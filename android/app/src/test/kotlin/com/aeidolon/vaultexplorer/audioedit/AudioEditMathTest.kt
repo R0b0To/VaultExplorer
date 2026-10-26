@@ -332,6 +332,73 @@ class AudioEditMathTest {
         assertEquals(255, acc.peaks[1].toInt() and 0xFF)
     }
 
+    // ── Decoding a long file in parallel ─────────────────────────────────
+
+    private val oneHourUs = 3_600_000_000L
+
+    @Test
+    fun parallelDecodeNeedsALongFileAnExactSeekingCodecAndSomeCores() {
+        val aac = AudioEditMath.MIME_AAC
+        assertEquals(4, AudioEditMath.parallelWorkersFor(aac, 3 * oneHourUs, 8))
+        assertEquals(3, AudioEditMath.parallelWorkersFor(aac, 3 * oneHourUs, 6))
+        assertEquals(1, AudioEditMath.parallelWorkersFor(aac, 3 * oneHourUs, 2)) // 1 worker is no parallelism
+        assertEquals(1, AudioEditMath.parallelWorkersFor(aac, 10L * 60_000_000L, 8)) // 10 minutes: not worth it
+        assertEquals(1, AudioEditMath.parallelWorkersFor(AudioEditMath.MIME_MP3, 3 * oneHourUs, 8))
+        assertEquals(1, AudioEditMath.parallelWorkersFor(AudioEditMath.MIME_RAW, 3 * oneHourUs, 8))
+        for (mime in listOf(AudioEditMath.MIME_OPUS, AudioEditMath.MIME_VORBIS, AudioEditMath.MIME_FLAC)) {
+            assertEquals(4, AudioEditMath.parallelWorkersFor(mime, oneHourUs, 8))
+        }
+    }
+
+    @Test
+    fun chunksStartOnBucketBoundariesAndCoverEverything() {
+        val pps = AudioEditMath.peaksPerSecondFor(3 * oneHourUs)
+        val perChunk = AudioEditMath.chunkBuckets(pps)
+        val total = AudioEditMath.bucketCountFor(3 * oneHourUs, pps)
+        assertTrue("per chunk $perChunk", perChunk in 1000..20_000)
+        val chunks = (total + perChunk - 1) / perChunk
+        assertTrue(chunks * perChunk >= total)
+        assertTrue((chunks - 1) * perChunk < total) // no empty chunk at the end
+    }
+
+    @Test
+    fun bucketStartsAndFramePositionsAgree() {
+        // Bucket 4600 of a 46 peaks/s file starts at 100 s, which at 44.1 kHz is frame 4,410,000.
+        assertEquals(100_000_000L, AudioEditMath.bucketStartUs(4600, 46.0))
+        assertEquals(4_410_000L, AudioEditMath.frameAtUs(100_000_000L, 44_100))
+        assertEquals(0L, AudioEditMath.frameAtUs(-5L, 44_100)) // a negative timestamp is not a position
+    }
+
+    @Test
+    fun accumulatorsInDifferentWindowsShareOneArrayWithoutTouchingEachOther() {
+        val shared = ByteArray(10)
+        val left = PeakAccumulator(10, 1.0, shared, firstBucket = 0, endBucket = 5)
+        val right = PeakAccumulator(10, 1.0, shared, firstBucket = 5, endBucket = 10)
+        for (frame in 0L until 10L) {
+            left.add(frame, 1.0f)   // loud everywhere, but may only write 0..4
+            right.add(frame, 0.5f)  // half as loud, may only write 5..9
+        }
+        assertArrayEquals(
+            byteArrayOf(-1, -1, -1, -1, -1, 128.toByte(), 128.toByte(), 128.toByte(), 128.toByte(), 128.toByte()),
+            shared,
+        )
+    }
+
+    @Test
+    fun aReaderCanStartInTheMiddleOfAFile() {
+        // Frames 8..15 land in buckets 2 and 3 (4 frames per bucket); a decode that starts at frame 8
+        // must put its peaks there, not at the start.
+        val acc = PeakAccumulator(bucketCount = 4, bucketsPerFrame = 0.25)
+        val reader = PcmPeakReader(acc).apply { channels = 1; encoding = AudioEditMath.PCM_16BIT }
+        reader.frameIndex = 8
+        reader.consume(sixteenBitMono(32767, 32767, 0, 0, 16384, 16384, 0, 0), 0, 16)
+        assertEquals(16L, reader.frameIndex)
+        assertEquals(0, acc.peaks[0].toInt() and 0xFF)
+        assertEquals(0, acc.peaks[1].toInt() and 0xFF)
+        assertEquals(255, acc.peaks[2].toInt() and 0xFF)
+        assertEquals(128, acc.peaks[3].toInt() and 0xFF)
+    }
+
     // ── Progressive waveform ─────────────────────────────────────────────
 
     @Test

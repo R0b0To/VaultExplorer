@@ -1,8 +1,6 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui';
-import 'package:path/path.dart' as p;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -40,7 +38,10 @@ import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/viewer/carousel_geometry.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_lock_controller.dart';
+import 'package:vaultexplorer/features/browser/viewer/media_playback_paths.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_session_bridge.dart';
+import 'package:vaultexplorer/features/browser/viewer/mini_player/mini_player_host.dart';
+import 'package:vaultexplorer/features/browser/viewer/pip/picture_in_picture_coordinator.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_prefetch_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/screen_brightness_bridge.dart';
@@ -97,6 +98,10 @@ class MediaViewerScreen extends ConsumerStatefulWidget {
   /// export, bookmark, and playlist actions must not be available.
   final bool isArchivePreview;
 
+  /// Set when the viewer is reopened from the mini player: the live player and
+  /// playlist it was showing, taken back so playback carries on uninterrupted.
+  final MiniPlayerSession? resumeSession;
+
   const MediaViewerScreen({
     super.key,
     required this.container,
@@ -112,6 +117,7 @@ class MediaViewerScreen extends ConsumerStatefulWidget {
     this.onCurrentFileChanged,
     this.onFileDeleted,
     this.isArchivePreview = false,
+    this.resumeSession,
   });
 
   bool get _isPreviewOnly => isArchivePreview;
@@ -198,6 +204,16 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   NativeVideoController? _lastListenedController;
   bool _wakelockEnabled = false;
   bool _lockedRouteDismissalScheduled = false;
+
+  /// Prepared in [_prepareMiniPlayerHandoff] when the person closes the viewer
+  /// with something playing and "keep playing after closing" allows it;
+  /// [dispose] gives it to [MiniPlayerHost] instead of releasing the player.
+  MiniPlayerSession? _miniPlayerHandoff;
+
+  /// The item whose already-running player this viewer took over from the mini
+  /// player, so [_activateCurrentMedia] doesn't seek it back to a saved
+  /// position.
+  String? _adoptedFile;
   int _transitionToken = 0;
   int _resumeFlowToken = 0;
   bool _resumeFlowStarted = false;
@@ -208,12 +224,11 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   Future<String> _resumePositionKey(String fileName) async {
     final cached = _resumePositionKeys[fileName];
     if (cached != null) return cached;
-    final identity = '${widget.container.uri}\u001f$fileName';
-    final digest = await ref
-        .read(vaultHashApiProvider)
-        .hashBytesSha256(Uint8List.fromList(utf8.encode(identity)));
-    if (digest.isEmpty) throw StateError('Could not derive playback key');
-    final key = 'media_resume_$digest';
+    final key = await mediaResumePositionKey(
+      ref.read(vaultHashApiProvider),
+      widget.container.uri,
+      fileName,
+    );
     _resumePositionKeys[fileName] = key;
     return key;
   }
@@ -240,10 +255,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     if (widget._isPreviewOnly) return;
     try {
       final key = await _resumePositionKey(fileName);
-      if (position <= const Duration(seconds: 3) ||
-          (duration != null &&
-              duration > Duration.zero &&
-              position >= duration - const Duration(seconds: 3))) {
+      if (!isResumePositionWorthKeeping(position, duration)) {
         await AppSecureStorage.instance.delete(key: key);
         _lastSavedPlaybackPositions.remove(fileName);
       } else {
@@ -447,19 +459,40 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       _onMediaSessionAction,
     );
 
-    _playlistController = PlaylistController(
-      container: widget.container,
-      fileIoApi: _fileIoApi,
-      initialMediaFiles: widget.mediaFiles,
-      initialIndex: widget.initialIndex,
-      startingFolder: widget.startingFolder,
-      mediaFilter: widget.mediaFilter,
-      sortBy: widget.sortBy,
-      sortAscending: widget.sortAscending,
-      pinnedPaths: widget.pinnedPaths,
-    );
+    MiniPlayerHost.instance.registerViewer();
+    // Reopened from the mini player, or opening the very item it is playing:
+    // take the running player over instead of starting another one.
+    final carried =
+        widget.resumeSession ??
+        (widget._isPreviewOnly ||
+                widget.initialIndex < 0 ||
+                widget.initialIndex >= widget.mediaFiles.length
+            ? null
+            : MiniPlayerHost.instance.takeMatching(
+                widget.container,
+                widget.mediaFiles[widget.initialIndex],
+              ));
+
+    _playlistController =
+        widget.resumeSession?.playlist ??
+        PlaylistController(
+          container: widget.container,
+          fileIoApi: _fileIoApi,
+          initialMediaFiles: widget.mediaFiles,
+          initialIndex: widget.initialIndex,
+          startingFolder: widget.startingFolder,
+          mediaFilter: widget.mediaFilter,
+          sortBy: widget.sortBy,
+          sortAscending: widget.sortAscending,
+          pinnedPaths: widget.pinnedPaths,
+        );
     _wasEmpty = _playlistController.isEmpty;
-    _playbackManager = VideoPlaybackManager();
+    _playbackManager = carried?.playbackManager ?? VideoPlaybackManager();
+    if (carried != null) {
+      _adoptedFile = _playbackManager.currentFileName;
+      // The player is already past its resume decision; don't run it again.
+      _resumeFlowStarted = true;
+    }
     _pageController = PageController(initialPage: widget.initialIndex);
     _listScrollController = ScrollController();
     _continuousTransformationController = TransformationController();
@@ -487,10 +520,14 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       _onCurrentMediaFileChanged,
     );
     _kickOffAspectRatioPreload();
+    if (carried != null) _onActiveVideoControllerChanged();
 
     _loadConfig();
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (carried != null && mounted) {
+        _sessionController.setPlaybackSpeed(carried.playbackSpeed);
+      }
       unawaited(_activateCurrentMedia());
       _startSlideshowTimerIfNeeded();
       await PlaybackThrottleController.initGate;
@@ -546,12 +583,56 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   /// preview never has a media session, so it ignores this.
   void _closeFromMediaSession() {
     if (widget._isPreviewOnly) return;
+    _miniPlayerHandoff = null;
     final route = ModalRoute.of(context);
     if (route == null || !route.isActive) return;
     final navigator = Navigator.of(context);
     // Dismiss anything opened on top of the viewer (a sheet, a dialog) first.
     navigator.popUntil((r) => identical(r, route));
     if (!route.isFirst) navigator.pop();
+  }
+
+  /// Called when the person closes the viewer (back button or gesture) --
+  /// never for closes the app forces (app lock, locked or detached container,
+  /// the media notification's Stop), which must always end playback. When
+  /// "keep playing after closing" allows it for what is playing, prepares the
+  /// hand-off that [dispose] completes: the live player goes to
+  /// [MiniPlayerHost] instead of being released.
+  void _prepareMiniPlayerHandoff() {
+    _miniPlayerHandoff = null;
+    if (widget._isPreviewOnly || _playlistController.isEmpty) return;
+    if (ref.read(mediaViewerLockProvider(widget.container.volId))) return;
+    final file = _playbackManager.currentFileName;
+    final controller = _playbackManager.activeController;
+    if (file == null || controller == null || controller.isDisposed) return;
+    // Mid-transition: the player isn't on the item the playlist points at.
+    if (file != _playlistController.currentFile) return;
+    final value = controller.value;
+    if (!value.isInitialized || value.hasError || !value.isPlaying) return;
+    final isVideo = MediaViewerConstants.isVideo(file);
+    if (!isVideo && !MediaViewerConstants.isAudio(file)) return;
+    final mode = ref
+        .read(fileManagerToolbarSettingsProvider(null))
+        .config
+        .mediaViewerToolbarConfig
+        .continuePlaybackMode;
+    if (!mode.keepsPlaying(isVideo: isVideo)) return;
+    _miniPlayerHandoff = MiniPlayerSession(
+      providers: ProviderScope.containerOf(context, listen: false),
+      container: widget.container,
+      playlist: _playlistController,
+      playbackManager: _playbackManager,
+      thumbnailQuality: widget.thumbnailQuality,
+      thumbnailCacheMode: widget.thumbnailCacheMode,
+      startingFolder: widget.startingFolder,
+      mediaFilter: widget.mediaFilter,
+      sortBy: widget.sortBy,
+      sortAscending: widget.sortAscending,
+      pinnedPaths: widget.pinnedPaths,
+      playbackMode: _videoPlaybackMode,
+      playbackSpeed: _playbackSpeed,
+      isMuted: _isMuted,
+    );
   }
 
   int _activateToken = 0;
@@ -568,7 +649,16 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     final token = ++_activateToken;
     final isVid = MediaViewerConstants.isVideo(file);
     final isAud = MediaViewerConstants.isAudio(file);
-    if (isVid || isAud) {
+    // The app has a single native player: let go of the mini player's before
+    // this viewer starts one of its own.
+    if ((isVid || isAud) && MiniPlayerHost.instance.needsRelease) {
+      await MiniPlayerHost.instance.closeAndWait();
+      if (!mounted || token != _activateToken) return;
+    }
+    final isAdopted = _adoptedFile != null && _adoptedFile == file;
+    if ((isVid || isAud) && !isAdopted) {
+      // An adopted player is already initialized, so nothing would ever
+      // release this gate again.
       PlaybackThrottleController.setInitializing();
     }
     await PlaybackThrottleController.setActive(isVid || isAud);
@@ -589,7 +679,8 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                 await _readResumePosition(file));
       final canResume =
           savedPosition != null && savedPosition >= const Duration(seconds: 5);
-      final shouldPreSeek = canResume && mode == ResumePlaybackMode.always;
+      final shouldPreSeek =
+          canResume && mode == ResumePlaybackMode.always && !isAdopted;
 
       unawaited(
         _playbackManager.activate(
@@ -600,15 +691,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
           // branch instead reads this as a real, absolute path straight
           // off disk, so it needs the full path rather than one relative
           // to the container root.
-          filePath: widget.container.isLocalStorage
-              ? (widget.container.isSafStorage
-                    ? (file.startsWith(widget.container.uri)
-                          ? file
-                          : '${widget.container.uri}/${file.replaceFirst(RegExp(r"^/+"), "")}')
-                    : (p.isAbsolute(file)
-                          ? file
-                          : p.join(widget.container.uri, file)))
-              : file,
+          filePath: nativePlaybackPathFor(widget.container, file),
           isLocalStorage: widget.container.isLocalStorage,
           // Wait until the position preference and any resume prompt have
           // been handled before starting audio/video output.
@@ -683,6 +766,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
 
   void _onContainerDetached(int volId) {
     if (!mounted || volId != widget.container.volId) return;
+    _miniPlayerHandoff = null;
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
@@ -879,11 +963,13 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
 
     if (controller == null) {
       _updateWakelock(false);
+      _syncPictureInPicture();
       return;
     }
 
     controller.addListener(_onControllerTickUpdate);
     _updateWakelock(controller.value.isPlaying);
+    _syncPictureInPicture();
     // Each playlist item gets its own native controller, which otherwise
     // starts at the platform's default volume -- reapply the persisted
     // mute state here so toggling mute stays in effect as the person
@@ -898,6 +984,31 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     _abLoopToast.value = null;
     _resumeFlowToken++;
     _resumeFlowStarted = false;
+    _adoptedFile = null;
+    _syncPictureInPicture();
+  }
+
+  /// Offers the playing video to Android's picture-in-picture window (when
+  /// the setting is on), or withdraws it for anything that isn't a video.
+  /// Idempotent: the coordinator ignores repeats.
+  void _syncPictureInPicture() {
+    if (!mounted) return;
+    final coordinator = PictureInPictureCoordinator.instance;
+    final file = _playbackManager.currentFileName;
+    final controller = _playbackManager.activeController;
+    if (file == null ||
+        controller == null ||
+        controller.isDisposed ||
+        !MediaViewerConstants.isVideo(file)) {
+      coordinator.detach(this);
+      return;
+    }
+    final enabled = ref
+        .read(fileManagerToolbarSettingsProvider(null))
+        .config
+        .mediaViewerToolbarConfig
+        .pictureInPictureEnabled;
+    coordinator.attach(this, controller, enabled: enabled);
   }
 
   void _onControllerTickUpdate() {
@@ -2802,6 +2913,8 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   }
 
   void _dismissRouteAfterContainerLock() {
+    // A locked vault must never leave a player behind.
+    _miniPlayerHandoff = null;
     if (_lockedRouteDismissalScheduled) return;
     _lockedRouteDismissalScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -2818,7 +2931,6 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   @override
   void dispose() {
     unawaited(_saveActivePlaybackPosition());
-    PlaybackThrottleController.setActive(false);
     unawaited(_mediaSessionSubscription!.cancel());
     _engineEvents.removeUsbContainerDetachedListener(_onContainerDetached);
     _playlistController.removeListener(_onPlaylistUpdate);
@@ -2847,7 +2959,19 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       _onContinuousTransformationChanged,
     );
     _continuousTransformationController.dispose();
-    _playbackManager.dispose();
+    // Closed with something playing and "keep playing after closing" on: the
+    // mini player takes the live player; otherwise it is released as always.
+    // Withdraw this viewer's video from the PiP window first; the mini player
+    // offers its own once it has adopted the player.
+    PictureInPictureCoordinator.instance.detach(this);
+    final handoff = _miniPlayerHandoff;
+    _miniPlayerHandoff = null;
+    final handedOff = handoff != null && MiniPlayerHost.instance.adopt(handoff);
+    if (!handedOff) {
+      PlaybackThrottleController.setActive(false);
+      _playbackManager.dispose();
+    }
+    MiniPlayerHost.instance.unregisterViewer();
     _swipePhysicsNotifier.dispose();
     _videoProgressNotifier.dispose();
     _abLoopNotifier.dispose();
@@ -3043,6 +3167,10 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
             next.config.mediaViewerToolbarConfig.swipeToSeekEnabled) {
           _updateSwipePhysics();
         }
+        if (previous?.config.mediaViewerToolbarConfig.pictureInPictureEnabled !=
+            next.config.mediaViewerToolbarConfig.pictureInPictureEnabled) {
+          _syncPictureInPicture();
+        }
         if (previous?.config.showMediaCarousel !=
             next.config.showMediaCarousel) {
           _sessionController.setEnableCarousel(next.config.showMediaCarousel);
@@ -3084,14 +3212,22 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     }
 
     return PopScope(
-      canPop: !_isEditingLayout,
+      // Always intercepted: the only things that reach this callback with
+      // didPop == false are the person's own back presses (maybePop), which
+      // is how a deliberate close is told apart from one the app forces with
+      // pop / popUntil / removeRoute (app lock, locked container, ...).
+      canPop: false,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && _isEditingLayout) {
+        if (didPop) return;
+        if (_isEditingLayout) {
           setState(() => _isEditingLayout = false);
           _updateSwipePhysics();
           _menuClosed();
           _startHideTimer();
+          return;
         }
+        _prepareMiniPlayerHandoff();
+        Navigator.of(context).pop();
       },
       child: AnnotatedRegion<SystemUiOverlayStyle>(
         value: AppSystemUI.transparentDark,

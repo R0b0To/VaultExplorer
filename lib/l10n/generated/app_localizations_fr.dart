@@ -8131,6 +8131,40 @@ class AppLocalizationsFr extends AppLocalizations {
   String get resumePlaybackResume => 'Reprendre';
 
   @override
+  String get continuePlaybackTitle => 'Continuer la lecture après la fermeture';
+
+  @override
+  String get continuePlaybackOff => 'Désactivé';
+
+  @override
+  String get continuePlaybackAudioOnly => 'Audio uniquement';
+
+  @override
+  String get continuePlaybackAudioAndVideo => 'Audio et vidéo';
+
+  @override
+  String get continuePlaybackOffDescription =>
+      'La fermeture de la visionneuse arrête la lecture';
+
+  @override
+  String get continuePlaybackAudioOnlyDescription =>
+      'Le son continue dans un mini-lecteur';
+
+  @override
+  String get continuePlaybackAudioAndVideoDescription =>
+      'Le son continue dans un mini-lecteur, la vidéo dans une fenêtre flottante';
+
+  @override
+  String get miniPlayerOpenTooltip => 'Ouvrir le lecteur';
+
+  @override
+  String get pictureInPictureTitle => 'Image dans l’image';
+
+  @override
+  String get pictureInPictureSubtitle =>
+      'La vidéo continue dans une petite fenêtre flottante en quittant l’application';
+
+  @override
   String get mediaControlsResetSuccess =>
       'Commandes multimédias réinitialisées par défaut';
 

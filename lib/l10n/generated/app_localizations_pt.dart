@@ -8073,6 +8073,40 @@ class AppLocalizationsPt extends AppLocalizations {
   String get resumePlaybackResume => 'Retomar';
 
   @override
+  String get continuePlaybackTitle => 'Continuar a reproduzir ao fechar';
+
+  @override
+  String get continuePlaybackOff => 'Desativado';
+
+  @override
+  String get continuePlaybackAudioOnly => 'Somente áudio';
+
+  @override
+  String get continuePlaybackAudioAndVideo => 'Áudio e vídeo';
+
+  @override
+  String get continuePlaybackOffDescription =>
+      'Fechar o visualizador interrompe a reprodução';
+
+  @override
+  String get continuePlaybackAudioOnlyDescription =>
+      'O áudio continua num miniplayer';
+
+  @override
+  String get continuePlaybackAudioAndVideoDescription =>
+      'O áudio continua num miniplayer e o vídeo numa janela flutuante';
+
+  @override
+  String get miniPlayerOpenTooltip => 'Abrir reprodutor';
+
+  @override
+  String get pictureInPictureTitle => 'Imagem em imagem';
+
+  @override
+  String get pictureInPictureSubtitle =>
+      'O vídeo continua numa pequena janela flutuante ao sair da app';
+
+  @override
   String get mediaControlsResetSuccess =>
       'Controles multimídia redefinidos para os padrões';
 

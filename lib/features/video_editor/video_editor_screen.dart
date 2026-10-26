@@ -26,6 +26,7 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
+import 'package:vaultexplorer/features/browser/viewer/mini_player/mini_player_host.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/editor_swipe_to_seek_area.dart';
 
 import 'models/edit_segment.dart';
@@ -201,6 +202,11 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
   Future<void> _load() async {
     final api = ref.read(vaultVideoEditApiProvider);
     try {
+      // The app has a single native player; the mini player lets go of it first.
+      if (MiniPlayerHost.instance.needsRelease) {
+        await MiniPlayerHost.instance.closeAndWait();
+        if (!mounted) return;
+      }
       await PlaybackThrottleController.setActive(true);
       if (!mounted) return;
 

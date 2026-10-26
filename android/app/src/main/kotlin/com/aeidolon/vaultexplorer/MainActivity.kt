@@ -410,6 +410,7 @@ open class MainActivity : FlutterFragmentActivity() {
     // without forcing one into existence.
     private val nativePlayerManagerLazy = lazy { com.aeidolon.vaultexplorer.engine.NativePlayerManager(this) }
     private val nativePlayerManager by nativePlayerManagerLazy
+    private val pipController = com.aeidolon.vaultexplorer.pip.PictureInPictureController(this)
     private val compositeHandlers = com.aeidolon.vaultexplorer.handlers.CompositeContainerHandlers(this, ioExecutor, nativeOps)
     private val videoEditHandlers = VideoEditHandlers(this, ioExecutor)
     private val audioEditHandlers = AudioEditHandlers(this, ioExecutor)
@@ -487,17 +488,32 @@ open class MainActivity : FlutterFragmentActivity() {
         // Screen off, another app in front, or the picker open: nothing is
         // visible, so only audio needs to keep playing.
         if (nativePlayerManagerLazy.isInitialized()) nativePlayerManager.setAppInBackground(true)
+        // Stopped from the PiP window: the person closed it.
+        pipController.onStop()
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        pipController.onUserLeaveHint()
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        pipController.onModeChanged(isInPictureInPictureMode)
     }
 
     override fun onPause() {
         super.onPause()
-        if (systemHandlers.userWantsSecureScreen) {
+        // Not while going into the PiP window: the curtain would blank the
+        // video the person asked to keep on screen. FLAG_SECURE still applies.
+        if (systemHandlers.userWantsSecureScreen && !pipController.keepsContentVisible) {
             privacyCurtain.show()
         }
     }
 
     override fun onResume() {
         super.onResume()
+        pipController.onResume()
         systemHandlers.setBackgroundProtectionActive(false)
         if (systemHandlers.userWantsSecureScreen) {
             privacyCurtain.armPendingReveal()
@@ -690,6 +706,8 @@ open class MainActivity : FlutterFragmentActivity() {
             com.aeidolon.vaultexplorer.pdf.JETPACK_PDF_VIEWER_VIEW_TYPE,
             com.aeidolon.vaultexplorer.pdf.JetpackPdfViewerViewFactory(this, flutterEngine.dartExecutor.binaryMessenger),
         )
+
+        pipController.attach(flutterEngine.dartExecutor.binaryMessenger)
 
         val playerChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.aeidolon.vaultexplorer/player")
         nativePlayerManager.methodChannel = playerChannel

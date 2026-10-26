@@ -8129,6 +8129,40 @@ class AppLocalizationsAr extends AppLocalizations {
   String get resumePlaybackResume => 'استئناف';
 
   @override
+  String get continuePlaybackTitle => 'متابعة التشغيل بعد الإغلاق';
+
+  @override
+  String get continuePlaybackOff => 'إيقاف';
+
+  @override
+  String get continuePlaybackAudioOnly => 'الصوت فقط';
+
+  @override
+  String get continuePlaybackAudioAndVideo => 'الصوت والفيديو';
+
+  @override
+  String get continuePlaybackOffDescription =>
+      'يؤدي إغلاق العارض إلى إيقاف التشغيل';
+
+  @override
+  String get continuePlaybackAudioOnlyDescription =>
+      'يستمر الصوت في مشغّل مصغّر';
+
+  @override
+  String get continuePlaybackAudioAndVideoDescription =>
+      'يستمر الصوت في مشغّل مصغّر والفيديو في نافذة عائمة';
+
+  @override
+  String get miniPlayerOpenTooltip => 'فتح المشغّل';
+
+  @override
+  String get pictureInPictureTitle => 'صورة داخل صورة';
+
+  @override
+  String get pictureInPictureSubtitle =>
+      'استمرار تشغيل الفيديو في نافذة صغيرة عائمة عند مغادرة التطبيق';
+
+  @override
   String get mediaControlsResetSuccess =>
       'تمت إعادة ضبط عناصر تحكم الوسائط إلى الإعدادات الافتراضية';
 

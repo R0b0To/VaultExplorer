@@ -9,6 +9,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
+import 'package:vaultexplorer/features/browser/viewer/mini_player/mini_player_host.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/editor_swipe_to_seek_area.dart';
 import 'package:vaultexplorer/features/image_editor/image_editor_screen.dart';
 import 'package:vaultexplorer/features/video_editor/models/edit_segment.dart';
@@ -129,6 +130,11 @@ class _CameraMediaReviewViewState extends ConsumerState<CameraMediaReviewView> {
   Future<void> _initVideoPlayer(String path) async {
     _videoController?.removeListener(_onVideoTick);
     _videoController?.dispose();
+    // The app has a single native player; the mini player lets go of it first.
+    if (MiniPlayerHost.instance.needsRelease) {
+      await MiniPlayerHost.instance.closeAndWait();
+      if (!mounted) return;
+    }
     final controller = NativeVideoController(
       volId: -1,
       filePath: path,

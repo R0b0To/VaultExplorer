@@ -8060,6 +8060,41 @@ class AppLocalizationsIt extends AppLocalizations {
   String get resumePlaybackResume => 'Riprendi';
 
   @override
+  String get continuePlaybackTitle =>
+      'Continua la riproduzione dopo la chiusura';
+
+  @override
+  String get continuePlaybackOff => 'Disattivato';
+
+  @override
+  String get continuePlaybackAudioOnly => 'Solo audio';
+
+  @override
+  String get continuePlaybackAudioAndVideo => 'Audio e video';
+
+  @override
+  String get continuePlaybackOffDescription =>
+      'Chiudendo il visualizzatore la riproduzione si interrompe';
+
+  @override
+  String get continuePlaybackAudioOnlyDescription =>
+      'Si continua ad ascoltare in un mini player';
+
+  @override
+  String get continuePlaybackAudioAndVideoDescription =>
+      'Audio in un mini player, video in una finestra mobile';
+
+  @override
+  String get miniPlayerOpenTooltip => 'Apri il player';
+
+  @override
+  String get pictureInPictureTitle => 'Picture-in-picture';
+
+  @override
+  String get pictureInPictureSubtitle =>
+      'Il video continua in una piccola finestra mobile quando si lascia l’app';
+
+  @override
   String get mediaControlsResetSuccess =>
       'Controlli multimediali ripristinati ai valori predefiniti';
 

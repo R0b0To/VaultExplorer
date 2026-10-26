@@ -10,6 +10,7 @@ import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
 import 'package:vaultexplorer/data/models/media_viewer_action.dart';
 import 'package:vaultexplorer/data/models/resume_playback_mode.dart';
+import 'package:vaultexplorer/data/models/continue_playback_mode.dart';
 import 'package:vaultexplorer/data/models/media_viewer_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/media_decoder_mode.dart';
 import 'package:vaultexplorer/data/models/audio_equalizer_settings.dart';
@@ -648,6 +649,20 @@ void applyImportedConfig(FileManagerToolbarConfig newConfig) {
   Future<void> setMediaViewerResumePlaybackMode(ResumePlaybackMode mode) {
     final updated = state.config.mediaViewerToolbarConfig.copyWith(
       resumePlaybackMode: mode,
+    );
+    return updateMediaViewerConfig(updated);
+  }
+
+  Future<void> setMediaViewerContinuePlaybackMode(ContinuePlaybackMode mode) {
+    final updated = state.config.mediaViewerToolbarConfig.copyWith(
+      continuePlaybackMode: mode,
+    );
+    return updateMediaViewerConfig(updated);
+  }
+
+  Future<void> setMediaViewerPictureInPictureEnabled(bool enabled) {
+    final updated = state.config.mediaViewerToolbarConfig.copyWith(
+      pictureInPictureEnabled: enabled,
     );
     return updateMediaViewerConfig(updated);
   }

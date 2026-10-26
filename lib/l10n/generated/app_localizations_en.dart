@@ -7939,6 +7939,40 @@ class AppLocalizationsEn extends AppLocalizations {
   String get resumePlaybackResume => 'Resume';
 
   @override
+  String get continuePlaybackTitle => 'Keep playing after closing';
+
+  @override
+  String get continuePlaybackOff => 'Off';
+
+  @override
+  String get continuePlaybackAudioOnly => 'Audio only';
+
+  @override
+  String get continuePlaybackAudioAndVideo => 'Audio and video';
+
+  @override
+  String get continuePlaybackOffDescription =>
+      'Closing the viewer stops playback';
+
+  @override
+  String get continuePlaybackAudioOnlyDescription =>
+      'Audio keeps playing in a mini player';
+
+  @override
+  String get continuePlaybackAudioAndVideoDescription =>
+      'Audio keeps playing in a mini player, video in a floating window';
+
+  @override
+  String get miniPlayerOpenTooltip => 'Open player';
+
+  @override
+  String get pictureInPictureTitle => 'Picture-in-picture';
+
+  @override
+  String get pictureInPictureSubtitle =>
+      'Keep video playing in a small floating window when you leave the app';
+
+  @override
   String get mediaControlsResetSuccess => 'Media controls reset to defaults';
 
   @override

@@ -8122,6 +8122,40 @@ class AppLocalizationsUk extends AppLocalizations {
   String get resumePlaybackResume => 'Відновити';
 
   @override
+  String get continuePlaybackTitle => 'Продовжувати відтворення після закриття';
+
+  @override
+  String get continuePlaybackOff => 'Вимкнено';
+
+  @override
+  String get continuePlaybackAudioOnly => 'Лише аудіо';
+
+  @override
+  String get continuePlaybackAudioAndVideo => 'Аудіо та відео';
+
+  @override
+  String get continuePlaybackOffDescription =>
+      'Закриття переглядача зупиняє відтворення';
+
+  @override
+  String get continuePlaybackAudioOnlyDescription =>
+      'Аудіо продовжує грати в міні-програвачі';
+
+  @override
+  String get continuePlaybackAudioAndVideoDescription =>
+      'Аудіо продовжує грати в міні-програвачі, відео — у плаваючому вікні';
+
+  @override
+  String get miniPlayerOpenTooltip => 'Відкрити програвач';
+
+  @override
+  String get pictureInPictureTitle => 'Картинка в картинці';
+
+  @override
+  String get pictureInPictureSubtitle =>
+      'Відео продовжує грати в маленькому плаваючому вікні після виходу із застосунку';
+
+  @override
   String get mediaControlsResetSuccess =>
       'Елементи керування мультимедіа скинуто до стандартних';
 

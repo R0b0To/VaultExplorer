@@ -42,6 +42,20 @@ object AudioWaveformExtractor {
 
     class CancelledException : Exception("Waveform cancelled")
 
+    /** One line in the log saying how long the decode took and where the time went. */
+    private fun logTiming(stats: WaveformStats, mime: String, durationUs: Long, wallStartNs: Long, complete: Boolean) {
+        val wallMs = (System.nanoTime() - wallStartNs) / 1_000_000L
+        val audioSeconds = durationUs / 1_000_000L
+        val speed = if (wallMs > 0) audioSeconds * 1000.0 / wallMs else 0.0
+        VeLog.i(TAG) {
+            "waveform timing: ${stats.mode}, $mime, ${audioSeconds}s of audio in ${wallMs}ms " +
+                "(${"%.0f".format(speed)}x realtime), complete=$complete; thread time: " +
+                "reading ${stats.extractorNs.get() / 1_000_000L}ms, " +
+                "waiting on decoder ${stats.waitNs.get() / 1_000_000L}ms, " +
+                "measuring peaks ${stats.peaksNs.get() / 1_000_000L}ms"
+        }
+    }
+
     class Waveform(
         /** One 0..255 level per slice, oldest first. */
         val peaks: ByteArray,
@@ -60,7 +74,10 @@ object AudioWaveformExtractor {
         isCancelled: () -> Boolean,
         onProgress: (Float) -> Unit,
         onPartial: (peaks: ByteArray, peaksPerSecond: Double, from: Int, to: Int) -> Unit = { _, _, _, _ -> },
+        cpuCount: Int = Runtime.getRuntime().availableProcessors(),
     ): Waveform {
+        val wallStartNs = System.nanoTime()
+        val stats = WaveformStats()
         val extractor = newExtractor()
         var codec: MediaCodec? = null
         var ffmpeg: FfmpegPcmDecoder? = null
@@ -109,6 +126,40 @@ object AudioWaveformExtractor {
                 reader.stride = AudioEditMath.strideFor(rate, peaksPerSecond)
             }
             applySampleRate(sampleRate)
+
+            // A long file with a codec that seeks exactly is decoded in pieces by several workers at once.
+            // If that gives up for any reason, everything it wrote is cleared and the plain front-to-back
+            // decode below runs instead; it is the reference behaviour and always correct.
+            val workers = if (isRaw || useFfmpeg) {
+                1
+            } else {
+                AudioEditMath.parallelWorkersFor(mime, durationUs, cpuCount)
+            }
+            if (workers > 1) {
+                stats.mode = "parallel x$workers"
+                val done = ParallelWaveformDecoder.decode(
+                    newExtractor = newExtractor,
+                    track = track,
+                    format = format,
+                    mime = mime,
+                    sampleRate = sampleRate,
+                    channels = reader.channels,
+                    peaksPerSecond = peaksPerSecond,
+                    peaks = accumulator.peaks,
+                    workers = workers,
+                    isCancelled = isCancelled,
+                    onProgress = onProgress,
+                    onPartial = onPartial,
+                    stats = stats,
+                )
+                if (done) {
+                    onProgress(1f)
+                    logTiming(stats, mime, durationUs, wallStartNs, complete = true)
+                    return Waveform(accumulator.peaks, peaksPerSecond, true)
+                }
+                java.util.Arrays.fill(accumulator.peaks, 0.toByte())
+                stats.mode = "sequential (parallel decode gave up)"
+            }
 
             extractor.selectTrack(track)
             val activeCodec = if (isRaw || useFfmpeg) {
@@ -210,7 +261,7 @@ object AudioWaveformExtractor {
                         if (outRate > 0 && outRate != sampleRate) applySampleRate(outRate)
                         val outChannels = activeFfmpeg.channelCount
                         if (outChannels > 0) reader.channels = outChannels
-                        reader.consume(data, offset, size)
+                        stats.time(stats.peaksNs) { reader.consume(data, offset, size) }
                         progressed = true
                     }
                     emitPartial()
@@ -229,6 +280,7 @@ object AudioWaveformExtractor {
                 while (extractor.sampleTrackIndex >= 0) {
                     if (isCancelled()) throw CancelledException()
                     var size = -1
+                    val readStart = System.nanoTime()
                     while (true) {
                         try {
                             buffer.clear()
@@ -239,11 +291,12 @@ object AudioWaveformExtractor {
                             buffer = ByteBuffer.allocateDirect(buffer.capacity() * 2)
                         }
                     }
+                    stats.extractorNs.addAndGet(System.nanoTime() - readStart)
                     if (size < 0) break
-                    reader.consume(buffer, 0, size)
+                    stats.time(stats.peaksNs) { reader.consume(buffer, 0, size) }
                     report(extractor.sampleTime)
                     emitPartial()
-                    extractor.advance()
+                    stats.time(stats.extractorNs) { extractor.advance() }
                 }
             } else {
                 val info = MediaCodec.BufferInfo()
@@ -257,7 +310,7 @@ object AudioWaveformExtractor {
                         outIndex >= 0 -> {
                             val outBuffer = activeCodec.getOutputBuffer(outIndex)
                             if (outBuffer != null && info.size > 0) {
-                                reader.consume(outBuffer, info.offset, info.size)
+                                stats.time(stats.peaksNs) { reader.consume(outBuffer, info.offset, info.size) }
                             }
                             activeCodec.releaseOutputBuffer(outIndex, false)
                             if ((info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) outputDone = true
@@ -286,7 +339,11 @@ object AudioWaveformExtractor {
                         val inIndex = activeCodec.dequeueInputBuffer(0L)
                         if (inIndex < 0) break
                         val inBuffer = activeCodec.getInputBuffer(inIndex)
-                        val size = if (inBuffer == null) -1 else extractor.readSampleData(inBuffer, 0)
+                        val size = if (inBuffer == null) {
+                            -1
+                        } else {
+                            stats.time(stats.extractorNs) { extractor.readSampleData(inBuffer, 0) }
+                        }
                         if (size < 0) {
                             activeCodec.queueInputBuffer(inIndex, 0, 0, 0L, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
                             inputDone = true
@@ -294,7 +351,7 @@ object AudioWaveformExtractor {
                             val ts = extractor.sampleTime
                             activeCodec.queueInputBuffer(inIndex, 0, size, ts, 0)
                             report(ts)
-                            extractor.advance()
+                            stats.time(stats.extractorNs) { extractor.advance() }
                         }
                         progressed = true
                     }
@@ -305,7 +362,9 @@ object AudioWaveformExtractor {
 
                     if (!progressed && !outputDone) {
                         // Nothing moved: wait on the decoder briefly rather than spin.
+                        val waitStart = System.nanoTime()
                         if (drainOne(DEQUEUE_TIMEOUT_US)) progressed = true
+                        stats.waitNs.addAndGet(System.nanoTime() - waitStart)
                         if (stalled(progressed)) {
                             complete = false
                             break
@@ -318,6 +377,7 @@ object AudioWaveformExtractor {
 
             VeLog.d(TAG) { "extract: ${accumulator.bucketCount} peaks, complete=$complete" }
             onProgress(1f)
+            logTiming(stats, mime, durationUs, wallStartNs, complete)
             return Waveform(accumulator.peaks, peaksPerSecond, complete)
         } finally {
             codec?.let {

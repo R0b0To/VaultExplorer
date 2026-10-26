@@ -18,6 +18,7 @@ import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/audio_editor/audio_edit_providers.dart';
 import 'package:vaultexplorer/features/audio_editor/models/audio_waveform.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
+import 'package:vaultexplorer/features/browser/viewer/mini_player/mini_player_host.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 
@@ -759,6 +760,11 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
 
   Future<void> _initPlayer(String path) async {
     await _disposePlayer();
+    // The app has a single native player; the mini player lets go of it first.
+    if (MiniPlayerHost.instance.needsRelease) {
+      await MiniPlayerHost.instance.closeAndWait();
+      if (!mounted) return;
+    }
     final player = NativeVideoController(
       volId: -1,
       filePath: path,

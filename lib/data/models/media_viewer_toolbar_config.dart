@@ -2,6 +2,7 @@ import 'media_viewer_action.dart';
 import 'scrub_preview_style.dart';
 import 'video_aspect_ratio_mode.dart';
 import 'resume_playback_mode.dart';
+import 'continue_playback_mode.dart';
 import 'thumbnail_generation_strategy.dart';
 import 'media_decoder_mode.dart';
 import 'audio_equalizer_settings.dart';
@@ -34,6 +35,14 @@ class MediaViewerToolbarConfig {
   final double holdToSpeedMultiplier;
   final bool swipeToSeekEnabled;
   final ResumePlaybackMode resumePlaybackMode;
+
+  /// Whether audio / video keeps playing (in the app-wide mini player) after
+  /// the viewer is closed. See [ContinuePlaybackMode].
+  final ContinuePlaybackMode continuePlaybackMode;
+
+  /// Whether a playing video carries on in Android's picture-in-picture
+  /// window when the app is left (home, recents, another app).
+  final bool pictureInPictureEnabled;
   final bool tapEdgesToNavigate;
 
   /// Double-tapping the middle of the video or audio screen plays or pauses
@@ -110,6 +119,8 @@ class MediaViewerToolbarConfig {
     this.holdToSpeedMultiplier = 2.0,
     this.swipeToSeekEnabled = false,
     this.resumePlaybackMode = ResumePlaybackMode.askEveryTime,
+    this.continuePlaybackMode = ContinuePlaybackMode.off,
+    this.pictureInPictureEnabled = false,
     this.tapEdgesToNavigate = true,
     this.doubleTapPlayPause = true,
     this.loopPlaylist = true,
@@ -152,6 +163,8 @@ class MediaViewerToolbarConfig {
     double? holdToSpeedMultiplier,
     bool? swipeToSeekEnabled,
     ResumePlaybackMode? resumePlaybackMode,
+    ContinuePlaybackMode? continuePlaybackMode,
+    bool? pictureInPictureEnabled,
     bool? tapEdgesToNavigate,
     bool? doubleTapPlayPause,
     bool? loopPlaylist,
@@ -198,6 +211,9 @@ class MediaViewerToolbarConfig {
     holdToSpeedMultiplier: holdToSpeedMultiplier ?? this.holdToSpeedMultiplier,
     swipeToSeekEnabled: swipeToSeekEnabled ?? this.swipeToSeekEnabled,
     resumePlaybackMode: resumePlaybackMode ?? this.resumePlaybackMode,
+    continuePlaybackMode: continuePlaybackMode ?? this.continuePlaybackMode,
+    pictureInPictureEnabled:
+        pictureInPictureEnabled ?? this.pictureInPictureEnabled,
     tapEdgesToNavigate: tapEdgesToNavigate ?? this.tapEdgesToNavigate,
     doubleTapPlayPause: doubleTapPlayPause ?? this.doubleTapPlayPause,
     loopPlaylist: loopPlaylist ?? this.loopPlaylist,
@@ -290,6 +306,8 @@ class MediaViewerToolbarConfig {
     'holdToSpeedMultiplier': holdToSpeedMultiplier,
     'swipeToSeekEnabled': swipeToSeekEnabled,
     'resumePlaybackMode': resumePlaybackMode.name,
+    'continuePlaybackMode': continuePlaybackMode.name,
+    'pictureInPictureEnabled': pictureInPictureEnabled,
     'tapEdgesToNavigate': tapEdgesToNavigate,
     'doubleTapPlayPause': doubleTapPlayPause,
     'loopPlaylist': loopPlaylist,
@@ -438,6 +456,10 @@ class MediaViewerToolbarConfig {
         (mode) => mode.name == j['resumePlaybackMode'],
         orElse: () => ResumePlaybackMode.askEveryTime,
       ),
+      continuePlaybackMode: ContinuePlaybackMode.fromJson(
+        j['continuePlaybackMode'] as String?,
+      ),
+      pictureInPictureEnabled: j['pictureInPictureEnabled'] as bool? ?? false,
       tapEdgesToNavigate: j['tapEdgesToNavigate'] as bool? ?? true,
       doubleTapPlayPause: j['doubleTapPlayPause'] as bool? ?? true,
       loopPlaylist: j['loopPlaylist'] as bool? ?? true,

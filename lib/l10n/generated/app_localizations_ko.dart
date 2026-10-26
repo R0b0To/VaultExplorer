@@ -7635,6 +7635,37 @@ class AppLocalizationsKo extends AppLocalizations {
   String get resumePlaybackResume => '이어보기';
 
   @override
+  String get continuePlaybackTitle => '닫은 후에도 계속 재생';
+
+  @override
+  String get continuePlaybackOff => '끔';
+
+  @override
+  String get continuePlaybackAudioOnly => '오디오만';
+
+  @override
+  String get continuePlaybackAudioAndVideo => '오디오 및 비디오';
+
+  @override
+  String get continuePlaybackOffDescription => '뷰어를 닫으면 재생이 중지됩니다';
+
+  @override
+  String get continuePlaybackAudioOnlyDescription => '오디오가 미니 플레이어에서 계속 재생됩니다';
+
+  @override
+  String get continuePlaybackAudioAndVideoDescription =>
+      '오디오는 미니 플레이어에서, 비디오는 플로팅 창에서 계속 재생됩니다';
+
+  @override
+  String get miniPlayerOpenTooltip => '플레이어 열기';
+
+  @override
+  String get pictureInPictureTitle => '화면 속 화면';
+
+  @override
+  String get pictureInPictureSubtitle => '앱을 나가도 작은 플로팅 창에서 동영상을 계속 재생합니다';
+
+  @override
   String get mediaControlsResetSuccess => '미디어 컨트롤을 기본값으로 초기화했습니다';
 
   @override

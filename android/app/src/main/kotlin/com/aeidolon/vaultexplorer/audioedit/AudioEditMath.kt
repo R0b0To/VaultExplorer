@@ -75,6 +75,7 @@ object AudioEditMath {
     const val MIME_MP3 = "audio/mpeg"
     const val MIME_OPUS = "audio/opus"
     const val MIME_VORBIS = "audio/vorbis"
+    const val MIME_FLAC = "audio/flac"
     const val MIME_RAW = "audio/raw"
     const val MIME_AC3 = "audio/ac3"
     const val MIME_EAC3 = "audio/eac3"
@@ -94,6 +95,43 @@ object AudioEditMath {
      */
     const val TARGET_PEAKS_PER_SECOND = 100.0
     const val MAX_PEAKS = 500_000
+
+    // ── Decoding a long file in parallel ─────────────────────────────────
+
+    /** Shorter files decode quickly enough in one piece, so they take the plain path. */
+    const val PARALLEL_MIN_DURATION_US = 20L * 60L * 1_000_000L
+    const val PARALLEL_MAX_WORKERS = 4
+
+    /** A worker takes the file in pieces of about this much audio, front to back. */
+    const val PARALLEL_CHUNK_SECONDS = 120.0
+
+    /**
+     * Codecs whose containers seek to an exact frame with exact timestamps (MP4/M4A, Ogg, FLAC), which a
+     * decode that starts mid-file relies on to put each peak at the right time. MP3 is left out on
+     * purpose: without a full seek table Android estimates a position from the bitrate, and the
+     * timestamp it then reports can be seconds off the real audio.
+     */
+    fun seeksExactly(mime: String): Boolean =
+        mime == MIME_AAC || mime == MIME_OPUS || mime == MIME_VORBIS || mime == MIME_FLAC
+
+    /** How many decoders to run side by side for this file: 1 means the plain front-to-back decode. */
+    fun parallelWorkersFor(mime: String, durationUs: Long, cpuCount: Int): Int {
+        if (!seeksExactly(mime) || durationUs < PARALLEL_MIN_DURATION_US) return 1
+        val workers = min(PARALLEL_MAX_WORKERS, cpuCount / 2)
+        return if (workers >= 2) workers else 1
+    }
+
+    /** Peaks per piece. Pieces start on a bucket boundary, so no two workers ever share a bucket. */
+    fun chunkBuckets(peaksPerSecond: Double): Int =
+        max(1, ceil(PARALLEL_CHUNK_SECONDS * peaksPerSecond).toInt())
+
+    /** Where bucket [bucket] begins in the audio, in microseconds. */
+    fun bucketStartUs(bucket: Int, peaksPerSecond: Double): Long =
+        (bucket / peaksPerSecond * 1_000_000.0).toLong()
+
+    /** The PCM frame a presentation time falls on, at [sampleRate]. */
+    fun frameAtUs(timeUs: Long, sampleRate: Int): Long =
+        Math.round(max(0L, timeUs) * sampleRate / 1_000_000.0)
 
     /** The coarse-bucket sampler looks at no fewer than this many frames per peak (see [strideFor]). */
     const val MIN_FRAMES_PER_PEAK_SAMPLED = 256
@@ -353,9 +391,15 @@ class StreamDurationMeter {
  * Keeps the loudest sample seen in each time bucket, as a 0..255 byte.
  * [bucketsPerFrame] is buckets per PCM frame (peaks-per-second / sample rate).
  */
-class PeakAccumulator(val bucketCount: Int, var bucketsPerFrame: Double) {
-    val peaks = ByteArray(bucketCount)
-
+class PeakAccumulator(
+    val bucketCount: Int,
+    var bucketsPerFrame: Double,
+    /** Where the levels go. Several accumulators can share one array, each in its own window. */
+    val peaks: ByteArray = ByteArray(bucketCount),
+    /** Only buckets in `[firstBucket, endBucket)` are written; frames outside that are ignored. */
+    val firstBucket: Int = 0,
+    val endBucket: Int = bucketCount,
+) {
     /**
      * How many buckets from the start are final after [framesConsumed] frames: every bucket before
      * the one the next frame falls in. The partial bucket at the frontier is left out, so a
@@ -367,7 +411,7 @@ class PeakAccumulator(val bucketCount: Int, var bucketsPerFrame: Double) {
     /** [amplitude] is the absolute sample level, 0..1 (the loudest channel of the frame). */
     fun add(frameIndex: Long, amplitude: Float) {
         val bucket = (frameIndex * bucketsPerFrame).toInt()
-        if (bucket < 0 || bucket >= bucketCount) return
+        if (bucket < firstBucket || bucket >= endBucket) return
         val level = (amplitude * 255f + 0.5f).toInt().coerceIn(0, 255)
         if (level > (peaks[bucket].toInt() and 0xFF)) peaks[bucket] = level.toByte()
     }
@@ -385,9 +429,11 @@ class PcmPeakReader(private val accumulator: PeakAccumulator) {
      */
     var stride: Int = 1
 
-    /** Index of the next PCM frame; also the number of frames consumed so far. */
+    /**
+     * Index of the next PCM frame: the number of frames consumed so far, or wherever the caller put it
+     * (a decode that starts in the middle of the file sets it from the first buffer's timestamp).
+     */
     var frameIndex: Long = 0L
-        private set
 
     fun consume(data: ByteBuffer, offset: Int, size: Int) {
         val bytesPerSample = AudioEditMath.bytesPerSample(encoding) ?: return

@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/app/app_navigator_key.dart';
 import 'package:vaultexplorer/core/theme/app_skin_settings_provider.dart';
 import 'package:vaultexplorer/data/models/app_skin_preset.dart';
+import 'package:vaultexplorer/features/browser/viewer/mini_player/mini_player_overlay.dart';
+import 'package:vaultexplorer/features/browser/viewer/pip/picture_in_picture_layer.dart';
 import 'package:vaultexplorer/features/skin_editor/skin_edit_session.dart';
 import 'package:vaultexplorer/features/skin_editor/skin_editor_overlay.dart';
 import 'package:vaultexplorer/core/api/quick_capture_api.dart';
@@ -122,7 +124,11 @@ class VaultExplorerApp extends ConsumerWidget {
                                     .resetAllAutoCloseTimers();
                               },
                               child: SkinEditorHost(
-                                child: child ?? const SizedBox.shrink(),
+                                child: PictureInPictureLayer(
+                                  child: MiniPlayerLayer(
+                                    child: child ?? const SizedBox.shrink(),
+                                  ),
+                                ),
                               ),
                             );
                           },

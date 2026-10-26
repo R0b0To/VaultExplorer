@@ -16,6 +16,7 @@ import com.aeidolon.vaultexplorer.audioedit.AudioWaveformExtractor
 import com.aeidolon.vaultexplorer.audioedit.LosslessAudioCutter
 import com.aeidolon.vaultexplorer.audioedit.Media3AudioSource
 import com.aeidolon.vaultexplorer.audioedit.PlatformAudioSource
+import com.aeidolon.vaultexplorer.audioedit.ReadAheadMediaDataSource
 import com.aeidolon.vaultexplorer.bridge.AudioEditProgressBridge
 import com.aeidolon.vaultexplorer.cancellation.AudioEditCancellation
 import com.aeidolon.vaultexplorer.container.ContainerFileSystem
@@ -82,12 +83,17 @@ class AudioEditHandlers(
      * here too. Once the platform extractor has failed for this file it isn't retried: the cutter
      * asks for a fresh source more than once (cut, then re-encode).
      */
-    private fun extractorFactory(volId: Int, filePath: String, isLocal: Boolean): () -> AudioSource {
+    private fun extractorFactory(
+        volId: Int,
+        filePath: String,
+        isLocal: Boolean,
+        readAhead: Boolean = false,
+    ): () -> AudioSource {
         var preferMedia3 = false
         return {
             var source: AudioSource? = null
             if (!preferMedia3) {
-                source = openPlatform(volId, filePath, isLocal)
+                source = openPlatform(volId, filePath, isLocal, readAhead)
                 if (source == null) preferMedia3 = true
             }
             source ?: openMedia3(volId, filePath, isLocal)
@@ -95,13 +101,16 @@ class AudioEditHandlers(
     }
 
     /** The platform extractor, or null when it can't open the file or sees no audio track in it. */
-    private fun openPlatform(volId: Int, filePath: String, isLocal: Boolean): AudioSource? {
+    private fun openPlatform(volId: Int, filePath: String, isLocal: Boolean, readAhead: Boolean): AudioSource? {
         val extractor = MediaExtractor()
         try {
             if (isLocal) {
                 extractor.setDataSource(filePath)
             } else {
-                extractor.setDataSource(ContainerMediaDataSource(activity, filePath, filePath, volId))
+                val vaultFile = ContainerMediaDataSource(activity, filePath, filePath, volId)
+                // A front-to-back scan (the waveform) reads in big blocks instead of one native call per
+                // audio frame; the other operations keep reading exactly as before.
+                extractor.setDataSource(if (readAhead) ReadAheadMediaDataSource(vaultFile) else vaultFile)
             }
             val source = PlatformAudioSource(extractor)
             if (LosslessAudioCutter.firstAudioTrack(source) < 0) {
@@ -215,7 +224,7 @@ class AudioEditHandlers(
         waveformExecutor.execute {
             try {
                 val waveform = AudioWaveformExtractor.extract(
-                    newExtractor = extractorFactory(volId, filePath, isLocal),
+                    newExtractor = extractorFactory(volId, filePath, isLocal, readAhead = true),
                     isCancelled = { AudioEditCancellation.isCancelled(opId) },
                     onProgress = { f -> AudioEditProgressBridge.reportProgress(opId, 0, 1, "waveform", f) },
                     onPartial = { peaks, peaksPerSecond, from, to ->

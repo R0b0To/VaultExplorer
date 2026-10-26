@@ -96,7 +96,9 @@ class MediaViewerTopBar extends StatelessWidget {
             action: MediaViewerAction.playPause,
             customIcon: Icons.arrow_back_rounded,
             customTooltip: context.l10n.backTooltip,
-            onTap: () => Navigator.pop(context),
+            // maybePop, not pop: the viewer tells a deliberate close (which
+            // may hand playback to the mini player) from a forced one by it.
+            onTap: () => Navigator.maybePop(context),
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(

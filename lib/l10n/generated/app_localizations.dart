@@ -13345,6 +13345,66 @@ abstract class AppLocalizations {
   /// **'Resume'**
   String get resumePlaybackResume;
 
+  /// Title of the setting that lets audio and video keep playing after the media viewer is closed
+  ///
+  /// In en, this message translates to:
+  /// **'Keep playing after closing'**
+  String get continuePlaybackTitle;
+
+  /// Option: closing the media viewer stops playback
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get continuePlaybackOff;
+
+  /// Option: only audio keeps playing after the media viewer is closed
+  ///
+  /// In en, this message translates to:
+  /// **'Audio only'**
+  String get continuePlaybackAudioOnly;
+
+  /// Option: audio and video keep playing after the media viewer is closed
+  ///
+  /// In en, this message translates to:
+  /// **'Audio and video'**
+  String get continuePlaybackAudioAndVideo;
+
+  /// Explains the Off option of the keep-playing setting
+  ///
+  /// In en, this message translates to:
+  /// **'Closing the viewer stops playback'**
+  String get continuePlaybackOffDescription;
+
+  /// Explains the Audio only option of the keep-playing setting
+  ///
+  /// In en, this message translates to:
+  /// **'Audio keeps playing in a mini player'**
+  String get continuePlaybackAudioOnlyDescription;
+
+  /// Explains the Audio and video option of the keep-playing setting
+  ///
+  /// In en, this message translates to:
+  /// **'Audio keeps playing in a mini player, video in a floating window'**
+  String get continuePlaybackAudioAndVideoDescription;
+
+  /// Tooltip for the mini player action that reopens the full media viewer
+  ///
+  /// In en, this message translates to:
+  /// **'Open player'**
+  String get miniPlayerOpenTooltip;
+
+  /// Title of the setting that keeps a playing video on screen in Android picture-in-picture when the app is left
+  ///
+  /// In en, this message translates to:
+  /// **'Picture-in-picture'**
+  String get pictureInPictureTitle;
+
+  /// Explains the picture-in-picture setting of the media viewer
+  ///
+  /// In en, this message translates to:
+  /// **'Keep video playing in a small floating window when you leave the app'**
+  String get pictureInPictureSubtitle;
+
   /// Snackbar message when media controls are reset to defaults
   ///
   /// In en, this message translates to:

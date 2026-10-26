@@ -10114,6 +10114,16 @@
   "resumePlaybackPromptMessage": "Continue from {position}?",
   "resumePlaybackStartOver": "Start over",
   "resumePlaybackResume": "Resume",
+  "continuePlaybackTitle": "Keep playing after closing",
+  "continuePlaybackOff": "Off",
+  "continuePlaybackAudioOnly": "Audio only",
+  "continuePlaybackAudioAndVideo": "Audio and video",
+  "continuePlaybackOffDescription": "Closing the viewer stops playback",
+  "continuePlaybackAudioOnlyDescription": "Audio keeps playing in a mini player",
+  "continuePlaybackAudioAndVideoDescription": "Audio keeps playing in a mini player, video in a floating window",
+  "miniPlayerOpenTooltip": "Open player",
+  "pictureInPictureTitle": "Picture-in-picture",
+  "pictureInPictureSubtitle": "Keep video playing in a small floating window when you leave the app",
   "@mediaPlayerControlsTitle": {
     "description": "Title for media player toolbar customization screen"
   },
@@ -12028,6 +12038,36 @@
   },
   "@resumePlaybackResume": {
     "description": "Action button to resume playback from the saved position"
+  },
+  "@continuePlaybackTitle": {
+    "description": "Title of the setting that lets audio and video keep playing after the media viewer is closed"
+  },
+  "@continuePlaybackOff": {
+    "description": "Option: closing the media viewer stops playback"
+  },
+  "@continuePlaybackAudioOnly": {
+    "description": "Option: only audio keeps playing after the media viewer is closed"
+  },
+  "@continuePlaybackAudioAndVideo": {
+    "description": "Option: audio and video keep playing after the media viewer is closed"
+  },
+  "@continuePlaybackOffDescription": {
+    "description": "Explains the Off option of the keep-playing setting"
+  },
+  "@continuePlaybackAudioOnlyDescription": {
+    "description": "Explains the Audio only option of the keep-playing setting"
+  },
+  "@continuePlaybackAudioAndVideoDescription": {
+    "description": "Explains the Audio and video option of the keep-playing setting"
+  },
+  "@miniPlayerOpenTooltip": {
+    "description": "Tooltip for the mini player action that reopens the full media viewer"
+  },
+  "@pictureInPictureTitle": {
+    "description": "Title of the setting that keeps a playing video on screen in Android picture-in-picture when the app is left"
+  },
+  "@pictureInPictureSubtitle": {
+    "description": "Explains the picture-in-picture setting of the media viewer"
   },
   "compositeArchiveCarrierBlockingWarning": "Remove the archive from this selection to continue. Archives cannot be used as composite carriers because adding a vault can corrupt them.",
   "@compositeArchiveCarrierBlockingWarning": {

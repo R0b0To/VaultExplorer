@@ -11,11 +11,22 @@ void main() {
 
   const channel = MethodChannel('com.aeidolon.vaultexplorer/engine');
   late ProviderContainer container;
+  // What the platform answers when asked to create a biometric sentinel key,
+  // and the ids it was asked to delete.
+  late bool sentinelCreationSucceeds;
+  late List<String> deletedSentinels;
 
   setUp(() {
+    sentinelCreationSucceeds = true;
+    deletedSentinels = [];
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
       switch (call.method) {
+        case 'biometricKeyCreate':
+          return sentinelCreationSucceeds;
+        case 'biometricKeyDelete':
+          deletedSentinels.add((call.arguments as Map)['id'] as String);
+          return true;
         case 'hasAllFilesAccess':
           return true;
         case 'getAndroidSdkInt':
@@ -146,6 +157,42 @@ void main() {
       state = container.read(appSettingsControllerProvider);
       expect(state.settings.masterUnlockMethod, MasterUnlockMethod.biometrics);
       expect(state.settings.masterPatternHash, isNull);
+    });
+
+    test('setMasterUnlockMethod(biometrics) does not switch when the '
+        'biometric sentinel key cannot be created', () async {
+      sentinelCreationSucceeds = false;
+      final subscription = container.listen(appSettingsControllerProvider, (_, _) {});
+      addTearDown(subscription.close);
+      final controller = container.read(appSettingsControllerProvider.notifier);
+      await controller.load();
+
+      final changed = await controller.setMasterUnlockMethod(
+        MasterUnlockMethod.biometrics,
+      );
+
+      expect(changed, isFalse);
+      expect(
+        container.read(appSettingsControllerProvider).settings.masterUnlockMethod,
+        isNot(MasterUnlockMethod.biometrics),
+      );
+    });
+
+    test('leaving biometrics deletes the master biometric sentinel key', () async {
+      final subscription = container.listen(appSettingsControllerProvider, (_, _) {});
+      addTearDown(subscription.close);
+      final controller = container.read(appSettingsControllerProvider.notifier);
+      await controller.load();
+
+      expect(
+        await controller.setMasterUnlockMethod(MasterUnlockMethod.biometrics),
+        isTrue,
+      );
+      expect(deletedSentinels, isEmpty);
+
+      await controller.setMasterUnlockMethod(MasterUnlockMethod.password);
+
+      expect(deletedSentinels, ['master']);
     });
 
     test('setMasterUnlockMethod is a no-op when the target already matches '

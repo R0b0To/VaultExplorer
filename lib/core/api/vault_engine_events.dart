@@ -5,6 +5,7 @@
 // exactly the "one native MethodCallHandler for the process lifetime"
 // behaviour the old static singleton had, without a hand-rolled singleton.
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/services/cache_coordinator.dart';
@@ -232,6 +233,15 @@ class VaultEngineEvents {
   void removeVideoEditProgressListener(
     void Function(VideoEditProgress progress) listener,
   ) => _videoEditProgressRegistry.remove(listener);
+
+  final ListenerRegistry<AudioWaveformChunk> _audioWaveformChunkRegistry =
+      ListenerRegistry<AudioWaveformChunk>();
+  void addAudioWaveformChunkListener(
+    void Function(AudioWaveformChunk chunk) listener,
+  ) => _audioWaveformChunkRegistry.add(listener);
+  void removeAudioWaveformChunkListener(
+    void Function(AudioWaveformChunk chunk) listener,
+  ) => _audioWaveformChunkRegistry.remove(listener);
 
   final ListenerRegistry<AudioEditProgress> _audioEditProgressRegistry =
       ListenerRegistry<AudioEditProgress>();
@@ -568,6 +578,26 @@ class VaultEngineEvents {
             outputCount: outputCount,
             phase: phase,
             fraction: fraction,
+          ));
+        }
+      } else if (call.method == 'onAudioWaveformChunk') {
+        final args = call.arguments as Map<Object?, Object?>;
+        final opId = (args['opId'] as num?)?.toInt();
+        final start = (args['start'] as num?)?.toInt();
+        final total = (args['total'] as num?)?.toInt();
+        final peaksPerSecond = (args['peaksPerSecond'] as num?)?.toDouble();
+        final peaks = args['peaks'];
+        if (opId != null &&
+            start != null &&
+            total != null &&
+            peaksPerSecond != null &&
+            peaks is Uint8List) {
+          _audioWaveformChunkRegistry.notify((
+            opId: opId,
+            start: start,
+            total: total,
+            peaksPerSecond: peaksPerSecond,
+            peaks: peaks,
           ));
         }
       } else if (call.method == 'onCopyProgress') {

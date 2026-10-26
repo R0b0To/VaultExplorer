@@ -69,8 +69,9 @@ class AudioWaveformResult {
   final Uint8List peaks;
   final double peaksPerSecond;
 
-  /// False when the decode hit its time budget (a very long file) before the
-  /// end; the rest of the timeline is then drawn flat.
+  /// False when the decoder stalled before the end of the file; the rest of
+  /// the timeline is then drawn flat. (There is no time limit any more: a long
+  /// file is decoded to the end, however many minutes that takes.)
   final bool complete;
 
   const AudioWaveformResult({

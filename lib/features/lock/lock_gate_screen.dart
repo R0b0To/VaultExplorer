@@ -90,6 +90,18 @@ class _LockGateScreenState extends ConsumerState<LockGateScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(lockGateProvider);
     ref.listen<LockGateState>(lockGateProvider, (previous, next) {
+      // The gate switched biometric unlock off before it was ever shown (the
+      // device's biometrics changed); say why it is asking for the password.
+      if (next.biometricsChanged && !(previous?.biometricsChanged ?? false)) {
+        final l10n = context.l10n;
+        Future<void>.microtask(() {
+          if (mounted) {
+            ref
+                .read(lockGateProvider.notifier)
+                .showBiometricsChangedNotice(l10n);
+          }
+        });
+      }
       if (next.decoyNavigateTick > (previous?.decoyNavigateTick ?? 0)) {
         final container = next.decoyContainer;
         if (container != null) _goToDecoyContainer(container);

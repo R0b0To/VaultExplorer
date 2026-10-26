@@ -6,6 +6,7 @@ import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
+import 'package:vaultexplorer/data/services/biometric_enrollment_guard.dart';
 import 'package:vaultexplorer/data/services/password_hasher.dart';
 import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
@@ -252,15 +253,27 @@ class AppSettingsController extends _$AppSettingsController {
   /// [ContainerRepository]'s behaviour of dropping a container's unused
   /// unlock credential whenever its [ContainerUnlockMethod] changes, so no
   /// stale hash lingers in the Keystore for a method that's no longer active.
-  Future<void> setMasterUnlockMethod(MasterUnlockMethod method) async {
-    if (method == state.settings.masterUnlockMethod) return;
+  ///
+  /// Choosing biometrics first sets up the sentinel key that lets the gate
+  /// notice a later fingerprint/face enrollment (see
+  /// [BiometricEnrollmentGuard]). Returns false, changing nothing, when
+  /// Android refuses to create it (no biometric enrolled, no secure lock
+  /// screen); true otherwise.
+  Future<bool> setMasterUnlockMethod(MasterUnlockMethod method) async {
+    if (method == state.settings.masterUnlockMethod) return true;
+    if (method == MasterUnlockMethod.biometrics &&
+        !await ref.read(biometricEnrollmentGuardProvider).enableMaster()) {
+      return false;
+    }
+    if (!ref.mounted) return false;
     await _clearHashesExcept(method);
-    if (!ref.mounted) return;
+    if (!ref.mounted) return false;
     await ref
         .read(appSettingsServiceProvider)
         .setMasterUnlockMethod(state.settings, method);
-    if (!ref.mounted) return;
+    if (!ref.mounted) return false;
     state = state._copy();
+    return true;
   }
 
   /// Wipes any pattern/PIN hash that doesn't belong to [keep], so at most
@@ -275,6 +288,12 @@ class AppSettingsController extends _$AppSettingsController {
   /// asking for a new one.
   Future<void> _clearHashesExcept(MasterUnlockMethod keep) async {
     final service = ref.read(appSettingsServiceProvider);
+    // The biometric sentinel belongs to the biometric method too.
+    if (keep != MasterUnlockMethod.biometrics &&
+        state.settings.masterUnlockMethod == MasterUnlockMethod.biometrics) {
+      await ref.read(biometricEnrollmentGuardProvider).forgetMaster();
+      if (!ref.mounted) return;
+    }
     if (keep != MasterUnlockMethod.pattern &&
         state.settings.masterPatternHash != null) {
       await service.clearMasterPattern(state.settings);

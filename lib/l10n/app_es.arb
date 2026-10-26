@@ -352,6 +352,7 @@
   "failedToHashPassword": "Error al aplicar hash a la contraseña — inténtalo de nuevo",
   "languageLabel": "Idioma",
   "biometricNotAvailable": "La biometría no está disponible en este dispositivo",
+  "biometricsChangedFallbackMessage": "La biometría de tu dispositivo cambió, así que se desactivó el desbloqueo biométrico. Usa tu contraseña.",
   "unlockVaultExplorerReason": "Desbloquear VaultExplorer",
   "biometricErrorWithCode": "Error biométrico: {code}",
   "tooManyFailedAttempts": "Demasiados intentos fallidos. Vuelve a intentarlo en {seconds, plural, =1{1 segundo} other{{seconds} segundos}}.",

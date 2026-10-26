@@ -1338,6 +1338,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get biometricNotAvailable => 'البصمة الحيوية غير متاحة على هذا الجهاز';
 
   @override
+  String get biometricsChangedFallbackMessage =>
+      'تغيّرت البيانات الحيوية للجهاز، لذلك تم إيقاف فتح القفل بالبصمة. استخدم كلمة المرور.';
+
+  @override
   String get unlockVaultExplorerReason => 'فتح قفل VaultExplorer';
 
   @override

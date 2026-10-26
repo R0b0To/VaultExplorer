@@ -352,6 +352,7 @@
   "failedToHashPassword": "비밀번호 해시 생성에 실패했습니다 — 다시 시도해 주세요",
   "languageLabel": "언어",
   "biometricNotAvailable": "이 기기에서는 생체 인식을 사용할 수 없습니다",
+  "biometricsChangedFallbackMessage": "기기의 생체 정보가 변경되어 생체 인식 잠금 해제가 꺼졌습니다. 비밀번호를 사용하세요.",
   "unlockVaultExplorerReason": "VaultExplorer 잠금 해제",
   "biometricErrorWithCode": "생체 인식 오류: {code}",
   "tooManyFailedAttempts": "실패 횟수가 너무 많습니다. {seconds, plural, other{{seconds}초}} 후 다시 시도하세요.",

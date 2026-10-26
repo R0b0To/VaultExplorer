@@ -14,6 +14,7 @@ import 'package:vaultexplorer/core/utils/sensitive_clipboard.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
 import 'package:vaultexplorer/data/models/app_skin_preset.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
+import 'package:vaultexplorer/data/services/biometric_enrollment_guard.dart';
 import 'package:vaultexplorer/data/services/password_hasher.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/lock/duress_settings_service.dart';
@@ -774,7 +775,16 @@ class _SecuritySettingsScreenState
         return;
       }
       if (!mounted) return;
-      await controller.setMasterUnlockMethod(method);
+      if (!await controller.setMasterUnlockMethod(method)) {
+        if (mounted) {
+          showAppSnackBar(
+            context,
+            message: context.l10n.biometricNotAvailable,
+            tone: AppBannerTone.error,
+          );
+        }
+        return;
+      }
       _recentlyCreatedMasterPassword = false;
       return;
     }
@@ -809,6 +819,36 @@ class _SecuritySettingsScreenState
     _recentlyCreatedMasterPassword = false;
   }
 
+  /// Whether the master lock's biometric unlock may still be used. When the
+  /// device's biometrics changed it has just been switched back to the master
+  /// password: reload so the screen shows that, say why, and refuse.
+  Future<bool> _masterBiometricsStillTrusted() async {
+    final check = await ref
+        .read(biometricEnrollmentGuardProvider)
+        .checkMaster();
+    if (!mounted) return false;
+    switch (check) {
+      case BiometricGuardResult.ok:
+        return true;
+      case BiometricGuardResult.reverted:
+        await ref.read(appSettingsControllerProvider.notifier).load();
+        if (!mounted) return false;
+        showAppSnackBar(
+          context,
+          message: context.l10n.biometricsChangedFallbackMessage,
+          tone: AppBannerTone.warning,
+        );
+        return false;
+      case BiometricGuardResult.unavailable:
+        showAppSnackBar(
+          context,
+          message: context.l10n.biometricNotAvailable,
+          tone: AppBannerTone.error,
+        );
+        return false;
+    }
+  }
+
   Future<bool> _verifyCurrentUnlockCredential(
     AppSettingsViewState state,
   ) async {
@@ -821,11 +861,16 @@ class _SecuritySettingsScreenState
         );
       case MasterUnlockMethod.biometrics:
         try {
-          return await _localAuth.authenticate(
+          // This prompt guards changing or removing the master lock, so a
+          // biometric enrolled after biometric unlock was set up must not
+          // pass it.
+          if (!await _masterBiometricsStillTrusted()) return false;
+          final ok = await _localAuth.authenticate(
             localizedReason: context.l10n.authenticateToModifySettingsPrompt,
             biometricOnly: true,
             persistAcrossBackgrounding: true,
           );
+          return ok && await _masterBiometricsStillTrusted();
         } catch (e) {
           VeLog.w('SecuritySettingsScreen', 'Biometric verification failed', e);
           return false;

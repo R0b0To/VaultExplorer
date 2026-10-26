@@ -1296,6 +1296,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get biometricNotAvailable => 'Biometric not available on this device';
 
   @override
+  String get biometricsChangedFallbackMessage =>
+      'Your device\'s biometrics changed, so biometric unlock was turned off. Use your password.';
+
+  @override
   String get unlockVaultExplorerReason => 'Unlock VaultExplorer';
 
   @override

@@ -1727,6 +1727,10 @@
   "@biometricNotAvailable": {
     "description": "Error shown when biometric auth is requested but unsupported"
   },
+  "biometricsChangedFallbackMessage": "Your device's biometrics changed, so biometric unlock was turned off. Use your password.",
+  "@biometricsChangedFallbackMessage": {
+    "description": "Shown when biometric unlock was switched off because the device's enrolled biometrics changed"
+  },
   "unlockVaultExplorerReason": "Unlock VaultExplorer",
   "@unlockVaultExplorerReason": {
     "description": "Reason string shown by the OS biometric prompt"

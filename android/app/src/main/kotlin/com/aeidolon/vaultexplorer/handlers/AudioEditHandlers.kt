@@ -27,6 +27,7 @@ import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 /**
  * Audio Editor (trim / cut / merge, plus the waveform) -- the native half of
@@ -57,6 +58,20 @@ class AudioEditHandlers(
         const val TEMP_PREFIX = "vx_vid_aud_cut_"
         const val TEMP_SUFFIX = ".mp4"
         const val COPY_BUFFER = 256 * 1024
+    }
+
+    /**
+     * The waveform decode gets a thread of its own. It is no longer cut off after a minute, so on a
+     * multi-hour file it can run for many minutes, and parking that on the shared [ioExecutor] (four
+     * threads for everything: unlocking, copying, exporting...) would starve other work. One thread is
+     * enough: the editor asks for one waveform at a time, and leaving it cancels the decode. Daemon and
+     * slightly below normal priority, so it never competes with the UI or playback for the CPU.
+     */
+    private val waveformExecutor: ExecutorService = Executors.newSingleThreadExecutor { r ->
+        Thread(r, "AudioWaveform").apply {
+            isDaemon = true
+            priority = Thread.NORM_PRIORITY - 1
+        }
     }
 
     /**
@@ -183,8 +198,9 @@ class AudioEditHandlers(
 
     /**
      * Args: `volId`, `filePath`, `isLocalStorage`, `opId`. Progress arrives as
-     * `onAudioEditProgress` events with phase `waveform`; `cancelAudioEdit`
-     * with the same opId stops the decode early.
+     * `onAudioEditProgress` events with phase `waveform`, and the finished part of the
+     * waveform as `onAudioWaveformChunk` events while the decode runs (the reply carries the
+     * whole thing at the end); `cancelAudioEdit` with the same opId stops the decode early.
      */
     fun handleWaveform(call: MethodCall, result: MethodChannel.Result) {
         val volId = call.argument<Number>("volId")?.toInt()
@@ -196,12 +212,18 @@ class AudioEditHandlers(
             return
         }
 
-        ioExecutor.execute {
+        waveformExecutor.execute {
             try {
                 val waveform = AudioWaveformExtractor.extract(
                     newExtractor = extractorFactory(volId, filePath, isLocal),
                     isCancelled = { AudioEditCancellation.isCancelled(opId) },
                     onProgress = { f -> AudioEditProgressBridge.reportProgress(opId, 0, 1, "waveform", f) },
+                    onPartial = { peaks, peaksPerSecond, from, to ->
+                        // A copy: the decoder keeps writing into `peaks` while the message is in flight.
+                        AudioEditProgressBridge.reportWaveformChunk(
+                            opId, from, peaks.size, peaksPerSecond, peaks.copyOfRange(from, to),
+                        )
+                    },
                 )
                 val map = hashMapOf<String, Any?>(
                     "peaks" to waveform.peaks,

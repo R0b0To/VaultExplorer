@@ -12,6 +12,7 @@ import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
+import 'package:vaultexplorer/data/services/biometric_enrollment_guard.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
 import 'package:vaultexplorer/features/lock/widgets/pin_lock_view.dart';
@@ -1076,11 +1077,44 @@ class UnlockController extends _$UnlockController {
     }
   }
 
+  /// Whether biometric unlock may still be used for [uri]: false after the
+  /// device's biometrics changed (the vault has then just been put back on a
+  /// manual password) or when that could not be determined. Either way the
+  /// password UI is shown and the saved credentials are not touched.
+  Future<bool> _biometricsAllowed(String uri, AppLocalizations l10n) async {
+    BiometricGuardResult check;
+    try {
+      check = await ref.read(biometricEnrollmentGuardProvider).checkVault(uri);
+    } catch (e) {
+      VeLog.e('UnlockController', 'Biometric enrollment check failed', e);
+      check = BiometricGuardResult.unavailable;
+    }
+    if (!ref.mounted) return false;
+    switch (check) {
+      case BiometricGuardResult.ok:
+        return true;
+      case BiometricGuardResult.reverted:
+        state = state._copy(
+          unlockMethod: ContainerUnlockMethod.password,
+          showPasswordFallback: true,
+          error: l10n.biometricsChangedFallbackMessage,
+        );
+        return false;
+      case BiometricGuardResult.unavailable:
+        state = state._copy(
+          error: l10n.biometricNotAvailable,
+          showPasswordFallback: true,
+        );
+        return false;
+    }
+  }
+
   Future<void> tryBiometric(AppLocalizations l10n) async {
     if (params.initialUri == null) return;
     if (state.isAuthenticating) return;
     try {
       state = state._copy(isAuthenticating: true);
+      if (!await _biometricsAllowed(params.initialUri!, l10n)) return;
       final localAuth = LocalAuthentication();
       final canCheck = await localAuth.canCheckBiometrics;
       final isSupported = await localAuth.isDeviceSupported();
@@ -1100,7 +1134,11 @@ class UnlockController extends _$UnlockController {
         biometricOnly: false,
         persistAcrossBackgrounding: true,
       );
-      if (ok && ref.mounted) {
+      // Checked again after the prompt: saved credentials are only released
+      // while the biometrics are still the ones this vault was set up with.
+      if (ok &&
+          ref.mounted &&
+          await _biometricsAllowed(params.initialUri!, l10n)) {
         final uri = params.initialUri!;
         await _cachedKeyThenSavedCredentials(
           uri: uri,

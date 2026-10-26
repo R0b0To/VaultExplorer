@@ -36,4 +36,27 @@ object AudioEditProgressBridge {
             )
         }
     }
+
+    /**
+     * A finished stretch of the waveform, sent while the file is still being decoded so the editor can
+     * draw it growing. Event name: `"onAudioWaveformChunk"`. [peaks] holds peaks `[start, start + size)`
+     * of a final array of [total] peaks, [peaksPerSecond] of them per second. The caller passes a copy:
+     * the decoder keeps writing into its own array.
+     */
+    @JvmStatic
+    fun reportWaveformChunk(opId: Int, start: Int, total: Int, peaksPerSecond: Double, peaks: ByteArray) {
+        val ch = channel ?: return
+        mainHandler.post {
+            ch.invokeMethod(
+                "onAudioWaveformChunk",
+                mapOf(
+                    "opId" to opId,
+                    "start" to start,
+                    "total" to total,
+                    "peaksPerSecond" to peaksPerSecond,
+                    "peaks" to peaks,
+                ),
+            )
+        }
+    }
 }

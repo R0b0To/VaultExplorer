@@ -45,6 +45,7 @@ import com.aeidolon.vaultexplorer.saf.MirrorPushEvents
 import com.aeidolon.vaultexplorer.handlers.AppSettingsFileHandlers
 import com.aeidolon.vaultexplorer.handlers.BackgroundServiceHandlers
 import com.aeidolon.vaultexplorer.handlers.CameraRecordingServiceHandlers
+import com.aeidolon.vaultexplorer.handlers.BiometricKeyHandlers
 import com.aeidolon.vaultexplorer.handlers.DerivedKeyHandlers
 import com.aeidolon.vaultexplorer.handlers.DisguiseModeHandlers
 import com.aeidolon.vaultexplorer.handlers.FileOperationHandlers
@@ -189,6 +190,9 @@ private object ChannelMethods {
     const val SET_DERIVED_KEY_EXPIRY    = "setDerivedKeyExpiry"
     const val GET_DERIVED_KEY_EXPIRY    = "getDerivedKeyExpiry"
     const val PURGE_EXPIRED_DERIVED_KEYS = "purgeExpiredDerivedKeys"
+    const val BIOMETRIC_KEY_CREATE      = "biometricKeyCreate"
+    const val BIOMETRIC_KEY_STATUS      = "biometricKeyStatus"
+    const val BIOMETRIC_KEY_DELETE      = "biometricKeyDelete"
     const val WRITE_FILE_CHUNK          = "writeFileChunk"
     const val BEGIN_BATCH_WRITE         = "beginBatchWrite"
     const val END_BATCH_WRITE           = "endBatchWrite"
@@ -372,6 +376,7 @@ open class MainActivity : FlutterFragmentActivity() {
     private val pendingResult = PendingActivityResult()
     private val nativeOps = NativeOpSupport(this, ioExecutor)
     private val derivedKeyHandlers = DerivedKeyHandlers(this, ioExecutor, nativeOps)
+    private val biometricKeyHandlers = BiometricKeyHandlers(this, ioExecutor)
     private val usbHandlers = UsbContainerHandlers(this, ACTION_USB_PERMISSION, ioExecutor, nativeOps, derivedKeyHandlers)
     private val vaultPickerHandlers = VaultPickerHandlers(this, pendingResult, ioExecutor)
     private val vaultCreationHandlers = VaultCreationHandlers(this, pendingResult, ioExecutor, nativeOps)
@@ -1095,6 +1100,9 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.SET_DERIVED_KEY_EXPIRY -> derivedKeyHandlers.handleSetDerivedKeyExpiry(call, result)
                 ChannelMethods.GET_DERIVED_KEY_EXPIRY -> derivedKeyHandlers.handleGetDerivedKeyExpiry(call, result)
                 ChannelMethods.PURGE_EXPIRED_DERIVED_KEYS -> derivedKeyHandlers.handlePurgeExpiredDerivedKeys(call, result)
+                ChannelMethods.BIOMETRIC_KEY_CREATE -> biometricKeyHandlers.handleCreate(call, result)
+                ChannelMethods.BIOMETRIC_KEY_STATUS -> biometricKeyHandlers.handleStatus(call, result)
+                ChannelMethods.BIOMETRIC_KEY_DELETE -> biometricKeyHandlers.handleDelete(call, result)
                 ChannelMethods.HASH_PASSWORD -> derivedKeyHandlers.handleHashPassword(call, result)
                 ChannelMethods.HASH_PASSWORD_SHA256 -> derivedKeyHandlers.handleHashPasswordSha256(call, result)
                 ChannelMethods.AES_GCM_ENCRYPT -> derivedKeyHandlers.handleAesGcmEncrypt(call, result)

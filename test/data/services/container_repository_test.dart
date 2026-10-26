@@ -22,6 +22,13 @@ class _FakePathProviderPlatform extends PathProviderPlatform
 
 class _FakeCryptoApi implements VaultCryptoApi {
   final List<String> clearedPaths = [];
+  final List<String> deletedBiometricIds = [];
+
+  @override
+  Future<bool> deleteBiometricKey(String id) async {
+    deletedBiometricIds.add(id);
+    return true;
+  }
 
   @override
   Future<bool> clearDerivedKey(String filePath, {bool removeExpiry = false}) async {
@@ -672,6 +679,98 @@ void main() {
     test('resetting when no vault has its own settings changes nothing', () async {
       await repo.save(follower);
       expect(await repo.resetThumbnailOverrides(), 0);
+    });
+  });
+
+  group('revertBiometricsToPassword', () {
+    ContainerRecord biometricRecord(String uri) => ContainerRecord(
+      uri: uri,
+      label: 'Vault',
+      containerFormat: 'cryptomator',
+      unlockMethod: ContainerUnlockMethod.biometrics,
+      pendingPassword: 'Secret',
+      cacheDerivedKey: true,
+    );
+
+    test('puts the vault on a manual password and drops what only the '
+        'biometric method needed', () async {
+      await repo.save(biometricRecord(uriA));
+      secureStorage.data[pimStorageKey(uriA)] = '485';
+      expect(await repo.getPassword(uriA), 'Secret');
+
+      final reverted = await repo.revertBiometricsToPassword(uriA);
+
+      expect(reverted!.unlockMethod, ContainerUnlockMethod.password);
+      expect(reverted.cacheDerivedKey, isFalse);
+      expect(reverted.keyfiles, isEmpty);
+      expect(await repo.getPassword(uriA), isNull);
+      expect(secureStorage.data.containsKey(pimStorageKey(uriA)), isFalse);
+      expect(cryptoApi.clearedPaths, contains(derivedKeyPathForUri(uriA)));
+      expect(
+        cryptoApi.deletedBiometricIds,
+        contains(vaultBiometricKeyId(uriA)),
+      );
+    });
+
+    test('the revert is persisted', () async {
+      await repo.save(biometricRecord(uriA));
+      await repo.revertBiometricsToPassword(uriA);
+
+      final reopened = ContainerRepository.withCryptoApi(
+        cryptoApi,
+        secureStorage,
+      );
+      expect(
+        (await reopened.loadAll())[uriA]!.unlockMethod,
+        ContainerUnlockMethod.password,
+      );
+    });
+
+    test('leaves other biometric vaults alone', () async {
+      await repo.save(biometricRecord(uriA));
+      await repo.save(biometricRecord(uriB));
+
+      await repo.revertBiometricsToPassword(uriA);
+
+      expect(
+        (await repo.loadAll())[uriB]!.unlockMethod,
+        ContainerUnlockMethod.biometrics,
+      );
+      expect(await repo.getPassword(uriB), 'Secret');
+      expect(
+        cryptoApi.deletedBiometricIds,
+        isNot(contains(vaultBiometricKeyId(uriB))),
+      );
+    });
+
+    test('does nothing for a vault that is not using biometrics', () async {
+      await repo.save(
+        ContainerRecord(
+          uri: uriC,
+          label: 'Manual',
+          containerFormat: 'cryptomator',
+          unlockMethod: ContainerUnlockMethod.password,
+        ),
+      );
+
+      final result = await repo.revertBiometricsToPassword(uriC);
+
+      expect(result!.unlockMethod, ContainerUnlockMethod.password);
+      expect(cryptoApi.deletedBiometricIds, isEmpty);
+      expect(cryptoApi.clearedPaths, isEmpty);
+    });
+
+    test('an unknown vault yields null', () async {
+      expect(await repo.revertBiometricsToPassword(uriA), isNull);
+    });
+
+    test('removing a vault deletes its biometric sentinel', () async {
+      await repo.save(biometricRecord(uriA));
+      await repo.remove(uriA);
+      expect(
+        cryptoApi.deletedBiometricIds,
+        contains(vaultBiometricKeyId(uriA)),
+      );
     });
   });
 }

@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -266,7 +268,37 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
       }
     }
 
+    // A long file takes minutes to decode, so the native side sends each finished stretch as it goes
+    // and the waveform grows from the left. The buffer is the final size from the first chunk on,
+    // so the timeline's scale never changes under the person's fingers.
+    Uint8List? growing;
+    var growingFilled = 0;
+    var finished = false;
+    void onChunk(AudioWaveformChunk c) {
+      if (c.opId != opId || finished || !mounted) return;
+      if (c.total <= 0 || c.start < 0 || c.start + c.peaks.length > c.total) {
+        return;
+      }
+      var buffer = growing;
+      if (buffer == null || buffer.length != c.total) {
+        buffer = growing = Uint8List(c.total);
+        growingFilled = 0;
+      }
+      buffer.setRange(c.start, c.start + c.peaks.length, c.peaks);
+      // Chunks arrive in order; never let a stray one move the frontier backwards.
+      growingFilled = math.max(growingFilled, c.start + c.peaks.length);
+      setState(() {
+        _waveform = AudioWaveform(
+          peaks: buffer!,
+          peaksPerSecond: c.peaksPerSecond,
+          complete: false,
+          filledPeaks: growingFilled,
+        );
+      });
+    }
+
     _events.addAudioEditProgressListener(onProgress);
+    _events.addAudioWaveformChunkListener(onChunk);
     try {
       final result = await _api.waveform(
         volId: widget.container.volId,
@@ -274,19 +306,27 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
         isLocalStorage: _isLocal,
         opId: opId,
       );
+      finished = true;
       if (!mounted) return;
+      // The reply holds the whole waveform, so it replaces whatever the chunks built up.
       setState(() {
         _waveform = AudioWaveform(
           peaks: result.peaks,
           peaksPerSecond: result.peaksPerSecond,
           complete: result.complete,
+          // A decode that stalled before the end keeps what it measured; the rest is flat.
+          filledPeaks: result.complete ? null : growingFilled,
         );
       });
     } on AudioEditException catch (e) {
-      // Editing still works without the waveform; the track just stays flat.
+      finished = true;
+      // Editing still works without the waveform; the track just stays flat (or keeps the part
+      // that was already drawn).
       if (!e.cancelled) VeLog.w(_tag, 'Waveform failed: ${e.message}');
     } finally {
+      finished = true;
       _events.removeAudioEditProgressListener(onProgress);
+      _events.removeAudioWaveformChunkListener(onChunk);
       if (_waveOpId == opId) _waveOpId = null;
       if (mounted) _waveProgress.value = null;
     }
@@ -632,6 +672,10 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
       count: outputCount,
       existingLowercase: existingLowercase,
       unique: FileOperationService.makeUniqueName,
+      // The export sheet pre-fills "<name>_cut", so a name from its text field is already the one the
+      // person wants: marking it again gave "<name>_cut_cut". Only a name derived from the source
+      // (replace-original, or a cleared field) gets the "_cut" marker.
+      suffix: choice.customName != null ? '' : '_cut',
     );
 
     final relativePaths = <String>[];

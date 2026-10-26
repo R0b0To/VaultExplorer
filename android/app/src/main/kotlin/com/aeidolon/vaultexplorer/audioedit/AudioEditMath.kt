@@ -83,9 +83,20 @@ object AudioEditMath {
     /** RIFF sizes are 32-bit, so a WAV can't hold more data than this. */
     const val MAX_WAV_DATA_BYTES = 0xFFFF_FFFFL - 36L
 
-    /** Waveform resolution: 10 ms per peak, until the peak list would exceed [MAX_PEAKS]. */
+    /**
+     * Waveform resolution: 10 ms per peak, until the peak list would exceed [MAX_PEAKS].
+     *
+     * One byte per peak, so 500k peaks is half a megabyte -- cheap to hold and to ship over the
+     * channel. It is the full 100/s up to ~83 minutes; a 3 hour file still gets ~46 peaks per
+     * second (~22 ms), enough to see where a cut lands when zoomed in. (It used to be 100k, which
+     * left a 3 hour file at ~9 peaks per second: only a handful of blocks across the screen at
+     * the editor's maximum zoom.)
+     */
     const val TARGET_PEAKS_PER_SECOND = 100.0
-    const val MAX_PEAKS = 100_000
+    const val MAX_PEAKS = 500_000
+
+    /** The coarse-bucket sampler looks at no fewer than this many frames per peak (see [strideFor]). */
+    const val MIN_FRAMES_PER_PEAK_SAMPLED = 256
 
     /**
      * Picks the output container and file extension for a source track.
@@ -300,6 +311,21 @@ object AudioEditMath {
         val raw = ceil(durationUs / 1_000_000.0 * peaksPerSecond).toInt()
         return raw.coerceIn(1, MAX_PEAKS)
     }
+
+    /**
+     * How many PCM frames [PcmPeakReader] may skip between the ones it looks at.
+     *
+     * A bucket of a long file spans thousands of frames (a 3 hour file at 44.1 kHz: ~1000 per
+     * peak). Reading every one of them costs time the picture can't show, so only every n-th frame
+     * is read, as long as that still leaves [MIN_FRAMES_PER_PEAK_SAMPLED] looks per bucket. Files
+     * at full 10 ms resolution and 44.1 / 48 kHz (441 / 480 frames per bucket) get 1: every frame
+     * is read, exactly as before.
+     */
+    fun strideFor(sampleRate: Int, peaksPerSecond: Double): Int {
+        if (sampleRate <= 0 || peaksPerSecond <= 0.0) return 1
+        val framesPerPeak = sampleRate / peaksPerSecond
+        return (framesPerPeak / MIN_FRAMES_PER_PEAK_SAMPLED).toInt().coerceIn(1, 64)
+    }
 }
 
 /**
@@ -330,6 +356,14 @@ class StreamDurationMeter {
 class PeakAccumulator(val bucketCount: Int, var bucketsPerFrame: Double) {
     val peaks = ByteArray(bucketCount)
 
+    /**
+     * How many buckets from the start are final after [framesConsumed] frames: every bucket before
+     * the one the next frame falls in. The partial bucket at the frontier is left out, so a
+     * progressive waveform never shows a half-measured (too quiet) last bar that later jumps up.
+     */
+    fun completeBuckets(framesConsumed: Long): Int =
+        (framesConsumed * bucketsPerFrame).toLong().coerceIn(0L, bucketCount.toLong()).toInt()
+
     /** [amplitude] is the absolute sample level, 0..1 (the loudest channel of the frame). */
     fun add(frameIndex: Long, amplitude: Float) {
         val bucket = (frameIndex * bucketsPerFrame).toInt()
@@ -344,6 +378,13 @@ class PcmPeakReader(private val accumulator: PeakAccumulator) {
     var channels: Int = 2
     var encoding: Int = AudioEditMath.PCM_16BIT
 
+    /**
+     * Look at every [stride]-th frame only (1 = all of them). The frame counter still advances over
+     * the skipped ones, so every peak stays at the right time; only the loudest-of-bucket gets
+     * slightly less exact on files whose buckets are thousands of frames wide.
+     */
+    var stride: Int = 1
+
     /** Index of the next PCM frame; also the number of frames consumed so far. */
     var frameIndex: Long = 0L
         private set
@@ -357,17 +398,23 @@ class PcmPeakReader(private val accumulator: PeakAccumulator) {
         val layout = AudioEditMath.littleEndianOf(encoding)
         val view = data.duplicate().order(if (bigEndian) ByteOrder.BIG_ENDIAN else ByteOrder.LITTLE_ENDIAN)
         view.limit(offset + size)
-        var pos = offset
-        for (frame in 0 until frames) {
+        val step = max(1, stride)
+        val frameBytes = bytesPerSample * channelCount
+        // Which frame of this chunk is the first one to read: the stride is counted across chunks,
+        // not restarted at every chunk boundary.
+        var frame = ((step - (frameIndex % step)) % step).toInt()
+        while (frame < frames) {
+            var pos = offset + frame * frameBytes
             var loudest = 0f
             for (channel in 0 until channelCount) {
                 val level = amplitudeAt(view, pos, layout, bigEndian)
                 if (level > loudest) loudest = level
                 pos += bytesPerSample
             }
-            accumulator.add(frameIndex, loudest)
-            frameIndex++
+            accumulator.add(frameIndex + frame, loudest)
+            frame += step
         }
+        frameIndex += frames
     }
 
     /** [layout] is a little-endian encoding; [bigEndian] says the bytes (and [b]'s order) are reversed. */

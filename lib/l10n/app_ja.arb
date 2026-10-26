@@ -352,6 +352,7 @@
   "failedToHashPassword": "パスワードのハッシュ化に失敗しました — もう一度お試しください",
   "languageLabel": "言語",
   "biometricNotAvailable": "このデバイスでは生体認証を利用できません",
+  "biometricsChangedFallbackMessage": "デバイスの生体情報が変更されたため、生体認証によるロック解除をオフにしました。パスワードを使用してください。",
   "unlockVaultExplorerReason": "VaultExplorerのロックを解除",
   "biometricErrorWithCode": "生体認証エラー: {code}",
   "tooManyFailedAttempts": "失敗回数が多すぎます。{seconds, plural, other{{seconds}秒}}後にもう一度お試しください。",

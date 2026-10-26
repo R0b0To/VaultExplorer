@@ -118,6 +118,11 @@ ContainerRepository containerRepository(Ref ref) =>
 String derivedKeyPathForUri(String uri) =>
     uri.startsWith('usb:') ? uri.substring('usb:'.length) : uri;
 
+/// Id of the biometric sentinel key that guards [uri]'s biometric unlock (see
+/// `VaultCryptoApi.createBiometricKey`). Keyed by the record URI itself, so
+/// every unlock flow addresses the same key.
+String vaultBiometricKeyId(String uri) => 'vault:$uri';
+
 /// Secure-storage key under which a container's saved PIM is kept. The config
 /// flow writes it; [ContainerRepository.getPim] reads it.
 String pimStorageKey(String uri) => 'pim_$uri';
@@ -133,15 +138,23 @@ String tempPimStorageKey(String uri) => 'temp_pim_$uri';
 String tempKeyfilesStorageKey(String uri) => 'temp_kf_$uri';
 
 class ContainerRepository {
-  ContainerRepository._(this._clearDerivedKey, [AppSecureStorage? secure])
-    : _secure = secure ?? AppSecureStorage.instance;
+  ContainerRepository._(
+    this._clearDerivedKey,
+    this._deleteBiometricKey, [
+    AppSecureStorage? secure,
+  ]) : _secure = secure ?? AppSecureStorage.instance;
   ContainerRepository.withCryptoApi(
     VaultCryptoApi cryptoApi, [
     AppSecureStorage? secure,
-  ]) : this._(cryptoApi.clearDerivedKey, secure);
+  ]) : this._(
+         cryptoApi.clearDerivedKey,
+         cryptoApi.deleteBiometricKey,
+         secure,
+       );
 
   final Future<bool> Function(String filePath, {bool removeExpiry})
   _clearDerivedKey;
+  final Future<bool> Function(String id) _deleteBiometricKey;
   final AppSecureStorage _secure;
   Map<String, ContainerRecord>? _cache;
 
@@ -377,7 +390,56 @@ class ContainerRepository {
     } catch (e) {
       _logSwallowed('remove/clearDerivedKey', e);
     }
+    try {
+      await _deleteBiometricKey(vaultBiometricKeyId(uri));
+    } catch (e) {
+      _logSwallowed('remove/deleteBiometricKey', e);
+    }
     await _persist();
+  }
+
+  /// Turns biometric unlock off for [uri] and puts the vault back on a manual
+  /// password. Used when the device's biometrics changed (see
+  /// `BiometricEnrollmentGuard`): biometric unlock is only a prompt in front
+  /// of the credentials saved for this vault, so once a new fingerprint or
+  /// face could pass that prompt those credentials must stop being reachable
+  /// by it.
+  ///
+  /// Everything that existed only to serve the biometric method goes with it
+  /// -- the saved password (dropped by [save] for a manual-password record),
+  /// the saved PIM and keyfile list, the cached derived key and its expiry,
+  /// and the biometric sentinel key -- the same state as choosing "Manual
+  /// Password" in the vault's settings. Returns the updated record, or the
+  /// record unchanged (null when unknown) if it was not using biometrics.
+  Future<ContainerRecord?> revertBiometricsToPassword(String uri) async {
+    await _ensureLoaded();
+    final record = _cache![uri];
+    if (record == null || record.unlockMethod != ContainerUnlockMethod.biometrics) {
+      return record;
+    }
+    final reverted = record.copyWith(
+      unlockMethod: ContainerUnlockMethod.password,
+      rememberPassword: false,
+      cacheDerivedKey: false,
+      keyfiles: const [],
+    );
+    await save(reverted);
+    try {
+      await _secure.delete(key: pimStorageKey(uri));
+    } catch (e) {
+      _logSwallowed('revertBiometrics/deletePim', e);
+    }
+    try {
+      await _clearDerivedKey(derivedKeyPathForUri(uri), removeExpiry: true);
+    } catch (e) {
+      _logSwallowed('revertBiometrics/clearDerivedKey', e);
+    }
+    try {
+      await _deleteBiometricKey(vaultBiometricKeyId(uri));
+    } catch (e) {
+      _logSwallowed('revertBiometrics/deleteBiometricKey', e);
+    }
+    return _cache![uri];
   }
 
   /// Switches derived-key caching off for every record whose cached key was

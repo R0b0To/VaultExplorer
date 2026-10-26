@@ -13,6 +13,7 @@ import 'package:vaultexplorer/data/models/thumbnail_settings.dart';
 import 'package:vaultexplorer/data/models/vault_delete_after_import_mode.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
+import 'package:vaultexplorer/data/services/biometric_enrollment_guard.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/automation_settings_screen.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/change_password_screen.dart';
@@ -199,6 +200,14 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
     if (record != null && mounted) {
       widget.onSaved(record);
       Navigator.pop(context);
+    } else if (record == null && mounted) {
+      // Only happens when biometric unlock could not be set up (no biometric
+      // enrolled / no secure lock screen); nothing was saved.
+      showAppSnackBar(
+        context,
+        message: context.l10n.biometricNotAvailable,
+        tone: AppBannerTone.error,
+      );
     }
   }
 
@@ -228,18 +237,63 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
     }
   }
 
+  /// Whether this vault's biometric unlock may still be used. When the
+  /// device's biometrics changed the vault has just been put back on a manual
+  /// password: say so, hand the dashboard the updated record and close this
+  /// sheet, which was built for the biometric record and would otherwise keep
+  /// offering it. Reopening shows the vault as a manual-password vault.
+  Future<bool> _biometricsStillTrusted() async {
+    BiometricGuardResult check;
+    try {
+      check = await ref
+          .read(biometricEnrollmentGuardProvider)
+          .checkVault(widget.uri);
+    } catch (e) {
+      VeLog.w('ContainerConfigSheet', 'Biometric enrollment check failed', e);
+      check = BiometricGuardResult.unavailable;
+    }
+    if (!mounted) return false;
+    switch (check) {
+      case BiometricGuardResult.ok:
+        return true;
+      case BiometricGuardResult.unavailable:
+        showAppSnackBar(
+          context,
+          message: context.l10n.biometricNotAvailable,
+          tone: AppBannerTone.error,
+        );
+        return false;
+      case BiometricGuardResult.reverted:
+        final updated = (await ref
+            .read(containerRepositoryProvider)
+            .loadAll())[widget.uri];
+        if (!mounted) return false;
+        showAppSnackBar(
+          context,
+          message: context.l10n.biometricsChangedFallbackMessage,
+          tone: AppBannerTone.warning,
+        );
+        if (updated != null) widget.onSaved(updated);
+        Navigator.pop(context);
+        return false;
+    }
+  }
+
   Future<void> _authenticateSettings(ContainerConfigState state) async {
     final record = widget.existingRecord;
     if (record == null) return;
 
     if (record.unlockMethod == ContainerUnlockMethod.biometrics) {
       try {
+        // This prompt releases the saved password into the form, so it is
+        // held to the same rule as unlocking: no new biometric may pass it.
+        if (!await _biometricsStillTrusted()) return;
         final localAuth = LocalAuthentication();
         final ok = await localAuth.authenticate(
           localizedReason: context.l10n.authenticateToModifySettingsPrompt,
           persistAcrossBackgrounding: true,
         );
-        if (ok && mounted) {
+        if (ok && mounted && await _biometricsStillTrusted()) {
           final savedPassword = await ref
               .read(containerRepositoryProvider)
               .getPassword(widget.uri);

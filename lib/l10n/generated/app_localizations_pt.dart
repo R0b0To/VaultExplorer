@@ -1317,6 +1317,10 @@ class AppLocalizationsPt extends AppLocalizations {
       'Biometria não disponível neste dispositivo';
 
   @override
+  String get biometricsChangedFallbackMessage =>
+      'A biometria do seu dispositivo mudou, por isso o desbloqueio biométrico foi desativado. Use a sua senha.';
+
+  @override
   String get unlockVaultExplorerReason => 'Desbloquear o VaultExplorer';
 
   @override

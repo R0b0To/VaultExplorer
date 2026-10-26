@@ -16,16 +16,29 @@ import java.nio.ByteBuffer
  * file is decrypted on demand and never written out in plaintext. When the
  * device has no `MediaCodec` decoder for the codec (AC-3 / E-AC-3 / DTS on many
  * phones) the FFmpeg decoder the player already bundles is used instead, see
- * [FfmpegPcmDecoder]; the data path is the same. It is
- * time-boxed: a very long file stops at [TIME_BUDGET_MS] and returns what it
- * has with [Waveform.complete] false (the editor draws the rest flat) -- the
- * same trade-off the video probe makes with `keyframesComplete`.
+ * [FfmpegPcmDecoder]; the data path is the same.
+ *
+ * **There is no overall time limit.** An earlier version gave up after 60 s and
+ * drew the rest flat, which on a 3 hour file left everything past the first
+ * ~18 minutes blank. The whole file is decoded now, however long that takes; what
+ * keeps this usable is that
+ *  - finished peaks are handed out as they are produced (`onPartial`), so the
+ *    editor draws the waveform growing from the left instead of waiting for the end;
+ *  - the decoder is kept busy (several buffers in flight) rather than fed one
+ *    frame at a time; and
+ *  - very long files are sampled sparsely inside each peak (see [AudioEditMath.strideFor]).
+ *
+ * What does end a decode early is a decoder that has stopped producing anything for
+ * [STALL_TIMEOUT_MS] (a broken stream): it returns what it has with
+ * [Waveform.complete] false. Cancelling (the editor closing) ends it at any time.
  */
 object AudioWaveformExtractor {
     private const val TAG = "AudioWaveformExtractor"
-    private const val TIME_BUDGET_MS = 60_000L
+    private const val STALL_TIMEOUT_MS = 20_000L
+    private const val PARTIAL_INTERVAL_MS = 400L
     private const val DEQUEUE_TIMEOUT_US = 10_000L
     private const val FFMPEG_IDLE_SLEEP_MS = 2L
+    private const val MAX_SAMPLE_BUFFER = 16 * 1024 * 1024
 
     class CancelledException : Exception("Waveform cancelled")
 
@@ -33,14 +46,20 @@ object AudioWaveformExtractor {
         /** One 0..255 level per slice, oldest first. */
         val peaks: ByteArray,
         val peaksPerSecond: Double,
-        /** False when the time budget ran out before the end of the file. */
+        /** False when the decoder stalled before the end of the file (see [STALL_TIMEOUT_MS]). */
         val complete: Boolean,
     )
 
+    /**
+     * [onPartial] gets `(peaks, peaksPerSecond, from, to)`: peaks `[from, to)` of the final array are finished and will
+     * not change. It runs on the decoding thread, at most every [PARTIAL_INTERVAL_MS]; [peaks] is the
+     * live array, so a receiver that keeps the bytes must copy them before returning.
+     */
     fun extract(
         newExtractor: () -> AudioSource,
         isCancelled: () -> Boolean,
         onProgress: (Float) -> Unit,
+        onPartial: (peaks: ByteArray, peaksPerSecond: Double, from: Int, to: Int) -> Unit = { _, _, _, _ -> },
     ): Waveform {
         val extractor = newExtractor()
         var codec: MediaCodec? = null
@@ -80,7 +99,16 @@ object AudioWaveformExtractor {
             if (AudioEditMath.bytesPerSample(reader.encoding) == null) {
                 throw IllegalStateException("This PCM sample format isn't supported")
             }
-            accumulator.bucketsPerFrame = peaksPerSecond / sampleRate
+
+            // The decoder's real rate can differ from the container's (HE-AAC doubles it, FFmpeg reports
+            // its own), and the bucket size and sampling stride both follow from it.
+            fun applySampleRate(rate: Int) {
+                if (rate <= 0) return
+                sampleRate = rate
+                accumulator.bucketsPerFrame = peaksPerSecond / rate
+                reader.stride = AudioEditMath.strideFor(rate, peaksPerSecond)
+            }
+            applySampleRate(sampleRate)
 
             extractor.selectTrack(track)
             val activeCodec = if (isRaw || useFfmpeg) {
@@ -95,7 +123,6 @@ object AudioWaveformExtractor {
             val activeFfmpeg = if (useFfmpeg) FfmpegPcmDecoder.create(format) else null
             ffmpeg = activeFfmpeg
 
-            val deadline = SystemClock.elapsedRealtime() + TIME_BUDGET_MS
             var lastPermille = -1
             var complete = true
 
@@ -105,6 +132,33 @@ object AudioWaveformExtractor {
                     lastPermille = permille
                     onProgress(permille / 1000f)
                 }
+            }
+
+            // Hands the finished peaks to the caller every PARTIAL_INTERVAL_MS, so the editor can draw
+            // the waveform as it grows. The last, partly measured bucket is held back until it is done.
+            var sentUpTo = 0
+            var lastEmitMs = SystemClock.elapsedRealtime()
+            fun emitPartial() {
+                val now = SystemClock.elapsedRealtime()
+                if (now - lastEmitMs < PARTIAL_INTERVAL_MS) return
+                lastEmitMs = now
+                val upTo = accumulator.completeBuckets(reader.frameIndex)
+                if (upTo > sentUpTo) {
+                    onPartial(accumulator.peaks, peaksPerSecond, sentUpTo, upTo)
+                    sentUpTo = upTo
+                }
+            }
+
+            // Watchdog: the clock restarts whenever the decoder takes or gives anything. Only a decoder
+            // that has gone quiet for STALL_TIMEOUT_MS ends the decode early; a slow one never does.
+            var lastMovedMs = SystemClock.elapsedRealtime()
+            fun stalled(moved: Boolean): Boolean {
+                val now = SystemClock.elapsedRealtime()
+                if (moved) {
+                    lastMovedMs = now
+                    return false
+                }
+                return now - lastMovedMs > STALL_TIMEOUT_MS
             }
 
             if (activeFfmpeg != null) {
@@ -117,10 +171,6 @@ object AudioWaveformExtractor {
                 var outputDone = false
                 while (!outputDone) {
                     if (isCancelled()) throw CancelledException()
-                    if (SystemClock.elapsedRealtime() > deadline) {
-                        complete = false
-                        break
-                    }
                     var progressed = false
 
                     if (!inputDone) {
@@ -132,7 +182,7 @@ object AudioWaveformExtractor {
                                     size = extractor.readSampleData(buffer, 0)
                                     break
                                 } catch (e: IllegalArgumentException) {
-                                    if (buffer.capacity() >= 16 * 1024 * 1024) throw e
+                                    if (buffer.capacity() >= MAX_SAMPLE_BUFFER) throw e
                                     buffer = ByteBuffer.allocateDirect(buffer.capacity() * 2)
                                 }
                             }
@@ -157,17 +207,18 @@ object AudioWaveformExtractor {
                     val ended = activeFfmpeg.drain { data, offset, size ->
                         // The decoder's real output layout (known from its first chunk on).
                         val outRate = activeFfmpeg.sampleRate
-                        if (outRate > 0 && outRate != sampleRate) {
-                            sampleRate = outRate
-                            accumulator.bucketsPerFrame = peaksPerSecond / sampleRate
-                        }
+                        if (outRate > 0 && outRate != sampleRate) applySampleRate(outRate)
                         val outChannels = activeFfmpeg.channelCount
                         if (outChannels > 0) reader.channels = outChannels
                         reader.consume(data, offset, size)
                         progressed = true
                     }
+                    emitPartial()
                     if (ended) {
                         outputDone = true
+                    } else if (stalled(progressed)) {
+                        complete = false
+                        break
                     } else if (!progressed) {
                         Thread.sleep(FFMPEG_IDLE_SLEEP_MS)
                     }
@@ -177,10 +228,6 @@ object AudioWaveformExtractor {
                 var buffer = ByteBuffer.allocateDirect(64 * 1024)
                 while (extractor.sampleTrackIndex >= 0) {
                     if (isCancelled()) throw CancelledException()
-                    if (SystemClock.elapsedRealtime() > deadline) {
-                        complete = false
-                        break
-                    }
                     var size = -1
                     while (true) {
                         try {
@@ -188,45 +235,25 @@ object AudioWaveformExtractor {
                             size = extractor.readSampleData(buffer, 0)
                             break
                         } catch (e: IllegalArgumentException) {
-                            if (buffer.capacity() >= 16 * 1024 * 1024) throw e
+                            if (buffer.capacity() >= MAX_SAMPLE_BUFFER) throw e
                             buffer = ByteBuffer.allocateDirect(buffer.capacity() * 2)
                         }
                     }
                     if (size < 0) break
                     reader.consume(buffer, 0, size)
                     report(extractor.sampleTime)
+                    emitPartial()
                     extractor.advance()
                 }
             } else {
                 val info = MediaCodec.BufferInfo()
                 var inputDone = false
                 var outputDone = false
-                while (!outputDone) {
-                    if (isCancelled()) throw CancelledException()
-                    if (SystemClock.elapsedRealtime() > deadline) {
-                        complete = false
-                        break
-                    }
 
-                    if (!inputDone) {
-                        val inIndex = activeCodec.dequeueInputBuffer(DEQUEUE_TIMEOUT_US)
-                        if (inIndex >= 0) {
-                            val inBuffer = activeCodec.getInputBuffer(inIndex)
-                            val size = if (inBuffer == null) -1 else extractor.readSampleData(inBuffer, 0)
-                            if (size < 0) {
-                                activeCodec.queueInputBuffer(inIndex, 0, 0, 0L, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
-                                inputDone = true
-                            } else {
-                                val ts = extractor.sampleTime
-                                activeCodec.queueInputBuffer(inIndex, 0, size, ts, 0)
-                                report(ts)
-                                extractor.advance()
-                            }
-                        }
-                    }
-
-                    val outIndex = activeCodec.dequeueOutputBuffer(info, DEQUEUE_TIMEOUT_US)
-                    when {
+                // Takes one decoded buffer (or format change) if the decoder has one within timeoutUs.
+                fun drainOne(timeoutUs: Long): Boolean {
+                    val outIndex = activeCodec.dequeueOutputBuffer(info, timeoutUs)
+                    return when {
                         outIndex >= 0 -> {
                             val outBuffer = activeCodec.getOutputBuffer(outIndex)
                             if (outBuffer != null && info.size > 0) {
@@ -234,15 +261,57 @@ object AudioWaveformExtractor {
                             }
                             activeCodec.releaseOutputBuffer(outIndex, false)
                             if ((info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) outputDone = true
+                            true
                         }
                         outIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
                             // The decoder's real output layout (HE-AAC doubles the rate, for one).
                             val out = activeCodec.outputFormat
-                            LosslessAudioCutter.intValue(out, MediaFormat.KEY_SAMPLE_RATE)?.let { sampleRate = it }
                             LosslessAudioCutter.intValue(out, MediaFormat.KEY_CHANNEL_COUNT)?.let { reader.channels = it }
                             reader.encoding = LosslessAudioCutter.pcmEncodingOf(out) ?: AudioEditMath.PCM_16BIT
-                            accumulator.bucketsPerFrame = peaksPerSecond / sampleRate
+                            LosslessAudioCutter.intValue(out, MediaFormat.KEY_SAMPLE_RATE)?.let { applySampleRate(it) }
+                            true
                         }
+                        else -> false
+                    }
+                }
+
+                while (!outputDone) {
+                    if (isCancelled()) throw CancelledException()
+                    var progressed = false
+
+                    // Keep the decoder fed: queue every input buffer it has free right now. Handing it one
+                    // frame and then waiting for it to come back (what this used to do) caps the speed at one
+                    // codec round trip per ~23 ms of audio, however fast the decoder itself is.
+                    while (!inputDone) {
+                        val inIndex = activeCodec.dequeueInputBuffer(0L)
+                        if (inIndex < 0) break
+                        val inBuffer = activeCodec.getInputBuffer(inIndex)
+                        val size = if (inBuffer == null) -1 else extractor.readSampleData(inBuffer, 0)
+                        if (size < 0) {
+                            activeCodec.queueInputBuffer(inIndex, 0, 0, 0L, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+                            inputDone = true
+                        } else {
+                            val ts = extractor.sampleTime
+                            activeCodec.queueInputBuffer(inIndex, 0, size, ts, 0)
+                            report(ts)
+                            extractor.advance()
+                        }
+                        progressed = true
+                    }
+
+                    // ...and take everything it has decoded so far.
+                    while (!outputDone && drainOne(0L)) progressed = true
+                    emitPartial()
+
+                    if (!progressed && !outputDone) {
+                        // Nothing moved: wait on the decoder briefly rather than spin.
+                        if (drainOne(DEQUEUE_TIMEOUT_US)) progressed = true
+                        if (stalled(progressed)) {
+                            complete = false
+                            break
+                        }
+                    } else {
+                        stalled(true)
                     }
                 }
             }

@@ -352,6 +352,7 @@
   "failedToHashPassword": "密码哈希处理失败——请重试",
   "languageLabel": "语言",
   "biometricNotAvailable": "此设备不支持生物识别",
+  "biometricsChangedFallbackMessage": "设备的生物识别信息已更改，因此已关闭生物识别解锁。请使用密码。",
   "unlockVaultExplorerReason": "解锁VaultExplorer",
   "biometricErrorWithCode": "生物识别错误：{code}",
   "tooManyFailedAttempts": "失败次数过多。请在{seconds, plural, other{{seconds}秒}}后重试。",

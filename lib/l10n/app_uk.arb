@@ -352,6 +352,7 @@
   "failedToHashPassword": "Не вдалося створити хеш пароля — спробуйте знову",
   "languageLabel": "Мова",
   "biometricNotAvailable": "Біометрія недоступна на цьому пристрої",
+  "biometricsChangedFallbackMessage": "Біометричні дані пристрою змінилися, тому біометричне розблокування вимкнено. Використайте пароль.",
   "unlockVaultExplorerReason": "Розблокувати VaultExplorer",
   "biometricErrorWithCode": "Помилка біометрії: {code}",
   "tooManyFailedAttempts": "Забагато невдалих спроб. Спробуйте знову через {seconds, plural, one{1 секунду} few{{seconds} секунди} many{{seconds} секунд} other{{seconds} секунд}}.",

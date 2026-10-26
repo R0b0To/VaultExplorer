@@ -17,6 +17,7 @@ import 'package:vaultexplorer/data/models/thumbnail_settings.dart';
 import 'package:vaultexplorer/data/models/vault_delete_after_import_mode.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
+import 'package:vaultexplorer/data/services/biometric_enrollment_guard.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
@@ -769,6 +770,21 @@ class ContainerConfigController extends _$ContainerConfigController {
     required ContainerRecord? existingRecord,
   }) async {
     state = state._copy(saving: true);
+
+    // Biometric unlock is only a prompt in front of the saved credentials, so
+    // choosing it first sets up the sentinel key that lets the app notice a
+    // later fingerprint/face enrollment (see BiometricEnrollmentGuard). Done
+    // before anything is written, and if Android refuses (no biometric
+    // enrolled, no secure lock screen) nothing is saved.
+    final wasBiometrics =
+        existingRecord?.unlockMethod == ContainerUnlockMethod.biometrics;
+    final isBiometrics = state.unlockMethod == ContainerUnlockMethod.biometrics;
+    final guard = ref.read(biometricEnrollmentGuardProvider);
+    if (isBiometrics && !wasBiometrics && !await guard.enableVault(params.uri)) {
+      if (ref.mounted) state = state._copy(saving: false);
+      return null;
+    }
+
     final label = labelText.trim().isEmpty
         ? params.currentLabel
         : labelText.trim();
@@ -844,6 +860,7 @@ class ContainerConfigController extends _$ContainerConfigController {
     );
 
     await ref.read(containerRepositoryProvider).save(record);
+    if (wasBiometrics && !isBiometrics) await guard.forgetVault(params.uri);
     await _applyDerivedKeyLifetime();
     if (!ref.mounted) return record;
     if (!state.isMounted && !state.cacheDerivedKey) {

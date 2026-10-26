@@ -13,6 +13,40 @@ enum Pbkdf2Hash { sha1, sha256 }
 /// Hash functions [VaultCryptoApi.hmac] can run.
 enum HmacHash { sha1, sha256, sha512 }
 
+/// What the platform layer found when it checked a biometric sentinel key (see
+/// [VaultCryptoApi.biometricKeyStatus]).
+enum BiometricKeyStatus {
+  /// The key exists and the device's biometrics have not changed since it was
+  /// created.
+  valid,
+
+  /// Android invalidated the key: a biometric was enrolled (or the last one
+  /// removed, or the secure lock screen disabled) after it was created.
+  invalidated,
+
+  /// There is no key: biometrics were never set up on this device for that
+  /// purpose, its Keystore entries were cleared, or the setting was restored
+  /// from a backup made elsewhere.
+  missing,
+
+  /// The Keystore could not answer. Not evidence of a change, so callers
+  /// refuse the current attempt without switching anything off.
+  error;
+
+  static BiometricKeyStatus fromWire(String? value) => switch (value) {
+    'valid' => BiometricKeyStatus.valid,
+    'invalidated' => BiometricKeyStatus.invalidated,
+    'missing' => BiometricKeyStatus.missing,
+    _ => BiometricKeyStatus.error,
+  };
+
+  /// True when biometric unlock must be switched off for good: the key was
+  /// invalidated or never existed here. [error] is deliberately excluded.
+  bool get requiresRevert =>
+      this == BiometricKeyStatus.invalidated ||
+      this == BiometricKeyStatus.missing;
+}
+
 /// Password hashing and derived-key storage: PBKDF2 hashing used by the
 /// unlock/create flows, plus the Keystore-backed derived-key cache, plus
 /// AES-GCM and AVIF decode primitives that also live in the native crypto
@@ -364,5 +398,46 @@ class VaultCryptoApi {
       ChannelMethods.purgeExpiredDerivedKeys,
     );
     return result ?? const [];
+  }
+
+  /// Creates (replacing any existing) the biometric sentinel key for [id] --
+  /// an Android Keystore key that Android permanently invalidates when a new
+  /// biometric is enrolled. It trusts the biometrics enrolled *now*.
+  ///
+  /// Returns false when the key could not be created, usually because no
+  /// biometric is enrolled or there is no secure lock screen; biometric unlock
+  /// must then not be turned on. Biometric unlock is only a prompt in front of
+  /// the saved credentials, so this key is what makes a later enrollment
+  /// detectable.
+  Future<bool> createBiometricKey(String id) async {
+    final result = await _channel.invokeMethod<bool>(
+      ChannelMethods.biometricKeyCreate,
+      {'id': id},
+    );
+    return result ?? false;
+  }
+
+  /// Whether the biometric sentinel key for [id] still trusts the device's
+  /// current biometrics. A platform failure is reported as
+  /// [BiometricKeyStatus.error], never thrown, so callers fail closed.
+  Future<BiometricKeyStatus> biometricKeyStatus(String id) async {
+    try {
+      final result = await _channel.invokeMethod<String>(
+        ChannelMethods.biometricKeyStatus,
+        {'id': id},
+      );
+      return BiometricKeyStatus.fromWire(result);
+    } on PlatformException {
+      return BiometricKeyStatus.error;
+    }
+  }
+
+  /// Deletes the biometric sentinel key for [id]. Idempotent.
+  Future<bool> deleteBiometricKey(String id) async {
+    final result = await _channel.invokeMethod<bool>(
+      ChannelMethods.biometricKeyDelete,
+      {'id': id},
+    );
+    return result ?? false;
   }
 }

@@ -1255,6 +1255,10 @@ class AppLocalizationsJa extends AppLocalizations {
   String get biometricNotAvailable => 'このデバイスでは生体認証を利用できません';
 
   @override
+  String get biometricsChangedFallbackMessage =>
+      'デバイスの生体情報が変更されたため、生体認証によるロック解除をオフにしました。パスワードを使用してください。';
+
+  @override
   String get unlockVaultExplorerReason => 'VaultExplorerのロックを解除';
 
   @override

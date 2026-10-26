@@ -1238,6 +1238,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get biometricNotAvailable => '此设备不支持生物识别';
 
   @override
+  String get biometricsChangedFallbackMessage =>
+      '设备的生物识别信息已更改，因此已关闭生物识别解锁。请使用密码。';
+
+  @override
   String get unlockVaultExplorerReason => '解锁VaultExplorer';
 
   @override

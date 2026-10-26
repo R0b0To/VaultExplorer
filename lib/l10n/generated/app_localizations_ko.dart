@@ -1251,6 +1251,10 @@ class AppLocalizationsKo extends AppLocalizations {
   String get biometricNotAvailable => '이 기기에서는 생체 인식을 사용할 수 없습니다';
 
   @override
+  String get biometricsChangedFallbackMessage =>
+      '기기의 생체 정보가 변경되어 생체 인식 잠금 해제가 꺼졌습니다. 비밀번호를 사용하세요.';
+
+  @override
   String get unlockVaultExplorerReason => 'VaultExplorer 잠금 해제';
 
   @override

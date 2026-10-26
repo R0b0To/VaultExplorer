@@ -46,7 +46,9 @@ class AudioTimeline extends StatefulWidget {
   final VideoEditMode mode;
   final ValueListenable<int> playheadUs;
 
-  /// Null until the native decode finishes; the track shows a flat centre line.
+  /// Null until the first part of the native decode arrives; the track shows a
+  /// flat centre line. While a long file is still being decoded this grows from
+  /// the left (see [AudioWaveform.filledPeaks]).
   final AudioWaveform? waveform;
 
   final VoidCallback onScrubStart;
@@ -457,13 +459,15 @@ class _TimelineBackgroundPainter extends CustomPainter {
       final t0 = (viewStartUs + x * usPerPx).round();
       final t1 = (viewStartUs + (x + colW) * usPerPx).round();
       if (t0 >= durationUs) break;
+      // Not decoded yet: leave the flat centre line, don't paint bars of silence over it.
+      if (!wf.complete && t0 >= wf.coveredUs) break;
       final peak = wf.peakBetween(t0, t1);
       final h = math.max(1.0, math.pow(peak / 255.0, 0.6).toDouble() * half);
       canvas.drawLine(Offset(x + 1, mid - h), Offset(x + 1, mid + h), bar);
     }
     canvas.drawLine(Offset(0, mid), Offset(w, mid), line);
 
-    // Part of a very long file the native decode never reached.
+    // Part of the file the native decode hasn't reached (yet, or ever if it stalled).
     if (!wf.complete) {
       final x = _x(wf.coveredUs, w);
       if (x < w) {

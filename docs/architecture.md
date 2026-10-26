@@ -466,6 +466,28 @@ new code must not violate. Each is traceable to specific enforcement code.
     volume is treated as unknown, i.e. case-insensitive. Dart decides the
     policy and sends it with each import pick; Kotlin does not re-derive it.
 
+13. **Biometric unlock never outlives the biometrics it was set up with.**
+    It is a `local_auth` prompt in front of credentials held in Keystore
+    storage whose keys are not tied to the user's biometrics, so Android
+    would not invalidate anything when a fingerprint or face is enrolled.
+    Every biometric-protected thing (the master lock, each vault) therefore
+    owns a *sentinel* Keystore key (`BiometricKeyHandlers`): per-use
+    `BIOMETRIC_STRONG` authentication with
+    `setInvalidatedByBiometricEnrollment(true)`, used for nothing else.
+    `BiometricEnrollmentGuard` checks it before every biometric prompt is
+    offered and again before the result is accepted (lock gate, both unlock
+    controllers, the vault settings sheet, the master-lock settings
+    verification). An invalidated *or missing* sentinel fails closed: the
+    master lock goes back to the master password, and a vault goes back to a
+    manual password with its saved password, PIM, keyfile list and cached
+    derived key removed (`ContainerRepository.revertBiometricsToPassword`).
+    A Keystore error refuses that attempt but is not evidence of a change, so
+    nothing is switched off. Sentinels are per thing and are only ever
+    replaced when the person turns biometrics on again, so re-enabling one
+    can never make another, older one look valid. Any new code path that
+    releases saved credentials after a biometric prompt must go through the
+    guard.
+
 ---
 
 ## 3. Concurrency & threading model

@@ -352,6 +352,7 @@
   "failedToHashPassword": "Échec du hachage du mot de passe — veuillez réessayer",
   "languageLabel": "Langue",
   "biometricNotAvailable": "Biométrie non disponible sur cet appareil",
+  "biometricsChangedFallbackMessage": "La biométrie de votre appareil a changé, le déverrouillage biométrique a donc été désactivé. Utilisez votre mot de passe.",
   "unlockVaultExplorerReason": "Déverrouiller VaultExplorer",
   "biometricErrorWithCode": "Erreur biométrique : {code}",
   "tooManyFailedAttempts": "Trop de tentatives échouées. Réessayez dans {seconds, plural, =1{1 seconde} other{{seconds} secondes}}.",

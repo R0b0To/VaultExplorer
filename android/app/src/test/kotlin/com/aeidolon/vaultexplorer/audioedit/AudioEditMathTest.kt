@@ -263,6 +263,88 @@ class AudioEditMathTest {
         assertEquals(1, AudioEditMath.bucketCountFor(1L, 100.0))
     }
 
+    @Test
+    fun aThreeHourFileKeepsAUsefulResolutionAndAllOfItsPeaks() {
+        // Regression: this used to be capped at 100k peaks (~9 per second for 3 hours).
+        val threeHoursUs = 3L * 3_600_000_000L
+        val pps = AudioEditMath.peaksPerSecondFor(threeHoursUs)
+        assertTrue("got $pps peaks/s", pps > 40.0)
+        assertEquals(AudioEditMath.MAX_PEAKS, AudioEditMath.bucketCountFor(threeHoursUs, pps))
+    }
+
+    // ── Sparse sampling of long files ────────────────────────────────────
+
+    @Test
+    fun strideIsOneWhereEveryFrameIsStillCheap() {
+        // 10 ms peaks at 44.1 / 48 kHz: 441 / 480 frames each.
+        assertEquals(1, AudioEditMath.strideFor(44_100, 100.0))
+        assertEquals(1, AudioEditMath.strideFor(48_000, 100.0))
+        assertEquals(1, AudioEditMath.strideFor(0, 100.0))
+        assertEquals(1, AudioEditMath.strideFor(44_100, 0.0))
+    }
+
+    @Test
+    fun strideGrowsWithBucketWidthButKeepsEnoughLooksPerPeak() {
+        val pps = AudioEditMath.peaksPerSecondFor(3L * 3_600_000_000L)
+        val stride = AudioEditMath.strideFor(44_100, pps)
+        assertTrue("stride $stride", stride > 1)
+        val looksPerPeak = (44_100 / pps) / stride
+        assertTrue("looks per peak $looksPerPeak", looksPerPeak >= AudioEditMath.MIN_FRAMES_PER_PEAK_SAMPLED)
+        assertTrue(AudioEditMath.strideFor(192_000, 1.0) <= 64)
+    }
+
+    private fun sixteenBitMono(vararg samples: Int): ByteBuffer {
+        val b = ByteBuffer.allocateDirect(samples.size * 2).order(ByteOrder.LITTLE_ENDIAN)
+        for (v in samples) b.putShort(v.toShort())
+        return b
+    }
+
+    @Test
+    fun strideSkipsFramesButKeepsPeaksAtTheRightTime() {
+        // 8 frames, 4 per bucket, stride 4: frames 0 and 4 are read. The loud frames 1 and 5 are skipped.
+        val acc = PeakAccumulator(bucketCount = 2, bucketsPerFrame = 0.25)
+        val reader = PcmPeakReader(acc).apply { channels = 1; encoding = AudioEditMath.PCM_16BIT; stride = 4 }
+        reader.consume(sixteenBitMono(16384, 32767, 0, 0, 8192, 32767, 0, 0), 0, 16)
+        assertEquals(8L, reader.frameIndex) // skipped frames still count
+        assertEquals(128, acc.peaks[0].toInt() and 0xFF)
+        assertEquals(64, acc.peaks[1].toInt() and 0xFF)
+    }
+
+    @Test
+    fun strideIsCountedAcrossChunksNotRestartedAtEachOne() {
+        // Same 8 frames delivered as 3 + 5: with stride 4 the frames read must still be 0 and 4.
+        val samples = intArrayOf(16384, 32767, 0, 0, 8192, 32767, 0, 0)
+        val acc = PeakAccumulator(bucketCount = 2, bucketsPerFrame = 0.25)
+        val reader = PcmPeakReader(acc).apply { channels = 1; encoding = AudioEditMath.PCM_16BIT; stride = 4 }
+        reader.consume(sixteenBitMono(*samples.copyOfRange(0, 3)), 0, 6)
+        reader.consume(sixteenBitMono(*samples.copyOfRange(3, 8)), 0, 10)
+        assertEquals(8L, reader.frameIndex)
+        assertEquals(128, acc.peaks[0].toInt() and 0xFF)
+        assertEquals(64, acc.peaks[1].toInt() and 0xFF)
+    }
+
+    @Test
+    fun strideOneReadsEveryFrameAsBefore() {
+        val acc = PeakAccumulator(bucketCount = 2, bucketsPerFrame = 0.25)
+        val reader = PcmPeakReader(acc).apply { channels = 1; encoding = AudioEditMath.PCM_16BIT }
+        reader.consume(sixteenBitMono(16384, 32767, 0, 0, 8192, 32767, 0, 0), 0, 16)
+        assertEquals(255, acc.peaks[0].toInt() and 0xFF)
+        assertEquals(255, acc.peaks[1].toInt() and 0xFF)
+    }
+
+    // ── Progressive waveform ─────────────────────────────────────────────
+
+    @Test
+    fun onlyFinishedBucketsAreReportedAsComplete() {
+        val acc = PeakAccumulator(bucketCount = 10, bucketsPerFrame = 0.25) // 4 frames per bucket
+        assertEquals(0, acc.completeBuckets(0))
+        assertEquals(0, acc.completeBuckets(3)) // bucket 0 is still filling
+        assertEquals(1, acc.completeBuckets(4))
+        assertEquals(2, acc.completeBuckets(11))
+        assertEquals(10, acc.completeBuckets(40))
+        assertEquals(10, acc.completeBuckets(10_000)) // never past the end
+    }
+
     // ── PeakAccumulator / PcmPeakReader ──────────────────────────────────
 
     @Test

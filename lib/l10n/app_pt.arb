@@ -352,6 +352,7 @@
   "failedToHashPassword": "Falha ao gerar o hash da senha — tente novamente",
   "languageLabel": "Idioma",
   "biometricNotAvailable": "Biometria não disponível neste dispositivo",
+  "biometricsChangedFallbackMessage": "A biometria do seu dispositivo mudou, por isso o desbloqueio biométrico foi desativado. Use a sua senha.",
   "unlockVaultExplorerReason": "Desbloquear o VaultExplorer",
   "biometricErrorWithCode": "Erro biométrico: {code}",
   "tooManyFailedAttempts": "Muitas tentativas malsucedidas. Tente novamente em {seconds, plural, =1{1 segundo} other{{seconds} segundos}}.",

@@ -1330,6 +1330,10 @@ class AppLocalizationsUk extends AppLocalizations {
   String get biometricNotAvailable => 'Біометрія недоступна на цьому пристрої';
 
   @override
+  String get biometricsChangedFallbackMessage =>
+      'Біометричні дані пристрою змінилися, тому біометричне розблокування вимкнено. Використайте пароль.';
+
+  @override
   String get unlockVaultExplorerReason => 'Розблокувати VaultExplorer';
 
   @override

@@ -2238,6 +2238,12 @@ abstract class AppLocalizations {
   /// **'Biometric not available on this device'**
   String get biometricNotAvailable;
 
+  /// Shown when biometric unlock was switched off because the device's enrolled biometrics changed
+  ///
+  /// In en, this message translates to:
+  /// **'Your device\'s biometrics changed, so biometric unlock was turned off. Use your password.'**
+  String get biometricsChangedFallbackMessage;
+
   /// Reason string shown by the OS biometric prompt
   ///
   /// In en, this message translates to:

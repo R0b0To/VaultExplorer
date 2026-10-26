@@ -137,19 +137,25 @@ List<TimeRange> planExportRanges(
 /// [unique] against [existingLowercase] (lower-cased names already in the
 /// folder) and added to it, so the outputs can't collide with the folder or
 /// with each other.
+///
+/// [suffix] is the marker put after the name (`_cut` by default). Pass `''`
+/// when [sourceFileName] already is the name the person chose, so it isn't
+/// marked a second time (`clip_cut` would otherwise become `clip_cut_cut`):
+/// one output is then `<name>.<ext>`, several are `<name>_1.<ext>`, ...
 List<String> planOutputNames({
   required String sourceFileName,
   required String extension,
   required int count,
   required Set<String> existingLowercase,
   required String Function(String name, Set<String> existingLowercase) unique,
+  String suffix = '_cut',
 }) {
   final dot = sourceFileName.lastIndexOf('.');
   final stem = dot > 0 ? sourceFileName.substring(0, dot) : sourceFileName;
   final taken = {...existingLowercase};
   final names = <String>[];
   for (var i = 0; i < count; i++) {
-    final base = count == 1 ? '${stem}_cut' : '${stem}_cut_${i + 1}';
+    final base = count == 1 ? '$stem$suffix' : '$stem${suffix}_${i + 1}';
     final name = unique('$base.$extension', taken);
     taken.add(name.toLowerCase());
     names.add(name);

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'dart:developer' as developer;
 
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
@@ -167,6 +169,19 @@ typedef AudioEditProgress = ({
   int outputCount,
   String phase,
   double fraction,
+});
+
+/// A finished stretch of an audio waveform, sent by the native side while the
+/// file is still being decoded (event `onAudioWaveformChunk`). [peaks] holds
+/// peaks `[start, start + peaks.length)` of a final array of [total] peaks, at
+/// [peaksPerSecond] per second. Lets the Audio Editor draw the waveform as it
+/// grows instead of waiting for the end of a very long file.
+typedef AudioWaveformChunk = ({
+  int opId,
+  int start,
+  int total,
+  double peaksPerSecond,
+  Uint8List peaks,
 });
 
 typedef CopyProgress = ({int opId, int bytesDelta});

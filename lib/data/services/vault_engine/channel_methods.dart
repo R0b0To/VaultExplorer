@@ -142,6 +142,9 @@ abstract final class ChannelMethods {
   static const setDerivedKeyExpiry = 'setDerivedKeyExpiry';
   static const getDerivedKeyExpiry = 'getDerivedKeyExpiry';
   static const purgeExpiredDerivedKeys = 'purgeExpiredDerivedKeys';
+  static const biometricKeyCreate = 'biometricKeyCreate';
+  static const biometricKeyStatus = 'biometricKeyStatus';
+  static const biometricKeyDelete = 'biometricKeyDelete';
   static const aesGcmEncrypt = 'aesGcmEncrypt';
   static const aesGcmDecrypt = 'aesGcmDecrypt';
   static const aesCbcDecrypt = 'aesCbcDecrypt';

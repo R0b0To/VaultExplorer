@@ -208,6 +208,64 @@ void main() {
     });
   });
 
+  group('planOutputNames with an empty suffix (a name the person chose)', () {
+    test('is not marked a second time', () {
+      // The audio export sheet pre-fills "<name>_cut"; that must stay as typed.
+      expect(
+        planOutputNames(
+          sourceFileName: 'clip_cut.m4a',
+          extension: 'm4a',
+          count: 1,
+          existingLowercase: {},
+          unique: _unique,
+          suffix: '',
+        ),
+        ['clip_cut.m4a'],
+      );
+    });
+
+    test('several outputs are numbered after the chosen name', () {
+      expect(
+        planOutputNames(
+          sourceFileName: 'talk.m4a',
+          extension: 'm4a',
+          count: 3,
+          existingLowercase: {},
+          unique: _unique,
+          suffix: '',
+        ),
+        ['talk_1.m4a', 'talk_2.m4a', 'talk_3.m4a'],
+      );
+    });
+
+    test('still never collides with the folder', () {
+      expect(
+        planOutputNames(
+          sourceFileName: 'talk.m4a',
+          extension: 'm4a',
+          count: 1,
+          existingLowercase: {'talk.m4a'},
+          unique: _unique,
+          suffix: '',
+        ),
+        ['talk (1).m4a'],
+      );
+    });
+
+    test('the default suffix is unchanged', () {
+      expect(
+        planOutputNames(
+          sourceFileName: 'talk.m4a',
+          extension: 'm4a',
+          count: 2,
+          existingLowercase: {},
+          unique: _unique,
+        ),
+        ['talk_cut_1.m4a', 'talk_cut_2.m4a'],
+      );
+    });
+  });
+
   group('formatTimecode', () {
     test('formats minutes, hours and the optional fraction', () {
       expect(formatTimecode(0), '0:00.000');

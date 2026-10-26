@@ -352,6 +352,7 @@
   "failedToHashPassword": "Impossibile calcolare l'hash della password — riprova",
   "languageLabel": "Lingua",
   "biometricNotAvailable": "Autenticazione biometrica non disponibile su questo dispositivo",
+  "biometricsChangedFallbackMessage": "I dati biometrici del dispositivo sono cambiati, quindi lo sblocco biometrico è stato disattivato. Usa la password.",
   "unlockVaultExplorerReason": "Sblocca VaultExplorer",
   "biometricErrorWithCode": "Errore biometrico: {code}",
   "tooManyFailedAttempts": "Troppi tentativi falliti. Riprova tra {seconds, plural, =1{1 secondo} other{{seconds} secondi}}.",

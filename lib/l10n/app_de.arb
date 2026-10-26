@@ -352,6 +352,7 @@
   "failedToHashPassword": "Passwort-Hash konnte nicht erstellt werden — bitte erneut versuchen",
   "languageLabel": "Sprache",
   "biometricNotAvailable": "Biometrie auf diesem Gerät nicht verfügbar",
+  "biometricsChangedFallbackMessage": "Die Biometrie Ihres Geräts hat sich geändert, daher wurde die biometrische Entsperrung deaktiviert. Verwenden Sie Ihr Passwort.",
   "unlockVaultExplorerReason": "VaultExplorer entsperren",
   "biometricErrorWithCode": "Biometrie-Fehler: {code}",
   "tooManyFailedAttempts": "Zu viele fehlgeschlagene Versuche. Erneut versuchen in {seconds, plural, =1{1 Sekunde} other{{seconds} Sekunden}}.",

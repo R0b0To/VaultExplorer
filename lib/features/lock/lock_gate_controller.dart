@@ -9,6 +9,7 @@ import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
+import 'package:vaultexplorer/data/services/biometric_enrollment_guard.dart';
 import 'package:vaultexplorer/data/services/password_hasher.dart';
 import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/features/lock/duress_settings_service.dart';
@@ -49,6 +50,11 @@ class LockGateState {
   final MountedContainer? decoyContainer;
   final int decoyNavigateTick;
 
+  /// True when the gate had to switch biometric unlock off because the
+  /// device's biometrics changed. The screen turns it into a message (it has
+  /// the localizations; this controller's [LockGate._init] does not).
+  final bool biometricsChanged;
+
   const LockGateState({
     this.settings,
     this.loading = true,
@@ -63,6 +69,7 @@ class LockGateState {
     this.pinResetKey = 0,
     this.decoyContainer,
     this.decoyNavigateTick = 0,
+    this.biometricsChanged = false,
   });
 
   Duration? get lockoutRemaining {
@@ -106,6 +113,7 @@ class LockGate extends _$LockGate {
     int? pinResetKey,
     MountedContainer? decoyContainer,
     int? decoyNavigateTick,
+    bool? biometricsChanged,
   }) => LockGateState(
     settings: settings ?? state.settings,
     loading: loading ?? state.loading,
@@ -120,6 +128,7 @@ class LockGate extends _$LockGate {
     pinResetKey: pinResetKey ?? state.pinResetKey,
     decoyContainer: decoyContainer ?? state.decoyContainer,
     decoyNavigateTick: decoyNavigateTick ?? state.decoyNavigateTick,
+    biometricsChanged: biometricsChanged ?? state.biometricsChanged,
   );
 
   void _requestNavigateToDashboard() {
@@ -177,13 +186,92 @@ class LockGate extends _$LockGate {
       _requestNavigateToDashboard();
       return;
     }
-    state = _copy(settings: s, loading: false);
+
+    // A new fingerprint/face must never be able to reach the gate's biometric
+    // prompt. Decide before the settings are published: the screen starts the
+    // prompt on its own the moment it sees biometrics as the method, so by
+    // then a changed device has to look like a password-only gate already.
+    var gateSettings = s;
+    var biometricsChanged = false;
+    var passwordFallback = false;
+    if (s.masterUnlockMethod == MasterUnlockMethod.biometrics) {
+      final check = await _checkBiometricGuard();
+      if (!ref.mounted) return;
+      switch (check) {
+        case BiometricGuardResult.ok:
+          break;
+        case BiometricGuardResult.reverted:
+          biometricsChanged = true;
+          gateSettings = await ref
+              .read(appSettingsServiceProvider)
+              .loadSettings();
+          if (!ref.mounted) return;
+        case BiometricGuardResult.unavailable:
+          passwordFallback = true;
+      }
+    }
+    state = _copy(
+      settings: gateSettings,
+      loading: false,
+      biometricsChanged: biometricsChanged,
+      showPasswordFallback: passwordFallback ? true : null,
+    );
+  }
+
+  /// Asks the guard whether the master lock's biometric unlock may be used.
+  /// A failure to ask counts as [BiometricGuardResult.unavailable] so the
+  /// gate fails closed.
+  Future<BiometricGuardResult> _checkBiometricGuard() async {
+    try {
+      return await ref.read(biometricEnrollmentGuardProvider).checkMaster();
+    } catch (e) {
+      VeLog.e(_kLogTag, 'Biometric enrollment check failed', e);
+      return BiometricGuardResult.unavailable;
+    }
+  }
+
+  /// Shows why the gate now asks for the password. Called by the screen when
+  /// [LockGateState.biometricsChanged] turns on.
+  void showBiometricsChangedNotice(AppLocalizations l10n) {
+    if (!ref.mounted) return;
+    state = _copy(error: l10n.biometricsChangedFallbackMessage);
+  }
+
+  /// Handles a non-ok guard result for [tryBiometric]: refreshes the gate to
+  /// the password (reverted) or just offers it (unavailable). Returns true when
+  /// biometrics may go ahead.
+  Future<bool> _biometricsAllowed(AppLocalizations l10n) async {
+    final check = await _checkBiometricGuard();
+    if (!ref.mounted) return false;
+    switch (check) {
+      case BiometricGuardResult.ok:
+        return true;
+      case BiometricGuardResult.reverted:
+        final refreshed = await ref
+            .read(appSettingsServiceProvider)
+            .loadSettings();
+        if (!ref.mounted) return false;
+        state = _copy(
+          settings: refreshed,
+          showPasswordFallback: true,
+          biometricsChanged: true,
+          error: l10n.biometricsChangedFallbackMessage,
+        );
+        return false;
+      case BiometricGuardResult.unavailable:
+        state = _copy(
+          error: l10n.biometricNotAvailable,
+          showPasswordFallback: true,
+        );
+        return false;
+    }
   }
 
   Future<void> tryBiometric(AppLocalizations l10n) async {
     if (_isAuthenticating) return;
     _isAuthenticating = true;
     try {
+      if (!await _biometricsAllowed(l10n)) return;
       final canCheck = await _localAuth.canCheckBiometrics;
       final isSupported = await _localAuth.isDeviceSupported();
       if (!canCheck || !isSupported) {
@@ -200,7 +288,11 @@ class LockGate extends _$LockGate {
         biometricOnly: false,
         persistAcrossBackgrounding: true,
       );
-      if (ok && ref.mounted) _requestNavigateToDashboard();
+      // Checked again after the prompt: only a gate whose biometrics are
+      // still the ones it was set up with may open.
+      if (ok && ref.mounted && await _biometricsAllowed(l10n)) {
+        _requestNavigateToDashboard();
+      }
     } on LocalAuthException catch (e) {
       final desc = e.description?.toLowerCase() ?? '';
       if (isBiometricCancellation(e.code.name, e.description)) return;

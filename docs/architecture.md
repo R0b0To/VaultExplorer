@@ -735,6 +735,24 @@ OS, which tears down an unfocused app's camera/mic connection on Android 9+
 unless a matching foreground service is running. It is independent of
 `VaultKeepAliveService` and only runs while a recording is in progress.
 
+Segmented video recording (the camera's "part length" menu: 1 / 5 / 10 / 30 min)
+cuts a recording into parts of an exact length, each saved to the vault as soon
+as it closes. A normal recording uses `MediaRecorder`; a segmented one does not,
+because `MediaRecorder` can only roll over to its next file on a *size* limit
+(its duration limit stops the recording instead), which made part lengths drift
+with the encoder's real bitrate, and the files it rolls into start their video
+late, behind a gap, so later parts had no usable frames for seek-bar previews.
+`SegmentedVideoEngine` (video `MediaCodec` with a surface input, `AudioRecord`
+into an AAC `MediaCodec`, one `MediaMuxer` per part) owns the encoding and muxing
+instead, and `SegmentPartRouter` makes the cuts: it asks the encoder for a
+keyframe shortly before a part is due and cuts on it, so every part starts on a
+keyframe at time zero and audio is split by timestamp without loss. Parts land
+within a couple of frames of the chosen length (the next natural keyframe, at
+most a second later, if an encoder ignores the request). The router and the
+camera-clock inference (`CameraClockMath`) are plain Kotlin with JVM tests; the
+codec and muxer glue needs a device. Part files keep the `vx_vid_` temp prefix,
+so the startup sweep still wipes any a crash leaves behind.
+
 Background playback of vault and local-storage media (audio/video continuing with the app
 minimized or the screen off, with a media notification and lock screen
 controls) is split three ways. `NativePlayerManager` still owns the single

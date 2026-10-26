@@ -1608,8 +1608,8 @@ class VaultCameraSession(
     }
 
     /**
-     * [segmentSeconds] above zero records in parts of about that length (see
-     * [VaultVideoRecorder]); each finished part is queued for [takeVideoSegments]
+     * [segmentSeconds] above zero records in parts of exactly that length (see
+     * [SegmentedVideoEngine]); each finished part is queued for [takeVideoSegments]
      * and announced with a `video_segment` event.
      */
     fun startRecording(
@@ -1676,18 +1676,18 @@ class VaultCameraSession(
                 captureSession?.stopRepeating()
                 captureSession?.abortCaptures()
             } catch (_: Exception) {}
+            // For a segmented recording every earlier part has been queued in
+            // finishedSegments by the time this returns, and the result is the
+            // length of the last part (the file at tempFilePath) only.
             val result = recorder.requestStop()
-            // If the recorder had already rolled over to the next part when the
-            // stop arrived, the part it left is finished and the new file holds
-            // the tail.
-            recorder.finalizePendingSegment()?.let { finishedSegments.add(it) }
             val path = recorder.tempFilePath
             recorder.releaseRecorderOnly()
 
             // A recording stopped before anything was encoded leaves an empty
-            // file; report it as "no video" instead of handing it on.
-            if (path != null && File(path).let { !it.exists() || it.length() == 0L }) {
-                VaultVideoRecorder.secureDeleteFile(File(path))
+            // file (or, segmented, no file at all: no keyframe ever arrived);
+            // report it as "no video" instead of handing it on.
+            if (path == null || File(path).let { !it.exists() || it.length() == 0L }) {
+                if (path != null) VaultVideoRecorder.secureDeleteFile(File(path))
                 callback(false, null, 0, null, "no video was captured")
                 createSessionLocked()
                 return@runOnCameraThread

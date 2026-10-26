@@ -1,80 +1,63 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
-import 'package:vaultexplorer/data/models/continue_playback_mode.dart';
 import 'package:vaultexplorer/data/models/media_viewer_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
-import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
-import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/models/video_playback_mode.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
-import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_playback_paths.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_session_bridge.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
-import 'package:vaultexplorer/features/browser/viewer/pip/picture_in_picture_coordinator.dart';
 import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 
-const String _kTag = 'MiniPlayer';
+const String _kTag = 'BackgroundPlayback';
 
-/// Everything the media viewer hands over when it is closed while something
-/// is still playing: the live player ([playbackManager]), the playlist it was
-/// walking ([playlist]) and the viewer's constructor arguments, so the full
-/// viewer can be reopened on exactly the same item.
-class MiniPlayerSession {
-  MiniPlayerSession({
+/// What the media viewer hands over when it is closed while audio is playing
+/// and "keep audio playing after closing" is on: the live player
+/// ([playbackManager]), the playlist it was walking ([playlist]) and the
+/// viewer's playback state.
+class BackgroundPlaybackSession {
+  BackgroundPlaybackSession({
     required this.providers,
     required this.container,
     required this.playlist,
     required this.playbackManager,
-    required this.thumbnailQuality,
-    required this.thumbnailCacheMode,
-    required this.startingFolder,
-    required this.mediaFilter,
-    required this.sortBy,
-    required this.sortAscending,
-    required this.pinnedPaths,
     required this.playbackMode,
     required this.playbackSpeed,
     required this.isMuted,
   });
 
   /// The app's provider container. The viewer's own `ref` is gone once it is
-  /// closed, so the mini player reads settings and services through this.
+  /// closed, so settings and services are read through this.
   final ProviderContainer providers;
   final MountedContainer container;
   final PlaylistController playlist;
   final VideoPlaybackManager playbackManager;
-  final ThumbnailQuality thumbnailQuality;
-  final ThumbnailCacheMode thumbnailCacheMode;
-  final String? startingFolder;
-  final String? mediaFilter;
-  final SortBy sortBy;
-  final bool sortAscending;
-  final Set<String>? pinnedPaths;
   final VideoPlaybackMode playbackMode;
   final double playbackSpeed;
   final bool isMuted;
 }
 
-/// App-wide owner of the media player once the media viewer has been closed
-/// ("keep playing after closing", see [ContinuePlaybackMode]).
+/// Keeps audio playing after the media viewer has been closed.
 ///
-/// The viewer normally owns the player and releases it when it goes away. When
-/// the person closes it with the setting on, it calls [adopt] instead of
-/// disposing its [VideoPlaybackManager]: the same native player (and, for
-/// background playback, the same media notification) carries on, and the
-/// mini player layer (`MiniPlayerLayer`) shows a bar or a floating video window
-/// for it. Opening the viewer again takes the session back with [take].
+/// The viewer normally owns the player and releases it when it goes away.
+/// When the person closes it with audio playing and the setting on, it calls
+/// [adopt] instead of disposing its [VideoPlaybackManager]: the same native
+/// player and media notification carry on, with no screen of their own -- the
+/// notification's Previous / Next / Stop are the controls. Opening that same
+/// item again hands the player back to the viewer ([takeMatching]).
+///
+/// The audio ends, and the player is released, when: the notification's Stop
+/// is used, the track ends with nothing to advance to, playback errors, the
+/// vault it plays from locks or is detached, or the app locks.
 ///
 /// The app has a single native player, so anything else that wants it (another
 /// viewer item, the video / audio editor, the capture review) must release
@@ -82,23 +65,13 @@ class MiniPlayerSession {
 ///
 /// Plain Dart singleton rather than a provider on purpose: it is touched from
 /// `State.dispose`, where provider state must not be modified.
-class MiniPlayerHost {
-  MiniPlayerHost._();
+class BackgroundPlaybackHost {
+  BackgroundPlaybackHost._();
 
-  static final MiniPlayerHost instance = MiniPlayerHost._();
+  static final BackgroundPlaybackHost instance = BackgroundPlaybackHost._();
 
-  MiniPlayerSession? _session;
+  BackgroundPlaybackSession? _session;
   Future<void>? _closing;
-
-  /// The session being shown, or null. Updated asynchronously (see
-  /// [_publish]) because it changes from `dispose` / `initState`, where
-  /// notifying widgets is not allowed.
-  final ValueNotifier<MiniPlayerSession?> sessionNotifier =
-      ValueNotifier<MiniPlayerSession?>(null);
-
-  /// True while at least one media viewer is open. The mini player stays out
-  /// of the way then: the viewer has its own controls.
-  final ValueNotifier<bool> viewerOpen = ValueNotifier<bool>(false);
   int _viewerCount = 0;
 
   StreamSubscription<MediaSessionAction>? _actionSubscription;
@@ -111,44 +84,23 @@ class MiniPlayerHost {
   String? _lastSavedFile;
   Duration _lastSavedPosition = Duration.zero;
 
-  MiniPlayerSession? get session => _session;
-  bool get hasSession => _session != null;
-
   /// True while a session exists or is still being torn down, i.e. whenever
   /// the native player may not be free yet.
   bool get needsRelease => _session != null || _closing != null;
 
-  NativeVideoController? get activeController =>
-      _session?.playbackManager.activeController;
-
-  // --- Viewer bookkeeping ---
-
-  void registerViewer() {
-    _viewerCount++;
-    _publish();
-  }
+  /// Viewers tell the host they are open: a viewer answers the notification's
+  /// Previous / Next for its own playlist, so the host must not as well.
+  void registerViewer() => _viewerCount++;
 
   void unregisterViewer() {
     if (_viewerCount > 0) _viewerCount--;
-    _publish();
-  }
-
-  /// Pushes the current state to the notifiers once the current build /
-  /// unmount pass is over. Notifying listeners while the widget tree is being
-  /// built or torn down throws in debug builds.
-  void _publish() {
-    scheduleMicrotask(() {
-      if (sessionNotifier.value != _session) sessionNotifier.value = _session;
-      final open = _viewerCount > 0;
-      if (viewerOpen.value != open) viewerOpen.value = open;
-    });
   }
 
   // --- Hand-off ---
 
   /// Takes over the player from a closing viewer. Returns false (and leaves
   /// the player to the caller, who must dispose it) when the app is locked.
-  bool adopt(MiniPlayerSession session) {
+  bool adopt(BackgroundPlaybackSession session) {
     final lockController = session.providers.read(
       sessionLockControllerProvider,
     );
@@ -164,25 +116,16 @@ class MiniPlayerHost {
     }
     _session = session;
     _attach(session);
-    _publish();
     return true;
   }
 
-  /// Gives the session back to a viewer that is opening. The player keeps
+  /// Gives the session back to a viewer that is opening on the very item it
+  /// plays, so the audio carries on instead of restarting. The player keeps
   /// playing; only this host's listeners are removed.
-  MiniPlayerSession? take() {
-    final session = _session;
-    if (session == null) return null;
-    _detach(session);
-    _session = null;
-    _publish();
-    return session;
-  }
-
-  /// Like [take], but only when the session is playing [file] of [container]:
-  /// opening that exact item from the file browser continues it instead of
-  /// restarting.
-  MiniPlayerSession? takeMatching(MountedContainer container, String file) {
+  BackgroundPlaybackSession? takeMatching(
+    MountedContainer container,
+    String file,
+  ) {
     final session = _session;
     if (session == null) return null;
     if (session.container.uri != container.uri ||
@@ -192,12 +135,14 @@ class MiniPlayerHost {
     if (session.playbackManager.currentFileName != file) return null;
     final controller = session.playbackManager.activeController;
     if (controller == null || controller.isDisposed) return null;
-    return take();
+    _detach(session);
+    _session = null;
+    return session;
   }
 
-  /// Stops playback, releases the native player and removes the mini player.
-  /// The returned future completes once the native release has finished, so
-  /// the caller can safely start another player. Safe to call repeatedly.
+  /// Stops playback, releases the native player and the notification. The
+  /// returned future completes once the native release has finished, so the
+  /// caller can safely start another player. Safe to call repeatedly.
   Future<void> closeAndWait() {
     final pending = _closing;
     if (pending != null) return pending;
@@ -211,10 +156,9 @@ class MiniPlayerHost {
     return future;
   }
 
-  Future<void> _teardown(MiniPlayerSession session) async {
+  Future<void> _teardown(BackgroundPlaybackSession session) async {
     _detach(session);
     if (identical(_session, session)) _session = null;
-    sessionNotifier.value = null;
     try {
       session.providers.read(sessionLockControllerProvider).setMediaPlaying(
         false,
@@ -240,11 +184,11 @@ class MiniPlayerHost {
 
   // --- Wiring ---
 
-  void _attach(MiniPlayerSession session) {
+  void _attach(BackgroundPlaybackSession session) {
     final events = session.providers.read(vaultEngineEventsProvider);
     void onVolumeGone(int volId) {
       if (volId == session.container.volId && identical(_session, session)) {
-        VeLog.i(_kTag, 'Container went away; closing the mini player');
+        VeLog.i(_kTag, 'Container went away; ending background playback');
         unawaited(closeAndWait());
       }
     }
@@ -258,9 +202,6 @@ class MiniPlayerHost {
     session.playbackManager.activeControllerNotifier.addListener(
       _onActiveControllerChanged,
     );
-    session.playbackManager.currentFileNotifier.addListener(
-      _onActiveControllerChanged,
-    );
 
     _advancing = false;
     _reportedPlaying = null;
@@ -271,7 +212,7 @@ class MiniPlayerHost {
     _syncNavigation(session);
   }
 
-  void _detach(MiniPlayerSession session) {
+  void _detach(BackgroundPlaybackSession session) {
     _advanceTimer?.cancel();
     _advanceTimer = null;
     _advancing = false;
@@ -291,13 +232,9 @@ class MiniPlayerHost {
       session.playbackManager.activeControllerNotifier.removeListener(
         _onActiveControllerChanged,
       );
-      session.playbackManager.currentFileNotifier.removeListener(
-        _onActiveControllerChanged,
-      );
     } catch (_) {
       // Notifier already disposed along with its manager.
     }
-    PictureInPictureCoordinator.instance.detach(this);
     final events = session.providers.read(vaultEngineEventsProvider);
     final locked = _lockedListener;
     final detached = _detachedListener;
@@ -313,7 +250,7 @@ class MiniPlayerHost {
     _bindController(session);
   }
 
-  void _bindController(MiniPlayerSession session) {
+  void _bindController(BackgroundPlaybackSession session) {
     final previous = _tickController;
     if (previous != null) {
       try {
@@ -326,7 +263,6 @@ class MiniPlayerHost {
     _tickController = controller;
     _advancing = false;
     _reportedPlaying = null;
-    _syncPictureInPicture(session);
     if (controller == null || controller.isDisposed) return;
     controller.addListener(_onTick);
     // Every item gets its own native controller, which starts at the default
@@ -335,33 +271,13 @@ class MiniPlayerHost {
     _reportPlaying(session, controller.value.isPlaying);
   }
 
-  /// Offers the mini player's video to Android's picture-in-picture window
-  /// (when the setting is on), or withdraws it for audio.
-  void _syncPictureInPicture(MiniPlayerSession session) {
-    final coordinator = PictureInPictureCoordinator.instance;
-    final file = session.playbackManager.currentFileName;
-    final controller = session.playbackManager.activeController;
-    if (file == null ||
-        controller == null ||
-        controller.isDisposed ||
-        !MediaViewerConstants.isVideo(file)) {
-      coordinator.detach(this);
-      return;
-    }
-    coordinator.attach(
-      this,
-      controller,
-      enabled: _config(session).pictureInPictureEnabled,
-    );
-  }
-
-  MediaViewerToolbarConfig _config(MiniPlayerSession session) => session
+  MediaViewerToolbarConfig _config(BackgroundPlaybackSession session) => session
       .providers
       .read(fileManagerToolbarSettingsProvider(null))
       .config
       .mediaViewerToolbarConfig;
 
-  void _reportPlaying(MiniPlayerSession session, bool isPlaying) {
+  void _reportPlaying(BackgroundPlaybackSession session, bool isPlaying) {
     if (_reportedPlaying == isPlaying) return;
     _reportedPlaying = isPlaying;
     // Same signal the viewer's player widget gives: inactivity timers are
@@ -377,7 +293,7 @@ class MiniPlayerHost {
     if (session == null || controller == null || controller.isDisposed) return;
     final value = controller.value;
     if (value.hasError) {
-      VeLog.w(_kTag, 'Playback error; closing the mini player');
+      VeLog.w(_kTag, 'Playback error; ending background playback');
       unawaited(closeAndWait());
       return;
     }
@@ -406,17 +322,28 @@ class MiniPlayerHost {
       }
       return;
     }
-    if (_advancing) return;
-    if (session.playbackMode == VideoPlaybackMode.playAndAdvance &&
-        position >= duration) {
-      _advancing = true;
-      unawaited(controller.pause());
-      _advanceTimer?.cancel();
-      _advanceTimer = Timer(const Duration(milliseconds: 300), () {
-        _advanceTimer = null;
-        unawaited(_step(1));
-      });
+    if (_advancing || position < duration) return;
+    _advancing = true;
+    unawaited(controller.pause());
+    _advanceTimer?.cancel();
+    _advanceTimer = Timer(const Duration(milliseconds: 300), () {
+      _advanceTimer = null;
+      unawaited(_onItemEnded(session));
+    });
+  }
+
+  /// The item ran to its end: on to the next one in play-and-advance mode,
+  /// otherwise there is nothing left to keep alive.
+  Future<void> _onItemEnded(BackgroundPlaybackSession session) async {
+    if (!identical(_session, session)) return;
+    if (session.playbackMode == VideoPlaybackMode.playAndAdvance) {
+      final target = _neighbour(1);
+      if (target != null) {
+        await _playIndex(session, target);
+        return;
+      }
     }
+    await closeAndWait();
   }
 
   // --- Navigation ---
@@ -425,48 +352,39 @@ class MiniPlayerHost {
     // While a viewer is open it handles Previous / Next for its own playlist;
     // answering too would move two playlists at once. Stop always applies: the
     // native side has already ended playback.
-    if (action != MediaSessionAction.stop && viewerOpen.value) return;
+    if (action != MediaSessionAction.stop && _viewerCount > 0) return;
     switch (action) {
       case MediaSessionAction.next:
-        unawaited(next());
+        unawaited(_step(1));
       case MediaSessionAction.previous:
-        unawaited(previous());
+        unawaited(_step(-1));
       case MediaSessionAction.stop:
         unawaited(closeAndWait());
     }
   }
 
-  Future<void> next() => _step(1);
-  Future<void> previous() => _step(-1);
+  bool get _hasNext => _neighbour(1) != null;
+  bool get _hasPrevious => _neighbour(-1) != null;
 
-  bool get hasNext => _neighbour(1) != null;
-  bool get hasPrevious => _neighbour(-1) != null;
-
-  /// Index of the closest playable item in [direction], wrapping around only
-  /// when "loop playlist" is on; null when there is none.
+  /// Index of the closest audio item in [direction], wrapping around only when
+  /// "loop playlist" is on; null when there is none. Videos and images have
+  /// no place to play in the background, so they are skipped.
   int? _neighbour(int direction) {
     final session = _session;
     if (session == null) return null;
     final playlist = session.playlist;
     final count = playlist.playlist.length;
     if (count <= 1) return null;
-    final config = _config(session);
+    final loop = _config(session).loopPlaylist;
     var index = playlist.currentIndex;
     for (var i = 0; i < count - 1; i++) {
       var candidate = index + direction;
       if (candidate < 0 || candidate >= count) {
-        if (!config.loopPlaylist) return null;
+        if (!loop) return null;
         candidate = (candidate + count) % count;
       }
       index = candidate;
-      final file = playlist.playlist[index];
-      final isVideo = MediaViewerConstants.isVideo(file);
-      final isAudio = MediaViewerConstants.isAudio(file);
-      final allowed =
-          isAudio ||
-          (isVideo &&
-              config.continuePlaybackMode != ContinuePlaybackMode.audioOnly);
-      if (allowed) return index;
+      if (MediaViewerConstants.isAudio(playlist.playlist[index])) return index;
     }
     return null;
   }
@@ -482,7 +400,7 @@ class MiniPlayerHost {
     await _playIndex(session, target);
   }
 
-  Future<void> _playIndex(MiniPlayerSession session, int index) async {
+  Future<void> _playIndex(BackgroundPlaybackSession session, int index) async {
     final manager = session.playbackManager;
     final previousFile = manager.currentFileName;
     final previousValue = manager.activeController?.value;
@@ -518,7 +436,7 @@ class MiniPlayerHost {
         mediaSession: true,
       );
     } catch (e) {
-      VeLog.w(_kTag, 'Could not switch item; closing the mini player', e);
+      VeLog.w(_kTag, 'Could not switch item; ending background playback', e);
       unawaited(closeAndWait());
       return;
     }
@@ -528,40 +446,22 @@ class MiniPlayerHost {
 
   /// Tells the media notification whether Previous / Next can act, like the
   /// viewer does for its own playlist.
-  void _syncNavigation(MiniPlayerSession session) {
+  void _syncNavigation(BackgroundPlaybackSession session) {
     final count = session.playlist.playlist.length;
     unawaited(
       MediaSessionBridge.setNavigation(
-        hasPrevious: hasPrevious,
-        hasNext: hasNext,
+        hasPrevious: _hasPrevious,
+        hasNext: _hasNext,
         currentPosition: count > 1 ? session.playlist.currentIndex + 1 : 0,
         totalItems: count > 1 ? count : 0,
       ),
     );
   }
 
-  // --- Transport ---
-
-  void togglePlayPause() {
-    final controller = activeController;
-    if (controller == null || controller.isDisposed) return;
-    if (controller.value.isPlaying) {
-      unawaited(controller.pause());
-    } else {
-      unawaited(controller.play());
-    }
-  }
-
-  void seekTo(Duration position) {
-    final controller = activeController;
-    if (controller == null || controller.isDisposed) return;
-    unawaited(controller.seekTo(position));
-  }
-
   // --- Resume position ---
 
   Future<void> _savePosition(
-    MiniPlayerSession session,
+    BackgroundPlaybackSession session,
     String file,
     Duration position,
     Duration? duration,

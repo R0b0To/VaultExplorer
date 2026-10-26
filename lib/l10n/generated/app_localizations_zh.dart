@@ -7533,35 +7533,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get resumePlaybackResume => '继续';
 
   @override
-  String get continuePlaybackTitle => '关闭后继续播放';
+  String get pictureInPictureTitle => '自动画中画';
 
   @override
-  String get continuePlaybackOff => '关闭';
+  String get pictureInPictureSubtitle => '播放视频时离开应用将自动进入画中画';
 
   @override
-  String get continuePlaybackAudioOnly => '仅音频';
+  String get pictureInPictureAction => '画中画';
 
   @override
-  String get continuePlaybackAudioAndVideo => '音频和视频';
+  String get keepAudioPlayingTitle => '关闭后继续播放音频';
 
   @override
-  String get continuePlaybackOffDescription => '关闭查看器会停止播放';
-
-  @override
-  String get continuePlaybackAudioOnlyDescription => '音频将在迷你播放器中继续播放';
-
-  @override
-  String get continuePlaybackAudioAndVideoDescription =>
-      '音频在迷你播放器中继续播放，视频在悬浮窗口中继续播放';
-
-  @override
-  String get miniPlayerOpenTooltip => '打开播放器';
-
-  @override
-  String get pictureInPictureTitle => '画中画';
-
-  @override
-  String get pictureInPictureSubtitle => '离开应用时，视频将在小型悬浮窗口中继续播放';
+  String get keepAudioPlayingSubtitle => '离开播放器后音频仍在后台播放，可通过通知控制';
 
   @override
   String get mediaControlsResetSuccess => '媒体控制已重置为默认设置';

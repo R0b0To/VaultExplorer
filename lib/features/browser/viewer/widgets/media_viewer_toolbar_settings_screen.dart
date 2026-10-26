@@ -10,7 +10,6 @@ import 'package:vaultexplorer/data/models/media_decoder_mode.dart';
 import 'package:vaultexplorer/data/models/media_viewer_action.dart';
 import 'package:vaultexplorer/data/models/media_viewer_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/resume_playback_mode.dart';
-import 'package:vaultexplorer/data/models/continue_playback_mode.dart';
 import 'package:vaultexplorer/data/models/scrub_preview_style.dart';
 import 'package:vaultexplorer/data/models/thumbnail_generation_strategy.dart';
 import 'package:vaultexplorer/data/models/video_aspect_ratio_mode.dart';
@@ -709,37 +708,6 @@ class _MediaViewerToolbarSettingsScreenState
       );
     }
 
-    if ('keep playing background mini player floating window pip continue audio video'
-            .contains(query) ||
-        l10n.continuePlaybackTitle.toLowerCase().contains(query)) {
-      matchingSettings.add(
-        OptionPickerTile<ContinuePlaybackMode>(
-          label: l10n.continuePlaybackTitle,
-          value: mediaConfig.continuePlaybackMode,
-          prefixIcon: Icons.picture_in_picture_alt_rounded,
-          options: ContinuePlaybackMode.values.map((mode) {
-            return SelectOption(
-              value: mode,
-              label: switch (mode) {
-                ContinuePlaybackMode.off => l10n.continuePlaybackOff,
-                ContinuePlaybackMode.audioOnly => l10n.continuePlaybackAudioOnly,
-                ContinuePlaybackMode.audioAndVideo =>
-                  l10n.continuePlaybackAudioAndVideo,
-              },
-              subtitle: switch (mode) {
-                ContinuePlaybackMode.off => l10n.continuePlaybackOffDescription,
-                ContinuePlaybackMode.audioOnly =>
-                  l10n.continuePlaybackAudioOnlyDescription,
-                ContinuePlaybackMode.audioAndVideo =>
-                  l10n.continuePlaybackAudioAndVideoDescription,
-              },
-            );
-          }).toList(),
-          onChanged: controller.setMediaViewerContinuePlaybackMode,
-        ),
-      );
-    }
-
     if ('swipe to seek fast forward rewind'.contains(query) ||
         l10n.swipeToSeekTitle.toLowerCase().contains(query)) {
       matchingSettings.add(
@@ -1110,32 +1078,6 @@ class MediaViewerPlaybackSettingsScreen extends ConsumerWidget {
                     }).toList(),
                     onChanged: controller.setMediaViewerResumePlaybackMode,
                   ),
-                  OptionPickerTile<ContinuePlaybackMode>(
-                    label: l10n.continuePlaybackTitle,
-                    value: mediaConfig.continuePlaybackMode,
-                    prefixIcon: Icons.picture_in_picture_alt_rounded,
-                    options: ContinuePlaybackMode.values.map((mode) {
-                      return SelectOption(
-                        value: mode,
-                        label: switch (mode) {
-                          ContinuePlaybackMode.off => l10n.continuePlaybackOff,
-                          ContinuePlaybackMode.audioOnly =>
-                            l10n.continuePlaybackAudioOnly,
-                          ContinuePlaybackMode.audioAndVideo =>
-                            l10n.continuePlaybackAudioAndVideo,
-                        },
-                        subtitle: switch (mode) {
-                          ContinuePlaybackMode.off =>
-                            l10n.continuePlaybackOffDescription,
-                          ContinuePlaybackMode.audioOnly =>
-                            l10n.continuePlaybackAudioOnlyDescription,
-                          ContinuePlaybackMode.audioAndVideo =>
-                            l10n.continuePlaybackAudioAndVideoDescription,
-                        },
-                      );
-                    }).toList(),
-                    onChanged: controller.setMediaViewerContinuePlaybackMode,
-                  ),
                   SwitchListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                     value: mediaConfig.showCenterTransportForImages,
@@ -1253,6 +1195,28 @@ class MediaViewerPlaybackSettingsScreen extends ConsumerWidget {
                     ),
                     secondary: Icon(
                       Icons.description_outlined,
+                      color: cs.primary,
+                    ),
+                  ),
+                  SwitchListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                    value: mediaConfig.keepAudioPlayingAfterClose,
+                    onChanged:
+                        controller.setMediaViewerKeepAudioPlayingAfterClose,
+                    title: Text(
+                      l10n.keepAudioPlayingTitle,
+                      style: textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      l10n.keepAudioPlayingSubtitle,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                    secondary: Icon(
+                      Icons.headphones_rounded,
                       color: cs.primary,
                     ),
                   ),

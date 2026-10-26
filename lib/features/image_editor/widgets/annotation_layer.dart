@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/features/image_editor/models/edit_annotation.dart';
 
-enum EditorTool { none, crop, draw, text, redact }
+enum EditorTool { none, crop, draw, text, redact, tuneImage, looks }
 
 enum _Edge { left, top, right, bottom }
 

@@ -13345,65 +13345,35 @@ abstract class AppLocalizations {
   /// **'Resume'**
   String get resumePlaybackResume;
 
-  /// Title of the setting that lets audio and video keep playing after the media viewer is closed
+  /// Title of the setting that makes a playing video enter Android picture-in-picture by itself when the app is left
   ///
   /// In en, this message translates to:
-  /// **'Keep playing after closing'**
-  String get continuePlaybackTitle;
+  /// **'Automatic picture-in-picture'**
+  String get pictureInPictureTitle;
 
-  /// Option: closing the media viewer stops playback
+  /// Explains the automatic picture-in-picture setting of the media viewer
   ///
   /// In en, this message translates to:
-  /// **'Off'**
-  String get continuePlaybackOff;
+  /// **'Enter picture-in-picture when you leave the app while a video plays'**
+  String get pictureInPictureSubtitle;
 
-  /// Option: only audio keeps playing after the media viewer is closed
-  ///
-  /// In en, this message translates to:
-  /// **'Audio only'**
-  String get continuePlaybackAudioOnly;
-
-  /// Option: audio and video keep playing after the media viewer is closed
-  ///
-  /// In en, this message translates to:
-  /// **'Audio and video'**
-  String get continuePlaybackAudioAndVideo;
-
-  /// Explains the Off option of the keep-playing setting
-  ///
-  /// In en, this message translates to:
-  /// **'Closing the viewer stops playback'**
-  String get continuePlaybackOffDescription;
-
-  /// Explains the Audio only option of the keep-playing setting
-  ///
-  /// In en, this message translates to:
-  /// **'Audio keeps playing in a mini player'**
-  String get continuePlaybackAudioOnlyDescription;
-
-  /// Explains the Audio and video option of the keep-playing setting
-  ///
-  /// In en, this message translates to:
-  /// **'Audio keeps playing in a mini player, video in a floating window'**
-  String get continuePlaybackAudioAndVideoDescription;
-
-  /// Tooltip for the mini player action that reopens the full media viewer
-  ///
-  /// In en, this message translates to:
-  /// **'Open player'**
-  String get miniPlayerOpenTooltip;
-
-  /// Title of the setting that keeps a playing video on screen in Android picture-in-picture when the app is left
+  /// Label and tooltip of the media viewer button that puts the video in a picture-in-picture window
   ///
   /// In en, this message translates to:
   /// **'Picture-in-picture'**
-  String get pictureInPictureTitle;
+  String get pictureInPictureAction;
 
-  /// Explains the picture-in-picture setting of the media viewer
+  /// Title of the setting that keeps audio playing in the background after the media viewer is closed
   ///
   /// In en, this message translates to:
-  /// **'Keep video playing in a small floating window when you leave the app'**
-  String get pictureInPictureSubtitle;
+  /// **'Keep audio playing after closing'**
+  String get keepAudioPlayingTitle;
+
+  /// Explains the keep-audio-playing setting: audio continues and is controlled from the notification
+  ///
+  /// In en, this message translates to:
+  /// **'Audio keeps playing in the background when you leave the player; use the notification to control it'**
+  String get keepAudioPlayingSubtitle;
 
   /// Snackbar message when media controls are reset to defaults
   ///

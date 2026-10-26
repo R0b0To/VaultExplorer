@@ -8131,38 +8131,22 @@ class AppLocalizationsFr extends AppLocalizations {
   String get resumePlaybackResume => 'Reprendre';
 
   @override
-  String get continuePlaybackTitle => 'Continuer la lecture après la fermeture';
-
-  @override
-  String get continuePlaybackOff => 'Désactivé';
-
-  @override
-  String get continuePlaybackAudioOnly => 'Audio uniquement';
-
-  @override
-  String get continuePlaybackAudioAndVideo => 'Audio et vidéo';
-
-  @override
-  String get continuePlaybackOffDescription =>
-      'La fermeture de la visionneuse arrête la lecture';
-
-  @override
-  String get continuePlaybackAudioOnlyDescription =>
-      'Le son continue dans un mini-lecteur';
-
-  @override
-  String get continuePlaybackAudioAndVideoDescription =>
-      'Le son continue dans un mini-lecteur, la vidéo dans une fenêtre flottante';
-
-  @override
-  String get miniPlayerOpenTooltip => 'Ouvrir le lecteur';
-
-  @override
-  String get pictureInPictureTitle => 'Image dans l’image';
+  String get pictureInPictureTitle => 'Image dans l’image automatique';
 
   @override
   String get pictureInPictureSubtitle =>
-      'La vidéo continue dans une petite fenêtre flottante en quittant l’application';
+      'Passer en image dans l’image en quittant l’application pendant la lecture d’une vidéo';
+
+  @override
+  String get pictureInPictureAction => 'Image dans l’image';
+
+  @override
+  String get keepAudioPlayingTitle =>
+      'Continuer la lecture audio après la fermeture';
+
+  @override
+  String get keepAudioPlayingSubtitle =>
+      'Le son continue en arrière-plan après la fermeture du lecteur ; commande depuis la notification';
 
   @override
   String get mediaControlsResetSuccess =>

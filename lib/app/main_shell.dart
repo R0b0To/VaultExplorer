@@ -21,7 +21,7 @@ import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
-import 'package:vaultexplorer/features/browser/viewer/mini_player/mini_player_host.dart';
+import 'package:vaultexplorer/features/browser/viewer/background_playback/background_playback_host.dart';
 import 'package:vaultexplorer/features/browser/browser_tabs_host.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
 import 'package:vaultexplorer/features/browser/models/browser_tab_origin.dart';
@@ -288,9 +288,8 @@ class _MainShellState extends ConsumerState<MainShell>
           !lockController.isVaultAutoLockPaused;
     }
     if (leaveToDecoy) {
-      // Nothing from the vault may keep playing (or stay on screen) in the
-      // decoy identity.
-      unawaited(MiniPlayerHost.instance.closeAndWait());
+      // Nothing from the vault may keep playing in the decoy identity.
+      unawaited(BackgroundPlaybackHost.instance.closeAndWait());
       final navigator = Navigator.of(context, rootNavigator: true);
       if (navigator.canPop()) {
         navigator.popUntil((route) => route.isFirst);
@@ -347,15 +346,14 @@ class _MainShellState extends ConsumerState<MainShell>
       final mode = await disguiseModeApi.getMode();
       if (!mounted) return;
 
-      // The mini player floats above every page, the lock gate included, so
-      // it must not outlive the app lock.
+      // Background audio must not outlive the app lock.
       final lockSettings = _container
           .read(appSettingsControllerProvider)
           .settings;
       if (mode == DisguiseMode.decoy ||
           (lockSettings.useMasterPassword &&
               lockSettings.masterPasswordHash != null)) {
-        unawaited(MiniPlayerHost.instance.closeAndWait());
+        unawaited(BackgroundPlaybackHost.instance.closeAndWait());
       }
 
       final navigator = Navigator.of(context);

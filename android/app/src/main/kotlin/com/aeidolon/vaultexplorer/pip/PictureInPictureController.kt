@@ -16,14 +16,18 @@ import io.flutter.plugin.common.MethodChannel
  * leaves the app (home, recents, another app), the activity shrinks into
  * Android's PiP window instead of going away.
  *
- * Dart owns the decision of *whether* a video is worth keeping on screen. It
- * calls `setState` with `armed = true` while a video plays (and the setting
- * is on) and `armed = false` otherwise. This class only turns that into the
- * platform calls:
+ * Dart owns the decision of *whether* a video is worth keeping on screen.
  *
- *  * Android 12+ (API 31): `setAutoEnterEnabled(armed)`, so the system enters
- *    PiP on its own when the person leaves, with its proper animation.
- *  * Android 8-11: enter from [onUserLeaveHint].
+ *  * Automatic: Dart calls `setState` with `armed = true` while a video plays
+ *    and the "automatic picture-in-picture" setting is on, `armed = false`
+ *    otherwise. This class turns that into platform calls:
+ *
+ *      - Android 12+ (API 31): `setAutoEnterEnabled(armed)`, so the system
+ *        enters PiP on its own when the person leaves, with its proper
+ *        animation.
+ *      - Android 8-11: enter from [onUserLeaveHint].
+ *  * On demand: Dart calls `enter` (the viewer's picture-in-picture button),
+ *    which enters PiP right away whatever the setting says.
  *
  * While the window is up, Dart replaces the whole app with just the video
  * (see `PictureInPictureLayer`); this class reports mode changes to it with
@@ -45,6 +49,9 @@ class PictureInPictureController(private val activity: MainActivity) {
     /** True from entering PiP until the activity is next resumed. */
     private var inPipSession = false
 
+    /** True while an on-demand [enterNow] is in flight. */
+    private var entering = false
+
     private val supported: Boolean by lazy {
         activity.packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
     }
@@ -63,6 +70,12 @@ class PictureInPictureController(private val activity: MainActivity) {
                     applyParams()
                     result.success(true)
                 }
+                "enter" -> {
+                    val width = (call.argument<Number>("width") ?: 16).toInt()
+                    val height = (call.argument<Number>("height") ?: 9).toInt()
+                    aspect = clampedRatio(width, height)
+                    result.success(enterNow())
+                }
                 else -> result.notImplemented()
             }
         }
@@ -74,7 +87,7 @@ class PictureInPictureController(private val activity: MainActivity) {
      * video the person asked to keep on screen.
      */
     val keepsContentVisible: Boolean
-        get() = (isActive || armed) && isScreenOn()
+        get() = (isActive || armed || entering) && isScreenOn()
 
     // A pause because the screen turned off is never a PiP entry: the curtain
     // must still cover the last frame there.
@@ -87,24 +100,41 @@ class PictureInPictureController(private val activity: MainActivity) {
         // From API 31 the system enters on its own (auto-enter); entering here
         // as well would race it.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) return
-        if (!armed || !supported || activity.isFinishing) return
-        try {
-            activity.enterPictureInPictureMode(buildParams())
+        if (!armed) return
+        enterNow()
+    }
+
+    /** Enters the PiP window now. Returns whether the system accepted it. */
+    private fun enterNow(): Boolean {
+        if (!supported || activity.isFinishing || activity.isDestroyed) return false
+        entering = true
+        return try {
+            val entered = activity.enterPictureInPictureMode(buildParams())
+            if (!entered) entering = false
+            entered
         } catch (e: IllegalStateException) {
+            entering = false
             VeLog.w(TAG, e) { "enterPictureInPictureMode refused" }
+            false
         } catch (e: IllegalArgumentException) {
+            entering = false
             VeLog.w(TAG, e) { "enterPictureInPictureMode rejected its parameters" }
+            false
         }
     }
 
     fun onModeChanged(active: Boolean) {
+        entering = false
         isActive = active
         if (active) inPipSession = true
         channel?.invokeMethod("modeChanged", mapOf("active" to active))
     }
 
     fun onResume() {
-        inPipSession = false
+        entering = false
+        // Some Android versions resume the activity while it is in the PiP
+        // window; only a resume out of PiP ends the session.
+        if (!isActive) inPipSession = false
     }
 
     /**

@@ -7635,35 +7635,20 @@ class AppLocalizationsJa extends AppLocalizations {
   String get resumePlaybackResume => '再開';
 
   @override
-  String get continuePlaybackTitle => '閉じた後も再生を続ける';
+  String get pictureInPictureTitle => '自動ピクチャーインピクチャー';
 
   @override
-  String get continuePlaybackOff => 'オフ';
+  String get pictureInPictureSubtitle => '動画の再生中にアプリを離れるとピクチャーインピクチャーに切り替わります';
 
   @override
-  String get continuePlaybackAudioOnly => '音声のみ';
+  String get pictureInPictureAction => 'ピクチャーインピクチャー';
 
   @override
-  String get continuePlaybackAudioAndVideo => '音声と動画';
+  String get keepAudioPlayingTitle => '閉じた後も音声を再生し続ける';
 
   @override
-  String get continuePlaybackOffDescription => 'ビューアを閉じると再生が停止します';
-
-  @override
-  String get continuePlaybackAudioOnlyDescription => '音声はミニプレーヤーで再生を続けます';
-
-  @override
-  String get continuePlaybackAudioAndVideoDescription =>
-      '音声はミニプレーヤーで、動画はフローティングウィンドウで再生を続けます';
-
-  @override
-  String get miniPlayerOpenTooltip => 'プレーヤーを開く';
-
-  @override
-  String get pictureInPictureTitle => 'ピクチャーインピクチャー';
-
-  @override
-  String get pictureInPictureSubtitle => 'アプリを離れても、動画を小さなフローティングウィンドウで再生し続けます';
+  String get keepAudioPlayingSubtitle =>
+      'プレーヤーを離れても音声はバックグラウンドで再生され、通知から操作できます';
 
   @override
   String get mediaControlsResetSuccess => 'メディア操作設定をデフォルトに戻しました';

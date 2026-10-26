@@ -8122,38 +8122,22 @@ class AppLocalizationsUk extends AppLocalizations {
   String get resumePlaybackResume => 'Відновити';
 
   @override
-  String get continuePlaybackTitle => 'Продовжувати відтворення після закриття';
-
-  @override
-  String get continuePlaybackOff => 'Вимкнено';
-
-  @override
-  String get continuePlaybackAudioOnly => 'Лише аудіо';
-
-  @override
-  String get continuePlaybackAudioAndVideo => 'Аудіо та відео';
-
-  @override
-  String get continuePlaybackOffDescription =>
-      'Закриття переглядача зупиняє відтворення';
-
-  @override
-  String get continuePlaybackAudioOnlyDescription =>
-      'Аудіо продовжує грати в міні-програвачі';
-
-  @override
-  String get continuePlaybackAudioAndVideoDescription =>
-      'Аудіо продовжує грати в міні-програвачі, відео — у плаваючому вікні';
-
-  @override
-  String get miniPlayerOpenTooltip => 'Відкрити програвач';
-
-  @override
-  String get pictureInPictureTitle => 'Картинка в картинці';
+  String get pictureInPictureTitle => 'Автоматична картинка в картинці';
 
   @override
   String get pictureInPictureSubtitle =>
-      'Відео продовжує грати в маленькому плаваючому вікні після виходу із застосунку';
+      'Переходити в режим «картинка в картинці» під час виходу із застосунку, коли відтворюється відео';
+
+  @override
+  String get pictureInPictureAction => 'Картинка в картинці';
+
+  @override
+  String get keepAudioPlayingTitle =>
+      'Продовжувати відтворення аудіо після закриття';
+
+  @override
+  String get keepAudioPlayingSubtitle =>
+      'Аудіо продовжує грати у фоновому режимі після виходу з програвача; керування через сповіщення';
 
   @override
   String get mediaControlsResetSuccess =>

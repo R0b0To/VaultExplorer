@@ -11,6 +11,13 @@ class ImageEditorAnnotations extends _$ImageEditorAnnotations {
   void add(EditAnnotation annotation) =>
       state = List.unmodifiable([...state, annotation]);
 
+  void insert(int index, EditAnnotation annotation) {
+    final updated = List<EditAnnotation>.of(state);
+    final clamped = index.clamp(0, updated.length);
+    updated.insert(clamped, annotation);
+    state = List.unmodifiable(updated);
+  }
+
   void setAll(List<EditAnnotation> annotations) =>
       state = List.unmodifiable(annotations);
 

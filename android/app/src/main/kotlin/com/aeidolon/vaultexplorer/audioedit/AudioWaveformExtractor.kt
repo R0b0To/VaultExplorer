@@ -84,7 +84,8 @@ object AudioWaveformExtractor {
                 }; " +
                 "thread time: " +
                 "reading ${stats.extractorNs.get() / 1_000_000L}ms, " +
-                "waiting on decoder ${stats.waitNs.get() / 1_000_000L}ms, " +
+                "calling the decoder ${stats.codecNs.get() / 1_000_000L}ms, " +
+                "waiting ${stats.waitNs.get() / 1_000_000L}ms, " +
                 "measuring peaks ${stats.peaksNs.get() / 1_000_000L}ms"
         }
     }
@@ -109,23 +110,51 @@ object AudioWaveformExtractor {
         onPartial: (peaks: ByteArray, peaksPerSecond: Double, from: Int, to: Int) -> Unit = { _, _, _, _ -> },
         cpuCount: Int = Runtime.getRuntime().availableProcessors(),
     ): Waveform {
+        try {
+            return decode(newExtractor, isCancelled, onProgress, onPartial, cpuCount, allowInProcess = true)
+        } catch (e: InProcessDecoderFailed) {
+            // The in-process decoder was only a faster choice, never the only one: start over, and
+            // everything it sent is overwritten from the left.
+            VeLog.i(TAG) { "in-process decoder gave up (${e.cause}); decoding with MediaCodec instead" }
+            return decode(newExtractor, isCancelled, onProgress, onPartial, cpuCount, allowInProcess = false)
+        }
+    }
+
+    /** The in-process decoder, chosen only because it is faster, failed; the platform decoder can still do it. */
+    private class InProcessDecoderFailed(cause: Throwable) : Exception(cause)
+
+    private fun decode(
+        newExtractor: () -> AudioSource,
+        isCancelled: () -> Boolean,
+        onProgress: (Float) -> Unit,
+        onPartial: (peaks: ByteArray, peaksPerSecond: Double, from: Int, to: Int) -> Unit,
+        cpuCount: Int,
+        allowInProcess: Boolean,
+    ): Waveform {
         val wallStartNs = System.nanoTime()
         val stats = WaveformStats()
         val extractor = newExtractor()
         var codec: MediaCodec? = null
         var ffmpeg: FfmpegPcmDecoder? = null
+        var inProcessByChoice = false
         try {
             val track = LosslessAudioCutter.firstAudioTrack(extractor)
             if (track < 0) throw IllegalStateException("No audio track found in this file")
             val format = extractor.getTrackFormat(track)
             val mime = format.getString(MediaFormat.KEY_MIME) ?: throw IllegalStateException("Unknown audio format")
             val isRawTrack = mime == AudioEditMath.MIME_RAW
-            // MediaCodec first. Without a platform decoder for this codec the bundled FFmpeg takes over;
-            // only when neither can decode it is there no waveform (and no point measuring the length).
-            val useFfmpeg = !isRawTrack && !LosslessAudioCutter.hasDecoder(format)
-            if (useFfmpeg && !FfmpegPcmDecoder.supports(mime)) {
+            // The platform decoder, except where the bundled FFmpeg is the faster choice (see
+            // AudioEditMath.prefersInProcessDecoder) or the only one: without a platform decoder for this
+            // codec FFmpeg takes over, and only when neither can decode it is there no waveform (and no
+            // point measuring the length).
+            val platformMissing = !isRawTrack && !LosslessAudioCutter.hasDecoder(format)
+            if (platformMissing && !FfmpegPcmDecoder.supports(mime)) {
                 throw IllegalStateException("This device can't decode $mime, so there is no waveform")
             }
+            inProcessByChoice = allowInProcess && !isRawTrack && !platformMissing &&
+                AudioEditMath.prefersInProcessDecoder(mime) && FfmpegPcmDecoder.supports(mime)
+            val useFfmpeg = platformMissing || inProcessByChoice
+            if (useFfmpeg) stats.mode = "sequential (in-process FFmpeg)"
             stats.openMs = (System.nanoTime() - wallStartNs) / 1_000_000L
             val durationStartNs = System.nanoTime()
             val durationUs = LosslessAudioCutter.durationUsOrMeasure(extractor, track, format) {
@@ -296,6 +325,7 @@ object AudioWaveformExtractor {
                     if (!inputDone) {
                         if (pendingSize < 0 && extractor.sampleTrackIndex >= 0) {
                             var size = -1
+                            val readStart = System.nanoTime()
                             while (true) {
                                 try {
                                     buffer.clear()
@@ -311,6 +341,7 @@ object AudioWaveformExtractor {
                                 pendingTimeUs = extractor.sampleTime
                                 extractor.advance()
                             }
+                            stats.extractorNs.addAndGet(System.nanoTime() - readStart)
                         }
                         if (pendingSize >= 0) {
                             if (activeFfmpeg.queueSample(buffer, pendingSize, pendingTimeUs)) {
@@ -340,7 +371,9 @@ object AudioWaveformExtractor {
                         complete = false
                         break
                     } else if (!progressed) {
+                        val napStart = System.nanoTime()
                         Thread.sleep(FFMPEG_IDLE_SLEEP_MS)
+                        stats.waitNs.addAndGet(System.nanoTime() - napStart)
                     }
                 }
             } else if (activeCodec == null) {
@@ -374,14 +407,18 @@ object AudioWaveformExtractor {
 
                 // Takes one decoded buffer (or format change) if the decoder has one within timeoutUs.
                 fun drainOne(timeoutUs: Long): Boolean {
-                    val outIndex = activeCodec.dequeueOutputBuffer(info, timeoutUs)
+                    val outIndex = if (timeoutUs == 0L) {
+                        stats.time(stats.codecNs) { activeCodec.dequeueOutputBuffer(info, 0L) }
+                    } else {
+                        activeCodec.dequeueOutputBuffer(info, timeoutUs) // blocking: counted as waiting
+                    }
                     return when {
                         outIndex >= 0 -> {
-                            val outBuffer = activeCodec.getOutputBuffer(outIndex)
+                            val outBuffer = stats.time(stats.codecNs) { activeCodec.getOutputBuffer(outIndex) }
                             if (outBuffer != null && info.size > 0) {
                                 stats.time(stats.peaksNs) { reader.consume(outBuffer, info.offset, info.size) }
                             }
-                            activeCodec.releaseOutputBuffer(outIndex, false)
+                            stats.time(stats.codecNs) { activeCodec.releaseOutputBuffer(outIndex, false) }
                             if ((info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) outputDone = true
                             true
                         }
@@ -405,9 +442,9 @@ object AudioWaveformExtractor {
                     // frame and then waiting for it to come back (what this used to do) caps the speed at one
                     // codec round trip per ~23 ms of audio, however fast the decoder itself is.
                     while (!inputDone) {
-                        val inIndex = activeCodec.dequeueInputBuffer(0L)
+                        val inIndex = stats.time(stats.codecNs) { activeCodec.dequeueInputBuffer(0L) }
                         if (inIndex < 0) break
-                        val inBuffer = activeCodec.getInputBuffer(inIndex)
+                        val inBuffer = stats.time(stats.codecNs) { activeCodec.getInputBuffer(inIndex) }
                         val size = if (inBuffer == null) {
                             -1
                         } else {
@@ -417,8 +454,8 @@ object AudioWaveformExtractor {
                             activeCodec.queueInputBuffer(inIndex, 0, 0, 0L, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
                             inputDone = true
                         } else {
-                            val ts = extractor.sampleTime
-                            activeCodec.queueInputBuffer(inIndex, 0, size, ts, 0)
+                            val ts = stats.time(stats.extractorNs) { extractor.sampleTime }
+                            stats.time(stats.codecNs) { activeCodec.queueInputBuffer(inIndex, 0, size, ts, 0) }
                             report(ts)
                             stats.time(stats.extractorNs) { extractor.advance() }
                         }
@@ -444,11 +481,15 @@ object AudioWaveformExtractor {
                 }
             }
 
+            if (!complete && inProcessByChoice) throw IllegalStateException("the in-process decoder stalled")
             VeLog.d(TAG) { "extract: ${accumulator.bucketCount} peaks, complete=$complete" }
             onProgress(1f)
             if (complete) logOverviewAccuracy(rough, accumulator.peaks)
             logTiming(stats, mime, durationUs, wallStartNs, complete)
             return Waveform(accumulator.peaks, peaksPerSecond, complete)
+        } catch (e: Exception) {
+            if (inProcessByChoice && e !is CancelledException) throw InProcessDecoderFailed(e)
+            throw e
         } finally {
             codec?.let {
                 runCatching { it.stop() }

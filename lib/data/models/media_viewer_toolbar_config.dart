@@ -2,7 +2,6 @@ import 'media_viewer_action.dart';
 import 'scrub_preview_style.dart';
 import 'video_aspect_ratio_mode.dart';
 import 'resume_playback_mode.dart';
-import 'continue_playback_mode.dart';
 import 'thumbnail_generation_strategy.dart';
 import 'media_decoder_mode.dart';
 import 'audio_equalizer_settings.dart';
@@ -36,12 +35,13 @@ class MediaViewerToolbarConfig {
   final bool swipeToSeekEnabled;
   final ResumePlaybackMode resumePlaybackMode;
 
-  /// Whether audio / video keeps playing (in the app-wide mini player) after
-  /// the viewer is closed. See [ContinuePlaybackMode].
-  final ContinuePlaybackMode continuePlaybackMode;
+  /// Whether audio keeps playing in the background after the viewer is
+  /// closed (controlled from the media notification).
+  final bool keepAudioPlayingAfterClose;
 
-  /// Whether a playing video carries on in Android's picture-in-picture
-  /// window when the app is left (home, recents, another app).
+  /// Whether a playing video enters Android's picture-in-picture window by
+  /// itself when the app is left (home, recents, another app). Off by
+  /// default: the viewer's picture-in-picture button enters it on demand.
   final bool pictureInPictureEnabled;
   final bool tapEdgesToNavigate;
 
@@ -66,6 +66,7 @@ class MediaViewerToolbarConfig {
     this.topBarActions = const [
       MediaViewerAction.bookmark,
       MediaViewerAction.playlistMenu,
+      MediaViewerAction.pictureInPicture,
     ],
     this.bottomBarActions = const [
       MediaViewerAction.mute,
@@ -119,7 +120,7 @@ class MediaViewerToolbarConfig {
     this.holdToSpeedMultiplier = 2.0,
     this.swipeToSeekEnabled = false,
     this.resumePlaybackMode = ResumePlaybackMode.askEveryTime,
-    this.continuePlaybackMode = ContinuePlaybackMode.off,
+    this.keepAudioPlayingAfterClose = false,
     this.pictureInPictureEnabled = false,
     this.tapEdgesToNavigate = true,
     this.doubleTapPlayPause = true,
@@ -163,7 +164,7 @@ class MediaViewerToolbarConfig {
     double? holdToSpeedMultiplier,
     bool? swipeToSeekEnabled,
     ResumePlaybackMode? resumePlaybackMode,
-    ContinuePlaybackMode? continuePlaybackMode,
+    bool? keepAudioPlayingAfterClose,
     bool? pictureInPictureEnabled,
     bool? tapEdgesToNavigate,
     bool? doubleTapPlayPause,
@@ -211,7 +212,8 @@ class MediaViewerToolbarConfig {
     holdToSpeedMultiplier: holdToSpeedMultiplier ?? this.holdToSpeedMultiplier,
     swipeToSeekEnabled: swipeToSeekEnabled ?? this.swipeToSeekEnabled,
     resumePlaybackMode: resumePlaybackMode ?? this.resumePlaybackMode,
-    continuePlaybackMode: continuePlaybackMode ?? this.continuePlaybackMode,
+    keepAudioPlayingAfterClose:
+        keepAudioPlayingAfterClose ?? this.keepAudioPlayingAfterClose,
     pictureInPictureEnabled:
         pictureInPictureEnabled ?? this.pictureInPictureEnabled,
     tapEdgesToNavigate: tapEdgesToNavigate ?? this.tapEdgesToNavigate,
@@ -306,7 +308,7 @@ class MediaViewerToolbarConfig {
     'holdToSpeedMultiplier': holdToSpeedMultiplier,
     'swipeToSeekEnabled': swipeToSeekEnabled,
     'resumePlaybackMode': resumePlaybackMode.name,
-    'continuePlaybackMode': continuePlaybackMode.name,
+    'keepAudioPlayingAfterClose': keepAudioPlayingAfterClose,
     'pictureInPictureEnabled': pictureInPictureEnabled,
     'tapEdgesToNavigate': tapEdgesToNavigate,
     'doubleTapPlayPause': doubleTapPlayPause,
@@ -419,10 +421,23 @@ class MediaViewerToolbarConfig {
         ? advancedWithNew
         : [...advancedWithNew, MediaViewerAction.equalizer];
 
+    // Same for `pictureInPicture`: a saved layout is the person's own
+    // arrangement, so it joins the More menu instead of crowding a bar.
+    final placed6 = {
+      ...top,
+      ...bottom,
+      ...moreWithAbLoop,
+      ...advancedWithEqualizer,
+      ...hidden,
+    };
+    final moreWithPip = placed6.contains(MediaViewerAction.pictureInPicture)
+        ? moreWithAbLoop
+        : [...moreWithAbLoop, MediaViewerAction.pictureInPicture];
+
     return MediaViewerToolbarConfig(
       topBarActions: top,
       bottomBarActions: bottom,
-      moreMenuActions: moreWithAbLoop,
+      moreMenuActions: moreWithPip,
       advancedSettingsActions: advancedWithEqualizer,
       hiddenActions: hidden,
       showProgressBar: j['showProgressBar'] as bool? ?? true,
@@ -456,9 +471,8 @@ class MediaViewerToolbarConfig {
         (mode) => mode.name == j['resumePlaybackMode'],
         orElse: () => ResumePlaybackMode.askEveryTime,
       ),
-      continuePlaybackMode: ContinuePlaybackMode.fromJson(
-        j['continuePlaybackMode'] as String?,
-      ),
+      keepAudioPlayingAfterClose:
+          j['keepAudioPlayingAfterClose'] as bool? ?? false,
       pictureInPictureEnabled: j['pictureInPictureEnabled'] as bool? ?? false,
       tapEdgesToNavigate: j['tapEdgesToNavigate'] as bool? ?? true,
       doubleTapPlayPause: j['doubleTapPlayPause'] as bool? ?? true,

@@ -30,7 +30,8 @@ enum MediaViewerAction {
   playlistMenu,
   advancedSettings,
   decoder,
-  diagnostics;
+  diagnostics,
+  pictureInPicture;
 
   IconData get icon => switch (this) {
         MediaViewerAction.playPause => Icons.play_arrow_rounded,
@@ -63,6 +64,8 @@ enum MediaViewerAction {
         MediaViewerAction.advancedSettings => Icons.tune_rounded,
         MediaViewerAction.decoder => Icons.memory_rounded,
         MediaViewerAction.diagnostics => Icons.analytics_outlined,
+        MediaViewerAction.pictureInPicture =>
+          Icons.picture_in_picture_alt_rounded,
       };
 
   String getLocalizedLabel(AppLocalizations l10n) => switch (this) {
@@ -95,6 +98,7 @@ enum MediaViewerAction {
         MediaViewerAction.advancedSettings => l10n.advancedSettingsTooltip,
         MediaViewerAction.decoder => l10n.videoDecoderTitle,
         MediaViewerAction.diagnostics => l10n.mediaViewerActionDiagnostics,
+        MediaViewerAction.pictureInPicture => l10n.pictureInPictureAction,
       };
 
   bool isApplicable({required bool isImage, required bool isAudio, required bool isPlaylistMode}) {
@@ -109,7 +113,8 @@ enum MediaViewerAction {
           this == MediaViewerAction.editAudio ||
           this == MediaViewerAction.abLoop ||
           this == MediaViewerAction.decoder ||
-          this == MediaViewerAction.diagnostics) {
+          this == MediaViewerAction.diagnostics ||
+          this == MediaViewerAction.pictureInPicture) {
         return false;
       }
       if (!isPlaylistMode &&
@@ -134,7 +139,9 @@ enum MediaViewerAction {
             this == MediaViewerAction.subtitles ||
             this == MediaViewerAction.rotate90 ||
             this == MediaViewerAction.screenOrientation ||
-            this == MediaViewerAction.aspectRatio)) {
+            this == MediaViewerAction.aspectRatio ||
+            // Picture-in-picture is for video: audio has nothing to show.
+            this == MediaViewerAction.pictureInPicture)) {
       return false;
     }
     if (!isPlaylistMode &&

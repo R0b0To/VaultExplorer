@@ -40,7 +40,8 @@ import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dar
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_lock_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_playback_paths.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_session_bridge.dart';
-import 'package:vaultexplorer/features/browser/viewer/mini_player/mini_player_host.dart';
+import 'package:vaultexplorer/features/browser/viewer/background_playback/background_playback_host.dart';
+import 'package:vaultexplorer/features/browser/viewer/pip/picture_in_picture_bridge.dart';
 import 'package:vaultexplorer/features/browser/viewer/pip/picture_in_picture_coordinator.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_prefetch_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
@@ -98,10 +99,6 @@ class MediaViewerScreen extends ConsumerStatefulWidget {
   /// export, bookmark, and playlist actions must not be available.
   final bool isArchivePreview;
 
-  /// Set when the viewer is reopened from the mini player: the live player and
-  /// playlist it was showing, taken back so playback carries on uninterrupted.
-  final MiniPlayerSession? resumeSession;
-
   const MediaViewerScreen({
     super.key,
     required this.container,
@@ -117,7 +114,6 @@ class MediaViewerScreen extends ConsumerStatefulWidget {
     this.onCurrentFileChanged,
     this.onFileDeleted,
     this.isArchivePreview = false,
-    this.resumeSession,
   });
 
   bool get _isPreviewOnly => isArchivePreview;
@@ -205,14 +201,15 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   bool _wakelockEnabled = false;
   bool _lockedRouteDismissalScheduled = false;
 
-  /// Prepared in [_prepareMiniPlayerHandoff] when the person closes the viewer
-  /// with something playing and "keep playing after closing" allows it;
-  /// [dispose] gives it to [MiniPlayerHost] instead of releasing the player.
-  MiniPlayerSession? _miniPlayerHandoff;
+  /// Prepared in [_prepareBackgroundPlaybackHandoff] when the person closes the
+  /// viewer with audio playing and "keep audio playing after closing" is on;
+  /// [dispose] gives it to [BackgroundPlaybackHost] instead of releasing the
+  /// player.
+  BackgroundPlaybackSession? _backgroundPlaybackHandoff;
 
-  /// The item whose already-running player this viewer took over from the mini
-  /// player, so [_activateCurrentMedia] doesn't seek it back to a saved
-  /// position.
+  /// The item whose already-running player this viewer took over from
+  /// background playback, so [_activateCurrentMedia] doesn't seek it back to a
+  /// saved position.
   String? _adoptedFile;
   int _transitionToken = 0;
   int _resumeFlowToken = 0;
@@ -417,11 +414,21 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     MediaViewerToolbarConfig config,
   ) {
     final hideCarouselAction = !_enableCarousel;
-    if (!widget._isPreviewOnly && !hideCarouselAction) return config;
+    // No picture-in-picture button on a device without the feature.
+    final hidePictureInPicture = !PictureInPictureBridge.isSupported.value;
+    if (!widget._isPreviewOnly &&
+        !hideCarouselAction &&
+        !hidePictureInPicture) {
+      return config;
+    }
     List<MediaViewerAction> filter(List<MediaViewerAction> actions) =>
         actions.where((action) {
           if (widget._isPreviewOnly &&
               !_archivePreviewActions.contains(action)) {
+            return false;
+          }
+          if (hidePictureInPicture &&
+              action == MediaViewerAction.pictureInPicture) {
             return false;
           }
           return !hideCarouselAction ||
@@ -459,33 +466,30 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       _onMediaSessionAction,
     );
 
-    MiniPlayerHost.instance.registerViewer();
-    // Reopened from the mini player, or opening the very item it is playing:
-    // take the running player over instead of starting another one.
+    BackgroundPlaybackHost.instance.registerViewer();
+    // Opening the very item that is still playing in the background: take the
+    // running player over instead of starting another one.
     final carried =
-        widget.resumeSession ??
-        (widget._isPreviewOnly ||
-                widget.initialIndex < 0 ||
-                widget.initialIndex >= widget.mediaFiles.length
-            ? null
-            : MiniPlayerHost.instance.takeMatching(
-                widget.container,
-                widget.mediaFiles[widget.initialIndex],
-              ));
+        widget._isPreviewOnly ||
+            widget.initialIndex < 0 ||
+            widget.initialIndex >= widget.mediaFiles.length
+        ? null
+        : BackgroundPlaybackHost.instance.takeMatching(
+            widget.container,
+            widget.mediaFiles[widget.initialIndex],
+          );
 
-    _playlistController =
-        widget.resumeSession?.playlist ??
-        PlaylistController(
-          container: widget.container,
-          fileIoApi: _fileIoApi,
-          initialMediaFiles: widget.mediaFiles,
-          initialIndex: widget.initialIndex,
-          startingFolder: widget.startingFolder,
-          mediaFilter: widget.mediaFilter,
-          sortBy: widget.sortBy,
-          sortAscending: widget.sortAscending,
-          pinnedPaths: widget.pinnedPaths,
-        );
+    _playlistController = PlaylistController(
+      container: widget.container,
+      fileIoApi: _fileIoApi,
+      initialMediaFiles: widget.mediaFiles,
+      initialIndex: widget.initialIndex,
+      startingFolder: widget.startingFolder,
+      mediaFilter: widget.mediaFilter,
+      sortBy: widget.sortBy,
+      sortAscending: widget.sortAscending,
+      pinnedPaths: widget.pinnedPaths,
+    );
     _wasEmpty = _playlistController.isEmpty;
     _playbackManager = carried?.playbackManager ?? VideoPlaybackManager();
     if (carried != null) {
@@ -583,7 +587,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   /// preview never has a media session, so it ignores this.
   void _closeFromMediaSession() {
     if (widget._isPreviewOnly) return;
-    _miniPlayerHandoff = null;
+    _backgroundPlaybackHandoff = null;
     final route = ModalRoute.of(context);
     if (route == null || !route.isActive) return;
     final navigator = Navigator.of(context);
@@ -595,11 +599,13 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   /// Called when the person closes the viewer (back button or gesture) --
   /// never for closes the app forces (app lock, locked or detached container,
   /// the media notification's Stop), which must always end playback. When
-  /// "keep playing after closing" allows it for what is playing, prepares the
-  /// hand-off that [dispose] completes: the live player goes to
-  /// [MiniPlayerHost] instead of being released.
-  void _prepareMiniPlayerHandoff() {
-    _miniPlayerHandoff = null;
+  /// "keep audio playing after closing" is on and audio is playing, prepares
+  /// the hand-off that [dispose] completes: the live player goes to
+  /// [BackgroundPlaybackHost] instead of being released. Video is never kept
+  /// (there is nowhere to show it; Android's picture-in-picture window is for
+  /// that), nor is anything paused.
+  void _prepareBackgroundPlaybackHandoff() {
+    _backgroundPlaybackHandoff = null;
     if (widget._isPreviewOnly || _playlistController.isEmpty) return;
     if (ref.read(mediaViewerLockProvider(widget.container.volId))) return;
     final file = _playbackManager.currentFileName;
@@ -607,28 +613,20 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     if (file == null || controller == null || controller.isDisposed) return;
     // Mid-transition: the player isn't on the item the playlist points at.
     if (file != _playlistController.currentFile) return;
+    if (!MediaViewerConstants.isAudio(file)) return;
     final value = controller.value;
     if (!value.isInitialized || value.hasError || !value.isPlaying) return;
-    final isVideo = MediaViewerConstants.isVideo(file);
-    if (!isVideo && !MediaViewerConstants.isAudio(file)) return;
-    final mode = ref
+    final keepAudio = ref
         .read(fileManagerToolbarSettingsProvider(null))
         .config
         .mediaViewerToolbarConfig
-        .continuePlaybackMode;
-    if (!mode.keepsPlaying(isVideo: isVideo)) return;
-    _miniPlayerHandoff = MiniPlayerSession(
+        .keepAudioPlayingAfterClose;
+    if (!keepAudio) return;
+    _backgroundPlaybackHandoff = BackgroundPlaybackSession(
       providers: ProviderScope.containerOf(context, listen: false),
       container: widget.container,
       playlist: _playlistController,
       playbackManager: _playbackManager,
-      thumbnailQuality: widget.thumbnailQuality,
-      thumbnailCacheMode: widget.thumbnailCacheMode,
-      startingFolder: widget.startingFolder,
-      mediaFilter: widget.mediaFilter,
-      sortBy: widget.sortBy,
-      sortAscending: widget.sortAscending,
-      pinnedPaths: widget.pinnedPaths,
       playbackMode: _videoPlaybackMode,
       playbackSpeed: _playbackSpeed,
       isMuted: _isMuted,
@@ -649,10 +647,10 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     final token = ++_activateToken;
     final isVid = MediaViewerConstants.isVideo(file);
     final isAud = MediaViewerConstants.isAudio(file);
-    // The app has a single native player: let go of the mini player's before
-    // this viewer starts one of its own.
-    if ((isVid || isAud) && MiniPlayerHost.instance.needsRelease) {
-      await MiniPlayerHost.instance.closeAndWait();
+    // The app has a single native player: let go of the one still playing in
+    // the background before this viewer starts one of its own.
+    if ((isVid || isAud) && BackgroundPlaybackHost.instance.needsRelease) {
+      await BackgroundPlaybackHost.instance.closeAndWait();
       if (!mounted || token != _activateToken) return;
     }
     final isAdopted = _adoptedFile != null && _adoptedFile == file;
@@ -766,7 +764,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
 
   void _onContainerDetached(int volId) {
     if (!mounted || volId != widget.container.volId) return;
-    _miniPlayerHandoff = null;
+    _backgroundPlaybackHandoff = null;
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
@@ -988,9 +986,10 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     _syncPictureInPicture();
   }
 
-  /// Offers the playing video to Android's picture-in-picture window (when
-  /// the setting is on), or withdraws it for anything that isn't a video.
-  /// Idempotent: the coordinator ignores repeats.
+  /// Offers the video on screen to Android's picture-in-picture window (the
+  /// viewer's button enters it; the "automatic" setting enters it on leaving
+  /// the app), or withdraws it for anything that isn't a video. Idempotent:
+  /// the coordinator ignores repeats.
   void _syncPictureInPicture() {
     if (!mounted) return;
     final coordinator = PictureInPictureCoordinator.instance;
@@ -1003,12 +1002,12 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       coordinator.detach(this);
       return;
     }
-    final enabled = ref
+    final autoEnter = ref
         .read(fileManagerToolbarSettingsProvider(null))
         .config
         .mediaViewerToolbarConfig
         .pictureInPictureEnabled;
-    coordinator.attach(this, controller, enabled: enabled);
+    coordinator.attach(this, controller, autoEnter: autoEnter);
   }
 
   void _onControllerTickUpdate() {
@@ -2510,6 +2509,12 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
         _startHideTimer();
         _sessionController.rotateClockwise(_playlistController.currentFile);
         break;
+      case MediaViewerAction.pictureInPicture:
+        if (!isImage) {
+          _syncPictureInPicture();
+          unawaited(PictureInPictureCoordinator.instance.enterNow());
+        }
+        break;
       case MediaViewerAction.playlistMenu:
         _showPlaylistOptionsMenu();
         break;
@@ -2914,7 +2919,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
 
   void _dismissRouteAfterContainerLock() {
     // A locked vault must never leave a player behind.
-    _miniPlayerHandoff = null;
+    _backgroundPlaybackHandoff = null;
     if (_lockedRouteDismissalScheduled) return;
     _lockedRouteDismissalScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -2959,19 +2964,19 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       _onContinuousTransformationChanged,
     );
     _continuousTransformationController.dispose();
-    // Closed with something playing and "keep playing after closing" on: the
-    // mini player takes the live player; otherwise it is released as always.
-    // Withdraw this viewer's video from the PiP window first; the mini player
-    // offers its own once it has adopted the player.
     PictureInPictureCoordinator.instance.detach(this);
-    final handoff = _miniPlayerHandoff;
-    _miniPlayerHandoff = null;
-    final handedOff = handoff != null && MiniPlayerHost.instance.adopt(handoff);
+    // Closed with audio playing and "keep audio playing after closing" on:
+    // background playback takes the live player; otherwise it is released as
+    // always.
+    final handoff = _backgroundPlaybackHandoff;
+    _backgroundPlaybackHandoff = null;
+    final handedOff =
+        handoff != null && BackgroundPlaybackHost.instance.adopt(handoff);
     if (!handedOff) {
       PlaybackThrottleController.setActive(false);
       _playbackManager.dispose();
     }
-    MiniPlayerHost.instance.unregisterViewer();
+    BackgroundPlaybackHost.instance.unregisterViewer();
     _swipePhysicsNotifier.dispose();
     _videoProgressNotifier.dispose();
     _abLoopNotifier.dispose();
@@ -3226,7 +3231,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
           _startHideTimer();
           return;
         }
-        _prepareMiniPlayerHandoff();
+        _prepareBackgroundPlaybackHandoff();
         Navigator.of(context).pop();
       },
       child: AnnotatedRegion<SystemUiOverlayStyle>(

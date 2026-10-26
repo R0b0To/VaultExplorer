@@ -31,9 +31,15 @@ class CropOverlay extends StatelessWidget {
   /// Locked width/height ratio, or null for a free-form crop.
   final double? aspectRatio;
 
+  /// Rotation angle of the underlying image in radians.
+  final double angleRad;
+
+  /// Callback when user drags horizontally on the scrim background (outside
+  /// the crop box) to rotate the image.
+  final ValueChanged<double>? onAngleDelta;
+
   static const double _minSize = 40;
   static const double _cornerHitSize = 52;
-  static const double _cornerVisualSize = 22;
   static const double _edgeHitSize = 48;
 
   const CropOverlay({
@@ -41,6 +47,8 @@ class CropOverlay extends StatelessWidget {
     required this.imageSize,
     required this.rectNotifier,
     this.aspectRatio,
+    this.angleRad = 0.0,
+    this.onAngleDelta,
   });
 
   @override
@@ -52,7 +60,11 @@ class CropOverlay extends StatelessWidget {
           clipBehavior: Clip.none,
           children: [
             Positioned.fill(
-              child: IgnorePointer(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onHorizontalDragUpdate: (details) {
+                  onAngleDelta?.call(details.primaryDelta ?? 0.0);
+                },
                 child: CustomPaint(
                   painter: _CropScrimPainter(rect: rect, bounds: imageSize),
                 ),
@@ -63,7 +75,7 @@ class CropOverlay extends StatelessWidget {
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onPanUpdate: (details) =>
-                    rectNotifier.value = _moveRect(rect, details.delta, imageSize),
+                    rectNotifier.value = _moveRect(rect, details.delta, imageSize, angleRad),
                 child: const SizedBox.expand(),
               ),
             ),
@@ -86,133 +98,107 @@ class CropOverlay extends StatelessWidget {
     return true;
   }
 
- Widget _buildHandle(_CropHandle handle, Rect rect) {
-  final Offset point;
-  final double hitWidth;
-  final double hitHeight;
+  Widget _buildHandle(_CropHandle handle, Rect rect) {
+    final Offset point;
+    final double hitWidth;
+    final double hitHeight;
 
-  switch (handle) {
-    case _CropHandle.topLeft:
-      point = rect.topLeft;
-      hitWidth = _cornerHitSize;
-      hitHeight = _cornerHitSize;
-    case _CropHandle.topRight:
-      point = rect.topRight;
-      hitWidth = _cornerHitSize;
-      hitHeight = _cornerHitSize;
-    case _CropHandle.bottomLeft:
-      point = rect.bottomLeft;
-      hitWidth = _cornerHitSize;
-      hitHeight = _cornerHitSize;
-    case _CropHandle.bottomRight:
-      point = rect.bottomRight;
-      hitWidth = _cornerHitSize;
-      hitHeight = _cornerHitSize;
-    case _CropHandle.top:
-      point = rect.topCenter;
-      hitWidth = 64;
-      hitHeight = _edgeHitSize;
-    case _CropHandle.bottom:
-      point = rect.bottomCenter;
-      hitWidth = 64;
-      hitHeight = _edgeHitSize;
-    case _CropHandle.left:
-      point = rect.centerLeft;
-      hitWidth = _edgeHitSize;
-      hitHeight = 64;
-    case _CropHandle.right:
-      point = rect.centerRight;
-      hitWidth = _edgeHitSize;
-      hitHeight = 64;
-  }
+    switch (handle) {
+      case _CropHandle.topLeft:
+        point = rect.topLeft;
+        hitWidth = _cornerHitSize;
+        hitHeight = _cornerHitSize;
+      case _CropHandle.topRight:
+        point = rect.topRight;
+        hitWidth = _cornerHitSize;
+        hitHeight = _cornerHitSize;
+      case _CropHandle.bottomLeft:
+        point = rect.bottomLeft;
+        hitWidth = _cornerHitSize;
+        hitHeight = _cornerHitSize;
+      case _CropHandle.bottomRight:
+        point = rect.bottomRight;
+        hitWidth = _cornerHitSize;
+        hitHeight = _cornerHitSize;
+      case _CropHandle.top:
+        point = rect.topCenter;
+        hitWidth = 64;
+        hitHeight = _edgeHitSize;
+      case _CropHandle.bottom:
+        point = rect.bottomCenter;
+        hitWidth = 64;
+        hitHeight = _edgeHitSize;
+      case _CropHandle.left:
+        point = rect.centerLeft;
+        hitWidth = _edgeHitSize;
+        hitHeight = 64;
+      case _CropHandle.right:
+        point = rect.centerRight;
+        hitWidth = _edgeHitSize;
+        hitHeight = 64;
+    }
 
-  return Positioned(
-    left: point.dx - hitWidth / 2,
-    top: point.dy - hitHeight / 2,
-    width: hitWidth,
-    height: hitHeight,
-    child: GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onPanUpdate: (details) {
-        rectNotifier.value = _resizeFromHandle(
-          rect: rectNotifier.value,
-          handle: handle,
-          delta: details.delta,
-          aspectRatio: aspectRatio,
-          bounds: imageSize,
-        );
-      },
-      // You don't necessarily need a circle widget here if the 
-      // L-brackets are already drawn by _CropScrimPainter!
-      child: const SizedBox.expand(),
-    ),
-  );
-}
-
-  Widget _buildCornerVisual() {
-    return Container(
-      width: _cornerVisualSize,
-      height: _cornerVisualSize,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        shape: BoxShape.circle,
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black45,
-            blurRadius: 4,
-            offset: Offset(0, 1),
-          ),
-        ],
-        border: Border.all(color: Colors.black38, width: 1.5),
+    return Positioned(
+      left: point.dx - hitWidth / 2,
+      top: point.dy - hitHeight / 2,
+      width: hitWidth,
+      height: hitHeight,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onPanUpdate: (details) {
+          rectNotifier.value = _resizeFromHandle(
+            rect: rectNotifier.value,
+            handle: handle,
+            delta: details.delta,
+            aspectRatio: aspectRatio,
+            imageSize: imageSize,
+            angleRad: angleRad,
+          );
+        },
+        child: const SizedBox.expand(),
       ),
     );
   }
 
-  Widget _buildHorizontalBarVisual() {
-    return Container(
-      width: 28,
-      height: 6,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(3),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black45,
-            blurRadius: 3,
-            offset: Offset(0, 1),
-          ),
-        ],
-        border: Border.all(color: Colors.black38, width: 1),
-      ),
-    );
-  }
+  static Rect _moveRect(Rect rect, Offset delta, Size imageSize, double angleRad) {
+    final nextCenter = rect.center + delta;
+    final w = rect.width;
+    final h = rect.height;
+    final W = imageSize.width;
+    final H = imageSize.height;
 
-  Widget _buildVerticalBarVisual() {
-    return Container(
-      width: 6,
-      height: 28,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(3),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black45,
-            blurRadius: 3,
-            offset: Offset(0, 1),
-          ),
-        ],
-        border: Border.all(color: Colors.black38, width: 1),
-      ),
-    );
-  }
+    final cosA = math.cos(angleRad.abs());
+    final sinA = math.sin(angleRad.abs());
 
-  static Rect _moveRect(Rect rect, Offset delta, Size bounds) {
-    var next = rect.translate(delta.dx, delta.dy);
-    if (next.left < 0) next = next.translate(-next.left, 0);
-    if (next.top < 0) next = next.translate(0, -next.top);
-    if (next.right > bounds.width) next = next.translate(bounds.width - next.right, 0);
-    if (next.bottom > bounds.height) next = next.translate(0, bounds.height - next.bottom);
-    return next;
+    // Half-spans of the upright rectangle along rotated image axes U and V
+    final spanU = (w / 2.0) * cosA + (h / 2.0) * sinA;
+    final spanV = (w / 2.0) * sinA + (h / 2.0) * cosA;
+
+    final limitU = math.max(0.0, W / 2.0 - spanU);
+    final limitV = math.max(0.0, H / 2.0 - spanV);
+
+    // Center relative to image center
+    final cx = nextCenter.dx - W / 2.0;
+    final cy = nextCenter.dy - H / 2.0;
+
+    // Transform center to rotated image frame (rotate by -angleRad)
+    final cosT = math.cos(angleRad);
+    final sinT = math.sin(angleRad);
+    final u = cx * cosT + cy * sinT;
+    final v = -cx * sinT + cy * cosT;
+
+    final clampedU = u.clamp(-limitU, limitU);
+    final clampedV = v.clamp(-limitV, limitV);
+
+    // Transform back to canvas frame (rotate by +angleRad)
+    final clampedCx = clampedU * cosT - clampedV * sinT;
+    final clampedCy = clampedU * sinT + clampedV * cosT;
+
+    return Rect.fromCenter(
+      center: Offset(W / 2.0 + clampedCx, H / 2.0 + clampedCy),
+      width: w,
+      height: h,
+    );
   }
 
   static Rect _resizeFromHandle({
@@ -220,7 +206,8 @@ class CropOverlay extends StatelessWidget {
     required _CropHandle handle,
     required Offset delta,
     required double? aspectRatio,
-    required Size bounds,
+    required Size imageSize,
+    required double angleRad,
   }) {
     double left = rect.left;
     double top = rect.top;
@@ -250,11 +237,6 @@ class CropOverlay extends StatelessWidget {
         right += delta.dx;
     }
 
-    left = left.clamp(0.0, bounds.width).toDouble();
-    top = top.clamp(0.0, bounds.height).toDouble();
-    right = right.clamp(0.0, bounds.width).toDouble();
-    bottom = bottom.clamp(0.0, bounds.height).toDouble();
-
     final bool movesLeft = handle == _CropHandle.topLeft ||
         handle == _CropHandle.bottomLeft ||
         handle == _CropHandle.left;
@@ -273,71 +255,99 @@ class CropOverlay extends StatelessWidget {
     if (movesTop && bottom - top < _minSize) top = bottom - _minSize;
     if (movesBottom && bottom - top < _minSize) bottom = top + _minSize;
 
-    var result = Rect.fromLTRB(left, top, right, bottom);
-
     if (aspectRatio != null && aspectRatio > 0) {
       if (handle == _CropHandle.top || handle == _CropHandle.bottom) {
-        final height = result.height;
-        var width = (height * aspectRatio).clamp(_minSize, bounds.width).toDouble();
-        var newLeft = result.center.dx - width / 2;
-        var newRight = result.center.dx + width / 2;
-        if (newLeft < 0) {
-          newRight += -newLeft;
-          newLeft = 0;
-        }
-        if (newRight > bounds.width) {
-          newLeft -= (newRight - bounds.width);
-          newRight = bounds.width;
-        }
-        newLeft = newLeft.clamp(0.0, bounds.width - _minSize).toDouble();
-        newRight = newRight.clamp(newLeft + _minSize, bounds.width).toDouble();
-        result = Rect.fromLTRB(newLeft, result.top, newRight, result.bottom);
+        final height = bottom - top;
+        final width = height * aspectRatio;
+        final centerX = (left + right) / 2.0;
+        left = centerX - width / 2.0;
+        right = centerX + width / 2.0;
       } else if (handle == _CropHandle.left || handle == _CropHandle.right) {
-        final width = result.width;
-        var height = (width / aspectRatio).clamp(_minSize, bounds.height).toDouble();
-        var newTop = result.center.dy - height / 2;
-        var newBottom = result.center.dy + height / 2;
-        if (newTop < 0) {
-          newBottom += -newTop;
-          newTop = 0;
-        }
-        if (newBottom > bounds.height) {
-          newTop -= (newBottom - bounds.height);
-          newBottom = bounds.height;
-        }
-        newTop = newTop.clamp(0.0, bounds.height - _minSize).toDouble();
-        newBottom = newBottom.clamp(newTop + _minSize, bounds.height).toDouble();
-        result = Rect.fromLTRB(result.left, newTop, result.right, newBottom);
+        final width = right - left;
+        final height = width / aspectRatio;
+        final centerY = (top + bottom) / 2.0;
+        top = centerY - height / 2.0;
+        bottom = centerY + height / 2.0;
       } else {
         final fixedLeft = handle == _CropHandle.topRight || handle == _CropHandle.bottomRight;
         final fixedTop = handle == _CropHandle.bottomLeft || handle == _CropHandle.bottomRight;
-
-        final anchorX = fixedLeft ? result.left : result.right;
-        final anchorY = fixedTop ? result.top : result.bottom;
-
-        var width = result.width;
+        final anchorX = fixedLeft ? left : right;
+        final anchorY = fixedTop ? top : bottom;
+        var width = (right - left).abs();
         var height = width / aspectRatio;
-
-        final maxHeight = fixedTop ? bounds.height - anchorY : anchorY;
-        if (height > maxHeight) {
-          height = maxHeight;
-          width = height * aspectRatio;
-        }
-        final maxWidth = fixedLeft ? bounds.width - anchorX : anchorX;
-        if (width > maxWidth) {
-          width = maxWidth;
+        if (width < _minSize) {
+          width = _minSize;
           height = width / aspectRatio;
         }
-        width = width < _minSize ? _minSize : width;
-        height = height < _minSize ? _minSize : height;
-
-        final newLeft = fixedLeft ? anchorX : anchorX - width;
-        final newTop = fixedTop ? anchorY : anchorY - height;
-        result = Rect.fromLTWH(newLeft, newTop, width, height);
+        if (height < _minSize) {
+          height = _minSize;
+          width = height * aspectRatio;
+        }
+        left = fixedLeft ? anchorX : anchorX - width;
+        right = fixedLeft ? anchorX + width : anchorX;
+        top = fixedTop ? anchorY : anchorY - height;
+        bottom = fixedTop ? anchorY + height : anchorY;
       }
     }
 
-    return result;
+    final W = imageSize.width;
+    final H = imageSize.height;
+    final cosA = math.cos(angleRad.abs());
+    final sinA = math.sin(angleRad.abs());
+
+    var curW = (right - left).abs().clamp(_minSize, W).toDouble();
+    var curH = (bottom - top).abs().clamp(_minSize, H).toDouble();
+
+    // Check maximum possible dimensions at this angle
+    if (aspectRatio != null && aspectRatio > 0) {
+      final denomU = aspectRatio * cosA + sinA;
+      final denomV = aspectRatio * sinA + cosA;
+      final maxH = math.min(W / denomU, H / denomV);
+      final maxW = aspectRatio * maxH;
+      if (curH > maxH) {
+        curH = maxH;
+        curW = maxW;
+      }
+      if (curW > maxW) {
+        curW = maxW;
+        curH = curW / aspectRatio;
+      }
+    } else {
+      final spanU = curW * cosA + curH * sinA;
+      final spanV = curW * sinA + curH * cosA;
+      if (spanU > W || spanV > H) {
+        final factor = math.min(W / spanU, H / spanV);
+        curW = math.max(_minSize, curW * factor);
+        curH = math.max(_minSize, curH * factor);
+      }
+    }
+
+    // Clamp center using (u, v) rotated frame projection
+    final candidateCenter = Offset((left + right) / 2.0, (top + bottom) / 2.0);
+    final spanU = (curW / 2.0) * cosA + (curH / 2.0) * sinA;
+    final spanV = (curW / 2.0) * sinA + (curH / 2.0) * cosA;
+    final limitU = math.max(0.0, W / 2.0 - spanU);
+    final limitV = math.max(0.0, H / 2.0 - spanV);
+
+    final cx = candidateCenter.dx - W / 2.0;
+    final cy = candidateCenter.dy - H / 2.0;
+
+    final cosT = math.cos(angleRad);
+    final sinT = math.sin(angleRad);
+    final u = cx * cosT + cy * sinT;
+    final v = -cx * sinT + cy * cosT;
+
+    final clampedU = u.clamp(-limitU, limitU);
+    final clampedV = v.clamp(-limitV, limitV);
+
+    final clampedCx = clampedU * cosT - clampedV * sinT;
+    final clampedCy = clampedU * sinT + clampedV * cosT;
+
+    return Rect.fromCenter(
+      center: Offset(W / 2.0 + clampedCx, H / 2.0 + clampedCy),
+      width: curW,
+      height: curH,
+    );
   }
 }
 
@@ -349,7 +359,9 @@ class _CropScrimPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final full = Offset.zero & bounds;
+    final maxDim = math.max(bounds.width, bounds.height) * 3.0;
+    final center = Offset(bounds.width / 2.0, bounds.height / 2.0);
+    final full = Rect.fromCenter(center: center, width: maxDim, height: maxDim);
     final scrimPath = Path()
       ..addRect(full)
       ..addRect(rect)

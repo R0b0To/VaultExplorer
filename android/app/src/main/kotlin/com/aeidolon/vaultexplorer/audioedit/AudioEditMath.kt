@@ -96,6 +96,18 @@ object AudioEditMath {
     const val TARGET_PEAKS_PER_SECOND = 100.0
     const val MAX_PEAKS = 500_000
 
+    // ── Which decoder ────────────────────────────────────────────────────
+
+    /**
+     * Codecs decoded in-process by the bundled FFmpeg even where the platform has a decoder. Every
+     * `MediaCodec` call is a round trip to the codec's own thread (and often another process), and a
+     * frame needs about eight of them: on a phone, 3 hours of MP3 spent ~400 of 514 seconds just calling
+     * the decoder, with ~100 s of everything else. FFmpeg runs in this process on a thread of its own.
+     * Only MP3, because that is what was measured; AAC and the rest keep the platform decoder (a long AAC
+     * file is split over several of them, see [parallelWorkersFor]).
+     */
+    fun prefersInProcessDecoder(mime: String): Boolean = mime == MIME_MP3
+
     // ── Decoding a long file in parallel ─────────────────────────────────
 
     /** Shorter files decode quickly enough in one piece, so they take the plain path. */
@@ -481,9 +493,14 @@ class PcmPeakReader(private val accumulator: PeakAccumulator) {
 
         val bigEndian = AudioEditMath.isBigEndian(encoding)
         val layout = AudioEditMath.littleEndianOf(encoding)
+        val step = max(1, stride)
+        if (layout == AudioEditMath.PCM_16BIT) {
+            consume16(data, offset, frames, channelCount, bigEndian, step)
+            frameIndex += frames
+            return
+        }
         val view = data.duplicate().order(if (bigEndian) ByteOrder.BIG_ENDIAN else ByteOrder.LITTLE_ENDIAN)
         view.limit(offset + size)
-        val step = max(1, stride)
         val frameBytes = bytesPerSample * channelCount
         // Which frame of this chunk is the first one to read: the stride is counted across chunks,
         // not restarted at every chunk boundary.
@@ -500,6 +517,38 @@ class PcmPeakReader(private val accumulator: PeakAccumulator) {
             frame += step
         }
         frameIndex += frames
+    }
+
+    private var scratch = ShortArray(0)
+
+    /**
+     * 16-bit PCM, which is nearly everything a decoder hands out: the whole buffer is copied into a
+     * [ShortArray] in one go and measured there. Reading each sample through `ByteBuffer.getShort` cost
+     * about 275 ns per frame on a phone (3 hours of audio spent 44 s just measuring); this is a memcpy
+     * and a plain loop over an array.
+     */
+    private fun consume16(data: ByteBuffer, offset: Int, frames: Int, channelCount: Int, bigEndian: Boolean, step: Int) {
+        val total = frames * channelCount
+        if (total <= 0) return
+        if (scratch.size < total) scratch = ShortArray(total)
+        val view = data.duplicate().order(if (bigEndian) ByteOrder.BIG_ENDIAN else ByteOrder.LITTLE_ENDIAN)
+        view.limit(offset + total * 2)
+        view.position(offset)
+        view.asShortBuffer().get(scratch, 0, total)
+        val samples = scratch
+        // Which frame of this chunk is the first one to read: the stride is counted across chunks.
+        var frame = ((step - (frameIndex % step)) % step).toInt()
+        while (frame < frames) {
+            val base = frame * channelCount
+            var loudest = 0
+            for (channel in 0 until channelCount) {
+                val v = samples[base + channel].toInt()
+                val a = if (v < 0) -v else v
+                if (a > loudest) loudest = a
+            }
+            accumulator.add(frameIndex + frame, loudest / 32768f)
+            frame += step
+        }
     }
 
     /** [layout] is a little-endian encoding; [bigEndian] says the bytes (and [b]'s order) are reversed. */

@@ -456,6 +456,88 @@ class AudioEditMathTest {
         assertEquals(9, out[39].toInt())
     }
 
+    // ── Measuring decoded samples quickly ────────────────────────────────
+
+    /** Straight from the definition: the loudest channel of every `stride`-th frame, into its bucket. */
+    private fun referencePeaks(
+        samples: ShortArray, channels: Int, bucketCount: Int, bucketsPerFrame: Double, stride: Int,
+    ): ByteArray {
+        val peaks = ByteArray(bucketCount)
+        val frames = samples.size / channels
+        for (frame in 0 until frames) {
+            if (frame % stride != 0) continue
+            var loudest = 0
+            for (c in 0 until channels) loudest = maxOf(loudest, Math.abs(samples[frame * channels + c].toInt()))
+            val bucket = (frame * bucketsPerFrame).toInt()
+            if (bucket >= bucketCount) continue
+            val level = (loudest / 32768f * 255f + 0.5f).toInt().coerceIn(0, 255)
+            if (level > (peaks[bucket].toInt() and 0xFF)) peaks[bucket] = level.toByte()
+        }
+        return peaks
+    }
+
+    private fun asBuffer(samples: ShortArray, from: Int, to: Int, direct: Boolean): ByteBuffer {
+        val b = if (direct) ByteBuffer.allocateDirect((to - from) * 2) else ByteBuffer.allocate((to - from) * 2)
+        b.order(ByteOrder.LITTLE_ENDIAN)
+        for (i in from until to) b.putShort(samples[i])
+        b.flip()
+        return b
+    }
+
+    @Test
+    fun the16BitFastPathMeasuresExactlyWhatTheDefinitionSays() {
+        val rnd = java.util.Random(11)
+        for (channels in listOf(1, 2, 6)) {
+            for (stride in listOf(1, 3, 7)) {
+                for (direct in listOf(true, false)) {
+                    val frames = 20_000
+                    val samples = ShortArray(frames * channels) { (rnd.nextGaussian() * 9_000).toInt().coerceIn(-32768, 32767).toShort() }
+                    samples[5 * channels] = Short.MIN_VALUE // the one value whose absolute value doesn't fit a Short
+                    val bucketsPerFrame = 1.0 / 441
+                    val buckets = frames / 441 + 1
+                    val acc = PeakAccumulator(buckets, bucketsPerFrame)
+                    val reader = PcmPeakReader(acc).apply {
+                        this.channels = channels; encoding = AudioEditMath.PCM_16BIT; this.stride = stride
+                    }
+                    // Delivered in irregular chunks: the stride is counted across them.
+                    var frame = 0
+                    while (frame < frames) {
+                        val n = minOf(frames - frame, 1 + rnd.nextInt(3_000))
+                        val buf = asBuffer(samples, frame * channels, (frame + n) * channels, direct)
+                        reader.consume(buf, 0, n * channels * 2)
+                        frame += n
+                    }
+                    assertEquals(frames.toLong(), reader.frameIndex)
+                    assertArrayEquals(
+                        "channels=$channels stride=$stride direct=$direct",
+                        referencePeaks(samples, channels, buckets, bucketsPerFrame, stride), acc.peaks,
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun theFastPathHonoursTheBufferOffset() {
+        // 3 junk shorts, then 4 mono frames; the reader is told where they start.
+        val b = ByteBuffer.allocateDirect(14).order(ByteOrder.LITTLE_ENDIAN)
+        for (v in shortArrayOf(32767, 32767, 32767, 8192, 0, 16384, 0)) b.putShort(v)
+        val acc = PeakAccumulator(bucketCount = 2, bucketsPerFrame = 0.5)
+        val reader = PcmPeakReader(acc).apply { channels = 1; encoding = AudioEditMath.PCM_16BIT }
+        reader.consume(b, 6, 8)
+        assertEquals(4L, reader.frameIndex)
+        assertEquals(64, acc.peaks[0].toInt() and 0xFF)  // frames 0,1 = 8192, 0
+        assertEquals(128, acc.peaks[1].toInt() and 0xFF) // frames 2,3 = 16384, 0
+    }
+
+    @Test
+    fun onlyMp3PrefersTheInProcessDecoder() {
+        assertTrue(AudioEditMath.prefersInProcessDecoder(AudioEditMath.MIME_MP3))
+        assertFalse(AudioEditMath.prefersInProcessDecoder(AudioEditMath.MIME_AAC))
+        assertFalse(AudioEditMath.prefersInProcessDecoder(AudioEditMath.MIME_OPUS))
+        assertFalse(AudioEditMath.prefersInProcessDecoder(AudioEditMath.MIME_RAW))
+    }
+
     // ── Progressive waveform ─────────────────────────────────────────────
 
     @Test

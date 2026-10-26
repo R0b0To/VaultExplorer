@@ -7,16 +7,19 @@ import 'package:vaultexplorer/features/browser/viewer/pip/picture_in_picture_bri
 /// Decides when the system picture-in-picture window may take over, and what
 /// it shows.
 ///
-/// Whoever is playing a video -- the media viewer, or the mini player once the
-/// viewer is closed -- [attach]es its controller here. While that video plays
-/// (and the "Picture-in-picture" setting is on) the platform is told to enter
-/// PiP as soon as the person leaves the app; otherwise it is told not to. The
-/// controller is also published as [source], which `PictureInPictureLayer`
-/// shows, alone, once the window is up.
+/// The media viewer [attach]es the controller of the video it shows. From then
+/// on:
+///  * [enterNow] (the viewer's picture-in-picture button) puts that video in
+///    the PiP window right away, whatever the settings say;
+///  * with `autoEnter` on (the "automatic picture-in-picture" setting), the
+///    platform is also told to enter PiP by itself as soon as the person
+///    leaves the app while the video plays, and not otherwise.
 ///
-/// Only one owner is active at a time: a new [attach] takes over from the
-/// previous owner, and a [detach] from anyone but the current owner is
-/// ignored, so a closing viewer can't disarm the mini player taking over.
+/// The attached controller is published as [source], which
+/// `PictureInPictureLayer` shows, alone, once the window is up.
+///
+/// A [detach] from anyone but the current owner is ignored, so a closing
+/// viewer can't withdraw the video a newer one has just attached.
 class PictureInPictureCoordinator {
   PictureInPictureCoordinator._() {
     PictureInPictureBridge.ensureInitialized();
@@ -32,21 +35,29 @@ class PictureInPictureCoordinator {
 
   Object? _owner;
   NativeVideoController? _controller;
-  bool _enabled = false;
+  bool _autoEnter = false;
 
   bool _lastArmed = false;
   int _lastWidth = 0;
   int _lastHeight = 0;
 
+  /// Whether a video is attached that [enterNow] could put on screen.
+  bool get canEnter {
+    final controller = _controller;
+    return PictureInPictureBridge.isSupported.value &&
+        controller != null &&
+        !controller.isDisposed &&
+        controller.value.isInitialized;
+  }
+
   /// Makes [owner] the source of the PiP window, playing [controller].
-  /// [enabled] is the person's "Picture-in-picture" setting; when it is off
-  /// this is the same as [detach].
+  /// [autoEnter] is the "automatic picture-in-picture" setting.
   void attach(
     Object owner,
     NativeVideoController controller, {
-    required bool enabled,
+    required bool autoEnter,
   }) {
-    if (!enabled || controller.isDisposed) {
+    if (controller.isDisposed) {
       detach(owner);
       return;
     }
@@ -56,7 +67,7 @@ class PictureInPictureCoordinator {
       controller.addListener(_apply);
     }
     _owner = owner;
-    _enabled = true;
+    _autoEnter = autoEnter;
     _publishSource();
     _apply();
   }
@@ -66,9 +77,21 @@ class PictureInPictureCoordinator {
     if (!identical(_owner, owner)) return;
     _unbind();
     _owner = null;
-    _enabled = false;
+    _autoEnter = false;
     _publishSource();
     _apply();
+  }
+
+  /// Puts the attached video in the PiP window now. Returns whether the
+  /// system accepted it.
+  Future<bool> enterNow() async {
+    final controller = _controller;
+    if (!canEnter || controller == null) return false;
+    final ratio = _ratioOf(controller.value);
+    return PictureInPictureBridge.enter(
+      width: ratio.width,
+      height: ratio.height,
+    );
   }
 
   void _unbind() {
@@ -93,30 +116,37 @@ class PictureInPictureCoordinator {
     });
   }
 
+  // A fixed denominator keeps the ratio an integer pair; the platform clamps
+  // it to what Android accepts.
+  ({int width, int height}) _ratioOf(NativeVideoValue value) =>
+      (width: (value.aspectRatio * 1000).round().clamp(1, 100000), height: 1000);
+
   void _apply() {
     final controller = _controller;
     var armed = false;
-    var width = 16;
-    var height = 9;
-    if (_enabled && controller != null && !controller.isDisposed) {
+    var ratio = (width: 16, height: 9);
+    if (controller != null && !controller.isDisposed) {
       final value = controller.value;
-      armed = value.isInitialized && value.isPlaying && !value.hasError;
-      // A fixed denominator keeps the ratio an integer pair; the platform
-      // clamps it to what Android accepts.
-      width = (value.aspectRatio * 1000).round().clamp(1, 100000);
-      height = 1000;
+      armed =
+          _autoEnter &&
+          value.isInitialized &&
+          value.isPlaying &&
+          !value.hasError;
+      ratio = _ratioOf(value);
     }
-    if (armed == _lastArmed && width == _lastWidth && height == _lastHeight) {
+    if (armed == _lastArmed &&
+        ratio.width == _lastWidth &&
+        ratio.height == _lastHeight) {
       return;
     }
     _lastArmed = armed;
-    _lastWidth = width;
-    _lastHeight = height;
+    _lastWidth = ratio.width;
+    _lastHeight = ratio.height;
     unawaited(
       PictureInPictureBridge.setState(
         armed: armed,
-        width: width,
-        height: height,
+        width: ratio.width,
+        height: ratio.height,
       ),
     );
   }

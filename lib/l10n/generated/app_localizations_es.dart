@@ -8082,38 +8082,21 @@ class AppLocalizationsEs extends AppLocalizations {
   String get resumePlaybackResume => 'Reanudar';
 
   @override
-  String get continuePlaybackTitle => 'Seguir reproduciendo al cerrar';
-
-  @override
-  String get continuePlaybackOff => 'Desactivado';
-
-  @override
-  String get continuePlaybackAudioOnly => 'Solo audio';
-
-  @override
-  String get continuePlaybackAudioAndVideo => 'Audio y vídeo';
-
-  @override
-  String get continuePlaybackOffDescription =>
-      'Al cerrar el visor se detiene la reproducción';
-
-  @override
-  String get continuePlaybackAudioOnlyDescription =>
-      'El audio sigue sonando en un minirreproductor';
-
-  @override
-  String get continuePlaybackAudioAndVideoDescription =>
-      'El audio sigue en un minirreproductor y el vídeo en una ventana flotante';
-
-  @override
-  String get miniPlayerOpenTooltip => 'Abrir reproductor';
-
-  @override
-  String get pictureInPictureTitle => 'Imagen en imagen';
+  String get pictureInPictureTitle => 'Imagen en imagen automática';
 
   @override
   String get pictureInPictureSubtitle =>
-      'El vídeo sigue reproduciéndose en una ventana flotante al salir de la app';
+      'Entrar en imagen en imagen al salir de la app mientras se reproduce un vídeo';
+
+  @override
+  String get pictureInPictureAction => 'Imagen en imagen';
+
+  @override
+  String get keepAudioPlayingTitle => 'Seguir reproduciendo audio al cerrar';
+
+  @override
+  String get keepAudioPlayingSubtitle =>
+      'El audio sigue sonando en segundo plano al salir del reproductor; se controla desde la notificación';
 
   @override
   String get mediaControlsResetSuccess =>

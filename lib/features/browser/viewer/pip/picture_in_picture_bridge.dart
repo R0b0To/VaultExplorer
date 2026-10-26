@@ -8,7 +8,8 @@ import 'package:vaultexplorer/core/utils/ve_log.dart';
 /// `PictureInPictureController.kt`).
 ///
 /// [PictureInPictureCoordinator] decides when a video is worth keeping on
-/// screen and calls [setState]; the platform reports back through
+/// screen: [setState] arms the automatic entry when the app is left, [enter]
+/// enters right away. The platform reports back through
 /// [isInPictureInPicture] (the window is up) and [windowDismissed] (the
 /// person closed it).
 class PictureInPictureBridge {
@@ -23,6 +24,10 @@ class PictureInPictureBridge {
     false,
   );
 
+  /// Whether this device can show a picture-in-picture window at all. False
+  /// until the platform has answered.
+  static final ValueNotifier<bool> isSupported = ValueNotifier<bool>(false);
+
   static final StreamController<void> _dismissed =
       StreamController<void>.broadcast();
 
@@ -35,6 +40,7 @@ class PictureInPictureBridge {
   static void ensureInitialized() {
     if (_handlerInstalled) return;
     _handlerInstalled = true;
+    unawaited(_loadSupport());
     _channel.setMethodCallHandler((call) async {
       switch (call.method) {
         case 'modeChanged':
@@ -45,6 +51,34 @@ class PictureInPictureBridge {
       }
       return null;
     });
+  }
+
+  static Future<void> _loadSupport() async {
+    try {
+      isSupported.value =
+          await _channel.invokeMethod<bool>('isSupported') ?? false;
+    } on PlatformException catch (e) {
+      VeLog.w('PictureInPicture', 'isSupported failed', e);
+    } on MissingPluginException {
+      // No native side (tests, other platforms): no picture-in-picture.
+    }
+  }
+
+  /// Enters the picture-in-picture window now, at [width] : [height]. Returns
+  /// whether the system accepted it.
+  static Future<bool> enter({required int width, required int height}) async {
+    try {
+      return await _channel.invokeMethod<bool>('enter', {
+            'width': width,
+            'height': height,
+          }) ??
+          false;
+    } on PlatformException catch (e) {
+      VeLog.w('PictureInPicture', 'enter failed', e);
+      return false;
+    } on MissingPluginException {
+      return false;
+    }
   }
 
   /// Tells the platform whether to enter PiP when the person leaves the app,

@@ -14,7 +14,7 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 /// `content://` document) straight off disk, so it needs the full path rather
 /// than one relative to the container root.
 ///
-/// Shared by the media viewer and the mini player so both resolve a playlist
+/// Shared by the media viewer and background audio playback so both resolve a playlist
 /// entry identically.
 String nativePlaybackPathFor(MountedContainer container, String file) {
   if (!container.isLocalStorage) return file;

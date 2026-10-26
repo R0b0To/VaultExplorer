@@ -24,6 +24,9 @@ class WaveformStats {
     /** Reading and demuxing: `readSampleData`, `advance`, `seekTo`. For a vault file this is the decrypt. */
     val extractorNs = AtomicLong()
 
+    /** Calling the platform decoder: queueing input, taking output, releasing it. Each call is a round trip. */
+    val codecNs = AtomicLong()
+
     /** Blocked waiting for the decoder to hand back a buffer, with nothing else left to do. */
     val waitNs = AtomicLong()
 

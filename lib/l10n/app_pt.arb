@@ -3399,6 +3399,7 @@
   "browserTabClose": "Fechar aba",
   "browserTabCloseOthers": "Fechar outras abas",
   "browserTabDuplicate": "Duplicar aba",
+  "browserTabMoveToOtherPane": "Mover para o outro painel",
   "browserTabSwitchPrevious": "Alternar para a aba anterior",
   "browserTabOpenInNewTab": "Abrir em nova aba",
   "browserTabLimitReached": "Limite de abas atingido ({max})",

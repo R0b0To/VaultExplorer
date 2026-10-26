@@ -3399,6 +3399,7 @@
   "browserTabClose": "Chiudi scheda",
   "browserTabCloseOthers": "Chiudi altre schede",
   "browserTabDuplicate": "Duplica scheda",
+  "browserTabMoveToOtherPane": "Sposta nell'altro riquadro",
   "browserTabSwitchPrevious": "Passa alla scheda precedente",
   "browserTabOpenInNewTab": "Apri in una nuova scheda",
   "browserTabLimitReached": "Limite di schede raggiunto ({max})",

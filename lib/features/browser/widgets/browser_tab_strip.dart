@@ -43,7 +43,14 @@ class BrowserLocationIcon extends StatelessWidget {
   }
 }
 
-enum _TabMenuAction { close, closeOthers, closeToLeft, closeToRight, duplicate }
+enum _TabMenuAction {
+  close,
+  closeOthers,
+  closeToLeft,
+  closeToRight,
+  duplicate,
+  moveToOtherPane,
+}
 
 /// Height of the strip; matches the text editor's tab strip.
 const double kBrowserTabStripHeight = 40;
@@ -54,11 +61,16 @@ const double kBrowserTabItemWidth = 148;
 /// tab opens its operation menu; long-press and drag reorder tabs. The tab
 /// controller retains its horizontal offset while the strip moves between
 /// screens.
+///
+/// With a [pane] the strip belongs to that pane in the dual-pane layout: it
+/// lists only the pane's own tabs, switching a tab changes only that pane, the
+/// new-tab button opens a tab in it, and its bottom edge marks whether the pane
+/// has focus. Without one it is the single strip over all tabs.
 class BrowserTabStrip extends ConsumerStatefulWidget {
   final BrowserTabsConfig workspaceConfig;
   final VoidCallback onNewTab;
   final ValueChanged<BrowserTabState> onDuplicate;
-  final TabId? secondaryTabId;
+  final TabPane? pane;
   final String storageKey;
 
   const BrowserTabStrip({
@@ -66,7 +78,7 @@ class BrowserTabStrip extends ConsumerStatefulWidget {
     required this.workspaceConfig,
     required this.onNewTab,
     required this.onDuplicate,
-    this.secondaryTabId,
+    this.pane,
     this.storageKey = 'browser-tab-strip-scroll-position',
   });
 
@@ -86,7 +98,7 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
     _scrollController = ScrollController(
       initialScrollOffset: ref
           .read(browserTabsProvider(widget.workspaceConfig).notifier)
-          .tabStripScrollOffset,
+          .tabStripScrollOffsetOf(widget.pane ?? TabPane.primary),
       keepScrollOffset: false,
     )..addListener(_rememberScrollOffset);
     _scrollActiveIntoView(force: true);
@@ -109,13 +121,30 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
     if (!_scrollController.hasClients) return;
     ref
         .read(browserTabsProvider(widget.workspaceConfig).notifier)
-        .setTabStripScrollOffset(_scrollController.position.pixels);
+        .setTabStripScrollOffset(
+          _scrollController.position.pixels,
+          pane: widget.pane ?? TabPane.primary,
+        );
+  }
+
+  /// The tab this strip treats as current: the pane's shown tab, or the active
+  /// tab for the single strip.
+  TabId? _shownTabId(BrowserTabsState state) {
+    final pane = widget.pane;
+    return pane == null ? state.activeTabId : state.activeTabIdOfPane(pane);
+  }
+
+  List<BrowserTabState> _stripTabs(BrowserTabsState state) {
+    final pane = widget.pane;
+    return pane == null ? state.tabs : state.tabsInPane(pane);
   }
 
   void _scrollActiveIntoView({bool force = false}) {
     final state = ref.read(browserTabsProvider(widget.workspaceConfig));
-    final active = state.activeTabId;
-    final activeIndex = state.activeIndex;
+    final active = _shownTabId(state);
+    final activeIndex = active == null
+        ? -1
+        : _stripTabs(state).indexWhere((tab) => tab.tabId == active);
     if (!force &&
         active == _lastActiveTabId &&
         activeIndex == _lastActiveIndex) {
@@ -126,7 +155,7 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted ||
           !_scrollController.hasClients ||
-          ref.read(browserTabsProvider(widget.workspaceConfig)).activeTabId !=
+          _shownTabId(ref.read(browserTabsProvider(widget.workspaceConfig))) !=
               active) {
         return;
       }
@@ -211,7 +240,8 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
       browserTabsProvider(widget.workspaceConfig).notifier,
     );
     final l10n = tabContext.l10n;
-    final tabIndex = state.tabs.indexWhere((entry) => entry.tabId == tab.tabId);
+    final stripTabs = _stripTabs(state);
+    final tabIndex = stripTabs.indexWhere((entry) => entry.tabId == tab.tabId);
     final choice = await showMenu<_TabMenuAction>(
       context: tabContext,
       position: RelativeRect.fromRect(anchor, Offset.zero & overlayBox.size),
@@ -226,7 +256,7 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
           _TabMenuAction.closeOthers,
           Icons.tab_unselected_rounded,
           l10n.browserTabCloseOthers,
-          enabled: state.tabs.length > 1,
+          enabled: stripTabs.length > 1,
         ),
         item(
           _TabMenuAction.closeToLeft,
@@ -238,9 +268,16 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
           _TabMenuAction.closeToRight,
           Icons.arrow_forward_rounded,
           l10n.browserTabCloseToRight,
-          enabled: tabIndex >= 0 && tabIndex < state.tabs.length - 1,
+          enabled: tabIndex >= 0 && tabIndex < stripTabs.length - 1,
         ),
         const PopupMenuDivider(),
+        if (state.splitAvailable)
+          item(
+            _TabMenuAction.moveToOtherPane,
+            Icons.swap_horiz_rounded,
+            l10n.browserTabMoveToOtherPane,
+            enabled: state.tabs.length > 1,
+          ),
         item(
           _TabMenuAction.duplicate,
           Icons.copy_all_rounded,
@@ -269,6 +306,8 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
         actions.closeToRight(tab.tabId);
       case _TabMenuAction.duplicate:
         widget.onDuplicate(tab);
+      case _TabMenuAction.moveToOtherPane:
+        actions.moveToPane(tab.tabId, tab.pane.other);
     }
   }
 
@@ -280,10 +319,11 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
     if (!tabsEnabled) return const SizedBox.shrink();
 
     final cs = Theme.of(context).colorScheme;
-    final tabs = ref.watch(browserTabsListProvider(widget.workspaceConfig));
-    final activeTab = ref.watch(
-      activeBrowserTabProvider(widget.workspaceConfig),
-    );
+    final state = ref.watch(browserTabsProvider(widget.workspaceConfig));
+    final pane = widget.pane;
+    final tabs = _stripTabs(state);
+    final shownTabId = _shownTabId(state);
+    final paneFocused = pane == null || state.focusedPane == pane;
     final actions = ref.read(
       browserTabsProvider(widget.workspaceConfig).notifier,
     );
@@ -298,12 +338,22 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
       height: kBrowserTabStripHeight,
       decoration: BoxDecoration(
         color: stripBackground,
+        // In dual pane the focused pane's strip carries the accent, so it is
+        // clear which pane the app bar and shortcuts belong to.
+        border: pane == null
+            ? null
+            : Border(
+                bottom: BorderSide(
+                  color: paneFocused ? cs.primary : Colors.transparent,
+                  width: 2,
+                ),
+              ),
       ),
       child: Row(
         children: [
           Expanded(
             child: ReorderableListView.builder(
-              key: PageStorageKey<String>(widget.storageKey),
+              key: PageStorageKey<String>('${widget.storageKey}-${pane?.name ?? 'all'}'),
               scrollController: _scrollController,
               itemExtent: kBrowserTabItemWidth,
               scrollDirection: Axis.horizontal,
@@ -312,7 +362,10 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
               padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
               itemCount: tabs.length,
               onReorderStart: (_) => HapticFeedback.mediumImpact(),
-              onReorderItem: actions.reorderTabs,
+              onReorderItem: pane == null
+                  ? actions.reorderTabs
+                  : (oldIndex, newIndex) =>
+                        actions.reorderTabsInPane(pane, oldIndex, newIndex),
               proxyDecorator: (child, index, animation) {
                 return AnimatedBuilder(
                   animation: animation,
@@ -335,9 +388,10 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
                   tab.tabId,
                   GlobalKey.new,
                 );
-                final isActive = tab.tabId == activeTab?.tabId;
-                final isSecondary =
-                    !isActive && tab.tabId == widget.secondaryTabId;
+                final isShown = tab.tabId == shownTabId;
+                final isActive = isShown && paneFocused;
+                // The other pane's shown tab: on screen, but not focused.
+                final isSecondary = isShown && !paneFocused;
                 return ReorderableDelayedDragStartListener(
                   key: ValueKey<TabId>(tab.tabId),
                   index: index,
@@ -362,7 +416,11 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
             icon: const Icon(Icons.add_rounded, size: 20),
             visualDensity: VisualDensity.compact,
             tooltip: context.l10n.browserTabNew,
-            onPressed: widget.onNewTab,
+            onPressed: () {
+              // The new tab joins the pane whose + was pressed.
+              if (pane != null) actions.focusPane(pane);
+              widget.onNewTab();
+            },
           ),
           const SizedBox(width: 4),
         ],

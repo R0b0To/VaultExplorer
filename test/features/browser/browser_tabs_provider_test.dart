@@ -732,6 +732,249 @@ void main() {
     });
   });
 
+  // BEGIN dual-pane tests
+  group('dual pane', () {
+    List<TabId> inPane(_Workspace w, TabPane pane) =>
+        w.state.tabsInPane(pane).map((tab) => tab.tabId).toList();
+
+    /// `A | B`: one tab in each pane, B (secondary) focused.
+    ({_Workspace w, TabId a, TabId b}) split() {
+      final w = workspace(1);
+      final a = w.active;
+      w.tabs.setSplitAvailable(true);
+      final b = w.tabs.openTab(_container(2))!;
+      return (w: w, a: a, b: b);
+    }
+
+    /// `A, C | B` with C (primary) focused.
+    ({_Workspace w, TabId a, TabId b, TabId c}) twoAndOne() {
+      final s = split();
+      s.w.tabs.focusPane(TabPane.primary);
+      final c = s.w.tabs.openTab(_container(3))!;
+      return (w: s.w, a: s.a, b: s.b, c: c);
+    }
+
+    test('a tab opened while the layout can split starts the second pane', () {
+      final s = split();
+      expect(s.w.state.isSplit, isTrue);
+      expect(s.w.state.activeTab!.pane, TabPane.secondary);
+      expect(s.w.state.activeTabIdOfPane(TabPane.primary), s.a);
+      expect(s.w.state.activeTabIdOfPane(TabPane.secondary), s.b);
+      expect(s.w.state.focusedPane, TabPane.secondary);
+    });
+
+    test('without room to split, tabs stay in one pane', () {
+      final w = workspace(1);
+      w.tabs.openTab(_container(2));
+      expect(w.state.hasBothPanes, isFalse);
+      expect(w.state.isSplit, isFalse);
+      expect(w.state.tabs.every((tab) => tab.pane == TabPane.primary), isTrue);
+    });
+
+    test('switching tabs in one pane leaves the other pane alone', () {
+      final s = twoAndOne();
+      expect(inPane(s.w, TabPane.primary), [s.a, s.c]);
+      expect(s.w.state.activeTabIdOfPane(TabPane.secondary), s.b);
+
+      s.w.tabs.activate(s.a);
+      expect(s.w.active, s.a);
+      expect(s.w.state.activeTabIdOfPane(TabPane.secondary), s.b);
+
+      s.w.tabs.activate(s.c);
+      expect(s.w.active, s.c);
+      expect(s.w.state.activeTabIdOfPane(TabPane.secondary), s.b);
+      expect(s.w.state.isSplit, isTrue);
+    });
+
+    test('focusing the other pane keeps what each pane shows', () {
+      final s = twoAndOne();
+      s.w.tabs.activate(s.b);
+      expect(s.w.active, s.b);
+      expect(s.w.state.activeTabIdOfPane(TabPane.primary), s.c);
+      expect(s.w.state.activeTabIdOfPane(TabPane.secondary), s.b);
+
+      s.w.tabs.focusPane(TabPane.primary);
+      expect(s.w.active, s.c);
+      expect(s.w.state.activeTabIdOfPane(TabPane.secondary), s.b);
+    });
+
+    test('tabs are kept as primary group then secondary group', () {
+      final s = twoAndOne();
+      expect(s.w.ids, [s.a, s.c, s.b]);
+      // Opening in the secondary pane lands inside its group.
+      s.w.tabs.focusPane(TabPane.secondary);
+      final d = s.w.tabs.openTab(_container(4))!;
+      expect(s.w.ids, [s.a, s.c, s.b, d]);
+      expect(s.w.state.tabs.map((tab) => tab.pane), [
+        TabPane.primary,
+        TabPane.primary,
+        TabPane.secondary,
+        TabPane.secondary,
+      ]);
+    });
+
+    test('moveToPane shows the tab in the new pane, which takes focus', () {
+      final s = twoAndOne();
+      s.w.tabs.moveToPane(s.c, TabPane.secondary);
+      expect(s.w.state.tabs.firstWhere((t) => t.tabId == s.c).pane,
+          TabPane.secondary);
+      expect(s.w.active, s.c);
+      expect(s.w.state.activeTabIdOfPane(TabPane.primary), s.a);
+      expect(s.w.state.activeTabIdOfPane(TabPane.secondary), s.c);
+      expect(s.w.ids, [s.a, s.c, s.b]);
+    });
+
+    test('moving a pane\'s last tab away collapses to a single pane', () {
+      final s = split();
+      s.w.tabs.moveToPane(s.a, TabPane.secondary);
+      expect(s.w.state.hasBothPanes, isFalse);
+      expect(s.w.state.isSplit, isFalse);
+      expect(s.w.state.tabs.every((t) => t.pane == TabPane.primary), isTrue);
+      expect(s.w.active, s.a);
+    });
+
+    test('closing a pane\'s last tab collapses and focuses the other pane', () {
+      final s = split();
+      s.w.tabs.closeTab(s.b);
+      expect(s.w.ids, [s.a]);
+      expect(s.w.active, s.a);
+      expect(s.w.state.isSplit, isFalse);
+    });
+
+    test('closing the active tab picks a neighbour in its own pane', () {
+      final s = twoAndOne();
+      // Make the other pane the one used last, so "previous" is tempting.
+      s.w.tabs.activate(s.b);
+      s.w.tabs.activate(s.c);
+      s.w.tabs.closeTab(s.c);
+      expect(s.w.active, s.a);
+      expect(s.w.state.activeTabIdOfPane(TabPane.secondary), s.b);
+      expect(s.w.state.isSplit, isTrue);
+    });
+
+    test('closing the tab an unfocused pane shows moves it to a neighbour', () {
+      final s = split();
+      s.w.tabs.focusPane(TabPane.secondary);
+      final d = s.w.tabs.openTab(_container(4))!; // A | B, D, D shown
+      s.w.tabs.activate(s.b);
+      s.w.tabs.focusPane(TabPane.primary); // B is shown, unfocused
+      s.w.tabs.closeTab(s.b);
+      expect(s.w.state.activeTabIdOfPane(TabPane.secondary), d);
+      expect(s.w.active, s.a);
+    });
+
+    test('openInOtherPane shows the new tab in the other pane', () {
+      final s = split();
+      final x = s.w.tabs.openInOtherPane(_container(5))!;
+      expect(s.w.state.tabs.firstWhere((t) => t.tabId == x).pane,
+          TabPane.primary);
+      expect(s.w.active, x);
+      expect(s.w.state.activeTabIdOfPane(TabPane.secondary), s.b);
+    });
+
+    test('openInOtherPane can leave focus where it was', () {
+      final s = split();
+      final x = s.w.tabs.openInOtherPane(_container(5), focus: false)!;
+      expect(s.w.active, s.b);
+      expect(s.w.state.activeTabIdOfPane(TabPane.primary), x);
+    });
+
+    test('openInOtherPane respects the tab limit', () {
+      final s = split();
+      while (!s.w.state.atLimit) {
+        s.w.tabs.openTab(_container(9));
+      }
+      expect(s.w.tabs.openInOtherPane(_container(5)), isNull);
+    });
+
+    test('becoming splittable splits a single pane', () {
+      final w = workspace(1);
+      final a = w.active;
+      final b = w.tabs.openTab(_container(2))!;
+      final c = w.tabs.openTab(_container(3))!;
+      w.tabs.setSplitAvailable(true);
+      // The tab used before the current one moves across.
+      expect(inPane(w, TabPane.primary), [a, c]);
+      expect(inPane(w, TabPane.secondary), [b]);
+      expect(w.active, c);
+      expect(w.state.activeTabIdOfPane(TabPane.secondary), b);
+    });
+
+    test('losing the room to split keeps the arrangement', () {
+      final s = twoAndOne();
+      s.w.tabs.setSplitAvailable(false);
+      expect(s.w.state.isSplit, isFalse);
+      expect(s.w.state.splitAvailable, isFalse);
+      s.w.tabs.setSplitAvailable(true);
+      expect(inPane(s.w, TabPane.primary), [s.a, s.c]);
+      expect(inPane(s.w, TabPane.secondary), [s.b]);
+    });
+
+    test('closeOthers and closeToRight only touch the tab\'s own pane', () {
+      final s = twoAndOne();
+      s.w.tabs.closeToRight(s.a);
+      expect(s.w.ids, [s.a, s.b]);
+
+      final t = twoAndOne();
+      t.w.tabs.closeOthers(t.a);
+      expect(t.w.ids, [t.a, t.b]);
+      expect(t.w.active, t.a);
+    });
+
+    test('closeToRight on a pane\'s last tab changes nothing', () {
+      final s = twoAndOne();
+      final seen = s.w.notifications;
+      s.w.tabs.closeToRight(s.c);
+      expect(s.w.notifications, seen);
+    });
+
+    test('reorderTabsInPane counts indexes inside the pane', () {
+      final s = twoAndOne();
+      s.w.tabs.focusPane(TabPane.secondary);
+      final d = s.w.tabs.openTab(_container(4))!;
+      s.w.tabs.reorderTabsInPane(TabPane.secondary, 0, 1);
+      expect(s.w.ids, [s.a, s.c, d, s.b]);
+      s.w.tabs.reorderTabsInPane(TabPane.secondary, 0, 2);
+      expect(s.w.ids, [s.a, s.c, d, s.b]);
+    });
+
+    test('a drag cannot carry a tab into the other pane', () {
+      final s = twoAndOne();
+      s.w.tabs.reorderTabs(0, 2);
+      expect(inPane(s.w, TabPane.primary), [s.c, s.a]);
+      expect(inPane(s.w, TabPane.secondary), [s.b]);
+      expect(s.w.ids, [s.c, s.a, s.b]);
+    });
+
+    test('closeByVolId picks a survivor in the active tab\'s pane', () {
+      final s = twoAndOne(); // C is vol 3, active
+      expect(s.w.tabs.closeByVolId(3), isTrue);
+      expect(s.w.active, s.a);
+      expect(s.w.state.activeTabIdOfPane(TabPane.secondary), s.b);
+    });
+
+    test('Home in the other pane: back at the root closes the tab in place',
+        () {
+      final w = workspace(1, includeDashboardTab: true);
+      w.tabs.setSplitAvailable(true); // Home moves across
+      final home = w.state.tabs.firstWhere((t) => t.isDashboard);
+      expect(home.pane, TabPane.secondary);
+      final a = w.active;
+      final b = w.tabs.openTab(_container(2))!;
+      expect(w.state.tabs.firstWhere((t) => t.tabId == b).pane,
+          TabPane.primary);
+      expect(w.tabs.returnToDashboardAtRoot(b), isTrue);
+      expect(w.ids, [a, home.tabId]);
+      expect(w.active, a);
+      expect(w.state.isSplit, isTrue);
+    });
+
+    test('the tab cap leaves room for both panes', () {
+      expect(kMaxBrowserTabs, 6);
+    });
+  });
+  // END dual-pane tests
+
   group('app-root workspace (decoy mode)', () {
     test('supports multiple tabs like any other workspace', () {
       final w = workspace(1, appRoot: true);

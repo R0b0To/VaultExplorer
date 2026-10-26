@@ -3399,6 +3399,7 @@
   "browserTabClose": "Tab schließen",
   "browserTabCloseOthers": "Andere Tabs schließen",
   "browserTabDuplicate": "Tab duplizieren",
+  "browserTabMoveToOtherPane": "In den anderen Bereich verschieben",
   "browserTabSwitchPrevious": "Zum vorherigen Tab wechseln",
   "browserTabOpenInNewTab": "In neuem Tab öffnen",
   "browserTabLimitReached": "Tab-Limit erreicht ({max})",

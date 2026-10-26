@@ -3399,6 +3399,7 @@
   "browserTabClose": "Fermer l'onglet",
   "browserTabCloseOthers": "Fermer les autres onglets",
   "browserTabDuplicate": "Dupliquer l'onglet",
+  "browserTabMoveToOtherPane": "Déplacer vers l'autre volet",
   "browserTabSwitchPrevious": "Passer à l'onglet précédent",
   "browserTabOpenInNewTab": "Ouvrir dans un nouvel onglet",
   "browserTabLimitReached": "Limite d'onglets atteinte ({max})",

@@ -12317,6 +12317,9 @@ class AppLocalizationsPt extends AppLocalizations {
   String get browserTabDuplicate => 'Duplicar aba';
 
   @override
+  String get browserTabMoveToOtherPane => 'Mover para o outro painel';
+
+  @override
   String get browserTabSwitchPrevious => 'Alternar para a aba anterior';
 
   @override

@@ -226,5 +226,142 @@ void main() {
       // No single finger stroke should have been completed from a 2-finger pinch
       expect(completedStroke, isNull);
     });
+
+    testWidgets('dashed brush indicator ring appears only while zooming', (tester) async {
+      final transformController = TransformationController();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: viewportSize.width,
+                height: viewportSize.height,
+                child: DrawOverlay(
+                  imageRect: imageRect,
+                  transformationController: transformController,
+                  color: Colors.white,
+                  opacity: 1.0,
+                  onStrokeCompleted: (_) {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final brushRingFinder = find.byWidgetPredicate(
+        (w) => w is CustomPaint && w.painter.runtimeType.toString().contains('DashedBrushRingPainter'),
+      );
+
+      // 1. Idle: no brush ring indicator
+      expect(brushRingFinder, findsNothing);
+
+      // 2. 1-finger drawing: no brush ring indicator
+      final center = tester.getCenter(find.byType(DrawOverlay));
+      final strokeGesture = await tester.startGesture(center);
+      await strokeGesture.moveBy(const Offset(15, 10));
+      await tester.pump();
+      expect(brushRingFinder, findsNothing);
+      await strokeGesture.up();
+      await tester.pumpAndSettle();
+      expect(brushRingFinder, findsNothing);
+
+      // 3. 2-finger pinch zoom: brush ring indicator appears
+      final touch1 = await tester.startGesture(center + const Offset(-40, 0));
+      final touch2 = await tester.startGesture(center + const Offset(40, 0));
+      await tester.pump();
+      expect(brushRingFinder, findsOneWidget);
+
+      await touch1.moveBy(const Offset(-30, 0));
+      await touch2.moveBy(const Offset(30, 0));
+      await tester.pump();
+      expect(brushRingFinder, findsOneWidget);
+
+      // 4. Release zoom fingers: brush ring indicator disappears
+      await touch1.up();
+      await touch2.up();
+      await tester.pump();
+      expect(brushRingFinder, findsNothing);
+    });
+
+    testWidgets('allows zooming beyond 500% and scales stroke width smaller without premature clamp', (tester) async {
+      DrawingAnnotation? strokeAt1x;
+      DrawingAnnotation? strokeAt10x;
+      DrawingAnnotation? strokeAt20x;
+      final transformController = TransformationController();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: viewportSize.width,
+                height: viewportSize.height,
+                child: DrawOverlay(
+                  imageRect: imageRect,
+                  transformationController: transformController,
+                  color: Colors.green,
+                  opacity: 1.0,
+                  onStrokeCompleted: (stroke) {
+                    if (strokeAt1x == null) {
+                      strokeAt1x = stroke;
+                    } else if (strokeAt10x == null) {
+                      strokeAt10x = stroke;
+                    } else {
+                      strokeAt20x = stroke;
+                    }
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final center = tester.getCenter(find.byType(DrawOverlay));
+
+      // Draw stroke at 1x
+      final g1 = await tester.startGesture(center);
+      await g1.moveBy(const Offset(10, 5));
+      await g1.up();
+      await tester.pumpAndSettle();
+      expect(strokeAt1x, isNotNull);
+
+      // Zoom to 10x (1000% - beyond 500%)
+      transformController.value = Matrix4.diagonal3Values(10.0, 10.0, 1.0);
+      await tester.pump();
+
+      // Draw stroke at 10x
+      final g10 = await tester.startGesture(center);
+      await g10.moveBy(const Offset(10, 5));
+      await g10.up();
+      await tester.pumpAndSettle();
+      expect(strokeAt10x, isNotNull);
+
+      // Stroke width at 10x should be approximately 1/10th of 1x
+      expect(
+        strokeAt10x!.strokeWidthFraction,
+        closeTo(strokeAt1x!.strokeWidthFraction / 10.0, 0.002),
+      );
+
+      // Zoom to 20x (2000%)
+      transformController.value = Matrix4.diagonal3Values(20.0, 20.0, 1.0);
+      await tester.pump();
+
+      // Draw stroke at 20x
+      final g20 = await tester.startGesture(center);
+      await g20.moveBy(const Offset(10, 5));
+      await g20.up();
+      await tester.pumpAndSettle();
+      expect(strokeAt20x, isNotNull);
+
+      // Stroke width at 20x should be approximately half of 10x
+      expect(
+        strokeAt20x!.strokeWidthFraction,
+        closeTo(strokeAt10x!.strokeWidthFraction / 2.0, 0.001),
+      );
+      expect(strokeAt20x!.strokeWidthFraction, lessThan(strokeAt10x!.strokeWidthFraction));
+    });
   });
 }

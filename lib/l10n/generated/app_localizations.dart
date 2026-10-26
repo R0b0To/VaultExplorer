@@ -20551,6 +20551,12 @@ abstract class AppLocalizations {
   /// **'Duplicate tab'**
   String get browserTabDuplicate;
 
+  /// File manager tab menu action that moves the tab to the other pane of the landscape dual-pane layout
+  ///
+  /// In en, this message translates to:
+  /// **'Move to other pane'**
+  String get browserTabMoveToOtherPane;
+
   /// Tooltip for the button that flips back to the previously used file manager tab
   ///
   /// In en, this message translates to:

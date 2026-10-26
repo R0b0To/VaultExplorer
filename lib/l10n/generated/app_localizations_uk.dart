@@ -12411,6 +12411,9 @@ class AppLocalizationsUk extends AppLocalizations {
   String get browserTabDuplicate => 'Дублювати вкладку';
 
   @override
+  String get browserTabMoveToOtherPane => 'Перемістити в іншу панель';
+
+  @override
   String get browserTabSwitchPrevious => 'Перейти на попередню вкладку';
 
   @override

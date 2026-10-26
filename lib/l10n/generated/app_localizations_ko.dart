@@ -11638,6 +11638,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get browserTabDuplicate => '탭 복제';
 
   @override
+  String get browserTabMoveToOtherPane => '다른 패널로 이동';
+
+  @override
   String get browserTabSwitchPrevious => '이전 탭으로 전환';
 
   @override

@@ -12320,6 +12320,9 @@ class AppLocalizationsIt extends AppLocalizations {
   String get browserTabDuplicate => 'Duplica scheda';
 
   @override
+  String get browserTabMoveToOtherPane => 'Sposta nell\'altro riquadro';
+
+  @override
   String get browserTabSwitchPrevious => 'Passa alla scheda precedente';
 
   @override

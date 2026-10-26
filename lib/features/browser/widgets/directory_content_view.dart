@@ -3004,7 +3004,12 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     if (!ref.read(appSettingsControllerProvider).settings.useBrowserTabs) {
       return;
     }
-    final tabId = _workspaceNotifier.openTab(container, initialPath: fullPath);
+    // Side by side, "a new tab" is most useful next to the folder it came
+    // from: it opens in the other pane instead of covering this one.
+    final split = ref.read(browserTabsProvider(widget.workspaceConfig)).isSplit;
+    final tabId = split
+        ? _workspaceNotifier.openInOtherPane(container, initialPath: fullPath)
+        : _workspaceNotifier.openTab(container, initialPath: fullPath);
     if (tabId == null) {
       _setStatus(
         context.l10n.browserTabLimitReached(kMaxBrowserTabs),

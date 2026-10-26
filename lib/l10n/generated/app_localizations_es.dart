@@ -12349,6 +12349,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get browserTabDuplicate => 'Duplicar pestaña';
 
   @override
+  String get browserTabMoveToOtherPane => 'Mover al otro panel';
+
+  @override
   String get browserTabSwitchPrevious => 'Cambiar a la pestaña anterior';
 
   @override

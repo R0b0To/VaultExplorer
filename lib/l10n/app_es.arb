@@ -3399,6 +3399,7 @@
   "browserTabClose": "Cerrar pestaña",
   "browserTabCloseOthers": "Cerrar otras pestañas",
   "browserTabDuplicate": "Duplicar pestaña",
+  "browserTabMoveToOtherPane": "Mover al otro panel",
   "browserTabSwitchPrevious": "Cambiar a la pestaña anterior",
   "browserTabOpenInNewTab": "Abrir en una pestaña nueva",
   "browserTabLimitReached": "Límite de pestañas alcanzado ({max})",

@@ -3399,6 +3399,7 @@
   "browserTabClose": "Закрити вкладку",
   "browserTabCloseOthers": "Закрити інші вкладки",
   "browserTabDuplicate": "Дублювати вкладку",
+  "browserTabMoveToOtherPane": "Перемістити в іншу панель",
   "browserTabSwitchPrevious": "Перейти на попередню вкладку",
   "browserTabOpenInNewTab": "Відкрити в новій вкладці",
   "browserTabLimitReached": "Досягнуто ліміту вкладок ({max})",

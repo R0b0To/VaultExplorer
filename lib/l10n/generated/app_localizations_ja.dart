@@ -11640,6 +11640,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get browserTabDuplicate => 'タブを複製';
 
   @override
+  String get browserTabMoveToOtherPane => 'もう一方のペインに移動';
+
+  @override
   String get browserTabSwitchPrevious => '前のタブに切り替え';
 
   @override

@@ -3399,6 +3399,7 @@
   "browserTabClose": "إغلاق علامة التبويب",
   "browserTabCloseOthers": "إغلاق علامات التبويب الأخرى",
   "browserTabDuplicate": "تكرار علامة التبويب",
+  "browserTabMoveToOtherPane": "نقل إلى اللوحة الأخرى",
   "browserTabSwitchPrevious": "التبديل إلى علامة التبويب السابقة",
   "browserTabOpenInNewTab": "فتح في علامة تبويب جديدة",
   "browserTabLimitReached": "تم بلوغ حد علامات التبويب ({max})",

@@ -1059,7 +1059,15 @@ than take this summary on faith:
   the tab list, the active tab and the back-history of one workspace, keyed by
   a `BrowserTabsConfig`. A tab is a `HomeTab` (the Dashboard) or a `FolderTab`,
   identified by a process-unique `TabId` that is never reused and that also
-  keys every per-tab provider (navigation, selection, sort, search).
+  keys every per-tab provider (navigation, selection, sort, search). Every
+  tab also belongs to one of two groups (`TabPane.primary` / `secondary`):
+  `tabs` is kept ordered primary group first, `activeTabId` is the shown tab
+  of the *focused* pane, and `unfocusedPaneTabId` is what the other pane
+  shows. Landscape dual-pane is that grouping made visible: each pane has its
+  own strip and its own shown tab, so switching tabs in one pane never changes
+  the other. The shell reports whether the layout can split
+  (`setSplitAvailable`); a workspace with everything in one pane is simply the
+  single-pane layout, and a pane that loses its last tab collapses into it.
   `BrowserTabsShell` (`browser_tabs_host.dart`) is the only owner of window
   chrome (app bar, tab strip, drawer, FAB, bottom bar), the pager and the
   dual-pane layout. Each `DirectoryContentView` (one viewport per folder tab)

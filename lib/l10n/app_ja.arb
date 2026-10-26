@@ -3399,6 +3399,7 @@
   "browserTabClose": "タブを閉じる",
   "browserTabCloseOthers": "他のタブを閉じる",
   "browserTabDuplicate": "タブを複製",
+  "browserTabMoveToOtherPane": "もう一方のペインに移動",
   "browserTabSwitchPrevious": "前のタブに切り替え",
   "browserTabOpenInNewTab": "新しいタブで開く",
   "browserTabLimitReached": "タブの上限に達しました（{max}）",

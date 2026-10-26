@@ -12352,6 +12352,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get browserTabDuplicate => 'تكرار علامة التبويب';
 
   @override
+  String get browserTabMoveToOtherPane => 'نقل إلى اللوحة الأخرى';
+
+  @override
   String get browserTabSwitchPrevious => 'التبديل إلى علامة التبويب السابقة';
 
   @override

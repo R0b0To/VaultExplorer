@@ -12322,6 +12322,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get browserTabDuplicate => 'Tab duplizieren';
 
   @override
+  String get browserTabMoveToOtherPane => 'In den anderen Bereich verschieben';
+
+  @override
   String get browserTabSwitchPrevious => 'Zum vorherigen Tab wechseln';
 
   @override

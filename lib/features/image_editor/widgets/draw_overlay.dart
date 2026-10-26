@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:math' as math;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/features/image_editor/models/edit_annotation.dart';
 
@@ -6,7 +8,8 @@ import 'package:vaultexplorer/features/image_editor/models/edit_annotation.dart'
 ///
 /// Zooming scales the effective brush size inversely (drawing finer details when
 /// zoomed in, broader strokes when zoomed out). A dashed brush indicator is
-/// centered in the viewport representing the current on-screen stroke footprint.
+/// centered in the viewport representing the current on-screen stroke footprint,
+/// visible only while zooming.
 class DrawOverlay extends StatefulWidget {
   final Rect imageRect;
   final TransformationController transformationController;
@@ -18,6 +21,9 @@ class DrawOverlay extends StatefulWidget {
 
   /// Fixed logical pixel diameter of the brush footprint on screen.
   static const double kBrushScreenDiameter = 60.0;
+
+  /// Maximum zoom scale allowed during drawing gestures (3000%).
+  static const double kMaxZoomScale = 30.0;
 
   const DrawOverlay({
     super.key,
@@ -42,10 +48,20 @@ class _DrawOverlayState extends State<DrawOverlay> {
   Matrix4? _initialMatrix;
   Offset? _initialFocalPoint;
   bool _isTwoFingerZooming = false;
+  bool _isWheelZooming = false;
+  Timer? _wheelZoomDismissTimer;
+
+  bool get _isZooming => _isTwoFingerZooming || _isWheelZooming;
 
   // For 1-finger drawing
   final List<Offset> _liveStrokePoints = [];
   double _liveStrokeWidthFraction = 0.02;
+
+  @override
+  void dispose() {
+    _wheelZoomDismissTimer?.cancel();
+    super.dispose();
+  }
 
   Offset? _toNormalizedPoint(Offset viewportPoint) {
     if (widget.imageRect.width <= 0 || widget.imageRect.height <= 0) return null;
@@ -58,7 +74,7 @@ class _DrawOverlayState extends State<DrawOverlay> {
   double _calculateStrokeWidthFraction() {
     final scale = widget.transformationController.value.getMaxScaleOnAxis();
     final h = widget.imageRect.height > 0 ? widget.imageRect.height : 1.0;
-    return (DrawOverlay.kBrushScreenDiameter / (h * scale)).clamp(0.002, 0.25);
+    return (DrawOverlay.kBrushScreenDiameter / (h * scale)).clamp(0.00005, 0.25);
   }
 
   void _onPointerDown(PointerDownEvent event) {
@@ -106,7 +122,7 @@ class _DrawOverlayState extends State<DrawOverlay> {
           _initialFocalPoint != null) {
         final scaleFactor = currentDistance / _initialDistance!;
         final initialScale = _initialMatrix!.getMaxScaleOnAxis();
-        final newScale = (initialScale * scaleFactor).clamp(1.0, 5.0);
+        final newScale = (initialScale * scaleFactor).clamp(1.0, DrawOverlay.kMaxZoomScale);
         final effectiveRatio = newScale / initialScale;
 
         final matrix = _initialMatrix!.clone();
@@ -185,6 +201,53 @@ class _DrawOverlayState extends State<DrawOverlay> {
     }
   }
 
+  void _onPointerSignal(PointerSignalEvent event) {
+    if (event is PointerScrollEvent) {
+      final zoomDelta = event.scrollDelta.dy < 0 ? 1.15 : 1 / 1.15;
+      final currentScale = widget.transformationController.value.getMaxScaleOnAxis();
+      final newScale = (currentScale * zoomDelta).clamp(1.0, DrawOverlay.kMaxZoomScale);
+      if (newScale == currentScale) return;
+
+      final ratio = newScale / currentScale;
+      final focalPoint = event.localPosition;
+      final matrix = widget.transformationController.value.clone();
+      final translation = matrix.getTranslation();
+      final tx = translation.x;
+      final ty = translation.y;
+
+      final newTx = focalPoint.dx + (tx - focalPoint.dx) * ratio;
+      final newTy = focalPoint.dy + (ty - focalPoint.dy) * ratio;
+
+      final box = context.findRenderObject() as RenderBox?;
+      final overlayW = box?.size.width ?? widget.imageRect.width;
+      final overlayH = box?.size.height ?? widget.imageRect.height;
+      final scaledW = overlayW * newScale;
+      final scaledH = overlayH * newScale;
+
+      final clampedTx = newScale <= 1.0
+          ? (overlayW - scaledW) / 2.0
+          : newTx.clamp(overlayW - scaledW, 0.0);
+      final clampedTy = newScale <= 1.0
+          ? (overlayH - scaledH) / 2.0
+          : newTy.clamp(overlayH - scaledH, 0.0);
+
+      widget.transformationController.value =
+          Matrix4.diagonal3Values(newScale, newScale, 1.0)
+            ..setTranslationRaw(clampedTx, clampedTy, 0.0);
+
+      _wheelZoomDismissTimer?.cancel();
+      _isWheelZooming = true;
+      _wheelZoomDismissTimer = Timer(const Duration(milliseconds: 600), () {
+        if (mounted) {
+          setState(() {
+            _isWheelZooming = false;
+          });
+        }
+      });
+      setState(() {});
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Listener(
@@ -193,6 +256,7 @@ class _DrawOverlayState extends State<DrawOverlay> {
       onPointerMove: _onPointerMove,
       onPointerUp: _onPointerUp,
       onPointerCancel: _onPointerCancel,
+      onPointerSignal: _onPointerSignal,
       child: Stack(
         fit: StackFit.expand,
         children: [
@@ -211,16 +275,17 @@ class _DrawOverlayState extends State<DrawOverlay> {
               ),
             ),
 
-          // 2. Dashed circular brush ring in the center of the viewport
-          Positioned.fill(
-            child: IgnorePointer(
-              child: CustomPaint(
-                painter: _DashedBrushRingPainter(
-                  radius: DrawOverlay.kBrushScreenDiameter / 2.0,
+          // 2. Dashed circular brush ring in the center of the viewport (visible only when zooming)
+          if (_isZooming)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: CustomPaint(
+                  painter: _DashedBrushRingPainter(
+                    radius: DrawOverlay.kBrushScreenDiameter / 2.0,
+                  ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );

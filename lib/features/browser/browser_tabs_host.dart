@@ -248,7 +248,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   Offset _newTabSwipeStart = Offset.zero;
   Duration _newTabSwipeStartTime = Duration.zero;
   bool? _wasDualPane;
-  List<TabId>? _dualPaneTabIds;
+  bool? _requestedSplitAvailable;
   Set<TabId> _requestedVisibleTabs = const <TabId>{};
   int? _pageViewDrivenActiveIndex;
 
@@ -484,65 +484,59 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     );
   }
 
+  /// One pane of the dual-pane layout: its own tab strip above its shown tab.
   Widget _buildDualPaneViewport(
     BrowserTabState tab, {
+    required Widget stripSlot,
     required bool isActive,
     required bool autoHideAppBar,
     required bool autoHideTabBar,
   }) {
     return Expanded(
-      child: NotificationListener<ScrollNotification>(
-        onNotification: (notification) {
-          if (notification.metrics.axis == Axis.vertical) {
-            _handleAppBarScroll(
-              notification,
-              enabled: autoHideAppBar,
-              autoHideTabBar: autoHideTabBar,
-              active: isActive,
-            );
-          }
-          // Each pane owns its scroll notifications. In particular, its
-          // horizontal overscroll must not trigger the tab-strip edge action.
-          return true;
-        },
-        child: Listener(
-          behavior: HitTestBehavior.translucent,
-          onPointerDown: (_) => _focusTab(tab.tabId),
-          child: TickerMode(
-            enabled: true,
-            child: _buildTabContent(tab, isActive: isActive),
+      child: Column(
+        children: [
+          stripSlot,
+          Expanded(
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (notification) {
+                if (notification.metrics.axis == Axis.vertical) {
+                  _handleAppBarScroll(
+                    notification,
+                    enabled: autoHideAppBar,
+                    autoHideTabBar: autoHideTabBar,
+                    active: isActive,
+                  );
+                }
+                // Each pane owns its scroll notifications. In particular, its
+                // horizontal overscroll must not trigger the tab-strip edge
+                // action.
+                return true;
+              },
+              child: Listener(
+                behavior: HitTestBehavior.translucent,
+                onPointerDown: (_) => _focusTab(tab.tabId),
+                child: TickerMode(
+                  enabled: true,
+                  child: _buildTabContent(tab, isActive: isActive),
+                ),
+              ),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
 
-  List<TabId> _resolveDualPaneTabIds(
-    List<BrowserTabState> tabs,
-    TabId? activeTabId,
-  ) {
-    final activeIndex = tabs.indexWhere((tab) => tab.tabId == activeTabId);
-    final currentPair = _dualPaneTabIds;
-    final pairStillOpen =
-        currentPair != null &&
-        currentPair.length == 2 &&
-        tabs.any((tab) => tab.tabId == currentPair[0]) &&
-        tabs.any((tab) => tab.tabId == currentPair[1]);
-    final activeIsInPair = currentPair?.contains(activeTabId) ?? false;
-    if (!pairStillOpen || !activeIsInPair) {
-      final firstIndex = activeIndex >= tabs.length - 1
-          ? tabs.length - 2
-          : activeIndex.clamp(0, tabs.length - 2).toInt();
-      _dualPaneTabIds = [tabs[firstIndex].tabId, tabs[firstIndex + 1].tabId];
-    } else {
-      final pair = currentPair;
-      final firstPairIndex = tabs.indexWhere((tab) => tab.tabId == pair[0]);
-      final secondPairIndex = tabs.indexWhere((tab) => tab.tabId == pair[1]);
-      if (firstPairIndex > secondPairIndex) {
-        _dualPaneTabIds = [pair[1], pair[0]];
-      }
-    }
-    return _dualPaneTabIds!;
+  /// Tells the tab engine whether the layout can show two panes. The width
+  /// that decides this is only known while building, so it is published from a
+  /// frame callback; only a change is worth one.
+  void _publishSplitAvailable(bool available) {
+    if (_requestedSplitAvailable == available) return;
+    _requestedSplitAvailable = available;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _workspaceActions.setSplitAvailable(available);
+    });
   }
 
   /// Tells the tabs which of them are on screen besides the active one. The
@@ -1119,11 +1113,24 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     final availableWidth =
         MediaQuery.sizeOf(context).width -
         MediaQuery.paddingOf(context).horizontal;
-    final dualPaneForTabStrip =
+    final splitAvailable =
         tabsEnabled &&
         useDualPaneBrowsing &&
-        tabs.length > 1 &&
         availableWidth >= minDualPaneWidth;
+    _publishSplitAvailable(splitAvailable);
+    // Each pane shows its own tab: the pair is read from the engine, not
+    // guessed from the tab order.
+    final paneTabIds = ref.watch(
+      browserTabsProvider(_workspace).select(
+        (s) => s.isSplit
+            ? (
+                s.activeTabIdOfPane(TabPane.primary),
+                s.activeTabIdOfPane(TabPane.secondary),
+              )
+            : null,
+      ),
+    );
+    final dualPaneForTabStrip = splitAvailable && paneTabIds != null;
     // Swiping past an end wraps around. Side by side there is no pager to
     // swipe, so only a single-pane layout loops.
     final loopTabs =
@@ -1135,14 +1142,6 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     // opens from any tab, and a left swipe anywhere offers a new tab.
     final tabSwipingOff = tabsEnabled && !tabEdgeSwipe.swipesBetweenTabs;
     _newTabSwipeAnywhere = tabSwipingOff;
-    final dualPaneTabIds = dualPaneForTabStrip
-        ? _resolveDualPaneTabIds(tabs, activeTabId)
-        : null;
-    final secondaryTabId = dualPaneTabIds == null
-        ? null
-        : dualPaneTabIds.first == activeTabId
-        ? dualPaneTabIds.last
-        : dualPaneTabIds.first;
     final systemBackGestureInsetLeft = MediaQuery.systemGestureInsetsOf(
       context,
     ).left;
@@ -1150,7 +1149,13 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       workspaceConfig: _workspace,
       onNewTab: widget.onNewTab ?? _openNewTabSheet,
       onDuplicate: widget.onDuplicate ?? _duplicate,
-      secondaryTabId: secondaryTabId,
+    );
+    Widget paneStrip(TabPane pane) => BrowserTabStrip(
+      key: ValueKey<TabPane>(pane),
+      workspaceConfig: _workspace,
+      onNewTab: widget.onNewTab ?? _openNewTabSheet,
+      onDuplicate: widget.onDuplicate ?? _duplicate,
+      pane: pane,
     );
     final drawer = activeTab == null
         ? null
@@ -1225,7 +1230,8 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       appBar: appBar,
       selectionAppBarListenable: _chrome.selectionAppBar,
     );
-    final Widget tabStripSlot = ClipRect(
+    // The strip(s) slide away together with the tab bar auto-hide.
+    Widget stripSlotFor(Widget child) => ClipRect(
       child: AnimatedBuilder(
         animation: _tabBarVisibilityController,
         builder: (context, child) => Align(
@@ -1235,9 +1241,10 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
               : 1.0,
           child: SizedBox(height: kBrowserTabStripHeight, child: child),
         ),
-        child: strip,
+        child: child,
       ),
     );
+    final Widget tabStripSlot = stripSlotFor(strip);
     final Widget bottomBarSlot = ValueListenableBuilder<Widget?>(
       valueListenable: _chrome.bottomBar,
       builder: (context, bottomBar, _) => bottomBar ?? const SizedBox.shrink(),
@@ -1252,7 +1259,9 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
             child: Column(
               children: [
                 if (!appBarAtBottom) appBarSlot,
-                if (tabsEnabled && tabs.isNotEmpty) tabStripSlot,
+                // Side by side, each pane carries its own strip instead.
+                if (tabsEnabled && tabs.isNotEmpty && !dualPaneForTabStrip)
+                  tabStripSlot,
                 Expanded(
                   child: NotificationListener<FastScrollbarDragNotification>(
                     onNotification: _onScrollbarDrag,
@@ -1274,21 +1283,25 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                         }
 
                         if (dualPane) {
-                          final pair = _resolveDualPaneTabIds(
-                            tabs,
-                            activeTabId,
-                          );
+                          final ids = paneTabIds!;
+                          final firstId = ids.$1!;
+                          final secondId = ids.$2!;
                           final firstTab = tabs.firstWhere(
-                            (tab) => tab.tabId == pair[0],
+                            (tab) => tab.tabId == firstId,
+                            orElse: () => tabs.first,
                           );
                           final secondTab = tabs.firstWhere(
-                            (tab) => tab.tabId == pair[1],
+                            (tab) => tab.tabId == secondId,
+                            orElse: () => tabs.last,
                           );
-                          _publishVisibleTabs({pair[0], pair[1]});
+                          _publishVisibleTabs({firstId, secondId});
                           return Row(
                             children: [
                               _buildDualPaneViewport(
                                 firstTab,
+                                stripSlot: stripSlotFor(
+                                  paneStrip(TabPane.primary),
+                                ),
                                 isActive: firstTab.tabId == activeTabId,
                                 autoHideAppBar: autoHideAppBar,
                                 autoHideTabBar: autoHideTabBar,
@@ -1300,6 +1313,9 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                               ),
                               _buildDualPaneViewport(
                                 secondTab,
+                                stripSlot: stripSlotFor(
+                                  paneStrip(TabPane.secondary),
+                                ),
                                 isActive: secondTab.tabId == activeTabId,
                                 autoHideAppBar: autoHideAppBar,
                                 autoHideTabBar: autoHideTabBar,

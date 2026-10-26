@@ -11456,6 +11456,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get browserTabDuplicate => '复制标签页';
 
   @override
+  String get browserTabMoveToOtherPane => '移到另一个窗格';
+
+  @override
   String get browserTabSwitchPrevious => '切换到上一个标签页';
 
   @override

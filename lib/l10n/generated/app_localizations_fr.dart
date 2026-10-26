@@ -12426,6 +12426,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get browserTabDuplicate => 'Dupliquer l\'onglet';
 
   @override
+  String get browserTabMoveToOtherPane => 'Déplacer vers l\'autre volet';
+
+  @override
   String get browserTabSwitchPrevious => 'Passer à l\'onglet précédent';
 
   @override

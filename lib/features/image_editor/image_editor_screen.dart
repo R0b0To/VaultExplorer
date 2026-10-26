@@ -2050,7 +2050,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
                     child: InteractiveViewer(
                       transformationController: _transformationController,
                       minScale: 1.0,
-                      maxScale: 5.0,
+                      maxScale: DrawOverlay.kMaxZoomScale,
                       panEnabled:
                           !isCropping && !isTextTool && !isDrawTool && _controls.activeTool == EditorTool.none,
                       scaleEnabled: _controls.activeTool == EditorTool.none,

@@ -3399,6 +3399,7 @@
   "browserTabClose": "탭 닫기",
   "browserTabCloseOthers": "다른 탭 닫기",
   "browserTabDuplicate": "탭 복제",
+  "browserTabMoveToOtherPane": "다른 패널로 이동",
   "browserTabSwitchPrevious": "이전 탭으로 전환",
   "browserTabOpenInNewTab": "새 탭에서 열기",
   "browserTabLimitReached": "탭 한도에 도달했습니다({max})",

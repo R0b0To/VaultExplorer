@@ -3399,6 +3399,7 @@
   "browserTabClose": "关闭标签页",
   "browserTabCloseOthers": "关闭其他标签页",
   "browserTabDuplicate": "复制标签页",
+  "browserTabMoveToOtherPane": "移到另一个窗格",
   "browserTabSwitchPrevious": "切换到上一个标签页",
   "browserTabOpenInNewTab": "在新标签页中打开",
   "browserTabLimitReached": "已达到标签页上限（{max}）",

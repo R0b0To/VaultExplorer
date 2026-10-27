@@ -70,8 +70,9 @@ void main() {
       final h = _Harness();
       await tester.pumpWidget(h.build());
       final start = tester.getTopLeft(find.byKey(_contentKey));
+      final shortDrag = tester.getSize(find.byType(Scaffold)).height * 0.04;
 
-      await tester.drag(find.byKey(_contentKey), const Offset(0, 60));
+      await tester.drag(find.byKey(_contentKey), Offset(0, shortDrag));
       await tester.pumpAndSettle();
 
       expect(h.dismissed, 0);
@@ -117,17 +118,21 @@ void main() {
       final h = _Harness();
       await tester.pumpWidget(h.build());
       final start = tester.getTopLeft(find.byKey(_contentKey));
+      final dragDistance = tester.getSize(find.byType(Scaffold)).height * 0.04;
 
       final gesture = await tester.startGesture(
         tester.getCenter(find.byKey(_contentKey)),
       );
-      // The fade reaches full progress at 10% of the viewport; stay below the
-      // 20% dismissal threshold so this remains a follow-the-finger check.
-      await gesture.moveBy(const Offset(0, 20));
-      await gesture.moveBy(const Offset(0, 40));
+      // Stay below the 5% dismissal threshold so this remains a
+      // follow-the-finger check while still crossing touch slop.
+      await gesture.moveBy(Offset(0, dragDistance / 2));
+      await gesture.moveBy(Offset(0, dragDistance / 2));
       await tester.pump();
 
-      expect(tester.getTopLeft(find.byKey(_contentKey)).dy, greaterThan(start.dy));
+      expect(
+        tester.getTopLeft(find.byKey(_contentKey)).dy,
+        greaterThan(start.dy),
+      );
       expect(h.progress.value, greaterThan(0.0));
       expect(h.progress.value, lessThanOrEqualTo(1.0));
       expect(h.dismissed, 0);

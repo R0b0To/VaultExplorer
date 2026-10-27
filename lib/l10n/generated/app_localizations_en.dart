@@ -2472,9 +2472,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get takingPhoto => 'Capturing photo…';
 
   @override
-  String get savingToVault => 'Saving to vault…';
-
-  @override
   String get noVaultSelected => 'No vault selected';
 
   @override
@@ -8098,6 +8095,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get swipeToSeekSubtitle =>
       'Swipe horizontally across the screen to seek. In playlists, navigation buttons must be used instead of swiping between items';
+
+  @override
+  String get swipeToDismissTitle => 'Swipe to Dismiss';
+
+  @override
+  String get swipeToDismissSubtitle =>
+      'Close the viewer by swiping down. When a playlist scrolls vertically, swipe sideways instead';
 
   @override
   String get edgeSwipeBrightnessTitle => 'Brightness Swipe Gesture';

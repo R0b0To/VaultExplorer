@@ -2512,9 +2512,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get takingPhoto => 'Capturando foto…';
 
   @override
-  String get savingToVault => 'Guardando en la bóveda…';
-
-  @override
   String get noVaultSelected => 'No se seleccionó ninguna bóveda';
 
   @override
@@ -8247,6 +8244,13 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get swipeToSeekSubtitle =>
       'Desliza horizontalmente por la pantalla para buscar. En listas de reproducción, se deben usar los botones de navegación en lugar de deslizar entre elementos';
+
+  @override
+  String get swipeToDismissTitle => 'Deslizar para cerrar';
+
+  @override
+  String get swipeToDismissSubtitle =>
+      'Desliza hacia abajo para cerrar el visor. Si la lista de reproducción se desplaza en vertical, desliza hacia los lados';
 
   @override
   String get edgeSwipeBrightnessTitle => 'Gesto de deslizamiento de brillo';

@@ -739,6 +739,20 @@ class _MediaViewerToolbarSettingsScreenState
       );
     }
 
+    if ('swipe to dismiss close exit gesture'.contains(query) ||
+        l10n.swipeToDismissTitle.toLowerCase().contains(query)) {
+      matchingSettings.add(
+        SwitchListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+          value: mediaConfig.swipeToDismissEnabled,
+          onChanged: controller.setMediaViewerSwipeToDismissEnabled,
+          title: Text(l10n.swipeToDismissTitle),
+          subtitle: Text(l10n.swipeToDismissSubtitle),
+          secondary: Icon(Icons.swipe_down_alt_rounded, color: cs.primary),
+        ),
+      );
+    }
+
     if ('brightness gesture edge swipe'.contains(query) ||
         l10n.edgeSwipeBrightnessTitle.toLowerCase().contains(query)) {
       matchingSettings.add(
@@ -1331,6 +1345,27 @@ class MediaViewerPlaybackSettingsScreen extends ConsumerWidget {
                       onChangeEnd: (v) => unawaited(
                         controller.setMediaViewerSeekSensitivity(v),
                       ),
+                    ),
+                  ),
+                  SwitchListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                    value: mediaConfig.swipeToDismissEnabled,
+                    onChanged: controller.setMediaViewerSwipeToDismissEnabled,
+                    title: Text(
+                      l10n.swipeToDismissTitle,
+                      style: textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      l10n.swipeToDismissSubtitle,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                    secondary: Icon(
+                      Icons.swipe_down_alt_rounded,
+                      color: cs.primary,
                     ),
                   ),
                   SwitchListTile(

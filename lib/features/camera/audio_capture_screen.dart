@@ -1547,12 +1547,7 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
             if (saving) ...[
               const LinearProgressIndicator(),
               const SizedBox(height: 12),
-              Text(
-                widget.container.isLocalStorage
-                    ? l10n.savingLabel
-                    : l10n.savingToVault,
-                style: textTheme.bodyMedium,
-              ),
+              Text(l10n.savingLabel, style: textTheme.bodyMedium),
             ] else
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,

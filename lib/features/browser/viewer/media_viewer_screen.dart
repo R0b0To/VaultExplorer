@@ -58,6 +58,7 @@ import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_in_pl
 import 'package:vaultexplorer/features/browser/viewer/widgets/advanced_settings_sheet.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/audio_equalizer_sheet.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_diagnostics_sheet.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/swipe_to_dismiss_layer.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/video_scrub_fullscreen_layer.dart';
 import 'package:vaultexplorer/features/image_editor/image_editor_screen.dart';
 import 'package:vaultexplorer/features/video_editor/video_editor_screen.dart';
@@ -139,6 +140,12 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   TapDownDetails? _continuousDoubleTapDetails;
   final ValueNotifier<ScrollPhysics> _swipePhysicsNotifier =
       ValueNotifier<ScrollPhysics>(const BouncingScrollPhysics());
+
+  /// 0..1 while a swipe-to-dismiss drag pulls the viewer away. Only drives the
+  /// fade of the black backdrop, so the subtree below it is not rebuilt.
+  final ValueNotifier<double> _swipeDismissProgress = ValueNotifier<double>(
+    0.0,
+  );
 
   /// The A-B repeat section of the video now playing. In memory only, and
   /// emptied whenever another item (hence a fresh native player) takes over.
@@ -1272,6 +1279,43 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       return true;
     }
     return gestureConfig.swipeToSeekEnabled;
+  }
+
+  /// The drag that closes the viewer is always the one opposite to the drag
+  /// that changes items, so the two never compete: swipe down when items
+  /// change sideways, swipe sideways when they change vertically. A single
+  /// item has no playlist to change, so it uses the default (down).
+  Axis get _swipeDismissAxis {
+    if (!_playlistController.isPlaylistMode) return Axis.vertical;
+    return _scrollMode.axis == Axis.horizontal
+        ? Axis.vertical
+        : Axis.horizontal;
+  }
+
+  /// Asked by the swipe-to-dismiss layer whenever a finger lands. Mirrors the
+  /// conditions under which item swiping is locked, plus a page change that
+  /// is still settling, so a pinch, a pan of a zoomed image or a half-finished
+  /// swipe is never mistaken for a dismiss.
+  bool _canStartSwipeDismiss() {
+    if (!mounted || _playlistController.isEmpty) return false;
+    if (_isEditingLayout ||
+        _multiTouchLock ||
+        _zoomInteractionLock ||
+        _isProgrammaticScrolling ||
+        _isSwiping) {
+      return false;
+    }
+    // Continuous mode reports "zoom ended" even while still zoomed in.
+    if (_scrollMode.isContinuous && _continuousScale > 1.01) return false;
+    return true;
+  }
+
+  /// Closes the viewer the way a deliberate back press does (see PopScope in
+  /// build), so background playback still hands over.
+  void _closeViewerFromSwipe() {
+    if (!mounted) return;
+    _prepareBackgroundPlaybackHandoff();
+    Navigator.of(context).pop();
   }
 
   // Recomputes the shared swipe-physics notifier from the lock sources:
@@ -2978,6 +3022,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     }
     BackgroundPlaybackHost.instance.unregisterViewer();
     _swipePhysicsNotifier.dispose();
+    _swipeDismissProgress.dispose();
     _videoProgressNotifier.dispose();
     _abLoopNotifier.dispose();
     _abLoopToastTimer?.cancel();
@@ -3236,8 +3281,22 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       },
       child: AnnotatedRegion<SystemUiOverlayStyle>(
         value: AppSystemUI.transparentDark,
-        child: Scaffold(
-        backgroundColor: Colors.black,
+        // The black behind the viewer fades out while a swipe-to-dismiss drag
+        // pulls the content away, showing the screen underneath. It stays
+        // solid when the viewer sits on an opaque route (nothing to show).
+        child: ValueListenableBuilder<double>(
+          valueListenable: _swipeDismissProgress,
+          builder: (context, progress, scaffold) {
+            final fades = ModalRoute.of(context)?.opaque == false;
+            return ColoredBox(
+              color: fades
+                  ? Colors.black.withValues(alpha: 1.0 - progress)
+                  : Colors.black,
+              child: scaffold,
+            );
+          },
+          child: Scaffold(
+        backgroundColor: Colors.transparent,
         extendBody: true, // Draws content under bottom navigation bar
         extendBodyBehindAppBar: true,
         body: LayoutBuilder(
@@ -3443,7 +3502,15 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
               );
             }
 
-            return Stack(
+            final swipeDismissAxis = _swipeDismissAxis;
+            return MediaSwipeDismissLayer(
+              enabled: mediaViewerConfig.swipeToDismissEnabled && !_isEditingLayout,
+              axis: swipeDismissAxis,
+              bothDirections: swipeDismissAxis == Axis.horizontal,
+              canStart: _canStartSwipeDismiss,
+              onDismiss: _closeViewerFromSwipe,
+              progress: _swipeDismissProgress,
+              child: Stack(
               children: [
                 Listener(
                   behavior: HitTestBehavior.translucent,
@@ -3778,9 +3845,11 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                   ),
                 ],
               ],
+            ),
             );
           },
         ),
+      ),
       ),
     ),
   );

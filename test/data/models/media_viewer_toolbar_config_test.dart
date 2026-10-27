@@ -43,6 +43,45 @@ void main() {
     });
   });
 
+  group('MediaViewerToolbarConfig swipeToDismissEnabled', () {
+    test('is off by default', () {
+      expect(MediaViewerToolbarConfig.defaults().swipeToDismissEnabled, isFalse);
+      expect(const MediaViewerToolbarConfig().swipeToDismissEnabled, isFalse);
+    });
+
+    test('copyWith updates it without touching swipeToSeekEnabled', () {
+      final config = MediaViewerToolbarConfig.defaults().copyWith(
+        swipeToSeekEnabled: true,
+      );
+      final updated = config.copyWith(swipeToDismissEnabled: true);
+      expect(updated.swipeToDismissEnabled, isTrue);
+      expect(updated.swipeToSeekEnabled, isTrue);
+
+      final reset = updated.copyWith(swipeToDismissEnabled: false);
+      expect(reset.swipeToDismissEnabled, isFalse);
+      expect(reset.swipeToSeekEnabled, isTrue);
+    });
+
+    test('round-trips through JSON', () {
+      final config = MediaViewerToolbarConfig.defaults().copyWith(
+        swipeToDismissEnabled: true,
+      );
+      final json = config.toJson();
+      expect(json['swipeToDismissEnabled'], isTrue);
+      expect(
+        MediaViewerToolbarConfig.fromJson(json).swipeToDismissEnabled,
+        isTrue,
+      );
+    });
+
+    test('fromJson falls back to false for configs saved before it existed', () {
+      final config = MediaViewerToolbarConfig.fromJson(<String, dynamic>{
+        'showProgressBar': true,
+      });
+      expect(config.swipeToDismissEnabled, isFalse);
+    });
+  });
+
   group('editAudio action', () {
     test('is in the default More menu, next to editVideo', () {
       const config = MediaViewerToolbarConfig();

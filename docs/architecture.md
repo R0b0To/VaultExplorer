@@ -1065,8 +1065,11 @@ than take this summary on faith:
   of the *focused* pane, and `unfocusedPaneTabId` is what the other pane
   shows. Landscape dual-pane is that grouping made visible: each pane has its
   own strip and its own shown tab, so switching tabs in one pane never changes
-  the other. The shell reports whether the layout can split
-  (`setSplitAvailable`); a workspace with everything in one pane is simply the
+  the other. Each pane also has its own pager: swiping sideways in a pane moves
+  between that pane's tabs, its edge actions (new tab, wrap-around) work on
+  that pane's group, and a tab dragged out of one strip and dropped on the
+  other pane moves there (`moveToPane`). The shell reports whether the layout
+  can split (`setSplitAvailable`); a workspace with everything in one pane is simply the
   single-pane layout, and a pane that loses its last tab collapses into it.
   `BrowserTabsShell` (`browser_tabs_host.dart`) is the only owner of window
   chrome (app bar, tab strip, drawer, FAB, bottom bar), the pager and the

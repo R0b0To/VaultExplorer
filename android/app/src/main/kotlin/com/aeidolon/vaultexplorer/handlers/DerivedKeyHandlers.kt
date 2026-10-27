@@ -213,6 +213,8 @@ class DerivedKeyHandlers(
                 }
             } catch (e: Exception) {
                 activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
+            } catch (e: Throwable) {
+                reportAvifFailure(e, result)
             }
         }
     }
@@ -233,6 +235,8 @@ class DerivedKeyHandlers(
                 }
             } catch (e: Exception) {
                 activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
+            } catch (e: Throwable) {
+                reportAvifFailure(e, result)
             }
         }
     }
@@ -252,7 +256,24 @@ class DerivedKeyHandlers(
                 }
             } catch (e: Exception) {
                 activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
+            } catch (e: Throwable) {
+                reportAvifFailure(e, result)
             }
+        }
+    }
+
+    /**
+     * An AVIF decode that dies with an [Error] (a missing JNI symbol raises
+     * UnsatisfiedLinkError, a huge frame raises OutOfMemoryError) is not an
+     * [Exception], so the `catch (e: Exception)` blocks above miss it and it
+     * escapes the I/O executor thread, which takes the whole app down. Report
+     * it to Dart as a normal failed call instead, so the caller can show its
+     * "can't open this image" state.
+     */
+    private fun reportAvifFailure(e: Throwable, result: MethodChannel.Result) {
+        VeLog.w("VaultExplorer_AVIF", e) { "AVIF native call failed" }
+        activity.runOnUiThread {
+            result.error("AVIF_ERROR", e.message ?: e.javaClass.simpleName, null)
         }
     }
 

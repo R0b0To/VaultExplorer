@@ -2546,9 +2546,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get takingPhoto => 'جارٍ التقاط الصورة…';
 
   @override
-  String get savingToVault => 'جارٍ الحفظ في الخزنة…';
-
-  @override
   String get noVaultSelected => 'لم يتم تحديد خزنة';
 
   @override
@@ -8295,6 +8292,13 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get swipeToSeekSubtitle =>
       'اسحب أفقياً عبر الشاشة للتقديم والتأخير. في قوائم التشغيل، يجب استخدام أزرار التنقل بدلاً من السحب بين العناصر';
+
+  @override
+  String get swipeToDismissTitle => 'السحب للإغلاق';
+
+  @override
+  String get swipeToDismissSubtitle =>
+      'اسحب للأسفل لإغلاق العارض. في قائمة تشغيل تتمرر عموديًا، اسحب جانبيًا بدلًا من ذلك';
 
   @override
   String get edgeSwipeBrightnessTitle => 'إيماءة سحب السطوع';

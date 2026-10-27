@@ -123,6 +123,7 @@ MediaViewerToolbarConfig _customViewer() {
     // behavior
     loopPlaylist: !d.loopPlaylist,
     swipeToSeekEnabled: !d.swipeToSeekEnabled,
+    swipeToDismissEnabled: !d.swipeToDismissEnabled,
     thumbnailGenerationStrategy: ThumbnailGenerationStrategy.firstFrame,
     volumeBoostEnabled: !d.volumeBoostEnabled,
     seekSensitivity: 1.5,

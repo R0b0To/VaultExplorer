@@ -33,6 +33,11 @@ class MediaViewerToolbarConfig {
   final VideoAspectRatioMode defaultAspectRatioMode;
   final double holdToSpeedMultiplier;
   final bool swipeToSeekEnabled;
+
+  /// Closes the viewer with a drag: down for a single item or a horizontal
+  /// playlist, sideways when the playlist pages vertically (always the axis
+  /// opposite to the one that changes items).
+  final bool swipeToDismissEnabled;
   final ResumePlaybackMode resumePlaybackMode;
 
   /// Whether audio keeps playing in the background after the viewer is
@@ -119,6 +124,7 @@ class MediaViewerToolbarConfig {
     this.defaultAspectRatioMode = VideoAspectRatioMode.bestFit,
     this.holdToSpeedMultiplier = 2.0,
     this.swipeToSeekEnabled = false,
+    this.swipeToDismissEnabled = false,
     this.resumePlaybackMode = ResumePlaybackMode.askEveryTime,
     this.keepAudioPlayingAfterClose = false,
     this.pictureInPictureEnabled = false,
@@ -163,6 +169,7 @@ class MediaViewerToolbarConfig {
     VideoAspectRatioMode? defaultAspectRatioMode,
     double? holdToSpeedMultiplier,
     bool? swipeToSeekEnabled,
+    bool? swipeToDismissEnabled,
     ResumePlaybackMode? resumePlaybackMode,
     bool? keepAudioPlayingAfterClose,
     bool? pictureInPictureEnabled,
@@ -211,6 +218,8 @@ class MediaViewerToolbarConfig {
         defaultAspectRatioMode ?? this.defaultAspectRatioMode,
     holdToSpeedMultiplier: holdToSpeedMultiplier ?? this.holdToSpeedMultiplier,
     swipeToSeekEnabled: swipeToSeekEnabled ?? this.swipeToSeekEnabled,
+    swipeToDismissEnabled:
+        swipeToDismissEnabled ?? this.swipeToDismissEnabled,
     resumePlaybackMode: resumePlaybackMode ?? this.resumePlaybackMode,
     keepAudioPlayingAfterClose:
         keepAudioPlayingAfterClose ?? this.keepAudioPlayingAfterClose,
@@ -307,6 +316,7 @@ class MediaViewerToolbarConfig {
     'defaultAspectRatioMode': defaultAspectRatioMode.toJson(),
     'holdToSpeedMultiplier': holdToSpeedMultiplier,
     'swipeToSeekEnabled': swipeToSeekEnabled,
+    'swipeToDismissEnabled': swipeToDismissEnabled,
     'resumePlaybackMode': resumePlaybackMode.name,
     'keepAudioPlayingAfterClose': keepAudioPlayingAfterClose,
     'pictureInPictureEnabled': pictureInPictureEnabled,
@@ -467,6 +477,7 @@ class MediaViewerToolbarConfig {
       holdToSpeedMultiplier:
           (j['holdToSpeedMultiplier'] as num?)?.toDouble() ?? 2.0,
       swipeToSeekEnabled: j['swipeToSeekEnabled'] as bool? ?? false,
+      swipeToDismissEnabled: j['swipeToDismissEnabled'] as bool? ?? false,
       resumePlaybackMode: ResumePlaybackMode.values.firstWhere(
         (mode) => mode.name == j['resumePlaybackMode'],
         orElse: () => ResumePlaybackMode.askEveryTime,

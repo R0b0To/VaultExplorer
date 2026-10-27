@@ -234,6 +234,10 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   /// pulled past the last tab (left swipe), [_edgeOverscrollBackward] past the
   /// first tab (right swipe).
   bool _edgeSwipeEligible = false;
+
+  /// The pane the drag in [_edgeSwipeEligible] is swiping tabs in; null for
+  /// the single pager over all tabs.
+  TabPane? _edgeSwipePane;
   bool _edgeSwipeStartedAtFirst = false;
   bool _edgeSwipeStartedAtLast = false;
   double _edgeOverscrollForward = 0;
@@ -249,6 +253,20 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   Duration _newTabSwipeStartTime = Duration.zero;
   bool? _wasDualPane;
   bool? _requestedSplitAvailable;
+
+  /// Dual pane: where each pane is on screen (for dropping a dragged tab on
+  /// it), each pane's pager, the pane a dragged tab is currently over, and
+  /// the pane whose pager just wrapped round (only that one fades).
+  final Map<TabPane, GlobalKey> _paneKeys = {
+    for (final pane in TabPane.values)
+      pane: GlobalKey(debugLabel: 'pane-$pane'),
+  };
+  final Map<TabPane, GlobalKey<_PaneTabPagerState>> _panePagerKeys = {
+    for (final pane in TabPane.values)
+      pane: GlobalKey<_PaneTabPagerState>(debugLabel: 'pager-$pane'),
+  };
+  final ValueNotifier<TabPane?> _dropPane = ValueNotifier<TabPane?>(null);
+  TabPane? _loopingPane;
   Set<TabId> _requestedVisibleTabs = const <TabId>{};
   int? _pageViewDrivenActiveIndex;
 
@@ -317,6 +335,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     _appBarVisibilityController.dispose();
     _tabBarVisibilityController.dispose();
     _loopTransitionController.dispose();
+    _dropPane.dispose();
     super.dispose();
   }
 
@@ -326,6 +345,10 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   }
 
   void _onTabsChanged(BrowserTabsState? previous, BrowserTabsState next) {
+    // Side by side, each pane's pager follows its own tab.
+    for (final key in _panePagerKeys.values) {
+      key.currentState?.syncTo(next);
+    }
     final pageViewChangedActiveTab =
         previous?.activeTabId != next.activeTabId &&
         next.activeIndex == _pageViewDrivenActiveIndex;
@@ -484,47 +507,105 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     );
   }
 
-  /// One pane of the dual-pane layout: its own tab strip above its shown tab.
+  /// One pane of the dual-pane layout: its own tab strip above a pager over its
+  /// own tabs. Swiping sideways in the pane moves between that pane's tabs and
+  /// leaves the other pane alone.
   Widget _buildDualPaneViewport(
-    BrowserTabState tab, {
+    TabPane pane, {
+    required List<BrowserTabState> groupTabs,
+    required TabId shownTabId,
+    required TabId? activeTabId,
     required Widget stripSlot,
-    required bool isActive,
+    required bool swipeEnabled,
     required bool autoHideAppBar,
     required bool autoHideTabBar,
   }) {
+    final isActive = shownTabId == activeTabId;
     return Expanded(
-      child: Column(
+      child: Stack(
+        key: _paneKeys[pane],
+        fit: StackFit.expand,
         children: [
-          stripSlot,
-          Expanded(
-            child: NotificationListener<ScrollNotification>(
-              onNotification: (notification) {
-                if (notification.metrics.axis == Axis.vertical) {
-                  _handleAppBarScroll(
-                    notification,
-                    enabled: autoHideAppBar,
-                    autoHideTabBar: autoHideTabBar,
-                    active: isActive,
-                  );
-                }
-                // Each pane owns its scroll notifications. In particular, its
-                // horizontal overscroll must not trigger the tab-strip edge
-                // action.
-                return true;
-              },
-              child: Listener(
-                behavior: HitTestBehavior.translucent,
-                onPointerDown: (_) => _focusTab(tab.tabId),
-                child: TickerMode(
-                  enabled: true,
-                  child: _buildTabContent(tab, isActive: isActive),
+          Column(
+            children: [
+              stripSlot,
+              Expanded(
+                child: NotificationListener<ScrollNotification>(
+                  onNotification: (notification) {
+                    if (notification.metrics.axis == Axis.vertical) {
+                      _handleAppBarScroll(
+                        notification,
+                        enabled: autoHideAppBar,
+                        autoHideTabBar: autoHideTabBar,
+                        active: isActive,
+                      );
+                    } else {
+                      // The pane's own pager: its ends are the ends of this
+                      // pane's tabs, not of the whole workspace.
+                      _handleTabEdgeSwipe(notification, pane: pane);
+                    }
+                    return true;
+                  },
+                  child: Listener(
+                    behavior: HitTestBehavior.translucent,
+                    onPointerDown: (event) {
+                      _focusTab(shownTabId);
+                      _onBrowserPointerDown(event);
+                    },
+                    onPointerMove: _onBrowserPointerMove,
+                    onPointerUp: _onBrowserPointerUp,
+                    onPointerCancel: _onBrowserPointerCancel,
+                    child: _PaneTabPager(
+                      key: _panePagerKeys[pane],
+                      pane: pane,
+                      tabs: groupTabs,
+                      shownTabId: shownTabId,
+                      onTabChanged: _focusTab,
+                      pageBuilder: (tab) => _buildTabContent(
+                        tab,
+                        isActive: tab.tabId == activeTabId,
+                      ),
+                      gate: _swipeGate,
+                      swipeEnabled: swipeEnabled,
+                      slopFactor: _tabPagerSlopFactor,
+                      fade: _loopingPane == pane
+                          ? _loopFade
+                          : const AlwaysStoppedAnimation<double>(1.0),
+                    ),
+                  ),
                 ),
+              ),
+            ],
+          ),
+          // Shown while a tab dragged out of the other strip is held over this
+          // pane: where it would land.
+          Positioned.fill(
+            child: IgnorePointer(
+              child: ValueListenableBuilder<TabPane?>(
+                valueListenable: _dropPane,
+                builder: (context, hover, _) {
+                  if (hover != pane) return const SizedBox.shrink();
+                  final cs = Theme.of(context).colorScheme;
+                  return DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: cs.primary.withValues(alpha: 0.08),
+                      border: Border.all(color: cs.primary, width: 2),
+                    ),
+                  );
+                },
               ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  /// Where [pane] is on screen, for dropping a dragged tab on it.
+  Rect? _paneBounds(TabPane pane) {
+    final box = _paneKeys[pane]?.currentContext?.findRenderObject();
+    if (box is! RenderBox || !box.attached || !box.hasSize) return null;
+    return box.localToGlobal(Offset.zero) & box.size;
   }
 
   /// Tells the tab engine whether the layout can show two panes. The width
@@ -788,7 +869,11 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   /// acts on them as the person's tab-edge-swipe setting says: offer a new tab
   /// past the last one (the first tab's right swipe belongs to the drawer), or
   /// wrap around to the tab at the other end.
-  void _handleTabEdgeSwipe(ScrollNotification notification) {
+  ///
+  /// [pane] is the pane whose pager was swiped in the dual-pane layout: its
+  /// ends are the first and last tab of that pane's group. Null is the single
+  /// pager over every tab.
+  void _handleTabEdgeSwipe(ScrollNotification notification, {TabPane? pane}) {
     // Something underneath (a media carousel, say) took the horizontal drag, so
     // it is not a swipe for the browser to act on.
     if (notification is ScrollStartNotification) _newTabSwipePointer = null;
@@ -798,14 +883,22 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       final state = _workspaceState;
       final settings = ref.read(appSettingsControllerProvider).settings;
       _resetEdgeSwipe();
+      final group = pane == null ? state.tabs : state.tabsInPane(pane);
+      final shownId = pane == null
+          ? state.activeTabId
+          : state.activeTabIdOfPane(pane);
+      final shownIndex = shownId == null
+          ? -1
+          : group.indexWhere((tab) => tab.tabId == shownId);
+      _edgeSwipePane = pane;
       _edgeSwipeEligible =
           notification.dragDetails != null &&
           settings.useBrowserTabs &&
           settings.tabEdgeSwipe.hasEdgeActions &&
-          state.activeIndex >= 0;
+          shownIndex >= 0;
       if (_edgeSwipeEligible) {
-        _edgeSwipeStartedAtFirst = state.activeIndex == 0;
-        _edgeSwipeStartedAtLast = state.activeIndex == state.tabs.length - 1;
+        _edgeSwipeStartedAtFirst = shownIndex == 0;
+        _edgeSwipeStartedAtLast = shownIndex == group.length - 1;
       }
       return;
     }
@@ -844,6 +937,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       final backward = _edgeOverscrollBackward;
       final startedAtFirst = _edgeSwipeStartedAtFirst;
       final startedAtLast = _edgeSwipeStartedAtLast;
+      final swipePane = _edgeSwipePane;
       // Pixels per second along the swipe: negative towards the next tab.
       final velocity = notification.dragDetails?.primaryVelocity ?? 0.0;
       _resetEdgeSwipe();
@@ -855,7 +949,9 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
           .tabEdgeSwipe
           .loops;
       if (loops) {
-        final tabCount = _workspaceState.tabs.length;
+        final tabCount = swipePane == null
+            ? _workspaceState.tabs.length
+            : _workspaceState.paneTabCount(swipePane);
         if (tabCount < 2) return;
         final wantsNext =
             forward >= _newTabSwipeThreshold ||
@@ -866,14 +962,14 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
             (backward >= _loopFlingMinOverscroll &&
                 velocity >= _loopFlingVelocity);
         if (startedAtLast && wantsNext) {
-          _scheduleLoopTo(0);
+          _scheduleLoopTo(0, pane: swipePane);
         } else if (startedAtFirst && wantsPrevious) {
-          _scheduleLoopTo(tabCount - 1);
+          _scheduleLoopTo(tabCount - 1, pane: swipePane);
         }
         return;
       }
       if (startedAtLast && forward >= _newTabSwipeThreshold) {
-        _scheduleNewTabPrompt();
+        _scheduleNewTabPrompt(pane: swipePane);
       }
     }
   }
@@ -888,7 +984,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     binding.ensureVisualUpdate();
   }
 
-  void _scheduleNewTabPrompt() {
+  void _scheduleNewTabPrompt({TabPane? pane}) {
     if (_newTabPromptScheduled) return;
     _newTabPromptScheduled = true;
     _afterThisFrame(() {
@@ -896,6 +992,8 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
         _newTabPromptScheduled = false;
         return;
       }
+      // The new tab joins the pane that was swiped past its last tab.
+      if (pane != null) _workspaceActions.focusPane(pane);
       unawaited(
         _openNewTabSheet().whenComplete(() {
           _afterThisFrame(() => _newTabPromptScheduled = false);
@@ -906,18 +1004,34 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
 
   /// Wraps to the tab at [index] once the drag that asked for it has finished
   /// dispatching its notifications.
-  void _scheduleLoopTo(int index) {
+  void _scheduleLoopTo(int index, {TabPane? pane}) {
     if (_loopScheduled) return;
     _loopScheduled = true;
     _afterThisFrame(() {
       _loopScheduled = false;
       if (!mounted) return;
-      _loopToIndex(index);
+      _loopToIndex(index, pane: pane);
     });
   }
 
-  void _loopToIndex(int index) {
+  void _loopToIndex(int index, {TabPane? pane}) {
     final state = _workspaceState;
+    if (pane != null) {
+      // Side by side, only the swiped pane wraps round, within its own tabs.
+      final group = state.tabsInPane(pane);
+      if (index < 0 || index >= group.length) return;
+      final target = group[index].tabId;
+      if (target == state.activeTabIdOfPane(pane)) return;
+      _loopingPane = pane;
+      _loopTransitionController.value = 0.0;
+      unawaited(
+        _loopTransitionController.animateTo(1.0, curve: Curves.easeOut),
+      );
+      // The pane's pager follows the workspace and brings the tab up.
+      _workspaceActions.activate(target);
+      return;
+    }
+    _loopingPane = null;
     if (index < 0 || index >= state.tabs.length) return;
     if (index == state.activeIndex) return;
     if (!_pageController.hasClients) {
@@ -1090,7 +1204,6 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
         _workspace,
       ).select((selection) => selection.hasSelection),
     );
-    final isFirstTab = tabs.first.tabId == activeTabId;
     final hasMultipleTabs = ref.watch(hasActiveBrowserTabsProvider(_workspace));
     final tabsEnabled = ref.watch(
       appSettingsControllerProvider.select((s) => s.settings.useBrowserTabs),
@@ -1131,12 +1244,21 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       ),
     );
     final dualPaneForTabStrip = splitAvailable && paneTabIds != null;
-    // Swiping past an end wraps around. Side by side there is no pager to
-    // swipe, so only a single-pane layout loops.
+    // Side by side, each pane swipes between its own tabs, so "first tab" and
+    // "wraps around" are about the focused pane's tabs. Only the left pane's
+    // first tab hands its right swipe to the side menu: that is the pane the
+    // menu comes out from.
+    final focusedPane = activeTab?.pane;
+    final focusedTabs = !dualPaneForTabStrip || focusedPane == null
+        ? tabs
+        : tabs.where((tab) => tab.pane == focusedPane).toList();
+    final isFirstTab =
+        focusedTabs.first.tabId == activeTabId &&
+        (!dualPaneForTabStrip || focusedPane == TabPane.primary);
+    // Swiping past an end wraps around, within the tabs of the pager swiped.
     final loopTabs =
         tabsEnabled &&
-        hasMultipleTabs &&
-        !dualPaneForTabStrip &&
+        (dualPaneForTabStrip ? focusedTabs.length > 1 : hasMultipleTabs) &&
         tabEdgeSwipe.loops;
     // Without tab swiping every tab acts like the first one: the side menu
     // opens from any tab, and a left swipe anywhere offers a new tab.
@@ -1156,6 +1278,8 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       onNewTab: widget.onNewTab ?? _openNewTabSheet,
       onDuplicate: widget.onDuplicate ?? _duplicate,
       pane: pane,
+      paneBounds: _paneBounds,
+      onDragOverPane: (over) => _dropPane.value = over,
     );
     final drawer = activeTab == null
         ? null
@@ -1279,6 +1403,10 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                           _wasDualPane = dualPane;
                           if (wasDualPane == true && !dualPane) {
                             _schedulePageSync();
+                            // A drag cannot outlive the layout it was in.
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (mounted) _dropPane.value = null;
+                            });
                           }
                         }
 
@@ -1295,14 +1423,24 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                             orElse: () => tabs.last,
                           );
                           _publishVisibleTabs({firstId, secondId});
+                          final swipeEnabled =
+                              tabsEnabled &&
+                              tabEdgeSwipe.swipesBetweenTabs &&
+                              !_drawerOpenOrDragging &&
+                              !_edgeDrawerGestureActive;
                           return Row(
                             children: [
                               _buildDualPaneViewport(
-                                firstTab,
+                                TabPane.primary,
+                                groupTabs: tabs
+                                    .where((tab) => tab.pane == TabPane.primary)
+                                    .toList(),
+                                shownTabId: firstTab.tabId,
+                                activeTabId: activeTabId,
                                 stripSlot: stripSlotFor(
                                   paneStrip(TabPane.primary),
                                 ),
-                                isActive: firstTab.tabId == activeTabId,
+                                swipeEnabled: swipeEnabled,
                                 autoHideAppBar: autoHideAppBar,
                                 autoHideTabBar: autoHideTabBar,
                               ),
@@ -1312,11 +1450,18 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                                 color: Theme.of(context).dividerColor,
                               ),
                               _buildDualPaneViewport(
-                                secondTab,
+                                TabPane.secondary,
+                                groupTabs: tabs
+                                    .where(
+                                      (tab) => tab.pane == TabPane.secondary,
+                                    )
+                                    .toList(),
+                                shownTabId: secondTab.tabId,
+                                activeTabId: activeTabId,
                                 stripSlot: stripSlotFor(
                                   paneStrip(TabPane.secondary),
                                 ),
-                                isActive: secondTab.tabId == activeTabId,
+                                swipeEnabled: swipeEnabled,
                                 autoHideAppBar: autoHideAppBar,
                                 autoHideTabBar: autoHideTabBar,
                               ),
@@ -1810,5 +1955,179 @@ class _BrowserTabPageState extends State<_BrowserTabPage>
   Widget build(BuildContext context) {
     super.build(context);
     return TickerMode(enabled: _onScreen, child: widget.child);
+  }
+}
+
+/// The pager of one pane in the dual-pane layout. Swiping sideways moves
+/// between the tabs of that pane only; the other pane keeps what it shows.
+///
+/// It follows the workspace the way the single pager does: a tab switched from
+/// elsewhere (the strip, a close, a move) is brought up without a slide, and a
+/// page change the swipe itself made is not jumped back over.
+class _PaneTabPager extends StatefulWidget {
+  final TabPane pane;
+  final List<BrowserTabState> tabs;
+  final TabId? shownTabId;
+  final ValueChanged<TabId> onTabChanged;
+  final Widget Function(BrowserTabState tab) pageBuilder;
+  final PagerSwipeGate gate;
+  final bool swipeEnabled;
+
+  /// The pager's touch slop, as a multiple of the platform's (see the single
+  /// pager for why it is larger).
+  final double slopFactor;
+  final Animation<double> fade;
+
+  const _PaneTabPager({
+    super.key,
+    required this.pane,
+    required this.tabs,
+    required this.shownTabId,
+    required this.onTabChanged,
+    required this.pageBuilder,
+    required this.gate,
+    required this.swipeEnabled,
+    required this.slopFactor,
+    required this.fade,
+  });
+
+  @override
+  State<_PaneTabPager> createState() => _PaneTabPagerState();
+}
+
+class _PaneTabPagerState extends State<_PaneTabPager> {
+  late final PageController _controller;
+
+  /// The page a swipe has just reported. The workspace change that follows
+  /// must not jump the pager there again while it is still settling.
+  int? _drivenIndex;
+  bool _jumping = false;
+
+  static int _indexOf(List<BrowserTabState> tabs, TabId? id) =>
+      id == null ? -1 : tabs.indexWhere((tab) => tab.tabId == id);
+
+  static bool _sameTabs(List<BrowserTabState> a, List<BrowserTabState> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].tabId != b[i].tabId) return false;
+    }
+    return true;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final index = _indexOf(widget.tabs, widget.shownTabId);
+    _controller = SettleTouchPageController(initialPage: index < 0 ? 0 : index);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant _PaneTabPager oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final sameTabs = _sameTabs(oldWidget.tabs, widget.tabs);
+    if (sameTabs && oldWidget.shownTabId == widget.shownTabId) return;
+    final index = _indexOf(widget.tabs, widget.shownTabId);
+    if (sameTabs && _drivenIndex != null && _drivenIndex == index) {
+      // The swipe got there by itself.
+      return;
+    }
+    _drivenIndex = null;
+    // A tab the list did not hold before can only be switched to once the new
+    // list is laid out.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final target = _indexOf(widget.tabs, widget.shownTabId);
+      if (target >= 0) _jumpTo(target);
+    });
+  }
+
+  /// Called as soon as the workspace changes, before the pager is rebuilt. A
+  /// tab among the pages already laid out is switched to in the same frame, so
+  /// a close or reorder never paints the wrong tab or springs back.
+  void syncTo(BrowserTabsState next) {
+    final group = next.tabsInPane(widget.pane);
+    final target = _indexOf(group, next.activeTabIdOfPane(widget.pane));
+    if (target < 0 || _drivenIndex == target) return;
+    if (target < widget.tabs.length) _jumpTo(target);
+  }
+
+  void _jumpTo(int target) {
+    if (!_controller.hasClients) return;
+    final current = _controller.page;
+    if (current != null && (current - target).abs() <= 0.01) return;
+    _jumping = true;
+    try {
+      _controller.jumpToPage(target);
+    } finally {
+      _jumping = false;
+    }
+  }
+
+  void _onPageChanged(int index) {
+    // Our own jump reports a page change too; it is not a swipe.
+    if (_jumping || index < 0 || index >= widget.tabs.length) return;
+    final tab = widget.tabs[index];
+    if (tab.tabId == widget.shownTabId) return;
+    _drivenIndex = index;
+    widget.onTabChanged(tab.tabId);
+    // The rebuild this causes happens in the next frame; after it the page
+    // change no longer counts as one the swipe just made.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _drivenIndex = null);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pageMedia = MediaQuery.of(context);
+    final pagerMedia = pageMedia.copyWith(
+      gestureSettings: DeviceGestureSettings(
+        touchSlop:
+            (pageMedia.gestureSettings.touchSlop ?? kTouchSlop) *
+            widget.slopFactor,
+      ),
+    );
+    final tabs = widget.tabs;
+    return FadeTransition(
+      opacity: widget.fade,
+      child: MediaQuery(
+        data: pagerMedia,
+        child: PageView.builder(
+          controller: _controller,
+          dragStartBehavior: DragStartBehavior.down,
+          clipBehavior: Clip.hardEdge,
+          pageSnapping: false,
+          physics: GatedPageScrollPhysics(
+            gate: widget.gate,
+            parent: widget.swipeEnabled
+                ? const AlwaysScrollableScrollPhysics()
+                : const NeverScrollableScrollPhysics(),
+          ),
+          itemCount: tabs.length,
+          onPageChanged: _onPageChanged,
+          findChildIndexCallback: (key) {
+            if (key is! ValueKey<TabId>) return null;
+            final index = tabs.indexWhere((tab) => tab.tabId == key.value);
+            return index < 0 ? null : index;
+          },
+          itemBuilder: (context, index) {
+            final tab = tabs[index];
+            return _BrowserTabPage(
+              key: ValueKey<TabId>(tab.tabId),
+              controller: _controller,
+              index: index,
+              child: MediaQuery(
+                data: pageMedia,
+                child: widget.pageBuilder(tab),
+              ),
+            );
+          },
+        ),
+      ),
+    );
   }
 }

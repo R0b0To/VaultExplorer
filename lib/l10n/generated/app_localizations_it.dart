@@ -2510,9 +2510,6 @@ class AppLocalizationsIt extends AppLocalizations {
   String get takingPhoto => 'Acquisizione foto…';
 
   @override
-  String get savingToVault => 'Salvataggio nel vault…';
-
-  @override
   String get noVaultSelected => 'Nessun vault selezionato';
 
   @override
@@ -8226,6 +8223,13 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get swipeToSeekSubtitle =>
       'Scorri orizzontalmente sullo schermo per cercare. Nelle playlist, è necessario utilizzare i pulsanti di navigazione anziché scorrere tra gli elementi';
+
+  @override
+  String get swipeToDismissTitle => 'Scorri per chiudere';
+
+  @override
+  String get swipeToDismissSubtitle =>
+      'Scorri verso il basso per chiudere il visualizzatore. Se la playlist scorre in verticale, scorri di lato';
 
   @override
   String get edgeSwipeBrightnessTitle => 'Gesto scorrimento luminosità';

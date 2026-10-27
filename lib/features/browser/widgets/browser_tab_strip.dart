@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart' show PointerMoveEvent;
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -71,6 +72,14 @@ class BrowserTabStrip extends ConsumerStatefulWidget {
   final VoidCallback onNewTab;
   final ValueChanged<BrowserTabState> onDuplicate;
   final TabPane? pane;
+
+  /// Where [TabPane]s are on screen, in global coordinates. With it a tab can
+  /// be dragged out of this strip and dropped on the other pane.
+  final Rect? Function(TabPane pane)? paneBounds;
+
+  /// The pane a dragged tab is over right now (null when over none), so the
+  /// owner can show where it would land.
+  final ValueChanged<TabPane?>? onDragOverPane;
   final String storageKey;
 
   const BrowserTabStrip({
@@ -79,6 +88,8 @@ class BrowserTabStrip extends ConsumerStatefulWidget {
     required this.onNewTab,
     required this.onDuplicate,
     this.pane,
+    this.paneBounds,
+    this.onDragOverPane,
     this.storageKey = 'browser-tab-strip-scroll-position',
   });
 
@@ -91,6 +102,10 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
   final Map<TabId, GlobalKey> _tabItemKeys = {};
   TabId? _lastActiveTabId;
   int? _lastActiveIndex;
+
+  /// The tab being dragged, and the other pane it is currently held over.
+  TabId? _draggingTabId;
+  TabPane? _hoverPane;
 
   @override
   void initState() {
@@ -125,6 +140,38 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
           _scrollController.position.pixels,
           pane: widget.pane ?? TabPane.primary,
         );
+  }
+
+  /// Follows the finger of a tab drag. The reorder list only moves the tab
+  /// within this strip; the finger itself may be over the other pane, which is
+  /// what a drop there is decided by.
+  void _trackDrag(PointerMoveEvent event) {
+    final pane = widget.pane;
+    if (_draggingTabId == null || pane == null) return;
+    final other = pane.other;
+    final bounds = widget.paneBounds?.call(other);
+    final over = bounds != null && bounds.contains(event.position)
+        ? other
+        : null;
+    if (over == _hoverPane) return;
+    _hoverPane = over;
+    widget.onDragOverPane?.call(over);
+  }
+
+  void _finishDrag(BrowserTabs actions) {
+    final id = _draggingTabId;
+    final target = _hoverPane;
+    _draggingTabId = null;
+    if (target != null) {
+      _hoverPane = null;
+      widget.onDragOverPane?.call(null);
+    }
+    if (id == null || target == null) return;
+    // After the list has settled its drop: moving the tab changes both strips.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      actions.moveToPane(id, target);
+    });
   }
 
   /// The tab this strip treats as current: the pane's shown tab, or the active
@@ -352,64 +399,76 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
       child: Row(
         children: [
           Expanded(
-            child: ReorderableListView.builder(
-              key: PageStorageKey<String>('${widget.storageKey}-${pane?.name ?? 'all'}'),
-              scrollController: _scrollController,
-              itemExtent: kBrowserTabItemWidth,
-              scrollDirection: Axis.horizontal,
-              clipBehavior: Clip.hardEdge,
-              buildDefaultDragHandles: false,
-              padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
-              itemCount: tabs.length,
-              onReorderStart: (_) => HapticFeedback.mediumImpact(),
-              onReorderItem: pane == null
-                  ? actions.reorderTabs
-                  : (oldIndex, newIndex) =>
-                        actions.reorderTabsInPane(pane, oldIndex, newIndex),
-              proxyDecorator: (child, index, animation) {
-                return AnimatedBuilder(
-                  animation: animation,
-                  builder: (context, child) {
-                    final t = Curves.easeInOut.transform(animation.value);
-                    return Material(
-                      elevation: 6 * t,
-                      color: activeBackground,
-                      shadowColor: cs.shadow.withValues(alpha: 0.35),
-                      borderRadius: BorderRadius.circular(8),
-                      child: child,
-                    );
-                  },
-                  child: child,
-                );
-              },
-              itemBuilder: (context, index) {
-                final tab = tabs[index];
-                final itemKey = _tabItemKeys.putIfAbsent(
-                  tab.tabId,
-                  GlobalKey.new,
-                );
-                final isShown = tab.tabId == shownTabId;
-                final isActive = isShown && paneFocused;
-                // The other pane's shown tab: on screen, but not focused.
-                final isSecondary = isShown && !paneFocused;
-                return ReorderableDelayedDragStartListener(
-                  key: ValueKey<TabId>(tab.tabId),
-                  index: index,
-                  child: Builder(
-                    builder: (tabContext) => SizedBox(
-                      key: itemKey,
-                      width: kBrowserTabItemWidth,
-                      child: _TabItem(
-                        tab: tab,
-                        active: isActive,
-                        secondary: isSecondary,
-                        activeBackground: activeBackground,
-                        onTap: () => _onTabTapped(tab, tabContext),
+            child: Listener(
+              behavior: HitTestBehavior.translucent,
+              onPointerMove: _trackDrag,
+              child: ReorderableListView.builder(
+                key: PageStorageKey<String>(
+                  '${widget.storageKey}-${pane?.name ?? 'all'}',
+                ),
+                scrollController: _scrollController,
+                itemExtent: kBrowserTabItemWidth,
+                scrollDirection: Axis.horizontal,
+                clipBehavior: Clip.hardEdge,
+                buildDefaultDragHandles: false,
+                padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
+                itemCount: tabs.length,
+                onReorderStart: (index) {
+                  HapticFeedback.mediumImpact();
+                  _draggingTabId = index >= 0 && index < tabs.length
+                      ? tabs[index].tabId
+                      : null;
+                },
+                onReorderEnd: (_) => _finishDrag(actions),
+                onReorderItem: pane == null
+                    ? actions.reorderTabs
+                    : (oldIndex, newIndex) =>
+                          actions.reorderTabsInPane(pane, oldIndex, newIndex),
+                proxyDecorator: (child, index, animation) {
+                  return AnimatedBuilder(
+                    animation: animation,
+                    builder: (context, child) {
+                      final t = Curves.easeInOut.transform(animation.value);
+                      return Material(
+                        elevation: 6 * t,
+                        color: activeBackground,
+                        shadowColor: cs.shadow.withValues(alpha: 0.35),
+                        borderRadius: BorderRadius.circular(8),
+                        child: child,
+                      );
+                    },
+                    child: child,
+                  );
+                },
+                itemBuilder: (context, index) {
+                  final tab = tabs[index];
+                  final itemKey = _tabItemKeys.putIfAbsent(
+                    tab.tabId,
+                    GlobalKey.new,
+                  );
+                  final isShown = tab.tabId == shownTabId;
+                  final isActive = isShown && paneFocused;
+                  // The other pane's shown tab: on screen, but not focused.
+                  final isSecondary = isShown && !paneFocused;
+                  return ReorderableDelayedDragStartListener(
+                    key: ValueKey<TabId>(tab.tabId),
+                    index: index,
+                    child: Builder(
+                      builder: (tabContext) => SizedBox(
+                        key: itemKey,
+                        width: kBrowserTabItemWidth,
+                        child: _TabItem(
+                          tab: tab,
+                          active: isActive,
+                          secondary: isSecondary,
+                          activeBackground: activeBackground,
+                          onTap: () => _onTabTapped(tab, tabContext),
+                        ),
                       ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
           ),
           IconButton(

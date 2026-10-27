@@ -2536,9 +2536,6 @@ class AppLocalizationsUk extends AppLocalizations {
   String get takingPhoto => 'Знімання фото…';
 
   @override
-  String get savingToVault => 'Збереження у сховище…';
-
-  @override
   String get noVaultSelected => 'Сховище не вибрано';
 
   @override
@@ -8291,6 +8288,13 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get swipeToSeekSubtitle =>
       'Проведіть горизонтально по екрану для перемотування. У списках відтворення слід використовувати кнопки навігації замість проведення між елементами';
+
+  @override
+  String get swipeToDismissTitle => 'Свайп для закриття';
+
+  @override
+  String get swipeToDismissSubtitle =>
+      'Свайпніть вниз, щоб закрити переглядач. Якщо список відтворення прокручується вертикально, свайпайте вбік';
 
   @override
   String get edgeSwipeBrightnessTitle => 'Свайп для регулювання яскравості';

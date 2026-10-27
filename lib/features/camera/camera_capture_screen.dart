@@ -710,9 +710,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
 
     captureSessionController.setEncrypting(
       true,
-      label: widget.container.isLocalStorage
-          ? context.l10n.savingLabel
-          : context.l10n.savingToVault,
+      label: context.l10n.savingLabel,
     );
     await Future.delayed(const Duration(milliseconds: 50));
 

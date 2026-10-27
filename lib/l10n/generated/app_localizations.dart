@@ -4128,12 +4128,6 @@ abstract class AppLocalizations {
   /// **'Capturing photo…'**
   String get takingPhoto;
 
-  /// Status text while saving captured media directly to vault
-  ///
-  /// In en, this message translates to:
-  /// **'Saving to vault…'**
-  String get savingToVault;
-
   /// Message when camera is launched without a target vault
   ///
   /// In en, this message translates to:
@@ -6828,7 +6822,7 @@ abstract class AppLocalizations {
   /// **'Autosaving…'**
   String get autosavingLabel;
 
-  /// Status label shown while the text editor is saving
+  /// Neutral status label shown while something is being saved (text editor, captured photos, videos and audio); must not mention vaults so it also fits the disguised mode
   ///
   /// In en, this message translates to:
   /// **'Saving…'**
@@ -13626,6 +13620,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Swipe horizontally across the screen to seek. In playlists, navigation buttons must be used instead of swiping between items'**
   String get swipeToSeekSubtitle;
+
+  /// Title for the swipe-to-dismiss gesture setting in the media viewer
+  ///
+  /// In en, this message translates to:
+  /// **'Swipe to Dismiss'**
+  String get swipeToDismissTitle;
+
+  /// Description for the swipe-to-dismiss gesture setting: down for a single item or horizontal playlist, sideways when the playlist scrolls vertically
+  ///
+  /// In en, this message translates to:
+  /// **'Close the viewer by swiping down. When a playlist scrolls vertically, swipe sideways instead'**
+  String get swipeToDismissSubtitle;
 
   /// Title for brightness swipe gesture setting
   ///

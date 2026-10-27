@@ -2378,9 +2378,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get takingPhoto => '写真を撮影中…';
 
   @override
-  String get savingToVault => '保管庫に保存中…';
-
-  @override
   String get noVaultSelected => '保管庫が選択されていません';
 
   @override
@@ -7785,6 +7782,13 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get swipeToSeekSubtitle =>
       '画面を水平にスワイプしてシークします。プレイリストでは、項目の切り替えにスワイプではなくナビゲーションボタンを使用する必要があります';
+
+  @override
+  String get swipeToDismissTitle => 'スワイプで閉じる';
+
+  @override
+  String get swipeToDismissSubtitle =>
+      '下にスワイプしてビューアを閉じます。プレイリストが縦にスクロールする場合は、横にスワイプします';
 
   @override
   String get edgeSwipeBrightnessTitle => '明るさスワイプジェスチャー';

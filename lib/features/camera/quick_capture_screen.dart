@@ -1128,7 +1128,7 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
                               const SizedBox(height: 20),
                               Text(
                                 _phase == _Phase.saving
-                                    ? context.l10n.savingToVault
+                                    ? context.l10n.savingLabel
                                     : busyLabel,
                                 style: const TextStyle(
                                   color: Colors.white,

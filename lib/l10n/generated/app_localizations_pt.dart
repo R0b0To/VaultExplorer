@@ -2511,9 +2511,6 @@ class AppLocalizationsPt extends AppLocalizations {
   String get takingPhoto => 'Capturando foto…';
 
   @override
-  String get savingToVault => 'Salvando no cofre…';
-
-  @override
   String get noVaultSelected => 'Nenhum cofre selecionado';
 
   @override
@@ -8239,6 +8236,13 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get swipeToSeekSubtitle =>
       'Deslize horizontalmente pela tela para buscar. Em listas de reprodução, use os botões de navegação em vez de deslizar entre os itens';
+
+  @override
+  String get swipeToDismissTitle => 'Deslizar para fechar';
+
+  @override
+  String get swipeToDismissSubtitle =>
+      'Deslize para baixo para fechar o visualizador. Se a playlist rolar na vertical, deslize para o lado';
 
   @override
   String get edgeSwipeBrightnessTitle => 'Gesto de deslize para brilho';

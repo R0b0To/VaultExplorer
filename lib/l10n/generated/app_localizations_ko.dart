@@ -2378,9 +2378,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String get takingPhoto => '사진 촬영 중…';
 
   @override
-  String get savingToVault => '볼트에 저장 중…';
-
-  @override
   String get noVaultSelected => '선택된 볼트가 없습니다';
 
   @override
@@ -7786,6 +7783,13 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get swipeToSeekSubtitle =>
       '화면을 가로로 스와이프하여 탐색합니다. 재생목록에서는 항목 간 이동 시 스와이프 대신 탐색 버튼을 사용해야 합니다';
+
+  @override
+  String get swipeToDismissTitle => '스와이프하여 닫기';
+
+  @override
+  String get swipeToDismissSubtitle =>
+      '아래로 스와이프하면 뷰어가 닫힙니다. 재생목록이 세로로 스크롤되면 옆으로 스와이프하세요';
 
   @override
   String get edgeSwipeBrightnessTitle => '밝기 조절 스와이프 제스처';

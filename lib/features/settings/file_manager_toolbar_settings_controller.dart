@@ -624,6 +624,13 @@ void applyImportedConfig(FileManagerToolbarConfig newConfig) {
     return updateMediaViewerConfig(updated);
   }
 
+  Future<void> setMediaViewerSwipeToDismissEnabled(bool enabled) {
+    final updated = state.config.mediaViewerToolbarConfig.copyWith(
+      swipeToDismissEnabled: enabled,
+    );
+    return updateMediaViewerConfig(updated);
+  }
+
   Future<void> setMediaViewerTapEdgesToNavigate(bool enabled) {
     final updated = state.config.mediaViewerToolbarConfig.copyWith(
       tapEdgesToNavigate: enabled,

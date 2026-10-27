@@ -2525,9 +2525,6 @@ class AppLocalizationsFr extends AppLocalizations {
   String get takingPhoto => 'Capture de la photo…';
 
   @override
-  String get savingToVault => 'Enregistrement dans le coffre…';
-
-  @override
   String get noVaultSelected => 'Aucun coffre sélectionné';
 
   @override
@@ -8299,6 +8296,13 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get swipeToSeekSubtitle =>
       'Balayez horizontalement l\'écran pour naviguer. Dans les listes de lecture, utilisez les boutons de navigation au lieu de balayer entre les éléments';
+
+  @override
+  String get swipeToDismissTitle => 'Balayer pour fermer';
+
+  @override
+  String get swipeToDismissSubtitle =>
+      'Balayez vers le bas pour fermer le lecteur. Si la liste de lecture défile verticalement, balayez sur le côté';
 
   @override
   String get edgeSwipeBrightnessTitle =>

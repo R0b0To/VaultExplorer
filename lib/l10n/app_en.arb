@@ -3254,10 +3254,6 @@
   "@takingPhoto": {
     "description": "Status text while taking a photo"
   },
-  "savingToVault": "Saving to vault…",
-  "@savingToVault": {
-    "description": "Status text while saving captured media directly to vault"
-  },
   "noVaultSelected": "No vault selected",
   "@noVaultSelected": {
     "description": "Message when camera is launched without a target vault"
@@ -5246,7 +5242,7 @@
   },
   "savingLabel": "Saving…",
   "@savingLabel": {
-    "description": "Status label shown while the text editor is saving"
+    "description": "Neutral status label shown while something is being saved (text editor, captured photos, videos and audio); must not mention vaults so it also fits the disguised mode"
   },
   "autosavedAtLabel": "Autosaved at {time}",
   "@autosavedAtLabel": {
@@ -10294,6 +10290,14 @@
   "swipeToSeekSubtitle": "Swipe horizontally across the screen to seek. In playlists, navigation buttons must be used instead of swiping between items",
   "@swipeToSeekSubtitle": {
     "description": "Description for swipe across screen to seek gesture setting"
+  },
+  "swipeToDismissTitle": "Swipe to Dismiss",
+  "@swipeToDismissTitle": {
+    "description": "Title for the swipe-to-dismiss gesture setting in the media viewer"
+  },
+  "swipeToDismissSubtitle": "Close the viewer by swiping down. When a playlist scrolls vertically, swipe sideways instead",
+  "@swipeToDismissSubtitle": {
+    "description": "Description for the swipe-to-dismiss gesture setting: down for a single item or horizontal playlist, sideways when the playlist scrolls vertically"
   },
   "edgeSwipeBrightnessTitle": "Brightness Swipe Gesture",
   "@edgeSwipeBrightnessTitle": {

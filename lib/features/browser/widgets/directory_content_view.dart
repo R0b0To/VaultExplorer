@@ -4139,7 +4139,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       );
       _setStatus(
         stillSaving
-            ? context.l10n.savingToVault
+            ? context.l10n.savingLabel
             : captured.isVideo
             ? context.l10n.videoCapturedEncrypted
             : context.l10n.photoCapturedEncrypted,

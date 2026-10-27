@@ -2518,9 +2518,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get takingPhoto => 'Foto wird aufgenommen…';
 
   @override
-  String get savingToVault => 'Wird im Tresor gespeichert…';
-
-  @override
   String get noVaultSelected => 'Kein Tresor ausgewählt';
 
   @override
@@ -8229,6 +8226,13 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get swipeToSeekSubtitle =>
       'Horizontal über den Bildschirm wischen, um zu spulen. In Wiedergabelisten müssen Navigationstasten verwendet werden, anstatt zwischen Elementen zu wischen';
+
+  @override
+  String get swipeToDismissTitle => 'Zum Schließen wischen';
+
+  @override
+  String get swipeToDismissSubtitle =>
+      'Zum Schließen des Viewers nach unten wischen. Bei einer vertikal scrollenden Wiedergabeliste stattdessen zur Seite wischen';
 
   @override
   String get edgeSwipeBrightnessTitle => 'Helligkeits-Wischgeste';

@@ -2340,9 +2340,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get takingPhoto => '正在拍照…';
 
   @override
-  String get savingToVault => '正在保存到保险库…';
-
-  @override
   String get noVaultSelected => '未选择保险库';
 
   @override
@@ -7680,6 +7677,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get swipeToSeekSubtitle => '在屏幕上水平滑动以调整进度。在播放列表中，必须使用导航按钮而不是通过滑动来切换项目';
+
+  @override
+  String get swipeToDismissTitle => '滑动关闭';
+
+  @override
+  String get swipeToDismissSubtitle => '向下滑动即可关闭查看器。播放列表垂直滚动时，请改为左右滑动';
 
   @override
   String get edgeSwipeBrightnessTitle => '边缘滑动调节亮度';

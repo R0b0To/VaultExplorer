@@ -10,6 +10,8 @@ import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_action_button.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_action_glyph.dart';
 
+enum _MoreMenuSelection { customizeControls }
+
 class MediaViewerTopBar extends StatelessWidget {
   final PlaylistController playlistController;
   final String currentFileName;
@@ -189,16 +191,23 @@ class MediaViewerTopBar extends StatelessWidget {
     ColorScheme cs,
     List<MediaViewerAction> actions,
   ) {
-    return MenuAnchor(
-      onOpen: onMenuOpened,
-      onClose: onMenuClosed,
-      builder: (ctx, controller, child) => MediaViewerActionButton(
-        action: MediaViewerAction.advancedSettings,
-        customIcon: Icons.more_vert_rounded,
-        customTooltip: 'More',
-        onTap: () => controller.isOpen ? controller.close() : controller.open(),
-      ),
-      menuChildren: [
+    return PopupMenuButton<Object>(
+      tooltip: 'More',
+      onOpened: () {
+        HapticFeedback.lightImpact();
+        onMenuOpened?.call();
+      },
+      onCanceled: onMenuClosed,
+      onSelected: (selection) {
+        onMenuClosed?.call();
+        HapticFeedback.lightImpact();
+        if (selection is MediaViewerAction) {
+          onExecuteAction(selection);
+        } else {
+          onCustomizeControls();
+        }
+      },
+      itemBuilder: (context) => [
         ...actions.map((action) {
           final isDelete = action == MediaViewerAction.delete;
           final isBookmarkAction = action == MediaViewerAction.bookmark;
@@ -214,43 +223,66 @@ class MediaViewerTopBar extends StatelessWidget {
             if (isMuted) iconColor = cs.error;
           }
 
-          return MenuItemButton(
-            style: isDelete || (isMuteAction && isMuted)
-                ? MenuItemButton.styleFrom(foregroundColor: cs.error)
-                : null,
-            leadingIcon: MediaViewerActionGlyph(
-              action: action,
-              icon: icon,
-              size: AppIconSize.small,
-              color: iconColor,
+          return PopupMenuItem<Object>(
+            value: action,
+            child: Row(
+              children: [
+                MediaViewerActionGlyph(
+                  action: action,
+                  icon: icon,
+                  size: AppIconSize.small,
+                  color: iconColor,
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Text(
+                  action.getLocalizedLabel(context.l10n),
+                  style: isDelete || (isMuteAction && isMuted)
+                      ? TextStyle(color: cs.error)
+                      : null,
+                ),
+              ],
             ),
-            onPressed: () {
-              HapticFeedback.lightImpact();
-              onExecuteAction(action);
-            },
-            child: Text(action.getLocalizedLabel(context.l10n)),
           );
         }),
         const PopupMenuDivider(),
-        MenuItemButton(
-          leadingIcon: Icon(
-            Icons.dashboard_customize_rounded,
-            size: AppIconSize.small,
-            color: cs.primary,
-          ),
-          onPressed: () {
-            HapticFeedback.lightImpact();
-            onCustomizeControls();
-          },
-          child: Text(
-            context.l10n.mediaViewerCustomizeControls,
-            style: TextStyle(
-              color: cs.primary,
-              fontWeight: FontWeight.bold,
-            ),
+        PopupMenuItem<Object>(
+          value: _MoreMenuSelection.customizeControls,
+          child: Row(
+            children: [
+              Icon(
+                Icons.dashboard_customize_rounded,
+                size: AppIconSize.small,
+                color: cs.primary,
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Text(
+                context.l10n.mediaViewerCustomizeControls,
+                style: TextStyle(
+                  color: cs.primary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
         ),
       ],
+      child: SizedBox(
+        width: 40,
+        height: 40,
+        child: Material(
+          color: Colors.white.withValues(alpha: 0.12),
+          shape: const CircleBorder(),
+          clipBehavior: Clip.antiAlias,
+          child: Center(
+            child: MediaViewerActionGlyph(
+              action: MediaViewerAction.advancedSettings,
+              icon: Icons.more_vert_rounded,
+              size: AppIconSize.standard,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      ),
     );
   }
 

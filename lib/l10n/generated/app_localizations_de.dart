@@ -8070,6 +8070,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get pictureInPictureAction => 'Bild-in-Bild';
 
   @override
+  String get mediaViewerActionLockControls => 'Steuerung sperren';
+
+  @override
+  String get mediaViewerHoldToUnlock => 'Zum Entsperren gedrückt halten';
+
+  @override
   String get keepAudioPlayingTitle => 'Audio nach dem Schließen weiterspielen';
 
   @override

@@ -2201,6 +2201,8 @@
   "pictureInPictureTitle": "Автоматична картинка в картинці",
   "pictureInPictureSubtitle": "Переходити в режим «картинка в картинці» під час виходу із застосунку, коли відтворюється відео",
   "pictureInPictureAction": "Картинка в картинці",
+  "mediaViewerActionLockControls": "Заблокувати керування",
+  "mediaViewerHoldToUnlock": "Утримуйте, щоб розблокувати",
   "keepAudioPlayingTitle": "Продовжувати відтворення аудіо після закриття",
   "keepAudioPlayingSubtitle": "Аудіо продовжує грати у фоновому режимі після виходу з програвача; керування через сповіщення",
   "mediaControlsResetSuccess": "Елементи керування мультимедіа скинуто до стандартних",

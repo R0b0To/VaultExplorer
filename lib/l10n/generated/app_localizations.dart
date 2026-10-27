@@ -13357,6 +13357,18 @@ abstract class AppLocalizations {
   /// **'Picture-in-picture'**
   String get pictureInPictureAction;
 
+  /// Label and tooltip of the media viewer button that locks the touch controls against accidental taps and gestures
+  ///
+  /// In en, this message translates to:
+  /// **'Lock controls'**
+  String get mediaViewerActionLockControls;
+
+  /// Hint shown on the media viewer's control lock overlay, telling the person to press and hold the lock button to unlock
+  ///
+  /// In en, this message translates to:
+  /// **'Hold to unlock'**
+  String get mediaViewerHoldToUnlock;
+
   /// Title of the setting that keeps audio playing in the background after the media viewer is closed
   ///
   /// In en, this message translates to:

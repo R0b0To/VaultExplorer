@@ -2190,6 +2190,8 @@
   "pictureInPictureTitle": "自动画中画",
   "pictureInPictureSubtitle": "播放视频时离开应用将自动进入画中画",
   "pictureInPictureAction": "画中画",
+  "mediaViewerActionLockControls": "锁定控件",
+  "mediaViewerHoldToUnlock": "长按解锁",
   "keepAudioPlayingTitle": "关闭后继续播放音频",
   "keepAudioPlayingSubtitle": "离开播放器后音频仍在后台播放，可通过通知控制",
   "mediaControlsResetSuccess": "媒体控制已重置为默认设置",

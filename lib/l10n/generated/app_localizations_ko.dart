@@ -7641,6 +7641,12 @@ class AppLocalizationsKo extends AppLocalizations {
   String get pictureInPictureAction => '화면 속 화면';
 
   @override
+  String get mediaViewerActionLockControls => '컨트롤 잠금';
+
+  @override
+  String get mediaViewerHoldToUnlock => '길게 눌러 잠금 해제';
+
+  @override
   String get keepAudioPlayingTitle => '닫은 후에도 오디오 계속 재생';
 
   @override

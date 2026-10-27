@@ -2190,6 +2190,8 @@
   "pictureInPictureTitle": "Picture-in-picture automatico",
   "pictureInPictureSubtitle": "Attiva il picture-in-picture quando si lascia l’app durante la riproduzione di un video",
   "pictureInPictureAction": "Picture-in-picture",
+  "mediaViewerActionLockControls": "Blocca i controlli",
+  "mediaViewerHoldToUnlock": "Tieni premuto per sbloccare",
   "keepAudioPlayingTitle": "Continua l’audio dopo la chiusura",
   "keepAudioPlayingSubtitle": "L’audio continua in background quando si lascia il player; controllo dalla notifica",
   "mediaControlsResetSuccess": "Controlli multimediali ripristinati ai valori predefiniti",

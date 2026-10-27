@@ -10113,6 +10113,8 @@
   "pictureInPictureTitle": "Automatic picture-in-picture",
   "pictureInPictureSubtitle": "Enter picture-in-picture when you leave the app while a video plays",
   "pictureInPictureAction": "Picture-in-picture",
+  "mediaViewerActionLockControls": "Lock controls",
+  "mediaViewerHoldToUnlock": "Hold to unlock",
   "keepAudioPlayingTitle": "Keep audio playing after closing",
   "keepAudioPlayingSubtitle": "Audio keeps playing in the background when you leave the player; use the notification to control it",
   "@mediaPlayerControlsTitle": {
@@ -12046,6 +12048,12 @@
   },
   "@pictureInPictureAction": {
     "description": "Label and tooltip of the media viewer button that puts the video in a picture-in-picture window"
+  },
+  "@mediaViewerActionLockControls": {
+    "description": "Label and tooltip of the media viewer button that locks the touch controls against accidental taps and gestures"
+  },
+  "@mediaViewerHoldToUnlock": {
+    "description": "Hint shown on the media viewer's control lock overlay, telling the person to press and hold the lock button to unlock"
   },
   "@keepAudioPlayingTitle": {
     "description": "Title of the setting that keeps audio playing in the background after the media viewer is closed"

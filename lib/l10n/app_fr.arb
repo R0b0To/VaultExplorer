@@ -2190,6 +2190,8 @@
   "pictureInPictureTitle": "Image dans l’image automatique",
   "pictureInPictureSubtitle": "Passer en image dans l’image en quittant l’application pendant la lecture d’une vidéo",
   "pictureInPictureAction": "Image dans l’image",
+  "mediaViewerActionLockControls": "Verrouiller les commandes",
+  "mediaViewerHoldToUnlock": "Maintenir pour déverrouiller",
   "keepAudioPlayingTitle": "Continuer la lecture audio après la fermeture",
   "keepAudioPlayingSubtitle": "Le son continue en arrière-plan après la fermeture du lecteur ; commande depuis la notification",
   "mediaControlsResetSuccess": "Commandes multimédias réinitialisées par défaut",

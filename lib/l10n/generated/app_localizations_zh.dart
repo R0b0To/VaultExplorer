@@ -7539,6 +7539,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get pictureInPictureAction => '画中画';
 
   @override
+  String get mediaViewerActionLockControls => '锁定控件';
+
+  @override
+  String get mediaViewerHoldToUnlock => '长按解锁';
+
+  @override
   String get keepAudioPlayingTitle => '关闭后继续播放音频';
 
   @override

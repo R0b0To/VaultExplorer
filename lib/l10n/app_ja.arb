@@ -2190,6 +2190,8 @@
   "pictureInPictureTitle": "自動ピクチャーインピクチャー",
   "pictureInPictureSubtitle": "動画の再生中にアプリを離れるとピクチャーインピクチャーに切り替わります",
   "pictureInPictureAction": "ピクチャーインピクチャー",
+  "mediaViewerActionLockControls": "操作をロック",
+  "mediaViewerHoldToUnlock": "長押しでロック解除",
   "keepAudioPlayingTitle": "閉じた後も音声を再生し続ける",
   "keepAudioPlayingSubtitle": "プレーヤーを離れても音声はバックグラウンドで再生され、通知から操作できます",
   "mediaControlsResetSuccess": "メディア操作設定をデフォルトに戻しました",

@@ -53,6 +53,7 @@ import 'package:vaultexplorer/features/browser/viewer/widgets/ab_loop_toast.dart
 import 'package:vaultexplorer/features/browser/viewer/widgets/file_info_sheet.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/image_page_item.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_player_widget.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_lock_overlay.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_top_bar.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_bottom_controls.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_in_place_layout_editor.dart';
@@ -163,6 +164,15 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   final VideoScrubPreviewHost _scrubPreviewHost = VideoScrubPreviewHost(null);
 
   bool _isEditingLayout = false;
+
+  /// Touch lock: while on, [MediaViewerLockOverlay] swallows every touch so a
+  /// stray tap or swipe can't pause, seek, zoom, switch item or close the
+  /// viewer. Lasts for this viewer only; it is never saved.
+  bool _controlsLocked = false;
+
+  /// Bumped to reveal the lock button without a touch (a back press while
+  /// locked).
+  final ValueNotifier<int> _lockNudge = ValueNotifier<int>(0);
 
   // Raw pointer tracking so a second finger touching down immediately locks
   // out swipe-to-next-item, before the gesture arena has a chance to let
@@ -417,6 +427,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     MediaViewerAction.aspectRatio,
     MediaViewerAction.advancedSettings,
     MediaViewerAction.diagnostics,
+    MediaViewerAction.lockControls,
   };
 
   MediaViewerToolbarConfig _effectiveToolbarConfig(
@@ -2084,7 +2095,18 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     });
   }
 
+  /// Turns the touch lock on or off. Locking tucks the chrome away; unlocking
+  /// brings it back.
+  void _setControlsLocked(bool locked) {
+    if (!mounted || _controlsLocked == locked) return;
+    setState(() => _controlsLocked = locked);
+    _hideTimer?.cancel();
+    _setUIVisibility(!locked);
+  }
+
   void _setUIVisibility(bool show) {
+    // Nothing may bring the chrome back while locked; unlocking does.
+    if (show && _controlsLocked) return;
     if (mounted) {
       _sessionController.setShowUI(show);
       if (show) {
@@ -2639,6 +2661,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       case MediaViewerAction.pictureInPicture:
         if (!isImage) unawaited(_enterPictureInPictureWindow());
         break;
+      case MediaViewerAction.lockControls:
+        if (!_isEditingLayout) _setControlsLocked(true);
+        break;
       case MediaViewerAction.playlistMenu:
         _showPlaylistOptionsMenu();
         break;
@@ -3103,6 +3128,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     BackgroundPlaybackHost.instance.unregisterViewer();
     _swipePhysicsNotifier.dispose();
     _swipeDismissProgress.dispose();
+    _lockNudge.dispose();
     _videoProgressNotifier.dispose();
     _abLoopNotifier.dispose();
     _abLoopToastTimer?.cancel();
@@ -3374,6 +3400,12 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
+        // A back press is as likely a misstap as any other touch: it only
+        // points at the lock button.
+        if (_controlsLocked) {
+          _lockNudge.value++;
+          return;
+        }
         if (_isEditingLayout) {
           setState(() => _isEditingLayout = false);
           _updateSwipePhysics();
@@ -3621,7 +3653,10 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
 
             final swipeDismissAxis = _swipeDismissAxis;
             return MediaSwipeDismissLayer(
-              enabled: mediaViewerConfig.swipeToDismissEnabled && !_isEditingLayout,
+              enabled:
+                  mediaViewerConfig.swipeToDismissEnabled &&
+                  !_isEditingLayout &&
+                  !_controlsLocked,
               axis: swipeDismissAxis,
               bothDirections: swipeDismissAxis == Axis.horizontal,
               canStart: _canStartSwipeDismiss,
@@ -3972,6 +4007,14 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                     ),
                   ),
                 ],
+                // Topmost, so it also covers the top and bottom bars.
+                if (_controlsLocked)
+                  Positioned.fill(
+                    child: MediaViewerLockOverlay(
+                      nudge: _lockNudge,
+                      onUnlock: () => _setControlsLocked(false),
+                    ),
+                  ),
               ],
             ),
             );

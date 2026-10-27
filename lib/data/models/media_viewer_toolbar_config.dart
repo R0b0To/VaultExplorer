@@ -72,6 +72,7 @@ class MediaViewerToolbarConfig {
       MediaViewerAction.bookmark,
       MediaViewerAction.playlistMenu,
       MediaViewerAction.pictureInPicture,
+      MediaViewerAction.lockControls,
     ],
     this.bottomBarActions = const [
       MediaViewerAction.mute,
@@ -444,10 +445,23 @@ class MediaViewerToolbarConfig {
         ? moreWithAbLoop
         : [...moreWithAbLoop, MediaViewerAction.pictureInPicture];
 
+    // Same for `lockControls`: it joins the More menu rather than crowding a
+    // bar the person has already arranged.
+    final placed7 = {
+      ...top,
+      ...bottom,
+      ...moreWithPip,
+      ...advancedWithEqualizer,
+      ...hidden,
+    };
+    final moreWithLock = placed7.contains(MediaViewerAction.lockControls)
+        ? moreWithPip
+        : [...moreWithPip, MediaViewerAction.lockControls];
+
     return MediaViewerToolbarConfig(
       topBarActions: top,
       bottomBarActions: bottom,
-      moreMenuActions: moreWithPip,
+      moreMenuActions: moreWithLock,
       advancedSettingsActions: advancedWithEqualizer,
       hiddenActions: hidden,
       showProgressBar: j['showProgressBar'] as bool? ?? true,

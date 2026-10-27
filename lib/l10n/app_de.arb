@@ -2190,6 +2190,8 @@
   "pictureInPictureTitle": "Automatisches Bild-in-Bild",
   "pictureInPictureSubtitle": "Bild-in-Bild starten, wenn die App während einer Videowiedergabe verlassen wird",
   "pictureInPictureAction": "Bild-in-Bild",
+  "mediaViewerActionLockControls": "Steuerung sperren",
+  "mediaViewerHoldToUnlock": "Zum Entsperren gedrückt halten",
   "keepAudioPlayingTitle": "Audio nach dem Schließen weiterspielen",
   "keepAudioPlayingSubtitle": "Audio läuft im Hintergrund weiter, wenn der Player verlassen wird; Steuerung über die Benachrichtigung",
   "mediaControlsResetSuccess": "Mediensteuerung auf Standardwerte zurückgesetzt",

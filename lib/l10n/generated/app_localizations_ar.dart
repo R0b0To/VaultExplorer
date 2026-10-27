@@ -8136,6 +8136,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get pictureInPictureAction => 'صورة داخل صورة';
 
   @override
+  String get mediaViewerActionLockControls => 'قفل عناصر التحكم';
+
+  @override
+  String get mediaViewerHoldToUnlock => 'اضغط مطولًا لإلغاء القفل';
+
+  @override
   String get keepAudioPlayingTitle => 'متابعة تشغيل الصوت بعد الإغلاق';
 
   @override

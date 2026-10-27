@@ -2190,6 +2190,8 @@
   "pictureInPictureTitle": "자동 화면 속 화면",
   "pictureInPictureSubtitle": "동영상 재생 중 앱을 나가면 화면 속 화면으로 전환합니다",
   "pictureInPictureAction": "화면 속 화면",
+  "mediaViewerActionLockControls": "컨트롤 잠금",
+  "mediaViewerHoldToUnlock": "길게 눌러 잠금 해제",
   "keepAudioPlayingTitle": "닫은 후에도 오디오 계속 재생",
   "keepAudioPlayingSubtitle": "플레이어를 나가도 오디오가 백그라운드에서 계속 재생되며 알림에서 제어할 수 있습니다",
   "mediaControlsResetSuccess": "미디어 컨트롤을 기본값으로 초기화했습니다",

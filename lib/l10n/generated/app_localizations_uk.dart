@@ -8129,6 +8129,12 @@ class AppLocalizationsUk extends AppLocalizations {
   String get pictureInPictureAction => 'Картинка в картинці';
 
   @override
+  String get mediaViewerActionLockControls => 'Заблокувати керування';
+
+  @override
+  String get mediaViewerHoldToUnlock => 'Утримуйте, щоб розблокувати';
+
+  @override
   String get keepAudioPlayingTitle =>
       'Продовжувати відтворення аудіо після закриття';
 

@@ -31,7 +31,8 @@ enum MediaViewerAction {
   advancedSettings,
   decoder,
   diagnostics,
-  pictureInPicture;
+  pictureInPicture,
+  lockControls;
 
   IconData get icon => switch (this) {
         MediaViewerAction.playPause => Icons.play_arrow_rounded,
@@ -66,6 +67,7 @@ enum MediaViewerAction {
         MediaViewerAction.diagnostics => Icons.analytics_outlined,
         MediaViewerAction.pictureInPicture =>
           Icons.picture_in_picture_alt_rounded,
+        MediaViewerAction.lockControls => Icons.lock_outline_rounded,
       };
 
   String getLocalizedLabel(AppLocalizations l10n) => switch (this) {
@@ -99,6 +101,7 @@ enum MediaViewerAction {
         MediaViewerAction.decoder => l10n.videoDecoderTitle,
         MediaViewerAction.diagnostics => l10n.mediaViewerActionDiagnostics,
         MediaViewerAction.pictureInPicture => l10n.pictureInPictureAction,
+        MediaViewerAction.lockControls => l10n.mediaViewerActionLockControls,
       };
 
   bool isApplicable({required bool isImage, required bool isAudio, required bool isPlaylistMode}) {

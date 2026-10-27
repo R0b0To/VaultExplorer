@@ -8138,6 +8138,12 @@ class AppLocalizationsFr extends AppLocalizations {
   String get pictureInPictureAction => 'Image dans l’image';
 
   @override
+  String get mediaViewerActionLockControls => 'Verrouiller les commandes';
+
+  @override
+  String get mediaViewerHoldToUnlock => 'Maintenir pour déverrouiller';
+
+  @override
   String get keepAudioPlayingTitle =>
       'Continuer la lecture audio après la fermeture';
 

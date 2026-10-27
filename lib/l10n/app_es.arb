@@ -2190,6 +2190,8 @@
   "pictureInPictureTitle": "Imagen en imagen automática",
   "pictureInPictureSubtitle": "Entrar en imagen en imagen al salir de la app mientras se reproduce un vídeo",
   "pictureInPictureAction": "Imagen en imagen",
+  "mediaViewerActionLockControls": "Bloquear controles",
+  "mediaViewerHoldToUnlock": "Mantén pulsado para desbloquear",
   "keepAudioPlayingTitle": "Seguir reproduciendo audio al cerrar",
   "keepAudioPlayingSubtitle": "El audio sigue sonando en segundo plano al salir del reproductor; se controla desde la notificación",
   "mediaControlsResetSuccess": "Controles multimedia restablecidos a los valores predeterminados",

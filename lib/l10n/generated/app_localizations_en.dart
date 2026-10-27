@@ -7946,6 +7946,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pictureInPictureAction => 'Picture-in-picture';
 
   @override
+  String get mediaViewerActionLockControls => 'Lock controls';
+
+  @override
+  String get mediaViewerHoldToUnlock => 'Hold to unlock';
+
+  @override
   String get keepAudioPlayingTitle => 'Keep audio playing after closing';
 
   @override

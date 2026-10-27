@@ -8080,6 +8080,12 @@ class AppLocalizationsPt extends AppLocalizations {
   String get pictureInPictureAction => 'Imagem em imagem';
 
   @override
+  String get mediaViewerActionLockControls => 'Bloquear controles';
+
+  @override
+  String get mediaViewerHoldToUnlock => 'Mantenha pressionado para desbloquear';
+
+  @override
   String get keepAudioPlayingTitle => 'Continuar a reproduzir áudio ao fechar';
 
   @override

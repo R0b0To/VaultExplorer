@@ -1,5 +1,5 @@
 diff --git a/libarchive/archive_read_support_format_7zip.c b/libarchive/archive_read_support_format_7zip.c
-index 9c9f9a0..85ff5bb 100644
+index 9c9f9a0..8109eaa 100644
 --- a/libarchive/archive_read_support_format_7zip.c
 +++ b/libarchive/archive_read_support_format_7zip.c
 @@ -59,6 +59,9 @@
@@ -668,18 +668,26 @@ index 9c9f9a0..85ff5bb 100644
  		archive_set_error(&(a->archive),
  		    ARCHIVE_ERRNO_MISC,
  		    "The %s is encoded with many filters, "
-@@ -3897,6 +4364,36 @@ setup_decode_folder(struct archive_read *a, struct _7z_folder *folder,
+@@ -3897,6 +4364,50 @@ setup_decode_folder(struct archive_read *a, struct _7z_folder *folder,
  	else
  		coder2 = NULL;
  
 +	if (aes_coder != NULL) {
 +#ifdef HAVE_LIBCRYPTO
 +		/*
-+		 * Supported: [AES, codec] and [AES, codec, filter], a plain chain
-+		 * in decoding order with a single packed stream.
++		 * Supported: [AES], [AES, codec] and [AES, codec, filter], a
++		 * plain chain in decoding order with a single packed stream.
++		 *
++		 * A lone [AES] folder is what 7-Zip writes for a small header
++		 * encrypted with -mhe=on (e.g. an archive holding one file):
++		 * the header is not worth compressing, so the decrypted bytes
++		 * are the folder's output and are passed through as COPY.
 +		 */
++		static const struct _7z_coder coder_aes_copy =
++		    {_7Z_COPY, 1, 1, 0, NULL};
++
 +		if (aes_index != 0 ||
-+		    (folder->numCoders != 2 && folder->numCoders != 3) ||
++		    folder->numCoders < 1 || folder->numCoders > 3 ||
 +		    folder->numBindPairs != folder->numCoders - 1 ||
 +		    folder->numPackedStreams != 1 ||
 +		    folder->numInStreams != folder->numCoders ||
@@ -693,8 +701,14 @@ index 9c9f9a0..85ff5bb 100644
 +		if (init_7zip_aes_decryption(a, zip, aes_coder,
 +		    folder->unPackSize[0]) != ARCHIVE_OK)
 +			return (header ? ARCHIVE_FATAL : ARCHIVE_FAILED);
-+		coder1 = &folder->coders[1];
-+		coder2 = (folder->numCoders == 3) ? &folder->coders[2] : NULL;
++		if (folder->numCoders == 1) {
++			coder1 = &coder_aes_copy;
++			coder2 = NULL;
++		} else {
++			coder1 = &folder->coders[1];
++			coder2 = (folder->numCoders == 3) ?
++			    &folder->coders[2] : NULL;
++		}
 +#else
 +		archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
 +		    "7-Zip AES decryption is unsupported due to lack of crypto library");

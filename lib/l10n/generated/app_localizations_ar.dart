@@ -12572,4 +12572,87 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get segmentRetrySave => 'Try again';
+
+  @override
+  String get imageEditorActionAuto => 'تلقائي';
+
+  @override
+  String get imageEditorActionFlip => 'قلب';
+
+  @override
+  String get imageEditorActionRotate => 'تدوير';
+
+  @override
+  String get imageEditorActionColor => 'اللون';
+
+  @override
+  String get imageEditorActionSize => 'الحجم';
+
+  @override
+  String get imageEditorActionOpacity => 'الشفافية';
+
+  @override
+  String get imageEditorActionStyle => 'النمط';
+
+  @override
+  String get imageEditorExportSave => 'تصدير / حفظ';
+
+  @override
+  String get imageEditorRevertOriginal => 'الرجوع إلى الأصل';
+
+  @override
+  String get imageEditorTuneImageToolLabel => 'ضبط الصورة';
+
+  @override
+  String get imageEditorLooksToolLabel => 'المظاهر';
+
+  @override
+  String get imageEditorLookCurrent => 'الحالي';
+
+  @override
+  String get imageEditorLookPortrait => 'بورتريه';
+
+  @override
+  String get imageEditorLookDramatic => 'درامي';
+
+  @override
+  String get imageEditorLookVintage => 'عتيق';
+
+  @override
+  String get imageEditorTuneAmbiance => 'الأجواء';
+
+  @override
+  String get imageEditorTuneWarmth => 'الدفء';
+
+  @override
+  String get imageEditorTuneShadows => 'الظلال';
+
+  @override
+  String get imageEditorCropAspectDin => 'DIN';
+
+  @override
+  String get imageEditorAngle => 'الزاوية';
+
+  @override
+  String get fontSizeSmall => 'صغير';
+
+  @override
+  String get fontSizeMedium => 'متوسط';
+
+  @override
+  String get fontSizeLarge => 'كبير';
+
+  @override
+  String get fontSizeExtraLarge => 'كبير جداً';
+
+  @override
+  String get imageEditorTextPlaceholder => 'اضغط مرتين هنا لتغيير النص';
+
+  @override
+  String get imageEditorFontSizePreview => 'معاينة نموذجية أبج 123';
+
+  @override
+  String imageEditorPhotoLabel(int index) {
+    return 'صورة $index';
+  }
 }

@@ -205,7 +205,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
     final path = widget.filePath;
     if (path == null) {
       if (widget.allowSequentialCapture) {
-        return 'Photo ${widget.batchIndex}';
+        return context.l10n.imageEditorPhotoLabel(widget.batchIndex);
       }
       return 'photo.jpg';
     }
@@ -882,7 +882,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
       _activeTextNotifier = ValueNotifier(
         TextMarkAnnotation(
           position: const Offset(0.5, 0.5),
-          text: 'DOUBLE TAP HERE TO CHANGE TEXT',
+          text: context.l10n.imageEditorTextPlaceholder,
           color: Colors.white,
           fontSizeFraction: 0.045,
           rotation: 0.0,
@@ -914,7 +914,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
     if (_activeTextNotifier == null) return;
     final current = _activeTextNotifier!.value;
     if (current.text.trim().isNotEmpty &&
-        current.text != 'DOUBLE TAP HERE TO CHANGE TEXT') {
+        current.text != context.l10n.imageEditorTextPlaceholder) {
       _pushUndoSnapshot();
       if (_editingTextAnnotationIndex != null) {
         _annotationsController.insert(_editingTextAnnotationIndex!, current);
@@ -927,7 +927,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
     _textEntrySnapshot = null;
     _activeTextNotifier!.value = TextMarkAnnotation(
       position: const Offset(0.5, 0.5),
-      text: 'DOUBLE TAP HERE TO CHANGE TEXT',
+      text: context.l10n.imageEditorTextPlaceholder,
       color: Colors.white,
       fontSizeFraction: 0.045,
       rotation: 0.0,
@@ -945,7 +945,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
     if (_activeTextNotifier != null) {
       final cur = _activeTextNotifier!.value;
       if (cur.text.trim().isNotEmpty &&
-          cur.text != 'DOUBLE TAP HERE TO CHANGE TEXT') {
+          cur.text != context.l10n.imageEditorTextPlaceholder) {
         _pushUndoSnapshot();
         if (_editingTextAnnotationIndex != null) {
           _annotationsController.insert(_editingTextAnnotationIndex!, cur);
@@ -1022,7 +1022,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
     if (notifier == null) return;
     final current = notifier.value.text;
     final initialVal =
-        current == 'DOUBLE TAP HERE TO CHANGE TEXT' ? '' : current;
+        current == context.l10n.imageEditorTextPlaceholder ? '' : current;
     final l10n = context.l10n;
 
     final result = await showDialog<String>(
@@ -1599,11 +1599,12 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
       );
     }
 
+    final l10n = context.l10n;
     final List<Widget> centerActions = switch (tool) {
       EditorTool.crop => [
         _EditorToolActionItem(
           icon: Icons.auto_fix_high_rounded,
-          label: 'Auto',
+          label: l10n.imageEditorActionAuto,
           onTap: () {
             _controlsController.setCropRotationAngle(0.0);
             final notifier = _cropRectNotifier;
@@ -1619,56 +1620,56 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
         ),
         _EditorToolActionItem(
           icon: Icons.flip_rounded,
-          label: 'Flip',
+          label: l10n.imageEditorActionFlip,
           onTap: () => setState(() => _cropFlippedHorizontal = !_cropFlippedHorizontal),
         ),
         _EditorToolActionItem(
           icon: Icons.rotate_90_degrees_cw_rounded,
-          label: 'Rotate',
+          label: l10n.imageEditorActionRotate,
           onTap: _stepRotate90,
         ),
       ],
       EditorTool.tuneImage => [
         _EditorToolActionItem(
           icon: Icons.auto_fix_high_rounded,
-          label: 'Auto',
+          label: l10n.imageEditorActionAuto,
           onTap: _autoTune,
         ),
         _EditorToolActionItem(
           icon: Icons.restart_alt_rounded,
-          label: 'Reset',
+          label: l10n.reset,
           onTap: _resetTuneValues,
         ),
       ],
       EditorTool.looks => [
         _EditorToolActionItem(
           icon: Icons.restart_alt_rounded,
-          label: 'Original',
+          label: l10n.cropAspectOriginalLabel,
           onTap: () => _applyPresetLook(_kLookPresets.first),
         ),
       ],
       EditorTool.draw => [
         _EditorToolActionItem(
           icon: Icons.format_color_fill_rounded,
-          label: 'Color',
+          label: l10n.imageEditorActionColor,
           isSelected: _drawShelfTab == _DrawShelfTab.color,
           onTap: () => setState(() => _drawShelfTab = _DrawShelfTab.color),
         ),
         _EditorToolActionItem(
           icon: Icons.line_weight_rounded,
-          label: 'Size',
+          label: l10n.imageEditorActionSize,
           isSelected: _drawShelfTab == _DrawShelfTab.size,
           onTap: () => setState(() => _drawShelfTab = _DrawShelfTab.size),
         ),
         _EditorToolActionItem(
           icon: Icons.water_drop_outlined,
-          label: 'Opacity',
+          label: l10n.imageEditorActionOpacity,
           isSelected: _drawShelfTab == _DrawShelfTab.opacity,
           onTap: () => setState(() => _drawShelfTab = _DrawShelfTab.opacity),
         ),
         _EditorToolActionItem(
           icon: Icons.delete_outline_rounded,
-          label: 'Clear',
+          label: l10n.clear,
           onTap: _annotations.any((a) => a is DrawingAnnotation)
               ? _clearDrawAnnotations
               : null,
@@ -1677,25 +1678,25 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
       EditorTool.text => [
         _EditorToolActionItem(
           icon: Icons.add_circle_outline_rounded,
-          label: 'Add',
+          label: l10n.add,
           isSelected: false,
           onTap: _addNewTextWhileInTextTool,
         ),
         _EditorToolActionItem(
           icon: Icons.format_color_fill_rounded,
-          label: 'Color',
+          label: l10n.imageEditorActionColor,
           isSelected: _textShelfTab == _TextShelfTab.color,
           onTap: () => setState(() => _textShelfTab = _TextShelfTab.color),
         ),
         _EditorToolActionItem(
           icon: Icons.water_drop_outlined,
-          label: 'Opacity',
+          label: l10n.imageEditorActionOpacity,
           isSelected: _textShelfTab == _TextShelfTab.opacity,
           onTap: () => setState(() => _textShelfTab = _TextShelfTab.opacity),
         ),
         _EditorToolActionItem(
           icon: Icons.style_rounded,
-          label: 'Style',
+          label: l10n.imageEditorActionStyle,
           isSelected: _textShelfTab == _TextShelfTab.style,
           onTap: () => setState(() => _textShelfTab = _TextShelfTab.style),
         ),
@@ -1703,7 +1704,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
       EditorTool.redact => [
         _EditorToolActionItem(
           icon: Icons.delete_outline_rounded,
-          label: 'Clear',
+          label: l10n.clear,
           onTap: _annotations.isNotEmpty ? _clearAllAnnotations : null,
         ),
       ],
@@ -2174,11 +2175,12 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
   }
 
   Future<void> _showFontSizePicker() async {
+    final l10n = context.l10n;
     final sizes = [
-      (label: 'Small', fraction: 0.035, sampleSp: 13.0),
-      (label: 'Medium', fraction: 0.055, sampleSp: 17.0),
-      (label: 'Large', fraction: 0.085, sampleSp: 22.0),
-      (label: 'Extra Large', fraction: 0.125, sampleSp: 28.0),
+      (label: l10n.fontSizeSmall, fraction: 0.035, sampleSp: 13.0),
+      (label: l10n.fontSizeMedium, fraction: 0.055, sampleSp: 17.0),
+      (label: l10n.fontSizeLarge, fraction: 0.085, sampleSp: 22.0),
+      (label: l10n.fontSizeExtraLarge, fraction: 0.125, sampleSp: 28.0),
     ];
 
     final selected = await showModalBottomSheet<double>(
@@ -2194,7 +2196,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 subtitle: Text(
-                  'Sample preview ABC 123',
+                  context.l10n.imageEditorFontSizePreview,
                   style: TextStyle(
                     fontSize: size.sampleSp,
                     color: _controls.currentColor,
@@ -2323,7 +2325,7 @@ class _TextAnnotationDialogState extends State<_TextAnnotationDialog> {
             style: TextButton.styleFrom(
               foregroundColor: Theme.of(context).colorScheme.error,
             ),
-            child: const Text('Delete'),
+            child: Text(context.l10n.delete),
           ),
         TextButton(
           onPressed: () => Navigator.of(context).pop(),

@@ -14135,5 +14135,118 @@
   "segmentRetrySave": "Try again",
   "@segmentRetrySave": {
     "description": "Button that retries saving recorded parts that could not be written to the vault."
+  },
+  "imageEditorActionAuto": "Auto",
+  "@imageEditorActionAuto": {
+    "description": "Image editor action button: automatic adjustment or enhancement"
+  },
+  "imageEditorActionFlip": "Flip",
+  "@imageEditorActionFlip": {
+    "description": "Image editor action button: mirror/flip image horizontally"
+  },
+  "imageEditorActionRotate": "Rotate",
+  "@imageEditorActionRotate": {
+    "description": "Image editor action button: rotate image 90 degrees"
+  },
+  "imageEditorActionColor": "Color",
+  "@imageEditorActionColor": {
+    "description": "Image editor action button: select drawing or text color"
+  },
+  "imageEditorActionSize": "Size",
+  "@imageEditorActionSize": {
+    "description": "Image editor action button: select brush stroke or text size"
+  },
+  "imageEditorActionOpacity": "Opacity",
+  "@imageEditorActionOpacity": {
+    "description": "Image editor action button: select stroke or text opacity"
+  },
+  "imageEditorActionStyle": "Style",
+  "@imageEditorActionStyle": {
+    "description": "Image editor action button: select text style preset"
+  },
+  "imageEditorExportSave": "Export / Save",
+  "@imageEditorExportSave": {
+    "description": "Image editor menu item: export or save the edited image"
+  },
+  "imageEditorRevertOriginal": "Revert to Original",
+  "@imageEditorRevertOriginal": {
+    "description": "Image editor menu item: revert all edits back to the original image"
+  },
+  "imageEditorTuneImageToolLabel": "Tune Image",
+  "@imageEditorTuneImageToolLabel": {
+    "description": "Image editor toolbar button: tune image adjustments (brightness, contrast, etc.)"
+  },
+  "imageEditorLooksToolLabel": "Looks",
+  "@imageEditorLooksToolLabel": {
+    "description": "Image editor toolbar button: preset look filters"
+  },
+  "imageEditorLookCurrent": "Current",
+  "@imageEditorLookCurrent": {
+    "description": "Image editor preset filter: current working image look"
+  },
+  "imageEditorLookPortrait": "Portrait",
+  "@imageEditorLookPortrait": {
+    "description": "Image editor preset filter: portrait tone"
+  },
+  "imageEditorLookDramatic": "Dramatic",
+  "@imageEditorLookDramatic": {
+    "description": "Image editor preset filter: high contrast dramatic look"
+  },
+  "imageEditorLookVintage": "Vintage",
+  "@imageEditorLookVintage": {
+    "description": "Image editor preset filter: warm vintage film look"
+  },
+  "imageEditorTuneAmbiance": "Ambiance",
+  "@imageEditorTuneAmbiance": {
+    "description": "Image editor tune parameter: ambiance adjustment"
+  },
+  "imageEditorTuneWarmth": "Warmth",
+  "@imageEditorTuneWarmth": {
+    "description": "Image editor tune parameter: color temperature warmth adjustment"
+  },
+  "imageEditorTuneShadows": "Shadows",
+  "@imageEditorTuneShadows": {
+    "description": "Image editor tune parameter: shadow recovery adjustment"
+  },
+  "imageEditorCropAspectDin": "DIN",
+  "@imageEditorCropAspectDin": {
+    "description": "Crop aspect-ratio preset: DIN standard (A4, etc.)"
+  },
+  "imageEditorAngle": "Angle",
+  "@imageEditorAngle": {
+    "description": "Image editor crop shelf label for rotation angle"
+  },
+  "fontSizeSmall": "Small",
+  "@fontSizeSmall": {
+    "description": "Font size option: small"
+  },
+  "fontSizeMedium": "Medium",
+  "@fontSizeMedium": {
+    "description": "Font size option: medium"
+  },
+  "fontSizeLarge": "Large",
+  "@fontSizeLarge": {
+    "description": "Font size option: large"
+  },
+  "fontSizeExtraLarge": "Extra Large",
+  "@fontSizeExtraLarge": {
+    "description": "Font size option: extra large"
+  },
+  "imageEditorTextPlaceholder": "DOUBLE TAP HERE TO CHANGE TEXT",
+  "@imageEditorTextPlaceholder": {
+    "description": "Default placeholder text shown on a newly added text annotation in the image editor"
+  },
+  "imageEditorFontSizePreview": "Sample preview ABC 123",
+  "@imageEditorFontSizePreview": {
+    "description": "Sample text shown in the font size picker to preview how the selected size looks"
+  },
+  "imageEditorPhotoLabel": "Photo {index}",
+  "@imageEditorPhotoLabel": {
+    "description": "Default file name for a photo captured from camera in the image editor",
+    "placeholders": {
+      "index": {
+        "type": "int"
+      }
+    }
   }
 }

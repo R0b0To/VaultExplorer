@@ -12,13 +12,13 @@ enum _TuneParam {
 }
 
 extension _TuneParamX on _TuneParam {
-  String get label => switch (this) {
-    _TuneParam.brightness => 'Brightness',
-    _TuneParam.contrast => 'Contrast',
-    _TuneParam.saturation => 'Saturation',
-    _TuneParam.ambiance => 'Ambiance',
-    _TuneParam.warmth => 'Warmth',
-    _TuneParam.shadows => 'Shadows',
+  String getLocalizedLabel(AppLocalizations l10n) => switch (this) {
+    _TuneParam.brightness => l10n.adjustmentBrightness,
+    _TuneParam.contrast => l10n.adjustmentContrast,
+    _TuneParam.saturation => l10n.adjustmentSaturation,
+    _TuneParam.ambiance => l10n.imageEditorTuneAmbiance,
+    _TuneParam.warmth => l10n.imageEditorTuneWarmth,
+    _TuneParam.shadows => l10n.imageEditorTuneShadows,
   };
 
   IconData get icon => switch (this) {
@@ -41,6 +41,18 @@ class _LookPreset {
     required this.label,
     required this.adjustments,
   });
+
+  String getLocalizedLabel(AppLocalizations l10n) => switch (id) {
+    'original' => l10n.imageEditorLookCurrent,
+    'portrait' => l10n.imageEditorLookPortrait,
+    'vivid' => l10n.adjustmentPresetVivid,
+    'bw' => l10n.adjustmentPresetBlackAndWhite,
+    'warm' => l10n.adjustmentPresetWarm,
+    'cool' => l10n.adjustmentPresetCool,
+    'dramatic' => l10n.imageEditorLookDramatic,
+    'vintage' => l10n.imageEditorLookVintage,
+    _ => label,
+  };
 }
 
 const List<_LookPreset> _kLookPresets = [
@@ -131,15 +143,18 @@ class _EditorTopBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Size get preferredSize => const Size.fromHeight(52);
 
-  String _toolTitle(EditorTool tool) => switch (tool) {
-    EditorTool.crop => 'Crop',
-    EditorTool.tuneImage => 'Tune Image',
-    EditorTool.looks => 'Looks',
-    EditorTool.draw => 'Draw',
-    EditorTool.text => 'Text',
-    EditorTool.redact => 'Redact',
-    EditorTool.none => fileName,
-  };
+  String _toolTitle(BuildContext context, EditorTool tool) {
+    final l10n = context.l10n;
+    return switch (tool) {
+      EditorTool.crop => l10n.cropToolLabel,
+      EditorTool.tuneImage => l10n.imageEditorTuneImageToolLabel,
+      EditorTool.looks => l10n.imageEditorLooksToolLabel,
+      EditorTool.draw => l10n.drawToolLabel,
+      EditorTool.text => l10n.textToolLabel,
+      EditorTool.redact => l10n.redactToolLabel,
+      EditorTool.none => fileName,
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -166,7 +181,7 @@ class _EditorTopBar extends StatelessWidget implements PreferredSizeWidget {
                   if (!isToolActive) ...[
                     IconButton(
                       icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-                      tooltip: 'Back',
+                      tooltip: context.l10n.goBack,
                       onPressed: onBack,
                     ),
                     const SizedBox(width: 4),
@@ -188,16 +203,8 @@ class _EditorTopBar extends StatelessWidget implements PreferredSizeWidget {
                         Icons.undo_rounded,
                         color: canUndo ? Colors.white : Colors.white24,
                       ),
-                      tooltip: 'Undo',
+                      tooltip: context.l10n.undoTooltip,
                       onPressed: canUndo ? onUndo : null,
-                    ),
-                    IconButton(
-                      icon: Icon(
-                        Icons.layers_outlined,
-                        color: hasEdits ? Colors.white : Colors.white38,
-                      ),
-                      tooltip: 'Reset Edits',
-                      onPressed: hasEdits ? onResetToOriginal : null,
                     ),
                     if (allowSequentialCapture && onContinueCapture != null)
                       IconButton(
@@ -205,7 +212,7 @@ class _EditorTopBar extends StatelessWidget implements PreferredSizeWidget {
                           Icons.add_a_photo_outlined,
                           color: Colors.white,
                         ),
-                        tooltip: 'Add Another',
+                        tooltip: context.l10n.add,
                         onPressed: onContinueCapture,
                       ),
                     PopupMenuButton<String>(
@@ -229,10 +236,10 @@ class _EditorTopBar extends StatelessWidget implements PreferredSizeWidget {
                         PopupMenuItem(
                           value: 'export',
                           child: Row(
-                            children: const [
-                              Icon(Icons.save_alt_rounded, color: Colors.white, size: 20),
-                              SizedBox(width: 12),
-                              Text('Export / Save', style: TextStyle(color: Colors.white)),
+                            children: [
+                              const Icon(Icons.save_alt_rounded, color: Colors.white, size: 20),
+                              const SizedBox(width: 12),
+                              Text(context.l10n.imageEditorExportSave, style: const TextStyle(color: Colors.white)),
                             ],
                           ),
                         ),
@@ -240,10 +247,10 @@ class _EditorTopBar extends StatelessWidget implements PreferredSizeWidget {
                           PopupMenuItem(
                             value: 'reset',
                             child: Row(
-                              children: const [
-                                Icon(Icons.restart_alt_rounded, color: Colors.white, size: 20),
-                                SizedBox(width: 12),
-                                Text('Revert to Original', style: TextStyle(color: Colors.white)),
+                              children: [
+                                const Icon(Icons.restart_alt_rounded, color: Colors.white, size: 20),
+                                const SizedBox(width: 12),
+                                Text(context.l10n.imageEditorRevertOriginal, style: const TextStyle(color: Colors.white)),
                               ],
                             ),
                           ),
@@ -263,7 +270,7 @@ class _EditorTopBar extends StatelessWidget implements PreferredSizeWidget {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        _toolTitle(activeTool),
+                        _toolTitle(context, activeTool),
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 17,
@@ -461,6 +468,7 @@ class _EditorToolsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Container(
       color: const Color(0xFF161616),
       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -472,27 +480,27 @@ class _EditorToolsRow extends StatelessWidget {
           children: [
             _buildToolItem(
               icon: Icons.tune_rounded,
-              label: 'Tune Image',
+              label: l10n.imageEditorTuneImageToolLabel,
               tool: EditorTool.tuneImage,
             ),
             _buildToolItem(
               icon: Icons.crop_rounded,
-              label: 'Crop',
+              label: l10n.cropToolLabel,
               tool: EditorTool.crop,
             ),
             _buildToolItem(
               icon: Icons.brush_rounded,
-              label: 'Draw',
+              label: l10n.drawToolLabel,
               tool: EditorTool.draw,
             ),
             _buildToolItem(
               icon: Icons.text_fields_rounded,
-              label: 'Text',
+              label: l10n.textToolLabel,
               tool: EditorTool.text,
             ),
             _buildToolItem(
               icon: Icons.visibility_off_outlined,
-              label: 'Redact',
+              label: l10n.redactToolLabel,
               tool: EditorTool.redact,
             ),
           ],
@@ -819,6 +827,7 @@ class _CropShelf extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final currentAspect = cropBoxSize == null
         ? 1.0
         : cropBoxSize!.width / cropBoxSize!.height;
@@ -828,10 +837,10 @@ class _CropShelf extends StatelessWidget {
         : '${angle > 0 ? '+' : ''}${angle.toStringAsFixed(2)}°';
 
     final aspects = [
-      (label: 'Free', icon: Icons.crop_free_rounded, ratio: null),
-      (label: 'Original', icon: Icons.crop_original_rounded, ratio: currentAspect),
-      (label: 'Square', icon: Icons.crop_square_rounded, ratio: 1.0),
-      (label: 'DIN', icon: Icons.description_outlined, ratio: 1.0 / 1.414),
+      (label: l10n.cropAspectFreeLabel, icon: Icons.crop_free_rounded, ratio: null),
+      (label: l10n.cropAspectOriginalLabel, icon: Icons.crop_original_rounded, ratio: currentAspect),
+      (label: l10n.cropAspectSquareLabel, icon: Icons.crop_square_rounded, ratio: 1.0),
+      (label: l10n.imageEditorCropAspectDin, icon: Icons.description_outlined, ratio: 1.0 / 1.414),
       (label: '3:2', icon: Icons.crop_3_2_rounded, ratio: 3.0 / 2.0),
       (label: '4:3', icon: Icons.crop_7_5_rounded, ratio: 4.0 / 3.0),
       (label: '16:9', icon: Icons.crop_16_9_rounded, ratio: 16.0 / 9.0),
@@ -867,9 +876,9 @@ class _CropShelf extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      const Text(
-                        'Angle',
-                        style: TextStyle(
+                      Text(
+                        l10n.imageEditorAngle,
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
@@ -1036,7 +1045,7 @@ class _TuneImageShelf extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            param.label,
+                            param.getLocalizedLabel(context.l10n),
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 14,
@@ -1145,7 +1154,7 @@ class _TuneParamOverlay extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            p.label,
+                            p.getLocalizedLabel(context.l10n),
                             style: TextStyle(
                               color: p == selectedParam ? Colors.black : Colors.white,
                               fontSize: 14,
@@ -1292,7 +1301,7 @@ class _LooksShelf extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        preset.label,
+                        preset.getLocalizedLabel(context.l10n),
                         style: TextStyle(
                           color: isSelected ? Colors.white : Colors.white70,
                           fontSize: 11,
@@ -1473,9 +1482,9 @@ class _TextShelf extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          const Text(
-                            'Opacity',
-                            style: TextStyle(
+                          Text(
+                            context.l10n.imageEditorActionOpacity,
+                            style: const TextStyle(
                               color: Colors.white,
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
@@ -1606,9 +1615,9 @@ class _DrawShelf extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          const Text(
-                            'Size',
-                            style: TextStyle(
+                          Text(
+                            context.l10n.imageEditorActionSize,
+                            style: const TextStyle(
                               color: Colors.white,
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
@@ -1683,9 +1692,9 @@ class _DrawShelf extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          const Text(
-                            'Opacity',
-                            style: TextStyle(
+                          Text(
+                            context.l10n.imageEditorActionOpacity,
+                            style: const TextStyle(
                               color: Colors.white,
                               fontSize: 14,
                               fontWeight: FontWeight.w500,

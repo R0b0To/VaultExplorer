@@ -20928,6 +20928,168 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Try again'**
   String get segmentRetrySave;
+
+  /// Image editor action button: automatic adjustment or enhancement
+  ///
+  /// In en, this message translates to:
+  /// **'Auto'**
+  String get imageEditorActionAuto;
+
+  /// Image editor action button: mirror/flip image horizontally
+  ///
+  /// In en, this message translates to:
+  /// **'Flip'**
+  String get imageEditorActionFlip;
+
+  /// Image editor action button: rotate image 90 degrees
+  ///
+  /// In en, this message translates to:
+  /// **'Rotate'**
+  String get imageEditorActionRotate;
+
+  /// Image editor action button: select drawing or text color
+  ///
+  /// In en, this message translates to:
+  /// **'Color'**
+  String get imageEditorActionColor;
+
+  /// Image editor action button: select brush stroke or text size
+  ///
+  /// In en, this message translates to:
+  /// **'Size'**
+  String get imageEditorActionSize;
+
+  /// Image editor action button: select stroke or text opacity
+  ///
+  /// In en, this message translates to:
+  /// **'Opacity'**
+  String get imageEditorActionOpacity;
+
+  /// Image editor action button: select text style preset
+  ///
+  /// In en, this message translates to:
+  /// **'Style'**
+  String get imageEditorActionStyle;
+
+  /// Image editor menu item: export or save the edited image
+  ///
+  /// In en, this message translates to:
+  /// **'Export / Save'**
+  String get imageEditorExportSave;
+
+  /// Image editor menu item: revert all edits back to the original image
+  ///
+  /// In en, this message translates to:
+  /// **'Revert to Original'**
+  String get imageEditorRevertOriginal;
+
+  /// Image editor toolbar button: tune image adjustments (brightness, contrast, etc.)
+  ///
+  /// In en, this message translates to:
+  /// **'Tune Image'**
+  String get imageEditorTuneImageToolLabel;
+
+  /// Image editor toolbar button: preset look filters
+  ///
+  /// In en, this message translates to:
+  /// **'Looks'**
+  String get imageEditorLooksToolLabel;
+
+  /// Image editor preset filter: current working image look
+  ///
+  /// In en, this message translates to:
+  /// **'Current'**
+  String get imageEditorLookCurrent;
+
+  /// Image editor preset filter: portrait tone
+  ///
+  /// In en, this message translates to:
+  /// **'Portrait'**
+  String get imageEditorLookPortrait;
+
+  /// Image editor preset filter: high contrast dramatic look
+  ///
+  /// In en, this message translates to:
+  /// **'Dramatic'**
+  String get imageEditorLookDramatic;
+
+  /// Image editor preset filter: warm vintage film look
+  ///
+  /// In en, this message translates to:
+  /// **'Vintage'**
+  String get imageEditorLookVintage;
+
+  /// Image editor tune parameter: ambiance adjustment
+  ///
+  /// In en, this message translates to:
+  /// **'Ambiance'**
+  String get imageEditorTuneAmbiance;
+
+  /// Image editor tune parameter: color temperature warmth adjustment
+  ///
+  /// In en, this message translates to:
+  /// **'Warmth'**
+  String get imageEditorTuneWarmth;
+
+  /// Image editor tune parameter: shadow recovery adjustment
+  ///
+  /// In en, this message translates to:
+  /// **'Shadows'**
+  String get imageEditorTuneShadows;
+
+  /// Crop aspect-ratio preset: DIN standard (A4, etc.)
+  ///
+  /// In en, this message translates to:
+  /// **'DIN'**
+  String get imageEditorCropAspectDin;
+
+  /// Image editor crop shelf label for rotation angle
+  ///
+  /// In en, this message translates to:
+  /// **'Angle'**
+  String get imageEditorAngle;
+
+  /// Font size option: small
+  ///
+  /// In en, this message translates to:
+  /// **'Small'**
+  String get fontSizeSmall;
+
+  /// Font size option: medium
+  ///
+  /// In en, this message translates to:
+  /// **'Medium'**
+  String get fontSizeMedium;
+
+  /// Font size option: large
+  ///
+  /// In en, this message translates to:
+  /// **'Large'**
+  String get fontSizeLarge;
+
+  /// Font size option: extra large
+  ///
+  /// In en, this message translates to:
+  /// **'Extra Large'**
+  String get fontSizeExtraLarge;
+
+  /// Default placeholder text shown on a newly added text annotation in the image editor
+  ///
+  /// In en, this message translates to:
+  /// **'DOUBLE TAP HERE TO CHANGE TEXT'**
+  String get imageEditorTextPlaceholder;
+
+  /// Sample text shown in the font size picker to preview how the selected size looks
+  ///
+  /// In en, this message translates to:
+  /// **'Sample preview ABC 123'**
+  String get imageEditorFontSizePreview;
+
+  /// Default file name for a photo captured from camera in the image editor
+  ///
+  /// In en, this message translates to:
+  /// **'Photo {index}'**
+  String imageEditorPhotoLabel(int index);
 }
 
 class _AppLocalizationsDelegate

@@ -11665,4 +11665,87 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get segmentRetrySave => 'Try again';
+
+  @override
+  String get imageEditorActionAuto => '自动';
+
+  @override
+  String get imageEditorActionFlip => '翻转';
+
+  @override
+  String get imageEditorActionRotate => '旋转';
+
+  @override
+  String get imageEditorActionColor => '颜色';
+
+  @override
+  String get imageEditorActionSize => '大小';
+
+  @override
+  String get imageEditorActionOpacity => '不透明度';
+
+  @override
+  String get imageEditorActionStyle => '样式';
+
+  @override
+  String get imageEditorExportSave => '导出 / 保存';
+
+  @override
+  String get imageEditorRevertOriginal => '恢复原始';
+
+  @override
+  String get imageEditorTuneImageToolLabel => '调整图片';
+
+  @override
+  String get imageEditorLooksToolLabel => '样式';
+
+  @override
+  String get imageEditorLookCurrent => '当前';
+
+  @override
+  String get imageEditorLookPortrait => '肖像';
+
+  @override
+  String get imageEditorLookDramatic => '戏剧';
+
+  @override
+  String get imageEditorLookVintage => '复古';
+
+  @override
+  String get imageEditorTuneAmbiance => '氛围';
+
+  @override
+  String get imageEditorTuneWarmth => '色温';
+
+  @override
+  String get imageEditorTuneShadows => '阴影';
+
+  @override
+  String get imageEditorCropAspectDin => 'DIN';
+
+  @override
+  String get imageEditorAngle => '角度';
+
+  @override
+  String get fontSizeSmall => '小';
+
+  @override
+  String get fontSizeMedium => '中';
+
+  @override
+  String get fontSizeLarge => '大';
+
+  @override
+  String get fontSizeExtraLarge => '特大';
+
+  @override
+  String get imageEditorTextPlaceholder => '双击此处更改文字';
+
+  @override
+  String get imageEditorFontSizePreview => '示例预览 ABC 123';
+
+  @override
+  String imageEditorPhotoLabel(int index) {
+    return '照片 $index';
+  }
 }

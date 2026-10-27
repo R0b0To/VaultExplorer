@@ -12537,4 +12537,89 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get segmentRetrySave => 'Try again';
+
+  @override
+  String get imageEditorActionAuto => 'Automático';
+
+  @override
+  String get imageEditorActionFlip => 'Virar';
+
+  @override
+  String get imageEditorActionRotate => 'Girar';
+
+  @override
+  String get imageEditorActionColor => 'Cor';
+
+  @override
+  String get imageEditorActionSize => 'Tamanho';
+
+  @override
+  String get imageEditorActionOpacity => 'Opacidade';
+
+  @override
+  String get imageEditorActionStyle => 'Estilo';
+
+  @override
+  String get imageEditorExportSave => 'Exportar / Salvar';
+
+  @override
+  String get imageEditorRevertOriginal => 'Reverter para o original';
+
+  @override
+  String get imageEditorTuneImageToolLabel => 'Ajustar imagem';
+
+  @override
+  String get imageEditorLooksToolLabel => 'Estilos';
+
+  @override
+  String get imageEditorLookCurrent => 'Atual';
+
+  @override
+  String get imageEditorLookPortrait => 'Retrato';
+
+  @override
+  String get imageEditorLookDramatic => 'Dramático';
+
+  @override
+  String get imageEditorLookVintage => 'Vintage';
+
+  @override
+  String get imageEditorTuneAmbiance => 'Ambiência';
+
+  @override
+  String get imageEditorTuneWarmth => 'Calor';
+
+  @override
+  String get imageEditorTuneShadows => 'Sombras';
+
+  @override
+  String get imageEditorCropAspectDin => 'DIN';
+
+  @override
+  String get imageEditorAngle => 'Ângulo';
+
+  @override
+  String get fontSizeSmall => 'Pequeno';
+
+  @override
+  String get fontSizeMedium => 'Médio';
+
+  @override
+  String get fontSizeLarge => 'Grande';
+
+  @override
+  String get fontSizeExtraLarge => 'Muito grande';
+
+  @override
+  String get imageEditorTextPlaceholder =>
+      'TOQUE DUAS VEZES PARA ALTERAR O TEXTO';
+
+  @override
+  String get imageEditorFontSizePreview =>
+      'Pré-visualização de exemplo ABC 123';
+
+  @override
+  String imageEditorPhotoLabel(int index) {
+    return 'Foto $index';
+  }
 }

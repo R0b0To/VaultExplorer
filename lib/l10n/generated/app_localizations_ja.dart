@@ -11851,4 +11851,87 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get segmentRetrySave => 'Try again';
+
+  @override
+  String get imageEditorActionAuto => '自動';
+
+  @override
+  String get imageEditorActionFlip => '反転';
+
+  @override
+  String get imageEditorActionRotate => '回転';
+
+  @override
+  String get imageEditorActionColor => '色';
+
+  @override
+  String get imageEditorActionSize => 'サイズ';
+
+  @override
+  String get imageEditorActionOpacity => '不透明度';
+
+  @override
+  String get imageEditorActionStyle => 'スタイル';
+
+  @override
+  String get imageEditorExportSave => 'エクスポート / 保存';
+
+  @override
+  String get imageEditorRevertOriginal => '元に戻す';
+
+  @override
+  String get imageEditorTuneImageToolLabel => '画像調整';
+
+  @override
+  String get imageEditorLooksToolLabel => 'スタイル';
+
+  @override
+  String get imageEditorLookCurrent => '現在';
+
+  @override
+  String get imageEditorLookPortrait => 'ポートレート';
+
+  @override
+  String get imageEditorLookDramatic => 'ドラマチック';
+
+  @override
+  String get imageEditorLookVintage => 'ビンテージ';
+
+  @override
+  String get imageEditorTuneAmbiance => 'アンビアンス';
+
+  @override
+  String get imageEditorTuneWarmth => '色温度';
+
+  @override
+  String get imageEditorTuneShadows => 'シャドウ';
+
+  @override
+  String get imageEditorCropAspectDin => 'DIN';
+
+  @override
+  String get imageEditorAngle => '角度';
+
+  @override
+  String get fontSizeSmall => '小';
+
+  @override
+  String get fontSizeMedium => '中';
+
+  @override
+  String get fontSizeLarge => '大';
+
+  @override
+  String get fontSizeExtraLarge => '特大';
+
+  @override
+  String get imageEditorTextPlaceholder => 'ダブルタップしてテキストを変更';
+
+  @override
+  String get imageEditorFontSizePreview => 'サンプルプレビュー ABC 123';
+
+  @override
+  String imageEditorPhotoLabel(int index) {
+    return '写真 $index';
+  }
 }

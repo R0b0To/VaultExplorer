@@ -11853,4 +11853,87 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get segmentRetrySave => 'Try again';
+
+  @override
+  String get imageEditorActionAuto => '자동';
+
+  @override
+  String get imageEditorActionFlip => '대칭';
+
+  @override
+  String get imageEditorActionRotate => '회전';
+
+  @override
+  String get imageEditorActionColor => '색상';
+
+  @override
+  String get imageEditorActionSize => '크기';
+
+  @override
+  String get imageEditorActionOpacity => '불투명도';
+
+  @override
+  String get imageEditorActionStyle => '스타일';
+
+  @override
+  String get imageEditorExportSave => '내보내기 / 저장';
+
+  @override
+  String get imageEditorRevertOriginal => '원본으로 되돌리기';
+
+  @override
+  String get imageEditorTuneImageToolLabel => '기본 보정';
+
+  @override
+  String get imageEditorLooksToolLabel => '스타일';
+
+  @override
+  String get imageEditorLookCurrent => '현재';
+
+  @override
+  String get imageEditorLookPortrait => '인물';
+
+  @override
+  String get imageEditorLookDramatic => '드라마틱';
+
+  @override
+  String get imageEditorLookVintage => '빈티지';
+
+  @override
+  String get imageEditorTuneAmbiance => '분위기';
+
+  @override
+  String get imageEditorTuneWarmth => '따뜻함';
+
+  @override
+  String get imageEditorTuneShadows => '어두운 영역';
+
+  @override
+  String get imageEditorCropAspectDin => 'DIN';
+
+  @override
+  String get imageEditorAngle => '각도';
+
+  @override
+  String get fontSizeSmall => '작게';
+
+  @override
+  String get fontSizeMedium => '보통';
+
+  @override
+  String get fontSizeLarge => '크게';
+
+  @override
+  String get fontSizeExtraLarge => '아주 크게';
+
+  @override
+  String get imageEditorTextPlaceholder => '두 번 탭하여 텍스트 변경';
+
+  @override
+  String get imageEditorFontSizePreview => '샘플 미리보기 ABC 123';
+
+  @override
+  String imageEditorPhotoLabel(int index) {
+    return '사진 $index';
+  }
 }

@@ -12631,4 +12631,88 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get segmentRetrySave => 'Try again';
+
+  @override
+  String get imageEditorActionAuto => 'Авто';
+
+  @override
+  String get imageEditorActionFlip => 'Віддзеркалити';
+
+  @override
+  String get imageEditorActionRotate => 'Обертати';
+
+  @override
+  String get imageEditorActionColor => 'Колір';
+
+  @override
+  String get imageEditorActionSize => 'Розмір';
+
+  @override
+  String get imageEditorActionOpacity => 'Непрозорість';
+
+  @override
+  String get imageEditorActionStyle => 'Стиль';
+
+  @override
+  String get imageEditorExportSave => 'Експорт / Зберегти';
+
+  @override
+  String get imageEditorRevertOriginal => 'Повернути до оригіналу';
+
+  @override
+  String get imageEditorTuneImageToolLabel => 'Корекція зображення';
+
+  @override
+  String get imageEditorLooksToolLabel => 'Стилі';
+
+  @override
+  String get imageEditorLookCurrent => 'Поточний';
+
+  @override
+  String get imageEditorLookPortrait => 'Портрет';
+
+  @override
+  String get imageEditorLookDramatic => 'Драматичний';
+
+  @override
+  String get imageEditorLookVintage => 'Вінтаж';
+
+  @override
+  String get imageEditorTuneAmbiance => 'Атмосфера';
+
+  @override
+  String get imageEditorTuneWarmth => 'Теплота';
+
+  @override
+  String get imageEditorTuneShadows => 'Тіні';
+
+  @override
+  String get imageEditorCropAspectDin => 'DIN';
+
+  @override
+  String get imageEditorAngle => 'Кут';
+
+  @override
+  String get fontSizeSmall => 'Малий';
+
+  @override
+  String get fontSizeMedium => 'Середній';
+
+  @override
+  String get fontSizeLarge => 'Великий';
+
+  @override
+  String get fontSizeExtraLarge => 'Дуже великий';
+
+  @override
+  String get imageEditorTextPlaceholder =>
+      'ДВІЧІ ТОРКНІТЬСЯ, ЩОБ ЗМІНИТИ ТЕКСТ';
+
+  @override
+  String get imageEditorFontSizePreview => 'Приклад перегляду ABC 123';
+
+  @override
+  String imageEditorPhotoLabel(int index) {
+    return 'Фото $index';
+  }
 }

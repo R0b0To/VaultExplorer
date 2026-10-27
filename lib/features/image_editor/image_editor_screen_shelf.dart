@@ -2,14 +2,7 @@ part of 'image_editor_screen.dart';
 
 // ── PHOTO STUDIO SPECIFICATIONS & TYPES ─────────────────────────────────────
 
-enum _TuneParam {
-  brightness,
-  contrast,
-  saturation,
-  ambiance,
-  warmth,
-  shadows,
-}
+enum _TuneParam { brightness, contrast, saturation, ambiance, warmth, shadows }
 
 extension _TuneParamX on _TuneParam {
   String getLocalizedLabel(AppLocalizations l10n) => switch (this) {
@@ -80,16 +73,8 @@ const List<_LookPreset> _kLookPresets = [
     label: 'B&W',
     adjustments: ViewerAdjustments.blackAndWhite,
   ),
-  _LookPreset(
-    id: 'warm',
-    label: 'Warm',
-    adjustments: ViewerAdjustments.warm,
-  ),
-  _LookPreset(
-    id: 'cool',
-    label: 'Cool',
-    adjustments: ViewerAdjustments.cool,
-  ),
+  _LookPreset(id: 'warm', label: 'Warm', adjustments: ViewerAdjustments.warm),
+  _LookPreset(id: 'cool', label: 'Cool', adjustments: ViewerAdjustments.cool),
   _LookPreset(
     id: 'dramatic',
     label: 'Dramatic',
@@ -180,7 +165,10 @@ class _EditorTopBar extends StatelessWidget implements PreferredSizeWidget {
                 children: [
                   if (!isToolActive) ...[
                     IconButton(
-                      icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                      icon: const Icon(
+                        Icons.arrow_back_rounded,
+                        color: Colors.white,
+                      ),
                       tooltip: context.l10n.goBack,
                       onPressed: onBack,
                     ),
@@ -216,7 +204,10 @@ class _EditorTopBar extends StatelessWidget implements PreferredSizeWidget {
                         onPressed: onContinueCapture,
                       ),
                     PopupMenuButton<String>(
-                      icon: const Icon(Icons.more_vert_rounded, color: Colors.white),
+                      icon: const Icon(
+                        Icons.more_vert_rounded,
+                        color: Colors.white,
+                      ),
                       color: const Color(0xFF262626),
                       elevation: 4,
                       shape: RoundedRectangleBorder(
@@ -237,9 +228,16 @@ class _EditorTopBar extends StatelessWidget implements PreferredSizeWidget {
                           value: 'export',
                           child: Row(
                             children: [
-                              const Icon(Icons.save_alt_rounded, color: Colors.white, size: 20),
+                              const Icon(
+                                Icons.save_alt_rounded,
+                                color: Colors.white,
+                                size: 20,
+                              ),
                               const SizedBox(width: 12),
-                              Text(context.l10n.imageEditorExportSave, style: const TextStyle(color: Colors.white)),
+                              Text(
+                                context.l10n.imageEditorExportSave,
+                                style: const TextStyle(color: Colors.white),
+                              ),
                             ],
                           ),
                         ),
@@ -248,9 +246,16 @@ class _EditorTopBar extends StatelessWidget implements PreferredSizeWidget {
                             value: 'reset',
                             child: Row(
                               children: [
-                                const Icon(Icons.restart_alt_rounded, color: Colors.white, size: 20),
+                                const Icon(
+                                  Icons.restart_alt_rounded,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
                                 const SizedBox(width: 12),
-                                Text(context.l10n.imageEditorRevertOriginal, style: const TextStyle(color: Colors.white)),
+                                Text(
+                                  context.l10n.imageEditorRevertOriginal,
+                                  style: const TextStyle(color: Colors.white),
+                                ),
                               ],
                             ),
                           ),
@@ -287,8 +292,12 @@ class _EditorTopBar extends StatelessWidget implements PreferredSizeWidget {
                       child: Container(
                         padding: const EdgeInsets.all(10),
                         child: Icon(
-                          isComparing ? Icons.visibility : Icons.visibility_outlined,
-                          color: isComparing ? const Color(0xFF38BDF8) : Colors.white,
+                          isComparing
+                              ? Icons.visibility
+                              : Icons.visibility_outlined,
+                          color: isComparing
+                              ? const Color(0xFF38BDF8)
+                              : Colors.white,
                           size: 22,
                         ),
                       ),
@@ -318,56 +327,63 @@ class _EditorToolsRow extends StatelessWidget {
   final EditorTool activeTool;
   final void Function(EditorTool) onSelectTool;
 
-  const _EditorToolsRow({
-    required this.activeTool,
-    required this.onSelectTool,
-  });
+  const _EditorToolsRow({required this.activeTool, required this.onSelectTool});
 
   Widget _buildToolItem({
     required IconData icon,
     required String label,
     required EditorTool tool,
+    required bool isLandscape,
   }) {
     final selected = activeTool == tool;
-    return InkWell(
-      onTap: () => onSelectTool(tool),
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: selected
-                    ? const Color(0xFF38BDF8).withValues(alpha: 0.18)
-                    : const Color(0xFF222222),
-                border: Border.all(
+    return SizedBox(
+      width: isLandscape ? 70 : null,
+      child: InkWell(
+        onTap: () => onSelectTool(tool),
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: isLandscape ? 3 : 10,
+            vertical: 8,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
                   color: selected
-                      ? const Color(0xFF38BDF8)
-                      : Colors.white.withValues(alpha: 0.18),
-                  width: 1.2,
+                      ? const Color(0xFF38BDF8).withValues(alpha: 0.18)
+                      : const Color(0xFF222222),
+                  border: Border.all(
+                    color: selected
+                        ? const Color(0xFF38BDF8)
+                        : Colors.white.withValues(alpha: 0.18),
+                    width: 1.2,
+                  ),
+                ),
+                child: Icon(
+                  icon,
+                  color: selected ? const Color(0xFF38BDF8) : Colors.white,
+                  size: 20,
                 ),
               ),
-              child: Icon(
-                icon,
-                color: selected ? const Color(0xFF38BDF8) : Colors.white,
-                size: 20,
+              const SizedBox(height: 6),
+              Text(
+                label,
+                maxLines: 2,
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: selected ? const Color(0xFF38BDF8) : Colors.white70,
+                  fontSize: isLandscape ? 10 : 11,
+                  fontWeight: selected ? FontWeight.bold : FontWeight.w500,
+                ),
               ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: selected ? const Color(0xFF38BDF8) : Colors.white70,
-                fontSize: 11,
-                fontWeight: selected ? FontWeight.bold : FontWeight.w500,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -376,48 +392,66 @@ class _EditorToolsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
+    final tools = [
+      _buildToolItem(
+        icon: Icons.filter_vintage_rounded,
+        label: l10n.imageEditorLooksToolLabel,
+        tool: EditorTool.looks,
+        isLandscape: isLandscape,
+      ),
+      _buildToolItem(
+        icon: Icons.tune_rounded,
+        label: l10n.imageEditorTuneImageToolLabel,
+        tool: EditorTool.tuneImage,
+        isLandscape: isLandscape,
+      ),
+      _buildToolItem(
+        icon: Icons.crop_rounded,
+        label: l10n.cropToolLabel,
+        tool: EditorTool.crop,
+        isLandscape: isLandscape,
+      ),
+      _buildToolItem(
+        icon: Icons.brush_rounded,
+        label: l10n.drawToolLabel,
+        tool: EditorTool.draw,
+        isLandscape: isLandscape,
+      ),
+      _buildToolItem(
+        icon: Icons.text_fields_rounded,
+        label: l10n.textToolLabel,
+        tool: EditorTool.text,
+        isLandscape: isLandscape,
+      ),
+      _buildToolItem(
+        icon: Icons.visibility_off_outlined,
+        label: l10n.redactToolLabel,
+        tool: EditorTool.redact,
+        isLandscape: isLandscape,
+      ),
+    ];
     return Container(
       color: const Color(0xFF161616),
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _buildToolItem(
-              icon: Icons.filter_vintage_rounded,
-              label: l10n.imageEditorLooksToolLabel,
-              tool: EditorTool.looks,
-            ),
-            _buildToolItem(
-              icon: Icons.tune_rounded,
-              label: l10n.imageEditorTuneImageToolLabel,
-              tool: EditorTool.tuneImage,
-            ),
-            _buildToolItem(
-              icon: Icons.crop_rounded,
-              label: l10n.cropToolLabel,
-              tool: EditorTool.crop,
-            ),
-            _buildToolItem(
-              icon: Icons.brush_rounded,
-              label: l10n.drawToolLabel,
-              tool: EditorTool.draw,
-            ),
-            _buildToolItem(
-              icon: Icons.text_fields_rounded,
-              label: l10n.textToolLabel,
-              tool: EditorTool.text,
-            ),
-            _buildToolItem(
-              icon: Icons.visibility_off_outlined,
-              label: l10n.redactToolLabel,
-              tool: EditorTool.redact,
-            ),
-          ],
-        ),
+      padding: EdgeInsets.symmetric(
+        vertical: 6,
+        horizontal: isLandscape ? 4 : 0,
       ),
+      child: isLandscape
+          ? Wrap(
+              alignment: WrapAlignment.center,
+              runAlignment: WrapAlignment.center,
+              children: tools,
+            )
+          : SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: tools,
+              ),
+            ),
     );
   }
 }
@@ -438,19 +472,79 @@ class _EditorToolActionBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
+    if (isLandscape) {
+      return Container(
+        width: double.infinity,
+        decoration: const BoxDecoration(
+          color: Color(0xFF161616),
+          border: Border(top: BorderSide(color: Color(0xFF262626), width: 0.8)),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (centerActions.isNotEmpty)
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 4,
+                runSpacing: 2,
+                children: [
+                  for (final action in centerActions)
+                    SizedBox(
+                      width: 88,
+                      height: 50,
+                      child: Center(child: action),
+                    ),
+                ],
+              ),
+            SizedBox(
+              height: 50,
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                    tooltip: l10n.cancel,
+                    onPressed: onCancel,
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.check_rounded,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                    tooltip: l10n.done,
+                    onPressed: onApply,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       height: 54,
       decoration: const BoxDecoration(
         color: Color(0xFF161616),
-        border: Border(
-          top: BorderSide(color: Color(0xFF262626), width: 0.8),
-        ),
+        border: Border(top: BorderSide(color: Color(0xFF262626), width: 0.8)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.close_rounded, color: Colors.white, size: 24),
+            icon: const Icon(
+              Icons.close_rounded,
+              color: Colors.white,
+              size: 24,
+            ),
             tooltip: l10n.cancel,
             onPressed: onCancel,
           ),
@@ -461,7 +555,11 @@ class _EditorToolActionBar extends StatelessWidget {
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.check_rounded, color: Colors.white, size: 24),
+            icon: const Icon(
+              Icons.check_rounded,
+              color: Colors.white,
+              size: 24,
+            ),
             tooltip: l10n.done,
             onPressed: onApply,
           ),
@@ -486,17 +584,21 @@ class _EditorToolActionItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = MediaQuery.of(context).orientation == Orientation.landscape;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+        padding: EdgeInsets.symmetric(
+          horizontal: 10,
+          vertical: compact ? 0 : 2,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               width: 38,
-              height: 30,
+              height: compact ? 26 : 30,
               decoration: BoxDecoration(
                 color: isSelected
                     ? const Color(0xFFDCDCDC)
@@ -511,12 +613,15 @@ class _EditorToolActionItem extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 2),
+            SizedBox(height: compact ? 1 : 2),
             Text(
               label,
+              maxLines: compact ? 1 : null,
+              overflow: compact ? TextOverflow.ellipsis : null,
+              textAlign: TextAlign.center,
               style: TextStyle(
                 color: isSelected ? Colors.white : Colors.white70,
-                fontSize: 10,
+                fontSize: compact ? 9 : 10,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
               ),
             ),
@@ -570,7 +675,10 @@ class _EditorLevelRulerState extends State<_EditorLevelRuler> {
     final dx = localPos.dx - _dragStartX!;
     final range = widget.max - widget.min;
     final deltaValue = (dx / usableW) * range;
-    final newVal = (_dragStartValue! + deltaValue).clamp(widget.min, widget.max);
+    final newVal = (_dragStartValue! + deltaValue).clamp(
+      widget.min,
+      widget.max,
+    );
     widget.onChanged(newVal);
   }
 
@@ -597,8 +705,10 @@ class _EditorLevelRulerState extends State<_EditorLevelRuler> {
         final w = constraints.maxWidth;
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onHorizontalDragStart: (details) => _handleDragStart(details.localPosition),
-          onHorizontalDragUpdate: (details) => _handleDragUpdate(details.localPosition, w),
+          onHorizontalDragStart: (details) =>
+              _handleDragStart(details.localPosition),
+          onHorizontalDragUpdate: (details) =>
+              _handleDragUpdate(details.localPosition, w),
           onHorizontalDragEnd: (_) {
             _dragStartX = null;
             _dragStartValue = null;
@@ -718,7 +828,9 @@ class _EditorLevelRulerPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _EditorLevelRulerPainter oldDelegate) =>
-      oldDelegate.value != value || oldDelegate.min != min || oldDelegate.max != max;
+      oldDelegate.value != value ||
+      oldDelegate.min != min ||
+      oldDelegate.max != max;
 }
 
 // ── CROP SHELF (ANGLE RULER + ASPECT CARDS) ──────────────────────────────────
@@ -741,6 +853,8 @@ class _CropShelf extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
     final currentAspect = cropBoxSize == null
         ? 1.0
         : cropBoxSize!.width / cropBoxSize!.height;
@@ -750,10 +864,26 @@ class _CropShelf extends StatelessWidget {
         : '${angle > 0 ? '+' : ''}${angle.toStringAsFixed(2)}°';
 
     final aspects = [
-      (label: l10n.cropAspectFreeLabel, icon: Icons.crop_free_rounded, ratio: null),
-      (label: l10n.cropAspectOriginalLabel, icon: Icons.crop_original_rounded, ratio: currentAspect),
-      (label: l10n.cropAspectSquareLabel, icon: Icons.crop_square_rounded, ratio: 1.0),
-      (label: l10n.imageEditorCropAspectDin, icon: Icons.description_outlined, ratio: 1.0 / 1.414),
+      (
+        label: l10n.cropAspectFreeLabel,
+        icon: Icons.crop_free_rounded,
+        ratio: null,
+      ),
+      (
+        label: l10n.cropAspectOriginalLabel,
+        icon: Icons.crop_original_rounded,
+        ratio: currentAspect,
+      ),
+      (
+        label: l10n.cropAspectSquareLabel,
+        icon: Icons.crop_square_rounded,
+        ratio: 1.0,
+      ),
+      (
+        label: l10n.imageEditorCropAspectDin,
+        icon: Icons.description_outlined,
+        ratio: 1.0 / 1.414,
+      ),
       (label: '3:2', icon: Icons.crop_3_2_rounded, ratio: 3.0 / 2.0),
       (label: '4:3', icon: Icons.crop_7_5_rounded, ratio: 4.0 / 3.0),
       (label: '16:9', icon: Icons.crop_16_9_rounded, ratio: 16.0 / 9.0),
@@ -823,26 +953,48 @@ class _CropShelf extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           // Aspect cards
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(
-              children: [
-                for (final item in aspects) ...[
-                  _AspectCard(
-                    icon: item.icon,
-                    label: item.label,
-                    selected: item.ratio == null
-                        ? cropAspectRatio == null
-                        : (cropAspectRatio != null &&
-                            (cropAspectRatio! - item.ratio!).abs() < 0.01),
-                    onTap: () => onSetCropAspect(item.ratio),
-                  ),
-                  const SizedBox(width: 8),
+          if (isLandscape)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  for (final item in aspects)
+                    _AspectCard(
+                      icon: item.icon,
+                      label: item.label,
+                      selected: item.ratio == null
+                          ? cropAspectRatio == null
+                          : (cropAspectRatio != null &&
+                                (cropAspectRatio! - item.ratio!).abs() < 0.01),
+                      onTap: () => onSetCropAspect(item.ratio),
+                    ),
                 ],
-              ],
+              ),
+            )
+          else
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                children: [
+                  for (final item in aspects) ...[
+                    _AspectCard(
+                      icon: item.icon,
+                      label: item.label,
+                      selected: item.ratio == null
+                          ? cropAspectRatio == null
+                          : (cropAspectRatio != null &&
+                                (cropAspectRatio! - item.ratio!).abs() < 0.01),
+                      onTap: () => onSetCropAspect(item.ratio),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                ],
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -940,14 +1092,20 @@ class _TuneImageShelf extends StatelessWidget {
                     behavior: HitTestBehavior.opaque,
                     onTap: onToggleParamMenu,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 4,
+                      ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Container(
                             padding: const EdgeInsets.all(2),
                             decoration: BoxDecoration(
-                              border: Border.all(color: Colors.white70, width: 1.2),
+                              border: Border.all(
+                                color: Colors.white70,
+                                width: 1.2,
+                              ),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: const Icon(
@@ -1063,13 +1221,17 @@ class _TuneParamOverlay extends StatelessWidget {
                           Icon(
                             p.icon,
                             size: 16,
-                            color: p == selectedParam ? Colors.black : Colors.white70,
+                            color: p == selectedParam
+                                ? Colors.black
+                                : Colors.white70,
                           ),
                           const SizedBox(width: 8),
                           Text(
                             p.getLocalizedLabel(context.l10n),
                             style: TextStyle(
-                              color: p == selectedParam ? Colors.black : Colors.white,
+                              color: p == selectedParam
+                                  ? Colors.black
+                                  : Colors.white,
                               fontSize: 14,
                               fontWeight: p == selectedParam
                                   ? FontWeight.w700
@@ -1080,12 +1242,16 @@ class _TuneParamOverlay extends StatelessWidget {
                           Text(
                             _formatValue(values[p] ?? 0),
                             style: TextStyle(
-                              color: p == selectedParam ? Colors.black : Colors.white70,
+                              color: p == selectedParam
+                                  ? Colors.black
+                                  : Colors.white70,
                               fontSize: 13,
                               fontWeight: p == selectedParam
                                   ? FontWeight.w700
                                   : FontWeight.normal,
-                              fontFeatures: const [FontFeature.tabularFigures()],
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
                             ),
                           ),
                         ],
@@ -1134,94 +1300,310 @@ class _LooksShelf extends StatelessWidget {
     required this.onSelectPreset,
   });
 
+  Widget _presetTile(
+    BuildContext context,
+    _LookPreset preset, {
+    required bool compact,
+  }) {
+    final isSelected = preset.id == selectedPresetId;
+    final previewSize = compact ? 48.0 : 54.0;
+    return SizedBox(
+      width: compact ? 92 : null,
+      child: GestureDetector(
+        onTap: () => onSelectPreset(preset),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: previewSize,
+              height: previewSize,
+              decoration: BoxDecoration(
+                color: const Color(0xFF262626),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isSelected ? Colors.white : Colors.white24,
+                  width: isSelected ? 2.0 : 1.0,
+                ),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: switch (preset.id) {
+                    'portrait' => const [Color(0xFF8B5E3C), Color(0xFF4A3525)],
+                    'vivid' => const [Color(0xFFE65100), Color(0xFF1565C0)],
+                    'bw' => const [Color(0xFF9E9E9E), Color(0xFF212121)],
+                    'warm' => const [Color(0xFFF57C00), Color(0xFFFFB74D)],
+                    'cool' => const [Color(0xFF0288D1), Color(0xFF81D4FA)],
+                    'dramatic' => const [Color(0xFF263238), Color(0xFF37474F)],
+                    'vintage' => const [Color(0xFF795548), Color(0xFFA1887F)],
+                    _ => const [Color(0xFF424242), Color(0xFF212121)],
+                  },
+                ),
+              ),
+              child: Center(
+                child: Icon(
+                  switch (preset.id) {
+                    'bw' => Icons.monochrome_photos_rounded,
+                    'portrait' => Icons.portrait_rounded,
+                    'vivid' => Icons.auto_awesome_rounded,
+                    'warm' => Icons.wb_sunny_rounded,
+                    'cool' => Icons.ac_unit_rounded,
+                    'dramatic' => Icons.filter_hdr_rounded,
+                    'vintage' => Icons.camera_roll_rounded,
+                    _ => Icons.photo_rounded,
+                  },
+                  color: Colors.white.withValues(alpha: 0.8),
+                  size: compact ? 20 : 22,
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              preset.getLocalizedLabel(context.l10n),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: isSelected ? Colors.white : Colors.white70,
+                fontSize: compact ? 10 : 11,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
+    if (isLandscape) {
+      return Container(
+        color: const Color(0xFF161616),
+        padding: const EdgeInsets.all(8),
+        child: Wrap(
+          alignment: WrapAlignment.center,
+          spacing: 6,
+          runSpacing: 8,
+          children: [
+            for (final preset in _kLookPresets)
+              _presetTile(context, preset, compact: true),
+          ],
+        ),
+      );
+    }
+
     return Container(
       color: const Color(0xFF161616),
       padding: const EdgeInsets.only(top: 8, bottom: 8),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            height: 90,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-              itemCount: _kLookPresets.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 10),
-              itemBuilder: (context, idx) {
-                final preset = _kLookPresets[idx];
-                final isSelected = preset.id == selectedPresetId;
-                return GestureDetector(
-                  onTap: () => onSelectPreset(preset),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 54,
-                        height: 54,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF262626),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: isSelected ? Colors.white : Colors.white24,
-                            width: isSelected ? 2.0 : 1.0,
-                          ),
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: switch (preset.id) {
-                              'portrait' => const [Color(0xFF8B5E3C), Color(0xFF4A3525)],
-                              'vivid' => const [Color(0xFFE65100), Color(0xFF1565C0)],
-                              'bw' => const [Color(0xFF9E9E9E), Color(0xFF212121)],
-                              'warm' => const [Color(0xFFF57C00), Color(0xFFFFB74D)],
-                              'cool' => const [Color(0xFF0288D1), Color(0xFF81D4FA)],
-                              'dramatic' => const [Color(0xFF263238), Color(0xFF37474F)],
-                              'vintage' => const [Color(0xFF795548), Color(0xFFA1887F)],
-                              _ => const [Color(0xFF424242), Color(0xFF212121)],
-                            },
-                          ),
-                        ),
-                        child: Center(
-                          child: Icon(
-                            switch (preset.id) {
-                              'bw' => Icons.monochrome_photos_rounded,
-                              'portrait' => Icons.portrait_rounded,
-                              'vivid' => Icons.auto_awesome_rounded,
-                              'warm' => Icons.wb_sunny_rounded,
-                              'cool' => Icons.ac_unit_rounded,
-                              'dramatic' => Icons.filter_hdr_rounded,
-                              'vintage' => Icons.camera_roll_rounded,
-                              _ => Icons.photo_rounded,
-                            },
-                            color: Colors.white.withValues(alpha: 0.8),
-                            size: 22,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        preset.getLocalizedLabel(context.l10n),
-                        style: TextStyle(
-                          color: isSelected ? Colors.white : Colors.white70,
-                          fontSize: 11,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
+      child: SizedBox(
+        height: 90,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+          itemCount: _kLookPresets.length,
+          separatorBuilder: (_, _) => const SizedBox(width: 10),
+          itemBuilder: (context, index) =>
+              _presetTile(context, _kLookPresets[index], compact: false),
+        ),
       ),
     );
   }
 }
 
 // ── TEXT SHELF (STYLE / COLOR / OPACITY TABS) ───────────────────────────────
+
+Future<void> _showImageEditorColorPicker(
+  BuildContext context, {
+  required Color color,
+  required ValueChanged<Color> onChanged,
+  ValueChanged<bool>? onInteraction,
+}) async {
+  await showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: const Color(0xFF202020),
+    isScrollControlled: true,
+    builder: (sheetContext) {
+      final maxHeight = MediaQuery.of(sheetContext).size.height * 0.9;
+      return SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: maxHeight),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _ImageEditorColorPicker(
+                  color: color,
+                  onChanged: onChanged,
+                  onInteraction: onInteraction,
+                  maxWheelDiameter: 260,
+                ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () => Navigator.of(sheetContext).pop(),
+                    child: Text(sheetContext.l10n.done),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
+  onInteraction?.call(false);
+}
+
+Widget _imageEditorCustomColorOption(
+  BuildContext context, {
+  required Color color,
+  required bool compact,
+  ValueChanged<bool>? onInteraction,
+  required ValueChanged<Color> onChanged,
+}) {
+  final size = compact ? 32.0 : 36.0;
+  return SizedBox(
+    width: compact ? 40 : null,
+    child: Center(
+      child: Tooltip(
+        message: context.l10n.imageEditorActionColor,
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: () => _showImageEditorColorPicker(
+            context,
+            color: color,
+            onChanged: onChanged,
+            onInteraction: onInteraction,
+          ),
+          child: Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white70, width: 1.5),
+            ),
+            child: Icon(
+              Icons.colorize_rounded,
+              size: compact ? 16 : 18,
+              color: color.computeLuminance() > 0.5
+                  ? Colors.black
+                  : Colors.white,
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _ImageEditorColorPicker extends StatefulWidget {
+  final Color color;
+  final ValueChanged<Color> onChanged;
+  final ValueChanged<bool>? onInteraction;
+  final double maxWheelDiameter;
+
+  const _ImageEditorColorPicker({
+    required this.color,
+    required this.onChanged,
+    required this.maxWheelDiameter,
+    this.onInteraction,
+  });
+
+  @override
+  State<_ImageEditorColorPicker> createState() =>
+      _ImageEditorColorPickerState();
+}
+
+class _ImageEditorColorPickerState extends State<_ImageEditorColorPicker> {
+  late HSVColor _hsv;
+  late int _lastEmitted;
+
+  @override
+  void initState() {
+    super.initState();
+    _hsv = HSVColor.fromColor(widget.color);
+    _lastEmitted = widget.color.toARGB32();
+  }
+
+  @override
+  void didUpdateWidget(_ImageEditorColorPicker oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.color.toARGB32() != _lastEmitted) {
+      _hsv = HSVColor.fromColor(widget.color);
+      _lastEmitted = widget.color.toARGB32();
+    }
+  }
+
+  void _emit(HSVColor value) {
+    final color = value.toColor();
+    setState(() {
+      _hsv = value;
+      _lastEmitted = color.toARGB32();
+    });
+    widget.onChanged(color);
+  }
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final availableWidth = constraints.maxWidth.isFinite
+          ? constraints.maxWidth
+          : MediaQuery.of(context).size.width;
+      final diameter = math.min(
+        widget.maxWheelDiameter,
+        math.max(120.0, availableWidth - 24),
+      );
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Center(
+            child: SizedBox.square(
+              dimension: diameter,
+              child: SkinHsvWheel(
+                value: _hsv,
+                onChanged: _emit,
+                onInteraction: widget.onInteraction,
+              ),
+            ),
+          ),
+          Row(
+            children: [
+              const Icon(
+                Icons.opacity_rounded,
+                size: 20,
+                color: Colors.white70,
+              ),
+              Expanded(
+                child: Slider(
+                  value: _hsv.alpha,
+                  onChangeStart: (_) => widget.onInteraction?.call(true),
+                  onChanged: (value) => _emit(_hsv.withAlpha(value)),
+                  onChangeEnd: (_) => widget.onInteraction?.call(false),
+                ),
+              ),
+              SizedBox(
+                width: 40,
+                child: Text(
+                  '${(_hsv.alpha * 100).round()}%',
+                  textAlign: TextAlign.end,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+    },
+  );
+}
 
 enum _TextShelfTab { color, opacity, style }
 
@@ -1231,6 +1613,7 @@ class _TextShelf extends StatelessWidget {
   final ValueChanged<String> onSelectStyle;
   final ValueChanged<Color> onSelectColor;
   final ValueChanged<double> onOpacityChanged;
+  final ValueChanged<bool>? onColorInteraction;
 
   const _TextShelf({
     required this.tab,
@@ -1238,119 +1621,158 @@ class _TextShelf extends StatelessWidget {
     required this.onSelectStyle,
     required this.onSelectColor,
     required this.onOpacityChanged,
+    this.onColorInteraction,
   });
+
+  Widget _styleOption(TextStylePreset preset, {required bool compact}) {
+    final selected = textAnnotation.styleId == preset.id;
+    return SizedBox(
+      width: compact ? 82 : null,
+      child: GestureDetector(
+        onTap: () => onSelectStyle(preset.id),
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: compact ? 2 : 5),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: compact ? 48 : 54,
+                height: compact ? 48 : 54,
+                decoration: BoxDecoration(
+                  color: selected
+                      ? Colors.white.withValues(alpha: 0.12)
+                      : Colors.white.withValues(alpha: 0.04),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: selected ? Colors.white : Colors.white24,
+                    width: selected ? 1.8 : 1.0,
+                  ),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  preset.previewText,
+                  style: getTextStyleForPreset(
+                    styleId: preset.id,
+                    fontSize: compact ? 13 : 15,
+                    color: selected ? Colors.white : Colors.white70,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                preset.label,
+                style: TextStyle(
+                  color: selected ? Colors.white : Colors.white60,
+                  fontSize: compact ? 10 : 11,
+                  fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _colorOption(Color color, {required bool compact}) {
+    final selected = textAnnotation.color == color;
+    final size = compact ? 32.0 : 36.0;
+    return SizedBox(
+      width: compact ? 36 : null,
+      child: GestureDetector(
+        onTap: () => onSelectColor(color),
+        child: Container(
+          width: size,
+          height: size,
+          margin: EdgeInsets.symmetric(horizontal: compact ? 2 : 6),
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: selected ? Colors.white : Colors.white24,
+              width: selected ? 2.5 : 1.2,
+            ),
+          ),
+          child: selected
+              ? Icon(
+                  Icons.check_rounded,
+                  size: 18,
+                  color: color.computeLuminance() > 0.5
+                      ? Colors.black
+                      : Colors.white,
+                )
+              : null,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
     switch (tab) {
       case _TextShelfTab.style:
         return Container(
           color: const Color(0xFF161616),
-          padding: const EdgeInsets.only(top: 10, bottom: 8),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: Row(
-              children: [
-                for (final preset in kTextPresets) ...[
-                  GestureDetector(
-                    onTap: () => onSelectStyle(preset.id),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 5),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 54,
-                            height: 54,
-                            decoration: BoxDecoration(
-                              color: textAnnotation.styleId == preset.id
-                                  ? Colors.white.withValues(alpha: 0.12)
-                                  : Colors.white.withValues(alpha: 0.04),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: textAnnotation.styleId == preset.id
-                                    ? Colors.white
-                                    : Colors.white24,
-                                width: textAnnotation.styleId == preset.id ? 1.8 : 1.0,
-                              ),
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              preset.previewText,
-                              style: getTextStyleForPreset(
-                                styleId: preset.id,
-                                fontSize: 15,
-                                color: textAnnotation.styleId == preset.id
-                                    ? Colors.white
-                                    : Colors.white70,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            preset.label,
-                            style: TextStyle(
-                              color: textAnnotation.styleId == preset.id
-                                  ? Colors.white
-                                  : Colors.white60,
-                              fontSize: 11,
-                              fontWeight: textAnnotation.styleId == preset.id
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+          padding: EdgeInsets.all(isLandscape ? 8 : 0),
+          child: isLandscape
+              ? Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 4,
+                  runSpacing: 8,
+                  children: [
+                    for (final preset in kTextPresets)
+                      _styleOption(preset, compact: true),
+                  ],
+                )
+              : SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 10,
                   ),
-                ],
-              ],
-            ),
-          ),
+                  child: Row(
+                    children: [
+                      for (final preset in kTextPresets) ...[
+                        _styleOption(preset, compact: false),
+                      ],
+                    ],
+                  ),
+                ),
         );
 
       case _TextShelfTab.color:
         return Container(
           color: const Color(0xFF161616),
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: Row(
-              children: [
-                for (final c in editorColorPalette) ...[
-                  GestureDetector(
-                    onTap: () => onSelectColor(c),
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      margin: const EdgeInsets.symmetric(horizontal: 6),
-                      decoration: BoxDecoration(
-                        color: c,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: textAnnotation.color == c
-                              ? Colors.white
-                              : Colors.white24,
-                          width: textAnnotation.color == c ? 2.5 : 1.2,
-                        ),
-                      ),
-                      child: textAnnotation.color == c
-                          ? Icon(
-                              Icons.check_rounded,
-                              size: 18,
-                              color: c.computeLuminance() > 0.5
-                                  ? Colors.black
-                                  : Colors.white,
-                            )
-                          : null,
-                    ),
+          padding: EdgeInsets.all(isLandscape ? 8 : 0),
+          child: isLandscape
+              ? _ImageEditorColorPicker(
+                  color: textAnnotation.color,
+                  onChanged: onSelectColor,
+                  onInteraction: onColorInteraction,
+                  maxWheelDiameter: 190,
+                )
+              : SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 14,
                   ),
-                ],
-              ],
-            ),
-          ),
+                  child: Row(
+                    children: [
+                      _imageEditorCustomColorOption(
+                        context,
+                        color: textAnnotation.color,
+                        compact: false,
+                        onInteraction: onColorInteraction,
+                        onChanged: onSelectColor,
+                      ),
+                      for (final color in editorColorPalette)
+                        _colorOption(color, compact: false),
+                    ],
+                  ),
+                ),
         );
 
       case _TextShelfTab.opacity:
@@ -1373,7 +1795,10 @@ class _TextShelf extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.all(2),
                             decoration: BoxDecoration(
-                              border: Border.all(color: Colors.white70, width: 1.2),
+                              border: Border.all(
+                                color: Colors.white70,
+                                width: 1.2,
+                              ),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: const Icon(
@@ -1431,6 +1856,7 @@ class _DrawShelf extends StatelessWidget {
   final ValueChanged<Color> onSelectColor;
   final ValueChanged<double> onOpacityChanged;
   final ValueChanged<double> onStrokeDiameterChanged;
+  final ValueChanged<bool>? onColorInteraction;
 
   const _DrawShelf({
     required this.tab,
@@ -1440,50 +1866,78 @@ class _DrawShelf extends StatelessWidget {
     required this.onSelectColor,
     required this.onOpacityChanged,
     required this.onStrokeDiameterChanged,
+    this.onColorInteraction,
   });
+
+  Widget _colorOption(Color color, {required bool compact}) {
+    final selected = selectedColor == color;
+    final size = compact ? 32.0 : 36.0;
+    return SizedBox(
+      width: compact ? 36 : null,
+      child: GestureDetector(
+        onTap: () => onSelectColor(color),
+        child: Container(
+          width: size,
+          height: size,
+          margin: EdgeInsets.symmetric(horizontal: compact ? 2 : 6),
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: selected ? Colors.white : Colors.white24,
+              width: selected ? 2.5 : 1.2,
+            ),
+          ),
+          child: selected
+              ? Icon(
+                  Icons.check_rounded,
+                  size: 18,
+                  color: color.computeLuminance() > 0.5
+                      ? Colors.black
+                      : Colors.white,
+                )
+              : null,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
     switch (tab) {
       case _DrawShelfTab.color:
         return Container(
           color: const Color(0xFF161616),
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: Row(
-              children: [
-                for (final c in editorColorPalette) ...[
-                  GestureDetector(
-                    onTap: () => onSelectColor(c),
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      margin: const EdgeInsets.symmetric(horizontal: 6),
-                      decoration: BoxDecoration(
-                        color: c,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: selectedColor == c ? Colors.white : Colors.white24,
-                          width: selectedColor == c ? 2.5 : 1.2,
-                        ),
-                      ),
-                      child: selectedColor == c
-                          ? Icon(
-                              Icons.check_rounded,
-                              size: 18,
-                              color: c.computeLuminance() > 0.5
-                                  ? Colors.black
-                                  : Colors.white,
-                            )
-                          : null,
-                    ),
+          padding: EdgeInsets.all(isLandscape ? 8 : 0),
+          child: isLandscape
+              ? _ImageEditorColorPicker(
+                  color: selectedColor,
+                  onChanged: onSelectColor,
+                  onInteraction: onColorInteraction,
+                  maxWheelDiameter: 190,
+                )
+              : SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 14,
                   ),
-                ],
-              ],
-            ),
-          ),
+                  child: Row(
+                    children: [
+                      _imageEditorCustomColorOption(
+                        context,
+                        color: selectedColor,
+                        compact: false,
+                        onInteraction: onColorInteraction,
+                        onChanged: onSelectColor,
+                      ),
+                      for (final color in editorColorPalette)
+                        _colorOption(color, compact: false),
+                    ],
+                  ),
+                ),
         );
 
       case _DrawShelfTab.size:
@@ -1506,7 +1960,10 @@ class _DrawShelf extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.all(2),
                             decoration: BoxDecoration(
-                              border: Border.all(color: Colors.white70, width: 1.2),
+                              border: Border.all(
+                                color: Colors.white70,
+                                width: 1.2,
+                              ),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: const Icon(
@@ -1538,11 +1995,15 @@ class _DrawShelf extends StatelessWidget {
                         ),
                       ),
                     ),
-                    if ((strokeDiameter - DrawOverlay.kDefaultBrushDiameter).abs() > 1.0)
+                    if ((strokeDiameter - DrawOverlay.kDefaultBrushDiameter)
+                            .abs() >
+                        1.0)
                       Positioned(
                         right: 16,
                         child: GestureDetector(
-                          onTap: () => onStrokeDiameterChanged(DrawOverlay.kDefaultBrushDiameter),
+                          onTap: () => onStrokeDiameterChanged(
+                            DrawOverlay.kDefaultBrushDiameter,
+                          ),
                           child: const Icon(
                             Icons.refresh_rounded,
                             size: 18,
@@ -1583,7 +2044,10 @@ class _DrawShelf extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.all(2),
                             decoration: BoxDecoration(
-                              border: Border.all(color: Colors.white70, width: 1.2),
+                              border: Border.all(
+                                color: Colors.white70,
+                                width: 1.2,
+                              ),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: const Icon(
@@ -1636,10 +2100,12 @@ class _DrawShelf extends StatelessWidget {
 class _RedactShelf extends StatelessWidget {
   final Color selectedColor;
   final ValueChanged<Color> onSelectColor;
+  final ValueChanged<bool>? onColorInteraction;
 
   const _RedactShelf({
     required this.selectedColor,
     required this.onSelectColor,
+    this.onColorInteraction,
   });
 
   static const List<Color> _swatchColors = [
@@ -1657,40 +2123,60 @@ class _RedactShelf extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
     return Container(
       color: const Color(0xFF161616),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            for (final color in _swatchColors)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: GestureDetector(
-                  onTap: () => onSelectColor(color),
-                  child: Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: color,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: color.toARGB32() == selectedColor.toARGB32()
-                            ? const Color(0xFF38BDF8)
-                            : Colors.white24,
-                        width: color.toARGB32() == selectedColor.toARGB32() ? 2.5 : 1.0,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
+      padding: EdgeInsets.symmetric(
+        horizontal: isLandscape ? 8 : 16,
+        vertical: 8,
       ),
+      child: isLandscape
+          ? _ImageEditorColorPicker(
+              color: selectedColor,
+              onChanged: onSelectColor,
+              onInteraction: onColorInteraction,
+              maxWheelDiameter: 190,
+            )
+          : SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _imageEditorCustomColorOption(
+                    context,
+                    color: selectedColor,
+                    compact: false,
+                    onInteraction: onColorInteraction,
+                    onChanged: onSelectColor,
+                  ),
+                  for (final color in _swatchColors) _swatch(color),
+                ],
+              ),
+            ),
     );
   }
+
+  Widget _swatch(Color color) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 4),
+    child: GestureDetector(
+      onTap: () => onSelectColor(color),
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: color.toARGB32() == selectedColor.toARGB32()
+                ? const Color(0xFF38BDF8)
+                : Colors.white24,
+            width: color.toARGB32() == selectedColor.toARGB32() ? 2.5 : 1.0,
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 // ── PORTRAIT & LANDSCAPE OVERALL LAYOUT COMPOSITION ─────────────────────────
@@ -1720,10 +2206,7 @@ class _PortraitLayout extends StatelessWidget {
               top: false,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                children: [
-                  shelf,
-                  bottomBar,
-                ],
+                children: [shelf, bottomBar],
               ),
             ),
           ),
@@ -1738,21 +2221,35 @@ class _LandscapeLayout extends StatelessWidget {
     required this.hasError,
     required this.shelf,
     required this.bottomBar,
+    required this.isTuneImage,
+    required this.onTunePointerDown,
+    required this.onTunePointerMove,
+    required this.onTunePointerUp,
+    required this.onTunePointerCancel,
   });
 
   final Widget body;
   final bool hasError;
   final Widget shelf;
   final Widget bottomBar;
+  final bool isTuneImage;
+  final ValueChanged<PointerDownEvent> onTunePointerDown;
+  final ValueChanged<PointerMoveEvent> onTunePointerMove;
+  final ValueChanged<PointerUpEvent> onTunePointerUp;
+  final ValueChanged<PointerCancelEvent> onTunePointerCancel;
 
   @override
   Widget build(BuildContext context) {
+    final panelWidth = (MediaQuery.of(context).size.width * 0.32).clamp(
+      220.0,
+      360.0,
+    );
     return Row(
       children: [
         Expanded(child: body),
         if (!hasError)
           Container(
-            width: 240,
+            width: panelWidth,
             decoration: const BoxDecoration(
               color: Color(0xFF161616),
               border: Border(
@@ -1761,9 +2258,30 @@ class _LandscapeLayout extends StatelessWidget {
             ),
             child: SafeArea(
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
-                    child: SingleChildScrollView(child: shelf),
+                    child: isTuneImage
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              shelf,
+                              Expanded(
+                                child: Listener(
+                                  behavior: HitTestBehavior.translucent,
+                                  onPointerDown: onTunePointerDown,
+                                  onPointerMove: onTunePointerMove,
+                                  onPointerUp: onTunePointerUp,
+                                  onPointerCancel: onTunePointerCancel,
+                                  child: const ColoredBox(
+                                    color: Color(0xFF161616),
+                                    child: SizedBox.expand(),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
+                        : SingleChildScrollView(child: shelf),
                   ),
                   bottomBar,
                 ],

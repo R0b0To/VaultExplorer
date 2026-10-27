@@ -649,7 +649,7 @@ class _AnnotationLayerState extends State<AnnotationLayer> {
         rect.height * size.height >= _minRedactSidePx) {
       final newIndex = widget.annotations.length;
       widget.onAnnotationAdded(
-        RedactAnnotation(rect: rect, color: widget.color.withValues(alpha: 1)),
+        RedactAnnotation(rect: rect, color: widget.color),
       );
       _selectAnnotation(newIndex);
       _isAddingRedact = false;
@@ -883,7 +883,7 @@ class _AnnotationPainter extends CustomPainter {
       canvas.drawRect(
         pixelRect,
         Paint()
-          ..color = liveColor.withValues(alpha: 1)
+          ..color = liveColor
           ..style = PaintingStyle.fill,
       );
       canvas.drawRect(

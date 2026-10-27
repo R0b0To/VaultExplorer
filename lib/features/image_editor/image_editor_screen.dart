@@ -37,6 +37,7 @@ import 'package:vaultexplorer/features/image_editor/widgets/draw_overlay.dart';
 import 'package:vaultexplorer/features/image_editor/widgets/save_image_sheet.dart';
 import 'package:vaultexplorer/features/image_editor/widgets/text_overlay.dart';
 import 'package:vaultexplorer/features/skin_editor/skin_edit_session.dart';
+import 'package:vaultexplorer/features/settings/widgets/skin_color_picker_sheet.dart';
 import 'image_editor_annotations_controller.dart';
 import 'image_editor_controls_controller.dart';
 import 'image_editor_document_controller.dart';
@@ -145,6 +146,8 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
   int? _selectedRedactIndex;
   List<RedactAnnotation>? _redactSessionSnapshot;
   bool _isAddingRedact = false;
+  bool _isRedactColorWheelInteracting = false;
+  bool _hasRedactColorWheelSnapshot = false;
   EditorTool? _pageAnnotationDragTool;
   int? _pageRedactDragIndex;
   bool _pageRedactEditStarted = false;
@@ -1048,13 +1051,25 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
       if (idx != null && idx >= 0 && idx < _annotations.length) {
         final current = _annotations[idx];
         if (current is RedactAnnotation && current.color != color) {
-          _pushUndoSnapshot();
+          if (_isRedactColorWheelInteracting) {
+            if (!_hasRedactColorWheelSnapshot) {
+              _pushUndoSnapshot();
+              _hasRedactColorWheelSnapshot = true;
+            }
+          } else {
+            _pushUndoSnapshot();
+          }
           _annotationsController.update(idx, current.copyWith(color: color));
         }
       }
     } else {
       _controlsController.setColor(color);
     }
+  }
+
+  void _onRedactColorWheelInteraction(bool interacting) {
+    _isRedactColorWheelInteracting = interacting;
+    _hasRedactColorWheelSnapshot = false;
   }
 
   void _addAnnotation(EditAnnotation annotation) {
@@ -1839,6 +1854,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
               onSelectColor: (color) {
                 _activeTextNotifier!.value = activeText.copyWith(color: color);
               },
+              onColorInteraction: null,
               onOpacityChanged: (opacity) {
                 _activeTextNotifier!.value = activeText.copyWith(
                   opacity: opacity,
@@ -1854,6 +1870,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
           opacity: _drawOpacity,
           strokeDiameter: _drawStrokeDiameter,
           onSelectColor: (c) => setState(() => _drawColor = c),
+          onColorInteraction: null,
           onOpacityChanged: (op) => setState(() => _drawOpacity = op),
           onStrokeDiameterChanged: (d) =>
               setState(() => _drawStrokeDiameter = d),
@@ -1862,6 +1879,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
         return _RedactShelf(
           selectedColor: _currentRedactShelfColor,
           onSelectColor: _setToolColor,
+          onColorInteraction: _onRedactColorWheelInteraction,
         );
     }
   }
@@ -2099,6 +2117,12 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
                         hasError: hasError,
                         shelf: _buildShelf(),
                         bottomBar: _buildBottomBar(),
+                        isTuneImage:
+                            _controls.activeTool == EditorTool.tuneImage,
+                        onTunePointerDown: _handleTunePointerDown,
+                        onTunePointerMove: _handleTunePointerMove,
+                        onTunePointerUp: _handleTunePointerUp,
+                        onTunePointerCancel: _handleTunePointerCancel,
                       )
                     : _PortraitLayout(
                         body: _buildBody(),

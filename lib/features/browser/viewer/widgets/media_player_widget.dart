@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
@@ -24,6 +25,7 @@ import 'package:vaultexplorer/features/browser/viewer/widgets/color_adjust_filte
 import 'package:vaultexplorer/features/browser/viewer/widgets/edge_swipe_claim_recognizer.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/swipe_to_seek_claim_recognizer.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/swipe_seek_hud.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/swipe_to_dismiss_layer.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 
 import 'package:vaultexplorer/data/models/scrub_preview_style.dart';
@@ -80,6 +82,7 @@ class MediaPlayerWidget extends ConsumerStatefulWidget {
   final String fileName;
   final String contentUriString;
   final bool showUI;
+  final ValueListenable<double>? dismissProgress;
   final ValueChanged<bool> onToggleUI;
   final ValueChanged<bool> onZoomChanged;
   final int skipSeconds;
@@ -133,6 +136,7 @@ class MediaPlayerWidget extends ConsumerStatefulWidget {
     required this.fileName,
     required this.contentUriString,
     required this.showUI,
+    this.dismissProgress,
     required this.onToggleUI,
     required this.onZoomChanged,
     required this.skipSeconds,
@@ -268,6 +272,19 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
   bool get _isZoomedIn =>
       _getMatrixScale(_videoTransformationController.value) >
       _baselineZoomScale + 0.001;
+
+  Widget _fadeWhileDismissing(Widget child) {
+    final progress = widget.dismissProgress;
+    if (progress == null) return child;
+    return ValueListenableBuilder<double>(
+      valueListenable: progress,
+      child: child,
+      builder: (context, value, child) => Opacity(
+        opacity: (1.0 - value).clamp(0.0, 1.0).toDouble(),
+        child: child,
+      ),
+    );
+  }
 
   double get _effectiveMinZoomScale => widget.pinchZoomOutEnabled
       ? widget.minVideoZoomScale.clamp(
@@ -1110,7 +1127,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
     }
 
     return Container(
-      color: Colors.black,
+      color: Colors.transparent,
       child: Stack(
         fit: StackFit.expand,
         children: [
@@ -1210,7 +1227,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
             createRectTween: (begin, end) =>
                 MaterialRectArcTween(begin: begin, end: end),
             child: Material(
-              color: Colors.black,
+              color: Colors.transparent,
               child: _buildPoster(cs, isLoading: _isActive),
             ),
           ),
@@ -1321,18 +1338,20 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
                                           videoVal.captionText.isNotEmpty
                                           ? videoVal.captionText
                                           : _captionTextAt(progress.position);
-                                      return ClosedCaptionText(
-                                        text: text,
-                                        textStyle: TextStyle(
-                                          fontSize: widget.subtitleFontSize,
-                                          color: Colors.white,
-                                          shadows: const [
-                                            Shadow(
-                                              blurRadius: 4,
-                                              color: Colors.black,
-                                              offset: Offset(1, 1),
-                                            ),
-                                          ],
+                                      return _fadeWhileDismissing(
+                                        ClosedCaptionText(
+                                          text: text,
+                                          textStyle: TextStyle(
+                                            fontSize: widget.subtitleFontSize,
+                                            color: Colors.white,
+                                            shadows: const [
+                                              Shadow(
+                                                blurRadius: 4,
+                                                color: Colors.black,
+                                                offset: Offset(1, 1),
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                       );
                                     },
@@ -1342,18 +1361,20 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
                             : ValueListenableBuilder<VideoPlaybackProgress>(
                                 valueListenable: widget.progressNotifier,
                                 builder: (context, progress, _) {
-                                  return ClosedCaptionText(
-                                    text: _captionTextAt(progress.position),
-                                    textStyle: TextStyle(
-                                      fontSize: widget.subtitleFontSize,
-                                      color: Colors.white,
-                                      shadows: const [
-                                        Shadow(
-                                          blurRadius: 4,
-                                          color: Colors.black,
-                                          offset: Offset(1, 1),
-                                        ),
-                                      ],
+                                  return _fadeWhileDismissing(
+                                    ClosedCaptionText(
+                                      text: _captionTextAt(progress.position),
+                                      textStyle: TextStyle(
+                                        fontSize: widget.subtitleFontSize,
+                                        color: Colors.white,
+                                        shadows: const [
+                                          Shadow(
+                                            blurRadius: 4,
+                                            color: Colors.black,
+                                            offset: Offset(1, 1),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   );
                                 },
@@ -1435,10 +1456,10 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
         ? Center(
             child: AspectRatio(
               aspectRatio: effectiveOuterAspectRatio,
-              child: stackContent,
+              child: MediaSwipeDismissTarget(child: stackContent),
             ),
           )
-        : SizedBox.expand(child: stackContent);
+        : SizedBox.expand(child: MediaSwipeDismissTarget(child: stackContent));
     if (!widget.isAudio && widget.enableZoom) {
       final vpSize = MediaQuery.of(context).size;
       corePlayerWidget = InteractiveViewer(
@@ -1614,36 +1635,38 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
                   Positioned(
                     top: 96,
                     child: IgnorePointer(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 7,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.65),
-                          borderRadius: BorderRadius.circular(100),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              '${_formatSpeedMultiplier(_effectiveHoldSpeed)}x',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.2,
+                      child: _fadeWhileDismissing(
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 7,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.65),
+                            borderRadius: BorderRadius.circular(100),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '${_formatSpeedMultiplier(_effectiveHoldSpeed)}x',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.2,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 6),
-                            Icon(
-                              _effectiveHoldSpeed < 1.0
-                                  ? Icons.play_arrow_rounded
-                                  : Icons.fast_forward_rounded,
-                              color: Colors.white,
-                              size: 16,
-                            ),
-                          ],
+                              const SizedBox(width: 6),
+                              Icon(
+                                _effectiveHoldSpeed < 1.0
+                                    ? Icons.play_arrow_rounded
+                                    : Icons.fast_forward_rounded,
+                                color: Colors.white,
+                                size: 16,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -1662,17 +1685,20 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
                         : Icons.volume_up_rounded,
                     level: _volumeLevel,
                   ),
-                if (_showSwipeSeekHud) _buildSwipeSeekHud(),
+                if (_showSwipeSeekHud)
+                  _fadeWhileDismissing(_buildSwipeSeekHud()),
                 if (!widget.isAudio && widget.enableZoom)
                   AnimatedPositioned(
                     duration: MediaViewerConstants.animationDuration,
                     curve: Curves.easeOutCubic,
                     bottom: widget.zoomIndicatorBottomOffset,
                     right: 16,
-                    child: AutoHideZoomIndicator(
-                      transform: _videoTransformationController,
-                      backgroundColor: Colors.white.withValues(alpha: 0.12),
-                      onReset: _resetVideoZoom,
+                    child: _fadeWhileDismissing(
+                      AutoHideZoomIndicator(
+                        transform: _videoTransformationController,
+                        backgroundColor: Colors.white.withValues(alpha: 0.12),
+                        onReset: _resetVideoZoom,
+                      ),
                     ),
                   ),
               ],
@@ -1701,7 +1727,8 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
       left: isLeft ? 40 : null,
       right: isLeft ? null : 40,
       child: IgnorePointer(
-        child: Container(
+        child: _fadeWhileDismissing(
+          Container(
           width: 56,
           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
           decoration: BoxDecoration(
@@ -1744,6 +1771,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
                 ),
               ),
             ],
+          ),
           ),
         ),
       ),
@@ -2222,7 +2250,8 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
       left: isLeft ? 40 : null,
       right: isLeft ? null : 40,
       child: IgnorePointer(
-        child: Container(
+        child: _fadeWhileDismissing(
+          Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           decoration: BoxDecoration(
             color: Colors.black.withValues(alpha: 0.65),
@@ -2242,6 +2271,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
                 ),
               ),
             ],
+          ),
           ),
         ),
       ),

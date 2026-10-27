@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -9,40 +10,39 @@ const double _kDismissDistanceFraction = 0.2;
 /// matter how far it was pulled.
 const double _kDismissFlingVelocity = 700.0;
 
+/// Maximum amount the dragged media surface shrinks while it follows a finger.
+const double _kDismissScaleAmount = 0.08;
+
 /// A drag only counts once it has travelled this many times further along its
 /// axis than across it, so a diagonal scribble never closes the viewer.
 const double _kAxisDominance = 1.5;
 
-/// Recognizes a one-finger drag that travels mainly along [axis] and reports
-/// how far it has moved.
+/// Recognizes a one-finger drag that starts along [axis], then reports the
+/// complete two-dimensional movement so the media can follow the finger.
 ///
-/// It is deliberately a plain [OneSequenceGestureRecognizer] rather than a
-/// drag recognizer subclass: the viewer needs a direction filter (down only,
-/// or either way) that the stock recognizers cannot express, and it must give
-/// the touch back to the playlist pager, the zoom/pan handling and the
-/// brightness/volume strips whenever one of them is the better owner.
-///
-/// Those all sit deeper in the widget tree, so they see every move event
-/// first. This recognizer only ever wins a drag nobody else has claimed.
+/// This is deliberately a plain [OneSequenceGestureRecognizer]: the viewer
+/// needs a direction filter (down only, or either way) that stock recognizers
+/// cannot express, and it must give the touch to the playlist pager, zoom/pan
+/// handling and brightness/volume strips whenever one of them is the better
+/// owner.
 class SwipeDismissRecognizer extends OneSequenceGestureRecognizer {
   SwipeDismissRecognizer({required this.canStart, super.debugOwner})
     : super(supportedDevices: const {PointerDeviceKind.touch});
 
-  /// Asked when a finger lands. `false` leaves that touch entirely alone
-  /// (zoomed in, pinching, a page change still settling, ...).
+  /// Asked when a finger lands. `false` leaves that touch entirely alone.
   bool Function() canStart;
 
-  /// Axis the dismissing drag travels along.
+  /// Axis along which the dismiss gesture has to begin.
   Axis axis = Axis.vertical;
 
-  /// Whether the drag may go either way along [axis]. When `false` only the
-  /// positive direction (down for a vertical axis) is accepted.
+  /// Whether the drag may start in either direction along [axis]. When `false`
+  /// only the positive direction (down for a vertical axis) is accepted.
   bool bothDirections = false;
 
   VoidCallback? onStart;
 
-  /// Distance moved along [axis] since the drag was accepted (signed).
-  ValueChanged<double>? onUpdate;
+  /// Full two-dimensional movement since the finger first landed.
+  ValueChanged<Offset>? onUpdate;
 
   /// Fired on release with the velocity along [axis] in logical px/s.
   ValueChanged<double>? onEnd;
@@ -53,7 +53,6 @@ class SwipeDismissRecognizer extends OneSequenceGestureRecognizer {
   int? _pointer;
   Offset _origin = Offset.zero;
   Offset _moved = Offset.zero;
-  double _acceptedAt = 0.0;
   bool _claimed = false;
   bool _accepted = false;
   VelocityTracker? _velocity;
@@ -85,7 +84,6 @@ class SwipeDismissRecognizer extends OneSequenceGestureRecognizer {
     _pointer = event.pointer;
     _origin = event.position;
     _moved = Offset.zero;
-    _acceptedAt = 0.0;
     _claimed = false;
     _accepted = false;
     _velocity = VelocityTracker.withKind(event.kind)
@@ -100,14 +98,15 @@ class SwipeDismissRecognizer extends OneSequenceGestureRecognizer {
       _velocity?.addPosition(event.timeStamp, event.position);
       _moved = event.position - _origin;
       if (_accepted) {
-        onUpdate?.call(_primaryOf(_moved) - _acceptedAt);
+        onUpdate?.call(_moved);
       } else {
         _consider();
       }
     } else if (event is PointerUpEvent) {
       _velocity?.addPosition(event.timeStamp, event.position);
       if (_accepted) {
-        final velocity = _velocity?.getVelocity().pixelsPerSecond ?? Offset.zero;
+        final velocity =
+            _velocity?.getVelocity().pixelsPerSecond ?? Offset.zero;
         _complete(velocity: _primaryOf(velocity));
       } else {
         resolve(GestureDisposition.rejected);
@@ -151,8 +150,8 @@ class SwipeDismissRecognizer extends OneSequenceGestureRecognizer {
     // recognizer claimed itself starts a dismiss.
     if (!_claimed || _pointer == null) return;
     _accepted = true;
-    _acceptedAt = _primaryOf(_moved);
     onStart?.call();
+    onUpdate?.call(_moved);
   }
 
   @override
@@ -189,13 +188,12 @@ class SwipeDismissRecognizer extends OneSequenceGestureRecognizer {
 
 /// Lets the person close the media viewer by dragging its content away.
 ///
-/// The content follows the finger (shrinking a little as it goes) while
-/// [progress] reports how far along the dismissal is, so the owner can fade
-/// whatever sits behind it. Letting go past a fifth of the screen, or with a
-/// fast flick, calls [onDismiss]; otherwise the content springs back.
+/// The media follows the finger in two dimensions (shrinking slightly as it
+/// moves) while [progress] reports how far along the dismissal is. The gesture
+/// must start along [axis]; returning the media to center cancels the dismiss.
 ///
-/// [axis] is the direction of the dismissing drag. The viewer picks the axis
-/// opposite to the one the playlist pages along, so the two never compete.
+/// [axis] is the direction opposite to the one the playlist pages along, so
+/// the two gestures never compete.
 class MediaSwipeDismissLayer extends StatefulWidget {
   const MediaSwipeDismissLayer({
     super.key,
@@ -206,6 +204,7 @@ class MediaSwipeDismissLayer extends StatefulWidget {
     required this.onDismiss,
     required this.child,
     this.progress,
+    this.transformChild = true,
   });
 
   /// Whether the gesture is armed at all.
@@ -214,7 +213,7 @@ class MediaSwipeDismissLayer extends StatefulWidget {
   /// Direction of the dismissing drag.
   final Axis axis;
 
-  /// `true` lets the drag go either way along [axis]; `false` accepts only
+  /// `true` lets the drag start either way along [axis]; `false` accepts only
   /// the positive direction (down for a vertical axis).
   final bool bothDirections;
 
@@ -224,9 +223,15 @@ class MediaSwipeDismissLayer extends StatefulWidget {
   /// Called once, when a drag is released past the threshold.
   final VoidCallback onDismiss;
 
-  /// Receives 0..1 while the content is pulled away (1 at half a screen).
+  /// Receives 0..1 while the media is pulled away (1 at half a screen).
   final ValueNotifier<double>? progress;
 
+  /// Whether this layer moves [child]. Set to false when only descendants
+  /// wrapped in [MediaSwipeDismissTarget] should follow the drag.
+  final bool transformChild;
+
+  /// The full viewer subtree. By default it follows the dismiss drag. Set
+  /// [transformChild] to false to keep it anchored and move only media targets.
   final Widget child;
 
   @override
@@ -235,12 +240,15 @@ class MediaSwipeDismissLayer extends StatefulWidget {
 
 class _MediaSwipeDismissLayerState extends State<MediaSwipeDismissLayer>
     with SingleTickerProviderStateMixin {
-  final ValueNotifier<double> _offset = ValueNotifier<double>(0.0);
+  final ValueNotifier<Offset> _offset = ValueNotifier<Offset>(Offset.zero);
   late final AnimationController _settle;
-  double _settleFrom = 0.0;
-  double _settleTo = 0.0;
-  double _dragBase = 0.0;
+  Offset _settleFrom = Offset.zero;
+  Offset _settleTo = Offset.zero;
+  Offset _dragBase = Offset.zero;
   bool _dismissed = false;
+
+  /// Size of the viewer along the drag axis, measured at drag start.
+  double _dragExtent = 0.0;
 
   @override
   void initState() {
@@ -251,7 +259,7 @@ class _MediaSwipeDismissLayerState extends State<MediaSwipeDismissLayer>
           duration: const Duration(milliseconds: 220),
         )..addListener(() {
           final t = Curves.easeOutCubic.transform(_settle.value);
-          _setOffset(_settleFrom + (_settleTo - _settleFrom) * t);
+          _setOffset(Offset.lerp(_settleFrom, _settleTo, t)!);
         });
   }
 
@@ -261,7 +269,7 @@ class _MediaSwipeDismissLayerState extends State<MediaSwipeDismissLayer>
     if (oldWidget.enabled && !widget.enabled) {
       _settle.stop();
       _dismissed = false;
-      _setOffset(0.0);
+      _setOffset(Offset.zero);
     }
   }
 
@@ -271,10 +279,6 @@ class _MediaSwipeDismissLayerState extends State<MediaSwipeDismissLayer>
     _offset.dispose();
     super.dispose();
   }
-
-  /// Size of the layer along the drag axis, measured when a drag starts (never
-  /// during build) and reused while that drag is painted.
-  double _dragExtent = 0.0;
 
   double _measureExtent() {
     final box = context.findRenderObject();
@@ -286,18 +290,21 @@ class _MediaSwipeDismissLayerState extends State<MediaSwipeDismissLayer>
 
   double get _extent => _dragExtent > 0 ? _dragExtent : _measureExtent();
 
-  double _progressFor(double offset) {
+  double _progressFor(Offset offset) {
     final extent = _dragExtent;
     if (extent <= 0) return 0.0;
-    return (offset.abs() / (extent * 0.5)).clamp(0.0, 1.0);
+    return (offset.distance / (extent * 0.5)).clamp(0.0, 1.0).toDouble();
   }
 
-  void _setOffset(double value) {
+  double _primaryOffset(Offset value) =>
+      widget.axis == Axis.vertical ? value.dy : value.dx;
+
+  void _setOffset(Offset value) {
     _offset.value = value;
     widget.progress?.value = _progressFor(value);
   }
 
-  void _animateTo(double target) {
+  void _animateTo(Offset target) {
     _settleFrom = _offset.value;
     _settleTo = target;
     _settle.forward(from: 0.0);
@@ -312,90 +319,233 @@ class _MediaSwipeDismissLayerState extends State<MediaSwipeDismissLayer>
     _dragBase = _offset.value;
   }
 
-  void _handleUpdate(double delta) {
+  void _handleUpdate(Offset delta) {
     if (_dismissed) return;
-    var value = _dragBase + delta;
-    if (!widget.bothDirections && value < 0) value = 0.0;
-    _setOffset(value);
+    _setOffset(_dragBase + delta);
   }
 
   void _handleEnd(double velocity) {
     if (_dismissed) return;
     final offset = _offset.value;
     final extent = _extent;
-    final sign = offset == 0 ? (velocity < 0 ? -1.0 : 1.0) : offset.sign;
+    final primary = _primaryOffset(offset);
+    final sign = widget.bothDirections
+        ? (primary == 0 ? (velocity < 0 ? -1.0 : 1.0) : primary.sign)
+        : 1.0;
     final towardsExit = velocity * sign;
 
+    final correctDirection = widget.bothDirections || primary > 0;
     final farEnough =
-        extent > 0 && offset.abs() >= extent * _kDismissDistanceFraction;
-    final flung = towardsExit >= _kDismissFlingVelocity && offset.abs() > 12.0;
+        extent > 0 &&
+        offset.distance >= extent * _kDismissDistanceFraction &&
+        correctDirection;
+    final flung =
+        towardsExit >= _kDismissFlingVelocity && offset.distance > 12.0;
     final flungBack = towardsExit <= -_kDismissFlingVelocity;
 
-    if (!flungBack && (farEnough || flung)) {
+    if (correctDirection && !flungBack && (farEnough || flung)) {
       _dismiss(sign);
     } else {
-      _animateTo(0.0);
+      _animateTo(Offset.zero);
     }
   }
 
   void _dismiss(double sign) {
     _dismissed = true;
-    _animateTo(sign * _extent);
+    final current = _offset.value;
+    final target = widget.axis == Axis.vertical
+        ? Offset(current.dx, sign * _extent)
+        : Offset(sign * _extent, current.dy);
+    _animateTo(target);
     widget.onDismiss();
     // The viewer normally pops right away and this widget goes with it. If
-    // something swallowed the pop, bring the content back instead of leaving
-    // an empty screen.
+    // something swallowed the pop, bring the media back instead of leaving it
+    // offscreen.
     Future<void>.delayed(const Duration(milliseconds: 800), () {
       if (!mounted || !_dismissed) return;
       _dismissed = false;
-      _animateTo(0.0);
+      _animateTo(Offset.zero);
     });
   }
 
   void _handleCancel() {
     if (_dismissed) return;
-    _animateTo(0.0);
+    _animateTo(Offset.zero);
   }
+
+  Map<Type, GestureRecognizerFactory> get _dismissGestures =>
+      <Type, GestureRecognizerFactory>{
+        SwipeDismissRecognizer:
+            GestureRecognizerFactoryWithHandlers<SwipeDismissRecognizer>(
+              () => SwipeDismissRecognizer(canStart: _canStart),
+              (recognizer) {
+                recognizer
+                  ..canStart = _canStart
+                  ..axis = widget.axis
+                  ..bothDirections = widget.bothDirections
+                  ..onStart = _handleStart
+                  ..onUpdate = _handleUpdate
+                  ..onEnd = _handleEnd
+                  ..onCancel = _handleCancel;
+              },
+            ),
+      };
 
   @override
   Widget build(BuildContext context) {
+    final Widget content = widget.transformChild
+        ? ValueListenableBuilder<Offset>(
+            valueListenable: _offset,
+            child: widget.child,
+            builder: (context, offset, child) => _buildTransformed(
+              offset: offset,
+              child: child,
+              progress: _progressFor(offset),
+            ),
+          )
+        : widget.child;
+
+    final scope = _SwipeDismissScope(
+      offset: _offset,
+      axis: widget.axis,
+      enabled: widget.enabled,
+      recognizeAtTarget: !widget.transformChild,
+      bothDirections: widget.bothDirections,
+      canStart: _canStart,
+      onStart: _handleStart,
+      onUpdate: _handleUpdate,
+      onEnd: _handleEnd,
+      onCancel: _handleCancel,
+      child: content,
+    );
+
+    // When only a media target should move, placing the recognizer here would
+    // let the viewer's InteractiveViewer/page recognizers win first. Targets
+    // install the recognizer deeper around the actual media instead.
+    if (!widget.transformChild) return scope;
+
     return RawGestureDetector(
       behavior: HitTestBehavior.translucent,
-      gestures: widget.enabled
-          ? <Type, GestureRecognizerFactory>{
-              SwipeDismissRecognizer:
-                  GestureRecognizerFactoryWithHandlers<SwipeDismissRecognizer>(
-                    () => SwipeDismissRecognizer(canStart: _canStart),
-                    (recognizer) {
-                      recognizer
-                        ..canStart = _canStart
-                        ..axis = widget.axis
-                        ..bothDirections = widget.bothDirections
-                        ..onStart = _handleStart
-                        ..onUpdate = _handleUpdate
-                        ..onEnd = _handleEnd
-                        ..onCancel = _handleCancel;
-                    },
-                  ),
-            }
-          : const <Type, GestureRecognizerFactory>{},
-      child: ValueListenableBuilder<double>(
-        valueListenable: _offset,
-        child: widget.child,
-        builder: (context, offset, child) {
-          final scale = 1.0 - 0.08 * _progressFor(offset);
-          final dx = widget.axis == Axis.horizontal ? offset : 0.0;
-          final dy = widget.axis == Axis.vertical ? offset : 0.0;
-          // Always a Transform, even at rest, so the subtree below keeps its
-          // element (and therefore its state) when a drag starts and ends.
-          return Transform(
-            alignment: Alignment.center,
-            transform: Matrix4.diagonal3Values(scale, scale, 1.0)
-              ..setTranslationRaw(dx, dy, 0.0),
-            child: child,
-          );
-        },
-      ),
+      gestures: widget.enabled ? _dismissGestures : const {},
+      child: scope,
     );
   }
+}
+
+/// Marks just the media surface that should follow a drag while viewer chrome
+/// stays anchored and fades away.
+class MediaSwipeDismissTarget extends StatelessWidget {
+  const MediaSwipeDismissTarget({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = context
+        .dependOnInheritedWidgetOfExactType<_SwipeDismissScope>();
+    if (scope == null) return child;
+
+    Widget transformed = LayoutBuilder(
+      builder: (context, constraints) {
+        final extent = scope.axis == Axis.vertical
+            ? constraints.maxHeight
+            : constraints.maxWidth;
+        return ValueListenableBuilder<Offset>(
+          valueListenable: scope.offset,
+          child: child,
+          builder: (context, offset, child) {
+            final progress = extent.isFinite && extent > 0
+                ? (offset.distance / (extent * 0.5)).clamp(0.0, 1.0).toDouble()
+                : 0.0;
+            return _buildTransformed(
+              offset: offset,
+              child: child,
+              progress: progress,
+            );
+          },
+        );
+      },
+    );
+
+    if (!scope.recognizeAtTarget) return transformed;
+
+    final gestures = scope.enabled
+        ? <Type, GestureRecognizerFactory>{
+            SwipeDismissRecognizer:
+                GestureRecognizerFactoryWithHandlers<SwipeDismissRecognizer>(
+                  () => SwipeDismissRecognizer(canStart: scope.canStart),
+                  (recognizer) {
+                    recognizer
+                      ..canStart = scope.canStart
+                      ..axis = scope.axis
+                      ..bothDirections = scope.bothDirections
+                      ..onStart = scope.onStart
+                      ..onUpdate = scope.onUpdate
+                      ..onEnd = scope.onEnd
+                      ..onCancel = scope.onCancel;
+                  },
+                ),
+          }
+        : const <Type, GestureRecognizerFactory>{};
+
+    return RawGestureDetector(
+      behavior: HitTestBehavior.translucent,
+      gestures: gestures,
+      child: transformed,
+    );
+  }
+}
+
+Widget _buildTransformed({
+  required Offset offset,
+  required Widget? child,
+  required double progress,
+}) {
+  final scale = 1.0 - _kDismissScaleAmount * progress;
+  return Transform(
+    alignment: Alignment.center,
+    transform: Matrix4.diagonal3Values(scale, scale, 1.0)
+      ..setTranslationRaw(offset.dx, offset.dy, 0.0),
+    child: child,
+  );
+}
+
+class _SwipeDismissScope extends InheritedWidget {
+  const _SwipeDismissScope({
+    required this.offset,
+    required this.axis,
+    required this.enabled,
+    required this.recognizeAtTarget,
+    required this.bothDirections,
+    required this.canStart,
+    required this.onStart,
+    required this.onUpdate,
+    required this.onEnd,
+    required this.onCancel,
+    required super.child,
+  });
+
+  final ValueListenable<Offset> offset;
+  final Axis axis;
+  final bool enabled;
+  final bool recognizeAtTarget;
+  final bool bothDirections;
+  final bool Function() canStart;
+  final VoidCallback onStart;
+  final ValueChanged<Offset> onUpdate;
+  final ValueChanged<double> onEnd;
+  final VoidCallback onCancel;
+
+  @override
+  bool updateShouldNotify(_SwipeDismissScope oldWidget) =>
+      offset != oldWidget.offset ||
+      axis != oldWidget.axis ||
+      enabled != oldWidget.enabled ||
+      recognizeAtTarget != oldWidget.recognizeAtTarget ||
+      bothDirections != oldWidget.bothDirections ||
+      canStart != oldWidget.canStart ||
+      onStart != oldWidget.onStart ||
+      onUpdate != oldWidget.onUpdate ||
+      onEnd != oldWidget.onEnd ||
+      onCancel != oldWidget.onCancel;
 }

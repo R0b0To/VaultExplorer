@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:math';
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui' show PointerDeviceKind;
+import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/utils/image_dimensions.dart';
 import 'package:vaultexplorer/core/widgets/zoom_indicator_pill.dart';
@@ -16,6 +16,7 @@ import 'package:vaultexplorer/features/browser/viewer/widgets/edge_swipe_claim_r
 import 'package:vaultexplorer/features/browser/viewer/models/viewer_adjustments.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/color_adjust_filter.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/encrypted_image_widget.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/swipe_to_dismiss_layer.dart';
 
 class ImagePageItem extends StatefulWidget {
   final String fileName;
@@ -25,6 +26,7 @@ class ImagePageItem extends StatefulWidget {
   final int rotationQuarterTurns;
   final ViewerAdjustments adjustments;
   final bool showUI;
+  final ValueListenable<double>? dismissProgress;
   final ValueChanged<bool> onToggleUI;
   final bool tapEdgesToNavigate;
   final ValueChanged<bool>? onEdgeTap;
@@ -51,6 +53,7 @@ class ImagePageItem extends StatefulWidget {
     required this.rotationQuarterTurns,
     this.adjustments = ViewerAdjustments.identity,
     required this.showUI,
+    this.dismissProgress,
     required this.onToggleUI,
     this.tapEdgesToNavigate = true,
     this.onEdgeTap,
@@ -106,6 +109,19 @@ class _ImagePageItemState extends State<ImagePageItem>
       (_getMatrixScale(_transformationController.value) - 1.0).abs() > 0.01;
   bool get _isZoomedIn =>
       _getMatrixScale(_transformationController.value) > 1.01;
+
+  Widget _fadeWhileDismissing(Widget child) {
+    final progress = widget.dismissProgress;
+    if (progress == null) return child;
+    return ValueListenableBuilder<double>(
+      valueListenable: progress,
+      child: child,
+      builder: (context, value, child) => Opacity(
+        opacity: (1.0 - value).clamp(0.0, 1.0).toDouble(),
+        child: child,
+      ),
+    );
+  }
 
   void _handleViewportTap(TapUpDetails details, double viewportWidth) {
     if (widget.tapEdgesToNavigate && !_isZoomed && viewportWidth > 0) {
@@ -521,7 +537,8 @@ bool _isClampingMatrix = false;
       left: isLeft ? 40 : null,
       right: isLeft ? null : 40,
       child: IgnorePointer(
-        child: Container(
+        child: _fadeWhileDismissing(
+          Container(
           width: 56,
           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
           decoration: BoxDecoration(
@@ -564,6 +581,7 @@ bool _isClampingMatrix = false;
                 ),
               ),
             ],
+          ),
           ),
         ),
       ),
@@ -638,38 +656,40 @@ bool _isClampingMatrix = false;
             }
           }
 
-          Widget imageContent = Center(
-            child: SizedBox(
-              width: childWidth,
-              height: childHeight,
-              child: Hero(
-                tag: 'media_hero_${widget.container.volId}_${widget.fileName}',
-                createRectTween: (begin, end) => MaterialRectArcTween(begin: begin, end: end),
-                child: Material(
-                  type: MaterialType.transparency,
-                  child: RotatedBox(
-                    quarterTurns: widget.rotationQuarterTurns,
-                    // Filter hugs the picture itself (inside the zoom
-                    // transform and the rotation) so the black letterbox is
-                    // never brightened and the filter area stays small.
-                    child: ColorAdjustFilter(
-                      adjustments: widget.adjustments,
-                      child: EncryptedImageWidget(
-                        container: widget.container,
-                        fileName: widget.fileName,
-                        prefetchedBytes: widget.prefetchedBytes,
-                        fit: BoxFit.contain,
-                        onError: widget.onError,
-                        thumbnailQuality: widget.thumbnailQuality,
-                        thumbnailCacheMode: widget.thumbnailCacheMode,
-                        onSizeKnown: (w, h) {
-                          if (_imageSize == null ||
-                              _imageSize!.width != w ||
-                              _imageSize!.height != h) {
-                            _imageSize = Size(w.toDouble(), h.toDouble());
-                            widget.onSizeKnown?.call(w, h);
-                          }
-                        },
+          Widget imageContent = MediaSwipeDismissTarget(
+            child: Center(
+              child: SizedBox(
+                width: childWidth,
+                height: childHeight,
+                child: Hero(
+                  tag: 'media_hero_${widget.container.volId}_${widget.fileName}',
+                  createRectTween: (begin, end) => MaterialRectArcTween(begin: begin, end: end),
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: RotatedBox(
+                      quarterTurns: widget.rotationQuarterTurns,
+                      // Filter hugs the picture itself (inside the zoom
+                      // transform and the rotation) so the black letterbox is
+                      // never brightened and the filter area stays small.
+                      child: ColorAdjustFilter(
+                        adjustments: widget.adjustments,
+                        child: EncryptedImageWidget(
+                          container: widget.container,
+                          fileName: widget.fileName,
+                          prefetchedBytes: widget.prefetchedBytes,
+                          fit: BoxFit.contain,
+                          onError: widget.onError,
+                          thumbnailQuality: widget.thumbnailQuality,
+                          thumbnailCacheMode: widget.thumbnailCacheMode,
+                          onSizeKnown: (w, h) {
+                            if (_imageSize == null ||
+                                _imageSize!.width != w ||
+                                _imageSize!.height != h) {
+                              _imageSize = Size(w.toDouble(), h.toDouble());
+                              widget.onSizeKnown?.call(w, h);
+                            }
+                          },
+                        ),
                       ),
                     ),
                   ),
@@ -833,12 +853,14 @@ bool _isClampingMatrix = false;
                     curve: Curves.easeOutCubic,
                     bottom: widget.zoomIndicatorBottomOffset,
                     right: 16,
-                    child: AutoHideZoomIndicator(
-                      transform: _transformationController,
-                      backgroundColor: Colors.white.withValues(alpha: 0.12),
-                      onReset: () => _animateImageZoomTo(
-                        _getBaselineMatrix(constraints),
-                        toBaseline: true,
+                    child: _fadeWhileDismissing(
+                      AutoHideZoomIndicator(
+                        transform: _transformationController,
+                        backgroundColor: Colors.white.withValues(alpha: 0.12),
+                        onReset: () => _animateImageZoomTo(
+                          _getBaselineMatrix(constraints),
+                          toBaseline: true,
+                        ),
                       ),
                     ),
                   ),

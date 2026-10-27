@@ -142,8 +142,8 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   final ValueNotifier<ScrollPhysics> _swipePhysicsNotifier =
       ValueNotifier<ScrollPhysics>(const BouncingScrollPhysics());
 
-  /// 0..1 while a swipe-to-dismiss drag pulls the viewer away. Only drives the
-  /// fade of the black backdrop, so the subtree below it is not rebuilt.
+  /// 0..1 while a swipe-to-dismiss drag pulls the media away. Drives the
+  /// backdrop and viewer chrome fade while the actual image stays visible.
   final ValueNotifier<double> _swipeDismissProgress = ValueNotifier<double>(
     0.0,
   );
@@ -178,6 +178,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   // or mid-interaction (reported via onZoomChanged). Kept separate from
   // _multiTouchLock so either source can hold the lock independently.
   bool _zoomInteractionLock = false;
+  String? _zoomLockFile;
 
   int _activeMenuCount = 0;
   late bool _wasEmpty;
@@ -499,6 +500,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       pinnedPaths: widget.pinnedPaths,
     );
     _wasEmpty = _playlistController.isEmpty;
+    _zoomLockFile = _playlistController.currentFile;
     _playbackManager = carried?.playbackManager ?? VideoPlaybackManager();
     if (carried != null) {
       _adoptedFile = _playbackManager.currentFileName;
@@ -850,6 +852,14 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
 
   void _onPlaylistUpdate() {
     if (!mounted) return;
+    final currentFile = _playlistController.currentFile;
+    if (currentFile != _zoomLockFile) {
+      _zoomLockFile = currentFile;
+      // Neighboring items reset their zoom as they become inactive. Clear
+      // the previous item's lock so the newly active image can dismiss now.
+      _zoomInteractionLock = false;
+      _updateSwipePhysics();
+    }
     final nowEmpty = _playlistController.isEmpty;
     if (nowEmpty != _wasEmpty) {
       _wasEmpty = nowEmpty;
@@ -3134,9 +3144,17 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
         .read(fileManagerToolbarSettingsProvider(null))
         .config
         .mediaViewerToolbarConfig;
-    final itemWidget = Container(
-      color: Colors.black,
-      child: isImg
+    void onItemZoomChanged(bool allowSwipe) {
+      // PageView keeps neighboring items alive. Their zoom callbacks must not
+      // change whether the item currently on screen can be dismissed.
+      if (fileName != _playlistController.currentFile) return;
+      _onZoomInteractionChanged(allowSwipe);
+    }
+    final itemWidget = ValueListenableBuilder<double>(
+      valueListenable: _swipeDismissProgress,
+      child: Container(
+        color: Colors.transparent,
+        child: isImg
           ? ImagePageItem(
               key: ValueKey(
                 'image_${fileName}_${_imageReloadEpoch[fileName] ?? 0}',
@@ -3148,13 +3166,14 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
               rotationQuarterTurns: _rotations[fileName] ?? 0,
               adjustments: _adjustmentsFor(fileName),
               showUI: _showUI,
+              dismissProgress: _swipeDismissProgress,
               zoomIndicatorBottomOffset: zoomIndicatorBottomOffset,
               tapEdgesToNavigate: gestureConfig.tapEdgesToNavigate,
               enableZoom: !_scrollMode.isContinuous,
               pinchZoomOutEnabled: gestureConfig.pinchZoomOutEnabled,
               minZoomScale: gestureConfig.minVideoZoomScale,
               onToggleUI: _setUIVisibility,
-              onZoomChanged: _onZoomInteractionChanged,
+              onZoomChanged: onItemZoomChanged,
               thumbnailQuality: widget.thumbnailQuality,
               thumbnailCacheMode: widget.thumbnailCacheMode,
               edgeSwipeBrightnessEnabled:
@@ -3181,6 +3200,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
               thumbnailGenerationStrategy:
                   gestureConfig.thumbnailGenerationStrategy,
               showUI: _showUI,
+              dismissProgress: _swipeDismissProgress,
               tapEdgesToNavigate: gestureConfig.tapEdgesToNavigate,
               doubleTapPlayPause: gestureConfig.doubleTapPlayPause,
               zoomIndicatorBottomOffset: zoomIndicatorBottomOffset,
@@ -3243,9 +3263,24 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                   _scheduleGeometryRebuild();
                 }
               },
-              onZoomChanged: _onZoomInteractionChanged,
+              onZoomChanged: onItemZoomChanged,
               onError: () => _handleMediaError(fileName),
             ),
+      ),
+      builder: (context, progress, media) {
+        final backgroundAlpha = (1.0 - progress).clamp(0.0, 1.0).toDouble();
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            Positioned.fill(
+              child: ColoredBox(
+                color: Colors.black.withValues(alpha: backgroundAlpha),
+              ),
+            ),
+            media!,
+          ],
+        );
+      },
     );
 
     // Only the currently active item should have its Hero enabled.
@@ -3352,8 +3387,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       child: AnnotatedRegion<SystemUiOverlayStyle>(
         value: AppSystemUI.transparentDark,
         // The black behind the viewer fades out while a swipe-to-dismiss drag
-        // pulls the content away, showing the screen underneath. It stays
-        // solid when the viewer sits on an opaque route (nothing to show).
+        // pulls the image away, showing the screen underneath.
         child: ValueListenableBuilder<double>(
           valueListenable: _swipeDismissProgress,
           builder: (context, progress, scaffold) {
@@ -3572,6 +3606,19 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
               );
             }
 
+            Widget fadeDuringDismiss(Widget child) =>
+                ValueListenableBuilder<double>(
+                  valueListenable: _swipeDismissProgress,
+                  child: child,
+                  builder: (context, progress, child) => IgnorePointer(
+                    ignoring: progress >= 0.99,
+                    child: Opacity(
+                      opacity: (1.0 - progress).clamp(0.0, 1.0).toDouble(),
+                      child: child,
+                    ),
+                  ),
+                );
+
             final swipeDismissAxis = _swipeDismissAxis;
             return MediaSwipeDismissLayer(
               enabled: mediaViewerConfig.swipeToDismissEnabled && !_isEditingLayout,
@@ -3580,6 +3627,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
               canStart: _canStartSwipeDismiss,
               onDismiss: _closeViewerFromSwipe,
               progress: _swipeDismissProgress,
+              transformChild: false,
               child: Stack(
               children: [
                 Listener(
@@ -3652,20 +3700,26 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                     mediaViewerConfig.scrubPreviewStyle ==
                         ScrubPreviewStyle.fullscreen)
                   Positioned.fill(
-                    child: VideoScrubFullscreenLayer(
-                      previewHost: _scrubPreviewHost,
-                      progress: _videoProgressNotifier,
-                      rotationQuarterTurns:
-                          _rotations[_playlistController.currentFile] ?? 0,
-                      adjustments: _adjustmentsFor(
-                        _playlistController.currentFile,
+                    child: fadeDuringDismiss(
+                      VideoScrubFullscreenLayer(
+                        previewHost: _scrubPreviewHost,
+                        progress: _videoProgressNotifier,
+                        rotationQuarterTurns:
+                            _rotations[_playlistController.currentFile] ?? 0,
+                        adjustments: _adjustmentsFor(
+                          _playlistController.currentFile,
+                        ),
                       ),
                     ),
                   ),
                 // A-B repeat feedback. Mid-screen and pointer-transparent so
                 // it can never cover or block the button that triggered it.
                 if (!_isEditingLayout)
-                  Positioned.fill(child: AbLoopToast(data: _abLoopToast)),
+                  Positioned.fill(
+                    child: fadeDuringDismiss(
+                      AbLoopToast(data: _abLoopToast),
+                    ),
+                  ),
 
                 if (_isEditingLayout)
                   Positioned.fill(
@@ -3731,7 +3785,8 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                     // its height is status-bar/cutout inset + content, so it
                     // grows with display size and font scale, and a hard-coded
                     // value left part of it visible when hidden.
-                    child: RepaintBoundary(
+                    child: fadeDuringDismiss(
+                      RepaintBoundary(
                       child: AnimatedSlide(
                         duration: MediaViewerConstants.animationDuration,
                         curve: Curves.easeOutCubic,
@@ -3790,13 +3845,15 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                           ),
                         ),
                       ),
+                      ),
                     ),
                   ),
                   Positioned(
                     left: 0,
                     right: 0,
                     bottom: 0,
-                    child: RepaintBoundary(
+                    child: fadeDuringDismiss(
+                      RepaintBoundary(
                       child: AnimatedSlide(
                         duration: MediaViewerConstants.animationDuration,
                         curve: Curves.easeOutCubic,
@@ -3910,6 +3967,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                             );
                           },
                         ),
+                      ),
                       ),
                     ),
                   ),

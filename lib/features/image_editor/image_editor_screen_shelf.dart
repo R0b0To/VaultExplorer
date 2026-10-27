@@ -766,9 +766,16 @@ class _EditorLevelRulerPainter extends CustomPainter {
       ..color = amberColor
       ..style = PaintingStyle.fill;
 
-    if (value.abs() > 0.4) {
-      final startX = math.min(centerX, valX);
-      final endX = math.max(centerX, valX);
+    if (min >= 0 || value.abs() > 0.4) {
+      final double startX;
+      final double endX;
+      if (min >= 0) {
+        startX = pad;
+        endX = valX;
+      } else {
+        startX = math.min(centerX, valX);
+        endX = math.max(centerX, valX);
+      }
       const barH = 10.0;
       final rrect = RRect.fromRectAndRadius(
         Rect.fromLTRB(startX, centerY - barH / 2.0, endX, centerY + barH / 2.0),
@@ -1504,21 +1511,25 @@ class _TextShelf extends StatelessWidget {
   }
 }
 
-enum _DrawShelfTab { color, opacity }
+enum _DrawShelfTab { color, size, opacity }
 
 class _DrawShelf extends StatelessWidget {
   final _DrawShelfTab tab;
   final Color selectedColor;
   final double opacity;
+  final double strokeDiameter;
   final ValueChanged<Color> onSelectColor;
   final ValueChanged<double> onOpacityChanged;
+  final ValueChanged<double> onStrokeDiameterChanged;
 
   const _DrawShelf({
     required this.tab,
     required this.selectedColor,
     required this.opacity,
+    required this.strokeDiameter,
     required this.onSelectColor,
     required this.onOpacityChanged,
+    required this.onStrokeDiameterChanged,
   });
 
   @override
@@ -1562,6 +1573,83 @@ class _DrawShelf extends StatelessWidget {
                 ],
               ],
             ),
+          ),
+        );
+
+      case _DrawShelfTab.size:
+        return Container(
+          color: const Color(0xFF161616),
+          padding: const EdgeInsets.only(top: 8, bottom: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                height: 34,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Positioned(
+                      left: 16,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.white70, width: 1.2),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Icon(
+                              Icons.line_weight_rounded,
+                              size: 14,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Size',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Center(
+                      child: Text(
+                        '${strokeDiameter.round()} px',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          fontFeatures: [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ),
+                    if ((strokeDiameter - DrawOverlay.kDefaultBrushDiameter).abs() > 1.0)
+                      Positioned(
+                        right: 16,
+                        child: GestureDetector(
+                          onTap: () => onStrokeDiameterChanged(DrawOverlay.kDefaultBrushDiameter),
+                          child: const Icon(
+                            Icons.refresh_rounded,
+                            size: 18,
+                            color: Colors.white70,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              _EditorLevelRuler(
+                value: strokeDiameter,
+                min: 4.0,
+                max: 200.0,
+                onChanged: onStrokeDiameterChanged,
+              ),
+            ],
           ),
         );
 

@@ -363,5 +363,120 @@ void main() {
       );
       expect(strokeAt20x!.strokeWidthFraction, lessThan(strokeAt10x!.strokeWidthFraction));
     });
+
+    testWidgets('strokeDiameter overrides stroke width without zooming', (tester) async {
+      DrawingAnnotation? smallStroke;
+      DrawingAnnotation? largeStroke;
+      final transformController = TransformationController();
+
+      // Test small stroke (20px)
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: viewportSize.width,
+                height: viewportSize.height,
+                child: DrawOverlay(
+                  imageRect: imageRect,
+                  transformationController: transformController,
+                  strokeDiameter: 20.0,
+                  color: Colors.white,
+                  opacity: 1.0,
+                  onStrokeCompleted: (s) => smallStroke = s,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      var center = tester.getCenter(find.byType(DrawOverlay));
+      var g = await tester.startGesture(center);
+      await g.moveBy(const Offset(10, 5));
+      await g.up();
+      await tester.pumpAndSettle();
+      expect(smallStroke, isNotNull);
+
+      // Test large stroke (80px - 4x of 20px)
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: viewportSize.width,
+                height: viewportSize.height,
+                child: DrawOverlay(
+                  imageRect: imageRect,
+                  transformationController: transformController,
+                  strokeDiameter: 80.0,
+                  color: Colors.white,
+                  opacity: 1.0,
+                  onStrokeCompleted: (s) => largeStroke = s,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      center = tester.getCenter(find.byType(DrawOverlay));
+      g = await tester.startGesture(center);
+      await g.moveBy(const Offset(10, 5));
+      await g.up();
+      await tester.pumpAndSettle();
+      expect(largeStroke, isNotNull);
+
+      // 80px stroke should have ~4x the stroke width fraction of 20px stroke
+      expect(
+        largeStroke!.strokeWidthFraction,
+        closeTo(smallStroke!.strokeWidthFraction * 4.0, 0.005),
+      );
+    });
+
+    testWidgets('showBrushIndicator displays dashed preview ring at the overridden diameter', (tester) async {
+      final transformController = TransformationController();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: viewportSize.width,
+                height: viewportSize.height,
+                child: DrawOverlay(
+                  imageRect: imageRect,
+                  transformationController: transformController,
+                  strokeDiameter: 90.0,
+                  showBrushIndicator: true,
+                  color: Colors.white,
+                  opacity: 1.0,
+                  onStrokeCompleted: (_) {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final brushRingFinder = find.byWidgetPredicate(
+        (w) => w is CustomPaint && w.painter.runtimeType.toString().contains('DashedBrushRingPainter'),
+      );
+
+      // Ring should be visible due to showBrushIndicator: true
+      expect(brushRingFinder, findsOneWidget);
+
+      // While drawing with 1 finger, it should temporarily hide
+      final center = tester.getCenter(find.byType(DrawOverlay));
+      final gesture = await tester.startGesture(center);
+      await gesture.moveBy(const Offset(10, 5));
+      await tester.pump();
+      expect(brushRingFinder, findsNothing);
+
+      // Upon stroke completion, ring should reappear
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(brushRingFinder, findsOneWidget);
+    });
   });
 }

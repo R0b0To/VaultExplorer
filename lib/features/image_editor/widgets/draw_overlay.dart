@@ -15,12 +15,17 @@ class DrawOverlay extends StatefulWidget {
   final TransformationController transformationController;
   final Color color;
   final double opacity;
+  final double strokeDiameter;
+  final bool showBrushIndicator;
   final ValueChanged<DrawingAnnotation> onStrokeCompleted;
   final VoidCallback? onStrokeStart;
   final VoidCallback? onResetZoom;
 
-  /// Fixed logical pixel diameter of the brush footprint on screen.
-  static const double kBrushScreenDiameter = 60.0;
+  /// Default logical pixel diameter of the brush footprint on screen.
+  static const double kDefaultBrushDiameter = 60.0;
+
+  /// Backward-compatible alias for [kDefaultBrushDiameter].
+  static const double kBrushScreenDiameter = kDefaultBrushDiameter;
 
   /// Maximum zoom scale allowed during drawing gestures (3000%).
   static const double kMaxZoomScale = 30.0;
@@ -31,6 +36,8 @@ class DrawOverlay extends StatefulWidget {
     required this.transformationController,
     required this.color,
     required this.opacity,
+    this.strokeDiameter = kDefaultBrushDiameter,
+    this.showBrushIndicator = false,
     required this.onStrokeCompleted,
     this.onStrokeStart,
     this.onResetZoom,
@@ -74,7 +81,7 @@ class _DrawOverlayState extends State<DrawOverlay> {
   double _calculateStrokeWidthFraction() {
     final scale = widget.transformationController.value.getMaxScaleOnAxis();
     final h = widget.imageRect.height > 0 ? widget.imageRect.height : 1.0;
-    return (DrawOverlay.kBrushScreenDiameter / (h * scale)).clamp(0.00005, 0.25);
+    return (widget.strokeDiameter / (h * scale)).clamp(0.00005, 0.5);
   }
 
   void _onPointerDown(PointerDownEvent event) {
@@ -275,13 +282,14 @@ class _DrawOverlayState extends State<DrawOverlay> {
               ),
             ),
 
-          // 2. Dashed circular brush ring in the center of the viewport (visible only when zooming)
-          if (_isZooming)
+          // 2. Dashed circular brush ring in the center of the viewport
+          // (visible while zooming, or when brush indicator is requested and no stroke is currently being drawn)
+          if (_isZooming || (widget.showBrushIndicator && _liveStrokePoints.isEmpty))
             Positioned.fill(
               child: IgnorePointer(
                 child: CustomPaint(
                   painter: _DashedBrushRingPainter(
-                    radius: DrawOverlay.kBrushScreenDiameter / 2.0,
+                    radius: widget.strokeDiameter / 2.0,
                   ),
                 ),
               ),

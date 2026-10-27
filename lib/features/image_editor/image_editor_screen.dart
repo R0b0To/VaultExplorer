@@ -139,6 +139,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
 
   Color _drawColor = Colors.white;
   double _drawOpacity = 1.0;
+  double _drawStrokeDiameter = DrawOverlay.kDefaultBrushDiameter;
   _DrawShelfTab _drawShelfTab = _DrawShelfTab.color;
   List<DrawingAnnotation>? _drawSessionSnapshot;
   bool _isToolsDrawerOpen = true;
@@ -1567,8 +1568,10 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
           tab: _drawShelfTab,
           selectedColor: _drawColor,
           opacity: _drawOpacity,
+          strokeDiameter: _drawStrokeDiameter,
           onSelectColor: (c) => setState(() => _drawColor = c),
           onOpacityChanged: (op) => setState(() => _drawOpacity = op),
+          onStrokeDiameterChanged: (d) => setState(() => _drawStrokeDiameter = d),
         );
       case EditorTool.redact:
         return _AnnotationShelf(
@@ -1650,6 +1653,12 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
           label: 'Color',
           isSelected: _drawShelfTab == _DrawShelfTab.color,
           onTap: () => setState(() => _drawShelfTab = _DrawShelfTab.color),
+        ),
+        _EditorToolActionItem(
+          icon: Icons.line_weight_rounded,
+          label: 'Size',
+          isSelected: _drawShelfTab == _DrawShelfTab.size,
+          onTap: () => setState(() => _drawShelfTab = _DrawShelfTab.size),
         ),
         _EditorToolActionItem(
           icon: Icons.water_drop_outlined,
@@ -2071,6 +2080,8 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
                       transformationController: _transformationController,
                       color: _drawColor,
                       opacity: _drawOpacity,
+                      strokeDiameter: _drawStrokeDiameter,
+                      showBrushIndicator: _drawShelfTab == _DrawShelfTab.size,
                       onStrokeCompleted: (stroke) {
                         _pushUndoSnapshot();
                         _annotationsController.add(stroke);

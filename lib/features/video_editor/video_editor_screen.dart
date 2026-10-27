@@ -618,6 +618,11 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
       count: outputCount,
       existingLowercase: {for (final e in existing) e.name.toLowerCase()},
       unique: FileOperationService.makeUniqueName,
+      // The export sheet pre-fills "<name>_cut", so a name from its text field
+      // already contains the suffix the user wants: appending it again produced
+      // "<name>_cut_cut". Only a name derived from the source (replace-original,
+      // or a cleared field) gets the "_cut" marker.
+      suffix: choice.customName != null ? '' : '_cut',
     );
 
     final relativePaths = <String>[];
@@ -943,7 +948,7 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
     final summaryStyle = text.bodySmall?.copyWith(color: cs.onSurfaceVariant);
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+      padding: const EdgeInsets.fromLTRB(24, 6, 24, 12),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,

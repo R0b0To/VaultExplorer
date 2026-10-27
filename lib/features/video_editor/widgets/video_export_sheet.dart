@@ -107,190 +107,185 @@ class _VideoExportSheetState extends State<VideoExportSheet> {
     final isSingleClip = widget.clipCount <= 1;
 
     return AppBottomSheet(
-      child: Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.viewInsetsOf(context).bottom,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(l10n.videoEditorExportTitle, style: text.titleLarge),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+              child: Text(
+                l10n.videoEditorExportSummary(
+                  widget.clipCount,
+                  formatTimecode(widget.totalDurationUs, millis: false),
+                ),
+                style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+              ),
+            ),
+
+            // Multiple clips: Merge vs Separate toggle
+            if (!isSingleClip && !_replaceOriginal) ...[
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(l10n.videoEditorExportTitle, style: text.titleLarge),
+                child: SegmentedButton<bool>(
+                  showSelectedIcon: false,
+                  segments: [
+                    ButtonSegment(
+                      value: true,
+                      icon: const Icon(Icons.merge_type_rounded),
+                      label: Text(l10n.videoEditorExportMerge),
+                    ),
+                    ButtonSegment(
+                      value: false,
+                      icon: const Icon(Icons.video_library_outlined),
+                      label: Text(l10n.videoEditorExportSeparate),
+                    ),
+                  ],
+                  selected: {_merge},
+                  onSelectionChanged: (s) => setState(() => _merge = s.first),
+                ),
               ),
+              const SizedBox(height: 12),
+            ],
+
+            // Replace original toggle (only if not read-only)
+            if (!widget.isReadOnly) ...[
+              SwitchListTile(
+                title: Text(l10n.videoEditorReplaceOriginal),
+                subtitle: Text(
+                  l10n.videoEditorReplaceOriginalHint,
+                  style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                ),
+                value: _replaceOriginal,
+                onChanged: (val) {
+                  setState(() {
+                    _replaceOriginal = val;
+                    if (val) _merge = true;
+                  });
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+
+            // Custom File Name input (hidden if replacing original)
+            if (!_replaceOriginal) ...[
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-                child: Text(
-                  l10n.videoEditorExportSummary(
-                    widget.clipCount,
-                    formatTimecode(widget.totalDurationUs, millis: false),
-                  ),
-                  style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _nameController,
+                        decoration: InputDecoration(
+                          labelText: l10n.videoEditorCustomFileName,
+                          filled: true,
+                          fillColor: cs.surfaceContainerHighest.withValues(
+                            alpha: 0.5,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: cs.outlineVariant.withValues(alpha: 0.4),
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: cs.primary,
+                              width: 2,
+                            ),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      height: 52,
+                      alignment: Alignment.center,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: cs.surfaceContainerHighest.withValues(
+                          alpha: 0.5,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: cs.outlineVariant.withValues(alpha: 0.4),
+                        ),
+                      ),
+                      child: Text(
+                        '.${widget.extension}',
+                        style: text.labelLarge?.copyWith(
+                          color: cs.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              const SizedBox(height: 8),
+            ],
 
-              // Multiple clips: Merge vs Separate toggle
-              if (!isSingleClip && !_replaceOriginal) ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: SegmentedButton<bool>(
-                    showSelectedIcon: false,
-                    segments: [
-                      ButtonSegment(
-                        value: true,
-                        icon: const Icon(Icons.merge_type_rounded),
-                        label: Text(l10n.videoEditorExportMerge),
-                      ),
-                      ButtonSegment(
-                        value: false,
-                        icon: const Icon(Icons.video_library_outlined),
-                        label: Text(l10n.videoEditorExportSeparate),
-                      ),
-                    ],
-                    selected: {_merge},
-                    onSelectionChanged: (s) => setState(() => _merge = s.first),
+            // Subtitles Warning if video has subtitle tracks
+            if (widget.hasSubtitles) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: cs.tertiaryContainer.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: cs.tertiary.withValues(alpha: 0.4)),
                   ),
-                ),
-                const SizedBox(height: 12),
-              ],
-
-              // Replace original toggle (only if not read-only)
-              if (!widget.isReadOnly) ...[
-                SwitchListTile(
-                  title: Text(l10n.videoEditorReplaceOriginal),
-                  subtitle: Text(
-                    l10n.videoEditorReplaceOriginalHint,
-                    style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                  ),
-                  value: _replaceOriginal,
-                  onChanged: (val) {
-                    setState(() {
-                      _replaceOriginal = val;
-                      if (val) _merge = true;
-                    });
-                  },
-                ),
-                const SizedBox(height: 8),
-              ],
-
-              // Custom File Name input (hidden if replacing original)
-              if (!_replaceOriginal) ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _nameController,
-                          decoration: InputDecoration(
-                            labelText: l10n.videoEditorCustomFileName,
-                            filled: true,
-                            fillColor: cs.surfaceContainerHighest.withValues(
-                              alpha: 0.5,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(
-                                color: cs.outlineVariant.withValues(alpha: 0.4),
-                              ),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(
-                                color: cs.primary,
-                                width: 2,
-                              ),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 14,
-                            ),
-                          ),
-                        ),
-                      ),
+                      Icon(Icons.subtitles_off_rounded, size: 20, color: cs.onTertiaryContainer),
                       const SizedBox(width: 8),
-                      Container(
-                        height: 52,
-                        alignment: Alignment.center,
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: cs.surfaceContainerHighest.withValues(
-                            alpha: 0.5,
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: cs.outlineVariant.withValues(alpha: 0.4),
-                          ),
-                        ),
+                      Expanded(
                         child: Text(
-                          '.${widget.extension}',
-                          style: text.labelLarge?.copyWith(
-                            color: cs.onSurfaceVariant,
-                            fontWeight: FontWeight.w600,
-                          ),
+                          l10n.videoEditorSubtitlesWarning,
+                          style: text.bodySmall?.copyWith(color: cs.onTertiaryContainer),
                         ),
                       ),
                     ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-              ],
-
-              // Subtitles Warning if video has subtitle tracks
-              if (widget.hasSubtitles) ...[
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: cs.tertiaryContainer.withValues(alpha: 0.5),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: cs.tertiary.withValues(alpha: 0.4)),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(Icons.subtitles_off_rounded, size: 20, color: cs.onTertiaryContainer),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            l10n.videoEditorSubtitlesWarning,
-                            style: text.bodySmall?.copyWith(color: cs.onTertiaryContainer),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-
-              // Lossless note
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-                child: Text(
-                  l10n.videoEditorLosslessNote,
-                  style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                ),
-              ),
-
-              // Export submit button
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                child: FilledButton(
-                  onPressed: _submit,
-                  child: Text(
-                    _replaceOriginal ? l10n.videoEditorReplaceOriginal : l10n.videoEditorExportAction,
                   ),
                 ),
               ),
             ],
-          ),
+
+            // Lossless note
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+              child: Text(
+                l10n.videoEditorLosslessNote,
+                style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              ),
+            ),
+
+            // Export submit button
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: FilledButton(
+                onPressed: _submit,
+                child: Text(
+                  _replaceOriginal ? l10n.videoEditorReplaceOriginal : l10n.videoEditorExportAction,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

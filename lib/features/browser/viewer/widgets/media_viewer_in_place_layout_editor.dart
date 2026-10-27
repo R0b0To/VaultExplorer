@@ -800,10 +800,10 @@ class _MediaViewerInPlaceLayoutEditorState
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
         decoration: BoxDecoration(
-          color: cs.surfaceContainerHigh.withValues(alpha: 0.92),
+          color: Colors.white.withValues(alpha: 0.14),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: cs.outlineVariant.withValues(alpha: 0.35),
+            color: Colors.white.withValues(alpha: 0.22),
           ),
         ),
         child: Row(
@@ -942,10 +942,10 @@ class _MediaViewerInPlaceLayoutEditorState
                         fontSize: 12,
                         color: Colors.white.withValues(alpha: 0.45),
                       ),
-                      prefixIcon: const Icon(Icons.search_rounded, size: 16),
+                      prefixIcon: const Icon(Icons.search_rounded, size: 16, color: Colors.white70),
                       suffixIcon: _searchQuery.isNotEmpty
                           ? IconButton(
-                              icon: const Icon(Icons.clear_rounded, size: 16),
+                              icon: const Icon(Icons.clear_rounded, size: 16, color: Colors.white70),
                               onPressed: () {
                                 _searchController.clear();
                                 setState(() => _searchQuery = '');

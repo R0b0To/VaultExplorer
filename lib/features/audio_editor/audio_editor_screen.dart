@@ -1096,7 +1096,7 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
     final summaryStyle = text.bodySmall?.copyWith(color: cs.onSurfaceVariant);
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+      padding: const EdgeInsets.fromLTRB(24, 6, 24, 12),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,

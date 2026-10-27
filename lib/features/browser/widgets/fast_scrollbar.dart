@@ -219,7 +219,9 @@ void _onControllerChange() {
     final total = maxScroll + viewport;
     if (total <= 0) return 48.0;
     final ratio = (viewport / total).clamp(0.0, 1.0);
-    return (trackExtent * ratio).clamp(44.0, trackExtent * 0.65);
+    final maxThumbExtent = trackExtent * 0.65;
+    final minThumbExtent = maxThumbExtent < 44.0 ? maxThumbExtent : 44.0;
+    return (trackExtent * ratio).clamp(minThumbExtent, maxThumbExtent);
   }
 
   String _formatPopupDate(DateTime dt) {
@@ -566,7 +568,8 @@ void _onControllerChange() {
                     if (isVertical &&
                         canScroll &&
                         _isDragging &&
-                        _popupBadge != null)
+                        _popupBadge != null &&
+                        trackExtent >= 64.0)
                       Positioned(
                         right: widget.touchWidth + 8.0,
                         top: (thumbStart + thumbExtent / 2 - 24.0).clamp(

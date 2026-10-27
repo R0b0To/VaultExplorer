@@ -13,6 +13,7 @@ import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/audio_editor/audio_edit_providers.dart';
@@ -827,6 +828,7 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
   Future<void> _save({bool popOnSuccess = true}) async {
     final path = _recordedPath;
     if (_busy || path == null || _phase != _Phase.reviewing) return;
+    final opService = ref.read(fileOperationServiceProvider);
     _busy = true;
     setState(() => _phase = _Phase.saving);
     try {
@@ -887,6 +889,7 @@ class _AudioCaptureScreenState extends ConsumerState<AudioCaptureScreen>
       await _recorder.discard(savePath);
       _recordedPath = null; // securely wiped after the destination write succeeds
       _saved = true;
+      opService.notifyVolumeContentChanged(widget.container.volId);
       if (popOnSuccess && mounted) Navigator.pop(context, name);
     } catch (e) {
       VeLog.w(_tag, 'save failed', e);

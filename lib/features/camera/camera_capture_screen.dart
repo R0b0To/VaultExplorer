@@ -873,6 +873,9 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
         );
       }
     } finally {
+      if (successfullySaved.any((item) => item.isPhoto)) {
+        opSvc.notifyVolumeContentChanged(widget.container.volId);
+      }
       if (mounted) captureSessionController.setEncrypting(false);
     }
   }

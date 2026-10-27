@@ -18,6 +18,7 @@ import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/services/text_editor_appearance_service.dart';
 import 'package:vaultexplorer/features/browser/viewer/markdown/markdown_body_view.dart';
 import 'package:vaultexplorer/features/browser/viewer/markdown/markdown_image_picker_dialog.dart';
@@ -1386,10 +1387,12 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
 
     final encodedContent = await _encodeTabContent(currentTab);
     if (encodedContent == null) return;
+    final opService = ref.read(fileOperationServiceProvider);
     final ok = await ref
         .read(vaultFileIoApiProvider)
         .writeWholeFile(widget.container, newFilePath, encodedContent);
 
+    if (ok) opService.notifyVolumeContentChanged(widget.container.volId);
     if (ok && mounted) {
       setState(() {
         currentTab.filePath = newFilePath;
@@ -3675,6 +3678,7 @@ Future<String?> _promptAndCreateEmptyFile({
   required MountedContainer container,
   required String parentDir,
 }) async {
+  final opService = ref.read(fileOperationServiceProvider);
   final controller = TextEditingController.fromValue(
     const TextEditingValue(
       text: 'untitled.txt',
@@ -3750,7 +3754,10 @@ Future<String?> _promptAndCreateEmptyFile({
   final ok = await ref
       .read(vaultFileIoApiProvider)
       .createEmptyFile(container, newFilePath);
-  if (ok) return newFilePath;
+  if (ok) {
+    opService.notifyVolumeContentChanged(container.volId);
+    return newFilePath;
+  }
 
   if (context.mounted) {
     showAppSnackBar(
@@ -3923,7 +3930,9 @@ class _ProjectDrawerState extends ConsumerState<_ProjectDrawer> {
     final newFullPath =
         parentDir.isEmpty ? uniqueName : '$parentDir/$uniqueName';
 
+    final opService = ref.read(fileOperationServiceProvider);
     final ok = await _copyRecursive(fullPath, newFullPath, entry.isDir);
+    opService.notifyVolumeContentChanged(widget.container.volId);
     if (!mounted) return;
     if (ok) {
       setState(() => _loadDirectory(refresh: true));
@@ -3998,7 +4007,9 @@ class _ProjectDrawerState extends ConsumerState<_ProjectDrawer> {
       }
     }
 
+    final opService = ref.read(fileOperationServiceProvider);
     final ok = await _copyRecursive(fullPath, newFullPath, entry.isDir);
+    opService.notifyVolumeContentChanged(widget.container.volId);
     if (!mounted) return;
     if (ok) {
       setState(() => _loadDirectory(refresh: true));
@@ -4033,10 +4044,12 @@ class _ProjectDrawerState extends ConsumerState<_ProjectDrawer> {
         : '$targetDir/${entry.name}';
     if (newFullPath == fullPath) return;
 
+    final opService = ref.read(fileOperationServiceProvider);
     final ok = await ref
         .read(vaultFileIoApiProvider)
         .renameFile(widget.container, fullPath, newFullPath);
 
+    if (ok) opService.notifyVolumeContentChanged(widget.container.volId);
     if (ok && mounted) {
       widget.onSyncRenamedPath(fullPath, newFullPath, entry.isDir);
       setState(() => _loadDirectory(refresh: true));
@@ -4098,10 +4111,12 @@ class _ProjectDrawerState extends ConsumerState<_ProjectDrawer> {
     if (result == null || result == entry.name || !mounted) return;
     final newFullPath = parentDir.isEmpty ? result : '$parentDir/$result';
 
+    final opService = ref.read(fileOperationServiceProvider);
     final ok = await ref
         .read(vaultFileIoApiProvider)
         .renameFile(widget.container, fullPath, newFullPath);
 
+    if (ok) opService.notifyVolumeContentChanged(widget.container.volId);
     if (ok && mounted) {
       widget.onSyncRenamedPath(fullPath, newFullPath, entry.isDir);
       setState(() => _loadDirectory(refresh: true));
@@ -4139,10 +4154,12 @@ class _ProjectDrawerState extends ConsumerState<_ProjectDrawer> {
 
     if (confirmed != true || !mounted) return;
 
+    final opService = ref.read(fileOperationServiceProvider);
     final ok = await ref
         .read(vaultFileIoApiProvider)
         .deleteFile(widget.container, fullPath);
 
+    if (ok) opService.notifyVolumeContentChanged(widget.container.volId);
     if (ok && mounted) {
       widget.onCloseTabsForDeletedPath(fullPath, entry.isDir);
       setState(() => _loadDirectory(refresh: true));
@@ -4271,10 +4288,12 @@ class _ProjectDrawerState extends ConsumerState<_ProjectDrawer> {
     if (result == null || !mounted) return;
     final newDirPath = parentDir.isEmpty ? result : '$parentDir/$result';
 
+    final opService = ref.read(fileOperationServiceProvider);
     final ok = await ref
         .read(vaultFileIoApiProvider)
         .createDirectory(widget.container, newDirPath);
 
+    if (ok) opService.notifyVolumeContentChanged(widget.container.volId);
     if (ok && mounted) {
       setState(() => _loadDirectory(refresh: true));
     } else if (mounted) {

@@ -70,6 +70,7 @@ import 'package:vaultexplorer/features/browser/viewer/media_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/pdf_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_screen.dart';
 import 'package:vaultexplorer/features/browser/widgets/add_item_menu_button.dart';
+import 'package:vaultexplorer/features/browser/widgets/browser_item_drag.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_manager_more_menu_button.dart';
 import 'package:vaultexplorer/features/browser/widgets/bookmark_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/bottom_search_bar.dart';
@@ -997,8 +998,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
           oldEntries: [entry],
           existingEntries: _currentItems,
           currentDirPath: _currentDirPath,
-          onSuccess: () =>
-              _loadDirectoryContents(_currentDirPath, refresh: true),
+          onSuccess: () {},
           readOnly: _isReadOnly,
         );
       },
@@ -2792,6 +2792,57 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     }
   }
 
+  Future<void> _handleBrowserItemDrop(
+    BrowserItemDragData data,
+    MountedContainer destination,
+    String destinationPath,
+  ) async {
+    if (!mounted || data.entries.isEmpty) return;
+    if (data.source.readOnly || destination.readOnly) {
+      _setStatus(context.l10n.readOnlyCantMove, error: true);
+      return;
+    }
+    if (!data.canDropInto(destination, destinationPath)) return;
+
+    final items = data.entries
+        .map(
+          (entry) => ClipboardItem(
+            path: data.pathFor(entry),
+            isDir: entry.isDir,
+            sizeBytes: entry.isDir ? 0 : entry.sizeBytes,
+            modifiedSecs: entry.modifiedSecs,
+          ),
+        )
+        .toList(growable: false);
+
+    _signalActivity();
+    final op = await ref
+        .read(fileBrowserOperationsControllerProvider)
+        .pasteStandardTransfer(
+          destContainer: destination,
+          srcContainer: data.source,
+          destDirPath: destinationPath,
+          items: items,
+          isCut: true,
+          isCrossContainer: data.source.volId != destination.volId,
+          resolveConflicts: (conflicts) async {
+            if (!mounted) return null;
+            return ConflictResolutionSheet.show(
+              context,
+              conflicts: conflicts,
+              caseSensitive: namesAreCaseSensitive(destination),
+            );
+          },
+          l10n: context.l10n,
+        );
+    if (!mounted || op == null) return;
+
+    ref
+        .read(fileBrowserSelectionProvider(_stateKey).notifier)
+        .exitSelectionMode();
+    _bindDroppedMoveListener(op);
+  }
+
   bool _isSupportedMedia(String fileName) =>
       MediaViewerConstants.isSupported(fileName);
 
@@ -2964,7 +3015,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       return;
     }
     _signalActivity();
-    await Navigator.push<String?>(
+    final createdPath = await Navigator.push<String?>(
       context,
       MaterialPageRoute(
         builder: (_) => VaultItemEditScreen(
@@ -2974,7 +3025,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         ),
       ),
     );
-    _loadDirectoryContents(_currentDirPath);
+    if (createdPath != null) {
+      _opSvc.notifyVolumeContentChanged(widget.container.volId);
+    }
   }
 
   // ── Cross-tab actions ─────────────────────────────────────────────────────
@@ -3139,6 +3192,28 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
           _opSvc.dismiss(op.id);
         }
       }
+    }
+
+    op.addListener(listener);
+  }
+
+  /// Drag drops can target a different tab or volume, so this viewport is not
+  /// necessarily the destination viewport. Let the service's volume-change
+  /// notifications refresh every affected tab instead of claiming the op as
+  /// its own destination update.
+  void _bindDroppedMoveListener(FileOperation op) {
+    void listener() {
+      if (!mounted) {
+        op.removeListener(listener);
+        return;
+      }
+      final done =
+          op.status != FileOperationStatus.running &&
+          op.status != FileOperationStatus.pending;
+      if (!done) return;
+      op.removeListener(listener);
+      if (op.isCut && !op.isDelete) _syncMarksAfterMove(op);
+      if (!_opNeedsAttention(op)) _opSvc.dismiss(op.id);
     }
 
     op.addListener(listener);
@@ -3438,10 +3513,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
           }
         }
         if (_searchActive && successfulPaths.isNotEmpty) {
-          _searchNotifier.removeDeletedPaths(
-            successfulPaths,
-            _currentDirPath,
-          );
+          _searchNotifier.removeDeletedPaths(successfulPaths, _currentDirPath);
         }
         await ref
             .read(fileBrowserPinsBookmarksProvider(container.volId).notifier)
@@ -3919,6 +3991,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         final keepVisible = _opNeedsAttention(op);
         if (op.status == FileOperationStatus.completed &&
             op.destDirPath == _currentDirPath) {
+          _ownedOpIds.add(op.id);
           _loadDirectoryContents(_currentDirPath).then((_) {
             _opSvc.dismiss(op.id);
           });
@@ -4073,6 +4146,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   /// operation from the transfer list. A failed or cancelled save stays listed
   /// so its error remains readable (see [_opNeedsAttention]).
   void _attachCaptureSaveCompletionListener(FileOperation op) {
+    final willReceiveContentChange =
+        op.status == FileOperationStatus.pending ||
+        op.status == FileOperationStatus.running;
     void listener() {
       final done =
           op.status != FileOperationStatus.running &&
@@ -4088,6 +4164,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       if (op.status == FileOperationStatus.completed) {
         final inCurrentDir = op.destDirPath == _currentDirPath;
         if (inCurrentDir) {
+          if (willReceiveContentChange) _ownedOpIds.add(op.id);
           FolderThumbnailPreview.clearSessionCache();
           _loadDirectoryContents(
             _currentDirPath,
@@ -4131,7 +4208,6 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       for (final op in captured.backgroundSaves) {
         _attachCaptureSaveCompletionListener(op);
       }
-      await _loadDirectoryContents(_currentDirPath);
       final stillSaving = captured.backgroundSaves.any(
         (op) =>
             op.status == FileOperationStatus.pending ||
@@ -4172,7 +4248,6 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         ),
       );
       if (savedName == null || !mounted) return;
-      await _loadDirectoryContents(_currentDirPath);
       _setStatus(
         context.l10n.audioCapturedEncrypted,
         autoClear: const Duration(seconds: 3),
@@ -4256,7 +4331,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
           context.l10n.extractedCount(count),
           autoClear: const Duration(seconds: 3),
         );
-        _loadDirectoryContents(_currentDirPath, refresh: true);
+        _opSvc.notifyVolumeContentChanged(widget.container.volId);
       }
     } catch (e) {
       if (mounted) {
@@ -4484,8 +4559,6 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         onSetStatus: _setStatus,
         onExtractArchive: _extractArchive,
         onSignalActivity: _signalActivity,
-        onLoadDirectoryContents: (path) =>
-            _loadDirectoryContents(path, refresh: true),
         onCaptureFromCamera: _captureFromCamera,
         onRecordAudio: _recordAudio,
         onImportFilesFromDevice: _importFilesFromDevice,
@@ -4615,8 +4688,6 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             onSetStatus: _setStatus,
             onExtractArchive: _extractArchive,
             onSignalActivity: _signalActivity,
-            onLoadDirectoryContents: (path) =>
-                _loadDirectoryContents(path, refresh: true),
             onCaptureFromCamera: _captureFromCamera,
             onRecordAudio: _recordAudio,
             onImportFilesFromDevice: _importFilesFromDevice,
@@ -5323,51 +5394,99 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                         children: [
                                           KeyedSubtree(
                                             key: ValueKey(_currentDirPath),
-                                            child: buildBrowserBody(
+                                                child: DragTarget<BrowserItemDragData>(
+                                                  onWillAcceptWithDetails:
+                                                      (details) =>
+                                                          _archiveContext ==
+                                                              null &&
+                                                          details.data
+                                                              .canDropInto(
+                                                                widget
+                                                                    .container,
+                                                                _currentDirPath,
+                                                              ),
+                                                  onAcceptWithDetails:
+                                                      (details) => unawaited(
+                                                        details.data.onDrop(
+                                                          details.data,
+                                                          widget.container,
+                                                          _currentDirPath,
+                                                        ),
+                                                      ),
+                                                  builder:
+                                                      (
+                                                        context,
+                                                        candidates,
+                                                        rejected,
+                                                      ) => buildBrowserBody(
                                               context,
                                               filteredItems,
                                               isLoading: _isLoading,
-                                              currentItems: _currentItems,
+                                                        currentItems:
+                                                            _currentItems,
                                               atRoot: _atRoot,
                                               onNavigateUp: _atRoot
                                                   ? null
                                                   : _navigateUp,
-                                              searchQuery: _searchQuery,
+                                                        searchQuery:
+                                                            _searchQuery,
                                               layoutMode: _layoutMode,
-                                              container: widget.container,
-                                              currentDirPath: _currentDirPath,
+                                                        container:
+                                                            widget.container,
+                                                        currentDirPath:
+                                                            _currentDirPath,
                                               thumbnailCacheMode:
                                                   _resolvedThumbnailCacheMode,
                                               thumbnailQuality:
                                                   _resolvedThumbnailQuality,
-                                              toolbarConfig: _toolbarConfig,
-                                              isSelectionMode: isSelectionMode,
-                                              selectedItems: selectedItems,
-                                              searchActive: _searchActive,
+                                                        toolbarConfig:
+                                                            _toolbarConfig,
+                                                        isSelectionMode:
+                                                            isSelectionMode,
+                                                        selectedItems:
+                                                            selectedItems,
+                                                        searchActive:
+                                                            _searchActive,
                                               bottomClearance:
                                                   bottomContentClearance,
                                               mountedDocProviderFolders:
                                                   _mountedDocProviderFolders,
-                                              isFolderMounted: _isFolderMounted,
+                                                        isFolderMounted:
+                                                            _isFolderMounted,
                                               isPinned: _isPinned,
                                               isBookmark: _isBookmark,
-                                              isFolderSynced: _isFolderSynced,
+                                                        isFolderSynced:
+                                                            _isFolderSynced,
                                               onDirTap: _handleDirTap,
-                                              onFileTap: _handleFileTap,
+                                                        onFileTap:
+                                                            _handleFileTap,
                                               onItemLongPress:
                                                   _handleItemLongPress,
-                                              onIconTap: _handleIconTap,
+                                                        onIconTap:
+                                                            _handleIconTap,
                                               onItemMoreTap:
                                                   _showItemActionsSheet,
                                               onSelectionChanged:
                                                   setSelectedItems,
+                                                        enableFileDrag:
+                                                            !widget
+                                                                .container
+                                                                .readOnly &&
+                                                            _archiveContext ==
+                                                                null &&
+                                                            !_isDeepSearch,
+                                                        onFileDrop:
+                                                            _handleBrowserItemDrop,
                                               onGridColumnCountChanged: (count) {
-                                                _toolbarConfig = isLandscape
-                                                    ? _toolbarConfig.copyWith(
+                                                          _toolbarConfig =
+                                                              isLandscape
+                                                              ? _toolbarConfig
+                                                                    .copyWith(
                                                         gridColumnsLandscape:
                                                             count,
                                                       )
-                                                    : _toolbarConfig.copyWith(
+                                                              : _toolbarConfig
+                                                                    .copyWith(
                                                         gridColumnsPortrait:
                                                             count,
                                                       );
@@ -5379,7 +5498,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                                         .container
                                                         .isLocalStorage
                                                     ? null
-                                                    : widget.container.uri;
+                                                              : widget
+                                                                    .container
+                                                                    .uri;
                                                 ref
                                                     .read(
                                                       fileManagerToolbarSettingsProvider(
@@ -5391,12 +5512,15 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                                     );
                                               },
                                               onMasonryColumnCountChanged: (count) {
-                                                _toolbarConfig = isLandscape
-                                                    ? _toolbarConfig.copyWith(
+                                                          _toolbarConfig =
+                                                              isLandscape
+                                                              ? _toolbarConfig
+                                                                    .copyWith(
                                                         masonryColumnsLandscape:
                                                             count,
                                                       )
-                                                    : _toolbarConfig.copyWith(
+                                                              : _toolbarConfig
+                                                                    .copyWith(
                                                         masonryColumnsPortrait:
                                                             count,
                                                       );
@@ -5408,7 +5532,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                                         .container
                                                         .isLocalStorage
                                                     ? null
-                                                    : widget.container.uri;
+                                                              : widget
+                                                                    .container
+                                                                    .uri;
                                                 ref
                                                     .read(
                                                       fileManagerToolbarSettingsProvider(
@@ -5422,8 +5548,10 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                               onListZoomLevelChanged: (newZoom) {
                                                 setState(() {
                                                   _toolbarConfig =
-                                                      _toolbarConfig.copyWith(
-                                                        listZoomLevel: newZoom,
+                                                                _toolbarConfig
+                                                                    .copyWith(
+                                                                      listZoomLevel:
+                                                                          newZoom,
                                                       );
                                                 });
                                                 _toolbarSvc.save(
@@ -5434,7 +5562,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                                         .container
                                                         .isLocalStorage
                                                     ? null
-                                                    : widget.container.uri;
+                                                              : widget
+                                                                    .container
+                                                                    .uri;
                                                 ref
                                                     .read(
                                                       fileManagerToolbarSettingsProvider(
@@ -5456,12 +5586,14 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                                   _isListingTruncated,
                                               scrollController:
                                                   _browserScrollController,
-                                              archiveContext: _archiveContext,
+                                                        archiveContext:
+                                                            _archiveContext,
                                               archiveRootPath:
                                                   _archiveRootPathForSearch,
                                               sortBy: sortBy,
                                             ),
                                           ),
+                                              ),
                                           if (_backGestureProgress != null)
                                             Positioned.fill(
                                               child: IgnorePointer(
@@ -5490,8 +5622,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                                         layoutMode:
                                                             _backGesturePreviewLayoutMode ??
                                                             _layoutMode,
-                                                        container:
-                                                            widget.container,
+                                                            container: widget
+                                                                .container,
                                                         currentDirPath:
                                                             previewDirPath,
                                                         thumbnailCacheMode:
@@ -5500,8 +5632,10 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                                             _resolvedThumbnailQuality,
                                                         toolbarConfig:
                                                             _toolbarConfig,
-                                                        isSelectionMode: false,
-                                                        selectedItems: const {},
+                                                            isSelectionMode:
+                                                                false,
+                                                            selectedItems:
+                                                                const {},
                                                         searchActive: false,
                                                         bottomClearance:
                                                             bottomContentClearance,
@@ -5529,16 +5663,19 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                                             _isFolderSynced,
                                                         onDirTap: (_) {},
                                                         onFileTap: (_) {},
-                                                        onItemLongPress: (_) {},
+                                                            onItemLongPress:
+                                                                (_) {},
                                                         onIconTap: (_) {},
-                                                        onItemMoreTap: (_) {},
+                                                            onItemMoreTap:
+                                                                (_) {},
                                                         onGridColumnCountChanged:
                                                             (_) {},
                                                         onMasonryColumnCountChanged:
                                                             (_) {},
                                                         onListZoomLevelChanged:
                                                             (_) {},
-                                                        onRefresh: () async {},
+                                                            onRefresh:
+                                                                () async {},
                                                         isListingTruncated:
                                                             false,
                                                         scrollController:
@@ -5551,7 +5688,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                                       ),
                                                     ],
                                                     Opacity(
-                                                      opacity: _fadeScrimOpacity(
+                                                          opacity:
+                                                              _fadeScrimOpacity(
                                                         _backGestureProgress!,
                                                       ),
                                                       child: ColoredBox(

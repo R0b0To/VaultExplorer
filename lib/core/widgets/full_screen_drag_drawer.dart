@@ -53,6 +53,7 @@ class _FullScreenDragDrawerState extends State<FullScreenDragDrawer>
   _DrawerPointerDrag? _pointerDrag;
   bool _reportedOpen = false;
   bool _edgeGestureActive = false;
+  bool _drawerDragBlocked = false;
 
   @override
   void dispose() {
@@ -118,6 +119,7 @@ class _FullScreenDragDrawerState extends State<FullScreenDragDrawer>
   }
 
   void _handlePointerDown(PointerDownEvent event) {
+    if (_drawerDragBlocked) return;
     if (_pointerDrag != null) {
       _pointerDrag = null;
       _setEdgeGestureActive(false);
@@ -167,6 +169,7 @@ class _FullScreenDragDrawerState extends State<FullScreenDragDrawer>
   }
 
   void _handlePointerMove(PointerMoveEvent event) {
+    if (_drawerDragBlocked) return;
     final drag = _pointerDrag;
     if (drag == null || drag.pointer != event.pointer) return;
     drag.velocityTracker.addPosition(event.timeStamp, event.position);
@@ -240,6 +243,15 @@ class _FullScreenDragDrawerState extends State<FullScreenDragDrawer>
     widget.onEdgeGestureChanged?.call(active);
   }
 
+  void _setDrawerDragBlocked(bool blocked) {
+    if (_drawerDragBlocked == blocked) return;
+    _drawerDragBlocked = blocked;
+    if (blocked) {
+      _pointerDrag = null;
+      _setEdgeGestureActive(false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final listener = Listener(
@@ -297,7 +309,11 @@ class _FullScreenDragDrawerState extends State<FullScreenDragDrawer>
       ),
     );
     if (widget.drawer == null) return listener;
-    return FullScreenDragDrawerScope(openDrawer: openDrawer, child: listener);
+    return FullScreenDragDrawerScope(
+      openDrawer: openDrawer,
+      setDrawerDragBlocked: _setDrawerDragBlocked,
+      child: listener,
+    );
   }
 }
 
@@ -320,15 +336,18 @@ class FullScreenDragDrawerScope extends InheritedWidget {
   const FullScreenDragDrawerScope({
     super.key,
     required this.openDrawer,
+    required this.setDrawerDragBlocked,
     required super.child,
   });
 
   final VoidCallback openDrawer;
+  final ValueChanged<bool> setDrawerDragBlocked;
 
   static FullScreenDragDrawerScope? maybeOf(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<FullScreenDragDrawerScope>();
 
   @override
   bool updateShouldNotify(FullScreenDragDrawerScope oldWidget) =>
-      openDrawer != oldWidget.openDrawer;
+      openDrawer != oldWidget.openDrawer ||
+      setDrawerDragBlocked != oldWidget.setDrawerDragBlocked;
 }

@@ -13,6 +13,7 @@ import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/widgets/directory_tile.dart';
 import 'package:vaultexplorer/features/browser/widgets/fast_scrollbar.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_tile.dart';
+import 'package:vaultexplorer/features/browser/widgets/browser_item_drag.dart';
 import 'package:vaultexplorer/features/browser/widgets/hold_range_select_container.dart';
 
 /// Rejects list scroll drag deltas while a 2-finger pinch gesture is active
@@ -40,6 +41,7 @@ class _ZoomScrollPhysics extends AlwaysScrollableScrollPhysics {
     return super.applyPhysicsToUserOffset(position, offset);
   }
 }
+
 class FileListView extends StatefulWidget {
   final List<RawEntry> items;
   final bool isSelectionMode;
@@ -67,6 +69,8 @@ class FileListView extends StatefulWidget {
   /// opening it. See `file_browser_screen.dart`'s `_handleIconTap`.
   final ValueChanged<RawEntry>? onIconTap;
   final ValueChanged<Set<RawEntry>>? onSelectionChanged;
+  final bool enableFileDrag;
+  final BrowserItemDropHandler? onFileDrop;
   final String? searchQuery;
   final bool Function(RawEntry entry)? isFolderMounted;
   final bool Function(RawEntry entry)? isPinned;
@@ -106,6 +110,8 @@ class FileListView extends StatefulWidget {
     this.onFileLongMenu,
     this.onIconTap,
     this.onSelectionChanged,
+    this.enableFileDrag = false,
+    this.onFileDrop,
     this.searchQuery,
     this.isFolderMounted,
     this.isPinned,
@@ -166,9 +172,7 @@ class _FileListViewState extends State<FileListView> {
 
   double _computeItemExtent(double zoom) {
     final textScaler = MediaQuery.textScalerOf(context);
-    final effectiveTextScaler = TextScaler.linear(
-      textScaler.scale(1.0) * zoom,
-    );
+    final effectiveTextScaler = TextScaler.linear(textScaler.scale(1.0) * zoom);
     final baseContentHeight = (widget.isCompact ? 32.0 : 44.0) * zoom;
     final scaledTextHeight = effectiveTextScaler.scale(
       widget.isDetailed ? 46.0 : 24.0,
@@ -200,7 +204,9 @@ class _FileListViewState extends State<FileListView> {
 
       if (!_isAtTopAnchor && !_isAtBottomAnchor) {
         final centerY = offset + (viewport / 2.0);
-        _anchorCenterItemIndex = currentExtent > 0 ? (centerY / currentExtent) : 0.0;
+        _anchorCenterItemIndex = currentExtent > 0
+            ? (centerY / currentExtent)
+            : 0.0;
       }
     }
   }
@@ -215,11 +221,13 @@ class _FileListViewState extends State<FileListView> {
     }
 
     if (!_isZooming || _lastPointerCount < 2) {
-      _handleScaleStart(ScaleStartDetails(
-        focalPoint: details.focalPoint,
-        localFocalPoint: details.localFocalPoint,
-        pointerCount: details.pointerCount,
-      ));
+      _handleScaleStart(
+        ScaleStartDetails(
+          focalPoint: details.focalPoint,
+          localFocalPoint: details.localFocalPoint,
+          pointerCount: details.pointerCount,
+        ),
+      );
     }
     _lastPointerCount = details.pointerCount;
 
@@ -261,7 +269,6 @@ class _FileListViewState extends State<FileListView> {
     widget.onZoomLevelChanged?.call(_zoomLevel);
   }
 
-
   bool _onScrollNotification(ScrollNotification notification) {
     if (notification is ScrollUpdateNotification) {
       final delta = notification.scrollDelta?.abs() ?? 0.0;
@@ -289,32 +296,149 @@ class _FileListViewState extends State<FileListView> {
     // mid-gesture and left the two objects disagreeing about whether a pinch
     // was still in progress. Trusting the scale callbacks alone avoids that.
     return HoldRangeSelectContainer(
-        items: widget.items,
-        selectedItems: widget.selectedItems,
-        isSelectionMode: widget.isSelectionMode,
-        onSelectionChanged: (newSelection) =>
-            widget.onSelectionChanged?.call(newSelection),
-        onLongPressSelect: (entry) => widget.onItemLongPress(entry),
-        onScaleStart: _handleScaleStart,
-        onScaleUpdate: _handleScaleUpdate,
-        onScaleEnd: _handleScaleEnd,
-        child: Column(
-          children: [
-            Expanded(
-              child: MediaQuery(
-                data: MediaQuery.of(context).copyWith(
-                  textScaler: TextScaler.linear(
-                    MediaQuery.textScalerOf(context).scale(1.0) * _zoomLevel,
-                  ),
+      items: widget.items,
+      selectedItems: widget.selectedItems,
+      isSelectionMode: widget.isSelectionMode,
+      onSelectionChanged: (newSelection) =>
+          widget.onSelectionChanged?.call(newSelection),
+      onLongPressSelect: (entry) => widget.onItemLongPress(entry),
+      enableHoldDrag: widget.enableFileDrag && widget.archiveContext == null,
+      onScaleStart: _handleScaleStart,
+      onScaleUpdate: _handleScaleUpdate,
+      onScaleEnd: _handleScaleEnd,
+      child: Column(
+        children: [
+          Expanded(
+            child: MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                textScaler: TextScaler.linear(
+                  MediaQuery.textScalerOf(context).scale(1.0) * _zoomLevel,
                 ),
-                child: NotificationListener<ScrollNotification>(
-                  onNotification: _onScrollNotification,
-                  child: widget.scrollController == null
-                      ? ListView.builder(
+              ),
+              child: NotificationListener<ScrollNotification>(
+                onNotification: _onScrollNotification,
+                child: widget.scrollController == null
+                    ? ListView.builder(
+                        controller: widget.scrollController,
+                        physics: scrollPhysics,
+                        itemExtent: itemExtent,
+                        findChildIndexCallback: (Key key) => _keyIndexMap[key],
+                        padding: EdgeInsets.only(
+                          top: 0,
+                          bottom: widget.bottomClearance,
+                        ),
+                        itemCount: total,
+                        itemBuilder: (_, index) {
+                          final entry = widget.items[index];
+                          final isSelected = widget.selectedItems.contains(
+                            entry,
+                          );
+                          final isPinned =
+                              widget.isPinned?.call(entry) ?? false;
+                          final isBookmark =
+                              widget.isBookmark?.call(entry) ?? false;
+                          final Widget tile;
+                          if (entry.isDir) {
+                            tile = DirectoryTile(
+                              key: ValueKey(
+                                'dir:${entry.raw}:$isPinned:$isBookmark',
+                              ),
+                              entry: entry,
+                              isSelectionMode: widget.isSelectionMode,
+                              isSelected: isSelected,
+                              isCompact: widget.isCompact,
+                              isDetailed: widget.isDetailed,
+                              zoomLevel: _zoomLevel,
+                              detailColumns: widget.detailColumns,
+                              longFileNameMode: widget.longFileNameMode,
+                              searchQuery: widget.searchQuery,
+                              isDocumentProviderMounted:
+                                  widget.isFolderMounted?.call(entry) ?? false,
+                              isPinned: isPinned,
+                              isBookmark: isBookmark,
+                              isSynced:
+                                  widget.isFolderSynced?.call(entry) ?? false,
+                              container: widget.container,
+                              currentDirPath: widget.currentDirPath,
+                              cacheMode: widget.thumbnailCacheMode,
+                              quality: widget.thumbnailQuality,
+                              showThumbnailPreview: widget.showThumbnails,
+                              showItemActionsMenu: widget.showItemActionsMenu,
+                              onTap: () => widget.onDirTap(entry),
+                              onLongPress: () {},
+                              onMoreTap: widget.onFileLongMenu,
+                              onIconTap: widget.onIconTap == null
+                                  ? null
+                                  : () => widget.onIconTap!(entry),
+                            );
+                          } else {
+                            tile = FileTile(
+                              key: ValueKey(
+                                'file:${entry.raw}:$isPinned:$isBookmark',
+                              ),
+                              entry: entry,
+                              isSelectionMode: widget.isSelectionMode,
+                              isSelected: isSelected,
+                              isCompact: widget.isCompact,
+                              isDetailed: widget.isDetailed,
+                              zoomLevel: _zoomLevel,
+                              detailColumns: widget.detailColumns,
+                              longFileNameMode: widget.longFileNameMode,
+                              searchQuery: widget.searchQuery,
+                              container: widget.container,
+                              currentDirPath: widget.currentDirPath,
+                              thumbnailCacheMode: widget.thumbnailCacheMode,
+                              thumbnailQuality: widget.thumbnailQuality,
+                              showThumbnail: widget.showThumbnails,
+                              isPinned: isPinned,
+                              isBookmark: isBookmark,
+                              showItemActionsMenu: widget.showItemActionsMenu,
+                              showFileExtensions: widget.showFileExtensions,
+                              onTap: () => widget.onFileTap(entry),
+                              onLongPress: () {},
+                              onLongMenu: widget.onFileLongMenu,
+                              onIconTap: widget.onIconTap == null
+                                  ? null
+                                  : () => widget.onIconTap!(entry),
+                              archiveContext: widget.archiveContext,
+                              archiveRootPath: widget.archiveRootPath,
+                            );
+                          }
+                          return HoldSelectableItem(
+                            key: ValueKey(entry),
+                            index: index,
+                            entry: entry,
+                            child: BrowserItemDragItem(
+                              entry: entry,
+                              container: widget.container,
+                              currentDirectory: widget.currentDirPath,
+                              visibleItems: widget.items,
+                              selectedItems: widget.selectedItems,
+                              isSelectionMode: widget.isSelectionMode,
+                              enabled:
+                                  widget.enableFileDrag &&
+                                  widget.archiveContext == null,
+                              onItemLongPress: widget.onItemLongPress,
+                              onDrop: widget.onFileDrop,
+                              child: tile,
+                            ),
+                          );
+                        },
+                      )
+                    : FastScrollbar(
+                        controller: widget.scrollController!,
+                        items: widget.items,
+                        sortBy: widget.sortBy,
+                        padding: EdgeInsets.only(
+                          top: 0,
+                          bottom: widget.bottomClearance,
+                        ),
+                        child: ListView.builder(
                           controller: widget.scrollController,
                           physics: scrollPhysics,
                           itemExtent: itemExtent,
-                          findChildIndexCallback: (Key key) => _keyIndexMap[key],
+                          findChildIndexCallback: (Key key) =>
+                              _keyIndexMap[key],
                           padding: EdgeInsets.only(
                             top: 0,
                             bottom: widget.bottomClearance,
@@ -322,13 +446,19 @@ class _FileListViewState extends State<FileListView> {
                           itemCount: total,
                           itemBuilder: (_, index) {
                             final entry = widget.items[index];
-                            final isSelected = widget.selectedItems.contains(entry);
-                            final isPinned = widget.isPinned?.call(entry) ?? false;
-                            final isBookmark = widget.isBookmark?.call(entry) ?? false;
+                            final isSelected = widget.selectedItems.contains(
+                              entry,
+                            );
+                            final isPinned =
+                                widget.isPinned?.call(entry) ?? false;
+                            final isBookmark =
+                                widget.isBookmark?.call(entry) ?? false;
                             final Widget tile;
                             if (entry.isDir) {
                               tile = DirectoryTile(
-                                key: ValueKey('dir:${entry.raw}:$isPinned:$isBookmark'),
+                                key: ValueKey(
+                                  'dir:${entry.raw}:$isPinned:$isBookmark',
+                                ),
                                 entry: entry,
                                 isSelectionMode: widget.isSelectionMode,
                                 isSelected: isSelected,
@@ -339,10 +469,12 @@ class _FileListViewState extends State<FileListView> {
                                 longFileNameMode: widget.longFileNameMode,
                                 searchQuery: widget.searchQuery,
                                 isDocumentProviderMounted:
-                                    widget.isFolderMounted?.call(entry) ?? false,
+                                    widget.isFolderMounted?.call(entry) ??
+                                    false,
                                 isPinned: isPinned,
                                 isBookmark: isBookmark,
-                                isSynced: widget.isFolderSynced?.call(entry) ?? false,
+                                isSynced:
+                                    widget.isFolderSynced?.call(entry) ?? false,
                                 container: widget.container,
                                 currentDirPath: widget.currentDirPath,
                                 cacheMode: widget.thumbnailCacheMode,
@@ -358,7 +490,9 @@ class _FileListViewState extends State<FileListView> {
                               );
                             } else {
                               tile = FileTile(
-                                key: ValueKey('file:${entry.raw}:$isPinned:$isBookmark'),
+                                key: ValueKey(
+                                  'file:${entry.raw}:$isPinned:$isBookmark',
+                                ),
                                 entry: entry,
                                 isSelectionMode: widget.isSelectionMode,
                                 isSelected: isSelected,
@@ -391,109 +525,29 @@ class _FileListViewState extends State<FileListView> {
                               key: ValueKey(entry),
                               index: index,
                               entry: entry,
-                              child: tile,
+                              child: BrowserItemDragItem(
+                                entry: entry,
+                                container: widget.container,
+                                currentDirectory: widget.currentDirPath,
+                                visibleItems: widget.items,
+                                selectedItems: widget.selectedItems,
+                                isSelectionMode: widget.isSelectionMode,
+                                enabled:
+                                    widget.enableFileDrag &&
+                                    widget.archiveContext == null,
+                                onItemLongPress: widget.onItemLongPress,
+                                onDrop: widget.onFileDrop,
+                                child: tile,
+                              ),
                             );
                           },
-                        )
-                      : FastScrollbar(
-                          controller: widget.scrollController!,
-                          items: widget.items,
-                          sortBy: widget.sortBy,
-                          padding: EdgeInsets.only(
-                            top: 0,
-                            bottom: widget.bottomClearance,
-                          ),
-                          child: ListView.builder(
-                            controller: widget.scrollController,
-                            physics: scrollPhysics,
-                            itemExtent: itemExtent,
-                            findChildIndexCallback: (Key key) => _keyIndexMap[key],
-                            padding: EdgeInsets.only(
-                              top: 0,
-                              bottom: widget.bottomClearance,
-                            ),
-                            itemCount: total,
-                            itemBuilder: (_, index) {
-                              final entry = widget.items[index];
-                              final isSelected = widget.selectedItems.contains(entry);
-                              final isPinned = widget.isPinned?.call(entry) ?? false;
-                              final isBookmark = widget.isBookmark?.call(entry) ?? false;
-                              final Widget tile;
-                              if (entry.isDir) {
-                                tile = DirectoryTile(
-                                  key: ValueKey('dir:${entry.raw}:$isPinned:$isBookmark'),
-                                  entry: entry,
-                                  isSelectionMode: widget.isSelectionMode,
-                                  isSelected: isSelected,
-                                  isCompact: widget.isCompact,
-                                  isDetailed: widget.isDetailed,
-                                  zoomLevel: _zoomLevel,
-                                  detailColumns: widget.detailColumns,
-                                  longFileNameMode: widget.longFileNameMode,
-                                  searchQuery: widget.searchQuery,
-                                  isDocumentProviderMounted:
-                                      widget.isFolderMounted?.call(entry) ?? false,
-                                  isPinned: isPinned,
-                                  isBookmark: isBookmark,
-                                  isSynced: widget.isFolderSynced?.call(entry) ?? false,
-                                  container: widget.container,
-                                  currentDirPath: widget.currentDirPath,
-                                  cacheMode: widget.thumbnailCacheMode,
-                                  quality: widget.thumbnailQuality,
-                                  showThumbnailPreview: widget.showThumbnails,
-                                  showItemActionsMenu: widget.showItemActionsMenu,
-                                  onTap: () => widget.onDirTap(entry),
-                                  onLongPress: () {},
-                                  onMoreTap: widget.onFileLongMenu,
-                                  onIconTap: widget.onIconTap == null
-                                      ? null
-                                      : () => widget.onIconTap!(entry),
-                                );
-                              } else {
-                                tile = FileTile(
-                                  key: ValueKey('file:${entry.raw}:$isPinned:$isBookmark'),
-                                  entry: entry,
-                                  isSelectionMode: widget.isSelectionMode,
-                                  isSelected: isSelected,
-                                  isCompact: widget.isCompact,
-                                  isDetailed: widget.isDetailed,
-                                  zoomLevel: _zoomLevel,
-                                  detailColumns: widget.detailColumns,
-                                  longFileNameMode: widget.longFileNameMode,
-                                  searchQuery: widget.searchQuery,
-                                  container: widget.container,
-                                  currentDirPath: widget.currentDirPath,
-                                  thumbnailCacheMode: widget.thumbnailCacheMode,
-                                  thumbnailQuality: widget.thumbnailQuality,
-                                  showThumbnail: widget.showThumbnails,
-                                  isPinned: isPinned,
-                                  isBookmark: isBookmark,
-                                  showItemActionsMenu: widget.showItemActionsMenu,
-                                  showFileExtensions: widget.showFileExtensions,
-                                  onTap: () => widget.onFileTap(entry),
-                                  onLongPress: () {},
-                                  onLongMenu: widget.onFileLongMenu,
-                                  onIconTap: widget.onIconTap == null
-                                      ? null
-                                      : () => widget.onIconTap!(entry),
-                                  archiveContext: widget.archiveContext,
-                                  archiveRootPath: widget.archiveRootPath,
-                                );
-                              }
-                              return HoldSelectableItem(
-                                key: ValueKey(entry),
-                                index: index,
-                                entry: entry,
-                                child: tile,
-                              );
-                            },
-                          ),
                         ),
-                ),
+                      ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
+      ),
     );
   }
 }

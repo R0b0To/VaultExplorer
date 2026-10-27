@@ -313,6 +313,45 @@ mixin _LiveNameValidation<T extends StatefulWidget> on State<T> {
   }
 }
 
+Widget _buildNamePromptDialog(
+  BuildContext context, {
+  required Widget title,
+  required Widget content,
+  required List<Widget> actions,
+}) {
+  final media = MediaQuery.of(context);
+  final maxHeight = (media.size.height - media.viewInsets.bottom - 16)
+      .clamp(0.0, media.size.height)
+      .toDouble();
+
+  return Dialog(
+    insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+    child: ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: 560, maxHeight: maxHeight),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            DefaultTextStyle(
+              style: Theme.of(context).textTheme.titleLarge!,
+              child: title,
+            ),
+            const SizedBox(height: 24),
+            content,
+            const SizedBox(height: 20),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Wrap(spacing: 8, children: actions),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 class _CreateFolderDialog extends ConsumerStatefulWidget {
   final MountedContainer container;
   final String currentDirPath;
@@ -369,9 +408,11 @@ class _CreateFolderDialogState extends ConsumerState<_CreateFolderDialog>
     ).validateAndBuild(l10n);
     if (built is! PathBuildSuccess) return;
     final parentContext = context;
+    final opService = ref.read(fileOperationServiceProvider);
     Navigator.pop(context);
     final ok = await _fileIoApi.createDirectory(widget.container, built.path);
     if (ok) {
+      opService.notifyVolumeContentChanged(widget.container.volId);
       widget.onSuccess();
     } else if (parentContext.mounted) {
       showAppSnackBar(
@@ -385,7 +426,8 @@ class _CreateFolderDialogState extends ConsumerState<_CreateFolderDialog>
   @override
   Widget build(BuildContext context) {
     final name = _ctrl.text;
-    return AlertDialog(
+    return _buildNamePromptDialog(
+      context,
       title: Text(context.l10n.newFolderTitle),
       content: SizedBox(
         width: double.maxFinite,
@@ -505,9 +547,11 @@ class _CreateFileDialogState extends ConsumerState<_CreateFileDialog>
     ).validateAndBuild(l10n);
     if (built is! PathBuildSuccess) return;
     final parentContext = context;
+    final opService = ref.read(fileOperationServiceProvider);
     Navigator.pop(context);
     final ok = await _fileIoApi.createEmptyFile(widget.container, built.path);
     if (ok) {
+      opService.notifyVolumeContentChanged(widget.container.volId);
       widget.onSuccess();
     } else if (parentContext.mounted) {
       showAppSnackBar(
@@ -521,7 +565,8 @@ class _CreateFileDialogState extends ConsumerState<_CreateFileDialog>
   @override
   Widget build(BuildContext context) {
     final name = _ctrl.text;
-    return AlertDialog(
+    return _buildNamePromptDialog(
+      context,
       title: Text(context.l10n.newTextFileTitle),
       content: SizedBox(
         width: double.maxFinite,
@@ -716,6 +761,7 @@ class _RenameDialogState extends ConsumerState<_RenameDialog>
     final marks = ref.read(
       fileBrowserPinsBookmarksProvider(widget.container.volId).notifier,
     );
+    final opService = ref.read(fileOperationServiceProvider);
     if (_isSingle) {
       if (!isValid) return;
       final oldEntry = widget.oldEntries.first;
@@ -744,6 +790,7 @@ class _RenameDialogState extends ConsumerState<_RenameDialog>
         built.path,
       );
       if (ok) {
+        opService.notifyVolumeContentChanged(widget.container.volId);
         // Bookmarks and pins on the entry (or inside a renamed folder) follow.
         unawaited(marks.remapPaths(widget.container, {oldFull: built.path}));
         widget.onSuccess();
@@ -818,7 +865,10 @@ class _RenameDialogState extends ConsumerState<_RenameDialog>
     if (renamed.isNotEmpty) {
       unawaited(marks.remapPaths(widget.container, renamed));
     }
-    if (successCount > 0) widget.onSuccess();
+    if (successCount > 0) {
+      opService.notifyVolumeContentChanged(widget.container.volId);
+      widget.onSuccess();
+    }
     if (failCount > 0 && parentContext.mounted) {
       showAppSnackBar(
         parentContext,
@@ -836,7 +886,8 @@ class _RenameDialogState extends ConsumerState<_RenameDialog>
         ? context.l10n.rename
         : context.l10n.renameMultipleTitle(widget.oldEntries.length);
     final name = _ctrl.text;
-    return AlertDialog(
+    return _buildNamePromptDialog(
+      context,
       title: Row(
         children: [
           Expanded(

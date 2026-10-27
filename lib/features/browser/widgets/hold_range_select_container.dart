@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
 
 /// A custom scale recognizer that prioritizes pinch-to-zoom over single-finger scrolling.
 /// A custom scale recognizer that prioritizes pinch-to-zoom over single-finger scrolling
@@ -88,10 +89,7 @@ class HoldSelectMetadata {
   final int index;
   final RawEntry entry;
 
-  const HoldSelectMetadata({
-    required this.index,
-    required this.entry,
-  });
+  const HoldSelectMetadata({required this.index, required this.entry});
 }
 
 /// Wraps an individual item (file or directory cell/tile) in a zero-overhead
@@ -146,6 +144,7 @@ class HoldRangeSelectContainer extends StatefulWidget {
   final bool isSelectionMode;
   final ValueChanged<Set<RawEntry>> onSelectionChanged;
   final void Function(RawEntry entry)? onLongPressSelect;
+  final bool enableHoldDrag;
   final GestureScaleStartCallback? onScaleStart;
   final GestureScaleUpdateCallback? onScaleUpdate;
   final GestureScaleEndCallback? onScaleEnd;
@@ -159,6 +158,7 @@ class HoldRangeSelectContainer extends StatefulWidget {
     required this.isSelectionMode,
     required this.onSelectionChanged,
     this.onLongPressSelect,
+    this.enableHoldDrag = false,
     this.onScaleStart,
     this.onScaleUpdate,
     this.onScaleEnd,
@@ -184,6 +184,8 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
   bool _isScrollActive = false;
   bool _scrollEndPending = false;
   bool _scrollEndResetScheduled = false;
+  int? _rangeHoldPointer;
+  ValueChanged<bool>? _setDrawerDragBlocked;
 
   int? get _effectiveAnchorIndex {
     if (_lastInteractedEntry != null &&
@@ -222,6 +224,15 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
     }
   }
 
+  @override
+  void dispose() {
+    if (_rangeHoldPointer != null) {
+      _setDrawerDragBlocked?.call(false);
+      _rangeHoldPointer = null;
+    }
+    super.dispose();
+  }
+
   HoldSelectMetadata? _findItemAt(Offset globalPosition) {
     final renderBox =
         _containerKey.currentContext?.findRenderObject() as RenderBox?;
@@ -254,7 +265,18 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
     }
 
     final item = _findItemAt(event.position);
-    return item != null && !item.entry.isPlaceholder;
+    if (item == null || item.entry.isPlaceholder) return false;
+
+    // A first hold starts a drag, which selects that item as the drag begins.
+    // In selection mode a hold on an already-selected item drags the whole
+    // selection. Unselected items still use the hold recognizer for range
+    // selection.
+    if (widget.enableHoldDrag &&
+        (!widget.isSelectionMode ||
+            widget.selectedItems.contains(item.entry))) {
+      return false;
+    }
+    return true;
   }
 
   bool _handleScrollNotification(ScrollNotification notification) {
@@ -300,6 +322,8 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
     if (!mounted || _downPointers.length != 1) return;
     final touchedItem = _pointerDownItem;
     if (touchedItem == null || touchedItem.entry.isPlaceholder) return;
+    _rangeHoldPointer = _downPointers.single;
+    _setDrawerDragBlocked?.call(true);
 
     if (!widget.isSelectionMode) {
       _lastInteractedIndex = touchedItem.index;
@@ -345,6 +369,10 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
 
   void _handlePointerUp(PointerUpEvent event) {
     _downPointers.remove(event.pointer);
+    if (_rangeHoldPointer == event.pointer) {
+      _rangeHoldPointer = null;
+      _setDrawerDragBlocked?.call(false);
+    }
     final interruptedScroll = _scrollInterruptPointers.remove(event.pointer);
     if (!interruptedScroll && !_hasMoved && _pointerDownItem != null) {
       _lastInteractedIndex = _pointerDownItem!.index;
@@ -358,6 +386,10 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
 
   void _handlePointerCancel(PointerCancelEvent event) {
     _downPointers.remove(event.pointer);
+    if (_rangeHoldPointer == event.pointer) {
+      _rangeHoldPointer = null;
+      _setDrawerDragBlocked?.call(false);
+    }
     _scrollInterruptPointers.remove(event.pointer);
     _pointerDownPosition = null;
     _pointerDownItem = null;
@@ -396,7 +428,9 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
       // One finger was lifted: immediately finish scaling so the remaining finger
       // can scroll natively without getting locked out.
       _scaleStarted = false;
-      widget.onScaleEnd?.call(ScaleEndDetails(pointerCount: details.pointerCount));
+      widget.onScaleEnd?.call(
+        ScaleEndDetails(pointerCount: details.pointerCount),
+      );
     }
   }
 
@@ -409,6 +443,9 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
 
   @override
   Widget build(BuildContext context) {
+    _setDrawerDragBlocked = FullScreenDragDrawerScope.maybeOf(
+      context,
+    )?.setDrawerDragBlocked;
     return Listener(
       behavior: HitTestBehavior.translucent,
       onPointerDown: _handlePointerDown,
@@ -420,25 +457,28 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
         behavior: HitTestBehavior.translucent,
         gestures: <Type, GestureRecognizerFactory>{
           _HoldSelectGestureRecognizer:
-              GestureRecognizerFactoryWithHandlers<_HoldSelectGestureRecognizer>(
-            () => _HoldSelectGestureRecognizer(duration: widget.holdDelay),
-            (_HoldSelectGestureRecognizer instance) {
-              instance
-                ..pointerFilter = _shouldTrackHold
-                ..onLongPressStart = _handleHoldStart;
-            },
-          ),
+              GestureRecognizerFactoryWithHandlers<
+                _HoldSelectGestureRecognizer
+              >(
+                () => _HoldSelectGestureRecognizer(duration: widget.holdDelay),
+                (_HoldSelectGestureRecognizer instance) {
+                  instance
+                    ..pointerFilter = _shouldTrackHold
+                    ..onLongPressStart = _handleHoldStart;
+                },
+              ),
           _PinchScaleGestureRecognizer:
-              GestureRecognizerFactoryWithHandlers<_PinchScaleGestureRecognizer>(
-            () => _PinchScaleGestureRecognizer(),
-            (_PinchScaleGestureRecognizer instance) {
-              instance
-                ..onStart = _handleScaleStart
-                ..onUpdate = _handleScaleUpdate
-                ..onEnd = _handleScaleEnd
-                ..onPinchEnd = _checkScaleFinished;
-            },
-          ),
+              GestureRecognizerFactoryWithHandlers<
+                _PinchScaleGestureRecognizer
+              >(() => _PinchScaleGestureRecognizer(), (
+                _PinchScaleGestureRecognizer instance,
+              ) {
+                instance
+                  ..onStart = _handleScaleStart
+                  ..onUpdate = _handleScaleUpdate
+                  ..onEnd = _handleScaleEnd
+                  ..onPinchEnd = _checkScaleFinished;
+              }),
         },
         child: NotificationListener<ScrollNotification>(
           onNotification: _handleScrollNotification,

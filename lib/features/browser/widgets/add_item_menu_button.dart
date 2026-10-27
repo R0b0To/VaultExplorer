@@ -24,7 +24,6 @@ class AddItemMenuButton extends ConsumerStatefulWidget {
   final void Function(String message, {bool error}) onSetStatus;
   final Future<void> Function() onExtractArchive;
   final void Function() onSignalActivity;
-  final Future<void> Function(String path) onLoadDirectoryContents;
   final Future<void> Function() onCaptureFromCamera;
   final Future<void> Function() onRecordAudio;
   final Future<void> Function() onImportFilesFromDevice;
@@ -52,7 +51,6 @@ class AddItemMenuButton extends ConsumerStatefulWidget {
     required this.onSetStatus,
     required this.onExtractArchive,
     required this.onSignalActivity,
-    required this.onLoadDirectoryContents,
     required this.onCaptureFromCamera,
     required this.onRecordAudio,
     required this.onImportFilesFromDevice,
@@ -166,8 +164,7 @@ class _AddItemMenuButtonState extends ConsumerState<AddItemMenuButton> {
               container: widget.container,
               currentDirPath: widget.currentDirPath,
               existingEntries: widget.currentItems,
-              onSuccess: () =>
-                  widget.onLoadDirectoryContents(widget.currentDirPath),
+              onSuccess: () {},
               readOnly: widget.isReadOnly,
             );
           },
@@ -184,8 +181,7 @@ class _AddItemMenuButtonState extends ConsumerState<AddItemMenuButton> {
               container: widget.container,
               currentDirPath: widget.currentDirPath,
               existingEntries: widget.currentItems,
-              onSuccess: () =>
-                  widget.onLoadDirectoryContents(widget.currentDirPath),
+              onSuccess: () {},
               readOnly: widget.isReadOnly,
             );
           },

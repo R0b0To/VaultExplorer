@@ -25,6 +25,7 @@ import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/widgets/apk_icon_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/archive_thumbnail_support.dart';
+import 'package:vaultexplorer/features/browser/widgets/browser_item_drag.dart';
 import 'package:vaultexplorer/features/browser/widgets/fast_scrollbar.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_thumbnail_preview.dart';
 import 'package:vaultexplorer/features/browser/widgets/grid_card_shell.dart';
@@ -62,6 +63,8 @@ class FileGridView extends StatefulWidget {
   /// layout uses).
   final bool showItemActionsMenu;
   final ValueChanged<Set<RawEntry>>? onSelectionChanged;
+  final bool enableFileDrag;
+  final BrowserItemDropHandler? onFileDrop;
   final String? searchQuery;
   final Set<String> mountedFolderPaths;
   final bool Function(RawEntry entry)? isPinned;
@@ -97,6 +100,8 @@ class FileGridView extends StatefulWidget {
     this.onFileLongMenu,
     this.showItemActionsMenu = true,
     this.onSelectionChanged,
+    this.enableFileDrag = false,
+    this.onFileDrop,
     this.searchQuery,
     this.mountedFolderPaths = const {},
     this.isPinned,
@@ -108,7 +113,7 @@ class FileGridView extends StatefulWidget {
     this.archiveRootPath,
     this.sortBy,
   });
-  
+
   @override
   State<FileGridView> createState() => _FileGridViewState();
 }
@@ -241,9 +246,15 @@ class _FileGridViewState extends State<FileGridView>
       final rowHeight = currentTileHeight + widget.spacing;
       final viewport = controller.position.viewportDimension;
       final viewportCenter = controller.offset + (viewport / 2.0);
-      final centerRow = math.max(0, ((viewportCenter - 12.0) / rowHeight).round());
+      final centerRow = math.max(
+        0,
+        ((viewportCenter - 12.0) / rowHeight).round(),
+      );
       // Lock the center item index ONCE for the whole gesture so continuous zooming never drifts to 0
-      _anchorItemIndex = (centerRow * _crossAxisCount).clamp(0, widget.items.length - 1);
+      _anchorItemIndex = (centerRow * _crossAxisCount).clamp(
+        0,
+        widget.items.length - 1,
+      );
     }
   }
 
@@ -274,7 +285,8 @@ class _FileGridViewState extends State<FileGridView>
         final newTileHeight = _getTileHeight(newColumns);
         final newRowHeight = newTileHeight + widget.spacing;
         final targetRow = anchor ~/ newColumns;
-        final targetRowCenter = 12.0 + (targetRow * newRowHeight) + (newTileHeight / 2.0);
+        final targetRowCenter =
+            12.0 + (targetRow * newRowHeight) + (newTileHeight / 2.0);
         final viewport = controller.position.viewportDimension;
         final maxScroll = controller.position.maxScrollExtent;
         final targetOffset = (targetRowCenter - (viewport / 2.0))
@@ -288,11 +300,13 @@ class _FileGridViewState extends State<FileGridView>
   void _handleScaleUpdate(ScaleUpdateDetails details) {
     if (details.pointerCount < 2) return;
     if (_anchorItemIndex == null) {
-      _handleScaleStart(ScaleStartDetails(
-        focalPoint: details.focalPoint,
-        localFocalPoint: details.localFocalPoint,
-        pointerCount: details.pointerCount,
-      ));
+      _handleScaleStart(
+        ScaleStartDetails(
+          focalPoint: details.focalPoint,
+          localFocalPoint: details.localFocalPoint,
+          pointerCount: details.pointerCount,
+        ),
+      );
     }
 
     final scale = details.scale;
@@ -335,14 +349,10 @@ class _FileGridViewState extends State<FileGridView>
       },
       child: GridView.builder(
         controller: controller,
-        physics: const AlwaysScrollableScrollPhysics(), // Native scroll physics that cannot freeze
+        physics:
+            const AlwaysScrollableScrollPhysics(), // Native scroll physics that cannot freeze
         findChildIndexCallback: (Key key) => _keyIndexMap[key],
-        padding: EdgeInsets.fromLTRB(
-          10,
-          12,
-          10,
-          widget.bottomClearance,
-        ),
+        padding: EdgeInsets.fromLTRB(10, 12, 10, widget.bottomClearance),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: _crossAxisCount,
           crossAxisSpacing: widget.spacing,
@@ -356,9 +366,20 @@ class _FileGridViewState extends State<FileGridView>
             key: ValueKey(entry),
             index: index,
             entry: entry,
-            child: entry.isDir
-                ? _buildDirCell(context, entry)
-                : _buildFileCell(context, entry),
+            child: BrowserItemDragItem(
+              entry: entry,
+              container: widget.container,
+              currentDirectory: widget.currentDirPath,
+              visibleItems: widget.items,
+              selectedItems: widget.selectedItems,
+              isSelectionMode: widget.isSelectionMode,
+              enabled: widget.enableFileDrag && widget.archiveContext == null,
+              onItemLongPress: widget.onItemLongPress,
+              onDrop: widget.onFileDrop,
+              child: entry.isDir
+                  ? _buildDirCell(context, entry)
+                  : _buildFileCell(context, entry),
+            ),
           );
         },
       ),
@@ -382,6 +403,8 @@ class _FileGridViewState extends State<FileGridView>
           onSelectionChanged: (newSelection) =>
               widget.onSelectionChanged?.call(newSelection),
           onLongPressSelect: (entry) => widget.onItemLongPress(entry),
+          enableHoldDrag:
+              widget.enableFileDrag && widget.archiveContext == null,
           onScaleStart: _handleScaleStart,
           onScaleUpdate: _handleScaleUpdate,
           onScaleEnd: _handleScaleEnd,
@@ -726,15 +749,15 @@ class _EncryptedImageGridThumb extends ConsumerWidget {
   }
 
   Widget _errorPlaceholder(ColorScheme cs) => Container(
-        color: cs.surfaceContainerLow,
-        child: Center(
-          child: Icon(
-            Icons.broken_image_rounded,
-            size: AppIconSize.feature,
-            color: cs.outline,
-          ),
-        ),
-      );
+    color: cs.surfaceContainerLow,
+    child: Center(
+      child: Icon(
+        Icons.broken_image_rounded,
+        size: AppIconSize.feature,
+        color: cs.outline,
+      ),
+    ),
+  );
 }
 
 class _VideoThumb extends ConsumerWidget {
@@ -763,18 +786,17 @@ class _VideoThumb extends ConsumerWidget {
     ThumbnailQuality quality,
     ArchiveContext? archiveContext,
     String? archiveRootPath,
-  ) =>
-      VideoThumbnailFetcher.fetch(
-        thumbnailCache,
-        fileIoApi,
-        container,
-        path,
-        mode: mode,
-        quality: quality,
-        targetSize: quality.scaledSize(180),
-        archiveContext: archiveContext,
-        archiveRootPath: archiveRootPath,
-      );
+  ) => VideoThumbnailFetcher.fetch(
+    thumbnailCache,
+    fileIoApi,
+    container,
+    path,
+    mode: mode,
+    quality: quality,
+    targetSize: quality.scaledSize(180),
+    archiveContext: archiveContext,
+    archiveRootPath: archiveRootPath,
+  );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -843,15 +865,15 @@ class _VideoThumb extends ConsumerWidget {
   }
 
   Widget _errorPlaceholder(ColorScheme cs) => Container(
-        color: cs.surfaceContainerLow,
-        child: Center(
-          child: Icon(
-            Icons.broken_image_rounded,
-            size: AppIconSize.feature,
-            color: cs.outline,
-          ),
-        ),
-      );
+    color: cs.surfaceContainerLow,
+    child: Center(
+      child: Icon(
+        Icons.broken_image_rounded,
+        size: AppIconSize.feature,
+        color: cs.outline,
+      ),
+    ),
+  );
 }
 
 class _ApkIconGridThumb extends ConsumerWidget {
@@ -923,7 +945,8 @@ class _ApkIconGridThumb extends ConsumerWidget {
       cache: ThumbnailConcurrency.inFlightThumbnails,
       limiter: ThumbnailConcurrency.imageLimiter,
       quality: quality,
-      fetchFn: (c, p) => _fetch(thumbnailCache, fileIoApi, c, p, cacheMode, quality),
+      fetchFn: (c, p) =>
+          _fetch(thumbnailCache, fileIoApi, c, p, cacheMode, quality),
       debounce: const Duration(milliseconds: 100),
       syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
       cacheHeight: quality.scaledSize(180),
@@ -948,10 +971,6 @@ class _ApkIconGridThumb extends ConsumerWidget {
   }
 
   Widget _fallbackWidget() => Center(
-        child: Icon(
-          fallbackIcon,
-          size: fallbackIconSize,
-          color: fallbackColor,
-        ),
-      );
+    child: Icon(fallbackIcon, size: fallbackIconSize, color: fallbackColor),
+  );
 }

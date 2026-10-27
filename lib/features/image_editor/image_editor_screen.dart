@@ -23,6 +23,7 @@ import 'package:vaultexplorer/core/widgets/feedback/app_feedback.dart';
 import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart';
 import 'package:vaultexplorer/core/widgets/zoom_indicator_pill.dart';
 import 'package:vaultexplorer/data/models/app_skin_preset.dart';
+import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/full_res_image_cache.dart';
@@ -1701,7 +1702,9 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
           tone: AppBannerTone.error,
         );
       case PathBuildSuccess(:final path):
+        final opService = ref.read(fileOperationServiceProvider);
         final ok = await _fileIoApi.writeWholeFile(container, path, bytes);
+        if (ok) opService.notifyVolumeContentChanged(container.volId);
         if (!mounted) return;
         _documentController.setSaving(false);
         if (ok) {

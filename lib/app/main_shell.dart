@@ -950,6 +950,7 @@ class _MainShellState extends ConsumerState<MainShell>
     );
 
     final Widget scaffold = Scaffold(
+      resizeToAvoidBottomInset: !browserContentVisible,
       // Tools and Settings have no horizontal pager, so let a drawer drag
       // start anywhere in their content, too.
       drawerEdgeDragWidth: double.maxFinite,

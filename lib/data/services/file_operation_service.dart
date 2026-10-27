@@ -25,8 +25,9 @@ class VolumeContentChange {
   /// The volume whose contents changed.
   final int volId;
 
-  /// The operation that changed it. A view that started that operation already
-  /// updates itself and can use this to skip the notification.
+  /// The operation that changed it. Zero means the write happened outside an
+  /// operation; a view that started a numbered operation can skip its own
+  /// notification after refreshing directly.
   final int opId;
 }
 
@@ -98,6 +99,12 @@ class FileOperationService extends ChangeNotifier {
   void removeVolumeContentChangedListener(
     void Function(VolumeContentChange change) listener,
   ) => _volumeContentChanged.remove(listener);
+
+  /// Announces a content change made outside this service, such as a camera
+  /// capture or a file created directly by a dialog/editor.
+  void notifyVolumeContentChanged(int volId) {
+    _volumeContentChanged.notify(VolumeContentChange(volId: volId, opId: 0));
+  }
 
   void _publishVolumeContentChanged(FileOperation op, int volId) {
     _volumeContentChanged.notify(VolumeContentChange(volId: volId, opId: op.id));
@@ -958,6 +965,10 @@ class FileOperationService extends ChangeNotifier {
     } finally {
       _engineEvents.removeSplitJoinProgressListener(onProgress);
       _endBatches(guardedVolIds);
+      _publishVolumeContentChanged(op, dest.volId);
+      if (deleteSourceAfter && source.volId != dest.volId) {
+        _publishVolumeContentChanged(op, source.volId);
+      }
       await _fileIoApi.clearCopyState(op.id);
       _unbindOperationListener(op);
       notifyListeners();
@@ -1084,6 +1095,10 @@ class FileOperationService extends ChangeNotifier {
     } finally {
       _engineEvents.removeSplitJoinProgressListener(onProgress);
       _endBatches(guardedVolIds);
+      _publishVolumeContentChanged(op, dest.volId);
+      if (deleteArchiveAfter && source.volId != dest.volId) {
+        _publishVolumeContentChanged(op, source.volId);
+      }
       await _fileIoApi.clearCopyState(op.id);
       _unbindOperationListener(op);
       notifyListeners();
@@ -1167,6 +1182,7 @@ class FileOperationService extends ChangeNotifier {
     } finally {
       _engineEvents.removeImportProgressListener(onProgress);
       _endBatches(guardedVolIds);
+      _publishVolumeContentChanged(op, dest.volId);
       _unbindOperationListener(op);
       notifyListeners();
       _syncNotificationProgress();

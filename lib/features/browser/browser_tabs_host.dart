@@ -1375,6 +1375,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     );
 
     final shell = Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Stack(
         fit: StackFit.expand,
         children: [

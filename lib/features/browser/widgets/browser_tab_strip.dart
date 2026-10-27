@@ -13,6 +13,7 @@ import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_selection_controller.dart';
 import 'package:vaultexplorer/features/browser/models/tab_id.dart';
+import 'package:vaultexplorer/features/browser/widgets/browser_item_drag.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 
 /// Leading icon for a location row in the new-tab picker.
@@ -106,6 +107,8 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
   /// The tab being dragged, and the other pane it is currently held over.
   TabId? _draggingTabId;
   TabPane? _hoverPane;
+  Timer? _fileDropHoverTimer;
+  TabId? _fileDropHoverTabId;
 
   @override
   void initState() {
@@ -127,9 +130,30 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
 
   @override
   void dispose() {
+    _fileDropHoverTimer?.cancel();
     _scrollController.removeListener(_rememberScrollOffset);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _scheduleFileDropTabActivation(
+    BrowserTabState tab,
+    BrowserTabs actions,
+  ) {
+    if (tab.isDashboard || _fileDropHoverTabId == tab.tabId) return;
+    _fileDropHoverTimer?.cancel();
+    _fileDropHoverTabId = tab.tabId;
+    _fileDropHoverTimer = Timer(const Duration(milliseconds: 450), () {
+      if (!mounted || _fileDropHoverTabId != tab.tabId) return;
+      actions.activate(tab.tabId);
+    });
+  }
+
+  void _cancelFileDropTabActivation(TabId tabId) {
+    if (_fileDropHoverTabId != tabId) return;
+    _fileDropHoverTimer?.cancel();
+    _fileDropHoverTimer = null;
+    _fileDropHoverTabId = null;
   }
 
   void _rememberScrollOffset() {
@@ -457,12 +481,65 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
                       builder: (tabContext) => SizedBox(
                         key: itemKey,
                         width: kBrowserTabItemWidth,
-                        child: _TabItem(
-                          tab: tab,
-                          active: isActive,
-                          secondary: isSecondary,
-                          activeBackground: activeBackground,
-                          onTap: () => _onTabTapped(tab, tabContext),
+                        child: DragTarget<BrowserItemDragData>(
+                          onWillAcceptWithDetails: (details) {
+                            final destination = tab.container;
+                            if (destination == null || tab.isDashboard) {
+                              return false;
+                            }
+                            final navigation = ref.read(
+                              fileBrowserNavigationProvider(tab.tabId),
+                            );
+                            if (navigation.archiveContext != null) {
+                              return false;
+                            }
+                            final path = navigation.currentDirPath;
+                            if (!details.data.canDropInto(destination, path)) {
+                              return false;
+                            }
+                            _scheduleFileDropTabActivation(tab, actions);
+                            return true;
+                          },
+                          onMove: (_) =>
+                              _scheduleFileDropTabActivation(tab, actions),
+                          onLeave: (_) =>
+                              _cancelFileDropTabActivation(tab.tabId),
+                          onAcceptWithDetails: (details) {
+                            _cancelFileDropTabActivation(tab.tabId);
+                            final destination = tab.container;
+                            if (destination == null || tab.isDashboard) return;
+                            actions.activate(tab.tabId);
+                            final navigation = ref.read(
+                              fileBrowserNavigationProvider(tab.tabId),
+                            );
+                            if (navigation.archiveContext != null) return;
+                            unawaited(
+                              details.data.onDrop(
+                                details.data,
+                                destination,
+                                navigation.currentDirPath,
+                              ),
+                            );
+                          },
+                          builder: (context, candidates, rejected) =>
+                              DecoratedBox(
+                                decoration: candidates.isEmpty
+                                    ? const BoxDecoration()
+                                    : BoxDecoration(
+                                        border: Border.all(
+                                          color: cs.primary,
+                                          width: 2,
+                                        ),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                child: _TabItem(
+                                  tab: tab,
+                                  active: isActive,
+                                  secondary: isSecondary,
+                                  activeBackground: activeBackground,
+                                  onTap: () => _onTabTapped(tab, tabContext),
+                                ),
+                              ),
                         ),
                       ),
                     ),

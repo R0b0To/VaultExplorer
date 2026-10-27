@@ -7,6 +7,7 @@ import 'package:vaultexplorer/core/api/quick_capture_api.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart' show logSwallowed;
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
@@ -432,6 +433,7 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
     );
 
     final successfullySaved = <CapturedMediaItem>[];
+    final opService = ref.read(fileOperationServiceProvider);
     try {
       String? firstName;
       bool hasVideo = false;
@@ -533,6 +535,10 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
           mediaToSave,
           successfullySaved,
         );
+      }
+    } finally {
+      if (successfullySaved.isNotEmpty) {
+        opService.notifyVolumeContentChanged(container.volId);
       }
     }
   }

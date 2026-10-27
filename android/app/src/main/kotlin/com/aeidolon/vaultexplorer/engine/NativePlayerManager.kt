@@ -90,6 +90,14 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
     private var surface: Surface? = null
     private var textureId: Long = -1L
 
+    /**
+     * Set while the picture-in-picture window (its own activity, with its own
+     * SurfaceView) is showing the video. The player then draws there instead
+     * of into the Flutter texture, and the video track stays on while the app
+     * is in the background: the window is what is on screen.
+     */
+    private var externalSurfaceView: android.view.SurfaceView? = null
+
     private var player: ExoPlayer? = null
     private var decoderManager: DecoderManager? = null
     private var requestedVideoDecoderMode = DecoderMode.AUTO
@@ -536,8 +544,14 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         applyVolumeBoost(exoPlayer.audioSessionId)
         applyBackgroundVideoPolicy(exoPlayer)
 
-        // 5. Connect newSurface to ExoPlayer and prepare
-        exoPlayer.setVideoSurface(newSurface)
+        // 5. Connect the output to ExoPlayer and prepare. While the
+        // picture-in-picture window is up, a new item belongs in it.
+        val pipView = externalSurfaceView
+        if (pipView != null) {
+            exoPlayer.setVideoSurfaceView(pipView)
+        } else {
+            exoPlayer.setVideoSurface(newSurface)
+        }
 
          isFallbackMode = false
         val extractorsFactory = createExtractorsFactory(lenient = false)
@@ -586,8 +600,30 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         player?.let { applyBackgroundVideoPolicy(it) }
     }
 
+    /**
+     * Moves the video output into the picture-in-picture window's [view].
+     * Returns false when there is no player to show.
+     */
+    fun attachExternalSurface(view: android.view.SurfaceView): Boolean {
+        val p = player ?: return false
+        externalSurfaceView = view
+        p.setVideoSurfaceView(view)
+        applyBackgroundVideoPolicy(p)
+        return true
+    }
+
+    /** Puts the video output back into the Flutter texture. */
+    fun detachExternalSurface(view: android.view.SurfaceView) {
+        if (externalSurfaceView !== view) return
+        externalSurfaceView = null
+        val p = player ?: return
+        p.clearVideoSurfaceView(view)
+        surface?.let { p.setVideoSurface(it) }
+        applyBackgroundVideoPolicy(p)
+    }
+
     private fun applyBackgroundVideoPolicy(p: ExoPlayer) {
-        val disabled = appInBackground
+        val disabled = appInBackground && externalSurfaceView == null
         if (p.trackSelectionParameters.disabledTrackTypes.contains(C.TRACK_TYPE_VIDEO) == disabled) return
         p.trackSelectionParameters = p.trackSelectionParameters.buildUpon()
             .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, disabled)
@@ -1038,6 +1074,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         }
         mediaSessionEnabled = false
         player = null
+        externalSurfaceView = null
         decoderManager = null
         equalizerProcessor.update(EqualizerSettings.DISABLED)
         releaseVolumeBoost()

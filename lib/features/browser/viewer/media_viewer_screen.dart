@@ -38,6 +38,7 @@ import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/viewer/carousel_geometry.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_lock_controller.dart';
+import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_playback_paths.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_session_bridge.dart';
 import 'package:vaultexplorer/features/browser/viewer/background_playback/background_playback_host.dart';
@@ -609,8 +610,8 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   /// "keep audio playing after closing" is on and audio is playing, prepares
   /// the hand-off that [dispose] completes: the live player goes to
   /// [BackgroundPlaybackHost] instead of being released. Video is never kept
-  /// (there is nowhere to show it; Android's picture-in-picture window is for
-  /// that), nor is anything paused.
+  /// this way (there is nowhere to show it; the picture-in-picture button is
+  /// for that, see [_enterPictureInPictureWindow]), nor is anything paused.
   void _prepareBackgroundPlaybackHandoff() {
     _backgroundPlaybackHandoff = null;
     if (widget._isPreviewOnly || _playlistController.isEmpty) return;
@@ -629,15 +630,87 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
         .mediaViewerToolbarConfig
         .keepAudioPlayingAfterClose;
     if (!keepAudio) return;
-    _backgroundPlaybackHandoff = BackgroundPlaybackSession(
-      providers: ProviderScope.containerOf(context, listen: false),
-      container: widget.container,
-      playlist: _playlistController,
-      playbackManager: _playbackManager,
-      playbackMode: _videoPlaybackMode,
-      playbackSpeed: _playbackSpeed,
-      isMuted: _isMuted,
-    );
+    _backgroundPlaybackHandoff = _newBackgroundPlaybackSession(pipWindow: false);
+  }
+
+  BackgroundPlaybackSession _newBackgroundPlaybackSession({
+    required bool pipWindow,
+  }) => BackgroundPlaybackSession(
+    providers: ProviderScope.containerOf(context, listen: false),
+    container: widget.container,
+    playlist: _playlistController,
+    playbackManager: _playbackManager,
+    playbackMode: _videoPlaybackMode,
+    playbackSpeed: _playbackSpeed,
+    isMuted: _isMuted,
+    thumbnailQuality: widget.thumbnailQuality,
+    thumbnailCacheMode: widget.thumbnailCacheMode,
+    startingFolder: widget.startingFolder,
+    mediaFilter: widget.mediaFilter,
+    sortBy: widget.sortBy,
+    sortAscending: widget.sortAscending,
+    pinnedPaths: widget.pinnedPaths,
+    pipWindow: pipWindow,
+  );
+
+  bool _enteringPictureInPicture = false;
+
+  /// The viewer's picture-in-picture button: floats the playing video in
+  /// Android's PiP window and closes the viewer, so the person is back in the
+  /// file manager (or wherever they opened the video from) with the video
+  /// still playing on top. The live player goes to [BackgroundPlaybackHost],
+  /// which keeps it going and answers the window being tapped (reopen the
+  /// viewer) or dismissed (stop).
+  Future<void> _enterPictureInPictureWindow() async {
+    if (widget._isPreviewOnly ||
+        _enteringPictureInPicture ||
+        _playlistController.isEmpty) {
+      return;
+    }
+    final file = _playbackManager.currentFileName;
+    final controller = _playbackManager.activeController;
+    if (file == null ||
+        file != _playlistController.currentFile ||
+        !MediaViewerConstants.isVideo(file) ||
+        controller == null ||
+        controller.isDisposed) {
+      return;
+    }
+    final value = controller.value;
+    if (!value.isInitialized || value.hasError) return;
+    if (ref.read(mediaViewerLockProvider(widget.container.volId))) return;
+
+    _enteringPictureInPicture = true;
+    final ratio = pictureInPictureRatio(value.aspectRatio);
+    final lockController = ref.read(sessionLockControllerProvider);
+    bool entered = false;
+    try {
+      // The app is covered by the window's activity for a moment: that must
+      // not count as leaving it (lock timers, return to the decoy).
+      entered = await lockController.withLockSuppression(
+        () => PictureInPictureBridge.startWindow(
+          width: ratio.width,
+          height: ratio.height,
+        ),
+      );
+    } finally {
+      _enteringPictureInPicture = false;
+    }
+    if (!entered) return;
+    if (!mounted) {
+      unawaited(PictureInPictureBridge.closeWindow());
+      return;
+    }
+    // The video may have changed while the window came up.
+    final stillPlaying = _playbackManager.activeController;
+    if (stillPlaying == null ||
+        stillPlaying.isDisposed ||
+        _playbackManager.currentFileName != _playlistController.currentFile) {
+      unawaited(PictureInPictureBridge.closeWindow());
+      return;
+    }
+    _backgroundPlaybackHandoff = _newBackgroundPlaybackSession(pipWindow: true);
+    Navigator.of(context).pop();
   }
 
   int _activateToken = 0;
@@ -2554,10 +2627,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
         _sessionController.rotateClockwise(_playlistController.currentFile);
         break;
       case MediaViewerAction.pictureInPicture:
-        if (!isImage) {
-          _syncPictureInPicture();
-          unawaited(PictureInPictureCoordinator.instance.enterNow());
-        }
+        if (!isImage) unawaited(_enterPictureInPictureWindow());
         break;
       case MediaViewerAction.playlistMenu:
         _showPlaylistOptionsMenu();

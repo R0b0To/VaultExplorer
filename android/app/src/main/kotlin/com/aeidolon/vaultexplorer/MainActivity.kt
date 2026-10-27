@@ -411,6 +411,20 @@ open class MainActivity : FlutterFragmentActivity() {
     private val nativePlayerManagerLazy = lazy { com.aeidolon.vaultexplorer.engine.NativePlayerManager(this) }
     private val nativePlayerManager by nativePlayerManagerLazy
     private val pipController = com.aeidolon.vaultexplorer.pip.PictureInPictureController(this)
+
+    // --- Picture-in-picture window (see PictureInPictureActivity) ---
+
+    /** Moves the video into the PiP window's surface; false if nothing plays. */
+    fun attachPipSurface(view: android.view.SurfaceView): Boolean =
+        nativePlayerManagerLazy.isInitialized() && nativePlayerManager.attachExternalSurface(view)
+
+    /** Gives the video back to the Flutter texture. */
+    fun detachPipSurface(view: android.view.SurfaceView) {
+        if (nativePlayerManagerLazy.isInitialized()) nativePlayerManager.detachExternalSurface(view)
+    }
+
+    /** Whether the PiP window must be as screenshot-proof as the app's own. */
+    fun pipWindowWantsSecureFlag(): Boolean = systemHandlers.userWantsSecureScreen
     private val compositeHandlers = com.aeidolon.vaultexplorer.handlers.CompositeContainerHandlers(this, ioExecutor, nativeOps)
     private val videoEditHandlers = VideoEditHandlers(this, ioExecutor)
     private val audioEditHandlers = AudioEditHandlers(this, ioExecutor)
@@ -581,6 +595,7 @@ open class MainActivity : FlutterFragmentActivity() {
         cameraRecordingServiceHandlers.onActivityDestroyed()
         quickCaptureScratchpadPlugin?.dispose()
         quickCaptureScratchpadPlugin = null
+        pipController.onDestroy()
         nativePlayerManager.release()
 
          if (this !is VaultShareActivity) {

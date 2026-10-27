@@ -62,7 +62,7 @@ class SwipeDismissRecognizer extends OneSequenceGestureRecognizer {
   double _crossOf(Offset o) => axis == Axis.vertical ? o.dx : o.dy;
 
   @override
-  bool isPointerAllowed(PointerEvent event) =>
+  bool isPointerAllowed(PointerDownEvent event) =>
       canStart() && super.isPointerAllowed(event);
 
   @override

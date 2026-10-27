@@ -2,38 +2,40 @@ package com.aeidolon.vaultexplorer.pip
 
 import android.app.PictureInPictureParams
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.PowerManager
 import android.util.Rational
+import android.view.SurfaceView
 import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.VeLog
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodChannel
 
 /**
- * System picture-in-picture for video: when a video is playing and the person
- * leaves the app (home, recents, another app), the activity shrinks into
- * Android's PiP window instead of going away.
+ * System picture-in-picture for video. Two ways in, both decided by Dart:
  *
- * Dart owns the decision of *whether* a video is worth keeping on screen.
+ *  1. **PiP window** (the viewer's picture-in-picture button): `startWindow`
+ *     launches [PictureInPictureActivity], which takes over the video output
+ *     and shrinks into Android's PiP window by itself. The app stays where
+ *     the person leaves it (the viewer closes, and they are back in the file
+ *     manager) while the video floats on top. The window reports back with
+ *     `windowEvent` (`entered`, `expanded`, `closed`, `failed`); Dart ends it
+ *     with `closeWindow` and follows the video's shape with `setWindowRatio`.
  *
- *  * Automatic: Dart calls `setState` with `armed = true` while a video plays
- *    and the "automatic picture-in-picture" setting is on, `armed = false`
- *    otherwise. This class turns that into platform calls:
+ *  2. **Automatic** ("automatic picture-in-picture"): the whole activity
+ *     becomes the PiP window when the app is left. Dart calls `setState` with
+ *     `armed = true` while a video plays and the setting is on, `armed =
+ *     false` otherwise.
+ *       - Android 12+ (API 31): `setAutoEnterEnabled(armed)`, so the system
+ *         enters PiP on its own when the person leaves, with its proper
+ *         animation.
+ *       - Android 8-11: enter from [onUserLeaveHint].
+ *     While that window is up, Dart replaces the app with just the video (see
+ *     `PictureInPictureLayer`), reporting `modeChanged` / `dismissed`.
  *
- *      - Android 12+ (API 31): `setAutoEnterEnabled(armed)`, so the system
- *        enters PiP on its own when the person leaves, with its proper
- *        animation.
- *      - Android 8-11: enter from [onUserLeaveHint].
- *  * On demand: Dart calls `enter` (the viewer's picture-in-picture button),
- *    which enters PiP right away whatever the setting says.
- *
- * While the window is up, Dart replaces the whole app with just the video
- * (see `PictureInPictureLayer`); this class reports mode changes to it with
- * `modeChanged`, and `dismissed` when the person closes the window.
- *
- * Playback controls inside the window come from the media session the
+ * Playback controls inside either window come from the media session the
  * player already publishes; no custom actions are added here.
  */
 class PictureInPictureController(private val activity: MainActivity) {
@@ -42,14 +44,14 @@ class PictureInPictureController(private val activity: MainActivity) {
     private var armed = false
     private var aspect: Rational = Rational(16, 9)
 
-    /** True while the activity is shown in the PiP window. */
+    /** True while the activity is shown in the PiP window (automatic mode). */
     var isActive = false
         private set
 
     /** True from entering PiP until the activity is next resumed. */
     private var inPipSession = false
 
-    /** True while an on-demand [enterNow] is in flight. */
+    /** True while a PiP window is being set up (the activity is covered). */
     private var entering = false
 
     private val supported: Boolean by lazy {
@@ -59,6 +61,9 @@ class PictureInPictureController(private val activity: MainActivity) {
     fun attach(messenger: BinaryMessenger) {
         val ch = MethodChannel(messenger, CHANNEL)
         channel = ch
+        // Share / quick-capture activities run their own engine; the window
+        // belongs to the main one.
+        if (activity.javaClass == MainActivity::class.java) current = this
         ch.setMethodCallHandler { call, result ->
             when (call.method) {
                 "isSupported" -> result.success(supported)
@@ -70,11 +75,20 @@ class PictureInPictureController(private val activity: MainActivity) {
                     applyParams()
                     result.success(true)
                 }
-                "enter" -> {
+                "startWindow" -> {
                     val width = (call.argument<Number>("width") ?: 16).toInt()
                     val height = (call.argument<Number>("height") ?: 9).toInt()
-                    aspect = clampedRatio(width, height)
-                    result.success(enterNow())
+                    result.success(startWindow(width, height))
+                }
+                "closeWindow" -> {
+                    windowActivity?.closeFromApp()
+                    result.success(true)
+                }
+                "setWindowRatio" -> {
+                    val width = (call.argument<Number>("width") ?: 16).toInt()
+                    val height = (call.argument<Number>("height") ?: 9).toInt()
+                    windowActivity?.setAspect(width, height)
+                    result.success(true)
                 }
                 else -> result.notImplemented()
             }
@@ -82,9 +96,10 @@ class PictureInPictureController(private val activity: MainActivity) {
     }
 
     /**
-     * Whether the activity is (about to be) in PiP. The privacy curtain is
-     * skipped for a pause in that case: it would otherwise cover the very
-     * video the person asked to keep on screen.
+     * Whether the activity is (about to be) in PiP, or covered by the PiP
+     * window's activity. The privacy curtain is skipped for a pause in that
+     * case: it would otherwise cover the very video the person asked to keep
+     * on screen, and flash over the app they come back to.
      */
     val keepsContentVisible: Boolean
         get() = (isActive || armed || entering) && isScreenOn()
@@ -100,31 +115,17 @@ class PictureInPictureController(private val activity: MainActivity) {
         // From API 31 the system enters on its own (auto-enter); entering here
         // as well would race it.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) return
-        if (!armed) return
-        enterNow()
-    }
-
-    /** Enters the PiP window now. Returns whether the system accepted it. */
-    private fun enterNow(): Boolean {
-        if (!supported || activity.isFinishing || activity.isDestroyed) return false
-        entering = true
-        return try {
-            val entered = activity.enterPictureInPictureMode(buildParams())
-            if (!entered) entering = false
-            entered
+        if (!armed || !supported || activity.isFinishing || activity.isDestroyed) return
+        try {
+            activity.enterPictureInPictureMode(buildParams())
         } catch (e: IllegalStateException) {
-            entering = false
             VeLog.w(TAG, e) { "enterPictureInPictureMode refused" }
-            false
         } catch (e: IllegalArgumentException) {
-            entering = false
             VeLog.w(TAG, e) { "enterPictureInPictureMode rejected its parameters" }
-            false
         }
     }
 
     fun onModeChanged(active: Boolean) {
-        entering = false
         isActive = active
         if (active) inPipSession = true
         channel?.invokeMethod("modeChanged", mapOf("active" to active))
@@ -149,6 +150,34 @@ class PictureInPictureController(private val activity: MainActivity) {
         channel?.invokeMethod("dismissed", null)
     }
 
+    fun onDestroy() {
+        // Only the main activity owns the window (a share / quick-capture
+        // activity going away must not close it).
+        if (current !== this) return
+        windowActivity?.closeFromApp()
+        current = null
+    }
+
+    // --- PiP window (separate activity) ---
+
+    private fun startWindow(width: Int, height: Int): Boolean {
+        if (!supported || activity.isFinishing || activity.isDestroyed) return false
+        windowActivity?.closeFromApp()
+        val intent = Intent(activity, PictureInPictureActivity::class.java)
+            .putExtra(PictureInPictureActivity.EXTRA_WIDTH, width)
+            .putExtra(PictureInPictureActivity.EXTRA_HEIGHT, height)
+            .putExtra(PictureInPictureActivity.EXTRA_SECURE, activity.pipWindowWantsSecureFlag())
+        entering = true
+        return try {
+            activity.startActivity(intent)
+            true
+        } catch (e: RuntimeException) {
+            entering = false
+            VeLog.w(TAG, e) { "Could not start the picture-in-picture window" }
+            false
+        }
+    }
+
     private fun applyParams() {
         if (!supported || activity.isFinishing || activity.isDestroyed) return
         try {
@@ -168,6 +197,11 @@ class PictureInPictureController(private val activity: MainActivity) {
         return builder.build()
     }
 
+    private fun sendWindowEvent(event: String) {
+        if (event != "entered") entering = false
+        channel?.invokeMethod("windowEvent", mapOf("event" to event))
+    }
+
     companion object {
         private const val TAG = "PictureInPicture"
         const val CHANNEL = "com.aeidolon.vaultexplorer/pip"
@@ -175,6 +209,13 @@ class PictureInPictureController(private val activity: MainActivity) {
         // Android rejects ratios outside 1:2.39 .. 2.39:1.
         private const val MIN_RATIO = 1.0 / 2.39
         private const val MAX_RATIO = 2.39
+
+        @Volatile
+        private var current: PictureInPictureController? = null
+
+        /** The live PiP window activity, if any (main thread only). */
+        @Volatile
+        var windowActivity: PictureInPictureActivity? = null
 
         fun clampedRatio(width: Int, height: Int): Rational {
             if (width <= 0 || height <= 0) return Rational(16, 9)
@@ -184,6 +225,20 @@ class PictureInPictureController(private val activity: MainActivity) {
                 ratio > MAX_RATIO -> Rational(239, 100)
                 else -> Rational(width, height)
             }
+        }
+
+        /** The PiP window asks for the video output. False if nothing plays. */
+        fun attachWindowSurface(view: SurfaceView): Boolean =
+            current?.activity?.attachPipSurface(view) ?: false
+
+        /** The PiP window is going away: the Flutter texture gets the video back. */
+        fun detachWindowSurface(view: SurfaceView) {
+            current?.activity?.detachPipSurface(view)
+        }
+
+        /** Tells Dart what the PiP window did: entered, expanded, closed, failed. */
+        fun windowEvent(event: String) {
+            current?.sendWindowEvent(event)
         }
     }
 }

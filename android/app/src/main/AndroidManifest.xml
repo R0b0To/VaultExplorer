@@ -59,6 +59,17 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+        <!-- The picture-in-picture window: nothing but the player's video
+             surface. A separate activity so the app itself stays usable behind
+             the window instead of being shrunk into it. -->
+        <activity
+            android:name=".pip.PictureInPictureActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:supportsPictureInPicture="true"
+            android:resizeableActivity="true"
+            android:theme="@android:style/Theme.Black.NoTitleBar"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|screenLayout|density|uiMode" />
         <activity-alias
             android:name=".UsbAttachAlias"
             android:targetActivity=".MainActivity"

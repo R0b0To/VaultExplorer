@@ -7,23 +7,28 @@ import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/media_viewer_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
+import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/models/video_playback_mode.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
+import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_playback_paths.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_session_bridge.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
+import 'package:vaultexplorer/features/browser/viewer/pip/picture_in_picture_bridge.dart';
 import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 
 const String _kTag = 'BackgroundPlayback';
 
-/// What the media viewer hands over when it is closed while audio is playing
-/// and "keep audio playing after closing" is on: the live player
-/// ([playbackManager]), the playlist it was walking ([playlist]) and the
-/// viewer's playback state.
+/// What the media viewer hands over when it is closed while its player must
+/// carry on: the live player ([playbackManager]), the playlist it was walking
+/// ([playlist]) and the viewer's playback state. Either audio with "keep audio
+/// playing after closing" on, or video floating in the picture-in-picture
+/// window ([pipWindow]).
 class BackgroundPlaybackSession {
   BackgroundPlaybackSession({
     required this.providers,
@@ -33,6 +38,14 @@ class BackgroundPlaybackSession {
     required this.playbackMode,
     required this.playbackSpeed,
     required this.isMuted,
+    required this.thumbnailQuality,
+    required this.thumbnailCacheMode,
+    required this.startingFolder,
+    required this.mediaFilter,
+    required this.sortBy,
+    required this.sortAscending,
+    required this.pinnedPaths,
+    this.pipWindow = false,
   });
 
   /// The app's provider container. The viewer's own `ref` is gone once it is
@@ -44,20 +57,38 @@ class BackgroundPlaybackSession {
   final VideoPlaybackMode playbackMode;
   final double playbackSpeed;
   final bool isMuted;
+
+  /// True when the video is showing in the picture-in-picture window: the
+  /// session then also steps through video items, and ends with the window.
+  final bool pipWindow;
+
+  // The viewer's own arguments, so it can be reopened on this playlist.
+  final ThumbnailQuality thumbnailQuality;
+  final ThumbnailCacheMode thumbnailCacheMode;
+  final String? startingFolder;
+  final String? mediaFilter;
+  final SortBy sortBy;
+  final bool sortAscending;
+  final Set<String>? pinnedPaths;
 }
 
-/// Keeps audio playing after the media viewer has been closed.
+/// Keeps media playing after the media viewer has been closed.
 ///
 /// The viewer normally owns the player and releases it when it goes away.
-/// When the person closes it with audio playing and the setting on, it calls
-/// [adopt] instead of disposing its [VideoPlaybackManager]: the same native
-/// player and media notification carry on, with no screen of their own -- the
-/// notification's Previous / Next / Stop are the controls. Opening that same
-/// item again hands the player back to the viewer ([takeMatching]).
+/// Two cases call [adopt] instead of disposing its [VideoPlaybackManager]:
+///  * audio, when "keep audio playing after closing" is on: the same native
+///    player and media notification carry on with no screen of their own --
+///    the notification's Previous / Next / Stop are the controls;
+///  * video in the picture-in-picture window (the viewer's button): the
+///    window shows the video while the app is free to be used.
+/// Opening that same item again hands the player back to the viewer
+/// ([takeMatching]); tapping the picture-in-picture window does so through
+/// [expandHandler].
 ///
-/// The audio ends, and the player is released, when: the notification's Stop
-/// is used, the track ends with nothing to advance to, playback errors, the
-/// vault it plays from locks or is detached, or the app locks.
+/// Playback ends, and the player is released (and the window closed), when:
+/// the notification's Stop is used, the item ends with nothing to advance to,
+/// playback errors, the picture-in-picture window is dismissed, the vault it
+/// plays from locks or is detached, or the app locks.
 ///
 /// The app has a single native player, so anything else that wants it (another
 /// viewer item, the video / audio editor, the capture review) must release
@@ -74,7 +105,15 @@ class BackgroundPlaybackHost {
   Future<void>? _closing;
   int _viewerCount = 0;
 
+  /// Reopens the media viewer on the running session (the picture-in-picture
+  /// window was tapped). Set by the app's root; without one, tapping the
+  /// window just ends playback.
+  void Function()? expandHandler;
+
   StreamSubscription<MediaSessionAction>? _actionSubscription;
+  StreamSubscription<String>? _windowSubscription;
+  bool _pipWindowOpen = false;
+  ({int width, int height})? _lastWindowRatio;
   void Function(int volId)? _lockedListener;
   void Function(int volId)? _detachedListener;
   NativeVideoController? _tickController;
@@ -87,6 +126,9 @@ class BackgroundPlaybackHost {
   /// True while a session exists or is still being torn down, i.e. whenever
   /// the native player may not be free yet.
   bool get needsRelease => _session != null || _closing != null;
+
+  /// The running session, if any.
+  BackgroundPlaybackSession? get session => _session;
 
   /// Viewers tell the host they are open: a viewer answers the notification's
   /// Previous / Next for its own playlist, so the host must not as well.
@@ -137,7 +179,15 @@ class BackgroundPlaybackHost {
     if (controller == null || controller.isDisposed) return null;
     _detach(session);
     _session = null;
+    // The viewer shows the video again: the window has nothing left to do.
+    _closePipWindow();
     return session;
+  }
+
+  void _closePipWindow() {
+    if (!_pipWindowOpen) return;
+    _pipWindowOpen = false;
+    unawaited(PictureInPictureBridge.closeWindow());
   }
 
   /// Stops playback, releases the native player and the notification. The
@@ -167,6 +217,7 @@ class BackgroundPlaybackHost {
       VeLog.w(_kTag, 'Could not clear the media-playing flag', e);
     }
     unawaited(PlaybackThrottleController.setActive(false));
+    _closePipWindow();
     final manager = session.playbackManager;
     final file = manager.currentFileName;
     final value = manager.activeController?.value;
@@ -202,9 +253,16 @@ class BackgroundPlaybackHost {
     session.playbackManager.activeControllerNotifier.addListener(
       _onActiveControllerChanged,
     );
+    if (session.pipWindow) {
+      _pipWindowOpen = true;
+      _windowSubscription = PictureInPictureBridge.windowEvents.listen(
+        _onWindowEvent,
+      );
+    }
 
     _advancing = false;
     _reportedPlaying = null;
+    _lastWindowRatio = null;
     _lastSavedFile = null;
     _lastSavedPosition = Duration.zero;
     unawaited(PlaybackThrottleController.setActive(true));
@@ -218,6 +276,8 @@ class BackgroundPlaybackHost {
     _advancing = false;
     unawaited(_actionSubscription?.cancel());
     _actionSubscription = null;
+    unawaited(_windowSubscription?.cancel());
+    _windowSubscription = null;
     final tick = _tickController;
     if (tick != null) {
       try {
@@ -300,6 +360,20 @@ class BackgroundPlaybackHost {
     _reportPlaying(session, value.isPlaying);
     if (!value.isInitialized) return;
 
+    if (session.pipWindow && _pipWindowOpen) {
+      // The window keeps the shape of what it shows (the next item may differ).
+      final ratio = pictureInPictureRatio(value.aspectRatio);
+      if (ratio != _lastWindowRatio) {
+        _lastWindowRatio = ratio;
+        unawaited(
+          PictureInPictureBridge.setWindowRatio(
+            width: ratio.width,
+            height: ratio.height,
+          ),
+        );
+      }
+    }
+
     final position = value.position;
     final duration = value.duration;
     final file = session.playbackManager.currentFileName;
@@ -346,6 +420,26 @@ class BackgroundPlaybackHost {
     await closeAndWait();
   }
 
+  // --- Picture-in-picture window ---
+
+  void _onWindowEvent(String event) {
+    switch (event) {
+      case 'closed':
+        // Dismissed by the person: the video does not carry on without it.
+        _pipWindowOpen = false;
+        unawaited(closeAndWait());
+      case 'expanded':
+        // Tapped to go back to the app: reopen the viewer on this session.
+        _pipWindowOpen = false;
+        final handler = expandHandler;
+        if (handler == null) {
+          unawaited(closeAndWait());
+        } else {
+          handler();
+        }
+    }
+  }
+
   // --- Navigation ---
 
   void _onSessionAction(MediaSessionAction action) {
@@ -366,9 +460,10 @@ class BackgroundPlaybackHost {
   bool get _hasNext => _neighbour(1) != null;
   bool get _hasPrevious => _neighbour(-1) != null;
 
-  /// Index of the closest audio item in [direction], wrapping around only when
-  /// "loop playlist" is on; null when there is none. Videos and images have
-  /// no place to play in the background, so they are skipped.
+  /// Index of the closest item this session can play in [direction], wrapping
+  /// around only when "loop playlist" is on; null when there is none. Audio
+  /// sessions play audio only; a picture-in-picture window plays video only
+  /// (audio and images have nothing to show in it).
   int? _neighbour(int direction) {
     final session = _session;
     if (session == null) return null;
@@ -384,7 +479,11 @@ class BackgroundPlaybackHost {
         candidate = (candidate + count) % count;
       }
       index = candidate;
-      if (MediaViewerConstants.isAudio(playlist.playlist[index])) return index;
+      final file = playlist.playlist[index];
+      final playable = session.pipWindow
+          ? MediaViewerConstants.isVideo(file)
+          : MediaViewerConstants.isAudio(file);
+      if (playable) return index;
     }
     return null;
   }

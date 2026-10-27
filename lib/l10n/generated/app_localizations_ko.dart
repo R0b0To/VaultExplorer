@@ -11813,50 +11813,48 @@ class AppLocalizationsKo extends AppLocalizations {
       '텍스트 편집기는 자체 색상을 사용하므로 앱 스킨을 따르도록 설정하기 전에는 여기서 바꾼 색이 적용되지 않습니다.';
 
   @override
-  String get cameraKeepShootingTooltip => 'Keep shooting after each capture';
+  String get cameraKeepShootingTooltip => '촬영 후에도 계속 촬영';
 
   @override
-  String get cameraSegmentLengthOff => 'Off';
+  String get cameraSegmentLengthOff => '끄기';
 
   @override
   String cameraSegmentLengthMinutes(int minutes) {
-    return '$minutes min';
+    return '$minutes분';
   }
 
   @override
-  String get cameraSegmentLengthTooltip =>
-      'Split recording into parts that save as they go';
+  String get cameraSegmentLengthTooltip => '녹화를 분할하여 실시간으로 저장';
 
   @override
   String get cameraSegmentSpaceMessage =>
-      'Not enough free space in the vault. Recording stopped; the part that could not be saved is kept for review.';
+      '금고의 저장 공간이 부족합니다. 녹화가 중단되었습니다. 저장되지 않은 부분은 검토를 위해 유지됩니다.';
 
   @override
-  String get audioSegmentedStopTitle => 'Stop recording?';
+  String get audioSegmentedStopTitle => '녹음을 중지할까요?';
 
   @override
   String get audioSegmentedStopMessage =>
-      'The parts recorded so far are already saved in the vault. Stop now and save the rest?';
+      '지금까지 녹음된 부분은 이미 금고에 저장되었습니다. 지금 중지하고 나머지를 저장할까요?';
 
   @override
-  String get audioSegmentedStopAction => 'Stop and save';
+  String get audioSegmentedStopAction => '중지하고 저장';
 
   @override
-  String get audioUnsavedPartsTitle => 'Some parts were not saved';
+  String get audioUnsavedPartsTitle => '일부 파트가 저장되지 않았습니다';
 
   @override
   String audioUnsavedPartsMessage(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count recorded parts could not be saved.',
-      one: '1 recorded part could not be saved.',
+      other: '$count개의 녹음 파트를 저장할 수 없습니다. 공간을 확보하고 다시 시도하거나 삭제하세요.',
     );
-    return '$_temp0 Free up space and try again, or discard them.';
+    return '$_temp0';
   }
 
   @override
-  String get segmentRetrySave => 'Try again';
+  String get segmentRetrySave => '다시 시도';
 
   @override
   String get imageEditorActionAuto => '자동';

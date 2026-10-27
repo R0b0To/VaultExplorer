@@ -12591,50 +12591,53 @@ class AppLocalizationsUk extends AppLocalizations {
       'Текстовий редактор використовує власні кольори, тож зміни тут не з’являться в ньому, доки він не почне наслідувати тему застосунку.';
 
   @override
-  String get cameraKeepShootingTooltip => 'Keep shooting after each capture';
+  String get cameraKeepShootingTooltip =>
+      'Продовжувати зйомку після кожного кадру';
 
   @override
-  String get cameraSegmentLengthOff => 'Off';
+  String get cameraSegmentLengthOff => 'Вимкнено';
 
   @override
   String cameraSegmentLengthMinutes(int minutes) {
-    return '$minutes min';
+    return '$minutes хв';
   }
 
   @override
   String get cameraSegmentLengthTooltip =>
-      'Split recording into parts that save as they go';
+      'Розбивати запис на частини, які зберігаються під час зйомки';
 
   @override
   String get cameraSegmentSpaceMessage =>
-      'Not enough free space in the vault. Recording stopped; the part that could not be saved is kept for review.';
+      'Недостатньо вільного місця у сховищі. Запис зупинено; частину, яку не вдалося зберегти, залишено для перегляду.';
 
   @override
-  String get audioSegmentedStopTitle => 'Stop recording?';
+  String get audioSegmentedStopTitle => 'Зупинити запис?';
 
   @override
   String get audioSegmentedStopMessage =>
-      'The parts recorded so far are already saved in the vault. Stop now and save the rest?';
+      'Частини, записані на цей момент, уже збережено у сховищі. Зупинити зараз і зберегти решту?';
 
   @override
-  String get audioSegmentedStopAction => 'Stop and save';
+  String get audioSegmentedStopAction => 'Зупинити та зберегти';
 
   @override
-  String get audioUnsavedPartsTitle => 'Some parts were not saved';
+  String get audioUnsavedPartsTitle => 'Деякі частини не вдалося зберегти';
 
   @override
   String audioUnsavedPartsMessage(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count recorded parts could not be saved.',
-      one: '1 recorded part could not be saved.',
+      other: 'Не вдалося зберегти $count записаної частини.',
+      many: 'Не вдалося зберегти $count записаних частин.',
+      few: 'Не вдалося зберегти $count записані частини.',
+      one: 'Не вдалося зберегти $count записану частину.',
     );
-    return '$_temp0 Free up space and try again, or discard them.';
+    return '$_temp0 Звільніть місце та спробуйте ще раз або видаліть їх.';
   }
 
   @override
-  String get segmentRetrySave => 'Try again';
+  String get segmentRetrySave => 'Спробувати знову';
 
   @override
   String get imageEditorActionAuto => 'Авто';

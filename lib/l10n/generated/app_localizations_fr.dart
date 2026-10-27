@@ -12609,10 +12609,11 @@ class AppLocalizationsFr extends AppLocalizations {
       'L\'éditeur de texte utilise ses propres couleurs ; les changements n\'y apparaîtront qu\'une fois qu\'il suit le thème de l\'app.';
 
   @override
-  String get cameraKeepShootingTooltip => 'Keep shooting after each capture';
+  String get cameraKeepShootingTooltip =>
+      'Continuer à capturer après chaque prise';
 
   @override
-  String get cameraSegmentLengthOff => 'Off';
+  String get cameraSegmentLengthOff => 'Désactivé';
 
   @override
   String cameraSegmentLengthMinutes(int minutes) {
@@ -12621,38 +12622,39 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get cameraSegmentLengthTooltip =>
-      'Split recording into parts that save as they go';
+      'Diviser l\'enregistrement en parties sauvegardées au fur et à mesure';
 
   @override
   String get cameraSegmentSpaceMessage =>
-      'Not enough free space in the vault. Recording stopped; the part that could not be saved is kept for review.';
+      'Espace libre insuffisant dans le coffre-fort. Enregistrement arrêté ; la partie qui n\'a pas pu être sauvegardée est conservée pour vérification.';
 
   @override
-  String get audioSegmentedStopTitle => 'Stop recording?';
+  String get audioSegmentedStopTitle => 'Arrêter l\'enregistrement ?';
 
   @override
   String get audioSegmentedStopMessage =>
-      'The parts recorded so far are already saved in the vault. Stop now and save the rest?';
+      'Les parties enregistrées jusqu\'à présent sont déjà sauvegardées dans le coffre-fort. Arrêter maintenant et sauvegarder le reste ?';
 
   @override
-  String get audioSegmentedStopAction => 'Stop and save';
+  String get audioSegmentedStopAction => 'Arrêter et sauvegarder';
 
   @override
-  String get audioUnsavedPartsTitle => 'Some parts were not saved';
+  String get audioUnsavedPartsTitle =>
+      'Certaines parties n\'ont pas été sauvegardées';
 
   @override
   String audioUnsavedPartsMessage(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count recorded parts could not be saved.',
-      one: '1 recorded part could not be saved.',
+      other: '$count parties enregistrées n\'ont pas pu être sauvegardées.',
+      one: '1 partie enregistrée n\'a pas pu être sauvegardée.',
     );
-    return '$_temp0 Free up space and try again, or discard them.';
+    return '$_temp0 Libérez de l\'espace et réessayez, ou supprimez-les.';
   }
 
   @override
-  String get segmentRetrySave => 'Try again';
+  String get segmentRetrySave => 'Réessayer';
 
   @override
   String get imageEditorActionAuto => 'Auto';

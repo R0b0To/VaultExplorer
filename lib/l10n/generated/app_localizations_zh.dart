@@ -11624,50 +11624,46 @@ class AppLocalizationsZh extends AppLocalizations {
       '文本编辑器使用自己的颜色，因此在它跟随应用皮肤之前，这里的更改不会显示在其中。';
 
   @override
-  String get cameraKeepShootingTooltip => 'Keep shooting after each capture';
+  String get cameraKeepShootingTooltip => '拍摄后继续拍摄';
 
   @override
-  String get cameraSegmentLengthOff => 'Off';
+  String get cameraSegmentLengthOff => '关闭';
 
   @override
   String cameraSegmentLengthMinutes(int minutes) {
-    return '$minutes min';
+    return '$minutes 分钟';
   }
 
   @override
-  String get cameraSegmentLengthTooltip =>
-      'Split recording into parts that save as they go';
+  String get cameraSegmentLengthTooltip => '将录制分段并在录制时自动保存';
 
   @override
-  String get cameraSegmentSpaceMessage =>
-      'Not enough free space in the vault. Recording stopped; the part that could not be saved is kept for review.';
+  String get cameraSegmentSpaceMessage => '保险箱可用空间不足。录制已停止；未能保存的分段已保留以供查看。';
 
   @override
-  String get audioSegmentedStopTitle => 'Stop recording?';
+  String get audioSegmentedStopTitle => '停止录音？';
 
   @override
-  String get audioSegmentedStopMessage =>
-      'The parts recorded so far are already saved in the vault. Stop now and save the rest?';
+  String get audioSegmentedStopMessage => '目前已录制的分段已保存在保险箱中。是否立即停止并保存剩余部分？';
 
   @override
-  String get audioSegmentedStopAction => 'Stop and save';
+  String get audioSegmentedStopAction => '停止并保存';
 
   @override
-  String get audioUnsavedPartsTitle => 'Some parts were not saved';
+  String get audioUnsavedPartsTitle => '部分分段未保存';
 
   @override
   String audioUnsavedPartsMessage(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count recorded parts could not be saved.',
-      one: '1 recorded part could not be saved.',
+      other: '有 $count 个录制分段未能保存。请释放空间后重试，或将其舍弃。',
     );
-    return '$_temp0 Free up space and try again, or discard them.';
+    return '$_temp0';
   }
 
   @override
-  String get segmentRetrySave => 'Try again';
+  String get segmentRetrySave => '重试';
 
   @override
   String get imageEditorActionAuto => '自动';

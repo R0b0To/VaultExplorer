@@ -12532,50 +12532,54 @@ class AppLocalizationsAr extends AppLocalizations {
       'يستخدم محرر النصوص ألوانه الخاصة، لذا لن تظهر التغييرات هنا فيه حتى يتبع المظهر التطبيق.';
 
   @override
-  String get cameraKeepShootingTooltip => 'Keep shooting after each capture';
+  String get cameraKeepShootingTooltip => 'متابعة التصوير بعد كل لقطة';
 
   @override
-  String get cameraSegmentLengthOff => 'Off';
+  String get cameraSegmentLengthOff => 'إيقاف';
 
   @override
   String cameraSegmentLengthMinutes(int minutes) {
-    return '$minutes min';
+    return '$minutes دقيقة';
   }
 
   @override
   String get cameraSegmentLengthTooltip =>
-      'Split recording into parts that save as they go';
+      'تقسيم التسجيل إلى أجزاء تُحفظ أثناء التسجيل';
 
   @override
   String get cameraSegmentSpaceMessage =>
-      'Not enough free space in the vault. Recording stopped; the part that could not be saved is kept for review.';
+      'المساحة الخالية في الخزنة غير كافية. تم إيقاف التسجيل؛ تم الاحتفاظ بالجزء الذي تعذر حفظه للمراجعة.';
 
   @override
-  String get audioSegmentedStopTitle => 'Stop recording?';
+  String get audioSegmentedStopTitle => 'إيقاف التسجيل؟';
 
   @override
   String get audioSegmentedStopMessage =>
-      'The parts recorded so far are already saved in the vault. Stop now and save the rest?';
+      'الأجزاء المسجلة حتى الآن محفوظة بالفعل في الخزنة. هل تريد التوقف الآن وحفظ الباقي؟';
 
   @override
-  String get audioSegmentedStopAction => 'Stop and save';
+  String get audioSegmentedStopAction => 'إيقاف وحفظ';
 
   @override
-  String get audioUnsavedPartsTitle => 'Some parts were not saved';
+  String get audioUnsavedPartsTitle => 'لم يتم حفظ بعض الأجزاء';
 
   @override
   String audioUnsavedPartsMessage(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count recorded parts could not be saved.',
-      one: '1 recorded part could not be saved.',
+      other: 'تعذر حفظ $count جزء مسجل.',
+      many: 'تعذر حفظ $count جزءًا مسجلًا.',
+      few: 'تعذر حفظ $count أجزاء مسجلة.',
+      two: 'تعذر حفظ جزءين مسجلين.',
+      one: 'تعذر حفظ جزء مسجل واحد.',
+      zero: 'تعذر حفظ أي جزء مسجل.',
     );
-    return '$_temp0 Free up space and try again, or discard them.';
+    return '$_temp0 وفّر مساحة وحاول مجددًا، أو تجاهلها.';
   }
 
   @override
-  String get segmentRetrySave => 'Try again';
+  String get segmentRetrySave => 'إعادة المحاولة';
 
   @override
   String get imageEditorActionAuto => 'تلقائي';

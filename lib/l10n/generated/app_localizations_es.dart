@@ -12529,10 +12529,11 @@ class AppLocalizationsEs extends AppLocalizations {
       'El editor de texto usa sus propios colores, así que los cambios no se verán en él hasta que siga el aspecto de la app.';
 
   @override
-  String get cameraKeepShootingTooltip => 'Keep shooting after each capture';
+  String get cameraKeepShootingTooltip =>
+      'Seguir capturando después de cada toma';
 
   @override
-  String get cameraSegmentLengthOff => 'Off';
+  String get cameraSegmentLengthOff => 'Desactivado';
 
   @override
   String cameraSegmentLengthMinutes(int minutes) {
@@ -12541,38 +12542,38 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get cameraSegmentLengthTooltip =>
-      'Split recording into parts that save as they go';
+      'Dividir la grabación en partes que se van guardando';
 
   @override
   String get cameraSegmentSpaceMessage =>
-      'Not enough free space in the vault. Recording stopped; the part that could not be saved is kept for review.';
+      'No hay suficiente espacio libre en la bóveda. Grabación detenida; la parte que no se pudo guardar se conserva para revisión.';
 
   @override
-  String get audioSegmentedStopTitle => 'Stop recording?';
+  String get audioSegmentedStopTitle => '¿Detener grabación?';
 
   @override
   String get audioSegmentedStopMessage =>
-      'The parts recorded so far are already saved in the vault. Stop now and save the rest?';
+      'Las partes grabadas hasta ahora ya están guardadas en la bóveda. ¿Detener ahora y guardar el resto?';
 
   @override
-  String get audioSegmentedStopAction => 'Stop and save';
+  String get audioSegmentedStopAction => 'Detener y guardar';
 
   @override
-  String get audioUnsavedPartsTitle => 'Some parts were not saved';
+  String get audioUnsavedPartsTitle => 'Algunas partes no se guardaron';
 
   @override
   String audioUnsavedPartsMessage(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count recorded parts could not be saved.',
-      one: '1 recorded part could not be saved.',
+      other: 'No se pudieron guardar $count partes grabadas.',
+      one: 'No se pudo guardar 1 parte grabada.',
     );
-    return '$_temp0 Free up space and try again, or discard them.';
+    return '$_temp0 Libera espacio e inténtalo de nuevo, o descártalas.';
   }
 
   @override
-  String get segmentRetrySave => 'Try again';
+  String get segmentRetrySave => 'Reintentar';
 
   @override
   String get imageEditorActionAuto => 'Automático';

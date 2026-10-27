@@ -3,8 +3,9 @@ import 'package:flutter/gestures.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// Share of the screen, along the drag axis, that the content has to be pulled
-/// before letting go closes the viewer.
-const double _kDismissDistanceFraction = 0.2;
+/// before letting go closes the viewer. This matches the distance at which the
+/// backdrop and controls finish fading.
+const double _kDismissDistanceFraction = 0.05;
 
 /// Release speed (logical px/s along the drag axis) that closes the viewer no
 /// matter how far it was pulled.

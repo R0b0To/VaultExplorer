@@ -89,16 +89,25 @@ void main() {
 
       await controller.start(quality: AudioRecordingQuality.voice);
       expect(calls.last.method, 'start');
-      expect(calls.last.arguments, {'bitrate': 32000, 'sampleRate': 22050});
+      expect(calls.last.arguments, {
+        'bitrate': 32000,
+        'sampleRate': 22050,
+        'segmentSeconds': 0,
+      });
 
       await controller.start(quality: AudioRecordingQuality.high);
-      expect(calls.last.arguments, {'bitrate': 128000, 'sampleRate': 44100});
+      expect(calls.last.arguments, {
+        'bitrate': 128000,
+        'sampleRate': 44100,
+        'segmentSeconds': 0,
+      });
 
       // No quality given: the default preset, not an unset value.
       await controller.start();
       expect(calls.last.arguments, {
         'bitrate': AudioRecordingQuality.defaultQuality.bitrate,
         'sampleRate': AudioRecordingQuality.defaultQuality.sampleRate,
+        'segmentSeconds': 0,
       });
     });
 

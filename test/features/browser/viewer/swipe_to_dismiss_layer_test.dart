@@ -22,12 +22,20 @@ class _Harness {
           canStart: () => canStart,
           onDismiss: () => dismissed++,
           progress: progress,
-          child:
-              child ??
-              const SizedBox.expand(
-                key: _contentKey,
-                child: ColoredBox(color: Colors.red),
-              ),
+          // The production viewer content has its own gesture recognizers
+          // (zoom, paging, seek). Keep one in the harness so Flutter does not
+          // give the dismiss recognizer the arena on pointer-down, before it
+          // can tell a tap from a drag.
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {},
+            child:
+                child ??
+                const SizedBox.expand(
+                  key: _contentKey,
+                  child: ColoredBox(color: Colors.red),
+                ),
+          ),
         ),
       ),
     );
@@ -113,8 +121,10 @@ void main() {
       final gesture = await tester.startGesture(
         tester.getCenter(find.byKey(_contentKey)),
       );
-      await gesture.moveBy(const Offset(0, 30));
-      await gesture.moveBy(const Offset(0, 120));
+      // The fade reaches full progress at 10% of the viewport; stay below the
+      // 20% dismissal threshold so this remains a follow-the-finger check.
+      await gesture.moveBy(const Offset(0, 20));
+      await gesture.moveBy(const Offset(0, 40));
       await tester.pump();
 
       expect(tester.getTopLeft(find.byKey(_contentKey)).dy, greaterThan(start.dy));

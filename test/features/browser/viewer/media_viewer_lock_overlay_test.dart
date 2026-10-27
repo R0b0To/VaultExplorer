@@ -153,6 +153,8 @@ void main() {
       final gesture = await tester.startGesture(
         tester.getCenter(find.byIcon(Icons.lock_rounded)),
       );
+      // The ticker starts on its first frame after pointer-down.
+      await tester.pump();
       await tester.pump(MediaViewerLockOverlay.holdDuration);
       await tester.pump(const Duration(milliseconds: 50));
       expect(unlocks, 1);

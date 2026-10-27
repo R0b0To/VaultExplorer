@@ -3660,7 +3660,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                   !_isEditingLayout &&
                   !_controlsLocked,
               axis: swipeDismissAxis,
-              bothDirections: swipeDismissAxis == Axis.horizontal,
+              bothDirections: true,
               canStart: _canStartSwipeDismiss,
               onDismiss: _closeViewerFromSwipe,
               progress: _swipeDismissProgress,

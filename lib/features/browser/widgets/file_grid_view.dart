@@ -68,6 +68,7 @@ class FileGridView extends StatefulWidget {
   final bool Function(RawEntry entry)? isBookmark;
   final bool Function(RawEntry entry)? isFolderSynced;
   final ScrollController? scrollController;
+  final double bottomClearance;
 
   final ArchiveContext? archiveContext;
   final String? archiveRootPath;
@@ -102,6 +103,7 @@ class FileGridView extends StatefulWidget {
     this.isBookmark,
     this.isFolderSynced,
     this.scrollController,
+    this.bottomClearance = 0.0,
     this.archiveContext,
     this.archiveRootPath,
     this.sortBy,
@@ -339,8 +341,7 @@ class _FileGridViewState extends State<FileGridView>
           10,
           12,
           10,
-          AppSpacing.floatingStackClearance +
-              MediaQuery.paddingOf(context).bottom,
+          widget.bottomClearance,
         ),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: _crossAxisCount,
@@ -394,8 +395,7 @@ class _FileGridViewState extends State<FileGridView>
                     sortBy: widget.sortBy,
                     padding: EdgeInsets.only(
                       top: 12,
-                      bottom: AppSpacing.floatingStackClearance +
-                          MediaQuery.paddingOf(context).bottom,
+                      bottom: widget.bottomClearance,
                     ),
                     child: _buildAnimatedGridView(
                       widget.scrollController,

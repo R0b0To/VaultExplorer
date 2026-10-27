@@ -71,6 +71,7 @@ class FileMasonryView extends ConsumerStatefulWidget {
   final bool Function(RawEntry entry)? isBookmark;
   final bool Function(RawEntry entry)? isFolderSynced;
   final ScrollController? scrollController;
+  final double bottomClearance;
 
   final ArchiveContext? archiveContext;
   final String? archiveRootPath;
@@ -104,6 +105,7 @@ class FileMasonryView extends ConsumerStatefulWidget {
     this.isBookmark,
     this.isFolderSynced,
     this.scrollController,
+    this.bottomClearance = 0.0,
     this.archiveContext,
     this.archiveRootPath,
     this.sortBy,
@@ -447,8 +449,7 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
           10,
           12,
           10,
-          AppSpacing.floatingStackClearance +
-              MediaQuery.paddingOf(context).bottom,
+          widget.bottomClearance,
         ),
         itemCount: total,
         itemBuilder: (context, i) {
@@ -502,8 +503,7 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
                 sortBy: widget.sortBy,
                 padding: EdgeInsets.only(
                   top: 12,
-                  bottom: AppSpacing.floatingStackClearance +
-                      MediaQuery.paddingOf(context).bottom,
+                  bottom: widget.bottomClearance,
                 ),
                 child: _buildAnimatedMasonryView(widget.scrollController, total),
               ),

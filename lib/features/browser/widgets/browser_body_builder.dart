@@ -31,6 +31,7 @@ Widget buildBrowserBody(
   required bool isSelectionMode,
   required Set<RawEntry> selectedItems,
   required bool searchActive,
+  required double bottomClearance,
   required Set<String> mountedDocProviderFolders,
   required bool Function(RawEntry entry) isFolderMounted,
   required bool Function(RawEntry entry) isPinned,
@@ -92,6 +93,7 @@ Widget buildBrowserBody(
   final content = switch (layoutMode) {
     BrowserLayoutMode.grid => FileGridView(
         scrollController: scrollController,
+        bottomClearance: bottomClearance,
         container: container,
         items: items,
         isSelectionMode: isSelectionMode,
@@ -129,6 +131,7 @@ Widget buildBrowserBody(
       ),
     BrowserLayoutMode.masonry => FileMasonryView(
         scrollController: scrollController,
+        bottomClearance: bottomClearance,
         container: container,
         items: items,
         isSelectionMode: isSelectionMode,
@@ -165,6 +168,7 @@ Widget buildBrowserBody(
     BrowserLayoutMode.compact =>
       FileListView(
         scrollController: scrollController,
+        bottomClearance: bottomClearance,
         container: container,
         currentDirPath: currentDirPath,
         thumbnailCacheMode: thumbnailCacheMode,

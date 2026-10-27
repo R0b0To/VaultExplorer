@@ -4909,7 +4909,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         !selectionBarVisible &&
         !_searchActive &&
         ref.watch(crossContainerClipboardProvider).hasItems;
-    final bool hasFabToolbar = useFab && !_searchActive;
+    final bool hasFabToolbar =
+        useFab && !_searchActive && _toolbarConfig.visible.isNotEmpty;
 
     double fabClearance = 0.0;
     if (hasClipboardFab && hasFabToolbar) {
@@ -4918,6 +4919,12 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     } else if (hasClipboardFab || hasFabToolbar) {
       fabClearance = 64.0; // Single FAB (56) + 8dp clearance
     }
+    final hasFloatingActions = hasClipboardFab || hasFabToolbar;
+    final bottomContentClearance =
+        bottomSystemInset +
+        (hasFloatingActions ? 16.0 + fabClearance : 0.0) +
+        (showBookmarkBarInViewport ? 48.0 : 0.0) +
+        (_searchActive ? 64.0 : 0.0);
 
     final double bannerBottomOffset = _searchActive
         ? 0.0
@@ -5156,17 +5163,17 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                 bottom: MediaQuery.viewInsetsOf(slotContext).bottom,
               ),
               child: Material(
-                color: Theme.of(context).colorScheme.surfaceContainer,
+                color: Theme.of(slotContext).colorScheme.surfaceContainer,
                 elevation: 0,
                 child: SafeArea(
                   top: false,
                   child: SizedBox(
                     height: kToolbarHeight,
                     child: MediaQuery.removePadding(
-                      context: context,
+                      context: slotContext,
                       removeTop: true,
                       removeBottom: true,
-                      child: buildAppBar(context, selectionMode: true),
+                      child: buildAppBar(slotContext, selectionMode: true),
                     ),
                   ),
                 ),
@@ -5337,6 +5344,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                               isSelectionMode: isSelectionMode,
                                               selectedItems: selectedItems,
                                               searchActive: _searchActive,
+                                              bottomClearance:
+                                                  bottomContentClearance,
                                               mountedDocProviderFolders:
                                                   _mountedDocProviderFolders,
                                               isFolderMounted: _isFolderMounted,
@@ -5494,6 +5503,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                                         isSelectionMode: false,
                                                         selectedItems: const {},
                                                         searchActive: false,
+                                                        bottomClearance:
+                                                            bottomContentClearance,
                                                         mountedDocProviderFolders:
                                                             _mountedDocProviderFolders,
                                                         isFolderMounted: (e) =>

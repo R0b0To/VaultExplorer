@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
-import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';
@@ -81,6 +80,7 @@ class FileListView extends StatefulWidget {
   final double initialZoomLevel;
   final ValueChanged<double>? onZoomLevelChanged;
   final ScrollController? scrollController;
+  final double bottomClearance;
 
   /// Set when [items] are being listed from inside an open archive rather
   /// than the real container filesystem -- see `file_tile.dart`'s
@@ -119,6 +119,7 @@ class FileListView extends StatefulWidget {
     this.initialZoomLevel = 1.0,
     this.onZoomLevelChanged,
     this.scrollController,
+    this.bottomClearance = 0.0,
     this.archiveContext,
     this.archiveRootPath,
     this.sortBy,
@@ -177,9 +178,8 @@ class _FileListViewState extends State<FileListView> {
   }
 
   double _computeMaxScroll(double itemExtent, double viewport) {
-    final bottomPadding = AppSpacing.floatingStackClearance +
-        MediaQuery.paddingOf(context).bottom;
-    final totalHeight = (widget.items.length * itemExtent) + bottomPadding + 8.0;
+    final totalHeight =
+        (widget.items.length * itemExtent) + widget.bottomClearance + 8.0;
     return math.max(0.0, totalHeight - viewport);
   }
 
@@ -317,8 +317,7 @@ class _FileListViewState extends State<FileListView> {
                           findChildIndexCallback: (Key key) => _keyIndexMap[key],
                           padding: EdgeInsets.only(
                             top: 0,
-                            bottom: AppSpacing.floatingStackClearance +
-                                MediaQuery.paddingOf(context).bottom,
+                            bottom: widget.bottomClearance,
                           ),
                           itemCount: total,
                           itemBuilder: (_, index) {
@@ -402,8 +401,7 @@ class _FileListViewState extends State<FileListView> {
                           sortBy: widget.sortBy,
                           padding: EdgeInsets.only(
                             top: 0,
-                            bottom: AppSpacing.floatingStackClearance +
-                                MediaQuery.paddingOf(context).bottom,
+                            bottom: widget.bottomClearance,
                           ),
                           child: ListView.builder(
                             controller: widget.scrollController,
@@ -412,8 +410,7 @@ class _FileListViewState extends State<FileListView> {
                             findChildIndexCallback: (Key key) => _keyIndexMap[key],
                             padding: EdgeInsets.only(
                               top: 0,
-                              bottom: AppSpacing.floatingStackClearance +
-                                  MediaQuery.paddingOf(context).bottom,
+                              bottom: widget.bottomClearance,
                             ),
                             itemCount: total,
                             itemBuilder: (_, index) {

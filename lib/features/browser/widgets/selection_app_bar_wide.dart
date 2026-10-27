@@ -474,7 +474,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
         const SizedBox(width: 4),
         if (showActionBar)
           ...visibleActions.map((action) => actionBuilders[action]!(context)),
-        const SizedBox(width: 4),
+        if (!showActionBar) const SizedBox(width: 4),
       ],
     );
   }

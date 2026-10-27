@@ -1738,18 +1738,20 @@ class _TopSelectionBarOverlay extends ConsumerWidget {
         if (!hasSelection || selectionAppBar == null) {
           return const SizedBox.shrink();
         }
-        return Material(
-          key: const ValueKey<String>('browser_selection_app_bar_overlay'),
-          color: Theme.of(context).colorScheme.surfaceContainer,
-          elevation: 0,
-          child: SafeArea(
-            bottom: false,
+        return SafeArea(
+          bottom: false,
+          child: Material(
+            key: const ValueKey<String>('browser_selection_app_bar_overlay'),
+            color: Theme.of(context).colorScheme.surfaceContainer,
+            elevation: 0,
             child: SizedBox(
               width: double.infinity,
               height: kToolbarHeight,
               child: MediaQuery.removePadding(
                 context: context,
                 removeTop: true,
+                removeLeft: true,
+                removeRight: true,
                 child: SkinAreaScope(
                   area: SkinArea.files,
                   child: Builder(

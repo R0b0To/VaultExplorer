@@ -32,7 +32,8 @@ class MediaViewerActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = context.colors;
     final activeColor = highlightColor ?? cs.primary;
-    final iconColor = isHighlighted ? activeColor : Colors.white;
+    final iconColor =
+        isHighlighted ? _legibleOnDark(activeColor) : Colors.white;
     final tooltip = customTooltip ?? action.getLocalizedLabel(context.l10n);
 
     return Tooltip(
@@ -42,7 +43,7 @@ class MediaViewerActionButton extends StatelessWidget {
         height: size,
         child: Material(
           color: isHighlighted
-              ? activeColor.withValues(alpha: 0.2)
+              ? _legibleOnDark(activeColor).withValues(alpha: 0.22)
               : Colors.white.withValues(alpha: 0.12),
           shape: const CircleBorder(),
           clipBehavior: Clip.antiAlias,
@@ -69,5 +70,13 @@ class MediaViewerActionButton extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// Lifts [color]'s lightness until it is clearly readable on the dark scrim.
+  static Color _legibleOnDark(Color color) {
+    const minLightness = 0.72;
+    final hsl = HSLColor.fromColor(color);
+    if (hsl.lightness >= minLightness) return color;
+    return hsl.withLightness(minLightness).toColor();
   }
 }

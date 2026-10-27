@@ -815,7 +815,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         break;
 
       case BrowserLayoutMode.grid:
-        final minCols = isLandscape ? 3 : 1;
+        const minCols = 1;
         final maxCols = isLandscape ? 7 : 4;
         final columns =
             (isLandscape

@@ -115,6 +115,7 @@ class _FileGridViewState extends State<FileGridView>
     with SingleTickerProviderStateMixin {
   Orientation? _lastOrientation;
   late int _crossAxisCount;
+  double? _viewportWidth;
   double _baselineScale = 1.0;
   final Map<Key, int> _keyIndexMap = {};
 
@@ -176,11 +177,7 @@ class _FileGridViewState extends State<FileGridView>
     }
   }
 
-  int get _minColumns {
-    final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
-    return isLandscape ? 3 : 1;
-  }
+  int get _minColumns => 1;
 
   int get _maxColumns {
     final isLandscape =
@@ -188,13 +185,24 @@ class _FileGridViewState extends State<FileGridView>
     return isLandscape ? 7 : 4;
   }
 
+  double _getViewportWidth(BuildContext context) {
+    final width = _viewportWidth;
+    return width != null && width.isFinite
+        ? width
+        : MediaQuery.sizeOf(context).width;
+  }
+
+  double _getTileWidth(int columns, BuildContext context) {
+    final width = _getViewportWidth(context);
+    return (width - 20 - (columns - 1) * widget.spacing) / columns;
+  }
+
   double _getAspectRatio(int columns) {
     final previewRatio = widget.gridAspectRatio.ratio;
     if (!widget.showFileNames) {
       return previewRatio;
     }
-    final width = MediaQuery.sizeOf(context).width;
-    final tileWidth = (width - 20 - (columns - 1) * widget.spacing) / columns;
+    final tileWidth = _getTileWidth(columns, context);
     const labelHeight = 36.0;
     final previewHeight = tileWidth / previewRatio;
     final totalHeight = previewHeight + labelHeight;
@@ -208,9 +216,7 @@ class _FileGridViewState extends State<FileGridView>
   ThumbnailQuality get _effectiveQuality {
     final q = widget.thumbnailQuality;
     if (!q.auto) return q;
-    final width = MediaQuery.sizeOf(context).width;
-    final tileWidth =
-        (width - 20 - (_crossAxisCount - 1) * widget.spacing) / _crossAxisCount;
+    final tileWidth = _getTileWidth(_crossAxisCount, context);
     return q.resolveForCell(
       logicalWidth: tileWidth,
       devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
@@ -218,8 +224,7 @@ class _FileGridViewState extends State<FileGridView>
   }
 
   double _getTileHeight(int columns) {
-    final width = MediaQuery.sizeOf(context).width;
-    final tileWidth = (width - 20 - (columns - 1) * widget.spacing) / columns;
+    final tileWidth = _getTileWidth(columns, context);
     final previewRatio = widget.gridAspectRatio.ratio;
     final labelHeight = widget.showFileNames ? 36.0 : 0.0;
     return (tileWidth / previewRatio) + labelHeight;
@@ -363,32 +368,43 @@ class _FileGridViewState extends State<FileGridView>
   Widget build(BuildContext context) {
     final total = widget.items.length;
 
-    return HoldRangeSelectContainer(
-      items: widget.items,
-      selectedItems: widget.selectedItems,
-      isSelectionMode: widget.isSelectionMode,
-      onSelectionChanged: (newSelection) =>
-          widget.onSelectionChanged?.call(newSelection),
-      onLongPressSelect: (entry) => widget.onItemLongPress(entry),
-      onScaleStart: _handleScaleStart,
-      onScaleUpdate: _handleScaleUpdate,
-      onScaleEnd: _handleScaleEnd,
-      child: NotificationListener<ScrollNotification>(
-        onNotification: _onScrollNotification,
-        child: widget.scrollController == null
-            ? _buildAnimatedGridView(null, total)
-            : FastScrollbar(
-                controller: widget.scrollController!,
-                items: widget.items,
-                sortBy: widget.sortBy,
-                padding: EdgeInsets.only(
-                  top: 12,
-                  bottom: AppSpacing.floatingStackClearance +
-                      MediaQuery.paddingOf(context).bottom,
-                ),
-                child: _buildAnimatedGridView(widget.scrollController, total),
-              ),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        _viewportWidth = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : null;
+
+        return HoldRangeSelectContainer(
+          items: widget.items,
+          selectedItems: widget.selectedItems,
+          isSelectionMode: widget.isSelectionMode,
+          onSelectionChanged: (newSelection) =>
+              widget.onSelectionChanged?.call(newSelection),
+          onLongPressSelect: (entry) => widget.onItemLongPress(entry),
+          onScaleStart: _handleScaleStart,
+          onScaleUpdate: _handleScaleUpdate,
+          onScaleEnd: _handleScaleEnd,
+          child: NotificationListener<ScrollNotification>(
+            onNotification: _onScrollNotification,
+            child: widget.scrollController == null
+                ? _buildAnimatedGridView(null, total)
+                : FastScrollbar(
+                    controller: widget.scrollController!,
+                    items: widget.items,
+                    sortBy: widget.sortBy,
+                    padding: EdgeInsets.only(
+                      top: 12,
+                      bottom: AppSpacing.floatingStackClearance +
+                          MediaQuery.paddingOf(context).bottom,
+                    ),
+                    child: _buildAnimatedGridView(
+                      widget.scrollController,
+                      total,
+                    ),
+                  ),
+          ),
+        );
+      },
     );
   }
 
@@ -404,6 +420,7 @@ class _FileGridViewState extends State<FileGridView>
       context,
       _crossAxisCount,
       spacing: widget.spacing,
+      viewportWidth: _getViewportWidth(context),
     );
     final skin = FileManagerSkinScope.of(context);
     final folderIcon = Icon(
@@ -489,6 +506,7 @@ class _FileGridViewState extends State<FileGridView>
       context,
       _crossAxisCount,
       spacing: widget.spacing,
+      viewportWidth: _getViewportWidth(context),
     );
 
     if (vaultIcon != null) {

@@ -13,9 +13,13 @@ const double _kDismissFlingVelocity = 700.0;
 /// Maximum amount the dragged media surface shrinks while it follows a finger.
 const double _kDismissScaleAmount = 0.08;
 
+/// Fade the backdrop and controls over a short initial pull, before the image
+/// reaches the distance needed to dismiss.
+const double _kFadeDistanceFraction = 0.1;
+
 /// A drag only counts once it has travelled this many times further along its
 /// axis than across it, so a diagonal scribble never closes the viewer.
-const double _kAxisDominance = 1.5;
+const double _kAxisDominance = 1.15;
 
 /// Recognizes a one-finger drag that starts along [axis], then reports the
 /// complete two-dimensional movement so the media can follow the finger.
@@ -123,12 +127,16 @@ class SwipeDismissRecognizer extends OneSequenceGestureRecognizer {
   /// Decides, before the drag is accepted, whether it is ours, someone
   /// else's, or still undecided.
   void _consider() {
-    final slop = computeHitSlop(PointerDeviceKind.touch, gestureSettings);
+    // The normal touch slop is tuned for broad platform gestures. This one
+    // needs to react earlier so it can beat the viewer's scale recognizer.
+    final slop =
+        computeHitSlop(PointerDeviceKind.touch, gestureSettings) * 0.65;
     final primary = _primaryOf(_moved);
     final cross = _crossOf(_moved).abs();
 
-    // Heading the wrong way for a one-way gesture (e.g. up instead of down).
-    if (!bothDirections && primary < -slop / 2) {
+    // A small initial move in the wrong direction can be hand jitter. Reject
+    // only once the finger has clearly committed to that direction.
+    if (!bothDirections && primary < -slop && primary.abs() > cross) {
       resolve(GestureDisposition.rejected);
       return;
     }
@@ -137,7 +145,10 @@ class SwipeDismissRecognizer extends OneSequenceGestureRecognizer {
       resolve(GestureDisposition.rejected);
       return;
     }
-    if (primary.abs() >= slop && primary.abs() > cross * _kAxisDominance) {
+    final startedInDismissDirection = bothDirections || primary > 0;
+    if (startedInDismissDirection &&
+        primary.abs() >= slop &&
+        primary.abs() > cross * _kAxisDominance) {
       _claimed = true;
       resolve(GestureDisposition.accepted);
     }
@@ -293,7 +304,12 @@ class _MediaSwipeDismissLayerState extends State<MediaSwipeDismissLayer>
   double _progressFor(Offset offset) {
     final extent = _dragExtent;
     if (extent <= 0) return 0.0;
-    return (offset.distance / (extent * 0.5)).clamp(0.0, 1.0).toDouble();
+    final fraction = (offset.distance / (extent * _kFadeDistanceFraction))
+        .clamp(0.0, 1.0)
+        .toDouble();
+    // Fade quickly at the start of the pull while keeping the image itself
+    // opaque and in motion until the normal dismiss threshold is reached.
+    return Curves.easeOutCubic.transform(fraction);
   }
 
   double _primaryOffset(Offset value) =>
@@ -454,9 +470,12 @@ class MediaSwipeDismissTarget extends StatelessWidget {
           valueListenable: scope.offset,
           child: child,
           builder: (context, offset, child) {
-            final progress = extent.isFinite && extent > 0
-                ? (offset.distance / (extent * 0.5)).clamp(0.0, 1.0).toDouble()
+            final fraction = extent.isFinite && extent > 0
+                ? (offset.distance / (extent * _kFadeDistanceFraction))
+                      .clamp(0.0, 1.0)
+                      .toDouble()
                 : 0.0;
+            final progress = Curves.easeOutCubic.transform(fraction);
             return _buildTransformed(
               offset: offset,
               child: child,

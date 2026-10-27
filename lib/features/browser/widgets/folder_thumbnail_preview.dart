@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
@@ -276,40 +277,74 @@ class _FolderThumbnailPreviewState
   @override
   Widget build(BuildContext context) {
     _tickerEnabled = TickerMode.valuesOf(context).enabled;
-    if (!_tickerEnabled) return Center(child: widget.child);
-    if (widget.cacheMode == ThumbnailCacheMode.disabled) {
-      return Center(child: widget.child);
-    }
+    final showPreview =
+        _tickerEnabled && widget.cacheMode != ThumbnailCacheMode.disabled;
 
-    final iconSize = _resolvedIconSize;
-    final badgeSize = widget.previewSize ?? (iconSize * 0.8);
-    final bytes = _previewBytes;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final requestedIconSize = _resolvedIconSize;
+        final requestedBadgeSize = showPreview
+            ? widget.previewSize ?? requestedIconSize * 0.8
+            : 0.0;
+        final requestedExtent = math.max(
+          requestedIconSize,
+          requestedIconSize * 0.5 + requestedBadgeSize,
+        ).toDouble();
+        final availableExtent = math.min(
+          constraints.maxWidth,
+          constraints.maxHeight,
+        ).toDouble();
+        final scale = availableExtent.isFinite &&
+                requestedExtent > availableExtent
+            ? availableExtent / requestedExtent
+            : 1.0;
+        final iconSize = requestedIconSize * scale;
+        final badgeSize = requestedBadgeSize * scale;
+        final contentExtent = math
+            .max(iconSize, iconSize * 0.5 + badgeSize)
+            .toDouble();
+        final fittedIcon = SizedBox(
+          width: iconSize,
+          height: iconSize,
+          child: FittedBox(fit: BoxFit.contain, child: widget.child),
+        );
 
-    return Center(
-      child: SizedBox(
-        width: iconSize,
-        height: iconSize,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Center(child: widget.child),
-            Positioned(
-              left: iconSize * 0.5,
-              top: iconSize * 0.5,
-              width: badgeSize,
-              height: badgeSize,
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 180),
-                switchInCurve: Curves.easeOut,
-                switchOutCurve: Curves.easeIn,
-                child: bytes != null
-                    ? _buildBadge(context, bytes, badgeSize)
-                    : const SizedBox.shrink(key: ValueKey('empty_badge')),
-              ),
+        if (!showPreview) return Center(child: fittedIcon);
+
+        final bytes = _previewBytes;
+        return Center(
+          child: SizedBox(
+            width: contentExtent,
+            height: contentExtent,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  width: iconSize,
+                  height: iconSize,
+                  child: fittedIcon,
+                ),
+                Positioned(
+                  left: iconSize * 0.5,
+                  top: iconSize * 0.5,
+                  width: badgeSize,
+                  height: badgeSize,
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 180),
+                    switchInCurve: Curves.easeOut,
+                    switchOutCurve: Curves.easeIn,
+                    child: bytes != null
+                        ? _buildBadge(context, bytes, badgeSize)
+                        : const SizedBox.shrink(key: ValueKey('empty_badge')),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }

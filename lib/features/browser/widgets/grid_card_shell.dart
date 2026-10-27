@@ -12,8 +12,9 @@ abstract final class GridCardUtils {
     BuildContext context,
     int columns, {
     double spacing = 8,
+    double? viewportWidth,
   }) {
-    final width = MediaQuery.sizeOf(context).width;
+    final width = viewportWidth ?? MediaQuery.sizeOf(context).width;
     final tileWidth = (width - 20 - (columns - 1) * spacing) / columns;
 
     final factor = switch (columns) {
@@ -152,7 +153,8 @@ class GridCardShell extends StatelessWidget {
     Widget previewStack = Stack(
       fit: StackFit.expand,
       children: [
-        preview,
+        // Keep preview paint, including folder badges, out of the name row.
+        ClipRect(child: preview),
         if (isSelected)
           DecoratedBox(
             decoration: BoxDecoration(

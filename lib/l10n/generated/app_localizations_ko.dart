@@ -9176,6 +9176,16 @@ class AppLocalizationsKo extends AppLocalizations {
       '동영상 또는 오디오 화면 중앙을 두 번 탭하면 확대 대신 재생 또는 일시정지합니다. 확대 중에 표시되는 확대 수준을 탭하면 보기가 초기화됩니다.';
 
   @override
+  String get doubleTapSkipTitle => '두 번 탭하여 건너뛰기';
+
+  @override
+  String get doubleTapSkipSubtitle =>
+      '동영상의 왼쪽 또는 오른쪽을 두 번 탭하면 뒤로 또는 앞으로 이동합니다. 계속 탭하면 더 건너뜁니다.';
+
+  @override
+  String get doubleTapSkipDurationTitle => '건너뛰기 시간';
+
+  @override
   String get loopPlaylistTitle => '재생목록 반복';
 
   @override

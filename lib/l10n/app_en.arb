@@ -12114,6 +12114,18 @@
   "@doubleTapPlayPauseSubtitle": {
     "description": "Explains that double-tap plays or pauses and the zoom level chip resets the zoom."
   },
+  "doubleTapSkipTitle": "Double-tap to skip",
+  "@doubleTapSkipTitle": {
+    "description": "Setting label for double-tapping the left or right side of a video to skip backward or forward."
+  },
+  "doubleTapSkipSubtitle": "Double-tap the left or right side of a video to jump backward or forward. Keep tapping to skip further.",
+  "@doubleTapSkipSubtitle": {
+    "description": "Explains that double-tapping the left or right side of a video skips backward or forward, and that repeated taps skip further."
+  },
+  "doubleTapSkipDurationTitle": "Skip time",
+  "@doubleTapSkipDurationTitle": {
+    "description": "Label of the slider that sets how many seconds one double-tap skips."
+  },
   "loopPlaylistTitle": "Loop playlist",
   "@loopPlaylistTitle": {
     "description": "Setting label for wrapping playlist navigation from the last item to the first."

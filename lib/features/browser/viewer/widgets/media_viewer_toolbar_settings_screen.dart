@@ -1307,6 +1307,70 @@ class MediaViewerPlaybackSettingsScreen extends ConsumerWidget {
                   ),
                   SwitchListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                    value: mediaConfig.doubleTapSkipEnabled,
+                    onChanged: controller.setMediaViewerDoubleTapSkipEnabled,
+                    title: Text(
+                      l10n.doubleTapSkipTitle,
+                      style: textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      l10n.doubleTapSkipSubtitle,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                    secondary: Icon(
+                      Icons.forward_10_rounded,
+                      color: cs.primary,
+                    ),
+                  ),
+                  if (mediaConfig.doubleTapSkipEnabled)
+                    ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                      ),
+                      leading: Icon(Icons.timer_outlined, color: cs.primary),
+                      title: Text(
+                        l10n.doubleTapSkipDurationTitle,
+                        style: textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      subtitle: Builder(
+                        builder: (context) {
+                          const options =
+                              MediaViewerToolbarConfig.doubleTapSkipOptions;
+                          // A value that isn't one of the steps (an imported
+                          // or older setting) shows at the nearest step.
+                          var index = 0;
+                          for (var i = 1; i < options.length; i++) {
+                            if ((options[i] - mediaConfig.doubleTapSkipSeconds)
+                                    .abs() <
+                                (options[index] -
+                                        mediaConfig.doubleTapSkipSeconds)
+                                    .abs()) {
+                              index = i;
+                            }
+                          }
+                          return _SettingsSlider(
+                            value: index.toDouble(),
+                            min: 0,
+                            max: (options.length - 1).toDouble(),
+                            divisions: options.length - 1,
+                            labelBuilder: (v) => '${options[v.round()]}s',
+                            onChangeEnd: (v) => unawaited(
+                              controller.setMediaViewerDoubleTapSkipSeconds(
+                                options[v.round()],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  SwitchListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                     value: mediaConfig.swipeToSeekEnabled,
                     onChanged: controller.setMediaViewerSwipeToSeekEnabled,
                     title: Text(

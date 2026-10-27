@@ -9541,6 +9541,16 @@ class AppLocalizationsEn extends AppLocalizations {
       'Double-tap the middle of the video or audio screen to play or pause instead of zooming. Tap the zoom level shown while zoomed to reset the view.';
 
   @override
+  String get doubleTapSkipTitle => 'Double-tap to skip';
+
+  @override
+  String get doubleTapSkipSubtitle =>
+      'Double-tap the left or right side of a video to jump backward or forward. Keep tapping to skip further.';
+
+  @override
+  String get doubleTapSkipDurationTitle => 'Skip time';
+
+  @override
   String get loopPlaylistTitle => 'Loop playlist';
 
   @override

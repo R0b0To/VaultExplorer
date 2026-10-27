@@ -9177,6 +9177,16 @@ class AppLocalizationsJa extends AppLocalizations {
       '動画または音声画面の中央をダブルタップすると、ズームではなく再生または一時停止します。ズーム中に表示されるズームレベルをタップすると、表示がリセットされます。';
 
   @override
+  String get doubleTapSkipTitle => 'ダブルタップでスキップ';
+
+  @override
+  String get doubleTapSkipSubtitle =>
+      '動画の左側または右側をダブルタップすると、戻る／進むことができます。続けてタップするとさらにスキップします。';
+
+  @override
+  String get doubleTapSkipDurationTitle => 'スキップ時間';
+
+  @override
   String get loopPlaylistTitle => 'プレイリストをループ';
 
   @override

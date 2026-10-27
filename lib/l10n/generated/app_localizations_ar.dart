@@ -9735,6 +9735,16 @@ class AppLocalizationsAr extends AppLocalizations {
       'انقر نقرًا مزدوجًا في منتصف شاشة الفيديو أو الصوت للتشغيل أو الإيقاف المؤقت بدلًا من التكبير. اضغط على مستوى التكبير المعروض أثناء التكبير لإعادة ضبط العرض.';
 
   @override
+  String get doubleTapSkipTitle => 'النقر المزدوج للتخطي';
+
+  @override
+  String get doubleTapSkipSubtitle =>
+      'انقر مرتين على الجانب الأيسر أو الأيمن من الفيديو للقفز للخلف أو للأمام. واصل النقر للتخطي أكثر.';
+
+  @override
+  String get doubleTapSkipDurationTitle => 'مدة التخطي';
+
+  @override
   String get loopPlaylistTitle => 'تكرار قائمة التشغيل';
 
   @override

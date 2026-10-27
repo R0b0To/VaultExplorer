@@ -16063,6 +16063,24 @@ abstract class AppLocalizations {
   /// **'Double-tap the middle of the video or audio screen to play or pause instead of zooming. Tap the zoom level shown while zoomed to reset the view.'**
   String get doubleTapPlayPauseSubtitle;
 
+  /// Setting label for double-tapping the left or right side of a video to skip backward or forward.
+  ///
+  /// In en, this message translates to:
+  /// **'Double-tap to skip'**
+  String get doubleTapSkipTitle;
+
+  /// Explains that double-tapping the left or right side of a video skips backward or forward, and that repeated taps skip further.
+  ///
+  /// In en, this message translates to:
+  /// **'Double-tap the left or right side of a video to jump backward or forward. Keep tapping to skip further.'**
+  String get doubleTapSkipSubtitle;
+
+  /// Label of the slider that sets how many seconds one double-tap skips.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip time'**
+  String get doubleTapSkipDurationTitle;
+
   /// Setting label for wrapping playlist navigation from the last item to the first.
   ///
   /// In en, this message translates to:

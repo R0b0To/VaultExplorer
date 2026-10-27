@@ -85,6 +85,8 @@ class MediaPlayerWidget extends ConsumerStatefulWidget {
   final ValueListenable<double>? dismissProgress;
   final ValueChanged<bool> onToggleUI;
   final ValueChanged<bool> onZoomChanged;
+  /// Seconds one double-tap on the left or right side skips; 0 turns
+  /// double-tap skipping off.
   final int skipSeconds;
   final bool isAudio;
   final bool subtitlesEnabled;
@@ -1424,7 +1426,8 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
                       _handleVideoDoubleTap();
                       return;
                     }
-                    // At default zoom, left/right 30% skips; center zooms in
+                    // At default zoom, left/right 30% skips (unless turned
+                    // off); center zooms in
                     final width = constraints.maxWidth;
                     final dx = _videoDoubleTapDetails?.localPosition.dx ?? 0;
                     final edgeWidth =
@@ -1433,9 +1436,12 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
                         (dx <= edgeWidth || dx >= width - edgeWidth)) {
                       return;
                     }
-                    if (dx < width * 0.3) {
+                    // With skipping off (skipSeconds == 0) the sides act like
+                    // the middle.
+                    final canSkip = widget.skipSeconds > 0;
+                    if (canSkip && dx < width * 0.3) {
                       _handleDoubleTapSkip(backwards: true);
-                    } else if (dx > width * 0.7) {
+                    } else if (canSkip && dx > width * 0.7) {
                       _handleDoubleTapSkip(backwards: false);
                     } else if (widget.doubleTapPlayPause) {
                       _togglePlayPause();

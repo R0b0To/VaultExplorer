@@ -53,6 +53,16 @@ class MediaViewerToolbarConfig {
   /// Double-tapping the middle of the video or audio screen plays or pauses
   /// instead of zooming. The zoom is then reset from the zoom-level pill.
   final bool doubleTapPlayPause;
+
+  /// Whether double-tapping the left or right side of a video skips backward
+  /// or forward. When off, those areas behave like the middle one.
+  final bool doubleTapSkipEnabled;
+
+  /// Seconds jumped by one double-tap (repeated taps add up).
+  final int doubleTapSkipSeconds;
+
+  /// The skip times offered by the settings slider.
+  static const List<int> doubleTapSkipOptions = [3, 5, 10, 15, 20, 30, 45, 60];
   final bool loopPlaylist;
   final ThumbnailGenerationStrategy thumbnailGenerationStrategy;
   final double thumbnailFramePosition;
@@ -131,6 +141,8 @@ class MediaViewerToolbarConfig {
     this.pictureInPictureEnabled = false,
     this.tapEdgesToNavigate = true,
     this.doubleTapPlayPause = true,
+    this.doubleTapSkipEnabled = true,
+    this.doubleTapSkipSeconds = 5,
     this.loopPlaylist = true,
     this.thumbnailGenerationStrategy = ThumbnailGenerationStrategy.hybrid,
     this.thumbnailFramePosition = 0.12,
@@ -176,6 +188,8 @@ class MediaViewerToolbarConfig {
     bool? pictureInPictureEnabled,
     bool? tapEdgesToNavigate,
     bool? doubleTapPlayPause,
+    bool? doubleTapSkipEnabled,
+    int? doubleTapSkipSeconds,
     bool? loopPlaylist,
     ThumbnailGenerationStrategy? thumbnailGenerationStrategy,
     double? thumbnailFramePosition,
@@ -228,6 +242,8 @@ class MediaViewerToolbarConfig {
         pictureInPictureEnabled ?? this.pictureInPictureEnabled,
     tapEdgesToNavigate: tapEdgesToNavigate ?? this.tapEdgesToNavigate,
     doubleTapPlayPause: doubleTapPlayPause ?? this.doubleTapPlayPause,
+    doubleTapSkipEnabled: doubleTapSkipEnabled ?? this.doubleTapSkipEnabled,
+    doubleTapSkipSeconds: doubleTapSkipSeconds ?? this.doubleTapSkipSeconds,
     loopPlaylist: loopPlaylist ?? this.loopPlaylist,
     thumbnailGenerationStrategy:
         thumbnailGenerationStrategy ?? this.thumbnailGenerationStrategy,
@@ -323,6 +339,8 @@ class MediaViewerToolbarConfig {
     'pictureInPictureEnabled': pictureInPictureEnabled,
     'tapEdgesToNavigate': tapEdgesToNavigate,
     'doubleTapPlayPause': doubleTapPlayPause,
+    'doubleTapSkipEnabled': doubleTapSkipEnabled,
+    'doubleTapSkipSeconds': doubleTapSkipSeconds,
     'loopPlaylist': loopPlaylist,
     'thumbnailGenerationStrategy': thumbnailGenerationStrategy.name,
     'thumbnailFramePosition': thumbnailFramePosition,
@@ -501,6 +519,10 @@ class MediaViewerToolbarConfig {
       pictureInPictureEnabled: j['pictureInPictureEnabled'] as bool? ?? false,
       tapEdgesToNavigate: j['tapEdgesToNavigate'] as bool? ?? true,
       doubleTapPlayPause: j['doubleTapPlayPause'] as bool? ?? true,
+      doubleTapSkipEnabled: j['doubleTapSkipEnabled'] as bool? ?? true,
+      doubleTapSkipSeconds: ((j['doubleTapSkipSeconds'] as num?)?.toInt() ?? 5)
+          .clamp(1, 600)
+          .toInt(),
       loopPlaylist: j['loopPlaylist'] as bool? ?? true,
       thumbnailGenerationStrategy: ThumbnailGenerationStrategy.fromJson(
         j['thumbnailGenerationStrategy'] as String?,

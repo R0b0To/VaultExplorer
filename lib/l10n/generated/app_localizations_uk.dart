@@ -9762,6 +9762,16 @@ class AppLocalizationsUk extends AppLocalizations {
       'Двічі торкніться центру екрана відео або аудіо, щоб відтворити чи призупинити замість масштабування. Торкніться рівня масштабу, який показано під час збільшення, щоб скинути вигляд.';
 
   @override
+  String get doubleTapSkipTitle => 'Подвійний дотик для перемотування';
+
+  @override
+  String get doubleTapSkipSubtitle =>
+      'Двічі торкніться лівої або правої частини відео, щоб перемотати назад або вперед. Продовжуйте торкатися, щоб перемотати далі.';
+
+  @override
+  String get doubleTapSkipDurationTitle => 'Тривалість перемотування';
+
+  @override
   String get loopPlaylistTitle => 'Повторювати список відтворення';
 
   @override

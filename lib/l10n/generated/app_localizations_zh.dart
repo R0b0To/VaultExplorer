@@ -9047,6 +9047,15 @@ class AppLocalizationsZh extends AppLocalizations {
       '双击视频或音频画面中央可播放或暂停，而不是缩放。缩放时点按显示的缩放比例可重置视图。';
 
   @override
+  String get doubleTapSkipTitle => '双击跳转';
+
+  @override
+  String get doubleTapSkipSubtitle => '双击视频左侧或右侧可快退或快进。继续点按可跳转更多。';
+
+  @override
+  String get doubleTapSkipDurationTitle => '跳转时长';
+
+  @override
   String get loopPlaylistTitle => '循环播放列表';
 
   @override

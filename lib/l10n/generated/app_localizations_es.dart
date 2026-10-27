@@ -9701,6 +9701,16 @@ class AppLocalizationsEs extends AppLocalizations {
       'Toca dos veces el centro de la pantalla de vídeo o audio para reproducir o pausar en lugar de hacer zoom. Toca el nivel de zoom que aparece al ampliar para restablecer la vista.';
 
   @override
+  String get doubleTapSkipTitle => 'Doble toque para saltar';
+
+  @override
+  String get doubleTapSkipSubtitle =>
+      'Toca dos veces el lado izquierdo o derecho de un vídeo para retroceder o avanzar. Sigue tocando para saltar más.';
+
+  @override
+  String get doubleTapSkipDurationTitle => 'Tiempo de salto';
+
+  @override
   String get loopPlaylistTitle => 'Repetir lista de reproducción';
 
   @override

@@ -645,6 +645,20 @@ void applyImportedConfig(FileManagerToolbarConfig newConfig) {
     return updateMediaViewerConfig(updated);
   }
 
+  Future<void> setMediaViewerDoubleTapSkipEnabled(bool enabled) {
+    final updated = state.config.mediaViewerToolbarConfig.copyWith(
+      doubleTapSkipEnabled: enabled,
+    );
+    return updateMediaViewerConfig(updated);
+  }
+
+  Future<void> setMediaViewerDoubleTapSkipSeconds(int seconds) {
+    final updated = state.config.mediaViewerToolbarConfig.copyWith(
+      doubleTapSkipSeconds: seconds.clamp(1, 600).toInt(),
+    );
+    return updateMediaViewerConfig(updated);
+  }
+
   Future<void> setMediaViewerLoopPlaylist(bool enabled) {
     final updated = state.config.mediaViewerToolbarConfig.copyWith(
       loopPlaylist: enabled,

@@ -209,7 +209,6 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   int _playbackModeInteractionRevision = 0;
 
   final bool _autoPlay = true;
-  final int _doubleTapSkipSeconds = 5;
   double _viewportWidth = 0.0;
   double _viewportHeight = 0.0;
   bool _isSwiping = false;
@@ -3232,7 +3231,10 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
               zoomIndicatorBottomOffset: zoomIndicatorBottomOffset,
               enableZoom: !_scrollMode.isContinuous,
               onToggleUI: _setUIVisibility,
-              skipSeconds: _doubleTapSkipSeconds,
+              // 0 turns double-tap skipping off.
+              skipSeconds: gestureConfig.doubleTapSkipEnabled
+                  ? gestureConfig.doubleTapSkipSeconds
+                  : 0,
               isAudio: isAudio,
               subtitlesEnabled: _subtitlesEnabled,
               subtitleFontSize: _subtitleFontSize,

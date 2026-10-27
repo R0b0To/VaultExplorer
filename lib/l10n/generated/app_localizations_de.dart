@@ -9685,6 +9685,16 @@ class AppLocalizationsDe extends AppLocalizations {
       'Doppeltippe in die Mitte des Video- oder Audiobildschirms, um abzuspielen oder zu pausieren, statt zu zoomen. Tippe auf die Zoomstufe, die beim Zoomen angezeigt wird, um die Ansicht zurückzusetzen.';
 
   @override
+  String get doubleTapSkipTitle => 'Doppeltippen zum Überspringen';
+
+  @override
+  String get doubleTapSkipSubtitle =>
+      'Tippe doppelt auf die linke oder rechte Seite eines Videos, um zurück- oder vorzuspringen. Tippe weiter, um noch weiter zu springen.';
+
+  @override
+  String get doubleTapSkipDurationTitle => 'Sprungdauer';
+
+  @override
   String get loopPlaylistTitle => 'Wiedergabeliste wiederholen';
 
   @override

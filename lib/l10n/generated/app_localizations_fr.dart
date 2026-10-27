@@ -9764,6 +9764,16 @@ class AppLocalizationsFr extends AppLocalizations {
       'Appuyez deux fois au centre de l’écran vidéo ou audio pour lancer ou mettre en pause au lieu de zoomer. Touchez le niveau de zoom affiché pendant le zoom pour réinitialiser la vue.';
 
   @override
+  String get doubleTapSkipTitle => 'Double appui pour sauter';
+
+  @override
+  String get doubleTapSkipSubtitle =>
+      'Appuyez deux fois sur le côté gauche ou droit d’une vidéo pour reculer ou avancer. Continuez d’appuyer pour sauter plus loin.';
+
+  @override
+  String get doubleTapSkipDurationTitle => 'Durée du saut';
+
+  @override
   String get loopPlaylistTitle => 'Répéter la liste de lecture';
 
   @override

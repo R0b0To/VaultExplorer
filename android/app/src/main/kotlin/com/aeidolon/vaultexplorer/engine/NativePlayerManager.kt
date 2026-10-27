@@ -94,7 +94,9 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
      * Set while the picture-in-picture window (its own activity, with its own
      * SurfaceView) is showing the video. The player then draws there instead
      * of into the Flutter texture, and the video track stays on while the app
-     * is in the background: the window is what is on screen.
+     * is in the background: the window is what is on screen. It outlives
+     * [release]: a playlist moves to its next item by releasing and recreating
+     * the player, and that item must keep showing in the window.
      */
     private var externalSurfaceView: android.view.SurfaceView? = null
 
@@ -1074,7 +1076,10 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         }
         mediaSessionEnabled = false
         player = null
-        externalSurfaceView = null
+        // externalSurfaceView is deliberately kept: every item change releases
+        // and recreates the player, and the next item belongs in the
+        // picture-in-picture window too. Only the window going away
+        // (detachExternalSurface) ends it.
         decoderManager = null
         equalizerProcessor.update(EqualizerSettings.DISABLED)
         releaseVolumeBoost()

@@ -1,0 +1,9 @@
+• Redesigned theme editor with floating live picker
+• Drag-and-drop files across tabs & folders
+• Independent dual-pane tab groups in landscape
+• PiP & background media playback
+• Player control lock & swipe-to-dismiss
+• Background camera recording, pause & snapshots
+• Non-blocking video saving
+• Biometric auto-reset on new enrollments
+• 7z, AVIF & waveform bug fixes

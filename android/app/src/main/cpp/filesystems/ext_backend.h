@@ -1,5 +1,10 @@
 #pragma once
 
+// <algorithm> must be seen BEFORE <ext2fs/ext2fs.h>: newer e2fsprogs (1.47.x
+// and the distro packages built from it) defines a function-like clamp(val,
+// min, max) macro in ext2fs.h, which breaks libstdc++'s std::clamp overloads
+// if <algorithm> is first included after it (GCC 15 hits this).
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -8,6 +13,12 @@
 extern "C" {
 #include <ext2fs/ext2fs.h>
 }
+
+// Drop the macro so any later include of a libstdc++ header (and any use of
+// std::clamp) in files that include this header still compiles.
+#ifdef clamp
+#undef clamp
+#endif
 
 constexpr size_t EXT_DIRECTORY_MAX_ENTRIES = 50000;
 

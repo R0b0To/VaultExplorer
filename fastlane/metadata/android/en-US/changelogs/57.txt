@@ -1,0 +1,28 @@
+### UI & Theming
+* **Interactive Floating Theme Editor:** Redesigned the theme editor into a floating picker accessible anywhere in the app. Tap UI elements directly to modify colors with instant live preview.
+* **Redesigned Image Editor UI:** A cleaner, more intuitive interface for editing images.
+* **General UI/UX Polish:** Fixed various layout glitches and visual inconsistencies across the app.
+
+### File Management & Dual Pane
+* **Drag-and-Drop Support:** Long-press and drag selected items or files directly into different folders and tabs.
+* **Independent Dual-Pane Tabs:** In landscape mode, each pane now manages its own independent tab group without mirroring or interfering with the other.
+* **Drawer Vault Behavior:** Vaults unlocked directly from the side drawer now open automatically.
+
+### Camera & Capture
+* **Non-blocking Video Saving:** Saving captured videos no longer freezes or locks the camera page. You can return immediately to the file manager while the save finishes as a background file transfer.
+* **Segmented Recording & Quick Snaps:** Added support for recording in segments and fast photo/video captures that bypass the preview screen (fully compatible with automation workflows).
+* **Pause & In-Recording Snapshots:** You can now pause active video recordings and take still snapshots while recording.
+* **Background Recording:** Quick camera now continues recording seamlessly when minimized or when the screen turns off.
+
+### Media Player
+* **Picture-in-Picture (PiP) & Background Audio:** Added support for PiP and continuous background playback after leaving the media player *(disabled by default, can be enabled in settings)*.
+* **Lock Controls Mode:** Added a lock button to prevent accidental taps, swipes, and pinch gestures. Press and hold to unlock; the system back button is also blocked while locked.
+* **Gesture Swipe-to-Dismiss:** Quickly dismiss items in playlists by swiping perpendicularly to the playlist scroll direction (e.g., swipe down on horizontal playlists, swipe sideways on vertical ones).
+
+### Security
+* **Biometric Invalidation:** Master lock and vault biometric authentication now automatically disable and revert to password unlock (clearing cached vault credentials) whenever a new fingerprint or facial profile is enrolled on the device.
+
+### Bug Fixes
+* **AVIF Images:** Fixed a crash when attempting to edit AVIF format images.
+* **Audio Waveform Visualizer:** Fixed an issue where the waveform visualizer in the audio editor failed to render long audio tracks.
+* **7-Zip Archives:** Resolved edge-case errors preventing certain `.7z` archives from opening or extracting correctly.

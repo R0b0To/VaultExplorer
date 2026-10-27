@@ -29,6 +29,12 @@ typedef struct struct_ext2_filsys *ext2_filsys;
 #endif
 }
 
+// e2fsprogs' ext2fs.h defines a function-like clamp() macro that collides with
+// std::clamp in any libstdc++ <algorithm> included afterwards (see ext_backend.h).
+#ifdef clamp
+#undef clamp
+#endif
+
 struct NtfsStream;
 struct ExtStream;
 

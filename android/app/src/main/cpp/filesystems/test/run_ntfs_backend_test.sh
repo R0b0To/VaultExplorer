@@ -39,7 +39,12 @@ fi
 sed -n '/^set(CONFIG_H_CONTENT "/,/^")$/p' "$CMAKE" | sed '1d;$d' > "$CACHE/config.h"
 [ -s "$CACHE/config.h" ] || { echo "could not extract config.h from $CMAKE" >&2; exit 2; }
 
-CFLAGS="-w -O1 -DHAVE_CONFIG_H -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -include stdint.h -include stddef.h -include sys/types.h"
+# -std=gnu17: GCC 15 defaults to C23, where bool/true/false are keywords and old-style
+# () prototypes change meaning -- both of which ntfs-3g's 2020s-era C relies on.
+# -include sys/ioctl.h: unix_io.c only includes it under HAVE_SYS_IOCTL_H, which the
+# CMake-generated config.h doesn't define (bionic pulls ioctl() in transitively; glibc
+# doesn't), and GCC 14+ makes an implicit function declaration a hard error.
+CFLAGS="-w -std=gnu17 -O1 -DHAVE_CONFIG_H -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -include stdint.h -include stddef.h -include sys/types.h -include sys/ioctl.h"
 CINC="-I $CACHE -I $SRC/include -I $SRC/include/ntfs-3g -I $SRC/ntfsprogs"
 
 LIB="$CACHE/libntfs3g_host.a"

@@ -255,7 +255,13 @@ set(ENABLE_CJSON_UNINSTALL OFF CACHE BOOL "Disable cJSON uninstall target" FORCE
 set(ENABLE_CUSTOM_COMPILER_FLAGS OFF CACHE BOOL "Disable cJSON custom compiler flags" FORCE)
 set(BUILD_SHARED_AND_STATIC_LIBS OFF CACHE BOOL "Build only static cJSON" FORCE)
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Disable shared cJSON" FORCE)
+# cJSON v1.7.18 declares cmake_minimum_required(VERSION 3.0), which CMake 4.x
+# (what ubuntu-latest CI now ships) rejects outright. Let it configure under the
+# 3.5 policy floor; the variable is ignored by older CMake and scoped to this call.
+set(_vexp_saved_policy_min "${CMAKE_POLICY_VERSION_MINIMUM}")
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 FetchContent_MakeAvailable(cjson)
+set(CMAKE_POLICY_VERSION_MINIMUM "${_vexp_saved_policy_min}")
 
 # 3b. Generate config.h
 set(CONFIG_H_CONTENT "

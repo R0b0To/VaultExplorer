@@ -312,100 +312,7 @@ class _EditorTopBar extends StatelessWidget implements PreferredSizeWidget {
   }
 }
 
-// ── BOTTOM NAVIGATION (LOOKS | TOOLS | EXPORT) ──────────────────────────────
-
-class _EditorBottomBar extends StatelessWidget {
-  final bool isToolsActive;
-  final bool isLooksActive;
-  final VoidCallback onSelectLooks;
-  final VoidCallback onSelectTools;
-  final VoidCallback onExport;
-
-  const _EditorBottomBar({
-    required this.isToolsActive,
-    required this.isLooksActive,
-    required this.onSelectLooks,
-    required this.onSelectTools,
-    required this.onExport,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 52,
-      decoration: const BoxDecoration(
-        color: Color(0xFF161616),
-        border: Border(
-          top: BorderSide(color: Color(0xFF262626), width: 0.8),
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: InkWell(
-              onTap: onSelectLooks,
-              child: Center(
-                child: Text(
-                  'Looks',
-                  style: TextStyle(
-                    color: isLooksActive ? const Color(0xFF38BDF8) : Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.6,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Expanded(
-            child: InkWell(
-              onTap: onSelectTools,
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.keyboard_arrow_up_rounded,
-                      color: Colors.white,
-                      size: 14,
-                    ),
-                    Text(
-                      'Tools',
-                      style: TextStyle(
-                        color: isToolsActive ? const Color(0xFF38BDF8) : Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.6,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Expanded(
-            child: InkWell(
-              onTap: onExport,
-              child: const Center(
-                child: Text(
-                  'Export',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.6,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── TOOLS DRAWER ROW ────────────────────────────────────────────────────────
+// ── TOOLS ROW ───────────────────────────────────────────────────────────────
 
 class _EditorToolsRow extends StatelessWidget {
   final EditorTool activeTool;
@@ -479,6 +386,11 @@ class _EditorToolsRow extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             _buildToolItem(
+              icon: Icons.filter_vintage_rounded,
+              label: l10n.imageEditorLooksToolLabel,
+              tool: EditorTool.looks,
+            ),
+            _buildToolItem(
               icon: Icons.tune_rounded,
               label: l10n.imageEditorTuneImageToolLabel,
               tool: EditorTool.tuneImage,
@@ -525,6 +437,7 @@ class _EditorToolActionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Container(
       height: 54,
       decoration: const BoxDecoration(
@@ -538,7 +451,7 @@ class _EditorToolActionBar extends StatelessWidget {
         children: [
           IconButton(
             icon: const Icon(Icons.close_rounded, color: Colors.white, size: 24),
-            tooltip: 'Cancel',
+            tooltip: l10n.cancel,
             onPressed: onCancel,
           ),
           Expanded(
@@ -549,7 +462,7 @@ class _EditorToolActionBar extends StatelessWidget {
           ),
           IconButton(
             icon: const Icon(Icons.check_rounded, color: Colors.white, size: 24),
-            tooltip: 'Apply',
+            tooltip: l10n.done,
             onPressed: onApply,
           ),
         ],
@@ -1230,18 +1143,6 @@ class _LooksShelf extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: Text(
-              'MY LOOKS',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.5),
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.0,
-              ),
-            ),
-          ),
           SizedBox(
             height: 90,
             child: ListView.separated(
@@ -1730,36 +1631,28 @@ class _DrawShelf extends StatelessWidget {
   }
 }
 
-// ── ANNOTATION CONTROLS (DRAW / TEXT / REDACT) ──────────────────────────────
+// ── REDACT SHELF (COLOR PALETTE) ───────────────────────────────────────────
 
-class _AnnotationShelf extends StatelessWidget {
-  final EditorTool activeTool;
-  final Color currentColor;
-  final ValueChanged<Color> onSetColor;
-  final VoidCallback onShowStrokeWidthPicker;
-  final VoidCallback onShowFontSizePicker;
-  final VoidCallback onClearAll;
-  final bool hasAnnotations;
+class _RedactShelf extends StatelessWidget {
+  final Color selectedColor;
+  final ValueChanged<Color> onSelectColor;
 
-  const _AnnotationShelf({
-    required this.activeTool,
-    required this.currentColor,
-    required this.onSetColor,
-    required this.onShowStrokeWidthPicker,
-    required this.onShowFontSizePicker,
-    required this.onClearAll,
-    required this.hasAnnotations,
+  const _RedactShelf({
+    required this.selectedColor,
+    required this.onSelectColor,
   });
 
   static const List<Color> _swatchColors = [
-    Colors.white,
     Colors.black,
-    Color(0xFFE53935), // Red
-    Color(0xFFFDD835), // Yellow
-    Color(0xFF43A047), // Green
-    Color(0xFF1E88E5), // Blue
-    Color(0xFF8E24AA), // Purple
-    Color(0xFFFFB74D), // Orange
+    Colors.white,
+    Color(0xFFEF4444), // Red
+    Color(0xFFF97316), // Orange
+    Color(0xFFFBBF24), // Yellow
+    Color(0xFF22C55E), // Green
+    Color(0xFF06B6D4), // Cyan
+    Color(0xFF3B82F6), // Blue
+    Color(0xFFA855F7), // Purple
+    Color(0xFFEC4899), // Pink
   ];
 
   @override
@@ -1767,46 +1660,34 @@ class _AnnotationShelf extends StatelessWidget {
     return Container(
       color: const Color(0xFF161616),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Color swatches row
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                for (final color in _swatchColors)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: GestureDetector(
-                      onTap: () => onSetColor(color),
-                      child: Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: color,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: color == currentColor ? Colors.white : Colors.white24,
-                            width: color == currentColor ? 2.5 : 1.0,
-                          ),
-                        ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            for (final color in _swatchColors)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: GestureDetector(
+                  onTap: () => onSelectColor(color),
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: color.toARGB32() == selectedColor.toARGB32()
+                            ? const Color(0xFF38BDF8)
+                            : Colors.white24,
+                        width: color.toARGB32() == selectedColor.toARGB32() ? 2.5 : 1.0,
                       ),
                     ),
                   ),
-              ],
-            ),
-          ),
-          if (activeTool == EditorTool.text)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 4),
-              child: Text(
-                'Tap on the photo to place text',
-                style: TextStyle(color: Colors.white70, fontSize: 11),
+                ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -27,12 +27,19 @@ class AnnotationLayer extends StatefulWidget {
   final Size imageSize;
   final List<EditAnnotation> annotations;
   final EditorTool activeTool;
+  final int? selectedAnnotationIndex;
+
+  /// `true` arms one box-creation drag, `false` disables empty-space creation,
+  /// and `null` keeps the layer's standalone draw-on-empty behavior.
+  final bool? isAddingRedact;
   final Color color;
   final double strokeWidthFraction;
   final ValueChanged<EditAnnotation> onAnnotationAdded;
   final void Function(int index, EditAnnotation annotation)?
   onAnnotationUpdated;
   final void Function(int index)? onAnnotationRemoved;
+  final ValueChanged<int?>? onSelectedAnnotationChanged;
+  final VoidCallback? onRedactAddComplete;
 
   /// Called once, right before the first change of a move/resize gesture, so
   /// the host can take a single undo snapshot per gesture (instead of one per
@@ -45,11 +52,15 @@ class AnnotationLayer extends StatefulWidget {
     required this.imageSize,
     required this.annotations,
     required this.activeTool,
+    this.selectedAnnotationIndex,
+    this.isAddingRedact,
     required this.color,
     required this.strokeWidthFraction,
     required this.onAnnotationAdded,
     this.onAnnotationUpdated,
     this.onAnnotationRemoved,
+    this.onSelectedAnnotationChanged,
+    this.onRedactAddComplete,
     this.onAnnotationEditStart,
     required this.onTextTapped,
   });
@@ -59,21 +70,36 @@ class AnnotationLayer extends StatefulWidget {
 }
 
 class _AnnotationLayerState extends State<AnnotationLayer> {
+  late bool _isAddingRedact;
   int? _selectedAnnotationIndex;
   bool _isDraggingAnnotation = false;
+  bool _isInteracting = false;
+  bool _isDrawingNewRect = false;
   Offset? _lastLocalPoint;
+  DateTime? _lastTapTime;
+  Offset? _lastTapPosition;
+
+  // Scale & rotate interaction state (matching text tool)
+  Rect _startRect = Rect.zero;
+  double _startRotation = 0.0;
+  double _lastSnappedAngle = 0.0;
+  Rect _currentRect = Rect.zero;
 
   // Freehand drawing state
   final List<Offset> _currentDrawingPoints = [];
 
-  // Redaction box state: a drag draws a rectangle between these two corners
-  // (normalized). Both are null when no box is being drawn.
   Offset? _redactStart;
   Offset? _redactCurrent;
 
-  /// Smallest box (in on-screen pixels, per side) worth keeping. Anything
-  /// smaller is treated as an accidental touch.
+  /// Smallest box (in on-screen pixels, per side) allowed while resizing.
   static const double _minRedactSidePx = 6.0;
+
+  Rect? get _liveRedactRect {
+    final a = _redactStart;
+    final b = _redactCurrent;
+    if (a == null || b == null) return null;
+    return Rect.fromPoints(a, b);
+  }
 
   /// Edges/corners closer than this (px) to a drag snap onto it.
   static const double _snapPx = 10.0;
@@ -93,6 +119,47 @@ class _AnnotationLayerState extends State<AnnotationLayer> {
   double? _guideY;
 
   bool _editStarted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _isAddingRedact = widget.isAddingRedact ?? false;
+  }
+
+  @override
+  void didUpdateWidget(AnnotationLayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isAddingRedact != widget.isAddingRedact) {
+      _isAddingRedact = widget.isAddingRedact ?? false;
+    }
+    if (oldWidget.activeTool == EditorTool.redact &&
+        widget.activeTool != EditorTool.redact) {
+      _selectedAnnotationIndex = null;
+    } else if (widget.activeTool == EditorTool.redact &&
+        (oldWidget.activeTool != EditorTool.redact ||
+            oldWidget.selectedAnnotationIndex !=
+                widget.selectedAnnotationIndex)) {
+      _selectedAnnotationIndex = widget.selectedAnnotationIndex;
+    }
+    if (_selectedAnnotationIndex != null) {
+      if (_selectedAnnotationIndex! >= widget.annotations.length ||
+          (widget.activeTool == EditorTool.redact &&
+              widget.annotations[_selectedAnnotationIndex!]
+                  is! RedactAnnotation)) {
+        _selectedAnnotationIndex = null;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) widget.onSelectedAnnotationChanged?.call(null);
+        });
+      }
+    }
+  }
+
+  void _selectAnnotation(int? index) {
+    if (_selectedAnnotationIndex != index) {
+      setState(() => _selectedAnnotationIndex = index);
+      widget.onSelectedAnnotationChanged?.call(index);
+    }
+  }
 
   void _beginEdit() {
     if (_editStarted) return;
@@ -248,13 +315,6 @@ class _AnnotationLayerState extends State<AnnotationLayer> {
     _lastLocalPoint = null;
   }
 
-  Rect? get _liveRedactRect {
-    final a = _redactStart;
-    final b = _redactCurrent;
-    if (a == null || b == null) return null;
-    return Rect.fromPoints(a, b);
-  }
-
   Offset _toNormalized(Offset local) => Offset(
     (local.dx / widget.imageSize.width).clamp(0.0, 1.0),
     (local.dy / widget.imageSize.height).clamp(0.0, 1.0),
@@ -269,92 +329,6 @@ class _AnnotationLayerState extends State<AnnotationLayer> {
     return null;
   }
 
-  void _onPanDown(DragDownDetails details) {
-    _editStarted = false;
-    final norm = _toNormalized(details.localPosition);
-    final hit = _hitTest(norm);
-
-    // 0. IN REDACT TOOL: grabbing an edge/corner of the selected redaction
-    // resizes it.
-    final selected = _selectedAnnotationIndex;
-    if (widget.activeTool == EditorTool.redact &&
-        selected != null &&
-        selected < widget.annotations.length) {
-      final annotation = widget.annotations[selected];
-      if (annotation is RedactAnnotation) {
-        final edges = _resizeEdgesAt(details.localPosition, annotation.rect);
-        if (edges.isNotEmpty) {
-          setState(() {
-            _resizeEdges = edges;
-            _resizeRaw = annotation.rect;
-            _lastLocalPoint = details.localPosition;
-          });
-          return;
-        }
-      }
-    }
-
-    // 1. IN REDACT TOOL: Touching an existing redaction grabs and moves it.
-    if (widget.activeTool == EditorTool.redact &&
-        hit != null &&
-        widget.annotations[hit] is RedactAnnotation) {
-      setState(() {
-        _selectedAnnotationIndex = hit;
-        _isDraggingAnnotation = true;
-        _lastLocalPoint = details.localPosition;
-      });
-      return;
-    }
-
-    // 2. IN TEXT TOOL: Touching existing text grabs and moves it
-    if (widget.activeTool == EditorTool.text &&
-        hit != null &&
-        widget.annotations[hit] is TextMarkAnnotation) {
-      setState(() {
-        _selectedAnnotationIndex = hit;
-        _isDraggingAnnotation = true;
-        _lastLocalPoint = details.localPosition;
-      });
-      return;
-    }
-
-    // 3. IN NONE TOOL: Touching any annotation grabs and moves it
-    if (widget.activeTool == EditorTool.none && hit != null) {
-      setState(() {
-        _selectedAnnotationIndex = hit;
-        _isDraggingAnnotation = true;
-        _lastLocalPoint = details.localPosition;
-      });
-      return;
-    }
-
-    // Deselect when touching elsewhere
-    if (_selectedAnnotationIndex != null) {
-      setState(() => _selectedAnnotationIndex = null);
-    }
-
-    // 4. DRAW TOOL: start a freehand stroke.
-    if (widget.activeTool == EditorTool.draw) {
-      setState(() {
-        _currentDrawingPoints
-          ..clear()
-          ..add(norm);
-      });
-      return;
-    }
-
-    // 5. REDACT TOOL: start a rectangle; dragging stretches it.
-    if (widget.activeTool == EditorTool.redact) {
-      final snapped = _snapPoint(norm);
-      setState(() {
-        _redactStart = snapped.point;
-        _redactCurrent = snapped.point;
-        _setGuides(snapped.guideX, snapped.guideY);
-      });
-      return;
-    }
-  }
-
   ({Offset point, double? guideX, double? guideY}) _snapPoint(Offset norm) {
     final sx = _snap(norm.dx, _snapTargetsX(null), widget.imageSize.width);
     final sy = _snap(norm.dy, _snapTargetsY(null), widget.imageSize.height);
@@ -365,23 +339,166 @@ class _AnnotationLayerState extends State<AnnotationLayer> {
     );
   }
 
-  void _onPanUpdate(DragUpdateDetails details) {
-    if (_resizeEdges.isNotEmpty) {
-      _resizeUpdate(details.localPosition);
-      return;
-    }
+  void _startRedactBox(Offset norm) {
+    _selectAnnotation(null);
+    final snapped = _snapPoint(norm);
+    setState(() {
+      _isInteracting = true;
+      _isDrawingNewRect = true;
+      _isDraggingAnnotation = false;
+      _resizeEdges = {};
+      _redactStart = snapped.point;
+      _redactCurrent = snapped.point;
+      _setGuides(snapped.guideX, snapped.guideY);
+    });
+  }
 
-    if (widget.activeTool == EditorTool.draw && !_isDraggingAnnotation) {
+  void _handleScaleStart(ScaleStartDetails details) {
+    _editStarted = false;
+    _lastLocalPoint = details.localFocalPoint;
+    final norm = _toNormalized(details.localFocalPoint);
+    final hit = _hitTest(norm);
+
+    // 0. DRAW TOOL: start freehand stroke
+    if (widget.activeTool == EditorTool.draw) {
       setState(() {
-        _currentDrawingPoints.add(_toNormalized(details.localPosition));
+        _isInteracting = true;
+        _isDraggingAnnotation = false;
+        _currentDrawingPoints
+          ..clear()
+          ..add(norm);
       });
       return;
     }
 
+    // 1. REDACT TOOL:
+    if (widget.activeTool == EditorTool.redact) {
+      // 1a. Check if touching an edge of the already selected redact box (1 finger, unrotated)
+      final selected = _selectedAnnotationIndex;
+      if (!_isAddingRedact &&
+          details.pointerCount == 1 &&
+          selected != null &&
+          selected < widget.annotations.length) {
+        final annotation = widget.annotations[selected];
+        if (annotation is RedactAnnotation &&
+            annotation.rotation.abs() < 0.05) {
+          final edges = _resizeEdgesAt(
+            details.localFocalPoint,
+            annotation.rect,
+          );
+          if (edges.isNotEmpty) {
+            setState(() {
+              _isInteracting = true;
+              _resizeEdges = edges;
+              _resizeRaw = annotation.rect;
+              _lastLocalPoint = details.localFocalPoint;
+              _isDraggingAnnotation = false;
+            });
+            return;
+          }
+        }
+      }
+
+      // Add arms the next drag anywhere on the image to create one new box.
+      if (_isAddingRedact) {
+        _startRedactBox(norm);
+        return;
+      }
+
+      // Touching a box grabs it. A background drag moves the current box.
+      final hitRedact =
+          hit != null && widget.annotations[hit] is RedactAnnotation;
+      final selectedForMove = hitRedact
+          ? hit
+          : selected != null &&
+                selected < widget.annotations.length &&
+                widget.annotations[selected] is RedactAnnotation
+          ? selected
+          : null;
+      if (selectedForMove != null) {
+        final ann = widget.annotations[selectedForMove] as RedactAnnotation;
+        _selectAnnotation(selectedForMove);
+        setState(() {
+          _isInteracting = true;
+          _isDraggingAnnotation = true;
+          _resizeEdges = {};
+          _startRect = ann.rect;
+          _currentRect = ann.rect;
+          _startRotation = ann.rotation;
+          _lastSnappedAngle = ann.rotation;
+          _lastLocalPoint = details.localFocalPoint;
+        });
+        return;
+      }
+
+      // Preserve the standalone layer's original draw-on-empty behavior when
+      // the host does not provide an explicit Add state.
+      if (widget.isAddingRedact == null) {
+        _startRedactBox(norm);
+        return;
+      }
+
+      _selectAnnotation(null);
+      return;
+    }
+
+    // 2. TEXT TOOL: touching existing text grabs it
+    if (widget.activeTool == EditorTool.text &&
+        hit != null &&
+        widget.annotations[hit] is TextMarkAnnotation) {
+      _selectAnnotation(hit);
+      setState(() {
+        _isInteracting = true;
+        _isDraggingAnnotation = true;
+        _lastLocalPoint = details.localFocalPoint;
+      });
+      return;
+    }
+
+    // 3. NONE TOOL: touching any annotation grabs it
+    if (widget.activeTool == EditorTool.none && hit != null) {
+      _selectAnnotation(hit);
+      setState(() {
+        _isInteracting = true;
+        _isDraggingAnnotation = true;
+        _lastLocalPoint = details.localFocalPoint;
+      });
+      return;
+    }
+
+    // Deselect when touching empty space in other tools
+    if (_selectedAnnotationIndex != null) {
+      _selectAnnotation(null);
+    }
+  }
+
+  void _handleScaleUpdate(ScaleUpdateDetails details) {
+    final imageSize = widget.imageSize;
+    if (imageSize.width <= 0 || imageSize.height <= 0) return;
+
+    // 0. Redact edge resizing (single finger)
+    if (_resizeEdges.isNotEmpty) {
+      if (details.pointerCount >= 2) {
+        _resizeEdges = {};
+      } else {
+        _resizeUpdate(details.localFocalPoint);
+        return;
+      }
+    }
+
+    // 1. Draw tool freehand points
+    if (widget.activeTool == EditorTool.draw && !_isDraggingAnnotation) {
+      setState(() {
+        _currentDrawingPoints.add(_toNormalized(details.localFocalPoint));
+      });
+      return;
+    }
+
+    // 2. Redact tool: draw the requested box after Add is armed.
     if (widget.activeTool == EditorTool.redact &&
-        !_isDraggingAnnotation &&
+        _isDrawingNewRect &&
         _redactStart != null) {
-      final snapped = _snapPoint(_toNormalized(details.localPosition));
+      final snapped = _snapPoint(_toNormalized(details.localFocalPoint));
       setState(() {
         _redactCurrent = snapped.point;
         _setGuides(snapped.guideX, snapped.guideY);
@@ -389,49 +506,130 @@ class _AnnotationLayerState extends State<AnnotationLayer> {
       return;
     }
 
+    // 3. Redact tool: manipulating selected box (move / pinch resize / rotate)
+    if (widget.activeTool == EditorTool.redact &&
+        _isDraggingAnnotation &&
+        _selectedAnnotationIndex != null &&
+        _selectedAnnotationIndex! < widget.annotations.length) {
+      final ann = widget.annotations[_selectedAnnotationIndex!];
+      if (ann is RedactAnnotation) {
+        // 1. Move position (pan / translation)
+        final normDelta = Offset(
+          details.focalPointDelta.dx / imageSize.width,
+          details.focalPointDelta.dy / imageSize.height,
+        );
+
+        var curRect = _currentRect;
+        if (normDelta != Offset.zero) {
+          final shifted = curRect.shift(normDelta);
+          final clamped = Rect.fromLTRB(
+            shifted.left.clamp(0.0, 1.0 - shifted.width),
+            shifted.top.clamp(0.0, 1.0 - shifted.height),
+            shifted.right.clamp(shifted.width, 1.0),
+            shifted.bottom.clamp(shifted.height, 1.0),
+          );
+          curRect = clamped;
+        }
+
+        // 2. Pinch scale (resizing width and height around center)
+        if (details.scale != 1.0) {
+          final minW = _minRedactSidePx / imageSize.width;
+          final minH = _minRedactSidePx / imageSize.height;
+          final targetW = (_startRect.width * details.scale).clamp(minW, 1.0);
+          final targetH = (_startRect.height * details.scale).clamp(minH, 1.0);
+          curRect = Rect.fromCenter(
+            center: curRect.center,
+            width: targetW,
+            height: targetH,
+          );
+        }
+        _currentRect = curRect;
+
+        // 3. Rotation gesture (matching TextOverlay)
+        double newRotation = ann.rotation;
+        if (details.rotation != 0.0 || details.pointerCount >= 2) {
+          var rawAngle = _startRotation + details.rotation;
+
+          // Magnetic snap around 0, +/-90, +/-180, +/-270 degrees within 2.5 degrees
+          const snapThreshold = 2.5 * math.pi / 180.0;
+          final snapPoints = [
+            0.0,
+            math.pi / 2,
+            -math.pi / 2,
+            math.pi,
+            -math.pi,
+            3 * math.pi / 2,
+            -3 * math.pi / 2,
+          ];
+          for (final snap in snapPoints) {
+            if ((rawAngle - snap).abs() <= snapThreshold) {
+              if (_lastSnappedAngle != snap &&
+                  (snap == 0.0 || snap.abs() == math.pi / 2)) {
+                HapticFeedback.selectionClick();
+              }
+              rawAngle = snap;
+              break;
+            }
+          }
+          _lastSnappedAngle = rawAngle;
+          newRotation = rawAngle;
+        }
+
+        _beginEdit();
+        widget.onAnnotationUpdated?.call(
+          _selectedAnnotationIndex!,
+          ann.copyWith(rect: curRect, rotation: newRotation),
+        );
+        return;
+      }
+    }
+
+    // 4. Other tools: generic annotation translation
     if (_isDraggingAnnotation &&
         _selectedAnnotationIndex != null &&
-        _lastLocalPoint != null) {
-      final delta = Offset(
-        (details.localPosition.dx - _lastLocalPoint!.dx) /
-            widget.imageSize.width,
-        (details.localPosition.dy - _lastLocalPoint!.dy) /
-            widget.imageSize.height,
+        _selectedAnnotationIndex! < widget.annotations.length) {
+      final normDelta = Offset(
+        details.focalPointDelta.dx / imageSize.width,
+        details.focalPointDelta.dy / imageSize.height,
       );
-      _lastLocalPoint = details.localPosition;
-
-      final current = widget.annotations[_selectedAnnotationIndex!];
-      final updated = current.translate(delta, widget.imageSize);
-      _beginEdit();
-      widget.onAnnotationUpdated?.call(_selectedAnnotationIndex!, updated);
+      if (normDelta != Offset.zero) {
+        final current = widget.annotations[_selectedAnnotationIndex!];
+        final updated = current.translate(normDelta, imageSize);
+        _beginEdit();
+        widget.onAnnotationUpdated?.call(_selectedAnnotationIndex!, updated);
+      }
     }
   }
 
-  void _onPanEnd(DragEndDetails details) {
+  void _handleScaleEnd(ScaleEndDetails details) {
+    _editStarted = false;
+    if (mounted) {
+      setState(() => _isInteracting = false);
+    }
+
     if (_resizeEdges.isNotEmpty) {
       setState(_endResize);
-      _editStarted = false;
       return;
     }
 
-    if (!_isDraggingAnnotation &&
-        widget.activeTool == EditorTool.draw &&
+    if (widget.activeTool == EditorTool.draw &&
         _currentDrawingPoints.isNotEmpty) {
-      widget.onAnnotationAdded(
-        DrawingAnnotation(
-          points: List<Offset>.from(_currentDrawingPoints),
-          color: widget.color,
-          strokeWidthFraction: widget.strokeWidthFraction,
-        ),
-      );
+      if (_currentDrawingPoints.length > 1) {
+        widget.onAnnotationAdded(
+          DrawingAnnotation(
+            points: List<Offset>.from(_currentDrawingPoints),
+            color: widget.color,
+            strokeWidthFraction: widget.strokeWidthFraction,
+          ),
+        );
+      }
       setState(() => _currentDrawingPoints.clear());
       return;
     }
 
-    if (!_isDraggingAnnotation &&
-        widget.activeTool == EditorTool.redact &&
-        _redactStart != null) {
+    if (widget.activeTool == EditorTool.redact && _isDrawingNewRect) {
       _commitRedactRect();
+      _isDrawingNewRect = false;
       return;
     }
 
@@ -449,12 +647,13 @@ class _AnnotationLayerState extends State<AnnotationLayer> {
     if (rect != null &&
         rect.width * size.width >= _minRedactSidePx &&
         rect.height * size.height >= _minRedactSidePx) {
-      // The new box goes on top of the list, so it is the one to select.
       final newIndex = widget.annotations.length;
       widget.onAnnotationAdded(
         RedactAnnotation(rect: rect, color: widget.color.withValues(alpha: 1)),
       );
-      setState(() => _selectedAnnotationIndex = newIndex);
+      _selectAnnotation(newIndex);
+      _isAddingRedact = false;
+      widget.onRedactAddComplete?.call();
     }
     setState(() {
       _redactStart = null;
@@ -462,66 +661,6 @@ class _AnnotationLayerState extends State<AnnotationLayer> {
       _guideX = null;
       _guideY = null;
     });
-  }
-
-  void _onPanCancel() {
-    setState(() {
-      _currentDrawingPoints.clear();
-      _redactStart = null;
-      _redactCurrent = null;
-      _guideX = null;
-      _guideY = null;
-      _resizeEdges = {};
-      _resizeRaw = null;
-      _isDraggingAnnotation = false;
-      _lastLocalPoint = null;
-    });
-  }
-
-  // ── HOLD TO MOVE (Long Press grabs any shape in any tool) ─────────────────
-
-  void _onLongPressStart(LongPressStartDetails details) {
-    final norm = _toNormalized(details.localPosition);
-    final hit = _hitTest(norm);
-    if (hit != null) {
-      _editStarted = false;
-      setState(() {
-        _selectedAnnotationIndex = hit;
-        _isDraggingAnnotation = true;
-        _lastLocalPoint = details.localPosition;
-        _currentDrawingPoints.clear();
-        _redactStart = null;
-        _redactCurrent = null;
-      });
-    }
-  }
-
-  void _onLongPressMoveUpdate(LongPressMoveUpdateDetails details) {
-    if (_isDraggingAnnotation &&
-        _selectedAnnotationIndex != null &&
-        _lastLocalPoint != null) {
-      final delta = Offset(
-        (details.localPosition.dx - _lastLocalPoint!.dx) /
-            widget.imageSize.width,
-        (details.localPosition.dy - _lastLocalPoint!.dy) /
-            widget.imageSize.height,
-      );
-      _lastLocalPoint = details.localPosition;
-
-      final current = widget.annotations[_selectedAnnotationIndex!];
-      final updated = current.translate(delta, widget.imageSize);
-      _beginEdit();
-      widget.onAnnotationUpdated?.call(_selectedAnnotationIndex!, updated);
-    }
-  }
-
-  void _onLongPressEnd(LongPressEndDetails details) {
-    if (_isDraggingAnnotation) {
-      setState(() {
-        _isDraggingAnnotation = false;
-        _lastLocalPoint = null;
-      });
-    }
   }
 
   void _onTapUp(TapUpDetails details) {
@@ -540,22 +679,46 @@ class _AnnotationLayerState extends State<AnnotationLayer> {
     }
 
     // A tap in the redact tool selects an existing box (or deselects); boxes
-    // are only created by dragging.
+    // are only created by dragging. Double-tapping an existing box deletes it.
     if (widget.activeTool == EditorTool.redact) {
+      if (_isAddingRedact) return;
+
+      final now = DateTime.now();
       final hit = _hitTest(norm);
-      setState(
-        () => _selectedAnnotationIndex =
-            hit != null && widget.annotations[hit] is RedactAnnotation
-            ? hit
-            : null,
-      );
+      final isDoubleTap =
+          _lastTapTime != null &&
+          now.difference(_lastTapTime!) < const Duration(milliseconds: 400) &&
+          _lastTapPosition != null &&
+          (details.localPosition - _lastTapPosition!).distance < 35.0;
+
+      if (isDoubleTap) {
+        _lastTapTime = null;
+        _lastTapPosition = null;
+        final targetIndex = hit ?? _selectedAnnotationIndex;
+        if (targetIndex != null &&
+            targetIndex >= 0 &&
+            targetIndex < widget.annotations.length &&
+            widget.annotations[targetIndex] is RedactAnnotation) {
+          _deleteAnnotationAt(targetIndex);
+          return;
+        }
+      }
+
+      _lastTapTime = now;
+      _lastTapPosition = details.localPosition;
+
+      final newIndex =
+          hit != null && widget.annotations[hit] is RedactAnnotation
+          ? hit
+          : null;
+      _selectAnnotation(newIndex);
       return;
     }
 
     if (widget.activeTool == EditorTool.text) {
       final hit = _hitTest(norm);
       if (hit != null && widget.annotations[hit] is TextMarkAnnotation) {
-        setState(() => _selectedAnnotationIndex = hit);
+        _selectAnnotation(hit);
       } else {
         widget.onTextTapped(norm);
       }
@@ -563,33 +726,31 @@ class _AnnotationLayerState extends State<AnnotationLayer> {
     }
 
     final hit = _hitTest(norm);
-    setState(() => _selectedAnnotationIndex = hit);
+    _selectAnnotation(hit);
+  }
+
+  void _deleteAnnotationAt(int index) {
+    HapticFeedback.mediumImpact();
+    widget.onAnnotationRemoved?.call(index);
+    _selectAnnotation(null);
   }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onPanDown: _onPanDown,
-      onPanUpdate: _onPanUpdate,
-      onPanEnd: _onPanEnd,
-      onPanCancel: _onPanCancel,
       onTapUp: _onTapUp,
-      onLongPressStart: _onLongPressStart,
-      onLongPressMoveUpdate: _onLongPressMoveUpdate,
-      onLongPressEnd: _onLongPressEnd,
-      // No onLongPressCancel on purpose: the long-press recognizer is rejected
-      // (and reports "cancel") every time a drag wins the gesture arena, which
-      // used to wipe the in-progress stroke/box mid-drag. A long press that was
-      // actually accepted always ends via onLongPressEnd.
+      onScaleStart: _handleScaleStart,
+      onScaleUpdate: _handleScaleUpdate,
+      onScaleEnd: _handleScaleEnd,
       child: CustomPaint(
         size: widget.imageSize,
         painter: _AnnotationPainter(
           annotations: widget.annotations,
           selectedIndex: _selectedAnnotationIndex,
+          isInteracting: _isInteracting,
           liveDrawing: _currentDrawingPoints,
           liveRedactRect: _liveRedactRect,
-          showResizeHandles: widget.activeTool == EditorTool.redact,
           guideX: _guideX,
           guideY: _guideY,
           liveColor: widget.color,
@@ -603,9 +764,9 @@ class _AnnotationLayerState extends State<AnnotationLayer> {
 class _AnnotationPainter extends CustomPainter {
   final List<EditAnnotation> annotations;
   final int? selectedIndex;
+  final bool isInteracting;
   final List<Offset> liveDrawing;
   final Rect? liveRedactRect;
-  final bool showResizeHandles;
   final double? guideX;
   final double? guideY;
   final Color liveColor;
@@ -614,9 +775,9 @@ class _AnnotationPainter extends CustomPainter {
   _AnnotationPainter({
     required this.annotations,
     this.selectedIndex,
+    required this.isInteracting,
     required this.liveDrawing,
     required this.liveRedactRect,
-    required this.showResizeHandles,
     required this.guideX,
     required this.guideY,
     required this.liveColor,
@@ -628,28 +789,84 @@ class _AnnotationPainter extends CustomPainter {
     for (int i = 0; i < annotations.length; i++) {
       annotations[i].paint(canvas, size);
 
-      // Clean selection frame (no misleading corner resize dots)
       if (selectedIndex == i) {
-        final bounds = annotations[i].getBounds(size);
-        if (bounds != null) {
-          final borderPaint = Paint()
-            ..color = const Color(0xFF3B82F6)
+        if (annotations[i] is RedactAnnotation) {
+          final ann = annotations[i] as RedactAnnotation;
+          final pixelRect = ann.getBounds(size);
+          final center = pixelRect.center;
+
+          canvas.save();
+          canvas.translate(center.dx, center.dy);
+          if (ann.rotation != 0.0) {
+            canvas.rotate(ann.rotation);
+          }
+
+          final guidePaint = Paint()
+            ..color = Colors.white.withValues(
+              alpha: isInteracting ? 0.65 : 0.40,
+            )
             ..style = PaintingStyle.stroke
-            ..strokeWidth = 2.0;
+            ..strokeWidth = 1.2;
 
-          final fillPaint = Paint()
-            ..color = const Color(0xFF3B82F6).withValues(alpha: 0.12)
-            ..style = PaintingStyle.fill;
+          final halfW = pixelRect.width / 2.0 + 6.0;
+          final halfH = pixelRect.height / 2.0 + 6.0;
+          const extend = 18.0;
 
-          final rrect = RRect.fromRectAndRadius(
-            bounds.inflate(6.0),
-            const Radius.circular(6.0),
+          // Vertical guide lines extending past corners
+          _drawDashedLine(
+            canvas,
+            Offset(-halfW, -halfH - extend),
+            Offset(-halfW, halfH + extend),
+            guidePaint,
           );
-          canvas.drawRRect(rrect, fillPaint);
-          canvas.drawRRect(rrect, borderPaint);
+          _drawDashedLine(
+            canvas,
+            Offset(halfW, -halfH - extend),
+            Offset(halfW, halfH + extend),
+            guidePaint,
+          );
 
-          if (showResizeHandles && annotations[i] is RedactAnnotation) {
-            _paintHandles(canvas, bounds);
+          // Horizontal guide lines extending past corners
+          _drawDashedLine(
+            canvas,
+            Offset(-halfW - extend, -halfH),
+            Offset(halfW + extend, -halfH),
+            guidePaint,
+          );
+          _drawDashedLine(
+            canvas,
+            Offset(-halfW - extend, halfH),
+            Offset(halfW + extend, halfH),
+            guidePaint,
+          );
+
+          // Horizontal guide line passing through center
+          _drawDashedLine(
+            canvas,
+            Offset(-halfW - extend, 0),
+            Offset(halfW + extend, 0),
+            guidePaint,
+          );
+
+          canvas.restore();
+        } else {
+          final bounds = annotations[i].getBounds(size);
+          if (bounds != null) {
+            final borderPaint = Paint()
+              ..color = const Color(0xFF3B82F6)
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 2.0;
+
+            final fillPaint = Paint()
+              ..color = const Color(0xFF3B82F6).withValues(alpha: 0.12)
+              ..style = PaintingStyle.fill;
+
+            final rrect = RRect.fromRectAndRadius(
+              bounds.inflate(6.0),
+              const Radius.circular(6.0),
+            );
+            canvas.drawRRect(rrect, fillPaint);
+            canvas.drawRRect(rrect, borderPaint);
           }
         }
       }
@@ -669,8 +886,6 @@ class _AnnotationPainter extends CustomPainter {
           ..color = liveColor.withValues(alpha: 1)
           ..style = PaintingStyle.fill,
       );
-      // Thin light outline so the box stays visible over similarly coloured
-      // parts of the image while it is being drawn.
       canvas.drawRect(
         pixelRect,
         Paint()
@@ -721,6 +936,32 @@ class _AnnotationPainter extends CustomPainter {
     }
   }
 
+  void _drawDashedLine(
+    Canvas canvas,
+    Offset p1,
+    Offset p2,
+    Paint paint, {
+    double dash = 6,
+    double gap = 4,
+  }) {
+    final dx = p2.dx - p1.dx;
+    final dy = p2.dy - p1.dy;
+    final dist = math.sqrt(dx * dx + dy * dy);
+    if (dist <= 0) return;
+    final unitX = dx / dist;
+    final unitY = dy / dist;
+    double current = 0;
+    while (current < dist) {
+      final end = math.min(current + dash, dist);
+      canvas.drawLine(
+        Offset(p1.dx + unitX * current, p1.dy + unitY * current),
+        Offset(p1.dx + unitX * end, p1.dy + unitY * end),
+        paint,
+      );
+      current += dash + gap;
+    }
+  }
+
   void _paintGuides(Canvas canvas, Size size) {
     final guide = Paint()
       ..color = const Color(0xFF22D3EE)
@@ -743,37 +984,15 @@ class _AnnotationPainter extends CustomPainter {
     }
   }
 
-  void _paintHandles(Canvas canvas, Rect bounds) {
-    final fill = Paint()..color = Colors.white;
-    final border = Paint()
-      ..color = const Color(0xFF3B82F6)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
-    void handle(Offset center) {
-      canvas.drawCircle(center, 7, fill);
-      canvas.drawCircle(center, 7, border);
-    }
-
-    for (final corner in [
-      bounds.topLeft,
-      bounds.topRight,
-      bounds.bottomLeft,
-      bounds.bottomRight,
-    ]) {
-      handle(corner);
-    }
-    // Edge-midpoint handles only when the side is long enough not to overlap
-    // the corner handles.
-    if (bounds.width >= 48) {
-      handle(Offset(bounds.center.dx, bounds.top));
-      handle(Offset(bounds.center.dx, bounds.bottom));
-    }
-    if (bounds.height >= 48) {
-      handle(Offset(bounds.left, bounds.center.dy));
-      handle(Offset(bounds.right, bounds.center.dy));
-    }
-  }
-
   @override
-  bool shouldRepaint(covariant _AnnotationPainter oldDelegate) => true;
+  bool shouldRepaint(covariant _AnnotationPainter oldDelegate) =>
+      oldDelegate.annotations != annotations ||
+      oldDelegate.selectedIndex != selectedIndex ||
+      oldDelegate.isInteracting != isInteracting ||
+      oldDelegate.liveDrawing != liveDrawing ||
+      oldDelegate.liveRedactRect != liveRedactRect ||
+      oldDelegate.guideX != guideX ||
+      oldDelegate.guideY != guideY ||
+      oldDelegate.liveColor != liveColor ||
+      oldDelegate.strokeWidthFraction != strokeWidthFraction;
 }

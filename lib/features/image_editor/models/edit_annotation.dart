@@ -14,17 +14,27 @@ abstract class EditAnnotation {
   Rect? getBounds(Size size) => null;
 }
 
-/// A solid or colored rectangle used to black out sensitive data.
+/// A solid or colored rectangle used to black out sensitive data with rotation and scale support.
 class RedactAnnotation extends EditAnnotation {
-  final Rect rect; // normalized 0.0 .. 1.0
+  final Rect rect; // normalized 0.0 .. 1.0 (unrotated bounds)
   final Color color;
+  final double rotation; // in radians, 0.0 is unrotated
 
-  RedactAnnotation({required this.rect, this.color = Colors.black});
+  RedactAnnotation({
+    required this.rect,
+    this.color = Colors.black,
+    this.rotation = 0.0,
+  });
 
-  RedactAnnotation copyWith({Rect? rect, Color? color}) {
+  RedactAnnotation copyWith({
+    Rect? rect,
+    Color? color,
+    double? rotation,
+  }) {
     return RedactAnnotation(
       rect: rect ?? this.rect,
       color: color ?? this.color,
+      rotation: rotation ?? this.rotation,
     );
   }
 
@@ -40,13 +50,22 @@ class RedactAnnotation extends EditAnnotation {
 
   @override
   bool contains(Offset normalizedPoint, Size size) {
-    // Pixel-based tolerance (not a % of the image) so a new box can be started
-    // right next to an existing one without grabbing it instead.
+    final bounds = getBounds(size);
     final touch = Offset(
       normalizedPoint.dx * size.width,
       normalizedPoint.dy * size.height,
     );
-    return getBounds(size).inflate(6.0).contains(touch);
+
+    final dx = touch.dx - bounds.center.dx;
+    final dy = touch.dy - bounds.center.dy;
+    final cosT = math.cos(rotation);
+    final sinT = math.sin(rotation);
+    final u = dx * cosT + dy * sinT;
+    final v = -dx * sinT + dy * cosT;
+
+    final halfW = bounds.width / 2.0 + 8.0;
+    final halfH = bounds.height / 2.0 + 8.0;
+    return u.abs() <= halfW && v.abs() <= halfH;
   }
 
   @override
@@ -64,12 +83,30 @@ class RedactAnnotation extends EditAnnotation {
   @override
   void paint(Canvas canvas, Size size) {
     final pixelRect = getBounds(size);
-    canvas.drawRect(
-      pixelRect,
-      Paint()
-        ..color = color
-        ..style = PaintingStyle.fill,
-    );
+    if (rotation != 0.0) {
+      canvas.save();
+      final center = pixelRect.center;
+      canvas.translate(center.dx, center.dy);
+      canvas.rotate(rotation);
+      canvas.drawRect(
+        Rect.fromCenter(
+          center: Offset.zero,
+          width: pixelRect.width,
+          height: pixelRect.height,
+        ),
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.fill,
+      );
+      canvas.restore();
+    } else {
+      canvas.drawRect(
+        pixelRect,
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.fill,
+      );
+    }
   }
 }
 

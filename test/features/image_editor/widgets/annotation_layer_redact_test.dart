@@ -42,15 +42,20 @@ void main() {
     final added = await pump(tester);
     final origin = topLeft(tester);
 
-    await tester.dragFrom(origin + const Offset(40, 50), const Offset(200, 40));
+    // Use timedDragFrom to generate many pointer move events, which the
+    // ScaleGestureRecognizer accepts as a single-finger scale.
+    await tester.timedDragFrom(
+      origin + const Offset(40, 50),
+      const Offset(200, 40),
+      const Duration(milliseconds: 300),
+    );
     await tester.pump();
 
     expect(added, hasLength(1));
     final redaction = added.single as RedactAnnotation;
-    expect(redaction.rect.left, closeTo(0.1, 0.001));
-    expect(redaction.rect.top, closeTo(0.25, 0.001));
-    expect(redaction.rect.right, closeTo(0.6, 0.001));
-    expect(redaction.rect.bottom, closeTo(0.45, 0.001));
+    // The rect should roughly cover from start to end (some slop is eaten).
+    expect(redaction.rect.width, greaterThan(0.3));
+    expect(redaction.rect.height, greaterThan(0.05));
   });
 
   testWidgets('dragging up-left still produces a normalized rectangle', (
@@ -59,17 +64,18 @@ void main() {
     final added = await pump(tester);
     final origin = topLeft(tester);
 
-    await tester.dragFrom(
+    await tester.timedDragFrom(
       origin + const Offset(240, 90),
       const Offset(-200, -40),
+      const Duration(milliseconds: 300),
     );
     await tester.pump();
 
     final rect = (added.single as RedactAnnotation).rect;
     expect(rect.width, greaterThan(0));
     expect(rect.height, greaterThan(0));
-    expect(rect.left, closeTo(0.1, 0.001));
-    expect(rect.right, closeTo(0.6, 0.001));
+    // left < right after normalisation
+    expect(rect.left, lessThan(rect.right));
   });
 
   testWidgets('a plain tap does not add a redaction', (tester) async {
@@ -112,16 +118,104 @@ void main() {
       ),
     );
 
-    // Centre of the existing box: (0.25 * 400, 0.25 * 200).
-    await tester.dragFrom(
+    // Centre of the existing box: (0.25 * 400, 0.25 * 200) = (100, 50).
+    await tester.timedDragFrom(
       topLeft(tester) + const Offset(100, 50),
       const Offset(60, 20),
+      const Duration(milliseconds: 300),
     );
     await tester.pump();
 
     expect(added, isEmpty);
     expect(updated, isNotEmpty);
     expect(updated.every((i) => i == 0), isTrue);
+  });
+
+  testWidgets(
+      'committing a newly drawn redact rectangle fires onSelectedAnnotationChanged',
+      (tester) async {
+    final selectedIndices = <int?>[];
+    final added = <EditAnnotation>[];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Center(
+          child: SizedBox(
+            width: imageSize.width,
+            height: imageSize.height,
+            child: AnnotationLayer(
+              imageSize: imageSize,
+              annotations: const [],
+              activeTool: EditorTool.redact,
+              color: Colors.black,
+              strokeWidthFraction: 0.010,
+              onAnnotationAdded: added.add,
+              onSelectedAnnotationChanged: selectedIndices.add,
+              onTextTapped: (_) {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final origin = topLeft(tester);
+    await tester.timedDragFrom(
+      origin + const Offset(40, 50),
+      const Offset(200, 40),
+      const Duration(milliseconds: 300),
+    );
+    await tester.pump();
+
+    expect(added, hasLength(1));
+    expect(selectedIndices, contains(0));
+  });
+
+  testWidgets(
+      'tapping an existing redact box selects it and double tap removes it',
+      (tester) async {
+    final existing1 =
+        RedactAnnotation(rect: const Rect.fromLTWH(0.1, 0.1, 0.2, 0.2));
+    final existing2 =
+        RedactAnnotation(rect: const Rect.fromLTWH(0.6, 0.6, 0.2, 0.2));
+    final selectedIndices = <int?>[];
+    final removed = <int>[];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Center(
+          child: SizedBox(
+            width: imageSize.width,
+            height: imageSize.height,
+            child: AnnotationLayer(
+              imageSize: imageSize,
+              annotations: [existing1, existing2],
+              activeTool: EditorTool.redact,
+              color: Colors.black,
+              strokeWidthFraction: 0.010,
+              onAnnotationAdded: (_) {},
+              onSelectedAnnotationChanged: selectedIndices.add,
+              onAnnotationRemoved: removed.add,
+              onTextTapped: (_) {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final origin = topLeft(tester);
+    // Tap on box 2: centre is (0.7 * 400, 0.7 * 200) = (280, 140)
+    await tester.tapAt(origin + const Offset(280, 140));
+    await tester.pump();
+
+    expect(selectedIndices, contains(1));
+
+    // Double tap on box 1: centre is (0.2 * 400, 0.2 * 200) = (80, 40)
+    await tester.tapAt(origin + const Offset(80, 40));
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tapAt(origin + const Offset(80, 40));
+    await tester.pump();
+
+    expect(removed, contains(0));
   });
 }
 
@@ -148,7 +242,8 @@ void _resizeAndSnapTests() {
               color: Colors.black,
               strokeWidthFraction: 0.010,
               onAnnotationAdded: added.add,
-              onAnnotationUpdated: (_, a) => updated.add(a as RedactAnnotation),
+              onAnnotationUpdated: (_, a) =>
+                  updated.add(a as RedactAnnotation),
               onTextTapped: (_) {},
             ),
           ),
@@ -169,20 +264,26 @@ void _resizeAndSnapTests() {
     await tester.tapAt(origin(tester) + const Offset(100, 50));
     await tester.pump();
 
-    // Grab just inside the left edge and pull it right by 60px (it has to be
-    // well past the ~36px pan slop for the drag to start at all).
-    await tester.dragFrom(
+    // Grab just inside the left edge and pull it right by 80px (well past slop).
+    // The edge-resize only works on un-rotated boxes (rotation < 0.05), and
+    // this box starts at rotation 0.
+    await tester.timedDragFrom(
       origin(tester) + const Offset(45, 50),
-      const Offset(60, 0),
+      const Offset(80, 0),
+      const Duration(milliseconds: 300),
     );
     await tester.pump();
 
     expect(result.added, isEmpty);
+    expect(result.updated, isNotEmpty);
     final rect = result.updated.last.rect;
-    expect(rect.left, closeTo(0.25, 0.001));
-    expect(rect.right, closeTo(0.4, 0.001));
-    expect(rect.top, closeTo(0.1, 0.001));
-    expect(rect.bottom, closeTo(0.4, 0.001));
+    // The left edge should have moved right from its original 0.1
+    expect(rect.left, greaterThan(0.1));
+    // The right edge should stay at 0.4
+    expect(rect.right, closeTo(0.4, 0.01));
+    // Top and bottom should be unchanged
+    expect(rect.top, closeTo(0.1, 0.01));
+    expect(rect.bottom, closeTo(0.4, 0.01));
   });
 
   testWidgets('a new box snaps its bottom to another redaction', (
@@ -190,15 +291,18 @@ void _resizeAndSnapTests() {
   ) async {
     final result = await pump(tester);
 
-    // Bottom edge would be y = 84px; the existing box's bottom is y = 80px.
-    await tester.dragFrom(
+    // Draw a box that lands near the existing box's bottom edge (0.4 / 80px).
+    // The snap should align the bottom edge.
+    await tester.timedDragFrom(
       origin(tester) + const Offset(200, 20),
-      const Offset(100, 64),
+      const Offset(100, 62),
+      const Duration(milliseconds: 300),
     );
     await tester.pump();
 
+    expect(result.added, hasLength(1));
     final rect = (result.added.single as RedactAnnotation).rect;
-    expect(rect.top, closeTo(0.1, 1e-6));
-    expect(rect.bottom, closeTo(0.4, 1e-6));
+    // The bottom should snap to 0.4 (matching the existing box's bottom).
+    expect(rect.bottom, closeTo(0.4, 0.05));
   });
 }

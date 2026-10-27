@@ -112,4 +112,56 @@ void main() {
     // Loading indicator is gone and error UI is displayed
     expect(find.byType(CircularProgressIndicator), findsNothing);
   });
+
+  testWidgets('ImageEditorScreen tools row is always visible with all tools including Looks and no redundant bottom bar', (tester) async {
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    final fakeIo = _FakeVaultFileIoApi(bytesToReturn: png1x1);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          vaultFileIoApiProvider.overrideWithValue(fakeIo),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            ...GlobalMaterialLocalizations.delegates,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: ImageEditorScreen(
+            container: testContainer,
+            filePath: 'photos/sample.png',
+          ),
+        ),
+      ),
+    );
+
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pump();
+
+    // Verify tools row is visible immediately and contains all tools including Looks
+    expect(find.byIcon(Icons.filter_vintage_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.tune_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.crop_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.brush_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.text_fields_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.visibility_off_outlined), findsOneWidget);
+
+    // Verify there is no redundant bottom navigation bar (no Tools/Looks/Export bottom tabs)
+    expect(find.byIcon(Icons.keyboard_arrow_up_rounded), findsNothing);
+
+    // Tap Redact tool
+    await tester.ensureVisible(find.byIcon(Icons.visibility_off_outlined));
+    await tester.tap(find.byIcon(Icons.visibility_off_outlined));
+    await tester.pump();
+
+    // Redact action bar displays Delete and Clear
+    expect(find.byIcon(Icons.delete_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.delete_sweep_rounded), findsOneWidget);
+  });
 }

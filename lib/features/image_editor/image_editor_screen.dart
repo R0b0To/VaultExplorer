@@ -142,7 +142,19 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
   double _drawStrokeDiameter = DrawOverlay.kDefaultBrushDiameter;
   _DrawShelfTab _drawShelfTab = _DrawShelfTab.color;
   List<DrawingAnnotation>? _drawSessionSnapshot;
-  bool _isToolsDrawerOpen = true;
+  int? _selectedRedactIndex;
+  List<RedactAnnotation>? _redactSessionSnapshot;
+  bool _isAddingRedact = false;
+  EditorTool? _pageAnnotationDragTool;
+  int? _pageRedactDragIndex;
+  bool _pageRedactEditStarted = false;
+  double _pageTextStartFontSize = 0.045;
+  double _pageTextStartRotation = 0.0;
+  double _pageTextLastSnappedAngle = 0.0;
+  Rect? _pageRedactStartRect;
+  Rect? _pageRedactCurrentRect;
+  double _pageRedactStartRotation = 0.0;
+  double _pageRedactLastSnappedAngle = 0.0;
   _TuneParam _selectedTuneParam = _TuneParam.brightness;
   bool _showTuneParamMenu = false;
   String _selectedPresetId = 'original';
@@ -664,8 +676,10 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
 
     if (_tuneGestureDir == _TuneGestureDirection.vertical) {
       final step = (dy / 34.0).round();
-      final newIndex = (_tunePointerStartParamIdx + step)
-          .clamp(0, _TuneParam.values.length - 1);
+      final newIndex = (_tunePointerStartParamIdx + step).clamp(
+        0,
+        _TuneParam.values.length - 1,
+      );
       final newParam = _TuneParam.values[newIndex];
       if (newParam != _selectedTuneParam) {
         setState(() {
@@ -766,7 +780,9 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
       if (_textEntrySnapshot != null) {
         if (_editingTextAnnotationIndex != null) {
           _annotationsController.insert(
-              _editingTextAnnotationIndex!, _textEntrySnapshot!);
+            _editingTextAnnotationIndex!,
+            _textEntrySnapshot!,
+          );
         } else {
           _annotationsController.add(_textEntrySnapshot!);
         }
@@ -777,11 +793,25 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
       _editingTextAnnotationIndex = null;
     } else if (tool == EditorTool.draw) {
       if (_drawSessionSnapshot != null) {
-        final nonDraw =
-            _annotations.where((a) => a is! DrawingAnnotation).toList();
+        final nonDraw = _annotations
+            .where((a) => a is! DrawingAnnotation)
+            .toList();
         _annotationsController.setAll([...nonDraw, ..._drawSessionSnapshot!]);
         _drawSessionSnapshot = null;
       }
+    } else if (tool == EditorTool.redact) {
+      if (_redactSessionSnapshot != null) {
+        final nonRedact = _annotations
+            .where((a) => a is! RedactAnnotation)
+            .toList();
+        _annotationsController.setAll([
+          ...nonRedact,
+          ..._redactSessionSnapshot!,
+        ]);
+        _redactSessionSnapshot = null;
+      }
+      _selectedRedactIndex = null;
+      _isAddingRedact = false;
     } else if (tool == EditorTool.tuneImage || tool == EditorTool.looks) {
       _resetTuneValues();
       setState(() {
@@ -802,7 +832,9 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
         _pushUndoSnapshot();
         if (_editingTextAnnotationIndex != null) {
           _annotationsController.insert(
-              _editingTextAnnotationIndex!, _activeTextNotifier!.value);
+            _editingTextAnnotationIndex!,
+            _activeTextNotifier!.value,
+          );
         } else {
           _annotationsController.add(_activeTextNotifier!.value);
         }
@@ -815,6 +847,12 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
       _controlsController.clearActiveTool();
     } else if (tool == EditorTool.draw) {
       _drawSessionSnapshot = null;
+      _documentController.markEdited();
+      _controlsController.clearActiveTool();
+    } else if (tool == EditorTool.redact) {
+      _redactSessionSnapshot = null;
+      _selectedRedactIndex = null;
+      _isAddingRedact = false;
       _documentController.markEdited();
       _controlsController.clearActiveTool();
     } else if (tool == EditorTool.tuneImage || tool == EditorTool.looks) {
@@ -865,8 +903,10 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
     if (_document.isSaving) return;
     if (tool == EditorTool.crop ||
         tool == EditorTool.text ||
+        tool == EditorTool.redact ||
         _controls.activeTool == EditorTool.crop ||
-        _controls.activeTool == EditorTool.text) {
+        _controls.activeTool == EditorTool.text ||
+        _controls.activeTool == EditorTool.redact) {
       _resetZoom(animate: false);
     }
     if (tool == EditorTool.crop) {
@@ -893,8 +933,16 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
     }
     if (tool == EditorTool.draw) {
       _drawShelfTab = _DrawShelfTab.color;
-      _drawSessionSnapshot =
-          _annotations.whereType<DrawingAnnotation>().toList();
+      _drawSessionSnapshot = _annotations
+          .whereType<DrawingAnnotation>()
+          .toList();
+    }
+    if (tool == EditorTool.redact) {
+      _selectedRedactIndex = null;
+      _isAddingRedact = true;
+      _redactSessionSnapshot = _annotations
+          .whereType<RedactAnnotation>()
+          .toList();
     }
     if (tool == EditorTool.tuneImage) {
       _resetTuneValues();
@@ -904,8 +952,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
 
   void _clearDrawAnnotations() {
     _pushUndoSnapshot();
-    final nonDraw =
-        _annotations.where((a) => a is! DrawingAnnotation).toList();
+    final nonDraw = _annotations.where((a) => a is! DrawingAnnotation).toList();
     _annotationsController.setAll(nonDraw);
     _documentController.markEdited();
   }
@@ -983,9 +1030,32 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
       ? _controls.redactColor
       : _controls.currentColor;
 
-  void _setToolColor(Color color) => _controls.activeTool == EditorTool.redact
-      ? _controlsController.setRedactColor(color)
-      : _controlsController.setColor(color);
+  Color get _currentRedactShelfColor {
+    final idx = _selectedRedactIndex;
+    if (idx != null && idx >= 0 && idx < _annotations.length) {
+      final ann = _annotations[idx];
+      if (ann is RedactAnnotation) {
+        return ann.color;
+      }
+    }
+    return _toolColor;
+  }
+
+  void _setToolColor(Color color) {
+    if (_controls.activeTool == EditorTool.redact) {
+      _controlsController.setRedactColor(color);
+      final idx = _selectedRedactIndex;
+      if (idx != null && idx >= 0 && idx < _annotations.length) {
+        final current = _annotations[idx];
+        if (current is RedactAnnotation && current.color != color) {
+          _pushUndoSnapshot();
+          _annotationsController.update(idx, current.copyWith(color: color));
+        }
+      }
+    } else {
+      _controlsController.setColor(color);
+    }
+  }
 
   void _addAnnotation(EditAnnotation annotation) {
     _pushUndoSnapshot();
@@ -1021,8 +1091,9 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
     final notifier = _activeTextNotifier;
     if (notifier == null) return;
     final current = notifier.value.text;
-    final initialVal =
-        current == context.l10n.imageEditorTextPlaceholder ? '' : current;
+    final initialVal = current == context.l10n.imageEditorTextPlaceholder
+        ? ''
+        : current;
     final l10n = context.l10n;
 
     final result = await showDialog<String>(
@@ -1033,7 +1104,8 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
         cancelLabel: l10n.cancel,
         addLabel: l10n.add,
         initialText: initialVal,
-        showDelete: _editingTextAnnotationIndex != null ||
+        showDelete:
+            _editingTextAnnotationIndex != null ||
             (initialVal.isNotEmpty &&
                 _annotations.any((a) => a is TextMarkAnnotation)),
         onDelete: () {
@@ -1049,15 +1121,226 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
 
     final trimmed = result?.trim();
     if (trimmed != null && trimmed.isNotEmpty && _activeTextNotifier != null) {
-      _activeTextNotifier!.value =
-          _activeTextNotifier!.value.copyWith(text: trimmed);
+      _activeTextNotifier!.value = _activeTextNotifier!.value.copyWith(
+        text: trimmed,
+      );
     }
   }
 
-  void _clearAllAnnotations() {
-    if (_annotations.isEmpty) return;
+  void _deleteSelectedRedactAnnotation() {
+    final idx = _selectedRedactIndex;
+    if (idx != null && idx >= 0 && idx < _annotations.length) {
+      _pushUndoSnapshot();
+      _annotationsController.removeAt(idx);
+      setState(() => _selectedRedactIndex = null);
+      _documentController.markEdited();
+      HapticFeedback.mediumImpact();
+    }
+  }
+
+  void _clearRedactAnnotations() {
+    final hasRedact = _annotations.any((a) => a is RedactAnnotation);
+    if (!hasRedact) return;
     _pushUndoSnapshot();
-    _annotationsController.clear();
+    final nonRedact = _annotations
+        .where((a) => a is! RedactAnnotation)
+        .toList();
+    _annotationsController.setAll(nonRedact);
+    setState(() => _selectedRedactIndex = null);
+    _documentController.markEdited();
+    HapticFeedback.mediumImpact();
+  }
+
+  void _addRedactAnnotation() {
+    setState(() => _isAddingRedact = true);
+  }
+
+  void _handleCanvasPageScaleStart(ScaleStartDetails details, Rect imageRect) {
+    _pageAnnotationDragTool = null;
+    _pageRedactDragIndex = null;
+    _pageRedactEditStarted = false;
+    _pageRedactStartRect = null;
+    _pageRedactCurrentRect = null;
+
+    // Image overlays handle gestures that start over the photo. This handler
+    // extends the same move gesture into the unused canvas around it.
+    if (imageRect.contains(details.localFocalPoint)) return;
+
+    if (_controls.activeTool == EditorTool.text &&
+        _activeTextNotifier != null) {
+      _pageAnnotationDragTool = EditorTool.text;
+      final annotation = _activeTextNotifier!.value;
+      _pageTextStartFontSize = annotation.fontSizeFraction;
+      _pageTextStartRotation = annotation.rotation;
+      _pageTextLastSnappedAngle = annotation.rotation;
+      return;
+    }
+
+    final index = _selectedRedactIndex;
+    if (_controls.activeTool == EditorTool.redact &&
+        index != null &&
+        index >= 0 &&
+        index < _annotations.length &&
+        _annotations[index] is RedactAnnotation) {
+      final annotation = _annotations[index] as RedactAnnotation;
+      _pageAnnotationDragTool = EditorTool.redact;
+      _pageRedactDragIndex = index;
+      _pageRedactStartRect = annotation.rect;
+      _pageRedactCurrentRect = annotation.rect;
+      _pageRedactStartRotation = annotation.rotation;
+      _pageRedactLastSnappedAngle = annotation.rotation;
+    }
+  }
+
+  void _handleCanvasPageScaleUpdate(
+    ScaleUpdateDetails details,
+    Size imageSize,
+  ) {
+    if (imageSize.width <= 0 || imageSize.height <= 0) return;
+    final delta = Offset(
+      details.focalPointDelta.dx / imageSize.width,
+      details.focalPointDelta.dy / imageSize.height,
+    );
+
+    if (_pageAnnotationDragTool == EditorTool.text) {
+      final notifier = _activeTextNotifier;
+      if (notifier == null) return;
+      final current = notifier.value;
+      notifier.value = current.copyWith(
+        position: Offset(
+          (current.position.dx + delta.dx).clamp(0.02, 0.98),
+          (current.position.dy + delta.dy).clamp(0.02, 0.98),
+        ),
+        fontSizeFraction: details.scale == 1.0
+            ? current.fontSizeFraction
+            : (_pageTextStartFontSize * details.scale).clamp(0.015, 0.35),
+        rotation: _pageTextRotation(current.rotation, details),
+      );
+      return;
+    }
+
+    final index = _pageRedactDragIndex;
+    if (_pageAnnotationDragTool != EditorTool.redact ||
+        index == null ||
+        index < 0 ||
+        index >= _annotations.length) {
+      return;
+    }
+
+    final annotation = _annotations[index];
+    if (annotation is! RedactAnnotation) return;
+    final startRect = _pageRedactStartRect;
+    if (startRect == null) return;
+
+    final currentRect = _pageRedactCurrentRect ?? annotation.rect;
+    final shifted = currentRect.shift(delta);
+    var updatedRect = _clampRedactRect(shifted);
+    if (details.scale != 1.0) {
+      final minWidth = 6.0 / imageSize.width;
+      final minHeight = 6.0 / imageSize.height;
+      final width = (startRect.width * details.scale)
+          .clamp(minWidth, 1.0)
+          .toDouble();
+      final height = (startRect.height * details.scale)
+          .clamp(minHeight, 1.0)
+          .toDouble();
+      updatedRect = _clampRedactRect(
+        Rect.fromCenter(
+          center: updatedRect.center,
+          width: width,
+          height: height,
+        ),
+      );
+    }
+    final updatedRotation = _pageRedactRotation(annotation.rotation, details);
+    if (updatedRect == annotation.rect &&
+        updatedRotation == annotation.rotation) {
+      return;
+    }
+
+    if (!_pageRedactEditStarted) {
+      _pushUndoSnapshot();
+      _pageRedactEditStarted = true;
+    }
+    _pageRedactCurrentRect = updatedRect;
+    _annotationsController.update(
+      index,
+      annotation.copyWith(rect: updatedRect, rotation: updatedRotation),
+    );
+  }
+
+  double _pageTextRotation(double currentRotation, ScaleUpdateDetails details) {
+    if (details.rotation == 0.0 && details.pointerCount < 2) {
+      return currentRotation;
+    }
+
+    var angle = _pageTextStartRotation + details.rotation;
+    const threshold = 2.5 * math.pi / 180.0;
+    const snapPoints = [0.0, math.pi / 2, -math.pi / 2, math.pi, -math.pi];
+    for (final snap in snapPoints) {
+      if ((angle - snap).abs() <= threshold) {
+        if (_pageTextLastSnappedAngle != snap && snap == 0.0) {
+          HapticFeedback.selectionClick();
+        }
+        angle = snap;
+        break;
+      }
+    }
+    _pageTextLastSnappedAngle = angle;
+    return angle;
+  }
+
+  double _pageRedactRotation(
+    double currentRotation,
+    ScaleUpdateDetails details,
+  ) {
+    if (details.rotation == 0.0 && details.pointerCount < 2) {
+      return currentRotation;
+    }
+
+    var angle = _pageRedactStartRotation + details.rotation;
+    const threshold = 2.5 * math.pi / 180.0;
+    final snapPoints = [
+      0.0,
+      math.pi / 2,
+      -math.pi / 2,
+      math.pi,
+      -math.pi,
+      3 * math.pi / 2,
+      -3 * math.pi / 2,
+    ];
+    for (final snap in snapPoints) {
+      if ((angle - snap).abs() <= threshold) {
+        if (_pageRedactLastSnappedAngle != snap &&
+            (snap == 0.0 || snap.abs() == math.pi / 2)) {
+          HapticFeedback.selectionClick();
+        }
+        angle = snap;
+        break;
+      }
+    }
+    _pageRedactLastSnappedAngle = angle;
+    return angle;
+  }
+
+  Rect _clampRedactRect(Rect rect) {
+    final width = rect.width.clamp(0.0, 1.0).toDouble();
+    final height = rect.height.clamp(0.0, 1.0).toDouble();
+    final left = rect.left.clamp(0.0, 1.0 - width).toDouble();
+    final top = rect.top.clamp(0.0, 1.0 - height).toDouble();
+    return Rect.fromLTWH(left, top, width, height);
+  }
+
+  void _handleCanvasPageScaleEnd(ScaleEndDetails _) {
+    _clearCanvasPagePan();
+  }
+
+  void _clearCanvasPagePan() {
+    _pageAnnotationDragTool = null;
+    _pageRedactDragIndex = null;
+    _pageRedactEditStarted = false;
+    _pageRedactStartRect = null;
+    _pageRedactCurrentRect = null;
   }
 
   void _setCropAspect(double? ratio) {
@@ -1515,7 +1798,6 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
   Widget _buildShelf() {
     switch (_controls.activeTool) {
       case EditorTool.none:
-        if (!_isToolsDrawerOpen) return const SizedBox.shrink();
         return _EditorToolsRow(
           activeTool: _controls.activeTool,
           onSelectTool: _selectTool,
@@ -1550,15 +1832,17 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
               tab: _textShelfTab,
               textAnnotation: activeText,
               onSelectStyle: (styleId) {
-                _activeTextNotifier!.value =
-                    activeText.copyWith(styleId: styleId);
+                _activeTextNotifier!.value = activeText.copyWith(
+                  styleId: styleId,
+                );
               },
               onSelectColor: (color) {
                 _activeTextNotifier!.value = activeText.copyWith(color: color);
               },
               onOpacityChanged: (opacity) {
-                _activeTextNotifier!.value =
-                    activeText.copyWith(opacity: opacity);
+                _activeTextNotifier!.value = activeText.copyWith(
+                  opacity: opacity,
+                );
               },
             );
           },
@@ -1571,17 +1855,13 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
           strokeDiameter: _drawStrokeDiameter,
           onSelectColor: (c) => setState(() => _drawColor = c),
           onOpacityChanged: (op) => setState(() => _drawOpacity = op),
-          onStrokeDiameterChanged: (d) => setState(() => _drawStrokeDiameter = d),
+          onStrokeDiameterChanged: (d) =>
+              setState(() => _drawStrokeDiameter = d),
         );
       case EditorTool.redact:
-        return _AnnotationShelf(
-          activeTool: _controls.activeTool,
-          currentColor: _toolColor,
-          onSetColor: _setToolColor,
-          onShowStrokeWidthPicker: _showStrokeWidthPicker,
-          onShowFontSizePicker: _showFontSizePicker,
-          onClearAll: _clearAllAnnotations,
-          hasAnnotations: _annotations.isNotEmpty,
+        return _RedactShelf(
+          selectedColor: _currentRedactShelfColor,
+          onSelectColor: _setToolColor,
         );
     }
   }
@@ -1589,14 +1869,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
   Widget _buildBottomBar() {
     final tool = _controls.activeTool;
     if (tool == EditorTool.none) {
-      return _EditorBottomBar(
-        isToolsActive: _isToolsDrawerOpen,
-        isLooksActive: false,
-        onSelectLooks: () => _selectTool(EditorTool.looks),
-        onSelectTools: () =>
-            setState(() => _isToolsDrawerOpen = !_isToolsDrawerOpen),
-        onExport: _onSavePressed,
-      );
+      return const SizedBox.shrink();
     }
 
     final l10n = context.l10n;
@@ -1621,7 +1894,8 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
         _EditorToolActionItem(
           icon: Icons.flip_rounded,
           label: l10n.imageEditorActionFlip,
-          onTap: () => setState(() => _cropFlippedHorizontal = !_cropFlippedHorizontal),
+          onTap: () =>
+              setState(() => _cropFlippedHorizontal = !_cropFlippedHorizontal),
         ),
         _EditorToolActionItem(
           icon: Icons.rotate_90_degrees_cw_rounded,
@@ -1703,9 +1977,27 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
       ],
       EditorTool.redact => [
         _EditorToolActionItem(
-          icon: Icons.delete_outline_rounded,
+          icon: Icons.add_circle_outline_rounded,
+          label: l10n.add,
+          isSelected: _isAddingRedact,
+          onTap: _addRedactAnnotation,
+        ),
+        _EditorToolActionItem(
+          icon: Icons.delete_rounded,
+          label: l10n.delete,
+          onTap:
+              (_selectedRedactIndex != null &&
+                  _selectedRedactIndex! >= 0 &&
+                  _selectedRedactIndex! < _annotations.length)
+              ? _deleteSelectedRedactAnnotation
+              : null,
+        ),
+        _EditorToolActionItem(
+          icon: Icons.delete_sweep_rounded,
           label: l10n.clear,
-          onTap: _annotations.isNotEmpty ? _clearAllAnnotations : null,
+          onTap: _annotations.any((a) => a is RedactAnnotation)
+              ? _clearRedactAnnotations
+              : null,
         ),
       ],
       EditorTool.none => const <Widget>[],
@@ -1733,21 +2025,22 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
         ? appSkin.preset
         : AppSkinPreset.custom;
     final customSkin = editSession?.draft ?? appSkin.customAppSkin;
-    final editorTheme = buildDarkTheme(
-      appSkin: skinPreset,
-      customAppSkin: customSkin,
-      manualFileManagerSkin: appSkin.fileManagerSkin,
-      fileManagerFollowsAppSkin: appSkin.fileManagerFollowsAppSkin,
-      editorFollowsAppSkin: appSkin.editorFollowsAppSkin,
-    ).copyWith(
-      scaffoldBackgroundColor: const Color(0xFF161616),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-        systemOverlayStyle: AppSystemUI.transparentDark,
-        elevation: 0,
-      ),
-    );
+    final editorTheme =
+        buildDarkTheme(
+          appSkin: skinPreset,
+          customAppSkin: customSkin,
+          manualFileManagerSkin: appSkin.fileManagerSkin,
+          fileManagerFollowsAppSkin: appSkin.fileManagerFollowsAppSkin,
+          editorFollowsAppSkin: appSkin.editorFollowsAppSkin,
+        ).copyWith(
+          scaffoldBackgroundColor: const Color(0xFF161616),
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Colors.black,
+            foregroundColor: Colors.white,
+            systemOverlayStyle: AppSystemUI.transparentDark,
+            elevation: 0,
+          ),
+        );
 
     return Theme(
       data: editorTheme,
@@ -1952,11 +2245,26 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
                         angleRad: (isCropping && !_showOriginalCompare)
                             ? angleRad
                             : 0.0,
-                        flipHorizontal: (isCropping && !_showOriginalCompare) &&
+                        flipHorizontal:
+                            (isCropping && !_showOriginalCompare) &&
                             _cropFlippedHorizontal,
                       ),
                     ),
                   ),
+                  if ((isTextTool ||
+                          _controls.activeTool == EditorTool.redact) &&
+                      !_showOriginalCompare)
+                    Positioned.fill(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.translucent,
+                        onScaleStart: (details) =>
+                            _handleCanvasPageScaleStart(details, fitted),
+                        onScaleUpdate: (details) =>
+                            _handleCanvasPageScaleUpdate(details, fitted.size),
+                        onScaleEnd: _handleCanvasPageScaleEnd,
+                        child: const SizedBox.expand(),
+                      ),
+                    ),
                   if (isCropping &&
                       _cropRectNotifier != null &&
                       !_showOriginalCompare)
@@ -1972,7 +2280,9 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
                           angleRad: angleRad,
                           onAngleDelta: (deltaPx) {
                             final deltaDeg = deltaPx * 0.15;
-                            _onRotateAngleChanged(_controls.cropRotationAngle + deltaDeg);
+                            _onRotateAngleChanged(
+                              _controls.cropRotationAngle + deltaDeg,
+                            );
                           },
                         ),
                       ),
@@ -1982,7 +2292,8 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
                     child: Opacity(
                       opacity: _showOriginalCompare ? 0.0 : 1.0,
                       child: IgnorePointer(
-                        ignoring: _controls.activeTool == EditorTool.none ||
+                        ignoring:
+                            _controls.activeTool == EditorTool.none ||
                             isTuneImage ||
                             isLooks ||
                             isCropping ||
@@ -1993,6 +2304,8 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
                           imageSize: fitted.size,
                           annotations: _annotations,
                           activeTool: _controls.activeTool,
+                          selectedAnnotationIndex: _selectedRedactIndex,
+                          isAddingRedact: _isAddingRedact,
                           color: _toolColor,
                           strokeWidthFraction:
                               _controls.currentStrokeWidthFraction,
@@ -2005,6 +2318,15 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
                           onAnnotationRemoved: (idx) {
                             _pushUndoSnapshot();
                             _annotationsController.removeAt(idx);
+                            if (_selectedRedactIndex == idx) {
+                              setState(() => _selectedRedactIndex = null);
+                            }
+                          },
+                          onSelectedAnnotationChanged: (idx) {
+                            setState(() => _selectedRedactIndex = idx);
+                          },
+                          onRedactAddComplete: () {
+                            setState(() => _isAddingRedact = false);
                           },
                           onTextTapped: _handleTextTapped,
                         ),
@@ -2028,8 +2350,9 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
                               .toList();
                           if (matchingIndex >= 0 &&
                               matchingIndex < textAnns.length) {
-                            final realIdx =
-                                _annotations.indexOf(textAnns[matchingIndex]);
+                            final realIdx = _annotations.indexOf(
+                              textAnns[matchingIndex],
+                            );
                             if (realIdx >= 0) {
                               _selectExistingTextAnnotation(realIdx);
                             }
@@ -2049,20 +2372,30 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
                   onPointerDown: isTuneImage ? _handleTunePointerDown : null,
                   onPointerMove: isTuneImage ? _handleTunePointerMove : null,
                   onPointerUp: isTuneImage ? _handleTunePointerUp : null,
-                  onPointerCancel: isTuneImage ? _handleTunePointerCancel : null,
+                  onPointerCancel: isTuneImage
+                      ? _handleTunePointerCancel
+                      : null,
                   child: GestureDetector(
-                    onDoubleTapDown: (!isTuneImage && !isCropping && !isTextTool && !isDrawTool && _controls.activeTool == EditorTool.none)
+                    onDoubleTapDown:
+                        (!isTuneImage &&
+                            !isCropping &&
+                            !isTextTool &&
+                            !isDrawTool &&
+                            _controls.activeTool == EditorTool.none)
                         ? (details) => _handleDoubleTap(
-                              details.localPosition,
-                              constraints.biggest,
-                            )
+                            details.localPosition,
+                            constraints.biggest,
+                          )
                         : null,
                     child: InteractiveViewer(
                       transformationController: _transformationController,
                       minScale: 1.0,
                       maxScale: DrawOverlay.kMaxZoomScale,
                       panEnabled:
-                          !isCropping && !isTextTool && !isDrawTool && _controls.activeTool == EditorTool.none,
+                          !isCropping &&
+                          !isTextTool &&
+                          !isDrawTool &&
+                          _controls.activeTool == EditorTool.none,
                       scaleEnabled: _controls.activeTool == EditorTool.none,
                       clipBehavior: Clip.hardEdge,
                       child: ColorAdjustFilter(
@@ -2112,7 +2445,8 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
                     child: _TuneParamOverlay(
                       selectedParam: _selectedTuneParam,
                       values: _tuneValues,
-                      isInteractive: _tuneGestureDir == _TuneGestureDirection.undecided,
+                      isInteractive:
+                          _tuneGestureDir == _TuneGestureDirection.undecided,
                       onSelectParam: (param) {
                         setState(() {
                           _selectedTuneParam = param;
@@ -2129,98 +2463,6 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
         );
       },
     );
-  }
-
-  Future<void> _showStrokeWidthPicker() async {
-    final selected = await showModalBottomSheet<double>(
-      context: context,
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              for (final fraction in editorStrokeWidthFractions)
-                InkWell(
-                  onTap: () => Navigator.of(sheetContext).pop(fraction),
-                  borderRadius: BorderRadius.circular(24),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Container(
-                      width: 12 + fraction * 200,
-                      height: 12 + fraction * 200,
-                      decoration: BoxDecoration(
-                        color: _controls.currentColor,
-                        shape: BoxShape.circle,
-                        border: _controls.currentStrokeWidthFraction == fraction
-                            ? Border.all(
-                                color: Theme.of(
-                                  sheetContext,
-                                ).colorScheme.primary,
-                                width: 2,
-                              )
-                            : null,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-    if (selected != null) {
-      _controlsController.setStrokeWidth(selected);
-    }
-  }
-
-  Future<void> _showFontSizePicker() async {
-    final l10n = context.l10n;
-    final sizes = [
-      (label: l10n.fontSizeSmall, fraction: 0.035, sampleSp: 13.0),
-      (label: l10n.fontSizeMedium, fraction: 0.055, sampleSp: 17.0),
-      (label: l10n.fontSizeLarge, fraction: 0.085, sampleSp: 22.0),
-      (label: l10n.fontSizeExtraLarge, fraction: 0.125, sampleSp: 28.0),
-    ];
-
-    final selected = await showModalBottomSheet<double>(
-      context: context,
-      builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (final size in sizes)
-              ListTile(
-                title: Text(
-                  size.label,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-                subtitle: Text(
-                  context.l10n.imageEditorFontSizePreview,
-                  style: TextStyle(
-                    fontSize: size.sampleSp,
-                    color: _controls.currentColor,
-                  ),
-                ),
-                trailing: SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: _controls.currentFontSizeFraction == size.fraction
-                      ? Icon(
-                          Icons.check_rounded,
-                          color: Theme.of(context).colorScheme.primary,
-                        )
-                      : null,
-                ),
-                onTap: () => Navigator.of(sheetContext).pop(size.fraction),
-              ),
-          ],
-        ),
-      ),
-    );
-    if (selected != null) {
-      _controlsController.setFontSize(selected);
-    }
   }
 }
 

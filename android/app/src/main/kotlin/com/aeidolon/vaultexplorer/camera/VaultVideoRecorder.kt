@@ -309,6 +309,14 @@ class VaultVideoRecorder(
     private var startTimeMs: Long = 0L
     private var stopTimeMs: Long = 0L
 
+    // Pausing (plain MediaRecorder recordings; a segmented one pauses inside its engine).
+    private var paused = false
+    private var pausedSinceMs = 0L
+    private var pausedTotalMs = 0L
+
+    /** True between [pause] and [resume]. */
+    val isPaused: Boolean get() = engine?.isPaused ?: paused
+
     /**
      * Called, from a recorder thread, whenever a part of a segmented recording
      * has been closed -- every part but the last, which [tempFilePath] points
@@ -358,6 +366,9 @@ class VaultVideoRecorder(
             return
         }
 
+        paused = false
+        pausedSinceMs = 0L
+        pausedTotalMs = 0L
         val temp = File.createTempFile(TEMP_PREFIX, TEMP_SUFFIX, cacheDir)
         tempFile = temp
         VeLog.d(TAG) { "prepareEncoder: ${width}x$height quality=$quality codec=${if (useHevc) "HEVC" else "H264"} bitrate=$bitrate orientation=$orientationDegrees audio=$recordAudio" }
@@ -409,6 +420,52 @@ class VaultVideoRecorder(
     }
 
     /**
+     * Pauses the recording without ending it. A plain recording stays one file
+     * (the footage on either side of the pause is joined). A segmented one
+     * closes the part in progress, which is then handed over like any other
+     * finished part, and a new part starts after [resume]. Returns false when
+     * the recorder could not pause.
+     */
+    fun pause(): Boolean {
+        val segmented = engine
+        if (segmented != null) {
+            segmented.pause()
+            return segmented.isPaused
+        }
+        val recorder = mediaRecorder ?: return false
+        if (paused) return true
+        return try {
+            recorder.pause()
+            paused = true
+            pausedSinceMs = System.currentTimeMillis()
+            true
+        } catch (e: Exception) {
+            VeLog.e(TAG, e) { "MediaRecorder.pause failed" }
+            false
+        }
+    }
+
+    /** Ends a [pause]. Returns false when the recorder could not resume. */
+    fun resume(): Boolean {
+        val segmented = engine
+        if (segmented != null) {
+            segmented.resume()
+            return !segmented.isPaused
+        }
+        val recorder = mediaRecorder ?: return false
+        if (!paused) return true
+        return try {
+            recorder.resume()
+            pausedTotalMs += System.currentTimeMillis() - pausedSinceMs
+            paused = false
+            true
+        } catch (e: Exception) {
+            VeLog.e(TAG, e) { "MediaRecorder.resume failed" }
+            false
+        }
+    }
+
+    /**
      * Stops recording. For a segmented recording the duration is that of the
      * last part only (the earlier parts were reported as they closed), and every
      * earlier part has been reported through [onSegmentFinished] by the time this
@@ -424,12 +481,21 @@ class VaultVideoRecorder(
         }
         val recorder = mediaRecorder ?: return RecordingResult(0)
         stopTimeMs = System.currentTimeMillis()
+        if (paused) {
+            // Some recorders only finalize cleanly from the recording state, so
+            // leave the pause first. The instant between the two is not counted.
+            try { recorder.resume() } catch (e: Exception) {
+                VeLog.w(TAG, e) { "MediaRecorder.resume before stop failed" }
+            }
+            pausedTotalMs += stopTimeMs - pausedSinceMs
+            paused = false
+        }
         try {
             recorder.stop()
         } catch (e: Exception) {
             VeLog.e(TAG, e) { "MediaRecorder.stop failed" }
         }
-        val duration = maxOf(0L, stopTimeMs - startTimeMs)
+        val duration = maxOf(0L, stopTimeMs - startTimeMs - pausedTotalMs)
         VeLog.d(TAG) { "requestStop: duration=${duration}ms" }
         return RecordingResult(duration)
     }

@@ -3489,5 +3489,9 @@
   "fontSizeExtraLarge": "特大",
   "imageEditorTextPlaceholder": "ダブルタップしてテキストを変更",
   "imageEditorFontSizePreview": "サンプルプレビュー ABC 123",
-  "imageEditorPhotoLabel": "写真 {index}"
+  "imageEditorPhotoLabel": "写真 {index}",
+  "cameraPauseRecordingTooltip": "録画を一時停止",
+  "cameraResumeRecordingTooltip": "録画を再開",
+  "cameraSnapshotTooltip": "録画中に写真を撮影",
+  "cameraPauseFailedMessage": "録画の一時停止または再開ができませんでした"
 }

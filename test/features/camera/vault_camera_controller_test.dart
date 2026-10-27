@@ -43,6 +43,9 @@ void main() {
         case 'takePhoto':
           return {'success': true, 'error': null};
         case 'startVideoRecording':
+          return {'success': true, 'error': null, 'snapshotAvailable': true};
+        case 'pauseVideoRecording':
+        case 'resumeVideoRecording':
           return {'success': true, 'error': null};
         case 'stopVideoRecording':
           return {'success': true, 'durationMs': 3500, 'error': null};
@@ -113,6 +116,29 @@ void main() {
       final stopRes = await controller.stopVideoRecording();
       expect(stopRes.success, isTrue);
       expect(stopRes.durationMs, 3500);
+    });
+
+    test('start reports whether photos can be taken while recording', () async {
+      await controller.open();
+      final startRes = await controller.startVideoRecording(volId: 1, virtualPath: 'video.mp4');
+      expect(startRes.snapshotAvailable, isTrue);
+    });
+
+    test('a recording can be paused and resumed', () async {
+      await controller.open();
+      await controller.startVideoRecording(volId: 1, virtualPath: 'video.mp4');
+
+      final paused = await controller.pauseVideoRecording();
+      expect(paused.success, isTrue);
+      final resumed = await controller.resumeVideoRecording();
+      expect(resumed.success, isTrue);
+    });
+
+    test('pause and resume before open report failure', () async {
+      final paused = await controller.pauseVideoRecording();
+      expect(paused.success, isFalse);
+      expect(paused.error, 'Camera not open');
+      expect((await controller.resumeVideoRecording()).success, isFalse);
     });
 
     test('getDisplayRotation returns the native quarter-turn index', () async {

@@ -11938,4 +11938,16 @@ class AppLocalizationsKo extends AppLocalizations {
   String imageEditorPhotoLabel(int index) {
     return '사진 $index';
   }
+
+  @override
+  String get cameraPauseRecordingTooltip => '녹화 일시중지';
+
+  @override
+  String get cameraResumeRecordingTooltip => '녹화 재개';
+
+  @override
+  String get cameraSnapshotTooltip => '녹화 중 사진 촬영';
+
+  @override
+  String get cameraPauseFailedMessage => '녹화를 일시중지하거나 재개할 수 없습니다';
 }

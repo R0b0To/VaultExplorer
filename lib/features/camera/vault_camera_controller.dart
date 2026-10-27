@@ -416,13 +416,17 @@ class VaultCameraController {
   /// into parts of about that length: each part is closed as a complete,
   /// playable file the moment it is full, and is announced with a
   /// `video_segment` event and handed over by [takeVideoSegments].
-  Future<({bool success, String? error})> startVideoRecording({
+  ///
+  /// `snapshotAvailable` says whether photos can be taken while this recording
+  /// runs (see [capturePhoto]); not every camera can do that at the chosen
+  /// video size.
+  Future<({bool success, String? error, bool snapshotAvailable})> startVideoRecording({
     required int volId,
     required String virtualPath,
     int segmentSeconds = 0,
   }) async {
     final sId = _sessionId;
-    if (sId == null) return (success: false, error: 'Camera not open');
+    if (sId == null) return (success: false, error: 'Camera not open', snapshotAvailable: false);
 
     final res = await _channel.invokeMethod<Map<dynamic, dynamic>>('startVideoRecording', {
       'sessionId': sId,
@@ -433,15 +437,38 @@ class VaultCameraController {
 
     final ok = res?['success'] as bool? ?? false;
     final error = res?['error'] as String?;
-    return (success: ok, error: error);
+    final snapshot = res?['snapshotAvailable'] as bool? ?? false;
+    return (success: ok, error: error, snapshotAvailable: snapshot);
   }
 
-  Future<({bool success, String? error})> startVideoRecordingToScratchpad({
+  /// Pauses the recording in progress without ending it. With segmented
+  /// recording the part in progress is closed at the pause (and handed over
+  /// like any finished part); the next part starts on [resumeVideoRecording].
+  Future<({bool success, String? error})> pauseVideoRecording() =>
+      _setRecordingPaused('pauseVideoRecording');
+
+  /// Continues a recording paused with [pauseVideoRecording].
+  Future<({bool success, String? error})> resumeVideoRecording() =>
+      _setRecordingPaused('resumeVideoRecording');
+
+  Future<({bool success, String? error})> _setRecordingPaused(String method) async {
+    final sId = _sessionId;
+    if (sId == null) return (success: false, error: 'Camera not open');
+    final res = await _channel.invokeMethod<Map<dynamic, dynamic>>(method, {
+      'sessionId': sId,
+    });
+    return (
+      success: res?['success'] as bool? ?? false,
+      error: res?['error'] as String?,
+    );
+  }
+
+  Future<({bool success, String? error, bool snapshotAvailable})> startVideoRecordingToScratchpad({
     required String sessionToken,
     required String scratchpadPath,
   }) async {
     final sId = _sessionId;
-    if (sId == null) return (success: false, error: 'Camera not open');
+    if (sId == null) return (success: false, error: 'Camera not open', snapshotAvailable: false);
 
     final res = await _channel.invokeMethod<Map<dynamic, dynamic>>(
       'startVideoRecordingToScratchpad',
@@ -454,7 +481,8 @@ class VaultCameraController {
 
     final ok = res?['success'] as bool? ?? false;
     final error = res?['error'] as String?;
-    return (success: ok, error: error);
+    final snapshot = res?['snapshotAvailable'] as bool? ?? false;
+    return (success: ok, error: error, snapshotAvailable: snapshot);
   }
 
    Future<({bool success, String? videoPath, int durationMs, Uint8List? thumbnail, String? error})> stopVideoRecordingForReview() async {

@@ -228,7 +228,13 @@ class VaultCameraRecordingService : Service() {
                 if (audioOnly) R.string.audio_recording_notification_title
                 else R.string.camera_recording_notification_title,
             )
-            contentText = localized.getString(R.string.camera_recording_notification_text, currentContainerName)
+            // Quick Capture records before any vault is chosen, so there is no
+            // name to say it is saving to; the title alone says enough then.
+            contentText = if (currentContainerName.isEmpty()) {
+                ""
+            } else {
+                localized.getString(R.string.camera_recording_notification_text, currentContainerName)
+            }
             actionLabel = localized.getString(R.string.camera_recording_stop_action)
             smallIcon = if (audioOnly) R.drawable.ic_notification_mic else R.drawable.ic_notification_camera
         }
@@ -236,7 +242,7 @@ class VaultCameraRecordingService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(smallIcon)
             .setContentTitle(contentTitle)
-            .setContentText(contentText)
+            .setContentText(contentText.ifEmpty { null })
             .setContentIntent(getContentIntent())
             .addAction(0, actionLabel, getStopIntent())
             .setOngoing(true)

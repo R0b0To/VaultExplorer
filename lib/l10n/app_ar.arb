@@ -3489,5 +3489,9 @@
   "fontSizeExtraLarge": "كبير جداً",
   "imageEditorTextPlaceholder": "اضغط مرتين هنا لتغيير النص",
   "imageEditorFontSizePreview": "معاينة نموذجية أبج 123",
-  "imageEditorPhotoLabel": "صورة {index}"
+  "imageEditorPhotoLabel": "صورة {index}",
+  "cameraPauseRecordingTooltip": "إيقاف التسجيل مؤقتًا",
+  "cameraResumeRecordingTooltip": "استئناف التسجيل",
+  "cameraSnapshotTooltip": "التقاط صورة أثناء التسجيل",
+  "cameraPauseFailedMessage": "تعذر إيقاف التسجيل مؤقتًا أو استئنافه"
 }

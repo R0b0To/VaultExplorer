@@ -95,6 +95,24 @@ mixin CaptureScreenStateMixin<T extends ConsumerStatefulWidget> on ConsumerState
 
   Timer? timer;
 
+  // --- Pause and snapshots while recording ----------------------------------
+
+  /// True while the recording in progress is paused.
+  bool captureIsPaused = false;
+
+  /// Photos can be taken while the recording in progress runs. Decided by the
+  /// camera when the recording starts: not every device can set up a photo
+  /// stream next to the video at the chosen size.
+  bool captureSnapshotAvailable = false;
+
+  /// Photos taken during the recording in progress. They wait in the tray like
+  /// any other capture; the count is shown on the snapshot button.
+  int recordingSnapshotCount = 0;
+
+  bool _isTogglingPause = false;
+  Duration _pausedBefore = Duration.zero;
+  DateTime? _pausedSince;
+
   final List<CapturedMediaItem> capturedMedia = [];
 
   final ScrollController trayScrollController = ScrollController();
@@ -182,6 +200,220 @@ mixin CaptureScreenStateMixin<T extends ConsumerStatefulWidget> on ConsumerState
   double get captureMaxExposureEv => captureSession.maxExposureEv;
 
   bool get captureShowExposureSlider => captureSession.showExposureSlider;
+
+  // --- Recording clock, pause and snapshots -----------------------------------
+
+  /// How long has been recorded: wall time since the start minus every pause.
+  Duration get recordingElapsed {
+    final start = recordingStart;
+    if (start == null) return Duration.zero;
+    final now = DateTime.now();
+    final pausedNow = _pausedSince == null
+        ? Duration.zero
+        : now.difference(_pausedSince!);
+    final elapsed = now.difference(start) - _pausedBefore - pausedNow;
+    return elapsed.isNegative ? Duration.zero : elapsed;
+  }
+
+  /// Starts the on-screen recording timer. Call once the recording has really
+  /// started, after setting [recordingStart]. [snapshotAvailable] is what the
+  /// camera reported for this recording.
+  void startRecordingClock({required bool snapshotAvailable}) {
+    _pausedBefore = Duration.zero;
+    _pausedSince = null;
+    captureIsPaused = false;
+    captureSnapshotAvailable = snapshotAvailable;
+    recordingSnapshotCount = 0;
+    timer?.cancel();
+    timer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+      if (!mounted || recordingStart == null) return;
+      final elapsed = recordingElapsed.inSeconds;
+      final text =
+          '${(elapsed ~/ 60).toString().padLeft(2, '0')}:${(elapsed % 60).toString().padLeft(2, '0')}';
+      // Frozen while paused: nothing to redraw.
+      if (text != captureTimerText) {
+        captureSessionController.updateTimerText(text);
+      }
+    });
+  }
+
+  /// Stops the recording timer and clears the pause/snapshot state. Returns
+  /// how many milliseconds were recorded, pauses not counted (9999 when the
+  /// start is unknown, so a recording is never thrown away as too short by
+  /// mistake). Read [recordingStart] only after this.
+  int stopRecordingClock() {
+    timer?.cancel();
+    final recordedMs = recordingStart == null
+        ? 9999
+        : recordingElapsed.inMilliseconds;
+    _pausedBefore = Duration.zero;
+    _pausedSince = null;
+    captureIsPaused = false;
+    captureSnapshotAvailable = false;
+    return recordedMs;
+  }
+
+  /// True when nothing but photos taken during the recording that just ended
+  /// is waiting in the tray, so the video is the first thing the user leaves
+  /// the camera with (and the review opens for it, unless "keep shooting" is on).
+  bool get trayHoldsOnlyRecordingSnapshots =>
+      capturedMedia.length == recordingSnapshotCount;
+
+  /// Pauses the recording in progress, or continues it when paused. The
+  /// preview stays live and photos can still be taken meanwhile.
+  Future<void> toggleRecordingPause() async {
+    if (!captureIsRecording || isStartingVideo || _isTogglingPause) return;
+    _isTogglingPause = true;
+    final pausing = !captureIsPaused;
+    HapticFeedback.mediumImpact();
+    try {
+      final result = pausing
+          ? await cameraController.pauseVideoRecording()
+          : await cameraController.resumeVideoRecording();
+      // The recording may have been stopped while the call was in flight.
+      if (!mounted || !captureIsRecording) return;
+      if (!result.success) {
+        showErrorToast(context.l10n.cameraPauseFailedMessage);
+        return;
+      }
+      final now = DateTime.now();
+      setState(() {
+        if (pausing) {
+          _pausedSince = now;
+        } else {
+          _pausedBefore += now.difference(_pausedSince ?? now);
+          _pausedSince = null;
+        }
+        captureIsPaused = pausing;
+      });
+    } catch (_) {
+      if (mounted && captureIsRecording) {
+        showErrorToast(context.l10n.cameraPauseFailedMessage);
+      }
+    } finally {
+      _isTogglingPause = false;
+    }
+  }
+
+  /// Takes a photo without interrupting the recording. It goes to the tray
+  /// like any capture; the review never opens until the recording is over.
+  Future<void> takeRecordingSnapshot() async {
+    if (!captureIsRecording ||
+        !captureSnapshotAvailable ||
+        isTakingPhoto ||
+        isEncrypting) {
+      return;
+    }
+    isTakingPhoto = true;
+    HapticFeedback.mediumImpact();
+    triggerShutterFlash();
+    setState(() => pendingPhotoCount++);
+    try {
+      final orientationDegrees = await computePreviewRotationDegrees();
+      // No aspect crop: the camera's photo stream already has the video's frame.
+      final result = await cameraController.capturePhoto(
+        orientationDegrees: orientationDegrees,
+      );
+      if (result.success && result.bytes != null && mounted) {
+        HapticFeedback.lightImpact();
+        setState(() {
+          capturedMedia.add(
+            CapturedMediaItem.photo(
+              photoBytes: result.bytes!,
+              thumbnailBytes: result.thumbnail ?? result.bytes!,
+            ),
+          );
+          recordingSnapshotCount++;
+        });
+      } else if (mounted && captureIsRecording) {
+        showErrorToast(
+          result.error ?? context.l10n.cameraPhotoCaptureFailedMessage,
+        );
+      }
+    } catch (_) {
+      // A photo still in flight when the recording is stopped fails on its own.
+      if (mounted && captureIsRecording) {
+        showErrorToast(context.l10n.cameraPhotoCaptureFailedMessage);
+      }
+    } finally {
+      isTakingPhoto = false;
+      if (mounted) {
+        setState(() {
+          pendingPhotoCount = math.max(0, pendingPhotoCount - 1);
+        });
+      }
+    }
+  }
+
+  /// One of the round buttons beside the shutter while recording.
+  Widget buildRecordingSideButton({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback? onPressed,
+    bool highlighted = false,
+    int badgeCount = 0,
+  }) {
+    return buildRotatedWidget(
+      iconTurns: captureIconTurns,
+      child: Tooltip(
+        message: tooltip,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onPressed,
+          child: SizedBox(
+            width: 48,
+            height: 48,
+            child: Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.center,
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: highlighted ? Colors.amber : Colors.black45,
+                    border: Border.all(
+                      color: highlighted ? Colors.amber : Colors.white70,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: highlighted ? Colors.black : Colors.white,
+                    size: 26,
+                  ),
+                ),
+                if (badgeCount > 0)
+                  Positioned(
+                    top: -2,
+                    right: -2,
+                    child: Container(
+                      constraints: const BoxConstraints(minWidth: 18),
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: Colors.amber,
+                        borderRadius: BorderRadius.circular(9),
+                      ),
+                      child: Text(
+                        '$badgeCount',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.black,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   // --- Shared behaviour ---------------------------------------------------------
   void handleCameraEvent(Map<String, dynamic> event) {
@@ -755,17 +987,35 @@ mixin CaptureScreenStateMixin<T extends ConsumerStatefulWidget> on ConsumerState
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                buildRotatedWidget(
-                  iconTurns: captureIconTurns,
-                  child: IconButton(
-                    icon: const Icon(
-                      Icons.flip_camera_ios_rounded,
-                      color: Colors.white,
-                      size: 32,
+                // While recording the lens cannot be switched (the recording is
+                // tied to the camera it started on), so this slot holds the
+                // pause button instead of the flip button.
+                if (captureIsRecording)
+                  SizedBox(
+                    width: 48,
+                    child: buildRecordingSideButton(
+                      icon: captureIsPaused
+                          ? Icons.play_arrow_rounded
+                          : Icons.pause_rounded,
+                      tooltip: captureIsPaused
+                          ? context.l10n.cameraResumeRecordingTooltip
+                          : context.l10n.cameraPauseRecordingTooltip,
+                      highlighted: captureIsPaused,
+                      onPressed: isStartingVideo ? null : toggleRecordingPause,
                     ),
-                    onPressed: flipCamera,
+                  )
+                else
+                  buildRotatedWidget(
+                    iconTurns: captureIconTurns,
+                    child: IconButton(
+                      icon: const Icon(
+                        Icons.flip_camera_ios_rounded,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                      onPressed: flipCamera,
+                    ),
                   ),
-                ),
                 GestureDetector(
                   onTap: onCaptureClicked,
                   child: Container(
@@ -790,7 +1040,25 @@ mixin CaptureScreenStateMixin<T extends ConsumerStatefulWidget> on ConsumerState
                     ),
                   ),
                 ),
-                if (!captureIsRecording && !captureIsCountingDown)
+                if (captureIsRecording)
+                  // Same width the mode toggle's slot had, so the shutter
+                  // does not move when the recording starts.
+                  SizedBox(
+                    width: supportsDocumentScan ? 94 : 48,
+                    child: captureSnapshotAvailable
+                        ? Center(
+                            child: buildRecordingSideButton(
+                              icon: Icons.photo_camera_rounded,
+                              tooltip: context.l10n.cameraSnapshotTooltip,
+                              badgeCount: recordingSnapshotCount,
+                              onPressed: isTakingPhoto || isEncrypting
+                                  ? null
+                                  : takeRecordingSnapshot,
+                            ),
+                          )
+                        : null,
+                  )
+                else if (!captureIsCountingDown)
                   buildModeToggle()
                 else
                   SizedBox(width: supportsDocumentScan ? 94 : 48),

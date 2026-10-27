@@ -24,6 +24,10 @@ import 'vault_camera_controller.dart';
 const _quickCaptureControlsKey = 'camera_capture';
 const _quickCaptureSessionKey = 'quick_capture';
 
+/// Volume id the Quick Capture recording service is started with: a capture
+/// is made before any vault is chosen, so there is none to name.
+const _kQuickCaptureVolId = -1;
+
 class QuickCaptureScreen extends ConsumerStatefulWidget {
   const QuickCaptureScreen({super.key});
 
@@ -54,6 +58,17 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
   late final SessionLockController _sessionLockController;
   late final VaultDashboardController _dashboardController;
   bool _autoLockPausedForRecording = false;
+
+  /// The foreground service that keeps the camera and microphone running when
+  /// the app leaves the screen (or the screen locks) is running for the
+  /// recording in progress. Without it Android would cut the camera, so a
+  /// recording not covered by it is stopped and kept when the app goes away.
+  bool _backgroundRecordingActive = false;
+
+  /// Volume id the running service was started with, which the notification's
+  /// Stop button reports back: [_kQuickCaptureVolId] for a plain capture, the
+  /// chosen vault's for a segmented one.
+  int _backgroundRecordingVolId = _kQuickCaptureVolId;
 
   _Phase _phase = _Phase.camera;
 
@@ -93,6 +108,15 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
   @override
   bool get captureIsCountingDown => captureSession.countdownValue > 0 && captureSession.isCountingDown;
 
+  /// The notification's "Stop & save" button. A plain Quick Capture has no
+  /// vault yet when it records, so its service is started without one
+  /// (volume -1); a segmented one is started with the vault it saves into.
+  void _onBackgroundRecordingStopRequestedEvent(int volId) {
+    if (volId == _backgroundRecordingVolId && captureIsRecording) {
+      unawaited(stopVideoRecording());
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -104,6 +128,9 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
     _dashboardController = ref.read(vaultDashboardControllerProvider.notifier);
     cameraController = VaultCameraController(engineEvents);
 
+    engineEvents.addBackgroundRecordingStopRequestedListener(
+      _onBackgroundRecordingStopRequestedEvent,
+    );
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
@@ -173,6 +200,9 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
   @override
   void dispose() {
     _resumeAutoLockAfterRecording();
+    engineEvents.removeBackgroundRecordingStopRequestedListener(
+      _onBackgroundRecordingStopRequestedEvent,
+    );
     WidgetsBinding.instance.removeObserver(this);
     trayScrollController.dispose();
     timer?.cancel();
@@ -183,6 +213,10 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
 
     if (captureIsRecording) {
       unawaited(captureFileIoApi.setKeepScreenOn(false));
+    }
+    if (_backgroundRecordingActive) {
+      _backgroundRecordingActive = false;
+      unawaited(captureFileIoApi.stopBackgroundRecording());
     }
 
     final pending = _pendingScratchpad;
@@ -232,6 +266,13 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
 
   Future<void> _handleGoingBackground() async {
     if (captureIsRecording) {
+      // The app leaving the screen (Home, another app, the screen locking)
+      // must not end a recording that the foreground service is keeping
+      // alive: the camera stays open and the recording carries on, as it does
+      // in the vault camera. Only a recording the service could not be started
+      // for is stopped here, so what was recorded so far is kept instead of
+      // being lost when Android cuts the camera.
+      if (_backgroundRecordingActive) return;
       await stopVideoRecording();
     }
     await cameraController.close();
@@ -596,19 +637,21 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
       }
 
       recordingStart = DateTime.now();
+      startRecordingClock(snapshotAvailable: result.snapshotAvailable);
       captureIsRecording = true;
       if (!mounted) return;
       _pauseAutoLockForRecording();
       captureSessionController.startRecording();
       unawaited(captureFileIoApi.setKeepScreenOn(true));
 
-      timer = Timer.periodic(const Duration(milliseconds: 500), (_) {
-        if (!mounted || recordingStart == null) return;
-        final elapsed = DateTime.now().difference(recordingStart!).inSeconds;
-        captureSessionController.updateTimerText(
-          '${(elapsed ~/ 60).toString().padLeft(2, '0')}:${(elapsed % 60).toString().padLeft(2, '0')}',
-        );
-      });
+      // Keeps the camera and microphone alive when the app leaves the screen
+      // or the screen locks. Started now, while the app is still in front:
+      // Android does not allow it from the background.
+      _backgroundRecordingVolId = _kQuickCaptureVolId;
+      _backgroundRecordingActive = await captureFileIoApi.startBackgroundRecording(
+        volId: _kQuickCaptureVolId,
+        containerName: '',
+      );
     } catch (e) {
       showErrorToast(
         context.l10n.cameraRecordingFailedWithReasonMessage('$e'),
@@ -626,14 +669,21 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
   Future<void> stopVideoRecording() async {
     if (!cameraController.isInitialized || !captureIsRecording) return;
 
-    timer?.cancel();
-    final startedAt = recordingStart;
+    // Time actually recorded, pauses not counted.
+    final recordedMs = stopRecordingClock();
+    final wasRecordingInBackground = _backgroundRecordingActive;
     recordingStart = null;
-    captureIsRecording = false;
+    if (mounted) {
+      setState(() => captureIsRecording = false);
+    } else {
+      captureIsRecording = false;
+    }
     _resumeAutoLockAfterRecording();
 
     try {
-      final isFirstMedia = capturedMedia.isEmpty;
+      // Photos taken during the recording are already in the tray; they do not
+      // make the video any less the first thing the user is leaving with.
+      final isFirstMedia = trayHoldsOnlyRecordingSnapshots;
       final result = await cameraController.stopVideoRecordingForReview();
 
       if (_segmentedRecording) {
@@ -645,9 +695,7 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
         return;
       }
 
-      final elapsedMs = startedAt == null
-          ? 9999
-          : DateTime.now().difference(startedAt).inMilliseconds;
+      final elapsedMs = recordedMs;
 
       final session = _pendingScratchpad;
       if (elapsedMs < 500 || !result.success || result.videoPath == null) {
@@ -690,6 +738,19 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
     } finally {
       _segmentedRecording = false;
       unawaited(captureFileIoApi.setKeepScreenOn(false));
+      if (_backgroundRecordingActive) {
+        _backgroundRecordingActive = false;
+        unawaited(captureFileIoApi.stopBackgroundRecording());
+      }
+      if (wasRecordingInBackground &&
+          (lastLifecycleState == AppLifecycleState.paused ||
+              lastLifecycleState == AppLifecycleState.hidden)) {
+        // The recording ended while the app was away (the notification's Stop
+        // button). The service that protected the camera is gone now, so let
+        // the camera go as well, as when the app left the screen, and reopen it
+        // when the user comes back.
+        backgroundingFuture = _handleGoingBackground();
+      }
     }
   }
 
@@ -751,19 +812,21 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
       _segmentChain = Future<void>.value();
 
       recordingStart = DateTime.now();
+      startRecordingClock(snapshotAvailable: result.snapshotAvailable);
       captureIsRecording = true;
       if (!mounted) return;
       _pauseAutoLockForRecording();
       captureSessionController.startRecording();
       unawaited(captureFileIoApi.setKeepScreenOn(true));
 
-      timer = Timer.periodic(const Duration(milliseconds: 500), (_) {
-        if (!mounted || recordingStart == null) return;
-        final elapsed = DateTime.now().difference(recordingStart!).inSeconds;
-        captureSessionController.updateTimerText(
-          '${(elapsed ~/ 60).toString().padLeft(2, '0')}:${(elapsed % 60).toString().padLeft(2, '0')}',
-        );
-      });
+      // Keeps the camera and microphone alive when the app leaves the screen
+      // or the screen locks. Started now, while the app is still in front.
+      // The vault is known here, so the notification can name it.
+      _backgroundRecordingVolId = container.volId;
+      _backgroundRecordingActive = await captureFileIoApi.startBackgroundRecording(
+        volId: container.volId,
+        containerName: container.displayName,
+      );
     } catch (e) {
       _segmentedRecording = false;
       if (mounted) {
@@ -1047,6 +1110,7 @@ class _QuickCaptureScreenState extends ConsumerState<QuickCaptureScreen>
                       child: CameraTopControlsBar(
                         isVideoMode: captureControls.isVideoMode,
                         isRecording: captureIsRecording,
+                        isPaused: captureIsPaused,
                         isCountingDown: captureIsCountingDown,
                         timerText: captureTimerText,
                         videoQuality: captureControls.videoQuality,

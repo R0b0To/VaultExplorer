@@ -3489,5 +3489,9 @@
   "fontSizeExtraLarge": "特大",
   "imageEditorTextPlaceholder": "双击此处更改文字",
   "imageEditorFontSizePreview": "示例预览 ABC 123",
-  "imageEditorPhotoLabel": "照片 {index}"
+  "imageEditorPhotoLabel": "照片 {index}",
+  "cameraPauseRecordingTooltip": "暂停录制",
+  "cameraResumeRecordingTooltip": "继续录制",
+  "cameraSnapshotTooltip": "录制时拍照",
+  "cameraPauseFailedMessage": "无法暂停或恢复录制"
 }

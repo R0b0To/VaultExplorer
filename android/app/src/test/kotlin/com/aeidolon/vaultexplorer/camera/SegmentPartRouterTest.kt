@@ -337,4 +337,122 @@ class SegmentPartRouterTest {
         r.router.finish()
         assertEquals(before, r.parts.size)
     }
+
+    // --- Pausing ---------------------------------------------------------
+
+    private val frameUs = 33_333L
+    private val base = 5_000_000_000_000L
+
+    /** Feeds [frames] video frames from frame [from] on (a keyframe every 30) plus matching audio. */
+    private fun feed(router: SegmentPartRouter<Int>, from: Int, frames: Int) {
+        for (j in from until from + frames) {
+            val pts = base + j * frameUs
+            router.onVideo(RoutedSample(SampleTrack.VIDEO, pts, j % 30 == 0, 0))
+            router.onAudio(RoutedSample(SampleTrack.AUDIO, pts, true, 0))
+        }
+    }
+
+    @Test
+    fun `pausing closes the part in progress as a part that is not the last`() {
+        val sink = RecordingSink()
+        val router = SegmentPartRouter<Int>(600_000_000L, frameUs, sink, {})
+        feed(router, 0, 90)
+        router.pause()
+        assertTrue(router.isPaused)
+        assertFalse(router.isOpen)
+        assertEquals(1, sink.parts.size)
+        assertFalse(sink.parts.single().isLast)
+        assertTrue(abs(sink.parts.single().durationUs - 90 * frameUs) <= 2 * frameUs)
+    }
+
+    @Test
+    fun `nothing is written while paused, even a keyframe`() {
+        val sink = RecordingSink()
+        val router = SegmentPartRouter<Int>(600_000_000L, frameUs, sink, {})
+        feed(router, 0, 60)
+        router.pause()
+        feed(router, 60, 120) // includes keyframes at 60, 90, 120, 150
+        assertEquals(1, sink.parts.size)
+        assertFalse(router.isOpen)
+    }
+
+    @Test
+    fun `after resume the next keyframe opens a new part that starts at time zero`() {
+        val sink = RecordingSink()
+        var syncRequests = 0
+        val router = SegmentPartRouter<Int>(600_000_000L, frameUs, sink, { syncRequests++ })
+        feed(router, 0, 60)
+        router.pause()
+        feed(router, 60, 100)
+        router.resume()
+        assertEquals("resuming asks the encoder for a keyframe", 1, syncRequests)
+        feed(router, 165, 60) // 165 is not a keyframe; 180 is
+        router.finish()
+
+        assertEquals(2, sink.parts.size)
+        val second = sink.parts[1]
+        assertTrue(second.isLast)
+        assertEquals(base + 180 * frameUs, second.startUs)
+        val firstVideo = second.video.first()
+        assertTrue(firstVideo.key)
+        assertEquals(0L, firstVideo.relUs)
+        assertTrue(second.audio.all { it.absUs >= second.startUs })
+    }
+
+    @Test
+    fun `audio heard while paused is not carried into the next part`() {
+        val sink = RecordingSink()
+        val router = SegmentPartRouter<Int>(600_000_000L, frameUs, sink, {})
+        feed(router, 0, 60)
+        router.pause()
+        feed(router, 60, 100)
+        router.resume()
+        feed(router, 180, 30)
+        router.finish()
+        val lastOfFirst = sink.parts[0].audio.maxOf { it.absUs }
+        val firstOfSecond = sink.parts[1].audio.minOf { it.absUs }
+        assertTrue(lastOfFirst < base + 60 * frameUs + frameUs)
+        assertTrue(firstOfSecond >= base + 180 * frameUs)
+    }
+
+    @Test
+    fun `pausing before any keyframe, and pausing twice, are harmless`() {
+        val sink = RecordingSink()
+        val router = SegmentPartRouter<Int>(600_000_000L, frameUs, sink, {})
+        router.pause()
+        router.pause()
+        router.resume()
+        router.resume()
+        feed(router, 1, 40) // frame 30 is the first keyframe
+        router.finish()
+        assertEquals(1, sink.parts.size)
+        assertEquals(base + 30 * frameUs, sink.parts.single().startUs)
+    }
+
+    @Test
+    fun `stopping while paused leaves every earlier part complete and no last part`() {
+        val sink = RecordingSink()
+        val router = SegmentPartRouter<Int>(600_000_000L, frameUs, sink, {})
+        feed(router, 0, 90)
+        router.pause()
+        router.finish()
+        assertEquals(1, sink.parts.size)
+        assertFalse("the closed part was not reported as the last one", sink.parts.single().isLast)
+    }
+
+    @Test
+    fun `part length counts from the start of each part after a pause`() {
+        val sink = RecordingSink()
+        val router = SegmentPartRouter<Int>(2_000_000L, frameUs, sink, {})
+        feed(router, 0, 30)          // 1 s in the first part
+        router.pause()
+        feed(router, 30, 300)
+        router.resume()
+        feed(router, 330, 150)       // 5 s: the new part is cut at about 2 s of its own
+        router.finish()
+        assertTrue(sink.parts.size >= 3)
+        for (part in sink.parts.drop(1).filter { !it.isLast }) {
+            assertTrue(abs(part.durationUs - 2_000_000L) <= 3 * frameUs)
+        }
+    }
 }

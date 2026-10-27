@@ -12663,4 +12663,17 @@ class AppLocalizationsAr extends AppLocalizations {
   String imageEditorPhotoLabel(int index) {
     return 'صورة $index';
   }
+
+  @override
+  String get cameraPauseRecordingTooltip => 'إيقاف التسجيل مؤقتًا';
+
+  @override
+  String get cameraResumeRecordingTooltip => 'استئناف التسجيل';
+
+  @override
+  String get cameraSnapshotTooltip => 'التقاط صورة أثناء التسجيل';
+
+  @override
+  String get cameraPauseFailedMessage =>
+      'تعذر إيقاف التسجيل مؤقتًا أو استئنافه';
 }

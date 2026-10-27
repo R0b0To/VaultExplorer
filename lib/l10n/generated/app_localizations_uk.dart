@@ -12722,4 +12722,17 @@ class AppLocalizationsUk extends AppLocalizations {
   String imageEditorPhotoLabel(int index) {
     return 'Фото $index';
   }
+
+  @override
+  String get cameraPauseRecordingTooltip => 'Призупинити запис';
+
+  @override
+  String get cameraResumeRecordingTooltip => 'Відновити запис';
+
+  @override
+  String get cameraSnapshotTooltip => 'Зробити фото під час запису';
+
+  @override
+  String get cameraPauseFailedMessage =>
+      'Не вдалося призупинити або відновити запис';
 }

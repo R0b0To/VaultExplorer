@@ -1646,19 +1646,32 @@ class VaultFileIoApi {
   /// off for the container being recorded into. See that service for the
   /// full rationale. [audioOnly] makes it declare only the microphone type
   /// (used by AudioCaptureScreen, which has no camera in play).
-  Future<void> startBackgroundRecording({
+  ///
+  /// Returns whether the service really started. It cannot be started once the
+  /// app is already in the background, and a recording that is not covered by
+  /// it will not survive the app leaving the screen, so a caller that wants to
+  /// keep recording in the background needs to know.
+  ///
+  /// [containerName] may be empty (Quick Capture records before a vault is
+  /// chosen); the notification then has no "saving to" line.
+  Future<bool> startBackgroundRecording({
     required int volId,
     required String containerName,
     bool audioOnly = false,
   }) async {
     try {
-      await _channel.invokeMethod(ChannelMethods.startBackgroundRecording, {
-        'volId': volId,
-        'containerName': containerName,
-        'audioOnly': audioOnly,
-      });
+      final started = await _channel.invokeMethod<bool>(
+        ChannelMethods.startBackgroundRecording,
+        {
+          'volId': volId,
+          'containerName': containerName,
+          'audioOnly': audioOnly,
+        },
+      );
+      return started ?? false;
     } catch (e) {
       logSwallowed('startBackgroundRecording', e);
+      return false;
     }
   }
 

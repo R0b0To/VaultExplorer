@@ -937,6 +937,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
       }
 
       recordingStart = DateTime.now();
+      startRecordingClock(snapshotAvailable: result.snapshotAvailable);
       setState(() => captureIsRecording = true);
       _pauseAutoLockForRecording();
 
@@ -955,14 +956,6 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
           containerName: widget.container.displayName,
         ),
       );
-
-      timer = Timer.periodic(const Duration(milliseconds: 500), (_) {
-        if (!mounted || recordingStart == null) return;
-        final elapsed = DateTime.now().difference(recordingStart!).inSeconds;
-        captureSessionController.updateTimerText(
-          '${(elapsed ~/ 60).toString().padLeft(2, '0')}:${(elapsed % 60).toString().padLeft(2, '0')}',
-        );
-      });
     } catch (e) {
       _segmentedRecording = false;
       showErrorToast(
@@ -981,14 +974,16 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
   Future<void> stopVideoRecording() async {
     if (!cameraController.isInitialized || !captureIsRecording) return;
 
-    timer?.cancel();
-    final startedAt = recordingStart;
+    // Time actually recorded, pauses not counted.
+    final recordedMs = stopRecordingClock();
     recordingStart = null;
     setState(() => captureIsRecording = false);
     _resumeAutoLockAfterRecording();
 
     try {
-      final isFirstMedia = capturedMedia.isEmpty;
+      // Photos taken during the recording are already in the tray; they do not
+      // make the video any less the first thing the user is leaving with.
+      final isFirstMedia = trayHoldsOnlyRecordingSnapshots;
       final result = await cameraController.stopVideoRecordingForReview();
 
       if (_segmentedRecording) {
@@ -1000,9 +995,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
         return;
       }
 
-      final elapsedMs = startedAt == null
-          ? 9999
-          : DateTime.now().difference(startedAt).inMilliseconds;
+      final elapsedMs = recordedMs;
       if (elapsedMs < 500 || !result.success || result.videoPath == null) {
         if (result.videoPath != null) {
           await cameraController.discardVideo(result.videoPath!);
@@ -1330,6 +1323,7 @@ class _CameraCaptureScreenState extends ConsumerState<CameraCaptureScreen>
               child: CameraTopControlsBar(
                 isVideoMode: captureControls.isVideoMode,
                 isRecording: captureIsRecording,
+                isPaused: captureIsPaused,
                 isCountingDown: captureIsCountingDown,
                 timerText: captureTimerText,
                 videoQuality: captureControls.videoQuality,

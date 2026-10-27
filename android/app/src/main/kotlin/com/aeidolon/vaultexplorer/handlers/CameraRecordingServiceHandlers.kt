@@ -28,9 +28,19 @@ class CameraRecordingServiceHandlers(private val activity: MainActivity) {
             putExtra(VaultCameraRecordingService.EXTRA_CONTAINER_NAME, containerName)
             putExtra(VaultCameraRecordingService.EXTRA_AUDIO_ONLY, audioOnly)
         }
-        ContextCompat.startForegroundService(activity, intent)
-        serviceStarted = true
-        result.success(null)
+        // Reports whether the service really started. Android refuses to start
+        // a camera/microphone foreground service from the background (and, on
+        // 14+, without the matching permission), and a recording that is not
+        // protected by one cannot be allowed to carry on once the app leaves
+        // the screen: Dart uses this answer to decide.
+        val started = try {
+            ContextCompat.startForegroundService(activity, intent)
+            true
+        } catch (e: Exception) {
+            false
+        }
+        if (started) serviceStarted = true
+        result.success(started)
     }
 
     fun handleStopBackgroundRecording(call: MethodCall, result: MethodChannel.Result) {

@@ -280,9 +280,17 @@ class VaultCameraPlugin(
                     val segmentSeconds = ((args["segmentSeconds"] as? Number)?.toInt() ?: 0).coerceIn(0, 4 * 60 * 60)
                     VeLog.d(TAG) { "startVideoRecording (pathLen=${path.length}, segmentSeconds=$segmentSeconds)" }
                     session.startRecording(volId, path, segmentSeconds) { ok, error ->
+                        // Read here, on the camera thread, where the session state lives.
+                        val snapshotAvailable = ok && session.snapshotWhileRecordingAvailable
                         mainHandler.post {
-                            VeLog.d(TAG) { "startVideoRecording result: ok=$ok error=$error" }
-                            result.success(mapOf("success" to ok, "error" to error))
+                            VeLog.d(TAG) { "startVideoRecording result: ok=$ok error=$error snapshots=$snapshotAvailable" }
+                            result.success(
+                                mapOf(
+                                    "success" to ok,
+                                    "error" to error,
+                                    "snapshotAvailable" to snapshotAvailable,
+                                )
+                            )
                         }
                     }
                 }
@@ -302,10 +310,28 @@ class VaultCameraPlugin(
                         ?: return@withSession result.error("no_such_session", "Scratchpad session expired", null)
                     VeLog.d(TAG) { "startVideoRecordingToScratchpad" }
                     session.startRecordingToScratchpad(java.io.File(scratchpadPath), key) { ok, error ->
+                        // Read here, on the camera thread, where the session state lives.
+                        val snapshotAvailable = ok && session.snapshotWhileRecordingAvailable
                         mainHandler.post {
-                            VeLog.d(TAG) { "startVideoRecordingToScratchpad result: ok=$ok error=$error" }
-                            result.success(mapOf("success" to ok, "error" to error))
+                            VeLog.d(TAG) { "startVideoRecordingToScratchpad result: ok=$ok error=$error snapshots=$snapshotAvailable" }
+                            result.success(
+                                mapOf(
+                                    "success" to ok,
+                                    "error" to error,
+                                    "snapshotAvailable" to snapshotAvailable,
+                                )
+                            )
                         }
+                    }
+                }
+                "pauseVideoRecording" -> withSession(call, result) { session, _ ->
+                    session.pauseRecording { ok, error ->
+                        mainHandler.post { result.success(mapOf("success" to ok, "error" to error)) }
+                    }
+                }
+                "resumeVideoRecording" -> withSession(call, result) { session, _ ->
+                    session.resumeRecording { ok, error ->
+                        mainHandler.post { result.success(mapOf("success" to ok, "error" to error)) }
                     }
                 }
                    "stopVideoRecordingForReview" -> withSession(call, result) { session, _ ->

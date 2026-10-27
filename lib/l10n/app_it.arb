@@ -3489,5 +3489,9 @@
   "fontSizeExtraLarge": "Molto grande",
   "imageEditorTextPlaceholder": "TOCCA DUE VOLTE PER MODIFICARE IL TESTO",
   "imageEditorFontSizePreview": "Anteprima esempio ABC 123",
-  "imageEditorPhotoLabel": "Foto {index}"
+  "imageEditorPhotoLabel": "Foto {index}",
+  "cameraPauseRecordingTooltip": "Metti in pausa la registrazione",
+  "cameraResumeRecordingTooltip": "Riprendi la registrazione",
+  "cameraSnapshotTooltip": "Scatta una foto durante la registrazione",
+  "cameraPauseFailedMessage": "Impossibile mettere in pausa o riprendere la registrazione"
 }

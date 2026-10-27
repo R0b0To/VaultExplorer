@@ -387,6 +387,10 @@ Widget buildRotatedWidget({required double iconTurns, required Widget child}) {
 class CameraTopControlsBar extends StatelessWidget {
   final bool isVideoMode;
   final bool isRecording;
+
+  /// The recording in progress is paused: the timer is shown frozen, in amber,
+  /// behind a pause icon.
+  final bool isPaused;
   final bool isCountingDown;
   final String timerText;
   final String videoQuality;
@@ -426,6 +430,7 @@ class CameraTopControlsBar extends StatelessWidget {
     super.key,
     required this.isVideoMode,
     required this.isRecording,
+    this.isPaused = false,
     required this.isCountingDown,
     required this.timerText,
     required this.videoQuality,
@@ -555,13 +560,28 @@ class CameraTopControlsBar extends StatelessWidget {
             if (isRecording || isCountingDown)
               buildRotatedWidget(
                 iconTurns: iconTurns,
-                child: Text(
-                  timerText,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isRecording && isPaused) ...[
+                      const Icon(
+                        Icons.pause_rounded,
+                        color: Colors.amber,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                    Text(
+                      timerText,
+                      style: TextStyle(
+                        color: isRecording && isPaused
+                            ? Colors.amber
+                            : Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
               )
             else

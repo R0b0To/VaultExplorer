@@ -12658,4 +12658,17 @@ class AppLocalizationsEs extends AppLocalizations {
   String imageEditorPhotoLabel(int index) {
     return 'Foto $index';
   }
+
+  @override
+  String get cameraPauseRecordingTooltip => 'Pausar grabación';
+
+  @override
+  String get cameraResumeRecordingTooltip => 'Reanudar grabación';
+
+  @override
+  String get cameraSnapshotTooltip => 'Tomar una foto durante la grabación';
+
+  @override
+  String get cameraPauseFailedMessage =>
+      'No se pudo pausar ni reanudar la grabación';
 }

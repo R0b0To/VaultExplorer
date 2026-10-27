@@ -78,6 +78,19 @@ class VaultCameraSession(
     private var cameraDevice: CameraDevice? = null
     private var captureSession: CameraCaptureSession? = null
     private var jpegReader: ImageReader? = null
+
+    /**
+     * JPEG stream used for photos taken *while recording* (Camera2's "video
+     * snapshot"). Its size is capped at the video size, which is what every
+     * device that can record guarantees next to a preview and a video stream.
+     */
+    private var snapshotReader: ImageReader? = null
+
+    /** The device refused a recording session that had the snapshot stream in it. */
+    private var snapshotUnsupported = false
+
+    /** The recording session now running has the snapshot stream. */
+    private var recordingHasSnapshot = false
     private var analysisReader: ImageReader? = null
     private var videoRecorder: VaultVideoRecorder? = null
     private var isScanMode = false
@@ -234,6 +247,12 @@ class VaultCameraSession(
     private var pendingRecordStart: ((Boolean, String?) -> Unit)? = null
 
     val currentCameraId: String get() = activeCameraId
+
+    /** Photos can be taken right now although a video is being recorded. */
+    val snapshotWhileRecordingAvailable: Boolean
+        get() = isRecording && recordingHasSnapshot && snapshotReader != null
+
+    val isRecordingPaused: Boolean get() = videoRecorder?.isPaused == true
     val hasFlash: Boolean get() = isFlashSupported
     val intrinsicZoomRatio: Float get() = intrinsicZoom
     val currentZoomMin: Float get() = zoomMinCurrent
@@ -348,6 +367,8 @@ class VaultCameraSession(
             closeCameraOnly {
                 jpegReader?.close()
                 jpegReader = null
+                snapshotReader?.close()
+                snapshotReader = null
                 analysisReader?.close()
                 analysisReader = null
                 previewSurface?.release()
@@ -380,6 +401,8 @@ class VaultCameraSession(
             pendingPhotoResolution = photoResolution
             pendingOpenResult = callback
             torchForFlash = false
+            snapshotUnsupported = false
+            recordingHasSnapshot = false
             openAttempts = 0
             lastOpenArgs = OpenArgs(cameraId, videoQuality, photoResolution)
             configureSizesAndSurfacesLocked(chars, videoQuality, photoResolution)
@@ -434,6 +457,7 @@ class VaultCameraSession(
         videoRecorder?.releaseEncoder()
         videoRecorder = null
         isRecording = false
+        recordingHasSnapshot = false
         recordingChunkWriter = null
         pendingRecordStart?.invoke(false, "camera closed")
         pendingRecordStart = null
@@ -488,6 +512,7 @@ class VaultCameraSession(
         captureSession = null
         videoRecorder = null
         isRecording = false
+        recordingHasSnapshot = false
         recordingChunkWriter = null
         torchForFlash = false
         try { device.close() } catch (_: Exception) {}
@@ -595,6 +620,14 @@ class VaultCameraSession(
         reader.setOnImageAvailableListener({ r -> onJpegAvailable(r) }, bgHandler)
         jpegReader = reader
 
+        snapshotReader?.close()
+        snapshotReader = null
+        videoSnapshotSize(jpegSizes, videoSize)?.let { size ->
+            val snapshot = ImageReader.newInstance(size.width, size.height, ImageFormat.JPEG, 2)
+            snapshot.setOnImageAvailableListener({ r -> onJpegAvailable(r) }, bgHandler)
+            snapshotReader = snapshot
+        }
+
         analysisReader?.close()
         val yuvSizes = map.getOutputSizes(ImageFormat.YUV_420_888)?.toList().orEmpty()
         // Same aspect as the photo/preview, so a quad detected here maps 1:1 onto the
@@ -609,6 +642,23 @@ class VaultCameraSession(
 
         currentPreviewWidth = previewSize.width
         currentPreviewHeight = previewSize.height
+    }
+
+    /**
+     * Size of the photo stream used while recording: the largest JPEG size that
+     * is no bigger than the video and has its shape, so the photo frames the
+     * scene like the video does. Null when the camera offers none that small.
+     */
+    private fun videoSnapshotSize(jpegSizes: List<Size>, video: Size): Size? {
+        if (video.width <= 0 || video.height <= 0) return null
+        val videoArea = video.width.toLong() * video.height
+        fun area(s: Size) = s.width.toLong() * s.height
+        val fitting = jpegSizes.filter { it.width > 0 && it.height > 0 && area(it) <= videoArea }
+        val aspect = video.width.toFloat() / video.height
+        return fitting
+            .filter { abs(it.width.toFloat() / it.height - aspect) < 0.02f }
+            .maxByOrNull { area(it) }
+            ?: fitting.maxByOrNull { area(it) }
     }
 
     private fun safePrepareRecorder(
@@ -644,8 +694,14 @@ class VaultCameraSession(
         captureSession?.let { try { it.close() } catch (_: Exception) {} }
         captureSession = null
 
+        val withSnapshot = isRecording && !snapshotUnsupported && snapshotReader != null
+        recordingHasSnapshot = withSnapshot
         val outputs = if (isRecording) {
-            listOfNotNull(previewSurface, videoRecorder?.inputSurface)
+            listOfNotNull(
+                previewSurface,
+                videoRecorder?.inputSurface,
+                if (withSnapshot) snapshotReader?.surface else null,
+            )
         } else {
             listOfNotNull(previewSurface, jpegReader?.surface, analysisReader?.surface)
         }
@@ -663,6 +719,7 @@ class VaultCameraSession(
 
             override fun onConfigureFailed(session: CameraCaptureSession) {
                 try { session.close() } catch (_: Exception) {}
+                if (withSnapshot && retryRecordingWithoutSnapshot("configuration failed")) return
                 onSessionFailed("session configuration failed")
             }
         }
@@ -684,8 +741,23 @@ class VaultCameraSession(
             }
         } catch (e: Exception) {
             VeLog.e(TAG, e) { "createCaptureSession threw" }
+            if (withSnapshot && retryRecordingWithoutSnapshot("createCaptureSession threw")) return
             onSessionFailed(e.message ?: "session configuration failed")
         }
+    }
+
+    /**
+     * Some devices cannot run a snapshot stream next to the preview and the
+     * recording at the video size they were asked for. Recording matters more
+     * than snapshots, so the session is rebuilt without that stream and
+     * snapshots are switched off for as long as this camera stays open.
+     */
+    private fun retryRecordingWithoutSnapshot(why: String): Boolean {
+        if (snapshotUnsupported || !isRecording) return false
+        VeLog.w(TAG) { "recording session with a snapshot stream failed ($why); retrying without it" }
+        snapshotUnsupported = true
+        createSessionLocked()
+        return true
     }
 
     private fun onSessionReady() {
@@ -732,6 +804,7 @@ class VaultCameraSession(
 
     private fun abortRecordingAndRestorePreview() {
         isRecording = false
+        recordingHasSnapshot = false
         recordingChunkWriter = null
         videoRecorder?.releaseEncoder()
         videoRecorder = null
@@ -1035,12 +1108,12 @@ class VaultCameraSession(
 
     /** Common gate for both photo entry points; reports the reason through [onError]. */
     private fun stillPreconditionsOk(onError: (String) -> Unit): Boolean {
-        if (cameraDevice == null || captureSession == null || jpegReader == null) {
-            onError("camera not ready")
-            return false
-        }
-        if (isRecording) {
-            onError("cannot take photo while recording")
+        if (cameraDevice == null || captureSession == null || stillReader() == null) {
+            if (isRecording) {
+                onError("cannot take photo while recording")
+            } else {
+                onError("camera not ready")
+            }
             return false
         }
         if (stillFlow != null) {
@@ -1049,6 +1122,14 @@ class VaultCameraSession(
         }
         return true
     }
+
+    /** The JPEG stream a photo is taken on right now: the snapshot stream while recording. */
+    private fun stillReader(): ImageReader? =
+        if (isRecording) {
+            if (recordingHasSnapshot) snapshotReader else null
+        } else {
+            jpegReader
+        }
 
     fun capturePhoto(
         aspectRatio: Float? = null,
@@ -1107,7 +1188,7 @@ class VaultCameraSession(
 
     private fun startStill(retried: Boolean) {
         val chars = characteristics
-        if (cameraDevice == null || captureSession == null || jpegReader == null || chars == null) {
+        if (cameraDevice == null || captureSession == null || stillReader() == null || chars == null) {
             failPendingPhoto("camera not ready")
             return
         }
@@ -1284,13 +1365,18 @@ class VaultCameraSession(
 
         val device = cameraDevice
         val session = captureSession
-        val reader = jpegReader
+        val reader = stillReader()
         if (device == null || session == null || reader == null) {
             abortStill("camera not ready")
             return
         }
         try {
-            val builder = device.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
+            val template = if (isRecording) {
+                CameraDevice.TEMPLATE_VIDEO_SNAPSHOT
+            } else {
+                CameraDevice.TEMPLATE_STILL_CAPTURE
+            }
+            val builder = device.createCaptureRequest(template)
             builder.addTarget(reader.surface)
             applyControls(builder)
             builder.set(CaptureRequest.JPEG_ORIENTATION, flow.captureOrientationDegrees)
@@ -1662,6 +1748,24 @@ class VaultCameraSession(
         }
     }
 
+    /** Pauses the recording in progress; the camera, preview and snapshots keep working. */
+    fun pauseRecording(callback: (Boolean, String?) -> Unit) = setRecordingPaused(true, callback)
+
+    /** Continues a recording paused with [pauseRecording]. */
+    fun resumeRecording(callback: (Boolean, String?) -> Unit) = setRecordingPaused(false, callback)
+
+    private fun setRecordingPaused(paused: Boolean, callback: (Boolean, String?) -> Unit) {
+        runOnCameraThread {
+            val recorder = videoRecorder
+            if (recorder == null || !isRecording || pendingRecordStart != null) {
+                callback(false, "not recording")
+                return@runOnCameraThread
+            }
+            val ok = if (paused) recorder.pause() else recorder.resume()
+            callback(ok, if (ok) null else if (paused) "could not pause" else "could not resume")
+        }
+    }
+
     fun stopRecordingForReview(callback: (Boolean, String?, Long, ByteArray?, String?) -> Unit) {
         runOnCameraThread {
             val recorder = videoRecorder
@@ -1670,6 +1774,7 @@ class VaultCameraSession(
                 return@runOnCameraThread
             }
             isRecording = false
+            recordingHasSnapshot = false
             videoRecorder = null
             recordingChunkWriter = null
             try {
@@ -1739,6 +1844,7 @@ class VaultCameraSession(
                 return@runOnCameraThread
             }
             isRecording = false
+            recordingHasSnapshot = false
             videoRecorder = null
             recordingChunkWriter = null
             try {

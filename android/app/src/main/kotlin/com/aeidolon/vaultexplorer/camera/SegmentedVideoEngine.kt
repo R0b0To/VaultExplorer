@@ -48,7 +48,15 @@ private const val TAG = "SegmentedVideoEngine"
  * only grows the queue, never stalls an encoder.
  *
  * Lifecycle, mirroring `MediaRecorder`: [prepare] (gives [inputSurface]) ->
- * [start] -> [stop] -> [release]. [release] is safe in any state.
+ * [start] -> ([pause] -> [resume])* -> [stop] -> [release]. [release] is safe in
+ * any state.
+ *
+ * A pause closes the part in progress and the next part opens after [resume]
+ * (see [SegmentPartRouter]), so a paused recording is simply a recording whose
+ * parts are cut where the pauses were. The video encoder is suspended meanwhile
+ * (as `MediaRecorder.pause` does). The microphone keeps being read, but what it
+ * hears is dropped before anything is written, so keeping the audio encoder's
+ * clock running costs nothing and cannot put the two tracks out of step.
  */
 internal class SegmentedVideoEngine(
     private val width: Int,
@@ -89,6 +97,10 @@ internal class SegmentedVideoEngine(
         class Format(val track: SampleTrack, val format: MediaFormat) : Item()
         class Sample(val track: SampleTrack, val ptsUs: Long, val isKey: Boolean, val data: ByteArray) : Item()
         class End(val track: SampleTrack) : Item()
+
+        /** Pause / resume, travelling in the queue so the mux thread sees them in step with the samples. */
+        object Pause : Item()
+        object Resume : Item()
     }
 
     private val queue = LinkedBlockingQueue<Item>()
@@ -139,6 +151,12 @@ internal class SegmentedVideoEngine(
 
     @Volatile
     private var stopDeadlineNs = Long.MAX_VALUE
+
+    @Volatile
+    private var pausedFlag = false
+
+    /** True between [pause] and [resume] (or [stop]). */
+    val isPaused: Boolean get() = pausedFlag
 
     @Volatile
     private var failure: Throwable? = null
@@ -269,6 +287,38 @@ internal class SegmentedVideoEngine(
     }
 
     /**
+     * Pauses the recording: the part in progress is closed and nothing is
+     * written until [resume]. Does nothing unless recording.
+     */
+    fun pause() {
+        if (!started.get() || stopRequested.get() || pausedFlag) return
+        pausedFlag = true
+        queue.put(Item.Pause)
+        suspendVideoInput(true)
+    }
+
+    /** Ends a [pause]; the next keyframe opens a new part. */
+    fun resume() {
+        if (!started.get() || stopRequested.get() || !pausedFlag) return
+        pausedFlag = false
+        // The mux thread must know the pause is over before the first frame of
+        // the new part can reach it, so this goes into the queue first.
+        queue.put(Item.Resume)
+        suspendVideoInput(false)
+    }
+
+    private fun suspendVideoInput(suspend: Boolean) {
+        try {
+            val params = Bundle()
+            params.putInt(MediaCodec.PARAMETER_KEY_SUSPEND, if (suspend) 1 else 0)
+            videoCodec?.setParameters(params)
+        } catch (e: Exception) {
+            // Not fatal: without it frames still reach the router, which drops them while paused.
+            VeLog.w(TAG, e) { "could not ${if (suspend) "suspend" else "resume"} the video encoder input" }
+        }
+    }
+
+    /**
      * Ends the recording and waits until the last part is closed. The camera
      * must have stopped sending frames. Returns the length of the last part, in
      * milliseconds; the file is [currentFile].
@@ -277,6 +327,12 @@ internal class SegmentedVideoEngine(
         if (!started.get() || !stopRequested.compareAndSet(false, true)) return lastPartDurationMs
         stopDeadlineNs = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(STOP_DRAIN_MS)
 
+        // End of stream is only reliably delivered by an encoder that is taking
+        // input. The router still drops anything that comes out while paused.
+        if (pausedFlag) {
+            pausedFlag = false
+            suspendVideoInput(false)
+        }
         try {
             videoCodec?.signalEndOfInputStream()
         } catch (e: Exception) {
@@ -528,6 +584,8 @@ internal class SegmentedVideoEngine(
         var earlyLastVideoUs = Long.MIN_VALUE
         var sink: MuxerSink? = null
         var router: SegmentPartRouter<ByteArray>? = null
+        // A pause that arrived before the first part could even be set up.
+        var pausedEarly = false
 
         fun route(sample: Item.Sample) {
             val r = router ?: return
@@ -561,6 +619,27 @@ internal class SegmentedVideoEngine(
                         if (item.track == SampleTrack.VIDEO) videoFormat = item.format else audioFormat = item.format
                     is Item.End ->
                         if (item.track == SampleTrack.VIDEO) videoEnded = true else audioEnded = true
+                    Item.Pause -> {
+                        val r = router
+                        if (r != null) {
+                            try {
+                                r.pause()
+                            } catch (e: Exception) {
+                                VeLog.e(TAG, e) { "closing the part at the pause failed; recording stops saving" }
+                                if (failure == null) failure = e
+                            }
+                        } else {
+                            // Nothing was written yet; what is waiting is footage from before the pause.
+                            pausedEarly = true
+                            early.clear()
+                            earlyFirstVideoUs = Long.MIN_VALUE
+                            earlyLastVideoUs = Long.MIN_VALUE
+                        }
+                    }
+                    Item.Resume -> {
+                        val r = router
+                        if (r != null) r.resume() else pausedEarly = false
+                    }
                     is Item.Sample -> {
                         if (item.track == SampleTrack.VIDEO && !clockKnown) {
                             val boot = SystemClock.elapsedRealtimeNanos() / 1000L
@@ -572,6 +651,8 @@ internal class SegmentedVideoEngine(
                         }
                         if (router != null) {
                             route(item)
+                        } else if (pausedEarly) {
+                            // Dropped, as the router would while paused.
                         } else {
                             if (item.track == SampleTrack.VIDEO) {
                                 if (earlyFirstVideoUs == Long.MIN_VALUE) earlyFirstVideoUs = item.ptsUs
@@ -602,6 +683,7 @@ internal class SegmentedVideoEngine(
                                 sink = s,
                                 requestSyncFrame = this::requestKeyFrame,
                             )
+                            if (pausedEarly) router?.pause()
                             for (queued in early) route(queued)
                             early.clear()
                         } catch (e: Exception) {

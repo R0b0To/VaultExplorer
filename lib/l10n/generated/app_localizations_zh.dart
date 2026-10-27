@@ -11747,4 +11747,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String imageEditorPhotoLabel(int index) {
     return '照片 $index';
   }
+
+  @override
+  String get cameraPauseRecordingTooltip => '暂停录制';
+
+  @override
+  String get cameraResumeRecordingTooltip => '继续录制';
+
+  @override
+  String get cameraSnapshotTooltip => '录制时拍照';
+
+  @override
+  String get cameraPauseFailedMessage => '无法暂停或恢复录制';
 }

@@ -3489,5 +3489,9 @@
   "fontSizeExtraLarge": "아주 크게",
   "imageEditorTextPlaceholder": "두 번 탭하여 텍스트 변경",
   "imageEditorFontSizePreview": "샘플 미리보기 ABC 123",
-  "imageEditorPhotoLabel": "사진 {index}"
+  "imageEditorPhotoLabel": "사진 {index}",
+  "cameraPauseRecordingTooltip": "녹화 일시중지",
+  "cameraResumeRecordingTooltip": "녹화 재개",
+  "cameraSnapshotTooltip": "녹화 중 사진 촬영",
+  "cameraPauseFailedMessage": "녹화를 일시중지하거나 재개할 수 없습니다"
 }

@@ -56,6 +56,13 @@ interface PartSink<T> {
  *    up with it (the video encoder is slower than the audio one), so an audio
  *    sample is never written to the old part just because it arrived early.
  *
+ * Pausing: [pause] closes the part in progress right away (so everything
+ * recorded so far is a complete file) and drops everything that arrives until
+ * [resume]. After [resume] the next video keyframe opens a fresh part at
+ * relative time zero, exactly like a cut. A pause therefore never needs any
+ * timestamp surgery: the footage on either side of it simply lives in
+ * different parts, and each part's clock starts again at zero.
+ *
  * Not thread safe: call from one thread. Holds no Android types.
  *
  * @param partLengthUs wanted length of every part but the last, in microseconds
@@ -80,6 +87,7 @@ class SegmentPartRouter<T>(
     private var partIndex = 0
     private var partStartUs = 0L
     private var syncRequested = false
+    private var paused = false
 
     private var watermarkUs = Long.MIN_VALUE
     private var lastVideoUs = Long.MIN_VALUE
@@ -101,6 +109,9 @@ class SegmentPartRouter<T>(
 
     val isOpen: Boolean get() = open
 
+    /** True between [pause] and [resume]. */
+    val isPaused: Boolean get() = paused
+
     /**
      * Routes one video sample.
      *
@@ -109,6 +120,12 @@ class SegmentPartRouter<T>(
      */
     fun onVideo(sample: RoutedSample<T>, pipelineLagUs: Long = 0L) {
         require(sample.track == SampleTrack.VIDEO) { "not a video sample" }
+
+        if (paused) {
+            // Frames that were already in the encoder when the pause began.
+            skippedVideo++
+            return
+        }
 
         if (!open) {
             if (!sample.isKeyFrame) {
@@ -150,12 +167,47 @@ class SegmentPartRouter<T>(
     /** Routes one audio sample. It is written once video has progressed past its timestamp. */
     fun onAudio(sample: RoutedSample<T>) {
         require(sample.track == SampleTrack.AUDIO) { "not an audio sample" }
+        if (paused) {
+            droppedAudio++
+            return
+        }
         pendingAudio.addLast(sample)
         if (pendingAudio.size > maxPendingAudio) {
             pendingAudio.removeFirst()
             droppedAudio++
         }
         if (open) flushAudio { it.ptsUs <= watermarkUs }
+    }
+
+    /**
+     * Pauses the recording. The part in progress (if a keyframe ever opened one)
+     * is closed now, as a part that is not the last, and everything routed from
+     * here until [resume] is dropped. Does nothing when already paused.
+     */
+    fun pause() {
+        if (paused) return
+        paused = true
+        syncRequested = false
+        if (open) {
+            flushAudio { true }
+            val durationUs = (lastVideoUs + lastFrameDurationUs - partStartUs).coerceAtLeast(1L)
+            closeOpenPart(durationUs, isLast = false)
+        } else {
+            droppedAudio += pendingAudio.size
+            pendingAudio.clear()
+        }
+    }
+
+    /**
+     * Ends the pause. The next video keyframe opens a new part; a keyframe is
+     * requested right away so that does not have to wait for a natural one.
+     * Does nothing when not paused.
+     */
+    fun resume() {
+        if (!paused) return
+        paused = false
+        syncRequested = false
+        requestSyncFrame()
     }
 
     /**

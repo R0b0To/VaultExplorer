@@ -3489,5 +3489,9 @@
   "fontSizeExtraLarge": "Дуже великий",
   "imageEditorTextPlaceholder": "ДВІЧІ ТОРКНІТЬСЯ, ЩОБ ЗМІНИТИ ТЕКСТ",
   "imageEditorFontSizePreview": "Приклад перегляду ABC 123",
-  "imageEditorPhotoLabel": "Фото {index}"
+  "imageEditorPhotoLabel": "Фото {index}",
+  "cameraPauseRecordingTooltip": "Призупинити запис",
+  "cameraResumeRecordingTooltip": "Відновити запис",
+  "cameraSnapshotTooltip": "Зробити фото під час запису",
+  "cameraPauseFailedMessage": "Не вдалося призупинити або відновити запис"
 }

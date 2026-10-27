@@ -21096,6 +21096,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Photo {index}'**
   String imageEditorPhotoLabel(int index);
+
+  /// Tooltip of the button beside the shutter that pauses a video recording in progress without stopping it.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause recording'**
+  String get cameraPauseRecordingTooltip;
+
+  /// Tooltip of the button beside the shutter that continues a paused video recording.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume recording'**
+  String get cameraResumeRecordingTooltip;
+
+  /// Tooltip of the button beside the shutter that takes a photo without interrupting the video recording in progress.
+  ///
+  /// In en, this message translates to:
+  /// **'Take a photo while recording'**
+  String get cameraSnapshotTooltip;
+
+  /// Error shown when the camera could not pause or resume the video recording in progress.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not pause or resume the recording'**
+  String get cameraPauseFailedMessage;
 }
 
 class _AppLocalizationsDelegate

@@ -11694,32 +11694,58 @@ class AppLocalizationsKo extends AppLocalizations {
   String get tabEdgeSwipeLabel => '탭 스와이프 동작';
 
   @override
-  String get tabEdgeSwipeDrawerAndNewTabLabel => '사이드 메뉴 열기 / 새 탭';
+  String get tabSwipeBetweenTabsTitle => '탭 간 스와이프';
 
   @override
-  String get tabEdgeSwipeDrawerAndNewTabDesc =>
-      '첫 번째 탭에서 오른쪽으로 스와이프하면 사이드 메뉴가 열리고, 마지막 탭에서 왼쪽으로 스와이프하면 새 탭이 열립니다.';
+  String get tabSwipeBetweenTabsOnDesc => '폴더에서 옆으로 스와이프하면 다음 또는 이전 탭으로 이동합니다.';
 
   @override
-  String get tabEdgeSwipeLoopLabel => '탭 순환';
+  String get tabSwipeBetweenTabsOffDesc =>
+      '탭 전환은 탭 바에서만 합니다. 아래 두 동작은 화면 어디에서나 작동합니다.';
 
   @override
-  String get tabEdgeSwipeLoopDesc =>
-      '마지막 탭을 넘어 스와이프하면 첫 번째 탭으로, 첫 번째 탭을 넘어 스와이프하면 마지막 탭으로 이동합니다. 사이드 메뉴는 화면 왼쪽 가장자리나 메뉴 버튼으로 엽니다.';
+  String get tabSwipeRightOnFirstTab => '첫 번째 탭에서 오른쪽으로 스와이프';
 
   @override
-  String get tabEdgeSwipeNoEdgeActionsLabel => '가장자리에서 동작 없음';
+  String get tabSwipeRightAnywhere => '어디서나 오른쪽으로 스와이프';
 
   @override
-  String get tabEdgeSwipeNoEdgeActionsDesc =>
-      '첫 번째 또는 마지막 탭을 넘어 스와이프해도 아무 일도 일어나지 않습니다. 사이드 메뉴는 화면 왼쪽 가장자리나 메뉴 버튼으로, 새 탭은 탭 바에서 엽니다.';
+  String get tabSwipeLeftOnLastTab => '마지막 탭에서 왼쪽으로 스와이프';
 
   @override
-  String get tabEdgeSwipeNoTabSwipingLabel => '탭 간 스와이프 안 함';
+  String get tabSwipeLeftAnywhere => '어디서나 왼쪽으로 스와이프';
 
   @override
-  String get tabEdgeSwipeNoTabSwipingDesc =>
-      '탭 전환은 탭 바에서만 합니다. 어디서든 오른쪽으로 스와이프하면 사이드 메뉴가, 왼쪽으로 스와이프하면 새 탭이 열립니다. 모든 탭이 첫 번째 탭인 것처럼 동작합니다.';
+  String get tabSwipeActionNewTab => '새 탭 열기';
+
+  @override
+  String get tabSwipeActionOpenDrawer => '사이드 메뉴 열기';
+
+  @override
+  String get tabSwipeActionLoopFirst => '첫 번째 탭으로 순환';
+
+  @override
+  String get tabSwipeActionLoopLast => '마지막 탭으로 순환';
+
+  @override
+  String get tabSwipeActionNothing => '아무 동작 안 함';
+
+  @override
+  String get tabSwipeRightNothingDesc =>
+      '사이드 메뉴는 화면 왼쪽 가장자리나 메뉴 버튼으로 계속 열 수 있습니다.';
+
+  @override
+  String get tabSwipeRightLoopDesc =>
+      '사이드 메뉴는 화면 왼쪽 가장자리나 메뉴 버튼으로 엽니다. 탭이 하나뿐이면 이 스와이프로 사이드 메뉴가 열립니다.';
+
+  @override
+  String get tabSwipeNewTabsFromStripDesc => '새 탭은 계속 탭 바에서 열 수 있습니다.';
+
+  @override
+  String get tabSwipePreviewFirstTab => '첫 번째 탭';
+
+  @override
+  String get tabSwipePreviewLastTab => '마지막 탭';
 
   @override
   String get appBarAtBottomLabel => '앱 바를 아래에 표시';

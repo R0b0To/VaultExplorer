@@ -20653,53 +20653,107 @@ abstract class AppLocalizations {
   /// **'Tab swipe gesture'**
   String get tabEdgeSwipeLabel;
 
-  /// Option: swiping past the first tab opens the side menu and swiping past the last tab opens a new tab.
+  /// Switch title: whether swiping sideways moves between file manager tabs.
   ///
   /// In en, this message translates to:
-  /// **'Open side menu / new tab'**
-  String get tabEdgeSwipeDrawerAndNewTabLabel;
+  /// **'Swipe between tabs'**
+  String get tabSwipeBetweenTabsTitle;
 
-  /// Explains the option that opens the side menu from the first tab and a new tab from the last tab.
+  /// Subtitle of the switch while swiping between tabs is on.
   ///
   /// In en, this message translates to:
-  /// **'Swipe right on the first tab to open the side menu. Swipe left on the last tab to open a new tab.'**
-  String get tabEdgeSwipeDrawerAndNewTabDesc;
+  /// **'Swipe sideways on a folder to move to the next or previous tab.'**
+  String get tabSwipeBetweenTabsOnDesc;
 
-  /// Option: swiping past the first or last tab wraps around to the other end.
+  /// Subtitle of the switch while swiping between tabs is off. The right and left swipe settings then apply anywhere on the screen.
   ///
   /// In en, this message translates to:
-  /// **'Loop through tabs'**
-  String get tabEdgeSwipeLoopLabel;
+  /// **'Tabs only change from the tab strip. The two gestures below then work anywhere on the screen.'**
+  String get tabSwipeBetweenTabsOffDesc;
 
-  /// Explains the option that loops through the file manager tabs.
+  /// Setting title: what swiping right on the first tab does.
   ///
   /// In en, this message translates to:
-  /// **'Swiping past the last tab goes to the first, and swiping past the first goes to the last. Open the side menu from the left screen edge or the menu button.'**
-  String get tabEdgeSwipeLoopDesc;
+  /// **'Swipe right on the first tab'**
+  String get tabSwipeRightOnFirstTab;
 
-  /// Option: swiping past the first or last tab does nothing.
+  /// Setting title shown while tab swiping is off: what swiping right anywhere does.
   ///
   /// In en, this message translates to:
-  /// **'No action at the ends'**
-  String get tabEdgeSwipeNoEdgeActionsLabel;
+  /// **'Swipe right anywhere'**
+  String get tabSwipeRightAnywhere;
 
-  /// Explains the option that turns off the actions at the first and last tab.
+  /// Setting title: what swiping left on the last tab does.
   ///
   /// In en, this message translates to:
-  /// **'Swiping past the first or last tab does nothing. Open the side menu from the left screen edge or the menu button, and new tabs from the tab strip.'**
-  String get tabEdgeSwipeNoEdgeActionsDesc;
+  /// **'Swipe left on the last tab'**
+  String get tabSwipeLeftOnLastTab;
 
-  /// Option: swiping does not change tabs, and every tab acts like the first one.
+  /// Setting title shown while tab swiping is off: what swiping left anywhere does.
   ///
   /// In en, this message translates to:
-  /// **'Don’t swipe between tabs'**
-  String get tabEdgeSwipeNoTabSwipingLabel;
+  /// **'Swipe left anywhere'**
+  String get tabSwipeLeftAnywhere;
 
-  /// Explains the option that turns off swiping between tabs. A right swipe anywhere opens the side menu and a left swipe anywhere opens a new tab.
+  /// Option for the left swipe: offers a new tab.
   ///
   /// In en, this message translates to:
-  /// **'Switch tabs from the tab strip only. Swipe right anywhere to open the side menu and left anywhere to open a new tab, as if every tab were the first.'**
-  String get tabEdgeSwipeNoTabSwipingDesc;
+  /// **'Open a new tab'**
+  String get tabSwipeActionNewTab;
+
+  /// Option for the right swipe: opens the side menu (drawer).
+  ///
+  /// In en, this message translates to:
+  /// **'Open the side menu'**
+  String get tabSwipeActionOpenDrawer;
+
+  /// Option for the left swipe on the last tab: wraps around to the first tab.
+  ///
+  /// In en, this message translates to:
+  /// **'Loop to the first tab'**
+  String get tabSwipeActionLoopFirst;
+
+  /// Option for the right swipe on the first tab: wraps around to the last tab.
+  ///
+  /// In en, this message translates to:
+  /// **'Loop to the last tab'**
+  String get tabSwipeActionLoopLast;
+
+  /// Option for either swipe: nothing happens.
+  ///
+  /// In en, this message translates to:
+  /// **'Do nothing'**
+  String get tabSwipeActionNothing;
+
+  /// Explains that choosing nothing for the right swipe leaves the side menu available from the left screen edge and the menu button.
+  ///
+  /// In en, this message translates to:
+  /// **'The side menu still opens from the left screen edge and the menu button.'**
+  String get tabSwipeRightNothingDesc;
+
+  /// Explains the right-swipe loop option: the side menu then opens from the screen edge or menu button, except with a single tab where there is nothing to loop to.
+  ///
+  /// In en, this message translates to:
+  /// **'The side menu opens from the left screen edge or the menu button. With a single tab, this swipe opens it instead.'**
+  String get tabSwipeRightLoopDesc;
+
+  /// Explains that new tabs can still be opened from the tab strip when the left swipe does not open one.
+  ///
+  /// In en, this message translates to:
+  /// **'New tabs still open from the tab strip.'**
+  String get tabSwipeNewTabsFromStripDesc;
+
+  /// Short caption in the swipe preview: the left swipe wraps to the first tab.
+  ///
+  /// In en, this message translates to:
+  /// **'First tab'**
+  String get tabSwipePreviewFirstTab;
+
+  /// Short caption in the swipe preview: the right swipe wraps to the last tab.
+  ///
+  /// In en, this message translates to:
+  /// **'Last tab'**
+  String get tabSwipePreviewLastTab;
 
   /// Setting title for showing the app bar at the bottom of the screen instead of the top.
   ///

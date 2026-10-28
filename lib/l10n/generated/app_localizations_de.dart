@@ -12378,33 +12378,61 @@ class AppLocalizationsDe extends AppLocalizations {
   String get tabEdgeSwipeLabel => 'Wischgeste zwischen Tabs';
 
   @override
-  String get tabEdgeSwipeDrawerAndNewTabLabel =>
-      'Seitenmenü öffnen / neuer Tab';
+  String get tabSwipeBetweenTabsTitle => 'Zwischen Tabs wischen';
 
   @override
-  String get tabEdgeSwipeDrawerAndNewTabDesc =>
-      'Auf dem ersten Tab nach rechts wischen, um das Seitenmenü zu öffnen. Auf dem letzten Tab nach links wischen, um einen neuen Tab zu öffnen.';
+  String get tabSwipeBetweenTabsOnDesc =>
+      'Auf einem Ordner seitlich wischen, um zum nächsten oder vorherigen Tab zu wechseln.';
 
   @override
-  String get tabEdgeSwipeLoopLabel => 'Tabs im Kreis durchlaufen';
+  String get tabSwipeBetweenTabsOffDesc =>
+      'Tabs wechseln nur über die Tab-Leiste. Die beiden Gesten unten funktionieren dann überall auf dem Bildschirm.';
 
   @override
-  String get tabEdgeSwipeLoopDesc =>
-      'Wischen über den letzten Tab hinaus führt zum ersten, über den ersten hinaus zum letzten. Das Seitenmenü öffnest du am linken Bildschirmrand oder mit der Menü-Schaltfläche.';
+  String get tabSwipeRightOnFirstTab =>
+      'Nach rechts wischen auf dem ersten Tab';
 
   @override
-  String get tabEdgeSwipeNoEdgeActionsLabel => 'Keine Aktion an den Enden';
+  String get tabSwipeRightAnywhere => 'Überall nach rechts wischen';
 
   @override
-  String get tabEdgeSwipeNoEdgeActionsDesc =>
-      'Wischen über den ersten oder letzten Tab hinaus bewirkt nichts. Das Seitenmenü öffnest du am linken Bildschirmrand oder mit der Menü-Schaltfläche, neue Tabs über die Tab-Leiste.';
+  String get tabSwipeLeftOnLastTab => 'Nach links wischen auf dem letzten Tab';
 
   @override
-  String get tabEdgeSwipeNoTabSwipingLabel => 'Nicht zwischen Tabs wischen';
+  String get tabSwipeLeftAnywhere => 'Überall nach links wischen';
 
   @override
-  String get tabEdgeSwipeNoTabSwipingDesc =>
-      'Tabs nur über die Tab-Leiste wechseln. Überall nach rechts wischen öffnet das Seitenmenü, überall nach links einen neuen Tab – als wäre jeder Tab der erste.';
+  String get tabSwipeActionNewTab => 'Neuen Tab öffnen';
+
+  @override
+  String get tabSwipeActionOpenDrawer => 'Seitenmenü öffnen';
+
+  @override
+  String get tabSwipeActionLoopFirst => 'Im Kreis zum ersten Tab';
+
+  @override
+  String get tabSwipeActionLoopLast => 'Im Kreis zum letzten Tab';
+
+  @override
+  String get tabSwipeActionNothing => 'Nichts tun';
+
+  @override
+  String get tabSwipeRightNothingDesc =>
+      'Das Seitenmenü öffnest du weiterhin am linken Bildschirmrand oder mit der Menü-Schaltfläche.';
+
+  @override
+  String get tabSwipeRightLoopDesc =>
+      'Das Seitenmenü öffnest du am linken Bildschirmrand oder mit der Menü-Schaltfläche. Mit nur einem Tab öffnet diese Wischgeste es stattdessen.';
+
+  @override
+  String get tabSwipeNewTabsFromStripDesc =>
+      'Neue Tabs öffnest du weiterhin über die Tab-Leiste.';
+
+  @override
+  String get tabSwipePreviewFirstTab => 'Erster Tab';
+
+  @override
+  String get tabSwipePreviewLastTab => 'Letzter Tab';
 
   @override
   String get appBarAtBottomLabel => 'App-Leiste unten anzeigen';

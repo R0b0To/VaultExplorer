@@ -11696,32 +11696,57 @@ class AppLocalizationsJa extends AppLocalizations {
   String get tabEdgeSwipeLabel => 'タブのスワイプ操作';
 
   @override
-  String get tabEdgeSwipeDrawerAndNewTabLabel => 'サイドメニュー / 新しいタブ';
+  String get tabSwipeBetweenTabsTitle => 'タブ間のスワイプ';
 
   @override
-  String get tabEdgeSwipeDrawerAndNewTabDesc =>
-      '最初のタブで右にスワイプするとサイドメニューが開き、最後のタブで左にスワイプすると新しいタブが開きます。';
+  String get tabSwipeBetweenTabsOnDesc => 'フォルダ上で横にスワイプすると、次または前のタブに移動します。';
 
   @override
-  String get tabEdgeSwipeLoopLabel => 'タブをループ';
+  String get tabSwipeBetweenTabsOffDesc =>
+      'タブの切り替えはタブバーからのみ行います。下の2つの操作は画面のどこでも使えます。';
 
   @override
-  String get tabEdgeSwipeLoopDesc =>
-      '最後のタブを越えてスワイプすると最初のタブへ、最初のタブを越えると最後のタブへ移動します。サイドメニューは画面の左端またはメニューボタンから開きます。';
+  String get tabSwipeRightOnFirstTab => '最初のタブで右にスワイプ';
 
   @override
-  String get tabEdgeSwipeNoEdgeActionsLabel => '端では何もしない';
+  String get tabSwipeRightAnywhere => 'どこでも右にスワイプ';
 
   @override
-  String get tabEdgeSwipeNoEdgeActionsDesc =>
-      '最初または最後のタブを越えてスワイプしても何も起こりません。サイドメニューは画面の左端またはメニューボタンから、新しいタブはタブバーから開きます。';
+  String get tabSwipeLeftOnLastTab => '最後のタブで左にスワイプ';
 
   @override
-  String get tabEdgeSwipeNoTabSwipingLabel => 'タブ間をスワイプしない';
+  String get tabSwipeLeftAnywhere => 'どこでも左にスワイプ';
 
   @override
-  String get tabEdgeSwipeNoTabSwipingDesc =>
-      'タブの切り替えはタブバーからのみ行います。どこでも右にスワイプするとサイドメニューが、左にスワイプすると新しいタブが開きます。すべてのタブが最初のタブであるかのように動作します。';
+  String get tabSwipeActionNewTab => '新しいタブを開く';
+
+  @override
+  String get tabSwipeActionOpenDrawer => 'サイドメニューを開く';
+
+  @override
+  String get tabSwipeActionLoopFirst => '最初のタブにループ';
+
+  @override
+  String get tabSwipeActionLoopLast => '最後のタブにループ';
+
+  @override
+  String get tabSwipeActionNothing => '何もしない';
+
+  @override
+  String get tabSwipeRightNothingDesc => 'サイドメニューは、画面の左端またはメニューボタンから引き続き開けます。';
+
+  @override
+  String get tabSwipeRightLoopDesc =>
+      'サイドメニューは画面の左端またはメニューボタンから開きます。タブが1つだけの場合は、このスワイプで開きます。';
+
+  @override
+  String get tabSwipeNewTabsFromStripDesc => '新しいタブは、引き続きタブバーから開けます。';
+
+  @override
+  String get tabSwipePreviewFirstTab => '最初のタブ';
+
+  @override
+  String get tabSwipePreviewLastTab => '最後のタブ';
 
   @override
   String get appBarAtBottomLabel => 'アプリバーを下に表示';

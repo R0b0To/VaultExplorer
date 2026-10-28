@@ -12408,33 +12408,60 @@ class AppLocalizationsAr extends AppLocalizations {
   String get tabEdgeSwipeLabel => 'إيماءة السحب بين علامات التبويب';
 
   @override
-  String get tabEdgeSwipeDrawerAndNewTabLabel =>
-      'فتح القائمة الجانبية / علامة تبويب جديدة';
+  String get tabSwipeBetweenTabsTitle => 'السحب بين علامات التبويب';
 
   @override
-  String get tabEdgeSwipeDrawerAndNewTabDesc =>
-      'اسحب خارج أول علامة تبويب لفتح القائمة الجانبية، واسحب خارج آخر علامة تبويب لفتح علامة تبويب جديدة.';
+  String get tabSwipeBetweenTabsOnDesc =>
+      'اسحب جانبيًا على مجلد للانتقال إلى علامة التبويب التالية أو السابقة.';
 
   @override
-  String get tabEdgeSwipeLoopLabel => 'التنقل بين علامات التبويب بشكل دائري';
+  String get tabSwipeBetweenTabsOffDesc =>
+      'تتغير علامات التبويب من شريط علامات التبويب فقط. وتعمل الإيماءتان أدناه في أي مكان على الشاشة.';
 
   @override
-  String get tabEdgeSwipeLoopDesc =>
-      'السحب بعد آخر علامة تبويب ينقلك إلى الأولى، والسحب بعد الأولى ينقلك إلى الأخيرة. افتح القائمة الجانبية من حافة الشاشة أو من زر القائمة.';
+  String get tabSwipeRightOnFirstTab => 'السحب لليمين على أول علامة تبويب';
 
   @override
-  String get tabEdgeSwipeNoEdgeActionsLabel => 'لا إجراء عند الأطراف';
+  String get tabSwipeRightAnywhere => 'السحب لليمين في أي مكان';
 
   @override
-  String get tabEdgeSwipeNoEdgeActionsDesc =>
-      'السحب بعد أول علامة تبويب أو آخرها لا يفعل شيئًا. افتح القائمة الجانبية من حافة الشاشة أو من زر القائمة، وافتح علامات تبويب جديدة من شريط علامات التبويب.';
+  String get tabSwipeLeftOnLastTab => 'السحب لليسار على آخر علامة تبويب';
 
   @override
-  String get tabEdgeSwipeNoTabSwipingLabel => 'عدم السحب بين علامات التبويب';
+  String get tabSwipeLeftAnywhere => 'السحب لليسار في أي مكان';
 
   @override
-  String get tabEdgeSwipeNoTabSwipingDesc =>
-      'بدّل علامات التبويب من شريط علامات التبويب فقط. اسحب لليمين في أي مكان لفتح القائمة الجانبية ولليسار لفتح علامة تبويب جديدة، وكأن كل علامة تبويب هي الأولى.';
+  String get tabSwipeActionNewTab => 'فتح علامة تبويب جديدة';
+
+  @override
+  String get tabSwipeActionOpenDrawer => 'فتح القائمة الجانبية';
+
+  @override
+  String get tabSwipeActionLoopFirst => 'الانتقال دائريًا إلى أول علامة تبويب';
+
+  @override
+  String get tabSwipeActionLoopLast => 'الانتقال دائريًا إلى آخر علامة تبويب';
+
+  @override
+  String get tabSwipeActionNothing => 'عدم فعل شيء';
+
+  @override
+  String get tabSwipeRightNothingDesc =>
+      'ما زالت القائمة الجانبية تُفتح من حافة الشاشة اليسرى ومن زر القائمة.';
+
+  @override
+  String get tabSwipeRightLoopDesc =>
+      'تُفتح القائمة الجانبية من حافة الشاشة اليسرى أو من زر القائمة. عند وجود علامة تبويب واحدة فقط، تفتحها هذه الإيماءة بدلًا من ذلك.';
+
+  @override
+  String get tabSwipeNewTabsFromStripDesc =>
+      'ما زالت علامات التبويب الجديدة تُفتح من شريط علامات التبويب.';
+
+  @override
+  String get tabSwipePreviewFirstTab => 'أول علامة تبويب';
+
+  @override
+  String get tabSwipePreviewLastTab => 'آخر علامة تبويب';
 
   @override
   String get appBarAtBottomLabel => 'عرض شريط التطبيق في الأسفل';

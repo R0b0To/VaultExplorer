@@ -12405,33 +12405,64 @@ class AppLocalizationsEs extends AppLocalizations {
   String get tabEdgeSwipeLabel => 'Gesto de deslizamiento entre pestañas';
 
   @override
-  String get tabEdgeSwipeDrawerAndNewTabLabel =>
-      'Abrir menú lateral / nueva pestaña';
+  String get tabSwipeBetweenTabsTitle => 'Deslizar entre pestañas';
 
   @override
-  String get tabEdgeSwipeDrawerAndNewTabDesc =>
-      'Desliza a la derecha en la primera pestaña para abrir el menú lateral. Desliza a la izquierda en la última pestaña para abrir una pestaña nueva.';
+  String get tabSwipeBetweenTabsOnDesc =>
+      'Desliza hacia un lado en una carpeta para pasar a la pestaña siguiente o anterior.';
 
   @override
-  String get tabEdgeSwipeLoopLabel => 'Recorrer las pestañas en bucle';
+  String get tabSwipeBetweenTabsOffDesc =>
+      'Las pestañas solo cambian desde la barra de pestañas. Los dos gestos de abajo funcionan entonces en cualquier parte de la pantalla.';
 
   @override
-  String get tabEdgeSwipeLoopDesc =>
-      'Al deslizar más allá de la última pestaña pasas a la primera, y más allá de la primera pasas a la última. Abre el menú lateral desde el borde izquierdo de la pantalla o con el botón de menú.';
+  String get tabSwipeRightOnFirstTab =>
+      'Deslizar a la derecha en la primera pestaña';
 
   @override
-  String get tabEdgeSwipeNoEdgeActionsLabel => 'Sin acción en los extremos';
+  String get tabSwipeRightAnywhere =>
+      'Deslizar a la derecha en cualquier parte';
 
   @override
-  String get tabEdgeSwipeNoEdgeActionsDesc =>
-      'Deslizar más allá de la primera o la última pestaña no hace nada. Abre el menú lateral desde el borde izquierdo de la pantalla o con el botón de menú, y las pestañas nuevas desde la barra de pestañas.';
+  String get tabSwipeLeftOnLastTab =>
+      'Deslizar a la izquierda en la última pestaña';
 
   @override
-  String get tabEdgeSwipeNoTabSwipingLabel => 'No deslizar entre pestañas';
+  String get tabSwipeLeftAnywhere =>
+      'Deslizar a la izquierda en cualquier parte';
 
   @override
-  String get tabEdgeSwipeNoTabSwipingDesc =>
-      'Cambia de pestaña solo desde la barra de pestañas. Desliza a la derecha en cualquier parte para abrir el menú lateral y a la izquierda para abrir una pestaña nueva, como si cada pestaña fuera la primera.';
+  String get tabSwipeActionNewTab => 'Abrir una pestaña nueva';
+
+  @override
+  String get tabSwipeActionOpenDrawer => 'Abrir el menú lateral';
+
+  @override
+  String get tabSwipeActionLoopFirst => 'Ir en bucle a la primera pestaña';
+
+  @override
+  String get tabSwipeActionLoopLast => 'Ir en bucle a la última pestaña';
+
+  @override
+  String get tabSwipeActionNothing => 'No hacer nada';
+
+  @override
+  String get tabSwipeRightNothingDesc =>
+      'El menú lateral se sigue abriendo desde el borde izquierdo de la pantalla y con el botón de menú.';
+
+  @override
+  String get tabSwipeRightLoopDesc =>
+      'El menú lateral se abre desde el borde izquierdo de la pantalla o con el botón de menú. Con una sola pestaña, este gesto lo abre en su lugar.';
+
+  @override
+  String get tabSwipeNewTabsFromStripDesc =>
+      'Las pestañas nuevas se siguen abriendo desde la barra de pestañas.';
+
+  @override
+  String get tabSwipePreviewFirstTab => 'Primera pestaña';
+
+  @override
+  String get tabSwipePreviewLastTab => 'Última pestaña';
 
   @override
   String get appBarAtBottomLabel => 'Mostrar la barra superior abajo';

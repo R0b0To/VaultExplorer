@@ -12376,33 +12376,62 @@ class AppLocalizationsIt extends AppLocalizations {
   String get tabEdgeSwipeLabel => 'Gesto di scorrimento tra schede';
 
   @override
-  String get tabEdgeSwipeDrawerAndNewTabLabel =>
-      'Apri menu laterale / nuova scheda';
+  String get tabSwipeBetweenTabsTitle => 'Scorri tra le schede';
 
   @override
-  String get tabEdgeSwipeDrawerAndNewTabDesc =>
-      'Scorri verso destra sulla prima scheda per aprire il menu laterale. Scorri verso sinistra sull’ultima scheda per aprire una nuova scheda.';
+  String get tabSwipeBetweenTabsOnDesc =>
+      'Scorri lateralmente su una cartella per passare alla scheda successiva o precedente.';
 
   @override
-  String get tabEdgeSwipeLoopLabel => 'Scorrimento ciclico delle schede';
+  String get tabSwipeBetweenTabsOffDesc =>
+      'Le schede cambiano solo dalla barra delle schede. I due gesti qui sotto funzionano quindi ovunque sullo schermo.';
 
   @override
-  String get tabEdgeSwipeLoopDesc =>
-      'Scorrendo oltre l’ultima scheda si passa alla prima, e oltre la prima si passa all’ultima. Apri il menu laterale dal bordo sinistro dello schermo o dal pulsante del menu.';
+  String get tabSwipeRightOnFirstTab =>
+      'Scorri verso destra sulla prima scheda';
 
   @override
-  String get tabEdgeSwipeNoEdgeActionsLabel => 'Nessuna azione agli estremi';
+  String get tabSwipeRightAnywhere => 'Scorri verso destra ovunque';
 
   @override
-  String get tabEdgeSwipeNoEdgeActionsDesc =>
-      'Scorrere oltre la prima o l’ultima scheda non fa nulla. Apri il menu laterale dal bordo sinistro dello schermo o dal pulsante del menu, e le nuove schede dalla barra delle schede.';
+  String get tabSwipeLeftOnLastTab =>
+      'Scorri verso sinistra sull’ultima scheda';
 
   @override
-  String get tabEdgeSwipeNoTabSwipingLabel => 'Non scorrere tra le schede';
+  String get tabSwipeLeftAnywhere => 'Scorri verso sinistra ovunque';
 
   @override
-  String get tabEdgeSwipeNoTabSwipingDesc =>
-      'Cambia scheda solo dalla barra delle schede. Scorri verso destra ovunque per aprire il menu laterale e verso sinistra ovunque per aprire una nuova scheda, come se ogni scheda fosse la prima.';
+  String get tabSwipeActionNewTab => 'Apri una nuova scheda';
+
+  @override
+  String get tabSwipeActionOpenDrawer => 'Apri il menu laterale';
+
+  @override
+  String get tabSwipeActionLoopFirst => 'Passa ciclicamente alla prima scheda';
+
+  @override
+  String get tabSwipeActionLoopLast => 'Passa ciclicamente all’ultima scheda';
+
+  @override
+  String get tabSwipeActionNothing => 'Non fare nulla';
+
+  @override
+  String get tabSwipeRightNothingDesc =>
+      'Il menu laterale si apre comunque dal bordo sinistro dello schermo e dal pulsante del menu.';
+
+  @override
+  String get tabSwipeRightLoopDesc =>
+      'Il menu laterale si apre dal bordo sinistro dello schermo o dal pulsante del menu. Con una sola scheda, questo gesto lo apre al suo posto.';
+
+  @override
+  String get tabSwipeNewTabsFromStripDesc =>
+      'Le nuove schede si aprono comunque dalla barra delle schede.';
+
+  @override
+  String get tabSwipePreviewFirstTab => 'Prima scheda';
+
+  @override
+  String get tabSwipePreviewLastTab => 'Ultima scheda';
 
   @override
   String get appBarAtBottomLabel => 'Mostra la barra superiore in basso';

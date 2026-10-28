@@ -118,6 +118,27 @@ class RawEntry {
   /// has no need to round-trip through this.
   String get raw => '${isDir ? 'D' : 'F'}|$sizeBytes|$modifiedSecs|$name';
 
+  /// This entry under a different [newName] (deep-search results, whose name
+  /// is the path relative to the folder searched from).
+  ///
+  /// The lowercase name and extension are worked out once here. An entry
+  /// built through the plain constructor recomputes both on every
+  /// [lowercaseName]/[extension] read, and a sort reads them twice per
+  /// comparison, so a few thousand results meant tens of thousands of
+  /// throwaway strings per rebuild. The formulas are the same ones the
+  /// getters fall back to, so the values are identical.
+  RawEntry withName(String newName) => RawEntry(
+    name: newName,
+    isDir: isDir,
+    sizeBytes: sizeBytes,
+    modifiedSecs: modifiedSecs,
+    isPlaceholder: isPlaceholder,
+    lowercaseName: newName.toLowerCase(),
+    extension: newName.contains('.')
+        ? newName.split('.').last.toLowerCase()
+        : '',
+  );
+
   /// Modification date/time, or null when the FAT timestamp is absent.
   DateTime? get modifiedAt => modifiedSecs > 0
       ? DateTime.fromMillisecondsSinceEpoch(modifiedSecs * 1000)

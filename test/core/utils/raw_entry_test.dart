@@ -238,4 +238,45 @@ void main() {
       expect(entry.extension, 'gz');
     });
   });
+
+  group('RawEntry.withName', () {
+    test('keeps every field except the name', () {
+      const original = RawEntry(
+        name: 'a.txt',
+        isDir: false,
+        sizeBytes: 12,
+        modifiedSecs: 34,
+        isPlaceholder: true,
+      );
+      final renamed = original.withName('dir/a.txt');
+      expect(renamed.name, 'dir/a.txt');
+      expect(renamed.isDir, isFalse);
+      expect(renamed.sizeBytes, 12);
+      expect(renamed.modifiedSecs, 34);
+      expect(renamed.isPlaceholder, isTrue);
+    });
+
+    test('lowercase name and extension match what a plain entry computes', () {
+      for (final name in [
+        'IMG_001.JPG',
+        'Photos/Trip.1/Day 2/IMG.Png',
+        'noextension',
+        'Photos/v1.2/readme',
+        'archive.tar.GZ',
+        '.hidden',
+        'trailingdot.',
+      ]) {
+        final plain = RawEntry(
+          name: name,
+          isDir: false,
+          sizeBytes: 0,
+          modifiedSecs: 0,
+        );
+        final renamed = plain.withName(name);
+        expect(renamed.lowercaseName, plain.lowercaseName, reason: name);
+        expect(renamed.extension, plain.extension, reason: name);
+        expect(renamed, plain, reason: name);
+      }
+    });
+  });
 }

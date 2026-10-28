@@ -2718,6 +2718,16 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       return;
     }
 
+    // The current folder has nothing to play under the active type filter, so
+    // fall back to its subfolders -- and keep honoring that filter there
+    // (e.g. with "Videos" selected, only videos are collected; images/audio
+    // in subfolders are skipped), same rule as the local-folder branch above.
+    // Snapshot the filter so changing it while a long scan is still running
+    // can't make the result a mix of two filters.
+    final scanFilter = _currentFilter;
+    bool matchesScanFilter(String name) =>
+        _isSupportedMedia(name) && matchesFilter(name, scanFilter);
+
     _mediaScanToken?.cancel();
     final token = CancellationToken();
     _mediaScanToken = token;
@@ -2735,7 +2745,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             sortBy: sortBy,
             sortAscending: sortAscending,
             pinnedPaths: _pinnedPaths,
-            isSupportedMedia: _isSupportedMedia,
+            isSupportedMedia: matchesScanFilter,
             onProgress: (foldersChecked) {
               if (!mounted) return;
               _navNotifier.setStatus(
@@ -4991,11 +5001,18 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       fabClearance = 64.0; // Single FAB (56) + 8dp clearance
     }
     final hasFloatingActions = hasClipboardFab || hasFabToolbar;
+    // BottomSearchBar floats over the list and lifts itself by the keyboard's
+    // inset (plus the system inset above), so the list has to clear that same
+    // height. Without it the bar sits on top of the last results while the
+    // keyboard is up, and they cannot be scrolled out from under it.
+    final double searchBarKeyboardLift = _searchActive
+        ? MediaQuery.viewInsetsOf(context).bottom
+        : 0.0;
     final bottomContentClearance =
         bottomSystemInset +
         (hasFloatingActions ? 16.0 + fabClearance : 0.0) +
         (showBookmarkBarInViewport ? 48.0 : 0.0) +
-        (_searchActive ? 64.0 : 0.0);
+        (_searchActive ? 64.0 + searchBarKeyboardLift : 0.0);
 
     final double bannerBottomOffset = _searchActive
         ? 0.0

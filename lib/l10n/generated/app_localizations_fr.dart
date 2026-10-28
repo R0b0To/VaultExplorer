@@ -12483,34 +12483,62 @@ class AppLocalizationsFr extends AppLocalizations {
   String get tabEdgeSwipeLabel => 'Geste de balayage entre onglets';
 
   @override
-  String get tabEdgeSwipeDrawerAndNewTabLabel =>
-      'Ouvrir le menu latéral / nouvel onglet';
+  String get tabSwipeBetweenTabsTitle => 'Balayer entre les onglets';
 
   @override
-  String get tabEdgeSwipeDrawerAndNewTabDesc =>
-      'Balayez vers la droite sur le premier onglet pour ouvrir le menu latéral. Balayez vers la gauche sur le dernier onglet pour ouvrir un nouvel onglet.';
+  String get tabSwipeBetweenTabsOnDesc =>
+      'Balayez sur un dossier vers le côté pour passer à l’onglet suivant ou précédent.';
 
   @override
-  String get tabEdgeSwipeLoopLabel => 'Parcourir les onglets en boucle';
+  String get tabSwipeBetweenTabsOffDesc =>
+      'Les onglets ne changent que depuis la barre d’onglets. Les deux gestes ci-dessous fonctionnent alors partout sur l’écran.';
 
   @override
-  String get tabEdgeSwipeLoopDesc =>
-      'Balayer au-delà du dernier onglet mène au premier, et au-delà du premier mène au dernier. Ouvrez le menu latéral depuis le bord gauche de l’écran ou avec le bouton de menu.';
+  String get tabSwipeRightOnFirstTab =>
+      'Balayer vers la droite sur le premier onglet';
 
   @override
-  String get tabEdgeSwipeNoEdgeActionsLabel => 'Aucune action aux extrémités';
+  String get tabSwipeRightAnywhere => 'Balayer vers la droite n’importe où';
 
   @override
-  String get tabEdgeSwipeNoEdgeActionsDesc =>
-      'Balayer au-delà du premier ou du dernier onglet ne fait rien. Ouvrez le menu latéral depuis le bord gauche de l’écran ou avec le bouton de menu, et les nouveaux onglets depuis la barre d’onglets.';
+  String get tabSwipeLeftOnLastTab =>
+      'Balayer vers la gauche sur le dernier onglet';
 
   @override
-  String get tabEdgeSwipeNoTabSwipingLabel =>
-      'Ne pas balayer entre les onglets';
+  String get tabSwipeLeftAnywhere => 'Balayer vers la gauche n’importe où';
 
   @override
-  String get tabEdgeSwipeNoTabSwipingDesc =>
-      'Changez d’onglet uniquement depuis la barre d’onglets. Balayez vers la droite n’importe où pour ouvrir le menu latéral et vers la gauche n’importe où pour ouvrir un nouvel onglet, comme si chaque onglet était le premier.';
+  String get tabSwipeActionNewTab => 'Ouvrir un nouvel onglet';
+
+  @override
+  String get tabSwipeActionOpenDrawer => 'Ouvrir le menu latéral';
+
+  @override
+  String get tabSwipeActionLoopFirst => 'Boucler vers le premier onglet';
+
+  @override
+  String get tabSwipeActionLoopLast => 'Boucler vers le dernier onglet';
+
+  @override
+  String get tabSwipeActionNothing => 'Ne rien faire';
+
+  @override
+  String get tabSwipeRightNothingDesc =>
+      'Le menu latéral s’ouvre toujours depuis le bord gauche de l’écran et avec le bouton de menu.';
+
+  @override
+  String get tabSwipeRightLoopDesc =>
+      'Le menu latéral s’ouvre depuis le bord gauche de l’écran ou avec le bouton de menu. Avec un seul onglet, ce balayage l’ouvre à la place.';
+
+  @override
+  String get tabSwipeNewTabsFromStripDesc =>
+      'Les nouveaux onglets s’ouvrent toujours depuis la barre d’onglets.';
+
+  @override
+  String get tabSwipePreviewFirstTab => 'Premier onglet';
+
+  @override
+  String get tabSwipePreviewLastTab => 'Dernier onglet';
 
   @override
   String get appBarAtBottomLabel => 'Afficher la barre supérieure en bas';

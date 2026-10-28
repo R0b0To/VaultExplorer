@@ -75,4 +75,28 @@ void main() {
       );
     });
   });
+
+  group('extension lookups', () {
+    test('are case-insensitive and use only the text after the last dot', () {
+      expect(MediaViewerConstants.isImage('Holiday.JPG'), isTrue);
+      expect(MediaViewerConstants.isVideo('clip.final.MkV'), isTrue);
+      expect(MediaViewerConstants.isAudio('a.b.FLAC'), isTrue);
+      expect(MediaViewerConstants.isImage('photo.jpg.txt'), isFalse);
+      expect(MediaViewerConstants.isVideo('movie.mp4.'), isFalse);
+      expect(MediaViewerConstants.isSupported('notes.pdf'), isFalse);
+      expect(MediaViewerConstants.isSupported('song.mp3'), isTrue);
+    });
+
+    test('a folder with a dot in its name does not give a bare file an extension', () {
+      expect(MediaViewerConstants.isImage('v1.jpg/readme'), isFalse);
+    });
+
+    test('hasRealThumbnail still compares vault-item extensions case-sensitively', () {
+      expect(MediaViewerConstants.hasRealThumbnail('photo.jpg'), isTrue);
+      expect(MediaViewerConstants.hasRealThumbnail('Photo.PNG'), isTrue);
+      expect(MediaViewerConstants.hasRealThumbnail('a.password'), isFalse);
+      expect(MediaViewerConstants.hasRealThumbnail('doc.pdf'), isFalse);
+      expect(MediaViewerConstants.hasRealThumbnail('photo.jpg', isPlaceholder: true), isFalse);
+    });
+  });
 }

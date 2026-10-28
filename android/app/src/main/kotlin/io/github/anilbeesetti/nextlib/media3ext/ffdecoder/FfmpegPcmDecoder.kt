@@ -82,7 +82,12 @@ class FfmpegPcmDecoder private constructor(
     override fun close() = decoder.release()
 
     companion object {
-        private const val NUM_BUFFERS = 8
+        /**
+         * Input and output buffers in flight. The caller feeds and drains on one thread while the decoder
+         * runs on its own, so this is how much work the decoder has queued each time the caller looks
+         * back at it. At 8 a 3 hour MP3 left it idle most of the time.
+         */
+        private const val NUM_BUFFERS = 32
         private const val DEFAULT_INPUT_BUFFER_SIZE = 16 * 1024
 
         /** Whether the bundled FFmpeg can decode [mime] (and its native library loaded at all). */

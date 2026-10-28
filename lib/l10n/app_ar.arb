@@ -3507,5 +3507,8 @@
   "cameraPauseRecordingTooltip": "إيقاف التسجيل مؤقتًا",
   "cameraResumeRecordingTooltip": "استئناف التسجيل",
   "cameraSnapshotTooltip": "التقاط صورة أثناء التسجيل",
-  "cameraPauseFailedMessage": "تعذر إيقاف التسجيل مؤقتًا أو استئنافه"
+  "cameraPauseFailedMessage": "تعذر إيقاف التسجيل مؤقتًا أو استئنافه",
+  "floatingPlayerTitle": "مشغّل فيديو عائم",
+  "floatingPlayerSubtitle": "عند إغلاق المشغّل أثناء تشغيل فيديو، يستمر التشغيل في نافذة صغيرة يمكنك تحريكها. وعند مغادرة التطبيق يتحول إلى صورة داخل صورة مع زر للصوت فقط",
+  "floatingPlayerExpandTooltip": "توسيع"
 }

@@ -3507,5 +3507,8 @@
   "cameraPauseRecordingTooltip": "録画を一時停止",
   "cameraResumeRecordingTooltip": "録画を再開",
   "cameraSnapshotTooltip": "録画中に写真を撮影",
-  "cameraPauseFailedMessage": "録画の一時停止または再開ができませんでした"
+  "cameraPauseFailedMessage": "録画の一時停止または再開ができませんでした",
+  "floatingPlayerTitle": "フローティング動画プレーヤー",
+  "floatingPlayerSubtitle": "動画の再生中にプレーヤーを閉じると、移動できる小さなウィンドウで再生を続けます。アプリを離れるとピクチャーインピクチャーに切り替わり、音声のみのボタンが表示されます",
+  "floatingPlayerExpandTooltip": "拡大"
 }

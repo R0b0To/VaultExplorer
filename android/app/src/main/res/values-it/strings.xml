@@ -15,4 +15,5 @@
     <string name="vault_media_action_previous">Precedente</string>
     <string name="vault_media_action_next">Successivo</string>
     <string name="vault_media_action_stop">Interrompi</string>
+    <string name="vault_pip_action_audio_only">Solo audio</string>
 </resources>

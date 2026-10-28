@@ -15,4 +15,5 @@
     <string name="vault_media_action_previous">Попередній</string>
     <string name="vault_media_action_next">Наступний</string>
     <string name="vault_media_action_stop">Зупинити</string>
+    <string name="vault_pip_action_audio_only">Лише аудіо</string>
 </resources>

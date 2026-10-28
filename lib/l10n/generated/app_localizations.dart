@@ -21204,6 +21204,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not pause or resume the recording'**
   String get cameraPauseFailedMessage;
+
+  /// Title of the setting that keeps a playing video going in a small floating window inside the app when the media viewer is closed
+  ///
+  /// In en, this message translates to:
+  /// **'Floating video player'**
+  String get floatingPlayerTitle;
+
+  /// Subtitle of the floating video player setting: closing the viewer keeps the video in a movable window, and leaving the app turns it into picture-in-picture with an audio-only button
+  ///
+  /// In en, this message translates to:
+  /// **'Closing the player while a video plays keeps it in a small window you can move around. Leaving the app turns it into picture-in-picture, with an audio-only button'**
+  String get floatingPlayerSubtitle;
+
+  /// Label of the button on the floating video window that reopens the video full screen
+  ///
+  /// In en, this message translates to:
+  /// **'Expand'**
+  String get floatingPlayerExpandTooltip;
 }
 
 class _AppLocalizationsDelegate

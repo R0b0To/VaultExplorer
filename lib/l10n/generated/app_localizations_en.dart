@@ -12496,4 +12496,14 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get cameraPauseFailedMessage =>
       'Could not pause or resume the recording';
+
+  @override
+  String get floatingPlayerTitle => 'Floating video player';
+
+  @override
+  String get floatingPlayerSubtitle =>
+      'Closing the player while a video plays keeps it in a small window you can move around. Leaving the app turns it into picture-in-picture, with an audio-only button';
+
+  @override
+  String get floatingPlayerExpandTooltip => 'Expand';
 }

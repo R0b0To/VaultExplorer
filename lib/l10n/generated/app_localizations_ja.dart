@@ -11989,4 +11989,14 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get cameraPauseFailedMessage => '録画の一時停止または再開ができませんでした';
+
+  @override
+  String get floatingPlayerTitle => 'フローティング動画プレーヤー';
+
+  @override
+  String get floatingPlayerSubtitle =>
+      '動画の再生中にプレーヤーを閉じると、移動できる小さなウィンドウで再生を続けます。アプリを離れるとピクチャーインピクチャーに切り替わり、音声のみのボタンが表示されます';
+
+  @override
+  String get floatingPlayerExpandTooltip => '拡大';
 }

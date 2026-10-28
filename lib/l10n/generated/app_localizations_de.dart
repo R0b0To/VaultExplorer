@@ -12688,4 +12688,14 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get cameraPauseFailedMessage =>
       'Aufnahme konnte nicht pausiert oder fortgesetzt werden';
+
+  @override
+  String get floatingPlayerTitle => 'Schwebender Video-Player';
+
+  @override
+  String get floatingPlayerSubtitle =>
+      'Beim Schließen des Players läuft das Video in einem kleinen, verschiebbaren Fenster weiter. Beim Verlassen der App wird es zu Bild-in-Bild, mit einer Nur-Audio-Taste';
+
+  @override
+  String get floatingPlayerExpandTooltip => 'Vergrößern';
 }

@@ -15,4 +15,5 @@
     <string name="vault_media_action_previous">Zurück</string>
     <string name="vault_media_action_next">Weiter</string>
     <string name="vault_media_action_stop">Stopp</string>
+    <string name="vault_pip_action_audio_only">Nur Audio</string>
 </resources>

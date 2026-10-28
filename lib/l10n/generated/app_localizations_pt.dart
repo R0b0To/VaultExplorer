@@ -12686,4 +12686,14 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get cameraPauseFailedMessage =>
       'Não foi possível pausar ou retomar a gravação';
+
+  @override
+  String get floatingPlayerTitle => 'Reprodutor de vídeo flutuante';
+
+  @override
+  String get floatingPlayerSubtitle =>
+      'Ao fechar o reprodutor, o vídeo continua numa janela pequena que pode mover. Ao sair da app, passa para imagem em imagem, com um botão de apenas áudio';
+
+  @override
+  String get floatingPlayerExpandTooltip => 'Expandir';
 }

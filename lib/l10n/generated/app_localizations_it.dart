@@ -12689,4 +12689,14 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get cameraPauseFailedMessage =>
       'Impossibile mettere in pausa o riprendere la registrazione';
+
+  @override
+  String get floatingPlayerTitle => 'Lettore video flottante';
+
+  @override
+  String get floatingPlayerSubtitle =>
+      'Chiudendo il lettore, il video continua in una piccola finestra che puoi spostare. Uscendo dall’app diventa picture-in-picture, con un pulsante solo audio';
+
+  @override
+  String get floatingPlayerExpandTooltip => 'Espandi';
 }

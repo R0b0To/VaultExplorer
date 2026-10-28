@@ -5,11 +5,12 @@ import 'package:vaultexplorer/app/app_navigator_key.dart';
 import 'package:vaultexplorer/features/browser/viewer/background_playback/background_playback_host.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
+import 'package:vaultexplorer/features/browser/viewer/pip/floating_video_player.dart';
 import 'package:vaultexplorer/features/browser/viewer/pip/picture_in_picture_bridge.dart';
 import 'package:vaultexplorer/features/browser/viewer/pip/picture_in_picture_coordinator.dart';
 
 /// Wraps the whole app (put it outermost in `MaterialApp.builder`) and owns the
-/// two app-level pieces of picture-in-picture:
+/// app-level pieces of picture-in-picture and the floating player:
 ///
 ///  * While Android's PiP window is the *app itself* (the "automatic
 ///    picture-in-picture" mode, entered when the app is left), the app is
@@ -20,6 +21,10 @@ import 'package:vaultexplorer/features/browser/viewer/pip/picture_in_picture_coo
 ///  * When the person taps the separate PiP window (the viewer's button) to go
 ///    back to full screen, the media viewer is reopened on the video it was
 ///    playing, taking the running player back.
+///  * The in-app floating player ([FloatingVideoPlayer]) is drawn here, above
+///    the navigator, while [BackgroundPlaybackHost] has a floating session.
+///    Leaving the app then turns the app into the PiP window above, with the
+///    same video.
 class PictureInPictureLayer extends StatefulWidget {
   final Widget child;
 
@@ -100,6 +105,23 @@ class _PictureInPictureLayerState extends State<PictureInPictureLayer> {
               child: Offstage(
                 offstage: inPictureInPicture,
                 child: widget.child,
+              ),
+            ),
+            // Kept mounted (just not painted) while the app is the PiP window,
+            // so the corner the person parked it in is still there afterwards.
+            Positioned.fill(
+              child: Offstage(
+                offstage: inPictureInPicture,
+                child: ValueListenableBuilder<BackgroundPlaybackSession?>(
+                  valueListenable:
+                      BackgroundPlaybackHost.instance.floatingSession,
+                  builder: (context, session, _) => session == null
+                      ? const SizedBox.shrink()
+                      : FloatingVideoPlayer(
+                          session: session,
+                          onExpand: BackgroundPlaybackHost.instance.expand,
+                        ),
+                ),
               ),
             ),
             if (inPictureInPicture)

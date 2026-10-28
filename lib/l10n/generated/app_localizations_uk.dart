@@ -12778,4 +12778,14 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get cameraPauseFailedMessage =>
       'Не вдалося призупинити або відновити запис';
+
+  @override
+  String get floatingPlayerTitle => 'Плаваючий відеоплеєр';
+
+  @override
+  String get floatingPlayerSubtitle =>
+      'Якщо закрити плеєр під час відтворення відео, воно продовжиться в невеликому вікні, яке можна переміщувати. Після виходу із застосунку воно перейде в режим «картинка в картинці» з кнопкою «Лише аудіо»';
+
+  @override
+  String get floatingPlayerExpandTooltip => 'Розгорнути';
 }

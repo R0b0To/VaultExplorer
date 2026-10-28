@@ -12719,4 +12719,14 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get cameraPauseFailedMessage =>
       'تعذر إيقاف التسجيل مؤقتًا أو استئنافه';
+
+  @override
+  String get floatingPlayerTitle => 'مشغّل فيديو عائم';
+
+  @override
+  String get floatingPlayerSubtitle =>
+      'عند إغلاق المشغّل أثناء تشغيل فيديو، يستمر التشغيل في نافذة صغيرة يمكنك تحريكها. وعند مغادرة التطبيق يتحول إلى صورة داخل صورة مع زر للصوت فقط';
+
+  @override
+  String get floatingPlayerExpandTooltip => 'توسيع';
 }

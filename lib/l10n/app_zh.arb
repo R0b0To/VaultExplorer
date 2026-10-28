@@ -3507,5 +3507,8 @@
   "cameraPauseRecordingTooltip": "暂停录制",
   "cameraResumeRecordingTooltip": "继续录制",
   "cameraSnapshotTooltip": "录制时拍照",
-  "cameraPauseFailedMessage": "无法暂停或恢复录制"
+  "cameraPauseFailedMessage": "无法暂停或恢复录制",
+  "floatingPlayerTitle": "悬浮视频播放器",
+  "floatingPlayerSubtitle": "播放视频时关闭播放器，视频会在可拖动的小窗口中继续播放。离开应用后将进入画中画，并提供仅音频按钮",
+  "floatingPlayerExpandTooltip": "展开"
 }

@@ -1,15 +1,19 @@
 package com.aeidolon.vaultexplorer.pip
 
 import android.app.PictureInPictureParams
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.PowerManager
 import android.util.Rational
 import android.view.SurfaceView
+import androidx.core.content.ContextCompat
 import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.VeLog
+import com.aeidolon.vaultexplorer.engine.VaultPlaybackSession
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodChannel
 
@@ -21,7 +25,7 @@ import io.flutter.plugin.common.MethodChannel
  *     and shrinks into Android's PiP window by itself. The app stays where
  *     the person leaves it (the viewer closes, and they are back in the file
  *     manager) while the video floats on top. The window reports back with
- *     `windowEvent` (`entered`, `expanded`, `closed`, `failed`); Dart ends it
+ *     `windowEvent` (`entered`, `expanded`, `closed`, `audioOnly`, `failed`); Dart ends it
  *     with `closeWindow` and follows the video's shape with `setWindowRatio`.
  *
  *  2. **Automatic** ("automatic picture-in-picture"): the whole activity
@@ -35,8 +39,11 @@ import io.flutter.plugin.common.MethodChannel
  *     While that window is up, Dart replaces the app with just the video (see
  *     `PictureInPictureLayer`), reporting `modeChanged` / `dismissed`.
  *
- * Playback controls inside either window come from the media session the
- * player already publishes; no custom actions are added here.
+ * Both windows carry the buttons built by [PictureInPictureActions]: previous /
+ * play-pause / next, and **audio only**. Audio only closes the video window and
+ * leaves the sound playing from the media notification (the player and its
+ * media session keep running; only the video is gone). They are kept in step
+ * with the session through [VaultPlaybackSession.onSnapshotChanged].
  */
 class PictureInPictureController(private val activity: MainActivity) {
 
@@ -54,6 +61,29 @@ class PictureInPictureController(private val activity: MainActivity) {
     /** True while a PiP window is being set up (the activity is covered). */
     private var entering = false
 
+    /**
+     * True from the "audio only" button (automatic mode) until the activity
+     * next resumes. Sending the task to the back looks to [onStop] exactly like
+     * the person closing the window, which pauses the video; this tells the two
+     * apart.
+     */
+    private var audioOnlyRequested = false
+
+    private var controlsRegistered = false
+
+    // The window's buttons are PendingIntents, delivered as a broadcast.
+    private val controlReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action != PictureInPictureActions.BROADCAST_ACTION) return
+            when (intent.getIntExtra(PictureInPictureActions.EXTRA_CONTROL, 0)) {
+                PictureInPictureActions.CONTROL_PREVIOUS -> VaultPlaybackSession.skipToPrevious()
+                PictureInPictureActions.CONTROL_TOGGLE -> VaultPlaybackSession.togglePlayPause()
+                PictureInPictureActions.CONTROL_NEXT -> VaultPlaybackSession.skipToNext()
+                PictureInPictureActions.CONTROL_AUDIO_ONLY -> switchToAudioOnly()
+            }
+        }
+    }
+
     private val supported: Boolean by lazy {
         activity.packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
     }
@@ -63,7 +93,10 @@ class PictureInPictureController(private val activity: MainActivity) {
         channel = ch
         // Share / quick-capture activities run their own engine; the window
         // belongs to the main one.
-        if (activity.javaClass == MainActivity::class.java) current = this
+        if (activity.javaClass == MainActivity::class.java) {
+            current = this
+            registerControls()
+        }
         ch.setMethodCallHandler { call, result ->
             when (call.method) {
                 "isSupported" -> result.success(supported)
@@ -133,6 +166,7 @@ class PictureInPictureController(private val activity: MainActivity) {
 
     fun onResume() {
         entering = false
+        audioOnlyRequested = false
         // Some Android versions resume the activity while it is in the PiP
         // window; only a resume out of PiP ends the session.
         if (!isActive) inPipSession = false
@@ -147,15 +181,81 @@ class PictureInPictureController(private val activity: MainActivity) {
         if (!inPipSession) return
         inPipSession = false
         if (!isScreenOn()) return
+        if (audioOnlyRequested) {
+            // The "audio only" button, not a dismissal: the video must not
+            // pause, the sound carries on.
+            audioOnlyRequested = false
+            return
+        }
         channel?.invokeMethod("dismissed", null)
     }
 
     fun onDestroy() {
-        // Only the main activity owns the window (a share / quick-capture
-        // activity going away must not close it).
+        // This activity's own receiver goes in any case; the rest belongs to the
+        // main activity only (a share / quick-capture activity going away must
+        // not close the window).
+        unregisterControls()
         if (current !== this) return
         windowActivity?.closeFromApp()
         current = null
+    }
+
+    // --- Window buttons ---
+
+    private fun registerControls() {
+        if (controlsRegistered) return
+        ContextCompat.registerReceiver(
+            activity,
+            controlReceiver,
+            IntentFilter(PictureInPictureActions.BROADCAST_ACTION),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        controlsRegistered = true
+        VaultPlaybackSession.onSnapshotChanged = { refreshActions() }
+    }
+
+    private fun unregisterControls() {
+        if (!controlsRegistered) return
+        controlsRegistered = false
+        // A newer main activity may already have taken the hook over.
+        if (current === this) VaultPlaybackSession.onSnapshotChanged = null
+        try {
+            activity.unregisterReceiver(controlReceiver)
+        } catch (e: IllegalArgumentException) {
+            VeLog.w(TAG, e) { "PiP control receiver was already unregistered" }
+        }
+    }
+
+    /** The session changed (play / pause, a new item): redraw the window's buttons. */
+    private fun refreshActions() {
+        val window = windowActivity
+        if (window != null) {
+            window.refreshActions()
+            return
+        }
+        // Armed too, not only in the window: the buttons must already be right
+        // for the frame the system enters PiP on its own.
+        if (armed || isActive) applyParams()
+    }
+
+    /**
+     * The window's "audio only" button: the video window goes away and the
+     * sound carries on from the media notification.
+     *  - Separate window: it just closes itself.
+     *  - Automatic mode (the app itself is the window): the task is sent to the
+     *    back, which dismisses the window without finishing the activity the
+     *    player and media session live in. [onStop] then sees the flag and
+     *    does not read it as a dismissal.
+     */
+    private fun switchToAudioOnly() {
+        val window = windowActivity
+        if (window != null) {
+            window.audioOnlyFromApp()
+            return
+        }
+        if (!isActive || activity.isFinishing || activity.isDestroyed) return
+        audioOnlyRequested = true
+        activity.moveTaskToBack(true)
     }
 
     // --- PiP window (separate activity) ---
@@ -190,7 +290,9 @@ class PictureInPictureController(private val activity: MainActivity) {
     }
 
     private fun buildParams(): PictureInPictureParams {
-        val builder = PictureInPictureParams.Builder().setAspectRatio(aspect)
+        val builder = PictureInPictureParams.Builder()
+            .setAspectRatio(aspect)
+            .setActions(PictureInPictureActions.build(activity))
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             builder.setAutoEnterEnabled(armed)
         }

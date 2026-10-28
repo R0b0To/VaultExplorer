@@ -46,6 +46,7 @@ import 'package:vaultexplorer/features/browser/viewer/pip/picture_in_picture_bri
 import 'package:vaultexplorer/features/browser/viewer/pip/picture_in_picture_coordinator.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_prefetch_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
+import 'package:vaultexplorer/features/browser/viewer/playlist_swipe_physics.dart';
 import 'package:vaultexplorer/features/browser/viewer/screen_brightness_bridge.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_scrub_preview_controller.dart';
@@ -143,6 +144,11 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   final ValueNotifier<ScrollPhysics> _swipePhysicsNotifier =
       ValueNotifier<ScrollPhysics>(const BouncingScrollPhysics());
 
+  /// Overall movement of the touch that swipes the playlist pager. The pager's
+  /// physics read it on release so a short, diagonal or curved swipe still
+  /// counts as a swipe (see [PlaylistSwipePageScrollPhysics]).
+  final PlaylistSwipeTracker _swipeTracker = PlaylistSwipeTracker();
+
   /// 0..1 while a swipe-to-dismiss drag pulls the media away. Drives the
   /// backdrop and viewer chrome fade while the actual image stays visible.
   final ValueNotifier<double> _swipeDismissProgress = ValueNotifier<double>(
@@ -220,9 +226,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   bool _lockedRouteDismissalScheduled = false;
 
   /// Prepared in [_prepareBackgroundPlaybackHandoff] when the person closes the
-  /// viewer with audio playing and "keep audio playing after closing" is on;
-  /// [dispose] gives it to [BackgroundPlaybackHost] instead of releasing the
-  /// player.
+  /// viewer with audio playing and "keep audio playing after closing" is on,
+  /// or with a video playing and the floating video player on; [dispose] gives
+  /// it to [BackgroundPlaybackHost] instead of releasing the player.
   BackgroundPlaybackSession? _backgroundPlaybackHandoff;
 
   /// The item whose already-running player this viewer took over from
@@ -621,9 +627,12 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   /// the media notification's Stop), which must always end playback. When
   /// "keep audio playing after closing" is on and audio is playing, prepares
   /// the hand-off that [dispose] completes: the live player goes to
-  /// [BackgroundPlaybackHost] instead of being released. Video is never kept
-  /// this way (there is nowhere to show it; the picture-in-picture button is
-  /// for that, see [_enterPictureInPictureWindow]), nor is anything paused.
+  /// [BackgroundPlaybackHost] instead of being released. The same goes for a
+  /// playing video when the floating video player is on: it carries on in a
+  /// small window over the app (and in the picture-in-picture window once the
+  /// app is left). A video can also be sent to the system's window right away
+  /// with the picture-in-picture button, see [_enterPictureInPictureWindow].
+  /// Nothing that is paused is kept.
   void _prepareBackgroundPlaybackHandoff() {
     _backgroundPlaybackHandoff = null;
     if (widget._isPreviewOnly || _playlistController.isEmpty) return;
@@ -633,20 +642,32 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     if (file == null || controller == null || controller.isDisposed) return;
     // Mid-transition: the player isn't on the item the playlist points at.
     if (file != _playlistController.currentFile) return;
-    if (!MediaViewerConstants.isAudio(file)) return;
+    final isAudio = MediaViewerConstants.isAudio(file);
+    final isVideo = MediaViewerConstants.isVideo(file);
+    if (!isAudio && !isVideo) return;
     final value = controller.value;
     if (!value.isInitialized || value.hasError || !value.isPlaying) return;
-    final keepAudio = ref
+    final config = ref
         .read(fileManagerToolbarSettingsProvider(null))
         .config
-        .mediaViewerToolbarConfig
-        .keepAudioPlayingAfterClose;
-    if (!keepAudio) return;
-    _backgroundPlaybackHandoff = _newBackgroundPlaybackSession(pipWindow: false);
+        .mediaViewerToolbarConfig;
+    if (isAudio) {
+      if (!config.keepAudioPlayingAfterClose) return;
+      _backgroundPlaybackHandoff = _newBackgroundPlaybackSession(
+        pipWindow: false,
+      );
+    } else {
+      if (!config.floatingPlayerEnabled) return;
+      _backgroundPlaybackHandoff = _newBackgroundPlaybackSession(
+        pipWindow: false,
+        floatingPlayer: true,
+      );
+    }
   }
 
   BackgroundPlaybackSession _newBackgroundPlaybackSession({
     required bool pipWindow,
+    bool floatingPlayer = false,
   }) => BackgroundPlaybackSession(
     providers: ProviderScope.containerOf(context, listen: false),
     container: widget.container,
@@ -663,6 +684,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     sortAscending: widget.sortAscending,
     pinnedPaths: widget.pinnedPaths,
     pipWindow: pipWindow,
+    floatingPlayer: floatingPlayer,
   );
 
   bool _enteringPictureInPicture = false;
@@ -1636,6 +1658,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
    void _handleTouchPointerDown(PointerDownEvent event) {
     if (event.kind != PointerDeviceKind.touch || _isEditingLayout) return;
     _activeTouchPointers.add(event.pointer);
+    if (_activeTouchPointers.length == 1) {
+      _swipeTracker.begin(event.position, _playlistController.currentIndex);
+    }
     if (_activeTouchPointers.length == 1 && !_zoomInteractionLock) {
       final toolbarConfig = ref
           .read(fileManagerToolbarSettingsProvider(null))
@@ -1674,6 +1699,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     }
     if (_activeTouchPointers.length >= 2 && !_multiTouchLock) {
       _multiTouchLock = true;
+      _swipeTracker.cancel();
       _clearEdgeTapCandidates();
       _loopSwipeStartPositions.clear();
       _loopSwipeStartIndices.clear();
@@ -1690,6 +1716,13 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     final start = _loopSwipeStartPositions.remove(event.pointer);
     final startIndex = _loopSwipeStartIndices.remove(event.pointer);
     _activeTouchPointers.remove(event.pointer);
+    // This runs before the pager's drag recognizer sees the finger lift, so
+    // the physics can judge the whole swipe when they settle the page.
+    if (event is PointerUpEvent && _activeTouchPointers.isEmpty) {
+      _swipeTracker.release(event.position);
+    } else {
+      _swipeTracker.cancel();
+    }
     if (event is PointerUpEvent &&
         edgeStart != null &&
         edgeDirection != null &&
@@ -1758,30 +1791,34 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     final count = _playlistController.playlist.length;
     if (count < 2 || _playlistController.currentIndex != startIndex) return;
 
-    final axis = _scrollMode.isContinuous ? Axis.vertical : _scrollMode.axis;
-    final axisDelta = axis == Axis.horizontal
-        ? end.dx - start.dx
-        : end.dy - start.dy;
-    final crossAxisDelta = axis == Axis.horizontal
-        ? end.dy - start.dy
-        : end.dx - start.dx;
-    final isRtl =
-        axis == Axis.horizontal &&
-        Directionality.of(context) == TextDirection.rtl;
-    final forwardDelta = axisDelta * (isRtl ? 1 : -1);
+    final isContinuous = _scrollMode.isContinuous;
+    final axis = isContinuous ? Axis.vertical : _scrollMode.axis;
+    final axisDirection = axis == Axis.horizontal
+        ? (Directionality.of(context) == TextDirection.rtl
+              ? AxisDirection.left
+              : AxisDirection.right)
+        : AxisDirection.down;
     final viewportExtent = axis == Axis.horizontal
         ? _viewportWidth
         : _viewportHeight;
-    final threshold = math.max(48.0, viewportExtent * 0.12);
-    if (forwardDelta.abs() < threshold ||
-        forwardDelta.abs() <= crossAxisDelta.abs()) {
-      return;
-    }
+    // Paged modes judge the swipe the same way the pager does (overall
+    // movement, diagonals allowed), so swiping past the end behaves like
+    // swiping between any two items. The continuous list is browsed by free
+    // scrolling, where a short scroll that happens to start on the last item
+    // must not jump to the first, so it keeps the stricter test.
+    final direction = playlistSwipeDirection(
+      end - start,
+      axisDirection,
+      minDistance: isContinuous
+          ? math.max(48.0, viewportExtent * 0.12)
+          : kPlaylistSwipeMinDistance,
+      maxCrossRatio: isContinuous ? 1.0 : kPlaylistSwipeMaxCrossRatio,
+    );
 
-    if (startIndex == count - 1 && forwardDelta > 0) {
+    if (startIndex == count - 1 && direction > 0) {
       HapticFeedback.lightImpact();
       _transitionTo(0);
-    } else if (startIndex == 0 && forwardDelta < 0) {
+    } else if (startIndex == 0 && direction < 0) {
       HapticFeedback.lightImpact();
       _transitionTo(count - 1);
     }
@@ -3621,11 +3658,26 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                 );
               }
 
+              // Locked: no user scrolling, but still page-snapping, so a drag
+              // cut short by a second finger settles on a page. Unlocked: the
+              // swipe is judged by its overall movement rather than only the
+              // speed of its last instant. PageView would put its own
+              // page-snapping physics ahead of these, so they snap themselves.
+              final ScrollPhysics pagePhysics =
+                  physics is NeverScrollableScrollPhysics
+                  ? const PageScrollPhysics(
+                      parent: NeverScrollableScrollPhysics(),
+                    )
+                  : PlaylistSwipePageScrollPhysics(
+                      parent: physics,
+                      tracker: _swipeTracker,
+                    );
               return PageView.builder(
                 key: builderKey,
                 controller: _pageController,
                 scrollDirection: _scrollMode.axis,
-                physics: physics,
+                pageSnapping: false,
+                physics: pagePhysics,
                 itemCount: _playlistController.playlist.length,
                 onPageChanged: (index) {
                   if (_playlistController.currentIndex != index) {

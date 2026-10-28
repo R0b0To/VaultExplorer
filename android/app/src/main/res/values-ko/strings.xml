@@ -15,4 +15,5 @@
     <string name="vault_media_action_previous">이전</string>
     <string name="vault_media_action_next">다음</string>
     <string name="vault_media_action_stop">중지</string>
+    <string name="vault_pip_action_audio_only">오디오만</string>
 </resources>

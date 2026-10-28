@@ -1257,6 +1257,27 @@ class MediaViewerPlaybackSettingsScreen extends ConsumerWidget {
                   ),
                   SwitchListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                    value: mediaConfig.floatingPlayerEnabled,
+                    onChanged: controller.setMediaViewerFloatingPlayerEnabled,
+                    title: Text(
+                      l10n.floatingPlayerTitle,
+                      style: textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      l10n.floatingPlayerSubtitle,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                    secondary: Icon(
+                      Icons.featured_video_rounded,
+                      color: cs.primary,
+                    ),
+                  ),
+                  SwitchListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                     value: mediaConfig.tapEdgesToNavigate,
                     onChanged: controller.setMediaViewerTapEdgesToNavigate,
                     title: Text(

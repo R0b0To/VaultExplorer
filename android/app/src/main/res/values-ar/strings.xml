@@ -16,4 +16,5 @@
     <string name="vault_media_action_previous">السابق</string>
     <string name="vault_media_action_next">التالي</string>
     <string name="vault_media_action_stop">إيقاف</string>
+    <string name="vault_pip_action_audio_only">الصوت فقط</string>
 </resources>

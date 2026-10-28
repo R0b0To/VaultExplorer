@@ -18,7 +18,7 @@ import 'package:vaultexplorer/core/utils/ve_log.dart';
 ///  * [startWindow], the viewer's button: a separate window activity takes
 ///    over the video while the app itself stays usable behind it. The window
 ///    reports back on [windowEvents] (`entered`, `expanded`, `closed`,
-///    `failed`); [closeWindow] ends it.
+///    `audioOnly`, `failed`); [closeWindow] ends it.
 ///  * [setState], the "automatic picture-in-picture" setting: the whole app
 ///    becomes the PiP window when it is left, reported through
 ///    [isInPictureInPicture] and [windowDismissed].
@@ -42,7 +42,9 @@ class PictureInPictureBridge {
       StreamController<String>.broadcast();
 
   /// What the PiP window activity did: `entered`, `expanded` (the person tapped
-  /// it to go back to the app), `closed` (they dismissed it) or `failed`.
+  /// it to go back to the app), `closed` (they dismissed it), `audioOnly` (they
+  /// pressed its "audio only" button: the window is gone, the sound carries on)
+  /// or `failed`.
   static Stream<String> get windowEvents => _windowEvents.stream;
 
   static final StreamController<void> _dismissed =

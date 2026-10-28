@@ -57,4 +57,5 @@
     <string name="vault_media_action_previous">Previous</string>
     <string name="vault_media_action_next">Next</string>
     <string name="vault_media_action_stop">Stop</string>
+    <string name="vault_pip_action_audio_only">Audio only</string>
 </resources>

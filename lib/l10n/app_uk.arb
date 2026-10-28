@@ -3507,5 +3507,8 @@
   "cameraPauseRecordingTooltip": "Призупинити запис",
   "cameraResumeRecordingTooltip": "Відновити запис",
   "cameraSnapshotTooltip": "Зробити фото під час запису",
-  "cameraPauseFailedMessage": "Не вдалося призупинити або відновити запис"
+  "cameraPauseFailedMessage": "Не вдалося призупинити або відновити запис",
+  "floatingPlayerTitle": "Плаваючий відеоплеєр",
+  "floatingPlayerSubtitle": "Якщо закрити плеєр під час відтворення відео, воно продовжиться в невеликому вікні, яке можна переміщувати. Після виходу із застосунку воно перейде в режим «картинка в картинці» з кнопкою «Лише аудіо»",
+  "floatingPlayerExpandTooltip": "Розгорнути"
 }

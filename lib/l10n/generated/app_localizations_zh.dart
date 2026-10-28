@@ -11798,4 +11798,14 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get cameraPauseFailedMessage => '无法暂停或恢复录制';
+
+  @override
+  String get floatingPlayerTitle => '悬浮视频播放器';
+
+  @override
+  String get floatingPlayerSubtitle =>
+      '播放视频时关闭播放器，视频会在可拖动的小窗口中继续播放。离开应用后将进入画中画，并提供仅音频按钮';
+
+  @override
+  String get floatingPlayerExpandTooltip => '展开';
 }

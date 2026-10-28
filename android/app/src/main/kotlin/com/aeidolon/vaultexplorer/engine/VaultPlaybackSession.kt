@@ -102,6 +102,14 @@ internal object VaultPlaybackSession {
 
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    /**
+     * Called on the main thread whenever something the system media controls
+     * show may have changed: playing / paused, the previous / next buttons, the
+     * item. The picture-in-picture window listens so its own buttons (play /
+     * pause, next, ...) always match the session.
+     */
+    var onSnapshotChanged: (() -> Unit)? = null
+
     private var appContext: Context? = null
     private var host: Host? = null
     private var rawPlayer: Player? = null
@@ -475,6 +483,7 @@ internal object VaultPlaybackSession {
     }
 
     private fun refreshService() {
+        onSnapshotChanged?.invoke()
         if (windowOpen && rawPlayer != null) VaultMediaPlaybackService.refresh()
     }
 

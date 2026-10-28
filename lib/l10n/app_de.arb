@@ -3507,5 +3507,8 @@
   "cameraPauseRecordingTooltip": "Aufnahme pausieren",
   "cameraResumeRecordingTooltip": "Aufnahme fortsetzen",
   "cameraSnapshotTooltip": "Foto während der Aufnahme aufnehmen",
-  "cameraPauseFailedMessage": "Aufnahme konnte nicht pausiert oder fortgesetzt werden"
+  "cameraPauseFailedMessage": "Aufnahme konnte nicht pausiert oder fortgesetzt werden",
+  "floatingPlayerTitle": "Schwebender Video-Player",
+  "floatingPlayerSubtitle": "Beim Schließen des Players läuft das Video in einem kleinen, verschiebbaren Fenster weiter. Beim Verlassen der App wird es zu Bild-in-Bild, mit einer Nur-Audio-Taste",
+  "floatingPlayerExpandTooltip": "Vergrößern"
 }

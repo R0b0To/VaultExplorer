@@ -687,6 +687,13 @@ void applyImportedConfig(FileManagerToolbarConfig newConfig) {
     return updateMediaViewerConfig(updated);
   }
 
+  Future<void> setMediaViewerFloatingPlayerEnabled(bool enabled) {
+    final updated = state.config.mediaViewerToolbarConfig.copyWith(
+      floatingPlayerEnabled: enabled,
+    );
+    return updateMediaViewerConfig(updated);
+  }
+
   Future<void> resetMediaViewerConfigToDefaults() {
     final defaultMediaConfig = MediaViewerToolbarConfig.defaults();
     ThumbnailCacheService.setVideoThumbnailSettings(

@@ -11992,4 +11992,14 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get cameraPauseFailedMessage => '녹화를 일시중지하거나 재개할 수 없습니다';
+
+  @override
+  String get floatingPlayerTitle => '플로팅 동영상 플레이어';
+
+  @override
+  String get floatingPlayerSubtitle =>
+      '동영상 재생 중 플레이어를 닫으면 옮길 수 있는 작은 창에서 계속 재생됩니다. 앱을 나가면 화면 속 화면으로 전환되며 오디오 전용 버튼이 표시됩니다';
+
+  @override
+  String get floatingPlayerExpandTooltip => '확대';
 }

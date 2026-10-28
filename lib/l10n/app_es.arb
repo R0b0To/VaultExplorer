@@ -3507,5 +3507,8 @@
   "cameraPauseRecordingTooltip": "Pausar grabación",
   "cameraResumeRecordingTooltip": "Reanudar grabación",
   "cameraSnapshotTooltip": "Tomar una foto durante la grabación",
-  "cameraPauseFailedMessage": "No se pudo pausar ni reanudar la grabación"
+  "cameraPauseFailedMessage": "No se pudo pausar ni reanudar la grabación",
+  "floatingPlayerTitle": "Reproductor de vídeo flotante",
+  "floatingPlayerSubtitle": "Al cerrar el reproductor, el vídeo sigue en una ventana pequeña que puedes mover. Al salir de la app pasa a imagen en imagen, con un botón de solo audio",
+  "floatingPlayerExpandTooltip": "Ampliar"
 }

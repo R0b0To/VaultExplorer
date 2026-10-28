@@ -3507,5 +3507,8 @@
   "cameraPauseRecordingTooltip": "Mettre l'enregistrement en pause",
   "cameraResumeRecordingTooltip": "Reprendre l'enregistrement",
   "cameraSnapshotTooltip": "Prendre une photo pendant l'enregistrement",
-  "cameraPauseFailedMessage": "Impossible de mettre en pause ou de reprendre l'enregistrement"
+  "cameraPauseFailedMessage": "Impossible de mettre en pause ou de reprendre l'enregistrement",
+  "floatingPlayerTitle": "Lecteur vidéo flottant",
+  "floatingPlayerSubtitle": "En fermant le lecteur, la vidéo continue dans une petite fenêtre déplaçable. En quittant l’application, elle passe en image dans l’image, avec un bouton audio seul",
+  "floatingPlayerExpandTooltip": "Agrandir"
 }

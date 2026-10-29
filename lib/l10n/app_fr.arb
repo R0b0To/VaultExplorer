@@ -3511,5 +3511,16 @@
   "cameraPauseFailedMessage": "Impossible de mettre en pause ou de reprendre l'enregistrement",
   "floatingPlayerTitle": "Lecteur vidéo flottant",
   "floatingPlayerSubtitle": "En fermant le lecteur, la vidéo continue dans une petite fenêtre déplaçable. En quittant l’application, elle passe en image dans l’image, avec un bouton audio seul",
-  "floatingPlayerExpandTooltip": "Agrandir"
+  "floatingPlayerExpandTooltip": "Agrandir",
+  "masterLockTitle": "Verrouillage principal",
+  "masterLockInactiveSubtitle": "Exiger un mot de passe, un code PIN ou un schéma pour ouvrir l'application",
+  "masterLockChooseTitle": "Choisissez comment verrouiller l'application",
+  "masterLockBackupTitle": "Ajouter un déverrouillage de secours",
+  "masterLockBackupMessage": "Le déverrouillage biométrique nécessite un mot de passe, un code PIN ou un schéma comme solution de repli. Choisissez-en un à configurer également.",
+  "masterCredentialPassword": "Mot de passe",
+  "masterCredentialPin": "PIN",
+  "masterCredentialPattern": "Schéma",
+  "masterCredentialSet": "Défini",
+  "masterCredentialNotSet": "Non défini",
+  "duressMasterLockRequired": "Un verrouillage principal doit être activé dans Sécurité avant de pouvoir configurer la contrainte."
 }

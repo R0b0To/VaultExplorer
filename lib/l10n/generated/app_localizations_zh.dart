@@ -11811,4 +11811,37 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get floatingPlayerExpandTooltip => '展开';
+
+  @override
+  String get masterLockTitle => '主锁';
+
+  @override
+  String get masterLockInactiveSubtitle => '打开应用时需要密码、PIN或图案';
+
+  @override
+  String get masterLockChooseTitle => '选择应用的锁定方式';
+
+  @override
+  String get masterLockBackupTitle => '添加备用解锁方式';
+
+  @override
+  String get masterLockBackupMessage => '生物识别解锁需要密码、PIN或图案作为备用方式。请选择一种一并设置。';
+
+  @override
+  String get masterCredentialPassword => '密码';
+
+  @override
+  String get masterCredentialPin => 'PIN';
+
+  @override
+  String get masterCredentialPattern => '图案';
+
+  @override
+  String get masterCredentialSet => '已设置';
+
+  @override
+  String get masterCredentialNotSet => '未设置';
+
+  @override
+  String get duressMasterLockRequired => '配置胁迫解锁前，必须在安全设置中启用主锁。';
 }

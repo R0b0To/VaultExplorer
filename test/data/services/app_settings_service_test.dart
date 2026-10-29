@@ -295,6 +295,63 @@ void main() {
     });
   });
 
+  group('AppSettings master lock', () {
+    test('a password, a PIN or a pattern alone is enough to make the lock '
+        'active', () {
+      expect(
+        AppSettings(useMasterPassword: true, masterPasswordHash: 'h')
+            .masterLockActive,
+        isTrue,
+      );
+      expect(
+        AppSettings(useMasterPassword: true, masterPinHash: 'n').masterLockActive,
+        isTrue,
+      );
+      expect(
+        AppSettings(useMasterPassword: true, masterPatternHash: 'p')
+            .masterLockActive,
+        isTrue,
+      );
+    });
+
+    test('the flag without any credential, or a credential without the '
+        'flag, is no lock', () {
+      expect(AppSettings(useMasterPassword: true).masterLockActive, isFalse);
+      expect(AppSettings(masterPinHash: 'n').masterLockActive, isFalse);
+    });
+
+    test('configuredMasterCredentials lists what is set in gate order, and '
+        'masterFallbackFor skips the credential being shown', () {
+      final s = AppSettings(masterPatternHash: 'p', masterPasswordHash: 'h');
+
+      expect(s.configuredMasterCredentials, [
+        MasterUnlockMethod.password,
+        MasterUnlockMethod.pattern,
+      ]);
+      expect(s.masterFallbackFor(MasterUnlockMethod.password),
+          MasterUnlockMethod.pattern);
+      expect(s.masterFallbackFor(MasterUnlockMethod.pattern),
+          MasterUnlockMethod.password);
+      // Biometrics are not a credential, so the first one that is set is the
+      // way back from them.
+      expect(s.masterFallbackFor(MasterUnlockMethod.biometrics),
+          MasterUnlockMethod.password);
+      expect(
+        AppSettings(masterPinHash: 'n').masterFallbackFor(MasterUnlockMethod.pin),
+        isNull,
+      );
+    });
+
+    test('biometrics are never a credential in their own right', () {
+      final s = AppSettings(masterPinHash: 'n');
+
+      expect(MasterUnlockMethod.biometrics.isCredential, isFalse);
+      expect(s.hasMasterCredentialFor(MasterUnlockMethod.biometrics), isFalse);
+      expect(s.hasMasterCredentialFor(MasterUnlockMethod.pin), isTrue);
+      expect(s.hasMasterCredentialFor(MasterUnlockMethod.pattern), isFalse);
+    });
+  });
+
   group('AppSettings.copyWith', () {
     test('with no arguments, every field is unchanged', () {
       final original = AppSettings(

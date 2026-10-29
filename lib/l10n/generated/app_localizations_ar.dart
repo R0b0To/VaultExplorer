@@ -12732,4 +12732,40 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get floatingPlayerExpandTooltip => 'توسيع';
+
+  @override
+  String get masterLockTitle => 'القفل الرئيسي';
+
+  @override
+  String get masterLockInactiveSubtitle =>
+      'طلب كلمة مرور أو رمز PIN أو نمط لفتح التطبيق';
+
+  @override
+  String get masterLockChooseTitle => 'اختر طريقة قفل التطبيق';
+
+  @override
+  String get masterLockBackupTitle => 'أضف طريقة فتح احتياطية';
+
+  @override
+  String get masterLockBackupMessage =>
+      'يحتاج الفتح بالبصمة الحيوية إلى كلمة مرور أو رمز PIN أو نمط كخيار احتياطي. اختر واحدًا لإعداده أيضًا.';
+
+  @override
+  String get masterCredentialPassword => 'كلمة المرور';
+
+  @override
+  String get masterCredentialPin => 'PIN';
+
+  @override
+  String get masterCredentialPattern => 'النمط';
+
+  @override
+  String get masterCredentialSet => 'تم التعيين';
+
+  @override
+  String get masterCredentialNotSet => 'غير معيّن';
+
+  @override
+  String get duressMasterLockRequired =>
+      'يجب تمكين القفل الرئيسي في أمان التطبيق قبل تكوين فتح الإكراه.';
 }

@@ -3511,5 +3511,16 @@
   "cameraPauseFailedMessage": "Не вдалося призупинити або відновити запис",
   "floatingPlayerTitle": "Плаваючий відеоплеєр",
   "floatingPlayerSubtitle": "Якщо закрити плеєр під час відтворення відео, воно продовжиться в невеликому вікні, яке можна переміщувати. Після виходу із застосунку воно перейде в режим «картинка в картинці» з кнопкою «Лише аудіо»",
-  "floatingPlayerExpandTooltip": "Розгорнути"
+  "floatingPlayerExpandTooltip": "Розгорнути",
+  "masterLockTitle": "Головне блокування",
+  "masterLockInactiveSubtitle": "Вимагати пароль, PIN-код або графічний ключ для відкриття програми",
+  "masterLockChooseTitle": "Виберіть, як блокувати програму",
+  "masterLockBackupTitle": "Додайте резервний спосіб розблокування",
+  "masterLockBackupMessage": "Біометричне розблокування потребує пароля, PIN-коду або графічного ключа як запасного варіанту. Виберіть, що налаштувати додатково.",
+  "masterCredentialPassword": "Пароль",
+  "masterCredentialPin": "PIN-код",
+  "masterCredentialPattern": "Графічний ключ",
+  "masterCredentialSet": "Встановлено",
+  "masterCredentialNotSet": "Не встановлено",
+  "duressMasterLockRequired": "Перед налаштуванням розблокування під примусом необхідно увімкнути головне блокування у розділі безпеки."
 }

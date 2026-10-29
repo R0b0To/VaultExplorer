@@ -40,7 +40,18 @@ class LockGateState {
   final DateTime? lockedUntil;
 
   final int navigateTick;
+
+  /// True once the gate has moved off the active method to another way in
+  /// (biometrics failed, or the person tapped "use X instead"). Which one is
+  /// [fallbackCredential]; when that is null the screen picks the first
+  /// other credential that is set.
   final bool showPasswordFallback;
+  final MasterUnlockMethod? fallbackCredential;
+
+  /// True when a duress password is set. The gate then keeps password entry
+  /// reachable even if no master password exists (a PIN- or pattern-only
+  /// lock), so the duress password can still be typed.
+  final bool duressPasswordEntry;
 
   final bool patternError;
   final int patternResetKey;
@@ -63,6 +74,8 @@ class LockGateState {
     this.lockedUntil,
     this.navigateTick = 0,
     this.showPasswordFallback = false,
+    this.fallbackCredential,
+    this.duressPasswordEntry = false,
     this.patternError = false,
     this.patternResetKey = 0,
     this.pinError = false,
@@ -107,6 +120,9 @@ class LockGate extends _$LockGate {
     bool clearLockedUntil = false,
     int? navigateTick,
     bool? showPasswordFallback,
+    MasterUnlockMethod? fallbackCredential,
+    bool clearFallbackCredential = false,
+    bool? duressPasswordEntry,
     bool? patternError,
     int? patternResetKey,
     bool? pinError,
@@ -122,6 +138,10 @@ class LockGate extends _$LockGate {
     lockedUntil: clearLockedUntil ? null : (lockedUntil ?? state.lockedUntil),
     navigateTick: navigateTick ?? state.navigateTick,
     showPasswordFallback: showPasswordFallback ?? state.showPasswordFallback,
+    fallbackCredential: clearFallbackCredential
+        ? null
+        : (fallbackCredential ?? state.fallbackCredential),
+    duressPasswordEntry: duressPasswordEntry ?? state.duressPasswordEntry,
     patternError: patternError ?? state.patternError,
     patternResetKey: patternResetKey ?? state.patternResetKey,
     pinError: pinError ?? state.pinError,
@@ -135,8 +155,18 @@ class LockGate extends _$LockGate {
     state = _copy(navigateTick: state.navigateTick + 1);
   }
 
-  void setShowPasswordFallback(bool show) =>
-      state = _copy(showPasswordFallback: show);
+  /// Moves the gate off (or, with false, back onto) its active method. When
+  /// moving off, the screen shows the first other credential that is set.
+  void setShowPasswordFallback(bool show) => state = _copy(
+    showPasswordFallback: show,
+    clearFallbackCredential: !show || state.fallbackCredential == null,
+  );
+
+  /// Shows a specific credential's unlock UI instead of the active method's.
+  void showCredential(MasterUnlockMethod method) => state = _copy(
+    showPasswordFallback: true,
+    fallbackCredential: method,
+  );
 
   Future<void> _loadPersistedLockoutState() async {
     DateTime? lockedUntil;
@@ -177,9 +207,10 @@ class LockGate extends _$LockGate {
       _requestNavigateToDashboard();
       return;
     }
-    if (s.masterPasswordHash == null) {
-      // Defensive fallback: useMasterPassword is true but masterPasswordHash was purged.
-      // Reset useMasterPassword to false and proceed.
+    if (!s.hasMasterCredential) {
+      // Defensive fallback: useMasterPassword is true but every credential
+      // (password, PIN and pattern) was purged. Reset useMasterPassword to
+      // false and proceed.
       final reset = s.copyWith(useMasterPassword: false);
       await ref.read(appSettingsServiceProvider).saveSettings(reset);
       if (!ref.mounted) return;
@@ -210,11 +241,21 @@ class LockGate extends _$LockGate {
           passwordFallback = true;
       }
     }
+    var duressPasswordEntry = false;
+    try {
+      duressPasswordEntry =
+          (await ref.read(duressSettingsServiceProvider).getConfig())
+              .hasPassword;
+    } catch (e) {
+      VeLog.e(_kLogTag, 'Failed to read the duress configuration', e);
+    }
+    if (!ref.mounted) return;
     state = _copy(
       settings: gateSettings,
       loading: false,
       biometricsChanged: biometricsChanged,
       showPasswordFallback: passwordFallback ? true : null,
+      duressPasswordEntry: duressPasswordEntry,
     );
   }
 

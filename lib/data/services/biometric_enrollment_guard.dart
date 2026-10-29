@@ -19,11 +19,11 @@ enum BiometricGuardResult {
 
   /// They changed (a biometric was enrolled, or all were removed), or biometric
   /// unlock was never set up on this device. Biometric unlock has just been
-  /// switched off and the password is required. The caller must stop the
-  /// biometric flow, show the password UI and say why.
+  /// switched off and a password, PIN or pattern is required. The caller must
+  /// stop the biometric flow, show that credential's UI and say why.
   reverted,
 
-  /// The Keystore could not say. Refuse this attempt and offer the password,
+  /// The Keystore could not say. Refuse this attempt and offer the fallback credential,
   /// but nothing was switched off: this is not evidence of a change.
   unavailable,
 }
@@ -40,7 +40,7 @@ enum BiometricGuardResult {
 /// invalidates it on enrollment, and this class reacts by turning biometric
 /// unlock off for what it guarded.
 ///
-///  - the master lock goes back to the master password;
+///  - the master lock goes back to its password, PIN or pattern;
 ///  - a vault goes back to a manual password, dropping its saved credentials.
 ///
 /// Fails closed: a sentinel that is missing counts the same as an invalidated
@@ -72,23 +72,28 @@ class BiometricEnrollmentGuard {
 
   /// Checks the master lock's biometric unlock before it is offered or
   /// accepted. On [BiometricGuardResult.reverted] the persisted settings
-  /// already use the master password.
+  /// already use a stored credential.
   Future<BiometricGuardResult> checkMaster() async {
     final status = await _crypto.biometricKeyStatus(kMasterBiometricKeyId);
     if (status == BiometricKeyStatus.valid) return BiometricGuardResult.ok;
     if (!status.requiresRevert) return BiometricGuardResult.unavailable;
-    VeLog.w(_kLogTag, 'Master biometrics changed ($status); using the password');
+    VeLog.w(_kLogTag, 'Master biometrics changed ($status); using the fallback credential');
     await revertMaster();
     return BiometricGuardResult.reverted;
   }
 
-  /// Switches the master lock to the master password and drops its sentinel.
-  /// The master password itself is untouched -- it is what the gate falls back
+  /// Switches the master lock to the credential behind biometrics (the first
+  /// of password, PIN and pattern that is set) and drops its sentinel. The
+  /// credentials themselves are untouched -- they are what the gate falls back
   /// to. Does nothing if biometrics are not the current method.
   Future<void> revertMaster() async {
     await _settings.updateSettings(
       (s) => s.masterUnlockMethod == MasterUnlockMethod.biometrics
-          ? s.copyWith(masterUnlockMethod: MasterUnlockMethod.password)
+          ? s.copyWith(
+              masterUnlockMethod:
+                  s.configuredMasterCredentials.firstOrNull ??
+                  MasterUnlockMethod.password,
+            )
           : s,
     );
     await _delete(kMasterBiometricKeyId);

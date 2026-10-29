@@ -12002,4 +12002,39 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get floatingPlayerExpandTooltip => '拡大';
+
+  @override
+  String get masterLockTitle => 'マスターロック';
+
+  @override
+  String get masterLockInactiveSubtitle => 'アプリを開く際にパスワード、PIN、またはパターンを要求する';
+
+  @override
+  String get masterLockChooseTitle => 'アプリのロック方法を選択';
+
+  @override
+  String get masterLockBackupTitle => 'バックアップ用のロック解除を追加';
+
+  @override
+  String get masterLockBackupMessage =>
+      '生体認証によるロック解除には、代替手段としてパスワード、PIN、またはパターンが必要です。あわせて設定するものを選んでください。';
+
+  @override
+  String get masterCredentialPassword => 'パスワード';
+
+  @override
+  String get masterCredentialPin => 'PIN';
+
+  @override
+  String get masterCredentialPattern => 'パターン';
+
+  @override
+  String get masterCredentialSet => '設定済み';
+
+  @override
+  String get masterCredentialNotSet => '未設定';
+
+  @override
+  String get duressMasterLockRequired =>
+      '強要解除を設定する前に、セキュリティでマスターロックを有効にする必要があります。';
 }

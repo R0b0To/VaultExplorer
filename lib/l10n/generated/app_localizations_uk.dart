@@ -12791,4 +12791,40 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get floatingPlayerExpandTooltip => 'Розгорнути';
+
+  @override
+  String get masterLockTitle => 'Головне блокування';
+
+  @override
+  String get masterLockInactiveSubtitle =>
+      'Вимагати пароль, PIN-код або графічний ключ для відкриття програми';
+
+  @override
+  String get masterLockChooseTitle => 'Виберіть, як блокувати програму';
+
+  @override
+  String get masterLockBackupTitle => 'Додайте резервний спосіб розблокування';
+
+  @override
+  String get masterLockBackupMessage =>
+      'Біометричне розблокування потребує пароля, PIN-коду або графічного ключа як запасного варіанту. Виберіть, що налаштувати додатково.';
+
+  @override
+  String get masterCredentialPassword => 'Пароль';
+
+  @override
+  String get masterCredentialPin => 'PIN-код';
+
+  @override
+  String get masterCredentialPattern => 'Графічний ключ';
+
+  @override
+  String get masterCredentialSet => 'Встановлено';
+
+  @override
+  String get masterCredentialNotSet => 'Не встановлено';
+
+  @override
+  String get duressMasterLockRequired =>
+      'Перед налаштуванням розблокування під примусом необхідно увімкнути головне блокування у розділі безпеки.';
 }

@@ -12702,4 +12702,40 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get floatingPlayerExpandTooltip => 'Espandi';
+
+  @override
+  String get masterLockTitle => 'Blocco principale';
+
+  @override
+  String get masterLockInactiveSubtitle =>
+      'Richiedi una password, un PIN o uno schema per aprire l\'app';
+
+  @override
+  String get masterLockChooseTitle => 'Scegli come bloccare l\'app';
+
+  @override
+  String get masterLockBackupTitle => 'Aggiungi uno sblocco di riserva';
+
+  @override
+  String get masterLockBackupMessage =>
+      'Lo sblocco biometrico richiede una password, un PIN o uno schema come alternativa. Scegline uno da impostare.';
+
+  @override
+  String get masterCredentialPassword => 'Password';
+
+  @override
+  String get masterCredentialPin => 'PIN';
+
+  @override
+  String get masterCredentialPattern => 'Schema';
+
+  @override
+  String get masterCredentialSet => 'Impostato';
+
+  @override
+  String get masterCredentialNotSet => 'Non impostato';
+
+  @override
+  String get duressMasterLockRequired =>
+      'È necessario attivare un blocco principale in Sicurezza prima di configurare lo sblocco sotto coercizione.';
 }

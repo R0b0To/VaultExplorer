@@ -3511,5 +3511,16 @@
   "cameraPauseFailedMessage": "No se pudo pausar ni reanudar la grabación",
   "floatingPlayerTitle": "Reproductor de vídeo flotante",
   "floatingPlayerSubtitle": "Al cerrar el reproductor, el vídeo sigue en una ventana pequeña que puedes mover. Al salir de la app pasa a imagen en imagen, con un botón de solo audio",
-  "floatingPlayerExpandTooltip": "Ampliar"
+  "floatingPlayerExpandTooltip": "Ampliar",
+  "masterLockTitle": "Bloqueo maestro",
+  "masterLockInactiveSubtitle": "Requiere una contraseña, un PIN o un patrón para abrir la app",
+  "masterLockChooseTitle": "Elige cómo bloquear la app",
+  "masterLockBackupTitle": "Añade un desbloqueo de respaldo",
+  "masterLockBackupMessage": "El desbloqueo biométrico necesita una contraseña, un PIN o un patrón como alternativa. Elige uno para configurarlo también.",
+  "masterCredentialPassword": "Contraseña",
+  "masterCredentialPin": "PIN",
+  "masterCredentialPattern": "Patrón",
+  "masterCredentialSet": "Configurado",
+  "masterCredentialNotSet": "Sin configurar",
+  "duressMasterLockRequired": "Debe haber un bloqueo maestro habilitado en Seguridad antes de configurar el desbloqueo bajo coacción."
 }

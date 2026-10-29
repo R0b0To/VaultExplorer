@@ -3511,5 +3511,16 @@
   "cameraPauseFailedMessage": "Aufnahme konnte nicht pausiert oder fortgesetzt werden",
   "floatingPlayerTitle": "Schwebender Video-Player",
   "floatingPlayerSubtitle": "Beim Schließen des Players läuft das Video in einem kleinen, verschiebbaren Fenster weiter. Beim Verlassen der App wird es zu Bild-in-Bild, mit einer Nur-Audio-Taste",
-  "floatingPlayerExpandTooltip": "Vergrößern"
+  "floatingPlayerExpandTooltip": "Vergrößern",
+  "masterLockTitle": "Hauptsperre",
+  "masterLockInactiveSubtitle": "Ein Passwort, eine PIN oder ein Muster zum Öffnen der App verlangen",
+  "masterLockChooseTitle": "Wähle, wie die App gesperrt wird",
+  "masterLockBackupTitle": "Ersatz-Entsperrung hinzufügen",
+  "masterLockBackupMessage": "Die biometrische Entsperrung braucht ein Passwort, eine PIN oder ein Muster als Rückfallebene. Wähle eines davon, das du zusätzlich einrichtest.",
+  "masterCredentialPassword": "Passwort",
+  "masterCredentialPin": "PIN",
+  "masterCredentialPattern": "Muster",
+  "masterCredentialSet": "Festgelegt",
+  "masterCredentialNotSet": "Nicht festgelegt",
+  "duressMasterLockRequired": "In den App-Sicherheitseinstellungen muss eine Hauptsperre aktiviert sein, um die Nötigungs-Entsperrung zu konfigurieren."
 }

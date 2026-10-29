@@ -12810,4 +12810,41 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get floatingPlayerExpandTooltip => 'Agrandir';
+
+  @override
+  String get masterLockTitle => 'Verrouillage principal';
+
+  @override
+  String get masterLockInactiveSubtitle =>
+      'Exiger un mot de passe, un code PIN ou un schéma pour ouvrir l\'application';
+
+  @override
+  String get masterLockChooseTitle =>
+      'Choisissez comment verrouiller l\'application';
+
+  @override
+  String get masterLockBackupTitle => 'Ajouter un déverrouillage de secours';
+
+  @override
+  String get masterLockBackupMessage =>
+      'Le déverrouillage biométrique nécessite un mot de passe, un code PIN ou un schéma comme solution de repli. Choisissez-en un à configurer également.';
+
+  @override
+  String get masterCredentialPassword => 'Mot de passe';
+
+  @override
+  String get masterCredentialPin => 'PIN';
+
+  @override
+  String get masterCredentialPattern => 'Schéma';
+
+  @override
+  String get masterCredentialSet => 'Défini';
+
+  @override
+  String get masterCredentialNotSet => 'Non défini';
+
+  @override
+  String get duressMasterLockRequired =>
+      'Un verrouillage principal doit être activé dans Sécurité avant de pouvoir configurer la contrainte.';
 }

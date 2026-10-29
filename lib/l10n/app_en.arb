@@ -14340,5 +14340,49 @@
   "floatingPlayerExpandTooltip": "Expand",
   "@floatingPlayerExpandTooltip": {
     "description": "Label of the button on the floating video window that reopens the video full screen"
+  },
+  "masterLockTitle": "Master Lock",
+  "@masterLockTitle": {
+    "description": "Settings section and toggle title for the app-wide lock (password, PIN or pattern)"
+  },
+  "masterLockInactiveSubtitle": "Require a password, PIN, or pattern to open the app",
+  "@masterLockInactiveSubtitle": {
+    "description": "Settings toggle subtitle when the master lock is off"
+  },
+  "masterLockChooseTitle": "Choose how to lock the app",
+  "@masterLockChooseTitle": {
+    "description": "Title of the sheet shown when turning the master lock on"
+  },
+  "masterLockBackupTitle": "Add a backup unlock",
+  "@masterLockBackupTitle": {
+    "description": "Title of the sheet asking for a fallback credential when biometric unlock is chosen"
+  },
+  "masterLockBackupMessage": "Biometric unlock needs a password, PIN, or pattern to fall back on. Choose one to set up as well.",
+  "@masterLockBackupMessage": {
+    "description": "Explanation shown when biometric unlock is chosen without any other credential set"
+  },
+  "masterCredentialPassword": "Password",
+  "@masterCredentialPassword": {
+    "description": "Name of the password credential in the master lock settings"
+  },
+  "masterCredentialPin": "PIN",
+  "@masterCredentialPin": {
+    "description": "Name of the PIN credential in the master lock settings"
+  },
+  "masterCredentialPattern": "Pattern",
+  "@masterCredentialPattern": {
+    "description": "Name of the pattern credential in the master lock settings"
+  },
+  "masterCredentialSet": "Set",
+  "@masterCredentialSet": {
+    "description": "Status of a master lock credential that has been set up"
+  },
+  "masterCredentialNotSet": "Not set",
+  "@masterCredentialNotSet": {
+    "description": "Status of a master lock credential that has not been set up"
+  },
+  "duressMasterLockRequired": "A master lock must be enabled in App Security before configuring duress unlock.",
+  "@duressMasterLockRequired": {
+    "description": "Notice shown when no master lock is set"
   }
 }

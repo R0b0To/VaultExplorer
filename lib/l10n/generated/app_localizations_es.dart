@@ -12731,4 +12731,40 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get floatingPlayerExpandTooltip => 'Ampliar';
+
+  @override
+  String get masterLockTitle => 'Bloqueo maestro';
+
+  @override
+  String get masterLockInactiveSubtitle =>
+      'Requiere una contraseña, un PIN o un patrón para abrir la app';
+
+  @override
+  String get masterLockChooseTitle => 'Elige cómo bloquear la app';
+
+  @override
+  String get masterLockBackupTitle => 'Añade un desbloqueo de respaldo';
+
+  @override
+  String get masterLockBackupMessage =>
+      'El desbloqueo biométrico necesita una contraseña, un PIN o un patrón como alternativa. Elige uno para configurarlo también.';
+
+  @override
+  String get masterCredentialPassword => 'Contraseña';
+
+  @override
+  String get masterCredentialPin => 'PIN';
+
+  @override
+  String get masterCredentialPattern => 'Patrón';
+
+  @override
+  String get masterCredentialSet => 'Configurado';
+
+  @override
+  String get masterCredentialNotSet => 'Sin configurar';
+
+  @override
+  String get duressMasterLockRequired =>
+      'Debe haber un bloqueo maestro habilitado en Seguridad antes de configurar el desbloqueo bajo coacción.';
 }

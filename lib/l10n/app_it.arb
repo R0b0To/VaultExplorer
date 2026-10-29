@@ -3511,5 +3511,16 @@
   "cameraPauseFailedMessage": "Impossibile mettere in pausa o riprendere la registrazione",
   "floatingPlayerTitle": "Lettore video flottante",
   "floatingPlayerSubtitle": "Chiudendo il lettore, il video continua in una piccola finestra che puoi spostare. Uscendo dall’app diventa picture-in-picture, con un pulsante solo audio",
-  "floatingPlayerExpandTooltip": "Espandi"
+  "floatingPlayerExpandTooltip": "Espandi",
+  "masterLockTitle": "Blocco principale",
+  "masterLockInactiveSubtitle": "Richiedi una password, un PIN o uno schema per aprire l'app",
+  "masterLockChooseTitle": "Scegli come bloccare l'app",
+  "masterLockBackupTitle": "Aggiungi uno sblocco di riserva",
+  "masterLockBackupMessage": "Lo sblocco biometrico richiede una password, un PIN o uno schema come alternativa. Scegline uno da impostare.",
+  "masterCredentialPassword": "Password",
+  "masterCredentialPin": "PIN",
+  "masterCredentialPattern": "Schema",
+  "masterCredentialSet": "Impostato",
+  "masterCredentialNotSet": "Non impostato",
+  "duressMasterLockRequired": "È necessario attivare un blocco principale in Sicurezza prima di configurare lo sblocco sotto coercizione."
 }

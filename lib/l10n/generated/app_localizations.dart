@@ -21228,6 +21228,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Expand'**
   String get floatingPlayerExpandTooltip;
+
+  /// Settings section and toggle title for the app-wide lock (password, PIN or pattern)
+  ///
+  /// In en, this message translates to:
+  /// **'Master Lock'**
+  String get masterLockTitle;
+
+  /// Settings toggle subtitle when the master lock is off
+  ///
+  /// In en, this message translates to:
+  /// **'Require a password, PIN, or pattern to open the app'**
+  String get masterLockInactiveSubtitle;
+
+  /// Title of the sheet shown when turning the master lock on
+  ///
+  /// In en, this message translates to:
+  /// **'Choose how to lock the app'**
+  String get masterLockChooseTitle;
+
+  /// Title of the sheet asking for a fallback credential when biometric unlock is chosen
+  ///
+  /// In en, this message translates to:
+  /// **'Add a backup unlock'**
+  String get masterLockBackupTitle;
+
+  /// Explanation shown when biometric unlock is chosen without any other credential set
+  ///
+  /// In en, this message translates to:
+  /// **'Biometric unlock needs a password, PIN, or pattern to fall back on. Choose one to set up as well.'**
+  String get masterLockBackupMessage;
+
+  /// Name of the password credential in the master lock settings
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get masterCredentialPassword;
+
+  /// Name of the PIN credential in the master lock settings
+  ///
+  /// In en, this message translates to:
+  /// **'PIN'**
+  String get masterCredentialPin;
+
+  /// Name of the pattern credential in the master lock settings
+  ///
+  /// In en, this message translates to:
+  /// **'Pattern'**
+  String get masterCredentialPattern;
+
+  /// Status of a master lock credential that has been set up
+  ///
+  /// In en, this message translates to:
+  /// **'Set'**
+  String get masterCredentialSet;
+
+  /// Status of a master lock credential that has not been set up
+  ///
+  /// In en, this message translates to:
+  /// **'Not set'**
+  String get masterCredentialNotSet;
+
+  /// Notice shown when no master lock is set
+  ///
+  /// In en, this message translates to:
+  /// **'A master lock must be enabled in App Security before configuring duress unlock.'**
+  String get duressMasterLockRequired;
 }
 
 class _AppLocalizationsDelegate

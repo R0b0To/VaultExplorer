@@ -3511,5 +3511,16 @@
   "cameraPauseFailedMessage": "録画の一時停止または再開ができませんでした",
   "floatingPlayerTitle": "フローティング動画プレーヤー",
   "floatingPlayerSubtitle": "動画の再生中にプレーヤーを閉じると、移動できる小さなウィンドウで再生を続けます。アプリを離れるとピクチャーインピクチャーに切り替わり、音声のみのボタンが表示されます",
-  "floatingPlayerExpandTooltip": "拡大"
+  "floatingPlayerExpandTooltip": "拡大",
+  "masterLockTitle": "マスターロック",
+  "masterLockInactiveSubtitle": "アプリを開く際にパスワード、PIN、またはパターンを要求する",
+  "masterLockChooseTitle": "アプリのロック方法を選択",
+  "masterLockBackupTitle": "バックアップ用のロック解除を追加",
+  "masterLockBackupMessage": "生体認証によるロック解除には、代替手段としてパスワード、PIN、またはパターンが必要です。あわせて設定するものを選んでください。",
+  "masterCredentialPassword": "パスワード",
+  "masterCredentialPin": "PIN",
+  "masterCredentialPattern": "パターン",
+  "masterCredentialSet": "設定済み",
+  "masterCredentialNotSet": "未設定",
+  "duressMasterLockRequired": "強要解除を設定する前に、セキュリティでマスターロックを有効にする必要があります。"
 }

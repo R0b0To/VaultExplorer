@@ -3511,5 +3511,16 @@
   "cameraPauseFailedMessage": "无法暂停或恢复录制",
   "floatingPlayerTitle": "悬浮视频播放器",
   "floatingPlayerSubtitle": "播放视频时关闭播放器，视频会在可拖动的小窗口中继续播放。离开应用后将进入画中画，并提供仅音频按钮",
-  "floatingPlayerExpandTooltip": "展开"
+  "floatingPlayerExpandTooltip": "展开",
+  "masterLockTitle": "主锁",
+  "masterLockInactiveSubtitle": "打开应用时需要密码、PIN或图案",
+  "masterLockChooseTitle": "选择应用的锁定方式",
+  "masterLockBackupTitle": "添加备用解锁方式",
+  "masterLockBackupMessage": "生物识别解锁需要密码、PIN或图案作为备用方式。请选择一种一并设置。",
+  "masterCredentialPassword": "密码",
+  "masterCredentialPin": "PIN",
+  "masterCredentialPattern": "图案",
+  "masterCredentialSet": "已设置",
+  "masterCredentialNotSet": "未设置",
+  "duressMasterLockRequired": "配置胁迫解锁前，必须在安全设置中启用主锁。"
 }

@@ -44,6 +44,8 @@ CONSTANT_ALLOWLIST = {
     "lib/data/services/thumbnail_cache_service.dart",
     "lib/data/services/password_interchange/authenticator_backup_crypto.dart",
     "lib/main.dart",  # headless scheduled-sync entry-point; no Riverpod container
+    # Desktop: routes the engine channel to the in-process dart:ffi host; the channel name is its routing key.
+    "lib/core/engine/desktop/desktop_engine_binding.dart",
 }
 
 # Files that use the engine channel and so must use ChannelMethods constants.

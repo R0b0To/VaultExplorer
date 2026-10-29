@@ -12373,33 +12373,63 @@ class AppLocalizationsPt extends AppLocalizations {
   String get tabEdgeSwipeLabel => 'Gesto de deslizar entre abas';
 
   @override
-  String get tabEdgeSwipeDrawerAndNewTabLabel =>
-      'Abrir menu lateral / nova aba';
+  String get tabSwipeBetweenTabsTitle => 'Deslizar entre abas';
 
   @override
-  String get tabEdgeSwipeDrawerAndNewTabDesc =>
-      'Deslize para a direita na primeira aba para abrir o menu lateral. Deslize para a esquerda na última aba para abrir uma nova aba.';
+  String get tabSwipeBetweenTabsOnDesc =>
+      'Deslize para o lado em uma pasta para ir à aba seguinte ou anterior.';
 
   @override
-  String get tabEdgeSwipeLoopLabel => 'Percorrer as abas em loop';
+  String get tabSwipeBetweenTabsOffDesc =>
+      'As abas só mudam pela barra de abas. Os dois gestos abaixo passam a funcionar em qualquer lugar da tela.';
 
   @override
-  String get tabEdgeSwipeLoopDesc =>
-      'Deslizar além da última aba leva à primeira, e além da primeira leva à última. Abra o menu lateral pela borda esquerda da tela ou pelo botão de menu.';
+  String get tabSwipeRightOnFirstTab =>
+      'Deslizar para a direita na primeira aba';
 
   @override
-  String get tabEdgeSwipeNoEdgeActionsLabel => 'Nenhuma ação nas extremidades';
+  String get tabSwipeRightAnywhere =>
+      'Deslizar para a direita em qualquer lugar';
 
   @override
-  String get tabEdgeSwipeNoEdgeActionsDesc =>
-      'Deslizar além da primeira ou da última aba não faz nada. Abra o menu lateral pela borda esquerda da tela ou pelo botão de menu, e novas abas pela barra de abas.';
+  String get tabSwipeLeftOnLastTab => 'Deslizar para a esquerda na última aba';
 
   @override
-  String get tabEdgeSwipeNoTabSwipingLabel => 'Não deslizar entre abas';
+  String get tabSwipeLeftAnywhere =>
+      'Deslizar para a esquerda em qualquer lugar';
 
   @override
-  String get tabEdgeSwipeNoTabSwipingDesc =>
-      'Troque de aba somente pela barra de abas. Deslize para a direita em qualquer lugar para abrir o menu lateral e para a esquerda para abrir uma nova aba, como se cada aba fosse a primeira.';
+  String get tabSwipeActionNewTab => 'Abrir uma nova aba';
+
+  @override
+  String get tabSwipeActionOpenDrawer => 'Abrir o menu lateral';
+
+  @override
+  String get tabSwipeActionLoopFirst => 'Voltar em loop à primeira aba';
+
+  @override
+  String get tabSwipeActionLoopLast => 'Ir em loop à última aba';
+
+  @override
+  String get tabSwipeActionNothing => 'Não fazer nada';
+
+  @override
+  String get tabSwipeRightNothingDesc =>
+      'O menu lateral continua abrindo pela borda esquerda da tela e pelo botão de menu.';
+
+  @override
+  String get tabSwipeRightLoopDesc =>
+      'O menu lateral abre pela borda esquerda da tela ou pelo botão de menu. Com uma única aba, este gesto o abre no lugar.';
+
+  @override
+  String get tabSwipeNewTabsFromStripDesc =>
+      'Novas abas continuam abrindo pela barra de abas.';
+
+  @override
+  String get tabSwipePreviewFirstTab => 'Primeira aba';
+
+  @override
+  String get tabSwipePreviewLastTab => 'Última aba';
 
   @override
   String get appBarAtBottomLabel => 'Mostrar barra superior embaixo';

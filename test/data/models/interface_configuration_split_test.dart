@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/data/models/audio_recording_quality.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
-import 'package:vaultexplorer/data/models/browser_tab_edge_swipe.dart';
+import 'package:vaultexplorer/data/models/tab_swipe_gestures.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
 import 'package:vaultexplorer/data/models/file_item_action.dart';
 import 'package:vaultexplorer/data/models/file_manager_skin.dart';
@@ -85,7 +85,10 @@ AppSettings _customSettings() => AppSettings(
   enableAuthenticator: false,
   useBrowserTabs: false,
   useDualPaneBrowsing: true,
-  tabEdgeSwipe: BrowserTabEdgeSwipe.loop,
+  tabSwipeGestures: TabSwipeGestures(
+    leftSwipe: TabLeftSwipeAction.loopToFirst,
+    rightSwipe: TabRightSwipeAction.loopToLast,
+  ),
   // interface
   themeMode: ThemeMode.dark,
   useDynamicColor: true,

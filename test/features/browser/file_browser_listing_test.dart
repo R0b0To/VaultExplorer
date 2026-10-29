@@ -264,4 +264,55 @@ void main() {
       );
     });
   });
+
+  group('pinned ordering over a larger listing', () {
+    test('matches compareBrowserEntries applied to every pair', () {
+      final items = [
+        for (var i = 0; i < 40; i++)
+          if (i % 7 == 0) _dir('dir$i') else _file('file${(i * 13) % 40}.txt'),
+      ];
+      final pinned = {'file13.txt', 'dir7', 'docs/file26.txt', 'missing.txt'};
+      for (final dirPath in ['', 'docs']) {
+        final listing = buildBrowserListing(
+          _inputs(items, currentDirPath: dirPath, pinnedPaths: pinned),
+        );
+        final expected = [...items]
+          ..sort(
+            (a, b) => compareBrowserEntries(
+              a,
+              b,
+              currentDirPath: dirPath,
+              pinnedPaths: pinned,
+              sortBy: SortBy.name,
+              sortAscending: true,
+            ),
+          );
+        expect(
+          _names(listing),
+          expected.map((e) => e.name).toList(),
+          reason: 'dirPath="$dirPath"',
+        );
+      }
+    });
+  });
+
+  group('deep-search results', () {
+    test('sort the same whether or not the entries carry a cached name', () {
+      const names = ['Sub/B.txt', 'sub/a.txt', 'Sub/a10.txt', 'sub/a2.txt'];
+      List<String> sorted(List<RawEntry> results) => _names(
+        buildBrowserListing(
+          _inputs(
+            const [],
+            searchActive: true,
+            deepSearch: true,
+            query: 'sub',
+            deepSearchResults: results,
+          ),
+        ),
+      );
+      final plain = [for (final n in names) _file(n)];
+      final cached = [for (final n in names) _file(n).withName(n)];
+      expect(sorted(cached), sorted(plain));
+    });
+  });
 }

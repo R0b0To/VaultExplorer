@@ -11509,32 +11509,56 @@ class AppLocalizationsZh extends AppLocalizations {
   String get tabEdgeSwipeLabel => '标签页滑动手势';
 
   @override
-  String get tabEdgeSwipeDrawerAndNewTabLabel => '打开侧边菜单 / 新建标签页';
+  String get tabSwipeBetweenTabsTitle => '在标签页之间滑动';
 
   @override
-  String get tabEdgeSwipeDrawerAndNewTabDesc =>
-      '在第一个标签页向右滑动可打开侧边菜单，在最后一个标签页向左滑动可新建标签页。';
+  String get tabSwipeBetweenTabsOnDesc => '在文件夹上左右滑动，可切换到下一个或上一个标签页。';
 
   @override
-  String get tabEdgeSwipeLoopLabel => '循环切换标签页';
+  String get tabSwipeBetweenTabsOffDesc => '只能从标签栏切换标签页。下面两种滑动手势将在屏幕任意位置生效。';
 
   @override
-  String get tabEdgeSwipeLoopDesc =>
-      '滑过最后一个标签页会回到第一个，滑过第一个则跳到最后一个。可从屏幕左边缘或菜单按钮打开侧边菜单。';
+  String get tabSwipeRightOnFirstTab => '在第一个标签页向右滑动';
 
   @override
-  String get tabEdgeSwipeNoEdgeActionsLabel => '两端不执行操作';
+  String get tabSwipeRightAnywhere => '在任意位置向右滑动';
 
   @override
-  String get tabEdgeSwipeNoEdgeActionsDesc =>
-      '滑过第一个或最后一个标签页不会有任何反应。可从屏幕左边缘或菜单按钮打开侧边菜单，从标签栏新建标签页。';
+  String get tabSwipeLeftOnLastTab => '在最后一个标签页向左滑动';
 
   @override
-  String get tabEdgeSwipeNoTabSwipingLabel => '不通过滑动切换标签页';
+  String get tabSwipeLeftAnywhere => '在任意位置向左滑动';
 
   @override
-  String get tabEdgeSwipeNoTabSwipingDesc =>
-      '只能从标签栏切换标签页。在任意位置向右滑动可打开侧边菜单，向左滑动可新建标签页，就像每个标签页都是第一个一样。';
+  String get tabSwipeActionNewTab => '新建标签页';
+
+  @override
+  String get tabSwipeActionOpenDrawer => '打开侧边菜单';
+
+  @override
+  String get tabSwipeActionLoopFirst => '循环到第一个标签页';
+
+  @override
+  String get tabSwipeActionLoopLast => '循环到最后一个标签页';
+
+  @override
+  String get tabSwipeActionNothing => '不执行任何操作';
+
+  @override
+  String get tabSwipeRightNothingDesc => '仍可从屏幕左边缘或菜单按钮打开侧边菜单。';
+
+  @override
+  String get tabSwipeRightLoopDesc =>
+      '可从屏幕左边缘或菜单按钮打开侧边菜单。只有一个标签页时，该滑动会直接打开侧边菜单。';
+
+  @override
+  String get tabSwipeNewTabsFromStripDesc => '仍可从标签栏新建标签页。';
+
+  @override
+  String get tabSwipePreviewFirstTab => '第一个标签页';
+
+  @override
+  String get tabSwipePreviewLastTab => '最后一个标签页';
 
   @override
   String get appBarAtBottomLabel => '将应用栏显示在底部';

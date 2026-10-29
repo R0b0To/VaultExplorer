@@ -128,4 +128,69 @@ void main() {
       });
     });
   });
+
+  group('isHiddenEntryName', () {
+    test('dot-files are hidden', () {
+      expect(isHiddenEntryName('.nomedia'), isTrue);
+      expect(isHiddenEntryName('.'), isTrue);
+    });
+
+    test('ordinary names are not hidden', () {
+      for (final name in ['', 'photo.jpg', 'Documents', 'readme', 'a.b.c']) {
+        expect(isHiddenEntryName(name), isFalse, reason: name);
+      }
+    });
+
+    test('known system folders are hidden whatever their case', () {
+      for (final name in [
+        'lost+found',
+        'Lost+Found',
+        'LOST.DIR',
+        'System Volume Information',
+        r'$RECYCLE.BIN',
+        r'$Recycle.Bin',
+        'Recycled',
+        'RECYCLER',
+      ]) {
+        expect(isHiddenEntryName(name), isTrue, reason: name);
+      }
+    });
+
+    test('lookalikes of the system names are not hidden', () {
+      for (final name in [
+        'lost',
+        'lost+found2',
+        'recycle',
+        'recycler.bak',
+        'system volume',
+        'foundation',
+        'Fonts',
+        'Songs',
+      ]) {
+        expect(isHiddenEntryName(name), isFalse, reason: name);
+      }
+    });
+
+    test('chkdsk found.NNN folders are hidden, but only with ASCII digits', () {
+      for (final name in ['found.0', 'FOUND.12', 'Found.007']) {
+        expect(isHiddenEntryName(name), isTrue, reason: name);
+      }
+      for (final name in [
+        'found.',
+        'found',
+        'found.1a',
+        'found.1.2',
+        'xfound.1',
+        'found.\u0663', // Arabic-Indic digit three
+      ]) {
+        expect(isHiddenEntryName(name), isFalse, reason: name);
+      }
+    });
+
+    test('a path is hidden when any segment is', () {
+      expect(isHiddenEntryName('photos/.thumbs/a.jpg'), isTrue);
+      expect(isHiddenEntryName('photos/lost+found/a.jpg'), isTrue);
+      expect(isHiddenEntryName('photos/2026/a.jpg'), isFalse);
+    });
+  });
 }

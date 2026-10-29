@@ -12190,32 +12190,60 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tabEdgeSwipeLabel => 'Tab swipe gesture';
 
   @override
-  String get tabEdgeSwipeDrawerAndNewTabLabel => 'Open side menu / new tab';
+  String get tabSwipeBetweenTabsTitle => 'Swipe between tabs';
 
   @override
-  String get tabEdgeSwipeDrawerAndNewTabDesc =>
-      'Swipe right on the first tab to open the side menu. Swipe left on the last tab to open a new tab.';
+  String get tabSwipeBetweenTabsOnDesc =>
+      'Swipe sideways on a folder to move to the next or previous tab.';
 
   @override
-  String get tabEdgeSwipeLoopLabel => 'Loop through tabs';
+  String get tabSwipeBetweenTabsOffDesc =>
+      'Tabs only change from the tab strip. The two gestures below then work anywhere on the screen.';
 
   @override
-  String get tabEdgeSwipeLoopDesc =>
-      'Swiping past the last tab goes to the first, and swiping past the first goes to the last. Open the side menu from the left screen edge or the menu button.';
+  String get tabSwipeRightOnFirstTab => 'Swipe right on the first tab';
 
   @override
-  String get tabEdgeSwipeNoEdgeActionsLabel => 'No action at the ends';
+  String get tabSwipeRightAnywhere => 'Swipe right anywhere';
 
   @override
-  String get tabEdgeSwipeNoEdgeActionsDesc =>
-      'Swiping past the first or last tab does nothing. Open the side menu from the left screen edge or the menu button, and new tabs from the tab strip.';
+  String get tabSwipeLeftOnLastTab => 'Swipe left on the last tab';
 
   @override
-  String get tabEdgeSwipeNoTabSwipingLabel => 'Don’t swipe between tabs';
+  String get tabSwipeLeftAnywhere => 'Swipe left anywhere';
 
   @override
-  String get tabEdgeSwipeNoTabSwipingDesc =>
-      'Switch tabs from the tab strip only. Swipe right anywhere to open the side menu and left anywhere to open a new tab, as if every tab were the first.';
+  String get tabSwipeActionNewTab => 'Open a new tab';
+
+  @override
+  String get tabSwipeActionOpenDrawer => 'Open the side menu';
+
+  @override
+  String get tabSwipeActionLoopFirst => 'Loop to the first tab';
+
+  @override
+  String get tabSwipeActionLoopLast => 'Loop to the last tab';
+
+  @override
+  String get tabSwipeActionNothing => 'Do nothing';
+
+  @override
+  String get tabSwipeRightNothingDesc =>
+      'The side menu still opens from the left screen edge and the menu button.';
+
+  @override
+  String get tabSwipeRightLoopDesc =>
+      'The side menu opens from the left screen edge or the menu button. With a single tab, this swipe opens it instead.';
+
+  @override
+  String get tabSwipeNewTabsFromStripDesc =>
+      'New tabs still open from the tab strip.';
+
+  @override
+  String get tabSwipePreviewFirstTab => 'First tab';
+
+  @override
+  String get tabSwipePreviewLastTab => 'Last tab';
 
   @override
   String get appBarAtBottomLabel => 'Show app bar at bottom';

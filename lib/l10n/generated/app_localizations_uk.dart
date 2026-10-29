@@ -12467,33 +12467,60 @@ class AppLocalizationsUk extends AppLocalizations {
   String get tabEdgeSwipeLabel => 'Жест свайпу між вкладками';
 
   @override
-  String get tabEdgeSwipeDrawerAndNewTabLabel =>
-      'Відкрити бічне меню / нову вкладку';
+  String get tabSwipeBetweenTabsTitle => 'Свайп між вкладками';
 
   @override
-  String get tabEdgeSwipeDrawerAndNewTabDesc =>
-      'Проведіть праворуч на першій вкладці, щоб відкрити бічне меню. Проведіть ліворуч на останній вкладці, щоб відкрити нову вкладку.';
+  String get tabSwipeBetweenTabsOnDesc =>
+      'Проведіть убік по папці, щоб перейти до наступної або попередньої вкладки.';
 
   @override
-  String get tabEdgeSwipeLoopLabel => 'Перемикати вкладки по колу';
+  String get tabSwipeBetweenTabsOffDesc =>
+      'Вкладки перемикаються лише зі смуги вкладок. Два жести нижче тоді працюють будь-де на екрані.';
 
   @override
-  String get tabEdgeSwipeLoopDesc =>
-      'Свайп за межі останньої вкладки веде до першої, а за межі першої — до останньої. Бічне меню відкривається від лівого краю екрана або кнопкою меню.';
+  String get tabSwipeRightOnFirstTab => 'Свайп праворуч на першій вкладці';
 
   @override
-  String get tabEdgeSwipeNoEdgeActionsLabel => 'Без дій на краях';
+  String get tabSwipeRightAnywhere => 'Свайп праворуч будь-де';
 
   @override
-  String get tabEdgeSwipeNoEdgeActionsDesc =>
-      'Свайп за межі першої або останньої вкладки нічого не робить. Бічне меню відкривається від лівого краю екрана або кнопкою меню, а нові вкладки — зі смуги вкладок.';
+  String get tabSwipeLeftOnLastTab => 'Свайп ліворуч на останній вкладці';
 
   @override
-  String get tabEdgeSwipeNoTabSwipingLabel => 'Не перемикати вкладки свайпом';
+  String get tabSwipeLeftAnywhere => 'Свайп ліворуч будь-де';
 
   @override
-  String get tabEdgeSwipeNoTabSwipingDesc =>
-      'Перемикайте вкладки лише зі смуги вкладок. Проведіть праворуч будь-де, щоб відкрити бічне меню, і ліворуч будь-де, щоб відкрити нову вкладку, ніби кожна вкладка перша.';
+  String get tabSwipeActionNewTab => 'Відкрити нову вкладку';
+
+  @override
+  String get tabSwipeActionOpenDrawer => 'Відкрити бічне меню';
+
+  @override
+  String get tabSwipeActionLoopFirst => 'По колу до першої вкладки';
+
+  @override
+  String get tabSwipeActionLoopLast => 'По колу до останньої вкладки';
+
+  @override
+  String get tabSwipeActionNothing => 'Нічого не робити';
+
+  @override
+  String get tabSwipeRightNothingDesc =>
+      'Бічне меню, як і раніше, відкривається від лівого краю екрана та кнопкою меню.';
+
+  @override
+  String get tabSwipeRightLoopDesc =>
+      'Бічне меню відкривається від лівого краю екрана або кнопкою меню. Якщо вкладка одна, цей свайп відкриває його.';
+
+  @override
+  String get tabSwipeNewTabsFromStripDesc =>
+      'Нові вкладки, як і раніше, відкриваються зі смуги вкладок.';
+
+  @override
+  String get tabSwipePreviewFirstTab => 'Перша вкладка';
+
+  @override
+  String get tabSwipePreviewLastTab => 'Остання вкладка';
 
   @override
   String get appBarAtBottomLabel => 'Показувати панель унизу';

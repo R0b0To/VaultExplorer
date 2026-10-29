@@ -1639,6 +1639,7 @@
   "rememberPerFolderLayoutDesc": "单独保存每个文件夹的视图布局（列表、网格、瀑布流）和排序方式",
   "defaultFolderLayoutLabel": "默认文件夹布局",
   "fileInfoAction": "信息",
+  "goToLocationAction": "转到所在位置",
   "automationSectionHeader": "自动化",
   "automationTileTitle": "自动化",
   "automationTileSubtitle": "允许自动化解锁、锁定、导入或导出此保险库的文件",

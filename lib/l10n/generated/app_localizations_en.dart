@@ -6060,6 +6060,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fileInfoAction => 'Info';
 
   @override
+  String get goToLocationAction => 'Go to location';
+
+  @override
   String get automationSectionHeader => 'Automation';
 
   @override

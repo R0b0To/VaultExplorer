@@ -6201,6 +6201,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get fileInfoAction => 'Infos';
 
   @override
+  String get goToLocationAction => 'Aller à l\'emplacement';
+
+  @override
   String get automationSectionHeader => 'Automatisation';
 
   @override

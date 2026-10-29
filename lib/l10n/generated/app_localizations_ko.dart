@@ -5843,6 +5843,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get fileInfoAction => '정보';
 
   @override
+  String get goToLocationAction => '위치로 이동';
+
+  @override
   String get automationSectionHeader => '자동화';
 
   @override

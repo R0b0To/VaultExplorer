@@ -1639,6 +1639,7 @@
   "rememberPerFolderLayoutDesc": "Salva separatamente il layout di visualizzazione (elenco, griglia, mosaico) e l'ordine di ciascuna cartella",
   "defaultFolderLayoutLabel": "Layout predefinito delle cartelle",
   "fileInfoAction": "Info",
+  "goToLocationAction": "Vai alla posizione",
   "automationSectionHeader": "Automazione",
   "automationTileTitle": "Automazione",
   "automationTileSubtitle": "Consenti all'automazione di sbloccare, bloccare, importare o esportare file da questo vault",

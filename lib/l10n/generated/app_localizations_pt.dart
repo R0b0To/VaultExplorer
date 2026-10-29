@@ -6162,6 +6162,9 @@ class AppLocalizationsPt extends AppLocalizations {
   String get fileInfoAction => 'Info';
 
   @override
+  String get goToLocationAction => 'Ir para o local';
+
+  @override
   String get automationSectionHeader => 'Automação';
 
   @override

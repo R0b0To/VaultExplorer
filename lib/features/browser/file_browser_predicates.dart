@@ -45,6 +45,18 @@ String joinPath(String name, String currentDirPath) =>
 String fullPathOf(RawEntry entry, String currentDirPath) =>
     joinPath(entry.name, currentDirPath);
 
+/// Splits [fullPath] (`a/b/c.txt`) into the folder it lives in (`a/b`, or ''
+/// for the vault root) and its last segment (`c.txt`).
+({String parent, String name}) splitParentAndName(String fullPath) {
+  final slash = fullPath.lastIndexOf('/');
+  return slash == -1
+      ? (parent: '', name: fullPath)
+      : (
+          parent: fullPath.substring(0, slash),
+          name: fullPath.substring(slash + 1),
+        );
+}
+
 bool isFolderMounted(
   RawEntry entry,
   String currentDirPath,

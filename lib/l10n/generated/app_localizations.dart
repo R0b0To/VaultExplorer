@@ -10047,6 +10047,12 @@ abstract class AppLocalizations {
   /// **'Info'**
   String get fileInfoAction;
 
+  /// Menu item label, shown for an item opened from search results, that leaves the search and shows the item in the folder it lives in
+  ///
+  /// In en, this message translates to:
+  /// **'Go to location'**
+  String get goToLocationAction;
+
   /// Header for the automation settings section in the vault configuration screen
   ///
   /// In en, this message translates to:

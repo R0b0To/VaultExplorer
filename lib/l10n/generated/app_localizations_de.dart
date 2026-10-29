@@ -6152,6 +6152,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get fileInfoAction => 'Info';
 
   @override
+  String get goToLocationAction => 'Zum Speicherort gehen';
+
+  @override
   String get automationSectionHeader => 'Automatisierung';
 
   @override

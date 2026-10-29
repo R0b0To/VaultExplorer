@@ -1639,6 +1639,7 @@
   "rememberPerFolderLayoutDesc": "Salvar o layout de visualização (lista, grade, mosaico) e a ordem de classificação de cada pasta separadamente",
   "defaultFolderLayoutLabel": "Layout padrão da pasta",
   "fileInfoAction": "Info",
+  "goToLocationAction": "Ir para o local",
   "automationSectionHeader": "Automação",
   "automationTileTitle": "Automação",
   "automationTileSubtitle": "Permitir que a automação desbloqueie, bloqueie, importe ou exporte arquivos deste cofre",

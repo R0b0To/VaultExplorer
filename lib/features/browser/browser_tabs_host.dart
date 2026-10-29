@@ -246,6 +246,15 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   /// Whether a left swipe anywhere offers a new tab (tab swiping off, left
   /// swipe set to open a new tab). Kept up to date by the build.
   bool _newTabSwipeAnywhere = false;
+
+  /// The pane the current new-tab swipe started in (null: single layout).
+  TabPane? _newTabSwipePane;
+
+  /// Side by side: the pane being touched whose focus has not been moved yet.
+  /// Focus follows a touch once it is over (see [_focusTouchedPane]) instead of
+  /// jumping at touch-down, because the workspace change it causes ripples
+  /// through the tabs in the middle of the very gesture that caused it.
+  TabPane? _touchedPane;
   int _pointersDown = 0;
   Duration _lastPointerEventTime = Duration.zero;
   int? _newTabSwipePointer;
@@ -456,8 +465,27 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   }
 
   void _focusTab(TabId tabId) {
+    _touchedPane = null;
     if (_workspaceState.activeTabId == tabId) return;
     _workspaceActions.activate(tabId);
+  }
+
+  /// Gives focus to [pane], the pane a touch has just been in, showing the tab
+  /// it shows now. (Not the tab it showed when the touch began: a swipe may
+  /// have changed it since, and has already focused the new one.)
+  void _focusTouchedPane(TabPane pane) {
+    if (_touchedPane == pane) _touchedPane = null;
+    _workspaceActions.focusPane(pane);
+  }
+
+  /// The touch in [pane] is up. A pager that is being dragged, or is settling
+  /// after the drag, focuses its own tab when it lands, and focusing now would
+  /// pull it back mid-swipe; anything else (a tap, a hold, a list scroll) is
+  /// over, so focus follows it.
+  void _onPaneTouchEnd(TabPane pane) {
+    final moving = _panePagerKeys[pane]?.currentState?.isMoving ?? false;
+    if (moving) return;
+    _focusTouchedPane(pane);
   }
 
   void _handleBackToDashboard() {
@@ -519,6 +547,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     required bool swipeEnabled,
     required bool autoHideAppBar,
     required bool autoHideTabBar,
+    bool dividerAfter = false,
   }) {
     final isActive = shownTabId == activeTabId;
     return Expanded(
@@ -529,50 +558,81 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
           Column(
             children: [
               stripSlot,
+              // The pane separator lives here, below the tab strip, so the two
+              // strips read as one bar and only the content is split.
               Expanded(
-                child: NotificationListener<ScrollNotification>(
-                  onNotification: (notification) {
-                    if (notification.metrics.axis == Axis.vertical) {
-                      _handleAppBarScroll(
-                        notification,
-                        enabled: autoHideAppBar,
-                        autoHideTabBar: autoHideTabBar,
-                        active: isActive,
-                      );
-                    } else {
-                      // The pane's own pager: its ends are the ends of this
-                      // pane's tabs, not of the whole workspace.
-                      _handleTabEdgeSwipe(notification, pane: pane);
-                    }
-                    return true;
-                  },
-                  child: Listener(
-                    behavior: HitTestBehavior.translucent,
-                    onPointerDown: (event) {
-                      _focusTab(shownTabId);
-                      _onBrowserPointerDown(event);
-                    },
-                    onPointerMove: _onBrowserPointerMove,
-                    onPointerUp: _onBrowserPointerUp,
-                    onPointerCancel: _onBrowserPointerCancel,
-                    child: _PaneTabPager(
-                      key: _panePagerKeys[pane],
-                      pane: pane,
-                      tabs: groupTabs,
-                      shownTabId: shownTabId,
-                      onTabChanged: _focusTab,
-                      pageBuilder: (tab) => _buildTabContent(
-                        tab,
-                        isActive: tab.tabId == activeTabId,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: NotificationListener<ScrollNotification>(
+                        onNotification: (notification) {
+                          if (notification.metrics.axis == Axis.vertical) {
+                            _handleAppBarScroll(
+                              notification,
+                              enabled: autoHideAppBar,
+                              autoHideTabBar: autoHideTabBar,
+                              // The pane being touched drives the bars even
+                              // before it has been given focus.
+                              active: isActive || _touchedPane == pane,
+                            );
+                          } else {
+                            // The pane's own pager: its ends are the ends of
+                            // this pane's tabs, not of the whole workspace.
+                            _handleTabEdgeSwipe(notification, pane: pane);
+                            // The swipe has landed: focus follows it (a page
+                            // change has already done so; a swipe that came
+                            // back to the same page has not).
+                            if (notification is ScrollEndNotification &&
+                                _touchedPane == pane) {
+                              _focusTouchedPane(pane);
+                            }
+                          }
+                          return true;
+                        },
+                        child: Listener(
+                          behavior: HitTestBehavior.translucent,
+                          onPointerDown: (event) {
+                            // No focus change here: the swipe that may follow
+                            // is a gesture in this pane whether or not it has
+                            // focus, and the tabs reacting to a focus change
+                            // in the middle of it is what made the first swipe
+                            // in the other pane get lost.
+                            _touchedPane = pane;
+                            _onBrowserPointerDown(event, pane: pane);
+                          },
+                          onPointerMove: _onBrowserPointerMove,
+                          onPointerUp: (event) {
+                            _onBrowserPointerUp(event);
+                            _onPaneTouchEnd(pane);
+                          },
+                          onPointerCancel: _onBrowserPointerCancel,
+                          child: _PaneTabPager(
+                            key: _panePagerKeys[pane],
+                            pane: pane,
+                            tabs: groupTabs,
+                            shownTabId: shownTabId,
+                            onTabChanged: _focusTab,
+                            pageBuilder: (tab) => _buildTabContent(
+                              tab,
+                              isActive: tab.tabId == activeTabId,
+                            ),
+                            gate: _swipeGate,
+                            swipeEnabled: swipeEnabled,
+                            slopFactor: _tabPagerSlopFactor,
+                            fade: _loopingPane == pane
+                                ? _loopFade
+                                : const AlwaysStoppedAnimation<double>(1.0),
+                          ),
+                        ),
                       ),
-                      gate: _swipeGate,
-                      swipeEnabled: swipeEnabled,
-                      slopFactor: _tabPagerSlopFactor,
-                      fade: _loopingPane == pane
-                          ? _loopFade
-                          : const AlwaysStoppedAnimation<double>(1.0),
                     ),
-                  ),
+                    if (dividerAfter)
+                      VerticalDivider(
+                        width: 0.5,
+                        thickness: 0.5,
+                        color: Theme.of(context).dividerColor,
+                      ),
+                  ],
                 ),
               ),
             ],
@@ -763,7 +823,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     }
   }
 
-  void _onBrowserPointerDown(PointerDownEvent event) {
+  void _onBrowserPointerDown(PointerDownEvent event, {TabPane? pane}) {
     // The count only goes wrong if a finger's end was never seen (the layout
     // changed under it); nothing has been heard for a while then, so start over.
     if (_pointersDown > 0 &&
@@ -787,6 +847,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     if (startsSwipe) {
       _newTabSwipeStart = event.position;
       _newTabSwipeStartTime = event.timeStamp;
+      _newTabSwipePane = pane;
     }
   }
 
@@ -816,7 +877,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
         delta.dx <= -_newTabSwipeThreshold &&
         delta.dx.abs() >= delta.dy.abs() * 2 &&
         elapsed <= _newTabSwipeMaxDuration;
-    if (isLeftSwipe) _scheduleNewTabPrompt();
+    if (isLeftSwipe) _scheduleNewTabPrompt(pane: _newTabSwipePane);
   }
 
   void _onBrowserPointerCancel(PointerCancelEvent event) {
@@ -1260,22 +1321,25 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       ),
     );
     final dualPaneForTabStrip = splitAvailable && paneTabIds != null;
-    // Side by side, each pane swipes between its own tabs, so "first tab" and
-    // "wraps around" are about the focused pane's tabs. Only the left pane's
-    // first tab hands its right swipe to the side menu: that is the pane the
-    // menu comes out from.
-    final focusedPane = activeTab?.pane;
-    final focusedTabs = !dualPaneForTabStrip || focusedPane == null
+    // Side by side, each pane swipes between its own tabs, and a swipe is
+    // about the pane it starts in, whichever pane was used last. Only the left
+    // pane's first tab hands its right swipe to the side menu: that is the
+    // pane the menu comes out from. (Where a drawer drag may start is also
+    // limited to that pane, see canStartDrawerGestureAt.)
+    final drawerPaneTabs = !dualPaneForTabStrip
         ? tabs
-        : tabs.where((tab) => tab.pane == focusedPane).toList();
+        : tabs.where((tab) => tab.pane == TabPane.primary).toList();
+    final drawerPaneShownId = !dualPaneForTabStrip
+        ? activeTabId
+        : paneTabIds!.$1;
     final isFirstTab =
-        focusedTabs.first.tabId == activeTabId &&
-        (!dualPaneForTabStrip || focusedPane == TabPane.primary);
+        drawerPaneTabs.isNotEmpty &&
+        drawerPaneTabs.first.tabId == drawerPaneShownId;
     // Swiping right past the first tab wraps around to the last one, within
     // the tabs of the pager swiped. There has to be another tab to wrap to.
     final loopsBackward =
         tabsEnabled &&
-        (dualPaneForTabStrip ? focusedTabs.length > 1 : hasMultipleTabs) &&
+        (dualPaneForTabStrip ? drawerPaneTabs.length > 1 : hasMultipleTabs) &&
         tabSwipe.loopsBackward;
     // Without tab swiping every tab acts like both the first and the last
     // one: the two swipe gestures then work anywhere on the screen.
@@ -1339,6 +1403,13 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     /// buttons), wherever the app bar sits.
     bool canStartDrawerGestureAt(Offset position) {
       if (position.dy < browserChromeBottom()) return false;
+      // Side by side the menu belongs to the left pane; a swipe that starts in
+      // the right pane is that pane's own tab swipe. With tab swiping off
+      // there is no pager to keep out of the way, so the swipe works anywhere.
+      if (dualPaneForTabStrip && !tabSwipingOff) {
+        final primary = _paneBounds(TabPane.primary);
+        if (primary != null && position.dx >= primary.right) return false;
+      }
       if (!appBarAtBottom) return true;
       // Read, don't subscribe: this runs from a pointer handler, and
       // MediaQuery.of here would make the whole shell rebuild for every
@@ -1461,11 +1532,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                                 swipeEnabled: swipeEnabled,
                                 autoHideAppBar: autoHideAppBar,
                                 autoHideTabBar: autoHideTabBar,
-                              ),
-                              VerticalDivider(
-                                width: 1,
-                                thickness: 1,
-                                color: Theme.of(context).dividerColor,
+                                dividerAfter: true,
                               ),
                               _buildDualPaneViewport(
                                 TabPane.secondary,
@@ -2020,6 +2087,10 @@ class _PaneTabPagerState extends State<_PaneTabPager> {
   /// must not jump the pager there again while it is still settling.
   int? _drivenIndex;
   bool _jumping = false;
+
+  /// Whether the pager is being dragged or is settling on a page.
+  bool get isMoving =>
+      _controller.hasClients && _controller.position.isScrollingNotifier.value;
 
   static int _indexOf(List<BrowserTabState> tabs, TabId? id) =>
       id == null ? -1 : tabs.indexWhere((tab) => tab.tabId == id);

@@ -26,6 +26,11 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
   final Map<FileManagerAction, WidgetBuilder> actionBuilders;
   final VoidCallback? onFileInfo;
 
+  /// Set only for a single selected item while a search is showing: offers
+  /// "Go to location", which leaves the search and shows the item in the
+  /// folder it lives in.
+  final VoidCallback? onGoToLocation;
+
   final VoidCallback onClose;
   final VoidCallback onSelectAll;
   final VoidCallback onRename;
@@ -76,6 +81,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
     this.hideVaultOnlyActions = false,
     this.isInsideArchive = false,
     this.onFileInfo,
+    this.onGoToLocation,
     required this.readOnly,
     required this.showPinOption,
     required this.showUnpinOption,
@@ -235,6 +241,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
             if (value == 'unpin') onUnpin();
             if (value == 'bookmark') onBookmark();
             if (value == 'unbookmark') onUnbookmark();
+            if (value == 'go_to_location') onGoToLocation?.call();
             if (value == 'file_info') onFileInfo?.call();
           },
           itemBuilder: (context) => applyItemActionMenuConfig(
@@ -452,7 +459,18 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
                 ),
               ),
 
-            // 6. Properties / Info (Always at the bottom)
+            // 6. Location + Properties / Info (Always at the bottom)
+            if (onGoToLocation != null)
+              PopupMenuItem<String>(
+                value: 'go_to_location',
+                child: Row(
+                  children: [
+                    Icon(Icons.folder_open_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
+                    const SizedBox(width: 12),
+                    Text(context.l10n.goToLocationAction),
+                  ],
+                ),
+              ),
             if (singleFileSelected || singleFolderSelected)
               PopupMenuItem<String>(
                 value: 'file_info',

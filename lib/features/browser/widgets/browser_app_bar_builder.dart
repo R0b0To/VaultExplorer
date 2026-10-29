@@ -58,6 +58,10 @@ PreferredSizeWidget buildBrowserAppBar(
   required VoidCallback onCopy,
   required VoidCallback onCut,
   VoidCallback? onOpenInNewTab,
+
+  /// Leaves the search and shows the single selected item in the folder it
+  /// lives in. Offered only while a search is showing and outside archives.
+  VoidCallback? onGoToLocation,
   required VoidCallback onExport,
   required VoidCallback onCompressSelected,
   required VoidCallback onExtractSelectedArchive,
@@ -181,6 +185,9 @@ PreferredSizeWidget buildBrowserAppBar(
                 )
               : context.l10n.sizeCalculatingLabel)
         : formatBytes(totalBytes);
+
+    final VoidCallback? goToLocation =
+        single && searchActive && !isInsideArchive ? onGoToLocation : null;
 
     void doShowFileInfo() {
       final entry = selectedItems.first;
@@ -329,6 +336,7 @@ PreferredSizeWidget buildBrowserAppBar(
         onToggleDocumentProvider: doToggleDocProvider,
         onSyncSettings: doSyncSettings,
         onFileInfo: doShowFileInfo,
+        onGoToLocation: goToLocation,
         showEditImageOption: showEditImageOption,
         onEditImage: doEditImage,
         showEditVideoOption: showEditVideoOption,
@@ -384,6 +392,7 @@ PreferredSizeWidget buildBrowserAppBar(
       onEncrypt: onEncryptSelected,
       onDecrypt: onDecryptSelected,
       onFileInfo: doShowFileInfo,
+      onGoToLocation: goToLocation,
       showEditImageOption: showEditImageOption,
       onEditImage: doEditImage,
       showEditVideoOption: showEditVideoOption,

@@ -7763,6 +7763,10 @@
   "@fileInfoAction": {
     "description": "Menu item label to view metadata, EXIF, and details of the selected file"
   },
+  "goToLocationAction": "Go to location",
+  "@goToLocationAction": {
+    "description": "Menu item label, shown for an item opened from search results, that leaves the search and shows the item in the folder it lives in"
+  },
   "automationSectionHeader": "Automation",
   "@automationSectionHeader": {
     "description": "Header for the automation settings section in the vault configuration screen"

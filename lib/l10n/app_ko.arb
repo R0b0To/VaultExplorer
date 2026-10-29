@@ -1639,6 +1639,7 @@
   "rememberPerFolderLayoutDesc": "각 폴더의 보기 레이아웃(목록, 그리드, 메이슨리)과 정렬 순서를 별도로 저장",
   "defaultFolderLayoutLabel": "기본 폴더 레이아웃",
   "fileInfoAction": "정보",
+  "goToLocationAction": "위치로 이동",
   "automationSectionHeader": "자동화",
   "automationTileTitle": "자동화",
   "automationTileSubtitle": "자동화가 이 볼트를 잠금 해제, 잠금, 파일 가져오기 또는 내보내기를 하도록 허용합니다",

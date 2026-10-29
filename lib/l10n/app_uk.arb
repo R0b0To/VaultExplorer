@@ -1650,6 +1650,7 @@
   "rememberPerFolderLayoutDesc": "Зберігати вигляд (список, сітка, мозаїка) та порядок сортування для кожної папки окремо",
   "defaultFolderLayoutLabel": "Стандартний вигляд папки",
   "fileInfoAction": "Інформація",
+  "goToLocationAction": "Перейти до розташування",
   "automationSectionHeader": "Автоматизація",
   "automationTileTitle": "Автоматизація",
   "automationTileSubtitle": "Дозволити автоматизації розблоковувати, блокувати, імпортувати або експортувати файли цього сховища",

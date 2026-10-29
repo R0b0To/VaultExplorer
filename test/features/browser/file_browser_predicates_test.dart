@@ -193,4 +193,39 @@ void main() {
       expect(isHiddenEntryName('photos/2026/a.jpg'), isFalse);
     });
   });
+
+  group('splitParentAndName', () {
+    test('splits a nested path into folder and last segment', () {
+      final r = splitParentAndName('photos/2026/trip/img.jpg');
+      expect(r.parent, 'photos/2026/trip');
+      expect(r.name, 'img.jpg');
+    });
+
+    test('a single segment lives in the vault root', () {
+      final r = splitParentAndName('notes.txt');
+      expect(r.parent, '');
+      expect(r.name, 'notes.txt');
+    });
+
+    test('a folder path splits the same way as a file path', () {
+      final r = splitParentAndName('photos/2026');
+      expect(r.parent, 'photos');
+      expect(r.name, '2026');
+    });
+
+    test('round-trips with joinPath for deep-search results', () {
+      // Deep-search names are relative to the folder the search ran from.
+      final entry = RawEntry(
+        name: 'sub/dir/a.txt',
+        isDir: false,
+        sizeBytes: 1,
+        modifiedSecs: 1,
+      );
+      final full = fullPathOf(entry, 'root/start');
+      expect(full, 'root/start/sub/dir/a.txt');
+      final r = splitParentAndName(full);
+      expect(r.parent, 'root/start/sub/dir');
+      expect(r.name, 'a.txt');
+    });
+  });
 }

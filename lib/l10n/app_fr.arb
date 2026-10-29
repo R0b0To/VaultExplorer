@@ -1639,6 +1639,7 @@
   "rememberPerFolderLayoutDesc": "Enregistrer séparément la disposition d'affichage (liste, grille, mosaïque) et l'ordre de tri de chaque dossier",
   "defaultFolderLayoutLabel": "Disposition par défaut des dossiers",
   "fileInfoAction": "Infos",
+  "goToLocationAction": "Aller à l'emplacement",
   "automationSectionHeader": "Automatisation",
   "automationTileTitle": "Automatisation",
   "automationTileSubtitle": "Autoriser l'automatisation à déverrouiller, verrouiller, importer ou exporter ce coffre",

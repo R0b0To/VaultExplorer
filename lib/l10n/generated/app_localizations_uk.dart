@@ -6200,6 +6200,9 @@ class AppLocalizationsUk extends AppLocalizations {
   String get fileInfoAction => 'Інформація';
 
   @override
+  String get goToLocationAction => 'Перейти до розташування';
+
+  @override
   String get automationSectionHeader => 'Автоматизація';
 
   @override

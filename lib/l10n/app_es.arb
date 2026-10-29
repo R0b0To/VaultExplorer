@@ -1639,6 +1639,7 @@
   "rememberPerFolderLayoutDesc": "Guardar el diseño de vista (lista, cuadrícula, mosaico) y el orden de clasificación de cada carpeta por separado",
   "defaultFolderLayoutLabel": "Diseño de carpeta predeterminado",
   "fileInfoAction": "Info",
+  "goToLocationAction": "Ir a la ubicación",
   "automationSectionHeader": "Automatización",
   "automationTileTitle": "Automatización",
   "automationTileSubtitle": "Permite que la automatización desbloquee, bloquee, importe o exporte archivos de esta bóveda",

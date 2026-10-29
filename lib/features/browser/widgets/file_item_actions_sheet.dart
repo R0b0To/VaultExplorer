@@ -59,6 +59,11 @@ class FileItemActionsSheet extends ConsumerWidget {
   /// Tab actions (only wired while the file manager is hosted in tabs).
   final VoidCallback? onOpenInNewTab;
 
+  /// Set only when the sheet is opened from search results: shows the item in
+  /// the folder it lives in. Not a configurable action (it has no meaning
+  /// outside a search), so it is always offered when set.
+  final VoidCallback? onGoToLocation;
+
   /// The user's item-action configuration: hidden actions are not offered,
   /// and the quick row and the list follow this order.
   final List<FileItemAction> actionOrder;
@@ -101,6 +106,7 @@ class FileItemActionsSheet extends ConsumerWidget {
     this.onEncrypt,
     this.onDecrypt,
     this.onOpenInNewTab,
+    this.onGoToLocation,
     this.actionOrder = FileItemAction.values,
     this.hiddenActions = const {},
     this.quickActions = FileItemAction.defaultQuickActions,
@@ -140,6 +146,7 @@ class FileItemActionsSheet extends ConsumerWidget {
     VoidCallback? onEncrypt,
     VoidCallback? onDecrypt,
     VoidCallback? onOpenInNewTab,
+    VoidCallback? onGoToLocation,
     List<FileItemAction> actionOrder = FileItemAction.values,
     Set<FileItemAction> hiddenActions = const {},
     Set<FileItemAction> quickActions = FileItemAction.defaultQuickActions,
@@ -184,6 +191,7 @@ class FileItemActionsSheet extends ConsumerWidget {
         onEncrypt: onEncrypt,
         onDecrypt: onDecrypt,
         onOpenInNewTab: onOpenInNewTab,
+        onGoToLocation: onGoToLocation,
         actionOrder: actionOrder,
         hiddenActions: hiddenActions,
         quickActions: quickActions,
@@ -499,6 +507,21 @@ class FileItemActionsSheet extends ConsumerWidget {
         ),
       );
       previousGroup = action.group;
+    }
+
+    // "Go to location" is not one of the configurable actions: it only exists
+    // for search results, where it is the reason to look at an item's sheet,
+    // so it leads the list whatever order or hidden settings the user has.
+    final goToLocation = onGoToLocation;
+    if (goToLocation != null && archiveContext == null) {
+      listItems.insertAll(0, [
+        _ActionTile(
+          icon: Icons.folder_open_rounded,
+          label: context.l10n.goToLocationAction,
+          onTap: _closeThen(context, goToLocation),
+        ),
+        if (listItems.isNotEmpty) const SizedBox(height: 8),
+      ]);
     }
 
     final isDir = entry.isDir;

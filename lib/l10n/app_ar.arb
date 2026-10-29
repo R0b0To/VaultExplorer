@@ -1639,6 +1639,7 @@
   "rememberPerFolderLayoutDesc": "حفظ تخطيط العرض (قائمة، شبكة، بناء) وترتيب الفرز لكل مجلد بشكل منفصل",
   "defaultFolderLayoutLabel": "تخطيط المجلد الافتراضي",
   "fileInfoAction": "معلومات",
+  "goToLocationAction": "الانتقال إلى الموقع",
   "automationSectionHeader": "الأتمتة",
   "automationTileTitle": "الأتمتة",
   "automationTileSubtitle": "السماح للأتمتة بفتح قفل هذه الخزنة أو قفلها أو استيراد ملفات منها أو تصديرها إليها",

@@ -1639,6 +1639,7 @@
   "rememberPerFolderLayoutDesc": "Ansichtslayout (Liste, Raster, Masonry) und Sortierreihenfolge für jeden Ordner separat speichern",
   "defaultFolderLayoutLabel": "Standard-Ordnerlayout",
   "fileInfoAction": "Info",
+  "goToLocationAction": "Zum Speicherort gehen",
   "automationSectionHeader": "Automatisierung",
   "automationTileTitle": "Automatisierung",
   "automationTileSubtitle": "Automatisierung darf diesen Tresor entsperren, sperren, Dateien importieren oder exportieren",

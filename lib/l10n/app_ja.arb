@@ -1639,6 +1639,7 @@
   "rememberPerFolderLayoutDesc": "フォルダーごとに表示レイアウト（リスト、グリッド、メイソンリー）と並べ替え順を個別に保存",
   "defaultFolderLayoutLabel": "デフォルトのフォルダーレイアウト",
   "fileInfoAction": "情報",
+  "goToLocationAction": "場所へ移動",
   "automationSectionHeader": "自動化",
   "automationTileTitle": "自動化",
   "automationTileSubtitle": "自動化によるこのボールトのロック解除・ロック・ファイルのインポート／エクスポートを許可します",

@@ -147,6 +147,30 @@ void main() {
       expect(config.hiddenItemActions, isEmpty);
     });
 
+    test('a stored order from before go to location and copy path gets both, visible', () {
+      final old = FileItemAction.values
+          .where(
+            (a) =>
+                a != FileItemAction.goToLocation &&
+                a != FileItemAction.copyPath,
+          )
+          .map((a) => a.toJson())
+          .toList();
+      final config = FileManagerToolbarConfig.fromJson(<String, dynamic>{
+        'itemActionsOrder': old,
+        'hiddenItemActions': ['pin'],
+      });
+
+      expect(config.itemActionsOrder.take(old.length).map((a) => a.toJson()), old);
+      expect(
+        config.itemActionsOrder.skip(old.length),
+        containsAll([FileItemAction.goToLocation, FileItemAction.copyPath]),
+      );
+      expect(config.hiddenItemActions, {FileItemAction.pin});
+      expect(config.visibleItemActions, contains(FileItemAction.copyPath));
+      expect(config.visibleItemActions, contains(FileItemAction.goToLocation));
+    });
+
     test('fromJson drops unknown names and duplicates, appends missing', () {
       final config = FileManagerToolbarConfig.fromJson(<String, dynamic>{
         'itemActionsOrder': ['delete', 'noSuchAction', 'share', 'delete'],

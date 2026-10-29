@@ -129,12 +129,12 @@ class EditorChrome {
     // the chosen editor theme (it used to take the app-wide top bar color).
     final editorBars = appSkinTokens?.areaColors(SkinArea.editor);
     final toolbarBackground =
-        editorBars != null && editorBars.isCustom(SkinToken.appBar)
-        ? editorBars.color(SkinToken.appBar)
+        editorBars != null && editorBars.isCustom(SkinToken.chromeTopBar)
+        ? editorBars.color(SkinToken.chromeTopBar)
         : scheme.surfaceContainer;
     final toolbarForeground =
-        editorBars != null && editorBars.isCustom(SkinToken.onAppBar)
-        ? editorBars.color(SkinToken.onAppBar)
+        editorBars != null && editorBars.isCustom(SkinToken.chromeOnTopBar)
+        ? editorBars.color(SkinToken.chromeOnTopBar)
         : chromeForeground;
     final theme = baseTheme.copyWith(
       appBarTheme: baseTheme.appBarTheme.copyWith(

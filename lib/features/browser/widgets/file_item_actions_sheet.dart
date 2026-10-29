@@ -60,13 +60,12 @@ class FileItemActionsSheet extends ConsumerWidget {
   final VoidCallback? onOpenInNewTab;
 
   /// Set only when the sheet is opened from search results: shows the item in
-  /// the folder it lives in. Not a configurable action (it has no meaning
-  /// outside a search), so it is always offered when set.
+  /// the folder it lives in. Has no meaning outside a search, so the caller
+  /// leaves it null there and [FileItemAction.goToLocation] is not offered.
   final VoidCallback? onGoToLocation;
 
-  /// Copies the item's path to the clipboard. Like [onGoToLocation] it is not
-  /// a configurable action: it is always offered when the caller sets it
-  /// (never inside an archive, whose paths are not vault paths).
+  /// Copies the item's path to the clipboard. Not offered inside an archive,
+  /// whose paths are not vault paths.
   final VoidCallback? onCopyPath;
 
   /// The user's item-action configuration: hidden actions are not offered,
@@ -301,6 +300,13 @@ class FileItemActionsSheet extends ConsumerWidget {
     final l10n = context.l10n;
     final inArchive = archiveContext != null;
     switch (action) {
+      case FileItemAction.goToLocation:
+        if (inArchive || onGoToLocation == null) return null;
+        return _ActionSpec(
+          icon: Icons.folder_open_rounded,
+          label: l10n.goToLocationAction,
+          onTap: onGoToLocation!,
+        );
       case FileItemAction.openInNewTab:
         if (onOpenInNewTab == null) return null;
         return _ActionSpec(
@@ -440,6 +446,13 @@ class FileItemActionsSheet extends ConsumerWidget {
           label: isBookmark ? l10n.unbookmarkAction : l10n.bookmarkAction,
           onTap: onToggleBookmark,
         );
+      case FileItemAction.copyPath:
+        if (inArchive || onCopyPath == null) return null;
+        return _ActionSpec(
+          icon: Icons.link_rounded,
+          label: l10n.copyPathAction,
+          onTap: onCopyPath!,
+        );
       case FileItemAction.delete:
         if (inArchive) return null;
         // Destructive: red accent. The confirmation dialog lives in the
@@ -515,33 +528,6 @@ class FileItemActionsSheet extends ConsumerWidget {
         ),
       );
       previousGroup = action.group;
-    }
-
-    // "Go to location" is not one of the configurable actions: it only exists
-    // for search results, where it is the reason to look at an item's sheet,
-    // so it leads the list whatever order or hidden settings the user has.
-    final goToLocation = onGoToLocation;
-    if (goToLocation != null && archiveContext == null) {
-      listItems.insertAll(0, [
-        _ActionTile(
-          icon: Icons.folder_open_rounded,
-          label: context.l10n.goToLocationAction,
-          onTap: _closeThen(context, goToLocation),
-        ),
-        if (listItems.isNotEmpty) const SizedBox(height: 8),
-      ]);
-    }
-
-    final copyPath = onCopyPath;
-    if (copyPath != null && archiveContext == null) {
-      if (listItems.isNotEmpty) listItems.add(const SizedBox(height: 8));
-      listItems.add(
-        _ActionTile(
-          icon: Icons.link_rounded,
-          label: context.l10n.copyPathAction,
-          onTap: _closeThen(context, copyPath),
-        ),
-      );
     }
 
     final isDir = entry.isDir;

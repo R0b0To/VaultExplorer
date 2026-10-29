@@ -12830,4 +12830,311 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get duressMasterLockRequired =>
       'Перед налаштуванням розблокування під примусом необхідно увімкнути головне блокування у розділі безпеки.';
+
+  @override
+  String get skinTokenGroupSurface => 'Поверхні';
+
+  @override
+  String get skinTokenGroupContent => 'Текст та іконки';
+
+  @override
+  String get skinTokenGroupBorder => 'Межі';
+
+  @override
+  String get skinTokenGroupChrome => 'Верхня панель';
+
+  @override
+  String get skinTokenGroupAction => 'Кнопки';
+
+  @override
+  String get skinTokenGroupControl => 'Перемикачі та повзунки';
+
+  @override
+  String get skinTokenGroupChoice => 'Чіпи та сегменти';
+
+  @override
+  String get skinTokenGroupSelection => 'Вибрані елементи';
+
+  @override
+  String get skinTokenGroupOverlay => 'Меню, діалоги та панелі';
+
+  @override
+  String get skinTokenGroupFloating => 'Плаваючі елементи';
+
+  @override
+  String get skinTokenSurfacePage => 'Фон сторінки';
+
+  @override
+  String get skinTokenSurfacePageHint =>
+      'Полотно за всіма елементами на цій сторінці.';
+
+  @override
+  String get skinTokenSurfaceCard => 'Картки та рядки';
+
+  @override
+  String get skinTokenSurfaceCardHint =>
+      'Картки, рядки списку та згруповані панелі.';
+
+  @override
+  String get skinTokenSurfaceCardActive => 'Активна картка';
+
+  @override
+  String get skinTokenSurfaceCardActiveHint =>
+      'Виділена картка, наприклад розблоковане сховище.';
+
+  @override
+  String get skinTokenSurfaceTile => 'Плитки та мініатюри';
+
+  @override
+  String get skinTokenSurfaceTileHint =>
+      'Заповнювачі мініатюр, плитки іконок і блоки коду.';
+
+  @override
+  String get skinTokenSurfaceField => 'Поля вводу';
+
+  @override
+  String get skinTokenSurfaceFieldHint =>
+      'Заливка текстових полів і панелей пошуку.';
+
+  @override
+  String get skinTokenContentPrimary => 'Основний текст';
+
+  @override
+  String get skinTokenContentPrimaryHint =>
+      'Заголовки, імена та основний текст.';
+
+  @override
+  String get skinTokenContentSecondary => 'Вторинний текст';
+
+  @override
+  String get skinTokenContentSecondaryHint =>
+      'Підзаголовки, деталі та підказки.';
+
+  @override
+  String get skinTokenContentIcon => 'Іконки';
+
+  @override
+  String get skinTokenContentIconHint =>
+      'Прості іконки, які не знаходяться на кнопці чи панелі.';
+
+  @override
+  String get skinTokenBorderDivider => 'Розділювачі';
+
+  @override
+  String get skinTokenBorderDividerHint =>
+      'Тонкі лінії між рядками та розділами.';
+
+  @override
+  String get skinTokenBorderOutline => 'Контури';
+
+  @override
+  String get skinTokenBorderOutlineHint =>
+      'Межі контурних кнопок і невибраних прапорців.';
+
+  @override
+  String get skinTokenBorderFocus => 'Кільце фокусу';
+
+  @override
+  String get skinTokenBorderFocusHint =>
+      'Межа текстового поля, що редагується.';
+
+  @override
+  String get skinTokenChromeTopBar => 'Верхня панель';
+
+  @override
+  String get skinTokenChromeTopBarHint => 'Заливка верхньої панелі.';
+
+  @override
+  String get skinTokenChromeOnTopBar => 'Текст та іконки верхньої панелі';
+
+  @override
+  String get skinTokenChromeOnTopBarHint =>
+      'Колір заголовка та іконок на верхній панелі.';
+
+  @override
+  String get skinTokenActionPrimary => 'Заповнені кнопки';
+
+  @override
+  String get skinTokenActionPrimaryHint => 'Заливка заповнених кнопок.';
+
+  @override
+  String get skinTokenActionOnPrimary => 'Підпис заповненої кнопки';
+
+  @override
+  String get skinTokenActionOnPrimaryHint =>
+      'Підпис та іконка на заповненій кнопці.';
+
+  @override
+  String get skinTokenActionTonal => 'Підняті кнопки';
+
+  @override
+  String get skinTokenActionTonalHint => 'Заливка піднятих і тональних кнопок.';
+
+  @override
+  String get skinTokenActionOnTonal => 'Підпис піднятої кнопки';
+
+  @override
+  String get skinTokenActionOnTonalHint =>
+      'Підпис та іконка на піднятій кнопці.';
+
+  @override
+  String get skinTokenActionText => 'Текстові та контурні кнопки';
+
+  @override
+  String get skinTokenActionTextHint =>
+      'Колір підпису текстових кнопок, контурних кнопок і посилань.';
+
+  @override
+  String get skinTokenControlActive => 'Елемент увімкнено';
+
+  @override
+  String get skinTokenControlActiveHint =>
+      'Доріжка перемикача у ввімкненому стані, вибрані прапорці та радіокнопки, заливка повзунка та прогресу.';
+
+  @override
+  String get skinTokenControlOnActive => 'Повзунок перемикача та галочка';
+
+  @override
+  String get skinTokenControlOnActiveHint =>
+      'Повзунок увімкненого перемикача та галочка всередині прапорця.';
+
+  @override
+  String get skinTokenControlTrack => 'Доріжка елемента керування';
+
+  @override
+  String get skinTokenControlTrackHint =>
+      'Доріжка вимкненого перемикача та порожня частина повзунків і смуг прогресу.';
+
+  @override
+  String get skinTokenControlInactive => 'Елемент вимкнено';
+
+  @override
+  String get skinTokenControlInactiveHint =>
+      'Повзунок вимкненого перемикача та межі невідмічених прапорців.';
+
+  @override
+  String get skinTokenChoiceBackground => 'Чіп';
+
+  @override
+  String get skinTokenChoiceBackgroundHint =>
+      'Заливка невибраних чіпів і сегментів.';
+
+  @override
+  String get skinTokenChoiceSelected => 'Вибраний чіп';
+
+  @override
+  String get skinTokenChoiceSelectedHint =>
+      'Заливка вибраного чіпа або сегмента.';
+
+  @override
+  String get skinTokenChoiceOnSelected => 'Підпис вибраного чіпа';
+
+  @override
+  String get skinTokenChoiceOnSelectedHint =>
+      'Підпис та іконка на вибраному чіпі або сегменті.';
+
+  @override
+  String get skinTokenChoiceBorder => 'Межа чіпа';
+
+  @override
+  String get skinTokenChoiceBorderHint =>
+      'Контур чіпів і сегментованих кнопок.';
+
+  @override
+  String get skinTokenSelectionFill => 'Вибраний рядок';
+
+  @override
+  String get skinTokenSelectionFillHint =>
+      'Вибрані файли та рядки, а також підсвічені плитки іконок.';
+
+  @override
+  String get skinTokenSelectionOn => 'Текст та іконки вибраного рядка';
+
+  @override
+  String get skinTokenSelectionOnHint =>
+      'Текст та іконки, показані на вибраному рядку.';
+
+  @override
+  String get skinTokenOverlayMenu => 'Меню';
+
+  @override
+  String get skinTokenOverlayMenuHint =>
+      'Спливаючі, випадаючі та контекстні меню.';
+
+  @override
+  String get skinTokenOverlayOnMenu => 'Текст меню';
+
+  @override
+  String get skinTokenOverlayOnMenuHint => 'Текст та іконки в меню.';
+
+  @override
+  String get skinTokenOverlayDialog => 'Діалоги';
+
+  @override
+  String get skinTokenOverlayDialogHint => 'Заливка діалогових вікон.';
+
+  @override
+  String get skinTokenOverlayOnDialog => 'Заголовок діалогу';
+
+  @override
+  String get skinTokenOverlayOnDialogHint =>
+      'Текст заголовка діалогових вікон.';
+
+  @override
+  String get skinTokenOverlaySheet => 'Нижні панелі';
+
+  @override
+  String get skinTokenOverlaySheetHint => 'Заливка нижніх панелей.';
+
+  @override
+  String get skinTokenOverlayOnSheet => 'Текст нижньої панелі';
+
+  @override
+  String get skinTokenOverlayOnSheetHint => 'Текст та іконки в нижніх панелях.';
+
+  @override
+  String get skinTokenOverlayScrim => 'Затемнення за діалогами';
+
+  @override
+  String get skinTokenOverlayScrimHint =>
+      'Затемнення позаду діалогів і нижніх панелей.';
+
+  @override
+  String get skinTokenFloatingFab => 'Кругла кнопка додавання';
+
+  @override
+  String get skinTokenFloatingFabHint => 'Заливка круглої кнопки додавання.';
+
+  @override
+  String get skinTokenFloatingOnFab => 'Іконка круглої кнопки додавання';
+
+  @override
+  String get skinTokenFloatingOnFabHint =>
+      'Іконка на круглій кнопці додавання.';
+
+  @override
+  String get skinTokenFloatingToast => 'Плашка сповіщення';
+
+  @override
+  String get skinTokenFloatingToastHint =>
+      'Заливка інформаційного повідомлення, що з\'являється знизу.';
+
+  @override
+  String get skinTokenFloatingOnToast => 'Текст плашки сповіщення';
+
+  @override
+  String get skinTokenFloatingOnToastHint =>
+      'Текст та іконка на інформаційному повідомленні.';
+
+  @override
+  String get skinTokenFloatingTooltip => 'Підказки';
+
+  @override
+  String get skinTokenFloatingTooltipHint => 'Заливка підказок.';
+
+  @override
+  String get skinTokenFloatingOnTooltip => 'Текст підказки';
+
+  @override
+  String get skinTokenFloatingOnTooltipHint => 'Текст у спливаючих підказках.';
 }

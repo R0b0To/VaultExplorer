@@ -41,53 +41,115 @@ void main() {
       }
     });
 
+    test('every token resolves to a color on every page', () {
+      for (final colors in resolve().values) {
+        expect(colors.colors.keys.toSet(), SkinToken.values.toSet());
+      }
+    });
+
+    test('token ids are unique and live under their own group', () {
+      final ids = SkinToken.values.map((t) => t.id).toList();
+      expect(ids.toSet().length, ids.length);
+      for (final token in SkinToken.values) {
+        expect(token.id.startsWith('${token.group.id}.'), isTrue, reason: token.id);
+      }
+    });
+
     test('an override on one page never reaches another page', () {
       const red = Color(0xFFAA0000);
       final areas = resolve(
         (area, token) =>
-            area == SkinArea.tools && token == SkinToken.card ? red : null,
+            area == SkinArea.tools && token == SkinToken.surfaceCard
+            ? red
+            : null,
       );
-      expect(areas[SkinArea.tools]!.color(SkinToken.card), red);
-      expect(areas[SkinArea.tools]!.isCustom(SkinToken.card), isTrue);
+      expect(areas[SkinArea.tools]!.color(SkinToken.surfaceCard), red);
+      expect(areas[SkinArea.tools]!.isCustom(SkinToken.surfaceCard), isTrue);
       for (final area in SkinArea.values.where((a) => a != SkinArea.tools)) {
         expect(
-          areas[area]!.color(SkinToken.card),
+          areas[area]!.color(SkinToken.surfaceCard),
           base.surfaceContainerHigh,
           reason: area.id,
         );
-        expect(areas[area]!.isCustom(SkinToken.card), isFalse, reason: area.id);
+        expect(
+          areas[area]!.isCustom(SkinToken.surfaceCard),
+          isFalse,
+          reason: area.id,
+        );
       }
     });
 
     test('overrides for tokens a page does not expose are ignored', () {
       final areas = resolve((area, token) => const Color(0xFF00AA00));
-      // Tools has no round add button; the dashboard has no outline color.
-      expect(areas[SkinArea.tools]!.isCustom(SkinToken.fab), isFalse);
-      expect(areas[SkinArea.dashboard]!.isCustom(SkinToken.outline), isFalse);
-      expect(areas[SkinArea.dashboard]!.isCustom(SkinToken.fab), isTrue);
+      // Tools has no round add button; the side menu has no input fields.
+      expect(areas[SkinArea.tools]!.isCustom(SkinToken.floatingFab), isFalse);
+      expect(areas[SkinArea.drawer]!.isCustom(SkinToken.surfaceField), isFalse);
+      expect(areas[SkinArea.dashboard]!.isCustom(SkinToken.floatingFab), isTrue);
     });
 
-    test('moving a page background re-derives its surface steps', () {
-      const background = Color(0xFF101820);
-      final areas = resolve(
-        (area, token) =>
-            area == SkinArea.files && token == SkinToken.background
-            ? background
-            : null,
+    // The point of the split: tokens that start out the same color are still
+    // independent. Moving one must not move any other.
+    test('moving one token leaves every other token unchanged', () {
+      const probe = Color(0xFF123456);
+      final untouched = resolve()[SkinArea.dashboard]!;
+      for (final moved in SkinArea.dashboard.tokens) {
+        // The active card is the one documented derived default.
+        final areas = resolve(
+          (area, token) =>
+              area == SkinArea.dashboard && token == moved ? probe : null,
+        );
+        final colors = areas[SkinArea.dashboard]!;
+        expect(colors.color(moved), probe, reason: moved.id);
+        for (final other in SkinToken.values) {
+          if (other == moved) continue;
+          if (other == SkinToken.surfaceCardActive &&
+              (moved == SkinToken.surfaceCard ||
+                  moved == SkinToken.selectionFill)) {
+            continue;
+          }
+          expect(
+            colors.color(other),
+            untouched.color(other),
+            reason: 'editing ${moved.id} must not change ${other.id}',
+          );
+        }
+      }
+    });
+
+    test('the card color no longer drives fields, buttons, chips or dialogs', () {
+      const red = Color(0xFFAA0000);
+      final theme = buildSkinAreaTheme(
+        ThemeData(colorScheme: base),
+        resolve(
+          (area, token) =>
+              area == SkinArea.files && token == SkinToken.surfaceCard
+              ? red
+              : null,
+        )[SkinArea.files]!,
       );
-      final files = areas[SkinArea.files]!;
-      final card = files.color(SkinToken.card);
-      expect(files.surfaceLow, Color.lerp(background, card, 0.35));
-      expect(files.surfaceMid, Color.lerp(background, card, 0.6));
-      // The other pages keep the palette's own steps.
-      expect(areas[SkinArea.tools]!.surfaceLow, base.surfaceContainerLow);
+      expect(theme.dialogTheme.backgroundColor, base.surfaceContainerHigh);
+      expect(theme.chipTheme.backgroundColor, base.surfaceContainerHigh);
+      expect(theme.inputDecorationTheme.fillColor, base.surfaceContainerHigh);
+    });
+
+    test('menus, dialogs and sheets are three separate tokens', () {
+      const own = Color(0xFF334455);
+      final colors = resolve(
+        (area, token) =>
+            area == SkinArea.files && token == SkinToken.overlayDialog
+            ? own
+            : null,
+      )[SkinArea.files]!;
+      expect(colors.color(SkinToken.overlayDialog), own);
+      expect(colors.color(SkinToken.overlayMenu), base.surfaceContainer);
+      expect(colors.color(SkinToken.overlaySheet), base.surfaceContainerLow);
     });
 
     test('the side menu maps selection onto the secondary container', () {
       const pill = Color(0xFF445566);
       final areas = resolve(
         (area, token) =>
-            area == SkinArea.drawer && token == SkinToken.selection
+            area == SkinArea.drawer && token == SkinToken.selectionFill
             ? pill
             : null,
       );
@@ -100,7 +162,7 @@ void main() {
       const pill = Color(0xFF445566);
       final areas = resolve(
         (area, token) =>
-            area == SkinArea.settings && token == SkinToken.selection
+            area == SkinArea.settings && token == SkinToken.selectionFill
             ? pill
             : null,
       );
@@ -113,7 +175,7 @@ void main() {
       final areas = resolve();
       final dashboard = areas[SkinArea.dashboard]!;
       expect(
-        dashboard.color(SkinToken.cardActive),
+        dashboard.color(SkinToken.surfaceCardActive),
         Color.alphaBlend(
           base.primaryContainer.withValues(alpha: 0.35),
           base.surfaceContainerHigh,
@@ -122,11 +184,85 @@ void main() {
       const own = Color(0xFF334455);
       final custom = resolve(
         (area, token) =>
-            area == SkinArea.dashboard && token == SkinToken.cardActive
+            area == SkinArea.dashboard && token == SkinToken.surfaceCardActive
             ? own
             : null,
       );
-      expect(custom[SkinArea.dashboard]!.color(SkinToken.cardActive), own);
+      expect(
+        custom[SkinArea.dashboard]!.color(SkinToken.surfaceCardActive),
+        own,
+      );
+    });
+  });
+
+  group('legacy skins', () {
+    test('an old key fans out to every token it used to drive', () {
+      final restored = CustomAppSkin.fromJson({
+        'lightAreaColors': {
+          'tools': {'card': 0xFF111111, 'accent': 0xFF222222},
+        },
+      });
+      Color? c(SkinToken t) =>
+          restored.areaColorOrNull(SkinArea.tools, t, dark: false);
+      for (final t in [
+        SkinToken.surfaceCard,
+        SkinToken.surfaceField,
+        SkinToken.actionTonal,
+        SkinToken.choiceBackground,
+        SkinToken.overlayDialog,
+      ]) {
+        expect(c(t), const Color(0xFF111111), reason: t.id);
+      }
+      for (final t in [
+        SkinToken.actionPrimary,
+        SkinToken.actionText,
+        SkinToken.controlActive,
+        SkinToken.borderFocus,
+      ]) {
+        expect(c(t), const Color(0xFF222222), reason: t.id);
+      }
+    });
+
+    test('the old overlay key wins over the old card key for dialogs', () {
+      final restored = CustomAppSkin.fromJson({
+        'lightAreaColors': {
+          'tools': {'card': 0xFF111111, 'overlay': 0xFF333333},
+        },
+      });
+      expect(
+        restored.areaColorOrNull(SkinArea.tools, SkinToken.overlayDialog, dark: false),
+        const Color(0xFF333333),
+      );
+      expect(
+        restored.areaColorOrNull(SkinArea.tools, SkinToken.overlayMenu, dark: false),
+        const Color(0xFF333333),
+      );
+      expect(
+        restored.areaColorOrNull(SkinArea.tools, SkinToken.surfaceCard, dark: false),
+        const Color(0xFF111111),
+      );
+    });
+
+    test('a key in the current vocabulary beats the old key', () {
+      final restored = CustomAppSkin.fromJson({
+        'lightAreaColors': {
+          'tools': {'card': 0xFF111111, 'surface.field': 0xFF999999},
+        },
+      });
+      expect(
+        restored.areaColorOrNull(SkinArea.tools, SkinToken.surfaceField, dark: false),
+        const Color(0xFF999999),
+      );
+      expect(
+        restored.areaColorOrNull(SkinArea.tools, SkinToken.surfaceCard, dark: false),
+        const Color(0xFF111111),
+      );
+    });
+
+    test('every old key maps to at least one current token', () {
+      for (final key in SkinToken.legacyIdsInApplyOrder) {
+        expect(SkinToken.fromLegacyId(key), isNotEmpty, reason: key);
+      }
     });
   });
 
@@ -135,13 +271,13 @@ void main() {
       final skin = const CustomAppSkin()
           .withAreaColor(
             SkinArea.tools,
-            SkinToken.card,
+            SkinToken.surfaceCard,
             const Color(0xFF112233),
             dark: true,
           )
           .withAreaColor(
             SkinArea.files,
-            SkinToken.accent,
+            SkinToken.actionPrimary,
             const Color(0xFF445566),
             dark: false,
           );
@@ -149,21 +285,21 @@ void main() {
         jsonDecode(jsonEncode(skin.toJson())),
       );
       expect(
-        restored.areaColorOrNull(SkinArea.tools, SkinToken.card, dark: true),
+        restored.areaColorOrNull(SkinArea.tools, SkinToken.surfaceCard, dark: true),
         const Color(0xFF112233),
       );
       expect(
-        restored.areaColorOrNull(SkinArea.tools, SkinToken.card, dark: false),
+        restored.areaColorOrNull(SkinArea.tools, SkinToken.surfaceCard, dark: false),
         isNull,
       );
       expect(
-        restored.areaColorOrNull(SkinArea.files, SkinToken.accent, dark: false),
+        restored.areaColorOrNull(SkinArea.files, SkinToken.actionPrimary, dark: false),
         const Color(0xFF445566),
       );
 
       final cleared = restored.withAreaColor(
         SkinArea.tools,
-        SkinToken.card,
+        SkinToken.surfaceCard,
         null,
         dark: true,
       );
@@ -174,23 +310,23 @@ void main() {
       final skin = const CustomAppSkin()
           .withAreaColor(
             SkinArea.tools,
-            SkinToken.card,
+            SkinToken.surfaceCard,
             const Color(0xFF112233),
             dark: true,
           )
           .withAreaColor(
             SkinArea.files,
-            SkinToken.card,
+            SkinToken.surfaceCard,
             const Color(0xFF445566),
             dark: true,
           );
       final reset = skin.withoutAreaColors(SkinArea.tools, dark: true);
       expect(
-        reset.areaColorOrNull(SkinArea.tools, SkinToken.card, dark: true),
+        reset.areaColorOrNull(SkinArea.tools, SkinToken.surfaceCard, dark: true),
         isNull,
       );
       expect(
-        reset.areaColorOrNull(SkinArea.files, SkinToken.card, dark: true),
+        reset.areaColorOrNull(SkinArea.files, SkinToken.surfaceCard, dark: true),
         const Color(0xFF445566),
       );
     });
@@ -206,7 +342,7 @@ void main() {
       expect(
         restored.areaColorOrNull(
           SkinArea.dashboard,
-          SkinToken.card,
+          SkinToken.surfaceCard,
           dark: false,
         ),
         const Color(0xFF111111),
@@ -214,7 +350,7 @@ void main() {
       expect(
         restored.areaColorOrNull(
           SkinArea.dashboard,
-          SkinToken.cardActive,
+          SkinToken.surfaceCardActive,
           dark: false,
         ),
         const Color(0xFF222222),
@@ -231,7 +367,8 @@ void main() {
         },
       });
       expect(restored.lightAreaColors.keys, ['tools']);
-      expect(restored.lightAreaColors['tools']!.keys, ['card']);
+      expect(restored.lightAreaColors['tools']!.keys, contains('surface.card'));
+      expect(restored.lightAreaColors['tools']!.keys, isNot(contains('notAToken')));
     });
   });
 
@@ -239,7 +376,7 @@ void main() {
     const red = Color(0xFFCC0000);
     final skin = const CustomAppSkin().withAreaColor(
       SkinArea.files,
-      SkinToken.background,
+      SkinToken.surfacePage,
       red,
       dark: true,
     );
@@ -341,7 +478,7 @@ void main() {
       for (final area in SkinArea.values) {
         expect(tokens.areaColors(area).area, area);
       }
-      expect(tokens.areaColors(SkinArea.files).color(SkinToken.background), red);
+      expect(tokens.areaColors(SkinArea.files).color(SkinToken.surfacePage), red);
     });
   });
 }

@@ -14,20 +14,10 @@ class SkinAreaColors {
   final Map<SkinToken, Color> colors;
   final Set<SkinToken> custom;
 
-  /// The three surface steps between the page background and [SkinToken.card].
-  /// They follow the page automatically, so customizing a page background does
-  /// not leave half of its surfaces on the old ramp.
-  final Color surfaceLowest;
-  final Color surfaceLow;
-  final Color surfaceMid;
-
   const SkinAreaColors({
     required this.area,
     required this.colors,
     required this.custom,
-    required this.surfaceLowest,
-    required this.surfaceLow,
-    required this.surfaceMid,
   });
 
   Color color(SkinToken token) => colors[token] ?? const Color(0x00000000);
@@ -45,9 +35,6 @@ class SkinAreaColors {
           token: Color.lerp(a.color(token), b.color(token), t)!,
       },
       custom: discrete.custom,
-      surfaceLowest: Color.lerp(a.surfaceLowest, b.surfaceLowest, t)!,
-      surfaceLow: Color.lerp(a.surfaceLow, b.surfaceLow, t)!,
-      surfaceMid: Color.lerp(a.surfaceMid, b.surfaceMid, t)!,
     );
   }
 
@@ -57,10 +44,7 @@ class SkinAreaColors {
       other is SkinAreaColors &&
           area == other.area &&
           mapEquals(colors, other.colors) &&
-          setEquals(custom, other.custom) &&
-          surfaceLowest == other.surfaceLowest &&
-          surfaceLow == other.surfaceLow &&
-          surfaceMid == other.surfaceMid;
+          setEquals(custom, other.custom);
 
   @override
   int get hashCode => Object.hash(
@@ -69,9 +53,6 @@ class SkinAreaColors {
       SkinToken.values.map((token) => Object.hash(token, colors[token])),
     ),
     Object.hashAllUnordered(custom),
-    surfaceLowest,
-    surfaceLow,
-    surfaceMid,
   );
 }
 
@@ -104,6 +85,24 @@ Map<SkinArea, SkinAreaColors> resolveSkinAreaColors({
     ),
 };
 
+/// The tokens of a page that has no overrides and no scheme remapping: what
+/// the app theme itself (outside any [SkinArea]) is built from.
+SkinAreaColors resolveSharedSkinColors({
+  required ColorScheme scheme,
+  required Color appBar,
+  required Color onAppBar,
+  required Color fab,
+  required Color onFab,
+}) => _resolveArea(
+  area: SkinArea.settings,
+  scheme: scheme,
+  appBar: appBar,
+  onAppBar: onAppBar,
+  fab: fab,
+  onFab: onFab,
+  overrideFor: null,
+);
+
 SkinAreaColors _resolveArea({
   required SkinArea area,
   required ColorScheme scheme,
@@ -114,7 +113,7 @@ SkinAreaColors _resolveArea({
   required Color? Function(SkinArea area, SkinToken token)? overrideFor,
 }) {
   final custom = <SkinToken>{};
-  final exposed = area.tokens;
+  final exposed = area.tokens.toSet();
 
   Color pick(SkinToken token, Color fallback) {
     if (overrideFor == null || !exposed.contains(token)) return fallback;
@@ -124,115 +123,125 @@ SkinAreaColors _resolveArea({
     return value;
   }
 
+  final s = scheme;
   final isDrawer = area == SkinArea.drawer;
-  final isDark = scheme.brightness == Brightness.dark;
-  final defaultBackground = isDrawer
-      ? scheme.surfaceContainerLow
-      : scheme.surface;
+  final isDark = s.brightness == Brightness.dark;
 
-  final background = pick(SkinToken.background, defaultBackground);
-  final card = pick(SkinToken.card, scheme.surfaceContainerHigh);
-
-  // Only regenerate the surface ramp when the page really moved its
-  // background or card color; otherwise keep the palette's own steps.
-  final surfacesMoved =
-      background != defaultBackground || card != scheme.surfaceContainerHigh;
-  Color step(double t, Color paletteStep) =>
-      surfacesMoved ? Color.lerp(background, card, t)! : paletteStep;
-
-  final surfaceLowest = step(-0.25, scheme.surfaceContainerLowest);
-  final surfaceLow = step(0.35, scheme.surfaceContainerLow);
-  final surfaceMid = step(0.6, scheme.surfaceContainer);
-
-  final selection = pick(
-    SkinToken.selection,
-    isDrawer ? scheme.secondaryContainer : scheme.primaryContainer,
-  );
-  final onSelection = pick(
-    SkinToken.onSelection,
-    isDrawer ? scheme.onSecondaryContainer : scheme.onPrimaryContainer,
-  );
-
-  final colors = <SkinToken, Color>{
-    SkinToken.background: background,
-    SkinToken.text: pick(SkinToken.text, scheme.onSurface),
-    SkinToken.textSecondary: pick(
-      SkinToken.textSecondary,
-      scheme.onSurfaceVariant,
-    ),
-    SkinToken.appBar: pick(SkinToken.appBar, appBar),
-    SkinToken.onAppBar: pick(SkinToken.onAppBar, onAppBar),
-    SkinToken.card: card,
-    SkinToken.raised: pick(
-      SkinToken.raised,
-      step(1.5, scheme.surfaceContainerHighest),
-    ),
-    SkinToken.overlay: pick(SkinToken.overlay, scheme.surfaceContainer),
-    SkinToken.accent: pick(SkinToken.accent, scheme.primary),
-    SkinToken.onAccent: pick(SkinToken.onAccent, scheme.onPrimary),
-    SkinToken.selection: selection,
-    SkinToken.onSelection: onSelection,
-    SkinToken.divider: pick(SkinToken.divider, scheme.outlineVariant),
-    SkinToken.outline: pick(SkinToken.outline, scheme.outline),
-    SkinToken.fab: pick(SkinToken.fab, fab),
-    SkinToken.onFab: pick(SkinToken.onFab, onFab),
+  // Every default below comes straight from the shared palette, so two tokens
+  // that start out the same color (card / field / dialog / chip ...) stay
+  // independent: moving one never moves another. The surfaces that used to be
+  // lerped between background and card no longer exist; menus, sheets and
+  // dialogs have tokens of their own.
+  final defaults = <SkinToken, Color>{
+    SkinToken.surfacePage: isDrawer ? s.surfaceContainerLow : s.surface,
+    SkinToken.surfaceCard: s.surfaceContainerHigh,
+    SkinToken.surfaceTile: s.surfaceContainerHighest,
+    SkinToken.surfaceField: s.surfaceContainerHigh,
+    SkinToken.contentPrimary: s.onSurface,
+    SkinToken.contentSecondary: s.onSurfaceVariant,
+    SkinToken.contentIcon: s.onSurfaceVariant,
+    SkinToken.borderDivider: s.outlineVariant,
+    SkinToken.borderOutline: s.outline,
+    SkinToken.borderFocus: s.primary,
+    SkinToken.chromeTopBar: appBar,
+    SkinToken.chromeOnTopBar: onAppBar,
+    SkinToken.actionPrimary: s.primary,
+    SkinToken.actionOnPrimary: s.onPrimary,
+    SkinToken.actionTonal: s.surfaceContainerHigh,
+    SkinToken.actionOnTonal: s.primary,
+    SkinToken.actionText: s.primary,
+    SkinToken.controlActive: s.primary,
+    SkinToken.controlOnActive: s.onPrimary,
+    SkinToken.controlTrack: s.surfaceContainerHighest,
+    SkinToken.controlInactive: s.outline,
+    SkinToken.choiceBackground: s.surfaceContainerHigh,
+    SkinToken.choiceSelected: s.secondaryContainer,
+    SkinToken.choiceOnSelected: s.onSecondaryContainer,
+    SkinToken.choiceBorder: s.outlineVariant,
+    SkinToken.selectionFill: isDrawer
+        ? s.secondaryContainer
+        : s.primaryContainer,
+    SkinToken.selectionOn: isDrawer
+        ? s.onSecondaryContainer
+        : s.onPrimaryContainer,
+    SkinToken.overlayMenu: s.surfaceContainer,
+    SkinToken.overlayOnMenu: s.onSurface,
+    SkinToken.overlayDialog: s.surfaceContainerHigh,
+    SkinToken.overlayOnDialog: s.onSurface,
+    SkinToken.overlaySheet: s.surfaceContainerLow,
+    SkinToken.overlayOnSheet: s.onSurface,
+    SkinToken.overlayScrim: s.scrim,
+    SkinToken.floatingFab: fab,
+    SkinToken.floatingOnFab: onFab,
+    SkinToken.floatingToast: s.inverseSurface,
+    SkinToken.floatingOnToast: s.onInverseSurface,
+    SkinToken.floatingTooltip: s.inverseSurface,
+    SkinToken.floatingOnTooltip: s.onInverseSurface,
   };
 
-  // The "active" card (an unlocked vault) is the card tinted toward the
-  // page's selection color, exactly as before unless the skin overrides it.
-  colors[SkinToken.cardActive] = pick(
-    SkinToken.cardActive,
+  final colors = <SkinToken, Color>{};
+  for (final token in SkinToken.values) {
+    if (token == SkinToken.surfaceCardActive) continue;
+    colors[token] = pick(token, defaults[token]!);
+  }
+  // The one derived default: the "active" card (an unlocked vault) is the card
+  // tinted toward the page's selection color, unless the skin sets it.
+  colors[SkinToken.surfaceCardActive] = pick(
+    SkinToken.surfaceCardActive,
     Color.alphaBlend(
-      selection.withValues(alpha: isDark ? 0.35 : 0.55),
-      card,
+      colors[SkinToken.selectionFill]!.withValues(alpha: isDark ? 0.35 : 0.55),
+      colors[SkinToken.surfaceCard]!,
     ),
   );
 
-  return SkinAreaColors(
-    area: area,
-    colors: colors,
-    custom: custom,
-    surfaceLowest: surfaceLowest,
-    surfaceLow: surfaceLow,
-    surfaceMid: surfaceMid,
-  );
+  return SkinAreaColors(area: area, colors: colors, custom: custom);
 }
 
 /// Re-maps a page's tokens onto Material color roles.
 ///
-/// This is what lets a page's existing widgets (which read
-/// `Theme.of(context).colorScheme.*`) pick up the page's own colors without
-/// every widget being rewritten: inside a [SkinArea] the roles *are* that
-/// page's tokens.
+/// This is a compatibility bridge, not the way new code should read colors.
+/// Component themes (see `buildSkinAreaTheme`) are built from the tokens
+/// directly, so a switch, chip, dialog or text field no longer depends on what
+/// is painted with the matching Material role. The bridge only keeps widgets
+/// that still read `Theme.of(context).colorScheme.*` by hand following *one*
+/// clearly named token per role:
+///
+///   surface -> surface.page          onSurface -> content.primary
+///   onSurfaceVariant -> content.secondary
+///   surfaceContainerHigh -> surface.card
+///   surfaceContainerHighest -> surface.tile
+///   primary / onPrimary -> action.primary / action.onPrimary
+///   outline / outlineVariant -> border.outline / border.divider
+///   primaryContainer pair -> selection.fill / selection.on
+///   (the side menu maps that pair onto secondaryContainer instead)
+///
+/// The other surface steps (low, mid, lowest) are left as the shared palette
+/// has them. Migrate a direct read to `SkinAreaScope.colorOf` (or a component
+/// theme) when it needs to follow a different token than the one above.
 ColorScheme applySkinAreaToScheme(ColorScheme base, SkinAreaColors area) {
   // The side menu's default fill is a step above the page surface; leave the
   // surface role alone there unless the skin actually sets the menu's fill.
   final keepSurface =
-      area.area == SkinArea.drawer && !area.isCustom(SkinToken.background);
+      area.area == SkinArea.drawer && !area.isCustom(SkinToken.surfacePage);
   final scheme = base.copyWith(
-    surface: keepSurface ? base.surface : area.color(SkinToken.background),
-    onSurface: area.color(SkinToken.text),
-    onSurfaceVariant: area.color(SkinToken.textSecondary),
-    surfaceContainerLowest: area.surfaceLowest,
-    surfaceContainerLow: area.surfaceLow,
-    surfaceContainer: area.surfaceMid,
-    surfaceContainerHigh: area.color(SkinToken.card),
-    surfaceContainerHighest: area.color(SkinToken.raised),
-    primary: area.color(SkinToken.accent),
-    onPrimary: area.color(SkinToken.onAccent),
-    outline: area.color(SkinToken.outline),
-    outlineVariant: area.color(SkinToken.divider),
+    surface: keepSurface ? base.surface : area.color(SkinToken.surfacePage),
+    onSurface: area.color(SkinToken.contentPrimary),
+    onSurfaceVariant: area.color(SkinToken.contentSecondary),
+    surfaceContainerHigh: area.color(SkinToken.surfaceCard),
+    surfaceContainerHighest: area.color(SkinToken.surfaceTile),
+    primary: area.color(SkinToken.actionPrimary),
+    onPrimary: area.color(SkinToken.actionOnPrimary),
+    outline: area.color(SkinToken.borderOutline),
+    outlineVariant: area.color(SkinToken.borderDivider),
   );
-  // The side menu highlights its current destination with the secondary
-  // container; every other page uses the primary container for selection.
   if (area.area == SkinArea.drawer) {
     return scheme.copyWith(
-      secondaryContainer: area.color(SkinToken.selection),
-      onSecondaryContainer: area.color(SkinToken.onSelection),
+      secondaryContainer: area.color(SkinToken.selectionFill),
+      onSecondaryContainer: area.color(SkinToken.selectionOn),
     );
   }
   return scheme.copyWith(
-    primaryContainer: area.color(SkinToken.selection),
-    onPrimaryContainer: area.color(SkinToken.onSelection),
+    primaryContainer: area.color(SkinToken.selectionFill),
+    onPrimaryContainer: area.color(SkinToken.selectionOn),
   );
 }

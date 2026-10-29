@@ -5,6 +5,7 @@ import 'package:vaultexplorer/data/models/file_item_action.dart';
 /// are not listed (select all, file info, ...) are not configurable and are
 /// left alone by [applyItemActionMenuConfig].
 const Map<String, FileItemAction> _actionForMenuValue = {
+  'go_to_location': FileItemAction.goToLocation,
   'open_in_new_tab': FileItemAction.openInNewTab,
   'open_with_app': FileItemAction.openWith,
   'share': FileItemAction.share,
@@ -24,6 +25,7 @@ const Map<String, FileItemAction> _actionForMenuValue = {
   'unpin': FileItemAction.pin,
   'bookmark': FileItemAction.bookmark,
   'unbookmark': FileItemAction.bookmark,
+  'copy_path': FileItemAction.copyPath,
 };
 
 /// Applies the user's item-action configuration to a selection-bar overflow

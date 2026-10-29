@@ -11847,4 +11847,280 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get duressMasterLockRequired => '配置胁迫解锁前，必须在安全设置中启用主锁。';
+
+  @override
+  String get skinTokenGroupSurface => '表面';
+
+  @override
+  String get skinTokenGroupContent => '文本与图标';
+
+  @override
+  String get skinTokenGroupBorder => '边框';
+
+  @override
+  String get skinTokenGroupChrome => '顶栏';
+
+  @override
+  String get skinTokenGroupAction => '按钮';
+
+  @override
+  String get skinTokenGroupControl => '开关与滑块';
+
+  @override
+  String get skinTokenGroupChoice => '标签与分段';
+
+  @override
+  String get skinTokenGroupSelection => '选中项';
+
+  @override
+  String get skinTokenGroupOverlay => '菜单、对话框与底栏';
+
+  @override
+  String get skinTokenGroupFloating => '浮动元素';
+
+  @override
+  String get skinTokenSurfacePage => '页面背景';
+
+  @override
+  String get skinTokenSurfacePageHint => '本页面所有内容背后的画布。';
+
+  @override
+  String get skinTokenSurfaceCard => '卡片与行';
+
+  @override
+  String get skinTokenSurfaceCardHint => '卡片、列表行和分组面板。';
+
+  @override
+  String get skinTokenSurfaceCardActive => '活动卡片';
+
+  @override
+  String get skinTokenSurfaceCardActiveHint => '高亮显示的卡片，如已解锁的保管库。';
+
+  @override
+  String get skinTokenSurfaceTile => '磁贴与缩略图';
+
+  @override
+  String get skinTokenSurfaceTileHint => '缩略图占位符、图标磁贴和代码块。';
+
+  @override
+  String get skinTokenSurfaceField => '输入框';
+
+  @override
+  String get skinTokenSurfaceFieldHint => '文本输入框和搜索栏的填充色。';
+
+  @override
+  String get skinTokenContentPrimary => '主要文本';
+
+  @override
+  String get skinTokenContentPrimaryHint => '标题、名称和正文。';
+
+  @override
+  String get skinTokenContentSecondary => '次要文本';
+
+  @override
+  String get skinTokenContentSecondaryHint => '副标题、详情和提示。';
+
+  @override
+  String get skinTokenContentIcon => '图标';
+
+  @override
+  String get skinTokenContentIconHint => '不在按钮或栏上的普通图标。';
+
+  @override
+  String get skinTokenBorderDivider => '分割线';
+
+  @override
+  String get skinTokenBorderDividerHint => '行与部分之间的细线。';
+
+  @override
+  String get skinTokenBorderOutline => '轮廓';
+
+  @override
+  String get skinTokenBorderOutlineHint => '轮廓按钮和未选中文本框的边框。';
+
+  @override
+  String get skinTokenBorderFocus => '聚焦环';
+
+  @override
+  String get skinTokenBorderFocusHint => '正在编辑的文本框边框。';
+
+  @override
+  String get skinTokenChromeTopBar => '顶栏';
+
+  @override
+  String get skinTokenChromeTopBarHint => '顶栏的填充色。';
+
+  @override
+  String get skinTokenChromeOnTopBar => '顶栏文本与图标';
+
+  @override
+  String get skinTokenChromeOnTopBarHint => '顶栏上的标题与图标颜色。';
+
+  @override
+  String get skinTokenActionPrimary => '填充按钮';
+
+  @override
+  String get skinTokenActionPrimaryHint => '填充按钮的背景色。';
+
+  @override
+  String get skinTokenActionOnPrimary => '填充按钮标签';
+
+  @override
+  String get skinTokenActionOnPrimaryHint => '填充按钮上的文本和图标。';
+
+  @override
+  String get skinTokenActionTonal => '突起按钮';
+
+  @override
+  String get skinTokenActionTonalHint => '突起和色调按钮的填充色。';
+
+  @override
+  String get skinTokenActionOnTonal => '突起按钮标签';
+
+  @override
+  String get skinTokenActionOnTonalHint => '突起按钮上的文本和图标。';
+
+  @override
+  String get skinTokenActionText => '文本与轮廓按钮';
+
+  @override
+  String get skinTokenActionTextHint => '文本按钮、轮廓按钮和链接的文字颜色。';
+
+  @override
+  String get skinTokenControlActive => '控件开启状态';
+
+  @override
+  String get skinTokenControlActiveHint => '开启时的开关滑轨、选中的复选框与单选框、滑块与进度条填充色。';
+
+  @override
+  String get skinTokenControlOnActive => '开关滑块与对勾';
+
+  @override
+  String get skinTokenControlOnActiveHint => '开启状态的开关滑块以及复选框内的勾选标记。';
+
+  @override
+  String get skinTokenControlTrack => '控件滑轨';
+
+  @override
+  String get skinTokenControlTrackHint => '关闭时的开关滑轨以及滑块和进度条的未填充部分。';
+
+  @override
+  String get skinTokenControlInactive => '控件关闭状态';
+
+  @override
+  String get skinTokenControlInactiveHint => '关闭状态的开关滑块以及未勾选框的边框。';
+
+  @override
+  String get skinTokenChoiceBackground => '标签';
+
+  @override
+  String get skinTokenChoiceBackgroundHint => '未选中的标签和分段的填充色。';
+
+  @override
+  String get skinTokenChoiceSelected => '选中标签';
+
+  @override
+  String get skinTokenChoiceSelectedHint => '选中的标签或分段的填充色。';
+
+  @override
+  String get skinTokenChoiceOnSelected => '选中标签文本';
+
+  @override
+  String get skinTokenChoiceOnSelectedHint => '选中的标签或分段上的文本与图标。';
+
+  @override
+  String get skinTokenChoiceBorder => '标签边框';
+
+  @override
+  String get skinTokenChoiceBorderHint => '标签和分段按钮的轮廓。';
+
+  @override
+  String get skinTokenSelectionFill => '选中行';
+
+  @override
+  String get skinTokenSelectionFillHint => '选中的文件和行，以及高亮的图标磁贴。';
+
+  @override
+  String get skinTokenSelectionOn => '选中行文本与图标';
+
+  @override
+  String get skinTokenSelectionOnHint => '选中行上绘制的文本与图标。';
+
+  @override
+  String get skinTokenOverlayMenu => '菜单';
+
+  @override
+  String get skinTokenOverlayMenuHint => '弹窗菜单、下拉菜单和上下文菜单。';
+
+  @override
+  String get skinTokenOverlayOnMenu => '菜单文本';
+
+  @override
+  String get skinTokenOverlayOnMenuHint => '菜单中的文本与图标。';
+
+  @override
+  String get skinTokenOverlayDialog => '对话框';
+
+  @override
+  String get skinTokenOverlayDialogHint => '对话框的填充色。';
+
+  @override
+  String get skinTokenOverlayOnDialog => '对话框标题';
+
+  @override
+  String get skinTokenOverlayOnDialogHint => '对话框的标题文本。';
+
+  @override
+  String get skinTokenOverlaySheet => '底部工作表';
+
+  @override
+  String get skinTokenOverlaySheetHint => '底部工作表的填充色。';
+
+  @override
+  String get skinTokenOverlayOnSheet => '底部工作表文本';
+
+  @override
+  String get skinTokenOverlayOnSheetHint => '底部工作表中的文本与图标。';
+
+  @override
+  String get skinTokenOverlayScrim => '对话框背景遮罩';
+
+  @override
+  String get skinTokenOverlayScrimHint => '对话框和底部工作表背后的变暗遮罩。';
+
+  @override
+  String get skinTokenFloatingFab => '圆形添加按钮';
+
+  @override
+  String get skinTokenFloatingFabHint => '圆形添加按钮的填充色。';
+
+  @override
+  String get skinTokenFloatingOnFab => '圆形添加按钮图标';
+
+  @override
+  String get skinTokenFloatingOnFabHint => '圆形添加按钮上的图标。';
+
+  @override
+  String get skinTokenFloatingToast => '提示条';
+
+  @override
+  String get skinTokenFloatingToastHint => '底部弹出的信息提示条的填充色。';
+
+  @override
+  String get skinTokenFloatingOnToast => '提示条文本';
+
+  @override
+  String get skinTokenFloatingOnToastHint => '信息提示条上的文本与图标。';
+
+  @override
+  String get skinTokenFloatingTooltip => '工具提示';
+
+  @override
+  String get skinTokenFloatingTooltipHint => '工具提示的填充色。';
+
+  @override
+  String get skinTokenFloatingOnTooltip => '工具提示文本';
+
+  @override
+  String get skinTokenFloatingOnTooltipHint => '工具提示中的文本。';
 }

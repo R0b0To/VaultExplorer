@@ -523,19 +523,24 @@ ThemeData _buildTheme(
         fileManagerFollowsAppSkin: fileManagerFollowsAppSkin,
         editorFollowsAppSkin: editorFollowsAppSkin,
       );
-  // A page's own top bar / round button / overlay colors win over the shared
-  // ones; `overlay` is only applied when the skin actually set it, so the
-  // default menu, dialog and sheet surfaces are unchanged.
-  final appBarBackground =
-      area?.color(SkinToken.appBar) ?? resolvedSkinTokens.appBarBackground;
-  final appBarForeground =
-      area?.color(SkinToken.onAppBar) ?? resolvedSkinTokens.appBarForeground;
-  final fabBackground =
-      area?.color(SkinToken.fab) ?? resolvedSkinTokens.fabBackground;
-  final fabForeground =
-      area?.color(SkinToken.onFab) ?? resolvedSkinTokens.fabForeground;
-  final customOverlay = area != null && area.isCustom(SkinToken.overlay)
-      ? area.color(SkinToken.overlay)
+  // Every component below reads its own token. Inside a page (`area`) those
+  // are the page's resolved tokens; outside one (the app theme itself) they are
+  // the shared palette's defaults, which equal the colors these components had
+  // before the tokens were split.
+  final t =
+      area ??
+      resolveSharedSkinColors(
+        scheme: cs,
+        appBar: resolvedSkinTokens.appBarBackground,
+        onAppBar: resolvedSkinTokens.appBarForeground,
+        fab: resolvedSkinTokens.fabBackground,
+        onFab: resolvedSkinTokens.fabForeground,
+      );
+  Color tk(SkinToken token) => t.color(token);
+  // The dim behind dialogs and sheets is only set when the skin picked one, so
+  // the platform's own barrier is untouched otherwise.
+  final scrim = t.isCustom(SkinToken.overlayScrim)
+      ? t.color(SkinToken.overlayScrim)
       : null;
   return ThemeData(
     useMaterial3: true,
@@ -552,8 +557,8 @@ ThemeData _buildTheme(
       resolvedSkinTokens,
     ],
     appBarTheme: AppBarTheme(
-      backgroundColor: appBarBackground,
-      foregroundColor: appBarForeground,
+      backgroundColor: tk(SkinToken.chromeTopBar),
+      foregroundColor: tk(SkinToken.chromeOnTopBar),
       elevation: 0,
       scrolledUnderElevation: 3,
       surfaceTintColor: cs.surfaceTint,
@@ -561,10 +566,13 @@ ThemeData _buildTheme(
       titleTextStyle: TextStyle(
         fontSize: 22,
         fontWeight: FontWeight.w400,
-        color: appBarForeground,
+        color: tk(SkinToken.chromeOnTopBar),
       ),
-      iconTheme: IconThemeData(color: appBarForeground, size: AppIconSize.action),
-      actionsIconTheme: IconThemeData(color: appBarForeground),
+      iconTheme: IconThemeData(
+        color: tk(SkinToken.chromeOnTopBar),
+        size: AppIconSize.action,
+      ),
+      actionsIconTheme: IconThemeData(color: tk(SkinToken.chromeOnTopBar)),
       // Default for standard pages: matches cs.surface
       systemOverlayStyle: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -591,7 +599,7 @@ ThemeData _buildTheme(
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: cs.surfaceContainerHigh,
+      fillColor: tk(SkinToken.surfaceField),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppRadius.md),
@@ -603,7 +611,7 @@ ThemeData _buildTheme(
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppRadius.md),
-        borderSide: BorderSide(color: cs.primary, width: 2),
+        borderSide: BorderSide(color: tk(SkinToken.borderFocus), width: 2),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppRadius.md),
@@ -613,66 +621,81 @@ ThemeData _buildTheme(
         borderRadius: BorderRadius.circular(AppRadius.md),
         borderSide: BorderSide(color: cs.error, width: 2),
       ),
-      labelStyle: TextStyle(color: cs.onSurfaceVariant, fontSize: 16),
-      floatingLabelStyle: TextStyle(color: cs.primary, fontSize: 12),
-      hintStyle: TextStyle(color: cs.onSurfaceVariant, fontSize: 16),
-      prefixIconColor: cs.onSurfaceVariant,
-      suffixIconColor: cs.onSurfaceVariant,
+      labelStyle: TextStyle(color: tk(SkinToken.contentSecondary), fontSize: 16),
+      floatingLabelStyle: TextStyle(
+        color: tk(SkinToken.borderFocus),
+        fontSize: 12,
+      ),
+      hintStyle: TextStyle(color: tk(SkinToken.contentSecondary), fontSize: 16),
+      prefixIconColor: tk(SkinToken.contentIcon),
+      suffixIconColor: tk(SkinToken.contentIcon),
     ),
     dividerTheme: DividerThemeData(
-      color: cs.outlineVariant,
+      color: tk(SkinToken.borderDivider),
       thickness: 1,
       space: 1,
     ),
     listTileTheme: ListTileThemeData(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      iconColor: cs.onSurfaceVariant,
-      textColor: cs.onSurface,
+      iconColor: tk(SkinToken.contentIcon),
+      textColor: tk(SkinToken.contentPrimary),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadius.md),
       ),
     ),
     checkboxTheme: CheckboxThemeData(
       fillColor: WidgetStateProperty.resolveWith((states) {
-        if (states.contains(WidgetState.selected)) return cs.primary;
+        if (states.contains(WidgetState.selected)) {
+          return tk(SkinToken.controlActive);
+        }
         return Colors.transparent;
       }),
-      checkColor: WidgetStateProperty.all(cs.onPrimary),
-      side: BorderSide(color: cs.onSurfaceVariant, width: 2),
+      checkColor: WidgetStateProperty.all(tk(SkinToken.controlOnActive)),
+      side: BorderSide(color: tk(SkinToken.controlInactive), width: 2),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(2)),
     ),
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.resolveWith((states) {
-        if (states.contains(WidgetState.selected)) return cs.onPrimary;
-        return cs.outline;
+        if (states.contains(WidgetState.selected)) {
+          return tk(SkinToken.controlOnActive);
+        }
+        return tk(SkinToken.controlInactive);
       }),
       trackColor: WidgetStateProperty.resolveWith((states) {
-        if (states.contains(WidgetState.selected)) return cs.primary;
-        return cs.surfaceContainerHighest;
+        if (states.contains(WidgetState.selected)) {
+          return tk(SkinToken.controlActive);
+        }
+        return tk(SkinToken.controlTrack);
       }),
       trackOutlineColor: WidgetStateProperty.resolveWith((states) {
         if (states.contains(WidgetState.selected)) return Colors.transparent;
-        return cs.outline;
+        return tk(SkinToken.controlInactive);
       }),
     ),
     radioTheme: RadioThemeData(
       fillColor: WidgetStateProperty.resolveWith((states) {
-        if (states.contains(WidgetState.selected)) return cs.primary;
-        return cs.outline;
+        if (states.contains(WidgetState.selected)) {
+          return tk(SkinToken.controlActive);
+        }
+        return tk(SkinToken.controlInactive);
       }),
     ),
     sliderTheme: SliderThemeData(
-      activeTrackColor: cs.primary,
-      inactiveTrackColor: cs.surfaceContainerHighest,
-      thumbColor: cs.primary,
-      overlayColor: cs.primary.withValues(alpha: 0.12),
+      activeTrackColor: tk(SkinToken.controlActive),
+      inactiveTrackColor: tk(SkinToken.controlTrack),
+      thumbColor: tk(SkinToken.controlActive),
+      overlayColor: tk(SkinToken.controlActive).withValues(alpha: 0.12),
     ),
      filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        backgroundColor: cs.primary,
-        foregroundColor: cs.onPrimary,
-        disabledBackgroundColor: cs.onSurface.withValues(alpha: 0.12),
-        disabledForegroundColor: cs.onSurface.withValues(alpha: 0.38),
+        backgroundColor: tk(SkinToken.actionPrimary),
+        foregroundColor: tk(SkinToken.actionOnPrimary),
+        disabledBackgroundColor: tk(
+          SkinToken.contentPrimary,
+        ).withValues(alpha: 0.12),
+        disabledForegroundColor: tk(
+          SkinToken.contentPrimary,
+        ).withValues(alpha: 0.38),
         textStyle: const TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w500,
@@ -684,8 +707,8 @@ ThemeData _buildTheme(
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: cs.surfaceContainerHigh,
-        foregroundColor: cs.primary,
+        backgroundColor: tk(SkinToken.actionTonal),
+        foregroundColor: tk(SkinToken.actionOnTonal),
         elevation: 0,
         textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
         shape: const StadiumBorder(),
@@ -694,8 +717,8 @@ ThemeData _buildTheme(
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        foregroundColor: cs.primary,
-        side: BorderSide(color: cs.outline),
+        foregroundColor: tk(SkinToken.actionText),
+        side: BorderSide(color: tk(SkinToken.borderOutline)),
         textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
         shape: const StadiumBorder(),
         minimumSize: const Size(0, 48),
@@ -703,7 +726,7 @@ ThemeData _buildTheme(
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
-        foregroundColor: cs.primary,
+        foregroundColor: tk(SkinToken.actionText),
         textStyle: const TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w500,
@@ -714,11 +737,11 @@ ThemeData _buildTheme(
       ),
     ),
     iconButtonTheme: IconButtonThemeData(
-      style: IconButton.styleFrom(foregroundColor: cs.onSurfaceVariant),
+      style: IconButton.styleFrom(foregroundColor: tk(SkinToken.contentIcon)),
     ),
     floatingActionButtonTheme: FloatingActionButtonThemeData(
-      backgroundColor: fabBackground,
-      foregroundColor: fabForeground,
+      backgroundColor: tk(SkinToken.floatingFab),
+      foregroundColor: tk(SkinToken.floatingOnFab),
       elevation: 1,
       focusElevation: 1,
       hoverElevation: 2,
@@ -732,15 +755,15 @@ ThemeData _buildTheme(
       ),
     ),
     chipTheme: ChipThemeData(
-      backgroundColor: cs.surfaceContainerHigh,
-      selectedColor: cs.secondaryContainer,
-      disabledColor: cs.onSurface.withValues(alpha: 0.12),
-      labelStyle: TextStyle(color: cs.onSurface, fontSize: 13),
+      backgroundColor: tk(SkinToken.choiceBackground),
+      selectedColor: tk(SkinToken.choiceSelected),
+      disabledColor: tk(SkinToken.contentPrimary).withValues(alpha: 0.12),
+      labelStyle: TextStyle(color: tk(SkinToken.contentPrimary), fontSize: 13),
       secondaryLabelStyle: TextStyle(
-        color: cs.onSecondaryContainer,
+        color: tk(SkinToken.choiceOnSelected),
         fontSize: 13,
       ),
-      side: BorderSide(color: cs.outlineVariant),
+      side: BorderSide(color: tk(SkinToken.choiceBorder)),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadius.full),
       ),
@@ -748,16 +771,16 @@ ThemeData _buildTheme(
     ),
     segmentedButtonTheme: SegmentedButtonThemeData(
       style: SegmentedButton.styleFrom(
-        backgroundColor: cs.surfaceContainerHigh,
-        foregroundColor: cs.onSurfaceVariant,
-        selectedBackgroundColor: cs.secondaryContainer,
-        selectedForegroundColor: cs.onSecondaryContainer,
-        side: BorderSide(color: cs.outlineVariant),
+        backgroundColor: tk(SkinToken.choiceBackground),
+        foregroundColor: tk(SkinToken.contentSecondary),
+        selectedBackgroundColor: tk(SkinToken.choiceSelected),
+        selectedForegroundColor: tk(SkinToken.choiceOnSelected),
+        side: BorderSide(color: tk(SkinToken.choiceBorder)),
       ),
     ),
     drawerTheme: DrawerThemeData(
       backgroundColor: area?.area == SkinArea.drawer
-          ? area!.color(SkinToken.background)
+          ? area!.color(SkinToken.surfacePage)
           : cs.surfaceContainerLow,
     ),
     navigationBarTheme: NavigationBarThemeData(
@@ -786,20 +809,18 @@ ThemeData _buildTheme(
       }),
     ),
     popupMenuTheme: PopupMenuThemeData(
-      color: customOverlay ?? cs.surfaceContainer,
+      color: tk(SkinToken.overlayMenu),
       elevation: 3,
       shadowColor: Colors.black,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadius.sm * 2),
       ),
-      textStyle: TextStyle(color: cs.onSurface, fontSize: 14),
+      textStyle: TextStyle(color: tk(SkinToken.overlayOnMenu), fontSize: 14),
     ),
     menuTheme: MenuThemeData(
       style: MenuStyle(
-        backgroundColor: WidgetStateProperty.all(
-          customOverlay ?? cs.surfaceContainer,
-        ),
+        backgroundColor: WidgetStateProperty.all(tk(SkinToken.overlayMenu)),
         elevation: WidgetStateProperty.all(3),
         surfaceTintColor: WidgetStateProperty.all(Colors.transparent),
         shape: WidgetStateProperty.all(
@@ -810,8 +831,9 @@ ThemeData _buildTheme(
       ),
     ),
     bottomSheetTheme: BottomSheetThemeData(
-      backgroundColor: customOverlay ?? cs.surfaceContainerLow,
-      modalBackgroundColor: customOverlay ?? cs.surfaceContainerLow,
+      backgroundColor: tk(SkinToken.overlaySheet),
+      modalBackgroundColor: tk(SkinToken.overlaySheet),
+      modalBarrierColor: scrim,
       surfaceTintColor: Colors.transparent,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(
@@ -819,14 +841,17 @@ ThemeData _buildTheme(
         ),
       ),
       showDragHandle: true,
-      dragHandleColor: cs.onSurfaceVariant.withValues(alpha: 0.4),
+      dragHandleColor: tk(SkinToken.contentSecondary).withValues(alpha: 0.4),
       elevation: 1,
       modalElevation: 1,
     ),
     snackBarTheme: SnackBarThemeData(
       backgroundColor: Colors.transparent,
       elevation: 0,
-      contentTextStyle: TextStyle(color: cs.onInverseSurface, fontSize: 14),
+      contentTextStyle: TextStyle(
+        color: tk(SkinToken.floatingOnToast),
+        fontSize: 14,
+      ),
       actionTextColor: cs.inversePrimary,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadius.full),
@@ -835,7 +860,8 @@ ThemeData _buildTheme(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
     ),
     dialogTheme: DialogThemeData(
-      backgroundColor: customOverlay ?? cs.surfaceContainerHigh,
+      backgroundColor: tk(SkinToken.overlayDialog),
+      barrierColor: scrim,
       surfaceTintColor: Colors.transparent,
       elevation: 6,
       shadowColor: Colors.black45,
@@ -843,91 +869,96 @@ ThemeData _buildTheme(
         borderRadius: BorderRadius.circular(AppRadius.sheet),
       ),
       titleTextStyle: TextStyle(
-        color: cs.onSurface,
+        color: tk(SkinToken.overlayOnDialog),
         fontSize: 24,
         fontWeight: FontWeight.w400,
       ),
-      contentTextStyle: TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
+      contentTextStyle: TextStyle(
+        color: tk(SkinToken.contentSecondary),
+        fontSize: 14,
+      ),
     ),
     tooltipTheme: TooltipThemeData(
       decoration: BoxDecoration(
-        color: cs.inverseSurface,
+        color: tk(SkinToken.floatingTooltip),
         borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
-      textStyle: TextStyle(color: cs.onInverseSurface, fontSize: 12),
+      textStyle: TextStyle(color: tk(SkinToken.floatingOnTooltip), fontSize: 12),
     ),
     progressIndicatorTheme: ProgressIndicatorThemeData(
-      color: cs.primary,
-      linearTrackColor: cs.surfaceContainerHighest,
-      circularTrackColor: cs.surfaceContainerHighest,
+      color: tk(SkinToken.controlActive),
+      linearTrackColor: tk(SkinToken.controlTrack),
+      circularTrackColor: tk(SkinToken.controlTrack),
     ),
     scrollbarTheme: ScrollbarThemeData(
       thumbColor: WidgetStateProperty.resolveWith((states) {
         if (states.contains(WidgetState.dragged)) {
-          return cs.primary;
+          return tk(SkinToken.controlActive);
         }
-        return cs.primary.withValues(alpha: 0.5);
+        return tk(SkinToken.controlActive).withValues(alpha: 0.5);
       }),
-      trackColor: WidgetStateProperty.all(cs.primary.withValues(alpha: 0.15)),
+      trackColor: WidgetStateProperty.all(
+        tk(SkinToken.controlActive).withValues(alpha: 0.15),
+      ),
       radius: const Radius.circular(AppRadius.full),
     ),
     textTheme: TextTheme(
       headlineSmall: TextStyle(
-        color: cs.onSurface,
+        color: tk(SkinToken.contentPrimary),
         fontSize: 24,
         fontWeight: FontWeight.bold,
         letterSpacing: -0.2,
       ),
       titleLarge: TextStyle(
-        color: cs.onSurface,
+        color: tk(SkinToken.contentPrimary),
         fontSize: 22,
         fontWeight: FontWeight.w400,
         letterSpacing: 0,
       ),
       bodyLarge: TextStyle(
-        color: cs.onSurface,
+        color: tk(SkinToken.contentPrimary),
         fontSize: 16,
         height: 1.5,
         letterSpacing: 0.5,
       ),
       bodyMedium: TextStyle(
-        color: cs.onSurface,
+        color: tk(SkinToken.contentPrimary),
         fontSize: 14,
         height: 1.4,
         letterSpacing: 0.25,
       ),
       bodySmall: TextStyle(
-        color: cs.onSurfaceVariant,
+        color: tk(SkinToken.contentSecondary),
         fontSize: 12,
         height: 1.3,
         letterSpacing: 0.4,
       ),
       labelLarge: TextStyle(
-        color: cs.onSurface,
+        color: tk(SkinToken.contentPrimary),
         fontSize: 14,
         fontWeight: FontWeight.w500,
         letterSpacing: 0.1,
       ),
       labelMedium: TextStyle(
-        color: cs.onSurfaceVariant,
+        color: tk(SkinToken.contentSecondary),
         fontSize: 12,
         fontWeight: FontWeight.w500,
         letterSpacing: 0.5,
       ),
       labelSmall: TextStyle(
-        color: cs.onSurfaceVariant,
+        color: tk(SkinToken.contentSecondary),
         fontSize: 11,
         fontWeight: FontWeight.w500,
         letterSpacing: 0.5,
       ),
       titleMedium: TextStyle(
-        color: cs.onSurface,
+        color: tk(SkinToken.contentPrimary),
         fontSize: 16,
         fontWeight: FontWeight.w500,
         letterSpacing: 0.15,
       ),
       titleSmall: TextStyle(
-        color: cs.onSurface,
+        color: tk(SkinToken.contentPrimary),
         fontSize: 14,
         fontWeight: FontWeight.w500,
         letterSpacing: 0.1,

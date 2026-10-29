@@ -10053,7 +10053,7 @@ abstract class AppLocalizations {
   /// **'Go to location'**
   String get goToLocationAction;
 
-  /// Menu item label that copies the path of the selected file or folder, or of a storage or vault in the side drawer, to the clipboard
+  /// Menu item label that copies the path of the selected file or folder to the clipboard
   ///
   /// In en, this message translates to:
   /// **'Copy path'**
@@ -21300,6 +21300,558 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'A master lock must be enabled in App Security before configuring duress unlock.'**
   String get duressMasterLockRequired;
+
+  /// No description provided for @skinTokenGroupSurface.
+  ///
+  /// In en, this message translates to:
+  /// **'Surfaces'**
+  String get skinTokenGroupSurface;
+
+  /// No description provided for @skinTokenGroupContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Text and icons'**
+  String get skinTokenGroupContent;
+
+  /// No description provided for @skinTokenGroupBorder.
+  ///
+  /// In en, this message translates to:
+  /// **'Borders'**
+  String get skinTokenGroupBorder;
+
+  /// No description provided for @skinTokenGroupChrome.
+  ///
+  /// In en, this message translates to:
+  /// **'Top bar'**
+  String get skinTokenGroupChrome;
+
+  /// No description provided for @skinTokenGroupAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Buttons'**
+  String get skinTokenGroupAction;
+
+  /// No description provided for @skinTokenGroupControl.
+  ///
+  /// In en, this message translates to:
+  /// **'Switches and sliders'**
+  String get skinTokenGroupControl;
+
+  /// No description provided for @skinTokenGroupChoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Chips and segments'**
+  String get skinTokenGroupChoice;
+
+  /// No description provided for @skinTokenGroupSelection.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected items'**
+  String get skinTokenGroupSelection;
+
+  /// No description provided for @skinTokenGroupOverlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Menus, dialogs and sheets'**
+  String get skinTokenGroupOverlay;
+
+  /// No description provided for @skinTokenGroupFloating.
+  ///
+  /// In en, this message translates to:
+  /// **'Floating elements'**
+  String get skinTokenGroupFloating;
+
+  /// No description provided for @skinTokenSurfacePage.
+  ///
+  /// In en, this message translates to:
+  /// **'Page background'**
+  String get skinTokenSurfacePage;
+
+  /// No description provided for @skinTokenSurfacePageHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The canvas behind everything on this page.'**
+  String get skinTokenSurfacePageHint;
+
+  /// No description provided for @skinTokenSurfaceCard.
+  ///
+  /// In en, this message translates to:
+  /// **'Cards and rows'**
+  String get skinTokenSurfaceCard;
+
+  /// No description provided for @skinTokenSurfaceCardHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Cards, list rows and grouped panels.'**
+  String get skinTokenSurfaceCardHint;
+
+  /// No description provided for @skinTokenSurfaceCardActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active card'**
+  String get skinTokenSurfaceCardActive;
+
+  /// No description provided for @skinTokenSurfaceCardActiveHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The highlighted card, such as an unlocked vault.'**
+  String get skinTokenSurfaceCardActiveHint;
+
+  /// No description provided for @skinTokenSurfaceTile.
+  ///
+  /// In en, this message translates to:
+  /// **'Tiles and thumbnails'**
+  String get skinTokenSurfaceTile;
+
+  /// No description provided for @skinTokenSurfaceTileHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Thumbnail placeholders, icon tiles and code blocks.'**
+  String get skinTokenSurfaceTileHint;
+
+  /// No description provided for @skinTokenSurfaceField.
+  ///
+  /// In en, this message translates to:
+  /// **'Input fields'**
+  String get skinTokenSurfaceField;
+
+  /// No description provided for @skinTokenSurfaceFieldHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill of text fields and search bars.'**
+  String get skinTokenSurfaceFieldHint;
+
+  /// No description provided for @skinTokenContentPrimary.
+  ///
+  /// In en, this message translates to:
+  /// **'Main text'**
+  String get skinTokenContentPrimary;
+
+  /// No description provided for @skinTokenContentPrimaryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Titles, names and body text.'**
+  String get skinTokenContentPrimaryHint;
+
+  /// No description provided for @skinTokenContentSecondary.
+  ///
+  /// In en, this message translates to:
+  /// **'Secondary text'**
+  String get skinTokenContentSecondary;
+
+  /// No description provided for @skinTokenContentSecondaryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Subtitles, details and hints.'**
+  String get skinTokenContentSecondaryHint;
+
+  /// No description provided for @skinTokenContentIcon.
+  ///
+  /// In en, this message translates to:
+  /// **'Icons'**
+  String get skinTokenContentIcon;
+
+  /// No description provided for @skinTokenContentIconHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Plain icons that are not on a button or bar.'**
+  String get skinTokenContentIconHint;
+
+  /// No description provided for @skinTokenBorderDivider.
+  ///
+  /// In en, this message translates to:
+  /// **'Dividers'**
+  String get skinTokenBorderDivider;
+
+  /// No description provided for @skinTokenBorderDividerHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Thin lines between rows and sections.'**
+  String get skinTokenBorderDividerHint;
+
+  /// No description provided for @skinTokenBorderOutline.
+  ///
+  /// In en, this message translates to:
+  /// **'Outlines'**
+  String get skinTokenBorderOutline;
+
+  /// No description provided for @skinTokenBorderOutlineHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Borders of outlined buttons and of unselected option boxes.'**
+  String get skinTokenBorderOutlineHint;
+
+  /// No description provided for @skinTokenBorderFocus.
+  ///
+  /// In en, this message translates to:
+  /// **'Focus ring'**
+  String get skinTokenBorderFocus;
+
+  /// No description provided for @skinTokenBorderFocusHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Border of the text field being edited.'**
+  String get skinTokenBorderFocusHint;
+
+  /// No description provided for @skinTokenChromeTopBar.
+  ///
+  /// In en, this message translates to:
+  /// **'Top bar'**
+  String get skinTokenChromeTopBar;
+
+  /// No description provided for @skinTokenChromeTopBarHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill of the top bar.'**
+  String get skinTokenChromeTopBarHint;
+
+  /// No description provided for @skinTokenChromeOnTopBar.
+  ///
+  /// In en, this message translates to:
+  /// **'Top bar text and icons'**
+  String get skinTokenChromeOnTopBar;
+
+  /// No description provided for @skinTokenChromeOnTopBarHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Title and icon color on the top bar.'**
+  String get skinTokenChromeOnTopBarHint;
+
+  /// No description provided for @skinTokenActionPrimary.
+  ///
+  /// In en, this message translates to:
+  /// **'Filled buttons'**
+  String get skinTokenActionPrimary;
+
+  /// No description provided for @skinTokenActionPrimaryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill of filled buttons.'**
+  String get skinTokenActionPrimaryHint;
+
+  /// No description provided for @skinTokenActionOnPrimary.
+  ///
+  /// In en, this message translates to:
+  /// **'Filled button label'**
+  String get skinTokenActionOnPrimary;
+
+  /// No description provided for @skinTokenActionOnPrimaryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Label and icon on a filled button.'**
+  String get skinTokenActionOnPrimaryHint;
+
+  /// No description provided for @skinTokenActionTonal.
+  ///
+  /// In en, this message translates to:
+  /// **'Raised buttons'**
+  String get skinTokenActionTonal;
+
+  /// No description provided for @skinTokenActionTonalHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill of raised and tonal buttons.'**
+  String get skinTokenActionTonalHint;
+
+  /// No description provided for @skinTokenActionOnTonal.
+  ///
+  /// In en, this message translates to:
+  /// **'Raised button label'**
+  String get skinTokenActionOnTonal;
+
+  /// No description provided for @skinTokenActionOnTonalHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Label and icon on a raised button.'**
+  String get skinTokenActionOnTonalHint;
+
+  /// No description provided for @skinTokenActionText.
+  ///
+  /// In en, this message translates to:
+  /// **'Text and outlined buttons'**
+  String get skinTokenActionText;
+
+  /// No description provided for @skinTokenActionTextHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Label color of text buttons, outlined buttons and links.'**
+  String get skinTokenActionTextHint;
+
+  /// No description provided for @skinTokenControlActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Control on state'**
+  String get skinTokenControlActive;
+
+  /// No description provided for @skinTokenControlActiveHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch track when on, selected checkbox and radio, slider and progress fill.'**
+  String get skinTokenControlActiveHint;
+
+  /// No description provided for @skinTokenControlOnActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch thumb and checkmark'**
+  String get skinTokenControlOnActive;
+
+  /// No description provided for @skinTokenControlOnActiveHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Thumb of a switch that is on and the tick inside a checkbox.'**
+  String get skinTokenControlOnActiveHint;
+
+  /// No description provided for @skinTokenControlTrack.
+  ///
+  /// In en, this message translates to:
+  /// **'Control track'**
+  String get skinTokenControlTrack;
+
+  /// No description provided for @skinTokenControlTrackHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch track when off and the empty part of sliders and progress bars.'**
+  String get skinTokenControlTrackHint;
+
+  /// No description provided for @skinTokenControlInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'Control off state'**
+  String get skinTokenControlInactive;
+
+  /// No description provided for @skinTokenControlInactiveHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Thumb of a switch that is off and borders of unchecked boxes.'**
+  String get skinTokenControlInactiveHint;
+
+  /// No description provided for @skinTokenChoiceBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Chip'**
+  String get skinTokenChoiceBackground;
+
+  /// No description provided for @skinTokenChoiceBackgroundHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill of unselected chips and segments.'**
+  String get skinTokenChoiceBackgroundHint;
+
+  /// No description provided for @skinTokenChoiceSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected chip'**
+  String get skinTokenChoiceSelected;
+
+  /// No description provided for @skinTokenChoiceSelectedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill of the selected chip or segment.'**
+  String get skinTokenChoiceSelectedHint;
+
+  /// No description provided for @skinTokenChoiceOnSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected chip label'**
+  String get skinTokenChoiceOnSelected;
+
+  /// No description provided for @skinTokenChoiceOnSelectedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Label and icon on the selected chip or segment.'**
+  String get skinTokenChoiceOnSelectedHint;
+
+  /// No description provided for @skinTokenChoiceBorder.
+  ///
+  /// In en, this message translates to:
+  /// **'Chip border'**
+  String get skinTokenChoiceBorder;
+
+  /// No description provided for @skinTokenChoiceBorderHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Outline of chips and segmented buttons.'**
+  String get skinTokenChoiceBorderHint;
+
+  /// No description provided for @skinTokenSelectionFill.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected row'**
+  String get skinTokenSelectionFill;
+
+  /// No description provided for @skinTokenSelectionFillHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected files and rows, and highlighted icon tiles.'**
+  String get skinTokenSelectionFillHint;
+
+  /// No description provided for @skinTokenSelectionOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected row text and icons'**
+  String get skinTokenSelectionOn;
+
+  /// No description provided for @skinTokenSelectionOnHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Text and icons drawn on a selected row.'**
+  String get skinTokenSelectionOnHint;
+
+  /// No description provided for @skinTokenOverlayMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Menus'**
+  String get skinTokenOverlayMenu;
+
+  /// No description provided for @skinTokenOverlayMenuHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Popup, dropdown and context menus.'**
+  String get skinTokenOverlayMenuHint;
+
+  /// No description provided for @skinTokenOverlayOnMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Menu text'**
+  String get skinTokenOverlayOnMenu;
+
+  /// No description provided for @skinTokenOverlayOnMenuHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Text and icons in menus.'**
+  String get skinTokenOverlayOnMenuHint;
+
+  /// No description provided for @skinTokenOverlayDialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Dialogs'**
+  String get skinTokenOverlayDialog;
+
+  /// No description provided for @skinTokenOverlayDialogHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill of dialogs.'**
+  String get skinTokenOverlayDialogHint;
+
+  /// No description provided for @skinTokenOverlayOnDialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Dialog title'**
+  String get skinTokenOverlayOnDialog;
+
+  /// No description provided for @skinTokenOverlayOnDialogHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Title text of dialogs.'**
+  String get skinTokenOverlayOnDialogHint;
+
+  /// No description provided for @skinTokenOverlaySheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Bottom sheets'**
+  String get skinTokenOverlaySheet;
+
+  /// No description provided for @skinTokenOverlaySheetHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill of bottom sheets.'**
+  String get skinTokenOverlaySheetHint;
+
+  /// No description provided for @skinTokenOverlayOnSheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Bottom sheet text'**
+  String get skinTokenOverlayOnSheet;
+
+  /// No description provided for @skinTokenOverlayOnSheetHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Text and icons in bottom sheets.'**
+  String get skinTokenOverlayOnSheetHint;
+
+  /// No description provided for @skinTokenOverlayScrim.
+  ///
+  /// In en, this message translates to:
+  /// **'Dim behind dialogs'**
+  String get skinTokenOverlayScrim;
+
+  /// No description provided for @skinTokenOverlayScrimHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The darkening behind dialogs and bottom sheets.'**
+  String get skinTokenOverlayScrimHint;
+
+  /// No description provided for @skinTokenFloatingFab.
+  ///
+  /// In en, this message translates to:
+  /// **'Round add button'**
+  String get skinTokenFloatingFab;
+
+  /// No description provided for @skinTokenFloatingFabHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill of the round add button.'**
+  String get skinTokenFloatingFabHint;
+
+  /// No description provided for @skinTokenFloatingOnFab.
+  ///
+  /// In en, this message translates to:
+  /// **'Round add button icon'**
+  String get skinTokenFloatingOnFab;
+
+  /// No description provided for @skinTokenFloatingOnFabHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Icon on the round add button.'**
+  String get skinTokenFloatingOnFabHint;
+
+  /// No description provided for @skinTokenFloatingToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Message pill'**
+  String get skinTokenFloatingToast;
+
+  /// No description provided for @skinTokenFloatingToastHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill of the info message that pops up at the bottom.'**
+  String get skinTokenFloatingToastHint;
+
+  /// No description provided for @skinTokenFloatingOnToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Message pill text'**
+  String get skinTokenFloatingOnToast;
+
+  /// No description provided for @skinTokenFloatingOnToastHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Text and icon on the info message.'**
+  String get skinTokenFloatingOnToastHint;
+
+  /// No description provided for @skinTokenFloatingTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Tooltips'**
+  String get skinTokenFloatingTooltip;
+
+  /// No description provided for @skinTokenFloatingTooltipHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill of tooltips.'**
+  String get skinTokenFloatingTooltipHint;
+
+  /// No description provided for @skinTokenFloatingOnTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Tooltip text'**
+  String get skinTokenFloatingOnTooltip;
+
+  /// No description provided for @skinTokenFloatingOnTooltipHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Text in tooltips.'**
+  String get skinTokenFloatingOnTooltipHint;
 }
 
 class _AppLocalizationsDelegate

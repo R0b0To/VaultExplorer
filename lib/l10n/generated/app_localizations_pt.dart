@@ -12738,4 +12738,313 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get duressMasterLockRequired =>
       'Um Bloqueio Mestre deve ser ativado na Segurança do App antes de configurar o desbloqueio por coação.';
+
+  @override
+  String get skinTokenGroupSurface => 'Superfícies';
+
+  @override
+  String get skinTokenGroupContent => 'Texto e ícones';
+
+  @override
+  String get skinTokenGroupBorder => 'Bordas';
+
+  @override
+  String get skinTokenGroupChrome => 'Barra superior';
+
+  @override
+  String get skinTokenGroupAction => 'Botões';
+
+  @override
+  String get skinTokenGroupControl => 'Interruptores e controles deslizantes';
+
+  @override
+  String get skinTokenGroupChoice => 'Chips e segmentos';
+
+  @override
+  String get skinTokenGroupSelection => 'Itens selecionados';
+
+  @override
+  String get skinTokenGroupOverlay => 'Menus, diálogos e painéis';
+
+  @override
+  String get skinTokenGroupFloating => 'Elementos flutuantes';
+
+  @override
+  String get skinTokenSurfacePage => 'Fundo da página';
+
+  @override
+  String get skinTokenSurfacePageHint =>
+      'A tela de fundo por trás de todos os itens desta página.';
+
+  @override
+  String get skinTokenSurfaceCard => 'Cartões e linhas';
+
+  @override
+  String get skinTokenSurfaceCardHint =>
+      'Cartões, linhas de lista e painéis agrupados.';
+
+  @override
+  String get skinTokenSurfaceCardActive => 'Cartão ativo';
+
+  @override
+  String get skinTokenSurfaceCardActiveHint =>
+      'O cartão em destaque, como um cofre desbloqueado.';
+
+  @override
+  String get skinTokenSurfaceTile => 'Blocos e miniaturas';
+
+  @override
+  String get skinTokenSurfaceTileHint =>
+      'Marcadores de posição de miniaturas, blocos de ícones e blocos de código.';
+
+  @override
+  String get skinTokenSurfaceField => 'Campos de entrada';
+
+  @override
+  String get skinTokenSurfaceFieldHint =>
+      'Preenchimento de campos de texto e barras de pesquisa.';
+
+  @override
+  String get skinTokenContentPrimary => 'Texto principal';
+
+  @override
+  String get skinTokenContentPrimaryHint => 'Títulos, nomes e corpo do texto.';
+
+  @override
+  String get skinTokenContentSecondary => 'Texto secundário';
+
+  @override
+  String get skinTokenContentSecondaryHint => 'Subtítulos, detalhes e dicas.';
+
+  @override
+  String get skinTokenContentIcon => 'Ícones';
+
+  @override
+  String get skinTokenContentIconHint =>
+      'Ícones simples que não estão em botões ou barras.';
+
+  @override
+  String get skinTokenBorderDivider => 'Divisores';
+
+  @override
+  String get skinTokenBorderDividerHint =>
+      'Linhas finas entre linhas e seções.';
+
+  @override
+  String get skinTokenBorderOutline => 'Contornos';
+
+  @override
+  String get skinTokenBorderOutlineHint =>
+      'Bordas de botões com contorno e de caixas de seleção desmarcadas.';
+
+  @override
+  String get skinTokenBorderFocus => 'Anel de foco';
+
+  @override
+  String get skinTokenBorderFocusHint => 'Borda do campo de texto em edição.';
+
+  @override
+  String get skinTokenChromeTopBar => 'Barra superior';
+
+  @override
+  String get skinTokenChromeTopBarHint => 'Preenchimento da barra superior.';
+
+  @override
+  String get skinTokenChromeOnTopBar => 'Texto e ícones da barra superior';
+
+  @override
+  String get skinTokenChromeOnTopBarHint =>
+      'Cor do título e dos ícones na barra superior.';
+
+  @override
+  String get skinTokenActionPrimary => 'Botões preenchidos';
+
+  @override
+  String get skinTokenActionPrimaryHint =>
+      'Preenchimento de botões preenchidos.';
+
+  @override
+  String get skinTokenActionOnPrimary => 'Rótulo do botão preenchido';
+
+  @override
+  String get skinTokenActionOnPrimaryHint =>
+      'Rótulo e ícone em um botão preenchido.';
+
+  @override
+  String get skinTokenActionTonal => 'Botões elevados';
+
+  @override
+  String get skinTokenActionTonalHint =>
+      'Preenchimento de botões elevados e tonais.';
+
+  @override
+  String get skinTokenActionOnTonal => 'Rótulo do botão elevado';
+
+  @override
+  String get skinTokenActionOnTonalHint =>
+      'Rótulo e ícone em um botão elevado.';
+
+  @override
+  String get skinTokenActionText => 'Botões de texto e com contorno';
+
+  @override
+  String get skinTokenActionTextHint =>
+      'Cor do rótulo de botões de texto, botões com contorno e links.';
+
+  @override
+  String get skinTokenControlActive => 'Controle ativado';
+
+  @override
+  String get skinTokenControlActiveHint =>
+      'Trilho do interruptor ativado, caixa e opção selecionadas, preenchimento de controle deslizante e progresso.';
+
+  @override
+  String get skinTokenControlOnActive => 'Cursor do interruptor e marcação';
+
+  @override
+  String get skinTokenControlOnActiveHint =>
+      'Cursor de interruptor ativado e marca dentro de uma caixa de seleção.';
+
+  @override
+  String get skinTokenControlTrack => 'Trilho de controle';
+
+  @override
+  String get skinTokenControlTrackHint =>
+      'Trilho do interruptor desligado e parte vazia de controles deslizantes e barras de progresso.';
+
+  @override
+  String get skinTokenControlInactive => 'Controle desativado';
+
+  @override
+  String get skinTokenControlInactiveHint =>
+      'Cursor de interruptor desligado e bordas de caixas desmarcadas.';
+
+  @override
+  String get skinTokenChoiceBackground => 'Chip';
+
+  @override
+  String get skinTokenChoiceBackgroundHint =>
+      'Preenchimento de chips e segmentos não selecionados.';
+
+  @override
+  String get skinTokenChoiceSelected => 'Chip selecionado';
+
+  @override
+  String get skinTokenChoiceSelectedHint =>
+      'Preenchimento do chip ou segmento selecionado.';
+
+  @override
+  String get skinTokenChoiceOnSelected => 'Rótulo do chip selecionado';
+
+  @override
+  String get skinTokenChoiceOnSelectedHint =>
+      'Rótulo e ícone no chip ou segmento selecionado.';
+
+  @override
+  String get skinTokenChoiceBorder => 'Borda do chip';
+
+  @override
+  String get skinTokenChoiceBorderHint =>
+      'Contorno de chips e botões segmentados.';
+
+  @override
+  String get skinTokenSelectionFill => 'Linha selecionada';
+
+  @override
+  String get skinTokenSelectionFillHint =>
+      'Arquivos e linhas selecionados e blocos de ícones destacados.';
+
+  @override
+  String get skinTokenSelectionOn => 'Texto e ícones da linha selecionada';
+
+  @override
+  String get skinTokenSelectionOnHint =>
+      'Texto e ícones exibidos em uma linha selecionada.';
+
+  @override
+  String get skinTokenOverlayMenu => 'Menus';
+
+  @override
+  String get skinTokenOverlayMenuHint =>
+      'Menus pop-up, suspensos e contextuais.';
+
+  @override
+  String get skinTokenOverlayOnMenu => 'Texto do menu';
+
+  @override
+  String get skinTokenOverlayOnMenuHint => 'Texto e ícones em menus.';
+
+  @override
+  String get skinTokenOverlayDialog => 'Diálogos';
+
+  @override
+  String get skinTokenOverlayDialogHint => 'Preenchimento de diálogos.';
+
+  @override
+  String get skinTokenOverlayOnDialog => 'Título do diálogo';
+
+  @override
+  String get skinTokenOverlayOnDialogHint => 'Texto do título de diálogos.';
+
+  @override
+  String get skinTokenOverlaySheet => 'Painéis inferiores';
+
+  @override
+  String get skinTokenOverlaySheetHint =>
+      'Preenchimento de painéis inferiores.';
+
+  @override
+  String get skinTokenOverlayOnSheet => 'Texto do painel inferior';
+
+  @override
+  String get skinTokenOverlayOnSheetHint =>
+      'Texto e ícones em painéis inferiores.';
+
+  @override
+  String get skinTokenOverlayScrim => 'Escurecimento atrás de diálogos';
+
+  @override
+  String get skinTokenOverlayScrimHint =>
+      'O escurecimento atrás de diálogos e painéis inferiores.';
+
+  @override
+  String get skinTokenFloatingFab => 'Botão redondo de adicionar';
+
+  @override
+  String get skinTokenFloatingFabHint =>
+      'Preenchimento do botão redondo de adicionar.';
+
+  @override
+  String get skinTokenFloatingOnFab => 'Ícone do botão redondo de adicionar';
+
+  @override
+  String get skinTokenFloatingOnFabHint =>
+      'Ícone no botão redondo de adicionar.';
+
+  @override
+  String get skinTokenFloatingToast => 'Pílula de mensagem';
+
+  @override
+  String get skinTokenFloatingToastHint =>
+      'Preenchimento da mensagem informativa que aparece na parte inferior.';
+
+  @override
+  String get skinTokenFloatingOnToast => 'Texto da pílula de mensagem';
+
+  @override
+  String get skinTokenFloatingOnToastHint =>
+      'Texto e ícone na mensagem informativa.';
+
+  @override
+  String get skinTokenFloatingTooltip => 'Dicas de ferramentas';
+
+  @override
+  String get skinTokenFloatingTooltipHint =>
+      'Preenchimento de dicas de ferramentas.';
+
+  @override
+  String get skinTokenFloatingOnTooltip => 'Texto da dica de ferramenta';
+
+  @override
+  String get skinTokenFloatingOnTooltipHint => 'Texto em dicas de ferramentas.';
 }

@@ -6,13 +6,16 @@ import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 ///
 /// The declaration order is the default order. It is chosen so that, with
 /// nothing customised, both surfaces list their actions exactly as they did
-/// before this was configurable.
+/// before this was configurable. [goToLocation] and [copyPath] came later:
+/// the first leads (it is what a search result's menu is opened for), the
+/// second sits with the other utility rows just above [delete].
 ///
 /// In the item sheet an action is either one of the *quick* actions, laid out
 /// as a horizontal row of icon-over-label buttons, or a list row. Which
 /// actions are quick is the user's choice (see [defaultQuickActions] and
 /// [maxQuickActions]); every action works in either place.
 enum FileItemAction {
+  goToLocation,
   openInNewTab,
   extract,
   openWith,
@@ -31,6 +34,7 @@ enum FileItemAction {
   syncSettings,
   pin,
   bookmark,
+  copyPath,
   delete;
 
   /// The actions in the item sheet's quick row until the user changes it.
@@ -50,7 +54,7 @@ enum FileItemAction {
   /// grouping while the order is the default one and degrades gracefully
   /// when the user mixes groups. The numbers follow the default order.
   int get group => switch (this) {
-    FileItemAction.openInNewTab => 0,
+    FileItemAction.goToLocation || FileItemAction.openInNewTab => 0,
     FileItemAction.extract => 1,
     FileItemAction.openWith ||
     FileItemAction.share ||
@@ -66,11 +70,14 @@ enum FileItemAction {
     FileItemAction.decrypt ||
     FileItemAction.docProvider ||
     FileItemAction.syncSettings => 4,
-    FileItemAction.pin || FileItemAction.bookmark => 5,
+    FileItemAction.pin ||
+    FileItemAction.bookmark ||
+    FileItemAction.copyPath => 5,
     FileItemAction.delete => 6,
   };
 
   IconData get icon => switch (this) {
+    FileItemAction.goToLocation => Icons.folder_open_rounded,
     FileItemAction.openInNewTab => Icons.tab_rounded,
     FileItemAction.extract => Icons.unarchive_outlined,
     FileItemAction.openWith => Icons.open_in_new_rounded,
@@ -89,6 +96,7 @@ enum FileItemAction {
     FileItemAction.syncSettings => Icons.sync_rounded,
     FileItemAction.pin => Icons.push_pin_rounded,
     FileItemAction.bookmark => Icons.star_rounded,
+    FileItemAction.copyPath => Icons.link_rounded,
     FileItemAction.delete => Icons.delete_outline_rounded,
   };
 
@@ -96,6 +104,7 @@ enum FileItemAction {
   /// show; actions whose menu label flips with state (pin/unpin, ...) use
   /// their neutral form.
   String getLocalizedLabel(AppLocalizations l10n) => switch (this) {
+    FileItemAction.goToLocation => l10n.goToLocationAction,
     FileItemAction.openInNewTab => l10n.browserTabOpenInNewTab,
     FileItemAction.extract => l10n.extract,
     FileItemAction.openWith => l10n.openWithAppAction,
@@ -114,6 +123,7 @@ enum FileItemAction {
     FileItemAction.syncSettings => l10n.autoSyncMenuAction,
     FileItemAction.pin => l10n.pinAction,
     FileItemAction.bookmark => l10n.bookmarkAction,
+    FileItemAction.copyPath => l10n.copyPathAction,
     FileItemAction.delete => l10n.delete,
   };
 

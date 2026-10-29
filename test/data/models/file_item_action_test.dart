@@ -36,6 +36,7 @@ void main() {
           .toList();
 
       expect(list, [
+        FileItemAction.goToLocation,
         FileItemAction.openInNewTab,
         FileItemAction.extract,
         FileItemAction.openWith,
@@ -51,13 +52,16 @@ void main() {
         FileItemAction.syncSettings,
         FileItemAction.pin,
         FileItemAction.bookmark,
+        FileItemAction.copyPath,
       ]);
     });
 
     test('groups never decrease along the default order', () {
       final groups = FileItemAction.values.map((a) => a.group).toList();
 
-      expect(groups, [0, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 6]);
+      expect(groups, [
+        0, 0, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 6, //
+      ]);
     });
 
     test('with the default quick row, the list keeps its original groups', () {
@@ -66,7 +70,7 @@ void main() {
           .map((a) => a.group)
           .toList();
 
-      expect(groups, [0, 1, 2, 2, 2, 2, 3, 3, 4, 4, 4, 4, 4, 5, 5]);
+      expect(groups, [0, 0, 1, 2, 2, 2, 2, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5]);
     });
 
     test('every action has a label and survives a JSON round trip', () {
@@ -75,6 +79,12 @@ void main() {
         expect(action.getLocalizedLabel(l10n), isNotEmpty, reason: '$action');
         expect(FileItemAction.fromJson(action.toJson()), action);
       }
+    });
+
+    test('go to location leads the order and copy path sits just above delete', () {
+      expect(FileItemAction.values.first, FileItemAction.goToLocation);
+      final delete = FileItemAction.values.indexOf(FileItemAction.delete);
+      expect(FileItemAction.values[delete - 1], FileItemAction.copyPath);
     });
 
     test('fromJson ignores unknown and null names', () {

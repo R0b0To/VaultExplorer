@@ -12771,4 +12771,306 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get duressMasterLockRequired =>
       'يجب تمكين القفل الرئيسي في أمان التطبيق قبل تكوين فتح الإكراه.';
+
+  @override
+  String get skinTokenGroupSurface => 'الأسطح';
+
+  @override
+  String get skinTokenGroupContent => 'النصوص والأيقونات';
+
+  @override
+  String get skinTokenGroupBorder => 'الحدود';
+
+  @override
+  String get skinTokenGroupChrome => 'الشريط العلوي';
+
+  @override
+  String get skinTokenGroupAction => 'الأزرار';
+
+  @override
+  String get skinTokenGroupControl => 'المفاتيح وأشرطة التمرير';
+
+  @override
+  String get skinTokenGroupChoice => 'الشرائح والأقسام';
+
+  @override
+  String get skinTokenGroupSelection => 'العناصر المحددة';
+
+  @override
+  String get skinTokenGroupOverlay => 'القوائم والحوارات والصفائح';
+
+  @override
+  String get skinTokenGroupFloating => 'العناصر العائمة';
+
+  @override
+  String get skinTokenSurfacePage => 'خلفية الصفحة';
+
+  @override
+  String get skinTokenSurfacePageHint =>
+      'المساحة الخلفية لجميع العناصر في هذه الصفحة.';
+
+  @override
+  String get skinTokenSurfaceCard => 'البطاقات والصفوف';
+
+  @override
+  String get skinTokenSurfaceCardHint =>
+      'البطاقات، وصفوف القوائم، واللوحات المجمعة.';
+
+  @override
+  String get skinTokenSurfaceCardActive => 'البطاقة النشطة';
+
+  @override
+  String get skinTokenSurfaceCardActiveHint =>
+      'البطاقة المميزة، مثل الخزينة غير المقفلة.';
+
+  @override
+  String get skinTokenSurfaceTile => 'المربعات والصور المصغرة';
+
+  @override
+  String get skinTokenSurfaceTileHint =>
+      'عناصر الصور المصغرة المؤقتة، ومربعات الأيقونات، وكتل البرمجة.';
+
+  @override
+  String get skinTokenSurfaceField => 'حقول الإدخال';
+
+  @override
+  String get skinTokenSurfaceFieldHint => 'تعبئة حقول النصوص وأشرطة البحث.';
+
+  @override
+  String get skinTokenContentPrimary => 'النص الأساسي';
+
+  @override
+  String get skinTokenContentPrimaryHint =>
+      'العناوين، والأسماء، والنص الرئيسي.';
+
+  @override
+  String get skinTokenContentSecondary => 'النص الثانوي';
+
+  @override
+  String get skinTokenContentSecondaryHint =>
+      'العناوين الفرعية، والتفاصيل، والتلميحات.';
+
+  @override
+  String get skinTokenContentIcon => 'الأيقونات';
+
+  @override
+  String get skinTokenContentIconHint =>
+      'الأيقونات العادية غير الموجودة على زر أو شريط.';
+
+  @override
+  String get skinTokenBorderDivider => 'الفواصل';
+
+  @override
+  String get skinTokenBorderDividerHint => 'خطوط رفيعة بين الصفوف والأقسام.';
+
+  @override
+  String get skinTokenBorderOutline => 'الخطوط الخارجية';
+
+  @override
+  String get skinTokenBorderOutlineHint =>
+      'حدود الأزرار المحددة ومربعات الخيارات غير المحددة.';
+
+  @override
+  String get skinTokenBorderFocus => 'حلقة التركيز';
+
+  @override
+  String get skinTokenBorderFocusHint => 'إطار حقل النص قيد التعديل.';
+
+  @override
+  String get skinTokenChromeTopBar => 'الشريط العلوي';
+
+  @override
+  String get skinTokenChromeTopBarHint => 'تعبئة الشريط العلوي.';
+
+  @override
+  String get skinTokenChromeOnTopBar => 'نص وأيقونات الشريط العلوي';
+
+  @override
+  String get skinTokenChromeOnTopBarHint =>
+      'لون العنوان والأيقونات في الشريط العلوي.';
+
+  @override
+  String get skinTokenActionPrimary => 'الأزرار الممتلئة';
+
+  @override
+  String get skinTokenActionPrimaryHint => 'تعبئة الأزرار الممتلئة.';
+
+  @override
+  String get skinTokenActionOnPrimary => 'تسمية الزر الممتلئ';
+
+  @override
+  String get skinTokenActionOnPrimaryHint =>
+      'التسمية والأيقونة على الزر الممتلئ.';
+
+  @override
+  String get skinTokenActionTonal => 'الأزرار البارزة';
+
+  @override
+  String get skinTokenActionTonalHint =>
+      'تعبئة الأزرار البارزة والمتناسقة لونياً.';
+
+  @override
+  String get skinTokenActionOnTonal => 'تسمية الزر البارز';
+
+  @override
+  String get skinTokenActionOnTonalHint => 'التسمية والأيقونة على الزر البارز.';
+
+  @override
+  String get skinTokenActionText => 'الأزرار النصية والمحددة';
+
+  @override
+  String get skinTokenActionTextHint =>
+      'لون تسمية الأزرار النصية والمحددة والروابط.';
+
+  @override
+  String get skinTokenControlActive => 'حالة تشغيل عنصر التحكم';
+
+  @override
+  String get skinTokenControlActiveHint =>
+      'مسار المفتاح عند التشغيل، ومربع الاختيار والزر الدائري المحدد، وتعبئة شريط التمرير والتقدم.';
+
+  @override
+  String get skinTokenControlOnActive => 'مقبض المفتاح وعلامة الاختيار';
+
+  @override
+  String get skinTokenControlOnActiveHint =>
+      'مقبض المفتاح قيد التشغيل وعلامة الصح داخل مربع الاختيار.';
+
+  @override
+  String get skinTokenControlTrack => 'مسار عنصر التحكم';
+
+  @override
+  String get skinTokenControlTrackHint =>
+      'مسار المفتاح عند الإيقاف والجزء الفارغ من أشرطة التمرير والتقدم.';
+
+  @override
+  String get skinTokenControlInactive => 'حالة إيقاف عنصر التحكم';
+
+  @override
+  String get skinTokenControlInactiveHint =>
+      'مقبض المفتاح عند إيقافه وحدود المربعات غير المحددة.';
+
+  @override
+  String get skinTokenChoiceBackground => 'الشريحة';
+
+  @override
+  String get skinTokenChoiceBackgroundHint =>
+      'تعبئة الشرائح والأقسام غير المحددة.';
+
+  @override
+  String get skinTokenChoiceSelected => 'الشريحة المحددة';
+
+  @override
+  String get skinTokenChoiceSelectedHint => 'تعبئة الشريحة أو القسم المحدد.';
+
+  @override
+  String get skinTokenChoiceOnSelected => 'تسمية الشريحة المحددة';
+
+  @override
+  String get skinTokenChoiceOnSelectedHint =>
+      'التسمية والأيقونة على الشريحة أو القسم المحدد.';
+
+  @override
+  String get skinTokenChoiceBorder => 'إطار الشريحة';
+
+  @override
+  String get skinTokenChoiceBorderHint =>
+      'الخط الخارجي للشرائح والأزرار المقسمة.';
+
+  @override
+  String get skinTokenSelectionFill => 'الصف المحدد';
+
+  @override
+  String get skinTokenSelectionFillHint =>
+      'الملفات والصفوف المحددة ومربعات الأيقونات البارزة.';
+
+  @override
+  String get skinTokenSelectionOn => 'نص وأيقونات الصف المحدد';
+
+  @override
+  String get skinTokenSelectionOnHint =>
+      'النص والأيقونات المرسومة على صف محدد.';
+
+  @override
+  String get skinTokenOverlayMenu => 'القوائم';
+
+  @override
+  String get skinTokenOverlayMenuHint =>
+      'القوائم المنبثقة، والمنسدلة، وقوائم السياق.';
+
+  @override
+  String get skinTokenOverlayOnMenu => 'نص القائمة';
+
+  @override
+  String get skinTokenOverlayOnMenuHint => 'النص والأيقونات في القوائم.';
+
+  @override
+  String get skinTokenOverlayDialog => 'مربعات الحوار';
+
+  @override
+  String get skinTokenOverlayDialogHint => 'تعبئة مربعات الحوار.';
+
+  @override
+  String get skinTokenOverlayOnDialog => 'عنوان مربع الحوار';
+
+  @override
+  String get skinTokenOverlayOnDialogHint => 'نص عنوان مربعات الحوار.';
+
+  @override
+  String get skinTokenOverlaySheet => 'الصفائح السفلية';
+
+  @override
+  String get skinTokenOverlaySheetHint => 'تعبئة الصفائح السفلية.';
+
+  @override
+  String get skinTokenOverlayOnSheet => 'نص الصفيحة السفلية';
+
+  @override
+  String get skinTokenOverlayOnSheetHint =>
+      'النص والأيقونات في الصفائح السفلية.';
+
+  @override
+  String get skinTokenOverlayScrim => 'تعتيم خلفية الحوارات';
+
+  @override
+  String get skinTokenOverlayScrimHint =>
+      'التعتيم خلف مربعات الحوار والصفائح السفلية.';
+
+  @override
+  String get skinTokenFloatingFab => 'زر الإضافة الدائري';
+
+  @override
+  String get skinTokenFloatingFabHint => 'تعبئة زر الإضافة الدائري.';
+
+  @override
+  String get skinTokenFloatingOnFab => 'أيقونة زر الإضافة الدائري';
+
+  @override
+  String get skinTokenFloatingOnFabHint => 'الأيقونة على زر الإضافة الدائري.';
+
+  @override
+  String get skinTokenFloatingToast => 'كبسولة الرسائل';
+
+  @override
+  String get skinTokenFloatingToastHint =>
+      'تعبئة رسالة المعلومات المنبثقة في الأسفل.';
+
+  @override
+  String get skinTokenFloatingOnToast => 'نص كبسولة الرسائل';
+
+  @override
+  String get skinTokenFloatingOnToastHint =>
+      'النص والأيقونة في رسالة المعلومات.';
+
+  @override
+  String get skinTokenFloatingTooltip => 'تلميحات الأدوات';
+
+  @override
+  String get skinTokenFloatingTooltipHint => 'تعبئة تلميحات الأدوات.';
+
+  @override
+  String get skinTokenFloatingOnTooltip => 'نص تلميح الأداة';
+
+  @override
+  String get skinTokenFloatingOnTooltipHint => 'النص في تلميحات الأدوات.';
 }

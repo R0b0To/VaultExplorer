@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
@@ -9,8 +7,6 @@ import 'package:vaultexplorer/core/providers/external_storage_locations_provider
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
-import 'package:vaultexplorer/core/utils/path_clipboard.dart';
-import 'package:vaultexplorer/core/utils/storage_uri_path.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/container_format_icon.dart';
@@ -159,13 +155,6 @@ class AppNavigationDrawer extends ConsumerWidget {
     return Icons.sd_card_rounded;
   }
 
-  /// Closes the drawer, so the confirmation snackbar is not hidden behind it,
-  /// and copies [path] to the clipboard.
-  void _copyPathAndClose(BuildContext context, String path) {
-    Navigator.pop(context);
-    unawaited(copyPathToClipboard(context, path));
-  }
-
   void _showLocationContextMenu(
     BuildContext context,
     WidgetRef ref,
@@ -198,16 +187,6 @@ class AppNavigationDrawer extends ConsumerWidget {
             ),
           ),
         PopupMenuItem(
-          value: 'copy_path',
-          child: Row(
-            children: [
-              Icon(Icons.link_rounded, size: 20, color: cs.onSurface),
-              const SizedBox(width: 12),
-              Text(context.l10n.copyPathAction),
-            ],
-          ),
-        ),
-        PopupMenuItem(
           value: 'rename',
           child: Row(
             children: [
@@ -231,12 +210,6 @@ class AppNavigationDrawer extends ConsumerWidget {
     ).then((action) {
       if (action == 'new_tab') {
         _openLocationInNewTab(context, ref, loc);
-      } else if (action == 'copy_path') {
-        if (!context.mounted) return;
-        _copyPathAndClose(
-          context,
-          readablePathFromUri(loc.path.isNotEmpty ? loc.path : loc.resolvedUri),
-        );
       } else if (action == 'rename') {
         _promptRename(context, ref, loc);
       } else if (action == 'remove') {
@@ -272,9 +245,9 @@ class AppNavigationDrawer extends ConsumerWidget {
     );
   }
 
-  /// Long-press menu for the device storage entry: "Open in new tab" (only
-  /// while the browser is hosted in tabs) and "Copy path".
-  void _showLocalStorageMenu(
+  /// Long-press menu for entries that have no menu of their own (device
+  /// storage): just "Open in new tab".
+  void _showOpenInNewTabMenu(
     BuildContext context,
     Offset tapPosition,
     MountedContainer container,
@@ -292,36 +265,21 @@ class AppNavigationDrawer extends ConsumerWidget {
       ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       items: [
-        if (onOpenInNewTab != null)
-          PopupMenuItem(
-            value: 'new_tab',
-            child: Row(
-              children: [
-                Icon(Icons.tab_rounded, size: 20, color: cs.onSurface),
-                const SizedBox(width: 12),
-                Text(context.l10n.browserTabOpenInNewTab),
-              ],
-            ),
-          ),
         PopupMenuItem(
-          value: 'copy_path',
+          value: 'new_tab',
           child: Row(
             children: [
-              Icon(Icons.link_rounded, size: 20, color: cs.onSurface),
+              Icon(Icons.tab_rounded, size: 20, color: cs.onSurface),
               const SizedBox(width: 12),
-              Text(context.l10n.copyPathAction),
+              Text(context.l10n.browserTabOpenInNewTab),
             ],
           ),
         ),
       ],
     ).then((action) {
-      if (!context.mounted) return;
-      if (action == 'new_tab') {
-        Navigator.pop(context); // close the drawer
-        onOpenInNewTab?.call(container);
-      } else if (action == 'copy_path') {
-        _copyPathAndClose(context, readablePathFromUri(container.uri));
-      }
+      if (action != 'new_tab' || !context.mounted) return;
+      Navigator.pop(context); // close the drawer
+      onOpenInNewTab?.call(container);
     });
   }
 
@@ -669,10 +627,6 @@ class AppNavigationDrawer extends ConsumerWidget {
                                     );
                                   }
                                 : null,
-                            onCopyPath: () => _copyPathAndClose(
-                              context,
-                              readablePathFromUri(item.uri),
-                            ),
                             onEdit: () {
                               Navigator.pop(context);
                               _handleEditVault(context, ref, item);
@@ -761,7 +715,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                                 : FontWeight.w500,
                           ),
                         ),
-                        onLongPress: primary != null
+                        onLongPress: (onOpenInNewTab != null && primary != null)
                             ? () {
                                 final box =
                                     tileContext.findRenderObject()
@@ -771,7 +725,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                                         box.size.center(Offset.zero),
                                       )
                                     : Offset.zero;
-                                _showLocalStorageMenu(context, pos, primary);
+                                _showOpenInNewTabMenu(context, pos, primary);
                               }
                             : null,
                         onTap: () {
@@ -1015,7 +969,6 @@ class _DrawerVaultRow extends ConsumerWidget {
   final VoidCallback onTap;
   final VoidCallback? onLock;
   final VoidCallback? onOpenInNewTab;
-  final VoidCallback onCopyPath;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
@@ -1025,7 +978,6 @@ class _DrawerVaultRow extends ConsumerWidget {
     required this.isCurrent,
     required this.onTap,
     this.onOpenInNewTab,
-    required this.onCopyPath,
     required this.onLock,
     required this.onEdit,
     required this.onDelete,
@@ -1057,16 +1009,6 @@ class _DrawerVaultRow extends ConsumerWidget {
               ],
             ),
           ),
-        PopupMenuItem(
-          value: 'copy_path',
-          child: Row(
-            children: [
-              Icon(Icons.link_rounded, size: 20, color: cs.onSurface),
-              const SizedBox(width: 12),
-              Text(context.l10n.copyPathAction),
-            ],
-          ),
-        ),
         PopupMenuItem(
           value: 'edit',
           child: Row(
@@ -1102,7 +1044,6 @@ class _DrawerVaultRow extends ConsumerWidget {
       ],
     ).then((action) {
       if (action == 'new_tab') onOpenInNewTab?.call();
-      if (action == 'copy_path') onCopyPath();
       if (action == 'edit') onEdit();
       if (action == 'lock') onLock?.call();
       if (action == 'delete') onDelete();

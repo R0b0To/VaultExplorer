@@ -12043,4 +12043,283 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get duressMasterLockRequired =>
       '강요 해제를 설정하려면 먼저 보안 설정에서 마스터 잠금을 활성화해야 합니다.';
+
+  @override
+  String get skinTokenGroupSurface => '표면';
+
+  @override
+  String get skinTokenGroupContent => '텍스트 및 아이콘';
+
+  @override
+  String get skinTokenGroupBorder => '테두리';
+
+  @override
+  String get skinTokenGroupChrome => '상단 표시줄';
+
+  @override
+  String get skinTokenGroupAction => '버튼';
+
+  @override
+  String get skinTokenGroupControl => '스위치 및 슬라이더';
+
+  @override
+  String get skinTokenGroupChoice => '칩 및 세그먼트';
+
+  @override
+  String get skinTokenGroupSelection => '선택된 항목';
+
+  @override
+  String get skinTokenGroupOverlay => '메뉴, 대화상자 및 시트';
+
+  @override
+  String get skinTokenGroupFloating => '플로팅 요소';
+
+  @override
+  String get skinTokenSurfacePage => '페이지 배경';
+
+  @override
+  String get skinTokenSurfacePageHint => '이 페이지의 모든 요소 뒤에 있는 캔버스입니다.';
+
+  @override
+  String get skinTokenSurfaceCard => '카드 및 행';
+
+  @override
+  String get skinTokenSurfaceCardHint => '카드, 목록 행 및 그룹화된 패널입니다.';
+
+  @override
+  String get skinTokenSurfaceCardActive => '활성 카드';
+
+  @override
+  String get skinTokenSurfaceCardActiveHint => '잠금 해제된 보관함과 같이 강조 표시된 카드입니다.';
+
+  @override
+  String get skinTokenSurfaceTile => '타일 및 썸네일';
+
+  @override
+  String get skinTokenSurfaceTileHint => '썸네일 플레이스홀더, 아이콘 타일 및 코드 블록입니다.';
+
+  @override
+  String get skinTokenSurfaceField => '입력 필드';
+
+  @override
+  String get skinTokenSurfaceFieldHint => '텍스트 필드와 검색창의 채우기 색상입니다.';
+
+  @override
+  String get skinTokenContentPrimary => '기본 텍스트';
+
+  @override
+  String get skinTokenContentPrimaryHint => '제목, 이름 및 본문 텍스트입니다.';
+
+  @override
+  String get skinTokenContentSecondary => '보조 텍스트';
+
+  @override
+  String get skinTokenContentSecondaryHint => '부제목, 세부 정보 및 힌트입니다.';
+
+  @override
+  String get skinTokenContentIcon => '아이콘';
+
+  @override
+  String get skinTokenContentIconHint => '버튼이나 바에 있지 않은 일반 아이콘입니다.';
+
+  @override
+  String get skinTokenBorderDivider => '구분선';
+
+  @override
+  String get skinTokenBorderDividerHint => '행과 섹션 사이의 얇은 선입니다.';
+
+  @override
+  String get skinTokenBorderOutline => '윤곽선';
+
+  @override
+  String get skinTokenBorderOutlineHint => '외곽선 버튼과 선택되지 않은 옵션 상자의 테두리입니다.';
+
+  @override
+  String get skinTokenBorderFocus => '포커스 링';
+
+  @override
+  String get skinTokenBorderFocusHint => '현재 편집 중인 텍스트 필드의 테두리입니다.';
+
+  @override
+  String get skinTokenChromeTopBar => '상단 표시줄';
+
+  @override
+  String get skinTokenChromeTopBarHint => '상단 표시줄의 채우기 색상입니다.';
+
+  @override
+  String get skinTokenChromeOnTopBar => '상단 표시줄 텍스트 및 아이콘';
+
+  @override
+  String get skinTokenChromeOnTopBarHint => '상단 표시줄의 제목 및 아이콘 색상입니다.';
+
+  @override
+  String get skinTokenActionPrimary => '채워진 버튼';
+
+  @override
+  String get skinTokenActionPrimaryHint => '채워진 버튼의 채우기 색상입니다.';
+
+  @override
+  String get skinTokenActionOnPrimary => '채워진 버튼 레이블';
+
+  @override
+  String get skinTokenActionOnPrimaryHint => '채워진 버튼의 레이블과 아이콘입니다.';
+
+  @override
+  String get skinTokenActionTonal => '돌출형 버튼';
+
+  @override
+  String get skinTokenActionTonalHint => '돌출형 및 톤 버튼의 채우기 색상입니다.';
+
+  @override
+  String get skinTokenActionOnTonal => '돌출형 버튼 레이블';
+
+  @override
+  String get skinTokenActionOnTonalHint => '돌출형 버튼의 레이블과 아이콘입니다.';
+
+  @override
+  String get skinTokenActionText => '텍스트 및 외곽선 버튼';
+
+  @override
+  String get skinTokenActionTextHint => '텍스트 버튼, 외곽선 버튼 및 링크의 레이블 색상입니다.';
+
+  @override
+  String get skinTokenControlActive => '컨트롤 켜짐 상태';
+
+  @override
+  String get skinTokenControlActiveHint =>
+      '켜졌을 때의 스위치 트랙, 선택된 체크박스 및 라디오, 슬라이더 및 진행률 채우기입니다.';
+
+  @override
+  String get skinTokenControlOnActive => '스위치 손잡이 및 체크 표시';
+
+  @override
+  String get skinTokenControlOnActiveHint => '켜진 스위치의 손잡이와 체크박스 내부의 체크 표시입니다.';
+
+  @override
+  String get skinTokenControlTrack => '컨트롤 트랙';
+
+  @override
+  String get skinTokenControlTrackHint =>
+      '꺼졌을 때의 스위치 트랙과 슬라이더 및 진행률 표시줄의 빈 부분입니다.';
+
+  @override
+  String get skinTokenControlInactive => '컨트롤 꺼짐 상태';
+
+  @override
+  String get skinTokenControlInactiveHint =>
+      '꺼진 스위치의 손잡이와 선택되지 않은 확인란의 테두리입니다.';
+
+  @override
+  String get skinTokenChoiceBackground => '칩';
+
+  @override
+  String get skinTokenChoiceBackgroundHint => '선택되지 않은 칩과 세그먼트의 채우기 색상입니다.';
+
+  @override
+  String get skinTokenChoiceSelected => '선택된 칩';
+
+  @override
+  String get skinTokenChoiceSelectedHint => '선택된 칩 또는 세그먼트의 채우기 색상입니다.';
+
+  @override
+  String get skinTokenChoiceOnSelected => '선택된 칩 레이블';
+
+  @override
+  String get skinTokenChoiceOnSelectedHint => '선택된 칩 또는 세그먼트의 레이블과 아이콘입니다.';
+
+  @override
+  String get skinTokenChoiceBorder => '칩 테두리';
+
+  @override
+  String get skinTokenChoiceBorderHint => '칩 및 분할 버튼의 윤곽선입니다.';
+
+  @override
+  String get skinTokenSelectionFill => '선택된 행';
+
+  @override
+  String get skinTokenSelectionFillHint => '선택된 파일과 행, 강조 표시된 아이콘 타일입니다.';
+
+  @override
+  String get skinTokenSelectionOn => '선택된 행 텍스트 및 아이콘';
+
+  @override
+  String get skinTokenSelectionOnHint => '선택된 행에 표시되는 텍스트와 아이콘입니다.';
+
+  @override
+  String get skinTokenOverlayMenu => '메뉴';
+
+  @override
+  String get skinTokenOverlayMenuHint => '팝업, 드롭다운 및 컨텍스트 메뉴입니다.';
+
+  @override
+  String get skinTokenOverlayOnMenu => '메뉴 텍스트';
+
+  @override
+  String get skinTokenOverlayOnMenuHint => '메뉴의 텍스트와 아이콘입니다.';
+
+  @override
+  String get skinTokenOverlayDialog => '대화상자';
+
+  @override
+  String get skinTokenOverlayDialogHint => '대화상자의 채우기 색상입니다.';
+
+  @override
+  String get skinTokenOverlayOnDialog => '대화상자 제목';
+
+  @override
+  String get skinTokenOverlayOnDialogHint => '대화상자의 제목 텍스트입니다.';
+
+  @override
+  String get skinTokenOverlaySheet => '하단 시트';
+
+  @override
+  String get skinTokenOverlaySheetHint => '하단 시트의 채우기 색상입니다.';
+
+  @override
+  String get skinTokenOverlayOnSheet => '하단 시트 텍스트';
+
+  @override
+  String get skinTokenOverlayOnSheetHint => '하단 시트의 텍스트와 아이콘입니다.';
+
+  @override
+  String get skinTokenOverlayScrim => '대화상자 뒤 어둡게 하기';
+
+  @override
+  String get skinTokenOverlayScrimHint => '대화상자와 하단 시트 뒤의 어두운 배경입니다.';
+
+  @override
+  String get skinTokenFloatingFab => '원형 추가 버튼';
+
+  @override
+  String get skinTokenFloatingFabHint => '원형 추가 버튼의 채우기 색상입니다.';
+
+  @override
+  String get skinTokenFloatingOnFab => '원형 추가 버튼 아이콘';
+
+  @override
+  String get skinTokenFloatingOnFabHint => '원형 추가 버튼 위의 아이콘입니다.';
+
+  @override
+  String get skinTokenFloatingToast => '알림 캡슐';
+
+  @override
+  String get skinTokenFloatingToastHint => '하단에 팝업되는 안내 메시지의 채우기 색상입니다.';
+
+  @override
+  String get skinTokenFloatingOnToast => '알림 캡슐 텍스트';
+
+  @override
+  String get skinTokenFloatingOnToastHint => '안내 메시지의 텍스트와 아이콘입니다.';
+
+  @override
+  String get skinTokenFloatingTooltip => '툴팁';
+
+  @override
+  String get skinTokenFloatingTooltipHint => '툴팁의 채우기 색상입니다.';
+
+  @override
+  String get skinTokenFloatingOnTooltip => '툴팁 텍스트';
+
+  @override
+  String get skinTokenFloatingOnTooltipHint => '툴팁의 텍스트입니다.';
 }

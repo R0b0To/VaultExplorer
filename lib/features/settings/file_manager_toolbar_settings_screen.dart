@@ -4,7 +4,6 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
-import 'package:vaultexplorer/data/models/browser_tab_edge_swipe.dart';
 import 'package:vaultexplorer/data/models/grid_aspect_ratio.dart';
 import 'package:vaultexplorer/data/models/grid_corner_style.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
@@ -18,6 +17,7 @@ import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_toolb
 import 'package:vaultexplorer/features/settings/file_manager_item_actions_screen.dart';
 import 'package:vaultexplorer/features/settings/file_manager_skin_screen.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
+import 'package:vaultexplorer/features/settings/widgets/tab_swipe_gestures_section.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
@@ -79,9 +79,6 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
       appSettingsControllerProvider.select(
         (s) => s.settings.useDualPaneBrowsing,
       ),
-    );
-    final tabEdgeSwipe = ref.watch(
-      appSettingsControllerProvider.select((s) => s.settings.tabEdgeSwipe),
     );
     final appBarAtBottom = ref.watch(
       appSettingsControllerProvider.select((s) => s.settings.appBarAtBottom),
@@ -188,27 +185,6 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                                   : cs.onSurfaceVariant,
                             ),
                           ),
-                          OptionPickerTile<BrowserTabEdgeSwipe>(
-                            label: context.l10n.tabEdgeSwipeLabel,
-                            value: tabEdgeSwipe,
-                            enabled: useBrowserTabs,
-                            prefixIcon: Icons.swipe_rounded,
-                            options: BrowserTabEdgeSwipe.values.map((mode) {
-                              return SelectOption(
-                                value: mode,
-                                label: mode.getLocalizedLabel(context.l10n),
-                                subtitle: mode.getLocalizedDescription(
-                                  context.l10n,
-                                ),
-                              );
-                            }).toList(),
-                            onChanged: (v) => ref
-                                .read(appSettingsControllerProvider.notifier)
-                                .updateSettings(
-                                  (settings) =>
-                                      settings.copyWith(tabEdgeSwipe: v),
-                                ),
-                          ),
                           SwitchListTile(
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
@@ -245,6 +221,11 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 16),
+
+                      // The tab swipe gestures: swipe between tabs, and what a
+                      // right/left swipe does at the ends of the tabs.
+                      const TabSwipeGesturesSection(),
                       const SizedBox(height: 16),
 
                       // ==========================================

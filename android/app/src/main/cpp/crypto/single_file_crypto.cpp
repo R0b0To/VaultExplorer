@@ -2,6 +2,7 @@
 #include "crypto/cipher_shim.h"
 #include "crypto/cascade.h"
 #include "crypto/keyfile_mixing.h"
+#include "crypto/os_random.h"
 #include "crypto/xchacha20poly1305.h"
 #include "crypto/utf16le_password.h"
 #include "mbedtls/gcm.h"
@@ -82,12 +83,9 @@ static bool encryptAesCryptFile(
     unsigned char intKey[32];
     unsigned char iv1[16];
 
-    FILE* urnd = fopen("/dev/urandom", "rb");
-    if (!urnd) return false;
-    bool ok = (fread(iv0, 1, 16, urnd) == 16) &&
-              (fread(intKey, 1, 32, urnd) == 32) &&
-              (fread(iv1, 1, 16, urnd) == 16);
-    fclose(urnd);
+    const bool ok = osRandomBytes(iv0, 16) &&
+                    osRandomBytes(intKey, 32) &&
+                    osRandomBytes(iv1, 16);
     if (!ok) return false;
 
     std::vector<unsigned char> passwordUtf16 = utf8ToUtf16Le(password, passwordLen);
@@ -465,10 +463,7 @@ bool encryptSingleFile(
     }
     unsigned char salt[32];
     unsigned char fileId[16];
-    FILE* urnd = fopen("/dev/urandom", "rb");
-    if (!urnd) return false;
-    bool ok = (fread(salt, 1, 32, urnd) == 32) && (fread(fileId, 1, 16, urnd) == 16);
-    fclose(urnd);
+    const bool ok = osRandomBytes(salt, 32) && osRandomBytes(fileId, 16);
     if (!ok) return false;
 
     struct stat st{};

@@ -7,6 +7,7 @@ import 'package:vaultexplorer/app/vault_explorer_app.dart';
 import 'package:vaultexplorer/core/api/vault_engine_channel.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/api/vault_hash_api.dart';
+import 'package:vaultexplorer/core/engine/desktop/desktop_engine_binding.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/sync/services/scheduled_sync_background.dart';
@@ -50,7 +51,12 @@ void scheduledSyncBackgroundEntrypoint() {
 }
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  if (isDesktopEngineTarget) {
+    // Linux/Windows: answer the engine channel in-process via dart:ffi (no Kotlin there).
+    DesktopEngineBinding.ensureInitialized();
+  } else {
+    WidgetsFlutterBinding.ensureInitialized();
+  }
 
   // Not awaited: the platform message is queued ahead of runApp either way,
   // and waiting for its reply only delayed the first frame.

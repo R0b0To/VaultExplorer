@@ -1,4 +1,5 @@
 #include "user_entropy.h"
+#include "os_random.h"
 
 #include <cerrno>
 #include <cstring>
@@ -56,27 +57,10 @@ bool sha512Parts(const uint8_t* a, size_t aLen,
     return ok;
 }
 
-// Reads exactly `len` bytes from /dev/urandom, retrying on EINTR / short reads.
+// Reads exactly `len` bytes from the OS CSPRNG (see crypto/os_random.h:
+// /dev/urandom off Windows, BCryptGenRandom on it).
 bool readUrandom(uint8_t* buf, size_t len) {
-    int fd = open("/dev/urandom", O_RDONLY | O_CLOEXEC);
-    if (fd < 0) return false;
-    size_t done = 0;
-    bool ok = true;
-    while (done < len) {
-        ssize_t n = read(fd, buf + done, len - done);
-        if (n < 0) {
-            if (errno == EINTR) continue;
-            ok = false;
-            break;
-        }
-        if (n == 0) {  // EOF on urandom should be impossible; treat as failure
-            ok = false;
-            break;
-        }
-        done += static_cast<size_t>(n);
-    }
-    close(fd);
-    return ok;
+    return osRandomBytes(buf, len);
 }
 
 }  // namespace

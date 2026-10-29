@@ -1,5 +1,6 @@
 #include "ext_backend.h"
 #include "dir_entry_wire.h"
+#include "crypto/os_random.h"
 #include <algorithm>
 #include <android/log.h>
 #include <cstdio>
@@ -349,12 +350,10 @@ bool formatExtVolume(int volumeId, const char* variant) {
     fs->super->s_mtime = static_cast<uint32_t>(time(nullptr));
     fs->super->s_wtime = static_cast<uint32_t>(time(nullptr));
     unsigned char uuid[16];
-    if (FILE* random = fopen("/dev/urandom", "rb")) {
-        fread(uuid, 1, sizeof(uuid), random);
+    if (osRandomBytes(uuid, sizeof(uuid))) {
         uuid[6] = (uuid[6] & 0x0F) | 0x40;
         uuid[8] = (uuid[8] & 0x3F) | 0x80;
         std::memcpy(fs->super->s_uuid, uuid, sizeof(uuid));
-        fclose(random);
     }
     std::strncpy(reinterpret_cast<char*>(fs->super->s_last_mounted), "/", sizeof(fs->super->s_last_mounted));
     fs->super->s_r_blocks_count = 0;

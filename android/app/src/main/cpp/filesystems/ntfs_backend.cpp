@@ -8,6 +8,12 @@
 #include <cstring>
 #include <cstdlib>
 #include <fstream>
+// Standard headers that (on libstdc++) are pulled in lazily by later project headers must
+// be parsed BEFORE the ntfs-3g headers below, whose support.h #defines min()/max().
+#include <chrono>
+#include <limits>
+#include <mutex>
+#include <shared_mutex>
 #include <memory>
 #include <sys/stat.h>
 #include <unordered_set>

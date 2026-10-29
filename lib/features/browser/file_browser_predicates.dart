@@ -67,25 +67,52 @@ bool isHiddenEntryName(String name) {
 }
 
 bool isHiddenSingleName(String name) {
-  if (name.startsWith('.')) return true;
+  if (name.isEmpty) return false;
+  final first = name.codeUnitAt(0);
+  if (first == 0x2E) return true; // '.'
+  // This runs once per entry on every listing rebuild, and nearly every name
+  // is an ordinary one. The system names below start with l, s, r, f or $
+  // (either case), so any other first character settles it without
+  // lower-casing the whole name. No non-ASCII character lower-cases to one
+  // of those five, so this cannot skip a name that would have matched.
+  switch (first | 0x20) {
+    case 0x6C: // l
+    case 0x73: // s
+    case 0x72: // r
+    case 0x66: // f
+    case 0x24: // $
+      break;
+    default:
+      return false;
+  }
   final lower = name.toLowerCase();
-  if (lower == 'lost+found' ||
-      lower == 'lost.dir' ||
-      lower == 'system volume information' ||
-      lower == '\$recycle.bin' ||
-      lower == 'recycled' ||
-      lower == 'recycler') {
-    return true;
+  switch (lower) {
+    case 'lost+found':
+    case 'lost.dir':
+    case 'system volume information':
+    case '\$recycle.bin':
+    case 'recycled':
+    case 'recycler':
+      return true;
   }
-  if (RegExp(r'^found\.\d+$', caseSensitive: false).hasMatch(lower)) {
-    return true;
+  return _isFoundDotDigits(lower);
+}
+
+/// `found.<digits>` (chkdsk's recovered-fragment folders), already
+/// lower-cased. Hand-rolled rather than a RegExp: the pattern was rebuilt on
+/// every call.
+bool _isFoundDotDigits(String lower) {
+  const prefix = 'found.';
+  if (lower.length <= prefix.length || !lower.startsWith(prefix)) return false;
+  for (var i = prefix.length; i < lower.length; i++) {
+    final c = lower.codeUnitAt(i);
+    if (c < 0x30 || c > 0x39) return false;
   }
-  return false;
+  return true;
 }
 
 bool matchesFilter(String fileName, String? currentFilter) {
   if (currentFilter == null) return true;
-  final ext = fileName.split('.').last;
   switch (currentFilter) {
     case 'image':
       return MediaViewerConstants.isImage(fileName);
@@ -94,10 +121,19 @@ bool matchesFilter(String fileName, String? currentFilter) {
     case 'audio':
       return MediaViewerConstants.isAudio(fileName);
     case 'document':
-      return kBrowserFilterDocumentExtensions.contains(ext.toLowerCase());
+      return kBrowserFilterDocumentExtensions.contains(
+        _extensionAfterLastDot(fileName).toLowerCase(),
+      );
     case 'secure':
-      return vaultIconForExt(ext) != null;
+      return vaultIconForExt(_extensionAfterLastDot(fileName)) != null;
     default:
       return true;
   }
+}
+
+/// Everything after the last '.', or the whole name when it has none --
+/// what `name.split('.').last` returns, without building the list.
+String _extensionAfterLastDot(String fileName) {
+  final dot = fileName.lastIndexOf('.');
+  return dot == -1 ? fileName : fileName.substring(dot + 1);
 }

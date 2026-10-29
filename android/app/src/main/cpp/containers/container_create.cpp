@@ -17,6 +17,7 @@
 #include "crypto/cascade.h"
 #include "crypto/keyfile_mixing.h"
 #include "crypto/luks_header.h"
+#include "crypto/os_random.h"
 #include "crypto/user_entropy.h"
 #include "crypto/vc_header_layout.h"
 #include "crypto/xts_tweak.h"
@@ -842,11 +843,8 @@ bool changeContainerPassword(int fd,
         if (!foundMatch) break;
 
         mbedtls_platform_zeroize(recoveredKeyMaterial, sizeof(recoveredKeyMaterial));
-        FILE* urandom = fopen("/dev/urandom", "rb");
-        if (!urandom) break;
         unsigned char newSalt[VC_SALT_SIZE];
-        fread(newSalt, 1, sizeof(newSalt), urandom);
-        fclose(urandom);
+        if (!osRandomBytes(newSalt, sizeof(newSalt))) break;
 
         int clampedNewPim = clampPim(newPim);
         unsigned char newHeaderKey[192] = {0};

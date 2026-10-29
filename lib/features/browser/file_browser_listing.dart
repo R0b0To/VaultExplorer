@@ -1,3 +1,5 @@
+import 'dart:collection';
+
 import 'package:flutter/foundation.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/features/browser/file_browser_predicates.dart';
@@ -23,6 +25,23 @@ int compareBrowserEntries(
     final bPinned = isPinned(eb, currentDirPath, pinnedPaths);
     if (aPinned != bPinned) return aPinned ? -1 : 1;
   }
+  return _compareDirsThenSort(
+    ea,
+    eb,
+    sortBy: sortBy,
+    sortAscending: sortAscending,
+  );
+}
+
+/// The part of [compareBrowserEntries] after the pinned check: folders
+/// first, then the chosen sort field. Shared so the cached sort in
+/// [buildBrowserListing] cannot drift from it.
+int _compareDirsThenSort(
+  RawEntry ea,
+  RawEntry eb, {
+  required SortBy sortBy,
+  required bool sortAscending,
+}) {
   if (ea.isDir != eb.isDir) return ea.isDir ? -1 : 1;
   return compareEntriesBySort(
     ea,
@@ -48,7 +67,7 @@ bool isVisibleInListing(
 }) {
   if (!showHidden && isHiddenEntryName(item.name)) return false;
   if (!skipQueryCheck) {
-    if (query.isNotEmpty && !item.name.toLowerCase().contains(query)) {
+    if (query.isNotEmpty && !item.lowercaseName.contains(query)) {
       return false;
     }
   }
@@ -208,16 +227,38 @@ BrowserListing buildBrowserListing(BrowserListingInputs inputs) {
     deepSearchResults: inputs.deepSearchResults,
     showHidden: inputs.showHidden,
     typeFilter: inputs.typeFilter,
-  )..sort(
-      (ea, eb) => compareBrowserEntries(
+  );
+
+  // With pinned paths, compareBrowserEntries builds two path strings per
+  // comparison (about n log n comparisons). Work out who is pinned once per
+  // entry instead and look it up by identity while sorting.
+  final pinnedPaths = inputs.pinnedPaths;
+  if (pinnedPaths.isEmpty) {
+    items.sort(
+      (ea, eb) => _compareDirsThenSort(
         ea,
         eb,
-        currentDirPath: inputs.currentDirPath,
-        pinnedPaths: inputs.pinnedPaths,
         sortBy: inputs.sortBy,
         sortAscending: inputs.sortAscending,
       ),
     );
+  } else {
+    final pinned = HashSet<RawEntry>.identity();
+    for (final item in items) {
+      if (isPinned(item, inputs.currentDirPath, pinnedPaths)) pinned.add(item);
+    }
+    items.sort((ea, eb) {
+      final aPinned = pinned.contains(ea);
+      final bPinned = pinned.contains(eb);
+      if (aPinned != bPinned) return aPinned ? -1 : 1;
+      return _compareDirsThenSort(
+        ea,
+        eb,
+        sortBy: inputs.sortBy,
+        sortAscending: inputs.sortAscending,
+      );
+    });
+  }
 
   var dirCount = 0;
   for (final item in items) {

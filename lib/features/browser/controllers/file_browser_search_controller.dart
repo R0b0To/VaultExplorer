@@ -21,6 +21,7 @@ import 'dart:async';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/core/utils/bounded_semaphore.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';
@@ -48,6 +49,17 @@ const _emptySearch = (
 );
 
 const _maxScanDepth = 20;
+
+/// Directory listings a deep search keeps in flight at once. The walk used to
+/// visit one folder at a time, so a search across a big tree paid one full
+/// platform-channel round trip per folder, back to back. Same bound
+/// MediaScanService uses for its tree walk, for the same reason: an
+/// unbounded fan-out is what froze the app there.
+const _searchListConcurrency = 6;
+
+/// Item Vault content reads in flight at once across the whole search (the
+/// per-folder batch size it used before the walk went concurrent).
+const _searchContentConcurrency = 12;
 
 @riverpod
 class FileBrowserSearch extends _$FileBrowserSearch {
@@ -228,6 +240,8 @@ class FileBrowserSearch extends _$FileBrowserSearch {
       q,
       gen,
       results,
+      listSlots: BoundedSemaphore(_searchListConcurrency),
+      contentSlots: BoundedSemaphore(_searchContentConcurrency),
       container: container,
       showHiddenFiles: showHiddenFiles,
       archiveContext: archiveContext,
@@ -267,6 +281,8 @@ class FileBrowserSearch extends _$FileBrowserSearch {
     String query,
     int generation,
     List<RawEntry> results, {
+    required BoundedSemaphore listSlots,
+    required BoundedSemaphore contentSlots,
     required MountedContainer container,
     required bool showHiddenFiles,
     required ArchiveContext? archiveContext,
@@ -277,15 +293,28 @@ class FileBrowserSearch extends _$FileBrowserSearch {
   }) async {
     if (generation != _generation || depth > maxDepth) return;
     try {
-      final rawList = await _listDirEntries(
-        dirPath,
-        container: container,
-        archiveContext: archiveContext,
-        archiveRootPath: archiveRootPath,
-      );
+      List<String>? rawList;
+      await listSlots.acquire();
+      try {
+        // A folder queued behind the others can reach the front long after
+        // the search it belonged to was replaced; don't spend a listing on it.
+        if (generation != _generation) return;
+        rawList = await _listDirEntries(
+          dirPath,
+          container: container,
+          archiveContext: archiveContext,
+          archiveRootPath: archiveRootPath,
+        );
+      } finally {
+        // Released before descending into the subfolders (below), not after:
+        // holding it for the whole subtree would leave the other slots idle.
+        listSlots.release();
+      }
       if (rawList == null || generation != _generation) return;
       final entries = RawEntry.parseAll(rawList);
-      final subdirs = <RawEntry>[];
+      // Only the names are kept for the descent below, so the parsed
+      // listing of this folder is not held for the lifetime of its subtree.
+      final subdirNames = <String>[];
       // Vault-item files the name check didn't already resolve, held back
       // for a batched content check below instead of reading them one at a
       // time inline here -- a folder with a few hundred Item Vault entries
@@ -297,7 +326,7 @@ class FileBrowserSearch extends _$FileBrowserSearch {
         if (!showHiddenFiles && isHiddenEntryName(entry.name)) {
           continue;
         }
-        final nameMatches = entry.name.toLowerCase().contains(query);
+        final nameMatches = entry.lowercaseName.contains(query);
         if (nameMatches) {
           results.add(_toResultEntry(entry, relativePrefix));
         } else if (!entry.isDir &&
@@ -310,56 +339,66 @@ class FileBrowserSearch extends _$FileBrowserSearch {
           contentCandidates.add(entry);
         }
         if (entry.isDir) {
-          subdirs.add(entry);
+          subdirNames.add(entry.name);
         }
       }
 
       if (contentCandidates.isNotEmpty) {
         // Item Vault entries are also found by the username/email they
         // hold, not just by their title -- the same way a password
-        // manager's own search works. Bounded-concurrency batches keep
-        // this from either serializing hundreds of small reads or firing
-        // them all at once.
-        const batchSize = 12;
-        for (var i = 0; i < contentCandidates.length; i += batchSize) {
-          if (generation != _generation) return;
-          final batch = contentCandidates.skip(i).take(batchSize).toList();
-          final matches = await Future.wait(
-            batch.map((entry) {
-              final fullPath = dirPath.isEmpty
-                  ? entry.name
-                  : '$dirPath/${entry.name}';
-              return _vaultItemContentMatches(container, fullPath, query);
-            }),
-          );
-          if (generation != _generation) return;
-          for (var b = 0; b < batch.length; b++) {
-            if (matches[b])
-              results.add(_toResultEntry(batch[b], relativePrefix));
+        // manager's own search works. [contentSlots] is shared by every
+        // folder being walked, so this stays at a bounded number of reads
+        // in flight overall instead of serializing hundreds of small reads
+        // or firing them all at once.
+        final matches = await Future.wait(
+          contentCandidates.map((entry) async {
+            final fullPath = dirPath.isEmpty
+                ? entry.name
+                : '$dirPath/${entry.name}';
+            await contentSlots.acquire();
+            try {
+              if (generation != _generation) return false;
+              return await _vaultItemContentMatches(container, fullPath, query);
+            } finally {
+              contentSlots.release();
+            }
+          }),
+        );
+        if (generation != _generation) return;
+        for (var b = 0; b < contentCandidates.length; b++) {
+          if (matches[b]) {
+            results.add(_toResultEntry(contentCandidates[b], relativePrefix));
           }
         }
       }
 
-      for (final sub in subdirs) {
-        if (generation != _generation) return;
-        final subRelPrefix = relativePrefix.isEmpty
-            ? sub.name
-            : '$relativePrefix/${sub.name}';
-        final subFullPath = dirPath.isEmpty ? sub.name : '$dirPath/${sub.name}';
-        await _scanDirectoryForQuery(
-          subFullPath,
-          query,
-          generation,
-          results,
-          container: container,
-          showHiddenFiles: showHiddenFiles,
-          archiveContext: archiveContext,
-          archiveRootPath: archiveRootPath,
-          relativePrefix: subRelPrefix,
-          maxDepth: maxDepth,
-          depth: depth + 1,
-        );
-      }
+      if (subdirNames.isEmpty) return;
+      // Subfolders are walked concurrently (bounded by [listSlots]). The
+      // order matches are found in therefore varies from run to run, which
+      // is fine: every consumer of the results sorts them.
+      await Future.wait(
+        subdirNames.map((name) {
+          final subRelPrefix = relativePrefix.isEmpty
+              ? name
+              : '$relativePrefix/$name';
+          final subFullPath = dirPath.isEmpty ? name : '$dirPath/$name';
+          return _scanDirectoryForQuery(
+            subFullPath,
+            query,
+            generation,
+            results,
+            listSlots: listSlots,
+            contentSlots: contentSlots,
+            container: container,
+            showHiddenFiles: showHiddenFiles,
+            archiveContext: archiveContext,
+            archiveRootPath: archiveRootPath,
+            relativePrefix: subRelPrefix,
+            maxDepth: maxDepth,
+            depth: depth + 1,
+          );
+        }),
+      );
     } catch (e) {
       VeLog.e(
         'FileBrowserSearch',
@@ -369,12 +408,10 @@ class FileBrowserSearch extends _$FileBrowserSearch {
     }
   }
 
-  RawEntry _toResultEntry(RawEntry entry, String relativePrefix) => RawEntry(
-    name: relativePrefix.isEmpty ? entry.name : '$relativePrefix/${entry.name}',
-    isDir: entry.isDir,
-    sizeBytes: entry.sizeBytes,
-    modifiedSecs: entry.modifiedSecs,
-  );
+  RawEntry _toResultEntry(RawEntry entry, String relativePrefix) =>
+      relativePrefix.isEmpty
+      ? entry.withName(entry.name)
+      : entry.withName('$relativePrefix/${entry.name}');
 
   /// Whether the Item Vault entry at [fullPath] matches [query] by one of
   /// [kVaultItemSearchableFieldKeys] rather than by its file name -- e.g.

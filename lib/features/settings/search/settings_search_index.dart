@@ -456,10 +456,12 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
     (l) => l.tabEdgeSwipeLabel,
     section: (l) => l.browserLayoutSectionHeader,
     details: [
-      (l) => l.tabEdgeSwipeDrawerAndNewTabDesc,
-      (l) => l.tabEdgeSwipeLoopDesc,
-      (l) => l.tabEdgeSwipeNoEdgeActionsDesc,
-      (l) => l.tabEdgeSwipeNoTabSwipingDesc,
+      (l) => l.tabSwipeBetweenTabsTitle,
+      (l) => l.tabSwipeActionNewTab,
+      (l) => l.tabSwipeActionOpenDrawer,
+      (l) => l.tabSwipeActionLoopFirst,
+      (l) => l.tabSwipeActionLoopLast,
+      (l) => l.tabSwipeActionNothing,
     ],
     keywords: [
       'loop',

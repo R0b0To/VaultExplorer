@@ -15,7 +15,7 @@ import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
-import 'package:vaultexplorer/data/models/browser_tab_edge_swipe.dart';
+import 'package:vaultexplorer/data/models/tab_swipe_gestures.dart';
 import 'package:vaultexplorer/data/models/external_storage_location.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
@@ -243,8 +243,8 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   double _edgeOverscrollForward = 0;
   double _edgeOverscrollBackward = 0;
 
-  /// Whether a left swipe anywhere offers a new tab (the "no tab swiping"
-  /// setting). Kept up to date by the build.
+  /// Whether a left swipe anywhere offers a new tab (tab swiping off, left
+  /// swipe set to open a new tab). Kept up to date by the build.
   bool _newTabSwipeAnywhere = false;
   int _pointersDown = 0;
   Duration _lastPointerEventTime = Duration.zero;
@@ -866,9 +866,10 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   }
 
   /// Watches horizontal drags for being pulled past the first or last tab and
-  /// acts on them as the person's tab-edge-swipe setting says: offer a new tab
-  /// past the last one (the first tab's right swipe belongs to the drawer), or
-  /// wrap around to the tab at the other end.
+  /// acts on them as the person's tab swipe gestures say: offer a new tab or
+  /// wrap around to the first tab past the last one, and wrap around to the
+  /// last tab past the first one. (A right swipe that opens the drawer is the
+  /// drawer's own business.)
   ///
   /// [pane] is the pane whose pager was swiped in the dual-pane layout: its
   /// ends are the first and last tab of that pane's group. Null is the single
@@ -894,7 +895,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       _edgeSwipeEligible =
           notification.dragDetails != null &&
           settings.useBrowserTabs &&
-          settings.tabEdgeSwipe.hasEdgeActions &&
+          settings.tabSwipeGestures.actsPastTheEnds &&
           shownIndex >= 0;
       if (_edgeSwipeEligible) {
         _edgeSwipeStartedAtFirst = shownIndex == 0;
@@ -943,33 +944,48 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       _resetEdgeSwipe();
       if (_drawerOpenOrDragging || _edgeDrawerGestureActive) return;
 
-      final loops = ref
+      final gestures = ref
           .read(appSettingsControllerProvider)
           .settings
-          .tabEdgeSwipe
-          .loops;
-      if (loops) {
-        final tabCount = swipePane == null
-            ? _workspaceState.tabs.length
-            : _workspaceState.paneTabCount(swipePane);
-        if (tabCount < 2) return;
-        final wantsNext =
-            forward >= _newTabSwipeThreshold ||
-            (forward >= _loopFlingMinOverscroll &&
-                velocity <= -_loopFlingVelocity);
-        final wantsPrevious =
-            backward >= _newTabSwipeThreshold ||
-            (backward >= _loopFlingMinOverscroll &&
-                velocity >= _loopFlingVelocity);
-        if (startedAtLast && wantsNext) {
-          _scheduleLoopTo(0, pane: swipePane);
-        } else if (startedAtFirst && wantsPrevious) {
-          _scheduleLoopTo(tabCount - 1, pane: swipePane);
+          .tabSwipeGestures;
+      final tabCount = swipePane == null
+          ? _workspaceState.tabs.length
+          : _workspaceState.paneTabCount(swipePane);
+      // A slow drag has to travel the full threshold; a quick flick loops with
+      // less travel.
+      final wantsNext =
+          forward >= _newTabSwipeThreshold ||
+          (forward >= _loopFlingMinOverscroll &&
+              velocity <= -_loopFlingVelocity);
+      final wantsPrevious =
+          backward >= _newTabSwipeThreshold ||
+          (backward >= _loopFlingMinOverscroll &&
+              velocity >= _loopFlingVelocity);
+
+      // Left swipe past the last tab. The right swipe past the first tab is
+      // either the drawer's (it handles its own swipe) or a loop, so only the
+      // loop is dealt with here.
+      if (startedAtLast) {
+        switch (gestures.leftSwipe) {
+          case TabLeftSwipeAction.newTab:
+            if (forward >= _newTabSwipeThreshold) {
+              _scheduleNewTabPrompt(pane: swipePane);
+              return;
+            }
+          case TabLeftSwipeAction.loopToFirst:
+            if (tabCount >= 2 && wantsNext) {
+              _scheduleLoopTo(0, pane: swipePane);
+              return;
+            }
+          case TabLeftSwipeAction.nothing:
+            break;
         }
-        return;
       }
-      if (startedAtLast && forward >= _newTabSwipeThreshold) {
-        _scheduleNewTabPrompt(pane: swipePane);
+      if (startedAtFirst &&
+          gestures.rightSwipe == TabRightSwipeAction.loopToLast &&
+          tabCount >= 2 &&
+          wantsPrevious) {
+        _scheduleLoopTo(tabCount - 1, pane: swipePane);
       }
     }
   }
@@ -1213,8 +1229,8 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
         (s) => s.settings.useDualPaneBrowsing,
       ),
     );
-    final tabEdgeSwipe = ref.watch(
-      appSettingsControllerProvider.select((s) => s.settings.tabEdgeSwipe),
+    final tabSwipe = ref.watch(
+      appSettingsControllerProvider.select((s) => s.settings.tabSwipeGestures),
     );
     final appBarAtBottom = ref.watch(
       appSettingsControllerProvider.select((s) => s.settings.appBarAtBottom),
@@ -1255,15 +1271,16 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     final isFirstTab =
         focusedTabs.first.tabId == activeTabId &&
         (!dualPaneForTabStrip || focusedPane == TabPane.primary);
-    // Swiping past an end wraps around, within the tabs of the pager swiped.
-    final loopTabs =
+    // Swiping right past the first tab wraps around to the last one, within
+    // the tabs of the pager swiped. There has to be another tab to wrap to.
+    final loopsBackward =
         tabsEnabled &&
         (dualPaneForTabStrip ? focusedTabs.length > 1 : hasMultipleTabs) &&
-        tabEdgeSwipe.loops;
-    // Without tab swiping every tab acts like the first one: the side menu
-    // opens from any tab, and a left swipe anywhere offers a new tab.
-    final tabSwipingOff = tabsEnabled && !tabEdgeSwipe.swipesBetweenTabs;
-    _newTabSwipeAnywhere = tabSwipingOff;
+        tabSwipe.loopsBackward;
+    // Without tab swiping every tab acts like both the first and the last
+    // one: the two swipe gestures then work anywhere on the screen.
+    final tabSwipingOff = tabsEnabled && !tabSwipe.swipeBetweenTabs;
+    _newTabSwipeAnywhere = tabsEnabled && tabSwipe.leftSwipeAnywhereOpensNewTab;
     final systemBackGestureInsetLeft = MediaQuery.systemGestureInsetsOf(
       context,
     ).left;
@@ -1426,7 +1443,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                           _publishVisibleTabs({firstId, secondId});
                           final swipeEnabled =
                               tabsEnabled &&
-                              tabEdgeSwipe.swipesBetweenTabs &&
+                              tabSwipe.swipeBetweenTabs &&
                               !_drawerOpenOrDragging &&
                               !_edgeDrawerGestureActive;
                           return Row(
@@ -1516,7 +1533,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                                     gate: _swipeGate,
                                     parent:
                                         tabsEnabled &&
-                                            tabEdgeSwipe.swipesBetweenTabs &&
+                                            tabSwipe.swipeBetweenTabs &&
                                             !_drawerOpenOrDragging &&
                                             !_edgeDrawerGestureActive
                                         ? const AlwaysScrollableScrollPhysics()
@@ -1636,21 +1653,19 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
         edgeGestureTopBuilder: browserChromeBottom,
         canStartGestureAt: canStartDrawerGestureAt,
         // Reserve the left edge of the viewport for drawer opening while the
-        // PageView keeps native swipes everywhere else. On the first tab a right
-        // swipe may open it from anywhere, unless that swipe is what loops the
-        // tabs round to the last one or the person turned that action off. With
-        // tab swiping off there is no pager to keep out of the way.
+        // PageView keeps native swipes everywhere else. The right swipe opens
+        // it from anywhere only when the person chose that for it: on the
+        // first tab, or on any tab once tab swiping is off (there is no pager
+        // to keep out of the way). A right swipe that loops the tabs round to
+        // the last one leaves the drawer to the screen edge, unless there is
+        // no other tab to loop to. With tabs off the drawer is always free.
         canOpenFromAnywhere:
-            !(tabsEnabled && hasMultipleTabs) ||
-            tabSwipingOff ||
-            (isFirstTab &&
-                switch (tabEdgeSwipe) {
-                  BrowserTabEdgeSwipe.drawerAndNewTab => true,
-                  // Side by side there is no pager to loop, so the swipe is free.
-                  BrowserTabEdgeSwipe.loop => !loopTabs,
-                  BrowserTabEdgeSwipe.noEdgeActions ||
-                  BrowserTabEdgeSwipe.noTabSwiping => false,
-                }),
+            !tabsEnabled ||
+            switch (tabSwipe.rightSwipe) {
+              TabRightSwipeAction.openDrawer => tabSwipingOff || isFirstTab,
+              TabRightSwipeAction.loopToLast => isFirstTab && !loopsBackward,
+              TabRightSwipeAction.nothing => false,
+            },
         backGestureInsetLeft: systemBackGestureInsetLeft < 24
             ? 24
             : systemBackGestureInsetLeft,

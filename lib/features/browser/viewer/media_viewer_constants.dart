@@ -94,23 +94,35 @@ static const List<String> audioExtensions = [
   'aif', 'aifc', 'amr', 'awb', 'mka', 'weba', 'oga',
 ];
 
-  static bool isImage(String fileName) {
-    final ext = fileName.split('.').last.toLowerCase();
-    return imageExtensions.contains(ext);
+  // Looked up per file name while filtering, scanning and building cells, so
+  // membership is a hash lookup instead of a scan of the list, and the
+  // extension is cut out with lastIndexOf instead of split('.') (which builds
+  // a throwaway list for every call).
+  static final Set<String> _imageExtensionSet = imageExtensions.toSet();
+  static final Set<String> _videoExtensionSet = videoExtensions.toSet();
+  static final Set<String> _audioExtensionSet = audioExtensions.toSet();
+
+  /// What `fileName.split('.').last.toLowerCase()` returns: the text after
+  /// the last '.', or the whole name when it has none.
+  static String _lowerExtension(String fileName) {
+    final dot = fileName.lastIndexOf('.');
+    return (dot == -1 ? fileName : fileName.substring(dot + 1)).toLowerCase();
   }
 
-  static bool isVideo(String fileName) {
-    final ext = fileName.split('.').last.toLowerCase();
-    return videoExtensions.contains(ext);
-  }
+  static bool isImage(String fileName) =>
+      _imageExtensionSet.contains(_lowerExtension(fileName));
 
-  static bool isAudio(String fileName) {
-    final ext = fileName.split('.').last.toLowerCase();
-    return audioExtensions.contains(ext);
-  }
+  static bool isVideo(String fileName) =>
+      _videoExtensionSet.contains(_lowerExtension(fileName));
+
+  static bool isAudio(String fileName) =>
+      _audioExtensionSet.contains(_lowerExtension(fileName));
 
   static bool isSupported(String fileName) {
-    return isImage(fileName) || isVideo(fileName) || isAudio(fileName);
+    final ext = _lowerExtension(fileName);
+    return _imageExtensionSet.contains(ext) ||
+        _videoExtensionSet.contains(ext) ||
+        _audioExtensionSet.contains(ext);
   }
 
   /// Whether a file named [fileName] would render as an actual decoded
@@ -143,7 +155,8 @@ static const List<String> audioExtensions = [
     bool isPlaceholder = false,
   }) {
     if (isPlaceholder) return false;
-    final ext = fileName.contains('.') ? fileName.split('.').last : '';
+    final dot = fileName.lastIndexOf('.');
+    final ext = dot == -1 ? '' : fileName.substring(dot + 1);
     if (vaultIconForExt(ext) != null) return false;
     return isImage(fileName) || isVideo(fileName);
   }

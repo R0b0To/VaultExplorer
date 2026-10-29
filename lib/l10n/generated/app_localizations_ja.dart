@@ -5846,6 +5846,12 @@ class AppLocalizationsJa extends AppLocalizations {
   String get fileInfoAction => '情報';
 
   @override
+  String get goToLocationAction => '場所へ移動';
+
+  @override
+  String get copyPathAction => 'パスをコピー';
+
+  @override
   String get automationSectionHeader => '自動化';
 
   @override
@@ -11989,4 +11995,49 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get cameraPauseFailedMessage => '録画の一時停止または再開ができませんでした';
+
+  @override
+  String get floatingPlayerTitle => 'フローティング動画プレーヤー';
+
+  @override
+  String get floatingPlayerSubtitle =>
+      '動画の再生中にプレーヤーを閉じると、移動できる小さなウィンドウで再生を続けます。アプリを離れるとピクチャーインピクチャーに切り替わり、音声のみのボタンが表示されます';
+
+  @override
+  String get floatingPlayerExpandTooltip => '拡大';
+
+  @override
+  String get masterLockTitle => 'マスターロック';
+
+  @override
+  String get masterLockInactiveSubtitle => 'アプリを開く際にパスワード、PIN、またはパターンを要求する';
+
+  @override
+  String get masterLockChooseTitle => 'アプリのロック方法を選択';
+
+  @override
+  String get masterLockBackupTitle => 'バックアップ用のロック解除を追加';
+
+  @override
+  String get masterLockBackupMessage =>
+      '生体認証によるロック解除には、代替手段としてパスワード、PIN、またはパターンが必要です。あわせて設定するものを選んでください。';
+
+  @override
+  String get masterCredentialPassword => 'パスワード';
+
+  @override
+  String get masterCredentialPin => 'PIN';
+
+  @override
+  String get masterCredentialPattern => 'パターン';
+
+  @override
+  String get masterCredentialSet => '設定済み';
+
+  @override
+  String get masterCredentialNotSet => '未設定';
+
+  @override
+  String get duressMasterLockRequired =>
+      '強要解除を設定する前に、セキュリティでマスターロックを有効にする必要があります。';
 }

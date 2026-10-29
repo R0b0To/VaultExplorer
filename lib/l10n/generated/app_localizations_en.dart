@@ -6060,6 +6060,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fileInfoAction => 'Info';
 
   @override
+  String get goToLocationAction => 'Go to location';
+
+  @override
+  String get copyPathAction => 'Copy path';
+
+  @override
   String get automationSectionHeader => 'Automation';
 
   @override
@@ -12496,4 +12502,50 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get cameraPauseFailedMessage =>
       'Could not pause or resume the recording';
+
+  @override
+  String get floatingPlayerTitle => 'Floating video player';
+
+  @override
+  String get floatingPlayerSubtitle =>
+      'Closing the player while a video plays keeps it in a small window you can move around. Leaving the app turns it into picture-in-picture, with an audio-only button';
+
+  @override
+  String get floatingPlayerExpandTooltip => 'Expand';
+
+  @override
+  String get masterLockTitle => 'Master Lock';
+
+  @override
+  String get masterLockInactiveSubtitle =>
+      'Require a password, PIN, or pattern to open the app';
+
+  @override
+  String get masterLockChooseTitle => 'Choose how to lock the app';
+
+  @override
+  String get masterLockBackupTitle => 'Add a backup unlock';
+
+  @override
+  String get masterLockBackupMessage =>
+      'Biometric unlock needs a password, PIN, or pattern to fall back on. Choose one to set up as well.';
+
+  @override
+  String get masterCredentialPassword => 'Password';
+
+  @override
+  String get masterCredentialPin => 'PIN';
+
+  @override
+  String get masterCredentialPattern => 'Pattern';
+
+  @override
+  String get masterCredentialSet => 'Set';
+
+  @override
+  String get masterCredentialNotSet => 'Not set';
+
+  @override
+  String get duressMasterLockRequired =>
+      'A master lock must be enabled in App Security before configuring duress unlock.';
 }

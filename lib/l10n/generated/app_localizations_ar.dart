@@ -6232,6 +6232,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get fileInfoAction => 'معلومات';
 
   @override
+  String get goToLocationAction => 'الانتقال إلى الموقع';
+
+  @override
+  String get copyPathAction => 'نسخ المسار';
+
+  @override
   String get automationSectionHeader => 'الأتمتة';
 
   @override
@@ -12719,4 +12725,50 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get cameraPauseFailedMessage =>
       'تعذر إيقاف التسجيل مؤقتًا أو استئنافه';
+
+  @override
+  String get floatingPlayerTitle => 'مشغّل فيديو عائم';
+
+  @override
+  String get floatingPlayerSubtitle =>
+      'عند إغلاق المشغّل أثناء تشغيل فيديو، يستمر التشغيل في نافذة صغيرة يمكنك تحريكها. وعند مغادرة التطبيق يتحول إلى صورة داخل صورة مع زر للصوت فقط';
+
+  @override
+  String get floatingPlayerExpandTooltip => 'توسيع';
+
+  @override
+  String get masterLockTitle => 'القفل الرئيسي';
+
+  @override
+  String get masterLockInactiveSubtitle =>
+      'طلب كلمة مرور أو رمز PIN أو نمط لفتح التطبيق';
+
+  @override
+  String get masterLockChooseTitle => 'اختر طريقة قفل التطبيق';
+
+  @override
+  String get masterLockBackupTitle => 'أضف طريقة فتح احتياطية';
+
+  @override
+  String get masterLockBackupMessage =>
+      'يحتاج الفتح بالبصمة الحيوية إلى كلمة مرور أو رمز PIN أو نمط كخيار احتياطي. اختر واحدًا لإعداده أيضًا.';
+
+  @override
+  String get masterCredentialPassword => 'كلمة المرور';
+
+  @override
+  String get masterCredentialPin => 'PIN';
+
+  @override
+  String get masterCredentialPattern => 'النمط';
+
+  @override
+  String get masterCredentialSet => 'تم التعيين';
+
+  @override
+  String get masterCredentialNotSet => 'غير معيّن';
+
+  @override
+  String get duressMasterLockRequired =>
+      'يجب تمكين القفل الرئيسي في أمان التطبيق قبل تكوين فتح الإكراه.';
 }

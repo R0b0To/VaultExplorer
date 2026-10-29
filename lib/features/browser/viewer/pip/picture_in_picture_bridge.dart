@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show Rect;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -14,14 +15,16 @@ import 'package:vaultexplorer/core/utils/ve_log.dart';
 /// Dart side of Android's system picture-in-picture (see
 /// `PictureInPictureController.kt`).
 ///
-/// Two ways to get a video into the PiP window:
-///  * [startWindow], the viewer's button: a separate window activity takes
-///    over the video while the app itself stays usable behind it. The window
-///    reports back on [windowEvents] (`entered`, `expanded`, `closed`,
+/// Ways to get a video into the PiP window:
+///  * the app itself becomes the window: when it is left ([setState], with the
+///    floating player, or the "automatic picture-in-picture" setting) or right
+///    away ([enterNow], the viewer's button). Reported through
+///    [isInPictureInPicture] and [windowDismissed]. This is the seamless one:
+///    the same activity keeps playing the same video.
+///  * [startWindow], a fallback: a separate window activity takes over the
+///    video while the app stays usable behind it. The window reports back on
+///    [windowEvents] (`entered`, `expanded`, `closed`, `audioOnly`,
 ///    `failed`); [closeWindow] ends it.
-///  * [setState], the "automatic picture-in-picture" setting: the whole app
-///    becomes the PiP window when it is left, reported through
-///    [isInPictureInPicture] and [windowDismissed].
 class PictureInPictureBridge {
   PictureInPictureBridge._();
 
@@ -42,7 +45,9 @@ class PictureInPictureBridge {
       StreamController<String>.broadcast();
 
   /// What the PiP window activity did: `entered`, `expanded` (the person tapped
-  /// it to go back to the app), `closed` (they dismissed it) or `failed`.
+  /// it to go back to the app), `closed` (they dismissed it), `audioOnly` (they
+  /// pressed its "audio only" button: the window is gone, the sound carries on)
+  /// or `failed`.
   static Stream<String> get windowEvents => _windowEvents.stream;
 
   static final StreamController<void> _dismissed =
@@ -148,18 +153,60 @@ class PictureInPictureBridge {
     }
   }
 
+  /// Puts the app itself into the picture-in-picture window right now (the
+  /// viewer's button), at [width] : [height], animating from [sourceRect] (see
+  /// [setState]). It is the same activity that is already playing the video, so
+  /// nothing is handed over and the video just carries on, which is what
+  /// makes this seamless where [startWindow] (a second window) is not.
+  /// Returns false when the system would not enter PiP.
+  static Future<bool> enterNow({
+    required int width,
+    required int height,
+    Rect? sourceRect,
+  }) async {
+    try {
+      return await _channel.invokeMethod<bool>('enterNow', {
+            'width': width,
+            'height': height,
+            ..._rectArguments(sourceRect),
+          }) ??
+          false;
+    } on PlatformException catch (e) {
+      VeLog.w('PictureInPicture', 'enterNow failed', e);
+      return false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
+
+  static Map<String, int> _rectArguments(Rect? rect) => rect == null
+      ? const <String, int>{}
+      : <String, int>{
+          'left': rect.left.round(),
+          'top': rect.top.round(),
+          'right': rect.right.round(),
+          'bottom': rect.bottom.round(),
+        };
+
   /// Tells the platform whether to enter PiP when the person leaves the app,
   /// and at what aspect ratio ([width] : [height]).
+  ///
+  /// [sourceRect] is where the video is on screen, in physical pixels of the
+  /// app's own view. Android animates from that area into the PiP window (and
+  /// back out of it), so the video is what visibly shrinks, rather than the
+  /// whole app with the video appearing afterwards.
   static Future<void> setState({
     required bool armed,
     required int width,
     required int height,
+    Rect? sourceRect,
   }) async {
     try {
       await _channel.invokeMethod<bool>('setState', {
         'armed': armed,
         'width': width,
         'height': height,
+        ..._rectArguments(sourceRect),
       });
     } on PlatformException catch (e) {
       VeLog.w('PictureInPicture', 'setState failed', e);

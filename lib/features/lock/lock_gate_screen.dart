@@ -72,9 +72,31 @@ class _LockGateScreenState extends ConsumerState<LockGateScreen> {
     }
   }
 
+  /// The credential the gate is showing right now: the active method, or the
+  /// one the person (or a failed biometric prompt) moved to.
+  MasterUnlockMethod _shownMethod(AppSettings s, LockGateState state) {
+    if (!state.showPasswordFallback) return s.masterUnlockMethod;
+    return state.fallbackCredential ?? _defaultFallback(s, state);
+  }
+
+  /// Where the gate goes when it leaves the active method without being told
+  /// where: the first other credential that is set. Password entry also
+  /// counts while a duress password exists, so it can still be typed on a
+  /// PIN- or pattern-only lock.
+  MasterUnlockMethod _defaultFallback(AppSettings s, LockGateState state) {
+    final primary = s.masterUnlockMethod;
+    final other = s.masterFallbackFor(primary);
+    if (other != null) return other;
+    if (state.duressPasswordEntry && primary != MasterUnlockMethod.password) {
+      return MasterUnlockMethod.password;
+    }
+    if (primary.isCredential) return primary;
+    return s.configuredMasterCredentials.firstOrNull ??
+        MasterUnlockMethod.password;
+  }
+
   _LockGateCredential _credentialFor(AppSettings s, LockGateState state) {
-    if (state.showPasswordFallback) return _LockGateCredential.password;
-    switch (s.masterUnlockMethod) {
+    switch (_shownMethod(s, state)) {
       case MasterUnlockMethod.biometrics:
         return _LockGateCredential.biometric;
       case MasterUnlockMethod.pattern:
@@ -85,6 +107,83 @@ class _LockGateScreenState extends ConsumerState<LockGateScreen> {
         return _LockGateCredential.password;
     }
   }
+
+  /// The other ways in from [shown]: every other credential that is set, and
+  /// biometrics when they are the active method and the gate has moved off
+  /// them.
+  List<MasterUnlockMethod> _switchTargets(
+    AppSettings s,
+    LockGateState state,
+    MasterUnlockMethod shown,
+  ) => [
+    for (final m in MasterUnlockMethod.credentials)
+      if (m != shown &&
+          (s.hasMasterCredentialFor(m) ||
+              (m == MasterUnlockMethod.password && state.duressPasswordEntry)))
+        m,
+    if (s.masterUnlockMethod == MasterUnlockMethod.biometrics &&
+        shown != MasterUnlockMethod.biometrics)
+      MasterUnlockMethod.biometrics,
+  ];
+
+  Widget _switchButton(MasterUnlockMethod target) {
+    final l10n = context.l10n;
+    final notifier = ref.read(lockGateProvider.notifier);
+    void onTap() {
+      _pwCtrl.clear();
+      if (target == MasterUnlockMethod.biometrics) {
+        notifier.setShowPasswordFallback(false);
+        notifier.tryBiometric(l10n);
+      } else {
+        notifier.showCredential(target);
+      }
+    }
+
+    if (target == MasterUnlockMethod.password) {
+      return TextButton(
+        onPressed: onTap,
+        child: Text(l10n.usePasswordInsteadButtonLabel),
+      );
+    }
+    return TextButton.icon(
+      onPressed: onTap,
+      icon: Icon(target.icon, size: 18),
+      label: Text(target.getLocalizedLabel(l10n)),
+    );
+  }
+
+  /// The button next to "Authenticate" on the biometric screen that moves to
+  /// the credential behind it, or null when there is nowhere to go.
+  Widget? _biometricFallbackButton(
+    AppSettings s,
+    LockGateState state,
+    double height,
+  ) {
+    if (s.configuredMasterCredentials.isEmpty && !state.duressPasswordEntry) {
+      return null;
+    }
+    final l10n = context.l10n;
+    final fallback = _defaultFallback(s, state);
+    return OutlinedButton(
+      onPressed: () =>
+          ref.read(lockGateProvider.notifier).setShowPasswordFallback(true),
+      style: OutlinedButton.styleFrom(minimumSize: Size(0, height)),
+      child: Text(
+        fallback == MasterUnlockMethod.password
+            ? l10n.usePasswordButtonLabel
+            : fallback.getLocalizedLabel(l10n),
+      ),
+    );
+  }
+
+  /// One button per way to switch away from [shown]; empty when there is none.
+  List<Widget> _buildSwitchButtons(
+    AppSettings s,
+    LockGateState state,
+    MasterUnlockMethod shown,
+  ) => [
+    for (final target in _switchTargets(s, state, shown)) _switchButton(target),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -200,13 +299,10 @@ class _LockGateScreenState extends ConsumerState<LockGateScreen> {
                               if (credential == _LockGateCredential.pattern ||
                                   credential == _LockGateCredential.pin) ...[
                                 const SizedBox(height: 8),
-                                TextButton(
-                                  onPressed: () => ref
-                                      .read(lockGateProvider.notifier)
-                                      .setShowPasswordFallback(true),
-                                  child: Text(
-                                    context.l10n.usePasswordInsteadButtonLabel,
-                                  ),
+                                ..._buildSwitchButtons(
+                                  s,
+                                  state,
+                                  _shownMethod(s, state),
                                 ),
                               ],
                             ],
@@ -337,6 +433,11 @@ class _LockGateScreenState extends ConsumerState<LockGateScreen> {
         );
 
       case _LockGateCredential.biometric:
+        final landscapeBioFallback = _biometricFallbackButton(
+          state.settings!,
+          state,
+          44,
+        );
         return ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 320),
           child: Column(
@@ -357,18 +458,10 @@ class _LockGateScreenState extends ConsumerState<LockGateScreen> {
               const SizedBox(height: 18),
               Row(
                 children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => ref
-                          .read(lockGateProvider.notifier)
-                          .setShowPasswordFallback(true),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(0, 44),
-                      ),
-                      child: Text(context.l10n.usePasswordButtonLabel),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
+                  if (landscapeBioFallback != null) ...[
+                    Expanded(child: landscapeBioFallback),
+                    const SizedBox(width: 12),
+                  ],
                   Expanded(
                     child: FilledButton(
                       onPressed: isLockedOut
@@ -389,10 +482,11 @@ class _LockGateScreenState extends ConsumerState<LockGateScreen> {
         );
 
      case _LockGateCredential.password:
-        final method = state.settings?.masterUnlockMethod;
-        final canSwitchBack = state.showPasswordFallback &&
-            method != null &&
-            method != MasterUnlockMethod.password;
+        final passwordSwitchButtons = _buildSwitchButtons(
+          state.settings!,
+          state,
+          MasterUnlockMethod.password,
+        );
         return ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 340),
           child: AutofillGroup(
@@ -447,23 +541,9 @@ class _LockGateScreenState extends ConsumerState<LockGateScreen> {
                         )
                       : Text(context.l10n.unlock),
                 ),
-                if (canSwitchBack) ...[
+                if (passwordSwitchButtons.isNotEmpty) ...[
                   const SizedBox(height: 8),
-                  TextButton.icon(
-                    onPressed: () {
-                      _pwCtrl.clear();
-                      ref
-                          .read(lockGateProvider.notifier)
-                          .setShowPasswordFallback(false);
-                      if (method == MasterUnlockMethod.biometrics) {
-                        ref
-                            .read(lockGateProvider.notifier)
-                            .tryBiometric(context.l10n);
-                      }
-                    },
-                    icon: Icon(method.icon, size: 18),
-                    label: Text(method.getLocalizedLabel(context.l10n)),
-                  ),
+                  ...passwordSwitchButtons,
                 ],
               ],
             ),
@@ -481,6 +561,11 @@ class _LockGateScreenState extends ConsumerState<LockGateScreen> {
   }) {
     switch (credential) {
       case _LockGateCredential.biometric:
+        final portraitBioFallback = _biometricFallbackButton(
+          state.settings!,
+          state,
+          48,
+        );
         return [
           Container(
             padding: const EdgeInsets.all(20),
@@ -505,18 +590,10 @@ class _LockGateScreenState extends ConsumerState<LockGateScreen> {
           const SizedBox(height: 24),
           Row(
             children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => ref
-                      .read(lockGateProvider.notifier)
-                      .setShowPasswordFallback(true),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(0, 48),
-                  ),
-                  child: Text(context.l10n.usePasswordButtonLabel),
-                ),
-              ),
-              const SizedBox(width: 12),
+              if (portraitBioFallback != null) ...[
+                Expanded(child: portraitBioFallback),
+                const SizedBox(width: 12),
+              ],
               Expanded(
                 child: FilledButton(
                   onPressed: isLockedOut
@@ -563,11 +640,10 @@ class _LockGateScreenState extends ConsumerState<LockGateScreen> {
             ),
           ],
           const SizedBox(height: 12),
-          TextButton(
-            onPressed: () => ref
-                .read(lockGateProvider.notifier)
-                .setShowPasswordFallback(true),
-            child: Text(context.l10n.usePasswordInsteadButtonLabel),
+          ..._buildSwitchButtons(
+            state.settings!,
+            state,
+            _shownMethod(state.settings!, state),
           ),
         ];
 
@@ -600,19 +676,19 @@ class _LockGateScreenState extends ConsumerState<LockGateScreen> {
             ),
           ],
           const SizedBox(height: 12),
-          TextButton(
-            onPressed: () => ref
-                .read(lockGateProvider.notifier)
-                .setShowPasswordFallback(true),
-            child: Text(context.l10n.usePasswordInsteadButtonLabel),
+          ..._buildSwitchButtons(
+            state.settings!,
+            state,
+            _shownMethod(state.settings!, state),
           ),
         ];
 
       case _LockGateCredential.password:
-        final method = state.settings?.masterUnlockMethod;
-        final canSwitchBack = state.showPasswordFallback &&
-            method != null &&
-            method != MasterUnlockMethod.password;
+        final passwordSwitchButtons = _buildSwitchButtons(
+          state.settings!,
+          state,
+          MasterUnlockMethod.password,
+        );
         return [
           TextField(
             controller: _pwCtrl,
@@ -662,23 +738,9 @@ class _LockGateScreenState extends ConsumerState<LockGateScreen> {
                   )
                 : Text(context.l10n.unlock),
           ),
-          if (canSwitchBack) ...[
+          if (passwordSwitchButtons.isNotEmpty) ...[
             const SizedBox(height: 12),
-            TextButton.icon(
-              onPressed: () {
-                _pwCtrl.clear();
-                ref
-                    .read(lockGateProvider.notifier)
-                    .setShowPasswordFallback(false);
-                if (method == MasterUnlockMethod.biometrics) {
-                  ref
-                      .read(lockGateProvider.notifier)
-                      .tryBiometric(context.l10n);
-                }
-              },
-              icon: Icon(method.icon, size: 18),
-              label: Text(method.getLocalizedLabel(context.l10n)),
-            ),
+            ...passwordSwitchButtons,
           ],
         ];
     }

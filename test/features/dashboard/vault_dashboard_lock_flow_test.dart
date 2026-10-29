@@ -27,8 +27,9 @@ class FakeAppSettingsService extends AppSettingsService {
   Future<void> saveMasterPassword(
     AppSettings settings,
     String hash,
-    String salt,
-  ) async {}
+    String salt, {
+    bool makeActive = true,
+  }) async {}
 
   @override
   Future<void> clearMasterPassword(AppSettings settings) async {}

@@ -46,6 +46,7 @@ import 'package:vaultexplorer/features/browser/viewer/pip/picture_in_picture_bri
 import 'package:vaultexplorer/features/browser/viewer/pip/picture_in_picture_coordinator.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_prefetch_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
+import 'package:vaultexplorer/features/browser/viewer/playlist_swipe_physics.dart';
 import 'package:vaultexplorer/features/browser/viewer/screen_brightness_bridge.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_scrub_preview_controller.dart';
@@ -125,6 +126,55 @@ class MediaViewerScreen extends ConsumerStatefulWidget {
   ConsumerState<MediaViewerScreen> createState() => _MediaViewerScreenState();
 }
 
+/// How the viewer is closing with respect to the floating player.
+enum _FloatingClose {
+  /// Not closing that way.
+  none,
+
+  /// Handing the video to the floating player, which could not be told where
+  /// the video is: no Hero flight back to the thumbnail, but nothing flies in
+  /// either; the window just appears when the viewer is gone.
+  withoutFlight,
+
+  /// Handing the video over, and the floating window is flying out of it: the
+  /// viewer must not draw its own copy as well.
+  flying,
+}
+
+/// The viewer growing out of the floating window it was opened from. First
+/// only [from] (the window's video, where the viewer's own is still hidden
+/// while it is measured), then [dest] (where the viewer's video really is),
+/// [origin] (where the media layer sits on screen) and the [animation].
+class _ExpandFlight {
+  final Rect from;
+  final Rect? dest;
+  final Offset origin;
+  final Animation<double>? animation;
+
+  const _ExpandFlight({
+    required this.from,
+    this.dest,
+    this.origin = Offset.zero,
+    this.animation,
+  });
+}
+
+/// Clips to a rounded rectangle anywhere in the box, not only the box itself.
+class _RRectClipper extends CustomClipper<RRect> {
+  final Rect rect;
+  final double radius;
+
+  const _RRectClipper(this.rect, this.radius);
+
+  @override
+  RRect getClip(Size size) =>
+      RRect.fromRectAndRadius(rect, Radius.circular(radius));
+
+  @override
+  bool shouldReclip(covariant _RRectClipper oldClipper) =>
+      oldClipper.rect != rect || oldClipper.radius != radius;
+}
+
 class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     with TickerProviderStateMixin {
   late final VaultFileIoApi _fileIoApi;
@@ -143,11 +193,46 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   final ValueNotifier<ScrollPhysics> _swipePhysicsNotifier =
       ValueNotifier<ScrollPhysics>(const BouncingScrollPhysics());
 
+  /// Overall movement of the touch that swipes the playlist pager. The pager's
+  /// physics read it on release so a short, diagonal or curved swipe still
+  /// counts as a swipe (see [PlaylistSwipePageScrollPhysics]).
+  final PlaylistSwipeTracker _swipeTracker = PlaylistSwipeTracker();
+
+  /// Whether the pager's own drag recognizer took the current touch. If it
+  /// did, [PlaylistSwipePageScrollPhysics] settles the page. If it didn't (a
+  /// curved or L-shaped swipe often starts steeply and another recognizer
+  /// wins it first), the swipe is judged on release instead, see
+  /// [_maybeSwipeToAdjacentItem].
+  bool _pagerTookTouch = false;
+
   /// 0..1 while a swipe-to-dismiss drag pulls the media away. Drives the
   /// backdrop and viewer chrome fade while the actual image stays visible.
   final ValueNotifier<double> _swipeDismissProgress = ValueNotifier<double>(
     0.0,
   );
+
+  /// Asked, as a close begins, where the video on screen is.
+  final VideoFrameProbe _videoProbe = VideoFrameProbe();
+
+  /// Set when the close hands the playing video to the floating player.
+  final ValueNotifier<_FloatingClose> _floatingClose =
+      ValueNotifier<_FloatingClose>(_FloatingClose.none);
+  AnimationController? _closeFade;
+  Timer? _floatingCloseGuard;
+
+  /// 0 while the viewer opens out of the floating window (backdrop and
+  /// controls not yet there), 1 otherwise. A factor of its own: the swipe
+  /// progress also fades the video itself, which must stay solid here.
+  final ValueNotifier<double> _openReveal = ValueNotifier<double>(1.0);
+
+  /// Set while the video grows out of the floating window.
+  final ValueNotifier<_ExpandFlight?> _expandFlight =
+      ValueNotifier<_ExpandFlight?>(null);
+  AnimationController? _expandController;
+
+  /// The media layer, as built while it is still waiting to be measured: its
+  /// position on screen is the origin the flight is worked out against.
+  BuildContext? _expandLayerContext;
 
   /// The A-B repeat section of the video now playing. In memory only, and
   /// emptied whenever another item (hence a fresh native player) takes over.
@@ -220,9 +305,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   bool _lockedRouteDismissalScheduled = false;
 
   /// Prepared in [_prepareBackgroundPlaybackHandoff] when the person closes the
-  /// viewer with audio playing and "keep audio playing after closing" is on;
-  /// [dispose] gives it to [BackgroundPlaybackHost] instead of releasing the
-  /// player.
+  /// viewer with audio playing and "keep audio playing after closing" is on,
+  /// or with a video playing and the floating video player on; [dispose] gives
+  /// it to [BackgroundPlaybackHost] instead of releasing the player.
   BackgroundPlaybackSession? _backgroundPlaybackHandoff;
 
   /// The item whose already-running player this viewer took over from
@@ -516,6 +601,17 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       _adoptedFile = _playbackManager.currentFileName;
       // The player is already past its resume decision; don't run it again.
       _resumeFlowStarted = true;
+      // Opened from the floating player: the video grows out of the window
+      // instead of appearing full screen. Until it is drawn where the window
+      // is, the viewer's own copy stays hidden and the window stays up.
+      final from = carried.floatingPlayer
+          ? BackgroundPlaybackHost.instance.exit?.from
+          : null;
+      if (from != null) {
+        _openReveal.value = 0.0;
+        _expandFlight.value = _ExpandFlight(from: from);
+        unawaited(_runExpandFlight(from));
+      }
     }
     _pageController = PageController(initialPage: widget.initialIndex);
     _listScrollController = ScrollController();
@@ -621,11 +717,15 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   /// the media notification's Stop), which must always end playback. When
   /// "keep audio playing after closing" is on and audio is playing, prepares
   /// the hand-off that [dispose] completes: the live player goes to
-  /// [BackgroundPlaybackHost] instead of being released. Video is never kept
-  /// this way (there is nowhere to show it; the picture-in-picture button is
-  /// for that, see [_enterPictureInPictureWindow]), nor is anything paused.
+  /// [BackgroundPlaybackHost] instead of being released. The same goes for a
+  /// playing video when the floating video player is on: it carries on in a
+  /// small window over the app (and in the picture-in-picture window once the
+  /// app is left). A video can also be sent to the system's window right away
+  /// with the picture-in-picture button, see [_enterPictureInPictureWindow].
+  /// Nothing that is paused is kept.
   void _prepareBackgroundPlaybackHandoff() {
     _backgroundPlaybackHandoff = null;
+    _floatingClose.value = _FloatingClose.none;
     if (widget._isPreviewOnly || _playlistController.isEmpty) return;
     if (ref.read(mediaViewerLockProvider(widget.container.volId))) return;
     final file = _playbackManager.currentFileName;
@@ -633,20 +733,189 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     if (file == null || controller == null || controller.isDisposed) return;
     // Mid-transition: the player isn't on the item the playlist points at.
     if (file != _playlistController.currentFile) return;
-    if (!MediaViewerConstants.isAudio(file)) return;
+    final isAudio = MediaViewerConstants.isAudio(file);
+    final isVideo = MediaViewerConstants.isVideo(file);
+    if (!isAudio && !isVideo) return;
     final value = controller.value;
     if (!value.isInitialized || value.hasError || !value.isPlaying) return;
-    final keepAudio = ref
+    final config = ref
         .read(fileManagerToolbarSettingsProvider(null))
         .config
-        .mediaViewerToolbarConfig
-        .keepAudioPlayingAfterClose;
-    if (!keepAudio) return;
-    _backgroundPlaybackHandoff = _newBackgroundPlaybackSession(pipWindow: false);
+        .mediaViewerToolbarConfig;
+    if (isAudio) {
+      if (!config.keepAudioPlayingAfterClose) return;
+      _backgroundPlaybackHandoff = _newBackgroundPlaybackSession(
+        pipWindow: false,
+      );
+    } else {
+      if (!config.floatingPlayerEnabled) return;
+      _backgroundPlaybackHandoff = _newBackgroundPlaybackSession(
+        pipWindow: false,
+        floatingPlayer: true,
+      );
+    }
+  }
+
+  /// The viewer's video growing out of the floating window it was opened
+  /// from, the reverse of [_beginFloatingFlight]. The window stays up, still
+  /// showing the video, while this finds out where the viewer's own video is;
+  /// then the viewer draws its copy at the window's rectangle (under the window,
+  /// so nothing shows), the window goes, and the copy grows into place as the
+  /// backdrop and the controls fade in.
+  Future<void> _runExpandFlight(Rect from) async {
+    // The video widget needs a few frames to come up on the adopted player.
+    Rect? dest;
+    for (var frame = 0; frame < 30 && dest == null; frame++) {
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
+      dest = _videoProbe.measure();
+    }
+    final layer = _expandLayerContext;
+    final layerBox = layer != null && layer.mounted
+        ? layer.findRenderObject()
+        : null;
+    if (dest == null || layerBox is! RenderBox || !layerBox.attached) {
+      // Could not tell where the video lands: no flight, it simply shows.
+      _finishExpandFlight();
+      return;
+    }
+    final controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 280),
+    );
+    _expandController?.dispose();
+    _expandController = controller;
+    controller.addListener(() {
+      _openReveal.value = Curves.easeOut.transform(controller.value);
+    });
+    controller.addStatusListener((status) {
+      if (status == AnimationStatus.completed) _finishExpandFlight();
+    });
+    _expandFlight.value = _ExpandFlight(
+      from: from,
+      dest: dest,
+      origin: layerBox.localToGlobal(Offset.zero),
+      animation: controller,
+    );
+    unawaited(controller.forward());
+    // After the frame that first draws the viewer's copy over the window's
+    // spot, the window can go: the one frame in which both are drawn is not
+    // seen, they are the same picture in the same place.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      BackgroundPlaybackHost.instance.endFloatingExit();
+    });
+  }
+
+  void _finishExpandFlight() {
+    BackgroundPlaybackHost.instance.endFloatingExit();
+    if (!mounted) return;
+    _expandFlight.value = null;
+    _openReveal.value = 1.0;
+  }
+
+  /// The media layer of the item on screen during [_runExpandFlight]: hidden
+  /// while its place is measured, then scaled and moved so the video starts
+  /// exactly where the floating window had it, clipped to the window's rounded
+  /// shape and growing into its own.
+  Widget _expandFlightLayer(Widget media) {
+    return ValueListenableBuilder<_ExpandFlight?>(
+      valueListenable: _expandFlight,
+      child: media,
+      builder: (context, flight, child) {
+        if (flight == null) return child!;
+        final dest = flight.dest;
+        final animation = flight.animation;
+        if (dest == null || animation == null) {
+          _expandLayerContext = context;
+          return Opacity(opacity: 0.0, child: child);
+        }
+        final destLocal = dest.shift(-flight.origin);
+        final fromLocal = flight.from.shift(-flight.origin);
+        return AnimatedBuilder(
+          animation: animation,
+          child: child,
+          builder: (context, child) {
+            final e = Curves.easeInOutCubic.transform(animation.value);
+            final startScale = fromLocal.width / destLocal.width;
+            final scale = startScale + (1.0 - startScale) * e;
+            final center = Offset.lerp(fromLocal.center, destLocal.center, e)!;
+            final matrix = Matrix4.identity()
+              ..translate(
+                center.dx - scale * destLocal.center.dx,
+                center.dy - scale * destLocal.center.dy,
+              )
+              ..scale(scale, scale, 1.0);
+            // On screen the corners go from the window's 14 to square.
+            final radius = 14.0 * (1.0 - e) / scale;
+            return Transform(
+              transform: matrix,
+              child: ClipRRect(
+                clipper: _RRectClipper(destLocal, radius),
+                child: child,
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Called as a close that hands the playing video to the floating player
+  /// begins, right before the route pops. Together, in the same frame (so
+  /// nothing flickers):
+  ///  * the floating window appears over the video, where it is *now* (a swipe
+  ///    may have moved it since it was last reported), and flies into its
+  ///    corner;
+  ///  * the viewer stops drawing its own copy of the video;
+  ///  * the viewer's Hero flight back to the file manager's thumbnail is off:
+  ///    the video is going to the floating player, not back to where it was
+  ///    opened from.
+  ///
+  /// [fadeChrome]: a swipe already fades the backdrop and the controls as it
+  /// goes; a back press does not, so this does it, quickly, to keep the
+  /// window's flight from happening over a black screen that lingers.
+  void _beginFloatingFlight({bool fadeChrome = true}) {
+    if (_backgroundPlaybackHandoff?.floatingPlayer != true) return;
+    final from = _videoProbe.measure();
+    if (from != null) {
+      BackgroundPlaybackHost.instance.beginFloatingEntry(
+        FloatingPlayerEntry(playbackManager: _playbackManager, from: from),
+      );
+    }
+    _floatingClose.value = from != null
+        ? _FloatingClose.flying
+        : _FloatingClose.withoutFlight;
+
+    final start = _swipeDismissProgress.value;
+    if (fadeChrome && start < 0.99) {
+      _closeFade?.dispose();
+      final fade = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 220),
+      );
+      _closeFade = fade;
+      fade.addListener(() {
+        _swipeDismissProgress.value =
+            start + (1.0 - start) * Curves.easeOut.transform(fade.value);
+      });
+      unawaited(fade.forward());
+    }
+
+    // The route normally goes in a moment. If the pop is swallowed, the viewer
+    // must not stay half-faded with its own video hidden.
+    _floatingCloseGuard?.cancel();
+    _floatingCloseGuard = Timer(const Duration(milliseconds: 1500), () {
+      if (!mounted) return;
+      _closeFade?.stop();
+      _floatingClose.value = _FloatingClose.none;
+      _swipeDismissProgress.value = 0.0;
+      BackgroundPlaybackHost.instance.endFloatingEntry();
+    });
   }
 
   BackgroundPlaybackSession _newBackgroundPlaybackSession({
     required bool pipWindow,
+    bool floatingPlayer = false,
   }) => BackgroundPlaybackSession(
     providers: ProviderScope.containerOf(context, listen: false),
     container: widget.container,
@@ -663,16 +932,21 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     sortAscending: widget.sortAscending,
     pinnedPaths: widget.pinnedPaths,
     pipWindow: pipWindow,
+    floatingPlayer: floatingPlayer,
   );
 
   bool _enteringPictureInPicture = false;
 
-  /// The viewer's picture-in-picture button: floats the playing video in
-  /// Android's PiP window and closes the viewer, so the person is back in the
-  /// file manager (or wherever they opened the video from) with the video
-  /// still playing on top. The live player goes to [BackgroundPlaybackHost],
-  /// which keeps it going and answers the window being tapped (reopen the
-  /// viewer) or dismissed (stop).
+  /// The viewer's picture-in-picture button: the app itself becomes Android's
+  /// PiP window around the video that is playing, with the viewer left open
+  /// underneath (tapping the window brings the app back to it; dismissing it
+  /// pauses the video). Nothing is handed to another window, which is what
+  /// keeps the transition continuous.
+  ///
+  /// Only if the system refuses that does it fall back to the older way: a
+  /// separate window activity takes the video, the viewer closes, and the live
+  /// player goes to [BackgroundPlaybackHost], which keeps it going and answers
+  /// the window being tapped (reopen the viewer) or dismissed (stop).
   Future<void> _enterPictureInPictureWindow() async {
     if (widget._isPreviewOnly ||
         _enteringPictureInPicture ||
@@ -693,6 +967,16 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     if (ref.read(mediaViewerLockProvider(widget.container.volId))) return;
 
     _enteringPictureInPicture = true;
+    // First choice: the app itself becomes the window. It is the activity that
+    // is already playing this video, so nothing is handed over and the video
+    // carries on without a hitch (that is what looks like one continuous
+    // movement into the corner, as in YouTube). The viewer stays open
+    // underneath; tapping the window brings the app back to it.
+    if (await PictureInPictureCoordinator.instance.enterNow(this)) {
+      _enteringPictureInPicture = false;
+      return;
+    }
+    // Fallback, if the system would not do that: a separate window activity.
     final ratio = pictureInPictureRatio(value.aspectRatio);
     final lockController = ref.read(sessionLockControllerProvider);
     bool entered = false;
@@ -1087,9 +1371,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   }
 
   /// Offers the video on screen to Android's picture-in-picture window (the
-  /// viewer's button enters it; the "automatic" setting enters it on leaving
-  /// the app), or withdraws it for anything that isn't a video. Idempotent:
-  /// the coordinator ignores repeats.
+  /// viewer's button enters it right away through the coordinator; the
+  /// "automatic" setting enters it on leaving the app), or withdraws it for
+  /// anything that isn't a video. Idempotent: the coordinator ignores repeats.
   void _syncPictureInPicture() {
     if (!mounted) return;
     final coordinator = PictureInPictureCoordinator.instance;
@@ -1408,6 +1692,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   void _closeViewerFromSwipe() {
     if (!mounted) return;
     _prepareBackgroundPlaybackHandoff();
+    _beginFloatingFlight(fadeChrome: false);
     Navigator.of(context).pop();
   }
 
@@ -1636,6 +1921,14 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
    void _handleTouchPointerDown(PointerDownEvent event) {
     if (event.kind != PointerDeviceKind.touch || _isEditingLayout) return;
     _activeTouchPointers.add(event.pointer);
+    if (_activeTouchPointers.length == 1) {
+      _swipeTracker.begin(
+        event.position,
+        _playlistController.currentIndex,
+        timeStamp: event.timeStamp,
+      );
+      _pagerTookTouch = false;
+    }
     if (_activeTouchPointers.length == 1 && !_zoomInteractionLock) {
       final toolbarConfig = ref
           .read(fileManagerToolbarSettingsProvider(null))
@@ -1674,6 +1967,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     }
     if (_activeTouchPointers.length >= 2 && !_multiTouchLock) {
       _multiTouchLock = true;
+      _swipeTracker.cancel();
       _clearEdgeTapCandidates();
       _loopSwipeStartPositions.clear();
       _loopSwipeStartIndices.clear();
@@ -1690,6 +1984,14 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     final start = _loopSwipeStartPositions.remove(event.pointer);
     final startIndex = _loopSwipeStartIndices.remove(event.pointer);
     _activeTouchPointers.remove(event.pointer);
+    // This runs before the pager's drag recognizer sees the finger lift, so
+    // the physics can judge the whole swipe when they settle the page.
+    PlaylistSwipeSummary? swipe;
+    if (event is PointerUpEvent && _activeTouchPointers.isEmpty) {
+      swipe = _swipeTracker.release(event.position);
+    } else {
+      _swipeTracker.cancel();
+    }
     if (event is PointerUpEvent &&
         edgeStart != null &&
         edgeDirection != null &&
@@ -1710,8 +2012,12 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
         start != null &&
         startIndex != null &&
         _activeTouchPointers.isEmpty &&
-        mounted) {
+        mounted &&
+        (_pagerTookTouch || _scrollMode.isContinuous)) {
       _maybeWrapPlaylistSwipe(start, startIndex, event.position);
+    }
+    if (swipe != null && mounted && !_pagerTookTouch) {
+      _maybeSwipeToAdjacentItem(swipe);
     }
     if (_activeTouchPointers.isEmpty && _multiTouchLock) {
       _multiTouchLock = false;
@@ -1724,6 +2030,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   }
 
   void _handleTouchPointerMove(PointerMoveEvent event) {
+    _swipeTracker.move(event.position, timeStamp: event.timeStamp);
     final start = _edgeTapStartPositions[event.pointer];
     if (start == null) return;
     final startedDuringTransition =
@@ -1748,6 +2055,40 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     _edgeTapStartedDuringTransition.clear();
   }
 
+  /// The scroll direction of a pager that pages along [axis], as the framework
+  /// resolves it (a horizontal pager runs the other way in right-to-left).
+  AxisDirection _axisDirectionFor(Axis axis) {
+    if (axis == Axis.vertical) return AxisDirection.down;
+    return Directionality.of(context) == TextDirection.rtl
+        ? AxisDirection.left
+        : AxisDirection.right;
+  }
+
+  /// Changes item for a swipe the pager never received.
+  ///
+  /// The paged modes only reach the pager's physics for touches the pager's
+  /// own recognizer wins. A curved or L-shaped swipe that starts steeply is
+  /// often won by something else first, so it would be ignored however clear
+  /// it was overall. This judges such a touch on release by its overall
+  /// movement. Anything that really owns the touch (a zoom, a pinch, a
+  /// brightness, volume or seek drag, a dismiss, a page change under way)
+  /// locks paging or reports progress, and is left alone.
+  void _maybeSwipeToAdjacentItem(PlaylistSwipeSummary swipe) {
+    if (_scrollMode.isContinuous) return;
+    final direction = playlistSwipeFallbackDirection(
+      swipe: swipe,
+      axisDirection: _axisDirectionFor(_scrollMode.axis),
+      currentIndex: _playlistController.currentIndex,
+      isLocked: _swipePhysicsNotifier.value is NeverScrollableScrollPhysics,
+      isDismissing: _swipeDismissProgress.value > 0,
+    );
+    if (direction > 0) {
+      _navigateToNext();
+    } else if (direction < 0) {
+      _navigateToPrev();
+    }
+  }
+
   void _maybeWrapPlaylistSwipe(Offset start, int startIndex, Offset end) {
     if (!_isPlaylistLoopEnabled ||
         _zoomInteractionLock ||
@@ -1758,36 +2099,37 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     final count = _playlistController.playlist.length;
     if (count < 2 || _playlistController.currentIndex != startIndex) return;
 
-    final axis = _scrollMode.isContinuous ? Axis.vertical : _scrollMode.axis;
-    final axisDelta = axis == Axis.horizontal
-        ? end.dx - start.dx
-        : end.dy - start.dy;
-    final crossAxisDelta = axis == Axis.horizontal
-        ? end.dy - start.dy
-        : end.dx - start.dx;
-    final isRtl =
-        axis == Axis.horizontal &&
-        Directionality.of(context) == TextDirection.rtl;
-    final forwardDelta = axisDelta * (isRtl ? 1 : -1);
+    final isContinuous = _scrollMode.isContinuous;
+    final axis = isContinuous ? Axis.vertical : _scrollMode.axis;
+    final axisDirection = _axisDirectionFor(axis);
     final viewportExtent = axis == Axis.horizontal
         ? _viewportWidth
         : _viewportHeight;
-    final threshold = math.max(48.0, viewportExtent * 0.12);
-    if (forwardDelta.abs() < threshold ||
-        forwardDelta.abs() <= crossAxisDelta.abs()) {
-      return;
-    }
+    // Paged modes judge the swipe the same way the pager does (overall
+    // movement, diagonals allowed), so swiping past the end behaves like
+    // swiping between any two items. The continuous list is browsed by free
+    // scrolling, where a short scroll that happens to start on the last item
+    // must not jump to the first, so it keeps the stricter test.
+    final direction = playlistSwipeDirection(
+      end - start,
+      axisDirection,
+      minDistance: isContinuous
+          ? math.max(48.0, viewportExtent * 0.12)
+          : kPlaylistSwipeMinDistance,
+      maxCrossRatio: isContinuous ? 1.0 : kPlaylistSwipeMaxCrossRatio,
+    );
 
-    if (startIndex == count - 1 && forwardDelta > 0) {
+    if (startIndex == count - 1 && direction > 0) {
       HapticFeedback.lightImpact();
       _transitionTo(0);
-    } else if (startIndex == 0 && forwardDelta < 0) {
+    } else if (startIndex == 0 && direction < 0) {
       HapticFeedback.lightImpact();
       _transitionTo(count - 1);
     }
   }
 
   void _onScrollStart() {
+    _pagerTookTouch = true;
     if (!_isSwiping) {
       _isSwiping = true;
       _lockedExtents.clear();
@@ -3108,6 +3450,11 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     _pageController.dispose();
     _listScrollController.dispose();
     _continuousZoomAnimationController?.dispose();
+    _floatingCloseGuard?.cancel();
+    _closeFade?.dispose();
+    _expandController?.dispose();
+    // The floating window must not outlive a viewer that never got to end it.
+    BackgroundPlaybackHost.instance.endFloatingExit();
     _continuousTransformationController.removeListener(
       _onContinuousTransformationChanged,
     );
@@ -3120,6 +3467,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     _backgroundPlaybackHandoff = null;
     final handedOff =
         handoff != null && BackgroundPlaybackHost.instance.adopt(handoff);
+    // The window that flew out of this viewer is now the session's (or, if
+    // nothing was adopted, it has nothing left to show).
+    BackgroundPlaybackHost.instance.endFloatingEntry();
     if (!handedOff) {
       PlaybackThrottleController.setActive(false);
       _playbackManager.dispose();
@@ -3127,6 +3477,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     BackgroundPlaybackHost.instance.unregisterViewer();
     _swipePhysicsNotifier.dispose();
     _swipeDismissProgress.dispose();
+    _floatingClose.dispose();
+    _openReveal.dispose();
+    _expandFlight.dispose();
     _lockNudge.dispose();
     _videoProgressNotifier.dispose();
     _abLoopNotifier.dispose();
@@ -3246,6 +3599,22 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
               rotationQuarterTurns: _rotations[fileName] ?? 0,
               adjustments: _adjustmentsFor(fileName),
               videoAspectRatioMode: _videoAspectRatioMode,
+              // Only the video that is showing says where it is: the PiP
+              // transition animates from that rectangle.
+              onVideoRectChanged:
+                  !isAudio && fileName == _playlistController.currentFile
+                  ? (rect, devicePixelRatio) => PictureInPictureCoordinator
+                        .instance
+                        .setSourceRect(
+                          this,
+                          rect,
+                          devicePixelRatio: devicePixelRatio,
+                        )
+                  : null,
+              videoFrameProbe:
+                  !isAudio && fileName == _playlistController.currentFile
+                  ? _videoProbe
+                  : null,
               isMuted: _isMuted,
               onMuteChanged: (muted) {
                 if (_isMuted != muted) {
@@ -3301,11 +3670,30 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
           fit: StackFit.expand,
           children: [
             Positioned.fill(
-              child: ColoredBox(
-                color: Colors.black.withValues(alpha: backgroundAlpha),
+              child: ValueListenableBuilder<double>(
+                valueListenable: _openReveal,
+                builder: (context, reveal, _) => ColoredBox(
+                  color: Colors.black.withValues(
+                    alpha: backgroundAlpha * reveal,
+                  ),
+                ),
               ),
             ),
-            media!,
+            // While the floating window flies out of the video, this copy of
+            // it must not be drawn as well: it would hang about where the
+            // video was, fading, as the window leaves. And when the viewer was
+            // opened from the floating window, the item on screen grows out of
+            // it (see _runExpandFlight).
+            ValueListenableBuilder<_FloatingClose>(
+              valueListenable: _floatingClose,
+              child: fileName == _playlistController.currentFile
+                  ? _expandFlightLayer(media!)
+                  : media,
+              builder: (context, closing, child) => Opacity(
+                opacity: closing == _FloatingClose.flying ? 0.0 : 1.0,
+                child: child,
+              ),
+            ),
           ],
         );
       },
@@ -3314,11 +3702,23 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     // Only the currently active item should have its Hero enabled.
     // ListenableBuilder ensures HeroMode updates immediately on swipe
     // without rebuilding the heavy media widgets.
+    //
+    // Also off for a close that hands the video to the floating player: the
+    // Hero would fly the poster back to the file manager's thumbnail, when the
+    // video is going to the floating window instead.
     final heroGatedWidget = ListenableBuilder(
-      listenable: _playlistController,
+      listenable: Listenable.merge(<Listenable>[
+        _playlistController,
+        _floatingClose,
+      ]),
       builder: (context, child) {
         final isCurrent = _playlistController.currentIndex == index;
-        return HeroMode(enabled: isCurrent, child: child!);
+        final closingToFloatingPlayer =
+            _floatingClose.value != _FloatingClose.none;
+        return HeroMode(
+          enabled: isCurrent && !closingToFloatingPlayer,
+          child: child!,
+        );
       },
       child: itemWidget,
     );
@@ -3416,19 +3816,25 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
           return;
         }
         _prepareBackgroundPlaybackHandoff();
+        _beginFloatingFlight();
         Navigator.of(context).pop();
       },
       child: AnnotatedRegion<SystemUiOverlayStyle>(
         value: AppSystemUI.transparentDark,
         // The black behind the viewer fades out while a swipe-to-dismiss drag
         // pulls the image away, showing the screen underneath.
-        child: ValueListenableBuilder<double>(
-          valueListenable: _swipeDismissProgress,
-          builder: (context, progress, scaffold) {
+        child: ListenableBuilder(
+          listenable: Listenable.merge(<Listenable>[
+            _swipeDismissProgress,
+            _openReveal,
+          ]),
+          builder: (context, scaffold) {
             final fades = ModalRoute.of(context)?.opaque == false;
+            final shown = (1.0 - _swipeDismissProgress.value) *
+                _openReveal.value;
             return ColoredBox(
               color: fades
-                  ? Colors.black.withValues(alpha: 1.0 - progress)
+                  ? Colors.black.withValues(alpha: shown.clamp(0.0, 1.0))
                   : Colors.black,
               child: scaffold,
             );
@@ -3621,11 +4027,26 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                 );
               }
 
+              // Locked: no user scrolling, but still page-snapping, so a drag
+              // cut short by a second finger settles on a page. Unlocked: the
+              // swipe is judged by its overall movement rather than only the
+              // speed of its last instant. PageView would put its own
+              // page-snapping physics ahead of these, so they snap themselves.
+              final ScrollPhysics pagePhysics =
+                  physics is NeverScrollableScrollPhysics
+                  ? const PageScrollPhysics(
+                      parent: NeverScrollableScrollPhysics(),
+                    )
+                  : PlaylistSwipePageScrollPhysics(
+                      parent: physics,
+                      tracker: _swipeTracker,
+                    );
               return PageView.builder(
                 key: builderKey,
                 controller: _pageController,
                 scrollDirection: _scrollMode.axis,
-                physics: physics,
+                pageSnapping: false,
+                physics: pagePhysics,
                 itemCount: _playlistController.playlist.length,
                 onPageChanged: (index) {
                   if (_playlistController.currentIndex != index) {
@@ -3640,18 +4061,25 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
               );
             }
 
-            Widget fadeDuringDismiss(Widget child) =>
-                ValueListenableBuilder<double>(
-                  valueListenable: _swipeDismissProgress,
-                  child: child,
-                  builder: (context, progress, child) => IgnorePointer(
-                    ignoring: progress >= 0.99,
-                    child: Opacity(
-                      opacity: (1.0 - progress).clamp(0.0, 1.0).toDouble(),
-                      child: child,
-                    ),
-                  ),
+            Widget fadeDuringDismiss(Widget child) => ListenableBuilder(
+              listenable: Listenable.merge(<Listenable>[
+                _swipeDismissProgress,
+                _openReveal,
+              ]),
+              child: child,
+              builder: (context, child) {
+                // Fades out with a swipe, and in as the viewer opens out of
+                // the floating window.
+                final visible =
+                    ((1.0 - _swipeDismissProgress.value) * _openReveal.value)
+                        .clamp(0.0, 1.0)
+                        .toDouble();
+                return IgnorePointer(
+                  ignoring: visible <= 0.01,
+                  child: Opacity(opacity: visible, child: child),
                 );
+              },
+            );
 
             final swipeDismissAxis = _swipeDismissAxis;
             return MediaSwipeDismissLayer(

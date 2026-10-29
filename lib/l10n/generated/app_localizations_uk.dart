@@ -6200,6 +6200,12 @@ class AppLocalizationsUk extends AppLocalizations {
   String get fileInfoAction => 'Інформація';
 
   @override
+  String get goToLocationAction => 'Перейти до розташування';
+
+  @override
+  String get copyPathAction => 'Копіювати шлях';
+
+  @override
   String get automationSectionHeader => 'Автоматизація';
 
   @override
@@ -12778,4 +12784,50 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get cameraPauseFailedMessage =>
       'Не вдалося призупинити або відновити запис';
+
+  @override
+  String get floatingPlayerTitle => 'Плаваючий відеоплеєр';
+
+  @override
+  String get floatingPlayerSubtitle =>
+      'Якщо закрити плеєр під час відтворення відео, воно продовжиться в невеликому вікні, яке можна переміщувати. Після виходу із застосунку воно перейде в режим «картинка в картинці» з кнопкою «Лише аудіо»';
+
+  @override
+  String get floatingPlayerExpandTooltip => 'Розгорнути';
+
+  @override
+  String get masterLockTitle => 'Головне блокування';
+
+  @override
+  String get masterLockInactiveSubtitle =>
+      'Вимагати пароль, PIN-код або графічний ключ для відкриття програми';
+
+  @override
+  String get masterLockChooseTitle => 'Виберіть, як блокувати програму';
+
+  @override
+  String get masterLockBackupTitle => 'Додайте резервний спосіб розблокування';
+
+  @override
+  String get masterLockBackupMessage =>
+      'Біометричне розблокування потребує пароля, PIN-коду або графічного ключа як запасного варіанту. Виберіть, що налаштувати додатково.';
+
+  @override
+  String get masterCredentialPassword => 'Пароль';
+
+  @override
+  String get masterCredentialPin => 'PIN-код';
+
+  @override
+  String get masterCredentialPattern => 'Графічний ключ';
+
+  @override
+  String get masterCredentialSet => 'Встановлено';
+
+  @override
+  String get masterCredentialNotSet => 'Не встановлено';
+
+  @override
+  String get duressMasterLockRequired =>
+      'Перед налаштуванням розблокування під примусом необхідно увімкнути головне блокування у розділі безпеки.';
 }

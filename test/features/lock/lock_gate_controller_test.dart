@@ -15,6 +15,11 @@ class _FakeSettingsService implements AppSettingsService {
   Future<AppSettings> loadSettings() async => settings;
 
   @override
+  Future<void> saveSettings(AppSettings settings) async {
+    this.settings = settings;
+  }
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
@@ -171,6 +176,92 @@ void main() {
       expect(state.biometricsChanged, isFalse);
       expect(state.showPasswordFallback, isTrue);
       expect(state.error, l10n.biometricNotAvailable);
+    });
+  });
+  group('LockGateController credentials', () {
+    ProviderContainer containerFor(_FakeSettingsService service) {
+      final c = ProviderContainer(
+        overrides: [
+          appSettingsServiceProvider.overrideWithValue(service),
+          secureScreenPolicyProvider.overrideWithValue(_NoopSecureScreenPolicy()),
+        ],
+      );
+      addTearDown(c.dispose);
+      return c;
+    }
+
+    Future<void> loaded(ProviderContainer c) async {
+      for (var i = 0; i < 200; i++) {
+        final state = c.read(lockGateProvider);
+        if (!state.loading || state.navigateTick > 0) return;
+        await Future<void>.delayed(Duration.zero);
+      }
+      fail('the gate never finished loading');
+    }
+
+    test('a PIN-only lock is kept: the gate loads it and asks for the PIN '
+        'instead of treating the missing master password as no lock', () async {
+      final service = _FakeSettingsService(
+        AppSettings(
+          useMasterPassword: true,
+          masterUnlockMethod: MasterUnlockMethod.pin,
+          masterPinHash: 'pin-hash',
+        ),
+      );
+      final c = containerFor(service);
+      final subscription = c.listen(lockGateProvider, (_, _) {});
+      addTearDown(subscription.close);
+      await loaded(c);
+
+      final state = c.read(lockGateProvider);
+      expect(state.loading, isFalse);
+      expect(state.navigateTick, 0);
+      expect(state.settings!.masterUnlockMethod, MasterUnlockMethod.pin);
+      expect(service.settings.useMasterPassword, isTrue);
+    });
+
+    test('a lock with no credential at all is switched off rather than '
+        'leaving the gate with nothing to unlock it', () async {
+      final service = _FakeSettingsService(
+        AppSettings(
+          useMasterPassword: true,
+          masterUnlockMethod: MasterUnlockMethod.pin,
+        ),
+      );
+      final c = containerFor(service);
+      final subscription = c.listen(lockGateProvider, (_, _) {});
+      addTearDown(subscription.close);
+      await loaded(c);
+
+      expect(c.read(lockGateProvider).navigateTick, greaterThan(0));
+      expect(service.settings.useMasterPassword, isFalse);
+    });
+
+    test('showCredential moves the gate to that credential, and '
+        'setShowPasswordFallback(false) moves it back', () async {
+      final service = _FakeSettingsService(
+        AppSettings(
+          useMasterPassword: true,
+          masterUnlockMethod: MasterUnlockMethod.pin,
+          masterPinHash: 'pin-hash',
+          masterPatternHash: 'pattern-hash',
+        ),
+      );
+      final c = containerFor(service);
+      final subscription = c.listen(lockGateProvider, (_, _) {});
+      addTearDown(subscription.close);
+      await loaded(c);
+
+      final notifier = c.read(lockGateProvider.notifier);
+      notifier.showCredential(MasterUnlockMethod.pattern);
+      var state = c.read(lockGateProvider);
+      expect(state.showPasswordFallback, isTrue);
+      expect(state.fallbackCredential, MasterUnlockMethod.pattern);
+
+      notifier.setShowPasswordFallback(false);
+      state = c.read(lockGateProvider);
+      expect(state.showPasswordFallback, isFalse);
+      expect(state.fallbackCredential, isNull);
     });
   });
 }

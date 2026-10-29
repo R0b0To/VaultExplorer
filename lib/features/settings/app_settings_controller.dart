@@ -235,7 +235,13 @@ class AppSettingsController extends _$AppSettingsController {
   void setBackupBusy(bool busy) =>
       state = state._copy(exportBusy: busy, importBusy: busy);
 
+  /// Turns the whole master lock off: wipes the password, PIN and pattern
+  /// together and drops the biometric sentinel if biometrics were in use.
   Future<void> clearMasterPassword() async {
+    if (state.settings.masterUnlockMethod == MasterUnlockMethod.biometrics) {
+      await ref.read(biometricEnrollmentGuardProvider).forgetMaster();
+      if (!ref.mounted) return;
+    }
     await ref
         .read(appSettingsServiceProvider)
         .clearMasterPassword(state.settings);
@@ -248,25 +254,31 @@ class AppSettingsController extends _$AppSettingsController {
     state = state._copy(showPwFields: false, clearPwError: true);
   }
 
-  /// Switches the lock gate's quick-unlock method. If the outgoing method is
-  /// pattern or PIN, its stored hash is wiped first -- mirroring
-  /// [ContainerRepository]'s behaviour of dropping a container's unused
-  /// unlock credential whenever its [ContainerUnlockMethod] changes, so no
-  /// stale hash lingers in the Keystore for a method that's no longer active.
+  /// Switches the lock gate's active method. Password, PIN and pattern are
+  /// independent credentials, so nothing is wiped on the way: the previously
+  /// active one simply stays stored and can be switched back to.
   ///
-  /// Choosing biometrics first sets up the sentinel key that lets the gate
-  /// notice a later fingerprint/face enrollment (see
-  /// [BiometricEnrollmentGuard]). Returns false, changing nothing, when
-  /// Android refuses to create it (no biometric enrolled, no secure lock
-  /// screen); true otherwise.
+  /// Returns false, changing nothing, when [method] cannot be used yet: a
+  /// credential that is not set, biometrics with no credential behind them,
+  /// or biometrics Android refuses to create the sentinel key for (no
+  /// biometric enrolled, no secure lock screen).
+  ///
+  /// Choosing biometrics sets up the sentinel key that lets the gate notice a
+  /// later fingerprint/face enrollment (see [BiometricEnrollmentGuard]).
   Future<bool> setMasterUnlockMethod(MasterUnlockMethod method) async {
-    if (method == state.settings.masterUnlockMethod) return true;
-    if (method == MasterUnlockMethod.biometrics &&
-        !await ref.read(biometricEnrollmentGuardProvider).enableMaster()) {
+    final settings = state.settings;
+    if (method == settings.masterUnlockMethod) return true;
+    if (method == MasterUnlockMethod.biometrics) {
+      // Biometrics only ever sit in front of another credential.
+      if (!settings.hasMasterCredential) return false;
+      if (!await ref.read(biometricEnrollmentGuardProvider).enableMaster()) {
+        return false;
+      }
+    } else if (!settings.hasMasterCredentialFor(method)) {
       return false;
     }
     if (!ref.mounted) return false;
-    await _clearHashesExcept(method);
+    await _forgetBiometricsIfLeavingFor(method);
     if (!ref.mounted) return false;
     await ref
         .read(appSettingsServiceProvider)
@@ -276,44 +288,28 @@ class AppSettingsController extends _$AppSettingsController {
     return true;
   }
 
-  /// Wipes any pattern/PIN hash that doesn't belong to [keep], so at most
-  /// one quick-unlock credential ever exists in storage at a time. Called
-  /// before *every* method change -- both a plain switch (setMasterUnlockMethod)
-  /// and a fresh setup (saveMasterPattern/saveMasterPin) -- because a fresh
-  /// setup can itself be how a switch happens (e.g. pattern was active, PIN
-  /// wasn't configured yet, so picking PIN goes straight to PinSetupSheet
-  /// rather than through setMasterUnlockMethod). Without this, the outgoing
-  /// pattern hash would never get cleared on that path, and switching back
-  /// to pattern later would silently reactivate the old one instead of
-  /// asking for a new one.
-  Future<void> _clearHashesExcept(MasterUnlockMethod keep) async {
-    final service = ref.read(appSettingsServiceProvider);
-    // The biometric sentinel belongs to the biometric method too.
-    if (keep != MasterUnlockMethod.biometrics &&
+  /// The biometric sentinel belongs to the biometric method: drop it when the
+  /// active method moves to something else.
+  Future<void> _forgetBiometricsIfLeavingFor(MasterUnlockMethod next) async {
+    if (next != MasterUnlockMethod.biometrics &&
         state.settings.masterUnlockMethod == MasterUnlockMethod.biometrics) {
       await ref.read(biometricEnrollmentGuardProvider).forgetMaster();
-      if (!ref.mounted) return;
-    }
-    if (keep != MasterUnlockMethod.pattern &&
-        state.settings.masterPatternHash != null) {
-      await service.clearMasterPattern(state.settings);
-    }
-    if (!ref.mounted) return;
-    if (keep != MasterUnlockMethod.pin &&
-        state.settings.masterPinHash != null) {
-      await service.clearMasterPin(state.settings);
     }
   }
 
   /// Persists a freshly-drawn pattern (already hashed by [PatternSetupSheet])
-  /// as the master gate's unlock credential and makes it the active method.
-  Future<bool> saveMasterPattern(String hash) async {
+  /// as one of the master lock's credentials. With [makeActive] it is also the
+  /// method the gate shows first; without, it is set or changed while the
+  /// active method stays as it is. Any other credential is left alone.
+  Future<bool> saveMasterPattern(String hash, {bool makeActive = true}) async {
     try {
-      await _clearHashesExcept(MasterUnlockMethod.pattern);
-      if (!ref.mounted) return false;
+      if (makeActive) {
+        await _forgetBiometricsIfLeavingFor(MasterUnlockMethod.pattern);
+        if (!ref.mounted) return false;
+      }
       await ref
           .read(appSettingsServiceProvider)
-          .saveMasterPattern(state.settings, hash);
+          .saveMasterPattern(state.settings, hash, makeActive: makeActive);
       if (ref.mounted) state = state._copy();
       return true;
     } catch (e) {
@@ -322,15 +318,18 @@ class AppSettingsController extends _$AppSettingsController {
     }
   }
 
-  /// Persists a freshly-entered PIN (already hashed by [PinSetupSheet]) as
-  /// the master gate's unlock credential and makes it the active method.
-  Future<bool> saveMasterPin(String hash) async {
+  /// Persists a freshly-entered PIN (already hashed by [PinSetupSheet]) as one
+  /// of the master lock's credentials; [makeActive] works as for
+  /// [saveMasterPattern].
+  Future<bool> saveMasterPin(String hash, {bool makeActive = true}) async {
     try {
-      await _clearHashesExcept(MasterUnlockMethod.pin);
-      if (!ref.mounted) return false;
+      if (makeActive) {
+        await _forgetBiometricsIfLeavingFor(MasterUnlockMethod.pin);
+        if (!ref.mounted) return false;
+      }
       await ref
           .read(appSettingsServiceProvider)
-          .saveMasterPin(state.settings, hash);
+          .saveMasterPin(state.settings, hash, makeActive: makeActive);
       if (ref.mounted) state = state._copy();
       return true;
     } catch (e) {
@@ -339,15 +338,64 @@ class AppSettingsController extends _$AppSettingsController {
     }
   }
 
-  Future<bool> saveMasterPassword(String pw, AppLocalizations l10n) async {
+  /// Removes one credential and keeps the lock on. Refused (false) when it is
+  /// the only one left -- turn the lock off with [clearMasterPassword]
+  /// instead, otherwise the gate would be left with nothing to unlock it.
+  /// If the removed credential was the active method, the first remaining
+  /// credential takes over; biometrics, if active, stay active.
+  Future<bool> removeMasterCredential(MasterUnlockMethod method) async {
+    final settings = state.settings;
+    if (!method.isCredential) return false;
+    if (!settings.hasMasterCredentialFor(method)) return true;
+    final remaining = [
+      for (final m in settings.configuredMasterCredentials)
+        if (m != method) m,
+    ];
+    if (remaining.isEmpty) return false;
+    final service = ref.read(appSettingsServiceProvider);
+    switch (method) {
+      case MasterUnlockMethod.password:
+        await service.clearMasterPasswordCredential(settings);
+      case MasterUnlockMethod.pin:
+        await service.clearMasterPin(settings);
+      case MasterUnlockMethod.pattern:
+        await service.clearMasterPattern(settings);
+      case MasterUnlockMethod.biometrics:
+        return false;
+    }
+    if (!ref.mounted) return false;
+    if (settings.masterUnlockMethod == method) {
+      await service.setMasterUnlockMethod(state.settings, remaining.first);
+      if (!ref.mounted) return false;
+    }
+    state = state._copy();
+    return true;
+  }
+
+  /// Persists the master password. [makeActive] works as for
+  /// [saveMasterPattern].
+  Future<bool> saveMasterPassword(
+    String pw,
+    AppLocalizations l10n, {
+    bool makeActive = true,
+  }) async {
     state = state._copy(saving: true, clearPwError: true);
     try {
       final passwordHasher = ref.read(passwordHasherProvider);
       final (:hash, :salt) = await passwordHasher.deriveHash(pw);
       if (!ref.mounted) return false;
+      if (makeActive) {
+        await _forgetBiometricsIfLeavingFor(MasterUnlockMethod.password);
+        if (!ref.mounted) return false;
+      }
       await ref
           .read(appSettingsServiceProvider)
-          .saveMasterPassword(state.settings, hash, salt);
+          .saveMasterPassword(
+            state.settings,
+            hash,
+            salt,
+            makeActive: makeActive,
+          );
       state = state._copy(showPwFields: false, saving: false);
       return true;
     } catch (e) {

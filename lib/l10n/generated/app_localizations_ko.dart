@@ -5843,6 +5843,12 @@ class AppLocalizationsKo extends AppLocalizations {
   String get fileInfoAction => '정보';
 
   @override
+  String get goToLocationAction => '위치로 이동';
+
+  @override
+  String get copyPathAction => '경로 복사';
+
+  @override
   String get automationSectionHeader => '자동화';
 
   @override
@@ -11992,4 +11998,49 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get cameraPauseFailedMessage => '녹화를 일시중지하거나 재개할 수 없습니다';
+
+  @override
+  String get floatingPlayerTitle => '플로팅 동영상 플레이어';
+
+  @override
+  String get floatingPlayerSubtitle =>
+      '동영상 재생 중 플레이어를 닫으면 옮길 수 있는 작은 창에서 계속 재생됩니다. 앱을 나가면 화면 속 화면으로 전환되며 오디오 전용 버튼이 표시됩니다';
+
+  @override
+  String get floatingPlayerExpandTooltip => '확대';
+
+  @override
+  String get masterLockTitle => '마스터 잠금';
+
+  @override
+  String get masterLockInactiveSubtitle => '앱을 열 때 비밀번호, PIN 또는 패턴 요구';
+
+  @override
+  String get masterLockChooseTitle => '앱 잠금 방식을 선택하세요';
+
+  @override
+  String get masterLockBackupTitle => '백업 잠금 해제 추가';
+
+  @override
+  String get masterLockBackupMessage =>
+      '생체 인식 잠금 해제에는 대체 수단으로 비밀번호, PIN 또는 패턴이 필요합니다. 함께 설정할 항목을 선택하세요.';
+
+  @override
+  String get masterCredentialPassword => '비밀번호';
+
+  @override
+  String get masterCredentialPin => 'PIN';
+
+  @override
+  String get masterCredentialPattern => '패턴';
+
+  @override
+  String get masterCredentialSet => '설정됨';
+
+  @override
+  String get masterCredentialNotSet => '설정 안 됨';
+
+  @override
+  String get duressMasterLockRequired =>
+      '강요 해제를 설정하려면 먼저 보안 설정에서 마스터 잠금을 활성화해야 합니다.';
 }

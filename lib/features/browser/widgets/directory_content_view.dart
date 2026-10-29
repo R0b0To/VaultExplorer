@@ -15,6 +15,7 @@ import 'package:vaultexplorer/core/theme/file_manager_skin_scope.dart';
 import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
 import 'package:vaultexplorer/core/utils/cancellation_token.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
+import 'package:vaultexplorer/core/utils/path_clipboard.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/activity/clipboard_fab.dart';
@@ -1070,6 +1071,12 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         );
         _setStatus(context.l10n.clipboardVerbMoving);
       },
+      onCopyPath: _archiveContext == null
+          ? () => unawaited(_copyItemPath(entry))
+          : null,
+      onGoToLocation: _searchActive && _archiveContext == null
+          ? () => unawaited(_goToItemLocation(entry))
+          : null,
       onOpenInNewTab:
           (ref.read(appSettingsControllerProvider).settings.useBrowserTabs &&
               entry.isDir &&
@@ -1711,6 +1718,82 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       );
       await _handleFileTap(fileEntry);
     }
+  }
+
+  /// Copies [entry]'s path: the real filesystem path in a device or external
+  /// storage, the in-vault path in a vault (see [clipboardPathFor]).
+  Future<void> _copyItemPath(RawEntry entry) {
+    _signalActivity();
+    return copyPathToClipboard(
+      context,
+      clipboardPathFor(
+        relativePath: _fullPathOf(entry),
+        rootPath: widget.container.uri,
+        isLocalStorage: widget.container.isLocalStorage,
+      ),
+    );
+  }
+
+  /// Leaves the search and shows [entry] in the folder it lives in. Deep-search
+  /// results can be several levels below the folder the search ran from, so
+  /// that folder is opened first (the breadcrumb then reads as the item's real
+  /// path); the item is scrolled into view and left selected so it stands out.
+  Future<void> _goToItemLocation(RawEntry entry) async {
+    if (_disposed || !mounted || _archiveContext != null) return;
+    _signalActivity();
+    final (:parent, :name) = splitParentAndName(_fullPathOf(entry));
+    final isDir = entry.isDir;
+    // The selection holds the search listing's entry (whose name can be a
+    // relative path), which is not the entry of the folder about to open.
+    exitSelectionMode();
+
+    if (parent == _currentDirPath) {
+      _clearSearch();
+    } else {
+      _navNotifier.navigateToPath(
+        widget.container,
+        parent.isEmpty ? name : '$parent/$name',
+        isDir: false,
+        rootLabel: context.l10n.rootFolderLabel,
+        layoutMode: _getLayoutModeForFolder(parent),
+        resolveLayoutMode: _getLayoutModeForFolder,
+      );
+      final parentSort = _getSortStateForFolder(parent);
+      _sortNotifier.restore(parentSort.sortBy, parentSort.sortAscending);
+      _resetBrowserScrollController(initialOffset: 0.0);
+      _clearSearch();
+      await _loadDirectoryContents(parent);
+      if (_disposed || !mounted) return;
+    }
+
+    final target = _currentItems
+        .where((e) => e.isDir == isDir && e.name == name)
+        .firstOrNull;
+    // Gone since the search ran (renamed or deleted elsewhere): the folder is
+    // open, which is as close as it gets.
+    if (target == null) return;
+    _selectOnly(target);
+    if (selectedFolderCount > 0) {
+      fetchFolderSizes(widget.container, _currentDirPath);
+    }
+    _scrollToItemWhenReady(_fullPathOf(target));
+  }
+
+  /// [_scrollToItem] needs the list of a folder that was just opened to be
+  /// built and attached to the scroll controller, which takes a frame or two
+  /// after the directory finishes loading.
+  void _scrollToItemWhenReady(String fullPath, {int attemptsLeft = 20}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_disposed || !mounted) return;
+      if (_isLoading || !_browserScrollController.hasClients) {
+        if (attemptsLeft > 1) {
+          _scrollToItemWhenReady(fullPath, attemptsLeft: attemptsLeft - 1);
+        }
+        return;
+      }
+      _scrollToItem(fullPath);
+    });
+    WidgetsBinding.instance.scheduleFrame();
   }
 
   /// Opens a bookmark: a folder is entered, a file is opened in its folder.
@@ -5080,6 +5163,13 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             setSelectedItems({...selectedItems, ...filteredItems}),
         onCopy: () => _initClipboard(cut: false),
         onCut: () => _initClipboard(cut: true),
+        onCopyPath: (entry) => unawaited(_copyItemPath(entry)),
+        onGoToLocation: () {
+          final selected = selectedItems;
+          if (selected.length == 1) {
+            unawaited(_goToItemLocation(selected.first));
+          }
+        },
         onOpenInNewTab: appBarSingleSelectedFolderForNewTab == null
             ? null
             : () {

@@ -394,7 +394,6 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
     final pane = widget.pane;
     final tabs = _stripTabs(state);
     final shownTabId = _shownTabId(state);
-    final paneFocused = pane == null || state.focusedPane == pane;
     final actions = ref.read(
       browserTabsProvider(widget.workspaceConfig).notifier,
     );
@@ -407,19 +406,7 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
 
     return Container(
       height: kBrowserTabStripHeight,
-      decoration: BoxDecoration(
-        color: stripBackground,
-        // In dual pane the focused pane's strip carries the accent, so it is
-        // clear which pane the app bar and shortcuts belong to.
-        border: pane == null
-            ? null
-            : Border(
-                bottom: BorderSide(
-                  color: paneFocused ? cs.primary : Colors.transparent,
-                  width: 2,
-                ),
-              ),
-      ),
+      color: stripBackground,
       child: Row(
         children: [
           Expanded(
@@ -471,9 +458,9 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
                     GlobalKey.new,
                   );
                   final isShown = tab.tabId == shownTabId;
-                  final isActive = isShown && paneFocused;
-                  // The other pane's shown tab: on screen, but not focused.
-                  final isSecondary = isShown && !paneFocused;
+                  // Every pane's shown tab is highlighted the same way; no
+                  // pane is singled out as the focused one.
+                  final isActive = isShown;
                   return ReorderableDelayedDragStartListener(
                     key: ValueKey<TabId>(tab.tabId),
                     index: index,
@@ -535,7 +522,6 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
                                 child: _TabItem(
                                   tab: tab,
                                   active: isActive,
-                                  secondary: isSecondary,
                                   activeBackground: activeBackground,
                                   onTap: () => _onTabTapped(tab, tabContext),
                                 ),
@@ -568,14 +554,12 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
 class _TabItem extends ConsumerWidget {
   final BrowserTabState tab;
   final bool active;
-  final bool secondary;
   final Color activeBackground;
   final VoidCallback onTap;
 
   const _TabItem({
     required this.tab,
     required this.active,
-    required this.secondary,
     required this.activeBackground,
     required this.onTap,
   });
@@ -605,12 +589,7 @@ class _TabItem extends ConsumerWidget {
           );
     final name = tab.container?.displayName ?? context.l10n.dashboardNavLabel;
     final label = folderLabel ?? name;
-    final secondaryBackground = cs.primary.withValues(alpha: 0.08);
-    final fg = active
-        ? cs.onSurface
-        : secondary
-        ? cs.primary
-        : cs.onSurfaceVariant;
+    final fg = active ? cs.onSurface : cs.onSurfaceVariant;
 
     return Tooltip(
       message: folderLabel == null ? name : '$name / $folderLabel',
@@ -619,90 +598,52 @@ class _TabItem extends ConsumerWidget {
       // gesture and shows the label instead of starting a drag.
       triggerMode: TooltipTriggerMode.manual,
       child: Material(
-        color: active
-            ? activeBackground
-            : secondary
-            ? secondaryBackground
-            : Colors.transparent,
+        color: active ? activeBackground : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
           onTap: onTap,
-          child: Stack(
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 200),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
             alignment: Alignment.center,
-            children: [
-              Container(
-                constraints: const BoxConstraints(maxWidth: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                alignment: Alignment.center,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (selectedCount > 0)
-                      Container(
-                        margin: const EdgeInsets.only(right: 6),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 1,
-                        ),
-                        decoration: BoxDecoration(
-                          color: cs.primary,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          '$selectedCount',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: cs.onPrimary,
-                          ),
-                        ),
-                      ),
-                    Flexible(
-                      child: Text(
-                        label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: active
-                              ? FontWeight.bold
-                              : secondary
-                              ? FontWeight.w600
-                              : FontWeight.normal,
-                          color: fg,
-                        ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (selectedCount > 0)
+                  Container(
+                    margin: const EdgeInsets.only(right: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 1,
+                    ),
+                    decoration: BoxDecoration(
+                      color: cs.primary,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '$selectedCount',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: cs.onPrimary,
                       ),
                     ),
-                  ],
-                ),
-              ),
-              // Underline marking the active tab (full strength) and the
-              // dual-pane secondary tab (faint). Inset past the 8px corner
-              // radius so it sits on the straight part of the bottom edge.
-              // The "off" colour keeps the primary RGB at zero alpha so the
-              // fade does not pass through a dark tint.
-              Positioned(
-                left: 12,
-                right: 12,
-                bottom: 0,
-                height: 2.5,
-                child: IgnorePointer(
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    curve: Curves.easeOut,
-                    decoration: BoxDecoration(
-                      color: active
-                          ? cs.primary
-                          : secondary
-                          ? cs.primary.withValues(alpha: 0.4)
-                          : cs.primary.withValues(alpha: 0),
-                      borderRadius: BorderRadius.circular(2),
+                  ),
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: active ? FontWeight.bold : FontWeight.normal,
+                      color: fg,
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

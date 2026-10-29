@@ -10047,6 +10047,18 @@ abstract class AppLocalizations {
   /// **'Info'**
   String get fileInfoAction;
 
+  /// Menu item label, shown for an item opened from search results, that leaves the search and shows the item in the folder it lives in
+  ///
+  /// In en, this message translates to:
+  /// **'Go to location'**
+  String get goToLocationAction;
+
+  /// Menu item label that copies the path of the selected file or folder, or of a storage or vault in the side drawer, to the clipboard
+  ///
+  /// In en, this message translates to:
+  /// **'Copy path'**
+  String get copyPathAction;
+
   /// Header for the automation settings section in the vault configuration screen
   ///
   /// In en, this message translates to:
@@ -21204,6 +21216,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not pause or resume the recording'**
   String get cameraPauseFailedMessage;
+
+  /// Title of the setting that keeps a playing video going in a small floating window inside the app when the media viewer is closed
+  ///
+  /// In en, this message translates to:
+  /// **'Floating video player'**
+  String get floatingPlayerTitle;
+
+  /// Subtitle of the floating video player setting: closing the viewer keeps the video in a movable window, and leaving the app turns it into picture-in-picture with an audio-only button
+  ///
+  /// In en, this message translates to:
+  /// **'Closing the player while a video plays keeps it in a small window you can move around. Leaving the app turns it into picture-in-picture, with an audio-only button'**
+  String get floatingPlayerSubtitle;
+
+  /// Label of the button on the floating video window that reopens the video full screen
+  ///
+  /// In en, this message translates to:
+  /// **'Expand'**
+  String get floatingPlayerExpandTooltip;
+
+  /// Settings section and toggle title for the app-wide lock (password, PIN or pattern)
+  ///
+  /// In en, this message translates to:
+  /// **'Master Lock'**
+  String get masterLockTitle;
+
+  /// Settings toggle subtitle when the master lock is off
+  ///
+  /// In en, this message translates to:
+  /// **'Require a password, PIN, or pattern to open the app'**
+  String get masterLockInactiveSubtitle;
+
+  /// Title of the sheet shown when turning the master lock on
+  ///
+  /// In en, this message translates to:
+  /// **'Choose how to lock the app'**
+  String get masterLockChooseTitle;
+
+  /// Title of the sheet asking for a fallback credential when biometric unlock is chosen
+  ///
+  /// In en, this message translates to:
+  /// **'Add a backup unlock'**
+  String get masterLockBackupTitle;
+
+  /// Explanation shown when biometric unlock is chosen without any other credential set
+  ///
+  /// In en, this message translates to:
+  /// **'Biometric unlock needs a password, PIN, or pattern to fall back on. Choose one to set up as well.'**
+  String get masterLockBackupMessage;
+
+  /// Name of the password credential in the master lock settings
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get masterCredentialPassword;
+
+  /// Name of the PIN credential in the master lock settings
+  ///
+  /// In en, this message translates to:
+  /// **'PIN'**
+  String get masterCredentialPin;
+
+  /// Name of the pattern credential in the master lock settings
+  ///
+  /// In en, this message translates to:
+  /// **'Pattern'**
+  String get masterCredentialPattern;
+
+  /// Status of a master lock credential that has been set up
+  ///
+  /// In en, this message translates to:
+  /// **'Set'**
+  String get masterCredentialSet;
+
+  /// Status of a master lock credential that has not been set up
+  ///
+  /// In en, this message translates to:
+  /// **'Not set'**
+  String get masterCredentialNotSet;
+
+  /// Notice shown when no master lock is set
+  ///
+  /// In en, this message translates to:
+  /// **'A master lock must be enabled in App Security before configuring duress unlock.'**
+  String get duressMasterLockRequired;
 }
 
 class _AppLocalizationsDelegate

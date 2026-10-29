@@ -104,11 +104,9 @@ void main() {
       expect(container.read(appSettingsControllerProvider).backupBusy, isFalse);
     });
 
-    test('at most one of masterPatternHash/masterPinHash exists at a time: '
-        'saveMasterPin clears an existing pattern hash, and saveMasterPattern '
-        'clears an existing PIN hash -- regression test for switching '
-        'pattern -> PIN -> pattern silently reactivating the original '
-        'pattern instead of asking for a new one', () async {
+    test('password, PIN and pattern are independent credentials: saving one '
+        'leaves the others stored, and only makeActive moves the active '
+        'method', () async {
       final subscription = container.listen(appSettingsControllerProvider, (_, _) {});
       addTearDown(subscription.close);
       final controller = container.read(appSettingsControllerProvider.notifier);
@@ -123,19 +121,63 @@ void main() {
       state = container.read(appSettingsControllerProvider);
       expect(state.settings.masterPinHash, 'pinhash1');
       expect(state.settings.masterUnlockMethod, MasterUnlockMethod.pin);
-      // The pattern hash set moments ago must be gone now, or switching
-      // back to pattern later would reuse it instead of asking to redraw.
-      expect(state.settings.masterPatternHash, isNull);
+      // The pattern set earlier is still there to switch back to.
+      expect(state.settings.masterPatternHash, 'patternhash1');
 
-      expect(await controller.saveMasterPattern('patternhash2'), isTrue);
+      // Changing a credential without making it the active method.
+      expect(
+        await controller.saveMasterPattern('patternhash2', makeActive: false),
+        isTrue,
+      );
       state = container.read(appSettingsControllerProvider);
       expect(state.settings.masterPatternHash, 'patternhash2');
-      expect(state.settings.masterPinHash, isNull);
+      expect(state.settings.masterPinHash, 'pinhash1');
+      expect(state.settings.masterUnlockMethod, MasterUnlockMethod.pin);
     });
 
-    test('setMasterUnlockMethod(password) and setMasterUnlockMethod(biometrics) '
-        'both clear any configured pattern/PIN hash -- there is nothing left '
-        'to reactivate after switching away to either', () async {
+    test('a PIN alone is a complete master lock: no master password is '
+        'needed behind it', () async {
+      final subscription = container.listen(appSettingsControllerProvider, (_, _) {});
+      addTearDown(subscription.close);
+      final controller = container.read(appSettingsControllerProvider.notifier);
+      await controller.load();
+
+      await controller.updateSettings((s) => s.copyWith(useMasterPassword: true));
+      expect(
+        container.read(appSettingsControllerProvider).settings.masterLockActive,
+        isFalse,
+        reason: 'the flag alone, with nothing to unlock with, is no lock',
+      );
+
+      await controller.saveMasterPin('pinhash1');
+
+      final settings = container.read(appSettingsControllerProvider).settings;
+      expect(settings.hasMasterPassword, isFalse);
+      expect(settings.masterLockActive, isTrue);
+      expect(settings.masterUnlockMethod, MasterUnlockMethod.pin);
+    });
+
+    test('setMasterUnlockMethod refuses a credential that is not set, and '
+        'biometrics with no credential behind them', () async {
+      final subscription = container.listen(appSettingsControllerProvider, (_, _) {});
+      addTearDown(subscription.close);
+      final controller = container.read(appSettingsControllerProvider.notifier);
+      await controller.load();
+
+      expect(await controller.setMasterUnlockMethod(MasterUnlockMethod.pin), isFalse);
+      expect(
+        await controller.setMasterUnlockMethod(MasterUnlockMethod.biometrics),
+        isFalse,
+      );
+      expect(deletedSentinels, isEmpty);
+      expect(
+        container.read(appSettingsControllerProvider).settings.masterUnlockMethod,
+        MasterUnlockMethod.password,
+      );
+    });
+
+    test('biometrics sit in front of a stored credential and leave it '
+        'stored', () async {
       final subscription = container.listen(appSettingsControllerProvider, (_, _) {});
       addTearDown(subscription.close);
       final controller = container.read(appSettingsControllerProvider.notifier);
@@ -143,20 +185,13 @@ void main() {
 
       await controller.saveMasterPin('pinhash1');
       expect(
-        container.read(appSettingsControllerProvider).settings.masterPinHash,
-        isNotNull,
+        await controller.setMasterUnlockMethod(MasterUnlockMethod.biometrics),
+        isTrue,
       );
 
-      await controller.setMasterUnlockMethod(MasterUnlockMethod.password);
-      var state = container.read(appSettingsControllerProvider);
-      expect(state.settings.masterUnlockMethod, MasterUnlockMethod.password);
-      expect(state.settings.masterPinHash, isNull);
-
-      await controller.saveMasterPattern('patternhash1');
-      await controller.setMasterUnlockMethod(MasterUnlockMethod.biometrics);
-      state = container.read(appSettingsControllerProvider);
+      final state = container.read(appSettingsControllerProvider);
       expect(state.settings.masterUnlockMethod, MasterUnlockMethod.biometrics);
-      expect(state.settings.masterPatternHash, isNull);
+      expect(state.settings.masterPinHash, 'pinhash1');
     });
 
     test('setMasterUnlockMethod(biometrics) does not switch when the '
@@ -166,6 +201,7 @@ void main() {
       addTearDown(subscription.close);
       final controller = container.read(appSettingsControllerProvider.notifier);
       await controller.load();
+      await controller.saveMasterPin('pinhash1');
 
       final changed = await controller.setMasterUnlockMethod(
         MasterUnlockMethod.biometrics,
@@ -174,7 +210,7 @@ void main() {
       expect(changed, isFalse);
       expect(
         container.read(appSettingsControllerProvider).settings.masterUnlockMethod,
-        isNot(MasterUnlockMethod.biometrics),
+        MasterUnlockMethod.pin,
       );
     });
 
@@ -183,6 +219,7 @@ void main() {
       addTearDown(subscription.close);
       final controller = container.read(appSettingsControllerProvider.notifier);
       await controller.load();
+      await controller.saveMasterPin('pinhash1');
 
       expect(
         await controller.setMasterUnlockMethod(MasterUnlockMethod.biometrics),
@@ -190,9 +227,33 @@ void main() {
       );
       expect(deletedSentinels, isEmpty);
 
-      await controller.setMasterUnlockMethod(MasterUnlockMethod.password);
+      await controller.setMasterUnlockMethod(MasterUnlockMethod.pin);
 
       expect(deletedSentinels, ['master']);
+    });
+
+    test('removeMasterCredential never removes the last credential, and '
+        'removing the active one hands over to another', () async {
+      final subscription = container.listen(appSettingsControllerProvider, (_, _) {});
+      addTearDown(subscription.close);
+      final controller = container.read(appSettingsControllerProvider.notifier);
+      await controller.load();
+      await controller.saveMasterPattern('patternhash1');
+      await controller.saveMasterPin('pinhash1'); // now the active method
+
+      expect(await controller.removeMasterCredential(MasterUnlockMethod.pin), isTrue);
+      var settings = container.read(appSettingsControllerProvider).settings;
+      expect(settings.masterPinHash, isNull);
+      expect(settings.masterPatternHash, 'patternhash1');
+      expect(settings.masterUnlockMethod, MasterUnlockMethod.pattern);
+
+      expect(
+        await controller.removeMasterCredential(MasterUnlockMethod.pattern),
+        isFalse,
+      );
+      settings = container.read(appSettingsControllerProvider).settings;
+      expect(settings.masterPatternHash, 'patternhash1');
+      expect(settings.masterUnlockMethod, MasterUnlockMethod.pattern);
     });
 
     test('setMasterUnlockMethod is a no-op when the target already matches '

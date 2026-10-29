@@ -72,6 +72,47 @@ void main() {
     });
   });
 
+  group('MediaViewerToolbarConfig.floatingPlayerEnabled', () {
+    test('defaults to on (closing a playing video floats it)', () {
+      expect(
+        MediaViewerToolbarConfig.defaults().floatingPlayerEnabled,
+        isTrue,
+      );
+      expect(const MediaViewerToolbarConfig().floatingPlayerEnabled, isTrue);
+    });
+
+    test('copyWith and the JSON round trip keep it', () {
+      final off = MediaViewerToolbarConfig.defaults().copyWith(
+        floatingPlayerEnabled: false,
+      );
+      expect(off.floatingPlayerEnabled, isFalse);
+      final restored = MediaViewerToolbarConfig.fromJson(off.toJson());
+      expect(restored.floatingPlayerEnabled, isFalse);
+      expect(
+        restored.copyWith(loopPlaylist: false).floatingPlayerEnabled,
+        isFalse,
+      );
+    });
+
+    test('is independent of the automatic picture-in-picture setting', () {
+      final config = MediaViewerToolbarConfig.defaults().copyWith(
+        pictureInPictureEnabled: true,
+      );
+      expect(config.floatingPlayerEnabled, isTrue);
+      expect(
+        config.copyWith(floatingPlayerEnabled: false).pictureInPictureEnabled,
+        isTrue,
+      );
+    });
+
+    test('fromJson falls back to on when the key is missing', () {
+      final restored = MediaViewerToolbarConfig.fromJson(<String, dynamic>{
+        'showProgressBar': true,
+      });
+      expect(restored.floatingPlayerEnabled, isTrue);
+    });
+  });
+
   group('MediaViewerAction.pictureInPicture', () {
     test('is only applicable to video', () {
       const action = MediaViewerAction.pictureInPicture;

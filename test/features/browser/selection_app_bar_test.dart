@@ -312,4 +312,159 @@ void main() {
       expect(editVideoFinder, findsNothing);
     });
   });
+
+  group('Selection menu entries that depend on a callback', () {
+    Widget narrowBar({
+      VoidCallback? onGoToLocation,
+      VoidCallback? onCopyPath,
+    }) => _buildTestApp(
+      SelectionAppBar(
+        selectedCount: 1,
+        selectionLabel: '15 MB',
+        singleSelected: true,
+        singleFileSelected: true,
+        onGoToLocation: onGoToLocation,
+        onCopyPath: onCopyPath,
+        onEditVideo: () {},
+        onEditImage: () {},
+        onClose: () {},
+        onSelectAll: () {},
+        onRename: () {},
+        onCopy: () {},
+        onCut: () {},
+        onExport: () {},
+        onCompressSelection: () {},
+        onExtractSelectedArchive: () {},
+        onDelete: () {},
+        onOpenWithApp: () {},
+        onShare: () {},
+        showPinOption: false,
+        showUnpinOption: false,
+        onPin: () {},
+        onUnpin: () {},
+        showBookmarkOption: false,
+        showUnbookmarkOption: false,
+        onBookmark: () {},
+        onUnbookmark: () {},
+        showEncryptOption: false,
+        showDecryptOption: false,
+        onEncrypt: () {},
+        onDecrypt: () {},
+      ),
+    );
+
+    Widget wideBar({
+      VoidCallback? onGoToLocation,
+      VoidCallback? onCopyPath,
+    }) => _buildTestApp(
+      SelectionAppBarWide(
+        selectedCount: 1,
+        selectionLabel: '15 MB',
+        singleFileSelected: true,
+        singleFolderSelected: false,
+        singleArchiveSelected: false,
+        folderDocumentProviderMounted: false,
+        readOnly: false,
+        showPinOption: false,
+        showUnpinOption: false,
+        showBookmarkOption: false,
+        showUnbookmarkOption: false,
+        showEncryptOption: false,
+        showDecryptOption: false,
+        showActionBar: false,
+        visibleActions: const [],
+        actionBuilders: const {},
+        onGoToLocation: onGoToLocation,
+        onCopyPath: onCopyPath,
+        onEditVideo: () {},
+        onEditImage: () {},
+        onClose: () {},
+        onSelectAll: () {},
+        onRename: () {},
+        onCopy: () {},
+        onCut: () {},
+        onExport: () {},
+        onCompressSelection: () {},
+        onExtractSelectedArchive: () {},
+        onDelete: () {},
+        onOpenWithApp: () {},
+        onShare: () {},
+        onToggleDocumentProvider: () {},
+        onPin: () {},
+        onUnpin: () {},
+        onBookmark: () {},
+        onUnbookmark: () {},
+        onEncrypt: () {},
+        onDecrypt: () {},
+      ),
+    );
+
+    final bars =
+        <
+          String,
+          Widget Function({VoidCallback? onGoToLocation, VoidCallback? onCopyPath})
+        >{'SelectionAppBar': narrowBar, 'SelectionAppBarWide': wideBar};
+
+    // (menu value, label, icon, builds the bar with only that callback set)
+    final entries =
+        <(String, String, IconData, Widget Function(Widget Function({VoidCallback? onGoToLocation, VoidCallback? onCopyPath}), VoidCallback?))>[
+          (
+            'go_to_location',
+            'Go to location',
+            Icons.folder_open_rounded,
+            (bar, cb) => bar(onGoToLocation: cb),
+          ),
+          (
+            'copy_path',
+            'Copy path',
+            Icons.link_rounded,
+            (bar, cb) => bar(onCopyPath: cb),
+          ),
+        ];
+
+    for (final bar in bars.entries) {
+      for (final (value, label, icon, build) in entries) {
+        final finder = find.byWidgetPredicate(
+          (widget) => widget is PopupMenuItem<String> && widget.value == value,
+        );
+
+        testWidgets('${bar.key} offers "$label" and runs its callback when set', (
+          tester,
+        ) async {
+          var ran = false;
+          await tester.pumpWidget(build(bar.value, () => ran = true));
+          await tester.pumpAndSettle();
+
+          await tester.tap(find.byIcon(Icons.more_vert_rounded));
+          await tester.pumpAndSettle();
+
+          expect(finder, findsOneWidget);
+          expect(
+            find.descendant(of: finder, matching: find.byIcon(icon)),
+            findsOneWidget,
+          );
+          expect(
+            find.descendant(of: finder, matching: find.text(label)),
+            findsOneWidget,
+          );
+
+          await tester.tap(finder);
+          await tester.pumpAndSettle();
+          expect(ran, isTrue);
+        });
+
+        testWidgets('${bar.key} does not offer "$label" without a callback', (
+          tester,
+        ) async {
+          await tester.pumpWidget(build(bar.value, null));
+          await tester.pumpAndSettle();
+
+          await tester.tap(find.byIcon(Icons.more_vert_rounded));
+          await tester.pumpAndSettle();
+
+          expect(finder, findsNothing);
+        });
+      }
+    }
+  });
 }

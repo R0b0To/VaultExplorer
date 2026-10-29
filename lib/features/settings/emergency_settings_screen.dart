@@ -572,13 +572,11 @@ class _EmergencySettingsScreenState
                       SectionHeader(context.l10n.sectionDuressUnlock),
                       SectionCard(
                         children: [
-                          if (!appSettingsState.settings.useMasterPassword ||
-                              appSettingsState.settings.masterPasswordHash ==
-                                  null)
+                          if (!appSettingsState.settings.masterLockActive)
                             Padding(
                               padding: const EdgeInsets.all(16),
                               child: Text(
-                                context.l10n.duressMasterPasswordRequired,
+                                context.l10n.duressMasterLockRequired,
                                 style: textTheme.bodyMedium?.copyWith(
                                   color: cs.error,
                                 ),

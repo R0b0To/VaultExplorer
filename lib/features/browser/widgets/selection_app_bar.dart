@@ -8,6 +8,14 @@ import 'package:vaultexplorer/features/browser/widgets/item_action_menu_config.d
 class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
   final int selectedCount;
   final VoidCallback? onFileInfo;
+
+  /// Set only for a single selected item while a search is showing: offers
+  /// "Go to location", which leaves the search and shows the item in the
+  /// folder it lives in.
+  final VoidCallback? onGoToLocation;
+
+  /// Copies the single selected item's path to the clipboard.
+  final VoidCallback? onCopyPath;
   final String selectionLabel;
   final bool singleSelected;
   final bool singleFileSelected;
@@ -74,6 +82,8 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.hideVaultOnlyActions = false,
     this.isInsideArchive = false,
     this.onFileInfo,
+    this.onGoToLocation,
+    this.onCopyPath,
     required this.onClose,
     required this.onSelectAll,
     required this.onRename,
@@ -316,6 +326,8 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                 if (value == 'unpin') onUnpin();
                 if (value == 'bookmark') onBookmark();
                 if (value == 'unbookmark') onUnbookmark();
+                if (value == 'go_to_location') onGoToLocation?.call();
+                if (value == 'copy_path') onCopyPath?.call();
                 if (value == 'file_info') onFileInfo?.call();
               },
               itemBuilder: (context) => applyItemActionMenuConfig(
@@ -564,7 +576,29 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                     ),
                   ),
 
-                // 5. Properties / Info (Bottom Anchor)
+                // 5. Location + Properties / Info (Bottom Anchor)
+                if (onGoToLocation != null)
+                  PopupMenuItem<String>(
+                    value: 'go_to_location',
+                    child: Row(
+                      children: [
+                        Icon(Icons.folder_open_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
+                        const SizedBox(width: 12),
+                        Text(context.l10n.goToLocationAction),
+                      ],
+                    ),
+                  ),
+                if (onCopyPath != null)
+                  PopupMenuItem<String>(
+                    value: 'copy_path',
+                    child: Row(
+                      children: [
+                        Icon(Icons.link_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
+                        const SizedBox(width: 12),
+                        Text(context.l10n.copyPathAction),
+                      ],
+                    ),
+                  ),
                 if (singleSelected)
                   PopupMenuItem<String>(
                     value: 'file_info',

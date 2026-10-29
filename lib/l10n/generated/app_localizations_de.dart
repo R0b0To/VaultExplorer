@@ -6152,6 +6152,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get fileInfoAction => 'Info';
 
   @override
+  String get goToLocationAction => 'Zum Speicherort gehen';
+
+  @override
+  String get copyPathAction => 'Pfad kopieren';
+
+  @override
   String get automationSectionHeader => 'Automatisierung';
 
   @override
@@ -12688,4 +12694,50 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get cameraPauseFailedMessage =>
       'Aufnahme konnte nicht pausiert oder fortgesetzt werden';
+
+  @override
+  String get floatingPlayerTitle => 'Schwebender Video-Player';
+
+  @override
+  String get floatingPlayerSubtitle =>
+      'Beim Schließen des Players läuft das Video in einem kleinen, verschiebbaren Fenster weiter. Beim Verlassen der App wird es zu Bild-in-Bild, mit einer Nur-Audio-Taste';
+
+  @override
+  String get floatingPlayerExpandTooltip => 'Vergrößern';
+
+  @override
+  String get masterLockTitle => 'Hauptsperre';
+
+  @override
+  String get masterLockInactiveSubtitle =>
+      'Ein Passwort, eine PIN oder ein Muster zum Öffnen der App verlangen';
+
+  @override
+  String get masterLockChooseTitle => 'Wähle, wie die App gesperrt wird';
+
+  @override
+  String get masterLockBackupTitle => 'Ersatz-Entsperrung hinzufügen';
+
+  @override
+  String get masterLockBackupMessage =>
+      'Die biometrische Entsperrung braucht ein Passwort, eine PIN oder ein Muster als Rückfallebene. Wähle eines davon, das du zusätzlich einrichtest.';
+
+  @override
+  String get masterCredentialPassword => 'Passwort';
+
+  @override
+  String get masterCredentialPin => 'PIN';
+
+  @override
+  String get masterCredentialPattern => 'Muster';
+
+  @override
+  String get masterCredentialSet => 'Festgelegt';
+
+  @override
+  String get masterCredentialNotSet => 'Nicht festgelegt';
+
+  @override
+  String get duressMasterLockRequired =>
+      'In den App-Sicherheitseinstellungen muss eine Hauptsperre aktiviert sein, um die Nötigungs-Entsperrung zu konfigurieren.';
 }

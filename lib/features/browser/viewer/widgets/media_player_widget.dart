@@ -77,6 +77,32 @@ class VideoPlaybackProgress {
   }
 }
 
+/// Lets the viewer ask the video it is showing where it is on screen right
+/// now. The widget registers itself while it holds the probe, so the viewer
+/// can measure at the moment that matters (as a close begins, mid-swipe and
+/// all) instead of trusting the last reported position.
+class VideoFrameProbe {
+  Object? _owner;
+  Rect? Function()? _measure;
+
+  void _attach(Object owner, Rect? Function() measure) {
+    _owner = owner;
+    _measure = measure;
+  }
+
+  // A no-op for anyone but the current holder, so a page that lost the probe
+  // can't take it from the one that has it now.
+  void _detach(Object owner) {
+    if (!identical(_owner, owner)) return;
+    _owner = null;
+    _measure = null;
+  }
+
+  /// Where the video frame is, in logical pixels of the app's view and
+  /// clipped to the screen, or null when there is no video to measure.
+  Rect? measure() => _measure?.call();
+}
+
 class MediaPlayerWidget extends ConsumerStatefulWidget {
   final MountedContainer container;
   final String fileName;
@@ -108,6 +134,15 @@ class MediaPlayerWidget extends ConsumerStatefulWidget {
   final bool isMuted;
   final ValueChanged<bool>? onMuteChanged;
   final VideoAspectRatioMode videoAspectRatioMode;
+
+  /// Told where the video is on screen (logical pixels, clipped to the screen)
+  /// and the device pixel ratio, after layouts and zooms. The viewer passes it
+  /// on to picture-in-picture, so that Android animates from the video itself
+  /// into the PiP window. Only the video actually showing should be given one.
+  final void Function(Rect rect, double devicePixelRatio)? onVideoRectChanged;
+
+  /// Held by the one video the viewer is on; see [VideoFrameProbe].
+  final VideoFrameProbe? videoFrameProbe;
   final bool edgeSwipeBrightnessEnabled;
   final bool edgeSwipeVolumeEnabled;
   final bool edgeSwipeHudEnabled;
@@ -163,6 +198,8 @@ class MediaPlayerWidget extends ConsumerStatefulWidget {
     this.onMuteChanged,
     this.enableZoom = true,
     this.videoAspectRatioMode = VideoAspectRatioMode.bestFit,
+    this.onVideoRectChanged,
+    this.videoFrameProbe,
     this.edgeSwipeBrightnessEnabled = true,
     this.edgeSwipeVolumeEnabled = true,
     this.edgeSwipeHudEnabled = true,
@@ -202,6 +239,8 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
   bool _showRightIndicator = false;
   bool _isSpeedHeld = false;
   final GlobalKey _interactiveViewerKey = GlobalKey();
+  final GlobalKey _videoFrameKey = GlobalKey();
+  bool _videoRectReportScheduled = false;
   Timer? _skipDebounceTimer;
   bool _isSkipActive = false;
   bool _skipBackwards = false;
@@ -298,6 +337,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
   @override
   void initState() {
     super.initState();
+    widget.videoFrameProbe?._attach(this, _measureVideoRect);
     _lockController = ref.read(sessionLockControllerProvider);
     _thumbnailCache = ref.read(thumbnailCacheServiceProvider);
     final initialPoster =
@@ -366,6 +406,10 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
   @override
   void didUpdateWidget(covariant MediaPlayerWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.videoFrameProbe, widget.videoFrameProbe)) {
+      oldWidget.videoFrameProbe?._detach(this);
+      widget.videoFrameProbe?._attach(this, _measureVideoRect);
+    }
     if (oldWidget.fileName != widget.fileName) {
       // File changed — reset poster for new file
       final newPoster =
@@ -589,6 +633,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
 
   @override
   void dispose() {
+    widget.videoFrameProbe?._detach(this);
     _updateMediaPlayingState(false);
     _skipDebounceTimer?.cancel();
     _brightnessHudTimer?.cancel();
@@ -657,6 +702,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
 
   void _onVideoTransformationChanged() {
     if (_isClampingMatrix || !mounted) return;
+    _scheduleVideoRectReport();
     final vpSize = MediaQuery.of(context).size;
     if (vpSize.width <= 0 || vpSize.height <= 0) return;
 
@@ -908,7 +954,42 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
     }
   }
 
+  /// Where the video frame is on screen right now, once this frame has been
+  /// laid out: the frame's box through every transform above it (zoom,
+  /// rotation, fit), clipped to the screen. That is the area Android should
+  /// animate into the picture-in-picture window.
+  void _scheduleVideoRectReport() {
+    if (widget.onVideoRectChanged == null || _videoRectReportScheduled) return;
+    _videoRectReportScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _videoRectReportScheduled = false;
+      if (!mounted) return;
+      final callback = widget.onVideoRectChanged;
+      final visible = _measureVideoRect();
+      if (callback == null || visible == null) return;
+      callback(visible, View.of(context).devicePixelRatio);
+    });
+  }
+
+  /// The video frame's box through every transform above it (zoom, rotation,
+  /// fit, a swipe in progress), clipped to the screen; null when it is not
+  /// laid out or not on screen.
+  Rect? _measureVideoRect() {
+    if (!mounted) return null;
+    final box = _videoFrameKey.currentContext?.findRenderObject();
+    if (box is! RenderBox || !box.attached || !box.hasSize) return null;
+    final view = View.of(context);
+    final bounds = MatrixUtils.transformRect(
+      box.getTransformTo(null),
+      Offset.zero & box.size,
+    );
+    final screen = Offset.zero & (view.physicalSize / view.devicePixelRatio);
+    final visible = bounds.intersect(screen);
+    return visible.isEmpty ? null : visible;
+  }
+
   Widget _buildVideoTexture(NativeVideoController controller) {
+    _scheduleVideoRectReport();
     final mode = widget.videoAspectRatioMode;
     // The filter wraps only the texture, so the black letterbox bars stay
     // black and the filtered area is exactly the video frame. It sits inside
@@ -952,6 +1033,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
             fit: fit,
             clipBehavior: Clip.hardEdge,
             child: SizedBox(
+              key: _videoFrameKey,
               width: sizedWidth,
               height: sizedHeight,
               child: textureView,
@@ -1483,7 +1565,14 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
           if (details.pointerCount >= 2) {
             _zoomAnimationController?.stop();
           }
-          widget.onZoomChanged(false);
+          // The zoom recognizer accepts any one-finger drag after a short
+          // travel, even with nothing to pan. A lone finger on an item at
+          // its resting zoom must not freeze paging, or a curved or
+          // L-shaped swipe that happened to start steeply could never
+          // change the item.
+          if (details.pointerCount >= 2 || _isZoomed) {
+            widget.onZoomChanged(false);
+          }
         },
         onInteractionUpdate: (details) {
           final s = _getMatrixScale(_videoTransformationController.value);

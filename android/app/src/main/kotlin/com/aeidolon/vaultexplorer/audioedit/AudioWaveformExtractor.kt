@@ -6,6 +6,7 @@ import android.os.SystemClock
 import com.aeidolon.vaultexplorer.VeLog
 import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.FfmpegPcmDecoder
 import java.nio.ByteBuffer
+import java.util.concurrent.locks.LockSupport
 import kotlin.math.max
 
 /**
@@ -38,7 +39,14 @@ object AudioWaveformExtractor {
     private const val STALL_TIMEOUT_MS = 20_000L
     private const val PARTIAL_INTERVAL_MS = 400L
     private const val DEQUEUE_TIMEOUT_US = 10_000L
-    private const val FFMPEG_IDLE_SLEEP_MS = 2L
+    /**
+     * How long the FFmpeg loop parks when neither feeding nor draining moved. This used to be a 2 ms
+     * `Thread.sleep`, and that capped the whole decode: the decoder only holds a handful of buffers, takes
+     * well under a millisecond to chew through them, and then sat idle for the rest of the nap. A 3 hour MP3
+     * is ~410k frames, so a few thousand frames per second of nap-limited throughput is a minute or more.
+     * Parked this briefly the loop is decoder-bound instead.
+     */
+    private const val FFMPEG_IDLE_PARK_NS = 100_000L
     private const val MAX_SAMPLE_BUFFER = 16 * 1024 * 1024
 
     /** The rough first pass is only worth having if it is quick; past this it is dropped. */
@@ -372,7 +380,7 @@ object AudioWaveformExtractor {
                         break
                     } else if (!progressed) {
                         val napStart = System.nanoTime()
-                        Thread.sleep(FFMPEG_IDLE_SLEEP_MS)
+                        LockSupport.parkNanos(FFMPEG_IDLE_PARK_NS)
                         stats.waitNs.addAndGet(System.nanoTime() - napStart)
                     }
                 }

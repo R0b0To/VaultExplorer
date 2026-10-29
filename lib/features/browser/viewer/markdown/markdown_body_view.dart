@@ -1,15 +1,18 @@
 import 'dart:async';
 
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:path/path.dart' as p;
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/viewer/markdown/markdown_ast.dart';
+import 'package:vaultexplorer/features/browser/viewer/markdown/markdown_image_cache.dart';
 import 'package:vaultexplorer/features/browser/viewer/markdown/markdown_parser.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/markdown_image.dart';
 
-class MarkdownBodyView extends StatefulWidget {
+class MarkdownBodyView extends ConsumerStatefulWidget {
   final String source;
   final MountedContainer container;
   final String currentFilePath;
@@ -19,6 +22,11 @@ class MarkdownBodyView extends StatefulWidget {
   final int searchMatchIndex;
   final void Function(int totalMatches)? onMatchesFound;
   final void Function(int sourceLine, bool currentChecked)? onTaskToggled;
+
+  /// Extra space after the last block. Lets a host that clips a band off the
+  /// bottom of the view (the editor's sliding tab strip) keep the end of the
+  /// document reachable.
+  final double bottomInset;
 
   const MarkdownBodyView({
     super.key,
@@ -31,13 +39,14 @@ class MarkdownBodyView extends StatefulWidget {
     this.searchMatchIndex = 0,
     this.onMatchesFound,
     this.onTaskToggled,
+    this.bottomInset = 0,
   });
 
   @override
-  State<MarkdownBodyView> createState() => MarkdownBodyViewState();
+  ConsumerState<MarkdownBodyView> createState() => MarkdownBodyViewState();
 }
 
-class MarkdownBodyViewState extends State<MarkdownBodyView> {
+class MarkdownBodyViewState extends ConsumerState<MarkdownBodyView> {
   final List<GlobalKey> _topLevelBlockKeys = [];
   List<int> _topLevelBlockLines = [];
 
@@ -56,6 +65,17 @@ class MarkdownBodyViewState extends State<MarkdownBodyView> {
   int _totalSearchMatches = 0;
   late ScrollController _scrollController;
 
+  // Remembers image sizes/bytes for the lifetime of this viewer so the lazy
+  // list does not re-measure (and re-read from the vault) images every time
+  // they scroll out of and back into view.
+  MarkdownImageCache? _imageCache;
+
+  MarkdownImageCache get _images =>
+      _imageCache ??= MarkdownImageCache.forVault(
+        api: ref.read(vaultFileIoApiProvider),
+        container: widget.container,
+      );
+
   @override
   void initState() {
     super.initState();
@@ -70,6 +90,12 @@ class MarkdownBodyViewState extends State<MarkdownBodyView> {
         _scrollController.dispose();
       }
       _scrollController = widget.scrollController ?? ScrollController();
+    }
+
+    if (oldWidget.container.volId != widget.container.volId) {
+      _imageCache?.dispose();
+      _imageCache = null;
+      _cachedSource = null; // re-parse and re-prefetch against the new vault
     }
 
     if (oldWidget.searchMatchIndex != widget.searchMatchIndex &&
@@ -98,6 +124,7 @@ class MarkdownBodyViewState extends State<MarkdownBodyView> {
 
   @override
   void dispose() {
+    _imageCache?.dispose();
     if (widget.scrollController == null) {
       _scrollController.dispose();
     }
@@ -393,7 +420,44 @@ class MarkdownBodyViewState extends State<MarkdownBodyView> {
     _calloutCollapsedStates.clear();
     _indexHeadings(_blocks);
     _searchMetadataQuery = null;
+    _imageCache?.clearFailures();
+    _schedulePrefetchImageSizes();
     return true;
+  }
+
+  /// Learns every image's dimensions in the background so each image's layout
+  /// box is final before the user scrolls to it.
+  void _schedulePrefetchImageSizes() {
+    final paths = <String>[];
+    _collectImagePaths(_blocks, paths);
+    if (paths.isEmpty) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _images.prefetchSizes(paths);
+    });
+  }
+
+  void _collectImagePaths(List<MdBlock> blocks, List<String> out) {
+    for (final block in blocks) {
+      if (block is MdImageBlock) {
+        final path = block.path;
+        if (path.isEmpty ||
+            path.startsWith('http://') ||
+            path.startsWith('https://')) {
+          continue;
+        }
+        final resolved = _resolveVaultPath(widget.currentFilePath, path);
+        if (MarkdownImage.isDecodablePath(resolved)) out.add(resolved);
+      } else if (block is MdBlockquote) {
+        _collectImagePaths(block.children, out);
+      } else if (block is MdCallout) {
+        _collectImagePaths(block.children, out);
+      } else if (block is MdList) {
+        for (final item in block.items) {
+          _collectImagePaths(item.children, out);
+        }
+      }
+    }
   }
 
   void _indexHeadings(List<MdBlock> blocks) {
@@ -571,7 +635,11 @@ class MarkdownBodyViewState extends State<MarkdownBodyView> {
 
     return ListView.builder(
       controller: _scrollController,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + widget.bottomInset),
+      // Build a good distance beyond the viewport so images are loaded and
+      // laid out before they scroll into view, and are not torn down/rebuilt
+      // on every small back-and-forth scroll.
+      cacheExtent: 1000,
       itemCount: blocks.length,
       itemBuilder: (context, index) => KeyedSubtree(
         key: _topLevelBlockKeys[index],
@@ -912,6 +980,8 @@ class MarkdownBodyViewState extends State<MarkdownBodyView> {
       container: widget.container,
       resolvedPath: resolved,
       alt: alt,
+      cache: _images,
+      zoomable: true,
     );
   }
 

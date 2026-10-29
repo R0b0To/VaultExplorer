@@ -350,9 +350,7 @@ class _MainShellState extends ConsumerState<MainShell>
       final lockSettings = _container
           .read(appSettingsControllerProvider)
           .settings;
-      if (mode == DisguiseMode.decoy ||
-          (lockSettings.useMasterPassword &&
-              lockSettings.masterPasswordHash != null)) {
+      if (mode == DisguiseMode.decoy || lockSettings.masterLockActive) {
         unawaited(BackgroundPlaybackHost.instance.closeAndWait());
       }
 
@@ -383,10 +381,10 @@ class _MainShellState extends ConsumerState<MainShell>
       }
 
       final settings = _container.read(appSettingsControllerProvider).settings;
-      if (settings.useMasterPassword && settings.masterPasswordHash != null) {
+      if (settings.masterLockActive) {
         VeLog.i(
           _kLogTag,
-          '_enforceAppLock: master password set -> pushing LockGateScreen',
+          '_enforceAppLock: master lock set -> pushing LockGateScreen',
         );
         navigator.pushAndRemoveUntil(
           PageRouteBuilder(

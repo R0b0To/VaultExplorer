@@ -48,6 +48,13 @@ class MediaViewerToolbarConfig {
   /// itself when the app is left (home, recents, another app). Off by
   /// default: the viewer's picture-in-picture button enters it on demand.
   final bool pictureInPictureEnabled;
+
+  /// Whether closing the viewer while a video plays keeps it going in a small
+  /// floating window inside the app, instead of stopping it. That window turns
+  /// into Android's picture-in-picture window (with an "audio only" button)
+  /// when the app is left. On by default; off, closing the viewer ends the
+  /// video as it always did.
+  final bool floatingPlayerEnabled;
   final bool tapEdgesToNavigate;
 
   /// Double-tapping the middle of the video or audio screen plays or pauses
@@ -139,6 +146,7 @@ class MediaViewerToolbarConfig {
     this.resumePlaybackMode = ResumePlaybackMode.askEveryTime,
     this.keepAudioPlayingAfterClose = false,
     this.pictureInPictureEnabled = false,
+    this.floatingPlayerEnabled = true,
     this.tapEdgesToNavigate = true,
     this.doubleTapPlayPause = true,
     this.doubleTapSkipEnabled = true,
@@ -186,6 +194,7 @@ class MediaViewerToolbarConfig {
     ResumePlaybackMode? resumePlaybackMode,
     bool? keepAudioPlayingAfterClose,
     bool? pictureInPictureEnabled,
+    bool? floatingPlayerEnabled,
     bool? tapEdgesToNavigate,
     bool? doubleTapPlayPause,
     bool? doubleTapSkipEnabled,
@@ -240,6 +249,7 @@ class MediaViewerToolbarConfig {
         keepAudioPlayingAfterClose ?? this.keepAudioPlayingAfterClose,
     pictureInPictureEnabled:
         pictureInPictureEnabled ?? this.pictureInPictureEnabled,
+    floatingPlayerEnabled: floatingPlayerEnabled ?? this.floatingPlayerEnabled,
     tapEdgesToNavigate: tapEdgesToNavigate ?? this.tapEdgesToNavigate,
     doubleTapPlayPause: doubleTapPlayPause ?? this.doubleTapPlayPause,
     doubleTapSkipEnabled: doubleTapSkipEnabled ?? this.doubleTapSkipEnabled,
@@ -337,6 +347,7 @@ class MediaViewerToolbarConfig {
     'resumePlaybackMode': resumePlaybackMode.name,
     'keepAudioPlayingAfterClose': keepAudioPlayingAfterClose,
     'pictureInPictureEnabled': pictureInPictureEnabled,
+    'floatingPlayerEnabled': floatingPlayerEnabled,
     'tapEdgesToNavigate': tapEdgesToNavigate,
     'doubleTapPlayPause': doubleTapPlayPause,
     'doubleTapSkipEnabled': doubleTapSkipEnabled,
@@ -517,6 +528,7 @@ class MediaViewerToolbarConfig {
       keepAudioPlayingAfterClose:
           j['keepAudioPlayingAfterClose'] as bool? ?? false,
       pictureInPictureEnabled: j['pictureInPictureEnabled'] as bool? ?? false,
+      floatingPlayerEnabled: j['floatingPlayerEnabled'] as bool? ?? true,
       tapEdgesToNavigate: j['tapEdgesToNavigate'] as bool? ?? true,
       doubleTapPlayPause: j['doubleTapPlayPause'] as bool? ?? true,
       doubleTapSkipEnabled: j['doubleTapSkipEnabled'] as bool? ?? true,

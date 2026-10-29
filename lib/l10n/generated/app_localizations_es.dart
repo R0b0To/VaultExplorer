@@ -6164,6 +6164,12 @@ class AppLocalizationsEs extends AppLocalizations {
   String get fileInfoAction => 'Info';
 
   @override
+  String get goToLocationAction => 'Ir a la ubicación';
+
+  @override
+  String get copyPathAction => 'Copiar ruta';
+
+  @override
   String get automationSectionHeader => 'Automatización';
 
   @override
@@ -12718,4 +12724,50 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get cameraPauseFailedMessage =>
       'No se pudo pausar ni reanudar la grabación';
+
+  @override
+  String get floatingPlayerTitle => 'Reproductor de vídeo flotante';
+
+  @override
+  String get floatingPlayerSubtitle =>
+      'Al cerrar el reproductor, el vídeo sigue en una ventana pequeña que puedes mover. Al salir de la app pasa a imagen en imagen, con un botón de solo audio';
+
+  @override
+  String get floatingPlayerExpandTooltip => 'Ampliar';
+
+  @override
+  String get masterLockTitle => 'Bloqueo maestro';
+
+  @override
+  String get masterLockInactiveSubtitle =>
+      'Requiere una contraseña, un PIN o un patrón para abrir la app';
+
+  @override
+  String get masterLockChooseTitle => 'Elige cómo bloquear la app';
+
+  @override
+  String get masterLockBackupTitle => 'Añade un desbloqueo de respaldo';
+
+  @override
+  String get masterLockBackupMessage =>
+      'El desbloqueo biométrico necesita una contraseña, un PIN o un patrón como alternativa. Elige uno para configurarlo también.';
+
+  @override
+  String get masterCredentialPassword => 'Contraseña';
+
+  @override
+  String get masterCredentialPin => 'PIN';
+
+  @override
+  String get masterCredentialPattern => 'Patrón';
+
+  @override
+  String get masterCredentialSet => 'Configurado';
+
+  @override
+  String get masterCredentialNotSet => 'Sin configurar';
+
+  @override
+  String get duressMasterLockRequired =>
+      'Debe haber un bloqueo maestro habilitado en Seguridad antes de configurar el desbloqueo bajo coacción.';
 }

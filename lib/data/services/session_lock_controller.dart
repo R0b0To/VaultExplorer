@@ -34,8 +34,8 @@ SessionLockController sessionLockController(Ref ref) {
 /// - **App lock** ([performAppLock]) re-shows `LockGateScreen` via
 ///   [_enforceAppLock]. Cheap to reverse -- mounted containers are left
 ///   alone, so re-entry is just a password/PIN/pattern/biometric check.
-///   Gated by [AppSettings.useMasterPassword] (a password must actually be
-///   set) plus its own timing settings, [AppSettings.appLockAfterMins]
+///   Gated by [AppSettings.masterLockActive] (a password, PIN or pattern must
+///   actually be set) plus its own timing settings, [AppSettings.appLockAfterMins]
 ///   (inactivity) and [AppSettings.lockAppOnScreenLock] (screen-off).
 ///   [AppSettings.appLockScreenLockOnly] switches this from an inactivity
 ///   timer to reacting only to a genuine screen-off signal (ignoring plain
@@ -216,8 +216,7 @@ class SessionLockController {
     _appLockTimer = null;
   }
 
-  bool _hasMasterPassword(AppSettings settings) =>
-      settings.useMasterPassword && settings.masterPasswordHash != null;
+  bool _hasMasterLock(AppSettings settings) => settings.masterLockActive;
 
   /// Locks any mounted container explicitly configured to "Immediately"
   /// (`ContainerRecord.autoCloseImmediately`), regardless of
@@ -305,14 +304,14 @@ class SessionLockController {
     if (_settings == null || _isMediaPlaying) return;
     _appLockTimer?.cancel();
     final settings = _settings!();
-    final hasMasterPassword = _hasMasterPassword(settings);
+    final hasMasterLock = _hasMasterLock(settings);
     final mins = settings.appLockAfterMins;
 
-    if (!hasMasterPassword || settings.appLockScreenLockOnly || mins <= 0) {
+    if (!hasMasterLock || settings.appLockScreenLockOnly || mins <= 0) {
       VeLog.d(
         _kLogTag,
         '_scheduleAppLockTimer: skipped '
-        '(hasMasterPassword=$hasMasterPassword, '
+        '(hasMasterLock=$hasMasterLock, '
         'appLockScreenLockOnly=${settings.appLockScreenLockOnly}, appLockAfterMins=$mins)',
       );
       return;
@@ -413,12 +412,12 @@ class SessionLockController {
   void performAppLock() {
     if (_settings == null) return;
     final settings = _settings!();
-    final hasMasterPassword = _hasMasterPassword(settings);
+    final hasMasterLock = _hasMasterLock(settings);
     VeLog.i(
       _kLogTag,
-      'performAppLock: called (hasMasterPassword=$hasMasterPassword, isAppLocked=$_isAppLocked)',
+      'performAppLock: called (hasMasterLock=$hasMasterLock, isAppLocked=$_isAppLocked)',
     );
-    if (hasMasterPassword) {
+    if (hasMasterLock) {
       if (_isAppLocked) {
         VeLog.d(_kLogTag, 'performAppLock: app gate is already armed/locked, skipping duplicate');
         return;
@@ -508,18 +507,18 @@ class SessionLockController {
               : pausedAt;
       final vaultAwayDuration = _now().difference(vaultIdleSince);
       final settings = _settings!();
-      final hasMasterPassword = _hasMasterPassword(settings);
+      final hasMasterLock = _hasMasterLock(settings);
 
       VeLog.i(
         _kLogTag,
         'handleAppLifecycleState: resumed after awayDuration=$awayDuration '
-        '(hasMasterPassword=$hasMasterPassword, isAppLocked=$_isAppLocked, '
+        '(hasMasterLock=$hasMasterLock, isAppLocked=$_isAppLocked, '
         'appLockAfterMins=${settings.appLockAfterMins}, autoLockMins=${settings.autoLockMins})',
       );
 
       if (!evaluateAppLock) {
         _scheduleAppLockTimer();
-      } else if (hasMasterPassword && !_isAppLocked && !lockedAppOnScreenOff) {
+      } else if (hasMasterLock && !_isAppLocked && !lockedAppOnScreenOff) {
         if (settings.appLockScreenLockOnly) {
           // This mode ignores mere backgrounding entirely -- only a genuine
           // screen-off signal (handleScreenOff) should re-show the lock
@@ -594,10 +593,10 @@ class SessionLockController {
    void handleScreenOff() {
     if (_settings == null || isLockSuppressed) return;
     final settings = _settings!();
-    final hasMasterPassword = _hasMasterPassword(settings);
+    final hasMasterLock = _hasMasterLock(settings);
     VeLog.d(
       _kLogTag,
-      'handleScreenOff: received (hasMasterPassword=$hasMasterPassword, '
+      'handleScreenOff: received (hasMasterLock=$hasMasterLock, '
       'lockAppOnScreenLock=${settings.lockAppOnScreenLock}, appLockAfterMins=${settings.appLockAfterMins}, '
       'lockContainersOnScreenLock=${settings.lockContainersOnScreenLock}, autoLockMins=${settings.autoLockMins})',
     );
@@ -609,7 +608,7 @@ class SessionLockController {
 
      // appLockScreenLockOnly implies screen-off locking, so it applies
      // regardless of lockAppOnScreenLock -- see AppSettings.appLockScreenLockOnly.
-     if (hasMasterPassword && (settings.appLockScreenLockOnly || settings.lockAppOnScreenLock)) {
+     if (hasMasterLock && (settings.appLockScreenLockOnly || settings.lockAppOnScreenLock)) {
       if (settings.appLockScreenLockOnly || settings.appLockAfterMins <= 0) {
         // "Screen Lock Only" or "Immediately" is selected -- lock the app
         // gate as soon as the screen goes off.

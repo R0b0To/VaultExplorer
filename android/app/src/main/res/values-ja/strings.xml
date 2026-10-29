@@ -15,4 +15,5 @@
     <string name="vault_media_action_previous">前へ</string>
     <string name="vault_media_action_next">次へ</string>
     <string name="vault_media_action_stop">停止</string>
+    <string name="vault_pip_action_audio_only">音声のみ</string>
 </resources>

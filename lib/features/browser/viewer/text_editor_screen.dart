@@ -701,7 +701,12 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
     // The handle was released: show the strip if the editor ended up at the
     // top, otherwise leave it as it was but never stranded half-way.
     double? atTop;
-    final controller = _activeTab.verticalScrollController;
+    final tab = _activeTab;
+    // The handle may have been dragging the markdown preview, which scrolls
+    // with its own controller.
+    final controller = (tab.isMarkdownFile && tab.showMarkdownPreview)
+        ? tab.previewScrollController
+        : tab.verticalScrollController;
     if (controller.hasClients) {
       final pos = controller.position;
       if (pos.hasPixels && pos.pixels <= 0) atTop = 1;
@@ -2771,9 +2776,19 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
           displayColor: canvasForeground,
         ),
       );
+      // Same arrangement as the code editor below: with auto-hide on, the
+      // preview keeps a constant full-height viewport while the tab strip
+      // slides over it, and leaves slack at the end of the document for the
+      // band the strip pushes out of view. Resizing the viewport instead
+      // shifted the content and changed the scroll extent on every show/hide.
+      final previewPrefs = ref.watch(textEditorAppearanceProvider);
+      final previewStripSlack =
+          (previewPrefs.showTabBar && previewPrefs.autoHideTabBar)
+          ? _kTabStripHeight
+          : 0.0;
       return _tabSlideHost(
         tabBar: tabBar,
-        builder: (_) => Theme(
+        builder: (fullHeight) => Theme(
             data: markdownTheme,
             child: DefaultTextStyle(
               style: markdownTheme.textTheme.bodyMedium!.copyWith(
@@ -2781,15 +2796,26 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
               ),
               child: FastScrollbar(
                 controller: activeTab.previewScrollController,
-                child: SelectionArea(
-                  child: MarkdownBodyView(
-                    key: activeTab.previewKey,
-                    source: activeTab.codeController.text,
-                    container: widget.container,
-                    currentFilePath: activeTab.filePath,
-                    onLinkTap: _handleLinkTap,
-                    scrollController: activeTab.previewScrollController,
-                    onTaskToggled: _toggleMarkdownTask,
+                // The handle scrolls with a stream of jumpTo calls; keep the
+                // tab strip still until it is released.
+                onDragStateChanged: _onScrollbarDragStateChanged,
+                child: ClipRect(
+                  child: OverflowBox(
+                    alignment: Alignment.topCenter,
+                    minHeight: previewStripSlack > 0 ? fullHeight : null,
+                    maxHeight: previewStripSlack > 0 ? fullHeight : null,
+                    child: SelectionArea(
+                      child: MarkdownBodyView(
+                        key: activeTab.previewKey,
+                        source: activeTab.codeController.text,
+                        container: widget.container,
+                        currentFilePath: activeTab.filePath,
+                        onLinkTap: _handleLinkTap,
+                        scrollController: activeTab.previewScrollController,
+                        onTaskToggled: _toggleMarkdownTask,
+                        bottomInset: previewStripSlack,
+                      ),
+                    ),
                   ),
                 ),
               ),

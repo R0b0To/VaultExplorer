@@ -30,18 +30,6 @@ const _kMasterSalt = 'vc_master_salt_v2';
 const _kMasterPatternHash = 'vc_master_pattern_hash_v1';
 const _kMasterPinHash = 'vc_master_pin_hash_v1';
 
-/// How the app-wide lock gate ([LockGateScreen]) accepts unlock input.
-///
-/// The real master password (hashed via [AppSettings.masterPasswordHash])
-/// stays the security root no matter which method is active here -- it's
-/// always required to *enable* the gate in the first place, and it's what
-/// [AppSettingsScreen]'s "remove master password" flow re-verifies against.
-/// [pattern]/[pin]/[biometrics] are quick-unlock shortcuts layered on top,
-/// mirroring [ContainerUnlockMethod.biometrics]'s relationship to a vault's
-/// real password: a correct pattern/PIN/biometric grants access to the app
-/// without the master password ever being re-typed, exactly like a correct
-/// fingerprint already did for [masterPasswordIsFingerprint] before this
-/// enum replaced it.
 enum AuthenticatorSearchPlacement {
   bottom,
   top;
@@ -82,6 +70,19 @@ enum QuickActionLockMode {
   };
 }
 
+/// How the app-wide lock gate ([LockGateScreen]) accepts unlock input.
+///
+/// [password], [pin] and [pattern] are credentials in their own right, and
+/// each can be the only one: a PIN or a pattern does not need a master
+/// password behind it. Any mix of them may be set at the same time; the
+/// active method is the one the gate shows first, and the others (if set)
+/// are offered as ways to switch.
+///
+/// [biometrics] is different: it is never a credential, only a prompt in
+/// front of the stored ones. It can be the active method only while at least
+/// one of [password]/[pin]/[pattern] is set, since that is what the gate
+/// falls back to when biometrics are unavailable or have changed (see
+/// [BiometricEnrollmentGuard]).
 enum MasterUnlockMethod {
   password,
   biometrics,
@@ -108,6 +109,14 @@ enum MasterUnlockMethod {
     MasterUnlockMethod.pattern => Icons.pattern,
     MasterUnlockMethod.pin => Icons.dialpad_rounded,
   };
+
+  /// The methods that are a credential in their own right -- something the
+  /// person knows -- in the order the lock gate offers them as a way in.
+  /// [biometrics] is not one of them: it only ever sits in front of at least
+  /// one of these.
+  static const List<MasterUnlockMethod> credentials = [password, pin, pattern];
+
+  bool get isCredential => this != MasterUnlockMethod.biometrics;
 
   String toJson() => name;
   static MasterUnlockMethod fromJson(String? value) => switch (value) {
@@ -256,6 +265,44 @@ class AppSettings {
   String? get masterPasswordSalt => _masterPasswordSalt;
   String? get masterPatternHash => _masterPatternHash;
   String? get masterPinHash => _masterPinHash;
+
+  bool get hasMasterPassword => _masterPasswordHash != null;
+  bool get hasMasterPin => _masterPinHash != null;
+  bool get hasMasterPattern => _masterPatternHash != null;
+
+  /// True when at least one of password/PIN/pattern is stored.
+  bool get hasMasterCredential =>
+      hasMasterPassword || hasMasterPin || hasMasterPattern;
+
+  /// Whether the app-wide lock gate is actually in force: switched on *and*
+  /// something to unlock it with exists. Every place that used to ask
+  /// `useMasterPassword && masterPasswordHash != null` asks this instead.
+  bool get masterLockActive => useMasterPassword && hasMasterCredential;
+
+  /// Whether [method] is something that can be used to unlock right now.
+  /// Biometrics count as unlockable only through the credential behind them,
+  /// so they are never reported here.
+  bool hasMasterCredentialFor(MasterUnlockMethod method) => switch (method) {
+    MasterUnlockMethod.password => hasMasterPassword,
+    MasterUnlockMethod.pin => hasMasterPin,
+    MasterUnlockMethod.pattern => hasMasterPattern,
+    MasterUnlockMethod.biometrics => false,
+  };
+
+  /// The credentials that are set, in [MasterUnlockMethod.credentials] order.
+  List<MasterUnlockMethod> get configuredMasterCredentials => [
+    for (final m in MasterUnlockMethod.credentials)
+      if (hasMasterCredentialFor(m)) m,
+  ];
+
+  /// A set credential other than [shown], or null when [shown] is all there
+  /// is. Pass [MasterUnlockMethod.biometrics] to get the first set credential.
+  MasterUnlockMethod? masterFallbackFor(MasterUnlockMethod shown) {
+    for (final m in configuredMasterCredentials) {
+      if (m != shown) return m;
+    }
+    return null;
+  }
 
   void _setHashMaterial(String hash, String salt) {
     _masterPasswordHash = hash;
@@ -801,19 +848,18 @@ class AppSettingsService {
       if (hash != null) {
         settings._setHashMaterial(hash, salt);
       }
-      // Only the active quick-unlock method's hash is ever loaded, mirroring
-      // ContainerRepository's per-uri pattern/PIN loading: the other method's
-      // material (if any lingers from a prior switch) is simply never read.
-      switch (settings.masterUnlockMethod) {
-        case MasterUnlockMethod.pattern:
-          final patternHash = await _secure.read(key: _kMasterPatternHash);
-          if (patternHash != null) settings._setPatternHash(patternHash);
-        case MasterUnlockMethod.pin:
-          final pinHash = await _secure.read(key: _kMasterPinHash);
-          if (pinHash != null) settings._setPinHash(pinHash);
-        case MasterUnlockMethod.password:
-        case MasterUnlockMethod.biometrics:
-          break;
+      // Every stored credential is loaded: password, PIN and pattern are
+      // independent of each other, and the gate offers whichever are set.
+      final patternHash = await _secure.read(key: _kMasterPatternHash);
+      if (patternHash != null) settings._setPatternHash(patternHash);
+      final pinHash = await _secure.read(key: _kMasterPinHash);
+      if (pinHash != null) settings._setPinHash(pinHash);
+      // The active method must be something that can actually unlock. If it
+      // names a credential that is not set (stale settings), use one that is.
+      final active = settings.masterUnlockMethod;
+      if (active.isCredential && !settings.hasMasterCredentialFor(active)) {
+        final replacement = settings.configuredMasterCredentials.firstOrNull;
+        if (replacement != null) settings.masterUnlockMethod = replacement;
       }
     }
     return settings;
@@ -876,17 +922,26 @@ class AppSettingsService {
     }
   }
 
+  /// Stores the master password. With [makeActive] (the default) it also
+  /// becomes the method the gate shows first; pass false to set or change it
+  /// while another method stays in front.
   Future<void> saveMasterPassword(
     AppSettings settings,
     String hash,
-    String salt,
-  ) async {
+    String salt, {
+    bool makeActive = true,
+  }) async {
     settings._setHashMaterial(hash, salt);
+    if (makeActive) settings.masterUnlockMethod = MasterUnlockMethod.password;
     await _secure.write(key: _kMasterHash, value: hash);
     await _secure.write(key: _kMasterSalt, value: salt);
     await saveSettings(settings);
   }
 
+  /// Turns the whole master lock off: wipes the password, the PIN and the
+  /// pattern together. To drop just one of them, use
+  /// [clearMasterPasswordCredential], [clearMasterPin] or
+  /// [clearMasterPattern].
   Future<void> clearMasterPassword(AppSettings settings) async {
     settings._clearHashMaterial();
     settings._clearPatternHash();
@@ -899,12 +954,28 @@ class AppSettingsService {
     await saveSettings(settings);
   }
 
-  /// Persists a new master-gate unlock pattern and makes it the active
-  /// [MasterUnlockMethod], the same way drawing a pattern for a vault makes
-  /// [ContainerUnlockMethod.pattern] that container's method.
-  Future<void> saveMasterPattern(AppSettings settings, String hash) async {
+  /// Removes only the master password, leaving the PIN and pattern alone.
+  /// The caller makes sure another credential remains and that the active
+  /// method does not point at the password afterwards.
+  Future<void> clearMasterPasswordCredential(AppSettings settings) async {
+    settings._clearHashMaterial();
+    await _secure.delete(key: _kMasterHash);
+    await _secure.delete(key: _kMasterSalt);
+    await saveSettings(settings);
+  }
+
+  /// Persists a new master-gate unlock pattern. With [makeActive] (the
+  /// default) it also becomes the active [MasterUnlockMethod], the same way
+  /// drawing a pattern for a vault makes [ContainerUnlockMethod.pattern] that
+  /// container's method; pass false to set or change it while another method
+  /// stays in front.
+  Future<void> saveMasterPattern(
+    AppSettings settings,
+    String hash, {
+    bool makeActive = true,
+  }) async {
     settings._setPatternHash(hash);
-    settings.masterUnlockMethod = MasterUnlockMethod.pattern;
+    if (makeActive) settings.masterUnlockMethod = MasterUnlockMethod.pattern;
     await _secure.write(key: _kMasterPatternHash, value: hash);
     await saveSettings(settings);
   }
@@ -915,11 +986,15 @@ class AppSettingsService {
     await saveSettings(settings);
   }
 
-  /// Persists a new master-gate unlock PIN and makes it the active
-  /// [MasterUnlockMethod], mirroring [saveMasterPattern].
-  Future<void> saveMasterPin(AppSettings settings, String hash) async {
+  /// Persists a new master-gate unlock PIN, mirroring [saveMasterPattern]
+  /// (including [makeActive]).
+  Future<void> saveMasterPin(
+    AppSettings settings,
+    String hash, {
+    bool makeActive = true,
+  }) async {
     settings._setPinHash(hash);
-    settings.masterUnlockMethod = MasterUnlockMethod.pin;
+    if (makeActive) settings.masterUnlockMethod = MasterUnlockMethod.pin;
     await _secure.write(key: _kMasterPinHash, value: hash);
     await saveSettings(settings);
   }
@@ -931,9 +1006,8 @@ class AppSettingsService {
   }
 
   /// Switches which method the lock gate shows first, without touching any
-  /// stored hash. The caller is responsible for clearing the outgoing
-  /// method's stored hash first (via [clearMasterPattern]/[clearMasterPin])
-  /// if it's being abandoned rather than kept for a later switch-back.
+  /// stored hash. The caller makes sure the method can actually be used (its
+  /// credential is set, or for biometrics that some credential is).
   Future<void> setMasterUnlockMethod(
     AppSettings settings,
     MasterUnlockMethod method,

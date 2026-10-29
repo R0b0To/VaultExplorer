@@ -181,9 +181,7 @@ class _DisguiseModeGateState extends ConsumerState<_DisguiseModeGate> {
       ref
           .read(pendingQuickCaptureLaunchProvider)
           .markPending(
-            appUnlockRequired:
-                settings.useMasterPassword &&
-                settings.masterPasswordHash != null,
+            appUnlockRequired: settings.masterLockActive,
           );
       _quickCaptureLaunch = true;
     }

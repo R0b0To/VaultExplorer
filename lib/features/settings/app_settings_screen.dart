@@ -669,7 +669,13 @@ class _SecuritySettingsScreenState
   bool _obscurePw = true;
   bool _obscureConfirm = true;
   final _localAuth = LocalAuthentication();
-  bool _recentlyCreatedMasterPassword = false;
+  bool _recentlyCreatedMasterCredential = false;
+
+  /// Set while the inline master-password form is open: whether saving the
+  /// password also makes it the method the gate shows first, and what to do
+  /// once it is saved (e.g. go on to enable biometrics behind it).
+  bool _pwSetupMakesActive = true;
+  Future<void> Function()? _onPasswordSaved;
 
   @override
   void dispose() {
@@ -736,10 +742,14 @@ class _SecuritySettingsScreenState
 
     final ok = await ref
         .read(appSettingsControllerProvider.notifier)
-        .saveMasterPassword(pw, context.l10n);
+        .saveMasterPassword(
+          pw,
+          context.l10n,
+          makeActive: _pwSetupMakesActive,
+        );
 
     if (ok && mounted) {
-      _recentlyCreatedMasterPassword = true;
+      _recentlyCreatedMasterCredential = true;
       _pwCtrl.clear();
       _pwConfirmCtrl.clear();
       showAppSnackBar(
@@ -747,6 +757,38 @@ class _SecuritySettingsScreenState
         message: context.l10n.masterPasswordSetSnack,
         tone: AppBannerTone.success,
       );
+      final onSaved = _onPasswordSaved;
+      _onPasswordSaved = null;
+      if (onSaved != null) await onSaved();
+    }
+  }
+
+  /// Opens the inline password form. The lock flag goes on first because the
+  /// stored hashes are only read back while it is on.
+  Future<void> _beginPasswordSetup({
+    required bool makeActive,
+    Future<void> Function()? onSaved,
+  }) async {
+    final controller = ref.read(appSettingsControllerProvider.notifier);
+    _pwSetupMakesActive = makeActive;
+    _onPasswordSaved = onSaved;
+    _pwCtrl.clear();
+    _pwConfirmCtrl.clear();
+    await controller.updateSettings((s) => s.copyWith(useMasterPassword: true));
+    if (!mounted) return;
+    controller.setShowPwFields(true);
+  }
+
+  /// Closes the inline password form. If nothing else is set up yet the lock
+  /// goes back off, since a lock with no credential is no lock.
+  void _cancelPasswordSetup() {
+    _pwCtrl.clear();
+    _pwConfirmCtrl.clear();
+    _onPasswordSaved = null;
+    final controller = ref.read(appSettingsControllerProvider.notifier);
+    controller.setShowPwFields(false);
+    if (!ref.read(appSettingsControllerProvider).settings.hasMasterCredential) {
+      controller.updateSettings((s) => s.copyWith(useMasterPassword: false));
     }
   }
 
@@ -754,8 +796,8 @@ class _SecuritySettingsScreenState
     final settingsState = ref.read(appSettingsControllerProvider);
     if (method == settingsState.settings.masterUnlockMethod) return;
 
-    // Skip verification if the user created the master password in this session
-    if (!_recentlyCreatedMasterPassword) {
+    // Skip verification if the user set a credential up in this session
+    if (!_recentlyCreatedMasterCredential) {
       final verified = await _verifyCurrentUnlockCredential(settingsState);
       if (!verified || !mounted) return;
     }
@@ -785,38 +827,234 @@ class _SecuritySettingsScreenState
         }
         return;
       }
-      _recentlyCreatedMasterPassword = false;
+      _recentlyCreatedMasterCredential = false;
       return;
     }
 
-    if (method == MasterUnlockMethod.pattern) {
-      final configured =
-          ref.read(appSettingsControllerProvider).settings.masterPatternHash !=
-          null;
-      if (configured) {
-        await controller.setMasterUnlockMethod(method);
-        _recentlyCreatedMasterPassword = false;
-      } else {
-        await _setupMasterPattern();
+    if (settingsState.settings.hasMasterCredentialFor(method)) {
+      await controller.setMasterUnlockMethod(method);
+      _recentlyCreatedMasterCredential = false;
+      return;
+    }
+
+    // Not set up yet: set it up now, and it becomes the active method.
+    await _setUpCredential(method, makeActive: true);
+    _recentlyCreatedMasterCredential = false;
+  }
+
+  /// Runs the setup flow for one credential. PIN and pattern open their sheet
+  /// and return whether something was saved. The password uses the inline
+  /// form, which finishes later: this returns false for it, and whatever
+  /// should follow a successful save goes in [onPasswordSaved].
+  Future<bool> _setUpCredential(
+    MasterUnlockMethod credential, {
+    required bool makeActive,
+    Future<void> Function()? onPasswordSaved,
+  }) async {
+    switch (credential) {
+      case MasterUnlockMethod.pin:
+        return _setupMasterPin(makeActive: makeActive);
+      case MasterUnlockMethod.pattern:
+        return _setupMasterPattern(makeActive: makeActive);
+      case MasterUnlockMethod.password:
+        await _beginPasswordSetup(
+          makeActive: makeActive,
+          onSaved: onPasswordSaved,
+        );
+        return false;
+      case MasterUnlockMethod.biometrics:
+        return false;
+    }
+  }
+
+  String _credentialName(BuildContext ctx, MasterUnlockMethod method) =>
+      switch (method) {
+        MasterUnlockMethod.password => ctx.l10n.masterCredentialPassword,
+        MasterUnlockMethod.pin => ctx.l10n.masterCredentialPin,
+        MasterUnlockMethod.pattern => ctx.l10n.masterCredentialPattern,
+        MasterUnlockMethod.biometrics => method.getLocalizedLabel(ctx.l10n),
+      };
+
+  Future<MasterUnlockMethod?> _pickMasterMethod({
+    required String title,
+    String? message,
+    required List<MasterUnlockMethod> options,
+  }) {
+    return showModalBottomSheet<MasterUnlockMethod>(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppRadius.sheet),
+        ),
+      ),
+      builder: (ctx) {
+        final cs = Theme.of(ctx).colorScheme;
+        final textTheme = Theme.of(ctx).textTheme;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Text(
+                    title,
+                    style: textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                if (message != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+                    child: Text(
+                      message,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 8),
+                for (final m in options)
+                  ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+                    leading: Icon(m.icon),
+                    title: Text(_credentialName(ctx, m)),
+                    subtitle: Text(m.getLocalizedSubtitle(ctx.l10n)),
+                    onTap: () => Navigator.pop(ctx, m),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Switching the master lock on: pick how to lock the app, then set that
+  /// up on its own -- a PIN or a pattern needs no master password behind it.
+  /// Biometrics are the one exception: they are not a credential, so picking
+  /// them also asks for a password, PIN or pattern to fall back on.
+  Future<void> _enableMasterLock() async {
+    final biometricAvailable = ref
+        .read(appSettingsControllerProvider)
+        .biometricAvailable;
+    final choice = await _pickMasterMethod(
+      title: context.l10n.masterLockChooseTitle,
+      options: [
+        ...MasterUnlockMethod.credentials,
+        if (biometricAvailable) MasterUnlockMethod.biometrics,
+      ],
+    );
+    if (choice == null || !mounted) return;
+
+    final withBiometrics = choice == MasterUnlockMethod.biometrics;
+    var credential = choice;
+    if (withBiometrics) {
+      final backup = await _pickMasterMethod(
+        title: context.l10n.masterLockBackupTitle,
+        message: context.l10n.masterLockBackupMessage,
+        options: MasterUnlockMethod.credentials,
+      );
+      if (backup == null || !mounted) return;
+      credential = backup;
+    }
+
+    // The credential becomes the active method first. If the biometric step
+    // that follows is cancelled, the lock simply stays on that credential.
+    Future<void> finish() async {
+      _recentlyCreatedMasterCredential = true;
+      if (withBiometrics && mounted) {
+        await _selectMasterUnlockMethod(MasterUnlockMethod.biometrics);
       }
-      return;
     }
 
-    if (method == MasterUnlockMethod.pin) {
-      final configured =
-          ref.read(appSettingsControllerProvider).settings.masterPinHash !=
-          null;
-      if (configured) {
-        await controller.setMasterUnlockMethod(method);
-        _recentlyCreatedMasterPassword = false;
-      } else {
-        await _setupMasterPin();
-      }
-      return;
-    }
+    // Stored hashes are only read back while the flag is on.
+    await ref
+        .read(appSettingsControllerProvider.notifier)
+        .updateSettings((s) => s.copyWith(useMasterPassword: true));
+    if (!mounted) return;
 
-    await controller.setMasterUnlockMethod(method);
-    _recentlyCreatedMasterPassword = false;
+    final saved = await _setUpCredential(
+      credential,
+      makeActive: true,
+      onPasswordSaved: finish,
+    );
+    if (!mounted) return;
+    if (saved) {
+      await finish();
+    } else if (credential != MasterUnlockMethod.password) {
+      // The sheet was dismissed: nothing was set up, so the lock goes back off.
+      await _switchOffLockIfEmpty();
+    }
+  }
+
+  Future<void> _switchOffLockIfEmpty() async {
+    final settings = ref.read(appSettingsControllerProvider).settings;
+    if (settings.hasMasterCredential) return;
+    await ref
+        .read(appSettingsControllerProvider.notifier)
+        .updateSettings((s) => s.copyWith(useMasterPassword: false));
+  }
+
+  /// Set or change one credential, leaving the active method alone.
+  Future<void> _changeCredential(MasterUnlockMethod credential) async {
+    final state = ref.read(appSettingsControllerProvider);
+    if (!_recentlyCreatedMasterCredential) {
+      final verified = await _verifyCurrentUnlockCredential(state);
+      if (!verified || !mounted) return;
+    }
+    _recentlyCreatedMasterCredential = false;
+    await _setUpCredential(credential, makeActive: false);
+  }
+
+  /// Remove one credential, keeping the lock on (the last one cannot be
+  /// removed; switch the lock off instead).
+  Future<void> _removeCredential(MasterUnlockMethod credential) async {
+    final state = ref.read(appSettingsControllerProvider);
+    final verified = await _verifyStrongCredential(state);
+    if (!verified || !mounted) return;
+    _recentlyCreatedMasterCredential = false;
+    await ref
+        .read(appSettingsControllerProvider.notifier)
+        .removeMasterCredential(credential);
+  }
+
+  List<Widget> _buildCredentialTiles(
+    AppSettingsViewState state,
+    TextTheme textTheme,
+    ColorScheme cs,
+  ) {
+    final settings = state.settings;
+    final canRemove = settings.configuredMasterCredentials.length > 1;
+    return [
+      for (final m in MasterUnlockMethod.credentials)
+        ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+          leading: Icon(m.icon),
+          title: Text(
+            _credentialName(context, m),
+            style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          subtitle: Text(
+            settings.hasMasterCredentialFor(m)
+                ? context.l10n.masterCredentialSet
+                : context.l10n.masterCredentialNotSet,
+            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+          trailing: settings.hasMasterCredentialFor(m) && canRemove
+              ? IconButton(
+                  icon: const Icon(Icons.delete_outline_rounded),
+                  tooltip: context.l10n.remove,
+                  onPressed: () => _removeCredential(m),
+                )
+              : null,
+          onTap: () => _changeCredential(m),
+        ),
+    ];
   }
 
   /// Whether the master lock's biometric unlock may still be used. When the
@@ -849,15 +1087,52 @@ class _SecuritySettingsScreenState
     }
   }
 
-  Future<bool> _verifyCurrentUnlockCredential(
+  /// Verifies the credential the gate currently shows first. Guards changing
+  /// the master lock's method and credentials.
+  Future<bool> _verifyCurrentUnlockCredential(AppSettingsViewState state) =>
+      _verifyCredential(
+        state,
+        state.settings.masterUnlockMethod,
+        title: context.l10n.masterPasswordTitle,
+        message: context.l10n.enterMasterPasswordPrompt,
+      );
+
+  /// Like [_verifyCurrentUnlockCredential], but never satisfied by biometrics
+  /// alone: with biometric unlock active it asks for the credential behind
+  /// them. Guards the changes that cannot be undone from the lock screen --
+  /// switching the lock off or removing a credential.
+  Future<bool> _verifyStrongCredential(
+    AppSettingsViewState state, {
+    String? passwordTitle,
+    String? passwordMessage,
+  }) {
+    final settings = state.settings;
+    final active = settings.masterUnlockMethod;
+    final credential =
+        active.isCredential && settings.hasMasterCredentialFor(active)
+        ? active
+        : (settings.configuredMasterCredentials.firstOrNull ??
+              MasterUnlockMethod.password);
+    return _verifyCredential(
+      state,
+      credential,
+      title: passwordTitle ?? context.l10n.masterPasswordTitle,
+      message: passwordMessage ?? context.l10n.enterMasterPasswordPrompt,
+    );
+  }
+
+  Future<bool> _verifyCredential(
     AppSettingsViewState state,
-  ) async {
-    switch (state.settings.masterUnlockMethod) {
+    MasterUnlockMethod credential, {
+    required String title,
+    required String message,
+  }) async {
+    switch (credential) {
       case MasterUnlockMethod.password:
         return _verifyCurrentMasterPassword(
           state,
-          title: context.l10n.masterPasswordTitle,
-          message: context.l10n.enterMasterPasswordPrompt,
+          title: title,
+          message: message,
         );
       case MasterUnlockMethod.biometrics:
         try {
@@ -896,11 +1171,13 @@ class _SecuritySettingsScreenState
     }
   }
 
-  Future<void> _setupMasterPattern() async {
+  /// Opens the pattern sheet and saves what was drawn. False when the sheet
+  /// was dismissed or saving failed.
+  Future<bool> _setupMasterPattern({required bool makeActive}) async {
     final duressPatternHash = await ref
         .read(duressSettingsServiceProvider)
         .getPatternHash();
-    if (!mounted) return;
+    if (!mounted) return false;
     final hash = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -909,19 +1186,19 @@ class _SecuritySettingsScreenState
         disallowedMessage: context.l10n.masterMatchesDuressPatternError,
       ),
     );
-    if (hash != null && mounted) {
-      await ref
-          .read(appSettingsControllerProvider.notifier)
-          .saveMasterPattern(hash);
-      _recentlyCreatedMasterPassword = false;
-    }
+    if (hash == null || !mounted) return false;
+    return ref
+        .read(appSettingsControllerProvider.notifier)
+        .saveMasterPattern(hash, makeActive: makeActive);
   }
 
-  Future<void> _setupMasterPin() async {
+  /// Opens the PIN sheet and saves what was entered. False when the sheet was
+  /// dismissed or saving failed.
+  Future<bool> _setupMasterPin({required bool makeActive}) async {
     final duressPinHash = await ref
         .read(duressSettingsServiceProvider)
         .getPinHash();
-    if (!mounted) return;
+    if (!mounted) return false;
     final hash = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -930,47 +1207,45 @@ class _SecuritySettingsScreenState
         disallowedMessage: context.l10n.masterMatchesDuressPinError,
       ),
     );
-    if (hash != null && mounted) {
-      await ref
-          .read(appSettingsControllerProvider.notifier)
-          .saveMasterPin(hash);
-      _recentlyCreatedMasterPassword = false;
-    }
+    if (hash == null || !mounted) return false;
+    return ref
+        .read(appSettingsControllerProvider.notifier)
+        .saveMasterPin(hash, makeActive: makeActive);
   }
 
   Future<void> _toggleMasterPassword(
     AppSettingsViewState state,
     bool enabled,
   ) async {
-    if (!enabled) {
-      _recentlyCreatedMasterPassword = false;
-      if (state.settings.masterPasswordHash == null) {
-        _pwCtrl.clear();
-        _pwConfirmCtrl.clear();
-        ref.read(appSettingsControllerProvider.notifier).setShowPwFields(false);
-        ref
-            .read(appSettingsControllerProvider.notifier)
-            .updateSettings((s) => s.copyWith(useMasterPassword: false));
-        return;
-      }
-      final verified = await _verifyCurrentMasterPassword(state);
-      if (!verified) {
-        ref
-            .read(appSettingsControllerProvider.notifier)
-            .updateSettings((s) => s.copyWith(useMasterPassword: true));
-        return;
-      }
+    final controller = ref.read(appSettingsControllerProvider.notifier);
+    if (enabled) {
+      await _enableMasterLock();
+      return;
+    }
+    _recentlyCreatedMasterCredential = false;
+    if (!state.settings.hasMasterCredential) {
+      // Nothing was ever saved (the password form is still open): just drop
+      // the flag again.
       _pwCtrl.clear();
       _pwConfirmCtrl.clear();
-      await ref
-          .read(appSettingsControllerProvider.notifier)
-          .clearMasterPassword();
-    } else {
-      ref
-          .read(appSettingsControllerProvider.notifier)
-          .updateSettings((s) => s.copyWith(useMasterPassword: true));
-      ref.read(appSettingsControllerProvider.notifier).setShowPwFields(true);
+      _onPasswordSaved = null;
+      controller.setShowPwFields(false);
+      controller.updateSettings((s) => s.copyWith(useMasterPassword: false));
+      return;
     }
+    final verified = await _verifyStrongCredential(
+      state,
+      passwordTitle: context.l10n.removeMasterPasswordTitle,
+      passwordMessage: context.l10n.confirmRemoveMasterPasswordMessage,
+    );
+    if (!verified) {
+      controller.updateSettings((s) => s.copyWith(useMasterPassword: true));
+      return;
+    }
+    _pwCtrl.clear();
+    _pwConfirmCtrl.clear();
+    _onPasswordSaved = null;
+    await controller.clearMasterPassword();
   }
 
   Future<bool> _verifyCurrentMasterPassword(
@@ -1096,7 +1371,7 @@ class _SecuritySettingsScreenState
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             children: [
               // 1. App Authentication
-              SectionHeader(context.l10n.masterPasswordTitle),
+              SectionHeader(context.l10n.masterLockTitle),
               SectionCard(
                 children: [
                   Column(
@@ -1107,16 +1382,15 @@ class _SecuritySettingsScreenState
                           horizontal: 16,
                         ),
                         title: Text(
-                          context.l10n.masterPasswordTitle,
+                          context.l10n.masterLockTitle,
                           style: textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                         subtitle: Text(
-                          state.settings.useMasterPassword &&
-                                  state.settings.masterPasswordHash != null
+                          state.settings.masterLockActive
                               ? context.l10n.masterPasswordActiveSubtitle
-                              : context.l10n.masterPasswordInactiveSubtitle,
+                              : context.l10n.masterLockInactiveSubtitle,
                           style: textTheme.bodySmall?.copyWith(
                             color: cs.onSurfaceVariant,
                           ),
@@ -1125,8 +1399,7 @@ class _SecuritySettingsScreenState
                         onChanged: (v) => _toggleMasterPassword(state, v),
                       ),
                       if (state.settings.useMasterPassword &&
-                          state.showPwFields &&
-                          state.settings.masterPasswordHash == null) ...[
+                          state.showPwFields) ...[
                         Padding(
                           padding: const EdgeInsets.all(16),
                           child: AutofillGroup(
@@ -1201,27 +1474,7 @@ class _SecuritySettingsScreenState
                                       child: OutlinedButton(
                                         onPressed: state.saving
                                             ? null
-                                            : () {
-                                                _pwCtrl.clear();
-                                                _pwConfirmCtrl.clear();
-                                                ref
-                                                    .read(
-                                                      appSettingsControllerProvider
-                                                          .notifier,
-                                                    )
-                                                    .setShowPwFields(false);
-                                                ref
-                                                    .read(
-                                                      appSettingsControllerProvider
-                                                          .notifier,
-                                                    )
-                                                    .updateSettings(
-                                                      (s) => s.copyWith(
-                                                        useMasterPassword:
-                                                            false,
-                                                      ),
-                                                    );
-                                              },
+                                            : _cancelPasswordSetup,
                                         child: Text(context.l10n.cancel),
                                       ),
                                     ),
@@ -1253,9 +1506,8 @@ class _SecuritySettingsScreenState
                       ],
                     ],
                   ),
-                  if (state.settings.useMasterPassword &&
-                      state.settings.masterPasswordHash != null &&
-                      !state.showPwFields)
+                  if (state.settings.masterLockActive &&
+                      !state.showPwFields) ...[
                     OptionPickerTile<MasterUnlockMethod>(
                       label: context.l10n.unlockCredentialsLabel,
                       value: state.settings.masterUnlockMethod,
@@ -1283,13 +1535,14 @@ class _SecuritySettingsScreenState
                           .toList(),
                       onChanged: _selectMasterUnlockMethod,
                     ),
+                    ..._buildCredentialTiles(state, textTheme, cs),
+                  ],
                 ],
               ),
               const SizedBox(height: 16),
 
               // 2. App Lock Behavior
-              if (state.settings.useMasterPassword &&
-                  state.settings.masterPasswordHash != null &&
+              if (state.settings.masterLockActive &&
                   !state.showPwFields) ...[
                 SectionHeader(context.l10n.appLockBehaviorTitle),
                 SectionCard(

@@ -8,6 +8,7 @@ import android.content.res.Configuration
 import android.graphics.Color
 import android.os.Bundle
 import android.os.PowerManager
+import android.util.Rational
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.ViewGroup
@@ -30,7 +31,12 @@ import com.aeidolon.vaultexplorer.VeLog
  *  - `entered`  the PiP window is up;
  *  - `expanded` the person tapped the window to go back to full screen;
  *  - `closed`   the person dismissed the window;
+ *  - `audioOnly` the person pressed the window's "audio only" button: the
+ *               window is gone, the sound carries on;
  *  - `failed`   the window could not be shown.
+ *
+ * The window's buttons (previous / play-pause / next / audio only) come from
+ * [PictureInPictureActions].
  */
 class PictureInPictureActivity : Activity(), SurfaceHolder.Callback {
 
@@ -40,6 +46,7 @@ class PictureInPictureActivity : Activity(), SurfaceHolder.Callback {
     private var enterRequested = false
     private var inPip = false
     private var endedByApp = false
+    private var ratio: Rational = PictureInPictureController.clampedRatio(16, 9)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,6 +55,10 @@ class PictureInPictureActivity : Activity(), SurfaceHolder.Callback {
             // screen recordings of vault content.
             window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         }
+        ratio = PictureInPictureController.clampedRatio(
+            intent.getIntExtra(EXTRA_WIDTH, 16),
+            intent.getIntExtra(EXTRA_HEIGHT, 9),
+        )
         surfaceView = SurfaceView(this)
         val root = FrameLayout(this)
         root.setBackgroundColor(Color.BLACK)
@@ -91,13 +102,8 @@ class PictureInPictureActivity : Activity(), SurfaceHolder.Callback {
     private fun maybeEnterPictureInPicture() {
         if (enterRequested || !resumed || !surfaceAttached || isFinishing) return
         enterRequested = true
-        val width = intent.getIntExtra(EXTRA_WIDTH, 16)
-        val height = intent.getIntExtra(EXTRA_HEIGHT, 9)
         try {
-            val params = PictureInPictureParams.Builder()
-                .setAspectRatio(PictureInPictureController.clampedRatio(width, height))
-                .build()
-            if (!enterPictureInPictureMode(params)) fail("the system refused")
+            if (!enterPictureInPictureMode(windowParams())) fail("the system refused")
         } catch (e: IllegalStateException) {
             fail("enterPictureInPictureMode threw: ${e.message}")
         } catch (e: IllegalArgumentException) {
@@ -147,20 +153,43 @@ class PictureInPictureActivity : Activity(), SurfaceHolder.Callback {
         super.onDestroy()
     }
 
+    private fun windowParams(): PictureInPictureParams =
+        PictureInPictureParams.Builder()
+            .setAspectRatio(ratio)
+            .setActions(PictureInPictureActions.build(this))
+            .build()
+
     /** The video's shape changed (next item): keep the window the same shape. */
     fun setAspect(width: Int, height: Int) {
+        ratio = PictureInPictureController.clampedRatio(width, height)
+        applyWindowParams("Could not resize the picture-in-picture window")
+    }
+
+    /** The session changed (play / pause, a new item): redraw the window's buttons. */
+    fun refreshActions() {
+        applyWindowParams("Could not update the picture-in-picture buttons")
+    }
+
+    private fun applyWindowParams(failureMessage: String) {
         if (isFinishing || isDestroyed || !inPip) return
         try {
-            setPictureInPictureParams(
-                PictureInPictureParams.Builder()
-                    .setAspectRatio(PictureInPictureController.clampedRatio(width, height))
-                    .build(),
-            )
+            setPictureInPictureParams(windowParams())
         } catch (e: IllegalStateException) {
-            VeLog.w(TAG, e) { "Could not resize the picture-in-picture window" }
+            VeLog.w(TAG, e) { failureMessage }
         } catch (e: IllegalArgumentException) {
-            VeLog.w(TAG, e) { "Resize rejected its parameters" }
+            VeLog.w(TAG, e) { "$failureMessage (parameters rejected)" }
         }
+    }
+
+    /**
+     * The window's "audio only" button: close the window and leave the player
+     * going. Tells Dart so it stops treating a window as open.
+     */
+    fun audioOnlyFromApp() {
+        if (isFinishing || isDestroyed || endedByApp) return
+        endedByApp = true
+        PictureInPictureController.windowEvent("audioOnly")
+        finish()
     }
 
     /** Dart is done with the window (playback ended, another video, a lock). */

@@ -981,6 +981,7 @@ class MarkdownBodyViewState extends ConsumerState<MarkdownBodyView> {
       resolvedPath: resolved,
       alt: alt,
       cache: _images,
+      zoomable: true,
     );
   }
 

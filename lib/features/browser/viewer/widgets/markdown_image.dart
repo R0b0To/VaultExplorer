@@ -7,6 +7,7 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/viewer/markdown/markdown_image_cache.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/markdown_image_viewer.dart';
 
 /// An image embedded in a markdown document, read from the vault.
 ///
@@ -23,12 +24,17 @@ class MarkdownImage extends ConsumerStatefulWidget {
   /// one (used by one-off previews such as the image dialog).
   final MarkdownImageCache? cache;
 
+  /// When true, tapping the loaded image opens it full screen with pinch /
+  /// double-tap zoom.
+  final bool zoomable;
+
   const MarkdownImage({
     super.key,
     required this.container,
     required this.resolvedPath,
     required this.alt,
     this.cache,
+    this.zoomable = false,
   });
 
   static const _decodableExtensions = {
@@ -55,7 +61,10 @@ class MarkdownImage extends ConsumerStatefulWidget {
 class _MarkdownImageState extends ConsumerState<MarkdownImage> {
   static const double _maxHeight = 420;
   static const double _placeholderHeight = 160;
-  static const int _maxDecodeWidth = 4096;
+
+  /// Identifies this instance for the Hero into the zoom viewer. An Object
+  /// (not the path) so the same image appearing twice never shares a tag.
+  final Object _heroTag = Object();
 
   MarkdownImageCache? _ownCache;
   Uint8List? _bytes;
@@ -135,6 +144,18 @@ class _MarkdownImageState extends ConsumerState<MarkdownImage> {
     });
   }
 
+  void _openViewer() {
+    final bytes = _bytes;
+    if (bytes == null) return;
+    MarkdownImageViewer.open(
+      context,
+      bytes: bytes,
+      alt: widget.alt,
+      heroTag: _heroTag,
+      pixelSize: _size,
+    );
+  }
+
   /// Applies [apply] when [future] completes, calling setState only when the
   /// completion is asynchronous (setState is not allowed during initState,
   /// and a SynchronousFuture runs its callback immediately).
@@ -194,17 +215,13 @@ class _MarkdownImageState extends ConsumerState<MarkdownImage> {
       content = _loadingBox(cs);
     } else {
       // Decode at (at most) screen resolution instead of full resolution:
-      // far less memory and a much faster decode for big photos.
-      final screenPx =
-          MediaQuery.sizeOf(context).width * MediaQuery.devicePixelRatioOf(context);
-      final cacheWidth = screenPx.isFinite && screenPx > 0
-          ? screenPx.round().clamp(1, _maxDecodeWidth)
-          : null;
-      content = Image.memory(
+      // far less memory and a much faster decode for big photos. The zoom
+      // viewer asks for the same width so it can reuse this decoded bitmap.
+      final image = Image.memory(
         bytes,
         fit: BoxFit.contain,
         gaplessPlayback: true,
-        cacheWidth: cacheWidth,
+        cacheWidth: MarkdownImageViewer.previewDecodeWidth(context),
         frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
           if (wasSynchronouslyLoaded || frame != null) return child;
           return _loadingBox(cs);
@@ -214,6 +231,13 @@ class _MarkdownImageState extends ConsumerState<MarkdownImage> {
           child: _fallbackCard(cs, context.l10n.invalidOrCorruptedImageMessage),
         ),
       );
+      content = widget.zoomable
+          ? GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _openViewer,
+              child: Hero(tag: _heroTag, child: image),
+            )
+          : image;
     }
 
     return ClipRRect(

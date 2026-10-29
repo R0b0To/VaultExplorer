@@ -113,21 +113,26 @@ class _PictureInPictureLayerState extends State<PictureInPictureLayer> {
             Positioned.fill(
               child: Offstage(
                 offstage: inPictureInPicture,
-                // Two sources for one window: the video flying in while the
-                // viewer is still closing (an entry), then the session that
-                // takes over once the viewer is gone. The constant key keeps
-                // it the same window, so the hand-over is not seen.
+                // Three sources for one window: the video flying in while the
+                // viewer is still closing (an entry), the session that takes
+                // over once the viewer is gone, and the player the viewer has
+                // just taken back, which the window stays up over until the
+                // viewer has drawn the video where it was (an exit). The
+                // constant key keeps it the same window throughout, so none of
+                // the hand-overs is seen.
                 child: ListenableBuilder(
                   listenable: Listenable.merge(<Listenable>[
                     BackgroundPlaybackHost.instance.floatingSession,
                     BackgroundPlaybackHost.instance.floatingEntry,
+                    BackgroundPlaybackHost.instance.floatingExit,
                   ]),
                   builder: (context, _) {
                     final host = BackgroundPlaybackHost.instance;
                     final entry = host.floatingEntry.value;
                     final manager =
                         host.floatingSession.value?.playbackManager ??
-                        entry?.playbackManager;
+                        entry?.playbackManager ??
+                        host.floatingExit.value?.playbackManager;
                     if (manager == null) return const SizedBox.shrink();
                     return FloatingVideoPlayer(
                       key: const ValueKey<String>('floating_video_player'),

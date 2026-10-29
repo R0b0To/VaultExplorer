@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/features/browser/viewer/background_playback/background_playback_host.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
+import 'package:vaultexplorer/features/browser/viewer/pip/picture_in_picture_bridge.dart';
 import 'package:vaultexplorer/features/browser/viewer/pip/picture_in_picture_coordinator.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dart';
 
@@ -15,7 +16,9 @@ import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dar
 ///
 /// It is the same live player the viewer had: the viewer handed it to
 /// [BackgroundPlaybackHost], and this just shows its texture. Expanding hands
-/// it back to a new viewer; closing ends playback. Leaving the app while it plays
+/// it back to a new viewer, whose video grows out of this window (the window
+/// stays up until the viewer has drawn the video where it is); closing ends
+/// playback. Leaving the app while it plays
 /// turns the app into Android's picture-in-picture window (the host arms that
 /// through `PictureInPictureCoordinator`), so there is no state to carry over.
 ///
@@ -81,9 +84,14 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
   /// viewer; null once it has set off (or when it simply appears).
   Rect? _flightFrom;
 
+  final GlobalKey _windowKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
+    // So the host can tell the viewer where this window's video is when the
+    // viewer takes the player back, and the viewer grows out of that spot.
+    BackgroundPlaybackHost.instance.registerFloatingRect(this, _measureVideo);
     _flightFrom = widget.flyFrom;
     if (_flightFrom != null) {
       // A clean picture while it travels; a tap brings the controls up.
@@ -100,8 +108,27 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
 
   @override
   void dispose() {
+    BackgroundPlaybackHost.instance.unregisterFloatingRect(this);
     _hideTimer?.cancel();
     super.dispose();
+  }
+
+  /// Where the video is on screen right now, wherever the window is in a drag
+  /// or an animation (logical pixels of the app's view); null when it cannot
+  /// be told (not laid out, or the app is the PiP window).
+  Rect? _measureVideo() {
+    if (!mounted || PictureInPictureBridge.isInPictureInPicture.value) {
+      return null;
+    }
+    final box = _windowKey.currentContext?.findRenderObject();
+    if (box is! RenderBox || !box.attached || !box.hasSize) return null;
+    final window = MatrixUtils.transformRect(
+      box.getTransformTo(null),
+      Offset.zero & box.size,
+    );
+    final controller = widget.playbackManager.activeController;
+    if (controller == null || controller.isDisposed) return window;
+    return _fitVideo(window, controller.value.aspectRatio);
   }
 
   void _scheduleHide() {
@@ -296,6 +323,7 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
             duration: _snapDuration,
             curve: Curves.easeInOutCubic,
             builder: (context, radius, child) => Material(
+              key: _windowKey,
               color: Colors.black,
               elevation: 10,
               shadowColor: Colors.black,

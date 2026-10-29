@@ -98,6 +98,21 @@ class FloatingPlayerEntry {
   const FloatingPlayerEntry({required this.playbackManager, required this.from});
 }
 
+/// The floating player being opened back up into the viewer. The window stays
+/// on screen, unchanged, until the viewer has drawn the same video at the same
+/// rectangle (see `_runExpandFlight` in the viewer), so there is never a frame
+/// with the video missing.
+class FloatingPlayerExit {
+  /// The player the viewer has just taken over; the same one the window shows.
+  final VideoPlaybackManager playbackManager;
+
+  /// Where the window's video was on screen when the viewer took the player,
+  /// in logical pixels of the app's view.
+  final Rect from;
+
+  const FloatingPlayerExit({required this.playbackManager, required this.from});
+}
+
 /// Keeps media playing after the media viewer has been closed.
 ///
 /// The viewer normally owns the player and releases it when it goes away.
@@ -146,6 +161,16 @@ class BackgroundPlaybackHost {
   final ValueNotifier<FloatingPlayerEntry?> floatingEntry =
       ValueNotifier<FloatingPlayerEntry?>(null);
   Timer? _entryTimer;
+
+  /// The floating player opening up into the viewer, or null. Set when the
+  /// viewer takes the running player back ([takeMatching]); see [exit].
+  final ValueNotifier<FloatingPlayerExit?> floatingExit =
+      ValueNotifier<FloatingPlayerExit?>(null);
+  FloatingPlayerExit? _exit;
+  Timer? _exitTimer;
+
+  Object? _floatingRectOwner;
+  Rect? Function()? _floatingRect;
 
   /// The session showing in the in-app floating player, or null. The app's
   /// root listens to this to draw the window. Updated from a microtask: the
@@ -207,6 +232,44 @@ class BackgroundPlaybackHost {
     });
   }
 
+  /// The floating window says how to find out where its video is on screen
+  /// right now (animation and drag included). Only the window that registered
+  /// can take itself off again.
+  void registerFloatingRect(Object owner, Rect? Function() measure) {
+    _floatingRectOwner = owner;
+    _floatingRect = measure;
+  }
+
+  void unregisterFloatingRect(Object owner) {
+    if (!identical(_floatingRectOwner, owner)) return;
+    _floatingRectOwner = null;
+    _floatingRect = null;
+  }
+
+  /// Where the floating window's video is on screen now (logical pixels), or
+  /// null when there is no window to ask.
+  Rect? measureFloatingWindow() => _floatingRect?.call();
+
+  /// The floating player that the viewer has just taken back, as of this
+  /// moment (the notifier trails it by a microtask): the viewer reads it right
+  /// after [takeMatching] to start growing out of the window. Null when the
+  /// session was not a floating one or the window could not be measured.
+  FloatingPlayerExit? get exit => _exit;
+
+  /// The viewer has its own copy of the video up: the window can go.
+  void endFloatingExit() {
+    _exitTimer?.cancel();
+    _exitTimer = null;
+    _exit = null;
+    _publishFloatingExit();
+  }
+
+  void _publishFloatingExit() {
+    scheduleMicrotask(() {
+      if (!identical(floatingExit.value, _exit)) floatingExit.value = _exit;
+    });
+  }
+
   void _publishFloatingSession() {
     scheduleMicrotask(() {
       final current = _session;
@@ -263,9 +326,27 @@ class BackgroundPlaybackHost {
     if (session.playbackManager.currentFileName != file) return null;
     final controller = session.playbackManager.activeController;
     if (controller == null || controller.isDisposed) return null;
+    if (session.floatingPlayer) {
+      // Measured now: this runs inside the viewer's initState, so the window
+      // is still on screen and laid out; it is removed from the tree a frame
+      // later. Kept up (through [floatingExit]) until the viewer has drawn the
+      // video where the window had it.
+      final from = measureFloatingWindow();
+      if (from != null && !from.isEmpty) {
+        _exit = FloatingPlayerExit(
+          playbackManager: session.playbackManager,
+          from: from,
+        );
+        // If the viewer never gets as far as ending it, the window must not
+        // stay up over it.
+        _exitTimer?.cancel();
+        _exitTimer = Timer(const Duration(seconds: 3), endFloatingExit);
+      }
+    }
     _detach(session);
     _session = null;
     _publishFloatingSession();
+    _publishFloatingExit();
     // The viewer shows the video again: the window has nothing left to do.
     _closePipWindow();
     return session;

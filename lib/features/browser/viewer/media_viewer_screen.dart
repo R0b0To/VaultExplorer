@@ -141,6 +141,40 @@ enum _FloatingClose {
   flying,
 }
 
+/// The viewer growing out of the floating window it was opened from. First
+/// only [from] (the window's video, where the viewer's own is still hidden
+/// while it is measured), then [dest] (where the viewer's video really is),
+/// [origin] (where the media layer sits on screen) and the [animation].
+class _ExpandFlight {
+  final Rect from;
+  final Rect? dest;
+  final Offset origin;
+  final Animation<double>? animation;
+
+  const _ExpandFlight({
+    required this.from,
+    this.dest,
+    this.origin = Offset.zero,
+    this.animation,
+  });
+}
+
+/// Clips to a rounded rectangle anywhere in the box, not only the box itself.
+class _RRectClipper extends CustomClipper<RRect> {
+  final Rect rect;
+  final double radius;
+
+  const _RRectClipper(this.rect, this.radius);
+
+  @override
+  RRect getClip(Size size) =>
+      RRect.fromRectAndRadius(rect, Radius.circular(radius));
+
+  @override
+  bool shouldReclip(covariant _RRectClipper oldClipper) =>
+      oldClipper.rect != rect || oldClipper.radius != radius;
+}
+
 class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     with TickerProviderStateMixin {
   late final VaultFileIoApi _fileIoApi;
@@ -185,6 +219,20 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       ValueNotifier<_FloatingClose>(_FloatingClose.none);
   AnimationController? _closeFade;
   Timer? _floatingCloseGuard;
+
+  /// 0 while the viewer opens out of the floating window (backdrop and
+  /// controls not yet there), 1 otherwise. A factor of its own: the swipe
+  /// progress also fades the video itself, which must stay solid here.
+  final ValueNotifier<double> _openReveal = ValueNotifier<double>(1.0);
+
+  /// Set while the video grows out of the floating window.
+  final ValueNotifier<_ExpandFlight?> _expandFlight =
+      ValueNotifier<_ExpandFlight?>(null);
+  AnimationController? _expandController;
+
+  /// The media layer, as built while it is still waiting to be measured: its
+  /// position on screen is the origin the flight is worked out against.
+  BuildContext? _expandLayerContext;
 
   /// The A-B repeat section of the video now playing. In memory only, and
   /// emptied whenever another item (hence a fresh native player) takes over.
@@ -553,6 +601,17 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       _adoptedFile = _playbackManager.currentFileName;
       // The player is already past its resume decision; don't run it again.
       _resumeFlowStarted = true;
+      // Opened from the floating player: the video grows out of the window
+      // instead of appearing full screen. Until it is drawn where the window
+      // is, the viewer's own copy stays hidden and the window stays up.
+      final from = carried.floatingPlayer
+          ? BackgroundPlaybackHost.instance.exit?.from
+          : null;
+      if (from != null) {
+        _openReveal.value = 0.0;
+        _expandFlight.value = _ExpandFlight(from: from);
+        unawaited(_runExpandFlight(from));
+      }
     }
     _pageController = PageController(initialPage: widget.initialIndex);
     _listScrollController = ScrollController();
@@ -695,6 +754,110 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
         floatingPlayer: true,
       );
     }
+  }
+
+  /// The viewer's video growing out of the floating window it was opened
+  /// from, the reverse of [_beginFloatingFlight]. The window stays up, still
+  /// showing the video, while this finds out where the viewer's own video is;
+  /// then the viewer draws its copy at the window's rectangle (under the window,
+  /// so nothing shows), the window goes, and the copy grows into place as the
+  /// backdrop and the controls fade in.
+  Future<void> _runExpandFlight(Rect from) async {
+    // The video widget needs a few frames to come up on the adopted player.
+    Rect? dest;
+    for (var frame = 0; frame < 30 && dest == null; frame++) {
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
+      dest = _videoProbe.measure();
+    }
+    final layer = _expandLayerContext;
+    final layerBox = layer != null && layer.mounted
+        ? layer.findRenderObject()
+        : null;
+    if (dest == null || layerBox is! RenderBox || !layerBox.attached) {
+      // Could not tell where the video lands: no flight, it simply shows.
+      _finishExpandFlight();
+      return;
+    }
+    final controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 280),
+    );
+    _expandController?.dispose();
+    _expandController = controller;
+    controller.addListener(() {
+      _openReveal.value = Curves.easeOut.transform(controller.value);
+    });
+    controller.addStatusListener((status) {
+      if (status == AnimationStatus.completed) _finishExpandFlight();
+    });
+    _expandFlight.value = _ExpandFlight(
+      from: from,
+      dest: dest,
+      origin: layerBox.localToGlobal(Offset.zero),
+      animation: controller,
+    );
+    unawaited(controller.forward());
+    // After the frame that first draws the viewer's copy over the window's
+    // spot, the window can go: the one frame in which both are drawn is not
+    // seen, they are the same picture in the same place.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      BackgroundPlaybackHost.instance.endFloatingExit();
+    });
+  }
+
+  void _finishExpandFlight() {
+    BackgroundPlaybackHost.instance.endFloatingExit();
+    if (!mounted) return;
+    _expandFlight.value = null;
+    _openReveal.value = 1.0;
+  }
+
+  /// The media layer of the item on screen during [_runExpandFlight]: hidden
+  /// while its place is measured, then scaled and moved so the video starts
+  /// exactly where the floating window had it, clipped to the window's rounded
+  /// shape and growing into its own.
+  Widget _expandFlightLayer(Widget media) {
+    return ValueListenableBuilder<_ExpandFlight?>(
+      valueListenable: _expandFlight,
+      child: media,
+      builder: (context, flight, child) {
+        if (flight == null) return child!;
+        final dest = flight.dest;
+        final animation = flight.animation;
+        if (dest == null || animation == null) {
+          _expandLayerContext = context;
+          return Opacity(opacity: 0.0, child: child);
+        }
+        final destLocal = dest.shift(-flight.origin);
+        final fromLocal = flight.from.shift(-flight.origin);
+        return AnimatedBuilder(
+          animation: animation,
+          child: child,
+          builder: (context, child) {
+            final e = Curves.easeInOutCubic.transform(animation.value);
+            final startScale = fromLocal.width / destLocal.width;
+            final scale = startScale + (1.0 - startScale) * e;
+            final center = Offset.lerp(fromLocal.center, destLocal.center, e)!;
+            final matrix = Matrix4.identity()
+              ..translate(
+                center.dx - scale * destLocal.center.dx,
+                center.dy - scale * destLocal.center.dy,
+              )
+              ..scale(scale, scale, 1.0);
+            // On screen the corners go from the window's 14 to square.
+            final radius = 14.0 * (1.0 - e) / scale;
+            return Transform(
+              transform: matrix,
+              child: ClipRRect(
+                clipper: _RRectClipper(destLocal, radius),
+                child: child,
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   /// Called as a close that hands the playing video to the floating player
@@ -3289,6 +3452,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     _continuousZoomAnimationController?.dispose();
     _floatingCloseGuard?.cancel();
     _closeFade?.dispose();
+    _expandController?.dispose();
+    // The floating window must not outlive a viewer that never got to end it.
+    BackgroundPlaybackHost.instance.endFloatingExit();
     _continuousTransformationController.removeListener(
       _onContinuousTransformationChanged,
     );
@@ -3312,6 +3478,8 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     _swipePhysicsNotifier.dispose();
     _swipeDismissProgress.dispose();
     _floatingClose.dispose();
+    _openReveal.dispose();
+    _expandFlight.dispose();
     _lockNudge.dispose();
     _videoProgressNotifier.dispose();
     _abLoopNotifier.dispose();
@@ -3502,16 +3670,25 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
           fit: StackFit.expand,
           children: [
             Positioned.fill(
-              child: ColoredBox(
-                color: Colors.black.withValues(alpha: backgroundAlpha),
+              child: ValueListenableBuilder<double>(
+                valueListenable: _openReveal,
+                builder: (context, reveal, _) => ColoredBox(
+                  color: Colors.black.withValues(
+                    alpha: backgroundAlpha * reveal,
+                  ),
+                ),
               ),
             ),
             // While the floating window flies out of the video, this copy of
             // it must not be drawn as well: it would hang about where the
-            // video was, fading, as the window leaves.
+            // video was, fading, as the window leaves. And when the viewer was
+            // opened from the floating window, the item on screen grows out of
+            // it (see _runExpandFlight).
             ValueListenableBuilder<_FloatingClose>(
               valueListenable: _floatingClose,
-              child: media,
+              child: fileName == _playlistController.currentFile
+                  ? _expandFlightLayer(media!)
+                  : media,
               builder: (context, closing, child) => Opacity(
                 opacity: closing == _FloatingClose.flying ? 0.0 : 1.0,
                 child: child,
@@ -3646,13 +3823,18 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
         value: AppSystemUI.transparentDark,
         // The black behind the viewer fades out while a swipe-to-dismiss drag
         // pulls the image away, showing the screen underneath.
-        child: ValueListenableBuilder<double>(
-          valueListenable: _swipeDismissProgress,
-          builder: (context, progress, scaffold) {
+        child: ListenableBuilder(
+          listenable: Listenable.merge(<Listenable>[
+            _swipeDismissProgress,
+            _openReveal,
+          ]),
+          builder: (context, scaffold) {
             final fades = ModalRoute.of(context)?.opaque == false;
+            final shown = (1.0 - _swipeDismissProgress.value) *
+                _openReveal.value;
             return ColoredBox(
               color: fades
-                  ? Colors.black.withValues(alpha: 1.0 - progress)
+                  ? Colors.black.withValues(alpha: shown.clamp(0.0, 1.0))
                   : Colors.black,
               child: scaffold,
             );
@@ -3879,18 +4061,25 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
               );
             }
 
-            Widget fadeDuringDismiss(Widget child) =>
-                ValueListenableBuilder<double>(
-                  valueListenable: _swipeDismissProgress,
-                  child: child,
-                  builder: (context, progress, child) => IgnorePointer(
-                    ignoring: progress >= 0.99,
-                    child: Opacity(
-                      opacity: (1.0 - progress).clamp(0.0, 1.0).toDouble(),
-                      child: child,
-                    ),
-                  ),
+            Widget fadeDuringDismiss(Widget child) => ListenableBuilder(
+              listenable: Listenable.merge(<Listenable>[
+                _swipeDismissProgress,
+                _openReveal,
+              ]),
+              child: child,
+              builder: (context, child) {
+                // Fades out with a swipe, and in as the viewer opens out of
+                // the floating window.
+                final visible =
+                    ((1.0 - _swipeDismissProgress.value) * _openReveal.value)
+                        .clamp(0.0, 1.0)
+                        .toDouble();
+                return IgnorePointer(
+                  ignoring: visible <= 0.01,
+                  child: Opacity(opacity: visible, child: child),
                 );
+              },
+            );
 
             final swipeDismissAxis = _swipeDismissAxis;
             return MediaSwipeDismissLayer(

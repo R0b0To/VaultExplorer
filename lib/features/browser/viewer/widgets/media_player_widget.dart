@@ -1565,7 +1565,14 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
           if (details.pointerCount >= 2) {
             _zoomAnimationController?.stop();
           }
-          widget.onZoomChanged(false);
+          // The zoom recognizer accepts any one-finger drag after a short
+          // travel, even with nothing to pan. A lone finger on an item at
+          // its resting zoom must not freeze paging, or a curved or
+          // L-shaped swipe that happened to start steeply could never
+          // change the item.
+          if (details.pointerCount >= 2 || _isZoomed) {
+            widget.onZoomChanged(false);
+          }
         },
         onInteractionUpdate: (details) {
           final s = _getMatrixScale(_videoTransformationController.value);

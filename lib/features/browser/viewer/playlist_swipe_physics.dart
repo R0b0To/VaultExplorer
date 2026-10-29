@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart' show kLongPressTimeout, kTouchSlop;
 import 'package:flutter/physics.dart' show ScrollSpringSimulation, Simulation;
 import 'package:flutter/widgets.dart';
 
@@ -51,15 +52,51 @@ int playlistSwipeDirection(
   return along > 0 ? 1 : -1;
 }
 
+/// Which item a finished touch should still switch to even though the pager
+/// never took it: `1` for the next, `-1` for the previous, `0` for none.
+///
+/// A curved or L-shaped swipe often starts out steep, and then another
+/// recognizer wins the touch before the pager does (most often the zoom
+/// recognizer of the item itself, which accepts any drag after a longer
+/// travel and then has nothing to pan). The pager never sees such a touch, so
+/// its physics can't settle it. This judges it by its overall movement
+/// instead, the way [PlaylistSwipePageScrollPhysics] does for the touches the
+/// pager does take.
+///
+/// It declines when something else legitimately owns the touch: [isLocked]
+/// (zoomed, pinching, a brightness, volume or seek drag, a page change under
+/// way), [isDismissing], or a long press (the finger stayed put long enough
+/// to hold the video at another speed before it moved), or when the page
+/// changed while the finger was down.
+int playlistSwipeFallbackDirection({
+  required PlaylistSwipeSummary swipe,
+  required AxisDirection axisDirection,
+  required int currentIndex,
+  required bool isLocked,
+  required bool isDismissing,
+}) {
+  if (isLocked || isDismissing || swipe.heldBeforeMoving) return 0;
+  if (currentIndex != swipe.startPage) return 0;
+  return playlistSwipeDirection(swipe.delta, axisDirection);
+}
+
 /// The overall movement of a finished touch, and the page it began on.
 class PlaylistSwipeSummary {
-  const PlaylistSwipeSummary({required this.delta, required this.startPage});
+  const PlaylistSwipeSummary({
+    required this.delta,
+    required this.startPage,
+    this.heldBeforeMoving = false,
+  });
 
   /// Movement from touch-down to release, in global coordinates.
   final Offset delta;
 
   /// The page that was showing when the finger landed.
   final int startPage;
+
+  /// Whether the finger stayed put for as long as a long press takes before it
+  /// started to move.
+  final bool heldBeforeMoving;
 }
 
 /// Records where the touch that drags the playlist pager began and ended, so
@@ -72,33 +109,53 @@ class PlaylistSwipeSummary {
 class PlaylistSwipeTracker {
   Offset? _start;
   int _startPage = 0;
+  Duration _startTime = Duration.zero;
+  bool _movedPastSlop = false;
+  bool _heldBeforeMoving = false;
   PlaylistSwipeSummary? _released;
 
   /// A single finger landed at [position] while [page] was showing.
-  void begin(Offset position, int page) {
+  void begin(Offset position, int page, {Duration timeStamp = Duration.zero}) {
     _start = position;
     _startPage = page;
+    _startTime = timeStamp;
+    _movedPastSlop = false;
+    _heldBeforeMoving = false;
     _released = null;
   }
 
-  /// The finger lifted at [position].
+  /// The finger moved to [position]. Only used to tell a long press, where the
+  /// finger rests before it moves, from a swipe.
+  void move(Offset position, {Duration timeStamp = Duration.zero}) {
+    final start = _start;
+    if (start == null || _movedPastSlop) return;
+    if ((position - start).distance > kTouchSlop) {
+      _movedPastSlop = true;
+      _heldBeforeMoving = timeStamp - _startTime >= kLongPressTimeout;
+    }
+  }
+
+  /// The finger lifted at [position]. Returns the summary of the touch, or
+  /// null if no touch was being tracked.
   ///
   /// The summary is only good for the rest of the current event dispatch,
   /// which is when the pager asks for it. It is dropped right after, so a
   /// touch the pager never took part in can't leak into a later, unrelated
   /// settle such as the end of a programmatic page animation.
-  void release(Offset position) {
+  PlaylistSwipeSummary? release(Offset position) {
     final start = _start;
     _start = null;
-    if (start == null) return;
+    if (start == null) return null;
     final summary = PlaylistSwipeSummary(
       delta: position - start,
       startPage: _startPage,
+      heldBeforeMoving: _heldBeforeMoving,
     );
     _released = summary;
     scheduleMicrotask(() {
       if (identical(_released, summary)) _released = null;
     });
+    return summary;
   }
 
   /// Forgets the touch: it was cancelled, or a second finger made it a pinch.

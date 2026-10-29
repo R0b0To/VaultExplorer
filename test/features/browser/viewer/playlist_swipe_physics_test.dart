@@ -134,8 +134,54 @@ void main() {
 
     test('a release with no touch-down is ignored', () {
       final tracker = PlaylistSwipeTracker();
-      tracker.release(const Offset(10, 10));
+      expect(tracker.release(const Offset(10, 10)), isNull);
       expect(tracker.take(), isNull);
+    });
+
+    test('release hands back the summary it records', () {
+      final tracker = PlaylistSwipeTracker();
+      tracker.begin(const Offset(400, 300), 1);
+      final summary = tracker.release(const Offset(430, 280));
+
+      expect(summary, isNotNull);
+      expect(summary!.delta, const Offset(30, -20));
+      expect(summary.startPage, 1);
+      expect(summary.heldBeforeMoving, isFalse);
+    });
+
+    test('a finger that rests as long as a long press is marked as held', () {
+      final tracker = PlaylistSwipeTracker();
+      tracker.begin(const Offset(400, 300), 0, timeStamp: Duration.zero);
+      // A tremor inside the slop does not count as moving off.
+      tracker.move(
+        const Offset(404, 302),
+        timeStamp: const Duration(milliseconds: 300),
+      );
+      tracker.move(
+        const Offset(440, 300),
+        timeStamp: const Duration(milliseconds: 700),
+      );
+
+      expect(tracker.release(const Offset(460, 300))!.heldBeforeMoving, isTrue);
+    });
+
+    test('a finger that moves off promptly is not held', () {
+      final tracker = PlaylistSwipeTracker();
+      tracker.begin(const Offset(400, 300), 0, timeStamp: Duration.zero);
+      tracker.move(
+        const Offset(440, 300),
+        timeStamp: const Duration(milliseconds: 120),
+      );
+      // Reaching the end late does not matter, only the first movement does.
+      tracker.move(
+        const Offset(470, 300),
+        timeStamp: const Duration(milliseconds: 900),
+      );
+
+      expect(
+        tracker.release(const Offset(470, 300))!.heldBeforeMoving,
+        isFalse,
+      );
     });
 
     test('a cancelled touch leaves nothing behind', () {
@@ -167,6 +213,90 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       expect(tracker.take(), isNull);
+    });
+  });
+
+  group('playlistSwipeFallbackDirection', () {
+    // An L-shaped swipe: 60 px sideways and 40 px down, from page 3.
+    const swipe = PlaylistSwipeSummary(delta: Offset(-60, 40), startPage: 3);
+
+    int run({
+      PlaylistSwipeSummary summary = swipe,
+      AxisDirection axisDirection = AxisDirection.right,
+      int currentIndex = 3,
+      bool isLocked = false,
+      bool isDismissing = false,
+    }) {
+      return playlistSwipeFallbackDirection(
+        swipe: summary,
+        axisDirection: axisDirection,
+        currentIndex: currentIndex,
+        isLocked: isLocked,
+        isDismissing: isDismissing,
+      );
+    }
+
+    test('a swipe the pager never received still changes the item', () {
+      expect(run(), 1);
+      expect(
+        run(
+          summary: const PlaylistSwipeSummary(
+            delta: Offset(60, -40),
+            startPage: 3,
+          ),
+        ),
+        -1,
+      );
+    });
+
+    test('a locked pager means something else owns the touch', () {
+      expect(run(isLocked: true), 0);
+    });
+
+    test('a dismiss in progress owns the touch', () {
+      expect(run(isDismissing: true), 0);
+    });
+
+    test('a long press followed by a slide is not a swipe', () {
+      expect(
+        run(
+          summary: const PlaylistSwipeSummary(
+            delta: Offset(-60, 40),
+            startPage: 3,
+            heldBeforeMoving: true,
+          ),
+        ),
+        0,
+      );
+    });
+
+    test('a page that changed under the finger is left alone', () {
+      expect(run(currentIndex: 4), 0);
+    });
+
+    test('a movement that is not a swipe overall changes nothing', () {
+      expect(
+        run(
+          summary: const PlaylistSwipeSummary(
+            delta: Offset(-20, 90),
+            startPage: 3,
+          ),
+        ),
+        0,
+      );
+    });
+
+    test('a vertical pager reads the vertical movement', () {
+      expect(
+        run(
+          summary: const PlaylistSwipeSummary(
+            delta: Offset(30, -70),
+            startPage: 3,
+          ),
+          axisDirection: AxisDirection.down,
+        ),
+        1,
+      );
     });
   });
 

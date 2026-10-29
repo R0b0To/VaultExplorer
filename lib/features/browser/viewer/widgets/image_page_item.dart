@@ -776,7 +776,12 @@ bool _isClampingMatrix = false;
                             if (details.pointerCount >= 2) {
                               _zoomAnimationController?.stop();
                             }
-                            widget.onZoomChanged(false);
+                            // See the video player: a lone finger on an item
+                            // at its resting zoom has nothing to pan, so it
+                            // must not freeze paging.
+                            if (details.pointerCount >= 2 || _isZoomed) {
+                              widget.onZoomChanged(false);
+                            }
                           },
                          onInteractionUpdate: (details) {
                             final s = _getMatrixScale(_transformationController.value);

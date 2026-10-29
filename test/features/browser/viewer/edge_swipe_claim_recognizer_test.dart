@@ -68,6 +68,30 @@ void main() {
   const offStrip = Offset(400, 150);
   const dragUp = Offset(0, -120);
 
+  group('edgeSwipeClaimsMovement', () {
+    test('a clearly vertical drag is claimed once it has travelled far enough',
+        () {
+      expect(edgeSwipeClaimsMovement(const Offset(0, 12)), isTrue);
+      expect(edgeSwipeClaimsMovement(const Offset(4, -14)), isTrue);
+      expect(edgeSwipeClaimsMovement(const Offset(-8, 60)), isTrue);
+    });
+
+    test('a drag that has not travelled far enough yet is not claimed', () {
+      expect(edgeSwipeClaimsMovement(Offset.zero), isFalse);
+      expect(edgeSwipeClaimsMovement(const Offset(0, 11.9)), isFalse);
+    });
+
+    test('a diagonal or curved start is left to the swipe', () {
+      expect(edgeSwipeClaimsMovement(const Offset(-12, 12)), isFalse);
+      expect(edgeSwipeClaimsMovement(const Offset(-14, 24)), isFalse);
+      expect(edgeSwipeClaimsMovement(const Offset(-30, 20)), isFalse);
+    });
+
+    test('a horizontal movement is never claimed', () {
+      expect(edgeSwipeClaimsMovement(const Offset(-80, 3)), isFalse);
+    });
+  });
+
   testWidgets(
     'a vertical drag that starts on the strip does not scroll the list, '
     'while the strip still sees the pointer moves',
@@ -106,6 +130,27 @@ void main() {
       await tester.pumpWidget(h.build());
 
       await tester.dragFrom(onStrip, dragUp);
+      await tester.pump();
+
+      expect(h.controller.offset, greaterThan(0.0));
+    },
+  );
+
+  testWidgets(
+    'a diagonal drag that leans downward is left to the list instead of '
+    'being claimed by the strip',
+    (tester) async {
+      final h = _Harness();
+      addTearDown(h.controller.dispose);
+      await tester.pumpWidget(h.build());
+
+      // Moves sideways as much as it moves up, like the start of a curved
+      // swipe. The strip used to claim any single move that leaned vertical.
+      final gesture = await tester.startGesture(onStrip);
+      await gesture.moveBy(const Offset(-10, -12));
+      await gesture.moveBy(const Offset(-10, -12));
+      await gesture.moveBy(const Offset(0, -100));
+      await gesture.up();
       await tester.pump();
 
       expect(h.controller.offset, greaterThan(0.0));

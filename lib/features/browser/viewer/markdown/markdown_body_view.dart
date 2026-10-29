@@ -23,6 +23,11 @@ class MarkdownBodyView extends ConsumerStatefulWidget {
   final void Function(int totalMatches)? onMatchesFound;
   final void Function(int sourceLine, bool currentChecked)? onTaskToggled;
 
+  /// Extra space after the last block. Lets a host that clips a band off the
+  /// bottom of the view (the editor's sliding tab strip) keep the end of the
+  /// document reachable.
+  final double bottomInset;
+
   const MarkdownBodyView({
     super.key,
     required this.source,
@@ -34,6 +39,7 @@ class MarkdownBodyView extends ConsumerStatefulWidget {
     this.searchMatchIndex = 0,
     this.onMatchesFound,
     this.onTaskToggled,
+    this.bottomInset = 0,
   });
 
   @override
@@ -629,7 +635,7 @@ class MarkdownBodyViewState extends ConsumerState<MarkdownBodyView> {
 
     return ListView.builder(
       controller: _scrollController,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + widget.bottomInset),
       // Build a good distance beyond the viewport so images are loaded and
       // laid out before they scroll into view, and are not torn down/rebuilt
       // on every small back-and-forth scroll.

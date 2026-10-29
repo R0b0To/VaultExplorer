@@ -53,17 +53,19 @@ those lines back and they become the to-do list.
 
 ## What works (design scope of this cut)
 
-Pick a container by path, probe, unlock (VeraCrypt / LUKS / BitLocker / plain block images,
-keyfiles, hidden-volume protection, cached derived keys passed through), unlock progress events,
-cancel, browse, read, write, create directory, rename, delete, set mtime, copy between volumes,
-space info, lock.
+Add a vault (multi-select file picker), probe, unlock (VeraCrypt / LUKS / BitLocker / plain block
+images, keyfiles, hidden-volume protection, cached derived keys passed through), unlock progress
+events, cancel, **create** (VeraCrypt, LUKS1/2, optional embedded hidden volume; built under a
+temporary name next to the destination and renamed into place only when complete), browse, read,
+write, create directory, rename, delete, set mtime, copy between volumes, space info, lock.
 
 ## Not yet
 
-- Directory vaults (Cryptomator / gocryptfs / CryFS) -- still Kotlin; needs porting to C++.
+- Folder vaults (Cryptomator / gocryptfs / CryFS) -- still Kotlin, so their add and create flows do
+  nothing on desktop; they need porting to C++.
 - Import / export / split-join / archive / thumbnails / media / PDF / camera -- need their
   desktop backends; copy/import/export progress events are drained but not yet forwarded.
-- Container creation through the channel (the C ABI already has `ve_create_container`).
+- Pre-flight free-space check on create (Android reports `INSUFFICIENT_SPACE`; desktop just fails).
 - Windows: all 41 engine C++ files pass a MinGW syntax check and the POSIX shims exist
   (`ffi/compat/`, `ffi/ve_win_platform.cpp`), but 16 C files still need work (Endian.h guard, ntfs-3g
   POSIX bits, Argon2 threading) and nothing has been linked or run there. Use MSYS2 UCRT64.

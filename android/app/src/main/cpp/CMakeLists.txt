@@ -529,8 +529,10 @@ elseif(ANDROID_ABI STREQUAL "armeabi-v7a")
     target_compile_options(vaultexplorer PRIVATE -mfpu=neon)
 endif()
 
-# GCC 14+ treats implicit function declarations as hard errors in legacy C code
-if(NOT MSVC)
+# GCC 14+ makes implicit function declarations a hard error, and some legacy C in the vendored
+# dependencies (ntfs-3g, e2fsprogs, dislocker) still relies on them. Desktop toolchains are GCC;
+# the Android NDK (clang) build keeps its flags exactly as before.
+if(VAULTEXPLORER_DESKTOP AND NOT MSVC)
     target_compile_options(vaultexplorer PRIVATE
         "$<$<COMPILE_LANGUAGE:C>:-Wno-error=implicit-function-declaration>")
 endif()

@@ -23,6 +23,7 @@
 #include <io.h>
 #include <vector>
 #include <stdint.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 
 namespace {
@@ -92,10 +93,14 @@ bool osRandomBytes(void* buf, size_t len) {
 // Opens a host file from a UTF-8 path (declared in ffi/ve_engine.cpp). Returns a CRT descriptor or -1.
 // _O_BINARY is essential: the C runtime's default text mode would translate CR/LF and treat 0x1A
 // as EOF, silently corrupting a container.
-int ve_win_open_utf8(const char* path, int writable) {
+int ve_win_open_utf8(const char* path, int writable, int create) {
     const int wlen = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, -1, nullptr, 0);
     if (wlen <= 0) return -1;
     std::vector<wchar_t> wpath(static_cast<size_t>(wlen));
     if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, -1, wpath.data(), wlen) <= 0) return -1;
+    if (create) {
+        return _wopen(wpath.data(), _O_RDWR | _O_CREAT | _O_TRUNC | _O_BINARY | _O_NOINHERIT,
+                      _S_IREAD | _S_IWRITE);
+    }
     return _wopen(wpath.data(), (writable ? _O_RDWR : _O_RDONLY) | _O_BINARY | _O_NOINHERIT);
 }

@@ -178,6 +178,31 @@ Object? veExecute(VeNative n, String op, List<Object?> a) {
         };
       }
 
+    case 'createContainer':
+      {
+        final m = Map<String, Object?>.from(a[0] as Map);
+        return n.createContainer(
+          path: m['path'] as String,
+          password: m['password'] as Uint8List,
+          pim: m['pim'] as int,
+          sizeBytes: m['sizeBytes'] as int,
+          fileSystem: m['fileSystem'] as String,
+          containerFormat: m['containerFormat'] as int,
+          cipherId: m['cipherId'] as int,
+          hashId: m['hashId'] as int,
+          keyfilePaths: (m['keyfilePaths'] as List<Object?>).cast<String>(),
+          quickFormat: m['quickFormat'] as bool,
+          userEntropy: m['userEntropy'] as Uint8List?,
+          hiddenPassword: m['hiddenPassword'] as Uint8List?,
+          hiddenFileSystem: m['hiddenFileSystem'] as String?,
+          hiddenSizeBytes: m['hiddenSizeBytes'] as int,
+          hiddenPim: m['hiddenPim'] as int,
+          hiddenCipherId: m['hiddenCipherId'] as int,
+          hiddenHashId: m['hiddenHashId'] as int,
+          hiddenKeyfilePaths: (m['hiddenKeyfilePaths'] as List<Object?>).cast<String>(),
+        );
+      }
+
     case 'cancelUnlock':
       n.requestCancelUnlock(a[0] as int);
       return null;

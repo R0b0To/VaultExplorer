@@ -133,11 +133,11 @@ static void runFilesystem(const char* fs, int64_t sizeBytes) {
     const char* kPassword = "correct horse battery staple";
     const int kVol = 0;
 
-    CHECK(makeSparseFile(path, sizeBytes));
+    std::remove(path.c_str());  // the file must not exist: ve_create_file makes it
 
     // ---- create ----
     {
-        int fd = ve_open_file(path.c_str(), 1);
+        int fd = ve_create_file(path.c_str());
         CHECK(fd >= 0);
         ve_create_params cp;
         std::memset(&cp, 0, sizeof(cp));
@@ -271,6 +271,54 @@ static void runFilesystem(const char* fs, int64_t sizeBytes) {
     std::remove(path.c_str());
 }
 
+// Creates a container in a file that does not exist yet (ve_create_file), with an embedded hidden
+// volume, then checks that each password opens its own volume and the contents stay separate.
+static void runHidden() {
+    std::printf("== hidden volume (fat outer 8 MiB, fat hidden 2 MiB) ==\n");
+    const std::string path = tempPath("ve_smoke_hidden.hc");
+    std::remove(path.c_str());  // must NOT exist: exercises ve_create_file
+    const char* kOuter = "outer password";
+    const char* kHidden = "hidden password";
+
+    int fd = ve_create_file(path.c_str());
+    CHECK(fd >= 0);
+    ve_create_hidden_params hp;
+    std::memset(&hp, 0, sizeof(hp));
+    hp.struct_size = sizeof(hp);
+    hp.fd = fd;
+    hp.outer_password = reinterpret_cast<const uint8_t*>(kOuter);
+    hp.outer_password_len = (int32_t)std::strlen(kOuter);
+    hp.hidden_password = reinterpret_cast<const uint8_t*>(kHidden);
+    hp.hidden_password_len = (int32_t)std::strlen(kHidden);
+    hp.size_bytes = 8ll << 20;
+    hp.hidden_size_bytes = 2ll << 20;
+    hp.outer_file_system = "fat";
+    hp.hidden_file_system = "fat";
+    hp.outer_cipher_id = hp.hidden_cipher_id = 255;
+    hp.outer_hash_id = hp.hidden_hash_id = 255;
+    hp.quick_format = 1;
+    CHECK_RC(ve_create_container_with_hidden(&hp), VE_OK);
+
+    CHECK_RC(unlock(path, kOuter, 0), VE_OK);
+    const std::string outerData = "lives in the outer volume";
+    CHECK_RC(ve_write_file_chunk(0, "outer.txt", 0, (const uint8_t*)outerData.data(), outerData.size()), VE_OK);
+    ve_lock(0);
+
+    CHECK_RC(unlock(path, kHidden, 0), VE_OK);
+    CHECK(ve_get_file_size(0, "outer.txt") == 0);  // the hidden volume is a different filesystem
+    const std::string hiddenData = "lives in the hidden volume";
+    CHECK_RC(ve_write_file_chunk(0, "secret.txt", 0, (const uint8_t*)hiddenData.data(), hiddenData.size()), VE_OK);
+    ve_lock(0);
+
+    CHECK_RC(unlock(path, kOuter, 0), VE_OK);
+    CHECK(readAll(0, "outer.txt") == outerData);
+    CHECK(ve_get_file_size(0, "secret.txt") == 0);
+    ve_lock(0);
+    CHECK_RC(unlock(path, "neither", 0), VE_ERR_FAILED);
+
+    std::remove(path.c_str());
+}
+
 int main(int argc, char** argv) {
     std::printf("ve abi %d, %d volume slots\n", ve_abi_version(), ve_max_volumes());
     CHECK(ve_abi_version() == VE_ABI_VERSION);
@@ -284,6 +332,8 @@ int main(int argc, char** argv) {
         const int64_t size = (fs == "fat" || fs == "exfat") ? 8ll << 20 : 32ll << 20;
         runFilesystem(fs.c_str(), size);
     }
+
+    runHidden();
 
     std::printf("\n%d checks, %d failed\n", g_checks, g_failures);
     return g_failures == 0 ? 0 : 1;

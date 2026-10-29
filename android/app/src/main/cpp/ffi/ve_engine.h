@@ -68,8 +68,11 @@ typedef struct ve_buffer {
 VE_API void ve_buffer_free(ve_buffer* buf); /* wipes, frees, zeroes the struct */
 
 /* ---- host files --------------------------------------------------------- */
-/* Opens a host file (binary mode, UTF-8 path) and returns a descriptor, or -1. */
+/* Opens an EXISTING host file (binary mode, UTF-8 path) and returns a descriptor, or -1. */
 VE_API int32_t ve_open_file(const char* path_utf8, int32_t writable);
+/* Creates (or truncates) a host file for read/write, owner-only permissions, and returns a
+ * descriptor, or -1. Use it to make the file a new container is written into. */
+VE_API int32_t ve_create_file(const char* path_utf8);
 VE_API void ve_close_fd(int32_t fd);
 
 /* ---- format probing (does NOT take ownership of fd) --------------------- */
@@ -133,6 +136,35 @@ typedef struct ve_create_params {
 } ve_create_params;
 
 VE_API int32_t ve_create_container(const ve_create_params* params);
+
+/* VeraCrypt container with an embedded hidden volume. cipher/hash ids apply to BOTH volumes. */
+typedef struct ve_create_hidden_params {
+    int32_t struct_size;
+    int32_t fd;                      /* owned by the engine (closed before return) */
+    const uint8_t* outer_password;
+    int32_t outer_password_len;
+    const uint8_t* hidden_password;
+    int32_t hidden_password_len;
+    int32_t outer_pim;
+    int32_t hidden_pim;
+    int64_t size_bytes;
+    const char* outer_file_system;
+    const char* hidden_file_system;
+    int64_t hidden_size_bytes;
+    int32_t outer_cipher_id;
+    int32_t outer_hash_id;
+    int32_t hidden_cipher_id;
+    int32_t hidden_hash_id;
+    const int32_t* outer_keyfile_fds;  /* owned by the engine */
+    int32_t outer_keyfile_count;
+    const int32_t* hidden_keyfile_fds; /* owned by the engine */
+    int32_t hidden_keyfile_count;
+    int32_t quick_format;
+    const uint8_t* user_entropy;
+    int32_t user_entropy_len;
+} ve_create_hidden_params;
+
+VE_API int32_t ve_create_container_with_hidden(const ve_create_hidden_params* params);
 
 /* ---- filesystem operations on an unlocked slot ---------------------------
  * Paths are UTF-8, '/'-separated, relative to the volume root ("/" or ""). */

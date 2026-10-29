@@ -27,7 +27,7 @@
 #  include <io.h>
 #  include <fcntl.h>
 // Defined in ffi/ve_win_platform.cpp -- the only file allowed to include <windows.h>.
-int ve_win_open_utf8(const char* path, int writable);
+int ve_win_open_utf8(const char* path, int writable, int create);
 #else
 #  include <fcntl.h>
 #  include <unistd.h>
@@ -191,9 +191,18 @@ extern "C" VE_API void ve_buffer_free(ve_buffer* buf) {
 extern "C" VE_API int32_t ve_open_file(const char* path, int32_t writable) {
     if (!path) return -1;
 #if defined(_WIN32)
-    return ve_win_open_utf8(path, writable);
+    return ve_win_open_utf8(path, writable, /*create=*/0);
 #else
     return open(path, (writable ? O_RDWR : O_RDONLY) | O_CLOEXEC);
+#endif
+}
+
+extern "C" VE_API int32_t ve_create_file(const char* path) {
+    if (!path) return -1;
+#if defined(_WIN32)
+    return ve_win_open_utf8(path, /*writable=*/1, /*create=*/1);
+#else
+    return open(path, O_RDWR | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
 #endif
 }
 
@@ -319,6 +328,38 @@ extern "C" VE_API int32_t ve_create_container(const ve_create_params* p) {
                                   p->quick_format != 0);
     }
     mbedtls_platform_zeroize(pass.data(), pass.size());
+    return okOrFailed(success);
+    VE_CATCH(VE_ERR_EXCEPTION)
+}
+
+extern "C" VE_API int32_t ve_create_container_with_hidden(const ve_create_hidden_params* p) {
+    if (!p || p->struct_size < static_cast<int32_t>(sizeof(ve_create_hidden_params)) ||
+        !p->outer_file_system || !p->hidden_file_system || p->size_bytes <= 0 ||
+        p->hidden_size_bytes <= 0 || p->outer_password_len < 0 || p->hidden_password_len < 0 ||
+        p->outer_keyfile_count < 0 || p->hidden_keyfile_count < 0) {
+        if (p) {
+            closeOne(p->fd);
+            closeFds(p->outer_keyfile_fds, p->outer_keyfile_count);
+            closeFds(p->hidden_keyfile_fds, p->hidden_keyfile_count);
+        }
+        return VE_ERR_INVALID_ARG;
+    }
+    VE_TRY
+    userentropy::Scope entropy(p->user_entropy,
+                               p->user_entropy ? static_cast<size_t>(p->user_entropy_len) : 0);
+    std::string outerPass(p->outer_password ? reinterpret_cast<const char*>(p->outer_password) : "",
+                          p->outer_password ? static_cast<size_t>(p->outer_password_len) : 0);
+    std::string hiddenPass(p->hidden_password ? reinterpret_cast<const char*>(p->hidden_password) : "",
+                           p->hidden_password ? static_cast<size_t>(p->hidden_password_len) : 0);
+    const bool success = createContainerWithHidden(
+        p->fd, outerPass.c_str(), hiddenPass.c_str(), p->outer_pim, p->hidden_pim, p->size_bytes,
+        p->outer_file_system, p->hidden_file_system, p->hidden_size_bytes,
+        p->outer_cipher_id, p->outer_hash_id, p->hidden_cipher_id, p->hidden_hash_id,
+        p->outer_keyfile_count > 0 ? p->outer_keyfile_fds : nullptr, p->outer_keyfile_count,
+        p->hidden_keyfile_count > 0 ? p->hidden_keyfile_fds : nullptr, p->hidden_keyfile_count,
+        p->quick_format != 0);
+    mbedtls_platform_zeroize(outerPass.data(), outerPass.size());
+    mbedtls_platform_zeroize(hiddenPass.data(), hiddenPass.size());
     return okOrFailed(success);
     VE_CATCH(VE_ERR_EXCEPTION)
 }

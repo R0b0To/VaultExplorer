@@ -86,6 +86,77 @@ final class VeUnlockParams extends Struct {
   external int hiddenKeyfileCount;
 }
 
+final class VeCreateParams extends Struct {
+  @Int32()
+  external int structSize;
+  @Int32()
+  external int fd;
+  external Pointer<Uint8> password;
+  @Int32()
+  external int passwordLen;
+  @Int32()
+  external int pim;
+  @Int64()
+  external int sizeBytes;
+  external Pointer<Utf8> fileSystem;
+  @Int32()
+  external int containerFormat;
+  @Int32()
+  external int cipherId;
+  @Int32()
+  external int hashId;
+  external Pointer<Int32> keyfileFds;
+  @Int32()
+  external int keyfileCount;
+  @Int32()
+  external int quickFormat;
+  external Pointer<Uint8> userEntropy;
+  @Int32()
+  external int userEntropyLen;
+}
+
+final class VeCreateHiddenParams extends Struct {
+  @Int32()
+  external int structSize;
+  @Int32()
+  external int fd;
+  external Pointer<Uint8> outerPassword;
+  @Int32()
+  external int outerPasswordLen;
+  external Pointer<Uint8> hiddenPassword;
+  @Int32()
+  external int hiddenPasswordLen;
+  @Int32()
+  external int outerPim;
+  @Int32()
+  external int hiddenPim;
+  @Int64()
+  external int sizeBytes;
+  external Pointer<Utf8> outerFileSystem;
+  external Pointer<Utf8> hiddenFileSystem;
+  @Int64()
+  external int hiddenSizeBytes;
+  @Int32()
+  external int outerCipherId;
+  @Int32()
+  external int outerHashId;
+  @Int32()
+  external int hiddenCipherId;
+  @Int32()
+  external int hiddenHashId;
+  external Pointer<Int32> outerKeyfileFds;
+  @Int32()
+  external int outerKeyfileCount;
+  external Pointer<Int32> hiddenKeyfileFds;
+  @Int32()
+  external int hiddenKeyfileCount;
+  @Int32()
+  external int quickFormat;
+  external Pointer<Uint8> userEntropy;
+  @Int32()
+  external int userEntropyLen;
+}
+
 final class VeEvent extends Struct {
   @Int32()
   external int kind;
@@ -127,6 +198,9 @@ class VeNative {
   VeNative._(this._lib) {
     _openFile = _lib.lookupFunction<Int32 Function(Pointer<Utf8>, Int32), int Function(Pointer<Utf8>, int)>('ve_open_file');
     _closeFd = _lib.lookupFunction<Void Function(Int32), void Function(int)>('ve_close_fd');
+    _createFile = _lib.lookupFunction<Int32 Function(Pointer<Utf8>), int Function(Pointer<Utf8>)>('ve_create_file');
+    _createContainer = _lib.lookupFunction<Int32 Function(Pointer<VeCreateParams>), int Function(Pointer<VeCreateParams>)>('ve_create_container');
+    _createHidden = _lib.lookupFunction<Int32 Function(Pointer<VeCreateHiddenParams>), int Function(Pointer<VeCreateHiddenParams>)>('ve_create_container_with_hidden');
     _abiVersion = _lib.lookupFunction<Int32 Function(), int Function()>('ve_abi_version');
     _maxVolumes = _lib.lookupFunction<Int32 Function(), int Function()>('ve_max_volumes');
     _probe = _lib.lookupFunction<Pointer<Utf8> Function(Int32), Pointer<Utf8> Function(int)>('ve_probe_format');
@@ -159,6 +233,9 @@ class VeNative {
   final DynamicLibrary _lib;
   late final int Function(Pointer<Utf8>, int) _openFile;
   late final void Function(int) _closeFd;
+  late final int Function(Pointer<Utf8>) _createFile;
+  late final int Function(Pointer<VeCreateParams>) _createContainer;
+  late final int Function(Pointer<VeCreateHiddenParams>) _createHidden;
   late final int Function() _abiVersion;
   late final int Function() _maxVolumes;
   late final Pointer<Utf8> Function(int) _probe;
@@ -253,6 +330,8 @@ class VeNative {
   // ── host files / probing ───────────────────────────────────────────────
 
   int openFile(String path, {bool writable = false}) => _withUtf8(path, (p) => _openFile(p, writable ? 1 : 0));
+  /// Creates (or truncates) [path] for read/write and returns a descriptor, or -1.
+  int createFile(String path) => _withUtf8(path, (p) => _createFile(p));
   void closeFd(int fd) => _closeFd(fd);
   String probeFormat(int fd) => _probe(fd).toDartString();
 
@@ -371,6 +450,151 @@ class VeNative {
       if (kfp != nullptr) calloc.free(kfp);
       if (hkfp != nullptr) calloc.free(hkfp);
       calloc.free(params);
+    }
+  }
+
+  // ── container creation ─────────────────────────────────────────────────
+
+  /// Creates a new container in a NEW file at [path] (VeraCrypt, or LUKS1/2 via [containerFormat]
+  /// 1/2; with [hiddenPassword] a VeraCrypt container with an embedded hidden volume).
+  /// Returns a ve* result code, or -1 when the file / a keyfile cannot be opened. On any failure
+  /// the caller should delete [path]. Secrets are wiped from native memory before returning.
+  int createContainer({
+    required String path,
+    required Uint8List password,
+    required int pim,
+    required int sizeBytes,
+    required String fileSystem,
+    int containerFormat = 0,
+    int cipherId = 255,
+    int hashId = 255,
+    List<String> keyfilePaths = const [],
+    bool quickFormat = false,
+    Uint8List? userEntropy,
+    Uint8List? hiddenPassword,
+    String? hiddenFileSystem,
+    int hiddenSizeBytes = 0,
+    int hiddenPim = 0,
+    int hiddenCipherId = 255,
+    int hiddenHashId = 255,
+    List<String> hiddenKeyfilePaths = const [],
+  }) {
+    List<int>? openKeyfiles(List<String> paths) {
+      final fds = <int>[];
+      for (final k in paths) {
+        final f = openFile(k);
+        if (f < 0) {
+          for (final x in fds) {
+            closeFd(x);
+          }
+          return null;
+        }
+        fds.add(f);
+      }
+      return fds;
+    }
+
+    final kf = openKeyfiles(keyfilePaths);
+    if (kf == null) return -1;
+    final hidden = hiddenPassword != null;
+    final hkf = hidden ? openKeyfiles(hiddenKeyfilePaths) : <int>[];
+    if (hkf == null) {
+      for (final x in kf) {
+        closeFd(x);
+      }
+      return -1;
+    }
+    final fd = createFile(path);
+    if (fd < 0) {
+      for (final x in [...kf, ...hkf]) {
+        closeFd(x);
+      }
+      return -1;
+    }
+
+    final allocated = <Pointer<NativeType>>[]; // freed in finally
+    final secrets = <(Pointer<Uint8>, int)>[]; // wiped, then freed
+    Pointer<Uint8> secretBytes(Uint8List? src) {
+      if (src == null) return nullptr;
+      final p = calloc<Uint8>(src.isEmpty ? 1 : src.length);
+      p.asTypedList(src.length).setAll(0, src);
+      secrets.add((p, src.length));
+      return p;
+    }
+
+    Pointer<Int32> fdArray(List<int> fds) {
+      if (fds.isEmpty) return nullptr;
+      final p = calloc<Int32>(fds.length);
+      for (var i = 0; i < fds.length; i++) {
+        p[i] = fds[i];
+      }
+      allocated.add(p);
+      return p;
+    }
+
+    Pointer<Utf8> cString(String s) {
+      final p = s.toNativeUtf8();
+      allocated.add(p);
+      return p;
+    }
+
+    try {
+      if (!hidden) {
+        final params = calloc<VeCreateParams>();
+        allocated.add(params);
+        final r = params.ref;
+        r.structSize = sizeOf<VeCreateParams>();
+        r.fd = fd;
+        r.password = secretBytes(password);
+        r.passwordLen = password.length;
+        r.pim = pim;
+        r.sizeBytes = sizeBytes;
+        r.fileSystem = cString(fileSystem);
+        r.containerFormat = containerFormat;
+        r.cipherId = cipherId;
+        r.hashId = hashId;
+        r.keyfileFds = fdArray(kf);
+        r.keyfileCount = kf.length;
+        r.quickFormat = quickFormat ? 1 : 0;
+        r.userEntropy = secretBytes(userEntropy);
+        r.userEntropyLen = userEntropy?.length ?? 0;
+        return _createContainer(params);
+      }
+      final params = calloc<VeCreateHiddenParams>();
+      allocated.add(params);
+      final r = params.ref;
+      r.structSize = sizeOf<VeCreateHiddenParams>();
+      r.fd = fd;
+      r.outerPassword = secretBytes(password);
+      r.outerPasswordLen = password.length;
+      r.hiddenPassword = secretBytes(hiddenPassword);
+      r.hiddenPasswordLen = hiddenPassword.length;
+      r.outerPim = pim;
+      r.hiddenPim = hiddenPim;
+      r.sizeBytes = sizeBytes;
+      r.outerFileSystem = cString(fileSystem);
+      r.hiddenFileSystem = cString(hiddenFileSystem ?? 'fat');
+      r.hiddenSizeBytes = hiddenSizeBytes;
+      r.outerCipherId = cipherId;
+      r.outerHashId = hashId;
+      r.hiddenCipherId = hiddenCipherId;
+      r.hiddenHashId = hiddenHashId;
+      r.outerKeyfileFds = fdArray(kf);
+      r.outerKeyfileCount = kf.length;
+      r.hiddenKeyfileFds = fdArray(hkf);
+      r.hiddenKeyfileCount = hkf.length;
+      r.quickFormat = quickFormat ? 1 : 0;
+      r.userEntropy = secretBytes(userEntropy);
+      r.userEntropyLen = userEntropy?.length ?? 0;
+      return _createHidden(params);
+    } finally {
+      for (final (p, len) in secrets) {
+        p.asTypedList(len).fillRange(0, len, 0);
+        calloc.free(p);
+      }
+      for (final p in allocated) {
+        calloc.free(p);
+      }
     }
   }
 

@@ -13,6 +13,7 @@
 // is logged once in debug builds.
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:file_selector/file_selector.dart';
@@ -84,6 +85,11 @@ class DesktopEngineHost {
     switch (call.method) {
       case ChannelMethods.pickContainer:
         return _pickContainer();
+      case ChannelMethods.pickCryptoFiles: // the "add a vault" picker (multi-select, composite-aware)
+      case ChannelMethods.pickKeyfiles:
+        return _pickFiles();
+      case ChannelMethods.createContainer:
+        return _createContainer(args);
       case ChannelMethods.probeContainerFormat:
         return await pool.call('probe', [args['filePath']]) as String;
       case ChannelMethods.unlockContainer:
@@ -170,6 +176,92 @@ class DesktopEngineHost {
     if (file == null) return null;
     // On desktop the container "URI" is simply its filesystem path.
     return {'uri': file.path, 'displayName': p.basename(file.path)};
+  }
+
+  /// Multi-select picker shared by "add a vault" and keyfile selection. A file's `uri` is simply its
+  /// filesystem path on desktop (keyfile "paths" handed back to unlock/create are the same value).
+  Future<Object?> _pickFiles() async {
+    final files = await openFiles();
+    return [
+      for (final f in files) {'uri': f.path, 'displayName': p.basename(f.path)},
+    ];
+  }
+
+  // ── creation ───────────────────────────────────────────────────────────
+
+  /// Android shows ACTION_CREATE_DOCUMENT, builds the container in a staging file, then copies it to
+  /// the chosen document. Here: a save dialog, then the container is built next to the destination
+  /// under a temporary name and renamed into place only once it is complete, so a failed or
+  /// cancelled creation never leaves a half-written file at the chosen path.
+  Future<Object?> _createContainer(Map<Object?, Object?> args) async {
+    final location = await getSaveLocation(suggestedName: args['displayName'] as String?);
+    if (location == null) return {'success': false, 'uri': null};
+    final destination = location.path;
+    final staging = '$destination.vaultexplorer-part';
+
+    final password = Uint8List.fromList(utf8.encode((args['password'] as String?) ?? ''));
+    final createHidden = args['createHiddenVolume'] == true && ((args['containerFormat'] as num?)?.toInt() ?? 0) == 0;
+    final hiddenPassword = createHidden
+        ? Uint8List.fromList(utf8.encode((args['hiddenPassword'] as String?) ?? ''))
+        : null;
+    final entropy = args['userEntropy'] is Uint8List ? args['userEntropy'] as Uint8List : null;
+
+    int rc;
+    try {
+      rc = await _withActivity(() async => await pool.call('createContainer', [
+            {
+              'path': staging,
+              'password': password,
+              'pim': (args['pim'] as num?)?.toInt() ?? 0,
+              'sizeBytes': (args['sizeBytes'] as num).toInt(),
+              'fileSystem': (args['fileSystem'] as String?) ?? 'fat',
+              'containerFormat': (args['containerFormat'] as num?)?.toInt() ?? 0,
+              'cipherId': (args['cipherId'] as num?)?.toInt() ?? 255,
+              'hashId': (args['hashId'] as num?)?.toInt() ?? 255,
+              'keyfilePaths': (args['keyfilePaths'] as List<Object?>?)?.cast<String>() ?? const <String>[],
+              'quickFormat': args['quickFormat'] == true,
+              'userEntropy': entropy,
+              'hiddenPassword': hiddenPassword,
+              'hiddenFileSystem': args['hiddenFileSystem'] as String?,
+              'hiddenSizeBytes': (args['hiddenSizeBytes'] as num?)?.toInt() ?? 0,
+              'hiddenPim': (args['hiddenPim'] as num?)?.toInt() ?? 0,
+              'hiddenCipherId': (args['hiddenCipherId'] as num?)?.toInt() ?? 255,
+              'hiddenHashId': (args['hiddenHashId'] as num?)?.toInt() ?? 255,
+              'hiddenKeyfilePaths':
+                  (args['hiddenKeyfilePaths'] as List<Object?>?)?.cast<String>() ?? const <String>[],
+            },
+          ]) as int);
+    } finally {
+      password.fillRange(0, password.length, 0);
+      hiddenPassword?.fillRange(0, hiddenPassword.length, 0);
+      entropy?.fillRange(0, entropy.length, 0);
+    }
+
+    if (rc != veOk) {
+      try {
+        await File(staging).delete();
+      } on FileSystemException {
+        // nothing was created
+      }
+      throw PlatformException(
+        code: 'C++_ERROR',
+        message: rc == -1
+            ? 'Could not create the container file (or open a keyfile) at $destination'
+            : 'Container creation failed (code $rc)',
+      );
+    }
+
+    try {
+      await File(staging).rename(destination);
+    } on FileSystemException catch (e) {
+      try {
+        await File(staging).delete();
+      } on FileSystemException {
+        // best effort
+      }
+      throw PlatformException(code: 'C++_ERROR', message: 'Could not save the container to $destination: ${e.message}');
+    }
+    return {'success': true, 'uri': destination};
   }
 
   // ── lifecycle ──────────────────────────────────────────────────────────

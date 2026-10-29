@@ -313,14 +313,18 @@ void main() {
     });
   });
 
-  group('Go to location (selection from search results)', () {
-    Widget narrowBar({VoidCallback? onGoToLocation}) => _buildTestApp(
+  group('Selection menu entries that depend on a callback', () {
+    Widget narrowBar({
+      VoidCallback? onGoToLocation,
+      VoidCallback? onCopyPath,
+    }) => _buildTestApp(
       SelectionAppBar(
         selectedCount: 1,
         selectionLabel: '15 MB',
         singleSelected: true,
         singleFileSelected: true,
         onGoToLocation: onGoToLocation,
+        onCopyPath: onCopyPath,
         onEditVideo: () {},
         onEditImage: () {},
         onClose: () {},
@@ -349,7 +353,10 @@ void main() {
       ),
     );
 
-    Widget wideBar({VoidCallback? onGoToLocation}) => _buildTestApp(
+    Widget wideBar({
+      VoidCallback? onGoToLocation,
+      VoidCallback? onCopyPath,
+    }) => _buildTestApp(
       SelectionAppBarWide(
         selectedCount: 1,
         selectionLabel: '15 MB',
@@ -368,6 +375,7 @@ void main() {
         visibleActions: const [],
         actionBuilders: const {},
         onGoToLocation: onGoToLocation,
+        onCopyPath: onCopyPath,
         onEditVideo: () {},
         onEditImage: () {},
         onClose: () {},
@@ -391,57 +399,72 @@ void main() {
       ),
     );
 
-    final goToLocationFinder = find.byWidgetPredicate(
-      (widget) =>
-          widget is PopupMenuItem<String> && widget.value == 'go_to_location',
-    );
+    final bars =
+        <
+          String,
+          Widget Function({VoidCallback? onGoToLocation, VoidCallback? onCopyPath})
+        >{'SelectionAppBar': narrowBar, 'SelectionAppBarWide': wideBar};
 
-    for (final entry in <String, Widget Function({VoidCallback? onGoToLocation})>{
-      'SelectionAppBar': narrowBar,
-      'SelectionAppBarWide': wideBar,
-    }.entries) {
-      testWidgets('${entry.key} offers it and runs the callback when set', (
-        tester,
-      ) async {
-        var went = false;
-        await tester.pumpWidget(entry.value(onGoToLocation: () => went = true));
-        await tester.pumpAndSettle();
-
-        await tester.tap(find.byIcon(Icons.more_vert_rounded));
-        await tester.pumpAndSettle();
-
-        expect(goToLocationFinder, findsOneWidget);
-        expect(
-          find.descendant(
-            of: goToLocationFinder,
-            matching: find.byIcon(Icons.folder_open_rounded),
+    // (menu value, label, icon, builds the bar with only that callback set)
+    final entries =
+        <(String, String, IconData, Widget Function(Widget Function({VoidCallback? onGoToLocation, VoidCallback? onCopyPath}), VoidCallback?))>[
+          (
+            'go_to_location',
+            'Go to location',
+            Icons.folder_open_rounded,
+            (bar, cb) => bar(onGoToLocation: cb),
           ),
-          findsOneWidget,
-        );
-        expect(
-          find.descendant(
-            of: goToLocationFinder,
-            matching: find.text('Go to location'),
+          (
+            'copy_path',
+            'Copy path',
+            Icons.link_rounded,
+            (bar, cb) => bar(onCopyPath: cb),
           ),
-          findsOneWidget,
+        ];
+
+    for (final bar in bars.entries) {
+      for (final (value, label, icon, build) in entries) {
+        final finder = find.byWidgetPredicate(
+          (widget) => widget is PopupMenuItem<String> && widget.value == value,
         );
 
-        await tester.tap(goToLocationFinder);
-        await tester.pumpAndSettle();
-        expect(went, isTrue);
-      });
+        testWidgets('${bar.key} offers "$label" and runs its callback when set', (
+          tester,
+        ) async {
+          var ran = false;
+          await tester.pumpWidget(build(bar.value, () => ran = true));
+          await tester.pumpAndSettle();
 
-      testWidgets('${entry.key} does not offer it when no callback is set', (
-        tester,
-      ) async {
-        await tester.pumpWidget(entry.value());
-        await tester.pumpAndSettle();
+          await tester.tap(find.byIcon(Icons.more_vert_rounded));
+          await tester.pumpAndSettle();
 
-        await tester.tap(find.byIcon(Icons.more_vert_rounded));
-        await tester.pumpAndSettle();
+          expect(finder, findsOneWidget);
+          expect(
+            find.descendant(of: finder, matching: find.byIcon(icon)),
+            findsOneWidget,
+          );
+          expect(
+            find.descendant(of: finder, matching: find.text(label)),
+            findsOneWidget,
+          );
 
-        expect(goToLocationFinder, findsNothing);
-      });
+          await tester.tap(finder);
+          await tester.pumpAndSettle();
+          expect(ran, isTrue);
+        });
+
+        testWidgets('${bar.key} does not offer "$label" without a callback', (
+          tester,
+        ) async {
+          await tester.pumpWidget(build(bar.value, null));
+          await tester.pumpAndSettle();
+
+          await tester.tap(find.byIcon(Icons.more_vert_rounded));
+          await tester.pumpAndSettle();
+
+          expect(finder, findsNothing);
+        });
+      }
     }
   });
 }

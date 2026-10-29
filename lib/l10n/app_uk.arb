@@ -1651,6 +1651,7 @@
   "defaultFolderLayoutLabel": "Стандартний вигляд папки",
   "fileInfoAction": "Інформація",
   "goToLocationAction": "Перейти до розташування",
+  "copyPathAction": "Копіювати шлях",
   "automationSectionHeader": "Автоматизація",
   "automationTileTitle": "Автоматизація",
   "automationTileSubtitle": "Дозволити автоматизації розблоковувати, блокувати, імпортувати або експортувати файли цього сховища",

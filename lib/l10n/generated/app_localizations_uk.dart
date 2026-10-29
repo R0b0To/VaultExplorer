@@ -6203,6 +6203,9 @@ class AppLocalizationsUk extends AppLocalizations {
   String get goToLocationAction => 'Перейти до розташування';
 
   @override
+  String get copyPathAction => 'Копіювати шлях';
+
+  @override
   String get automationSectionHeader => 'Автоматизація';
 
   @override

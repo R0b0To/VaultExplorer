@@ -1640,6 +1640,7 @@
   "defaultFolderLayoutLabel": "Layout predefinito delle cartelle",
   "fileInfoAction": "Info",
   "goToLocationAction": "Vai alla posizione",
+  "copyPathAction": "Copia percorso",
   "automationSectionHeader": "Automazione",
   "automationTileTitle": "Automazione",
   "automationTileSubtitle": "Consenti all'automazione di sbloccare, bloccare, importare o esportare file da questo vault",

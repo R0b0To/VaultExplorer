@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/external_storage_locations_provider.dart';
+import 'package:vaultexplorer/core/utils/path_clipboard.dart';
+import 'package:vaultexplorer/core/utils/storage_uri_path.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/external_storage_location.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -92,6 +96,49 @@ class StorageLocationsDrawer extends ConsumerWidget {
     );
   }
 
+  /// Closes the drawer, so the confirmation snackbar is not hidden behind it,
+  /// and copies [path] to the clipboard.
+  void _copyPathAndClose(BuildContext context, String path) {
+    Navigator.pop(context);
+    unawaited(copyPathToClipboard(context, path));
+  }
+
+  void _showLocalStorageMenu(
+    BuildContext context,
+    Offset tapPosition,
+    MountedContainer container,
+  ) {
+    HapticFeedback.mediumImpact();
+    final cs = Theme.of(context).colorScheme;
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (overlay == null) return;
+
+    showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(
+        tapPosition & const Size(40, 40),
+        Offset.zero & overlay.size,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      items: [
+        PopupMenuItem(
+          value: 'copy_path',
+          child: Row(
+            children: [
+              Icon(Icons.link_rounded, size: 20, color: cs.onSurface),
+              const SizedBox(width: 12),
+              Text(context.l10n.copyPathAction),
+            ],
+          ),
+        ),
+      ],
+    ).then((action) {
+      if (action == 'copy_path' && context.mounted) {
+        _copyPathAndClose(context, readablePathFromUri(container.uri));
+      }
+    });
+  }
+
   void _showLocationContextMenu(
     BuildContext context,
     WidgetRef ref,
@@ -111,6 +158,16 @@ class StorageLocationsDrawer extends ConsumerWidget {
       ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       items: [
+        PopupMenuItem(
+          value: 'copy_path',
+          child: Row(
+            children: [
+              Icon(Icons.link_rounded, size: 20, color: cs.onSurface),
+              const SizedBox(width: 12),
+              Text(context.l10n.copyPathAction),
+            ],
+          ),
+        ),
         PopupMenuItem(
           value: 'rename',
           child: Row(
@@ -133,7 +190,13 @@ class StorageLocationsDrawer extends ConsumerWidget {
         ),
       ],
     ).then((action) {
-      if (action == 'rename') {
+      if (action == 'copy_path') {
+        if (!context.mounted) return;
+        _copyPathAndClose(
+          context,
+          readablePathFromUri(loc.path.isNotEmpty ? loc.path : loc.resolvedUri),
+        );
+      } else if (action == 'rename') {
         _promptRename(context, ref, loc);
       } else if (action == 'remove') {
         _confirmRemove(context, ref, loc);
@@ -158,7 +221,8 @@ class StorageLocationsDrawer extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 children: [
                   if (primary != null)
-                    ListTile(
+                    Builder(
+                      builder: (tileContext) => ListTile(
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
                       selected: activeVolId == kDecoyLocalVolId,
                       selectedTileColor: cs.secondaryContainer.withValues(alpha: 0.5),
@@ -172,11 +236,19 @@ class StorageLocationsDrawer extends ConsumerWidget {
                           fontWeight: activeVolId == kDecoyLocalVolId ? FontWeight.bold : FontWeight.w500,
                         ),
                       ),
+                      onLongPress: () {
+                        final box = tileContext.findRenderObject() as RenderBox?;
+                        final pos = box != null
+                            ? box.localToGlobal(box.size.center(Offset.zero))
+                            : Offset.zero;
+                        _showLocalStorageMenu(context, pos, primary);
+                      },
                       onTap: () {
                         Navigator.pop(context);
                         if (activeVolId == kDecoyLocalVolId) return;
                         onSelected(primary);
                       },
+                    ),
                     ),
 
                   for (final loc in externals) ...[

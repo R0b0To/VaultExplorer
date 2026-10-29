@@ -1,5 +1,6 @@
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/core/utils/storage_uri_path.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 
 const Set<String> kBrowserFilterDocumentExtensions = {
@@ -44,6 +45,31 @@ String joinPath(String name, String currentDirPath) =>
 
 String fullPathOf(RawEntry entry, String currentDirPath) =>
     joinPath(entry.name, currentDirPath);
+
+/// What "Copy path" puts on the clipboard for the item at [relativePath]
+/// inside a storage rooted at [rootPath] ('' [relativePath] is the root).
+///
+/// A device or external storage is a real folder, so its items get the real
+/// path (root + relative) -- the form other apps and a terminal understand. A
+/// root given as a SAF URI is turned back into its path first (see
+/// [readablePathFromUri]). A vault's contents only exist inside the
+/// container, so there the path is the in-vault one, the same "Full Path" the
+/// file info sheet shows; it is also the fallback when a storage's root has
+/// no filesystem path, since gluing a path onto a URI would not make one.
+String clipboardPathFor({
+  required String relativePath,
+  required String rootPath,
+  required bool isLocalStorage,
+}) {
+  if (!isLocalStorage) return relativePath;
+  final root = readablePathFromUri(rootPath);
+  if (!root.startsWith('/')) return relativePath;
+  final trimmed = root.length > 1 && root.endsWith('/')
+      ? root.substring(0, root.length - 1)
+      : root;
+  if (relativePath.isEmpty) return trimmed;
+  return trimmed == '/' ? '/$relativePath' : '$trimmed/$relativePath';
+}
 
 /// Splits [fullPath] (`a/b/c.txt`) into the folder it lives in (`a/b`, or ''
 /// for the vault root) and its last segment (`c.txt`).

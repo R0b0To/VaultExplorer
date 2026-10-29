@@ -31,6 +31,9 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
   /// folder it lives in.
   final VoidCallback? onGoToLocation;
 
+  /// Copies the single selected item's path to the clipboard.
+  final VoidCallback? onCopyPath;
+
   final VoidCallback onClose;
   final VoidCallback onSelectAll;
   final VoidCallback onRename;
@@ -82,6 +85,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
     this.isInsideArchive = false,
     this.onFileInfo,
     this.onGoToLocation,
+    this.onCopyPath,
     required this.readOnly,
     required this.showPinOption,
     required this.showUnpinOption,
@@ -242,6 +246,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
             if (value == 'bookmark') onBookmark();
             if (value == 'unbookmark') onUnbookmark();
             if (value == 'go_to_location') onGoToLocation?.call();
+            if (value == 'copy_path') onCopyPath?.call();
             if (value == 'file_info') onFileInfo?.call();
           },
           itemBuilder: (context) => applyItemActionMenuConfig(
@@ -468,6 +473,17 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
                     Icon(Icons.folder_open_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
                     const SizedBox(width: 12),
                     Text(context.l10n.goToLocationAction),
+                  ],
+                ),
+              ),
+            if (onCopyPath != null)
+              PopupMenuItem<String>(
+                value: 'copy_path',
+                child: Row(
+                  children: [
+                    Icon(Icons.link_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
+                    const SizedBox(width: 12),
+                    Text(context.l10n.copyPathAction),
                   ],
                 ),
               ),

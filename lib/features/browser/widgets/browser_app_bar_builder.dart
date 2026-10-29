@@ -62,6 +62,10 @@ PreferredSizeWidget buildBrowserAppBar(
   /// Leaves the search and shows the single selected item in the folder it
   /// lives in. Offered only while a search is showing and outside archives.
   VoidCallback? onGoToLocation,
+
+  /// Copies [entry]'s path to the clipboard. Offered for a single selected
+  /// item outside archives.
+  void Function(RawEntry entry)? onCopyPath,
   required VoidCallback onExport,
   required VoidCallback onCompressSelected,
   required VoidCallback onExtractSelectedArchive,
@@ -188,6 +192,15 @@ PreferredSizeWidget buildBrowserAppBar(
 
     final VoidCallback? goToLocation =
         single && searchActive && !isInsideArchive ? onGoToLocation : null;
+
+    final VoidCallback? copyPath =
+        single && !isInsideArchive && onCopyPath != null
+        ? () {
+            final entry = selectedItems.first;
+            onExitSelectionMode();
+            onCopyPath(entry);
+          }
+        : null;
 
     void doShowFileInfo() {
       final entry = selectedItems.first;
@@ -337,6 +350,7 @@ PreferredSizeWidget buildBrowserAppBar(
         onSyncSettings: doSyncSettings,
         onFileInfo: doShowFileInfo,
         onGoToLocation: goToLocation,
+        onCopyPath: copyPath,
         showEditImageOption: showEditImageOption,
         onEditImage: doEditImage,
         showEditVideoOption: showEditVideoOption,
@@ -393,6 +407,7 @@ PreferredSizeWidget buildBrowserAppBar(
       onDecrypt: onDecryptSelected,
       onFileInfo: doShowFileInfo,
       onGoToLocation: goToLocation,
+      onCopyPath: copyPath,
       showEditImageOption: showEditImageOption,
       onEditImage: doEditImage,
       showEditVideoOption: showEditVideoOption,

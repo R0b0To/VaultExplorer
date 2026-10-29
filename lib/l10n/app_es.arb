@@ -1640,6 +1640,7 @@
   "defaultFolderLayoutLabel": "Diseño de carpeta predeterminado",
   "fileInfoAction": "Info",
   "goToLocationAction": "Ir a la ubicación",
+  "copyPathAction": "Copiar ruta",
   "automationSectionHeader": "Automatización",
   "automationTileTitle": "Automatización",
   "automationTileSubtitle": "Permite que la automatización desbloquee, bloquee, importe o exporte archivos de esta bóveda",

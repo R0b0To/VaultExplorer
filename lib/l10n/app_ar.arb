@@ -1640,6 +1640,7 @@
   "defaultFolderLayoutLabel": "تخطيط المجلد الافتراضي",
   "fileInfoAction": "معلومات",
   "goToLocationAction": "الانتقال إلى الموقع",
+  "copyPathAction": "نسخ المسار",
   "automationSectionHeader": "الأتمتة",
   "automationTileTitle": "الأتمتة",
   "automationTileSubtitle": "السماح للأتمتة بفتح قفل هذه الخزنة أو قفلها أو استيراد ملفات منها أو تصديرها إليها",

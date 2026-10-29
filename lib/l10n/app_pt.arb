@@ -1640,6 +1640,7 @@
   "defaultFolderLayoutLabel": "Layout padrão da pasta",
   "fileInfoAction": "Info",
   "goToLocationAction": "Ir para o local",
+  "copyPathAction": "Copiar caminho",
   "automationSectionHeader": "Automação",
   "automationTileTitle": "Automação",
   "automationTileSubtitle": "Permitir que a automação desbloqueie, bloqueie, importe ou exporte arquivos deste cofre",

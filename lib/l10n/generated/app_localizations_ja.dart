@@ -5849,6 +5849,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get goToLocationAction => '場所へ移動';
 
   @override
+  String get copyPathAction => 'パスをコピー';
+
+  @override
   String get automationSectionHeader => '自動化';
 
   @override

@@ -228,4 +228,76 @@ void main() {
       expect(r.name, 'a.txt');
     });
   });
+
+  group('clipboardPathFor', () {
+    test('a vault copies the in-vault path', () {
+      expect(
+        clipboardPathFor(
+          relativePath: 'Photos/2026/a.jpg',
+          rootPath: 'content://com.android.externalstorage.documents/tree/primary%3AVaults%2Fx.hc',
+          isLocalStorage: false,
+        ),
+        'Photos/2026/a.jpg',
+      );
+    });
+
+    test('a device storage copies the real filesystem path', () {
+      expect(
+        clipboardPathFor(
+          relativePath: 'DCIM/Camera/a.jpg',
+          rootPath: '/storage/emulated/0',
+          isLocalStorage: true,
+        ),
+        '/storage/emulated/0/DCIM/Camera/a.jpg',
+      );
+    });
+
+    test('the root itself is just the root path', () {
+      expect(
+        clipboardPathFor(
+          relativePath: '',
+          rootPath: '/storage/emulated/0/',
+          isLocalStorage: true,
+        ),
+        '/storage/emulated/0',
+      );
+    });
+
+    test('a trailing slash on the root does not double up', () {
+      expect(
+        clipboardPathFor(
+          relativePath: 'a.txt',
+          rootPath: '/storage/1234-ABCD/',
+          isLocalStorage: true,
+        ),
+        '/storage/1234-ABCD/a.txt',
+      );
+      expect(
+        clipboardPathFor(relativePath: 'a.txt', rootPath: '/', isLocalStorage: true),
+        '/a.txt',
+      );
+    });
+
+    test('an external storage given as a SAF tree URI is mapped back to a path', () {
+      expect(
+        clipboardPathFor(
+          relativePath: 'sub/a.txt',
+          rootPath: 'content://com.android.externalstorage.documents/tree/primary%3ADownload',
+          isLocalStorage: true,
+        ),
+        '/storage/emulated/0/Download/sub/a.txt',
+      );
+    });
+
+    test('a storage root with no filesystem path falls back to the relative path', () {
+      expect(
+        clipboardPathFor(
+          relativePath: 'sub/a.txt',
+          rootPath: 'content://com.example.cloud/tree/abc',
+          isLocalStorage: true,
+        ),
+        'sub/a.txt',
+      );
+    });
+  });
 }

@@ -1640,6 +1640,7 @@
   "defaultFolderLayoutLabel": "デフォルトのフォルダーレイアウト",
   "fileInfoAction": "情報",
   "goToLocationAction": "場所へ移動",
+  "copyPathAction": "パスをコピー",
   "automationSectionHeader": "自動化",
   "automationTileTitle": "自動化",
   "automationTileSubtitle": "自動化によるこのボールトのロック解除・ロック・ファイルのインポート／エクスポートを許可します",

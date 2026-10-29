@@ -10053,6 +10053,12 @@ abstract class AppLocalizations {
   /// **'Go to location'**
   String get goToLocationAction;
 
+  /// Menu item label that copies the path of the selected file or folder, or of a storage or vault in the side drawer, to the clipboard
+  ///
+  /// In en, this message translates to:
+  /// **'Copy path'**
+  String get copyPathAction;
+
   /// Header for the automation settings section in the vault configuration screen
   ///
   /// In en, this message translates to:

@@ -1640,6 +1640,7 @@
   "defaultFolderLayoutLabel": "Disposition par défaut des dossiers",
   "fileInfoAction": "Infos",
   "goToLocationAction": "Aller à l'emplacement",
+  "copyPathAction": "Copier le chemin",
   "automationSectionHeader": "Automatisation",
   "automationTileTitle": "Automatisation",
   "automationTileSubtitle": "Autoriser l'automatisation à déverrouiller, verrouiller, importer ou exporter ce coffre",

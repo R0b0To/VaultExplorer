@@ -1640,6 +1640,7 @@
   "defaultFolderLayoutLabel": "Standard-Ordnerlayout",
   "fileInfoAction": "Info",
   "goToLocationAction": "Zum Speicherort gehen",
+  "copyPathAction": "Pfad kopieren",
   "automationSectionHeader": "Automatisierung",
   "automationTileTitle": "Automatisierung",
   "automationTileSubtitle": "Automatisierung darf diesen Tresor entsperren, sperren, Dateien importieren oder exportieren",

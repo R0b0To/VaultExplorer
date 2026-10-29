@@ -64,6 +64,11 @@ class FileItemActionsSheet extends ConsumerWidget {
   /// outside a search), so it is always offered when set.
   final VoidCallback? onGoToLocation;
 
+  /// Copies the item's path to the clipboard. Like [onGoToLocation] it is not
+  /// a configurable action: it is always offered when the caller sets it
+  /// (never inside an archive, whose paths are not vault paths).
+  final VoidCallback? onCopyPath;
+
   /// The user's item-action configuration: hidden actions are not offered,
   /// and the quick row and the list follow this order.
   final List<FileItemAction> actionOrder;
@@ -107,6 +112,7 @@ class FileItemActionsSheet extends ConsumerWidget {
     this.onDecrypt,
     this.onOpenInNewTab,
     this.onGoToLocation,
+    this.onCopyPath,
     this.actionOrder = FileItemAction.values,
     this.hiddenActions = const {},
     this.quickActions = FileItemAction.defaultQuickActions,
@@ -147,6 +153,7 @@ class FileItemActionsSheet extends ConsumerWidget {
     VoidCallback? onDecrypt,
     VoidCallback? onOpenInNewTab,
     VoidCallback? onGoToLocation,
+    VoidCallback? onCopyPath,
     List<FileItemAction> actionOrder = FileItemAction.values,
     Set<FileItemAction> hiddenActions = const {},
     Set<FileItemAction> quickActions = FileItemAction.defaultQuickActions,
@@ -192,6 +199,7 @@ class FileItemActionsSheet extends ConsumerWidget {
         onDecrypt: onDecrypt,
         onOpenInNewTab: onOpenInNewTab,
         onGoToLocation: onGoToLocation,
+        onCopyPath: onCopyPath,
         actionOrder: actionOrder,
         hiddenActions: hiddenActions,
         quickActions: quickActions,
@@ -522,6 +530,18 @@ class FileItemActionsSheet extends ConsumerWidget {
         ),
         if (listItems.isNotEmpty) const SizedBox(height: 8),
       ]);
+    }
+
+    final copyPath = onCopyPath;
+    if (copyPath != null && archiveContext == null) {
+      if (listItems.isNotEmpty) listItems.add(const SizedBox(height: 8));
+      listItems.add(
+        _ActionTile(
+          icon: Icons.link_rounded,
+          label: context.l10n.copyPathAction,
+          onTap: _closeThen(context, copyPath),
+        ),
+      );
     }
 
     final isDir = entry.isDir;

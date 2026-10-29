@@ -15,6 +15,7 @@ import 'package:vaultexplorer/core/theme/file_manager_skin_scope.dart';
 import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
 import 'package:vaultexplorer/core/utils/cancellation_token.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
+import 'package:vaultexplorer/core/utils/path_clipboard.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/activity/clipboard_fab.dart';
@@ -1070,6 +1071,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         );
         _setStatus(context.l10n.clipboardVerbMoving);
       },
+      onCopyPath: _archiveContext == null
+          ? () => unawaited(_copyItemPath(entry))
+          : null,
       onGoToLocation: _searchActive && _archiveContext == null
           ? () => unawaited(_goToItemLocation(entry))
           : null,
@@ -1714,6 +1718,20 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       );
       await _handleFileTap(fileEntry);
     }
+  }
+
+  /// Copies [entry]'s path: the real filesystem path in a device or external
+  /// storage, the in-vault path in a vault (see [clipboardPathFor]).
+  Future<void> _copyItemPath(RawEntry entry) {
+    _signalActivity();
+    return copyPathToClipboard(
+      context,
+      clipboardPathFor(
+        relativePath: _fullPathOf(entry),
+        rootPath: widget.container.uri,
+        isLocalStorage: widget.container.isLocalStorage,
+      ),
+    );
   }
 
   /// Leaves the search and shows [entry] in the folder it lives in. Deep-search
@@ -5145,6 +5163,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             setSelectedItems({...selectedItems, ...filteredItems}),
         onCopy: () => _initClipboard(cut: false),
         onCut: () => _initClipboard(cut: true),
+        onCopyPath: (entry) => unawaited(_copyItemPath(entry)),
         onGoToLocation: () {
           final selected = selectedItems;
           if (selected.length == 1) {

@@ -6235,6 +6235,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get goToLocationAction => 'الانتقال إلى الموقع';
 
   @override
+  String get copyPathAction => 'نسخ المسار';
+
+  @override
   String get automationSectionHeader => 'الأتمتة';
 
   @override

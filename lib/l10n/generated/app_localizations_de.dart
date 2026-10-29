@@ -6155,6 +6155,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get goToLocationAction => 'Zum Speicherort gehen';
 
   @override
+  String get copyPathAction => 'Pfad kopieren';
+
+  @override
   String get automationSectionHeader => 'Automatisierung';
 
   @override

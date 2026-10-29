@@ -5773,6 +5773,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get goToLocationAction => '转到所在位置';
 
   @override
+  String get copyPathAction => '复制路径';
+
+  @override
   String get automationSectionHeader => '自动化';
 
   @override

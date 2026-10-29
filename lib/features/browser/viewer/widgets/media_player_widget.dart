@@ -77,6 +77,32 @@ class VideoPlaybackProgress {
   }
 }
 
+/// Lets the viewer ask the video it is showing where it is on screen right
+/// now. The widget registers itself while it holds the probe, so the viewer
+/// can measure at the moment that matters (as a close begins, mid-swipe and
+/// all) instead of trusting the last reported position.
+class VideoFrameProbe {
+  Object? _owner;
+  Rect? Function()? _measure;
+
+  void _attach(Object owner, Rect? Function() measure) {
+    _owner = owner;
+    _measure = measure;
+  }
+
+  // A no-op for anyone but the current holder, so a page that lost the probe
+  // can't take it from the one that has it now.
+  void _detach(Object owner) {
+    if (!identical(_owner, owner)) return;
+    _owner = null;
+    _measure = null;
+  }
+
+  /// Where the video frame is, in logical pixels of the app's view and
+  /// clipped to the screen, or null when there is no video to measure.
+  Rect? measure() => _measure?.call();
+}
+
 class MediaPlayerWidget extends ConsumerStatefulWidget {
   final MountedContainer container;
   final String fileName;
@@ -114,6 +140,9 @@ class MediaPlayerWidget extends ConsumerStatefulWidget {
   /// on to picture-in-picture, so that Android animates from the video itself
   /// into the PiP window. Only the video actually showing should be given one.
   final void Function(Rect rect, double devicePixelRatio)? onVideoRectChanged;
+
+  /// Held by the one video the viewer is on; see [VideoFrameProbe].
+  final VideoFrameProbe? videoFrameProbe;
   final bool edgeSwipeBrightnessEnabled;
   final bool edgeSwipeVolumeEnabled;
   final bool edgeSwipeHudEnabled;
@@ -170,6 +199,7 @@ class MediaPlayerWidget extends ConsumerStatefulWidget {
     this.enableZoom = true,
     this.videoAspectRatioMode = VideoAspectRatioMode.bestFit,
     this.onVideoRectChanged,
+    this.videoFrameProbe,
     this.edgeSwipeBrightnessEnabled = true,
     this.edgeSwipeVolumeEnabled = true,
     this.edgeSwipeHudEnabled = true,
@@ -307,6 +337,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
   @override
   void initState() {
     super.initState();
+    widget.videoFrameProbe?._attach(this, _measureVideoRect);
     _lockController = ref.read(sessionLockControllerProvider);
     _thumbnailCache = ref.read(thumbnailCacheServiceProvider);
     final initialPoster =
@@ -375,6 +406,10 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
   @override
   void didUpdateWidget(covariant MediaPlayerWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.videoFrameProbe, widget.videoFrameProbe)) {
+      oldWidget.videoFrameProbe?._detach(this);
+      widget.videoFrameProbe?._attach(this, _measureVideoRect);
+    }
     if (oldWidget.fileName != widget.fileName) {
       // File changed — reset poster for new file
       final newPoster =
@@ -598,6 +633,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
 
   @override
   void dispose() {
+    widget.videoFrameProbe?._detach(this);
     _updateMediaPlayingState(false);
     _skipDebounceTimer?.cancel();
     _brightnessHudTimer?.cancel();
@@ -929,19 +965,27 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
       _videoRectReportScheduled = false;
       if (!mounted) return;
       final callback = widget.onVideoRectChanged;
-      final box = _videoFrameKey.currentContext?.findRenderObject();
-      if (callback == null || box is! RenderBox || !box.attached) return;
-      if (!box.hasSize) return;
-      final view = View.of(context);
-      final bounds = MatrixUtils.transformRect(
-        box.getTransformTo(null),
-        Offset.zero & box.size,
-      );
-      final screen = Offset.zero & (view.physicalSize / view.devicePixelRatio);
-      final visible = bounds.intersect(screen);
-      if (visible.isEmpty) return;
-      callback(visible, view.devicePixelRatio);
+      final visible = _measureVideoRect();
+      if (callback == null || visible == null) return;
+      callback(visible, View.of(context).devicePixelRatio);
     });
+  }
+
+  /// The video frame's box through every transform above it (zoom, rotation,
+  /// fit, a swipe in progress), clipped to the screen; null when it is not
+  /// laid out or not on screen.
+  Rect? _measureVideoRect() {
+    if (!mounted) return null;
+    final box = _videoFrameKey.currentContext?.findRenderObject();
+    if (box is! RenderBox || !box.attached || !box.hasSize) return null;
+    final view = View.of(context);
+    final bounds = MatrixUtils.transformRect(
+      box.getTransformTo(null),
+      Offset.zero & box.size,
+    );
+    final screen = Offset.zero & (view.physicalSize / view.devicePixelRatio);
+    final visible = bounds.intersect(screen);
+    return visible.isEmpty ? null : visible;
   }
 
   Widget _buildVideoTexture(NativeVideoController controller) {

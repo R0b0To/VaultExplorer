@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show Rect;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -82,10 +83,25 @@ class BackgroundPlaybackSession {
   final Set<String>? pinnedPaths;
 }
 
+/// A video taking off for the floating player: the viewer announces it as a
+/// close that hands the video over begins, so the window can fly out of where
+/// the video is on screen while the viewer is still closing (the session itself
+/// is only adopted once the viewer is gone).
+class FloatingPlayerEntry {
+  /// The player whose video is flying; the same one the session will hold.
+  final VideoPlaybackManager playbackManager;
+
+  /// Where the video was on screen when the close began, in logical pixels of
+  /// the app's view.
+  final Rect from;
+
+  const FloatingPlayerEntry({required this.playbackManager, required this.from});
+}
+
 /// Keeps media playing after the media viewer has been closed.
 ///
 /// The viewer normally owns the player and releases it when it goes away.
-/// Two cases call [adopt] instead of disposing its [VideoPlaybackManager]:
+/// Three cases call [adopt] instead of disposing its [VideoPlaybackManager]:
 ///  * audio, when "keep audio playing after closing" is on: the same native
 ///    player and media notification carry on with no screen of their own --
 ///    the notification's Previous / Next / Stop are the controls;
@@ -125,6 +141,12 @@ class BackgroundPlaybackHost {
   /// root; without one, expanding just ends playback.
   void Function()? expandHandler;
 
+  /// The video flying into the floating player while the viewer closes, or
+  /// null. See [beginFloatingEntry].
+  final ValueNotifier<FloatingPlayerEntry?> floatingEntry =
+      ValueNotifier<FloatingPlayerEntry?>(null);
+  Timer? _entryTimer;
+
   /// The session showing in the in-app floating player, or null. The app's
   /// root listens to this to draw the window. Updated from a microtask: the
   /// session changes from `State.dispose`, where a notifier that widgets
@@ -161,6 +183,28 @@ class BackgroundPlaybackHost {
     } else {
       handler();
     }
+  }
+
+  /// The viewer is closing and handing its playing video to the floating
+  /// player: the window appears now, taking off from [entry]'s rectangle, and
+  /// carries on as the session once the viewer has gone and [adopt]ed it.
+  void beginFloatingEntry(FloatingPlayerEntry entry) {
+    floatingEntry.value = entry;
+    // If the viewer never gets as far as handing over, the window must not
+    // stay up showing a player nobody holds.
+    _entryTimer?.cancel();
+    _entryTimer = Timer(const Duration(seconds: 3), endFloatingEntry);
+  }
+
+  /// The flight is over: the viewer is gone and the session has been adopted
+  /// (or nothing came of it). Queued behind the session's own publication, so
+  /// the window never has a frame with neither.
+  void endFloatingEntry() {
+    _entryTimer?.cancel();
+    _entryTimer = null;
+    scheduleMicrotask(() {
+      if (floatingEntry.value != null) floatingEntry.value = null;
+    });
   }
 
   void _publishFloatingSession() {

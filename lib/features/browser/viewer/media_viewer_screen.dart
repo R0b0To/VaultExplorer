@@ -126,6 +126,21 @@ class MediaViewerScreen extends ConsumerStatefulWidget {
   ConsumerState<MediaViewerScreen> createState() => _MediaViewerScreenState();
 }
 
+/// How the viewer is closing with respect to the floating player.
+enum _FloatingClose {
+  /// Not closing that way.
+  none,
+
+  /// Handing the video to the floating player, which could not be told where
+  /// the video is: no Hero flight back to the thumbnail, but nothing flies in
+  /// either; the window just appears when the viewer is gone.
+  withoutFlight,
+
+  /// Handing the video over, and the floating window is flying out of it: the
+  /// viewer must not draw its own copy as well.
+  flying,
+}
+
 class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     with TickerProviderStateMixin {
   late final VaultFileIoApi _fileIoApi;
@@ -154,6 +169,15 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   final ValueNotifier<double> _swipeDismissProgress = ValueNotifier<double>(
     0.0,
   );
+
+  /// Asked, as a close begins, where the video on screen is.
+  final VideoFrameProbe _videoProbe = VideoFrameProbe();
+
+  /// Set when the close hands the playing video to the floating player.
+  final ValueNotifier<_FloatingClose> _floatingClose =
+      ValueNotifier<_FloatingClose>(_FloatingClose.none);
+  AnimationController? _closeFade;
+  Timer? _floatingCloseGuard;
 
   /// The A-B repeat section of the video now playing. In memory only, and
   /// emptied whenever another item (hence a fresh native player) takes over.
@@ -635,6 +659,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   /// Nothing that is paused is kept.
   void _prepareBackgroundPlaybackHandoff() {
     _backgroundPlaybackHandoff = null;
+    _floatingClose.value = _FloatingClose.none;
     if (widget._isPreviewOnly || _playlistController.isEmpty) return;
     if (ref.read(mediaViewerLockProvider(widget.container.volId))) return;
     final file = _playbackManager.currentFileName;
@@ -663,6 +688,59 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
         floatingPlayer: true,
       );
     }
+  }
+
+  /// Called as a close that hands the playing video to the floating player
+  /// begins, right before the route pops. Together, in the same frame (so
+  /// nothing flickers):
+  ///  * the floating window appears over the video, where it is *now* (a swipe
+  ///    may have moved it since it was last reported), and flies into its
+  ///    corner;
+  ///  * the viewer stops drawing its own copy of the video;
+  ///  * the viewer's Hero flight back to the file manager's thumbnail is off:
+  ///    the video is going to the floating player, not back to where it was
+  ///    opened from.
+  ///
+  /// [fadeChrome]: a swipe already fades the backdrop and the controls as it
+  /// goes; a back press does not, so this does it, quickly, to keep the
+  /// window's flight from happening over a black screen that lingers.
+  void _beginFloatingFlight({bool fadeChrome = true}) {
+    if (_backgroundPlaybackHandoff?.floatingPlayer != true) return;
+    final from = _videoProbe.measure();
+    if (from != null) {
+      BackgroundPlaybackHost.instance.beginFloatingEntry(
+        FloatingPlayerEntry(playbackManager: _playbackManager, from: from),
+      );
+    }
+    _floatingClose.value = from != null
+        ? _FloatingClose.flying
+        : _FloatingClose.withoutFlight;
+
+    final start = _swipeDismissProgress.value;
+    if (fadeChrome && start < 0.99) {
+      _closeFade?.dispose();
+      final fade = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 220),
+      );
+      _closeFade = fade;
+      fade.addListener(() {
+        _swipeDismissProgress.value =
+            start + (1.0 - start) * Curves.easeOut.transform(fade.value);
+      });
+      unawaited(fade.forward());
+    }
+
+    // The route normally goes in a moment. If the pop is swallowed, the viewer
+    // must not stay half-faded with its own video hidden.
+    _floatingCloseGuard?.cancel();
+    _floatingCloseGuard = Timer(const Duration(milliseconds: 1500), () {
+      if (!mounted) return;
+      _closeFade?.stop();
+      _floatingClose.value = _FloatingClose.none;
+      _swipeDismissProgress.value = 0.0;
+      BackgroundPlaybackHost.instance.endFloatingEntry();
+    });
   }
 
   BackgroundPlaybackSession _newBackgroundPlaybackSession({
@@ -1444,6 +1522,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   void _closeViewerFromSwipe() {
     if (!mounted) return;
     _prepareBackgroundPlaybackHandoff();
+    _beginFloatingFlight(fadeChrome: false);
     Navigator.of(context).pop();
   }
 
@@ -3159,6 +3238,8 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     _pageController.dispose();
     _listScrollController.dispose();
     _continuousZoomAnimationController?.dispose();
+    _floatingCloseGuard?.cancel();
+    _closeFade?.dispose();
     _continuousTransformationController.removeListener(
       _onContinuousTransformationChanged,
     );
@@ -3171,6 +3252,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     _backgroundPlaybackHandoff = null;
     final handedOff =
         handoff != null && BackgroundPlaybackHost.instance.adopt(handoff);
+    // The window that flew out of this viewer is now the session's (or, if
+    // nothing was adopted, it has nothing left to show).
+    BackgroundPlaybackHost.instance.endFloatingEntry();
     if (!handedOff) {
       PlaybackThrottleController.setActive(false);
       _playbackManager.dispose();
@@ -3178,6 +3262,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     BackgroundPlaybackHost.instance.unregisterViewer();
     _swipePhysicsNotifier.dispose();
     _swipeDismissProgress.dispose();
+    _floatingClose.dispose();
     _lockNudge.dispose();
     _videoProgressNotifier.dispose();
     _abLoopNotifier.dispose();
@@ -3309,6 +3394,10 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                           devicePixelRatio: devicePixelRatio,
                         )
                   : null,
+              videoFrameProbe:
+                  !isAudio && fileName == _playlistController.currentFile
+                  ? _videoProbe
+                  : null,
               isMuted: _isMuted,
               onMuteChanged: (muted) {
                 if (_isMuted != muted) {
@@ -3368,7 +3457,17 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                 color: Colors.black.withValues(alpha: backgroundAlpha),
               ),
             ),
-            media!,
+            // While the floating window flies out of the video, this copy of
+            // it must not be drawn as well: it would hang about where the
+            // video was, fading, as the window leaves.
+            ValueListenableBuilder<_FloatingClose>(
+              valueListenable: _floatingClose,
+              child: media,
+              builder: (context, closing, child) => Opacity(
+                opacity: closing == _FloatingClose.flying ? 0.0 : 1.0,
+                child: child,
+              ),
+            ),
           ],
         );
       },
@@ -3377,11 +3476,23 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     // Only the currently active item should have its Hero enabled.
     // ListenableBuilder ensures HeroMode updates immediately on swipe
     // without rebuilding the heavy media widgets.
+    //
+    // Also off for a close that hands the video to the floating player: the
+    // Hero would fly the poster back to the file manager's thumbnail, when the
+    // video is going to the floating window instead.
     final heroGatedWidget = ListenableBuilder(
-      listenable: _playlistController,
+      listenable: Listenable.merge(<Listenable>[
+        _playlistController,
+        _floatingClose,
+      ]),
       builder: (context, child) {
         final isCurrent = _playlistController.currentIndex == index;
-        return HeroMode(enabled: isCurrent, child: child!);
+        final closingToFloatingPlayer =
+            _floatingClose.value != _FloatingClose.none;
+        return HeroMode(
+          enabled: isCurrent && !closingToFloatingPlayer,
+          child: child!,
+        );
       },
       child: itemWidget,
     );
@@ -3479,6 +3590,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
           return;
         }
         _prepareBackgroundPlaybackHandoff();
+        _beginFloatingFlight();
         Navigator.of(context).pop();
       },
       child: AnnotatedRegion<SystemUiOverlayStyle>(

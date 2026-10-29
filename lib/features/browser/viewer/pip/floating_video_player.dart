@@ -6,6 +6,7 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/features/browser/viewer/background_playback/background_playback_host.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/pip/picture_in_picture_coordinator.dart';
+import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dart';
 
 /// The app's own floating video window: what is left of the viewer when it is
 /// closed (back, or swipe down) while a video plays and "floating video player"
@@ -18,6 +19,11 @@ import 'package:vaultexplorer/features/browser/viewer/pip/picture_in_picture_coo
 /// turns the app into Android's picture-in-picture window (the host arms that
 /// through `PictureInPictureCoordinator`), so there is no state to carry over.
 ///
+/// When it comes from the viewer closing, the window does not just appear: it
+/// takes off from the rectangle the video was in and shrinks into its corner,
+/// so the video itself seems to travel there (the viewer's usual Hero flight
+/// back to the file manager's thumbnail is switched off for such a close).
+///
 /// The window tells [PictureInPictureCoordinator] where its video is, so that
 /// when the app is left, Android animates *that* rectangle into the PiP window
 /// (the video shrinking and moving into place, still playing) instead of
@@ -27,14 +33,22 @@ import 'package:vaultexplorer/features/browser/viewer/pip/picture_in_picture_coo
 /// why there are no tooltips here (a tooltip needs an `Overlay`, which lives
 /// below this widget): the buttons carry semantic labels instead.
 class FloatingVideoPlayer extends StatefulWidget {
-  final BackgroundPlaybackSession session;
+  /// Whose video this shows: the viewer's own player while the viewer is still
+  /// closing, the session's afterwards (it is the same object).
+  final VideoPlaybackManager playbackManager;
+
+  /// Where the video was on screen when the viewer started closing. Given, the
+  /// window takes off from there and flies to its corner, instead of simply
+  /// appearing in it. Only read when the window is created.
+  final Rect? flyFrom;
 
   /// Reopens the full viewer on the running session.
   final VoidCallback onExpand;
 
   const FloatingVideoPlayer({
     super.key,
-    required this.session,
+    required this.playbackManager,
+    this.flyFrom,
     required this.onExpand,
   });
 
@@ -44,11 +58,12 @@ class FloatingVideoPlayer extends StatefulWidget {
 
 class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
   static const double _margin = 12;
+  static const double _cornerRadius = 14;
 
   /// The bottom corners rest this far above the bottom edge, clear of the
   /// floating action buttons and bars the screens underneath usually have.
   static const double _bottomLift = 72;
-  static const Duration _snapDuration = Duration(milliseconds: 240);
+  static const Duration _snapDuration = Duration(milliseconds: 280);
   static const Duration _controlsTimeout = Duration(seconds: 3);
 
   // Which corner the window rests in; kept across items and across the app
@@ -62,10 +77,25 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
   bool _controlsVisible = true;
   Timer? _hideTimer;
 
+  /// Where the window sits for its first frame when it flies in from the
+  /// viewer; null once it has set off (or when it simply appears).
+  Rect? _flightFrom;
+
   @override
   void initState() {
     super.initState();
-    _scheduleHide();
+    _flightFrom = widget.flyFrom;
+    if (_flightFrom != null) {
+      // A clean picture while it travels; a tap brings the controls up.
+      _controlsVisible = false;
+      // The first frame is drawn at the starting rectangle; the next one asks
+      // for the corner, and the window animates there.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _flightFrom = null);
+      });
+    } else {
+      _scheduleHide();
+    }
   }
 
   @override
@@ -78,7 +108,7 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
     _hideTimer?.cancel();
     _hideTimer = Timer(_controlsTimeout, () {
       if (!mounted || !_controlsVisible) return;
-      final controller = widget.session.playbackManager.activeController;
+      final controller = widget.playbackManager.activeController;
       final playing =
           controller != null &&
           !controller.isDisposed &&
@@ -172,8 +202,7 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
       builder: (context, constraints) {
         final screen = constraints.biggest;
         return ValueListenableBuilder<NativeVideoController?>(
-          valueListenable:
-              widget.session.playbackManager.activeControllerNotifier,
+          valueListenable: widget.playbackManager.activeControllerNotifier,
           builder: (context, controller, _) {
             if (controller == null || controller.isDisposed) {
               return const SizedBox.shrink();
@@ -222,19 +251,28 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
     final restX = _atRight ? maxX : minX;
     final restY = _atBottom ? math.max(minY, maxY - _bottomLift) : minY;
     final dragging = _dragTopLeft;
-    final left = dragging == null
+    final flight = _flightFrom;
+    var left = dragging == null
         ? restX
         : dragging.dx.clamp(minX, maxX).toDouble();
-    final top = dragging == null
+    var top = dragging == null
         ? restY
         : dragging.dy.clamp(minY, maxY).toDouble();
+    // First frame of a flight: exactly where the viewer's video is, at its
+    // size; the frame after, the corner.
+    if (flight != null) {
+      left = flight.left;
+      top = flight.top;
+      width = flight.width;
+      height = flight.height;
+    }
 
     final showControls = _controlsVisible || !value.isPlaying;
     final windowSize = Size(width, height);
 
     // While a finger moves the window nothing is settled; the position it is
     // let go in is reported then.
-    if (dragging == null) {
+    if (dragging == null && flight == null) {
       _reportVideoRect(
         context,
         Rect.fromLTWH(left, top, width, height),
@@ -247,17 +285,24 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
       children: [
         AnimatedPositioned(
           duration: dragging == null ? _snapDuration : Duration.zero,
-          curve: Curves.easeOutCubic,
+          curve: Curves.easeInOutCubic,
           left: left,
           top: top,
           width: width,
           height: height,
-          child: Material(
-            color: Colors.black,
-            elevation: 10,
-            shadowColor: Colors.black,
-            borderRadius: BorderRadius.circular(14),
-            clipBehavior: Clip.antiAlias,
+          // Square while it is still the full video, rounding as it shrinks.
+          child: TweenAnimationBuilder<double>(
+            tween: Tween<double>(end: flight != null ? 0.0 : _cornerRadius),
+            duration: _snapDuration,
+            curve: Curves.easeInOutCubic,
+            builder: (context, radius, child) => Material(
+              color: Colors.black,
+              elevation: 10,
+              shadowColor: Colors.black,
+              borderRadius: BorderRadius.circular(radius),
+              clipBehavior: Clip.antiAlias,
+              child: child,
+            ),
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: _toggleControls,

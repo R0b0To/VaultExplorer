@@ -89,8 +89,9 @@ class BackgroundPlaybackSession {
 ///  * audio, when "keep audio playing after closing" is on: the same native
 ///    player and media notification carry on with no screen of their own --
 ///    the notification's Previous / Next / Stop are the controls;
-///  * video in the picture-in-picture window (the viewer's button): the
-///    window shows the video while the app is free to be used;
+///  * video in a separate picture-in-picture window (the fallback of the
+///    viewer's button, for when the app itself cannot enter PiP): the window
+///    shows the video while the app is free to be used;
 ///  * video in the in-app floating player (closing the viewer while a video
 ///    plays, with "floating video player" on): a small draggable window over
 ///    the app, which becomes the system picture-in-picture window when the

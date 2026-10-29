@@ -689,12 +689,16 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
 
   bool _enteringPictureInPicture = false;
 
-  /// The viewer's picture-in-picture button: floats the playing video in
-  /// Android's PiP window and closes the viewer, so the person is back in the
-  /// file manager (or wherever they opened the video from) with the video
-  /// still playing on top. The live player goes to [BackgroundPlaybackHost],
-  /// which keeps it going and answers the window being tapped (reopen the
-  /// viewer) or dismissed (stop).
+  /// The viewer's picture-in-picture button: the app itself becomes Android's
+  /// PiP window around the video that is playing, with the viewer left open
+  /// underneath (tapping the window brings the app back to it; dismissing it
+  /// pauses the video). Nothing is handed to another window, which is what
+  /// keeps the transition continuous.
+  ///
+  /// Only if the system refuses that does it fall back to the older way: a
+  /// separate window activity takes the video, the viewer closes, and the live
+  /// player goes to [BackgroundPlaybackHost], which keeps it going and answers
+  /// the window being tapped (reopen the viewer) or dismissed (stop).
   Future<void> _enterPictureInPictureWindow() async {
     if (widget._isPreviewOnly ||
         _enteringPictureInPicture ||
@@ -715,6 +719,16 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     if (ref.read(mediaViewerLockProvider(widget.container.volId))) return;
 
     _enteringPictureInPicture = true;
+    // First choice: the app itself becomes the window. It is the activity that
+    // is already playing this video, so nothing is handed over and the video
+    // carries on without a hitch (that is what looks like one continuous
+    // movement into the corner, as in YouTube). The viewer stays open
+    // underneath; tapping the window brings the app back to it.
+    if (await PictureInPictureCoordinator.instance.enterNow(this)) {
+      _enteringPictureInPicture = false;
+      return;
+    }
+    // Fallback, if the system would not do that: a separate window activity.
     final ratio = pictureInPictureRatio(value.aspectRatio);
     final lockController = ref.read(sessionLockControllerProvider);
     bool entered = false;
@@ -1109,9 +1123,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   }
 
   /// Offers the video on screen to Android's picture-in-picture window (the
-  /// viewer's button enters it; the "automatic" setting enters it on leaving
-  /// the app), or withdraws it for anything that isn't a video. Idempotent:
-  /// the coordinator ignores repeats.
+  /// viewer's button enters it right away through the coordinator; the
+  /// "automatic" setting enters it on leaving the app), or withdraws it for
+  /// anything that isn't a video. Idempotent: the coordinator ignores repeats.
   void _syncPictureInPicture() {
     if (!mounted) return;
     final coordinator = PictureInPictureCoordinator.instance;
@@ -3283,6 +3297,18 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
               rotationQuarterTurns: _rotations[fileName] ?? 0,
               adjustments: _adjustmentsFor(fileName),
               videoAspectRatioMode: _videoAspectRatioMode,
+              // Only the video that is showing says where it is: the PiP
+              // transition animates from that rectangle.
+              onVideoRectChanged:
+                  !isAudio && fileName == _playlistController.currentFile
+                  ? (rect, devicePixelRatio) => PictureInPictureCoordinator
+                        .instance
+                        .setSourceRect(
+                          this,
+                          rect,
+                          devicePixelRatio: devicePixelRatio,
+                        )
+                  : null,
               isMuted: _isMuted,
               onMuteChanged: (muted) {
                 if (_isMuted != muted) {

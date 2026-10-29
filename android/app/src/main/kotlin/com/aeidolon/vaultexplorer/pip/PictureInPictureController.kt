@@ -6,27 +6,31 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.graphics.Rect
 import android.os.Build
 import android.os.PowerManager
 import android.util.Rational
 import android.view.SurfaceView
+import android.view.View
 import androidx.core.content.ContextCompat
 import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.VeLog
 import com.aeidolon.vaultexplorer.engine.VaultPlaybackSession
 import io.flutter.plugin.common.BinaryMessenger
+import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import kotlin.math.roundToInt
 
 /**
  * System picture-in-picture for video. Two ways in, both decided by Dart:
  *
- *  1. **PiP window** (the viewer's picture-in-picture button): `startWindow`
- *     launches [PictureInPictureActivity], which takes over the video output
- *     and shrinks into Android's PiP window by itself. The app stays where
- *     the person leaves it (the viewer closes, and they are back in the file
- *     manager) while the video floats on top. The window reports back with
- *     `windowEvent` (`entered`, `expanded`, `closed`, `audioOnly`, `failed`); Dart ends it
- *     with `closeWindow` and follows the video's shape with `setWindowRatio`.
+ *  1. **PiP window** (a fallback, for when the app itself cannot enter PiP):
+ *     `startWindow` launches [PictureInPictureActivity], which takes over the
+ *     video output and shrinks into Android's PiP window by itself. The app
+ *     stays where the person leaves it while the video floats on top. The
+ *     window reports back with `windowEvent` (`entered`, `expanded`,
+ *     `closed`, `audioOnly`, `failed`); Dart ends it with `closeWindow` and
+ *     follows the video's shape with `setWindowRatio`.
  *
  *  2. **Automatic** ("automatic picture-in-picture"): the whole activity
  *     becomes the PiP window when the app is left. Dart calls `setState` with
@@ -39,6 +43,13 @@ import io.flutter.plugin.common.MethodChannel
  *     While that window is up, Dart replaces the app with just the video (see
  *     `PictureInPictureLayer`), reporting `modeChanged` / `dismissed`.
  *
+ * The viewer's PiP button uses this second way too (`enterNow`), not the
+ * separate window: a second window is a second surface and a second activity
+ * starting up, so the video visibly re-opens. Putting the same activity into
+ * PiP, with a source rect hint (where the video was on screen), is what makes
+ * the transition continuous. The viewer simply stays open underneath, and
+ * tapping the window brings the app back to it.
+ *
  * Both windows carry the buttons built by [PictureInPictureActions]: previous /
  * play-pause / next, and **audio only**. Audio only closes the video window and
  * leaves the sound playing from the media notification (the player and its
@@ -50,6 +61,19 @@ class PictureInPictureController(private val activity: MainActivity) {
     private var channel: MethodChannel? = null
     private var armed = false
     private var aspect: Rational = Rational(16, 9)
+
+    /**
+     * Where the video is on screen, in the Flutter view's own pixels, as last
+     * reported by Dart (null: not known). It becomes the PiP source rect hint.
+     */
+    private var sourceRect: Rect? = null
+
+    /**
+     * The hint last worked out against the full-size window. Inside the window
+     * it is kept as it was: Android reuses it for the way back out, and the
+     * (now tiny) window would only clip it.
+     */
+    private var sourceHint: Rect? = null
 
     /** True while the activity is shown in the PiP window (automatic mode). */
     var isActive = false
@@ -105,8 +129,18 @@ class PictureInPictureController(private val activity: MainActivity) {
                     val height = (call.argument<Number>("height") ?: 9).toInt()
                     armed = (call.argument<Boolean>("armed") ?: false) && supported
                     aspect = clampedRatio(width, height)
+                    // Inside the window the layout is the PiP one, not the
+                    // app's: whatever it measures is not where the video was.
+                    if (!isActive) sourceRect = rectArgument(call)
                     applyParams()
                     result.success(true)
+                }
+                "enterNow" -> {
+                    val width = (call.argument<Number>("width") ?: 16).toInt()
+                    val height = (call.argument<Number>("height") ?: 9).toInt()
+                    aspect = clampedRatio(width, height)
+                    if (!isActive) sourceRect = rectArgument(call)
+                    result.success(enterNow())
                 }
                 "startWindow" -> {
                     val width = (call.argument<Number>("width") ?: 16).toInt()
@@ -159,6 +193,7 @@ class PictureInPictureController(private val activity: MainActivity) {
     }
 
     fun onModeChanged(active: Boolean) {
+        entering = false
         isActive = active
         if (active) inPipSession = true
         channel?.invokeMethod("modeChanged", mapOf("active" to active))
@@ -198,6 +233,90 @@ class PictureInPictureController(private val activity: MainActivity) {
         if (current !== this) return
         windowActivity?.closeFromApp()
         current = null
+    }
+
+    // --- Entering PiP with the app itself ---
+
+    private fun rectArgument(call: MethodCall): Rect? {
+        val left = call.argument<Number>("left") ?: return null
+        val top = call.argument<Number>("top") ?: return null
+        val right = call.argument<Number>("right") ?: return null
+        val bottom = call.argument<Number>("bottom") ?: return null
+        return Rect(left.toInt(), top.toInt(), right.toInt(), bottom.toInt())
+    }
+
+    /**
+     * The viewer's picture-in-picture button: the app itself becomes the
+     * window, exactly as it does when the app is left with a video playing.
+     * Nothing is handed to a second window or activity, so the video that is
+     * playing just keeps playing, and Android animates from where the video is
+     * on screen (see [sourceRectHint]).
+     */
+    private fun enterNow(): Boolean {
+        if (!supported || activity.isFinishing || activity.isDestroyed) return false
+        if (isActive) return true
+        // Same reason as for the window: no privacy curtain over the video
+        // while the activity pauses on its way into PiP.
+        entering = true
+        return try {
+            val started = activity.enterPictureInPictureMode(buildParams())
+            if (!started) entering = false
+            started
+        } catch (e: IllegalStateException) {
+            entering = false
+            VeLog.w(TAG, e) { "enterPictureInPictureMode refused" }
+            false
+        } catch (e: IllegalArgumentException) {
+            entering = false
+            VeLog.w(TAG, e) { "enterPictureInPictureMode rejected its parameters" }
+            false
+        }
+    }
+
+    /**
+     * The area of the window the video occupies, which Android animates from
+     * (and back into on the way out): without it the whole app window shrinks
+     * into the PiP box and the video only appears once the layout has switched,
+     * which looks like the video opening a second time. The area is made to
+     * match the PiP aspect ratio, as the platform asks.
+     */
+    private fun sourceRectHint(): Rect? {
+        if (isActive) return sourceHint
+        val raw = sourceRect
+        if (raw == null) {
+            sourceHint = null
+            return null
+        }
+        val content = activity.findViewById<View>(android.R.id.content)
+        val decor = activity.window.decorView
+        if (content == null || decor.width <= 0 || decor.height <= 0) return sourceHint
+        // Dart measures from its own view; the hint is in window coordinates.
+        val origin = IntArray(2)
+        content.getLocationInWindow(origin)
+        val rect = Rect(raw)
+        rect.offset(origin[0], origin[1])
+        if (!rect.intersect(0, 0, decor.width, decor.height)) {
+            sourceHint = null
+            return null
+        }
+        sourceHint = fitToAspect(rect, aspect)
+        return sourceHint
+    }
+
+    private fun fitToAspect(rect: Rect, ratio: Rational): Rect? {
+        val width = rect.width()
+        val height = rect.height()
+        val target = ratio.toDouble()
+        if (width <= 0 || height <= 0 || target <= 0.0) return null
+        return if (width.toDouble() / height > target) {
+            val fitted = (height * target).roundToInt().coerceAtLeast(1)
+            val left = rect.left + (width - fitted) / 2
+            Rect(left, rect.top, left + fitted, rect.bottom)
+        } else {
+            val fitted = (width / target).roundToInt().coerceAtLeast(1)
+            val top = rect.top + (height - fitted) / 2
+            Rect(rect.left, top, rect.right, top + fitted)
+        }
     }
 
     // --- Window buttons ---
@@ -293,8 +412,14 @@ class PictureInPictureController(private val activity: MainActivity) {
         val builder = PictureInPictureParams.Builder()
             .setAspectRatio(aspect)
             .setActions(PictureInPictureActions.build(activity))
+        sourceRectHint()?.let { builder.setSourceRectHint(it) }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             builder.setAutoEnterEnabled(armed)
+            // The window shows Flutter UI that re-lays itself out at the new
+            // size, not a bare video surface: Android should cross-fade over
+            // that instead of stretching the old frame (the default is meant
+            // for plain video).
+            builder.setSeamlessResizeEnabled(false)
         }
         return builder.build()
     }

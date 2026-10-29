@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/features/browser/viewer/background_playback/background_playback_host.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
+import 'package:vaultexplorer/features/browser/viewer/pip/picture_in_picture_coordinator.dart';
 
 /// The app's own floating video window: what is left of the viewer when it is
 /// closed (back, or swipe down) while a video plays and "floating video player"
@@ -16,6 +17,11 @@ import 'package:vaultexplorer/features/browser/viewer/native_video_controller.da
 /// it back to a new viewer; closing ends playback. Leaving the app while it plays
 /// turns the app into Android's picture-in-picture window (the host arms that
 /// through `PictureInPictureCoordinator`), so there is no state to carry over.
+///
+/// The window tells [PictureInPictureCoordinator] where its video is, so that
+/// when the app is left, Android animates *that* rectangle into the PiP window
+/// (the video shrinking and moving into place, still playing) instead of
+/// shrinking the whole app.
 ///
 /// Mounted by [PictureInPictureLayer], above the whole navigator. That is also
 /// why there are no tooltips here (a tooltip needs an `Overlay`, which lives
@@ -99,6 +105,45 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
 
   void _close() {
     unawaited(BackgroundPlaybackHost.instance.closeAndWait());
+  }
+
+  /// Tells the PiP coordinator where the video is (not the window: the bars
+  /// around a video that does not fit the window's shape are not part of it).
+  /// Reported after every layout, not only when it changes: the coordinator
+  /// forgets the rectangle whenever the next item rebinds, and ignores a
+  /// value it already has.
+  void _reportVideoRect(BuildContext context, Rect window, double ratio) {
+    final video = _fitVideo(window, ratio);
+    final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      PictureInPictureCoordinator.instance.setSourceRect(
+        BackgroundPlaybackHost.instance,
+        video,
+        devicePixelRatio: devicePixelRatio,
+      );
+    });
+  }
+
+  static Rect _fitVideo(Rect window, double ratio) {
+    final windowRatio = window.width / window.height;
+    if ((windowRatio - ratio).abs() < 0.001) return window;
+    if (ratio > windowRatio) {
+      final height = window.width / ratio;
+      return Rect.fromLTWH(
+        window.left,
+        window.top + (window.height - height) / 2,
+        window.width,
+        height,
+      );
+    }
+    final width = window.height * ratio;
+    return Rect.fromLTWH(
+      window.left + (window.width - width) / 2,
+      window.top,
+      width,
+      window.height,
+    );
   }
 
   /// Lets go of the window: it settles in the corner nearest to where it would
@@ -186,6 +231,16 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
 
     final showControls = _controlsVisible || !value.isPlaying;
     final windowSize = Size(width, height);
+
+    // While a finger moves the window nothing is settled; the position it is
+    // let go in is reported then.
+    if (dragging == null) {
+      _reportVideoRect(
+        context,
+        Rect.fromLTWH(left, top, width, height),
+        value.aspectRatio,
+      );
+    }
 
     return Stack(
       clipBehavior: Clip.none,

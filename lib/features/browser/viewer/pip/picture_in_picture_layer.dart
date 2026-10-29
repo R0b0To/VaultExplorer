@@ -12,14 +12,15 @@ import 'package:vaultexplorer/features/browser/viewer/pip/picture_in_picture_coo
 /// Wraps the whole app (put it outermost in `MaterialApp.builder`) and owns the
 /// app-level pieces of picture-in-picture and the floating player:
 ///
-///  * While Android's PiP window is the *app itself* (the "automatic
-///    picture-in-picture" mode, entered when the app is left), the app is
+///  * While Android's PiP window is the *app itself* (entered when the app is
+///    left with the floating player or the "automatic picture-in-picture"
+///    setting, or right away with the viewer's button), the app is
 ///    hidden and only the playing video is shown, so the small window isn't a
 ///    squashed copy of whatever screen the person was on. The app stays
 ///    mounted underneath ([Offstage]), so nothing is rebuilt or reset when
 ///    they return to the full screen.
-///  * When the person taps the separate PiP window (the viewer's button) to go
-///    back to full screen, the media viewer is reopened on the video it was
+///  * When the person taps the separate PiP window (the fallback of the
+///    viewer's button) to go back to full screen, the media viewer is reopened on the video it was
 ///    playing, taking the running player back.
 ///  * The in-app floating player ([FloatingVideoPlayer]) is drawn here, above
 ///    the navigator, while [BackgroundPlaybackHost] has a floating session.

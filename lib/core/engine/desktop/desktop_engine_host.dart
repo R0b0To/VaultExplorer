@@ -22,19 +22,43 @@ import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';
 
+import 'desktop_secure_store.dart';
+import 'desktop_transfers.dart';
 import 'engine_worker_pool.dart';
 import 've_native.dart';
 
+/// What the app is told about an active session (Android keeps this in ContainerSessionRegistry).
+class _SessionMeta {
+  _SessionMeta({required this.displayName, required this.format, required this.readOnly});
+  String displayName;
+  final String format;
+  final bool readOnly;
+}
+
 class DesktopEngineHost {
-  DesktopEngineHost({required this.pool, required this.emit});
+  DesktopEngineHost({required this.pool, required this.emit, DesktopSecureStore? secureStore})
+      : secureStore = secureStore ?? DesktopSecureStore();
 
   final EngineWorkerPool pool;
+
+  /// Backs readSecure / writeSecure / ... (the OS keyring; see desktop_secure_store.dart).
+  final DesktopSecureStore secureStore;
 
   /// Pushes a native->Dart call (e.g. `onUnlockProgress`) to the Dart side of the channel.
   final void Function(String method, Object? arguments) emit;
 
+  /// Import / export between the host filesystem and a vault (see desktop_transfers.dart).
+  late final DesktopTransfers _transfers = DesktopTransfers(
+    pool: pool,
+    volFor: _vol,
+    emit: emit,
+    native: () => _nativeLocal,
+    withActivity: (body) => _withActivity<Object?>(body),
+  );
+
   final Map<String, int> _volByUri = {};
   final Map<int, String> _uriByVol = {};
+  final Map<int, _SessionMeta> _meta = {};
   final Set<String> _warned = {};
   int? _maxVolumes;
 
@@ -78,6 +102,19 @@ class DesktopEngineHost {
     'beginBatchDelete': true,
     'endBatchDelete': true,
     'detectsAsPlainDiskImage': false,
+    // Cached derived keys and biometric sentinel keys are Android Keystore features; on desktop
+    // there is never one to clear, which is the success case of these idempotent calls.
+    'clearDerivedKey': true,
+    'clearCopyState': null,
+    // Android window/OS integration with no desktop equivalent (or nothing to do): quiet no-ops.
+    'setSecureScreen': null,
+    'setRecentsSnapshotBlocked': null,
+    'setDebugLogging': null,
+    'checkPendingShareRequest': null,
+    'checkPendingQuickCaptureRequest': null,
+    'notifyResumedFramePainted': null,
+    'warmContainer': null,
+    'biometricKeyDelete': true,
   };
 
   Future<Object?> handle(MethodCall call) async {
@@ -90,6 +127,89 @@ class DesktopEngineHost {
         return _pickFiles();
       case ChannelMethods.createContainer:
         return _createContainer(args);
+      case ChannelMethods.documentExists:
+        {
+          final path = args['filePath'] as String?;
+          return path != null && await File(path).exists();
+        }
+      case ChannelMethods.getVaultInfo:
+        {
+          final r = await pool.call('vaultInfo', [_vol(args['filePath'])]) as List<Object?>;
+          final rc = r[0] as int;
+          if (rc != veOk) {
+            _throwFor(rc);
+            return null;
+          }
+          return r[1];
+        }
+
+      // ── secret store (OS keyring) ──
+      case ChannelMethods.readSecure:
+        return secureStore.read(args['key'] as String);
+      case ChannelMethods.writeSecure:
+        {
+          final key = args['key'] as String;
+          final value = args['value'] as String?;
+          return value == null ? secureStore.delete(key) : secureStore.write(key, value);
+        }
+      case ChannelMethods.deleteSecure:
+        return secureStore.delete(args['key'] as String);
+      case ChannelMethods.deleteAllSecure:
+        return secureStore.deleteAll();
+      case ChannelMethods.readAllSecure:
+        return secureStore.readAll(
+          prefixes: (args['prefixes'] as List<Object?>?)?.cast<String>(),
+          excludePrefixes: (args['excludePrefixes'] as List<Object?>?)?.cast<String>(),
+        );
+      case ChannelMethods.containsKeySecure:
+        return secureStore.containsKey(args['key'] as String);
+
+      // ── import / export ──
+      case ChannelMethods.pickImportFiles:
+        return _transfers.pickImportFiles(args);
+      case ChannelMethods.pickImportFolder:
+        return _transfers.pickImportFolder(args);
+      case ChannelMethods.cancelPickedImport:
+        _transfers.cancelPickedImport(args['pickToken']);
+        return null;
+      case ChannelMethods.importFile:
+      case ChannelMethods.importFolder:
+        return _transfers.importPicked(args);
+      case ChannelMethods.cancelImport:
+        _transfers.cancel((args['opId'] as num?)?.toInt() ?? 0);
+        return true;
+      case ChannelMethods.cancelExport:
+        _transfers.cancel((args['opId'] as num?)?.toInt() ?? 0);
+        return null;
+      case ChannelMethods.deleteImportSources:
+        return _transfers.deleteImportSources((args['opId'] as num?)?.toInt() ?? 0);
+      case ChannelMethods.clearImportSources:
+        _transfers.clearImportSources((args['opId'] as num?)?.toInt() ?? 0);
+        return true;
+      case ChannelMethods.exportFilesToFolder:
+        return _transfers.exportToFolder(args);
+      case ChannelMethods.exportFileToStorage:
+        return _transfers.exportFileToStorage(args);
+      case ChannelMethods.decryptFile:
+        return _transfers.decryptFile(args);
+
+      case ChannelMethods.getActiveContainerSessions:
+        return _activeSessions();
+      case ChannelMethods.updateContainerSettings:
+        {
+          final vol = _volByUri[args['filePath']];
+          final meta = vol == null ? null : _meta[vol];
+          if (meta == null) return false;
+          meta.displayName = (args['displayName'] as String?) ?? meta.displayName;
+          return true;
+        }
+      case ChannelMethods.getDeviceCapabilityProfile:
+        return _capabilityProfile();
+      case ChannelMethods.getMirrorPushActivity:
+        return {'activeCount': 0}; // no mirror proxy on desktop
+      case ChannelMethods.purgeExpiredDerivedKeys:
+        return <String>[]; // no cached derived keys on desktop
+
       case ChannelMethods.probeContainerFormat:
         return await pool.call('probe', [args['filePath']]) as String;
       case ChannelMethods.unlockContainer:
@@ -323,6 +443,11 @@ class DesktopEngineHost {
       case veOk:
         _volByUri[uri] = vol;
         _uriByVol[vol] = uri;
+        _meta[vol] = _SessionMeta(
+          displayName: (args['displayName'] as String?) ?? p.basename(uri),
+          format: result['format'] as String,
+          readOnly: args['readOnly'] == true,
+        );
         return {
           'volId': vol,
           'files': (result['files'] as List<Object?>).cast<String>(),
@@ -350,9 +475,51 @@ class DesktopEngineHost {
     final vol = _volByUri[uri];
     if (vol == null) return true; // already locked
     await pool.call('lock', [vol]);
-    _volByUri.remove(uri);
-    _uriByVol.remove(vol);
+    _forget(vol);
     return true;
+  }
+
+  // ── sessions ───────────────────────────────────────────────────────────
+
+  void _forget(int vol) {
+    final uri = _uriByVol.remove(vol);
+    if (uri != null) _volByUri.remove(uri);
+    _meta.remove(vol);
+  }
+
+  /// The ground truth the dashboard reconciles against (on start-up and every resume): every session
+  /// that is REALLY active in the engine right now. A session the engine no longer has (wiped, e.g.
+  /// by a panic lock) is dropped here too. Replying `null`/empty makes the app conclude nothing is
+  /// mounted and lock everything -- so this must be accurate.
+  Future<Object?> _activeSessions() async {
+    final sessions = <Map<String, Object?>>[];
+    for (final entry in _uriByVol.entries.toList()) {
+      final vol = entry.key;
+      final r = await pool.call('list', [vol, '']) as List<Object?>;
+      if (r[0] == veErrNotUnlocked) {
+        _forget(vol);
+        continue;
+      }
+      final meta = _meta[vol];
+      sessions.add({
+        'volId': vol,
+        'uri': entry.value,
+        'displayName': meta?.displayName ?? p.basename(entry.value),
+        'containerFormat': meta?.format ?? 'unknown',
+        'readOnly': meta?.readOnly ?? false,
+        'files': (r[1] as List<Object?>).cast<String>(),
+      });
+    }
+    return {'sessions': sessions};
+  }
+
+  /// Same tiering rule as the Android DeviceCapabilityProfiler (cores + memory class), with a fixed
+  /// desktop memory class: it only decides thumbnail concurrency and cache budgets.
+  Map<String, Object?> _capabilityProfile() {
+    final cores = Platform.numberOfProcessors;
+    const memoryClassMb = 512;
+    final tier = cores <= 4 ? 'LOW' : (cores >= 8 ? 'HIGH' : 'MEDIUM');
+    return {'tier': tier, 'cores': cores, 'memoryClassMb': memoryClassMb, 'isLowRamDevice': false};
   }
 
   // ── helpers ────────────────────────────────────────────────────────────
@@ -360,7 +527,9 @@ class DesktopEngineHost {
   int _vol(Object? uri) {
     final vol = _volByUri[uri];
     if (vol == null) {
-      throw PlatformException(code: 'NOT_UNLOCKED', message: 'NOT_UNLOCKED: no unlocked container for $uri');
+      // Same code + message the Android side uses for a path with no mounted session (the Dart
+      // callers test for NOT_MOUNTED, e.g. the vault-info and settings screens).
+      throw PlatformException(code: 'NOT_MOUNTED', message: 'Container not mounted');
     }
     return vol;
   }
@@ -413,8 +582,7 @@ class DesktopEngineHost {
           'slot': e.n0,
         });
       }
-      // Copy / import / export progress events are drained but not forwarded yet: their Dart-side
-      // event names and payloads still need mapping (docs/desktop-port.md, next steps).
+      _transfers.onNativeEvent(e); // copy / import / export byte progress
     }
   }
 
@@ -425,6 +593,7 @@ class DesktopEngineHost {
     }
     _uriByVol.clear();
     _volByUri.clear();
+    _meta.clear();
     await pool.dispose();
   }
 }

@@ -215,6 +215,11 @@ Object? veExecute(VeNative n, String op, List<Object?> a) {
         final (rc, files) = n.listDirectory(a[0] as int, a[1] as String);
         return [rc, files];
       }
+    case 'vaultInfo':
+      {
+        final (rc, map) = n.vaultInfo(a[0] as int);
+        return [rc, map];
+      }
     case 'fileSize':
       return n.fileSize(a[0] as int, a[1] as String);
     case 'folderSize':
@@ -244,26 +249,12 @@ Object? veExecute(VeNative n, String op, List<Object?> a) {
           if (opId > 0) n.opUnregister(opId);
         }
       }
+    // import / export: the CALLER registers the operation id (VeNative.opRegister) for the whole
+    // batch, because one id covers many files and cancellation must outlive a single call.
     case 'import':
-      {
-        final opId = a[3] as int;
-        if (opId > 0) n.opRegister(opId, veOpImport);
-        try {
-          return n.importFile(a[0] as int, a[1] as String, a[2] as String, opId);
-        } finally {
-          if (opId > 0) n.opUnregister(opId);
-        }
-      }
+      return n.importFile(a[0] as int, a[1] as String, a[2] as String, a[3] as int);
     case 'export':
-      {
-        final opId = a[3] as int;
-        if (opId > 0) n.opRegister(opId, veOpExport);
-        try {
-          return n.exportFile(a[0] as int, a[1] as String, a[2] as String, opId);
-        } finally {
-          if (opId > 0) n.opUnregister(opId);
-        }
-      }
+      return n.exportFile(a[0] as int, a[1] as String, a[2] as String, a[3] as int);
     case 'space':
       {
         final (rc, vals) = n.spaceInfo(a[0] as int);

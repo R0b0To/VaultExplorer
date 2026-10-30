@@ -14,7 +14,7 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
-const int kVeAbiVersion = 1;
+const int kVeAbiVersion = 3;
 
 // Result codes (ve_engine.h)
 const int veOk = 0;
@@ -31,6 +31,9 @@ const int veOpCopy = 0;
 const int veOpImport = 1;
 const int veOpExport = 2;
 const int veEventUnlockProgress = 1;
+const int veEventCopyProgress = 4;
+const int veEventImportProgress = 5;
+const int veEventExportProgress = 6;
 
 /// ContainerFormat (native enum) -> the wire name the Dart layer uses.
 String veFormatWireName(int native) => switch (native) {
@@ -157,6 +160,33 @@ final class VeCreateHiddenParams extends Struct {
   external int userEntropyLen;
 }
 
+final class VeVaultInfo extends Struct {
+  @Int32()
+  external int structSize;
+  @Int32()
+  external int containerFormat;
+  @Int32()
+  external int readOnly;
+  @Int32()
+  external int hiddenVolume;
+  @Int64()
+  external int volumeSizeBytes;
+  @Int32()
+  external int hasCipherHash;
+  @Int32()
+  external int cipherId;
+  @Int32()
+  external int hashId;
+  @Int32()
+  external int luksVersion;
+  @Int32()
+  external int sectorSize;
+  @Int32()
+  external int hasFileSystem;
+  @Array(64)
+  external Array<Uint8> fileSystem;
+}
+
 final class VeEvent extends Struct {
   @Int32()
   external int kind;
@@ -210,6 +240,7 @@ class VeNative {
     _format = _lib.lookupFunction<Int32 Function(Int32), int Function(int)>('ve_get_container_format');
     _matchedCipher = _lib.lookupFunction<Int32 Function(Int32), int Function(int)>('ve_get_matched_cipher_id');
     _matchedHash = _lib.lookupFunction<Int32 Function(Int32), int Function(int)>('ve_get_matched_hash_id');
+    _vaultInfo = _lib.lookupFunction<Int32 Function(Int32, Pointer<VeVaultInfo>), int Function(int, Pointer<VeVaultInfo>)>('ve_get_vault_info');
     _bufferFree = _lib.lookupFunction<Void Function(Pointer<VeBuffer>), void Function(Pointer<VeBuffer>)>('ve_buffer_free');
     _list = _lib.lookupFunction<Int32 Function(Int32, Pointer<Utf8>, Pointer<VeBuffer>), int Function(int, Pointer<Utf8>, Pointer<VeBuffer>)>('ve_list_directory');
     _fileSize = _lib.lookupFunction<Int64 Function(Int32, Pointer<Utf8>), int Function(int, Pointer<Utf8>)>('ve_get_file_size');
@@ -245,6 +276,7 @@ class VeNative {
   late final int Function(int) _format;
   late final int Function(int) _matchedCipher;
   late final int Function(int) _matchedHash;
+  late final int Function(int, Pointer<VeVaultInfo>) _vaultInfo;
   late final void Function(Pointer<VeBuffer>) _bufferFree;
   late final int Function(int, Pointer<Utf8>, Pointer<VeBuffer>) _list;
   late final int Function(int, Pointer<Utf8>) _fileSize;
@@ -279,20 +311,33 @@ class VeNative {
   }
 
   static VeNative open([String? explicitPath]) {
-    final errors = <String>[];
+    final problems = <String>[];
     for (final path in [if (explicitPath != null) explicitPath, ...candidatePaths()]) {
+      final DynamicLibrary lib;
       try {
-        final native = VeNative._(DynamicLibrary.open(path));
-        final v = native._abiVersion();
-        if (v != kVeAbiVersion) {
-          throw StateError('engine ABI $v, this app expects $kVeAbiVersion ($path)');
-        }
-        return native;
-      } on Object catch (e) {
-        errors.add('$path: $e');
+        lib = DynamicLibrary.open(path);
+      } on Object {
+        problems.add('$path: not found / not loadable');
+        continue;
       }
+      // Check the ABI version BEFORE binding anything. A stale library (built from older sources)
+      // lacks the newer functions, and the raw "undefined symbol" error says nothing useful.
+      final int version;
+      try {
+        version = lib.lookupFunction<Int32 Function(), int Function()>('ve_abi_version')();
+      } on Object {
+        problems.add('$path: loaded, but it has no ve_abi_version (not a VaultExplorer engine?)');
+        continue;
+      }
+      if (version != kVeAbiVersion) {
+        problems.add('$path: is engine ABI $version but this app needs $kVeAbiVersion. It is out of date: '
+            'rebuild it with scripts/build_desktop_engine.sh, then rebuild the app so the bundle gets the new copy '
+            '(or run with VE_ENGINE_LIBRARY=<path to the fresh .so>).');
+        continue;
+      }
+      return VeNative._(lib);
     }
-    throw StateError('Could not load the VaultExplorer engine library:\n${errors.join('\n')}');
+    throw StateError('Could not load the VaultExplorer engine library:\n${problems.join('\n')}');
   }
 
   int get maxVolumes => _maxVolumes();
@@ -605,6 +650,45 @@ class VeNative {
   int matchedHashId(int volId) => _matchedHash(volId);
 
   // ── filesystem ─────────────────────────────────────────────────────────
+
+  /// The "Vault information" map, with the same keys the Android bridge produces:
+  /// readOnly, volumeSizeBytes, fileSystem?, and per format cipherId/hashId/hiddenVolume (VeraCrypt)
+  /// or luksVersion/cipherId/sectorSize (LUKS). BitLocker only has the first three.
+  (int, Map<String, Object?>?) vaultInfo(int volId) {
+    final p = calloc<VeVaultInfo>();
+    try {
+      p.ref.structSize = sizeOf<VeVaultInfo>();
+      final rc = _vaultInfo(volId, p);
+      if (rc != veOk) return (rc, null);
+      final r = p.ref;
+      final map = <String, Object?>{
+        'readOnly': r.readOnly != 0,
+        'volumeSizeBytes': r.volumeSizeBytes,
+      };
+      if (r.hasFileSystem != 0) {
+        final chars = <int>[];
+        for (var i = 0; i < 64; i++) {
+          final c = r.fileSystem[i];
+          if (c == 0) break;
+          chars.add(c);
+        }
+        map['fileSystem'] = utf8.decode(chars, allowMalformed: true);
+      }
+      switch (r.containerFormat) {
+        case 0:
+          map['cipherId'] = r.cipherId;
+          map['hashId'] = r.hashId;
+          map['hiddenVolume'] = r.hiddenVolume != 0;
+        case 1 || 2:
+          map['luksVersion'] = r.luksVersion;
+          map['cipherId'] = r.cipherId;
+          map['sectorSize'] = r.sectorSize;
+      }
+      return (rc, map);
+    } finally {
+      calloc.free(p);
+    }
+  }
 
   /// (resultCode, entries). Entries are the engine's directory-entry wire strings.
   (int, List<String>) listDirectory(int volId, String path) {

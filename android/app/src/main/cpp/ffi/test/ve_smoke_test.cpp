@@ -185,6 +185,20 @@ static void runFilesystem(const char* fs, int64_t sizeBytes) {
         std::printf("  space: total=%llu free=%llu\n", (unsigned long long)total, (unsigned long long)freeB);
         CHECK(total > 0 && freeB > 0 && freeB <= total);
 
+        ve_vault_info info;
+        std::memset(&info, 0, sizeof(info));
+        info.struct_size = sizeof(info);
+        CHECK_RC(ve_get_vault_info(kVol, &info), VE_OK);
+        std::printf("  info: format=%d size=%lld cipher=%d hash=%d hidden=%d ro=%d fs=%s\n", info.container_format,
+                    (long long)info.volume_size_bytes, info.cipher_id, info.hash_id, info.hidden_volume,
+                    info.read_only, info.has_file_system ? info.file_system : "(none)");
+        CHECK(info.container_format == 0 && info.has_cipher_hash == 1 && info.volume_size_bytes > 0);
+        CHECK(info.read_only == 0 && info.hidden_volume == 0 && info.has_file_system == 1);
+        ve_vault_info bad;
+        std::memset(&bad, 0, sizeof(bad));
+        bad.struct_size = sizeof(bad);
+        CHECK_RC(ve_get_vault_info(7, &bad), VE_ERR_NOT_UNLOCKED);
+
         char label[64] = {0};
         CHECK(ve_get_filesystem_label(kVol, label, sizeof(label)) >= 0);
         std::printf("  fs label: %s\n", label);

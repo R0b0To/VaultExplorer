@@ -580,6 +580,58 @@ extern "C" VE_API int32_t ve_get_filesystem_label(int32_t vol, char* buf, size_t
     VE_CATCH(-VE_ERR_EXCEPTION)
 }
 
+extern "C" VE_API int32_t ve_get_vault_info(int32_t vol, ve_vault_info* out) {
+    if (!out || out->struct_size < static_cast<int32_t>(sizeof(ve_vault_info)) || !validVol(vol)) {
+        return VE_ERR_INVALID_ARG;
+    }
+    VE_TRY
+    if (!requireActiveSession(vol, "getVaultInfo")) return VE_ERR_NOT_UNLOCKED;
+    const int32_t size = out->struct_size;
+    std::memset(out, 0, sizeof(*out));
+    out->struct_size = size;
+
+    // Same sequence as the JNI bridge: crypto/session fields from VolumeState, and a best-effort
+    // mount so the filesystem label is available even if the file browser was never opened.
+    std::string label;
+    {
+        std::unique_lock<std::shared_mutex> fsLock(volumes[vol].mutex);
+        VolumeState& v = volumes[vol];
+        out->container_format = static_cast<int32_t>(v.containerFormat);
+        out->read_only = v.readOnly ? 1 : 0;
+        out->hidden_volume = v.isHiddenVolume ? 1 : 0;
+        out->volume_size_bytes = static_cast<int64_t>(v.dataAreaLengthBytes);
+        out->cipher_id = static_cast<int32_t>(v.matchedCipherId);
+        out->hash_id = static_cast<int32_t>(v.matchedHashId);
+        out->sector_size = static_cast<int32_t>(v.luksSectorSize);
+        if (ensureMounted(vol)) label = fsGetFilesystemLabel(vol);
+    }
+    switch (static_cast<ContainerFormat>(out->container_format)) {
+        case ContainerFormat::kVeraCrypt:
+            out->has_cipher_hash = 1;
+            break;
+        case ContainerFormat::kLuks1:
+        case ContainerFormat::kLuks2:
+            out->has_cipher_hash = 1;
+            out->luks_version = static_cast<ContainerFormat>(out->container_format) == ContainerFormat::kLuks1 ? 1 : 2;
+            break;
+        default:  // BitLocker etc.: only size / read-only / filesystem are known
+            out->cipher_id = 0;
+            out->hash_id = 0;
+            out->sector_size = 0;
+            break;
+    }
+    if (static_cast<ContainerFormat>(out->container_format) != ContainerFormat::kLuks1 &&
+        static_cast<ContainerFormat>(out->container_format) != ContainerFormat::kLuks2) {
+        out->sector_size = 0;
+    }
+    if (!label.empty()) {
+        out->has_file_system = 1;
+        std::strncpy(out->file_system, label.c_str(), sizeof(out->file_system) - 1);
+    }
+    return VE_OK;
+    VE_CATCH(VE_ERR_EXCEPTION)
+}
+
 // ── streams ──────────────────────────────────────────────────────────────
 
 extern "C" VE_API int64_t ve_open_stream(int32_t vol, const char* path) {

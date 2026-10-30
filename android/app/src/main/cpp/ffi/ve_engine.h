@@ -38,7 +38,7 @@ extern "C" {
 #  define VE_API __attribute__((visibility("default")))
 #endif
 
-#define VE_ABI_VERSION 1
+#define VE_ABI_VERSION 3 /* bump whenever a function/struct is added or changed; the Dart side checks it */
 
 /* ---- result codes ------------------------------------------------------- */
 #define VE_OK 0
@@ -200,6 +200,25 @@ VE_API int32_t ve_export_file(int32_t vol_id, const char* vault_path,
 VE_API int32_t ve_get_space_info(int32_t vol_id, uint64_t* total_bytes, uint64_t* free_bytes);
 /* Writes e.g. "FAT32" / "NTFS" / "ext4" into buf; returns its length, or <0. */
 VE_API int32_t ve_get_filesystem_label(int32_t vol_id, char* buf, size_t cap);
+
+/* "Vault information" for an unlocked block container (mirrors NativeEngine.getVaultInfo). Fields
+ * that do not apply to the format are left at their zero value; has_* says which are meaningful. */
+typedef struct ve_vault_info {
+    int32_t struct_size;
+    int32_t container_format;   /* ContainerFormat enum, see ve_get_container_format */
+    int32_t read_only;
+    int32_t hidden_volume;      /* VeraCrypt: this mount is the hidden volume */
+    int64_t volume_size_bytes;
+    int32_t has_cipher_hash;    /* VeraCrypt: cipher_id + hash_id valid; LUKS: cipher_id valid */
+    int32_t cipher_id;
+    int32_t hash_id;
+    int32_t luks_version;       /* 0 when not LUKS */
+    int32_t sector_size;        /* LUKS only, else 0 */
+    int32_t has_file_system;
+    char file_system[64];       /* e.g. "FAT32", "NTFS", "ext4" */
+} ve_vault_info;
+
+VE_API int32_t ve_get_vault_info(int32_t vol_id, ve_vault_info* out);
 
 /* Streaming reads (media playback). handle 0 = failure. Close every handle. */
 VE_API int64_t ve_open_stream(int32_t vol_id, const char* path);

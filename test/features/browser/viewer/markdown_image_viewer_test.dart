@@ -66,10 +66,32 @@ Widget _host(MarkdownImageCache cache, {required bool zoomable}) {
   );
 }
 
+/// Loads the image into [cache], mounts [_host], and lets the native image
+/// decoder finish so [MarkdownImage] transitions past its loading spinner.
+Future<void> _pumpHost(
+  WidgetTester tester,
+  MarkdownImageCache cache, {
+  required bool zoomable,
+}) async {
+  await tester.runAsync(() => cache.loadBytes('/a.png'));
+  await tester.pumpWidget(_host(cache, zoomable: zoomable));
+  final context = tester.element(find.byType(MarkdownImage));
+  await tester.runAsync(
+    () => precacheImage(
+      ResizeImage.resizeIfNeeded(
+        MarkdownImageViewer.previewDecodeWidth(context),
+        null,
+        MemoryImage(_png4x2),
+      ),
+      context,
+    ),
+  );
+  await tester.pump();
+}
+
 /// Loads the image into [cache], shows the preview and opens the viewer.
 Future<void> _openViewer(WidgetTester tester, MarkdownImageCache cache) async {
-  await tester.runAsync(() => cache.loadBytes('/a.png'));
-  await tester.pumpWidget(_host(cache, zoomable: true));
+  await _pumpHost(tester, cache, zoomable: true);
   await tester.tap(find.byType(MarkdownImage));
   await tester.pumpAndSettle();
   expect(find.byType(MarkdownImageViewer), findsOneWidget);
@@ -107,13 +129,12 @@ void main() {
     expect(find.byType(MarkdownImageViewer), findsNothing);
   });
 
-  testWidgets('an image that is not zoomable ignores taps', (tester) async {
+   testWidgets('an image that is not zoomable ignores taps', (tester) async {
     final cache = _cache();
     addTearDown(cache.dispose);
-    await tester.runAsync(() => cache.loadBytes('/a.png'));
+    await _pumpHost(tester, cache, zoomable: false);
 
-    await tester.pumpWidget(_host(cache, zoomable: false));
-    await tester.tap(find.byType(MarkdownImage));
+    await tester.tap(find.byType(MarkdownImage), warnIfMissed: false);
     await tester.pumpAndSettle();
 
     expect(find.byType(MarkdownImageViewer), findsNothing);

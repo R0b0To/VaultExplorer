@@ -131,6 +131,11 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
   bool _hasPendingRebuild = false;
   int? _anchorItemIndex;
 
+  /// The scroll offset this view was opened at (going back to a folder),
+  /// until it has been reached. See [_restoreInitialScrollOffset].
+  double? _pendingInitialOffset;
+  int _initialOffsetAttemptsLeft = 0;
+
   // Animation controller for smooth column transition morph
   late final AnimationController _morphController;
   late Animation<double> _scaleAnimation;
@@ -142,6 +147,7 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
     _columnCount = widget.initialColumns;
     _prewarmMemoryCache();
     _preloadDiskAspectRatios();
+    _scheduleInitialScrollOffsetRestore();
 
     _morphController = AnimationController(
       vsync: this,
@@ -155,6 +161,48 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
   void dispose() {
     _morphController.dispose();
     super.dispose();
+  }
+
+  /// A masonry grid with more than one column cannot start its first layout
+  /// away from the top: `SliverMasonryGrid` (flutter_staggered_grid_view
+  /// 0.7.0) only knows where a child goes once every child before it has been
+  /// placed, so it corrects an initial offset down to its cache extent
+  /// (letsar/flutter_staggered_grid_view#346). Going back to a folder opens
+  /// it with a controller whose `initialScrollOffset` is where the folder was
+  /// left, so that offset is applied again with `jumpTo` once the grid has
+  /// laid out from the top.
+  void _scheduleInitialScrollOffsetRestore() {
+    final controller = widget.scrollController;
+    if (controller == null || controller.hasClients) return;
+    final target = controller.initialScrollOffset;
+    if (target <= 0) return;
+    _pendingInitialOffset = target;
+    _initialOffsetAttemptsLeft = 10;
+    WidgetsBinding.instance.addPostFrameCallback(_restoreInitialScrollOffset);
+  }
+
+  void _restoreInitialScrollOffset(Duration _) {
+    final target = _pendingInitialOffset;
+    final controller = widget.scrollController;
+    if (!mounted || target == null || controller == null) {
+      _pendingInitialOffset = null;
+      return;
+    }
+    var reached = false;
+    if (controller.hasClients && controller.position.hasContentDimensions) {
+      final position = controller.position;
+      // Past the children laid out so far the extent is only an estimate, so
+      // a target beyond it is approached over the next frames.
+      final clamped = math.min(target, position.maxScrollExtent);
+      if ((position.pixels - clamped).abs() > 0.5) controller.jumpTo(clamped);
+      reached = (target - clamped).abs() <= 0.5;
+    }
+    if (reached || --_initialOffsetAttemptsLeft <= 0) {
+      _pendingInitialOffset = null;
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback(_restoreInitialScrollOffset);
+    WidgetsBinding.instance.scheduleFrame();
   }
 
   @override

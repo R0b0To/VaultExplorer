@@ -588,7 +588,7 @@ ThemeData _buildTheme(
       ),
     ),
     cardTheme: CardThemeData(
-      color: cs.surfaceContainerLow,
+      color: tk(SkinToken.surfacePanel),
       elevation: 0,
       shadowColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,
@@ -615,11 +615,11 @@ ThemeData _buildTheme(
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppRadius.md),
-        borderSide: BorderSide(color: cs.error, width: 1.5),
+        borderSide: BorderSide(color: tk(SkinToken.statusDanger), width: 1.5),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppRadius.md),
-        borderSide: BorderSide(color: cs.error, width: 2),
+        borderSide: BorderSide(color: tk(SkinToken.statusDanger), width: 2),
       ),
       labelStyle: TextStyle(color: tk(SkinToken.contentSecondary), fontSize: 16),
       floatingLabelStyle: TextStyle(
@@ -786,9 +786,9 @@ ThemeData _buildTheme(
     navigationBarTheme: NavigationBarThemeData(
       height: 80,
       elevation: 0,
-      backgroundColor: cs.surfaceContainer,
+      backgroundColor: tk(SkinToken.chromeBar),
       surfaceTintColor: Colors.transparent,
-      indicatorColor: cs.secondaryContainer,
+      indicatorColor: tk(SkinToken.choiceSelected),
       indicatorShape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadius.full),
       ),

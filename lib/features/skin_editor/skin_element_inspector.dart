@@ -6,6 +6,7 @@ import 'package:re_editor/re_editor.dart' show CodeTextColorProbe;
 import 'package:vaultexplorer/core/theme/file_manager_skin_scope.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
+import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart';
 import 'package:vaultexplorer/data/models/custom_app_skin.dart';
 import 'package:vaultexplorer/data/models/file_manager_skin.dart';
 import 'package:vaultexplorer/features/browser/widgets/grid_card_shell.dart';
@@ -265,6 +266,14 @@ const _textOrder = [
   SkinToken.overlayOnSheet,
   SkinToken.floatingOnToast,
   SkinToken.floatingOnTooltip,
+  SkinToken.accentPrimary,
+  SkinToken.accentSecondary,
+  SkinToken.accentTertiary,
+  SkinToken.accentOnTertiaryContainer,
+  SkinToken.statusDanger,
+  SkinToken.statusOnDanger,
+  SkinToken.statusOnDangerContainer,
+  SkinToken.statusOnInfo,
 ];
 const _fillOrder = [
   SkinToken.surfaceCard,
@@ -286,6 +295,11 @@ const _fillOrder = [
   SkinToken.floatingFab,
   SkinToken.floatingToast,
   SkinToken.floatingTooltip,
+  SkinToken.surfacePanel,
+  SkinToken.chromeBar,
+  SkinToken.accentTertiaryContainer,
+  SkinToken.statusDangerContainer,
+  SkinToken.statusInfo,
 ];
 const _lineOrder = [
   SkinToken.borderDivider,
@@ -362,6 +376,15 @@ Set<SkinToken> _ancestorHints(Element element) {
       hints.addAll(const {SkinToken.overlaySheet, SkinToken.overlayOnSheet});
     } else if (widget is PopupMenuButton || widget is MenuAnchor) {
       hints.addAll(const {SkinToken.overlayMenu, SkinToken.overlayOnMenu});
+    } else if (widget is Card) {
+      hints.add(SkinToken.surfacePanel);
+    } else if (widget is NavigationBar || widget is BottomAppBar) {
+      hints.add(SkinToken.chromeBar);
+    } else if (widget is InlineBanner) {
+      hints.addAll(const {
+        SkinToken.statusInfo,
+        SkinToken.statusDangerContainer,
+      });
     } else if (widget is Tooltip) {
       hints.addAll(const {
         SkinToken.floatingTooltip,

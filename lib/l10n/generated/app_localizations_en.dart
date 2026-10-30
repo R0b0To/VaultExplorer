@@ -12848,4 +12848,97 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get skinTokenFloatingOnTooltipHint => 'Text in tooltips.';
+
+  @override
+  String get skinTokenGroupAccent => 'Accent colors';
+
+  @override
+  String get skinTokenGroupStatus => 'Status and errors';
+
+  @override
+  String get skinTokenSurfacePanel => 'Panels';
+
+  @override
+  String get skinTokenSurfacePanelHint =>
+      'Cards made from the standard card widget, bookmark bar, grid cells and info sheets.';
+
+  @override
+  String get skinTokenChromeBar => 'Bars and tab strips';
+
+  @override
+  String get skinTokenChromeBarHint =>
+      'Action bars, tab strips, selection bar and bottom bars.';
+
+  @override
+  String get skinTokenAccentPrimary => 'Accent';
+
+  @override
+  String get skinTokenAccentPrimaryHint =>
+      'Highlights, links in text, small accent icons and badges.';
+
+  @override
+  String get skinTokenAccentSecondary => 'Secondary accent';
+
+  @override
+  String get skinTokenAccentSecondaryHint => 'Secondary highlights and tags.';
+
+  @override
+  String get skinTokenAccentTertiary => 'Tertiary accent';
+
+  @override
+  String get skinTokenAccentTertiaryHint => 'Tertiary highlights and tags.';
+
+  @override
+  String get skinTokenAccentTertiaryContainer => 'Tertiary accent fill';
+
+  @override
+  String get skinTokenAccentTertiaryContainerHint =>
+      'Fill behind tertiary highlights.';
+
+  @override
+  String get skinTokenAccentOnTertiaryContainer => 'Tertiary accent fill text';
+
+  @override
+  String get skinTokenAccentOnTertiaryContainerHint =>
+      'Text and icons on the tertiary fill.';
+
+  @override
+  String get skinTokenStatusDanger => 'Errors and delete';
+
+  @override
+  String get skinTokenStatusDangerHint =>
+      'Error text, delete actions and error borders.';
+
+  @override
+  String get skinTokenStatusOnDanger => 'Text on error color';
+
+  @override
+  String get skinTokenStatusOnDangerHint =>
+      'Text and icons drawn on the error color.';
+
+  @override
+  String get skinTokenStatusDangerContainer => 'Error message fill';
+
+  @override
+  String get skinTokenStatusDangerContainerHint =>
+      'Fill of error messages and banners.';
+
+  @override
+  String get skinTokenStatusOnDangerContainer => 'Error message text';
+
+  @override
+  String get skinTokenStatusOnDangerContainerHint =>
+      'Text and icons in error messages.';
+
+  @override
+  String get skinTokenStatusInfo => 'Info message fill';
+
+  @override
+  String get skinTokenStatusInfoHint => 'Fill of info banners.';
+
+  @override
+  String get skinTokenStatusOnInfo => 'Info message text';
+
+  @override
+  String get skinTokenStatusOnInfoHint => 'Text and icons in info banners.';
 }

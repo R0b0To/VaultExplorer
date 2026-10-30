@@ -12123,4 +12123,88 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get skinTokenFloatingOnTooltipHint => '工具提示中的文本。';
+
+  @override
+  String get skinTokenGroupAccent => '强调色';
+
+  @override
+  String get skinTokenGroupStatus => '状态与错误';
+
+  @override
+  String get skinTokenSurfacePanel => '面板';
+
+  @override
+  String get skinTokenSurfacePanelHint => '由标准卡片小部件制成的卡片、书签栏、网格单元格和信息表。';
+
+  @override
+  String get skinTokenChromeBar => '栏与标签条';
+
+  @override
+  String get skinTokenChromeBarHint => '操作栏、标签条、选择栏和底部栏。';
+
+  @override
+  String get skinTokenAccentPrimary => '强调';
+
+  @override
+  String get skinTokenAccentPrimaryHint => '高亮、文本中的链接、微型强调图标和角标。';
+
+  @override
+  String get skinTokenAccentSecondary => '次要强调';
+
+  @override
+  String get skinTokenAccentSecondaryHint => '次要高亮和标签。';
+
+  @override
+  String get skinTokenAccentTertiary => '三级强调';
+
+  @override
+  String get skinTokenAccentTertiaryHint => '三级高亮和标签。';
+
+  @override
+  String get skinTokenAccentTertiaryContainer => '三级强调填充';
+
+  @override
+  String get skinTokenAccentTertiaryContainerHint => '三级高亮背后的填充色。';
+
+  @override
+  String get skinTokenAccentOnTertiaryContainer => '三级强调填充文本';
+
+  @override
+  String get skinTokenAccentOnTertiaryContainerHint => '三级填充上的文本与图标。';
+
+  @override
+  String get skinTokenStatusDanger => '错误与删除';
+
+  @override
+  String get skinTokenStatusDangerHint => '错误文本、删除操作和错误边框。';
+
+  @override
+  String get skinTokenStatusOnDanger => '错误颜色上的文本';
+
+  @override
+  String get skinTokenStatusOnDangerHint => '在错误颜色上绘制的文本与图标。';
+
+  @override
+  String get skinTokenStatusDangerContainer => '错误信息填充';
+
+  @override
+  String get skinTokenStatusDangerContainerHint => '错误信息和横幅的填充色。';
+
+  @override
+  String get skinTokenStatusOnDangerContainer => '错误信息文本';
+
+  @override
+  String get skinTokenStatusOnDangerContainerHint => '错误信息中的文本与图标。';
+
+  @override
+  String get skinTokenStatusInfo => '提示信息填充';
+
+  @override
+  String get skinTokenStatusInfoHint => '提示横幅的填充色。';
+
+  @override
+  String get skinTokenStatusOnInfo => '提示信息文本';
+
+  @override
+  String get skinTokenStatusOnInfoHint => '提示横幅中的文本与图标。';
 }

@@ -47,54 +47,36 @@ enum SkinArea {
   /// by [SkinToken.group]). Every token a page does not list still resolves
   /// (from the shared palette) but is not editable for that page.
   List<SkinToken> get tokens => switch (this) {
-    SkinArea.dashboard => _tokensOf(_everything),
-    SkinArea.files => _tokensOf(_everything, without: _cardActiveOnly),
+    SkinArea.dashboard => _tokensOf(),
+    SkinArea.files => _tokensOf(without: _cardActiveOnly),
     SkinArea.tools || SkinArea.settings => _tokensOf(
-      _everything,
       without: _cardActiveAndFab,
     ),
-    // The side menu only has rows, a selected destination, and the menus,
-    // dialogs and sheets it opens.
-    SkinArea.drawer => _tokensOf(
-      _everything,
-      only: _drawerGroups,
-      without: _drawerExcluded,
-    ),
+    // The side menu has no top bar, round add button or vault card; everything
+    // else it can show (rows, switches, chips, menus, dialogs, messages) is
+    // editable.
+    SkinArea.drawer => _tokensOf(without: _drawerExcluded),
     // The editor's canvas, syntax and gutter colors live in the editor color
     // map; only the toolbar belongs to the per-page token set.
     SkinArea.editor => const [SkinToken.chromeTopBar, SkinToken.chromeOnTopBar],
   };
 }
 
-const _everything = SkinToken.values;
 const _cardActiveOnly = {SkinToken.surfaceCardActive};
 const _cardActiveAndFab = {
   SkinToken.surfaceCardActive,
   SkinToken.floatingFab,
   SkinToken.floatingOnFab,
 };
-const _drawerGroups = {
-  SkinTokenGroup.surface,
-  SkinTokenGroup.content,
-  SkinTokenGroup.border,
-  SkinTokenGroup.action,
-  SkinTokenGroup.selection,
-  SkinTokenGroup.overlay,
-  SkinTokenGroup.floating,
-};
 const _drawerExcluded = {
   SkinToken.surfaceCardActive,
-  SkinToken.surfaceField,
+  SkinToken.chromeTopBar,
+  SkinToken.chromeOnTopBar,
   SkinToken.floatingFab,
   SkinToken.floatingOnFab,
 };
 
-List<SkinToken> _tokensOf(
-  List<SkinToken> all, {
-  Set<SkinToken> without = const {},
-  Set<SkinTokenGroup>? only,
-}) => [
-  for (final token in all)
-    if (!without.contains(token) && (only == null || only.contains(token.group)))
-      token,
+List<SkinToken> _tokensOf({Set<SkinToken> without = const {}}) => [
+  for (final token in SkinToken.values)
+    if (!without.contains(token)) token,
 ];

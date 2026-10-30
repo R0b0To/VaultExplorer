@@ -81,9 +81,10 @@ void main() {
 
     test('overrides for tokens a page does not expose are ignored', () {
       final areas = resolve((area, token) => const Color(0xFF00AA00));
-      // Tools has no round add button; the side menu has no input fields.
+      // Tools has no round add button; the side menu has no top bar.
       expect(areas[SkinArea.tools]!.isCustom(SkinToken.floatingFab), isFalse);
-      expect(areas[SkinArea.drawer]!.isCustom(SkinToken.surfaceField), isFalse);
+      expect(areas[SkinArea.drawer]!.isCustom(SkinToken.chromeTopBar), isFalse);
+      expect(areas[SkinArea.drawer]!.isCustom(SkinToken.surfaceField), isTrue);
       expect(areas[SkinArea.dashboard]!.isCustom(SkinToken.floatingFab), isTrue);
     });
 
@@ -143,6 +144,49 @@ void main() {
       expect(colors.color(SkinToken.overlayDialog), own);
       expect(colors.color(SkinToken.overlayMenu), base.surfaceContainer);
       expect(colors.color(SkinToken.overlaySheet), base.surfaceContainerLow);
+    });
+
+    test('hand-painted roles follow one clearly named token each', () {
+      const probe = Color(0xFF13579B);
+      final bridged = <SkinToken, Color Function(ColorScheme)>{
+        SkinToken.surfacePanel: (s) => s.surfaceContainerLow,
+        SkinToken.chromeBar: (s) => s.surfaceContainer,
+        SkinToken.accentPrimary: (s) => s.primary,
+        SkinToken.accentSecondary: (s) => s.secondary,
+        SkinToken.accentTertiary: (s) => s.tertiary,
+        SkinToken.statusDanger: (s) => s.error,
+        SkinToken.statusDangerContainer: (s) => s.errorContainer,
+        SkinToken.floatingToast: (s) => s.inverseSurface,
+        SkinToken.choiceSelected: (s) => s.secondaryContainer,
+      };
+      for (final entry in bridged.entries) {
+        final areas = resolve(
+          (area, token) =>
+              area == SkinArea.settings && token == entry.key ? probe : null,
+        );
+        final scheme = applySkinAreaToScheme(base, areas[SkinArea.settings]!);
+        expect(entry.value(scheme), probe, reason: entry.key.id);
+      }
+    });
+
+    test('buttons and hand-painted accents are separate tokens', () {
+      const probe = Color(0xFF13579B);
+      final areas = resolve(
+        (area, token) =>
+            area == SkinArea.settings && token == SkinToken.actionPrimary
+            ? probe
+            : null,
+      );
+      final scheme = applySkinAreaToScheme(base, areas[SkinArea.settings]!);
+      expect(scheme.primary, base.primary);
+      final theme = buildSkinAreaTheme(
+        ThemeData(colorScheme: base),
+        areas[SkinArea.settings]!,
+      );
+      expect(
+        theme.filledButtonTheme.style!.backgroundColor!.resolve({}),
+        probe,
+      );
     });
 
     test('the side menu maps selection onto the secondary container', () {

@@ -21852,6 +21852,174 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Text in tooltips.'**
   String get skinTokenFloatingOnTooltipHint;
+
+  /// No description provided for @skinTokenGroupAccent.
+  ///
+  /// In en, this message translates to:
+  /// **'Accent colors'**
+  String get skinTokenGroupAccent;
+
+  /// No description provided for @skinTokenGroupStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status and errors'**
+  String get skinTokenGroupStatus;
+
+  /// No description provided for @skinTokenSurfacePanel.
+  ///
+  /// In en, this message translates to:
+  /// **'Panels'**
+  String get skinTokenSurfacePanel;
+
+  /// No description provided for @skinTokenSurfacePanelHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Cards made from the standard card widget, bookmark bar, grid cells and info sheets.'**
+  String get skinTokenSurfacePanelHint;
+
+  /// No description provided for @skinTokenChromeBar.
+  ///
+  /// In en, this message translates to:
+  /// **'Bars and tab strips'**
+  String get skinTokenChromeBar;
+
+  /// No description provided for @skinTokenChromeBarHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Action bars, tab strips, selection bar and bottom bars.'**
+  String get skinTokenChromeBarHint;
+
+  /// No description provided for @skinTokenAccentPrimary.
+  ///
+  /// In en, this message translates to:
+  /// **'Accent'**
+  String get skinTokenAccentPrimary;
+
+  /// No description provided for @skinTokenAccentPrimaryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Highlights, links in text, small accent icons and badges.'**
+  String get skinTokenAccentPrimaryHint;
+
+  /// No description provided for @skinTokenAccentSecondary.
+  ///
+  /// In en, this message translates to:
+  /// **'Secondary accent'**
+  String get skinTokenAccentSecondary;
+
+  /// No description provided for @skinTokenAccentSecondaryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Secondary highlights and tags.'**
+  String get skinTokenAccentSecondaryHint;
+
+  /// No description provided for @skinTokenAccentTertiary.
+  ///
+  /// In en, this message translates to:
+  /// **'Tertiary accent'**
+  String get skinTokenAccentTertiary;
+
+  /// No description provided for @skinTokenAccentTertiaryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tertiary highlights and tags.'**
+  String get skinTokenAccentTertiaryHint;
+
+  /// No description provided for @skinTokenAccentTertiaryContainer.
+  ///
+  /// In en, this message translates to:
+  /// **'Tertiary accent fill'**
+  String get skinTokenAccentTertiaryContainer;
+
+  /// No description provided for @skinTokenAccentTertiaryContainerHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill behind tertiary highlights.'**
+  String get skinTokenAccentTertiaryContainerHint;
+
+  /// No description provided for @skinTokenAccentOnTertiaryContainer.
+  ///
+  /// In en, this message translates to:
+  /// **'Tertiary accent fill text'**
+  String get skinTokenAccentOnTertiaryContainer;
+
+  /// No description provided for @skinTokenAccentOnTertiaryContainerHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Text and icons on the tertiary fill.'**
+  String get skinTokenAccentOnTertiaryContainerHint;
+
+  /// No description provided for @skinTokenStatusDanger.
+  ///
+  /// In en, this message translates to:
+  /// **'Errors and delete'**
+  String get skinTokenStatusDanger;
+
+  /// No description provided for @skinTokenStatusDangerHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Error text, delete actions and error borders.'**
+  String get skinTokenStatusDangerHint;
+
+  /// No description provided for @skinTokenStatusOnDanger.
+  ///
+  /// In en, this message translates to:
+  /// **'Text on error color'**
+  String get skinTokenStatusOnDanger;
+
+  /// No description provided for @skinTokenStatusOnDangerHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Text and icons drawn on the error color.'**
+  String get skinTokenStatusOnDangerHint;
+
+  /// No description provided for @skinTokenStatusDangerContainer.
+  ///
+  /// In en, this message translates to:
+  /// **'Error message fill'**
+  String get skinTokenStatusDangerContainer;
+
+  /// No description provided for @skinTokenStatusDangerContainerHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill of error messages and banners.'**
+  String get skinTokenStatusDangerContainerHint;
+
+  /// No description provided for @skinTokenStatusOnDangerContainer.
+  ///
+  /// In en, this message translates to:
+  /// **'Error message text'**
+  String get skinTokenStatusOnDangerContainer;
+
+  /// No description provided for @skinTokenStatusOnDangerContainerHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Text and icons in error messages.'**
+  String get skinTokenStatusOnDangerContainerHint;
+
+  /// No description provided for @skinTokenStatusInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Info message fill'**
+  String get skinTokenStatusInfo;
+
+  /// No description provided for @skinTokenStatusInfoHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill of info banners.'**
+  String get skinTokenStatusInfoHint;
+
+  /// No description provided for @skinTokenStatusOnInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Info message text'**
+  String get skinTokenStatusOnInfo;
+
+  /// No description provided for @skinTokenStatusOnInfoHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Text and icons in info banners.'**
+  String get skinTokenStatusOnInfoHint;
 }
 
 class _AppLocalizationsDelegate

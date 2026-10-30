@@ -136,6 +136,7 @@ SkinAreaColors _resolveArea({
     SkinToken.surfacePage: isDrawer ? s.surfaceContainerLow : s.surface,
     SkinToken.surfaceCard: s.surfaceContainerHigh,
     SkinToken.surfaceTile: s.surfaceContainerHighest,
+    SkinToken.surfacePanel: s.surfaceContainerLow,
     SkinToken.surfaceField: s.surfaceContainerHigh,
     SkinToken.contentPrimary: s.onSurface,
     SkinToken.contentSecondary: s.onSurfaceVariant,
@@ -145,6 +146,12 @@ SkinAreaColors _resolveArea({
     SkinToken.borderFocus: s.primary,
     SkinToken.chromeTopBar: appBar,
     SkinToken.chromeOnTopBar: onAppBar,
+    SkinToken.chromeBar: s.surfaceContainer,
+    SkinToken.accentPrimary: s.primary,
+    SkinToken.accentSecondary: s.secondary,
+    SkinToken.accentTertiary: s.tertiary,
+    SkinToken.accentTertiaryContainer: s.tertiaryContainer,
+    SkinToken.accentOnTertiaryContainer: s.onTertiaryContainer,
     SkinToken.actionPrimary: s.primary,
     SkinToken.actionOnPrimary: s.onPrimary,
     SkinToken.actionTonal: s.surfaceContainerHigh,
@@ -164,6 +171,12 @@ SkinAreaColors _resolveArea({
     SkinToken.selectionOn: isDrawer
         ? s.onSecondaryContainer
         : s.onPrimaryContainer,
+    SkinToken.statusDanger: s.error,
+    SkinToken.statusOnDanger: s.onError,
+    SkinToken.statusDangerContainer: s.errorContainer,
+    SkinToken.statusOnDangerContainer: s.onErrorContainer,
+    SkinToken.statusInfo: s.secondaryContainer,
+    SkinToken.statusOnInfo: s.onSecondaryContainer,
     SkinToken.overlayMenu: s.surfaceContainer,
     SkinToken.overlayOnMenu: s.onSurface,
     SkinToken.overlayDialog: s.surfaceContainerHigh,
@@ -206,18 +219,27 @@ SkinAreaColors _resolveArea({
 /// that still read `Theme.of(context).colorScheme.*` by hand following *one*
 /// clearly named token per role:
 ///
-///   surface -> surface.page          onSurface -> content.primary
-///   onSurfaceVariant -> content.secondary
+///   surface -> surface.page            surfaceContainer -> chrome.bar
+///   surfaceContainerLow -> surface.panel
 ///   surfaceContainerHigh -> surface.card
 ///   surfaceContainerHighest -> surface.tile
-///   primary / onPrimary -> action.primary / action.onPrimary
+///   onSurface -> content.primary       onSurfaceVariant -> content.secondary
+///   primary -> accent.primary          onPrimary -> action.onPrimary
+///   secondary -> accent.secondary      tertiary -> accent.tertiary
+///   tertiaryContainer pair -> accent.tertiaryContainer / accent.onTertiaryContainer
+///   error / onError -> status.danger / status.onDanger
+///   errorContainer pair -> status.dangerContainer / status.onDangerContainer
 ///   outline / outlineVariant -> border.outline / border.divider
+///   inverseSurface pair -> floating.toast / floating.onToast
 ///   primaryContainer pair -> selection.fill / selection.on
-///   (the side menu maps that pair onto secondaryContainer instead)
+///   secondaryContainer pair -> choice.selected / choice.onSelected
+///   (the side menu maps secondaryContainer to selection.fill / selection.on)
 ///
-/// The other surface steps (low, mid, lowest) are left as the shared palette
-/// has them. Migrate a direct read to `SkinAreaScope.colorOf` (or a component
-/// theme) when it needs to follow a different token than the one above.
+/// Note `primary` follows `accent.primary`, not `action.primary`: buttons read
+/// their own tokens, so recoloring the filled button no longer recolors the
+/// hundreds of hand-painted accents. Migrate a direct read to
+/// `SkinAreaScope.colorOf` (or a component theme) when it needs to follow a
+/// different token than the one above.
 ColorScheme applySkinAreaToScheme(ColorScheme base, SkinAreaColors area) {
   // The side menu's default fill is a step above the page surface; leave the
   // surface role alone there unless the skin actually sets the menu's fill.
@@ -225,14 +247,26 @@ ColorScheme applySkinAreaToScheme(ColorScheme base, SkinAreaColors area) {
       area.area == SkinArea.drawer && !area.isCustom(SkinToken.surfacePage);
   final scheme = base.copyWith(
     surface: keepSurface ? base.surface : area.color(SkinToken.surfacePage),
-    onSurface: area.color(SkinToken.contentPrimary),
-    onSurfaceVariant: area.color(SkinToken.contentSecondary),
+    surfaceContainer: area.color(SkinToken.chromeBar),
+    surfaceContainerLow: area.color(SkinToken.surfacePanel),
     surfaceContainerHigh: area.color(SkinToken.surfaceCard),
     surfaceContainerHighest: area.color(SkinToken.surfaceTile),
-    primary: area.color(SkinToken.actionPrimary),
+    onSurface: area.color(SkinToken.contentPrimary),
+    onSurfaceVariant: area.color(SkinToken.contentSecondary),
+    primary: area.color(SkinToken.accentPrimary),
     onPrimary: area.color(SkinToken.actionOnPrimary),
+    secondary: area.color(SkinToken.accentSecondary),
+    tertiary: area.color(SkinToken.accentTertiary),
+    tertiaryContainer: area.color(SkinToken.accentTertiaryContainer),
+    onTertiaryContainer: area.color(SkinToken.accentOnTertiaryContainer),
+    error: area.color(SkinToken.statusDanger),
+    onError: area.color(SkinToken.statusOnDanger),
+    errorContainer: area.color(SkinToken.statusDangerContainer),
+    onErrorContainer: area.color(SkinToken.statusOnDangerContainer),
     outline: area.color(SkinToken.borderOutline),
     outlineVariant: area.color(SkinToken.borderDivider),
+    inverseSurface: area.color(SkinToken.floatingToast),
+    onInverseSurface: area.color(SkinToken.floatingOnToast),
   );
   if (area.area == SkinArea.drawer) {
     return scheme.copyWith(
@@ -243,5 +277,7 @@ ColorScheme applySkinAreaToScheme(ColorScheme base, SkinAreaColors area) {
   return scheme.copyWith(
     primaryContainer: area.color(SkinToken.selectionFill),
     onPrimaryContainer: area.color(SkinToken.selectionOn),
+    secondaryContainer: area.color(SkinToken.choiceSelected),
+    onSecondaryContainer: area.color(SkinToken.choiceOnSelected),
   );
 }

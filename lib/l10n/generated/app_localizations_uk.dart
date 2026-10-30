@@ -13137,4 +13137,101 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get skinTokenFloatingOnTooltipHint => 'Текст у спливаючих підказках.';
+
+  @override
+  String get skinTokenGroupAccent => 'Акцентні кольори';
+
+  @override
+  String get skinTokenGroupStatus => 'Стан та помилки';
+
+  @override
+  String get skinTokenSurfacePanel => 'Панелі';
+
+  @override
+  String get skinTokenSurfacePanelHint =>
+      'Картки зі стандартного віджета карток, панель закладок, клітинки сітки та інформаційні панелі.';
+
+  @override
+  String get skinTokenChromeBar => 'Панелі та смуги вкладок';
+
+  @override
+  String get skinTokenChromeBarHint =>
+      'Панелі дій, смуги вкладок, панель вибору та нижні панелі.';
+
+  @override
+  String get skinTokenAccentPrimary => 'Акцент';
+
+  @override
+  String get skinTokenAccentPrimaryHint =>
+      'Виділення, посилання в тексті, невеликі акцентні іконки та значки.';
+
+  @override
+  String get skinTokenAccentSecondary => 'Вторинний акцент';
+
+  @override
+  String get skinTokenAccentSecondaryHint => 'Вторинні виділення та теги.';
+
+  @override
+  String get skinTokenAccentTertiary => 'Третинний акцент';
+
+  @override
+  String get skinTokenAccentTertiaryHint => 'Третинні виділення та теги.';
+
+  @override
+  String get skinTokenAccentTertiaryContainer => 'Заливка третинного акценту';
+
+  @override
+  String get skinTokenAccentTertiaryContainerHint =>
+      'Заливка позаду третинних виділень.';
+
+  @override
+  String get skinTokenAccentOnTertiaryContainer =>
+      'Текст заливки третинного акценту';
+
+  @override
+  String get skinTokenAccentOnTertiaryContainerHint =>
+      'Текст та іконки на третинній заливці.';
+
+  @override
+  String get skinTokenStatusDanger => 'Помилки та видалення';
+
+  @override
+  String get skinTokenStatusDangerHint =>
+      'Текст помилки, дії видалення та межі помилок.';
+
+  @override
+  String get skinTokenStatusOnDanger => 'Текст на кольорі помилки';
+
+  @override
+  String get skinTokenStatusOnDangerHint =>
+      'Текст та іконки, відображені на кольорі помилки.';
+
+  @override
+  String get skinTokenStatusDangerContainer =>
+      'Заливка повідомлення про помилку';
+
+  @override
+  String get skinTokenStatusDangerContainerHint =>
+      'Заливка повідомлень про помилки та банерів.';
+
+  @override
+  String get skinTokenStatusOnDangerContainer =>
+      'Текст повідомлення про помилку';
+
+  @override
+  String get skinTokenStatusOnDangerContainerHint =>
+      'Текст та іконки в повідомленнях про помилки.';
+
+  @override
+  String get skinTokenStatusInfo => 'Заливка інформаційного повідомлення';
+
+  @override
+  String get skinTokenStatusInfoHint => 'Заливка інформаційних банерів.';
+
+  @override
+  String get skinTokenStatusOnInfo => 'Текст інформаційного повідомлення';
+
+  @override
+  String get skinTokenStatusOnInfoHint =>
+      'Текст та іконки в інформаційних банерах.';
 }

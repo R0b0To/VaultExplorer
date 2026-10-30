@@ -13159,4 +13159,104 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get skinTokenFloatingOnTooltipHint => 'Texte dans les infobulles.';
+
+  @override
+  String get skinTokenGroupAccent => 'Couleurs d\'accentuation';
+
+  @override
+  String get skinTokenGroupStatus => 'État et erreurs';
+
+  @override
+  String get skinTokenSurfacePanel => 'Panneaux';
+
+  @override
+  String get skinTokenSurfacePanelHint =>
+      'Cartes créées à partir du widget de carte standard, barre de favoris, cellules de grille et volets d\'informations.';
+
+  @override
+  String get skinTokenChromeBar => 'Barres et onglets';
+
+  @override
+  String get skinTokenChromeBarHint =>
+      'Barres d\'actions, barres d\'onglets, barre de sélection et barres inférieures.';
+
+  @override
+  String get skinTokenAccentPrimary => 'Accentuation';
+
+  @override
+  String get skinTokenAccentPrimaryHint =>
+      'Mises en évidence, liens dans le texte, petites icônes d\'accentuation et badges.';
+
+  @override
+  String get skinTokenAccentSecondary => 'Accentuation secondaire';
+
+  @override
+  String get skinTokenAccentSecondaryHint =>
+      'Mises en évidence secondaires et étiquettes.';
+
+  @override
+  String get skinTokenAccentTertiary => 'Accentuation tertiaire';
+
+  @override
+  String get skinTokenAccentTertiaryHint =>
+      'Mises en évidence tertiaires et étiquettes.';
+
+  @override
+  String get skinTokenAccentTertiaryContainer =>
+      'Remplissage d\'accentuation tertiaire';
+
+  @override
+  String get skinTokenAccentTertiaryContainerHint =>
+      'Remplissage derrière les mises en évidence tertiaires.';
+
+  @override
+  String get skinTokenAccentOnTertiaryContainer =>
+      'Texte sur remplissage d\'accentuation tertiaire';
+
+  @override
+  String get skinTokenAccentOnTertiaryContainerHint =>
+      'Texte et icônes sur le remplissage tertiaire.';
+
+  @override
+  String get skinTokenStatusDanger => 'Erreurs et suppression';
+
+  @override
+  String get skinTokenStatusDangerHint =>
+      'Texte d\'erreur, actions de suppression et bordures d\'erreur.';
+
+  @override
+  String get skinTokenStatusOnDanger => 'Texte sur couleur d\'erreur';
+
+  @override
+  String get skinTokenStatusOnDangerHint =>
+      'Texte et icônes tracés sur la couleur d\'erreur.';
+
+  @override
+  String get skinTokenStatusDangerContainer =>
+      'Remplissage de message d\'erreur';
+
+  @override
+  String get skinTokenStatusDangerContainerHint =>
+      'Remplissage des messages d\'erreur et des bannières.';
+
+  @override
+  String get skinTokenStatusOnDangerContainer => 'Texte de message d\'erreur';
+
+  @override
+  String get skinTokenStatusOnDangerContainerHint =>
+      'Texte et icônes dans les messages d\'erreur.';
+
+  @override
+  String get skinTokenStatusInfo => 'Remplissage de message d\'information';
+
+  @override
+  String get skinTokenStatusInfoHint =>
+      'Remplissage des bannières d\'information.';
+
+  @override
+  String get skinTokenStatusOnInfo => 'Texte de message d\'information';
+
+  @override
+  String get skinTokenStatusOnInfoHint =>
+      'Texte et icônes dans les bannières d\'information.';
 }

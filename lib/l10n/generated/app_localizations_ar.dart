@@ -13073,4 +13073,99 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get skinTokenFloatingOnTooltipHint => 'النص في تلميحات الأدوات.';
+
+  @override
+  String get skinTokenGroupAccent => 'ألوان التمييز';
+
+  @override
+  String get skinTokenGroupStatus => 'الحالة والأخطاء';
+
+  @override
+  String get skinTokenSurfacePanel => 'اللوحات';
+
+  @override
+  String get skinTokenSurfacePanelHint =>
+      'البطاقات المكونة من عنصر البطاقة القياسي، وشريط الإشارات المرجعية، وخلايا الشبكة، وصفائح المعلومات.';
+
+  @override
+  String get skinTokenChromeBar => 'الأشرطة وشرائط علامات التبويب';
+
+  @override
+  String get skinTokenChromeBarHint =>
+      'أشرطة الإجراءات، وشرائط التبويب، وشريط التحديد، والأشرطة السفلية.';
+
+  @override
+  String get skinTokenAccentPrimary => 'لون التمييز';
+
+  @override
+  String get skinTokenAccentPrimaryHint =>
+      'العناصر المميزة، والروابط داخل النصوص، وأيقونات التمييز الصغيرة، والشارات.';
+
+  @override
+  String get skinTokenAccentSecondary => 'لون التمييز الثانوي';
+
+  @override
+  String get skinTokenAccentSecondaryHint =>
+      'العناصر المميزة الثانوية والوسوم.';
+
+  @override
+  String get skinTokenAccentTertiary => 'لون التمييز الثالثي';
+
+  @override
+  String get skinTokenAccentTertiaryHint => 'العناصر المميزة والوسوم الثالثية.';
+
+  @override
+  String get skinTokenAccentTertiaryContainer => 'تعبئة التمييز الثالثي';
+
+  @override
+  String get skinTokenAccentTertiaryContainerHint =>
+      'التعبئة خلف عناصر التمييز الثالثية.';
+
+  @override
+  String get skinTokenAccentOnTertiaryContainer => 'نص تعبئة التمييز الثالثي';
+
+  @override
+  String get skinTokenAccentOnTertiaryContainerHint =>
+      'النص والأيقونات على تعبئة التمييز الثالثي.';
+
+  @override
+  String get skinTokenStatusDanger => 'الأخطاء والحذف';
+
+  @override
+  String get skinTokenStatusDangerHint =>
+      'نصوص الأخطاء، وإجراءات الحذف، وحدود الأخطاء.';
+
+  @override
+  String get skinTokenStatusOnDanger => 'النص على لون الخطأ';
+
+  @override
+  String get skinTokenStatusOnDangerHint =>
+      'النص والأيقونات المعروضة على لون الخطأ.';
+
+  @override
+  String get skinTokenStatusDangerContainer => 'تعبئة رسالة الخطأ';
+
+  @override
+  String get skinTokenStatusDangerContainerHint =>
+      'تعبئة رسائل الأخطاء واللافتات.';
+
+  @override
+  String get skinTokenStatusOnDangerContainer => 'نص رسالة الخطأ';
+
+  @override
+  String get skinTokenStatusOnDangerContainerHint =>
+      'النص والأيقونات في رسائل الأخطاء.';
+
+  @override
+  String get skinTokenStatusInfo => 'تعبئة رسالة المعلومات';
+
+  @override
+  String get skinTokenStatusInfoHint => 'تعبئة لافتات المعلومات.';
+
+  @override
+  String get skinTokenStatusOnInfo => 'نص رسالة المعلومات';
+
+  @override
+  String get skinTokenStatusOnInfoHint =>
+      'النص والأيقونات في لافتات المعلومات.';
 }

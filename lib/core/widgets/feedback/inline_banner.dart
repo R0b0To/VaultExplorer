@@ -1,5 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
 enum AppBannerTone { info, success, warning, error }
 
@@ -24,8 +26,16 @@ class InlineBanner extends StatelessWidget {
     final textTheme = context.typography;
     final (Color bg, Color fg, IconData defaultIcon) = switch (tone) {
       AppBannerTone.info => (
-          cs.secondaryContainer,
-          cs.onSecondaryContainer,
+          SkinAreaScope.colorOf(
+            context,
+            SkinToken.statusInfo,
+            fallback: cs.secondaryContainer,
+          ),
+          SkinAreaScope.colorOf(
+            context,
+            SkinToken.statusOnInfo,
+            fallback: cs.onSecondaryContainer,
+          ),
           Icons.info_outline_rounded
         ),
       AppBannerTone.success => (
@@ -39,8 +49,16 @@ class InlineBanner extends StatelessWidget {
           Icons.warning_amber_rounded
         ),
       AppBannerTone.error => (
-          cs.errorContainer,
-          cs.onErrorContainer,
+          SkinAreaScope.colorOf(
+            context,
+            SkinToken.statusDangerContainer,
+            fallback: cs.errorContainer,
+          ),
+          SkinAreaScope.colorOf(
+            context,
+            SkinToken.statusOnDangerContainer,
+            fallback: cs.onErrorContainer,
+          ),
           Icons.error_outline_rounded
         ),
     };

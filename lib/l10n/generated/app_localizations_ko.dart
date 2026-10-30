@@ -12322,4 +12322,88 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get skinTokenFloatingOnTooltipHint => '툴팁의 텍스트입니다.';
+
+  @override
+  String get skinTokenGroupAccent => '강조 색상';
+
+  @override
+  String get skinTokenGroupStatus => '상태 및 오류';
+
+  @override
+  String get skinTokenSurfacePanel => '패널';
+
+  @override
+  String get skinTokenSurfacePanelHint => '표준 카드 위젯, 북마크 바, 그리드 셀 및 정보 시트입니다.';
+
+  @override
+  String get skinTokenChromeBar => '바 및 탭 스트립';
+
+  @override
+  String get skinTokenChromeBarHint => '작업 표시줄, 탭 스트립, 선택 바 및 하단 바입니다.';
+
+  @override
+  String get skinTokenAccentPrimary => '강조';
+
+  @override
+  String get skinTokenAccentPrimaryHint => '하이라이트, 본문 내 링크, 작은 강조 아이콘 및 배지입니다.';
+
+  @override
+  String get skinTokenAccentSecondary => '보조 강조';
+
+  @override
+  String get skinTokenAccentSecondaryHint => '보조 하이라이트 및 태그입니다.';
+
+  @override
+  String get skinTokenAccentTertiary => '3차 강조';
+
+  @override
+  String get skinTokenAccentTertiaryHint => '3차 하이라이트 및 태그입니다.';
+
+  @override
+  String get skinTokenAccentTertiaryContainer => '3차 강조 채우기';
+
+  @override
+  String get skinTokenAccentTertiaryContainerHint => '3차 하이라이트 배경의 채우기 색상입니다.';
+
+  @override
+  String get skinTokenAccentOnTertiaryContainer => '3차 강조 채우기 텍스트';
+
+  @override
+  String get skinTokenAccentOnTertiaryContainerHint => '3차 채우기 위의 텍스트와 아이콘입니다.';
+
+  @override
+  String get skinTokenStatusDanger => '오류 및 삭제';
+
+  @override
+  String get skinTokenStatusDangerHint => '오류 텍스트, 삭제 작업 및 오류 테두리입니다.';
+
+  @override
+  String get skinTokenStatusOnDanger => '오류 색상 위 텍스트';
+
+  @override
+  String get skinTokenStatusOnDangerHint => '오류 색상 위에 표시되는 텍스트와 아이콘입니다.';
+
+  @override
+  String get skinTokenStatusDangerContainer => '오류 메시지 채우기';
+
+  @override
+  String get skinTokenStatusDangerContainerHint => '오류 메시지 및 배너의 채우기 색상입니다.';
+
+  @override
+  String get skinTokenStatusOnDangerContainer => '오류 메시지 텍스트';
+
+  @override
+  String get skinTokenStatusOnDangerContainerHint => '오류 메시지 내의 텍스트와 아이콘입니다.';
+
+  @override
+  String get skinTokenStatusInfo => '안내 메시지 채우기';
+
+  @override
+  String get skinTokenStatusInfoHint => '안내 배너의 채우기 색상입니다.';
+
+  @override
+  String get skinTokenStatusOnInfo => '안내 메시지 텍스트';
+
+  @override
+  String get skinTokenStatusOnInfoHint => '안내 배너 내의 텍스트와 아이콘입니다.';
 }

@@ -12317,4 +12317,88 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get skinTokenFloatingOnTooltipHint => 'ツールチップ内のテキスト。';
+
+  @override
+  String get skinTokenGroupAccent => 'アクセントカラー';
+
+  @override
+  String get skinTokenGroupStatus => 'ステータスとエラー';
+
+  @override
+  String get skinTokenSurfacePanel => 'パネル';
+
+  @override
+  String get skinTokenSurfacePanelHint => '標準カードウィジェット、ブックマークバー、グリッドセル、情報シート。';
+
+  @override
+  String get skinTokenChromeBar => 'バーとタブストリップ';
+
+  @override
+  String get skinTokenChromeBarHint => 'アクションバー、タブストリップ、選択バー、下部バー。';
+
+  @override
+  String get skinTokenAccentPrimary => 'アクセント';
+
+  @override
+  String get skinTokenAccentPrimaryHint => 'ハイライト、テキスト内のリンク、小さなアクセントアイコン、バッジ。';
+
+  @override
+  String get skinTokenAccentSecondary => 'セカンダリアクセント';
+
+  @override
+  String get skinTokenAccentSecondaryHint => 'セカンダリのハイライトとタグ。';
+
+  @override
+  String get skinTokenAccentTertiary => 'ターシャリアクセント';
+
+  @override
+  String get skinTokenAccentTertiaryHint => 'ターシャリのハイライトとタグ。';
+
+  @override
+  String get skinTokenAccentTertiaryContainer => 'ターシャリアクセントの塗りつぶし';
+
+  @override
+  String get skinTokenAccentTertiaryContainerHint => 'ターシャリハイライトの背景の塗りつぶし。';
+
+  @override
+  String get skinTokenAccentOnTertiaryContainer => 'ターシャリアクセント塗りつぶしのテキスト';
+
+  @override
+  String get skinTokenAccentOnTertiaryContainerHint => 'ターシャリ塗りつぶし上のテキストとアイコン。';
+
+  @override
+  String get skinTokenStatusDanger => 'エラーと削除';
+
+  @override
+  String get skinTokenStatusDangerHint => 'エラーテキスト、削除アクション、エラー枠線。';
+
+  @override
+  String get skinTokenStatusOnDanger => 'エラーカラー上のテキスト';
+
+  @override
+  String get skinTokenStatusOnDangerHint => 'エラーカラー上に描画されるテキストとアイコン。';
+
+  @override
+  String get skinTokenStatusDangerContainer => 'エラーメッセージの塗りつぶし';
+
+  @override
+  String get skinTokenStatusDangerContainerHint => 'エラーメッセージやバナーの塗りつぶし。';
+
+  @override
+  String get skinTokenStatusOnDangerContainer => 'エラーメッセージのテキスト';
+
+  @override
+  String get skinTokenStatusOnDangerContainerHint => 'エラーメッセージ内のテキストとアイコン。';
+
+  @override
+  String get skinTokenStatusInfo => '情報メッセージの塗りつぶし';
+
+  @override
+  String get skinTokenStatusInfoHint => '情報バナーの塗りつぶし。';
+
+  @override
+  String get skinTokenStatusOnInfo => '情報メッセージのテキスト';
+
+  @override
+  String get skinTokenStatusOnInfoHint => '情報バナー内のテキストとアイコン。';
 }

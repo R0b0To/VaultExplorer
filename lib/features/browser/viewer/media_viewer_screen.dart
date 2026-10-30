@@ -2026,12 +2026,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
           .read(fileManagerToolbarSettingsProvider(null))
           .config
           .mediaViewerToolbarConfig;
-      final currentFile = _playlistController.currentFile;
       final edgeWidth =
           _viewportWidth * MediaViewerConstants.tapToNavigateEdgeFraction;
-      if (toolbarConfig.tapEdgesToNavigate &&
-          !MediaViewerConstants.isAudio(currentFile) &&
-          edgeWidth > 0) {
+      if (toolbarConfig.tapEdgesToNavigate && edgeWidth > 0) {
         final x = event.localPosition.dx;
         final bool? next = x <= edgeWidth
             ? false

@@ -1499,6 +1499,20 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
                   onDoubleTapDown: (d) => _videoDoubleTapDetails = d,
                   onDoubleTap: () {
                     if (widget.isAudio) {
+                      // The edges navigate on a single tap, so a double-tap
+                      // there must not also play/pause.
+                      final audioWidth = constraints.maxWidth;
+                      final audioDx =
+                          _videoDoubleTapDetails?.localPosition.dx ??
+                          audioWidth / 2;
+                      final audioEdge =
+                          audioWidth *
+                          MediaViewerConstants.tapToNavigateEdgeFraction;
+                      if (widget.tapEdgesToNavigate &&
+                          (audioDx <= audioEdge ||
+                              audioDx >= audioWidth - audioEdge)) {
+                        return;
+                      }
                       if (widget.doubleTapPlayPause) _togglePlayPause();
                       return;
                     }
@@ -1618,7 +1632,6 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
         final x = details.globalPosition.dx;
         if (widget.tapEdgesToNavigate &&
             !_isZoomed &&
-            !widget.isAudio &&
             width > 0 &&
             (x <= width * MediaViewerConstants.tapToNavigateEdgeFraction ||
                 x >=
@@ -1765,15 +1778,17 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
                       ),
                     ),
                   ),
+                // The HUDs sit on the opposite side from the strip being
+                // dragged, so the finger never covers them.
                 if (widget.edgeSwipeHudEnabled && _showBrightnessHud)
                   _buildEdgeGestureHud(
-                    isLeft: true,
+                    isLeft: false,
                     icon: Icons.wb_sunny_rounded,
                     level: _brightnessLevel,
                   ),
                 if (widget.edgeSwipeHudEnabled && _showVolumeHud)
                   _buildEdgeGestureHud(
-                    isLeft: false,
+                    isLeft: true,
                     icon: _volumeLevel <= 0.01
                         ? Icons.volume_off_rounded
                         : Icons.volume_up_rounded,
@@ -1977,7 +1992,6 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
       return;
     }
     if (widget.tapEdgesToNavigate &&
-        !widget.isAudio &&
         !_isZoomed &&
         _isActive &&
         _tapViewportWidth > 0) {

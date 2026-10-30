@@ -846,9 +846,11 @@ bool _isClampingMatrix = false;
                       onDragCancel: _handleBrightnessDragCancel,
                     ),
                   ),
+                // On the opposite side from the strip, so the finger never
+                // covers it.
                 if (widget.edgeSwipeHudEnabled && _showBrightnessHud)
                   _buildEdgeGestureHud(
-                    isLeft: true,
+                    isLeft: false,
                     icon: Icons.wb_sunny_rounded,
                     level: _brightnessLevel,
                   ),

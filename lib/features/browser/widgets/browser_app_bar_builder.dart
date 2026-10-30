@@ -27,6 +27,12 @@ PreferredSizeWidget buildBrowserAppBar(
   required MountedContainer container,
   required List<PathSegment> pathStack,
   required ValueChanged<int> onJumpTo,
+
+  /// Folders just stepped back out of, nearest first. They stay in the path
+  /// menu, dimmed below the current folder, so the person can walk forward
+  /// again. [onForwardTo] receives an index into this list.
+  List<PathSegment> forwardStack = const [],
+  ValueChanged<int>? onForwardTo,
   required List<RawEntry> filteredItems,
   required int dirCount,
   required int fileCount,
@@ -637,6 +643,29 @@ PreferredSizeWidget buildBrowserAppBar(
                 );
               })(),
             ],
+            for (int f = 0; f < forwardStack.length; f++)
+              MenuItemButton(
+                onPressed: onForwardTo == null ? null : () => onForwardTo(f),
+                leadingIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(width: (pathStack.length + f - 1) * 12.0),
+                    Icon(
+                      forwardStack[f].isArchiveRoot
+                          ? Icons.archive_rounded
+                          : Icons.folder_rounded,
+                      size: 18,
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.55),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  forwardStack[f].label,
+                  style: TextStyle(
+                    color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+                  ),
+                ),
+              ),
           ],
         );
       },

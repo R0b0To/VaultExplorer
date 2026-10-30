@@ -3,8 +3,11 @@ import 'package:flutter/gestures.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
+import 'package:vaultexplorer/features/browser/controllers/browser_drag_session.dart';
+import 'package:vaultexplorer/features/browser/widgets/browser_pane_scope.dart';
 
 /// A custom scale recognizer that prioritizes pinch-to-zoom over single-finger scrolling.
 /// A custom scale recognizer that prioritizes pinch-to-zoom over single-finger scrolling
@@ -14,6 +17,16 @@ class _PinchScaleGestureRecognizer extends ScaleGestureRecognizer {
 
   final Set<int> _activePointers = <int>{};
   VoidCallback? onPinchEnd;
+
+  /// True while no further finger may join (a drag is in progress, or this
+  /// viewport is only a drop target for a drag started elsewhere).
+  ValueGetter<bool>? isFrozen;
+
+  @override
+  bool isPointerAllowed(PointerDownEvent event) {
+    if (isFrozen?.call() ?? false) return false;
+    return super.isPointerAllowed(event);
+  }
 
   @override
   void addAllowedPointer(PointerDownEvent event) {
@@ -258,7 +271,25 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
   /// Pointer filter for [_HoldSelectGestureRecognizer]: only touches that land
   /// on a real item may become a hold. A press that interrupts scrolling only
   /// stops the scroll; it must be released before a hold can select an item.
+  /// Whether touches must not select or zoom right now: a drag of items is in
+  /// progress (a second finger must not start another selection or gesture),
+  /// or another viewport owns the drag and this one is only a drop target.
+  bool _isFrozen() {
+    if (!mounted) return false;
+    if (BrowserPaneScope.peek(context)?.interactionLocked ?? false) return true;
+    try {
+      return ProviderScope.containerOf(
+        context,
+        listen: false,
+      ).read(browserDragSessionProvider).isActive;
+    } catch (_) {
+      // Not under a ProviderScope (isolated widget tests): no drag can exist.
+      return false;
+    }
+  }
+
   bool _shouldTrackHold(PointerDownEvent event) {
+    if (_isFrozen()) return false;
     if (_isScrollActive || _scrollEndPending) {
       _scrollInterruptPointers.add(event.pointer);
       return false;
@@ -474,6 +505,7 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
                 _PinchScaleGestureRecognizer instance,
               ) {
                 instance
+                  ..isFrozen = _isFrozen
                   ..onStart = _handleScaleStart
                   ..onUpdate = _handleScaleUpdate
                   ..onEnd = _handleScaleEnd

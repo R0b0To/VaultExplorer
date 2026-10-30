@@ -21,6 +21,7 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_search_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_chrome_hub.dart';
+import 'package:vaultexplorer/features/browser/controllers/browser_drag_session.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
 import 'package:vaultexplorer/features/browser/models/browser_viewport_options.dart';
 import 'package:vaultexplorer/features/browser/models/tab_id.dart';
@@ -1353,14 +1354,18 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       onNewTab: widget.onNewTab ?? _openNewTabSheet,
       onDuplicate: widget.onDuplicate ?? _duplicate,
     );
-    Widget paneStrip(TabPane pane) => BrowserTabStrip(
-      key: ValueKey<TabPane>(pane),
-      workspaceConfig: _workspace,
-      onNewTab: widget.onNewTab ?? _openNewTabSheet,
-      onDuplicate: widget.onDuplicate ?? _duplicate,
+    Widget paneStrip(TabPane pane) => _DragLockedStrip(
       pane: pane,
-      paneBounds: _paneBounds,
-      onDragOverPane: (over) => _dropPane.value = over,
+      workspaceConfig: _workspace,
+      child: BrowserTabStrip(
+        key: ValueKey<TabPane>(pane),
+        workspaceConfig: _workspace,
+        onNewTab: widget.onNewTab ?? _openNewTabSheet,
+        onDuplicate: widget.onDuplicate ?? _duplicate,
+        pane: pane,
+        paneBounds: _paneBounds,
+        onDragOverPane: (over) => _dropPane.value = over,
+      ),
     );
     final drawer = activeTab == null
         ? null
@@ -1745,6 +1750,43 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
 /// The top app bar stays in the normal auto-hiding layout slot. A selection
 /// bar overlays it separately, so showing selection actions never changes the
 /// viewport's layout.
+/// Freezes a pane's tab strip while a drag of file items that started in the
+/// other pane is in progress: that pane is only a drop target until the drag
+/// ends (its folder view applies the same lock to its own content).
+class _DragLockedStrip extends ConsumerWidget {
+  const _DragLockedStrip({
+    required this.pane,
+    required this.workspaceConfig,
+    required this.child,
+  });
+
+  final TabPane pane;
+  final BrowserTabsConfig workspaceConfig;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sourceTabId = ref.watch(
+      browserDragSessionProvider.select((session) => session.sourceTabId),
+    );
+    TabPane? sourcePane;
+    if (sourceTabId != null) {
+      sourcePane = ref.watch(
+        browserTabsProvider(workspaceConfig).select((state) {
+          for (final tab in state.tabs) {
+            if (tab.tabId == sourceTabId) return tab.pane;
+          }
+          return null;
+        }),
+      );
+    }
+    return IgnorePointer(
+      ignoring: sourcePane != null && sourcePane != pane,
+      child: child,
+    );
+  }
+}
+
 class _TopAppBarSlot extends ConsumerWidget {
   const _TopAppBarSlot({
     required this.workspaceConfig,

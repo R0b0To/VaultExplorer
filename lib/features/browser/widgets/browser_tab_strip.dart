@@ -500,9 +500,13 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
                               fileBrowserNavigationProvider(tab.tabId),
                             );
                             if (navigation.archiveContext != null) return;
+                            // Same Copy / Move / Cancel menu as dropping in a
+                            // folder view (Move is left out when the items
+                            // already live in that tab's folder).
                             unawaited(
-                              details.data.onDrop(
-                                details.data,
+                              handleBrowserItemDrop(
+                                tabContext,
+                                details,
                                 destination,
                                 navigation.currentDirPath,
                               ),

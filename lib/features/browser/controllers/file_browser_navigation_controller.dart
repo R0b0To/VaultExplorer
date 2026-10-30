@@ -44,6 +44,16 @@ class PathSegment {
 
 class FileBrowserNavigationState {
   final List<PathSegment> pathStack;
+
+  /// Segments the user stepped back out of (nearest first), kept so the
+  /// breadcrumb can still show -- and jump forward into -- the path that was
+  /// just left. Going back from `a > b > c` to `a` leaves `[b, c]` here.
+  ///
+  /// Entering the next forward segment consumes it; entering any other folder
+  /// (or otherwise re-rooting the stack) discards the whole list, so history
+  /// never branches. Never holds an archive root or anything inside one once
+  /// that archive has been closed.
+  final List<PathSegment> forwardStack;
   final List<RawEntry> currentItems;
   final bool isLoading;
   final bool isListingTruncated;
@@ -65,6 +75,7 @@ class FileBrowserNavigationState {
 
   const FileBrowserNavigationState({
     this.pathStack = const [],
+    this.forwardStack = const [],
     this.currentItems = const [],
     this.isLoading = false,
     this.isListingTruncated = false,
@@ -85,6 +96,8 @@ class FileBrowserNavigationState {
 
   bool get atRoot => pathStack.length <= 1;
 
+  bool get hasForward => forwardStack.isNotEmpty;
+
   String get currentDirPath => pathStack.isEmpty ? '' : pathStack.last.fatPath;
 
   String? get archiveRootPath => archiveContext == null
@@ -95,6 +108,7 @@ class FileBrowserNavigationState {
 
   FileBrowserNavigationState copyWith({
     List<PathSegment>? pathStack,
+    List<PathSegment>? forwardStack,
     List<RawEntry>? currentItems,
     bool? isLoading,
     bool? isListingTruncated,
@@ -119,6 +133,7 @@ class FileBrowserNavigationState {
   }) {
     return FileBrowserNavigationState(
       pathStack: pathStack ?? this.pathStack,
+      forwardStack: forwardStack ?? this.forwardStack,
       currentItems: currentItems ?? this.currentItems,
       isLoading: isLoading ?? this.isLoading,
       isListingTruncated: isListingTruncated ?? this.isListingTruncated,
@@ -449,6 +464,7 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
       state = state.copyWith(
         archiveContext: ctx,
         pathStack: newStack,
+        forwardStack: const [],
         layoutMode: layoutMode ?? state.layoutMode,
         clearCurrentFilter: true,
       );
@@ -464,8 +480,31 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
 
   void closeArchive() {
     state.archiveContext?.dispose();
-    state = state.copyWith(clearArchiveContext: true);
+    state = state.copyWith(
+      clearArchiveContext: true,
+      forwardStack: _withoutArchiveSegments(state.forwardStack),
+    );
     _liveArchiveContext = null;
+  }
+
+  /// Cuts [segments] at the first archive root. A closed archive's context is
+  /// gone, so neither its root nor anything inside it can be walked forward
+  /// into again.
+  static List<PathSegment> _withoutArchiveSegments(
+    List<PathSegment> segments,
+  ) {
+    final cut = segments.indexWhere((segment) => segment.isArchiveRoot);
+    return cut < 0 ? segments : segments.sublist(0, cut);
+  }
+
+  /// The forward history after stepping back out of [removed] (in path
+  /// order): they sit in front of whatever was already ahead.
+  List<PathSegment> _forwardAfterBack(
+    List<PathSegment> removed, {
+    required bool archiveClosed,
+  }) {
+    final combined = [...removed, ...state.forwardStack];
+    return archiveClosed ? _withoutArchiveSegments(combined) : combined;
   }
 
   void updateArchiveContext(ArchiveContext archiveContext) {
@@ -505,8 +544,15 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
 
     final newStack = List<PathSegment>.from(state.pathStack)..add(newSegment);
 
+    // Re-entering the folder that was next in the forward history keeps the
+    // rest of it; entering anything else starts a new branch and overwrites
+    // the old forward path.
+    final forward = state.forwardStack;
+    final followsForward = forward.isNotEmpty && forward.first.fatPath == newPath;
+
     state = state.copyWith(
       pathStack: newStack,
+      forwardStack: followsForward ? forward.sublist(1) : const [],
       currentItems: const [],
       clearCurrentFilter: true,
       isLoading: true,
@@ -517,8 +563,11 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
   String? navigateUp({BrowserLayoutMode? layoutMode}) {
     if (state.atRoot) return null;
 
+    final removed = state.pathStack.last;
     final ctx = state.archiveContext;
-    if (ctx != null && state.pathStack.length - 1 <= ctx.pathStackEntryIndex) {
+    final closesArchive =
+        ctx != null && state.pathStack.length - 1 <= ctx.pathStackEntryIndex;
+    if (closesArchive) {
       closeArchive();
     }
 
@@ -531,6 +580,7 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
 
     state = state.copyWith(
       pathStack: newStack,
+      forwardStack: _forwardAfterBack([removed], archiveClosed: closesArchive),
       currentItems: List<RawEntry>.of(restoredItems),
       clearCurrentFilter: true,
       isLoading: restoredItems.isEmpty,
@@ -543,8 +593,10 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
   String? jumpTo(int index, {BrowserLayoutMode? layoutMode}) {
     if (index >= state.pathStack.length - 1 || index < 0) return null;
 
+    final removed = state.pathStack.sublist(index + 1);
     final ctx = state.archiveContext;
-    if (ctx != null && index < ctx.pathStackEntryIndex) {
+    final closesArchive = ctx != null && index < ctx.pathStackEntryIndex;
+    if (closesArchive) {
       closeArchive();
     }
 
@@ -555,6 +607,7 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
 
     state = state.copyWith(
       pathStack: newStack,
+      forwardStack: _forwardAfterBack(removed, archiveClosed: closesArchive),
       currentItems: List<RawEntry>.of(restoredItems),
       clearCurrentFilter: true,
       isLoading: restoredItems.isEmpty,
@@ -562,6 +615,29 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
     );
 
     return newPath;
+  }
+
+  /// Walks [steps] segments forward through the retained forward history
+  /// (1 = the nearest one, i.e. the folder just left) and returns the path to
+  /// load, or null when there is no such history.
+  String? navigateForward(int steps, {BrowserLayoutMode? layoutMode}) {
+    final forward = state.forwardStack;
+    if (steps <= 0 || steps > forward.length) return null;
+
+    final moved = forward.sublist(0, steps);
+    final target = moved.last;
+    final restoredItems = target.items ?? const <RawEntry>[];
+
+    state = state.copyWith(
+      pathStack: [...state.pathStack, ...moved],
+      forwardStack: forward.sublist(steps),
+      currentItems: List<RawEntry>.of(restoredItems),
+      clearCurrentFilter: true,
+      isLoading: restoredItems.isEmpty,
+      layoutMode: layoutMode ?? target.layoutMode ?? state.layoutMode,
+    );
+
+    return target.fatPath;
   }
 
   String navigateToPath(
@@ -602,6 +678,7 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
       }
       state = state.copyWith(
         pathStack: newStack,
+        forwardStack: const [],
         currentItems: const [],
         clearCurrentFilter: true,
         isLoading: true,
@@ -626,6 +703,7 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
       }
       state = state.copyWith(
         pathStack: newStack,
+        forwardStack: const [],
         currentItems: const [],
         clearCurrentFilter: true,
         isLoading: true,

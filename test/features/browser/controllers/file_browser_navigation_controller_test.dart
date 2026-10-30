@@ -306,6 +306,117 @@ void main() {
       });
     });
 
+    group('forward history', () {
+      const folder1 = RawEntry(name: 'folder1', isDir: true, sizeBytes: 0, modifiedSecs: 0);
+      const folder2 = RawEntry(name: 'folder2', isDir: true, sizeBytes: 0, modifiedSecs: 0);
+      const folder3 = RawEntry(name: 'folder3', isDir: true, sizeBytes: 0, modifiedSecs: 0);
+      const folderB = RawEntry(name: 'folderB', isDir: true, sizeBytes: 0, modifiedSecs: 0);
+
+      FileBrowserNavigationState read() =>
+          container.read(fileBrowserNavigationProvider(const TabId(1)));
+
+      /// Vault > folder1 > folder2 > folder3.
+      FileBrowserNavigation deepStack() {
+        final notifier = container.read(fileBrowserNavigationProvider(const TabId(1)).notifier);
+        notifier.initRoot(rootLabel: 'Vault');
+        notifier.enterDirectory(folder1, newPath: 'folder1');
+        notifier.enterDirectory(folder2, newPath: 'folder1/folder2');
+        notifier.enterDirectory(folder3, newPath: 'folder1/folder2/folder3');
+        return notifier;
+      }
+
+      test('navigateUp keeps the folder it left as forward history', () {
+        final notifier = deepStack();
+
+        notifier.navigateUp();
+        expect(read().forwardStack.map((s) => s.label), ['folder3']);
+
+        notifier.navigateUp();
+        expect(read().pathStack.map((s) => s.label), ['Vault', 'folder1']);
+        expect(read().forwardStack.map((s) => s.label), ['folder2', 'folder3']);
+      });
+
+      test('jumpTo keeps every skipped folder as forward history, nearest first', () {
+        final notifier = deepStack();
+
+        notifier.jumpTo(1);
+
+        expect(read().pathStack.map((s) => s.label), ['Vault', 'folder1']);
+        expect(read().forwardStack.map((s) => s.label), ['folder2', 'folder3']);
+      });
+
+      test('navigateForward walks back down one step at a time', () {
+        final notifier = deepStack();
+        notifier.jumpTo(1);
+
+        final first = notifier.navigateForward(1);
+
+        expect(first, 'folder1/folder2');
+        expect(read().pathStack.map((s) => s.label), ['Vault', 'folder1', 'folder2']);
+        expect(read().forwardStack.map((s) => s.label), ['folder3']);
+        expect(read().currentDirPath, 'folder1/folder2');
+      });
+
+      test('navigateForward can skip straight to a deeper folder', () {
+        final notifier = deepStack();
+        notifier.jumpTo(1);
+
+        final target = notifier.navigateForward(2);
+
+        expect(target, 'folder1/folder2/folder3');
+        expect(read().pathStack.map((s) => s.label), ['Vault', 'folder1', 'folder2', 'folder3']);
+        expect(read().forwardStack, isEmpty);
+      });
+
+      test('navigateForward without matching history is a no-op', () {
+        final notifier = deepStack();
+
+        expect(notifier.navigateForward(1), isNull);
+        notifier.navigateUp();
+        expect(notifier.navigateForward(0), isNull);
+        expect(notifier.navigateForward(2), isNull);
+        expect(read().forwardStack.map((s) => s.label), ['folder3']);
+      });
+
+      test('entering the next forward folder keeps the rest of the history', () {
+        final notifier = deepStack();
+        notifier.jumpTo(1);
+
+        notifier.enterDirectory(folder2, newPath: 'folder1/folder2');
+
+        expect(read().pathStack.map((s) => s.label), ['Vault', 'folder1', 'folder2']);
+        expect(read().forwardStack.map((s) => s.label), ['folder3']);
+      });
+
+      test('entering a different folder overwrites the forward history', () {
+        final notifier = deepStack();
+        notifier.jumpTo(1);
+
+        notifier.enterDirectory(folderB, newPath: 'folder1/folderB');
+
+        expect(read().pathStack.map((s) => s.label), ['Vault', 'folder1', 'folderB']);
+        expect(read().forwardStack, isEmpty);
+      });
+
+      test('navigateToPath discards the forward history', () {
+        final notifier = deepStack();
+        notifier.navigateUp();
+
+        notifier.navigateToPath(_testContainer(1), 'Elsewhere', isDir: true, rootLabel: 'Vault');
+
+        expect(read().forwardStack, isEmpty);
+      });
+
+      test('a state with forward history is not at an end it cannot leave', () {
+        final notifier = deepStack();
+        notifier.jumpTo(0);
+
+        expect(read().atRoot, isTrue);
+        expect(read().hasForward, isTrue);
+        expect(read().forwardStack, hasLength(3));
+      });
+    });
+
     group('directory loading, error status, space updates', () {
       test('loadDirectoryContents populates currentItems and clears isLoading', () async {
         final subscription = container.listen(fileBrowserNavigationProvider(const TabId(1)), (_, _) {});
@@ -557,6 +668,22 @@ void main() {
         final state = container.read(fileBrowserNavigationProvider(const TabId(1)));
         expect(state.archiveContext, isNull);
         expect(state.atRoot, isTrue);
+
+        subscription.close();
+      });
+
+      test('leaving an open archive does not keep it as forward history', () async {
+        final subscription = container.listen(fileBrowserNavigationProvider(const TabId(1)), (_, _) {});
+        final notifier = container.read(fileBrowserNavigationProvider(const TabId(1)).notifier);
+        notifier.initRoot(rootLabel: 'Vault');
+        archiveBytesResponse = _testArchiveBytes();
+        await notifier.openArchive(_testContainer(1), 'backup.zip', 'backup.zip');
+
+        notifier.navigateUp();
+
+        final state = container.read(fileBrowserNavigationProvider(const TabId(1)));
+        expect(state.archiveContext, isNull);
+        expect(state.forwardStack, isEmpty);
 
         subscription.close();
       });

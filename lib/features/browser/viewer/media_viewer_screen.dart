@@ -202,6 +202,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
         ? _pageController.position
         : null,
     canClaim: _canClaimPlaylistSwipe,
+    crossAxisYieldRatio: _playlistSwipeCrossAxisYield,
   );
 
   /// Whether a finger may swipe the playlist pager right now. Frozen scroll
@@ -212,6 +213,31 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       !_scrollMode.isContinuous &&
       _playlistController.playlist.length > 1 &&
       _swipePhysicsNotifier.value is! NeverScrollableScrollPhysics;
+
+  /// How clearly a drag has to lean across the paging axis before the pager's
+  /// claim leaves it to the recognizer that owns drags in that direction:
+  /// swipe to dismiss (which always works across the paging axis) or, in a
+  /// vertical playlist, swipe to seek. Null when neither can start for this
+  /// touch, so the claim keeps taking drags of any direction: an L-shaped
+  /// swipe may well start out across the axis. Asked when a finger lands.
+  double? _playlistSwipeCrossAxisYield() {
+    final config = ref
+        .read(fileManagerToolbarSettingsProvider(null))
+        .config
+        .mediaViewerToolbarConfig;
+    // The same conditions the swipe-to-dismiss layer is enabled under.
+    if (config.swipeToDismissEnabled &&
+        !_isEditingLayout &&
+        !_controlsLocked &&
+        _canStartSwipeDismiss()) {
+      return kPlaylistSwipeDismissYieldRatio;
+    }
+    if (_scrollMode == PlaylistScrollMode.verticalPage &&
+        _isCurrentItemSwipeToSeekEnabled) {
+      return kPlaylistSwipeSeekYieldRatio;
+    }
+    return null;
+  }
 
   /// 0..1 while a swipe-to-dismiss drag pulls the media away. Drives the
   /// backdrop and viewer chrome fade while the actual image stays visible.

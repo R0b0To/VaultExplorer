@@ -14,17 +14,23 @@ class _Pager {
     this.axis = Axis.horizontal,
     this.withClaim = true,
     this.touchSlop,
+    this.crossAxisYield,
   });
 
   final Axis axis;
   final bool withClaim;
   final double? touchSlop;
+
+  /// Stands for swipe to dismiss (or seek) being active: drags that lean this
+  /// clearly across the paging axis are left alone.
+  final double? crossAxisYield;
   final controller = PageController();
   bool swipeAllowed = true;
 
   late final drag = PlaylistSwipeDrag(
     positionOf: () => controller.hasClients ? controller.position : null,
     canClaim: () => swipeAllowed,
+    crossAxisYieldRatio: () => crossAxisYield,
   );
 
   Widget _page(int index) {
@@ -324,6 +330,80 @@ void defineClaimTests(double? touchSlop) {
       await tester.pumpAndSettle();
       expect(pager.controller.page, closeTo(1.0, 0.001));
     });
+
+    testWidgets(
+      'with swipe to dismiss active, a drag that clearly leans across the '
+      'axis is left alone',
+      (tester) async {
+        final pager = _Pager(
+          touchSlop: touchSlop,
+          crossAxisYield: kPlaylistSwipeDismissYieldRatio,
+        );
+        addTearDown(pager.controller.dispose);
+        await tester.pumpWidget(pager.build());
+
+        final gesture = await tester.startGesture(
+          tester.getCenter(find.byType(PageView)),
+        );
+        // Straight down, which is what dismiss claims. Without the yield the
+        // pager would take this touch at once, as in the L-shaped swipe.
+        await _moveInSteps(gesture, const Offset(0, 60));
+        await _moveInSteps(gesture, const Offset(-500, 0));
+        await gesture.up();
+        await tester.pumpAndSettle();
+
+        // Nothing here claimed it for the pager: it went to the zoom viewer,
+        // which stands in for dismiss.
+        expect(pager.controller.page, closeTo(0.0, 0.001));
+      },
+    );
+
+    testWidgets(
+      'with swipe to dismiss active, a diagonal swipe is still claimed',
+      (tester) async {
+        final pager = _Pager(
+          touchSlop: touchSlop,
+          crossAxisYield: kPlaylistSwipeDismissYieldRatio,
+        );
+        addTearDown(pager.controller.dispose);
+        await tester.pumpWidget(pager.build());
+
+        final gesture = await tester.startGesture(
+          tester.getCenter(find.byType(PageView)),
+        );
+        // 45 degrees: no further across the axis than along it.
+        await _moveInSteps(gesture, const Offset(-60, 60));
+        await _moveInSteps(gesture, const Offset(-500, 0));
+        expect(pager.controller.page, greaterThan(0.5));
+
+        await gesture.up();
+        await tester.pumpAndSettle();
+        expect(pager.controller.page, closeTo(1.0, 0.001));
+      },
+    );
+
+    testWidgets(
+      'in a vertical playlist the same yield leaves a sideways drag to seek',
+      (tester) async {
+        final pager = _Pager(
+          axis: Axis.vertical,
+          touchSlop: touchSlop,
+          crossAxisYield: kPlaylistSwipeSeekYieldRatio,
+        );
+        addTearDown(pager.controller.dispose);
+        await tester.pumpWidget(pager.build());
+
+        final gesture = await tester.startGesture(
+          tester.getCenter(find.byType(PageView)),
+        );
+        await _moveInSteps(gesture, const Offset(-60, 0));
+        await _moveInSteps(gesture, const Offset(0, -450));
+        await gesture.up();
+        await tester.pumpAndSettle();
+
+        expect(pager.controller.page, closeTo(0.0, 0.001));
+      },
+    );
 
     testWidgets('locking swipes mid-drag cancels the drag', (tester) async {
       final pager = _Pager(touchSlop: touchSlop);

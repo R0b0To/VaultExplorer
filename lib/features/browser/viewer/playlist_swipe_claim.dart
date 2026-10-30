@@ -13,6 +13,17 @@ import 'package:flutter/widgets.dart';
 /// stay clearly under 2. It is over 1 so a tap or a wobble never gets there.
 const double kPlaylistSwipeClaimSlopFactor = 1.5;
 
+/// How much further than along the paging axis a drag must have moved across
+/// it for swipe to dismiss to claim it. The dismiss recognizer asks this of a
+/// drag along its own axis, which is always across the paging axis, and a
+/// pager claim that left it no drags to claim would make dismiss hard to
+/// trigger.
+const double kPlaylistSwipeDismissYieldRatio = 1.15;
+
+/// The same for swipe to seek in a vertical playlist, where its drag is also
+/// across the paging axis.
+const double kPlaylistSwipeSeekYieldRatio = 1.2;
+
 /// Net distance, in logical pixels, that a swipe has to travel along the
 /// paging axis to wrap around at the end of a looping playlist.
 const double kPlaylistSwipeMinDistance = 32.0;
@@ -61,28 +72,50 @@ int playlistSwipeDirection(
 class _SwipeClaim {
   int? _finger;
   Offset _movement = Offset.zero;
+  double? _crossAxisYieldRatio;
 
   /// Starts following [pointer]. False if a finger is already being followed:
   /// a second finger is a pinch, which belongs to the zoom recognizer.
-  bool addFinger(int pointer) {
+  ///
+  /// [crossAxisYieldRatio], when not null, keeps the claim off a drag that
+  /// leans across the paging axis by more than that ratio, because another
+  /// recognizer claims such drags (see [PlaylistSwipeDrag.crossAxisYieldRatio]).
+  bool addFinger(int pointer, double? crossAxisYieldRatio) {
     if (_finger != null) return false;
     _finger = pointer;
     _movement = Offset.zero;
+    _crossAxisYieldRatio = crossAxisYieldRatio;
     return true;
   }
 
   /// Takes in [event] and returns true once the finger has travelled far
   /// enough from where it landed to be claimed: [kPlaylistSwipeClaimSlopFactor]
-  /// times [touchSlop].
-  bool hasMovedFarEnough(PointerEvent event, double touchSlop) {
+  /// times [touchSlop]. [axis] is the axis the pager pages along.
+  bool hasMovedFarEnough(
+    PointerEvent event, {
+    required double touchSlop,
+    required Axis axis,
+  }) {
     if (event is! PointerMoveEvent || event.pointer != _finger) return false;
     _movement += event.delta;
-    return _movement.distance >= touchSlop * kPlaylistSwipeClaimSlopFactor;
+    if (_movement.distance < touchSlop * kPlaylistSwipeClaimSlopFactor) {
+      return false;
+    }
+    final ratio = _crossAxisYieldRatio;
+    if (ratio != null) {
+      final along = axis == Axis.horizontal ? _movement.dx : _movement.dy;
+      final cross = axis == Axis.horizontal ? _movement.dy : _movement.dx;
+      // Left unclaimed, not rejected: if the drag straightens out toward the
+      // paging axis it is still claimed.
+      if (cross.abs() > along.abs() * ratio) return false;
+    }
+    return true;
   }
 
   void reset() {
     _finger = null;
     _movement = Offset.zero;
+    _crossAxisYieldRatio = null;
   }
 }
 
@@ -91,11 +124,16 @@ class _SwipeClaim {
 /// The two recognizers are the same apart from the axis they extend. They
 /// can't share a mixin: the framework's drag recognizer base class is sealed.
 class PlaylistSwipeHorizontalRecognizer extends HorizontalDragGestureRecognizer {
-  PlaylistSwipeHorizontalRecognizer({required this.canClaim})
-    : super(supportedDevices: const {PointerDeviceKind.touch});
+  PlaylistSwipeHorizontalRecognizer({
+    required this.canClaim,
+    this.crossAxisYieldRatio,
+  }) : super(supportedDevices: const {PointerDeviceKind.touch});
 
   /// Asked when a finger lands.
   final bool Function() canClaim;
+
+  /// Asked when a finger lands. See [PlaylistSwipeDrag.crossAxisYieldRatio].
+  final double? Function()? crossAxisYieldRatio;
 
   final _SwipeClaim _claim = _SwipeClaim();
 
@@ -105,7 +143,7 @@ class PlaylistSwipeHorizontalRecognizer extends HorizontalDragGestureRecognizer 
 
   @override
   void addAllowedPointer(PointerDownEvent event) {
-    if (!_claim.addFinger(event.pointer)) {
+    if (!_claim.addFinger(event.pointer, crossAxisYieldRatio?.call())) {
       // A second finger is a pinch: give the touch up.
       resolve(GestureDisposition.rejected);
       return;
@@ -126,7 +164,8 @@ class PlaylistSwipeHorizontalRecognizer extends HorizontalDragGestureRecognizer 
   void handleEvent(PointerEvent event) {
     if (_claim.hasMovedFarEnough(
       event,
-      computeHitSlop(event.kind, gestureSettings),
+      touchSlop: computeHitSlop(event.kind, gestureSettings),
+      axis: Axis.horizontal,
     )) {
       resolve(GestureDisposition.accepted);
     }
@@ -143,11 +182,16 @@ class PlaylistSwipeHorizontalRecognizer extends HorizontalDragGestureRecognizer 
 /// Claims a touch for a pager that pages vertically. See
 /// [PlaylistSwipeHorizontalRecognizer].
 class PlaylistSwipeVerticalRecognizer extends VerticalDragGestureRecognizer {
-  PlaylistSwipeVerticalRecognizer({required this.canClaim})
-    : super(supportedDevices: const {PointerDeviceKind.touch});
+  PlaylistSwipeVerticalRecognizer({
+    required this.canClaim,
+    this.crossAxisYieldRatio,
+  }) : super(supportedDevices: const {PointerDeviceKind.touch});
 
   /// Asked when a finger lands.
   final bool Function() canClaim;
+
+  /// Asked when a finger lands. See [PlaylistSwipeDrag.crossAxisYieldRatio].
+  final double? Function()? crossAxisYieldRatio;
 
   final _SwipeClaim _claim = _SwipeClaim();
 
@@ -157,7 +201,7 @@ class PlaylistSwipeVerticalRecognizer extends VerticalDragGestureRecognizer {
 
   @override
   void addAllowedPointer(PointerDownEvent event) {
-    if (!_claim.addFinger(event.pointer)) {
+    if (!_claim.addFinger(event.pointer, crossAxisYieldRatio?.call())) {
       // A second finger is a pinch: give the touch up.
       resolve(GestureDisposition.rejected);
       return;
@@ -175,7 +219,8 @@ class PlaylistSwipeVerticalRecognizer extends VerticalDragGestureRecognizer {
   void handleEvent(PointerEvent event) {
     if (_claim.hasMovedFarEnough(
       event,
-      computeHitSlop(event.kind, gestureSettings),
+      touchSlop: computeHitSlop(event.kind, gestureSettings),
+      axis: Axis.vertical,
     )) {
       resolve(GestureDisposition.accepted);
     }
@@ -194,7 +239,11 @@ class PlaylistSwipeVerticalRecognizer extends VerticalDragGestureRecognizer {
 /// the finger along the paging axis, and on release the pager's physics settle
 /// it, so a drag that falls short is cancelled and the page snaps back.
 class PlaylistSwipeDrag {
-  PlaylistSwipeDrag({required this.positionOf, required this.canClaim});
+  PlaylistSwipeDrag({
+    required this.positionOf,
+    required this.canClaim,
+    this.crossAxisYieldRatio,
+  });
 
   /// The pager's scroll position, or null while it has none.
   final ScrollPosition? Function() positionOf;
@@ -203,6 +252,17 @@ class PlaylistSwipeDrag {
   /// so on). Asked when a finger lands and again on every move, so a drag in
   /// progress is cancelled the moment swiping becomes locked.
   final bool Function() canClaim;
+
+  /// Asked when a finger lands. While another recognizer owns drags across the
+  /// paging axis (swipe to dismiss, or swipe to seek in a vertical playlist),
+  /// returns how much further across than along the axis a drag has to lean
+  /// for that recognizer to claim it, and null when none can start.
+  ///
+  /// A drag that clearly leans that way is left for that recognizer, instead
+  /// of racing it. Otherwise the pager, which takes a drag of any direction
+  /// after a short travel, would win every drag that is not perfectly straight
+  /// and the other gesture would be very hard to trigger.
+  final double? Function()? crossAxisYieldRatio;
 
   Drag? _drag;
 
@@ -266,7 +326,10 @@ class PlaylistSwipeDrag {
             GestureRecognizerFactoryWithHandlers<
               PlaylistSwipeHorizontalRecognizer
             >(
-              () => PlaylistSwipeHorizontalRecognizer(canClaim: canClaim),
+              () => PlaylistSwipeHorizontalRecognizer(
+                canClaim: canClaim,
+                crossAxisYieldRatio: crossAxisYieldRatio,
+              ),
               configure,
             ),
       },
@@ -275,7 +338,10 @@ class PlaylistSwipeDrag {
             GestureRecognizerFactoryWithHandlers<
               PlaylistSwipeVerticalRecognizer
             >(
-              () => PlaylistSwipeVerticalRecognizer(canClaim: canClaim),
+              () => PlaylistSwipeVerticalRecognizer(
+                canClaim: canClaim,
+                crossAxisYieldRatio: crossAxisYieldRatio,
+              ),
               configure,
             ),
       },

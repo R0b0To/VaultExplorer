@@ -238,16 +238,40 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
         }
         return;
       }
-      final itemContext = _tabItemKeys[active]?.currentContext;
-      if (itemContext == null) return;
-      Scrollable.ensureVisible(
-        itemContext,
-        alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeInOut,
+      // Tabs have a fixed width, so where the active one sits is known without
+      // asking its widget. (`Scrollable.ensureVisible` with
+      // `keepVisibleAtEnd` never scrolls backwards, so a tab hidden on the
+      // left stayed hidden; and a tab outside the built range has no widget to
+      // ask at all.)
+      final position = _scrollController.position;
+      final viewport = position.viewportDimension;
+      final itemStart = _stripPadding + activeIndex * kBrowserTabItemWidth;
+      final itemEnd = itemStart + kBrowserTabItemWidth;
+      double? target;
+      if (itemStart - _stripPadding < position.pixels) {
+        // Hidden (or clipped) on the left: bring its leading edge into view.
+        target = itemStart - _stripPadding;
+      } else if (itemEnd + _stripPadding > position.pixels + viewport) {
+        // Hidden (or clipped) on the right: bring its trailing edge into view.
+        target = itemEnd + _stripPadding - viewport;
+      }
+      if (target == null) return;
+      final clamped = target
+          .clamp(position.minScrollExtent, position.maxScrollExtent)
+          .toDouble();
+      if ((clamped - position.pixels).abs() < 0.5) return;
+      unawaited(
+        _scrollController.animateTo(
+          clamped,
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeInOut,
+        ),
       );
     });
   }
+
+  /// Horizontal padding of the tab list (see the list's `padding`).
+  static const double _stripPadding = 3;
 
   void _onTabTapped(BrowserTabState tab, BuildContext tabContext) {
     final state = ref.read(browserTabsProvider(widget.workspaceConfig));
@@ -422,7 +446,10 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
                 scrollDirection: Axis.horizontal,
                 clipBehavior: Clip.hardEdge,
                 buildDefaultDragHandles: false,
-                padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: _stripPadding,
+                  vertical: 3,
+                ),
                 itemCount: tabs.length,
                 onReorderStart: (index) {
                   HapticFeedback.mediumImpact();

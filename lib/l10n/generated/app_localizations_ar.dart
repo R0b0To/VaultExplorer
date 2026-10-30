@@ -12737,6 +12737,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get floatingPlayerExpandTooltip => 'توسيع';
 
   @override
+  String get floatingPlayerAudioOnly => 'الصوت فقط';
+
+  @override
+  String get floatingPlayerShowVideo => 'إظهار الفيديو';
+
+  @override
   String get masterLockTitle => 'القفل الرئيسي';
 
   @override

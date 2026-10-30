@@ -21235,6 +21235,18 @@ abstract class AppLocalizations {
   /// **'Expand'**
   String get floatingPlayerExpandTooltip;
 
+  /// Label of the button on the floating video window that stops showing the video and carries on with just the sound
+  ///
+  /// In en, this message translates to:
+  /// **'Audio only'**
+  String get floatingPlayerAudioOnly;
+
+  /// Label of the small chip that replaces the floating video window while it is audio only; tapping it brings the video back
+  ///
+  /// In en, this message translates to:
+  /// **'Show video'**
+  String get floatingPlayerShowVideo;
+
   /// Settings section and toggle title for the app-wide lock (password, PIN or pattern)
   ///
   /// In en, this message translates to:

@@ -12007,6 +12007,12 @@ class AppLocalizationsJa extends AppLocalizations {
   String get floatingPlayerExpandTooltip => '拡大';
 
   @override
+  String get floatingPlayerAudioOnly => '音声のみ';
+
+  @override
+  String get floatingPlayerShowVideo => '動画を表示';
+
+  @override
   String get masterLockTitle => 'マスターロック';
 
   @override

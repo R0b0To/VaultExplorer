@@ -779,6 +779,10 @@ open class MainActivity : FlutterFragmentActivity() {
                     nativePlayerManager.setVolume(volume)
                     result.success(null)
                 }
+                "setAudioOnly" -> {
+                    nativePlayerManager.setAudioOnly(call.argument<Boolean>("enabled") ?: false)
+                    result.success(null)
+                }
                 "setVolumeBoost" -> {
                     val enabled = call.argument<Boolean>("enabled") ?: false
                     val gainMb = call.argument<Int>("gainMb") ?: 2000

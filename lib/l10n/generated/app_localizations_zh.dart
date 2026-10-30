@@ -11816,6 +11816,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get floatingPlayerExpandTooltip => '展开';
 
   @override
+  String get floatingPlayerAudioOnly => '仅音频';
+
+  @override
+  String get floatingPlayerShowVideo => '显示视频';
+
+  @override
   String get masterLockTitle => '主锁';
 
   @override

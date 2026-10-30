@@ -3513,6 +3513,8 @@
   "floatingPlayerTitle": "플로팅 동영상 플레이어",
   "floatingPlayerSubtitle": "동영상 재생 중 플레이어를 닫으면 옮길 수 있는 작은 창에서 계속 재생됩니다. 앱을 나가면 화면 속 화면으로 전환되며 오디오 전용 버튼이 표시됩니다",
   "floatingPlayerExpandTooltip": "확대",
+  "floatingPlayerAudioOnly": "오디오만",
+  "floatingPlayerShowVideo": "동영상 표시",
   "masterLockTitle": "마스터 잠금",
   "masterLockInactiveSubtitle": "앱을 열 때 비밀번호, PIN 또는 패턴 요구",
   "masterLockChooseTitle": "앱 잠금 방식을 선택하세요",

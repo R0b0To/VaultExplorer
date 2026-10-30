@@ -3513,6 +3513,8 @@
   "floatingPlayerTitle": "مشغّل فيديو عائم",
   "floatingPlayerSubtitle": "عند إغلاق المشغّل أثناء تشغيل فيديو، يستمر التشغيل في نافذة صغيرة يمكنك تحريكها. وعند مغادرة التطبيق يتحول إلى صورة داخل صورة مع زر للصوت فقط",
   "floatingPlayerExpandTooltip": "توسيع",
+  "floatingPlayerAudioOnly": "الصوت فقط",
+  "floatingPlayerShowVideo": "إظهار الفيديو",
   "masterLockTitle": "القفل الرئيسي",
   "masterLockInactiveSubtitle": "طلب كلمة مرور أو رمز PIN أو نمط لفتح التطبيق",
   "masterLockChooseTitle": "اختر طريقة قفل التطبيق",

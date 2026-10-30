@@ -12796,6 +12796,12 @@ class AppLocalizationsUk extends AppLocalizations {
   String get floatingPlayerExpandTooltip => 'Розгорнути';
 
   @override
+  String get floatingPlayerAudioOnly => 'Лише аудіо';
+
+  @override
+  String get floatingPlayerShowVideo => 'Показати відео';
+
+  @override
   String get masterLockTitle => 'Головне блокування';
 
   @override

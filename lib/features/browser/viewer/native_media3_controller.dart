@@ -162,6 +162,7 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
   final bool mediaSession;
   double _currentSpeed;
   int _currentVolume = 100;
+  bool _audioOnly = false;
   MediaDecoderMode _videoDecoderMode;
   MediaDecoderMode _audioDecoderMode;
   bool _volumeBoostEnabled;
@@ -287,6 +288,13 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
         // setVolume() call that arrived (and was dropped, see setVolume's
         // comment) before the native player existed would leave a muted
         // session playing at full volume once the player actually starts.
+      }
+    }
+    if (_audioOnly) {
+      try {
+        await setAudioOnly(true);
+      } catch (_) {
+        // Non-fatal: the video is decoded for a moment longer than asked.
       }
     }
     if (autoPlay && !_disposed) {
@@ -434,6 +442,19 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
     if (!_disposed) {
       final double normalized = (vol / 100.0).clamp(0.0, 1.0);
       await _cmdChannel.invokeMethod('setVolume', {'volume': normalized});
+    }
+  }
+
+  /// Stops decoding (and drawing) the video while the sound carries on, or
+  /// starts again with `false`. Recorded before the native call, like
+  /// [setVolume], and applied again once the native player exists: the
+  /// platform forgets it whenever a player is released, so it never outlives
+  /// the item it was set on, and a call that arrives before the player does
+  /// still takes effect.
+  Future<void> setAudioOnly(bool enabled) async {
+    _audioOnly = enabled;
+    if (!_disposed) {
+      await _cmdChannel.invokeMethod('setAudioOnly', {'enabled': enabled});
     }
   }
 

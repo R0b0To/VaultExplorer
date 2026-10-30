@@ -14,13 +14,22 @@ import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dar
 /// is on. The video keeps playing in a small window that can be dragged around
 /// and parked in any corner, over whatever screen the person is on.
 ///
+/// Gestures: drag to move (it settles in the nearest corner), pinch to resize
+/// (the size is remembered), tap to show or hide the controls, double-tap the
+/// left or right edge to skip back or forward 10 seconds.
+///
+/// Controls, the same as the picture-in-picture window's plus the window's own:
+/// previous / play-pause / next, audio only, expand and close. Audio only stops
+/// the video being decoded or drawn while the sound carries on, and leaves a
+/// small chip in the corner that brings the video back.
+///
 /// It is the same live player the viewer had: the viewer handed it to
 /// [BackgroundPlaybackHost], and this just shows its texture. Expanding hands
 /// it back to a new viewer, whose video grows out of this window (the window
 /// stays up until the viewer has drawn the video where it is); closing ends
-/// playback. Leaving the app while it plays
-/// turns the app into Android's picture-in-picture window (the host arms that
-/// through `PictureInPictureCoordinator`), so there is no state to carry over.
+/// playback. Leaving the app while it plays turns the app into Android's
+/// picture-in-picture window (the host arms that through
+/// `PictureInPictureCoordinator`), so there is no state to carry over.
 ///
 /// When it comes from the viewer closing, the window does not just appear: it
 /// takes off from the rectangle the video was in and shrinks into its corner,
@@ -66,19 +75,50 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
   /// The bottom corners rest this far above the bottom edge, clear of the
   /// floating action buttons and bars the screens underneath usually have.
   static const double _bottomLift = 72;
+  static const double _chipSize = 48;
+
+  // Pinch limits. The window is also kept inside the screen and its width never
+  // goes under [_minWidth], whatever the factor says.
+  static const double _minWidth = 130;
+  static const double _minSizeFactor = 0.6;
+  static const double _maxSizeFactor = 2.2;
+
+  /// Below this height there is no room for previous / next between the row of
+  /// buttons at the top and the progress bar; play / pause alone remains.
+  static const double _compactHeight = 100;
+
   static const Duration _snapDuration = Duration(milliseconds: 280);
   static const Duration _controlsTimeout = Duration(seconds: 3);
+  static const Duration _skipStep = Duration(seconds: 10);
 
-  // Which corner the window rests in; kept across items and across the app
-  // being the picture-in-picture window (the widget stays mounted).
-  bool _atRight = true;
-  bool _atBottom = true;
+  // What the person chose, kept for the next window too (a session ends, the
+  // next video floats in the same corner at the same size).
+  static bool _lastAtRight = true;
+  static bool _lastAtBottom = true;
+  static double _lastSizeFactor = 1.0;
 
-  /// Top-left of the window while a finger is dragging it, else null.
-  Offset? _dragTopLeft;
+  // Which corner the window rests in, and how big it is relative to the
+  // default; kept across items and across the app being the PiP window (the
+  // widget stays mounted).
+  bool _atRight = _lastAtRight;
+  bool _atBottom = _lastAtBottom;
+  double _sizeFactor = _lastSizeFactor;
+
+  /// While a finger is on the window: its centre, and the size factor the
+  /// pinch started from. Null centre when nothing is touching it.
+  Offset? _dragCenter;
+  double _scaleStartFactor = 1.0;
 
   bool _controlsVisible = true;
   Timer? _hideTimer;
+
+  /// A double-tap skip being acknowledged on screen: -1 back, 1 forward, 0
+  /// none; and how many seconds the quick taps have added up to.
+  int _skipDirection = 0;
+  int _skipSeconds = 0;
+  Timer? _skipTimer;
+
+  bool _stepping = false;
 
   /// Where the window sits for its first frame when it flies in from the
   /// viewer; null once it has set off (or when it simply appears).
@@ -110,12 +150,14 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
   void dispose() {
     BackgroundPlaybackHost.instance.unregisterFloatingRect(this);
     _hideTimer?.cancel();
+    _skipTimer?.cancel();
     super.dispose();
   }
 
   /// Where the video is on screen right now, wherever the window is in a drag
   /// or an animation (logical pixels of the app's view); null when it cannot
-  /// be told (not laid out, or the app is the PiP window).
+  /// be told (not laid out, only the audio-only chip showing, or the app is
+  /// the PiP window).
   Rect? _measureVideo() {
     if (!mounted || PictureInPictureBridge.isInPictureInPicture.value) {
       return null;
@@ -164,6 +206,48 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
     unawaited(BackgroundPlaybackHost.instance.closeAndWait());
   }
 
+  /// Previous / next video. One step at a time: a second tap while the first
+  /// is still switching would only queue another switch behind it.
+  Future<void> _step(int direction) async {
+    if (_stepping) return;
+    _stepping = true;
+    try {
+      await BackgroundPlaybackHost.instance.stepItem(direction);
+    } finally {
+      _stepping = false;
+    }
+    if (mounted) _scheduleHide();
+  }
+
+  /// Double-tap on the left / right edge: [direction] -1 / 1 moves the video
+  /// by [_skipStep], and the number on screen adds up while the taps keep
+  /// coming.
+  void _skip(NativeVideoController controller, int direction) {
+    if (controller.isDisposed) return;
+    final value = controller.value;
+    if (!value.isInitialized) return;
+    var target = value.position + _skipStep * direction;
+    if (target < Duration.zero) target = Duration.zero;
+    if (value.duration > Duration.zero && target > value.duration) {
+      target = value.duration;
+    }
+    unawaited(controller.seekTo(target));
+    setState(() {
+      _skipSeconds = _skipDirection == direction
+          ? _skipSeconds + _skipStep.inSeconds
+          : _skipStep.inSeconds;
+      _skipDirection = direction;
+    });
+    _skipTimer?.cancel();
+    _skipTimer = Timer(const Duration(milliseconds: 700), () {
+      if (!mounted) return;
+      setState(() {
+        _skipDirection = 0;
+        _skipSeconds = 0;
+      });
+    });
+  }
+
   /// Tells the PiP coordinator where the video is (not the window: the bars
   /// around a video that does not fit the window's shape are not part of it).
   /// Reported after every layout, not only when it changes: the coordinator
@@ -203,23 +287,24 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
     );
   }
 
-  /// Lets go of the window: it settles in the corner nearest to where it would
-  /// have ended up, counting a little of the fling.
-  void _snap({
+  /// Fingers off: the window settles in the corner nearest to where it would
+  /// have ended up, counting a little of the fling, at the size the pinch left
+  /// it, and both are remembered.
+  void _finishGesture({
     required Offset velocity,
-    required Offset topLeft,
-    required Size window,
     required Size screen,
+    required double sizeFactor,
   }) {
-    final center =
-        topLeft +
-        Offset(window.width / 2, window.height / 2) +
-        velocity * 0.12;
+    final center = (_dragCenter ?? screen.center(Offset.zero)) + velocity * 0.12;
     setState(() {
       _atRight = center.dx > screen.width / 2;
       _atBottom = center.dy > screen.height / 2;
-      _dragTopLeft = null;
+      _sizeFactor = sizeFactor.clamp(_minSizeFactor, _maxSizeFactor).toDouble();
+      _dragCenter = null;
     });
+    _lastAtRight = _atRight;
+    _lastAtBottom = _atBottom;
+    _lastSizeFactor = _sizeFactor;
     _scheduleHide();
   }
 
@@ -228,16 +313,33 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final screen = constraints.biggest;
-        return ValueListenableBuilder<NativeVideoController?>(
-          valueListenable: widget.playbackManager.activeControllerNotifier,
-          builder: (context, controller, _) {
-            if (controller == null || controller.isDisposed) {
-              return const SizedBox.shrink();
-            }
-            return ValueListenableBuilder<NativeVideoValue>(
-              valueListenable: controller,
-              builder: (context, value, _) =>
-                  _buildWindow(context, screen, controller, value),
+        return ValueListenableBuilder<bool>(
+          valueListenable: BackgroundPlaybackHost.instance.floatingAudioOnly,
+          builder: (context, audioOnly, _) {
+            if (audioOnly) return _buildAudioOnlyChip(context, screen);
+            return ValueListenableBuilder<NativeVideoController?>(
+              valueListenable: widget.playbackManager.activeControllerNotifier,
+              builder: (context, controller, _) {
+                if (controller == null || controller.isDisposed) {
+                  return const SizedBox.shrink();
+                }
+                // Asked once per item, not per frame of the video: the
+                // answer only changes when the item does.
+                final host = BackgroundPlaybackHost.instance;
+                final canPrevious = host.canStepPrevious;
+                final canNext = host.canStepNext;
+                return ValueListenableBuilder<NativeVideoValue>(
+                  valueListenable: controller,
+                  builder: (context, value, _) => _buildWindow(
+                    context,
+                    screen,
+                    controller,
+                    value,
+                    canPrevious: canPrevious,
+                    canNext: canNext,
+                  ),
+                );
+              },
             );
           },
         );
@@ -249,8 +351,10 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
     BuildContext context,
     Size screen,
     NativeVideoController controller,
-    NativeVideoValue value,
-  ) {
+    NativeVideoValue value, {
+    required bool canPrevious,
+    required bool canNext,
+  }) {
     final media = MediaQuery.of(context);
     final padding = media.padding;
     final landscape = screen.width > screen.height;
@@ -258,12 +362,17 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
     // The window's own shape stays within a sensible range (a tall phone clip
     // does not become a tower); the video is letterboxed inside it.
     final shape = value.aspectRatio.clamp(0.75, 2.2).toDouble();
-    var width = landscape
+    var baseWidth = landscape
         ? math.min(screen.width * 0.32, 320.0)
         : math.min(screen.width * 0.56, 280.0);
-    width = math.max(width, 150.0);
+    baseWidth = math.max(baseWidth, 150.0);
+    final widest = math.max(
+      _minWidth,
+      math.min(screen.width - padding.horizontal - 2 * _margin, 560.0),
+    );
+    var width = (baseWidth * _sizeFactor).clamp(_minWidth, widest).toDouble();
     var height = width / shape;
-    final maxHeight = screen.height * 0.5;
+    final maxHeight = screen.height * 0.6;
     if (height > maxHeight) {
       height = maxHeight;
       width = height * shape;
@@ -277,14 +386,14 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
 
     final restX = _atRight ? maxX : minX;
     final restY = _atBottom ? math.max(minY, maxY - _bottomLift) : minY;
-    final dragging = _dragTopLeft;
+    final dragCenter = _dragCenter;
     final flight = _flightFrom;
-    var left = dragging == null
+    var left = dragCenter == null
         ? restX
-        : dragging.dx.clamp(minX, maxX).toDouble();
-    var top = dragging == null
+        : (dragCenter.dx - width / 2).clamp(minX, maxX).toDouble();
+    var top = dragCenter == null
         ? restY
-        : dragging.dy.clamp(minY, maxY).toDouble();
+        : (dragCenter.dy - height / 2).clamp(minY, maxY).toDouble();
     // First frame of a flight: exactly where the viewer's video is, at its
     // size; the frame after, the corner.
     if (flight != null) {
@@ -296,10 +405,13 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
 
     final showControls = _controlsVisible || !value.isPlaying;
     final windowSize = Size(width, height);
+    // What the size is, as a factor of the default, once the screen has had its
+    // say: what a pinch is measured from and leaves behind.
+    final effectiveFactor = width / baseWidth;
 
     // While a finger moves the window nothing is settled; the position it is
     // let go in is reported then.
-    if (dragging == null && flight == null) {
+    if (dragCenter == null && flight == null) {
       _reportVideoRect(
         context,
         Rect.fromLTWH(left, top, width, height),
@@ -311,7 +423,7 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
       clipBehavior: Clip.none,
       children: [
         AnimatedPositioned(
-          duration: dragging == null ? _snapDuration : Duration.zero,
+          duration: dragCenter == null ? _snapDuration : Duration.zero,
           curve: Curves.easeInOutCubic,
           left: left,
           top: top,
@@ -331,24 +443,37 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
               clipBehavior: Clip.antiAlias,
               child: child,
             ),
+            // One recogniser for both moving and pinching; taps and double
+            // taps are the zones' (below), and they only win when nothing
+            // moves.
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: _toggleControls,
-              onPanStart: (_) {
+              onScaleStart: (_) {
                 _hideTimer?.cancel();
-                setState(() => _dragTopLeft = Offset(left, top));
+                setState(() {
+                  _sizeFactor = effectiveFactor;
+                  _scaleStartFactor = effectiveFactor;
+                  _dragCenter = Offset(left + width / 2, top + height / 2);
+                });
               },
-              onPanUpdate: (details) => setState(
-                () => _dragTopLeft =
-                    (_dragTopLeft ?? Offset(left, top)) + details.delta,
-              ),
-              onPanEnd: (details) => _snap(
-                velocity: details.velocity.pixelsPerSecond,
-                topLeft: Offset(left, top),
-                window: windowSize,
-                screen: screen,
-              ),
-              onPanCancel: () => setState(() => _dragTopLeft = null),
+              onScaleUpdate: (details) => setState(() {
+                _dragCenter =
+                    (_dragCenter ?? Offset(left + width / 2, top + height / 2)) +
+                    details.focalPointDelta;
+                _sizeFactor = (_scaleStartFactor * details.scale)
+                    .clamp(_minSizeFactor, _maxSizeFactor)
+                    .toDouble();
+              }),
+              onScaleEnd: (details) {
+                // One finger lifting while another stays down ends this
+                // gesture and starts the next straight away.
+                if (details.pointerCount > 0) return;
+                _finishGesture(
+                  velocity: details.velocity.pixelsPerSecond,
+                  screen: screen,
+                  sizeFactor: effectiveFactor,
+                );
+              },
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -358,14 +483,23 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
                       child: NativeVideoPlayerView(controller: controller),
                     ),
                   ),
+                  _buildTapZones(controller),
                   IgnorePointer(
                     ignoring: !showControls,
                     child: AnimatedOpacity(
                       opacity: showControls ? 1 : 0,
                       duration: const Duration(milliseconds: 150),
-                      child: _buildControls(context, controller, value),
+                      child: _buildControls(
+                        context,
+                        controller,
+                        value,
+                        windowSize,
+                        canPrevious: canPrevious,
+                        canNext: canNext,
+                      ),
                     ),
                   ),
+                  _buildSkipFeedback(),
                   Positioned(
                     left: 0,
                     right: 0,
@@ -381,19 +515,64 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
     );
   }
 
+  /// Three vertical zones over the video. A tap anywhere shows or hides the
+  /// controls; a double tap in the outer two skips back / forward. The middle
+  /// has no double tap, so a tap there answers at once (a zone with a double
+  /// tap has to wait out the second tap before it knows it was a single one).
+  Widget _buildTapZones(NativeVideoController controller) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          flex: 3,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _toggleControls,
+            onDoubleTap: () => _skip(controller, -1),
+          ),
+        ),
+        Expanded(
+          flex: 4,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _toggleControls,
+          ),
+        ),
+        Expanded(
+          flex: 3,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _toggleControls,
+            onDoubleTap: () => _skip(controller, 1),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildControls(
     BuildContext context,
     NativeVideoController controller,
     NativeVideoValue value,
-  ) {
+    Size windowSize, {
+    required bool canPrevious,
+    required bool canNext,
+  }) {
     final l10n = context.l10n;
+    final host = BackgroundPlaybackHost.instance;
+    final compact = windowSize.height < _compactHeight;
+
+    Widget slot(Widget? child) => SizedBox(width: 30, height: 30, child: child);
+
     return Stack(
       fit: StackFit.expand,
       children: [
-        const ColoredBox(color: Color(0x66000000)),
+        // The scrim only darkens; it must not take the taps meant for the
+        // zones under it.
+        const IgnorePointer(child: ColoredBox(color: Color(0x66000000))),
         Positioned(
-          top: 4,
-          left: 4,
+          top: 3,
+          left: 3,
           child: _RoundButton(
             icon: Icons.open_in_full_rounded,
             label: l10n.floatingPlayerExpandTooltip,
@@ -401,32 +580,165 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
           ),
         ),
         Positioned(
-          top: 4,
-          right: 4,
-          child: _RoundButton(
-            icon: Icons.close_rounded,
-            label: l10n.closeTooltip,
-            onPressed: _close,
+          top: 3,
+          right: 3,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _RoundButton(
+                icon: Icons.headphones_rounded,
+                label: l10n.floatingPlayerAudioOnly,
+                onPressed: () => host.setAudioOnly(true),
+              ),
+              const SizedBox(width: 3),
+              _RoundButton(
+                icon: Icons.close_rounded,
+                label: l10n.closeTooltip,
+                onPressed: _close,
+              ),
+            ],
           ),
         ),
         Center(
-          child: value.isBuffering
-              ? const SizedBox(
-                  width: 28,
-                  height: 28,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    color: Colors.white,
-                  ),
-                )
-              : _RoundButton(
-                  icon: value.isPlaying
-                      ? Icons.pause_rounded
-                      : Icons.play_arrow_rounded,
-                  label: value.isPlaying ? l10n.pauseLabel : l10n.playLabel,
-                  size: 34,
-                  onPressed: () => _togglePlayPause(controller),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (!compact) ...[
+                slot(
+                  canPrevious
+                      ? _RoundButton(
+                          icon: Icons.skip_previous_rounded,
+                          label: l10n.previousTooltip,
+                          size: 20,
+                          box: 30,
+                          onPressed: () => unawaited(_step(-1)),
+                        )
+                      : null,
                 ),
+                const SizedBox(width: 4),
+              ],
+              value.isBuffering
+                  ? const SizedBox(
+                      width: 40,
+                      height: 40,
+                      child: Center(
+                        child: SizedBox(
+                          width: 26,
+                          height: 26,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    )
+                  : _RoundButton(
+                      icon: value.isPlaying
+                          ? Icons.pause_rounded
+                          : Icons.play_arrow_rounded,
+                      label: value.isPlaying ? l10n.pauseLabel : l10n.playLabel,
+                      size: 28,
+                      box: 40,
+                      onPressed: () => _togglePlayPause(controller),
+                    ),
+              if (!compact) ...[
+                const SizedBox(width: 4),
+                slot(
+                  canNext
+                      ? _RoundButton(
+                          icon: Icons.skip_next_rounded,
+                          label: l10n.nextTooltip,
+                          size: 20,
+                          box: 30,
+                          onPressed: () => unawaited(_step(1)),
+                        )
+                      : null,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// The "10" that shows on the side that was double-tapped.
+  Widget _buildSkipFeedback() {
+    if (_skipDirection == 0) return const SizedBox.shrink();
+    final forward = _skipDirection > 0;
+    const shadows = <Shadow>[Shadow(blurRadius: 6, color: Colors.black87)];
+    return IgnorePointer(
+      child: Align(
+        alignment: Alignment(forward ? 0.62 : -0.62, 0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              forward ? Icons.fast_forward_rounded : Icons.fast_rewind_rounded,
+              color: Colors.white,
+              size: 28,
+              shadows: shadows,
+            ),
+            Text(
+              '$_skipSeconds',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                shadows: shadows,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Audio only: no video to show, so just a small chip where the window was,
+  /// which brings the video back.
+  Widget _buildAudioOnlyChip(BuildContext context, Size screen) {
+    final media = MediaQuery.of(context);
+    final padding = media.padding;
+    final scheme = Theme.of(context).colorScheme;
+    final minX = padding.left + _margin;
+    final maxX = math.max(
+      minX,
+      screen.width - padding.right - _margin - _chipSize,
+    );
+    final minY = padding.top + _margin;
+    final bottomInset = math.max(padding.bottom, media.viewInsets.bottom);
+    final maxY = math.max(
+      minY,
+      screen.height - bottomInset - _margin - _chipSize,
+    );
+    final left = _atRight ? maxX : minX;
+    final top = _atBottom ? math.max(minY, maxY - _bottomLift) : minY;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        AnimatedPositioned(
+          duration: _snapDuration,
+          curve: Curves.easeInOutCubic,
+          left: left,
+          top: top,
+          width: _chipSize,
+          height: _chipSize,
+          child: Material(
+            color: scheme.primaryContainer,
+            elevation: 8,
+            shape: const CircleBorder(),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: () => BackgroundPlaybackHost.instance.setAudioOnly(false),
+              child: Center(
+                child: Icon(
+                  Icons.headphones_rounded,
+                  color: scheme.onPrimaryContainer,
+                  semanticLabel: context.l10n.floatingPlayerShowVideo,
+                ),
+              ),
+            ),
+          ),
         ),
       ],
     );
@@ -460,13 +772,17 @@ class _RoundButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onPressed;
+
+  /// The icon's size, and the side of the round button around it.
   final double size;
+  final double box;
 
   const _RoundButton({
     required this.icon,
     required this.label,
     required this.onPressed,
-    this.size = 20,
+    this.size = 17,
+    this.box = 26,
   });
 
   @override
@@ -480,8 +796,9 @@ class _RoundButton extends StatelessWidget {
       color: Colors.white,
       style: IconButton.styleFrom(
         backgroundColor: Colors.black45,
-        padding: const EdgeInsets.all(6),
-        minimumSize: const Size(32, 32),
+        padding: EdgeInsets.zero,
+        fixedSize: Size(box, box),
+        minimumSize: Size(box, box),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
     );

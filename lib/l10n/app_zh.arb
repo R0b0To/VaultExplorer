@@ -3513,6 +3513,8 @@
   "floatingPlayerTitle": "悬浮视频播放器",
   "floatingPlayerSubtitle": "播放视频时关闭播放器，视频会在可拖动的小窗口中继续播放。离开应用后将进入画中画，并提供仅音频按钮",
   "floatingPlayerExpandTooltip": "展开",
+  "floatingPlayerAudioOnly": "仅音频",
+  "floatingPlayerShowVideo": "显示视频",
   "masterLockTitle": "主锁",
   "masterLockInactiveSubtitle": "打开应用时需要密码、PIN或图案",
   "masterLockChooseTitle": "选择应用的锁定方式",

@@ -3513,6 +3513,8 @@
   "floatingPlayerTitle": "Lecteur vidéo flottant",
   "floatingPlayerSubtitle": "En fermant le lecteur, la vidéo continue dans une petite fenêtre déplaçable. En quittant l’application, elle passe en image dans l’image, avec un bouton audio seul",
   "floatingPlayerExpandTooltip": "Agrandir",
+  "floatingPlayerAudioOnly": "Audio uniquement",
+  "floatingPlayerShowVideo": "Afficher la vidéo",
   "masterLockTitle": "Verrouillage principal",
   "masterLockInactiveSubtitle": "Exiger un mot de passe, un code PIN ou un schéma pour ouvrir l'application",
   "masterLockChooseTitle": "Choisissez comment verrouiller l'application",

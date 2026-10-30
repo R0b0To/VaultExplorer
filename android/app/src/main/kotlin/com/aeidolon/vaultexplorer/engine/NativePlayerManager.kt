@@ -136,6 +136,11 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
     // onStop): while stopped nothing is on screen, so video decoding is
     // switched off and only audio keeps playing.
     private var appInBackground: Boolean = false
+    // Set by the floating player's "audio only" button: the video is not being
+    // shown, so it is not decoded either. Lives as long as the player it was
+    // set on (release() clears it): an item change re-applies it from Dart, and
+    // it can never carry over into a later video.
+    private var audioOnly: Boolean = false
 
     var methodChannel: MethodChannel? = null
     var eventSink: EventChannel.EventSink? = null
@@ -603,6 +608,17 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
     }
 
     /**
+     * "Audio only": the video track is switched off (no decoding, nothing
+     * pushed at the texture) while the sound carries on, and back on again
+     * with `false`. Like [setAppInBackground], but asked for by the person
+     * rather than caused by the activity being stopped.
+     */
+    fun setAudioOnly(enabled: Boolean) {
+        audioOnly = enabled
+        player?.let { applyBackgroundVideoPolicy(it) }
+    }
+
+    /**
      * Moves the video output into the picture-in-picture window's [view].
      * Returns false when there is no player to show.
      */
@@ -625,7 +641,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
     }
 
     private fun applyBackgroundVideoPolicy(p: ExoPlayer) {
-        val disabled = appInBackground && externalSurfaceView == null
+        val disabled = (appInBackground || audioOnly) && externalSurfaceView == null
         if (p.trackSelectionParameters.disabledTrackTypes.contains(C.TRACK_TYPE_VIDEO) == disabled) return
         p.trackSelectionParameters = p.trackSelectionParameters.buildUpon()
             .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, disabled)
@@ -1075,6 +1091,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
             p.release()
         }
         mediaSessionEnabled = false
+        audioOnly = false
         player = null
         // externalSurfaceView is deliberately kept: every item change releases
         // and recreates the player, and the next item belongs in the

@@ -3513,6 +3513,8 @@
   "floatingPlayerTitle": "フローティング動画プレーヤー",
   "floatingPlayerSubtitle": "動画の再生中にプレーヤーを閉じると、移動できる小さなウィンドウで再生を続けます。アプリを離れるとピクチャーインピクチャーに切り替わり、音声のみのボタンが表示されます",
   "floatingPlayerExpandTooltip": "拡大",
+  "floatingPlayerAudioOnly": "音声のみ",
+  "floatingPlayerShowVideo": "動画を表示",
   "masterLockTitle": "マスターロック",
   "masterLockInactiveSubtitle": "アプリを開く際にパスワード、PIN、またはパターンを要求する",
   "masterLockChooseTitle": "アプリのロック方法を選択",

@@ -14345,6 +14345,14 @@
   "@floatingPlayerExpandTooltip": {
     "description": "Label of the button on the floating video window that reopens the video full screen"
   },
+  "floatingPlayerAudioOnly": "Audio only",
+  "@floatingPlayerAudioOnly": {
+    "description": "Label of the button on the floating video window that stops showing the video and carries on with just the sound"
+  },
+  "floatingPlayerShowVideo": "Show video",
+  "@floatingPlayerShowVideo": {
+    "description": "Label of the small chip that replaces the floating video window while it is audio only; tapping it brings the video back"
+  },
   "masterLockTitle": "Master Lock",
   "@masterLockTitle": {
     "description": "Settings section and toggle title for the app-wide lock (password, PIN or pattern)"

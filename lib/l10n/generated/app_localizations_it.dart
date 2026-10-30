@@ -12707,6 +12707,12 @@ class AppLocalizationsIt extends AppLocalizations {
   String get floatingPlayerExpandTooltip => 'Espandi';
 
   @override
+  String get floatingPlayerAudioOnly => 'Solo audio';
+
+  @override
+  String get floatingPlayerShowVideo => 'Mostra video';
+
+  @override
   String get masterLockTitle => 'Blocco principale';
 
   @override

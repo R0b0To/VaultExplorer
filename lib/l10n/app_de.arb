@@ -3513,6 +3513,8 @@
   "floatingPlayerTitle": "Schwebender Video-Player",
   "floatingPlayerSubtitle": "Beim Schließen des Players läuft das Video in einem kleinen, verschiebbaren Fenster weiter. Beim Verlassen der App wird es zu Bild-in-Bild, mit einer Nur-Audio-Taste",
   "floatingPlayerExpandTooltip": "Vergrößern",
+  "floatingPlayerAudioOnly": "Nur Audio",
+  "floatingPlayerShowVideo": "Video anzeigen",
   "masterLockTitle": "Hauptsperre",
   "masterLockInactiveSubtitle": "Ein Passwort, eine PIN oder ein Muster zum Öffnen der App verlangen",
   "masterLockChooseTitle": "Wähle, wie die App gesperrt wird",

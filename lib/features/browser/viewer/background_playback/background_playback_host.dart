@@ -172,6 +172,14 @@ class BackgroundPlaybackHost {
   Object? _floatingRectOwner;
   Rect? Function()? _floatingRect;
 
+  bool _audioOnly = false;
+
+  /// Whether the floating player is in "audio only": the video is neither
+  /// decoded nor drawn, the sound carries on, and the window shrinks to a small
+  /// chip that brings the video back. Mirrors [audioOnly] for the UI (updated
+  /// from a microtask, like the other notifiers here).
+  final ValueNotifier<bool> floatingAudioOnly = ValueNotifier<bool>(false);
+
   /// The session showing in the in-app floating player, or null. The app's
   /// root listens to this to draw the window. Updated from a microtask: the
   /// session changes from `State.dispose`, where a notifier that widgets
@@ -231,6 +239,52 @@ class BackgroundPlaybackHost {
       if (floatingEntry.value != null) floatingEntry.value = null;
     });
   }
+
+  bool get audioOnly => _audioOnly;
+
+  /// The floating player's "audio only" button, or the chip that undoes it.
+  /// On, the video stops being decoded and drawn while the sound carries on
+  /// (the media notification still steers it), and leaving the app no longer
+  /// turns it into the picture-in-picture window: there is nothing to show in
+  /// one. Off, the video is back.
+  void setAudioOnly(bool enabled) {
+    final session = _session;
+    if (session == null || !session.floatingPlayer || _audioOnly == enabled) {
+      return;
+    }
+    _audioOnly = enabled;
+    _publishAudioOnly();
+    final controller = _tickController;
+    if (controller == null || controller.isDisposed) return;
+    unawaited(controller.setAudioOnly(enabled));
+    if (enabled) {
+      PictureInPictureCoordinator.instance.detach(this);
+    } else {
+      PictureInPictureCoordinator.instance.attach(
+        this,
+        controller,
+        autoEnter: true,
+      );
+    }
+  }
+
+  void _publishAudioOnly() {
+    scheduleMicrotask(() {
+      if (floatingAudioOnly.value != _audioOnly) {
+        floatingAudioOnly.value = _audioOnly;
+      }
+    });
+  }
+
+  /// Whether the running session has a next / previous video to go to: the
+  /// answer the media notification and the PiP window's buttons are given.
+  bool get canStepNext => _hasNext;
+  bool get canStepPrevious => _hasPrevious;
+
+  /// Moves the running session to the next ([direction] 1) or previous (-1)
+  /// video, as the notification's buttons do. The floating player's own
+  /// buttons call this; nothing happens when there is no such video.
+  Future<void> stepItem(int direction) => _step(direction);
 
   /// The floating window says how to find out where its video is on screen
   /// right now (animation and drag included). Only the window that registered
@@ -326,6 +380,12 @@ class BackgroundPlaybackHost {
     if (session.playbackManager.currentFileName != file) return null;
     final controller = session.playbackManager.activeController;
     if (controller == null || controller.isDisposed) return null;
+    if (_audioOnly) {
+      // The viewer shows the video: it must be decoded again.
+      _audioOnly = false;
+      _publishAudioOnly();
+      unawaited(controller.setAudioOnly(false));
+    }
     if (session.floatingPlayer) {
       // Measured now: this runs inside the viewer's initState, so the window
       // is still on screen and laid out; it is removed from the tree a frame
@@ -375,6 +435,9 @@ class BackgroundPlaybackHost {
   }
 
   Future<void> _teardown(BackgroundPlaybackSession session) async {
+    // The player is released below, which ends it natively too.
+    _audioOnly = false;
+    _publishAudioOnly();
     _detach(session);
     if (identical(_session, session)) _session = null;
     _publishFloatingSession();
@@ -504,12 +567,17 @@ class BackgroundPlaybackHost {
     // Every item gets its own native controller, which starts at the default
     // volume: re-apply the mute choice, as the viewer does.
     unawaited(controller.setVolume(session.isMuted ? 0 : 100));
+    // The same goes for "audio only": it belongs to the player it was set on.
+    if (session.floatingPlayer && _audioOnly) {
+      unawaited(controller.setAudioOnly(true));
+    }
     _reportPlaying(session, controller.value.isPlaying);
-    if (session.floatingPlayer) {
+    if (session.floatingPlayer && !_audioOnly) {
       // Leaving the app (home, recents, another app) while the floating player
       // plays turns the app into the picture-in-picture window. This does not
       // depend on the viewer's "automatic picture-in-picture" setting: having
-      // the floating player on is the person asking for exactly that.
+      // the floating player on is the person asking for exactly that. (Not in
+      // audio only, when there is no video to put in the window.)
       PictureInPictureCoordinator.instance.attach(
         this,
         controller,

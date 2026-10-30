@@ -12010,6 +12010,12 @@ class AppLocalizationsKo extends AppLocalizations {
   String get floatingPlayerExpandTooltip => '확대';
 
   @override
+  String get floatingPlayerAudioOnly => '오디오만';
+
+  @override
+  String get floatingPlayerShowVideo => '동영상 표시';
+
+  @override
   String get masterLockTitle => '마스터 잠금';
 
   @override

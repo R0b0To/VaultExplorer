@@ -12514,6 +12514,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get floatingPlayerExpandTooltip => 'Expand';
 
   @override
+  String get floatingPlayerAudioOnly => 'Audio only';
+
+  @override
+  String get floatingPlayerShowVideo => 'Show video';
+
+  @override
   String get masterLockTitle => 'Master Lock';
 
   @override

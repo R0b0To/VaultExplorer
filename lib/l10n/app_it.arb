@@ -3513,6 +3513,8 @@
   "floatingPlayerTitle": "Lettore video flottante",
   "floatingPlayerSubtitle": "Chiudendo il lettore, il video continua in una piccola finestra che puoi spostare. Uscendo dall’app diventa picture-in-picture, con un pulsante solo audio",
   "floatingPlayerExpandTooltip": "Espandi",
+  "floatingPlayerAudioOnly": "Solo audio",
+  "floatingPlayerShowVideo": "Mostra video",
   "masterLockTitle": "Blocco principale",
   "masterLockInactiveSubtitle": "Richiedi una password, un PIN o uno schema per aprire l'app",
   "masterLockChooseTitle": "Scegli come bloccare l'app",

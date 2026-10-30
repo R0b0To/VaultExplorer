@@ -3513,6 +3513,8 @@
   "floatingPlayerTitle": "Плаваючий відеоплеєр",
   "floatingPlayerSubtitle": "Якщо закрити плеєр під час відтворення відео, воно продовжиться в невеликому вікні, яке можна переміщувати. Після виходу із застосунку воно перейде в режим «картинка в картинці» з кнопкою «Лише аудіо»",
   "floatingPlayerExpandTooltip": "Розгорнути",
+  "floatingPlayerAudioOnly": "Лише аудіо",
+  "floatingPlayerShowVideo": "Показати відео",
   "masterLockTitle": "Головне блокування",
   "masterLockInactiveSubtitle": "Вимагати пароль, PIN-код або графічний ключ для відкриття програми",
   "masterLockChooseTitle": "Виберіть, як блокувати програму",

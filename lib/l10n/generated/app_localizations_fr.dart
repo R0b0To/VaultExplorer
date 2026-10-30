@@ -12815,6 +12815,12 @@ class AppLocalizationsFr extends AppLocalizations {
   String get floatingPlayerExpandTooltip => 'Agrandir';
 
   @override
+  String get floatingPlayerAudioOnly => 'Audio uniquement';
+
+  @override
+  String get floatingPlayerShowVideo => 'Afficher la vidéo';
+
+  @override
   String get masterLockTitle => 'Verrouillage principal';
 
   @override

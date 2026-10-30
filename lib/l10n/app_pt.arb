@@ -3513,6 +3513,8 @@
   "floatingPlayerTitle": "Reprodutor de vídeo flutuante",
   "floatingPlayerSubtitle": "Ao fechar o reprodutor, o vídeo continua numa janela pequena que pode mover. Ao sair da app, passa para imagem em imagem, com um botão de apenas áudio",
   "floatingPlayerExpandTooltip": "Expandir",
+  "floatingPlayerAudioOnly": "Somente áudio",
+  "floatingPlayerShowVideo": "Mostrar vídeo",
   "masterLockTitle": "Bloqueio Mestre",
   "masterLockInactiveSubtitle": "Exigir uma senha, PIN ou padrão para abrir o app",
   "masterLockChooseTitle": "Escolha como bloquear o app",

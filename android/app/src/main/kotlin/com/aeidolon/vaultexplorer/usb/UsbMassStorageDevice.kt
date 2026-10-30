@@ -28,9 +28,23 @@ class UsbMassStorageDevice private constructor(
     private var use16ByteCdb: Boolean = false
     private var tag: Int = 1
 
+    /** True when READ CAPACITY(10) overflowed (device > 2 TiB) but the bridge does not implement
+     *  READ CAPACITY(16): only the first 2^32 sectors are addressable, so [sectorCount] is capped. */
+    var capacityTruncated: Boolean = false; private set
+
+    /** Compact per-command outcome log of the capacity discovery, appended to the open failure
+     *  message so a user's bug report says *why* it failed without needing debug logging. */
+    private val openTrace = StringBuilder()
+    private var tracing = true
+    private var startUnitSent = false
+    private var discoveryDeadlineNs = Long.MAX_VALUE
+    private fun overBudget(): Boolean = System.nanoTime() > discoveryDeadlineNs
+
     private val ioLock = Any()
-    // 128 KB (256 sectors @ 512B) is the proven maximum size for stable USB BOT transfers
+    // 128 KB per command is the proven maximum size for stable USB BOT transfers; re-derived from the
+    // real sector size once it is known (256 sectors @ 512 B, 32 @ 4 KiB).
     private var maxSectorsPerCommand: Int = INITIAL_MAX_SECTORS_PER_COMMAND
+    private var minSectorsPerCommand: Int = MIN_SECTORS_PER_COMMAND
 
     companion object {
         private const val CBW_SIGNATURE = 0x43425355 // "USBC"
@@ -40,6 +54,17 @@ class UsbMassStorageDevice private constructor(
         private const val READINESS_RETRY_ATTEMPTS = 5
         private const val CAPACITY_RETRY_ATTEMPTS = 3
         private const val CAPACITY_RETRY_DELAY_MS = 250L
+        private const val MAX_RETRY_DELAY_MS = 1000L
+        // A bulk call that returns an error after (almost) the full timeout is a dead link; one that
+        // fails quickly is a STALL, which BOT (§6.7) says to clear and carry on from.
+        private const val TIMEOUT_SLACK_MS = 250L
+        // NOT READY ("becoming ready" / spinning up) is given this long before giving up.
+        private const val NOT_READY_BUDGET_MS = 8000L
+        private const val MAX_TRACE_CHARS = 480
+        // Wall-clock cap for the whole capacity discovery: the extra RC16 fallback and the reset-and-retry
+        // escalation stop being attempted once this has elapsed, so an unresponsive link (5 s timeout per
+        // command) still fails after roughly three commands -- no later than the plain retry sequence did.
+        private const val DISCOVERY_BUDGET_MS = 20_000L
         
         // CRITICAL: Linux kernel drivers/usb/core/devio.c enforces MAX_USBFS_BUFFER_SIZE = 16384.
         // Single bulkTransfer calls larger than 16 KB fail with -EINVAL (-1) immediately.
@@ -48,6 +73,11 @@ class UsbMassStorageDevice private constructor(
         // 128 KB per SCSI command provides optimal throughput without endpoint stalls
         private const val INITIAL_MAX_SECTORS_PER_COMMAND = 256
         private const val MIN_SECTORS_PER_COMMAND = 16 // 8 KB floor
+        private const val MAX_BYTES_PER_COMMAND = 128 * 1024
+        private const val MIN_BYTES_PER_COMMAND = 8 * 1024
+
+        internal fun isSupportedSectorSize(size: Int): Boolean =
+            size in 512..65536 && (size and (size - 1)) == 0
 
         internal fun buildCbw(tag: Int, cdb: ByteArray, dataLen: Int, dirIn: Boolean): ByteArray {
             val buf = ByteBuffer.allocate(31).order(ByteOrder.LITTLE_ENDIAN)
@@ -99,20 +129,33 @@ class UsbMassStorageDevice private constructor(
                         return UsbOpenResult.Failure("USB_ENDPOINT_ERROR", "USB device is missing a required bulk endpoint")
                     }
 
+                    // Select the Bulk-Only alternate setting explicitly (drives that also expose UASP
+                    // have a second alt setting) and put the endpoints into a known state. The kernel
+                    // driver we just force-detached may have been aborted mid-command. Best effort.
+                    if (!connection.setInterface(intf)) {
+                        VeLog.d(TAG) { "open: setInterface(alt=${intf.alternateSetting}) not accepted; continuing" }
+                    }
+
                     val msd = UsbMassStorageDevice(connection, intf, epIn, epOut)
                     val capacityOk = msd.readCapacity()
+                    msd.tracing = false
                     if (!capacityOk) {
                         VeLog.w(TAG) {
                             "open: READ CAPACITY failed for ${device.deviceName} " +
-                                "lastError=${msd.lastError?.toLogString() ?: "none"}"
+                                "lastError=${msd.lastError?.toLogString() ?: "none"} trace=${msd.openTrace}"
                         }
+                        val detail = msd.openTrace.toString().trim()
                         msd.close()
-                        return UsbOpenResult.Failure("USB_CAPACITY_FAILED", "Failed to read USB device capacity")
+                        return UsbOpenResult.Failure(
+                            "USB_CAPACITY_FAILED",
+                            if (detail.isEmpty()) "Failed to read USB device capacity"
+                            else "Failed to read USB device capacity [$detail]",
+                        )
                     }
                     VeLog.i(TAG) {
                         "open: ready device=${device.deviceName} sectorSize=${msd.sectorSize} " +
                             "sectorCount=${msd.sectorCount} totalCapacityBytes=${msd.sectorCount * msd.sectorSize} " +
-                            "use16ByteCdb=${msd.use16ByteCdb}"
+                            "use16ByteCdb=${msd.use16ByteCdb} capacityTruncated=${msd.capacityTruncated} trace=${msd.openTrace}"
                     }
                     return UsbOpenResult.Success(msd)
                 }
@@ -146,6 +189,11 @@ class UsbMassStorageDevice private constructor(
             )
             clearHalt(epIn)
             clearHalt(epOut)
+            // A raw CLEAR_FEATURE(ENDPOINT_HALT) only clears the *device* side. SET_INTERFACE goes
+            // through the kernel's usb_set_interface(), which also resets the host-side endpoint
+            // state (data toggle / xHCI ring) -- without it a drive can time out on every command
+            // after the first STALL. Falls back to the kernel's manual clear-halt on single-alt devices.
+            connection.setInterface(intf)
         } catch (e: Exception) {
             VeLog.w(TAG) { "resetRecovery: failed: ${e.message}" }
         } finally {
@@ -161,6 +209,24 @@ class UsbMassStorageDevice private constructor(
             0x00,
             endpoint.address, null, 0, 1000
         )
+    }
+
+    /**
+     * Reads the 13-byte Command Status Wrapper. Per BOT §6.5 a STALL on the CSW read is cleared and
+     * the read retried exactly once; a timeout (dead link) is not retried.
+     */
+    private fun readCsw(): ByteArray? {
+        val csw = ByteArray(13)
+        val start = System.nanoTime()
+        var n = connection.bulkTransfer(epIn, csw, 13, TIMEOUT_MS)
+        if (n == 13) return csw
+        val waitedMs = (System.nanoTime() - start) / 1_000_000
+        if (n < 0 && waitedMs < TIMEOUT_MS - TIMEOUT_SLACK_MS) {
+            clearHalt(epIn)
+            n = connection.bulkTransfer(epIn, csw, 13, TIMEOUT_MS)
+            if (n == 13) return csw
+        }
+        return null
     }
 
     private fun requestSense(): Triple<Int, Int, Int>? {
@@ -179,14 +245,30 @@ class UsbMassStorageDevice private constructor(
             val asc = data[12].toInt() and 0xFF
             val ascq = data[13].toInt() and 0xFF
             result = Triple(senseKey, asc, ascq)
+        } else if (got < 0) {
+            clearHalt(epIn)
         }
-        val csw = ByteArray(13)
-        connection.bulkTransfer(epIn, csw, 13, TIMEOUT_MS)
+        if (readCsw() == null) {
+            // Phase error: the next command would be sent into an out-of-sync device.
+            resetRecovery("request_sense_csw_failed")
+        }
         return result
     }
 
     private fun buildCbw(cdb: ByteArray, dataLen: Int, dirIn: Boolean): ByteArray =
         buildCbw(tag, cdb, dataLen, dirIn)
+
+    private fun briefError(e: UsbIoError?): String = when {
+        e == null -> "?"
+        e.stage == "CSW_STATUS" && e.senseKey >= 0 ->
+            "sense=%d/%02x/%02x".format(e.senseKey, e.asc, e.ascq)
+        e.stage == "CSW_STATUS" -> "csw=${e.cswStatus}" + if (e.requestSenseFailed) "(no-sense)" else ""
+        else -> e.stage.lowercase()
+    }
+
+    private fun trace(text: String) {
+        if (tracing && openTrace.length < MAX_TRACE_CHARS) openTrace.append(text).append(' ')
+    }
 
     private fun executeCommand(
         cdb: ByteArray,
@@ -198,10 +280,30 @@ class UsbMassStorageDevice private constructor(
         sectorCount: Int = 0,
         retryNumber: Int = 0,
     ): Boolean {
+        val ok = executeCommandOnce(cdb, buffer, bufferOffset, dataLen, dirIn, lba, sectorCount, retryNumber)
+        if (tracing) {
+            val op = if (cdb.isNotEmpty()) cdb[0].toInt() and 0xFF else 0
+            trace("%02x=%s".format(op, if (ok) "ok" else briefError(lastError)))
+        }
+        return ok
+    }
+
+    private fun executeCommandOnce(
+        cdb: ByteArray,
+        buffer: ByteArray?,
+        bufferOffset: Int,
+        dataLen: Int,
+        dirIn: Boolean,
+        lba: Long,
+        sectorCount: Int,
+        retryNumber: Int,
+    ): Boolean {
         val cmdStart = System.nanoTime()
         fun elapsedMs() = (System.nanoTime() - cmdStart) / 1_000_000.0
         val opcode = if (cdb.isNotEmpty()) cdb[0].toInt() and 0xFF else 0
         val dirLabel = if (dirIn) "IN" else "OUT"
+        // READ(10)/READ(16) must deliver every byte; INQUIRY & co. may legitimately return less.
+        val mustBeFull = dirIn && (opcode == 0x28 || opcode == 0x88)
 
         fun recordError(stage: String, cswStatus: Int = -1, sense: Triple<Int, Int, Int>? = null,
                         requestSenseFailed: Boolean = false, transferredBytes: Int = 0) {
@@ -225,11 +327,13 @@ class UsbMassStorageDevice private constructor(
         }
 
         var totalTransferred = 0
+        var dataStageStalled = false
         if (dataLen > 0 && buffer != null) {
             val endpoint = if (dirIn) epIn else epOut
             while (totalTransferred < dataLen) {
                 // Must not exceed MAX_BULK_CHUNK_BYTES (16 KB) for Linux devio compatibility
                 val chunkSize = minOf(MAX_BULK_CHUNK_BYTES, dataLen - totalTransferred)
+                val callStart = System.nanoTime()
                 val result = connection.bulkTransfer(
                     endpoint,
                     buffer,
@@ -237,22 +341,35 @@ class UsbMassStorageDevice private constructor(
                     chunkSize,
                     TIMEOUT_MS
                 )
-                if (result <= 0) {
-                    recordError("DATA_TRANSFER", transferredBytes = totalTransferred)
-                    VeLog.w(TAG) { "USB_SCSI_FAIL ${lastError?.toLogString()} note=chunkResult($result)atOffset($totalTransferred)" }
-                    resetRecovery("data_transfer_failed")
-                    return false
+                if (result < 0 || (result == 0 && !dirIn)) {
+                    val waitedMs = (System.nanoTime() - callStart) / 1_000_000
+                    if (waitedMs >= TIMEOUT_MS - TIMEOUT_SLACK_MS) {
+                        // Timeout: the device is not answering at all -- reset straight away.
+                        recordError("DATA_TRANSFER", transferredBytes = totalTransferred)
+                        VeLog.w(TAG) { "USB_SCSI_FAIL ${lastError?.toLogString()} note=chunkTimeout($result)atOffset($totalTransferred)" }
+                        resetRecovery("data_transfer_timeout")
+                        return false
+                    }
+                    // Quick failure = STALL. BOT §6.7.2/§6.7.3: a device that fails a command with a
+                    // data phase pending STALLs the pipe and still sends a CSW (with the sense data
+                    // available via REQUEST SENSE). Clear the halt and collect that CSW below instead
+                    // of resetting, otherwise the sense data is lost and the reset itself raises a
+                    // fresh UNIT ATTENTION on the next command.
+                    dataStageStalled = true
+                    VeLog.d(TAG) { "executeCommand: opcode=0x${opcode.toString(16)} data stage stalled at offset=$totalTransferred" }
+                    clearHalt(endpoint)
+                    break
                 }
                 totalTransferred += result
+                // A short IN transfer (or a zero-length packet) ends the data phase.
                 if (dirIn && result < chunkSize) break
             }
         }
 
-        val csw = ByteArray(13)
-        val cswLen = connection.bulkTransfer(epIn, csw, 13, TIMEOUT_MS)
-        if (cswLen != 13) {
-            recordError("CSW_READ", transferredBytes = totalTransferred)
-            VeLog.w(TAG) { "USB_SCSI_FAIL ${lastError?.toLogString()} note=cswLen($cswLen)!=13" }
+        val csw = readCsw()
+        if (csw == null) {
+            recordError(if (dataStageStalled) "DATA_TRANSFER" else "CSW_READ", transferredBytes = totalTransferred)
+            VeLog.w(TAG) { "USB_SCSI_FAIL ${lastError?.toLogString()} note=cswRead failed (dataStageStalled=$dataStageStalled)" }
             resetRecovery("csw_read_failed")
             return false
         }
@@ -277,22 +394,66 @@ class UsbMassStorageDevice private constructor(
             recordError("CSW_STATUS", cswStatus = status, sense = sense,
                        requestSenseFailed = senseFailed, transferredBytes = totalTransferred)
             VeLog.w(TAG) { "USB_SCSI_FAIL ${lastError?.toLogString()}" }
+            return false
         }
-        return status == 0
+        if (dataStageStalled || (mustBeFull && totalTransferred < dataLen)) {
+            // The device says "good" but did not deliver the data: never hand that back as a success.
+            recordError("DATA_TRANSFER", cswStatus = 0, transferredBytes = totalTransferred)
+            VeLog.w(TAG) { "USB_SCSI_FAIL ${lastError?.toLogString()} note=short/stalled data with good status" }
+            return false
+        }
+        return true
     }
 
     private fun readCapacity(): Boolean {
+        discoveryDeadlineNs = System.nanoTime() + DISCOVERY_BUDGET_MS * 1_000_000L
+        if (discoverCapacity()) return finishGeometry()
+        // A transport-level failure (CBW/data/CSW rather than a SCSI CHECK CONDITION) means the BOT
+        // state machine may simply be out of sync -- e.g. the kernel's usb-storage/uas driver was
+        // force-detached in the middle of a command. Reset once and run discovery again.
+        val stage = lastError?.stage
+        if (stage != null && stage != "CSW_STATUS" && !overBudget()) {
+            trace("|reset|")
+            resetRecovery("capacity_escalation")
+            if (discoverCapacity()) return finishGeometry()
+        }
+        return false
+    }
+
+    private fun finishGeometry(): Boolean {
+        // Size the per-command transfer from the real sector size (was a fixed 256 sectors, i.e. 1 MiB
+        // per command on a 4Kn drive).
+        maxSectorsPerCommand = maxOf(1, MAX_BYTES_PER_COMMAND / sectorSize)
+        minSectorsPerCommand = maxOf(1, MIN_BYTES_PER_COMMAND / sectorSize)
+        return true
+    }
+
+    private fun discoverCapacity(): Boolean {
+        sectorSize = 512
+        sectorCount = 0
+        use16ByteCdb = false
+        capacityTruncated = false
         prepareLun()
-        if (!readCapacity10WithRetry()) {
-            // READ CAPACITY(10) is normally sufficient for a 1 TB device, but
-            // some bridges only implement the 16-byte form correctly.
-            if (lastError?.senseKey != 0x05 || !readCapacity16WithRetry()) return false
-            use16ByteCdb = true
-        } else if (sectorCount == 0x100000000L) {
-            if (!readCapacity16WithRetry()) return false
+        if (readCapacity10WithRetry()) {
+            if (sectorCount == 0x100000000L) {
+                // lastLba == 0xFFFFFFFF: the capacity does not fit in 32 bits, ask READ CAPACITY(16).
+                if (readCapacity16WithRetry()) {
+                    use16ByteCdb = true
+                } else {
+                    // Bridge without READ CAPACITY(16): the first 2^32 sectors are still addressable
+                    // with 10-byte CDBs. Better a drive that mounts its first 2 TiB than none at all.
+                    VeLog.w(TAG) { "discoverCapacity: RC10 overflowed and RC16 failed; capping at 2^32 sectors" }
+                    sectorCount = 0x100000000L
+                    capacityTruncated = true
+                }
+            }
+        } else {
+            // Any RC10 failure (not only ILLEGAL REQUEST): some bridges only implement the 16-byte form,
+            // and a STALLed failure used to hide the sense key that this check relied on.
+            if (overBudget() || !readCapacity16WithRetry()) return false
             use16ByteCdb = true
         }
-        return sectorSize > 0 && sectorCount > 0
+        return sectorCount > 0 && isSupportedSectorSize(sectorSize)
     }
 
     /**
@@ -303,17 +464,25 @@ class UsbMassStorageDevice private constructor(
      */
     private fun prepareLun() {
         val inquiry = byteArrayOf(0x12, 0, 0, 0, 36, 0)
-        if (!executeCommand(inquiry, ByteArray(36), 0, 36, dirIn = true)) {
+        val inquiryData = ByteArray(36)
+        if (!executeCommand(inquiry, inquiryData, 0, 36, dirIn = true)) {
             VeLog.d(TAG) { "prepareLun: INQUIRY failed; continuing with readiness probe" }
+        } else {
+            trace("inq(type=%d,ver=%d)".format(inquiryData[0].toInt() and 0x1F, inquiryData[2].toInt() and 0xFF))
         }
 
         val testUnitReady = byteArrayOf(0, 0, 0, 0, 0, 0)
-        for (attempt in 0 until READINESS_RETRY_ATTEMPTS) {
+        val deadline = System.nanoTime() + NOT_READY_BUDGET_MS * 1_000_000L
+        var attempt = 0
+        while (true) {
             if (executeCommand(testUnitReady, null, 0, 0, dirIn = false)) return
             val error = lastError
             val unitAttention = error?.senseKey == 0x06
-            val becomingReady = error?.senseKey == 0x02
-            if ((!unitAttention && !becomingReady) || attempt == READINESS_RETRY_ATTEMPTS - 1) {
+            val notReady = error?.senseKey == 0x02
+            if (notReady && spinUpIfRequired(error)) continue
+            // UNIT ATTENTION clears after one report; NOT READY gets a longer, time-based budget.
+            val withinBudget = if (notReady) System.nanoTime() < deadline else attempt < READINESS_RETRY_ATTEMPTS - 1
+            if ((!unitAttention && !notReady) || !withinBudget) {
                 VeLog.d(TAG) {
                     "prepareLun: TEST UNIT READY did not succeed; continuing to READ CAPACITY " +
                         "lastError=${error?.toLogString() ?: "none"}"
@@ -321,7 +490,23 @@ class UsbMassStorageDevice private constructor(
                 return
             }
             if (!waitBeforeRetry(attempt)) return
+            attempt++
         }
+    }
+
+    /**
+     * NOT READY / "initializing command required" (ASC 04h ASCQ 02h) means the unit is stopped and
+     * will stay NOT READY until it gets START STOP UNIT -- waiting never helps. Linux's
+     * sd_spinup_disk() sends it here too. Sent at most once per open.
+     */
+    private fun spinUpIfRequired(error: UsbIoError?): Boolean {
+        if (startUnitSent || error?.stage != "CSW_STATUS" ||
+            error.senseKey != 0x02 || error.asc != 0x04 || error.ascq != 0x02) return false
+        startUnitSent = true
+        VeLog.i(TAG) { "spinUpIfRequired: unit stopped (04/02), sending START STOP UNIT" }
+        // IMMED=1 so the command itself cannot outlive our bulk timeout; callers keep polling.
+        executeCommand(byteArrayOf(0x1B, 0x01, 0, 0, 0x01, 0), null, 0, 0, dirIn = false)
+        return true
     }
 
     private fun readCapacity10WithRetry(): Boolean = retryCapacityRead("READ CAPACITY(10)") {
@@ -343,7 +528,7 @@ class UsbMassStorageDevice private constructor(
                 "CBW_SEND", "DATA_TRANSFER", "CSW_READ", "CSW_SIGNATURE" -> attempt == 0
                 else -> false
             }
-            if (!retryable || attempt == CAPACITY_RETRY_ATTEMPTS - 1) {
+            if (!retryable || attempt == CAPACITY_RETRY_ATTEMPTS - 1 || overBudget()) {
                 VeLog.d(TAG) {
                     "$command stopped retrying at attempt ${attempt + 1}; " +
                         "lastError=${error?.toLogString() ?: "none"}"
@@ -354,13 +539,14 @@ class UsbMassStorageDevice private constructor(
                 "$command retry ${attempt + 1}/${CAPACITY_RETRY_ATTEMPTS - 1}; " +
                     "lastError=${error?.toLogString() ?: "none"}"
             }
+            if (spinUpIfRequired(error)) continue
             if (!waitBeforeRetry(attempt)) return false
         }
         return false
     }
 
     private fun waitBeforeRetry(attempt: Int): Boolean {
-        val delayMs = CAPACITY_RETRY_DELAY_MS * (attempt + 1)
+        val delayMs = minOf(CAPACITY_RETRY_DELAY_MS * (attempt + 1), MAX_RETRY_DELAY_MS)
         return try {
             Thread.sleep(delayMs)
             true
@@ -400,7 +586,15 @@ class UsbMassStorageDevice private constructor(
         return false
     }
 
+    private fun rangeValid(startSector: Long, count: Int): Boolean =
+        count >= 0 && startSector >= 0 && startSector + count <= sectorCount &&
+            count.toLong() * sectorSize <= Int.MAX_VALUE
+
     fun readSectors(startSector: Long, count: Int, out: ByteArray): Boolean {
+        if (!rangeValid(startSector, count)) {
+            VeLog.e(TAG) { "readSectors: range out of bounds start=$startSector count=$count deviceSectors=$sectorCount" }
+            return false
+        }
         return synchronized(ioLock) {
             val totalLen = count * sectorSize
             require(out.size >= totalLen)
@@ -424,7 +618,7 @@ class UsbMassStorageDevice private constructor(
                         succeeded = true
                         break
                     }
-                    if (chunk <= MIN_SECTORS_PER_COMMAND) break
+                    if (chunk <= minSectorsPerCommand) break
                     val smaller = chunk / 2
                     retryNumber++
                     chunk = smaller
@@ -443,6 +637,10 @@ class UsbMassStorageDevice private constructor(
     }
 
     fun writeSectors(startSector: Long, count: Int, data: ByteArray): Boolean {
+        if (!rangeValid(startSector, count)) {
+            VeLog.e(TAG) { "writeSectors: range out of bounds start=$startSector count=$count deviceSectors=$sectorCount" }
+            return false
+        }
         return synchronized(ioLock) {
             val totalLen = count * sectorSize
             require(data.size >= totalLen)
@@ -466,7 +664,7 @@ class UsbMassStorageDevice private constructor(
                         succeeded = true
                         break
                     }
-                    if (chunk <= MIN_SECTORS_PER_COMMAND) break
+                    if (chunk <= minSectorsPerCommand) break
                     val smaller = chunk / 2
                     retryNumber++
                     chunk = smaller

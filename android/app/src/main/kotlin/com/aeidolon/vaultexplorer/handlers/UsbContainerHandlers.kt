@@ -510,9 +510,11 @@ class UsbContainerHandlers(
         ioExecutor.execute {
             var msd: UsbMassStorageDevice? = null
             try {
-                msd = UsbMassStorageDevice.open(usbManager, device)
+                val openResult = UsbMassStorageDevice.openDiagnostic(usbManager, device)
+                msd = (openResult as? UsbOpenResult.Success)?.device
                 if (msd == null) {
-                    activity.runOnUiThread { result.error("USB_OPEN_FAILED", "Failed to open USB device", null) }
+                    val failure = openResult as UsbOpenResult.Failure
+                    activity.runOnUiThread { result.error(failure.code, failure.message, null) }
                     return@execute
                 }
                 val capacityBytes = msd.sectorCount * msd.sectorSize

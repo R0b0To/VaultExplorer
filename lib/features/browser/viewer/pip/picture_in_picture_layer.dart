@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/app/app_navigator_key.dart';
 import 'package:vaultexplorer/features/browser/viewer/background_playback/background_playback_host.dart';
+import 'package:vaultexplorer/features/browser/viewer/media_session_bridge.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/pip/floating_video_player.dart';
@@ -36,14 +37,31 @@ class PictureInPictureLayer extends StatefulWidget {
 }
 
 class _PictureInPictureLayerState extends State<PictureInPictureLayer> {
+  StreamSubscription<void>? _openPlayerSubscription;
+
   @override
   void initState() {
     super.initState();
     BackgroundPlaybackHost.instance.expandHandler = _reopenViewer;
+    _openPlayerSubscription = MediaSessionBridge.openPlayerRequests.listen(
+      (_) => _onOpenPlayerRequest(),
+    );
+    unawaited(_initializeMediaSessionBridge());
+  }
+
+  Future<void> _initializeMediaSessionBridge() async {
+    await MediaSessionBridge.ensureInitialized();
+    if (mounted) _onOpenPlayerRequest();
+  }
+
+  void _onOpenPlayerRequest() {
+    if (!MediaSessionBridge.takePendingOpenPlayerRequest()) return;
+    BackgroundPlaybackHost.instance.openFromNotification();
   }
 
   @override
   void dispose() {
+    unawaited(_openPlayerSubscription?.cancel());
     final host = BackgroundPlaybackHost.instance;
     if (host.expandHandler == _reopenViewer) host.expandHandler = null;
     super.dispose();

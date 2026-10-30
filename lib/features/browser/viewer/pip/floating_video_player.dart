@@ -20,8 +20,8 @@ import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dar
 ///
 /// Controls, the same as the picture-in-picture window's plus the window's own:
 /// previous / play-pause / next, audio only, expand and close. Audio only stops
-/// the video being decoded or drawn while the sound carries on, and leaves a
-/// small chip in the corner that brings the video back.
+/// the video being decoded or drawn while the sound carries on through the
+/// media notification; the window goes away until the viewer is reopened.
 ///
 /// It is the same live player the viewer had: the viewer handed it to
 /// [BackgroundPlaybackHost], and this just shows its texture. Expanding hands
@@ -75,8 +75,6 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
   /// The bottom corners rest this far above the bottom edge, clear of the
   /// floating action buttons and bars the screens underneath usually have.
   static const double _bottomLift = 72;
-  static const double _chipSize = 48;
-
   // The window takes the shape of the video, within what Android's own PiP
   // window accepts (1:2.39 to 2.39:1); only a video beyond that, which the PiP
   // window letterboxes too, gets bars.
@@ -93,7 +91,7 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
   /// buttons at the top and the progress bar; play / pause alone remains.
   static const double _compactHeight = 100;
 
-  static const Duration _snapDuration = Duration(milliseconds: 280);
+ static const Duration _snapDuration = Duration(milliseconds: 320);
   static const Duration _controlsTimeout = Duration(seconds: 3);
   static const Duration _skipStep = Duration(seconds: 10);
 
@@ -109,6 +107,12 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
   bool _atRight = _lastAtRight;
   bool _atBottom = _lastAtBottom;
   double _sizeFactor = _lastSizeFactor;
+
+  /// Keep the last real video shape while another item is initializing. A new
+  /// controller starts with an empty size (whose fallback ratio is 1:1); using
+  /// that temporary value makes the floating window jump before the next
+  /// video's dimensions arrive.
+  double _lastAspectRatio = 16 / 9;
 
   /// While a finger is on the window: its centre, and the size factor the
   /// pinch started from. Null centre when nothing is touching it.
@@ -135,6 +139,12 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
   @override
   void initState() {
     super.initState();
+    final initialValue = widget.playbackManager.activeController?.value;
+    if (initialValue != null &&
+        initialValue.size.width > 0 &&
+        initialValue.size.height > 0) {
+      _lastAspectRatio = initialValue.aspectRatio;
+    }
     // So the host can tell the viewer where this window's video is when the
     // viewer takes the player back, and the viewer grows out of that spot.
     BackgroundPlaybackHost.instance.registerFloatingRect(this, _measureVideo);
@@ -162,8 +172,7 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
 
   /// Where the video is on screen right now, wherever the window is in a drag
   /// or an animation (logical pixels of the app's view); null when it cannot
-  /// be told (not laid out, only the audio-only chip showing, or the app is
-  /// the PiP window).
+  /// be told (not laid out, audio only, or the app is the PiP window).
   Rect? _measureVideo() {
     if (!mounted || PictureInPictureBridge.isInPictureInPicture.value) {
       return null;
@@ -176,7 +185,7 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
     );
     final controller = widget.playbackManager.activeController;
     if (controller == null || controller.isDisposed) return window;
-    return _fitVideo(window, controller.value.aspectRatio);
+    return _fitVideo(window, _lastAspectRatio);
   }
 
   void _scheduleHide() {
@@ -322,7 +331,7 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
         return ValueListenableBuilder<bool>(
           valueListenable: BackgroundPlaybackHost.instance.floatingAudioOnly,
           builder: (context, audioOnly, _) {
-            if (audioOnly) return _buildAudioOnlyChip(context, screen);
+            if (audioOnly) return const SizedBox.shrink();
             return ValueListenableBuilder<NativeVideoController?>(
               valueListenable: widget.playbackManager.activeControllerNotifier,
               builder: (context, controller, _) {
@@ -366,7 +375,13 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
     final landscape = screen.width > screen.height;
 
     // The window is the shape of the video, so it is filled edge to edge.
-    final shape = value.aspectRatio.clamp(_minShape, _maxShape).toDouble();
+    // Ignore the empty controller's 1:1 fallback until it reports real video
+    // dimensions; retain the prior item's shape during that loading gap.
+    if (value.size.width > 0 && value.size.height > 0) {
+      _lastAspectRatio = value.aspectRatio;
+    }
+    final aspectRatio = _lastAspectRatio;
+    final shape = aspectRatio.clamp(_minShape, _maxShape).toDouble();
     var baseWidth = landscape
         ? math.min(screen.width * 0.32, 320.0)
         : math.min(screen.width * 0.56, 280.0);
@@ -423,7 +438,7 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
       _reportVideoRect(
         context,
         Rect.fromLTWH(left, top, width, height),
-        value.aspectRatio,
+        aspectRatio,
       );
     }
 
@@ -432,7 +447,8 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
       children: [
         AnimatedPositioned(
           duration: dragCenter == null ? _snapDuration : Duration.zero,
-          curve: Curves.easeInOutCubic,
+          // Subtle spring overshoot mimicking Android PiP physics
+          curve: const Cubic(0.2, 0.9, 0.3, 1.08),
           left: left,
           top: top,
           width: width,
@@ -464,22 +480,30 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
                   _dragCenter = Offset(left + width / 2, top + height / 2);
                 });
               },
-              onScaleUpdate: (details) => setState(() {
-                _dragCenter =
-                    (_dragCenter ?? Offset(left + width / 2, top + height / 2)) +
-                    details.focalPointDelta;
-                _sizeFactor = (_scaleStartFactor * details.scale)
-                    .clamp(_minSizeFactor, _maxSizeFactor)
-                    .toDouble();
-              }),
+               onScaleUpdate: (details) {
+                final rawScale = _scaleStartFactor * details.scale;
+                double dampedScale = rawScale;
+
+                // Elastic resistance past bounds (rubber-band)
+                if (rawScale < _minSizeFactor) {
+                  dampedScale = _minSizeFactor - (_minSizeFactor - rawScale) * 0.25;
+                } else if (rawScale > _maxSizeFactor) {
+                  dampedScale = _maxSizeFactor + (rawScale - _maxSizeFactor) * 0.25;
+                }
+
+                setState(() {
+                  _dragCenter =
+                      (_dragCenter ?? Offset(left + width / 2, top + height / 2)) +
+                      details.focalPointDelta;
+                  _sizeFactor = dampedScale.clamp(0.4, 2.6);
+                });
+              },
               onScaleEnd: (details) {
-                // One finger lifting while another stays down ends this
-                // gesture and starts the next straight away.
                 if (details.pointerCount > 0) return;
                 _finishGesture(
                   velocity: details.velocity.pixelsPerSecond,
                   screen: screen,
-                  sizeFactor: effectiveFactor,
+                  sizeFactor: _sizeFactor,
                 );
               },
               child: Stack(
@@ -487,7 +511,7 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
                 children: [
                   Center(
                     child: AspectRatio(
-                      aspectRatio: value.aspectRatio,
+                      aspectRatio: aspectRatio,
                       child: NativeVideoPlayerView(controller: controller),
                     ),
                   ),
@@ -558,7 +582,7 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
     );
   }
 
-  Widget _buildControls(
+ Widget _buildControls(
     BuildContext context,
     NativeVideoController controller,
     NativeVideoValue value,
@@ -570,7 +594,7 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
     final host = BackgroundPlaybackHost.instance;
     final compact = windowSize.height < _compactHeight;
 
-    Widget slot(Widget? child) => SizedBox(width: 30, height: 30, child: child);
+    Widget slot(Widget? child) => SizedBox(width: 34, height: 34, child: child);
 
     return Stack(
       fit: StackFit.expand,
@@ -578,92 +602,109 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
         // The scrim only darkens; it must not take the taps meant for the
         // zones under it.
         const IgnorePointer(child: ColoredBox(color: Color(0x66000000))),
+
+         // Top-left: Audio-only mode
         Positioned(
-          top: 3,
-          left: 3,
+          top: 8,
+          left: 8,
           child: _RoundButton(
-            icon: Icons.open_in_full_rounded,
+            icon: Icons.headphones_rounded,
+            label: l10n.floatingPlayerAudioOnly,
+            size: 18,
+            box: 32,
+            onPressed: () => host.setAudioOnly(true),
+          ),
+        ),
+
+        // Top-right: Close window
+        Positioned(
+          top: 8,
+          right: 8,
+          child: _RoundButton(
+            icon: Icons.close_rounded,
+            label: l10n.closeTooltip,
+            size: 18,
+            box: 32,
+            onPressed: _close,
+          ),
+        ),
+
+        // Center: Fullscreen / Expand
+        Center(
+          child: _RoundButton(
+            icon: Icons.fullscreen_rounded,
             label: l10n.floatingPlayerExpandTooltip,
+            size: 22,
+            box: 36,
             onPressed: widget.onExpand,
           ),
         ),
+
+        // Bottom row: Symmetrical playback controls (Previous, Play/Pause, Next)
         Positioned(
-          top: 3,
-          right: 3,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _RoundButton(
-                icon: Icons.headphones_rounded,
-                label: l10n.floatingPlayerAudioOnly,
-                onPressed: () => host.setAudioOnly(true),
-              ),
-              const SizedBox(width: 3),
-              _RoundButton(
-                icon: Icons.close_rounded,
-                label: l10n.closeTooltip,
-                onPressed: _close,
-              ),
-            ],
-          ),
-        ),
-        Center(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (!compact) ...[
-                slot(
-                  canPrevious
-                      ? _RoundButton(
-                          icon: Icons.skip_previous_rounded,
-                          label: l10n.previousTooltip,
-                          size: 20,
-                          box: 30,
-                          onPressed: () => unawaited(_step(-1)),
-                        )
-                      : null,
-                ),
-                const SizedBox(width: 4),
-              ],
-              value.isBuffering || !value.isInitialized
-                  ? const SizedBox(
-                      width: 40,
-                      height: 40,
-                      child: Center(
-                        child: SizedBox(
-                          width: 26,
-                          height: 26,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.5,
-                            color: Colors.white,
+          left: 6,
+          right: 6,
+          bottom: 8,
+          child: Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!compact) ...[
+                  slot(
+                    canPrevious
+                        ? _RoundButton(
+                            icon: Icons.skip_previous_rounded,
+                            label: l10n.previousTooltip,
+                            size: 20,
+                            box: 34,
+                            onPressed: () => unawaited(_step(-1)),
+                          )
+                        : null,
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                value.isBuffering || !value.isInitialized
+                    ? const SizedBox(
+                        width: 44,
+                        height: 44,
+                        child: Center(
+                          child: SizedBox(
+                            width: 26,
+                            height: 26,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
+                      )
+                    : _RoundButton(
+                        icon: value.isPlaying
+                            ? Icons.pause_rounded
+                            : Icons.play_arrow_rounded,
+                        label: value.isPlaying
+                            ? l10n.pauseLabel
+                            : l10n.playLabel,
+                        size: 28,
+                        box: 44,
+                        onPressed: () => _togglePlayPause(controller),
                       ),
-                    )
-                  : _RoundButton(
-                      icon: value.isPlaying
-                          ? Icons.pause_rounded
-                          : Icons.play_arrow_rounded,
-                      label: value.isPlaying ? l10n.pauseLabel : l10n.playLabel,
-                      size: 28,
-                      box: 40,
-                      onPressed: () => _togglePlayPause(controller),
-                    ),
-              if (!compact) ...[
-                const SizedBox(width: 4),
-                slot(
-                  canNext
-                      ? _RoundButton(
-                          icon: Icons.skip_next_rounded,
-                          label: l10n.nextTooltip,
-                          size: 20,
-                          box: 30,
-                          onPressed: () => unawaited(_step(1)),
-                        )
-                      : null,
-                ),
+                if (!compact) ...[
+                  const SizedBox(width: 8),
+                  slot(
+                    canNext
+                        ? _RoundButton(
+                            icon: Icons.skip_next_rounded,
+                            label: l10n.nextTooltip,
+                            size: 20,
+                            box: 34,
+                            onPressed: () => unawaited(_step(1)),
+                          )
+                        : null,
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ],
@@ -699,56 +740,6 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
           ],
         ),
       ),
-    );
-  }
-
-  /// Audio only: no video to show, so just a small chip where the window was,
-  /// which brings the video back.
-  Widget _buildAudioOnlyChip(BuildContext context, Size screen) {
-    final media = MediaQuery.of(context);
-    final padding = media.padding;
-    final scheme = Theme.of(context).colorScheme;
-    final minX = padding.left + _margin;
-    final maxX = math.max(
-      minX,
-      screen.width - padding.right - _margin - _chipSize,
-    );
-    final minY = padding.top + _margin;
-    final bottomInset = math.max(padding.bottom, media.viewInsets.bottom);
-    final maxY = math.max(
-      minY,
-      screen.height - bottomInset - _margin - _chipSize,
-    );
-    final left = _atRight ? maxX : minX;
-    final top = _atBottom ? math.max(minY, maxY - _bottomLift) : minY;
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        AnimatedPositioned(
-          duration: _snapDuration,
-          curve: Curves.easeInOutCubic,
-          left: left,
-          top: top,
-          width: _chipSize,
-          height: _chipSize,
-          child: Material(
-            color: scheme.primaryContainer,
-            elevation: 8,
-            shape: const CircleBorder(),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              onTap: () => BackgroundPlaybackHost.instance.setAudioOnly(false),
-              child: Center(
-                child: Icon(
-                  Icons.headphones_rounded,
-                  color: scheme.onPrimaryContainer,
-                  semanticLabel: context.l10n.floatingPlayerShowVideo,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 

@@ -175,8 +175,8 @@ class BackgroundPlaybackHost {
   bool _audioOnly = false;
 
   /// Whether the floating player is in "audio only": the video is neither
-  /// decoded nor drawn, the sound carries on, and the window shrinks to a small
-  /// chip that brings the video back. Mirrors [audioOnly] for the UI (updated
+  /// decoded nor drawn, the sound carries on through its media notification,
+  /// and the in-app window is hidden. Mirrors [audioOnly] for the UI (updated
   /// from a microtask, like the other notifiers here).
   final ValueNotifier<bool> floatingAudioOnly = ValueNotifier<bool>(false);
 
@@ -218,6 +218,14 @@ class BackgroundPlaybackHost {
     }
   }
 
+  /// Opens the active background item from a tap on its media notification.
+  /// A viewer that is already open owns the player directly and needs no
+  /// second route pushed over it.
+  void openFromNotification() {
+    if (_session == null || _viewerCount > 0) return;
+    expand();
+  }
+
   /// The viewer is closing and handing its playing video to the floating
   /// player: the window appears now, taking off from [entry]'s rectangle, and
   /// carries on as the session once the viewer has gone and [adopt]ed it.
@@ -242,7 +250,7 @@ class BackgroundPlaybackHost {
 
   bool get audioOnly => _audioOnly;
 
-  /// The floating player's "audio only" button, or the chip that undoes it.
+  /// The floating player's "audio only" button.
   /// On, the video stops being decoded and drawn while the sound carries on
   /// (the media notification still steers it), and leaving the app no longer
   /// turns it into the picture-in-picture window: there is nothing to show in

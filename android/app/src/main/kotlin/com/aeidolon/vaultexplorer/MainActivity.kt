@@ -350,6 +350,8 @@ private object ChannelMethods {
 open class MainActivity : FlutterFragmentActivity() {
     companion object {
         @Volatile var activeMainActivity: MainActivity? = null
+        const val ACTION_OPEN_MEDIA_PLAYER =
+            "com.aeidolon.vaultexplorer.action.OPEN_MEDIA_PLAYER"
     }
 
     protected val CHANNEL = "com.aeidolon.vaultexplorer/engine"
@@ -369,6 +371,7 @@ open class MainActivity : FlutterFragmentActivity() {
     private val pdfExecutor = Executors.newFixedThreadPool(2) as ThreadPoolExecutor
     private var usbDetachReceiver: BroadcastReceiver? = null
     private var screenOffReceiver: BroadcastReceiver? = null
+    private var pendingOpenMediaPlayer = false
     private var vaultCameraPlugin: com.aeidolon.vaultexplorer.camera.VaultCameraPlugin? = null
     private var vaultAudioCapturePlugin: com.aeidolon.vaultexplorer.audiocapture.VaultAudioCapturePlugin? = null
     private var quickCaptureScratchpadPlugin: com.aeidolon.vaultexplorer.camera.QuickCaptureScratchpadPlugin? = null
@@ -435,6 +438,7 @@ open class MainActivity : FlutterFragmentActivity() {
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         setTheme(R.style.NormalTheme)
         super.onCreate(savedInstanceState)
+        handleMediaPlayerNotificationIntent(intent)
         ioExecutor.execute {
             ScheduledSyncHandlers.rescheduleAll(applicationContext)
         }
@@ -537,9 +541,23 @@ open class MainActivity : FlutterFragmentActivity() {
      override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        handleMediaPlayerNotificationIntent(intent)
         disguiseModeHandlers.updateActivityIdentity()
         if (this is VaultShareActivity) {
             shareIntentHandlers.handleIncomingIntent(intent)
+        }
+    }
+
+    private fun handleMediaPlayerNotificationIntent(intent: Intent?) {
+        if (intent?.action != ACTION_OPEN_MEDIA_PLAYER) return
+        pendingOpenMediaPlayer = true
+        if (nativePlayerManagerLazy.isInitialized()) {
+            runOnUiThread {
+                nativePlayerManager.methodChannel?.invokeMethod(
+                    "openMediaPlayer",
+                    null,
+                )
+            }
         }
     }
 
@@ -932,6 +950,11 @@ open class MainActivity : FlutterFragmentActivity() {
                     com.aeidolon.vaultexplorer.engine.VaultPlaybackSession
                         .setShowFileNames(show)
                     result.success(null)
+                }
+                "consumePendingOpenMediaPlayer" -> {
+                    val pending = pendingOpenMediaPlayer
+                    pendingOpenMediaPlayer = false
+                    result.success(pending)
                 }
                 "release" -> {
                     nativePlayerManager.release()

@@ -20,6 +20,7 @@ import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/widgets/zoom_indicator_pill.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
+import 'package:vaultexplorer/features/browser/viewer/playlist_swipe_claim.dart';
 import 'package:vaultexplorer/features/browser/viewer/models/viewer_adjustments.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/color_adjust_filter.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/edge_swipe_claim_recognizer.dart';
@@ -1565,14 +1566,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
           if (details.pointerCount >= 2) {
             _zoomAnimationController?.stop();
           }
-          // The zoom recognizer accepts any one-finger drag after a short
-          // travel, even with nothing to pan. A lone finger on an item at
-          // its resting zoom must not freeze paging, or a curved or
-          // L-shaped swipe that happened to start steeply could never
-          // change the item.
-          if (details.pointerCount >= 2 || _isZoomed) {
-            widget.onZoomChanged(false);
-          }
+          widget.onZoomChanged(false);
         },
         onInteractionUpdate: (details) {
           final s = _getMatrixScale(_videoTransformationController.value);
@@ -1663,6 +1657,11 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
               alignment: Alignment.center,
               children: [
                 corePlayerWidget,
+                // Lets a curved or L-shaped swipe be claimed for the playlist
+                // pager before the zoom viewer under it takes the touch. Audio
+                // has no zoom viewer, so nothing competes with the pager there.
+                if (!widget.isAudio && widget.enableZoom)
+                  const Positioned.fill(child: PlaylistSwipeClaimLayer()),
                 if (widget.swipeToSeekEnabled && !widget.isAudio)
                   Positioned(
                     left: math.min(

@@ -11,6 +11,7 @@ import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
+import 'package:vaultexplorer/features/browser/viewer/playlist_swipe_claim.dart';
 import 'package:vaultexplorer/features/browser/viewer/screen_brightness_bridge.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/edge_swipe_claim_recognizer.dart';
 import 'package:vaultexplorer/features/browser/viewer/models/viewer_adjustments.dart';
@@ -776,12 +777,7 @@ bool _isClampingMatrix = false;
                             if (details.pointerCount >= 2) {
                               _zoomAnimationController?.stop();
                             }
-                            // See the video player: a lone finger on an item
-                            // at its resting zoom has nothing to pan, so it
-                            // must not freeze paging.
-                            if (details.pointerCount >= 2 || _isZoomed) {
-                              widget.onZoomChanged(false);
-                            }
+                            widget.onZoomChanged(false);
                           },
                          onInteractionUpdate: (details) {
                             final s = _getMatrixScale(_transformationController.value);
@@ -831,6 +827,10 @@ bool _isClampingMatrix = false;
               alignment: Alignment.center,
               children: [
                 coreImageWidget,
+                // Lets a curved or L-shaped swipe be claimed for the playlist
+                // pager before the zoom viewer under it takes the touch.
+                if (widget.enableZoom)
+                  const Positioned.fill(child: PlaylistSwipeClaimLayer()),
                 if (widget.edgeSwipeBrightnessEnabled)
                   Positioned(
                     left: 0,

@@ -46,7 +46,7 @@ import 'package:vaultexplorer/features/browser/viewer/pip/picture_in_picture_bri
 import 'package:vaultexplorer/features/browser/viewer/pip/picture_in_picture_coordinator.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_prefetch_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
-import 'package:vaultexplorer/features/browser/viewer/playlist_swipe_physics.dart';
+import 'package:vaultexplorer/features/browser/viewer/playlist_swipe_claim.dart';
 import 'package:vaultexplorer/features/browser/viewer/screen_brightness_bridge.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_scrub_preview_controller.dart';
@@ -193,17 +193,25 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   final ValueNotifier<ScrollPhysics> _swipePhysicsNotifier =
       ValueNotifier<ScrollPhysics>(const BouncingScrollPhysics());
 
-  /// Overall movement of the touch that swipes the playlist pager. The pager's
-  /// physics read it on release so a short, diagonal or curved swipe still
-  /// counts as a swipe (see [PlaylistSwipePageScrollPhysics]).
-  final PlaylistSwipeTracker _swipeTracker = PlaylistSwipeTracker();
+  /// Hands a swipe that an item claims for the playlist pager to the pager as
+  /// a drag, so the page follows the finger and a drag that falls short is
+  /// cancelled. See [PlaylistSwipeClaimLayer].
+  late final PlaylistSwipeDrag _playlistSwipeDrag = PlaylistSwipeDrag(
+    positionOf: () =>
+        _pageController.hasClients && _pageController.positions.length == 1
+        ? _pageController.position
+        : null,
+    canClaim: _canClaimPlaylistSwipe,
+  );
 
-  /// Whether the pager's own drag recognizer took the current touch. If it
-  /// did, [PlaylistSwipePageScrollPhysics] settles the page. If it didn't (a
-  /// curved or L-shaped swipe often starts steeply and another recognizer
-  /// wins it first), the swipe is judged on release instead, see
-  /// [_maybeSwipeToAdjacentItem].
-  bool _pagerTookTouch = false;
+  /// Whether a finger may swipe the playlist pager right now. Frozen scroll
+  /// physics mean something else owns the touch: a zoomed item, a pinch, a
+  /// brightness, volume or seek drag, a page change under way.
+  bool _canClaimPlaylistSwipe() =>
+      mounted &&
+      !_scrollMode.isContinuous &&
+      _playlistController.playlist.length > 1 &&
+      _swipePhysicsNotifier.value is! NeverScrollableScrollPhysics;
 
   /// 0..1 while a swipe-to-dismiss drag pulls the media away. Drives the
   /// backdrop and viewer chrome fade while the actual image stays visible.
@@ -1921,14 +1929,6 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
    void _handleTouchPointerDown(PointerDownEvent event) {
     if (event.kind != PointerDeviceKind.touch || _isEditingLayout) return;
     _activeTouchPointers.add(event.pointer);
-    if (_activeTouchPointers.length == 1) {
-      _swipeTracker.begin(
-        event.position,
-        _playlistController.currentIndex,
-        timeStamp: event.timeStamp,
-      );
-      _pagerTookTouch = false;
-    }
     if (_activeTouchPointers.length == 1 && !_zoomInteractionLock) {
       final toolbarConfig = ref
           .read(fileManagerToolbarSettingsProvider(null))
@@ -1967,7 +1967,6 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     }
     if (_activeTouchPointers.length >= 2 && !_multiTouchLock) {
       _multiTouchLock = true;
-      _swipeTracker.cancel();
       _clearEdgeTapCandidates();
       _loopSwipeStartPositions.clear();
       _loopSwipeStartIndices.clear();
@@ -1984,14 +1983,6 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     final start = _loopSwipeStartPositions.remove(event.pointer);
     final startIndex = _loopSwipeStartIndices.remove(event.pointer);
     _activeTouchPointers.remove(event.pointer);
-    // This runs before the pager's drag recognizer sees the finger lift, so
-    // the physics can judge the whole swipe when they settle the page.
-    PlaylistSwipeSummary? swipe;
-    if (event is PointerUpEvent && _activeTouchPointers.isEmpty) {
-      swipe = _swipeTracker.release(event.position);
-    } else {
-      _swipeTracker.cancel();
-    }
     if (event is PointerUpEvent &&
         edgeStart != null &&
         edgeDirection != null &&
@@ -2012,12 +2003,8 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
         start != null &&
         startIndex != null &&
         _activeTouchPointers.isEmpty &&
-        mounted &&
-        (_pagerTookTouch || _scrollMode.isContinuous)) {
+        mounted) {
       _maybeWrapPlaylistSwipe(start, startIndex, event.position);
-    }
-    if (swipe != null && mounted && !_pagerTookTouch) {
-      _maybeSwipeToAdjacentItem(swipe);
     }
     if (_activeTouchPointers.isEmpty && _multiTouchLock) {
       _multiTouchLock = false;
@@ -2030,7 +2017,6 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   }
 
   void _handleTouchPointerMove(PointerMoveEvent event) {
-    _swipeTracker.move(event.position, timeStamp: event.timeStamp);
     final start = _edgeTapStartPositions[event.pointer];
     if (start == null) return;
     final startedDuringTransition =
@@ -2062,31 +2048,6 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     return Directionality.of(context) == TextDirection.rtl
         ? AxisDirection.left
         : AxisDirection.right;
-  }
-
-  /// Changes item for a swipe the pager never received.
-  ///
-  /// The paged modes only reach the pager's physics for touches the pager's
-  /// own recognizer wins. A curved or L-shaped swipe that starts steeply is
-  /// often won by something else first, so it would be ignored however clear
-  /// it was overall. This judges such a touch on release by its overall
-  /// movement. Anything that really owns the touch (a zoom, a pinch, a
-  /// brightness, volume or seek drag, a dismiss, a page change under way)
-  /// locks paging or reports progress, and is left alone.
-  void _maybeSwipeToAdjacentItem(PlaylistSwipeSummary swipe) {
-    if (_scrollMode.isContinuous) return;
-    final direction = playlistSwipeFallbackDirection(
-      swipe: swipe,
-      axisDirection: _axisDirectionFor(_scrollMode.axis),
-      currentIndex: _playlistController.currentIndex,
-      isLocked: _swipePhysicsNotifier.value is NeverScrollableScrollPhysics,
-      isDismissing: _swipeDismissProgress.value > 0,
-    );
-    if (direction > 0) {
-      _navigateToNext();
-    } else if (direction < 0) {
-      _navigateToPrev();
-    }
   }
 
   void _maybeWrapPlaylistSwipe(Offset start, int startIndex, Offset end) {
@@ -2129,7 +2090,6 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   }
 
   void _onScrollStart() {
-    _pagerTookTouch = true;
     if (!_isSwiping) {
       _isSwiping = true;
       _lockedExtents.clear();
@@ -4027,26 +3987,11 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                 );
               }
 
-              // Locked: no user scrolling, but still page-snapping, so a drag
-              // cut short by a second finger settles on a page. Unlocked: the
-              // swipe is judged by its overall movement rather than only the
-              // speed of its last instant. PageView would put its own
-              // page-snapping physics ahead of these, so they snap themselves.
-              final ScrollPhysics pagePhysics =
-                  physics is NeverScrollableScrollPhysics
-                  ? const PageScrollPhysics(
-                      parent: NeverScrollableScrollPhysics(),
-                    )
-                  : PlaylistSwipePageScrollPhysics(
-                      parent: physics,
-                      tracker: _swipeTracker,
-                    );
               return PageView.builder(
                 key: builderKey,
                 controller: _pageController,
                 scrollDirection: _scrollMode.axis,
-                pageSnapping: false,
-                physics: pagePhysics,
+                physics: physics,
                 itemCount: _playlistController.playlist.length,
                 onPageChanged: (index) {
                   if (_playlistController.currentIndex != index) {
@@ -4153,7 +4098,12 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                           }
                           return false;
                         },
-                        child: buildMainScrollView(physics),
+                        child: PlaylistSwipeScope(
+                          drag: _playlistSwipeDrag,
+                          axis: _scrollMode.axis,
+                          enabled: !_scrollMode.isContinuous,
+                          child: buildMainScrollView(physics),
+                        ),
                       );
                     },
                   ),

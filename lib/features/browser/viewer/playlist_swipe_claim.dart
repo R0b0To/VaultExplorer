@@ -1,15 +1,17 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
 
-/// Net distance, in logical pixels, that a single finger has to travel from
-/// where it landed, in any direction, before it is claimed as a drag of the
-/// playlist pager.
+/// How far a single finger has to travel from where it landed, in any
+/// direction, before it is claimed as a drag of the playlist pager, as a
+/// multiple of the device's touch slop.
 ///
 /// It is deliberately not about direction: the first leg of a curved or
-/// L-shaped swipe often points anywhere. It is small enough to beat the
-/// item's zoom recognizer, which takes any one-finger drag after 36 px, and
-/// large enough that a tap or a wobble never gets there.
-const double kPlaylistSwipeClaimDistance = 24.0;
+/// L-shaped swipe often points anywhere. And it is relative to the device's
+/// slop because that is what everything it competes with is relative to. The
+/// item's zoom recognizer accepts any one-finger drag after twice the touch
+/// slop (about 16 px on Android, where the slop is about 8 px), so this has to
+/// stay clearly under 2. It is over 1 so a tap or a wobble never gets there.
+const double kPlaylistSwipeClaimSlopFactor = 1.5;
 
 /// Net distance, in logical pixels, that a swipe has to travel along the
 /// paging axis to wrap around at the end of a looping playlist.
@@ -51,8 +53,8 @@ int playlistSwipeDirection(
 /// The claiming rule shared by the horizontal and the vertical recognizer.
 ///
 /// It follows a single finger and says when that finger has moved
-/// [kPlaylistSwipeClaimDistance] from where it landed, whatever the direction,
-/// ignoring the direction of any single move event. It does not decide
+/// [kPlaylistSwipeClaimSlopFactor] touch slops from where it landed, whatever
+/// the direction, ignoring the direction of any single move event. It does not decide
 /// anything else: whatever the recognizers accept is handed to the pager as a
 /// normal drag by [PlaylistSwipeDrag], so the page follows the finger and the
 /// pager's own physics decide whether the swipe commits or is cancelled.
@@ -70,11 +72,12 @@ class _SwipeClaim {
   }
 
   /// Takes in [event] and returns true once the finger has travelled far
-  /// enough from where it landed to be claimed.
-  bool hasMovedFarEnough(PointerEvent event) {
+  /// enough from where it landed to be claimed: [kPlaylistSwipeClaimSlopFactor]
+  /// times [touchSlop].
+  bool hasMovedFarEnough(PointerEvent event, double touchSlop) {
     if (event is! PointerMoveEvent || event.pointer != _finger) return false;
     _movement += event.delta;
-    return _movement.distance >= kPlaylistSwipeClaimDistance;
+    return _movement.distance >= touchSlop * kPlaylistSwipeClaimSlopFactor;
   }
 
   void reset() {
@@ -121,7 +124,10 @@ class PlaylistSwipeHorizontalRecognizer extends HorizontalDragGestureRecognizer 
 
   @override
   void handleEvent(PointerEvent event) {
-    if (_claim.hasMovedFarEnough(event)) {
+    if (_claim.hasMovedFarEnough(
+      event,
+      computeHitSlop(event.kind, gestureSettings),
+    )) {
       resolve(GestureDisposition.accepted);
     }
     super.handleEvent(event);
@@ -167,7 +173,10 @@ class PlaylistSwipeVerticalRecognizer extends VerticalDragGestureRecognizer {
 
   @override
   void handleEvent(PointerEvent event) {
-    if (_claim.hasMovedFarEnough(event)) {
+    if (_claim.hasMovedFarEnough(
+      event,
+      computeHitSlop(event.kind, gestureSettings),
+    )) {
       resolve(GestureDisposition.accepted);
     }
     super.handleEvent(event);
@@ -233,9 +242,14 @@ class PlaylistSwipeDrag {
     Axis axis,
   ) {
     final behavior = ScrollConfiguration.of(context);
+    // The device's own touch slop, which the pager's recognizer, the taps and
+    // the zoom viewer all use. A RawGestureDetector does not apply it by
+    // itself, as a GestureDetector does.
+    final gestureSettings = MediaQuery.maybeGestureSettingsOf(context);
     void configure(DragGestureRecognizer recognizer) {
       final physics = positionOf()?.physics;
       recognizer
+        ..gestureSettings = gestureSettings
         ..onStart = _start
         ..onUpdate = _update
         ..onEnd = _end

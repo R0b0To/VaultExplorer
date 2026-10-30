@@ -1949,6 +1949,7 @@ class _MediaPlayerWidgetState extends ConsumerState<MediaPlayerWidget>
               },
               (recognizer) {
                 recognizer
+                  ..gestureSettings = MediaQuery.maybeGestureSettingsOf(context)
                   ..onStart = onDragStart
                   ..onUpdate = onDragUpdate
                   ..onEnd = onDragEnd

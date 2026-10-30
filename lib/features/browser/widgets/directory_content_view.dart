@@ -793,12 +793,18 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         if (names.contains(sorted[i].name)) i,
     };
     if (indices.isEmpty) return;
-    _ensureTilesVisible(sorted, indices, animate: true, center: true);
+    _ensureTilesVisible(
+      sorted,
+      indices,
+      animate: true,
+      center: true,
+      clearOfToolbar: false,
+    );
   }
 
   /// Covers the body of the directory view: hands tiles the drag lock and the
-  /// reveal flash, and tints the whole pane while another pane's drag is over
-  /// it. The tint is shown only for a pane the drag did not start in -- the
+  /// reveal flash, and tints the whole pane (no border) while another pane's
+  /// drag is over it. The tint is shown only for a pane the drag did not start in -- the
   /// source pane would otherwise glow for the entire drag.
   Widget _paneDropChrome(
     BuildContext context, {
@@ -823,11 +829,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                 duration: const Duration(milliseconds: 150),
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: primary.withValues(alpha: 0.07),
-                    border: Border.all(
-                      color: primary.withValues(alpha: 0.55),
-                      width: 2,
-                    ),
+                    color: primary.withValues(alpha: 0.08),
                   ),
                 ),
               ),
@@ -1047,11 +1049,17 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   /// Scrolls so that at least one of the tiles at [indices] (positions in
   /// [sortedItems]) is clearly in view -- clear of the floating toolbar --
   /// moving as little as possible. Does nothing when one already is.
+  ///
+  /// With [clearOfToolbar] false, "in view" means simply inside the viewport
+  /// (a small margin aside). The toolbar-clearance band is far taller than a
+  /// landscape pane, so applying it there would call a tile at the top of the
+  /// list "hidden" and scroll for nothing.
   void _ensureTilesVisible(
     List<RawEntry> sortedItems,
     Set<int> indices, {
     required bool animate,
     required bool center,
+    bool clearOfToolbar = true,
   }) {
     final controller = _browserScrollController;
     if (!controller.hasClients) return;
@@ -1067,11 +1075,13 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     final maxScroll = position.maxScrollExtent;
     final viewportHeight = position.viewportDimension;
     final currentOffset = position.pixels;
-    const topMargin = 16.0;
+    final topMargin = clearOfToolbar ? 16.0 : 8.0;
 
     // Dynamically calculate bottom clearance to avoid toolbar & bottom padding overlap
     final bottomInset = MediaQuery.paddingOf(context).bottom;
-    final bottomMargin = AppSpacing.floatingStackClearance + bottomInset + 16.0;
+    final bottomMargin = clearOfToolbar
+        ? AppSpacing.floatingStackClearance + bottomInset + 16.0
+        : 8.0;
     final visibleTop = currentOffset + topMargin;
     final visibleBottom = currentOffset + viewportHeight - bottomMargin;
     final bandHeight = viewportHeight - bottomMargin - topMargin;
@@ -2782,11 +2792,29 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     _loadDirectoryContents(_currentDirPath);
   }
 
-  Future<void> _openMediaViewer(String fileName, String fullPath) async {
+  /// Opens [fullPath] in the media viewer. [forceKind] ("Open as...") makes
+  /// the viewer treat the file as that kind regardless of its extension; the
+  /// file then opens on its own, since a playlist built from the folder's
+  /// other media would have no reason to include a file the extension filter
+  /// does not recognise.
+  Future<void> _openMediaViewer(
+    String fileName,
+    String fullPath, {
+    MediaKind? forceKind,
+    bool singleFile = false,
+  }) async {
+    if (forceKind != null) {
+      await MediaViewerConstants.withKindOverride(
+        fullPath,
+        forceKind,
+        () => _openMediaViewer(fileName, fullPath, singleFile: true),
+      );
+      return;
+    }
     List<String> mediaFiles = [fullPath];
     int initialIndex = 0;
 
-    if (_toolbarConfig.autoStartPlaylistMode) {
+    if (!singleFile && _toolbarConfig.autoStartPlaylistMode) {
       final query = _searchQuery.trim().toLowerCase();
       final baseItems = (_searchActive && _isDeepSearch && query.isNotEmpty)
           ? _deepSearchResults
@@ -2980,9 +3008,57 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       }
       _openFileWithApp(fileName, fullPath);
     } else if (choice.action == 'open_as') {
-      if (choice.mimeType != null) {
-        _openFileWithApp(fileName, fullPath, mimeType: choice.mimeType!);
+      final mime = choice.mimeType;
+      if (mime == null) return;
+      if (choice.openExternally) {
+        _openFileWithApp(fileName, fullPath, mimeType: mime);
+        return;
       }
+      if (!mounted) return;
+      await _openFileAs(fileName, fullPath, mime);
+    }
+  }
+
+  /// "Open as..." in the app's own viewers, whatever the file is called.
+  ///
+  /// The type is a hint the user gave, not something the app can check
+  /// up front: a `.dat` the user says is a video may well not be one. Each
+  /// target therefore opens through the same screen a correctly named file
+  /// would, and any failure surfaces there (the player's error state, the
+  /// archive browser's "failed to read archive" status) instead of being
+  /// pre-judged here by extension. [mimeType] is one of the values the
+  /// "Open as" dialog produces.
+  Future<void> _openFileAs(
+    String fileName,
+    String fullPath,
+    String mimeType,
+  ) async {
+    _signalActivity();
+    switch (mimeType) {
+      case 'text/plain':
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => TextEditorScreen(
+              container: widget.container,
+              filePath: fullPath,
+            ),
+          ),
+        );
+        if (mounted) _loadDirectoryContents(_currentDirPath);
+      case 'image/*':
+        await _openMediaViewer(fileName, fullPath, forceKind: MediaKind.image);
+      case 'video/*':
+        await _openMediaViewer(fileName, fullPath, forceKind: MediaKind.video);
+      case 'audio/*':
+        await _openMediaViewer(fileName, fullPath, forceKind: MediaKind.audio);
+      case 'application/zip':
+        // The archive browser sniffs the format from the bytes (zip, 7z, rar,
+        // tar...), same as the APK-as-ZIP path, and asks for a password
+        // itself when needed.
+        await _openArchive(fullPath, fileName);
+      default:
+        _openFileWithApp(fileName, fullPath, mimeType: mimeType);
     }
   }
 

@@ -275,11 +275,7 @@ class BrowserItemDragItem extends StatelessWidget {
               duration: Duration(milliseconds: revealed ? 160 : 700),
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  color: primary.withValues(alpha: 0.18),
-                  border: Border.all(
-                    color: primary.withValues(alpha: 0.85),
-                    width: 2,
-                  ),
+                  color: primary.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(14),
                 ),
               ),

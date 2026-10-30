@@ -1,14 +1,24 @@
+import 'package:flutter/gestures.dart' show DeviceGestureSettings;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/features/browser/viewer/playlist_swipe_claim.dart';
 
 /// A three-page pager whose pages are built like the viewer's: a zoom viewer
 /// with the claim layer stacked on top of it.
+///
+/// [touchSlop] sets the device's touch slop the way a platform reports it. A
+/// real Android phone reports about 8 px, which halves every threshold the
+/// pager, the taps and the zoom viewer use; null leaves Flutter's fallback.
 class _Pager {
-  _Pager({this.axis = Axis.horizontal, this.withClaim = true});
+  _Pager({
+    this.axis = Axis.horizontal,
+    this.withClaim = true,
+    this.touchSlop,
+  });
 
   final Axis axis;
   final bool withClaim;
+  final double? touchSlop;
   final controller = PageController();
   bool swipeAllowed = true;
 
@@ -33,16 +43,28 @@ class _Pager {
   Widget build() {
     return MaterialApp(
       home: Scaffold(
-        body: PlaylistSwipeScope(
-          drag: drag,
-          axis: axis,
-          enabled: true,
-          child: PageView(
-            controller: controller,
-            scrollDirection: axis,
-            physics: const BouncingScrollPhysics(),
-            children: [for (var i = 0; i < 3; i++) _page(i)],
-          ),
+        body: Builder(
+          builder: (context) {
+            final Widget pager = PlaylistSwipeScope(
+              drag: drag,
+              axis: axis,
+              enabled: true,
+              child: PageView(
+                controller: controller,
+                scrollDirection: axis,
+                physics: const BouncingScrollPhysics(),
+                children: [for (var i = 0; i < 3; i++) _page(i)],
+              ),
+            );
+            final slop = touchSlop;
+            if (slop == null) return pager;
+            return MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(gestureSettings: DeviceGestureSettings(touchSlop: slop)),
+              child: pager,
+            );
+          },
         ),
       ),
     );
@@ -135,11 +157,22 @@ void main() {
     });
   });
 
-  group('a swipe claimed for the pager', () {
+  defineClaimTests(null);
+  defineClaimTests(8.0);
+}
+
+/// The scenarios that matter for a swipe claimed for the pager, at one device
+/// touch slop. Both slops are exercised because the claim has to win against
+/// the zoom viewer at either: the viewer accepts at twice the slop.
+void defineClaimTests(double? touchSlop) {
+  final slopName = touchSlop == null
+      ? 'the fallback touch slop'
+      : 'a touch slop of ${touchSlop.toStringAsFixed(0)} px';
+  group('a swipe claimed for the pager, with $slopName', () {
     testWidgets(
       'without the claim layer the zoom viewer swallows an L-shaped swipe',
       (tester) async {
-        final pager = _Pager(withClaim: false);
+        final pager = _Pager(withClaim: false, touchSlop: touchSlop);
         addTearDown(pager.controller.dispose);
         await tester.pumpWidget(pager.build());
 
@@ -158,7 +191,7 @@ void main() {
     testWidgets('an L-shaped swipe drags the page along with the finger', (
       tester,
     ) async {
-      final pager = _Pager();
+      final pager = _Pager(touchSlop: touchSlop);
       addTearDown(pager.controller.dispose);
       await tester.pumpWidget(pager.build());
 
@@ -180,7 +213,7 @@ void main() {
     testWidgets('a curved swipe that starts steeply drags and commits', (
       tester,
     ) async {
-      final pager = _Pager();
+      final pager = _Pager(touchSlop: touchSlop);
       addTearDown(pager.controller.dispose);
       await tester.pumpWidget(pager.build());
 
@@ -204,7 +237,7 @@ void main() {
     testWidgets('a short drag is cancelled and the page snaps back', (
       tester,
     ) async {
-      final pager = _Pager();
+      final pager = _Pager(touchSlop: touchSlop);
       addTearDown(pager.controller.dispose);
       await tester.pumpWidget(pager.build());
 
@@ -223,7 +256,7 @@ void main() {
     testWidgets('dragging back before letting go cancels the swipe', (
       tester,
     ) async {
-      final pager = _Pager();
+      final pager = _Pager(touchSlop: touchSlop);
       addTearDown(pager.controller.dispose);
       await tester.pumpWidget(pager.build());
 
@@ -241,7 +274,7 @@ void main() {
     });
 
     testWidgets('a straight swipe still works as before', (tester) async {
-      final pager = _Pager();
+      final pager = _Pager(touchSlop: touchSlop);
       addTearDown(pager.controller.dispose);
       await tester.pumpWidget(pager.build());
 
@@ -258,7 +291,7 @@ void main() {
     testWidgets('a purely vertical drag leaves the page where it is', (
       tester,
     ) async {
-      final pager = _Pager();
+      final pager = _Pager(touchSlop: touchSlop);
       addTearDown(pager.controller.dispose);
       await tester.pumpWidget(pager.build());
 
@@ -275,7 +308,7 @@ void main() {
     testWidgets('a vertical pager follows an L-shaped swipe the other way', (
       tester,
     ) async {
-      final pager = _Pager(axis: Axis.vertical);
+      final pager = _Pager(axis: Axis.vertical, touchSlop: touchSlop);
       addTearDown(pager.controller.dispose);
       await tester.pumpWidget(pager.build());
 
@@ -293,7 +326,7 @@ void main() {
     });
 
     testWidgets('locking swipes mid-drag cancels the drag', (tester) async {
-      final pager = _Pager();
+      final pager = _Pager(touchSlop: touchSlop);
       addTearDown(pager.controller.dispose);
       await tester.pumpWidget(pager.build());
 
@@ -315,7 +348,7 @@ void main() {
     });
 
     testWidgets('nothing is claimed while swipes are locked', (tester) async {
-      final pager = _Pager()..swipeAllowed = false;
+      final pager = _Pager(touchSlop: touchSlop)..swipeAllowed = false;
       addTearDown(pager.controller.dispose);
       await tester.pumpWidget(pager.build());
 

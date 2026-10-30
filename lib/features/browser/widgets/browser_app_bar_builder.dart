@@ -426,6 +426,10 @@ PreferredSizeWidget buildBrowserAppBar(
   }
 
   final hasParents = pathStack.length > 1;
+  // At the storage-location root the title is normally just a label (or the
+  // storage switcher). Forward history lives in the path menu, so with
+  // history to walk forward through the title becomes that menu instead.
+  final showsPathMenu = hasParents || forwardStack.isNotEmpty;
 
   Widget buildReadOnlyBadge() {
     return Tooltip(
@@ -501,7 +505,7 @@ PreferredSizeWidget buildBrowserAppBar(
     final style =
         textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold) ??
         const TextStyle(fontSize: 16, fontWeight: FontWeight.bold);
-    if (!hasParents) {
+    if (!showsPathMenu) {
       if (onOpenStorageSwitcher == null) {
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 2),
@@ -666,6 +670,20 @@ PreferredSizeWidget buildBrowserAppBar(
                   ),
                 ),
               ),
+            // At the root the title tap used to open the storage switcher;
+            // keep that reachable now that it opens the path menu instead.
+            if (!hasParents && onOpenStorageSwitcher != null) ...[
+              const Divider(height: 8),
+              MenuItemButton(
+                onPressed: onOpenStorageSwitcher,
+                leadingIcon: Icon(
+                  Icons.storage_rounded,
+                  size: 18,
+                  color: cs.onSurfaceVariant,
+                ),
+                child: Text(context.l10n.storageLocationsTitle),
+              ),
+            ],
           ],
         );
       },

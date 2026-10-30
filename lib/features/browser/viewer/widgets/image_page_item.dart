@@ -513,6 +513,7 @@ bool _isClampingMatrix = false;
               },
               (recognizer) {
                 recognizer
+                  ..gestureSettings = MediaQuery.maybeGestureSettingsOf(context)
                   ..onStart = onDragStart
                   ..onUpdate = onDragUpdate
                   ..onEnd = onDragEnd

@@ -402,6 +402,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
         ? null
         : await _readResumePosition(fileName);
     if (!mounted ||
+        _closing ||
         flowToken != _resumeFlowToken ||
         controller != _playbackManager.activeController) {
       return;
@@ -446,6 +447,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       }
     }
     if (!mounted ||
+        _closing ||
         flowToken != _resumeFlowToken ||
         controller != _playbackManager.activeController) {
       return;
@@ -745,7 +747,16 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     final isVideo = MediaViewerConstants.isVideo(file);
     if (!isAudio && !isVideo) return;
     final value = controller.value;
-    if (!value.isInitialized || value.hasError || !value.isPlaying) return;
+    // Playing, or about to be. The player is opened with auto-play off and
+    // started only after it is initialized and the saved position has been
+    // looked up, so for the first moments of a video it is not "playing" yet;
+    // going back then used to drop the video instead of floating it. A video
+    // the person paused, one that has finished and one that failed are still
+    // let go.
+    if (value.hasError) return;
+    final finished =
+        value.duration > Duration.zero && value.position >= value.duration;
+    if (finished || !(value.isPlaying || !controller.pauseRequested)) return;
     final config = ref
         .read(fileManagerToolbarSettingsProvider(null))
         .config
@@ -761,6 +772,82 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
         pipWindow: false,
         floatingPlayer: true,
       );
+    }
+    if (_backgroundPlaybackHandoff != null && !value.isPlaying) {
+      // It was about to start, and the code that would have started it (this
+      // viewer's) is going away: whoever takes the player over must see that
+      // it plays.
+      unawaited(controller.playWhenReady());
+    }
+  }
+
+  bool _closingFromBackPress = false;
+
+  /// True once a close has begun. The start-up chain that would otherwise go
+  /// on to ask about resuming, seek and play (see [_resolveInitialPlayback])
+  /// stands down: with a hand-off the new owner starts the player itself, and
+  /// without one nothing should start in a viewer that is going away.
+  bool _closing = false;
+
+  /// A back press. Closes the viewer, handing the video to the floating
+  /// player (or the audio to the background) when there is one to hand over.
+  /// If the player does not exist yet, because the video was only just opened,
+  /// it waits for it, briefly: going back straight after opening a video
+  /// should still float it, not drop it.
+  Future<void> _closeFromBackPress() async {
+    if (_closingFromBackPress) return;
+    _closingFromBackPress = true;
+    _closing = true;
+    try {
+      await _waitForPlayerToExist();
+      if (!mounted) return;
+      _prepareBackgroundPlaybackHandoff();
+      _beginFloatingFlight();
+      Navigator.of(context).pop();
+    } finally {
+      _closingFromBackPress = false;
+    }
+  }
+
+  /// Returns once the player for the item on screen exists (or after a
+  /// moment, whichever is first). Only waits when there would be something to
+  /// hand over: a video with the floating player on, or an audio file with
+  /// "keep audio playing after closing" on.
+  Future<void> _waitForPlayerToExist() async {
+    if (widget._isPreviewOnly || _playlistController.isEmpty) return;
+    final file = _playlistController.currentFile;
+    final isVideo = MediaViewerConstants.isVideo(file);
+    final isAudio = MediaViewerConstants.isAudio(file);
+    if (!isVideo && !isAudio) return;
+    final config = ref
+        .read(fileManagerToolbarSettingsProvider(null))
+        .config
+        .mediaViewerToolbarConfig;
+    final wouldHandOver = isVideo
+        ? config.floatingPlayerEnabled
+        : config.keepAudioPlayingAfterClose;
+    if (!wouldHandOver) return;
+    bool exists() {
+      final controller = _playbackManager.activeController;
+      return controller != null &&
+          !controller.isDisposed &&
+          _playbackManager.currentFileName == file;
+    }
+
+    if (exists()) return;
+    final done = Completer<void>();
+    void check() {
+      if (!done.isCompleted && exists()) done.complete();
+    }
+
+    _playbackManager.activeControllerNotifier.addListener(check);
+    try {
+      await done.future.timeout(
+        const Duration(milliseconds: 1200),
+        onTimeout: () {},
+      );
+    } finally {
+      _playbackManager.activeControllerNotifier.removeListener(check);
     }
   }
 
@@ -1059,6 +1146,10 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
           ? null
           : (_lastSavedPlaybackPositions[file] ??
                 await _readResumePosition(file));
+      // The saved position was awaited above: the viewer may have been closed
+      // (or the item changed) meanwhile, and a player created now would have no
+      // owner left to release it.
+      if (!mounted || token != _activateToken) return;
       final canResume =
           savedPosition != null && savedPosition >= const Duration(seconds: 5);
       final shouldPreSeek =
@@ -1699,6 +1790,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   /// build), so background playback still hands over.
   void _closeViewerFromSwipe() {
     if (!mounted) return;
+    _closing = true;
     _prepareBackgroundPlaybackHandoff();
     _beginFloatingFlight(fadeChrome: false);
     Navigator.of(context).pop();
@@ -3775,9 +3867,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
           _startHideTimer();
           return;
         }
-        _prepareBackgroundPlaybackHandoff();
-        _beginFloatingFlight();
-        Navigator.of(context).pop();
+        unawaited(_closeFromBackPress());
       },
       child: AnnotatedRegion<SystemUiOverlayStyle>(
         value: AppSystemUI.transparentDark,

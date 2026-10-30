@@ -99,4 +99,68 @@ void main() {
       expect(MediaViewerConstants.hasRealThumbnail('photo.jpg', isPlaceholder: true), isFalse);
     });
   });
+  group('MediaViewerConstants.withKindOverride ("Open as...")', () {
+    test('forces the kind for the exact path while the body runs', () async {
+      await MediaViewerConstants.withKindOverride(
+        'stuff/clip.dat',
+        MediaKind.video,
+        () async {
+          expect(MediaViewerConstants.isVideo('stuff/clip.dat'), isTrue);
+          expect(MediaViewerConstants.isImage('stuff/clip.dat'), isFalse);
+          expect(MediaViewerConstants.isAudio('stuff/clip.dat'), isFalse);
+          expect(MediaViewerConstants.isSupported('stuff/clip.dat'), isTrue);
+        },
+      );
+    });
+
+    test('a forced kind overrides what the extension says', () async {
+      await MediaViewerConstants.withKindOverride(
+        'song.mp4',
+        MediaKind.audio,
+        () async {
+          expect(MediaViewerConstants.isAudio('song.mp4'), isTrue);
+          expect(MediaViewerConstants.isVideo('song.mp4'), isFalse);
+        },
+      );
+    });
+
+    test('is removed afterwards, including when the body throws', () async {
+      await expectLater(
+        MediaViewerConstants.withKindOverride(
+          'noext',
+          MediaKind.image,
+          () async => throw StateError('viewer failed'),
+        ),
+        throwsStateError,
+      );
+      expect(MediaViewerConstants.isImage('noext'), isFalse);
+      expect(MediaViewerConstants.isSupported('noext'), isFalse);
+    });
+
+    test('does not leak to other paths or to the bare entry name', () async {
+      await MediaViewerConstants.withKindOverride(
+        'dir/clip.dat',
+        MediaKind.video,
+        () async {
+          expect(MediaViewerConstants.isVideo('clip.dat'), isFalse);
+          expect(MediaViewerConstants.isVideo('dir/other.dat'), isFalse);
+        },
+      );
+    });
+
+    test('restores an outer override for the same path when nested', () async {
+      await MediaViewerConstants.withKindOverride(
+        'x.dat',
+        MediaKind.image,
+        () async {
+          await MediaViewerConstants.withKindOverride(
+            'x.dat',
+            MediaKind.video,
+            () async => expect(MediaViewerConstants.isVideo('x.dat'), isTrue),
+          );
+          expect(MediaViewerConstants.isImage('x.dat'), isTrue);
+        },
+      );
+    });
+  });
 }

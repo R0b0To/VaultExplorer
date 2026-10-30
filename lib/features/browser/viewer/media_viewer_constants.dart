@@ -1,5 +1,9 @@
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 
+/// What the media viewer should treat a file as when the user picked
+/// "Open as..." (see [MediaViewerConstants.withKindOverride]).
+enum MediaKind { image, video, audio }
+
 class MediaViewerConstants {
   static const Duration uiHideDelay = Duration(seconds: 3);
   static const Duration animationDuration = Duration(milliseconds: 250);
@@ -109,16 +113,62 @@ static const List<String> audioExtensions = [
     return (dot == -1 ? fileName : fileName.substring(dot + 1)).toLowerCase();
   }
 
-  static bool isImage(String fileName) =>
-      _imageExtensionSet.contains(_lowerExtension(fileName));
+  // "Open as..." support: the user can tell the app to treat a file as an
+  // image/video/audio regardless of its extension (a `.dat` that is really an
+  // MP4, a media file with no extension at all). Every viewer check below
+  // goes through these predicates, so registering the exact path string the
+  // viewer was given as an override makes the whole viewer -- type switch,
+  // playlist filters, prefetch, toolbar -- agree without threading a "kind"
+  // through ~50 call sites. The native player and Flutter's image decoder
+  // both sniff the bytes, so the extension is never what actually decodes
+  // the file.
+  //
+  // Keyed by the full path string (what the viewer receives in `mediaFiles`),
+  // NOT the bare entry name the grid and tiles pass, so a forced type never
+  // leaks into thumbnails or the file list. Callers must clear the override
+  // when the viewer closes (see [withKindOverride]).
+  static final Map<String, MediaKind> _kindOverrides = <String, MediaKind>{};
 
-  static bool isVideo(String fileName) =>
-      _videoExtensionSet.contains(_lowerExtension(fileName));
+  /// Runs [body] with [path] treated as [kind], removing the override when it
+  /// finishes -- normally, by throwing, or by the viewer being popped.
+  static Future<T> withKindOverride<T>(
+    String path,
+    MediaKind kind,
+    Future<T> Function() body,
+  ) async {
+    final previous = _kindOverrides[path];
+    _kindOverrides[path] = kind;
+    try {
+      return await body();
+    } finally {
+      if (previous == null) {
+        _kindOverrides.remove(path);
+      } else {
+        _kindOverrides[path] = previous;
+      }
+    }
+  }
 
-  static bool isAudio(String fileName) =>
-      _audioExtensionSet.contains(_lowerExtension(fileName));
+  static bool isImage(String fileName) {
+    final forced = _kindOverrides[fileName];
+    if (forced != null) return forced == MediaKind.image;
+    return _imageExtensionSet.contains(_lowerExtension(fileName));
+  }
+
+  static bool isVideo(String fileName) {
+    final forced = _kindOverrides[fileName];
+    if (forced != null) return forced == MediaKind.video;
+    return _videoExtensionSet.contains(_lowerExtension(fileName));
+  }
+
+  static bool isAudio(String fileName) {
+    final forced = _kindOverrides[fileName];
+    if (forced != null) return forced == MediaKind.audio;
+    return _audioExtensionSet.contains(_lowerExtension(fileName));
+  }
 
   static bool isSupported(String fileName) {
+    if (_kindOverrides.containsKey(fileName)) return true;
     final ext = _lowerExtension(fileName);
     return _imageExtensionSet.contains(ext) ||
         _videoExtensionSet.contains(ext) ||

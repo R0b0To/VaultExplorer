@@ -77,6 +77,12 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
   static const double _bottomLift = 72;
   static const double _chipSize = 48;
 
+  // The window takes the shape of the video, within what Android's own PiP
+  // window accepts (1:2.39 to 2.39:1); only a video beyond that, which the PiP
+  // window letterboxes too, gets bars.
+  static const double _minShape = 1 / 2.39;
+  static const double _maxShape = 2.39;
+
   // Pinch limits. The window is also kept inside the screen and its width never
   // goes under [_minWidth], whatever the factor says.
   static const double _minWidth = 130;
@@ -359,13 +365,15 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
     final padding = media.padding;
     final landscape = screen.width > screen.height;
 
-    // The window's own shape stays within a sensible range (a tall phone clip
-    // does not become a tower); the video is letterboxed inside it.
-    final shape = value.aspectRatio.clamp(0.75, 2.2).toDouble();
+    // The window is the shape of the video, so it is filled edge to edge.
+    final shape = value.aspectRatio.clamp(_minShape, _maxShape).toDouble();
     var baseWidth = landscape
         ? math.min(screen.width * 0.32, 320.0)
         : math.min(screen.width * 0.56, 280.0);
     baseWidth = math.max(baseWidth, 150.0);
+    // A tall video in a window as wide as a landscape one would be a tower:
+    // give it a narrower one, so it takes up about as much room.
+    if (shape < 1) baseWidth *= 0.7 + 0.3 * shape;
     final widest = math.max(
       _minWidth,
       math.min(screen.width - padding.horizontal - 2 * _margin, 560.0),
@@ -617,7 +625,7 @@ class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
                 ),
                 const SizedBox(width: 4),
               ],
-              value.isBuffering
+              value.isBuffering || !value.isInitialized
                   ? const SizedBox(
                       width: 40,
                       height: 40,

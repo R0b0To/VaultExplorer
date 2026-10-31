@@ -245,5 +245,82 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 1600));
     });
+
+    testWidgets(
+      'a steady drag never moves the content backwards or reaches the end '
+      'early when the list\'s extent estimate shrinks',
+      (tester) async {
+        // Tall children first, short ones after. While the first screens are
+        // laid out the list extrapolates a huge extent from the tall
+        // children, and the estimate collapses once the short ones come into
+        // view. A drag that mapped the thumb through that live estimate
+        // jumped backwards at that point (the markdown preview's jitter).
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SizedBox(
+                width: 400,
+                height: 600,
+                child: FastScrollbar(
+                  controller: controller,
+                  touchWidth: 32.0,
+                  child: ListView.builder(
+                    controller: controller,
+                    itemCount: 90,
+                    itemBuilder: (context, index) =>
+                        SizedBox(height: index < 30 ? 300.0 : 100.0),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final gesture = await tester.startGesture(const Offset(390, 20));
+        await gesture.moveBy(const Offset(0, 20));
+        await tester.pump();
+
+        var previous = controller.offset;
+        for (var i = 0; i < 14; i++) {
+          await gesture.moveBy(const Offset(0, 18));
+          await tester.pump();
+          expect(
+            controller.offset,
+            greaterThanOrEqualTo(previous - 0.5),
+            reason: 'content moved backwards at step $i',
+          );
+          previous = controller.offset;
+        }
+
+        // The handle at 70% of its track: the content must not be at its end
+        // yet, even though the first estimate (tall children) was far larger
+        // than the real extent.
+        await gesture.moveTo(const Offset(390, 409));
+        await tester.pump();
+        expect(
+          controller.offset,
+          lessThan(controller.position.maxScrollExtent - 100),
+          reason: 'content reached its end while the handle was mid-track',
+        );
+
+        // Dragging to the very end still lands on the end of the content.
+        // Two moves: the first lays out the end, the second re-reads the
+        // (by then exact) extent.
+        await gesture.moveTo(const Offset(390, 598));
+        await tester.pump();
+        await gesture.moveTo(const Offset(390, 599));
+        await tester.pump();
+
+        await gesture.up();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 1600));
+
+        expect(
+          controller.offset,
+          closeTo(controller.position.maxScrollExtent, 1.0),
+        );
+      },
+    );
   });
 }

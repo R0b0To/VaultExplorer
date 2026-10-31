@@ -73,6 +73,17 @@ class _FastScrollbarState extends State<FastScrollbar>
   double _dragTouchOffsetInThumb = 0.0;
   final GlobalKey _trackKey = GlobalKey();
 
+  /// `maxScrollExtent` captured when the current drag began. Only used to
+  /// keep the thumb's length constant while it is held.
+  double? _dragMaxExtent;
+
+  /// Low-pass filtered `maxScrollExtent` for the current drag (see
+  /// [_dragTargetOffset]).
+  double? _dragSmoothedExtent;
+
+  /// How far the filtered extent moves toward the live one per drag event.
+  static const double _kExtentSmoothing = 0.15;
+
   bool _postFrameCallbackPending = false;
 
   @override
@@ -106,6 +117,8 @@ class _FastScrollbarState extends State<FastScrollbar>
     if (_isDragging) {
       // Never leave an owner thinking the handle is still held.
       _isDragging = false;
+      _dragMaxExtent = null;
+      _dragSmoothedExtent = null;
       widget.onDragStateChanged?.call(false);
     }
     _fadeController.dispose();
@@ -215,7 +228,10 @@ void _onControllerChange() {
     if (!_canScroll) return 48.0;
     final pos = widget.controller.position;
     final viewport = pos.viewportDimension;
-    final maxScroll = pos.maxScrollExtent;
+    // Frozen while dragging so the thumb does not change size as the list
+    // refines its own extent estimate.
+    final maxScroll =
+        (_isDragging ? _dragMaxExtent : null) ?? pos.maxScrollExtent;
     final total = maxScroll + viewport;
     if (total <= 0) return 48.0;
     final ratio = (viewport / total).clamp(0.0, 1.0);
@@ -306,6 +322,8 @@ void _onControllerChange() {
     if (travelDistance <= 0) return;
 
     _autoHideTimer?.cancel();
+    _dragMaxExtent = widget.controller.position.maxScrollExtent;
+    _dragSmoothedExtent = _dragMaxExtent;
     _isDragging = true;
     _notifyDragState(true);
     _fadeController.value = 1.0;
@@ -324,9 +342,9 @@ void _onControllerChange() {
     final targetThumbStart = trackPosition - _dragTouchOffsetInThumb;
     final fraction = (targetThumbStart / travelDistance).clamp(0.0, 1.0);
 
+    final previousFraction = _scrollFraction;
     _scrollFraction = fraction;
-    final targetOffset = fraction * widget.controller.position.maxScrollExtent;
-    widget.controller.jumpTo(targetOffset);
+    widget.controller.jumpTo(_dragTargetOffset(fraction, previousFraction));
     _popupBadge = _computePopupBadge(fraction);
 
     ThumbnailConcurrency.imageLimiter.cancelTier(TaskPriority.visible);
@@ -348,6 +366,53 @@ void _onControllerChange() {
     if (mounted) {
       FastScrollbarDragNotification(dragging: dragging).dispatch(context);
     }
+  }
+
+  /// Scroll offset for the thumb moving from [previousFraction] to
+  /// [fraction] (both 0..1) during a drag.
+  ///
+  /// A list whose children differ in height (the markdown preview) only
+  /// *estimates* its extent, from the children laid out around the viewport,
+  /// and the estimate changes with every jump the handle makes. Reading
+  /// `fraction * maxScrollExtent` therefore moved the content up and down
+  /// even while the finger moved steadily.
+  ///
+  /// Instead the content moves *relative to where it is now*: the part of the
+  /// track still ahead of the thumb is spread over the part of the content
+  /// still ahead of the viewport (and the same behind it when dragging
+  /// back). An error in the estimate then only changes how fast the content
+  /// moves, never where it is, so nothing jumps, and the content can only
+  /// reach its end when the thumb reaches the end of the track (exactly 0 and
+  /// the live extent at the two ends). The extent is low-pass filtered so the
+  /// speed does not flicker either. When the extent is exact (a plain list)
+  /// this equals `fraction * maxScrollExtent`.
+  double _dragTargetOffset(double fraction, double previousFraction) {
+    final position = widget.controller.position;
+    final live = position.maxScrollExtent;
+    if (fraction >= 0.999) return live;
+    if (fraction <= 0.0) return 0.0;
+
+    final smoothed = _dragSmoothedExtent ?? live;
+    final filtered = smoothed + (live - smoothed) * _kExtentSmoothing;
+    _dragSmoothedExtent = filtered;
+    // Never plan beyond what the list says exists, or the content would
+    // reach its end before the thumb does.
+    final extent = filtered < live ? filtered : live;
+
+    final anchor = position.pixels.clamp(0.0, live);
+    final double target;
+    if (fraction > previousFraction) {
+      // Share of the remaining track covered by this move.
+      final share = (fraction - previousFraction) / (1 - previousFraction);
+      final ahead = extent > anchor ? extent - anchor : 0.0;
+      target = anchor + share * ahead;
+    } else if (fraction < previousFraction) {
+      final share = (previousFraction - fraction) / previousFraction;
+      target = anchor - share * anchor;
+    } else {
+      target = anchor;
+    }
+    return target.clamp(0.0, live);
   }
 
   void _handleDragUpdate(
@@ -374,11 +439,9 @@ void _onControllerChange() {
     final fraction = (targetThumbStart / travelDistance).clamp(0.0, 1.0);
 
    if ((fraction - _scrollFraction).abs() > 0.0001 || fraction >= 0.999) {
+      final previousFraction = _scrollFraction;
       _scrollFraction = fraction;
-      final targetOffset = fraction >= 0.999
-          ? widget.controller.position.maxScrollExtent
-          : fraction * widget.controller.position.maxScrollExtent;
-      widget.controller.jumpTo(targetOffset);
+      widget.controller.jumpTo(_dragTargetOffset(fraction, previousFraction));
       _popupBadge = _computePopupBadge(fraction);
       ThumbnailConcurrency.imageLimiter.cancelTier(TaskPriority.visible);
       setState(() {});
@@ -388,6 +451,8 @@ void _onControllerChange() {
   void _handleDragEnd(DragEndDetails details) {
     if (!_isDragging) return;
     _isDragging = false;
+    _dragMaxExtent = null;
+    _dragSmoothedExtent = null;
     _notifyDragState(false);
     _popupBadge = null;
     _startAutoHideTimer();
@@ -397,6 +462,8 @@ void _onControllerChange() {
   void _handleDragCancel() {
     if (!_isDragging) return;
     _isDragging = false;
+    _dragMaxExtent = null;
+    _dragSmoothedExtent = null;
     _notifyDragState(false);
     _popupBadge = null;
     _startAutoHideTimer();

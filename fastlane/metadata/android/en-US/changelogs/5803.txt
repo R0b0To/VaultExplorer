@@ -1,0 +1,9 @@
+• Added EPUB & CBZ support
+• Standalone PIN/pattern/password lock
+• Search: fixed UI overlap & jump to location
+• Configurable tab swipe gestures
+• Retain forward history in breadcrumbs
+• Drag & drop copy/move prompt
+• PiP background audio & player gesture fixes
+• Markdown: tap-to-zoom images & scroll fix
+• Copy file path option & better USB handling

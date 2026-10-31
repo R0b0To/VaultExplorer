@@ -159,6 +159,26 @@ class VaultBookApi {
   final MethodChannel _channel;
   const VaultBookApi(this._channel);
 
+  String _localStoragePath(MountedContainer container, String path) {
+    if (container.isSafStorage) {
+      final root = Uri.parse(container.uri);
+      final childSegments = path
+          .split('/')
+          .where((segment) => segment.isNotEmpty);
+      return root
+          .replace(pathSegments: [...root.pathSegments, ...childSegments])
+          .toString();
+    }
+
+    // Local Storage paths describe the device filesystem, whose separator is
+    // independent of the OS running a Dart test or desktop build.
+    final isWindowsPath = RegExp(
+      r'^(?:[A-Za-z]:[\\/]|\\\\)',
+    ).hasMatch(container.uri);
+    final context = isWindowsPath ? p.windows : p.posix;
+    return context.join(container.uri, path);
+  }
+
   Future<BookOpenResult> open({
     required MountedContainer container,
     required String path,
@@ -167,7 +187,7 @@ class VaultBookApi {
     final args = <String, Object?>{'kind': kind.name};
     if (container.isLocalStorage) {
       // Same raw-path / SAF-URI string the local archive scan takes.
-      args['localPathOrUri'] = p.join(container.uri, path);
+      args['localPathOrUri'] = _localStoragePath(container, path);
     } else {
       args['volId'] = container.volId;
       args['vaultPath'] = path;

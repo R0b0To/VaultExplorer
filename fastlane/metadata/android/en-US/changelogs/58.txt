@@ -1,0 +1,35 @@
+## What's New
+
+### File Management & Navigation
+* **Document Viewer:** Added initial support for reading **EPUB** and **CBZ** comic/book files.
+* **Breadcrumb Retention:** Implemented forward-history path retention—navigating backward no longer clears the child path immediately from the breadcrumb and top bar.
+* **Search Enhancements:** 
+  * Fixed an issue where the search bar overlapped result items.
+  * Added an option to open a file/folder's location directly from search results.
+* **Drag & Drop:** Added a prompt asking whether to **Copy** or **Move** files during drag-and-drop actions.
+* **Copy Path:** Added an option to easily copy file and folder paths to the clipboard.
+* **USB Storage:** Enhanced USB drive handling with improved sector mapping.
+
+### Tabs & Navigation
+* **Configurable Tab Gestures:** Tab swipe gestures can now be customized individually:
+  * Choose whether swiping switches tabs.
+  * Configure edge swipes on the first tab (open side menu, loop to last tab, or do nothing).
+  * Configure edge swipes on the last tab (new tab, loop to first tab, or do nothing).
+  * *Note:* Swiping left on the last tab no longer defaults to opening a new tab (existing user settings are preserved).
+* **Tab UI:** Performance optimizations and general UI refinements for tab management.
+
+### Security
+* **Flexible Master Lock:** The master lock can now use a standalone PIN, pattern, or password without needing a separate underlying master password.
+
+### Media Player & PiP
+* **Picture-in-Picture (PiP):** Smoother transitions and added the option to close the video window while continuing playback as background audio.
+* **Gesture Improvements:**
+  * Adjusted gesture sensitivity in the player and playlist.
+  * Inverted volume and brightness indicator placement so they aren't covered by your finger.
+  * Fixed edge-tap gestures not skipping tracks in the audio playlist.
+
+### Markdown Viewer
+* **Interactive Images:** Tap images within Markdown files to view and zoom in full screen.
+* **Scroll Fix:** Resolved scrolling jitter caused by images rendering in Markdown files.
+
+SHA256 Signature: `0bde9d3b0ee3f56617d02632c843b1629bf0b2faa4560dff5d26f651dc325f19`

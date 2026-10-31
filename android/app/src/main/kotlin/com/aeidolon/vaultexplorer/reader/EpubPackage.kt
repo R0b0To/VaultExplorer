@@ -4,11 +4,15 @@ import android.util.Xml
 import org.xmlpull.v1.XmlPullParser
 import java.io.ByteArrayInputStream
 import java.net.URLDecoder
+import java.security.MessageDigest
 
 class EpubSpineItem(val path: String, val linear: Boolean)
 
 /** One table-of-contents row. [path] is a zip entry path, [fragment] the `#id` part. */
 class EpubTocItem(val title: String, val path: String, val fragment: String, val level: Int)
+
+/** Prefix XOR parameters for the two EPUB font-embedding obfuscation schemes. */
+class FontObfuscation(val key: ByteArray, val prefixLength: Int)
 
 /**
  * What the reader needs to know about a book: reading order (the "playlist"),
@@ -22,7 +26,10 @@ class EpubPackage(
     val language: String,
     /** `rtl`, `ltr` or empty when the book does not say. */
     val direction: String,
+    val fixedLayout: Boolean,
     val coverPath: String,
+    val coverSize: Long,
+    val fontObfuscation: Map<String, FontObfuscation>,
     val spine: List<EpubSpineItem>,
     val toc: List<EpubTocItem>,
 ) {
@@ -31,7 +38,9 @@ class EpubPackage(
         "author" to author,
         "language" to language,
         "direction" to direction,
+        "fixedLayout" to fixedLayout,
         "coverPath" to coverPath,
+        "coverSize" to coverSize,
         "spine" to spine.map { mapOf("path" to it.path, "linear" to it.linear) },
         "toc" to toc.map {
             mapOf("title" to it.title, "path" to it.path, "fragment" to it.fragment, "level" to it.level)
@@ -78,12 +87,24 @@ class EpubPackage(
             val coverItem = opf.manifest.values.firstOrNull { "cover-image" in it.properties.split(' ') }
                 ?: opf.manifest[opf.coverId]
 
+            val coverPath = coverItem?.let { resolvePath(opfDir, it.href) } ?: ""
+            val fontObfuscation = runCatching {
+                val encryption = dir.find("META-INF/encryption.xml")
+                    ?: return@runCatching emptyMap<String, FontObfuscation>()
+                parseFontObfuscation(
+                    ZipReader.readEntry(src, encryption, MAX_XML_BYTES),
+                    opf,
+                )
+            }.getOrDefault(emptyMap())
             return EpubPackage(
                 title = opf.title,
                 author = opf.authors.joinToString(", "),
                 language = opf.language,
                 direction = opf.direction,
-                coverPath = coverItem?.let { resolvePath(opfDir, it.href) } ?: "",
+                fixedLayout = opf.renditionLayout == "pre-paginated",
+                coverPath = coverPath,
+                coverSize = dir.find(coverPath)?.size ?: 0L,
+                fontObfuscation = fontObfuscation,
                 spine = opf.spine.mapNotNull { ref ->
                     val item = opf.manifest[ref.idref] ?: return@mapNotNull null
                     val path = resolvePath(opfDir, item.href)
@@ -102,6 +123,9 @@ class EpubPackage(
             val authors: List<String>,
             val language: String,
             val direction: String,
+            val renditionLayout: String,
+            val uniqueIdentifier: String,
+            val identifiers: Map<String, String>,
             val coverId: String,
             val tocId: String,
             val manifest: Map<String, ManifestItem>,
@@ -127,6 +151,9 @@ class EpubPackage(
             var direction = ""
             var coverId = ""
             var tocId = ""
+            var renditionLayout = ""
+            var uniqueIdentifier = ""
+            val identifiers = LinkedHashMap<String, String>()
             val manifest = LinkedHashMap<String, ManifestItem>()
             val spine = ArrayList<ItemRef>()
             var inMetadata = false
@@ -138,12 +165,23 @@ class EpubPackage(
                 }
                 if (p.eventType != XmlPullParser.START_TAG) continue
                 when (p.localName()) {
+                    "package" -> uniqueIdentifier = p.getAttributeValue(null, "unique-identifier") ?: ""
                     "metadata" -> inMetadata = true
                     "title" -> if (inMetadata && title.isEmpty()) title = readText(p)
                     "creator" -> if (inMetadata) readText(p).takeIf { it.isNotEmpty() }?.let { authors.add(it) }
                     "language" -> if (inMetadata && language.isEmpty()) language = readText(p)
-                    "meta" -> if (inMetadata && p.getAttributeValue(null, "name") == "cover") {
-                        coverId = p.getAttributeValue(null, "content") ?: ""
+                    "identifier" -> if (inMetadata) {
+                        val id = p.getAttributeValue(null, "id")
+                        val value = readText(p)
+                        if (!id.isNullOrEmpty()) identifiers[id] = value
+                    }
+                    "meta" -> if (inMetadata) {
+                        if (p.getAttributeValue(null, "name") == "cover") {
+                            coverId = p.getAttributeValue(null, "content") ?: ""
+                        }
+                        if (p.getAttributeValue(null, "property") == "rendition:layout") {
+                            renditionLayout = readText(p)
+                        }
                     }
                     "item" -> {
                         val id = p.getAttributeValue(null, "id")
@@ -165,7 +203,55 @@ class EpubPackage(
                     }
                 }
             }
-            return Opf(title, authors, language, direction, coverId, tocId, manifest, spine)
+            return Opf(
+                title, authors, language, direction, renditionLayout, uniqueIdentifier,
+                identifiers, coverId, tocId, manifest, spine,
+            )
+        }
+
+        private fun parseFontObfuscation(
+            bytes: ByteArray,
+            opf: Opf,
+        ): Map<String, FontObfuscation> {
+            val idValue = opf.identifiers[opf.uniqueIdentifier].orEmpty()
+            val parser = newParser(bytes)
+            val result = LinkedHashMap<String, FontObfuscation>()
+            var fontKey: ByteArray? = null
+            var prefix = 0
+            while (parser.next() != XmlPullParser.END_DOCUMENT) {
+                if (parser.eventType != XmlPullParser.START_TAG) continue
+                when (parser.localName()) {
+                    "EncryptedData" -> {
+                        fontKey = null
+                        prefix = 0
+                    }
+                    "EncryptionMethod" -> {
+                        val algorithm = parser.getAttributeValue(null, "Algorithm") ?: ""
+                        when (algorithm) {
+                            "http://www.idpf.org/2008/embedding" -> {
+                                val id = idValue.filterNot(Char::isWhitespace).toByteArray(Charsets.UTF_8)
+                                fontKey = if (id.isEmpty()) null else MessageDigest.getInstance("SHA-1").digest(id)
+                                prefix = 1040
+                            }
+                            "http://ns.adobe.com/pdf/enc#RC" -> {
+                                val uuid = Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+                                    .find(idValue)?.value?.replace("-", "")
+                                fontKey = uuid?.chunked(2)?.map { it.toInt(16).toByte() }?.toByteArray()
+                                prefix = 1024
+                            }
+                        }
+                    }
+                    "CipherReference" -> {
+                        val uri = parser.getAttributeValue(null, "URI") ?: continue
+                        val key = fontKey ?: continue
+                        // CipherReference URIs are rooted at the OCF container,
+                        // alongside META-INF, rather than beside the OPF file.
+                        val path = resolvePath("", uri)
+                        if (prefix > 0) result[path] = FontObfuscation(key, prefix)
+                    }
+                }
+            }
+            return result
         }
 
         // -- Tables of contents ------------------------------------------

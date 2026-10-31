@@ -2769,6 +2769,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             builder: (_) => ComicReaderScreen(
               container: widget.container,
               title: name,
+              filePath: fullPath,
               token: token,
               pages: pages,
             ),
@@ -2787,6 +2788,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             builder: (_) => EpubReaderScreen(
               container: widget.container,
               fallbackTitle: name,
+              filePath: fullPath,
               token: token,
               info: info,
             ),

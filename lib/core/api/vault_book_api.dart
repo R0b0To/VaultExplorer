@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
@@ -72,6 +70,8 @@ class EpubInfo {
   /// `rtl`, `ltr`, or empty when the book does not say.
   final String direction;
   final String coverPath;
+  final int coverSize;
+  final bool fixedLayout;
   final List<EpubSpineEntry> spine;
   final List<EpubTocEntry> toc;
   const EpubInfo({
@@ -80,6 +80,8 @@ class EpubInfo {
     required this.language,
     required this.direction,
     required this.coverPath,
+    this.coverSize = 0,
+    this.fixedLayout = false,
     required this.spine,
     required this.toc,
   });
@@ -106,6 +108,8 @@ class EpubInfo {
       language: map['language'] as String? ?? '',
       direction: map['direction'] as String? ?? '',
       coverPath: map['coverPath'] as String? ?? '',
+      coverSize: (map['coverSize'] as num?)?.toInt() ?? 0,
+      fixedLayout: map['fixedLayout'] as bool? ?? false,
       spine: spine,
       toc: toc,
     );

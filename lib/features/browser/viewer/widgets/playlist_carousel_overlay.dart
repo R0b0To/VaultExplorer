@@ -21,6 +21,11 @@ class PlaylistCarouselOverlay extends StatefulWidget {
   final ThumbnailQuality thumbnailQuality;
   final ThumbnailCacheMode thumbnailCacheMode;
   final ValueChanged<int> onSelect;
+  final Widget Function(BuildContext context, int index, String fileName)?
+  thumbnailBuilder;
+  final bool showItemNumbers;
+  final bool alwaysShowScrubber;
+  final Color? backgroundColor;
   final VoidCallback? onClose;
 
   const PlaylistCarouselOverlay({
@@ -31,6 +36,10 @@ class PlaylistCarouselOverlay extends StatefulWidget {
     required this.thumbnailQuality,
     required this.thumbnailCacheMode,
     required this.onSelect,
+    this.thumbnailBuilder,
+    this.showItemNumbers = false,
+    this.alwaysShowScrubber = false,
+    this.backgroundColor,
     this.onClose,
   });
 
@@ -54,7 +63,11 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
   double _verticalDragDistance = 0.0;
 
   void _toggleScrubber(bool show) {
-    if (_showScrubber == show || widget.playlist.length <= 1) return;
+    if (widget.alwaysShowScrubber ||
+        _showScrubber == show ||
+        widget.playlist.length <= 1) {
+      return;
+    }
     HapticFeedback.selectionClick();
     _scrubberChangedDuringGesture = true;
     setState(() {
@@ -90,9 +103,7 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
       _toggleScrubber(true);
     } else if (vy > 100 && _showScrubber) {
       _toggleScrubber(false);
-    } else if (vy > 180 &&
-        !_showScrubber &&
-        !_scrubberChangedDuringGesture) {
+    } else if (vy > 180 && !_showScrubber && !_scrubberChangedDuringGesture) {
       _dismissCarousel();
     }
     _verticalDragDistance = 0.0;
@@ -113,12 +124,16 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
   @override
   void initState() {
     super.initState();
+    _showScrubber = widget.alwaysShowScrubber;
     _scrollController.addListener(_onScroll);
   }
 
   @override
   void didUpdateWidget(covariant PlaylistCarouselOverlay oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.alwaysShowScrubber != widget.alwaysShowScrubber) {
+      _showScrubber = widget.alwaysShowScrubber;
+    }
     if (oldWidget.currentIndex != widget.currentIndex ||
         oldWidget.playlist.length != widget.playlist.length) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -196,6 +211,17 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
       duration: const Duration(milliseconds: 220),
       curve: Curves.easeOutCubic,
       height: currentHeight,
+      decoration: BoxDecoration(
+        color: widget.backgroundColor ?? const Color(0xE6121212),
+        border: const Border(top: BorderSide(color: Colors.white24)),
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black54,
+            blurRadius: 14,
+            offset: Offset(0, -4),
+          ),
+        ],
+      ),
       child: ClipRect(
         child: GestureDetector(
           behavior: HitTestBehavior.translucent,
@@ -229,8 +255,9 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
                             onTap: () => widget.onSelect(index),
                             child: Container(
                               width: _tileWidth,
-                              margin:
-                                  const EdgeInsets.only(right: _tileSpacing),
+                              margin: const EdgeInsets.only(
+                                right: _tileSpacing,
+                              ),
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
@@ -244,13 +271,53 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
                                 borderRadius: BorderRadius.circular(
                                   isSelected ? 13 : 15,
                                 ),
-                                child: _CarouselThumb(
-                                  key: ValueKey(fileName),
-                                  container: widget.container,
-                                  fileName: fileName,
-                                  thumbnailQuality: widget.thumbnailQuality,
-                                  thumbnailCacheMode:
-                                      widget.thumbnailCacheMode,
+                                child: Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    widget.thumbnailBuilder?.call(
+                                          context,
+                                          index,
+                                          fileName,
+                                        ) ??
+                                        _CarouselThumb(
+                                          key: ValueKey(fileName),
+                                          container: widget.container,
+                                          fileName: fileName,
+                                          thumbnailQuality:
+                                              widget.thumbnailQuality,
+                                          thumbnailCacheMode:
+                                              widget.thumbnailCacheMode,
+                                        ),
+                                    if (widget.showItemNumbers)
+                                      Positioned(
+                                        left: 6,
+                                        bottom: 6,
+                                        child: DecoratedBox(
+                                          decoration: BoxDecoration(
+                                            color: Colors.black.withValues(
+                                              alpha: 0.72,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                          ),
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 7,
+                                              vertical: 3,
+                                            ),
+                                            child: Text(
+                                              '${index + 1}',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ),
                             ),
@@ -295,8 +362,7 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
                                 activeTrackColor: cs.primary,
                                 inactiveTrackColor: Colors.white24,
                                 thumbColor: cs.primary,
-                                overlayColor:
-                                    cs.primary.withValues(alpha: 0.2),
+                                overlayColor: cs.primary.withValues(alpha: 0.2),
                               ),
                               child: ValueListenableBuilder<double>(
                                 valueListenable: _sliderProportion,
@@ -316,8 +382,7 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
 
                                       _isDraggingSlider = true;
                                       _sliderProportion.value = val;
-                                      _scrollController
-                                          .jumpTo(val * maxExt);
+                                      _scrollController.jumpTo(val * maxExt);
                                     },
                                     onChangeEnd: (val) {
                                       _isDraggingSlider = false;
@@ -423,18 +488,17 @@ class _CarouselThumb extends ConsumerWidget {
     String path,
     ThumbnailQuality quality,
     ThumbnailCacheMode mode,
-  ) =>
-      VideoThumbnailFetcher.fetch(
-        thumbnailCache,
-        fileIoApi,
-        container,
-        path,
-        mode: mode,
-        quality: quality,
-        targetSize: quality.scaledSize(
-          MediaViewerConstants.carouselThumbnailTargetSize,
-        ),
-      );
+  ) => VideoThumbnailFetcher.fetch(
+    thumbnailCache,
+    fileIoApi,
+    container,
+    path,
+    mode: mode,
+    quality: quality,
+    targetSize: quality.scaledSize(
+      MediaViewerConstants.carouselThumbnailTargetSize,
+    ),
+  );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -491,7 +555,7 @@ class _CarouselThumb extends ConsumerWidget {
       syncLookup: () =>
           thumbnailCache.peekMemory(container, fileName, thumbnailQuality),
       cacheHeight: scaledSize,
-       imageBuilder: (context, bytes, cacheHeight) {
+      imageBuilder: (context, bytes, cacheHeight) {
         final dims = extractImageDimensionsFromBytes(bytes);
         if (dims != null && dims.$1 > 0 && dims.$2 > 0) {
           MediaAspectRatioCache.put(container, fileName, dims.$1, dims.$2);

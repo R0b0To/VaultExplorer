@@ -13240,4 +13240,30 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get skinTokenStatusOnInfoHint =>
       'Текст та іконки в інформаційних банерах.';
+
+  @override
+  String get bookReaderOpenFailed => 'Не вдалося відкрити цю книгу';
+
+  @override
+  String get comicNoPages => 'У цьому коміксі не знайдено зображень';
+
+  @override
+  String get comicPageLoadFailed => 'Не вдалося завантажити цю сторінку';
+
+  @override
+  String get comicReadingDirectionRtl => 'Читання справа наліво';
+
+  @override
+  String get comicReadingDirectionLtr => 'Читання зліва направо';
+
+  @override
+  String get epubTextSize => 'Розмір тексту';
+
+  @override
+  String get epubThemeOriginal => 'Оригінал';
+
+  @override
+  String epubChapterFallbackTitle(int number) {
+    return 'Розділ $number';
+  }
 }

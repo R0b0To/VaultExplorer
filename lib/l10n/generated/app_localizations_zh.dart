@@ -12213,4 +12213,30 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get skinTokenStatusOnInfoHint => '提示横幅中的文本与图标。';
+
+  @override
+  String get bookReaderOpenFailed => '无法打开这本书';
+
+  @override
+  String get comicNoPages => '此漫画中未找到图片';
+
+  @override
+  String get comicPageLoadFailed => '无法加载此页面';
+
+  @override
+  String get comicReadingDirectionRtl => '从右向左阅读';
+
+  @override
+  String get comicReadingDirectionLtr => '从左向右阅读';
+
+  @override
+  String get epubTextSize => '文字大小';
+
+  @override
+  String get epubThemeOriginal => '原始';
+
+  @override
+  String epubChapterFallbackTitle(int number) {
+    return '第 $number 章';
+  }
 }

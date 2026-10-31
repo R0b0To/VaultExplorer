@@ -65,6 +65,10 @@ import 'package:vaultexplorer/features/browser/file_open_dispatch.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/services/folder_document_provider_service.dart';
 import 'package:vaultexplorer/features/browser/services/media_scan_service.dart';
+import 'package:vaultexplorer/core/api/vault_book_api.dart';
+import 'package:vaultexplorer/features/browser/viewer/books/comic_pages.dart';
+import 'package:vaultexplorer/features/browser/viewer/books/comic_reader_screen.dart';
+import 'package:vaultexplorer/features/browser/viewer/books/epub_reader_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/html_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_screen.dart';
@@ -2582,6 +2586,10 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         await _openPdfViewer(fullPath);
       case OpenInHtmlViewer():
         _openHtmlViewer(fullPath);
+      case OpenInComicReader():
+        await _openBook(entry.name, fullPath, BookKind.comic);
+      case OpenInEpubReader():
+        await _openBook(entry.name, fullPath, BookKind.epub);
       case OpenWithSystemApp(packageName: final packageName):
         _openFileWithApp(entry.name, fullPath, packageName: packageName);
       case InstallApk():
@@ -2698,6 +2706,93 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       ),
     );
     _loadDirectoryContents(_currentDirPath);
+  }
+
+  /// Opens a `.cbz`/`.epub` (or a comic under another name) in the in-app
+  /// reader. The reader takes over the book session and closes it itself.
+  ///
+  /// Anything the reader cannot take -- a real RAR, a password-protected
+  /// archive, an exotic compression method -- goes to the archive browser
+  /// instead, where the pages can still be viewed one at a time.
+  Future<void> _openBook(String name, String fullPath, BookKind kind) async {
+    final api = ref.read(vaultBookApiProvider);
+    _navNotifier.setLoading(true);
+    BookOpenResult result;
+    try {
+      result = await api.open(
+        container: widget.container,
+        path: fullPath,
+        kind: kind,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _navNotifier.setLoading(false);
+      _setStatus(context.l10n.bookReaderOpenFailed, error: true);
+      return;
+    }
+    final token = result.token;
+    if (!mounted) {
+      if (token != null) unawaited(api.close(token));
+      return;
+    }
+    _navNotifier.setLoading(false);
+
+    Future<void> fallBackToArchive() async {
+      if (token != null) unawaited(api.close(token));
+      await _openArchive(fullPath, name);
+    }
+
+    if (result.status != BookOpenStatus.ok || token == null) {
+      if (result.status.archiveBrowserMayHelp) {
+        await fallBackToArchive();
+      } else {
+        _setStatus(context.l10n.bookReaderOpenFailed, error: true);
+      }
+      return;
+    }
+
+    switch (kind) {
+      case BookKind.comic:
+        if (result.hasEncryptedEntries) {
+          await fallBackToArchive();
+          return;
+        }
+        final pages = comicPageNames(result.entries);
+        if (pages.isEmpty) {
+          unawaited(api.close(token));
+          _setStatus(context.l10n.comicNoPages, error: true);
+          return;
+        }
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ComicReaderScreen(
+              container: widget.container,
+              title: name,
+              token: token,
+              pages: pages,
+            ),
+          ),
+        );
+      case BookKind.epub:
+        final info = result.epub;
+        if (info == null || info.spine.isEmpty) {
+          unawaited(api.close(token));
+          _setStatus(context.l10n.bookReaderOpenFailed, error: true);
+          return;
+        }
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => EpubReaderScreen(
+              container: widget.container,
+              fallbackTitle: name,
+              token: token,
+              info: info,
+            ),
+          ),
+        );
+    }
   }
 
   void _openHtmlViewer(String fullPath) {

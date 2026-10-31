@@ -32,6 +32,26 @@ class OpenInHtmlViewer extends FileOpenAction {
   const OpenInHtmlViewer();
 }
 
+/// Read a comic archive in the in-app comic reader (pages streamed out of the
+/// ZIP in memory, zoomable like the image viewer).
+///
+/// Reached for `.cbz` and, because many of them are really ZIPs, `.cbr`/`.cb7`/
+/// `.cbt` too; the caller falls back to the archive browser when the file
+/// turns out not to be a plain ZIP (a real RAR, a password-protected archive).
+class OpenInComicReader extends FileOpenAction {
+  const OpenInComicReader();
+}
+
+/// Read an `.epub` in the in-app e-book reader (the local-only WebView in
+/// "book mode", chapters served from the book in memory).
+class OpenInEpubReader extends FileOpenAction {
+  const OpenInEpubReader();
+}
+
+/// Extensions the comic reader is offered for. Only `.cbz` is certain to be a
+/// ZIP; the rest are tried and handed to the archive browser if they are not.
+const Set<String> kComicExtensions = {'cbz', 'cbr', 'cb7', 'cbt'};
+
 /// Hand off to a system app -- either the one already remembered for this
 /// extension ([packageName] set), or the platform's own app picker
 /// ([packageName] null, covering both the "needs a system app for a local
@@ -80,7 +100,8 @@ class ShowOpenWithDialog extends FileOpenAction {
 /// [ext] is the already-lowercased, dot-and-whitespace-stripped extension
 /// (see `_handleFileTap`'s own normalization). [extensionPreference] is
 /// the saved choice for that extension, if any (`'editor'`, `'media'`,
-/// `'pdf'`, `'html'`, `'document'`, `'markdown'`, `'installer'`, `'archive'`,
+/// `'pdf'`, `'html'`, `'comic'`, `'epub'`, `'document'`, `'markdown'`,
+/// `'installer'`, `'archive'`,
 /// `'external'`, or `'package:<name>'`).
 /// [needsSystemAppForLocal] and [isSupportedMedia] are pre-computed by the
 /// caller (the former depends on `widget.container.isLocalStorage`, the
@@ -104,6 +125,8 @@ FileOpenAction decideFileOpenAction({
   if (pref == 'media') return const OpenInMediaViewer();
   if (pref == 'pdf') return const OpenInPdfViewer();
   if (pref == 'html') return const OpenInHtmlViewer();
+  if (pref == 'comic') return const OpenInComicReader();
+  if (pref == 'epub') return const OpenInEpubReader();
   // Only meaningful for .apk (the chooser is the only thing that saves them);
   // anything else with one of these values -- a hand-edited settings file --
   // falls through to the normal extension fallback instead of being
@@ -115,7 +138,9 @@ FileOpenAction decideFileOpenAction({
   }
   if (pref == 'external') return const OpenWithSystemApp();
   if (isSupportedMedia) return const OpenInMediaViewer();
-if (ext == 'pdf') return const OpenInPdfViewer();
+  if (ext == 'pdf') return const OpenInPdfViewer();
+  if (ext == 'epub') return const OpenInEpubReader();
+  if (kComicExtensions.contains(ext)) return const OpenInComicReader();
   if (ext == 'html' || ext == 'htm') return const OpenInHtmlViewer();
   if (ext == 'md' || ext == 'markdown') return const OpenInEditor();
   if (ext == 'apk') return const ShowApkOpenChooser();

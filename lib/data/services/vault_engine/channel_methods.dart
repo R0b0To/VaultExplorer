@@ -225,6 +225,11 @@ abstract final class ChannelMethods {
   static const archiveDiscardBrowseFile = 'archiveDiscardBrowseFile';
   static const archiveCreate = 'archiveCreate';
 
+  // In-app comic (.cbz) / e-book (.epub) readers (BookReaderHandlers.kt)
+  static const bookOpen = 'bookOpen';
+  static const bookReadEntry = 'bookReadEntry';
+  static const bookClose = 'bookClose';
+
   // Header Backup tool.
   static const exportContainerHeader = 'exportContainerHeader';
   static const restoreContainerHeaderRegion = 'restoreContainerHeaderRegion';

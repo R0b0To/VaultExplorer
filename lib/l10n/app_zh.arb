@@ -3645,5 +3645,13 @@
   "skinTokenStatusInfo": "提示信息填充",
   "skinTokenStatusInfoHint": "提示横幅的填充色。",
   "skinTokenStatusOnInfo": "提示信息文本",
-  "skinTokenStatusOnInfoHint": "提示横幅中的文本与图标。"
+  "skinTokenStatusOnInfoHint": "提示横幅中的文本与图标。",
+  "bookReaderOpenFailed": "无法打开这本书",
+  "comicNoPages": "此漫画中未找到图片",
+  "comicPageLoadFailed": "无法加载此页面",
+  "comicReadingDirectionRtl": "从右向左阅读",
+  "comicReadingDirectionLtr": "从左向右阅读",
+  "epubTextSize": "文字大小",
+  "epubThemeOriginal": "原始",
+  "epubChapterFallbackTitle": "第 {number} 章"
 }

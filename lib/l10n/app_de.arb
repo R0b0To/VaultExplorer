@@ -3645,5 +3645,13 @@
   "skinTokenStatusInfo": "Füllung von Infomeldungen",
   "skinTokenStatusInfoHint": "Füllung von Info-Bannern.",
   "skinTokenStatusOnInfo": "Text von Infomeldungen",
-  "skinTokenStatusOnInfoHint": "Text und Symbole in Info-Bannern."
+  "skinTokenStatusOnInfoHint": "Text und Symbole in Info-Bannern.",
+  "bookReaderOpenFailed": "Dieses Buch konnte nicht geöffnet werden",
+  "comicNoPages": "Keine Bilder in diesem Comic gefunden",
+  "comicPageLoadFailed": "Diese Seite konnte nicht geladen werden",
+  "comicReadingDirectionRtl": "Leserichtung: von rechts nach links",
+  "comicReadingDirectionLtr": "Leserichtung: von links nach rechts",
+  "epubTextSize": "Textgröße",
+  "epubThemeOriginal": "Original",
+  "epubChapterFallbackTitle": "Kapitel {number}"
 }

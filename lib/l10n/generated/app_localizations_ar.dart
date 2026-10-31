@@ -13174,4 +13174,30 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get skinTokenStatusOnInfoHint =>
       'النص والأيقونات في لافتات المعلومات.';
+
+  @override
+  String get bookReaderOpenFailed => 'تعذّر فتح هذا الكتاب';
+
+  @override
+  String get comicNoPages => 'لم يتم العثور على صور في هذه القصة المصورة';
+
+  @override
+  String get comicPageLoadFailed => 'تعذّر تحميل هذه الصفحة';
+
+  @override
+  String get comicReadingDirectionRtl => 'القراءة من اليمين إلى اليسار';
+
+  @override
+  String get comicReadingDirectionLtr => 'القراءة من اليسار إلى اليمين';
+
+  @override
+  String get epubTextSize => 'حجم النص';
+
+  @override
+  String get epubThemeOriginal => 'الأصلي';
+
+  @override
+  String epubChapterFallbackTitle(int number) {
+    return 'الفصل $number';
+  }
 }

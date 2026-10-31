@@ -293,6 +293,11 @@ private object ChannelMethods {
     const val ARCHIVE_STAGE_BROWSE_ENTRY = "archiveStageBrowseEntry"
     const val ARCHIVE_DISCARD_BROWSE_FILE = "archiveDiscardBrowseFile"
     const val ARCHIVE_CREATE = "archiveCreate"
+
+    // In-app comic (.cbz) / e-book (.epub) readers (see BookReaderHandlers).
+    const val BOOK_OPEN = "bookOpen"
+    const val BOOK_READ_ENTRY = "bookReadEntry"
+    const val BOOK_CLOSE = "bookClose"
     const val PROFILE_CARRIERS = "profileCarriers"
     const val CREATE_COMPOSITE_CONTAINER = "createCompositeContainer"
     const val UNLOCK_COMPOSITE_CONTAINER = "unlockCompositeContainer"
@@ -409,6 +414,7 @@ open class MainActivity : FlutterFragmentActivity() {
     private val headerBackupHandlers = HeaderBackupHandlers(this, ioExecutor, nativeOps)
     private val pdfViewerHandlers = com.aeidolon.vaultexplorer.pdf.PdfViewerHandlers(this, pdfExecutor)
     private val archiveHandlers = com.aeidolon.vaultexplorer.handlers.ArchiveHandlers(this, ioExecutor, nativeOps)
+    private val bookReaderHandlers = com.aeidolon.vaultexplorer.handlers.BookReaderHandlers(this, ioExecutor, nativeOps)
     // Held as a Lazy so onStart/onStop can tell whether a player exists
     // without forcing one into existence.
     private val nativePlayerManagerLazy = lazy { com.aeidolon.vaultexplorer.engine.NativePlayerManager(this) }
@@ -1496,6 +1502,9 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.ARCHIVE_STAGE_BROWSE_ENTRY -> archiveHandlers.handleArchiveStageBrowseEntry(call, result)
                 ChannelMethods.ARCHIVE_DISCARD_BROWSE_FILE -> archiveHandlers.handleArchiveDiscardBrowseFile(call, result)
                 ChannelMethods.ARCHIVE_CREATE -> archiveHandlers.handleArchiveCreate(call, result)
+                ChannelMethods.BOOK_OPEN -> bookReaderHandlers.handleBookOpen(call, result)
+                ChannelMethods.BOOK_READ_ENTRY -> bookReaderHandlers.handleBookReadEntry(call, result)
+                ChannelMethods.BOOK_CLOSE -> bookReaderHandlers.handleBookClose(call, result)
                 ChannelMethods.EXPORT_CONTAINER_HEADER -> headerBackupHandlers.handleExportContainerHeader(call, result)
                 ChannelMethods.RESTORE_CONTAINER_HEADER_REGION ->
                     headerBackupHandlers.handleRestoreContainerHeaderRegion(call, result)

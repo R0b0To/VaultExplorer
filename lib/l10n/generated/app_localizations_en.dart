@@ -12947,4 +12947,30 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get skinTokenStatusOnInfoHint => 'Text and icons in info banners.';
+
+  @override
+  String get bookReaderOpenFailed => 'Couldn\'t open this book';
+
+  @override
+  String get comicNoPages => 'No images found in this comic';
+
+  @override
+  String get comicPageLoadFailed => 'Couldn\'t load this page';
+
+  @override
+  String get comicReadingDirectionRtl => 'Reading right to left';
+
+  @override
+  String get comicReadingDirectionLtr => 'Reading left to right';
+
+  @override
+  String get epubTextSize => 'Text size';
+
+  @override
+  String get epubThemeOriginal => 'Original';
+
+  @override
+  String epubChapterFallbackTitle(int number) {
+    return 'Chapter $number';
+  }
 }

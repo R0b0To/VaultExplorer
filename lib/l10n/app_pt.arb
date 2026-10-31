@@ -3645,5 +3645,13 @@
   "skinTokenStatusInfo": "Preenchimento de mensagem informativa",
   "skinTokenStatusInfoHint": "Preenchimento de banners informativos.",
   "skinTokenStatusOnInfo": "Texto da mensagem informativa",
-  "skinTokenStatusOnInfoHint": "Texto e ícones em banners informativos."
+  "skinTokenStatusOnInfoHint": "Texto e ícones em banners informativos.",
+  "bookReaderOpenFailed": "Não foi possível abrir este livro",
+  "comicNoPages": "Nenhuma imagem encontrada neste quadrinho",
+  "comicPageLoadFailed": "Não foi possível carregar esta página",
+  "comicReadingDirectionRtl": "Leitura da direita para a esquerda",
+  "comicReadingDirectionLtr": "Leitura da esquerda para a direita",
+  "epubTextSize": "Tamanho do texto",
+  "epubThemeOriginal": "Original",
+  "epubChapterFallbackTitle": "Capítulo {number}"
 }

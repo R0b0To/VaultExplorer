@@ -14516,5 +14516,42 @@
   "skinTokenStatusInfo": "Info message fill",
   "skinTokenStatusInfoHint": "Fill of info banners.",
   "skinTokenStatusOnInfo": "Info message text",
-  "skinTokenStatusOnInfoHint": "Text and icons in info banners."
+  "skinTokenStatusOnInfoHint": "Text and icons in info banners.",
+  "bookReaderOpenFailed": "Couldn't open this book",
+  "@bookReaderOpenFailed": {
+    "description": "Error shown when a comic or e-book file cannot be opened"
+  },
+  "comicNoPages": "No images found in this comic",
+  "@comicNoPages": {
+    "description": "Error shown when a comic archive contains no images"
+  },
+  "comicPageLoadFailed": "Couldn't load this page",
+  "@comicPageLoadFailed": {
+    "description": "Shown in place of a comic page that could not be read from the archive"
+  },
+  "comicReadingDirectionRtl": "Reading right to left",
+  "@comicReadingDirectionRtl": {
+    "description": "Tooltip of the comic reader's reading-direction button while reading right to left (manga)"
+  },
+  "comicReadingDirectionLtr": "Reading left to right",
+  "@comicReadingDirectionLtr": {
+    "description": "Tooltip of the comic reader's reading-direction button while reading left to right"
+  },
+  "epubTextSize": "Text size",
+  "@epubTextSize": {
+    "description": "Label and tooltip for the e-book reader's text size and theme settings"
+  },
+  "epubThemeOriginal": "Original",
+  "@epubThemeOriginal": {
+    "description": "E-book reading theme that keeps the book's own colours"
+  },
+  "epubChapterFallbackTitle": "Chapter {number}",
+  "@epubChapterFallbackTitle": {
+    "description": "Contents entry for a chapter when the book has no table of contents",
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  }
 }

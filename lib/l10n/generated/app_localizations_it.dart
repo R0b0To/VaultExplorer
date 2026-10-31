@@ -13157,4 +13157,30 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get skinTokenStatusOnInfoHint =>
       'Testo e icone nei banner informativi.';
+
+  @override
+  String get bookReaderOpenFailed => 'Impossibile aprire questo libro';
+
+  @override
+  String get comicNoPages => 'Nessuna immagine trovata in questo fumetto';
+
+  @override
+  String get comicPageLoadFailed => 'Impossibile caricare questa pagina';
+
+  @override
+  String get comicReadingDirectionRtl => 'Lettura da destra a sinistra';
+
+  @override
+  String get comicReadingDirectionLtr => 'Lettura da sinistra a destra';
+
+  @override
+  String get epubTextSize => 'Dimensione del testo';
+
+  @override
+  String get epubThemeOriginal => 'Originale';
+
+  @override
+  String epubChapterFallbackTitle(int number) {
+    return 'Capitolo $number';
+  }
 }

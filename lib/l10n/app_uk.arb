@@ -3645,5 +3645,13 @@
   "skinTokenStatusInfo": "Заливка інформаційного повідомлення",
   "skinTokenStatusInfoHint": "Заливка інформаційних банерів.",
   "skinTokenStatusOnInfo": "Текст інформаційного повідомлення",
-  "skinTokenStatusOnInfoHint": "Текст та іконки в інформаційних банерах."
+  "skinTokenStatusOnInfoHint": "Текст та іконки в інформаційних банерах.",
+  "bookReaderOpenFailed": "Не вдалося відкрити цю книгу",
+  "comicNoPages": "У цьому коміксі не знайдено зображень",
+  "comicPageLoadFailed": "Не вдалося завантажити цю сторінку",
+  "comicReadingDirectionRtl": "Читання справа наліво",
+  "comicReadingDirectionLtr": "Читання зліва направо",
+  "epubTextSize": "Розмір тексту",
+  "epubThemeOriginal": "Оригінал",
+  "epubChapterFallbackTitle": "Розділ {number}"
 }

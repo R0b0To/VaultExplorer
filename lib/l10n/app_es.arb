@@ -3645,5 +3645,13 @@
   "skinTokenStatusInfo": "Relleno de mensaje de información",
   "skinTokenStatusInfoHint": "Relleno de carteles informativos.",
   "skinTokenStatusOnInfo": "Texto de mensaje de información",
-  "skinTokenStatusOnInfoHint": "Texto e iconos en carteles informativos."
+  "skinTokenStatusOnInfoHint": "Texto e iconos en carteles informativos.",
+  "bookReaderOpenFailed": "No se pudo abrir este libro",
+  "comicNoPages": "No se encontraron imágenes en este cómic",
+  "comicPageLoadFailed": "No se pudo cargar esta página",
+  "comicReadingDirectionRtl": "Lectura de derecha a izquierda",
+  "comicReadingDirectionLtr": "Lectura de izquierda a derecha",
+  "epubTextSize": "Tamaño del texto",
+  "epubThemeOriginal": "Original",
+  "epubChapterFallbackTitle": "Capítulo {number}"
 }

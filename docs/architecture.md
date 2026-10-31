@@ -96,6 +96,28 @@ rather than Flutter plugins — video via AndroidX Media3/ExoPlayer, PDF via
 the AndroidX Jetpack PDF library (`androidx.pdf`) — both decode through the
 OS's own codec/renderer.
 
+Comics (`.cbz`) and EPUB e-books have their own readers rather than going
+through the media viewer's playlist. The playlist and its prefetch/thumbnail
+code address files by container path, and the archive engine's single-entry
+extraction (`archiveExtractVaultEntry`) re-opens the archive for every entry
+and, for folder vaults (gocryptfs, Cryptomator, CryFS), first copies the whole
+archive into a plaintext cache file — fine for one preview, wrong for a reader
+that asks for a page at a time. Both readers instead use `reader/BookZip.kt`: a
+random-access ZIP reader (central directory parsed once, ZIP64 included;
+stored and deflate entries) over `ContainerFileSystem.readFileChunk`, or over a
+file descriptor for Local Storage, so only the bytes of the requested entry are
+read and nothing is written to disk. `BookSessions` keeps one parsed directory
+per open book. The comic reader (`ComicReaderScreen`) pulls pages over the
+channel into the shared in-memory image cache and shows them with the media
+viewer's own `ImagePageItem` (zoom, pan, edge taps), with the same pinch-versus-
+swipe pointer rule as the media viewer. The EPUB reader
+(`EpubReaderScreen`) is the HTML viewer's WebView in "book mode": requests to a
+virtual origin are answered from the book session, `EpubPackage` supplies the
+reading order (the spine, the reader's "playlist") and the table of contents,
+a small style sheet is injected for text layout and the chosen theme, and
+JavaScript and all network access stay off. Password-protected or non-ZIP
+files (a real RAR `.cbr`, DRM) fall back to the archive browser.
+
 The media viewer's player has a 10-band graphic equalizer (31 Hz–16 kHz,
 ±12 dB per band, plus a preamp and a clipping guard) that applies to both
 video and audio. It is a software `AudioProcessor`
@@ -851,6 +873,7 @@ not every constant is spelled out by name.
 | Audio editor (§1.3) | `audioEditProbe`, `audioEditWaveform`, `audioEditExport`, `cancelAudioEdit` |
 | Native PDF viewer (`pdf/`, backs the AndroidX Jetpack platform view, NOTICE.md) | `openPdf`, `getPdfPageSize`, `renderPdfPage`, `closePdf`, `isJetpackPdfViewerSupported`, `register/revokeJetpackPdfSession`, `printPdf` |
 | Document viewer (`officeviewer/`, platform view `com.aeidolon.vaultexplorer/office_viewer`) | No main-channel methods. The per-view channel has one call, `loadDocument` (bytes, extension, theme colours, notes label), which converts DOCX/PPTX/XLSX, ODT/ODP/ODS and legacy PPT text to a script-free HTML page in pure Kotlin (own XML reader, no third-party code) and loads it into a WebView that serves only that in-memory page and its images: JS, storage, file access and network off, CSP `default-src 'none'`. Decrypted bytes are read in Dart (`readWholeFile`, so local storage works too), converted off the UI thread, and never written to disk; errors come back as `ENCRYPTED` / `TOO_LARGE` / `UNSUPPORTED` |
+| Comic / EPUB readers (`reader/`, `handlers/BookReaderHandlers.kt`) | `bookOpen` (parses the ZIP directory; returns a session token plus the page list or the parsed EPUB package), `bookReadEntry`, `bookClose`. The EPUB WebView's per-view channel additionally takes `loadEntry`, `setTextZoom`, `setBookStyle`, `pageScroll` |
 | Archive engine (native libarchive, see §1) | `archiveScanVault`/`archiveScanLocal`, `archiveExtractVaultEntry`/`archiveExtractVaultAll`/`archiveExtractLocalEntry`, `archiveCreate`, `archiveStageBrowseEntry`/`archiveDiscardBrowseFile`, plus `pickArchiveFile`/`pickExtractFolder` |
 | Header backup & repair ("Check & Repair" tool) | `diagnoseUnmountedContainerFile`, `diagnoseMountedVolumeFilesystem`, `runMountedVolumeFilesystemCheck`, `exportContainerHeader`, `restoreBackupHeaderUnmounted`/`restoreContainerHeaderRegion`, `pickFolderVaultForRepair`, `checkFolderVault`, `repairFolderVault`, `resolveFolderVaultConfigFile`/`restoreFolderVaultConfig` |
 | Split & Join | `splitContainer`, `joinContainer`, `cancelSplitJoin`, `unlockSplitContainer` |

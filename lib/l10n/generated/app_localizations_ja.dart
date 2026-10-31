@@ -12407,4 +12407,30 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get skinTokenStatusOnInfoHint => '情報バナー内のテキストとアイコン。';
+
+  @override
+  String get bookReaderOpenFailed => 'この本を開けませんでした';
+
+  @override
+  String get comicNoPages => 'このコミックに画像が見つかりません';
+
+  @override
+  String get comicPageLoadFailed => 'このページを読み込めませんでした';
+
+  @override
+  String get comicReadingDirectionRtl => '右から左へ読む';
+
+  @override
+  String get comicReadingDirectionLtr => '左から右へ読む';
+
+  @override
+  String get epubTextSize => '文字サイズ';
+
+  @override
+  String get epubThemeOriginal => 'オリジナル';
+
+  @override
+  String epubChapterFallbackTitle(int number) {
+    return '第$number章';
+  }
 }

@@ -3645,5 +3645,13 @@
   "skinTokenStatusInfo": "情報メッセージの塗りつぶし",
   "skinTokenStatusInfoHint": "情報バナーの塗りつぶし。",
   "skinTokenStatusOnInfo": "情報メッセージのテキスト",
-  "skinTokenStatusOnInfoHint": "情報バナー内のテキストとアイコン。"
+  "skinTokenStatusOnInfoHint": "情報バナー内のテキストとアイコン。",
+  "bookReaderOpenFailed": "この本を開けませんでした",
+  "comicNoPages": "このコミックに画像が見つかりません",
+  "comicPageLoadFailed": "このページを読み込めませんでした",
+  "comicReadingDirectionRtl": "右から左へ読む",
+  "comicReadingDirectionLtr": "左から右へ読む",
+  "epubTextSize": "文字サイズ",
+  "epubThemeOriginal": "オリジナル",
+  "epubChapterFallbackTitle": "第{number}章"
 }

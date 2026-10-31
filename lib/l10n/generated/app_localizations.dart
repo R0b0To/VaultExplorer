@@ -22032,6 +22032,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Text and icons in info banners.'**
   String get skinTokenStatusOnInfoHint;
+
+  /// Error shown when a comic or e-book file cannot be opened
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open this book'**
+  String get bookReaderOpenFailed;
+
+  /// Error shown when a comic archive contains no images
+  ///
+  /// In en, this message translates to:
+  /// **'No images found in this comic'**
+  String get comicNoPages;
+
+  /// Shown in place of a comic page that could not be read from the archive
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load this page'**
+  String get comicPageLoadFailed;
+
+  /// Tooltip of the comic reader's reading-direction button while reading right to left (manga)
+  ///
+  /// In en, this message translates to:
+  /// **'Reading right to left'**
+  String get comicReadingDirectionRtl;
+
+  /// Tooltip of the comic reader's reading-direction button while reading left to right
+  ///
+  /// In en, this message translates to:
+  /// **'Reading left to right'**
+  String get comicReadingDirectionLtr;
+
+  /// Label and tooltip for the e-book reader's text size and theme settings
+  ///
+  /// In en, this message translates to:
+  /// **'Text size'**
+  String get epubTextSize;
+
+  /// E-book reading theme that keeps the book's own colours
+  ///
+  /// In en, this message translates to:
+  /// **'Original'**
+  String get epubThemeOriginal;
+
+  /// Contents entry for a chapter when the book has no table of contents
+  ///
+  /// In en, this message translates to:
+  /// **'Chapter {number}'**
+  String epubChapterFallbackTitle(int number);
 }
 
 class _AppLocalizationsDelegate

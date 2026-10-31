@@ -12412,4 +12412,30 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get skinTokenStatusOnInfoHint => '안내 배너 내의 텍스트와 아이콘입니다.';
+
+  @override
+  String get bookReaderOpenFailed => '이 책을 열 수 없습니다';
+
+  @override
+  String get comicNoPages => '이 만화에서 이미지를 찾을 수 없습니다';
+
+  @override
+  String get comicPageLoadFailed => '이 페이지를 불러올 수 없습니다';
+
+  @override
+  String get comicReadingDirectionRtl => '오른쪽에서 왼쪽으로 읽기';
+
+  @override
+  String get comicReadingDirectionLtr => '왼쪽에서 오른쪽으로 읽기';
+
+  @override
+  String get epubTextSize => '글자 크기';
+
+  @override
+  String get epubThemeOriginal => '원본';
+
+  @override
+  String epubChapterFallbackTitle(int number) {
+    return '$number장';
+  }
 }

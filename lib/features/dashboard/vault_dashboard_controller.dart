@@ -100,6 +100,10 @@ class VaultDashboardController extends _$VaultDashboardController {
   final Map<int, String> _autoCloseContainerUris = {};
   final Map<int, int> _autoClosePauseDepth = {};
   int _autoCloseActivityPauseDepth = 0;
+  // volIds whose record was already checked for a leftover timer/native alarm
+  // while configured for no timed lock (Never / App Default / Immediately /
+  // Screen Lock Only). See reconcileActiveSessions.
+  final Set<int> _autoCloseOffSwept = {};
   Timer? _undoTimer;
   Future<void>? _loadAllFuture;
 
@@ -156,6 +160,7 @@ class VaultDashboardController extends _$VaultDashboardController {
       _autoCloseTimers.clear();
       _autoCloseScheduledAt.clear();
       _autoCloseContainerUris.clear();
+      _autoCloseOffSwept.clear();
       _undoTimer?.cancel();
 
       events.removeUsbContainerDetachedListener(_onUsbDetachedListener);
@@ -270,6 +275,20 @@ class VaultDashboardController extends _$VaultDashboardController {
         scheduledAt = _autoCloseScheduledAt[session.volId] ??
             await _readAutoCloseStartedAt(session.uri);
         if (!ref.mounted) return;
+      } else {
+        // The record no longer asks for a timed lock (user switched the vault
+        // to Never / App Default / Immediately / Screen Lock Only while it was
+        // mounted, or did so in an earlier process). A Dart timer, persisted
+        // start time and native alarm armed under the old setting would
+        // otherwise survive and still lock the vault. Swept once per session
+        // plus whenever a live timer is found, so repeated loadAll() calls
+        // stay free.
+        final hasLeftover = _autoCloseTimers.containsKey(session.volId) ||
+            _autoCloseScheduledAt.containsKey(session.volId);
+        if (hasLeftover || _autoCloseOffSwept.add(session.volId)) {
+          _autoCloseContainerUris[session.volId] = session.uri;
+          cancelAutoClose(session.volId);
+        }
       }
 
       final timeout = Duration(minutes: timeoutMins);
@@ -549,6 +568,17 @@ class VaultDashboardController extends _$VaultDashboardController {
   Future<void> _performAutoCloseLock(MountedContainer container) async {
     if (!ref.mounted) return;
     if (_isAutoClosePaused(container.volId)) return;
+    // The timer was armed under an earlier setting. If the vault has since
+    // been switched to a mode with no timed lock, this must not lock it.
+    final currentMins = state.records[container.uri]?.autoCloseMins ?? 0;
+    if (currentMins <= 0) {
+      VeLog.i(
+        _kLogTag,
+        '_performAutoCloseLock: volId=${container.volId} no longer has a timed auto-close, cancelling instead of locking',
+      );
+      cancelAutoClose(container.volId);
+      return;
+    }
     if (ref.read(sessionLockControllerProvider).isMediaPlaying) {
       VeLog.d(_kLogTag, '_performAutoCloseLock: media is playing, postponing auto-close');
       _armAutoCloseRetry(container);
@@ -850,6 +880,7 @@ class VaultDashboardController extends _$VaultDashboardController {
       'onContainerLocked: volId=$volId, currently mounted=${state.mounted.map((c) => c.volId).toList()}',
     );
     cancelAutoClose(volId);
+    _autoCloseOffSwept.remove(volId);
     final idx = state.mounted.indexWhere((c) => c.volId == volId);
     if (idx != -1) {
       final container = state.mounted[idx];

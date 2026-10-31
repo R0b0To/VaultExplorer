@@ -2530,6 +2530,10 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
               ),
             ),
           );
+          // The vault may have been locked (or the tab closed) while the
+          // detail screen was open; `_currentDirPath` reads Riverpod state
+          // through this widget's ref, which throws once unmounted.
+          if (!mounted) return;
           _loadDirectoryContents(_currentDirPath);
         }
       } else {
@@ -2579,6 +2583,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             ),
           ),
         );
+        if (!mounted) return;
         _loadDirectoryContents(_currentDirPath);
       case OpenInMediaViewer():
         await _openMediaViewer(entry.name, fullPath);
@@ -2705,6 +2710,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             PdfViewerScreen(container: widget.container, filePath: fullPath),
       ),
     );
+    if (!mounted) return;
     _loadDirectoryContents(_currentDirPath);
   }
 

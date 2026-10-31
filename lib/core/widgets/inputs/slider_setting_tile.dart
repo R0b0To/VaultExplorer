@@ -18,6 +18,13 @@ class SliderSettingTile extends StatefulWidget {
   final String Function(int value) valueLabel;
   final ValueChanged<int> onChanged;
 
+  /// Called while dragging each time the rounded value changes, for settings
+  /// that should preview live. [onChanged] still fires once at drag end.
+  final ValueChanged<int>? onChangedLive;
+
+  /// Called with true when a drag starts and false when it ends.
+  final ValueChanged<bool>? onDragChanged;
+
   const SliderSettingTile({
     super.key,
     required this.label,
@@ -26,6 +33,8 @@ class SliderSettingTile extends StatefulWidget {
     required this.max,
     required this.valueLabel,
     required this.onChanged,
+    this.onChangedLive,
+    this.onDragChanged,
     this.divisions,
     this.prefixIcon,
   });
@@ -37,6 +46,7 @@ class SliderSettingTile extends StatefulWidget {
 class _SliderSettingTileState extends State<SliderSettingTile> {
   late double _value;
   bool _dragging = false;
+  int? _lastLive;
 
   @override
   void initState() {
@@ -97,11 +107,24 @@ class _SliderSettingTileState extends State<SliderSettingTile> {
             max: widget.max.toDouble(),
             divisions: widget.divisions ?? (widget.max - widget.min),
             label: widget.valueLabel(shown),
-            onChangeStart: (_) => _dragging = true,
-            onChanged: (v) => setState(() => _value = v),
+            onChangeStart: (_) {
+              _dragging = true;
+              _lastLive = _value.round();
+              widget.onDragChanged?.call(true);
+            },
+            onChanged: (v) {
+              setState(() => _value = v);
+              final rounded = v.round();
+              if (rounded != _lastLive) {
+                _lastLive = rounded;
+                widget.onChangedLive?.call(rounded);
+              }
+            },
             onChangeEnd: (v) {
               _dragging = false;
+              _lastLive = null;
               widget.onChanged(v.round());
+              widget.onDragChanged?.call(false);
             },
           ),
         ],

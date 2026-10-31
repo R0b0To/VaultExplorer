@@ -7,7 +7,9 @@ import 'package:vaultexplorer/core/api/vault_book_api.dart';
 import 'package:vaultexplorer/core/api/vault_engine_events.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/core/widgets/inputs/slider_setting_tile.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/book_reader_state_store.dart';
 import 'package:vaultexplorer/features/browser/viewer/books/epub_style.dart';
@@ -93,6 +95,7 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> {
   bool _pageMargins = true;
   bool _twoPageLandscape = false;
   bool _isLandscape = false;
+  bool _sliderDragging = false;
 
   bool get _twoPageSpreadActive => _twoPageLandscape && _isLandscape;
 
@@ -471,81 +474,144 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> {
       builder: (sheetContext) => DefaultTabController(
         length: 2,
         child: StatefulBuilder(
-          builder: (context, setSheetState) => SafeArea(
-            child: SizedBox(
-              height: MediaQuery.sizeOf(context).height * .78,
-              child: Column(
-                children: [
-                  TabBar(
-                    tabs: [
-                      Tab(text: l10n.contentsLabel),
-                      Tab(text: l10n.bookmarkBarSectionHeader),
-                    ],
-                  ),
-                  Expanded(
-                    child: TabBarView(
-                      children: [
-                        ListView.builder(
-                          itemCount: entries.length,
-                          itemBuilder: (context, i) {
-                            final entry = entries[i];
-                            final index = _spineIndexByPath[entry.path];
-                            return ListTile(
-                              contentPadding: EdgeInsetsDirectional.only(
-                                start: 16.0 + 16.0 * entry.level.clamp(0, 5),
-                                end: 16,
-                              ),
-                              selected: index == _current,
-                              title: Text(
-                                entry.title,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              onTap: index == null
-                                  ? null
-                                  : () => Navigator.of(sheetContext).pop((
-                                      position: index,
-                                      fraction: 0.0,
-                                      fragment: entry.fragment,
-                                    )),
-                            );
-                          },
-                        ),
-                        ListView(
-                          children: [
-                            ListTile(
-                              leading: const Icon(Icons.bookmark_add_outlined),
-                              title: Text(l10n.bookmarkAction),
-                              subtitle: Text(_chapterTitle(_current)),
-                              onTap: () async {
-                                await _toggleBookmark();
-                                setSheetState(() {});
-                              },
-                            ),
-                            if (_bookmarks.isEmpty)
-                              ListTile(title: Text(l10n.noBookmarksYet)),
-                            for (final bookmark in _bookmarks)
-                              ListTile(
-                                leading: const Icon(Icons.bookmark),
-                                title: Text(_chapterTitle(bookmark.position)),
-                                subtitle: Text(
-                                  '${(bookmark.fraction * 100).round()}%',
-                                ),
-                                onTap: () => Navigator.of(sheetContext).pop((
-                                  position: bookmark.position,
-                                  fraction: bookmark.fraction,
-                                  fragment: '',
-                                )),
-                              ),
-                          ],
-                        ),
+          builder: (context, setSheetState) {
+            final cs = context.colors;
+            final textTheme = context.typography;
+            const tilePadding = EdgeInsets.symmetric(horizontal: 16);
+
+            return SafeArea(
+              child: SizedBox(
+                height: MediaQuery.sizeOf(context).height * .78,
+                child: Column(
+                  children: [
+                    TabBar(
+                      tabs: [
+                        Tab(text: l10n.contentsLabel),
+                        Tab(text: l10n.bookmarkBarSectionHeader),
                       ],
                     ),
-                  ),
-                ],
+                    Expanded(
+                      child: TabBarView(
+                        children: [
+                          ListView.builder(
+                            padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+                            itemCount: entries.length,
+                            itemBuilder: (context, i) {
+                              final entry = entries[i];
+                              final index = _spineIndexByPath[entry.path];
+                              final selected = index == _current;
+                              return ListTile(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    AppRadius.md,
+                                  ),
+                                ),
+                                contentPadding: EdgeInsetsDirectional.only(
+                                  start: 16.0 + 16.0 * entry.level.clamp(0, 5),
+                                  end: 16,
+                                ),
+                                selected: selected,
+                                selectedColor: cs.primary,
+                                selectedTileColor: cs.primaryContainer
+                                    .withValues(alpha: 0.5),
+                                title: Text(
+                                  entry.title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: textTheme.bodyMedium?.copyWith(
+                                    fontWeight: selected
+                                        ? FontWeight.bold
+                                        : FontWeight.w500,
+                                  ),
+                                ),
+                                onTap: index == null
+                                    ? null
+                                    : () => Navigator.of(sheetContext).pop((
+                                        position: index,
+                                        fraction: 0.0,
+                                        fragment: entry.fragment,
+                                      )),
+                              );
+                            },
+                          ),
+                          ListView(
+                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                            children: [
+                              SectionCard(
+                                children: [
+                                  ListTile(
+                                    contentPadding: tilePadding,
+                                    leading: Icon(
+                                      Icons.bookmark_add_rounded,
+                                      color: cs.primary,
+                                    ),
+                                    title: Text(
+                                      l10n.bookmarkAction,
+                                      style: textTheme.bodyMedium?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    subtitle: Text(
+                                      _chapterTitle(_current),
+                                      style: textTheme.bodySmall?.copyWith(
+                                        color: cs.onSurfaceVariant,
+                                      ),
+                                    ),
+                                    onTap: () async {
+                                      await _toggleBookmark();
+                                      setSheetState(() {});
+                                    },
+                                  ),
+                                  for (final bookmark in _bookmarks)
+                                    ListTile(
+                                      contentPadding: tilePadding,
+                                      leading: Icon(
+                                        Icons.bookmark_rounded,
+                                        color: context.semanticColors.bookmark,
+                                      ),
+                                      title: Text(
+                                        _chapterTitle(bookmark.position),
+                                        style: textTheme.bodyMedium?.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      subtitle: Text(
+                                        '${(bookmark.fraction * 100).round()}%',
+                                        style: textTheme.bodySmall?.copyWith(
+                                          color: cs.onSurfaceVariant,
+                                        ),
+                                      ),
+                                      onTap: () =>
+                                          Navigator.of(sheetContext).pop((
+                                            position: bookmark.position,
+                                            fraction: bookmark.fraction,
+                                            fragment: '',
+                                          )),
+                                    ),
+                                ],
+                              ),
+                              if (_bookmarks.isEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.all(24),
+                                  child: Center(
+                                    child: Text(
+                                      l10n.noBookmarksYet,
+                                      style: textTheme.bodyMedium?.copyWith(
+                                        color: cs.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ),
+            );
+          },
         ),
       ),
     );
@@ -557,395 +623,284 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> {
     );
   }
 
-  Future<void> _showAppearance() => showDialog<void>(
+  /// Reader settings, built from the same pieces as the app's settings
+  /// screens (section headers, grouped cards, option pickers, slider tiles)
+  /// so it follows the active theme instead of carrying its own palette.
+  Future<void> _showAppearance() => showModalBottomSheet<void>(
     context: context,
-    builder: (dialogContext) => StatefulBuilder(
-      builder: (context, setDialogState) {
+    isScrollControlled: true,
+    useSafeArea: true,
+    // No scrim and no sheet surface of its own: while a slider is dragged the
+    // whole panel fades so the book underneath is readable.
+    barrierColor: Colors.transparent,
+    backgroundColor: Colors.transparent,
+    elevation: 0,
+    builder: (sheetContext) => StatefulBuilder(
+      builder: (context, setSheetState) {
         final l10n = context.l10n;
+        final cs = context.colors;
+        final textTheme = context.typography;
         final theme = _theme ?? EpubTheme.light;
-        const panel = Color(0xFF343434);
-        const card = Color(0xFF454545);
-        const accent = Color(0xFF13B8D0);
 
+        // Runs [action], then rebuilds the sheet so every control shows the
+        // new value.
         Future<void> refresh(Future<void> Function() action) async {
           await action();
-          if (dialogContext.mounted) setDialogState(() {});
+          if (sheetContext.mounted) setSheetState(() {});
         }
 
-        Widget settingCard(String title, Widget child) => Container(
-          margin: const EdgeInsets.only(bottom: 3),
-          padding: const EdgeInsets.fromLTRB(8, 4, 8, 3),
-          decoration: BoxDecoration(
-            color: card,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title.toUpperCase(),
-                style: const TextStyle(
-                  color: Colors.white60,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              child,
-            ],
-          ),
-        );
-
-        Widget toggleCard(
-          String title,
-          bool value,
-          ValueChanged<bool> onChanged,
-        ) => Container(
-          margin: const EdgeInsets.only(bottom: 3),
-          decoration: BoxDecoration(
-            color: card,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: SwitchListTile(
-            dense: true,
-            visualDensity: VisualDensity.compact,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 10),
-            title: Text(
-              title,
-              style: const TextStyle(color: Colors.white, fontSize: 14),
-            ),
-            value: value,
-            activeThumbColor: const Color(0xFFFFC400),
-            onChanged: onChanged,
-          ),
-        );
-
-        Widget dropdown<T>({
-          required T value,
-          required List<DropdownMenuItem<T>> items,
-          required ValueChanged<T?> onChanged,
-        }) => DropdownButton<T>(
+        Widget switchTile({
+          required IconData icon,
+          required String title,
+          required bool value,
+          required ValueChanged<bool> onChanged,
+        }) => SwitchListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
           value: value,
-          isExpanded: true,
-          isDense: true,
-          menuMaxHeight: 280,
-          dropdownColor: card,
-          style: const TextStyle(color: Colors.white, fontSize: 14),
-          iconEnabledColor: Colors.white70,
-          underline: const SizedBox.shrink(),
-          items: items,
           onChanged: onChanged,
+          secondary: Icon(icon, color: cs.primary),
+          title: Text(
+            title,
+            style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+          ),
         );
 
-        return Dialog(
-          backgroundColor: panel,
-          insetPadding: const EdgeInsets.symmetric(
-            horizontal: 32,
-            vertical: 28,
-          ),
-          child: SizedBox(
-            width: 328,
-            height: MediaQuery.sizeOf(context).height * .66,
-            child: Column(
-              children: [
+        void setDragging(bool dragging) {
+          _sliderDragging = dragging;
+          setSheetState(() {});
+        }
+
+        return AnimatedOpacity(
+          opacity: _sliderDragging ? .22 : 1,
+          duration: const Duration(milliseconds: 150),
+          child: Material(
+            color: cs.surfaceContainerLow,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(
+                top: Radius.circular(AppRadius.sheet),
+              ),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(context).height * .85,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 32,
+                    height: 4,
+                    margin: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: cs.onSurfaceVariant.withValues(alpha: .4),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  Flexible(
+                    child: SafeArea(
+                      top: false,
+                      child: ListView(
+                        shrinkWrap: true,
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                        children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 8, 4),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          children: [
-                            Text(
-                              'READER SETTINGS',
-                              style: TextStyle(
-                                color: accent,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: .4,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            const Text(
-                              'EPUB',
-                              style: TextStyle(
-                                color: Colors.white60,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: l10n.closeButton,
-                        onPressed: () => Navigator.of(dialogContext).pop(),
-                        icon: const Icon(Icons.close, color: Colors.white70),
-                      ),
-                    ],
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+                  child: Text(
+                    'Reader settings',
+                    style: textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
-                    children: [
-                      settingCard(
-                        'Page flipping',
-                        dropdown<bool>(
-                          value: _paged,
-                          items: [
-                            const DropdownMenuItem(
-                              value: true,
-                              child: Text('Horizontal'),
-                            ),
-                            DropdownMenuItem(
-                              value: false,
-                              child: Text(
-                                l10n.playlistScrollVerticalContinuousLabel,
-                              ),
-                            ),
-                          ],
-                          onChanged: (value) {
-                            if (value != null) {
-                              unawaited(refresh(() => _setPaged(value)));
-                            }
-                          },
+                const SectionHeader('Page'),
+                SectionCard(
+                  children: [
+                    OptionPickerTile<bool>(
+                      label: 'Page flipping',
+                      prefixIcon: Icons.swap_horiz_rounded,
+                      value: _paged,
+                      options: [
+                        const SelectOption(value: true, label: 'Horizontal'),
+                        SelectOption(
+                          value: false,
+                          label: l10n.playlistScrollVerticalContinuousLabel,
                         ),
-                      ),
-                      settingCard(
-                        'Text direction',
-                        dropdown<bool>(
-                          value: _rtl,
-                          items: [
-                            DropdownMenuItem(
-                              value: false,
-                              child: Text(l10n.comicReadingDirectionLtr),
-                            ),
-                            DropdownMenuItem(
-                              value: true,
-                              child: Text(l10n.comicReadingDirectionRtl),
-                            ),
-                          ],
-                          onChanged: (value) {
-                            if (value == null || value == _rtl) return;
-                            setState(() => _rtl = value);
-                            unawaited(refresh(_applyBookStyle));
-                          },
+                      ],
+                      onChanged: (value) =>
+                          unawaited(refresh(() => _setPaged(value))),
+                    ),
+                    OptionPickerTile<bool>(
+                      label: 'Text direction',
+                      prefixIcon: _rtl
+                          ? Icons.format_textdirection_r_to_l_rounded
+                          : Icons.format_textdirection_l_to_r_rounded,
+                      value: _rtl,
+                      options: [
+                        SelectOption(
+                          value: false,
+                          label: l10n.comicReadingDirectionLtr,
                         ),
-                      ),
-                      settingCard(
-                        'Color mode',
-                        dropdown<EpubTheme>(
-                          value: theme,
-                          items: [
-                            for (final option in EpubTheme.values)
-                              DropdownMenuItem(
-                                value: option,
-                                child: Text(_themeLabel(l10n, option)),
-                              ),
-                          ],
-                          onChanged: (value) {
-                            if (value != null) {
-                              unawaited(refresh(() => _setTheme(value)));
-                            }
-                          },
+                        SelectOption(
+                          value: true,
+                          label: l10n.comicReadingDirectionRtl,
                         ),
-                      ),
-                      settingCard(
-                        'Font face',
-                        dropdown<EpubFontFace>(
-                          value: _fontFace,
-                          items: const [
-                            DropdownMenuItem(
-                              value: EpubFontFace.publisher,
-                              child: Text('Publisher default'),
-                            ),
-                            DropdownMenuItem(
-                              value: EpubFontFace.serif,
-                              child: Text('Serif'),
-                            ),
-                            DropdownMenuItem(
-                              value: EpubFontFace.sansSerif,
-                              child: Text('Sans serif'),
-                            ),
-                            DropdownMenuItem(
-                              value: EpubFontFace.monospace,
-                              child: Text('Monospace'),
-                            ),
-                          ],
-                          onChanged: (value) {
-                            if (value == null) return;
-                            setState(() => _fontFace = value);
-                            unawaited(refresh(_applyBookStyle));
-                          },
-                        ),
-                      ),
-                      settingCard(
-                        l10n.epubTextSize,
-                        Row(
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.remove_circle_outline),
-                              color: Colors.white70,
-                              onPressed: _textZoom > kEpubTextZoomMin
-                                  ? () => unawaited(
-                                      refresh(
-                                        () => _setTextZoom(
-                                          _textZoom - kEpubTextZoomStep,
-                                        ),
-                                      ),
-                                    )
-                                  : null,
-                            ),
-                            Expanded(
-                              child: Center(
-                                child: Text(
-                                  '$_textZoom%',
-                                  style: const TextStyle(color: Colors.white),
-                                ),
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.add_circle_outline),
-                              color: Colors.white70,
-                              onPressed: _textZoom < kEpubTextZoomMax
-                                  ? () => unawaited(
-                                      refresh(
-                                        () => _setTextZoom(
-                                          _textZoom + kEpubTextZoomStep,
-                                        ),
-                                      ),
-                                    )
-                                  : null,
-                            ),
-                          ],
-                        ),
-                      ),
-                      settingCard(
-                        'Font thickness',
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Slider(
-                                min: 300,
-                                max: 700,
-                                divisions: 4,
-                                value: _fontWeight.toDouble(),
-                                activeColor: const Color(0xFFFFC400),
-                                onChanged: (value) {
-                                  setState(() => _fontWeight = value.round());
-                                  setDialogState(() {});
-                                },
-                                onChangeEnd: (_) =>
-                                    unawaited(_applyBookStyle()),
-                              ),
-                            ),
-                            SizedBox(
-                              width: 36,
-                              child: Text(
-                                '$_fontWeight',
-                                style: const TextStyle(color: Colors.white70),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      settingCard(
-                        'Line spacing',
-                        Row(
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.remove_circle_outline),
-                              color: Colors.white70,
-                              onPressed: _lineHeight > 1.0
-                                  ? () {
-                                      setState(
-                                        () => _lineHeight = (_lineHeight - .1)
-                                            .clamp(1.0, 2.0)
-                                            .toDouble(),
-                                      );
-                                      setDialogState(() {});
-                                      unawaited(_applyBookStyle());
-                                    }
-                                  : null,
-                            ),
-                            Expanded(
-                              child: Center(
-                                child: Text(
-                                  '${(_lineHeight * 100).round()}%',
-                                  style: const TextStyle(color: Colors.white),
-                                ),
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.add_circle_outline),
-                              color: Colors.white70,
-                              onPressed: _lineHeight < 2.0
-                                  ? () {
-                                      setState(
-                                        () => _lineHeight = (_lineHeight + .1)
-                                            .clamp(1.0, 2.0)
-                                            .toDouble(),
-                                      );
-                                      setDialogState(() {});
-                                      unawaited(_applyBookStyle());
-                                    }
-                                  : null,
-                            ),
-                          ],
-                        ),
-                      ),
-                      settingCard(
-                        'Text align',
-                        dropdown<EpubTextAlignment>(
-                          value: _textAlignment,
-                          items: const [
-                            DropdownMenuItem(
-                              value: EpubTextAlignment.publisher,
-                              child: Text('Publisher default'),
-                            ),
-                            DropdownMenuItem(
-                              value: EpubTextAlignment.left,
-                              child: Text('Left'),
-                            ),
-                            DropdownMenuItem(
-                              value: EpubTextAlignment.justified,
-                              child: Text('Justified'),
-                            ),
-                            DropdownMenuItem(
-                              value: EpubTextAlignment.center,
-                              child: Text('Center'),
-                            ),
-                            DropdownMenuItem(
-                              value: EpubTextAlignment.right,
-                              child: Text('Right'),
-                            ),
-                          ],
-                          onChanged: (value) {
-                            if (value == null) return;
-                            setState(() => _textAlignment = value);
-                            unawaited(refresh(_applyBookStyle));
-                          },
-                        ),
-                      ),
-                      toggleCard(
-                        'Two pages in landscape orientation',
-                        _twoPageLandscape,
-                        (value) {
-                          setState(() => _twoPageLandscape = value);
-                          setDialogState(() {});
-                          unawaited(_applyBookStyle());
-                        },
-                      ),
-                      toggleCard('Page margins', _pageMargins, (value) {
-                        setState(() => _pageMargins = value);
-                        setDialogState(() {});
+                      ],
+                      onChanged: (value) {
+                        if (value == _rtl) return;
+                        setState(() => _rtl = value);
+                        unawaited(refresh(_applyBookStyle));
+                      },
+                    ),
+                    OptionPickerTile<EpubTheme>(
+                      label: 'Color mode',
+                      prefixIcon: Icons.palette_rounded,
+                      value: theme,
+                      options: [
+                        for (final option in EpubTheme.values)
+                          SelectOption(
+                            value: option,
+                            label: _themeLabel(l10n, option),
+                          ),
+                      ],
+                      onChanged: (value) =>
+                          unawaited(refresh(() => _setTheme(value))),
+                    ),
+                    switchTile(
+                      icon: Icons.menu_book_rounded,
+                      title: 'Two pages in landscape orientation',
+                      value: _twoPageLandscape,
+                      onChanged: (value) {
+                        setState(() => _twoPageLandscape = value);
+                        setSheetState(() {});
                         unawaited(_applyBookStyle());
-                      }),
-                    ],
+                      },
+                    ),
+                    switchTile(
+                      icon: Icons.border_outer_rounded,
+                      title: 'Page margins',
+                      value: _pageMargins,
+                      onChanged: (value) {
+                        setState(() => _pageMargins = value);
+                        setSheetState(() {});
+                        unawaited(_applyBookStyle());
+                      },
+                    ),
+                  ],
+                ),
+                const SectionHeader('Text'),
+                SectionCard(
+                  children: [
+                    OptionPickerTile<EpubFontFace>(
+                      label: 'Font face',
+                      prefixIcon: Icons.font_download_rounded,
+                      value: _fontFace,
+                      options: const [
+                        SelectOption(
+                          value: EpubFontFace.publisher,
+                          label: 'Publisher default',
+                        ),
+                        SelectOption(
+                          value: EpubFontFace.serif,
+                          label: 'Serif',
+                        ),
+                        SelectOption(
+                          value: EpubFontFace.sansSerif,
+                          label: 'Sans serif',
+                        ),
+                        SelectOption(
+                          value: EpubFontFace.monospace,
+                          label: 'Monospace',
+                        ),
+                      ],
+                      onChanged: (value) {
+                        setState(() => _fontFace = value);
+                        unawaited(refresh(_applyBookStyle));
+                      },
+                    ),
+                    SliderSettingTile(
+                      label: l10n.epubTextSize,
+                      prefixIcon: Icons.format_size_rounded,
+                      value: _textZoom,
+                      min: kEpubTextZoomMin,
+                      max: kEpubTextZoomMax,
+                      divisions:
+                          (kEpubTextZoomMax - kEpubTextZoomMin) ~/
+                          kEpubTextZoomStep,
+                      valueLabel: (value) => '$value%',
+                      onDragChanged: setDragging,
+                      onChangedLive: (value) => unawaited(_setTextZoom(value)),
+                      onChanged: (_) => setSheetState(() {}),
+                    ),
+                    SliderSettingTile(
+                      label: 'Font thickness',
+                      prefixIcon: Icons.format_bold_rounded,
+                      value: _fontWeight,
+                      min: 300,
+                      max: 700,
+                      divisions: 4,
+                      valueLabel: (value) => '$value',
+                      onDragChanged: setDragging,
+                      onChangedLive: (value) {
+                        setState(() => _fontWeight = value);
+                        unawaited(_applyBookStyle());
+                      },
+                      onChanged: (_) => setSheetState(() {}),
+                    ),
+                    SliderSettingTile(
+                      label: 'Line spacing',
+                      prefixIcon: Icons.format_line_spacing_rounded,
+                      value: (_lineHeight * 100).round(),
+                      min: 100,
+                      max: 200,
+                      divisions: 10,
+                      valueLabel: (value) => '$value%',
+                      onDragChanged: setDragging,
+                      onChangedLive: (value) {
+                        setState(() => _lineHeight = value / 100);
+                        unawaited(_applyBookStyle());
+                      },
+                      onChanged: (_) => setSheetState(() {}),
+                    ),
+                    OptionPickerTile<EpubTextAlignment>(
+                      label: 'Text align',
+                      prefixIcon: Icons.format_align_left_rounded,
+                      value: _textAlignment,
+                      options: const [
+                        SelectOption(
+                          value: EpubTextAlignment.publisher,
+                          label: 'Publisher default',
+                        ),
+                        SelectOption(
+                          value: EpubTextAlignment.left,
+                          label: 'Left',
+                        ),
+                        SelectOption(
+                          value: EpubTextAlignment.justified,
+                          label: 'Justified',
+                        ),
+                        SelectOption(
+                          value: EpubTextAlignment.center,
+                          label: 'Center',
+                        ),
+                        SelectOption(
+                          value: EpubTextAlignment.right,
+                          label: 'Right',
+                        ),
+                      ],
+                      onChanged: (value) {
+                        setState(() => _textAlignment = value);
+                        unawaited(refresh(_applyBookStyle));
+                      },
+                    ),
+                  ],
+                ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: const Text('DONE'),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );
@@ -1020,10 +975,22 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> {
           itemBuilder: (context) => [
             PopupMenuItem(
               value: 'scripts',
-              child: Text(
-                _javascriptEnabled
-                    ? l10n.disableJavaScriptMenu
-                    : l10n.enableJavaScriptMenu,
+              child: Row(
+                children: [
+                  Icon(
+                    _javascriptEnabled
+                        ? Icons.code_off_rounded
+                        : Icons.code_rounded,
+                    size: AppIconSize.small,
+                    color: context.colors.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Text(
+                    _javascriptEnabled
+                        ? l10n.disableJavaScriptMenu
+                        : l10n.enableJavaScriptMenu,
+                  ),
+                ],
               ),
             ),
           ],

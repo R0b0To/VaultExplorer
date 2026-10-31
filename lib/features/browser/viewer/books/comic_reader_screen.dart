@@ -364,7 +364,7 @@ class _ComicReaderScreenState extends ConsumerState<ComicReaderScreen> {
       }
       return Image.memory(
         bytes,
-        fit: BoxFit.contain,
+        fit: BoxFit.cover,
         cacheWidth: 240,
         gaplessPlayback: true,
       );

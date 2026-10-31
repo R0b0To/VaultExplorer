@@ -211,17 +211,6 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
       duration: const Duration(milliseconds: 220),
       curve: Curves.easeOutCubic,
       height: currentHeight,
-      decoration: BoxDecoration(
-        color: widget.backgroundColor ?? const Color(0xE6121212),
-        border: const Border(top: BorderSide(color: Colors.white24)),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black54,
-            blurRadius: 14,
-            offset: Offset(0, -4),
-          ),
-        ],
-      ),
       child: ClipRect(
         child: GestureDetector(
           behavior: HitTestBehavior.translucent,

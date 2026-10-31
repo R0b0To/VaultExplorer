@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/api/vault_book_api.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
@@ -22,6 +23,7 @@ import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/widgets/apk_icon_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/archive_thumbnail_support.dart';
+import 'package:vaultexplorer/features/browser/widgets/book_cover_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/thumbnail_raw_fallback.dart';
 import 'package:vaultexplorer/features/browser/widgets/tile_selection_style.dart';
 
@@ -148,6 +150,7 @@ class FileTile extends StatelessWidget {
     final isImg = MediaViewerConstants.isImage(entry.name);
     final isVid = MediaViewerConstants.isVideo(entry.name);
     final isApk = isApkFile(entry.name);
+    final isBook = isBookWithCover(entry.name);
     if (showThumbnail &&
         container != null &&
         vaultIcon == null &&
@@ -197,6 +200,22 @@ class FileTile extends StatelessWidget {
         customLeading = Material(
           type: MaterialType.transparency,
           child: _ListApkIconThumb(
+            container: container!,
+            filePath: fullPath,
+            cacheMode: thumbnailCacheMode,
+            quality: thumbnailQuality,
+            fallbackIcon: displayIcon,
+            fallbackColor: iconColor,
+            zoomLevel: zoomLevel,
+          ),
+        );
+      } else if (isBook && archiveContext == null) {
+        // Same restriction as the APK above. Unlike an app icon a cover is
+        // shown filled into the row's squircle, like a photo or video frame,
+        // so customLeadingIsIcon stays false.
+        customLeading = Material(
+          type: MaterialType.transparency,
+          child: _ListBookCoverThumb(
             container: container!,
             filePath: fullPath,
             cacheMode: thumbnailCacheMode,
@@ -642,6 +661,73 @@ class _ListApkIconThumb extends ConsumerWidget {
           ),
         ),
       ),
+      errorBuilder: (context) => _fallbackWidget(),
+    );
+  }
+
+  Widget _fallbackWidget() {
+    return Center(
+      child: Icon(
+        fallbackIcon,
+        size: AppIconSize.action * zoomLevel,
+        color: fallbackColor,
+      ),
+    );
+  }
+}
+
+/// A book's cover as the leading thumbnail of a list row. See
+/// [_BookCoverGridThumb] for why loading and failure both just show the icon.
+class _ListBookCoverThumb extends ConsumerWidget {
+  final MountedContainer container;
+  final String filePath;
+  final ThumbnailCacheMode cacheMode;
+  final ThumbnailQuality quality;
+  final IconData fallbackIcon;
+  final Color fallbackColor;
+  final double zoomLevel;
+  const _ListBookCoverThumb({
+    required this.container,
+    required this.filePath,
+    required this.cacheMode,
+    required this.quality,
+    required this.fallbackIcon,
+    required this.fallbackColor,
+    this.zoomLevel = 1.0,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
+    final bookApi = ref.read(vaultBookApiProvider);
+    return AsyncThumbnail(
+      key: ValueKey('list_book:$filePath'),
+      container: container,
+      filePath: filePath,
+      quality: quality,
+      cache: ThumbnailConcurrency.inFlightThumbnails,
+      limiter: ThumbnailConcurrency.imageLimiter,
+      fetchFn: (c, p) async => (await loadBookCoverThumbnail(
+        thumbnailCache: thumbnailCache,
+        bookApi: bookApi,
+        container: c,
+        path: p,
+        mode: cacheMode,
+        quality: quality,
+      )).bytes,
+      debounce: const Duration(milliseconds: 100),
+      syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
+      cacheHeight: quality.scaledSize(180),
+      imageBuilder: (context, bytes, cacheHeight) => Image.memory(
+        bytes,
+        fit: BoxFit.cover,
+        alignment: Alignment.topCenter,
+        width: double.infinity,
+        height: double.infinity,
+        cacheHeight: cacheHeight,
+        errorBuilder: (_, _, _) => _fallbackWidget(),
+      ),
+      loadingBuilder: (context) => _fallbackWidget(),
       errorBuilder: (context) => _fallbackWidget(),
     );
   }

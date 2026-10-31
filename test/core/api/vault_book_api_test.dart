@@ -161,6 +161,76 @@ void main() {
     });
   });
 
+  group('getCover', () {
+    final cover = Uint8List.fromList([0xFF, 0xD8, 0x01, 0xFF, 0xD9]);
+
+    test('a vault book is addressed by volume id and vault path', () async {
+      nextResult = {'bytes': cover, 'width': 600, 'height': 900};
+
+      final thumb = await api.getCover(
+        container: _vault(),
+        path: '/Comics/a.cbz',
+        kind: BookKind.comic,
+        targetSize: 240,
+        quality: 80,
+      );
+
+      expect(calls.single.method, 'bookCover');
+      expect(calls.single.arguments['volId'], 7);
+      expect(calls.single.arguments['vaultPath'], '/Comics/a.cbz');
+      expect(calls.single.arguments['kind'], 'comic');
+      expect(calls.single.arguments['targetSize'], 240);
+      expect(calls.single.arguments['quality'], 80);
+      expect(calls.single.arguments.containsKey('localPathOrUri'), isFalse);
+      expect(thumb.bytes, cover);
+      expect(thumb.width, 600);
+      expect(thumb.height, 900);
+      expect(thumb.aspectRatio, closeTo(600 / 900, 1e-9));
+    });
+
+    test('a Local Storage book is addressed by its full path', () async {
+      nextResult = {'bytes': cover, 'width': 1, 'height': 2};
+      final local = buildLocalStorageContainer(
+        rootPath: '/storage/emulated/0',
+        displayName: 'Internal',
+      );
+
+      await api.getCover(container: local, path: 'Books/b.epub', kind: BookKind.epub);
+
+      expect(calls.single.arguments['localPathOrUri'], '/storage/emulated/0/Books/b.epub');
+      expect(calls.single.arguments['kind'], 'epub');
+      expect(calls.single.arguments['targetSize'], 180);
+      expect(calls.single.arguments['quality'], 70);
+      expect(calls.single.arguments.containsKey('volId'), isFalse);
+    });
+
+    test('an empty or malformed reply is an error, never a blank tile', () async {
+      for (final bad in <Object?>[
+        null,
+        {'bytes': Uint8List(0), 'width': 1, 'height': 1},
+        {'width': 1, 'height': 1},
+        'nope',
+      ]) {
+        // Awaited per case: the mock handler reads `nextResult` when the call
+        // is delivered, so the next case must not overwrite it first.
+        nextResult = bad;
+        await expectLater(
+          api.getCover(container: _vault(), path: 'a.cbz', kind: BookKind.comic),
+          throwsA(isA<PlatformException>().having((e) => e.code, 'code', 'BOOK_EMPTY')),
+          reason: '$bad',
+        );
+      }
+    });
+
+    test('native failures keep their code', () {
+      nextError = PlatformException(code: 'BOOK_NO_COVER');
+      expect(
+        () => api.getCover(container: _vault(), path: 'a.epub', kind: BookKind.epub),
+        throwsA(isA<PlatformException>().having((e) => e.code, 'code', 'BOOK_NO_COVER')),
+      );
+    });
+  });
+
   group('readEntry / close', () {
     test('readEntry returns the bytes for a token and entry name', () async {
       nextResult = Uint8List.fromList([1, 2, 3]);

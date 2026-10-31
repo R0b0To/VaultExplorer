@@ -5,6 +5,7 @@ import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/models/thumbnail_with_size.dart';
 import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';
 
 /// What a book is opened as. A comic hands back its page list; an e-book hands
@@ -218,6 +219,41 @@ class VaultBookApi {
       throw PlatformException(code: 'BOOK_EMPTY', message: 'No data for $name');
     }
     return bytes;
+  }
+
+  /// A file-manager thumbnail of the book's cover, with the cover's source
+  /// width/height (for masonry layout): the first page of a comic, the declared
+  /// cover image of an EPUB.
+  ///
+  /// Unlike [open] this is one self-contained call -- no session to close. The
+  /// cover is decoded and downscaled natively, so only the small thumbnail
+  /// crosses the channel. Throws [PlatformException] when there is nothing to
+  /// show: `BOOK_NO_COVER`, the other `BOOK_*` codes (not a ZIP, encrypted,
+  /// corrupt, ...), or `DECODE_FAILED` / `IMAGE_TOO_LARGE` / `OUT_OF_MEMORY`.
+  Future<ThumbnailWithSize> getCover({
+    required MountedContainer container,
+    required String path,
+    required BookKind kind,
+    int targetSize = 180,
+    int quality = 70,
+  }) async {
+    final args = <String, Object?>{
+      'kind': kind.name,
+      'targetSize': targetSize,
+      'quality': quality,
+    };
+    if (container.isLocalStorage) {
+      args['localPathOrUri'] = p.join(container.uri, path);
+    } else {
+      args['volId'] = container.volId;
+      args['vaultPath'] = path;
+    }
+    final res = await _channel.invokeMethod<Object?>(ChannelMethods.bookCover, args);
+    final thumb = ThumbnailWithSize.fromChannelResult(res);
+    if (thumb == null || thumb.bytes.isEmpty) {
+      throw PlatformException(code: 'BOOK_EMPTY', message: 'No cover data for $path');
+    }
+    return thumb;
   }
 
   Future<void> close(String token) async {

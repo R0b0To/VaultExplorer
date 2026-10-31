@@ -114,6 +114,81 @@ class EpubPackage(
             )
         }
 
+        /**
+         * Zip entry path of the book's cover image, or null if it has none the
+         * platform can decode.
+         *
+         * For file-manager thumbnails, where [parse] is too much: it also reads
+         * and parses the table of contents, and it refuses a book whose reading
+         * order is empty even though the cover is perfectly usable. This reads
+         * only `container.xml` and the package document.
+         *
+         * Looks, in order, for the EPUB 3 `cover-image` item, the EPUB 2
+         * `<meta name="cover">` item, and finally a raster image whose id or
+         * file name says it is the cover. A candidate must be a raster image
+         * that is actually in the archive: a `<meta name="cover">` that points
+         * at an XHTML cover *page* (common) or an SVG is skipped rather than
+         * handed to the bitmap decoder.
+         */
+        fun findCoverPath(src: BookByteSource, dir: ZipDirectory): String? {
+            fun read(path: String): ByteArray {
+                val entry = dir.find(path)
+                    ?: throw BookFormatException(BookError.NOT_FOUND, "Missing $path")
+                return ZipReader.readEntry(src, entry, MAX_XML_BYTES)
+            }
+
+            val opfPath = parseRootfile(read("META-INF/container.xml")) ?: return null
+            val opfDir = opfPath.substringBeforeLast('/', "")
+            val opf = parseOpf(read(opfPath), opfDir)
+            val item = pickCoverItem(opf.manifest, opf.coverId) ?: return null
+            return resolvePath(opfDir, item.href).takeIf { dir.find(it) != null }
+        }
+
+        private val COVER_STEMS = setOf(
+            "cover", "cover-image", "coverimage", "cover_image",
+            "frontcover", "front-cover", "front_cover",
+        )
+
+        private fun isRasterImage(item: ManifestItem): Boolean {
+            val type = item.mediaType.lowercase()
+            if (type.startsWith("image/")) return type != "image/svg+xml"
+            // Media type missing or wrong: fall back to the extension.
+            return BookCover.hasRasterExtension(item.href.substringBefore('#'))
+        }
+
+        private fun stemOf(href: String): String =
+            href.substringBefore('#').substringAfterLast('/').substringBeforeLast('.').lowercase()
+
+        private fun pickCoverItem(manifest: Map<String, ManifestItem>, coverId: String): ManifestItem? {
+            // EPUB 3.
+            manifest.values
+                .firstOrNull { "cover-image" in it.properties.split(' ') && isRasterImage(it) }
+                ?.let { return it }
+
+            // EPUB 2. `content` is meant to be a manifest id, but some
+            // producers write the file's href there instead.
+            if (coverId.isNotEmpty()) {
+                val byId = manifest[coverId]
+                if (byId != null && isRasterImage(byId)) return byId
+                if (byId == null) {
+                    manifest.values
+                        .firstOrNull { (it.href == coverId || it.href.endsWith("/$coverId")) && isRasterImage(it) }
+                        ?.let { return it }
+                }
+            }
+
+            // No usable declaration: an image that calls itself the cover.
+            val images = manifest.entries.filter { isRasterImage(it.value) }
+            images.firstOrNull { it.key.lowercase() in COVER_STEMS || stemOf(it.value.href) in COVER_STEMS }
+                ?.let { return it.value }
+            return images
+                .firstOrNull {
+                    val stem = stemOf(it.value.href)
+                    "cover" in stem && "back" !in stem
+                }
+                ?.value
+        }
+
         // -- OPF ----------------------------------------------------------
 
         private class ManifestItem(val href: String, val mediaType: String, val properties: String)

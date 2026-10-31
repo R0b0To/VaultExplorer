@@ -14553,5 +14553,101 @@
         "type": "int"
       }
     }
+  },
+  "bookReaderSettingsTitle": "Reader settings",
+  "@bookReaderSettingsTitle": {
+    "description": "Title of the EPUB reader appearance and reading settings sheet"
+  },
+  "bookReaderPageSection": "Page",
+  "@bookReaderPageSection": {
+    "description": "Section heading for page layout options in the EPUB reader settings"
+  },
+  "bookReaderTextSection": "Text",
+  "@bookReaderTextSection": {
+    "description": "Section heading for text appearance options in the EPUB reader settings"
+  },
+  "bookReaderReadingModeTitle": "Reading mode",
+  "@bookReaderReadingModeTitle": {
+    "description": "Label for the comic reader setting that selects single, spread, or continuous pages"
+  },
+  "bookReaderPageFlippingLabel": "Page flipping",
+  "@bookReaderPageFlippingLabel": {
+    "description": "Label for the EPUB page flipping direction or scrolling mode setting"
+  },
+  "bookReaderColorModeLabel": "Color mode",
+  "@bookReaderColorModeLabel": {
+    "description": "Label for choosing the EPUB reader color theme"
+  },
+  "bookReaderTextDirectionLabel": "Text direction",
+  "@bookReaderTextDirectionLabel": {
+    "description": "Label for choosing left-to-right or right-to-left reading direction in book readers"
+  },
+  "bookReaderTwoPageLandscapeLabel": "Two pages in landscape",
+  "@bookReaderTwoPageLandscapeLabel": {
+    "description": "Switch label to show two book pages side by side in landscape orientation"
+  },
+  "bookReaderPageMarginsLabel": "Page margins",
+  "@bookReaderPageMarginsLabel": {
+    "description": "Switch label for enabling margins around reflowable EPUB pages"
+  },
+  "bookReaderFontFaceLabel": "Font face",
+  "@bookReaderFontFaceLabel": {
+    "description": "Label for the font family selector in EPUB reader settings"
+  },
+  "bookReaderFontPublisherDefault": "Publisher default",
+  "@bookReaderFontPublisherDefault": {
+    "description": "Font and alignment option that preserves the publisher setting"
+  },
+  "bookReaderFontSerif": "Serif",
+  "@bookReaderFontSerif": {
+    "description": "Font family option with serifs in EPUB reader settings"
+  },
+  "bookReaderFontSansSerif": "Sans serif",
+  "@bookReaderFontSansSerif": {
+    "description": "Font family option without serifs in EPUB reader settings"
+  },
+  "bookReaderFontMonospace": "Monospace",
+  "@bookReaderFontMonospace": {
+    "description": "Fixed-width font family option in EPUB reader settings"
+  },
+  "bookReaderFontWeightLabel": "Font thickness",
+  "@bookReaderFontWeightLabel": {
+    "description": "Label for the font weight slider in EPUB reader settings"
+  },
+  "bookReaderLineSpacingLabel": "Line spacing",
+  "@bookReaderLineSpacingLabel": {
+    "description": "Label for the line spacing slider in EPUB reader settings"
+  },
+  "bookReaderTextAlignmentLabel": "Text alignment",
+  "@bookReaderTextAlignmentLabel": {
+    "description": "Label for the text alignment selector in EPUB reader settings"
+  },
+  "bookReaderTextAlignLeft": "Left",
+  "@bookReaderTextAlignLeft": {
+    "description": "Text alignment option aligned to the left"
+  },
+  "bookReaderTextAlignJustified": "Justified",
+  "@bookReaderTextAlignJustified": {
+    "description": "Text alignment option that aligns text to both edges"
+  },
+  "bookReaderTextAlignCenter": "Center",
+  "@bookReaderTextAlignCenter": {
+    "description": "Text alignment option centered on the page"
+  },
+  "bookReaderTextAlignRight": "Right",
+  "@bookReaderTextAlignRight": {
+    "description": "Text alignment option aligned to the right"
+  },
+  "comicReaderModeSinglePage": "Single page",
+  "@comicReaderModeSinglePage": {
+    "description": "Comic reading mode showing one page at a time"
+  },
+  "comicReaderModeTwoPageSpread": "Two-page spread",
+  "@comicReaderModeTwoPageSpread": {
+    "description": "Comic reading mode showing two pages side by side"
+  },
+  "comicReaderCarouselScrubberSubtitle": "Show page thumbnails above the scrubber",
+  "@comicReaderCarouselScrubberSubtitle": {
+    "description": "Subtitle for the comic reader switch that shows the page thumbnail carousel"
   }
 }

@@ -13200,4 +13200,77 @@ class AppLocalizationsAr extends AppLocalizations {
   String epubChapterFallbackTitle(int number) {
     return 'الفصل $number';
   }
+
+  @override
+  String get bookReaderSettingsTitle => 'إعدادات القارئ';
+
+  @override
+  String get bookReaderPageSection => 'الصفحة';
+
+  @override
+  String get bookReaderTextSection => 'النص';
+
+  @override
+  String get bookReaderReadingModeTitle => 'وضع القراءة';
+
+  @override
+  String get bookReaderPageFlippingLabel => 'تقليب الصفحات';
+
+  @override
+  String get bookReaderColorModeLabel => 'نمط اللون';
+
+  @override
+  String get bookReaderTextDirectionLabel => 'اتجاه النص';
+
+  @override
+  String get bookReaderTwoPageLandscapeLabel => 'صفحتان في الوضع الأفقي';
+
+  @override
+  String get bookReaderPageMarginsLabel => 'هوامش الصفحة';
+
+  @override
+  String get bookReaderFontFaceLabel => 'نوع الخط';
+
+  @override
+  String get bookReaderFontPublisherDefault => 'الافتراضي للناشر';
+
+  @override
+  String get bookReaderFontSerif => 'خط ذو زوائد';
+
+  @override
+  String get bookReaderFontSansSerif => 'خط بلا زوائد';
+
+  @override
+  String get bookReaderFontMonospace => 'أحادي المسافة';
+
+  @override
+  String get bookReaderFontWeightLabel => 'سُمك الخط';
+
+  @override
+  String get bookReaderLineSpacingLabel => 'تباعد الأسطر';
+
+  @override
+  String get bookReaderTextAlignmentLabel => 'محاذاة النص';
+
+  @override
+  String get bookReaderTextAlignLeft => 'محاذاة لليسار';
+
+  @override
+  String get bookReaderTextAlignJustified => 'ضبط';
+
+  @override
+  String get bookReaderTextAlignCenter => 'توسيط';
+
+  @override
+  String get bookReaderTextAlignRight => 'محاذاة لليمين';
+
+  @override
+  String get comicReaderModeSinglePage => 'صفحة واحدة';
+
+  @override
+  String get comicReaderModeTwoPageSpread => 'صفحتان متقابلتان';
+
+  @override
+  String get comicReaderCarouselScrubberSubtitle =>
+      'إظهار صور مصغرة للصفحات فوق شريط التمرير';
 }

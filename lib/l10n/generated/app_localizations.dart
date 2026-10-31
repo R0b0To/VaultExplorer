@@ -22080,6 +22080,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Chapter {number}'**
   String epubChapterFallbackTitle(int number);
+
+  /// Title of the EPUB reader appearance and reading settings sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Reader settings'**
+  String get bookReaderSettingsTitle;
+
+  /// Section heading for page layout options in the EPUB reader settings
+  ///
+  /// In en, this message translates to:
+  /// **'Page'**
+  String get bookReaderPageSection;
+
+  /// Section heading for text appearance options in the EPUB reader settings
+  ///
+  /// In en, this message translates to:
+  /// **'Text'**
+  String get bookReaderTextSection;
+
+  /// Label for the comic reader setting that selects single, spread, or continuous pages
+  ///
+  /// In en, this message translates to:
+  /// **'Reading mode'**
+  String get bookReaderReadingModeTitle;
+
+  /// Label for the EPUB page flipping direction or scrolling mode setting
+  ///
+  /// In en, this message translates to:
+  /// **'Page flipping'**
+  String get bookReaderPageFlippingLabel;
+
+  /// Label for choosing the EPUB reader color theme
+  ///
+  /// In en, this message translates to:
+  /// **'Color mode'**
+  String get bookReaderColorModeLabel;
+
+  /// Label for choosing left-to-right or right-to-left reading direction in book readers
+  ///
+  /// In en, this message translates to:
+  /// **'Text direction'**
+  String get bookReaderTextDirectionLabel;
+
+  /// Switch label to show two book pages side by side in landscape orientation
+  ///
+  /// In en, this message translates to:
+  /// **'Two pages in landscape'**
+  String get bookReaderTwoPageLandscapeLabel;
+
+  /// Switch label for enabling margins around reflowable EPUB pages
+  ///
+  /// In en, this message translates to:
+  /// **'Page margins'**
+  String get bookReaderPageMarginsLabel;
+
+  /// Label for the font family selector in EPUB reader settings
+  ///
+  /// In en, this message translates to:
+  /// **'Font face'**
+  String get bookReaderFontFaceLabel;
+
+  /// Font and alignment option that preserves the publisher setting
+  ///
+  /// In en, this message translates to:
+  /// **'Publisher default'**
+  String get bookReaderFontPublisherDefault;
+
+  /// Font family option with serifs in EPUB reader settings
+  ///
+  /// In en, this message translates to:
+  /// **'Serif'**
+  String get bookReaderFontSerif;
+
+  /// Font family option without serifs in EPUB reader settings
+  ///
+  /// In en, this message translates to:
+  /// **'Sans serif'**
+  String get bookReaderFontSansSerif;
+
+  /// Fixed-width font family option in EPUB reader settings
+  ///
+  /// In en, this message translates to:
+  /// **'Monospace'**
+  String get bookReaderFontMonospace;
+
+  /// Label for the font weight slider in EPUB reader settings
+  ///
+  /// In en, this message translates to:
+  /// **'Font thickness'**
+  String get bookReaderFontWeightLabel;
+
+  /// Label for the line spacing slider in EPUB reader settings
+  ///
+  /// In en, this message translates to:
+  /// **'Line spacing'**
+  String get bookReaderLineSpacingLabel;
+
+  /// Label for the text alignment selector in EPUB reader settings
+  ///
+  /// In en, this message translates to:
+  /// **'Text alignment'**
+  String get bookReaderTextAlignmentLabel;
+
+  /// Text alignment option aligned to the left
+  ///
+  /// In en, this message translates to:
+  /// **'Left'**
+  String get bookReaderTextAlignLeft;
+
+  /// Text alignment option that aligns text to both edges
+  ///
+  /// In en, this message translates to:
+  /// **'Justified'**
+  String get bookReaderTextAlignJustified;
+
+  /// Text alignment option centered on the page
+  ///
+  /// In en, this message translates to:
+  /// **'Center'**
+  String get bookReaderTextAlignCenter;
+
+  /// Text alignment option aligned to the right
+  ///
+  /// In en, this message translates to:
+  /// **'Right'**
+  String get bookReaderTextAlignRight;
+
+  /// Comic reading mode showing one page at a time
+  ///
+  /// In en, this message translates to:
+  /// **'Single page'**
+  String get comicReaderModeSinglePage;
+
+  /// Comic reading mode showing two pages side by side
+  ///
+  /// In en, this message translates to:
+  /// **'Two-page spread'**
+  String get comicReaderModeTwoPageSpread;
+
+  /// Subtitle for the comic reader switch that shows the page thumbnail carousel
+  ///
+  /// In en, this message translates to:
+  /// **'Show page thumbnails above the scrubber'**
+  String get comicReaderCarouselScrubberSubtitle;
 }
 
 class _AppLocalizationsDelegate

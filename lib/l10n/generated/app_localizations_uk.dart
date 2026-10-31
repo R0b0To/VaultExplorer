@@ -13266,4 +13266,78 @@ class AppLocalizationsUk extends AppLocalizations {
   String epubChapterFallbackTitle(int number) {
     return 'Розділ $number';
   }
+
+  @override
+  String get bookReaderSettingsTitle => 'Налаштування читача';
+
+  @override
+  String get bookReaderPageSection => 'Сторінка';
+
+  @override
+  String get bookReaderTextSection => 'Текст';
+
+  @override
+  String get bookReaderReadingModeTitle => 'Режим читання';
+
+  @override
+  String get bookReaderPageFlippingLabel => 'Перегортання сторінок';
+
+  @override
+  String get bookReaderColorModeLabel => 'Режим кольору';
+
+  @override
+  String get bookReaderTextDirectionLabel => 'Напрямок тексту';
+
+  @override
+  String get bookReaderTwoPageLandscapeLabel =>
+      'Дві сторінки в альбомній орієнтації';
+
+  @override
+  String get bookReaderPageMarginsLabel => 'Поля сторінки';
+
+  @override
+  String get bookReaderFontFaceLabel => 'Шрифт';
+
+  @override
+  String get bookReaderFontPublisherDefault => 'За замовчуванням видавця';
+
+  @override
+  String get bookReaderFontSerif => 'З засічками';
+
+  @override
+  String get bookReaderFontSansSerif => 'Без засічок';
+
+  @override
+  String get bookReaderFontMonospace => 'Моноширинний';
+
+  @override
+  String get bookReaderFontWeightLabel => 'Товщина шрифту';
+
+  @override
+  String get bookReaderLineSpacingLabel => 'Міжрядковий інтервал';
+
+  @override
+  String get bookReaderTextAlignmentLabel => 'Вирівнювання тексту';
+
+  @override
+  String get bookReaderTextAlignLeft => 'Ліворуч';
+
+  @override
+  String get bookReaderTextAlignJustified => 'За шириною';
+
+  @override
+  String get bookReaderTextAlignCenter => 'По центру';
+
+  @override
+  String get bookReaderTextAlignRight => 'Праворуч';
+
+  @override
+  String get comicReaderModeSinglePage => 'Одна сторінка';
+
+  @override
+  String get comicReaderModeTwoPageSpread => 'Розворот на дві сторінки';
+
+  @override
+  String get comicReaderCarouselScrubberSubtitle =>
+      'Показувати мініатюри сторінок над повзунком';
 }

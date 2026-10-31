@@ -12433,4 +12433,76 @@ class AppLocalizationsJa extends AppLocalizations {
   String epubChapterFallbackTitle(int number) {
     return '第$number章';
   }
+
+  @override
+  String get bookReaderSettingsTitle => 'リーダー設定';
+
+  @override
+  String get bookReaderPageSection => 'ページ';
+
+  @override
+  String get bookReaderTextSection => 'テキスト';
+
+  @override
+  String get bookReaderReadingModeTitle => '読書モード';
+
+  @override
+  String get bookReaderPageFlippingLabel => 'ページめくり';
+
+  @override
+  String get bookReaderColorModeLabel => 'カラーモード';
+
+  @override
+  String get bookReaderTextDirectionLabel => 'テキストの方向';
+
+  @override
+  String get bookReaderTwoPageLandscapeLabel => '横向きで2ページ表示';
+
+  @override
+  String get bookReaderPageMarginsLabel => 'ページ余白';
+
+  @override
+  String get bookReaderFontFaceLabel => 'フォント';
+
+  @override
+  String get bookReaderFontPublisherDefault => '出版社の既定';
+
+  @override
+  String get bookReaderFontSerif => 'セリフ';
+
+  @override
+  String get bookReaderFontSansSerif => 'サンセリフ';
+
+  @override
+  String get bookReaderFontMonospace => '等幅';
+
+  @override
+  String get bookReaderFontWeightLabel => 'フォントの太さ';
+
+  @override
+  String get bookReaderLineSpacingLabel => '行間';
+
+  @override
+  String get bookReaderTextAlignmentLabel => 'テキスト配置';
+
+  @override
+  String get bookReaderTextAlignLeft => '左揃え';
+
+  @override
+  String get bookReaderTextAlignJustified => '両端揃え';
+
+  @override
+  String get bookReaderTextAlignCenter => '中央揃え';
+
+  @override
+  String get bookReaderTextAlignRight => '右揃え';
+
+  @override
+  String get comicReaderModeSinglePage => '単ページ';
+
+  @override
+  String get comicReaderModeTwoPageSpread => '見開き';
+
+  @override
+  String get comicReaderCarouselScrubberSubtitle => 'スライダーの上にページのサムネイルを表示';
 }

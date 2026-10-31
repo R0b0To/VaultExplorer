@@ -13213,4 +13213,77 @@ class AppLocalizationsEs extends AppLocalizations {
   String epubChapterFallbackTitle(int number) {
     return 'Capítulo $number';
   }
+
+  @override
+  String get bookReaderSettingsTitle => 'Ajustes del lector';
+
+  @override
+  String get bookReaderPageSection => 'Página';
+
+  @override
+  String get bookReaderTextSection => 'Texto';
+
+  @override
+  String get bookReaderReadingModeTitle => 'Modo de lectura';
+
+  @override
+  String get bookReaderPageFlippingLabel => 'Pasar página';
+
+  @override
+  String get bookReaderColorModeLabel => 'Modo de color';
+
+  @override
+  String get bookReaderTextDirectionLabel => 'Dirección del texto';
+
+  @override
+  String get bookReaderTwoPageLandscapeLabel => 'Dos páginas en horizontal';
+
+  @override
+  String get bookReaderPageMarginsLabel => 'Márgenes de página';
+
+  @override
+  String get bookReaderFontFaceLabel => 'Tipografía';
+
+  @override
+  String get bookReaderFontPublisherDefault => 'Predeterminada de la editorial';
+
+  @override
+  String get bookReaderFontSerif => 'Serif';
+
+  @override
+  String get bookReaderFontSansSerif => 'Sans serif';
+
+  @override
+  String get bookReaderFontMonospace => 'Monoespaciada';
+
+  @override
+  String get bookReaderFontWeightLabel => 'Grosor de fuente';
+
+  @override
+  String get bookReaderLineSpacingLabel => 'Interlineado';
+
+  @override
+  String get bookReaderTextAlignmentLabel => 'Alineación del texto';
+
+  @override
+  String get bookReaderTextAlignLeft => 'Izquierda';
+
+  @override
+  String get bookReaderTextAlignJustified => 'Justificado';
+
+  @override
+  String get bookReaderTextAlignCenter => 'Centrado';
+
+  @override
+  String get bookReaderTextAlignRight => 'Derecha';
+
+  @override
+  String get comicReaderModeSinglePage => 'Página única';
+
+  @override
+  String get comicReaderModeTwoPageSpread => 'Doble página';
+
+  @override
+  String get comicReaderCarouselScrubberSubtitle =>
+      'Mostrar miniaturas de página sobre el control deslizante';
 }

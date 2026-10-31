@@ -707,21 +707,24 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
                   child: Text(
-                    'Reader settings',
+                    l10n.bookReaderSettingsTitle,
                     style: textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
-                const SectionHeader('Page'),
+                SectionHeader(l10n.bookReaderPageSection),
                 SectionCard(
                   children: [
                     OptionPickerTile<bool>(
-                      label: 'Page flipping',
+                      label: l10n.bookReaderPageFlippingLabel,
                       prefixIcon: Icons.swap_horiz_rounded,
                       value: _paged,
                       options: [
-                        const SelectOption(value: true, label: 'Horizontal'),
+                        SelectOption(
+                          value: true,
+                          label: l10n.playlistScrollHorizontalLabel,
+                        ),
                         SelectOption(
                           value: false,
                           label: l10n.playlistScrollVerticalContinuousLabel,
@@ -731,7 +734,7 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> {
                           unawaited(refresh(() => _setPaged(value))),
                     ),
                     OptionPickerTile<bool>(
-                      label: 'Text direction',
+                      label: l10n.bookReaderTextDirectionLabel,
                       prefixIcon: _rtl
                           ? Icons.format_textdirection_r_to_l_rounded
                           : Icons.format_textdirection_l_to_r_rounded,
@@ -753,7 +756,7 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> {
                       },
                     ),
                     OptionPickerTile<EpubTheme>(
-                      label: 'Color mode',
+                      label: l10n.bookReaderColorModeLabel,
                       prefixIcon: Icons.palette_rounded,
                       value: theme,
                       options: [
@@ -768,7 +771,7 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> {
                     ),
                     switchTile(
                       icon: Icons.menu_book_rounded,
-                      title: 'Two pages in landscape orientation',
+                      title: l10n.bookReaderTwoPageLandscapeLabel,
                       value: _twoPageLandscape,
                       onChanged: (value) {
                         setState(() => _twoPageLandscape = value);
@@ -778,7 +781,7 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> {
                     ),
                     switchTile(
                       icon: Icons.border_outer_rounded,
-                      title: 'Page margins',
+                      title: l10n.bookReaderPageMarginsLabel,
                       value: _pageMargins,
                       onChanged: (value) {
                         setState(() => _pageMargins = value);
@@ -788,29 +791,29 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> {
                     ),
                   ],
                 ),
-                const SectionHeader('Text'),
+                SectionHeader(l10n.bookReaderTextSection),
                 SectionCard(
                   children: [
                     OptionPickerTile<EpubFontFace>(
-                      label: 'Font face',
+                      label: l10n.bookReaderFontFaceLabel,
                       prefixIcon: Icons.font_download_rounded,
                       value: _fontFace,
-                      options: const [
+                      options: [
                         SelectOption(
                           value: EpubFontFace.publisher,
-                          label: 'Publisher default',
+                          label: l10n.bookReaderFontPublisherDefault,
                         ),
                         SelectOption(
                           value: EpubFontFace.serif,
-                          label: 'Serif',
+                          label: l10n.bookReaderFontSerif,
                         ),
                         SelectOption(
                           value: EpubFontFace.sansSerif,
-                          label: 'Sans serif',
+                          label: l10n.bookReaderFontSansSerif,
                         ),
                         SelectOption(
                           value: EpubFontFace.monospace,
-                          label: 'Monospace',
+                          label: l10n.bookReaderFontMonospace,
                         ),
                       ],
                       onChanged: (value) {
@@ -833,7 +836,7 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> {
                       onChanged: (_) => setSheetState(() {}),
                     ),
                     SliderSettingTile(
-                      label: 'Font thickness',
+                      label: l10n.bookReaderFontWeightLabel,
                       prefixIcon: Icons.format_bold_rounded,
                       value: _fontWeight,
                       min: 300,
@@ -848,7 +851,7 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> {
                       onChanged: (_) => setSheetState(() {}),
                     ),
                     SliderSettingTile(
-                      label: 'Line spacing',
+                      label: l10n.bookReaderLineSpacingLabel,
                       prefixIcon: Icons.format_line_spacing_rounded,
                       value: (_lineHeight * 100).round(),
                       min: 100,
@@ -863,29 +866,29 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> {
                       onChanged: (_) => setSheetState(() {}),
                     ),
                     OptionPickerTile<EpubTextAlignment>(
-                      label: 'Text align',
+                      label: l10n.bookReaderTextAlignmentLabel,
                       prefixIcon: Icons.format_align_left_rounded,
                       value: _textAlignment,
-                      options: const [
+                      options: [
                         SelectOption(
                           value: EpubTextAlignment.publisher,
-                          label: 'Publisher default',
+                          label: l10n.bookReaderFontPublisherDefault,
                         ),
                         SelectOption(
                           value: EpubTextAlignment.left,
-                          label: 'Left',
+                          label: l10n.bookReaderTextAlignLeft,
                         ),
                         SelectOption(
                           value: EpubTextAlignment.justified,
-                          label: 'Justified',
+                          label: l10n.bookReaderTextAlignJustified,
                         ),
                         SelectOption(
                           value: EpubTextAlignment.center,
-                          label: 'Center',
+                          label: l10n.bookReaderTextAlignCenter,
                         ),
                         SelectOption(
                           value: EpubTextAlignment.right,
-                          label: 'Right',
+                          label: l10n.bookReaderTextAlignRight,
                         ),
                       ],
                       onChanged: (value) {

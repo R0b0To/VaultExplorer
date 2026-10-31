@@ -12438,4 +12438,76 @@ class AppLocalizationsKo extends AppLocalizations {
   String epubChapterFallbackTitle(int number) {
     return '$number장';
   }
+
+  @override
+  String get bookReaderSettingsTitle => '리더 설정';
+
+  @override
+  String get bookReaderPageSection => '페이지';
+
+  @override
+  String get bookReaderTextSection => '텍스트';
+
+  @override
+  String get bookReaderReadingModeTitle => '읽기 모드';
+
+  @override
+  String get bookReaderPageFlippingLabel => '페이지 넘김';
+
+  @override
+  String get bookReaderColorModeLabel => '색상 모드';
+
+  @override
+  String get bookReaderTextDirectionLabel => '텍스트 방향';
+
+  @override
+  String get bookReaderTwoPageLandscapeLabel => '가로 모드에서 두 페이지';
+
+  @override
+  String get bookReaderPageMarginsLabel => '페이지 여백';
+
+  @override
+  String get bookReaderFontFaceLabel => '글꼴';
+
+  @override
+  String get bookReaderFontPublisherDefault => '출판사 기본값';
+
+  @override
+  String get bookReaderFontSerif => '세리프';
+
+  @override
+  String get bookReaderFontSansSerif => '산세리프';
+
+  @override
+  String get bookReaderFontMonospace => '고정폭';
+
+  @override
+  String get bookReaderFontWeightLabel => '글꼴 굵기';
+
+  @override
+  String get bookReaderLineSpacingLabel => '줄 간격';
+
+  @override
+  String get bookReaderTextAlignmentLabel => '텍스트 정렬';
+
+  @override
+  String get bookReaderTextAlignLeft => '왼쪽';
+
+  @override
+  String get bookReaderTextAlignJustified => '양쪽 맞춤';
+
+  @override
+  String get bookReaderTextAlignCenter => '가운데';
+
+  @override
+  String get bookReaderTextAlignRight => '오른쪽';
+
+  @override
+  String get comicReaderModeSinglePage => '한 페이지';
+
+  @override
+  String get comicReaderModeTwoPageSpread => '두 페이지 펼침';
+
+  @override
+  String get comicReaderCarouselScrubberSubtitle => '스크러버 위에 페이지 썸네일 표시';
 }

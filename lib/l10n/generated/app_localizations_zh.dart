@@ -12239,4 +12239,76 @@ class AppLocalizationsZh extends AppLocalizations {
   String epubChapterFallbackTitle(int number) {
     return '第 $number 章';
   }
+
+  @override
+  String get bookReaderSettingsTitle => '阅读器设置';
+
+  @override
+  String get bookReaderPageSection => '页面';
+
+  @override
+  String get bookReaderTextSection => '文本';
+
+  @override
+  String get bookReaderReadingModeTitle => '阅读模式';
+
+  @override
+  String get bookReaderPageFlippingLabel => '翻页方式';
+
+  @override
+  String get bookReaderColorModeLabel => '颜色模式';
+
+  @override
+  String get bookReaderTextDirectionLabel => '文本方向';
+
+  @override
+  String get bookReaderTwoPageLandscapeLabel => '横屏双页';
+
+  @override
+  String get bookReaderPageMarginsLabel => '页边距';
+
+  @override
+  String get bookReaderFontFaceLabel => '字体';
+
+  @override
+  String get bookReaderFontPublisherDefault => '出版商默认';
+
+  @override
+  String get bookReaderFontSerif => '衬线';
+
+  @override
+  String get bookReaderFontSansSerif => '无衬线';
+
+  @override
+  String get bookReaderFontMonospace => '等宽';
+
+  @override
+  String get bookReaderFontWeightLabel => '字体粗细';
+
+  @override
+  String get bookReaderLineSpacingLabel => '行距';
+
+  @override
+  String get bookReaderTextAlignmentLabel => '文本对齐';
+
+  @override
+  String get bookReaderTextAlignLeft => '左对齐';
+
+  @override
+  String get bookReaderTextAlignJustified => '两端对齐';
+
+  @override
+  String get bookReaderTextAlignCenter => '居中';
+
+  @override
+  String get bookReaderTextAlignRight => '右对齐';
+
+  @override
+  String get comicReaderModeSinglePage => '单页';
+
+  @override
+  String get comicReaderModeTwoPageSpread => '双页';
+
+  @override
+  String get comicReaderCarouselScrubberSubtitle => '在滑块上方显示页面缩略图';
 }

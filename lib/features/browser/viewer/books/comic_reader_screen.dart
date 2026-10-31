@@ -388,18 +388,23 @@ class _ComicReaderScreenState extends ConsumerState<ComicReaderScreen> {
           shrinkWrap: true,
           children: [
             ListTile(
-              title: Text(context.l10n.playlistScrollModeMenu),
+              title: Text(context.l10n.bookReaderReadingModeTitle),
               trailing: DropdownButton<String>(
                 value: _mode,
-                items: const [
-                  DropdownMenuItem(value: 'single', child: Text('Single page')),
+                items: [
+                  DropdownMenuItem(
+                    value: 'single',
+                    child: Text(context.l10n.comicReaderModeSinglePage),
+                  ),
                   DropdownMenuItem(
                     value: 'spread',
-                    child: Text('Two-page spread'),
+                    child: Text(context.l10n.comicReaderModeTwoPageSpread),
                   ),
                   DropdownMenuItem(
                     value: 'vertical',
-                    child: Text('Vertical continuous'),
+                    child: Text(
+                      context.l10n.playlistScrollVerticalContinuousLabel,
+                    ),
                   ),
                 ],
                 onChanged: (value) {
@@ -410,7 +415,7 @@ class _ComicReaderScreenState extends ConsumerState<ComicReaderScreen> {
               ),
             ),
             ListTile(
-              title: const Text('Text direction'),
+              title: Text(context.l10n.bookReaderTextDirectionLabel),
               trailing: DropdownButton<bool>(
                 value: _rtl,
                 items: [
@@ -433,7 +438,7 @@ class _ComicReaderScreenState extends ConsumerState<ComicReaderScreen> {
             ),
             SwitchListTile(
               title: Text(context.l10n.thumbnailCarouselTooltip),
-              subtitle: const Text('Show page thumbnails above the scrubber'),
+              subtitle: Text(context.l10n.comicReaderCarouselScrubberSubtitle),
               value: _carouselVisible,
               onChanged: (value) {
                 _toggleCarousel(value);

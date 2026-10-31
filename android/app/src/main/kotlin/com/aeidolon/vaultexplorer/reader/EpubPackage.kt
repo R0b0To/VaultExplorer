@@ -355,8 +355,18 @@ class EpubPackage(
             val sb = StringBuilder()
             var depth = 1
             while (depth > 0) {
-                when (p.next()) {
-                    XmlPullParser.TEXT -> sb.append(p.text)
+                when (p.nextToken()) {
+                    XmlPullParser.TEXT,
+                    XmlPullParser.CDSECT,
+                    XmlPullParser.IGNORABLE_WHITESPACE,
+                    -> sb.append(p.text)
+                    XmlPullParser.ENTITY_REF -> {
+                        val entityName = p.name
+                        sb.append(
+                            HTML_ENTITIES.firstOrNull { it.first == entityName }?.second
+                                ?: p.text.orEmpty(),
+                        )
+                    }
                     XmlPullParser.START_TAG -> depth++
                     XmlPullParser.END_TAG -> depth--
                     XmlPullParser.END_DOCUMENT -> depth = 0

@@ -115,8 +115,14 @@ swipe pointer rule as the media viewer. The EPUB reader
 virtual origin are answered from the book session, `EpubPackage` supplies the
 reading order (the spine, the reader's "playlist") and the table of contents,
 a small style sheet is injected for text layout and the chosen theme, and
-JavaScript and all network access stay off. Password-protected or non-ZIP
-files (a real RAR `.cbr`, DRM) fall back to the archive browser.
+JavaScript and all network access stay off. In horizontal (paged) mode the
+chapter is laid out in CSS columns and the WebView is scrolled one screen at a
+time; `reader/PageMath` defines the pages (with a few pixels of tolerance for
+layout rounding). Swiping or pressing next/previous past the last/first page of
+a chapter makes the native view emit a `chapterEdge` event, and the reader opens
+the neighbouring spine item, on its last page when paging backwards (`loadEntry`
+with `atEnd`). Password-protected or non-ZIP files (a real RAR `.cbr`, DRM) fall
+back to the archive browser. Continuous-scroll mode fits the chapter to the screen width with a device-width viewport tag, and pulling past the bottom (or top) of a chapter, started while already resting there, moves to the next (or previous) one through the same `chapterEdge` event.
 
 The media viewer's player has a 10-band graphic equalizer (31 Hz–16 kHz,
 ±12 dB per band, plus a preamp and a clipping guard) that applies to both
@@ -873,7 +879,7 @@ not every constant is spelled out by name.
 | Audio editor (§1.3) | `audioEditProbe`, `audioEditWaveform`, `audioEditExport`, `cancelAudioEdit` |
 | Native PDF viewer (`pdf/`, backs the AndroidX Jetpack platform view, NOTICE.md) | `openPdf`, `getPdfPageSize`, `renderPdfPage`, `closePdf`, `isJetpackPdfViewerSupported`, `register/revokeJetpackPdfSession`, `printPdf` |
 | Document viewer (`officeviewer/`, platform view `com.aeidolon.vaultexplorer/office_viewer`) | No main-channel methods. The per-view channel has one call, `loadDocument` (bytes, extension, theme colours, notes label), which converts DOCX/PPTX/XLSX, ODT/ODP/ODS and legacy PPT text to a script-free HTML page in pure Kotlin (own XML reader, no third-party code) and loads it into a WebView that serves only that in-memory page and its images: JS, storage, file access and network off, CSP `default-src 'none'`. Decrypted bytes are read in Dart (`readWholeFile`, so local storage works too), converted off the UI thread, and never written to disk; errors come back as `ENCRYPTED` / `TOO_LARGE` / `UNSUPPORTED` |
-| Comic / EPUB readers (`reader/`, `handlers/BookReaderHandlers.kt`) | `bookOpen` (parses the ZIP directory; returns a session token plus the page list or the parsed EPUB package), `bookReadEntry`, `bookClose`. The EPUB WebView's per-view channel additionally takes `loadEntry`, `setTextZoom`, `setBookStyle`, `pageScroll` |
+| Comic / EPUB readers (`reader/`, `handlers/BookReaderHandlers.kt`) | `bookOpen` (parses the ZIP directory; returns a session token plus the page list or the parsed EPUB package), `bookReadEntry`, `bookClose`. The EPUB WebView's per-view channel additionally takes `loadEntry` (optionally `atEnd`), `setTextZoom`, `setBookStyle`, `setScrollFraction`, `turnPage`, `pageScroll`, and sends `pageFinished`, `scroll` and `chapterEdge` events |
 | Archive engine (native libarchive, see §1) | `archiveScanVault`/`archiveScanLocal`, `archiveExtractVaultEntry`/`archiveExtractVaultAll`/`archiveExtractLocalEntry`, `archiveCreate`, `archiveStageBrowseEntry`/`archiveDiscardBrowseFile`, plus `pickArchiveFile`/`pickExtractFolder` |
 | Header backup & repair ("Check & Repair" tool) | `diagnoseUnmountedContainerFile`, `diagnoseMountedVolumeFilesystem`, `runMountedVolumeFilesystemCheck`, `exportContainerHeader`, `restoreBackupHeaderUnmounted`/`restoreContainerHeaderRegion`, `pickFolderVaultForRepair`, `checkFolderVault`, `repairFolderVault`, `resolveFolderVaultConfigFile`/`restoreFolderVaultConfig` |
 | Split & Join | `splitContainer`, `joinContainer`, `cancelSplitJoin`, `unlockSplitContainer` |

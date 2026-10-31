@@ -72,12 +72,9 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> {
   bool _atEnd = false;
   int _chapterPage = 1;
   int _chapterPages = 1;
-  int? _autoAdvancedFrom;
-  int? _displayedChapter;
   double? _pendingRestoreFraction;
   Timer? _saveTimer;
   Timer? _hideControlsTimer;
-  Timer? _autoAdvanceTimer;
   int? _tapPointer;
   Offset? _tapStart;
   List<BookReaderBookmark> _bookmarks = const [];
@@ -263,7 +260,6 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> {
     _eventSub?.cancel();
     _saveTimer?.cancel();
     _hideControlsTimer?.cancel();
-    _autoAdvanceTimer?.cancel();
     unawaited(_saveState());
     unawaited(_api.close(widget.token));
     super.dispose();
@@ -295,10 +291,7 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> {
         final index = _spineIndexByPath[(raw['entry'] as String?) ?? ''];
         setState(() {
           _loading = false;
-          if (index != null) {
-            _current = index;
-            _displayedChapter = index;
-          }
+          if (index != null) _current = index;
         });
         if (_pendingRestoreFraction != null) {
           final fraction = _pendingRestoreFraction!;
@@ -315,32 +308,8 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> {
           _atEnd = raw['atEnd'] as bool? ?? false;
         });
         _scheduleSave();
-        final pageTurnDirection =
-            (raw['pageTurnDirection'] as num?)?.toInt() ?? 0;
-        if ((!_atEnd || pageTurnDirection != 1) &&
-            _autoAdvancedFrom == _current) {
-          _autoAdvanceTimer?.cancel();
-          _autoAdvanceTimer = null;
-          _autoAdvancedFrom = null;
-        }
-        if (_atEnd &&
-            raw['pageTurn'] == true &&
-            pageTurnDirection == 1 &&
-            _displayedChapter == _current &&
-            _current < widget.info.spine.length - 1 &&
-            _autoAdvancedFrom != _current) {
-          _autoAdvancedFrom = _current;
-          final chapter = _current;
-          _autoAdvanceTimer?.cancel();
-          _autoAdvanceTimer = Timer(const Duration(milliseconds: 350), () {
-            if (mounted && _current == chapter && _atEnd) {
-              _openChapter(chapter + 1);
-            } else if (mounted && _autoAdvancedFrom == chapter) {
-              _autoAdvancedFrom = null;
-              _autoAdvanceTimer = null;
-            }
-          });
-        }
+      case 'chapterEdge':
+        _onChapterEdge((raw['direction'] as num?)?.toInt() ?? 0);
       case 'error':
         setState(() => _loading = false);
     }
@@ -356,27 +325,38 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> {
     }
   }
 
+  /// Opens spine item [index]. With [atEnd] the chapter opens on its last page
+  /// (paging backwards out of the next chapter) instead of its first.
   Future<void> _openChapter(
     int index, {
     String fragment = '',
     double fraction = 0,
+    bool atEnd = false,
   }) async {
     if (index < 0 || index >= widget.info.spine.length) return;
-    _autoAdvanceTimer?.cancel();
-    _autoAdvanceTimer = null;
     setState(() {
       _current = index;
       _loading = true;
-      _fraction = fraction;
-      _atStart = fraction <= 0;
-      _atEnd = false;
-      _pendingRestoreFraction = fraction > 0 ? fraction : null;
-      _autoAdvancedFrom = null;
+      _fraction = atEnd ? 1 : fraction;
+      _atStart = !atEnd && fraction <= 0;
+      _atEnd = atEnd;
+      _pendingRestoreFraction = !atEnd && fraction > 0 ? fraction : null;
     });
     await _invoke('loadEntry', {
       'entry': widget.info.spine[index].path,
       'fragment': fragment,
+      'atEnd': atEnd,
     });
+  }
+
+  /// The reader swiped or tapped past the first/last page of the chapter:
+  /// carry on into the neighbouring one, like turning the page of a book.
+  /// [direction] is in reading order (+1 next, -1 previous).
+  void _onChapterEdge(int direction) {
+    if (direction == 0 || _loading) return;
+    final target = _current + direction;
+    if (target < 0 || target >= widget.info.spine.length) return;
+    unawaited(_openChapter(target, atEnd: direction < 0));
   }
 
   Future<void> _turnPage(int direction) async {
@@ -1153,8 +1133,10 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> {
                             tooltip: l10n.previousTooltip,
                             color: Colors.white,
                             icon: const Icon(Icons.chevron_left),
-                            onPressed: _paged && !_atStart
-                                ? () => _turnPage(-1)
+                            onPressed: _paged
+                                ? (_current > 0 || !_atStart
+                                      ? () => _turnPage(-1)
+                                      : null)
                                 : (_current > 0
                                       ? () => _openChapter(_current - 1)
                                       : null),
@@ -1186,8 +1168,10 @@ class _EpubReaderScreenState extends ConsumerState<EpubReaderScreen> {
                             tooltip: l10n.nextTooltip,
                             color: Colors.white,
                             icon: const Icon(Icons.chevron_right),
-                            onPressed: _paged && !_atEnd
-                                ? () => _turnPage(1)
+                            onPressed: _paged
+                                ? (_current < chapters - 1 || !_atEnd
+                                      ? () => _turnPage(1)
+                                      : null)
                                 : (_current < chapters - 1
                                       ? () => _openChapter(_current + 1)
                                       : null),

@@ -5,6 +5,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.net.Uri
 import android.view.MotionEvent
+import android.view.VelocityTracker
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.animation.DecelerateInterpolator
@@ -19,6 +20,7 @@ import com.aeidolon.vaultexplorer.container.ContainerFileSystem
 import com.aeidolon.vaultexplorer.container.ContainerSessionRegistry
 import com.aeidolon.vaultexplorer.MimeTypeHelper
 import com.aeidolon.vaultexplorer.reader.BookSessions
+import com.aeidolon.vaultexplorer.reader.PageMath
 import com.aeidolon.vaultexplorer.reader.ZipReader
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.EventChannel
@@ -52,7 +54,7 @@ internal const val EPUB_HOST = "epub-local.internal"
  *  and gives long words/URLs somewhere to break. Theme CSS from Dart follows it. */
 private const val EPUB_BASE_CSS =
     "img,svg,video{max-width:100%!important;height:auto!important}" +
-        "body{overflow-wrap:break-word}table{max-width:100%}pre{white-space:pre-wrap}"
+        "html{overflow-x:hidden}body{overflow-wrap:break-word}table{max-width:100%}pre{white-space:pre-wrap}"
 private const val EPUB_FIXED_CSS =
     "img,svg,video{max-width:100%;max-height:100%}"
 
@@ -60,10 +62,21 @@ private class ReaderWebView(context: Context) : WebView(context) {
     var pagedMode: Boolean = false
     var rightToLeft: Boolean = false
     var twoPageLandscape: Boolean = false
-    var onPageTurn: ((Int) -> Unit)? = null
+
+    /** Called with +1 / -1 (reading order) when the reader tries to turn past the
+     *  last / first page of the chapter: the host moves on to the neighbouring chapter. */
+    var onChapterEdge: ((Int) -> Unit)? = null
     var onPageLayoutChanged: (() -> Unit)? = null
 
+    /** Physical edge a freshly loaded chapter should rest on: 1 = highest scroll
+     *  offset, -1 = lowest, 0 = leave it alone. Chapter layout (images, fonts)
+     *  can finish after the page "finishes", so the host re-applies this for a
+     *  moment; a touch or an explicit scroll position cancels it. */
+    var landingEdge: Int = 0
+
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
+    private val flingVelocity = ViewConfiguration.get(context).scaledMinimumFlingVelocity * 6
+    private val edgeSlop = (resources.displayMetrics.density * 4f).toInt().coerceAtLeast(4)
     private var downX = 0f
     private var downY = 0f
     private var downPage = 0
@@ -72,6 +85,7 @@ private class ReaderWebView(context: Context) : WebView(context) {
     private var wasHorizontalSpread = false
     private var pageAnimator: ValueAnimator? = null
     private var pageAnimatorTargetOffset: Int? = null
+    private var velocityTracker: VelocityTracker? = null
 
     fun horizontalScrollRange(): Int = computeHorizontalScrollRange()
 
@@ -85,6 +99,46 @@ private class ReaderWebView(context: Context) : WebView(context) {
         (contentHeight * resources.displayMetrics.density).toInt()
     }
 
+    private fun currentOffset(): Int = if (isHorizontalPaging()) scrollX else scrollY
+
+    private fun maxPageOffset(): Int = PageMath.maxOffset(pageContentRange(), pageViewport())
+
+    private fun lastPage(): Int = PageMath.lastPage(pageContentRange(), pageViewport(), edgeSlop)
+
+    private fun pageAtOffset(offset: Int): Int =
+        PageMath.pageAtOffset(offset, pageContentRange(), pageViewport(), edgeSlop)
+
+    /** Scroll offset showing [page] (0-based, physical order). */
+    fun offsetOfPage(page: Int): Int =
+        PageMath.offsetOfPage(page, pageContentRange(), pageViewport(), edgeSlop)
+
+    fun pageCount(): Int = lastPage() + 1
+
+    /** The page on screen (0-based, physical order). */
+    fun currentPage(): Int = pageAtOffset(scrollX)
+
+    fun isAtPhysicalStart(): Boolean = scrollX <= edgeSlop
+
+    fun isAtPhysicalEnd(): Boolean = scrollX >= maxPageOffset() - edgeSlop
+
+    /** Moves to [landingEdge] if one is pending; true when the position changed. */
+    fun settleToLandingEdge(): Boolean {
+        if (landingEdge == 0) return false
+        if (!pagedMode) {
+            // Continuous scroll: rest at the very bottom (coming back from the next chapter).
+            val bottom = (computeVerticalScrollRange() - height).coerceAtLeast(0)
+            val targetY = if (landingEdge > 0) bottom else 0
+            if (scrollY == targetY) return false
+            scrollTo(scrollX, targetY)
+            return true
+        }
+        val target = if (landingEdge > 0) maxPageOffset() else 0
+        if (scrollX == target && scrollY == 0) return false
+        cancelPageAnimation()
+        scrollTo(target, 0)
+        return true
+    }
+
     fun cancelPageAnimation(settleToTarget: Boolean = false) {
         val targetOffset = pageAnimatorTargetOffset
         pageAnimator?.cancel()
@@ -93,24 +147,24 @@ private class ReaderWebView(context: Context) : WebView(context) {
         if (settleToTarget && targetOffset != null) scrollTo(targetOffset, 0)
     }
 
+    /** [direction] is in reading order: +1 = next page, -1 = previous page. */
     fun turnPage(direction: Int, rightToLeft: Boolean) {
-        val viewport = pageViewport().coerceAtLeast(1)
-        val offset = if (isHorizontalPaging()) {
-            pageAnimatorTargetOffset ?: scrollX
-        } else {
-            pageAnimatorTargetOffset ?: scrollY
-        }
-        val currentPage = (offset.toFloat() / viewport).roundToInt()
         val progression = if (rightToLeft) -1 else 1
-        scrollToPage(currentPage + direction * progression, animate = true)
+        val page = pageAtOffset(pageAnimatorTargetOffset ?: currentOffset())
+        val target = page + direction * progression
+        if (target < 0 || target > lastPage()) {
+            // Past the first/last page of the chapter: carry on into the neighbour.
+            onChapterEdge?.invoke(direction)
+            return
+        }
+        scrollToPage(target, animate = true)
     }
 
     private fun scrollToPage(page: Int, animate: Boolean = false) {
         val horizontal = isHorizontalPaging()
         val viewport = pageViewport()
         if (viewport <= 0) return
-        val maxOffset = (pageContentRange() - viewport).coerceAtLeast(0)
-        val offset = (page * viewport).coerceIn(0, maxOffset)
+        val offset = offsetOfPage(page)
         val current = if (horizontal) scrollX else scrollY
         cancelPageAnimation()
         if (!animate || current == offset) {
@@ -158,24 +212,82 @@ private class ReaderWebView(context: Context) : WebView(context) {
         }
     }
 
+    private fun recycleVelocityTracker() {
+        velocityTracker?.recycle()
+        velocityTracker = null
+    }
+
+    private var scrollStartAtTop = false
+    private var scrollStartAtBottom = false
+    private var scrollMultiTouch = false
+
+    /** Continuous-scroll mode: a deliberate pull past the bottom (or top) of the
+     *  chapter, started while already resting there, moves to the next (or
+     *  previous) chapter. Never consumes events; WebView scrolls as usual. */
+    private fun trackScrollModeEdges(event: MotionEvent) {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                landingEdge = 0
+                recycleVelocityTracker()
+                velocityTracker = VelocityTracker.obtain().also { it.addMovement(event) }
+                downX = event.x
+                downY = event.y
+                scrollStartAtTop = !canScrollVertically(-1)
+                scrollStartAtBottom = !canScrollVertically(1)
+                scrollMultiTouch = false
+            }
+            MotionEvent.ACTION_POINTER_DOWN -> scrollMultiTouch = true
+            MotionEvent.ACTION_MOVE -> velocityTracker?.addMovement(event)
+            MotionEvent.ACTION_UP -> {
+                velocityTracker?.addMovement(event)
+                val tracker = velocityTracker
+                tracker?.computeCurrentVelocity(1000)
+                val vy = tracker?.yVelocity ?: 0f
+                recycleVelocityTracker()
+                val dx = event.x - downX
+                val dy = event.y - downY
+                if (!scrollMultiTouch && kotlin.math.abs(dy) > kotlin.math.abs(dx)) {
+                    val threshold = maxOf(touchSlop * 3, (height * 0.12f).toInt())
+                    val flicked = kotlin.math.abs(vy) >= flingVelocity &&
+                        kotlin.math.abs(dy) >= touchSlop * 2 &&
+                        (vy < 0f) == (dy < 0f)
+                    if (kotlin.math.abs(dy) >= threshold || flicked) {
+                        if (dy < 0 && scrollStartAtBottom && !canScrollVertically(1)) {
+                            onChapterEdge?.invoke(1)
+                        } else if (dy > 0 && scrollStartAtTop && !canScrollVertically(-1)) {
+                            onChapterEdge?.invoke(-1)
+                        }
+                    }
+                }
+            }
+            MotionEvent.ACTION_CANCEL -> recycleVelocityTracker()
+        }
+    }
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (!pagedMode) return super.onTouchEvent(event)
+        if (!pagedMode) {
+            trackScrollModeEdges(event)
+            return super.onTouchEvent(event)
+        }
 
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 // A fast second swipe starts from the page already being
                 // turned to, so repeated turns do not get trapped midway.
                 cancelPageAnimation(settleToTarget = true)
+                // The reader has taken over; stop re-applying the landing position.
+                landingEdge = 0
+                recycleVelocityTracker()
+                velocityTracker = VelocityTracker.obtain().also { it.addMovement(event) }
                 downX = event.x
                 downY = event.y
-                val viewport = pageViewport().coerceAtLeast(1)
-                val offset = if (isHorizontalPaging()) scrollX else scrollY
-                downPage = (offset.toFloat() / viewport).roundToInt()
+                downPage = pageAtOffset(currentOffset())
                 scrollToPage(downPage)
                 pagingGesture = false
                 horizontalPageGesture = false
             }
             MotionEvent.ACTION_MOVE -> {
+                velocityTracker?.addMovement(event)
                 val dx = event.x - downX
                 val dy = event.y - downY
                 if (
@@ -196,9 +308,8 @@ private class ReaderWebView(context: Context) : WebView(context) {
                 }
                 if (pagingGesture) {
                     if (horizontalPageGesture && event.pointerCount == 1) {
-                        val viewport = pageViewport().coerceAtLeast(1)
-                        val maxOffset = (pageContentRange() - viewport).coerceAtLeast(0)
-                        val startOffset = (downPage * viewport).coerceIn(0, maxOffset)
+                        val maxOffset = maxPageOffset()
+                        val startOffset = offsetOfPage(downPage).coerceIn(0, maxOffset)
                         val offset = (startOffset - dx.roundToInt()).coerceIn(0, maxOffset)
                         scrollTo(offset, 0)
                     }
@@ -206,14 +317,30 @@ private class ReaderWebView(context: Context) : WebView(context) {
                 }
             }
             MotionEvent.ACTION_UP -> {
+                velocityTracker?.addMovement(event)
                 if (pagingGesture) {
                     val dx = event.x - downX
+                    val tracker = velocityTracker
+                    tracker?.computeCurrentVelocity(1000)
+                    val vx = tracker?.xVelocity ?: 0f
+                    recycleVelocityTracker()
                     val turnThreshold = maxOf(touchSlop * 2, (width * 0.18f).toInt())
-                    if (horizontalPageGesture && kotlin.math.abs(dx) >= turnThreshold) {
+                    // A quick flick turns the page even if it did not travel far.
+                    val flicked = kotlin.math.abs(vx) >= flingVelocity &&
+                        kotlin.math.abs(dx) >= touchSlop * 2 &&
+                        (vx < 0f) == (dx < 0f)
+                    if (horizontalPageGesture && (kotlin.math.abs(dx) >= turnThreshold || flicked)) {
                         val direction = if (dx < 0) 1 else -1
                         val progression = if (rightToLeft) -1 else 1
-                        scrollToPage(downPage + direction, animate = true)
-                        onPageTurn?.invoke(direction * progression)
+                        val target = downPage + direction
+                        if (target < 0 || target > lastPage()) {
+                            // Swiped past the first/last page: settle back and
+                            // hand over to the neighbouring chapter.
+                            scrollToPage(downPage, animate = true)
+                            onChapterEdge?.invoke(direction * progression)
+                        } else {
+                            scrollToPage(target, animate = true)
+                        }
                     } else {
                         scrollToPage(downPage, animate = true)
                     }
@@ -221,6 +348,7 @@ private class ReaderWebView(context: Context) : WebView(context) {
                     horizontalPageGesture = false
                     return true
                 }
+                recycleVelocityTracker()
                 val moved = kotlin.math.abs(event.x - downX) > 2f ||
                     kotlin.math.abs(event.y - downY) > 2f
                 val handled = super.onTouchEvent(event)
@@ -234,6 +362,7 @@ private class ReaderWebView(context: Context) : WebView(context) {
                 return handled
             }
             MotionEvent.ACTION_CANCEL -> {
+                recycleVelocityTracker()
                 if (pagingGesture) {
                     scrollToPage(downPage)
                     pagingGesture = false
@@ -333,11 +462,10 @@ class HtmlViewerView(
         webView.settings.textZoom = initialTextZoom.coerceIn(50, 300)
         if (initialBackgroundColor != null) webView.setBackgroundColor(initialBackgroundColor)
         if (bookToken != null) {
-            webView.onPageTurn = { direction ->
-                pendingPageTurn = true
-                pendingPageTurnDirection = direction
-                scheduleScrollEvent()
+            webView.onChapterEdge = { direction ->
+                eventSink?.success(mapOf("event" to "chapterEdge", "direction" to direction))
             }
+            webView.landingEdge = startEdge()
             webView.onPageLayoutChanged = { scheduleScrollEvent() }
             webView.setOnScrollChangeListener { _, _, _, _, _ -> scheduleScrollEvent() }
         }
@@ -382,8 +510,13 @@ class HtmlViewerView(
 
     private var scrollEventPending = false
     private var suppressNextScrollEvent = false
-    private var pendingPageTurn = false
-    private var pendingPageTurnDirection = 0
+    private var landingToken = 0
+
+    /** Physical scroll edge that is the start of a chapter in reading order. */
+    private fun startEdge(): Int = if (bookPagedMode && bookRtl) 1 else 0
+
+    /** Physical scroll edge that is the end of a chapter in reading order. */
+    private fun endEdge(): Int = if (bookRtl) -1 else 1
 
     private fun scheduleScrollEvent() {
         if (scrollEventPending) return
@@ -392,23 +525,11 @@ class HtmlViewerView(
             scrollEventPending = false
             val initial = suppressNextScrollEvent
             suppressNextScrollEvent = false
-            val pageTurn = pendingPageTurn
-            val pageTurnDirection = pendingPageTurnDirection
-            pendingPageTurn = false
-            pendingPageTurnDirection = 0
-            emitScrollEvent(
-                initial = initial,
-                pageTurn = pageTurn,
-                pageTurnDirection = pageTurnDirection,
-            )
+            emitScrollEvent(initial = initial)
         }, 120)
     }
 
-    private fun emitScrollEvent(
-        initial: Boolean = false,
-        pageTurn: Boolean = false,
-        pageTurnDirection: Int = 0,
-    ) {
+    private fun emitScrollEvent(initial: Boolean = false) {
         val horizontalPages = webView.isHorizontalPaging()
         val verticalContent = (webView.contentHeight * webView.resources.displayMetrics.density).toInt()
         val contentPx = if (bookPagedMode && horizontalPages) {
@@ -424,21 +545,21 @@ class HtmlViewerView(
         } else {
             (offset.toFloat() / travel).coerceIn(0f, 1f)
         }
-        val pageCount = if (bookPagedMode && viewportPx > 0) {
-            ((contentPx + viewportPx - 1) / viewportPx).coerceAtLeast(1)
+        val pagedHorizontally = bookPagedMode && horizontalPages
+        val pageCount = if (pagedHorizontally) webView.pageCount() else 1
+        val physicalPage = webView.currentPage()
+        val page = if (pagedHorizontally) {
+            if (bookRtl) pageCount - physicalPage else physicalPage + 1
         } else {
             1
         }
-        val page = if (bookPagedMode) {
-            (fraction * (pageCount - 1)).roundToInt() + 1
-        } else {
-            1
-        }
-        val atStart = if (bookPagedMode && horizontalPages) {
-            if (bookRtl) !webView.canScrollHorizontally(1) else !webView.canScrollHorizontally(-1)
+        // Edges use the same pixel tolerance as page turning, so "at the end"
+        // here and "can't turn further" in the gesture code always agree.
+        val atStart = if (pagedHorizontally) {
+            if (bookRtl) webView.isAtPhysicalEnd() else webView.isAtPhysicalStart()
         } else !webView.canScrollVertically(-1)
-        val atEnd = if (bookPagedMode && horizontalPages) {
-            if (bookRtl) !webView.canScrollHorizontally(-1) else !webView.canScrollHorizontally(1)
+        val atEnd = if (pagedHorizontally) {
+            if (bookRtl) webView.isAtPhysicalStart() else webView.isAtPhysicalEnd()
         } else !webView.canScrollVertically(1)
         eventSink?.success(
             mapOf(
@@ -446,8 +567,6 @@ class HtmlViewerView(
                 "fraction" to fraction.toDouble(),
                 "page" to page,
                 "pageCount" to pageCount,
-                "pageTurn" to pageTurn,
-                "pageTurnDirection" to pageTurnDirection,
                 "atStart" to atStart,
                 "atEnd" to atEnd,
                 "initial" to initial,
@@ -466,7 +585,9 @@ class HtmlViewerView(
 
     private fun injectBookStyle(bytes: ByteArray): ByteArray {
         var text = String(bytes, Charsets.UTF_8)
-        if (bookPagedMode && !bookFixedLayout) {
+        if (!bookFixedLayout) {
+            // Without a device-width viewport the WebView lays the chapter out at
+            // its ~980px default and shrinks it, leaving tiny text to pinch and pan.
             val viewportPattern = Regex(
                 """<meta\b(?=[^>]*\bname\s*=\s*["']viewport["'])[^>]*>""",
                 RegexOption.IGNORE_CASE,
@@ -596,13 +717,16 @@ class HtmlViewerView(
                 )
             )
             if (bookToken != null) {
-                webView.post {
-                    if (bookPagedMode && bookRtl && webView.isHorizontalPaging()) {
-                        val maxOffset =
-                            (webView.horizontalScrollRange() - webView.width).coerceAtLeast(0)
-                        webView.scrollTo(maxOffset, 0)
-                    }
-                    emitScrollEvent(initial = true)
+                // The page can report "finished" before its columns have their
+                // final width (images, web fonts), so the chapter's first/last
+                // page is re-applied for a moment until the layout has settled.
+                val token = ++landingToken
+                for (delayMs in longArrayOf(0, 80, 200, 450, 900)) {
+                    webView.postDelayed({
+                        if (token != landingToken) return@postDelayed
+                        webView.settleToLandingEdge()
+                        if (delayMs == 0L) emitScrollEvent(initial = true)
+                    }, delayMs)
                 }
             }
         }
@@ -650,8 +774,16 @@ class HtmlViewerView(
             "loadEntry" -> {
                 val entry = call.argument<String>("entry") ?: ""
                 val fragment = call.argument<String>("fragment") ?: ""
+                val atEnd = call.argument<Boolean>("atEnd") ?: false
                 if (bookToken != null && entry.isNotEmpty()) {
                     webView.cancelPageAnimation()
+                    // Coming back from the next chapter lands on this one's last
+                    // page; an anchor (#fragment) keeps the position it asks for.
+                    webView.landingEdge = when {
+                        fragment.isNotEmpty() -> 0
+                        atEnd -> if (bookPagedMode) endEdge() else 1
+                        else -> startEdge()
+                    }
                     webView.loadUrl(buildBookUri(entry, fragment).toString())
                 }
                 result.success(null)
@@ -667,12 +799,15 @@ class HtmlViewerView(
                 bookTwoPageLandscape = call.argument<Boolean>("twoPageLandscape") ?: bookTwoPageLandscape
                 webView.configurePagedMode(bookPagedMode, bookTwoPageLandscape)
                 webView.rightToLeft = bookRtl
+                webView.landingEdge = startEdge()
                 call.argument<Number>("backgroundColor")?.toInt()?.let { webView.setBackgroundColor(it) }
                 webView.reload()
                 result.success(null)
             }
             "setScrollFraction" -> {
                 val fraction = (call.argument<Number>("fraction")?.toFloat() ?: 0f).coerceIn(0f, 1f)
+                // An explicit position overrides any pending first/last-page landing.
+                webView.landingEdge = 0
                 webView.post {
                     webView.cancelPageAnimation()
                     val horizontalPages = webView.isHorizontalPaging()
@@ -686,10 +821,9 @@ class HtmlViewerView(
                     val viewportPx = if (bookPagedMode && horizontalPages) webView.width else webView.height
                     val maxOffset = (contentPx - viewportPx).coerceAtLeast(0)
                     val logicalFraction = if (bookPagedMode && horizontalPages && bookRtl) 1f - fraction else fraction
-                    val offset = if (bookPagedMode && viewportPx > 0) {
-                        val pageCount = ((contentPx + viewportPx - 1) / viewportPx).coerceAtLeast(1)
-                        val page = ((pageCount - 1) * logicalFraction).roundToInt()
-                        (page * viewportPx).coerceIn(0, maxOffset)
+                    val offset = if (bookPagedMode && horizontalPages && viewportPx > 0) {
+                        val page = ((webView.pageCount() - 1) * logicalFraction).roundToInt()
+                        webView.offsetOfPage(page)
                     } else {
                         (maxOffset * logicalFraction).toInt()
                     }
@@ -705,9 +839,10 @@ class HtmlViewerView(
             "turnPage" -> {
                 val direction = call.argument<Number>("direction")?.toInt() ?: 1
                 if (bookPagedMode) {
+                    // Turns the page, or reports a chapterEdge past the first/last one.
                     webView.turnPage(direction, bookRtl)
                     scheduleScrollEvent()
-                    webView.postDelayed({ emitScrollEvent() }, 180)
+                    webView.postDelayed({ emitScrollEvent() }, 280)
                 } else {
                     webView.scrollBy(0, if (direction > 0) webView.height else -webView.height)
                     webView.postDelayed({ emitScrollEvent() }, 180)
@@ -723,6 +858,7 @@ class HtmlViewerView(
             "setJavaScriptEnabled" -> {
                 val enabled = call.argument<Boolean>("enabled") ?: false
                 webView.settings.javaScriptEnabled = enabled
+                webView.landingEdge = startEdge()
                 webView.reload()
                 result.success(null)
             }

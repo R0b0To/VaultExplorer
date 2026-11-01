@@ -40,6 +40,14 @@ class UsbMassStorageDevice private constructor(
     private var discoveryDeadlineNs = Long.MAX_VALUE
     private fun overBudget(): Boolean = System.nanoTime() > discoveryDeadlineNs
 
+    // How long one command may wait for the device to *answer* (IN data / CSW) before we give up on it
+    // and reset. Normal I/O keeps the old single 5 s timeout; capacity discovery is far more patient
+    // because a bridge that is spinning up a large HDD can sit on the very first command for 10+ s.
+    private var inPatienceMs: Long = TIMEOUT_MS.toLong()
+    private var lastTimedOut = false      // did the most recent command end in a timeout (vs a quick STALL/error)?
+    private var sawInTraffic = false      // has *anything* come back on the IN pipe in this discovery round?
+    private var silentDevice = false      // INQUIRY and TEST UNIT READY both got no answer at all
+
     private val ioLock = Any()
     // 128 KB per command is the proven maximum size for stable USB BOT transfers; re-derived from the
     // real sector size once it is known (256 sectors @ 512 B, 32 @ 4 KiB).
@@ -60,11 +68,14 @@ class UsbMassStorageDevice private constructor(
         private const val TIMEOUT_SLACK_MS = 250L
         // NOT READY ("becoming ready" / spinning up) is given this long before giving up.
         private const val NOT_READY_BUDGET_MS = 8000L
-        private const val MAX_TRACE_CHARS = 480
-        // Wall-clock cap for the whole capacity discovery: the extra RC16 fallback and the reset-and-retry
-        // escalation stop being attempted once this has elapsed, so an unresponsive link (5 s timeout per
-        // command) still fails after roughly three commands -- no later than the plain retry sequence did.
-        private const val DISCOVERY_BUDGET_MS = 20_000L
+        private const val MAX_TRACE_CHARS = 760
+        // Safety net for the whole capacity discovery ladder (see readCapacity()).
+        private const val DISCOVERY_BUDGET_MS = 120_000L
+        // Per-command patience while discovering capacity: first round, then after a reset.
+        private const val FIRST_ROUND_PATIENCE_MS = 20_000L
+        private const val RESET_ROUND_PATIENCE_MS = 15_000L
+        // After a port reset the bridge re-initialises its USB side (and often the disk link).
+        private const val PORT_RESET_SETTLE_MS = 1500L
         
         // CRITICAL: Linux kernel drivers/usb/core/devio.c enforces MAX_USBFS_BUFFER_SIZE = 16384.
         // Single bulkTransfer calls larger than 16 KB fail with -EINVAL (-1) immediately.
@@ -132,11 +143,16 @@ class UsbMassStorageDevice private constructor(
                     // Select the Bulk-Only alternate setting explicitly (drives that also expose UASP
                     // have a second alt setting) and put the endpoints into a known state. The kernel
                     // driver we just force-detached may have been aborted mid-command. Best effort.
-                    if (!connection.setInterface(intf)) {
+                    val setIfOk = connection.setInterface(intf)
+                    if (!setIfOk) {
                         VeLog.d(TAG) { "open: setInterface(alt=${intf.alternateSetting}) not accepted; continuing" }
                     }
 
                     val msd = UsbMassStorageDevice(connection, intf, epIn, epOut)
+                    // Hardware fingerprint first, so a bug report on a non-reproducible drive says what it is:
+                    // ids, endpoint packet size (1024 = SuperSpeed, 512 = High-Speed), what the drive asks the
+                    // port to supply, and which protocols (50 = BOT, 62 = UASP) its alternate settings offer.
+                    msd.trace(deviceFingerprint(device, intf, epIn, setIfOk))
                     val capacityOk = msd.readCapacity()
                     msd.tracing = false
                     if (!capacityOk) {
@@ -161,6 +177,19 @@ class UsbMassStorageDevice private constructor(
                 }
             }
             return UsbOpenResult.Failure("USB_NOT_FOUND", "No USB mass-storage interface found on device")
+        }
+
+        private fun deviceFingerprint(device: UsbDevice, intf: UsbInterface, epIn: UsbEndpoint, setIfOk: Boolean): String {
+            val protocols = (0 until device.interfaceCount).map { device.getInterface(it) }
+                .filter { it.interfaceClass == 0x08 }
+                .joinToString(",") { "%d.%d=%02x".format(it.id, it.alternateSetting, it.interfaceProtocol) }
+            val power = try {
+                if (device.configurationCount > 0) "${device.getConfiguration(0).maxPower}mA" else "?"
+            } catch (_: Exception) { "?" }
+            return "dev=%04x:%04x mps=%d pwr=%s if=%s%s".format(
+                device.vendorId, device.productId, epIn.maxPacketSize, power, protocols,
+                if (setIfOk) "" else " setif=fail",
+            )
         }
 
         private fun logDeviceIdentity(device: UsbDevice, intf: UsbInterface) {
@@ -217,16 +246,37 @@ class UsbMassStorageDevice private constructor(
      */
     private fun readCsw(): ByteArray? {
         val csw = ByteArray(13)
-        val start = System.nanoTime()
-        var n = connection.bulkTransfer(epIn, csw, 13, TIMEOUT_MS)
+        var n = bulkInPatient(csw, 0, 13)
         if (n == 13) return csw
-        val waitedMs = (System.nanoTime() - start) / 1_000_000
-        if (n < 0 && waitedMs < TIMEOUT_MS - TIMEOUT_SLACK_MS) {
+        if (n < 0 && !lastTimedOut) {
             clearHalt(epIn)
-            n = connection.bulkTransfer(epIn, csw, 13, TIMEOUT_MS)
+            n = bulkInPatient(csw, 0, 13)
             if (n == 13) return csw
         }
         return null
+    }
+
+    /**
+     * One bulk-IN read that waits up to [inPatienceMs] for the device to answer. A timeout is *not*
+     * an error until the patience is used up: the command block was already accepted, so the device is
+     * simply not done yet (a bridge waiting for a disk to spin up looks exactly like this), and
+     * resetting it would abort that work and start the wait over. A quick failure is a STALL and is
+     * returned immediately so the caller can clear the halt (BOT §6.7). Sets [lastTimedOut].
+     */
+    private fun bulkInPatient(buffer: ByteArray, offset: Int, length: Int): Int {
+        val start = System.nanoTime()
+        lastTimedOut = false
+        while (true) {
+            val callStart = System.nanoTime()
+            val r = connection.bulkTransfer(epIn, buffer, offset, length, TIMEOUT_MS)
+            if (r > 0) sawInTraffic = true
+            if (r >= 0) return r
+            val callMs = (System.nanoTime() - callStart) / 1_000_000
+            if (callMs < TIMEOUT_MS - TIMEOUT_SLACK_MS) return r   // quick failure: STALL / error
+            val totalMs = (System.nanoTime() - start) / 1_000_000
+            if (totalMs >= inPatienceMs - TIMEOUT_SLACK_MS) { lastTimedOut = true; return r }
+            // still within patience: keep waiting without disturbing the device
+        }
     }
 
     private fun requestSense(): Triple<Int, Int, Int>? {
@@ -239,7 +289,7 @@ class UsbMassStorageDevice private constructor(
             return null
         }
         val data = ByteArray(18)
-        val got = connection.bulkTransfer(epIn, data, 18, TIMEOUT_MS)
+        val got = bulkInPatient(data, 0, 18)
         if (got >= 14) {
             val senseKey = data[2].toInt() and 0x0F
             val asc = data[12].toInt() and 0xFF
@@ -263,10 +313,11 @@ class UsbMassStorageDevice private constructor(
         e.stage == "CSW_STATUS" && e.senseKey >= 0 ->
             "sense=%d/%02x/%02x".format(e.senseKey, e.asc, e.ascq)
         e.stage == "CSW_STATUS" -> "csw=${e.cswStatus}" + if (e.requestSenseFailed) "(no-sense)" else ""
-        else -> e.stage.lowercase()
+        // transport failure: say whether the device went silent (timeout) or failed fast (stall/error), and how long it took
+        else -> e.stage.lowercase() + (if (lastTimedOut) "+timeout" else "") + "@%.1fs".format(e.elapsedMs / 1000.0)
     }
 
-    private fun trace(text: String) {
+    internal fun trace(text: String) {
         if (tracing && openTrace.length < MAX_TRACE_CHARS) openTrace.append(text).append(' ')
     }
 
@@ -299,6 +350,7 @@ class UsbMassStorageDevice private constructor(
         retryNumber: Int,
     ): Boolean {
         val cmdStart = System.nanoTime()
+        lastTimedOut = false
         fun elapsedMs() = (System.nanoTime() - cmdStart) / 1_000_000.0
         val opcode = if (cdb.isNotEmpty()) cdb[0].toInt() and 0xFF else 0
         val dirLabel = if (dirIn) "IN" else "OUT"
@@ -334,17 +386,17 @@ class UsbMassStorageDevice private constructor(
                 // Must not exceed MAX_BULK_CHUNK_BYTES (16 KB) for Linux devio compatibility
                 val chunkSize = minOf(MAX_BULK_CHUNK_BYTES, dataLen - totalTransferred)
                 val callStart = System.nanoTime()
-                val result = connection.bulkTransfer(
-                    endpoint,
-                    buffer,
-                    bufferOffset + totalTransferred,
-                    chunkSize,
-                    TIMEOUT_MS
-                )
+                val result = if (dirIn) {
+                    bulkInPatient(buffer, bufferOffset + totalTransferred, chunkSize)
+                } else {
+                    connection.bulkTransfer(endpoint, buffer, bufferOffset + totalTransferred, chunkSize, TIMEOUT_MS)
+                }
                 if (result < 0 || (result == 0 && !dirIn)) {
                     val waitedMs = (System.nanoTime() - callStart) / 1_000_000
-                    if (waitedMs >= TIMEOUT_MS - TIMEOUT_SLACK_MS) {
-                        // Timeout: the device is not answering at all -- reset straight away.
+                    val timedOut = if (dirIn) lastTimedOut else waitedMs >= TIMEOUT_MS - TIMEOUT_SLACK_MS
+                    if (timedOut) {
+                        // Timeout (after the full patience): the device is not answering at all -- reset.
+                        lastTimedOut = true
                         recordError("DATA_TRANSFER", transferredBytes = totalTransferred)
                         VeLog.w(TAG) { "USB_SCSI_FAIL ${lastError?.toLogString()} note=chunkTimeout($result)atOffset($totalTransferred)" }
                         resetRecovery("data_transfer_timeout")
@@ -405,19 +457,83 @@ class UsbMassStorageDevice private constructor(
         return true
     }
 
+    /**
+     * Capacity discovery with an escalating recovery ladder. Each rung is only tried if the previous one
+     * failed at the *transport* level (the device did not answer, as opposed to answering with a SCSI
+     * error, which no reset can fix):
+     *
+     *  1. plain discovery, very patient (a bridge spinning up a big HDD can need 10+ s for its first answer);
+     *  2. Bulk-Only reset recovery, then discover again   (skipped when the device was completely silent,
+     *     because a BOT reset is a request to the same firmware that is not answering);
+     *  3. USB port reset (hidden `resetDevice()`, best effort -- see [portReset]), settle, re-claim, discover
+     *     again: the heavy hammer that un-wedges a hung bridge or a host-side endpoint left half-aborted by
+     *     the force-detached kernel driver. Where it is unavailable this is one more patient round.
+     */
     private fun readCapacity(): Boolean {
         discoveryDeadlineNs = System.nanoTime() + DISCOVERY_BUDGET_MS * 1_000_000L
-        if (discoverCapacity()) return finishGeometry()
-        // A transport-level failure (CBW/data/CSW rather than a SCSI CHECK CONDITION) means the BOT
-        // state machine may simply be out of sync -- e.g. the kernel's usb-storage/uas driver was
-        // force-detached in the middle of a command. Reset once and run discovery again.
-        val stage = lastError?.stage
-        if (stage != null && stage != "CSW_STATUS" && !overBudget()) {
-            trace("|reset|")
-            resetRecovery("capacity_escalation")
-            if (discoverCapacity()) return finishGeometry()
+        try {
+            for (rung in 1..3) {
+                when (rung) {
+                    1 -> inPatienceMs = FIRST_ROUND_PATIENCE_MS
+                    2 -> {
+                        if (silentDevice) continue
+                        trace("|bot-reset|")
+                        resetRecovery("capacity_ladder")
+                        inPatienceMs = RESET_ROUND_PATIENCE_MS
+                    }
+                    3 -> {
+                        // No public API resets a USB port; UsbDeviceConnection.resetDevice() is hidden and
+                        // may be absent or blocked. Without it this rung is simply one more patient round
+                        // (a drive that needs 30+ s to come up still gets its chance).
+                        val performed = portReset()
+                        if (performed == null) {
+                            trace("|port-reset=n/a|")
+                            connection.setInterface(intf)
+                        } else {
+                            trace("|port-reset|")
+                        }
+                        inPatienceMs = RESET_ROUND_PATIENCE_MS
+                    }
+                }
+                silentDevice = false
+                sawInTraffic = false
+                if (discoverCapacity()) return finishGeometry()
+                val stage = lastError?.stage
+                // A real SCSI answer (CHECK CONDITION) is final; so is running out of time.
+                if ((stage != null && stage == "CSW_STATUS") || overBudget()) break
+            }
+            return false
+        } finally {
+            inPatienceMs = TIMEOUT_MS.toLong()
         }
-        return false
+    }
+
+    /**
+     * USB port reset, which re-initialises a hung bridge without touching our claim on the interface.
+     * `UsbDeviceConnection.resetDevice()` is **not part of the public SDK** (calling it directly does not
+     * compile), so it is looked up reflectively. Returns null when it is unavailable (removed, or blocked
+     * by the platform's non-SDK-interface restrictions) and otherwise the reset's own result.
+     */
+    private fun portReset(): Boolean? {
+        val method = try {
+            UsbDeviceConnection::class.java.getMethod("resetDevice")
+        } catch (e: Throwable) {
+            VeLog.i(TAG) { "portReset: resetDevice() not available (${e.javaClass.simpleName})" }
+            return null
+        }
+        val ok = try {
+            method.invoke(connection) as? Boolean ?: false
+        } catch (e: Throwable) {
+            VeLog.w(TAG) { "portReset: resetDevice() blocked/failed (${e.javaClass.simpleName}: ${e.message})" }
+            return null
+        }
+        VeLog.i(TAG) { "portReset: resetDevice() -> $ok" }
+        try { Thread.sleep(PORT_RESET_SETTLE_MS) } catch (_: InterruptedException) { Thread.currentThread().interrupt() }
+        // A reset can drop the claim on some stacks; claiming again is a no-op if we still hold it.
+        connection.claimInterface(intf, true)
+        connection.setInterface(intf)
+        startUnitSent = false
+        return ok
     }
 
     private fun finishGeometry(): Boolean {
@@ -434,6 +550,7 @@ class UsbMassStorageDevice private constructor(
         use16ByteCdb = false
         capacityTruncated = false
         prepareLun()
+        if (silentDevice) return false   // nothing is answering; don't spend more patience on RC10/RC16
         if (readCapacity10WithRetry()) {
             if (sectorCount == 0x100000000L) {
                 // lastLba == 0xFFFFFFFF: the capacity does not fit in 32 bits, ask READ CAPACITY(16).
@@ -465,8 +582,10 @@ class UsbMassStorageDevice private constructor(
     private fun prepareLun() {
         val inquiry = byteArrayOf(0x12, 0, 0, 0, 36, 0)
         val inquiryData = ByteArray(36)
+        var inquirySilent = false
         if (!executeCommand(inquiry, inquiryData, 0, 36, dirIn = true)) {
             VeLog.d(TAG) { "prepareLun: INQUIRY failed; continuing with readiness probe" }
+            inquirySilent = lastTimedOut && !sawInTraffic
         } else {
             trace("inq(type=%d,ver=%d)".format(inquiryData[0].toInt() and 0x1F, inquiryData[2].toInt() and 0xFF))
         }
@@ -474,6 +593,16 @@ class UsbMassStorageDevice private constructor(
         val testUnitReady = byteArrayOf(0, 0, 0, 0, 0, 0)
         val deadline = System.nanoTime() + NOT_READY_BUDGET_MS * 1_000_000L
         var attempt = 0
+        if (inquirySilent) {
+            // INQUIRY got no answer in the full patience window. One cheap second opinion (a bridge that
+            // only chokes on INQUIRY would still answer this) before declaring the device silent.
+            val saved = inPatienceMs
+            inPatienceMs = TIMEOUT_MS.toLong()
+            val ready = executeCommand(testUnitReady, null, 0, 0, dirIn = false)
+            inPatienceMs = saved
+            if (ready) return
+            if (lastTimedOut && !sawInTraffic) { silentDevice = true; return }
+        }
         while (true) {
             if (executeCommand(testUnitReady, null, 0, 0, dirIn = false)) return
             val error = lastError
@@ -523,9 +652,9 @@ class UsbMassStorageDevice private constructor(
             val error = lastError
             val retryable = when (error?.stage) {
                 "CSW_STATUS" -> error.senseKey == 0x02 || error.senseKey == 0x06
-                // One retry can recover a transient BOT transfer failure; do
-                // not repeatedly wait for the full USB timeout on a dead link.
-                "CBW_SEND", "DATA_TRANSFER", "CSW_READ", "CSW_SIGNATURE" -> attempt == 0
+                // One retry can recover a transient BOT transfer failure. A command that already
+                // waited out its whole patience window is not retried: the ladder handles that.
+                "CBW_SEND", "DATA_TRANSFER", "CSW_READ", "CSW_SIGNATURE" -> attempt == 0 && !lastTimedOut
                 else -> false
             }
             if (!retryable || attempt == CAPACITY_RETRY_ATTEMPTS - 1 || overBudget()) {

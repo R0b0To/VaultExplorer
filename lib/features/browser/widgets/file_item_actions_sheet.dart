@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/api/vault_book_api.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
@@ -18,6 +19,7 @@ import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/widgets/archive_thumbnail_support.dart';
+import 'package:vaultexplorer/features/browser/widgets/book_cover_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_thumbnail_preview.dart';
 import 'package:vaultexplorer/features/browser/widgets/thumbnail_raw_fallback.dart';
 
@@ -270,6 +272,21 @@ class FileItemActionsSheet extends ConsumerWidget {
         fallbackIconColor: fallbackIconColor,
         archiveContext: archiveContext,
         archiveRootPath: archiveRootPath,
+      );
+    }
+
+    // Not for a book nested inside an open archive: it has no container/local
+    // path of its own for the native side to open (same rule as the tiles).
+    if (isBookWithCover(cleanName) &&
+        !entry.isPlaceholder &&
+        archiveContext == null) {
+      return _ItemBookCover(
+        container: container,
+        filePath: fullPath,
+        cacheMode: thumbnailCacheMode,
+        quality: thumbnailQuality,
+        fallbackIcon: fallbackIcon,
+        fallbackIconColor: fallbackIconColor,
       );
     }
 
@@ -769,6 +786,72 @@ class _ItemImageThumbnail extends ConsumerWidget {
       ),
       errorBuilder: (context) =>
           Icon(fallbackIcon, color: fallbackIconColor, size: 24),
+    );
+  }
+}
+
+/// A book's cover in the sheet's header, in place of its file-type icon.
+///
+/// Same loader and cache as the file manager's tiles ([loadBookCoverThumbnail]),
+/// so a cover the folder already loaded at this quality is shown here without
+/// reopening the book. While it loads, and for a book with no cover, the header
+/// keeps the icon rather than a spinner: most failures are permanent, and a
+/// spinner that turned into an icon would be a flicker on every such book.
+class _ItemBookCover extends ConsumerWidget {
+  final MountedContainer container;
+  final String filePath;
+  final ThumbnailCacheMode cacheMode;
+  final ThumbnailQuality quality;
+  final IconData fallbackIcon;
+  final Color fallbackIconColor;
+
+  const _ItemBookCover({
+    required this.container,
+    required this.filePath,
+    required this.cacheMode,
+    required this.quality,
+    required this.fallbackIcon,
+    required this.fallbackIconColor,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
+    final bookApi = ref.read(vaultBookApiProvider);
+    final icon = Center(
+      child: Icon(fallbackIcon, color: fallbackIconColor, size: 24),
+    );
+
+    return AsyncThumbnail(
+      key: ValueKey('sheet_book:$filePath'),
+      container: container,
+      filePath: filePath,
+      cache: ThumbnailConcurrency.inFlightThumbnails,
+      limiter: ThumbnailConcurrency.imageLimiter,
+      quality: quality,
+      fetchFn: (c, p) async => (await loadBookCoverThumbnail(
+        thumbnailCache: thumbnailCache,
+        bookApi: bookApi,
+        container: c,
+        path: p,
+        mode: cacheMode,
+        quality: quality,
+      )).bytes,
+      debounce: const Duration(milliseconds: 50),
+      syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
+      cacheHeight: quality.scaledSize(180),
+      // Anchored to the top, where a cover's title is, like the file tiles.
+      imageBuilder: (context, bytes, cacheHeight) => Image.memory(
+        bytes,
+        width: double.infinity,
+        height: double.infinity,
+        fit: BoxFit.cover,
+        alignment: Alignment.topCenter,
+        cacheHeight: cacheHeight,
+        errorBuilder: (_, _, _) => icon,
+      ),
+      loadingBuilder: (context) => icon,
+      errorBuilder: (context) => icon,
     );
   }
 }

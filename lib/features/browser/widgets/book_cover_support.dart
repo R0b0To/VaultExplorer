@@ -88,6 +88,7 @@ Future<ThumbnailWithSize> fetchBookCoverForThumbnail({
 bool _isPermanent(String code) {
   switch (code) {
     case 'BOOK_NO_COVER':
+    case 'FILE_NOT_FOUND':
     case 'BOOK_NOT_ZIP':
     case 'BOOK_ENCRYPTED':
     case 'BOOK_UNSUPPORTED':

@@ -121,7 +121,7 @@ void main() {
       for (final code in [
         'BOOK_NO_COVER', 'BOOK_NOT_ZIP', 'BOOK_ENCRYPTED', 'BOOK_UNSUPPORTED',
         'BOOK_TOO_LARGE', 'BOOK_CORRUPT', 'BOOK_NOT_FOUND', 'BOOK_EMPTY',
-        'DECODE_FAILED', 'IMAGE_TOO_LARGE',
+        'FILE_NOT_FOUND', 'DECODE_FAILED', 'IMAGE_TOO_LARGE',
       ]) {
         api.error = PlatformException(code: code);
         await expectLater(

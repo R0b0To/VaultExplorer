@@ -243,7 +243,9 @@ class VaultBookApi {
       'quality': quality,
     };
     if (container.isLocalStorage) {
-      args['localPathOrUri'] = p.join(container.uri, path);
+      // Exactly what open() sends, so a cover and the reader always resolve the
+      // same file (a SAF storage location is a URI, not a joinable path).
+      args['localPathOrUri'] = _localStoragePath(container, path);
     } else {
       args['volId'] = container.volId;
       args['vaultPath'] = path;

@@ -204,6 +204,28 @@ void main() {
       expect(calls.single.arguments.containsKey('volId'), isFalse);
     });
 
+    test('a SAF storage location is addressed exactly as open() addresses it', () async {
+      // A SAF root is a content:// URI, which p.join would mangle. open() has
+      // its own builder for it; the cover must resolve the same file the
+      // reader does, so compare the two rather than hard-code an encoding.
+      final saf = buildExternalStorageContainer(
+        rootPath: 'content://com.android.externalstorage.documents/tree/primary%3ABooks',
+        displayName: 'SD card',
+        volId: kExternalStorageBaseVolId,
+      );
+      nextResult = {'status': 'ok', 'token': 't', 'entries': <Object?>[], 'encrypted': false};
+      await api.open(container: saf, path: 'Comics/a b.cbz', kind: BookKind.comic);
+      final opened = calls.single.arguments['localPathOrUri'];
+      calls.clear();
+
+      nextResult = {'bytes': cover, 'width': 1, 'height': 2};
+      await api.getCover(container: saf, path: 'Comics/a b.cbz', kind: BookKind.comic);
+
+      expect(calls.single.arguments['localPathOrUri'], opened);
+      expect(opened, startsWith('content://com.android.externalstorage.documents/'));
+      expect(opened, isNot(contains('//Comics')));
+    });
+
     test('an empty or malformed reply is an error, never a blank tile', () async {
       for (final bad in <Object?>[
         null,

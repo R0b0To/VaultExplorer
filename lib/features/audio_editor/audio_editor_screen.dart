@@ -68,6 +68,10 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
   /// Within this of a segment edge counts as "on" it for the cut-point buttons.
   static const int _cutPointSlackUs = 50000;
 
+  /// How far the step buttons move the playhead: audio has no frames, so a
+  /// fixed 0.1 s (the shortest segment the editor allows) stands in for one.
+  static const int _nudgeStepUs = 100000;
+
   late final VaultAudioEditApi _api;
   late final VaultEngineEvents _events;
   late final VaultFileIoApi _fileIoApi;
@@ -545,6 +549,13 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
       );
     }
     unawaited(_seekToUs(target));
+  }
+
+  /// Moves the playhead by one small step, the audio counterpart of the
+  /// video editor's frame step.
+  void _nudge({required bool forward}) {
+    final deltaUs = forward ? _nudgeStepUs : -_nudgeStepUs;
+    unawaited(_seekToUs(_playhead.value + deltaUs));
   }
 
   // ── Segment edits ──────────────────────────────────────────────────────
@@ -1040,17 +1051,11 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               ..._buildFormatBanner(context),
-                              _buildSummaryRow(
-                                context,
-                                editor,
-                                includeMute: false,
-                                compact: true,
-                              ),
+                              _buildSummaryRow(context, editor, compact: true),
                               const SizedBox(height: 4),
                               _buildTransportRow(
                                 context,
                                 player,
-                                includeMute: true,
                                 compact: true,
                               ),
                               const SizedBox(height: 4),
@@ -1209,12 +1214,12 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
           // Row 2: waveform timeline with draggable handles
           _buildTimeline(editor),
 
-          // Row 3: selected segment times, mute, speed, segments chip
-          _buildSummaryRow(context, editor, includeMute: true),
+          // Row 3: selected segment times, speed, segments chip
+          _buildSummaryRow(context, editor),
           const SizedBox(height: 4),
 
-          // Row 4: cut-point navigation, playback and cut preview.
-          _buildTransportRow(context, player, includeMute: false),
+          // Row 4: cut-point navigation, nudging, playback, cut preview, mute.
+          _buildTransportRow(context, player),
           const SizedBox(height: 4),
 
           // Row 5: editing tools.
@@ -1334,12 +1339,10 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
     );
   }
 
-  /// Selected segment range, then (optionally) mute, playback speed and the
-  /// segments chip.
+  /// Selected segment range, then playback speed and the segments chip.
   Widget _buildSummaryRow(
     BuildContext context,
     AudioEditorController editor, {
-    required bool includeMute,
     bool compact = false,
   }) {
     final l10n = context.l10n;
@@ -1367,7 +1370,6 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
                   overflow: TextOverflow.ellipsis,
                 ),
         ),
-        if (includeMute) _buildMuteButton(context),
         _buildSpeedButton(context),
         const SizedBox(width: 4),
         ActionChip(
@@ -1388,28 +1390,24 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
     );
   }
 
-  /// Mute toggle. Without [box] it is the standard-size button used in the
-  /// summary row; with it, a square transport-row button of that size.
+  /// Mute toggle: a square transport-row button of [box] size.
   Widget _buildMuteButton(
     BuildContext context, {
-    double? box,
-    double? iconSize,
+    required double box,
+    required double iconSize,
   }) {
     final l10n = context.l10n;
     final cs = context.colors;
     return IconButton.filledTonal(
       style: IconButton.styleFrom(
-        minimumSize: box == null ? null : Size(box, box),
-        padding: box == null ? null : EdgeInsets.zero,
+        minimumSize: Size(box, box),
+        padding: EdgeInsets.zero,
         backgroundColor: _isMuted ? cs.primaryContainer : null,
         foregroundColor: _isMuted ? cs.onPrimaryContainer : null,
       ),
       iconSize: iconSize,
       tooltip: _isMuted ? l10n.unmuteTooltip : l10n.muteTooltip,
-      icon: Icon(
-        _isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
-        size: iconSize ?? 24,
-      ),
+      icon: Icon(_isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded),
       onPressed: () => unawaited(_toggleMute()),
     );
   }
@@ -1467,12 +1465,11 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
     );
   }
 
-  /// Cut-point navigation, play / pause and cut preview, plus (when
-  /// [includeMute]) the mute toggle. [compact] uses slightly smaller buttons.
+  /// Cut-point navigation, small-step nudging, play / pause, cut preview and
+  /// mute. [compact] uses slightly smaller buttons.
   Widget _buildTransportRow(
     BuildContext context,
     NativeVideoController player, {
-    required bool includeMute,
     bool compact = false,
   }) {
     final l10n = context.l10n;
@@ -1498,6 +1495,13 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
             icon: const Icon(Icons.skip_previous_rounded),
             onPressed: () => _jumpCutPoint(forward: false),
           ),
+          IconButton(
+            iconSize: iconSize,
+            style: sideStyle,
+            tooltip: l10n.audioEditorStepBack,
+            icon: const Icon(Icons.chevron_left_rounded),
+            onPressed: () => _nudge(forward: false),
+          ),
           ValueListenableBuilder<NativeVideoValue>(
             valueListenable: player,
             builder: (context, v, _) => IconButton.filled(
@@ -1514,6 +1518,13 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
               ),
               onPressed: () => unawaited(_togglePlay()),
             ),
+          ),
+          IconButton(
+            iconSize: iconSize,
+            style: sideStyle,
+            tooltip: l10n.audioEditorStepForward,
+            icon: const Icon(Icons.chevron_right_rounded),
+            onPressed: () => _nudge(forward: true),
           ),
           IconButton(
             iconSize: iconSize,
@@ -1539,8 +1550,7 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen>
             ),
             onPressed: () => setState(() => _previewResult = !_previewResult),
           ),
-          if (includeMute)
-            _buildMuteButton(context, box: box, iconSize: iconSize),
+          _buildMuteButton(context, box: box, iconSize: iconSize),
         ],
       ),
     );

@@ -11408,6 +11408,12 @@ class AppLocalizationsUk extends AppLocalizations {
   String get audioEditorNextCutPoint => 'Наступна точка розрізу';
 
   @override
+  String get audioEditorStepBack => 'Крок назад';
+
+  @override
+  String get audioEditorStepForward => 'Крок уперед';
+
+  @override
   String audioEditorReencodeBanner(String format) {
     return 'Аудіо $format не можна скопіювати як є, тож під час експорту його буде перекодовано в AAC (.m4a).';
   }

@@ -7,7 +7,8 @@ import 'package:vaultexplorer/features/browser/models/tab_id.dart';
 /// - [interactionLocked]: another viewport started a drag, so this one only
 ///   acts as a drop target (tiles ignore taps/holds, selection is frozen).
 /// - [revealNames]/[revealToken]: names of items a drop just placed in this
-///   viewport's folder; tiles with those names flash while it is non-empty.
+///   viewport's folder; tiles with those names play one short pulse (again for
+///   each new [revealToken]).
 class BrowserPaneScope extends InheritedWidget {
   final TabId tabId;
   final bool interactionLocked;

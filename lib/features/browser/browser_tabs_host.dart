@@ -2081,7 +2081,22 @@ class _BrowserTabPageState extends State<_BrowserTabPage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return TickerMode(enabled: _onScreen, child: widget.child);
+    return TickerMode(
+      enabled: _onScreen,
+      // Every page is its own ink surface. Tiles paint their selection
+      // highlight (and ripples) with Ink/InkWell, and those draw on the
+      // nearest Material ancestor rather than on the tile itself. Without a
+      // Material in here that is the shell's Scaffold, which sits *outside*
+      // the pager: the page's content is clipped to its pane while it slides,
+      // but the highlight is not, so a selected row bled across the divider
+      // into the other pane. A clipping Material keeps the ink inside the page
+      // and moves/clips it with the page.
+      child: Material(
+        type: MaterialType.transparency,
+        clipBehavior: Clip.hardEdge,
+        child: widget.child,
+      ),
+    );
   }
 }
 

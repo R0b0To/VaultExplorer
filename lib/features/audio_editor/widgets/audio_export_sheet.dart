@@ -158,207 +158,202 @@ class _AudioExportSheetState extends State<AudioExportSheet> {
     final text = context.typography;
     final isSingleClip = widget.clipCount <= 1;
 
+    // AppBottomSheet already lifts its child above the keyboard; padding by
+    // the keyboard inset again here left a keyboard-sized gap under the
+    // file name field.
     return AppBottomSheet(
-      child: Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(l10n.videoEditorExportTitle, style: text.titleLarge),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+              child: Text(
+                l10n.videoEditorExportSummary(
+                  widget.clipCount,
+                  formatTimecode(widget.totalDurationUs, millis: false),
+                ),
+                style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+              ),
+            ),
+
+            // Several clips: one merged file, or one file each.
+            if (!isSingleClip && !_replaceOriginal) ...[
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(l10n.videoEditorExportTitle, style: text.titleLarge),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-                child: Text(
-                  l10n.videoEditorExportSummary(
-                    widget.clipCount,
-                    formatTimecode(widget.totalDurationUs, millis: false),
-                  ),
-                  style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-                ),
-              ),
-
-              // Several clips: one merged file, or one file each.
-              if (!isSingleClip && !_replaceOriginal) ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: SegmentedButton<bool>(
-                    showSelectedIcon: false,
-                    segments: [
-                      ButtonSegment(
-                        value: true,
-                        icon: const Icon(Icons.merge_type_rounded),
-                        label: Text(l10n.audioEditorExportMerge),
-                      ),
-                      ButtonSegment(
-                        value: false,
-                        icon: const Icon(Icons.library_music_outlined),
-                        label: Text(l10n.audioEditorExportSeparate),
-                      ),
-                    ],
-                    selected: {_merge},
-                    onSelectionChanged: (s) => setState(() => _merge = s.first),
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-
-              if (!widget.isReadOnly) ...[
-                SwitchListTile(
-                  title: Text(l10n.audioEditorReplaceOriginal),
-                  subtitle: Text(
-                    l10n.audioEditorReplaceOriginalHint,
-                    style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                  ),
-                  value: _replaceOriginal,
-                  onChanged: (val) {
-                    setState(() {
-                      _replaceOriginal = val;
-                      // Replacing the original needs everything in one file.
-                      if (val) _merge = true;
-                    });
-                  },
-                ),
-                const SizedBox(height: 8),
-              ],
-
-              // Smaller file: re-encode at a lower bitrate.
-              if (widget.compressionOptions.length > 1) ...[
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-                  child: Text(
-                    l10n.audioEditorCompressTitle,
-                    style: text.titleSmall,
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: SegmentedButton<AudioCompression>(
-                    showSelectedIcon: false,
-                    segments: [
-                      for (final c in widget.compressionOptions)
-                        ButtonSegment(
-                          value: c,
-                          label: Text(_compressionLabel(c)),
-                        ),
-                    ],
-                    selected: {_compression},
-                    onSelectionChanged: (s) =>
-                        setState(() => _compression = s.first),
-                  ),
-                ),
-                if (_estimatedBytes != null)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
-                    child: Text(
-                      l10n.audioEditorCompressEstimate(
-                        formatBytes(_estimatedBytes!),
-                      ),
-                      style: text.bodySmall?.copyWith(
-                        color: cs.onSurfaceVariant,
-                      ),
+                child: SegmentedButton<bool>(
+                  showSelectedIcon: false,
+                  segments: [
+                    ButtonSegment(
+                      value: true,
+                      icon: const Icon(Icons.merge_type_rounded),
+                      label: Text(l10n.audioEditorExportMerge),
                     ),
-                  ),
-                const SizedBox(height: 12),
-              ],
-
-              if (!_replaceOriginal) ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 4,
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _nameController,
-                          decoration: InputDecoration(
-                            labelText: l10n.videoEditorCustomFileName,
-                            filled: true,
-                            fillColor: cs.surfaceContainerHighest.withValues(
-                              alpha: 0.5,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(
-                                color: cs.outlineVariant.withValues(alpha: 0.4),
-                              ),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(
-                                color: cs.primary,
-                                width: 2,
-                              ),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 14,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        height: 52,
-                        alignment: Alignment.center,
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: cs.surfaceContainerHighest.withValues(
-                            alpha: 0.5,
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: cs.outlineVariant.withValues(alpha: 0.4),
-                          ),
-                        ),
-                        child: Text(
-                          '.$_outputExtension',
-                          style: text.labelLarge?.copyWith(
-                            color: cs.onSurfaceVariant,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ButtonSegment(
+                      value: false,
+                      icon: const Icon(Icons.library_music_outlined),
+                      label: Text(l10n.audioEditorExportSeparate),
+                    ),
+                  ],
+                  selected: {_merge},
+                  onSelectionChanged: (s) => setState(() => _merge = s.first),
                 ),
-                const SizedBox(height: 8),
-              ],
+              ),
+              const SizedBox(height: 12),
+            ],
 
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-                child: Text(
-                  _compression.isOn
-                      ? l10n.audioEditorCompressNote
-                      : widget.reencode
-                      ? l10n.audioEditorReencodeNote
-                      : l10n.audioEditorLosslessNote,
+            if (!widget.isReadOnly) ...[
+              SwitchListTile(
+                title: Text(l10n.audioEditorReplaceOriginal),
+                subtitle: Text(
+                  l10n.audioEditorReplaceOriginalHint,
                   style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                 ),
+                value: _replaceOriginal,
+                onChanged: (val) {
+                  setState(() {
+                    _replaceOriginal = val;
+                    // Replacing the original needs everything in one file.
+                    if (val) _merge = true;
+                  });
+                },
               ),
+              const SizedBox(height: 8),
+            ],
 
+            // Smaller file: re-encode at a lower bitrate.
+            if (widget.compressionOptions.length > 1) ...[
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                child: FilledButton(
-                  onPressed: _submit,
-                  child: Text(
-                    _replaceOriginal
-                        ? l10n.audioEditorReplaceOriginal
-                        : l10n.videoEditorExportAction,
-                  ),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                child: Text(
+                  l10n.audioEditorCompressTitle,
+                  style: text.titleSmall,
                 ),
               ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: SegmentedButton<AudioCompression>(
+                  showSelectedIcon: false,
+                  segments: [
+                    for (final c in widget.compressionOptions)
+                      ButtonSegment(
+                        value: c,
+                        label: Text(_compressionLabel(c)),
+                      ),
+                  ],
+                  selected: {_compression},
+                  onSelectionChanged: (s) =>
+                      setState(() => _compression = s.first),
+                ),
+              ),
+              if (_estimatedBytes != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+                  child: Text(
+                    l10n.audioEditorCompressEstimate(
+                      formatBytes(_estimatedBytes!),
+                    ),
+                    style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                ),
+              const SizedBox(height: 12),
             ],
-          ),
+
+            if (!_replaceOriginal) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _nameController,
+                        decoration: InputDecoration(
+                          labelText: l10n.videoEditorCustomFileName,
+                          filled: true,
+                          fillColor: cs.surfaceContainerHighest.withValues(
+                            alpha: 0.5,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: cs.outlineVariant.withValues(alpha: 0.4),
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: cs.primary, width: 2),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      height: 52,
+                      alignment: Alignment.center,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: cs.surfaceContainerHighest.withValues(
+                          alpha: 0.5,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: cs.outlineVariant.withValues(alpha: 0.4),
+                        ),
+                      ),
+                      child: Text(
+                        '.$_outputExtension',
+                        style: text.labelLarge?.copyWith(
+                          color: cs.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+              child: Text(
+                _compression.isOn
+                    ? l10n.audioEditorCompressNote
+                    : widget.reencode
+                    ? l10n.audioEditorReencodeNote
+                    : l10n.audioEditorLosslessNote,
+                style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              ),
+            ),
+
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: FilledButton(
+                onPressed: _submit,
+                child: Text(
+                  _replaceOriginal
+                      ? l10n.audioEditorReplaceOriginal
+                      : l10n.videoEditorExportAction,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

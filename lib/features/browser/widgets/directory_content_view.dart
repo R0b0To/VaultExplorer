@@ -779,10 +779,17 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       _revealToken = token;
     });
     _revealClearTimer?.cancel();
-    _revealClearTimer = Timer(const Duration(milliseconds: 2200), () {
-      if (!mounted) return;
-      setState(() => _revealNames = const {});
-    });
+    // Each tile plays its own short pulse (see kDropRevealPulseDuration) and
+    // always finishes it, so the names do not have to stay announced for the
+    // pulse's sake. They only have to outlast the scroll that brings an item
+    // into view (320 ms), so a tile built part-way through it still pulses.
+    _revealClearTimer = Timer(
+      kDropRevealPulseDuration + const Duration(milliseconds: 320),
+      () {
+        if (!mounted) return;
+        setState(() => _revealNames = const {});
+      },
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _scrollToRevealed(listed);
     });

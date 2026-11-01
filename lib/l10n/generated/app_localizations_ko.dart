@@ -10717,6 +10717,12 @@ class AppLocalizationsKo extends AppLocalizations {
   String get audioEditorNextCutPoint => '다음 컷 지점';
 
   @override
+  String get audioEditorStepBack => '한 단계 뒤로';
+
+  @override
+  String get audioEditorStepForward => '한 단계 앞으로';
+
+  @override
   String audioEditorReencodeBanner(String format) {
     return '$format 오디오는 그대로 복사할 수 없어 내보낼 때 AAC(.m4a)로 다시 인코딩됩니다.';
   }

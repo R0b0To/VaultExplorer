@@ -3092,6 +3092,8 @@
   "audioEditorUnsupportedFormat": "{format} 文件无法在此设备上编辑，因此此文件可在此播放，但无法导出。",
   "audioEditorPrevCutPoint": "上一个剪辑点",
   "audioEditorNextCutPoint": "下一个剪辑点",
+  "audioEditorStepBack": "后退一步",
+  "audioEditorStepForward": "前进一步",
   "audioEditorReencodeBanner": "{format} 音频无法按原样复制，导出时将重新编码为 AAC (.m4a)。",
   "audioEditorReencodeNote": "此格式无法按原样复制，因此导出的音频会重新编码为 AAC。音质仍然很高，但与原文件并非逐位相同。剪辑点会精确落在你设置的位置。标签和封面不会保留。",
   "skinEditorKeywords": "关键字",

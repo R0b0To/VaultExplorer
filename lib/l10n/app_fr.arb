@@ -3092,6 +3092,8 @@
   "audioEditorUnsupportedFormat": "Les fichiers {format} ne peuvent pas être modifiés sur cet appareil : ce fichier peut être lu ici, mais pas exporté.",
   "audioEditorPrevCutPoint": "Point de coupe précédent",
   "audioEditorNextCutPoint": "Point de coupe suivant",
+  "audioEditorStepBack": "Pas en arrière",
+  "audioEditorStepForward": "Pas en avant",
   "audioEditorReencodeBanner": "L'audio {format} ne peut pas être copié tel quel : il sera réencodé en AAC (.m4a) à l'export.",
   "audioEditorReencodeNote": "Ce format ne peut pas être copié tel quel, l'audio exporté est donc réencodé en AAC. La qualité reste élevée, mais elle n'est pas identique bit à bit. Les coupes tombent exactement là où vous les placez. Les balises et la pochette ne sont pas conservées.",
   "skinEditorKeywords": "Mots-clés",

@@ -942,17 +942,11 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              _buildSummaryRow(
-                                context,
-                                editor,
-                                includeMute: false,
-                                compact: true,
-                              ),
+                              _buildSummaryRow(context, editor, compact: true),
                               const SizedBox(height: 4),
                               _buildTransportRow(
                                 context,
                                 player,
-                                includeMute: true,
                                 compact: true,
                               ),
                               const SizedBox(height: 4),
@@ -1054,12 +1048,12 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
           _buildTimeline(editor),
           const SizedBox(height: 4),
 
-          // Row 3: Selected segment timestamps, mute, speed, segments chip
-          _buildSummaryRow(context, editor, includeMute: true),
+          // Row 3: Selected segment timestamps, speed, segments chip
+          _buildSummaryRow(context, editor),
           const SizedBox(height: 4),
 
-          // Row 4: Transport and preview cut
-          _buildTransportRow(context, player, includeMute: false),
+          // Row 4: Transport, preview cut and mute
+          _buildTransportRow(context, player),
           const SizedBox(height: 4),
 
           // Row 5: Editing tools
@@ -1145,12 +1139,10 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
     );
   }
 
-  /// Selected segment range, then (optionally) mute, playback speed and the
-  /// segments chip.
+  /// Selected segment range, then playback speed and the segments chip.
   Widget _buildSummaryRow(
     BuildContext context,
     VideoEditorController editor, {
-    required bool includeMute,
     bool compact = false,
   }) {
     final l10n = context.l10n;
@@ -1179,7 +1171,6 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
                   maxLines: 1,
                 ),
         ),
-        if (includeMute) _buildMuteButton(context),
         _buildSpeedButton(context),
         const SizedBox(width: 4),
         ActionChip(
@@ -1199,28 +1190,24 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
     );
   }
 
-  /// Mute toggle. Without [box] it is the standard-size button used in the
-  /// summary row; with it, a square transport-row button of that size.
+  /// Mute toggle: a square transport-row button of [box] size.
   Widget _buildMuteButton(
     BuildContext context, {
-    double? box,
-    double? iconSize,
+    required double box,
+    required double iconSize,
   }) {
     final l10n = context.l10n;
     final cs = context.colors;
     return IconButton.filledTonal(
       style: IconButton.styleFrom(
-        minimumSize: box == null ? null : Size(box, box),
-        padding: box == null ? null : EdgeInsets.zero,
+        minimumSize: Size(box, box),
+        padding: EdgeInsets.zero,
         backgroundColor: _isMuted ? cs.primaryContainer : null,
         foregroundColor: _isMuted ? cs.onPrimaryContainer : null,
       ),
       iconSize: iconSize,
       tooltip: _isMuted ? l10n.unmuteTooltip : l10n.muteTooltip,
-      icon: Icon(
-        _isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
-        size: iconSize ?? 24,
-      ),
+      icon: Icon(_isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded),
       onPressed: () => unawaited(_toggleMute()),
     );
   }
@@ -1278,12 +1265,11 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
     );
   }
 
-  /// Keyframe / frame stepping, play / pause and cut preview, plus (when
-  /// [includeMute]) the mute toggle. [compact] uses slightly smaller buttons.
+  /// Keyframe / frame stepping, play / pause, cut preview and mute. [compact]
+  /// uses slightly smaller buttons.
   Widget _buildTransportRow(
     BuildContext context,
     NativeVideoController player, {
-    required bool includeMute,
     bool compact = false,
   }) {
     final l10n = context.l10n;
@@ -1366,8 +1352,7 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
               setState(() => _previewResult = !_previewResult);
             },
           ),
-          if (includeMute)
-            _buildMuteButton(context, box: box, iconSize: iconSize),
+          _buildMuteButton(context, box: box, iconSize: iconSize),
         ],
       ),
     );

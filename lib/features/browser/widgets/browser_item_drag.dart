@@ -247,6 +247,7 @@ class BrowserItemDragItem extends StatelessWidget {
     BuildContext context, {
     required bool locked,
     required bool revealed,
+    int revealToken = 0,
     bool dropHover = false,
   }) {
     final primary = Theme.of(context).colorScheme.primary;
@@ -270,15 +271,10 @@ class BrowserItemDragItem extends StatelessWidget {
         ),
         Positioned.fill(
           child: IgnorePointer(
-            child: AnimatedOpacity(
-              opacity: revealed ? 1.0 : 0.0,
-              duration: Duration(milliseconds: revealed ? 160 : 700),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: primary.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
+            child: _DropRevealPulse(
+              active: revealed,
+              token: revealToken,
+              color: primary,
             ),
           ),
         ),
@@ -291,11 +287,17 @@ class BrowserItemDragItem extends StatelessWidget {
     final scope = BrowserPaneScope.maybeOf(context);
     final locked = scope?.interactionLocked ?? false;
     final revealed = scope?.revealNames.contains(entry.name) ?? false;
+    final revealToken = scope?.revealToken ?? 0;
 
     final drawerScope = FullScreenDragDrawerScope.maybeOf(context);
     final source = container;
     if (!enabled || source == null || entry.isPlaceholder || onDrop == null) {
-      return _withOverlays(context, locked: locked, revealed: revealed);
+      return _withOverlays(
+        context,
+        locked: locked,
+        revealed: revealed,
+        revealToken: revealToken,
+      );
     }
 
     final session = ProviderScope.containerOf(
@@ -330,11 +332,17 @@ class BrowserItemDragItem extends StatelessWidget {
           context,
           locked: locked,
           revealed: revealed,
+          revealToken: revealToken,
           dropHover: candidates.isNotEmpty,
         ),
       );
     } else {
-      dragChild = _withOverlays(context, locked: locked, revealed: revealed);
+      dragChild = _withOverlays(
+        context,
+        locked: locked,
+        revealed: revealed,
+        revealToken: revealToken,
+      );
     }
 
     // In selection mode, unselected rows belong to the range-select hold
@@ -367,6 +375,105 @@ class BrowserItemDragItem extends StatelessWidget {
       ),
       childWhenDragging: dragChild,
       child: dragChild,
+    );
+  }
+}
+
+/// How long the flash on freshly dropped items lasts, start to finish. Short
+/// on purpose: it is a pulse that says "these just arrived", not a highlight
+/// that has to be waited out. Change this one value to retime it.
+const Duration kDropRevealPulseDuration = Duration(milliseconds: 600);
+
+/// Strongest the flash gets, as the alpha of the primary colour. A little
+/// firmer than a held highlight would be, since it is only there for a moment.
+const double _kDropRevealPulsePeakAlpha = 0.28;
+
+/// One quick pulse over a tile: a fast rise, then a softer fade away.
+///
+/// It plays when [active] turns on, and again for every new [token] (a second
+/// drop that lands on the same names). Turning [active] off does not cut it
+/// short -- the pulse always finishes -- so the viewport only has to leave the
+/// names announced for as long as it takes tiles to be built.
+class _DropRevealPulse extends StatefulWidget {
+  final bool active;
+  final int token;
+  final Color color;
+
+  const _DropRevealPulse({
+    required this.active,
+    required this.token,
+    required this.color,
+  });
+
+  @override
+  State<_DropRevealPulse> createState() => _DropRevealPulseState();
+}
+
+class _DropRevealPulseState extends State<_DropRevealPulse>
+    with SingleTickerProviderStateMixin {
+  /// 0 -> 1 -> 0 over the pulse: the first quarter rises, the rest fades.
+  static final Animatable<double> _envelope = TweenSequence<double>([
+    TweenSequenceItem(
+      tween: Tween<double>(
+        begin: 0.0,
+        end: 1.0,
+      ).chain(CurveTween(curve: Curves.easeOut)),
+      weight: 25,
+    ),
+    TweenSequenceItem(
+      tween: Tween<double>(
+        begin: 1.0,
+        end: 0.0,
+      ).chain(CurveTween(curve: Curves.easeInOut)),
+      weight: 75,
+    ),
+  ]);
+
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: kDropRevealPulseDuration,
+  );
+  late final Animation<double> _strength = _controller.drive(_envelope);
+
+  @override
+  void initState() {
+    super.initState();
+    // A tile built while its name is being announced (scrolled into view by
+    // the reveal, say) pulses as it appears.
+    if (widget.active) _controller.forward();
+  }
+
+  @override
+  void didUpdateWidget(covariant _DropRevealPulse oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.active &&
+        (!oldWidget.active || widget.token != oldWidget.token)) {
+      _controller.forward(from: 0.0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        // Almost every tile is at rest almost all the time: paint nothing.
+        if (_controller.isDismissed) return const SizedBox.shrink();
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            color: widget.color.withValues(
+              alpha: _kDropRevealPulsePeakAlpha * _strength.value,
+            ),
+            borderRadius: BorderRadius.circular(14),
+          ),
+        );
+      },
     );
   }
 }

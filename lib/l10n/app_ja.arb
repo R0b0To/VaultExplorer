@@ -3092,6 +3092,8 @@
   "audioEditorUnsupportedFormat": "{format} ファイルはこのデバイスでは編集できないため、ここで再生はできますがエクスポートはできません。",
   "audioEditorPrevCutPoint": "前のカット位置",
   "audioEditorNextCutPoint": "次のカット位置",
+  "audioEditorStepBack": "少し戻る",
+  "audioEditorStepForward": "少し進む",
   "audioEditorReencodeBanner": "{format} のオーディオはそのままコピーできないため、エクスポート時に AAC (.m4a) へ再エンコードされます。",
   "audioEditorReencodeNote": "この形式はそのままコピーできないため、書き出すオーディオは AAC に再エンコードされます。音質は高いままですが、ビット単位では同一になりません。カットは設定した位置どおりになります。タグとカバーアートは引き継がれません。",
   "skinEditorKeywords": "キーワード",

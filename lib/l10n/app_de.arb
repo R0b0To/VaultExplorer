@@ -3092,6 +3092,8 @@
   "audioEditorUnsupportedFormat": "{format}-Dateien lassen sich auf diesem Gerät nicht bearbeiten. Diese Datei kann hier abgespielt, aber nicht exportiert werden.",
   "audioEditorPrevCutPoint": "Vorheriger Schnittpunkt",
   "audioEditorNextCutPoint": "Nächster Schnittpunkt",
+  "audioEditorStepBack": "Schritt zurück",
+  "audioEditorStepForward": "Schritt vor",
   "audioEditorReencodeBanner": "{format}-Audio lässt sich nicht unverändert kopieren und wird beim Export in AAC (.m4a) neu kodiert.",
   "audioEditorReencodeNote": "Dieses Format lässt sich nicht unverändert kopieren, daher wird das exportierte Audio in AAC neu kodiert. Die Qualität bleibt hoch, ist aber nicht bitgenau identisch. Schnitte sitzen genau an deiner Markierung. Tags und Titelbilder werden nicht übernommen.",
   "skinEditorKeywords": "Schlüsselwörter",

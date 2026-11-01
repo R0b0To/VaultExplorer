@@ -18889,6 +18889,18 @@ abstract class AppLocalizations {
   /// **'Next cut point'**
   String get audioEditorNextCutPoint;
 
+  /// Tooltip of the button that moves the audio editor playhead back by one small fixed step (0.1 s), the audio counterpart of stepping back one video frame
+  ///
+  /// In en, this message translates to:
+  /// **'Step back'**
+  String get audioEditorStepBack;
+
+  /// Tooltip of the button that moves the audio editor playhead forward by one small fixed step (0.1 s), the audio counterpart of stepping forward one video frame
+  ///
+  /// In en, this message translates to:
+  /// **'Step forward'**
+  String get audioEditorStepForward;
+
   /// Info banner in the audio editor for a format that can't be copied and will be re-encoded to AAC on export. {format} is the file extension in capitals, e.g. FLAC
   ///
   /// In en, this message translates to:

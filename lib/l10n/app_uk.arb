@@ -3122,6 +3122,8 @@
   "audioEditorUnsupportedFormat": "Файли {format} не можна редагувати на цьому пристрої, тож цей файл можна відтворити тут, але не експортувати.",
   "audioEditorPrevCutPoint": "Попередня точка розрізу",
   "audioEditorNextCutPoint": "Наступна точка розрізу",
+  "audioEditorStepBack": "Крок назад",
+  "audioEditorStepForward": "Крок уперед",
   "audioEditorReencodeBanner": "Аудіо {format} не можна скопіювати як є, тож під час експорту його буде перекодовано в AAC (.m4a).",
   "audioEditorReencodeNote": "Цей формат не можна скопіювати як є, тому експортоване аудіо перекодовується в AAC. Якість лишається високою, але не ідентична побітово. Розрізи припадають точно на задані вами точки. Теги й обкладинка не переносяться.",
   "mediaViewerActionAbLoop": "Повторення A-B",

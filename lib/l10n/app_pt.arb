@@ -3092,6 +3092,8 @@
   "audioEditorUnsupportedFormat": "Arquivos {format} não podem ser editados neste dispositivo, então este arquivo pode ser reproduzido aqui, mas não exportado.",
   "audioEditorPrevCutPoint": "Ponto de corte anterior",
   "audioEditorNextCutPoint": "Próximo ponto de corte",
+  "audioEditorStepBack": "Passo atrás",
+  "audioEditorStepForward": "Passo à frente",
   "audioEditorReencodeBanner": "O áudio {format} não pode ser copiado como está, então será recodificado para AAC (.m4a) ao exportar.",
   "audioEditorReencodeNote": "Este formato não pode ser copiado como está, então o áudio exportado é recodificado para AAC. A qualidade continua alta, mas não é idêntica bit a bit. Os cortes caem exatamente onde você os definiu. Tags e capa não são mantidas.",
   "skinEditorKeywords": "Palavras-chave",

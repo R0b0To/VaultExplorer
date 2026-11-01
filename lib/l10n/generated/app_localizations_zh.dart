@@ -10549,6 +10549,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get audioEditorNextCutPoint => '下一个剪辑点';
 
   @override
+  String get audioEditorStepBack => '后退一步';
+
+  @override
+  String get audioEditorStepForward => '前进一步';
+
+  @override
   String audioEditorReencodeBanner(String format) {
     return '$format 音频无法按原样复制，导出时将重新编码为 AAC (.m4a)。';
   }

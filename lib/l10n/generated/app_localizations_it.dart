@@ -11327,6 +11327,12 @@ class AppLocalizationsIt extends AppLocalizations {
   String get audioEditorNextCutPoint => 'Punto di taglio successivo';
 
   @override
+  String get audioEditorStepBack => 'Passo indietro';
+
+  @override
+  String get audioEditorStepForward => 'Passo avanti';
+
+  @override
   String audioEditorReencodeBanner(String format) {
     return 'L\'audio $format non può essere copiato così com\'è, quindi verrà ricodificato in AAC (.m4a) all\'esportazione.';
   }

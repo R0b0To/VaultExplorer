@@ -523,6 +523,10 @@ class FileOperationService extends ChangeNotifier {
     _bindOperationListener(op);
     notifyListeners();
     _syncNotificationProgress();
+    // A nested archive is read from a temporary copy that the browser wipes
+    // when the archive is closed, which can happen right after the paste
+    // while this operation is still running. Hold the copy until it is done.
+    archiveContext.retainSource();
     _runArchiveExtract(
       op,
       source,
@@ -1075,7 +1079,9 @@ class FileOperationService extends ChangeNotifier {
         op._setStatus(FileOperationStatus.cancelled);
       } else if (count > 0 || totalEntries == 0) {
         op._setDoneCount(count);
-        if (deleteArchiveAfter) {
+        // A nested archive is an entry of another archive, not a file in
+        // [source]: there is nothing at [archivePath] to delete.
+        if (deleteArchiveAfter && !archiveContext.isNested) {
           await _deleteEntryRecursive(source, archivePath, false);
         }
         op._setStatus(FileOperationStatus.completed);
@@ -1093,6 +1099,7 @@ class FileOperationService extends ChangeNotifier {
         op._setStatus(FileOperationStatus.failed);
       }
     } finally {
+      archiveContext.releaseSource();
       _engineEvents.removeSplitJoinProgressListener(onProgress);
       _endBatches(guardedVolIds);
       _publishVolumeContentChanged(op, dest.volId);

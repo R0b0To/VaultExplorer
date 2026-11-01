@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/data/models/archive_models.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -717,6 +718,196 @@ void main() {
         final state = container.read(fileBrowserNavigationProvider(const TabId(1)));
         expect(state.isLoading, isFalse);
         expect(state.archiveContext, isNull);
+
+        subscription.close();
+      });
+    });
+
+    group('archives inside archives', () {
+      StagedArchiveSource stagedCopy() => StagedArchiveSource(
+        '/cache/archive_browse_1_inner.zip',
+        container.read(vaultArchiveApiProvider),
+      );
+
+      /// Opens backup.zip, then inner.zip (an entry of backup.zip) on top.
+      Future<(ArchiveContext outer, ArchiveContext nested, StagedArchiveSource source)>
+      openBoth(FileBrowserNavigation notifier) async {
+        notifier.initRoot(rootLabel: 'Vault');
+        archiveBytesResponse = _testArchiveBytes();
+        final outer = await notifier.openArchive(
+          _testContainer(1),
+          'backup.zip',
+          'backup.zip',
+        );
+        final source = stagedCopy();
+        final nested = await notifier.openNestedArchive(
+          source,
+          'backup.zip/inner.zip',
+          'inner.zip',
+        );
+        return (outer, nested, source);
+      }
+
+      test('opening an archive inside an archive stacks it on the outer one', () async {
+        final subscription = container.listen(fileBrowserNavigationProvider(const TabId(1)), (_, _) {});
+        final notifier = container.read(fileBrowserNavigationProvider(const TabId(1)).notifier);
+
+        final (outer, nested, source) = await openBoth(notifier);
+
+        final state = container.read(fileBrowserNavigationProvider(const TabId(1)));
+        expect(nested.status, ArchiveOpenStatus.ok);
+        expect(state.archiveContext, same(nested));
+        expect(nested.parent, same(outer));
+        expect(nested.stagedSource, same(source));
+        expect(state.pathStack.map((s) => s.fatPath), ['', 'backup.zip', 'backup.zip/inner.zip']);
+        expect(state.pathStack.last.isArchiveRoot, isTrue);
+        expect(state.currentDirPath, 'backup.zip/inner.zip');
+        expect(state.isLoading, isFalse);
+        expect(state.currentItems.map((e) => e.name), containsAll(['readme.txt', 'sub']));
+
+        subscription.close();
+      });
+
+      test('a folder inside the nested archive lists its own entries', () async {
+        final subscription = container.listen(fileBrowserNavigationProvider(const TabId(1)), (_, _) {});
+        final notifier = container.read(fileBrowserNavigationProvider(const TabId(1)).notifier);
+        await openBoth(notifier);
+
+        notifier.enterDirectory(
+          const RawEntry(name: 'sub', isDir: true, sizeBytes: 0, modifiedSecs: 0),
+          newPath: 'backup.zip/inner.zip/sub',
+        );
+        await notifier.loadDirectoryContents(_testContainer(1), 'backup.zip/inner.zip/sub');
+
+        final state = container.read(fileBrowserNavigationProvider(const TabId(1)));
+        expect(state.currentItems.map((e) => e.name), ['nested.txt']);
+
+        subscription.close();
+      });
+
+      test('going up from the nested archive returns to the outer archive', () async {
+        final subscription = container.listen(fileBrowserNavigationProvider(const TabId(1)), (_, _) {});
+        final notifier = container.read(fileBrowserNavigationProvider(const TabId(1)).notifier);
+        final (outer, _, source) = await openBoth(notifier);
+
+        notifier.navigateUp();
+
+        final state = container.read(fileBrowserNavigationProvider(const TabId(1)));
+        expect(state.archiveContext, same(outer));
+        expect(state.pathStack.map((s) => s.fatPath), ['', 'backup.zip']);
+        expect(state.currentDirPath, 'backup.zip');
+        expect(state.forwardStack, isEmpty);
+        expect(source.isReleased, isTrue);
+
+        subscription.close();
+      });
+
+      test('going up twice leaves archive mode', () async {
+        final subscription = container.listen(fileBrowserNavigationProvider(const TabId(1)), (_, _) {});
+        final notifier = container.read(fileBrowserNavigationProvider(const TabId(1)).notifier);
+        await openBoth(notifier);
+
+        notifier.navigateUp();
+        notifier.navigateUp();
+
+        final state = container.read(fileBrowserNavigationProvider(const TabId(1)));
+        expect(state.archiveContext, isNull);
+        expect(state.atRoot, isTrue);
+        expect(state.forwardStack, isEmpty);
+
+        subscription.close();
+      });
+
+      test('closeArchive closes only the innermost archive', () async {
+        final subscription = container.listen(fileBrowserNavigationProvider(const TabId(1)), (_, _) {});
+        final notifier = container.read(fileBrowserNavigationProvider(const TabId(1)).notifier);
+        final (outer, _, source) = await openBoth(notifier);
+
+        notifier.closeArchive();
+
+        expect(container.read(fileBrowserNavigationProvider(const TabId(1))).archiveContext, same(outer));
+        expect(source.isReleased, isTrue);
+
+        subscription.close();
+      });
+
+      test('jumping to the outer archive root closes only the nested archive', () async {
+        final subscription = container.listen(fileBrowserNavigationProvider(const TabId(1)), (_, _) {});
+        final notifier = container.read(fileBrowserNavigationProvider(const TabId(1)).notifier);
+        final (outer, _, source) = await openBoth(notifier);
+
+        notifier.jumpTo(1);
+
+        final state = container.read(fileBrowserNavigationProvider(const TabId(1)));
+        expect(state.archiveContext, same(outer));
+        expect(state.currentDirPath, 'backup.zip');
+        expect(source.isReleased, isTrue);
+
+        subscription.close();
+      });
+
+      test('jumping out of both archives closes both', () async {
+        final subscription = container.listen(fileBrowserNavigationProvider(const TabId(1)), (_, _) {});
+        final notifier = container.read(fileBrowserNavigationProvider(const TabId(1)).notifier);
+        final (_, _, source) = await openBoth(notifier);
+
+        notifier.jumpTo(0);
+
+        final state = container.read(fileBrowserNavigationProvider(const TabId(1)));
+        expect(state.archiveContext, isNull);
+        expect(state.atRoot, isTrue);
+        expect(state.forwardStack, isEmpty);
+        expect(source.isReleased, isTrue);
+
+        subscription.close();
+      });
+
+      test('navigateToPath closes every open archive', () async {
+        final subscription = container.listen(fileBrowserNavigationProvider(const TabId(1)), (_, _) {});
+        final notifier = container.read(fileBrowserNavigationProvider(const TabId(1)).notifier);
+        final (_, _, source) = await openBoth(notifier);
+
+        notifier.navigateToPath(_testContainer(1), 'Elsewhere', isDir: true, rootLabel: 'Vault');
+
+        expect(container.read(fileBrowserNavigationProvider(const TabId(1))).archiveContext, isNull);
+        expect(source.isReleased, isTrue);
+
+        subscription.close();
+      });
+
+      test('a failed nested open rethrows, clears isLoading and keeps the outer archive', () async {
+        final subscription = container.listen(fileBrowserNavigationProvider(const TabId(1)), (_, _) {});
+        final notifier = container.read(fileBrowserNavigationProvider(const TabId(1)).notifier);
+        notifier.initRoot(rootLabel: 'Vault');
+        archiveBytesResponse = _testArchiveBytes();
+        final outer = await notifier.openArchive(_testContainer(1), 'backup.zip', 'backup.zip');
+        final source = stagedCopy();
+
+        archiveFileError = PlatformException(code: 'READ_FAIL', message: 'Failed to read archive');
+        await expectLater(
+          () => notifier.openNestedArchive(source, 'backup.zip/inner.zip', 'inner.zip'),
+          throwsA(isA<PlatformException>()),
+        );
+
+        final state = container.read(fileBrowserNavigationProvider(const TabId(1)));
+        expect(state.isLoading, isFalse);
+        expect(state.archiveContext, same(outer));
+        expect(state.pathStack, hasLength(2));
+        // The caller still owns the copy after a failure, so it can wipe it.
+        expect(source.isReleased, isFalse);
+
+        subscription.close();
+      });
+
+      test('openNestedArchive needs an open archive to open from', () async {
+        final subscription = container.listen(fileBrowserNavigationProvider(const TabId(1)), (_, _) {});
+        final notifier = container.read(fileBrowserNavigationProvider(const TabId(1)).notifier);
+        notifier.initRoot(rootLabel: 'Vault');
+
+        await expectLater(
+          () => notifier.openNestedArchive(stagedCopy(), 'inner.zip', 'inner.zip'),
+          throwsStateError,
+        );
 
         subscription.close();
       });

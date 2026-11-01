@@ -198,6 +198,8 @@ class ArchiveService {
     required String archiveName,
     int pathStackEntryIndex = 0,
     String? passphrase,
+    ArchiveContext? parent,
+    StagedArchiveSource? stagedSource,
   }) async {
     final result = await _archive.scanLocalArchive(
       pathOrUri: pathOrUri,
@@ -221,6 +223,49 @@ class ArchiveService {
       api: _archive,
       localPathOrUri: pathOrUri,
       passphrase: passphrase,
+      parent: parent,
+      stagedSource: stagedSource,
+    );
+  }
+
+  /// Whether a file tapped inside an open archive should be opened as an
+  /// archive of its own. Split archive parts are left out: the native engine
+  /// finds the other parts as sibling files, and inside an archive there are
+  /// none to find, so a part could only ever open as a truncated archive.
+  static bool canOpenNested(String fileName, String ext) =>
+      opensOnTap(ext) && !isSplitArchivePart(fileName);
+
+  /// Takes ownership of an archive entry that was just staged to [path] (see
+  /// [ArchiveContext.stageEntryForBrowse]) so it can be opened as a nested
+  /// archive. The caller owns the returned source until [openNested] succeeds
+  /// -- after that the opened context does -- and must `release()` it when
+  /// the open fails or is abandoned, which wipes the temporary file.
+  static StagedArchiveSource adoptStagedArchive(String path) =>
+      StagedArchiveSource(path, _archive);
+
+  /// Opens the archive that was staged in [source] (an entry of [parent]) as
+  /// a nested archive. [ArchiveContext.dispose] on the result releases the
+  /// copy; closing the result returns to [parent].
+  ///
+  /// Throws [StateError] if that would nest deeper than
+  /// [ArchiveContext.maxNestingDepth].
+  static Future<ArchiveContext> openNested({
+    required ArchiveContext parent,
+    required StagedArchiveSource source,
+    required String archiveName,
+    required int pathStackEntryIndex,
+    String? passphrase,
+  }) async {
+    if (parent.nestingDepth + 1 > ArchiveContext.maxNestingDepth) {
+      throw StateError('Archive nesting is too deep');
+    }
+    return openLocal(
+      pathOrUri: source.path,
+      archiveName: archiveName,
+      pathStackEntryIndex: pathStackEntryIndex,
+      passphrase: passphrase,
+      parent: parent,
+      stagedSource: source,
     );
   }
 

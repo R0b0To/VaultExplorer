@@ -43,7 +43,10 @@ import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_co
 String browserTabDuplicatePath(FileBrowserNavigationState nav) {
   final archive = nav.archiveContext;
   if (archive != null) {
-    final idx = archive.pathStackEntryIndex - 1;
+    // For an archive opened from inside another archive, the folder to use
+    // is the one that holds the outermost archive; the nested ones only exist
+    // as virtual paths.
+    final idx = archive.outermost.pathStackEntryIndex - 1;
     if (idx >= 0 && idx < nav.pathStack.length) {
       return nav.pathStack[idx].fatPath;
     }

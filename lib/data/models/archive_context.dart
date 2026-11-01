@@ -1,7 +1,56 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'package:path/path.dart' as p;
 import 'package:vaultexplorer/core/api/vault_archive_api.dart';
 import 'package:vaultexplorer/data/models/archive_models.dart';
+
+/// An app-private temporary copy of an archive that is itself an entry of
+/// another archive (a `.zip` inside a `.7z`, say).
+///
+/// libarchive needs random access to read a ZIP or 7z, which an entry that is
+/// still compressed inside its parent can't give, so a nested archive is
+/// streamed once into a file in the app's private cache (the same
+/// `archive_browse_` files that archive previews use) and browsed from there.
+/// The native side wipes the file when it is discarded, and startup cleanup
+/// wipes anything a crash left behind.
+///
+/// Several owners can need the copy at once: the open archive view, a
+/// clipboard that is holding a partial extract of it, and an extraction that
+/// is still running after the view has been closed. Each one [retain]s it and
+/// [release]s it when done; the file is wiped when the last owner lets go.
+/// A new source starts with one owner, the code that staged it.
+class StagedArchiveSource {
+  StagedArchiveSource(this.path, this._api);
+
+  /// Native path of the staged copy.
+  final String path;
+
+  final VaultArchiveApi _api;
+  int _owners = 1;
+
+  /// Whether the last owner has let go (the file is gone or being wiped).
+  bool get isReleased => _owners <= 0;
+
+  /// Adds an owner. Has no effect once the file has been released.
+  void retain() {
+    if (_owners > 0) _owners++;
+  }
+
+  /// Removes an owner; the last one wipes the file.
+  void release() {
+    if (_owners <= 0) return;
+    _owners--;
+    if (_owners == 0) unawaited(_discard());
+  }
+
+  Future<void> _discard() async {
+    try {
+      await _api.discardBrowseFile(path);
+    } catch (_) {
+      // Startup cleanup retries anything left behind.
+    }
+  }
+}
 
 /// Holds the state for browsing inside an archive file using native indexing.
 ///
@@ -37,6 +86,15 @@ class ArchiveContext {
   /// Passphrase used to scan / extract entries, if password-protected.
   final String? passphrase;
 
+  /// The archive this one was opened from, when this archive is an entry of
+  /// another archive; null for an archive that lives directly in a container
+  /// or on device storage. Closing this archive returns to [parent].
+  final ArchiveContext? parent;
+
+  /// The temporary copy this archive is read from when it is nested (its
+  /// path is also [localPathOrUri]); null otherwise.
+  final StagedArchiveSource? stagedSource;
+
   /// Pre-computed directory tree: maps each directory path (relative to
   /// archive root, with '/' separator) to its immediate children entries
   /// in RawEntry wire format.
@@ -54,6 +112,8 @@ class ArchiveContext {
     this.vaultPath,
     this.localPathOrUri,
     this.passphrase,
+    this.parent,
+    this.stagedSource,
     required this._tree,
     required this._entryMap,
   });
@@ -68,6 +128,8 @@ class ArchiveContext {
     String? vaultPath,
     String? localPathOrUri,
     String? passphrase,
+    ArchiveContext? parent,
+    StagedArchiveSource? stagedSource,
   }) {
     final tree = <String, Set<String>>{};
     final entryMap = <String, ArchiveEntryInfo>{};
@@ -130,9 +192,39 @@ class ArchiveContext {
       vaultPath: vaultPath,
       localPathOrUri: localPathOrUri,
       passphrase: passphrase,
+      parent: parent,
+      stagedSource: stagedSource,
       tree: treeMap,
       entryMap: entryMap,
     );
+  }
+
+  /// Deepest chain of archives inside archives that can be opened. Each level
+  /// costs a temporary copy on disk, and a hostile archive could otherwise
+  /// nest forever.
+  static const int maxNestingDepth = 8;
+
+  /// Whether this archive is an entry of another open archive.
+  bool get isNested => parent != null;
+
+  /// How many archives sit above this one: 0 for an archive in a container or
+  /// on device storage, 1 for an archive inside that, and so on.
+  int get nestingDepth {
+    var depth = 0;
+    for (var up = parent; up != null; up = up.parent) {
+      depth++;
+    }
+    return depth;
+  }
+
+  /// The archive at the top of the chain: the one that lives in a container
+  /// or on device storage. This archive itself when it isn't nested.
+  ArchiveContext get outermost {
+    var top = this;
+    while (top.parent != null) {
+      top = top.parent!;
+    }
+    return top;
   }
 
   /// Whether this archive is a solid archive (e.g. RAR or 7z with multi-file shared blocks).
@@ -295,6 +387,8 @@ class ArchiveContext {
       vaultPath: vaultPath,
       localPathOrUri: localPathOrUri,
       passphrase: newPassphrase,
+      parent: parent,
+      stagedSource: stagedSource,
       tree: _tree,
       entryMap: _entryMap,
     );
@@ -342,6 +436,8 @@ class ArchiveContext {
       vaultPath: vaultPath,
       localPathOrUri: localPathOrUri,
       passphrase: newPassphrase,
+      parent: parent,
+      stagedSource: stagedSource,
     );
   }
 
@@ -376,5 +472,28 @@ class ArchiveContext {
         .toList();
   }
 
-  void dispose() {}
+  bool _disposed = false;
+
+  /// Keeps this archive's temporary copy (if it is nested) alive for another
+  /// owner, such as a clipboard holding a partial extract or an extraction
+  /// that outlives the browser view. Pair every call with [releaseSource].
+  void retainSource() => stagedSource?.retain();
+
+  /// Gives back a [retainSource]; the copy is wiped when the last owner does.
+  void releaseSource() => stagedSource?.release();
+
+  /// Releases this archive's own hold on its temporary copy. [parent] is left
+  /// alone: closing a nested archive returns to it.
+  void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    stagedSource?.release();
+  }
+
+  /// [dispose]s this archive and every archive above it, for when the whole
+  /// browser goes away (lock, tab closed) rather than one level being left.
+  void disposeChain() {
+    dispose();
+    parent?.disposeChain();
+  }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vaultexplorer/core/api/vault_archive_api.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
+import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/data/models/archive_models.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/archive_service.dart';
@@ -346,6 +347,69 @@ void main() {
       for (final ext in ['txt', 'pdf', 'xapk', '']) {
         expect(ArchiveService.isOpenableAsArchive(ext), isFalse, reason: ext);
       }
+    });
+  });
+  group('archives inside archives', () {
+    test('archives that open on tap also open from inside an archive', () {
+      for (final (name, ext) in [
+        ('inner.zip', 'zip'),
+        ('inner.7z', '7z'),
+        ('data.tar', 'tar'),
+        ('logs.gz', 'gz'),
+        ('disc.iso', 'iso'),
+        ('INNER.ZIP', 'zip'),
+      ]) {
+        expect(ArchiveService.canOpenNested(name, ext), isTrue, reason: name);
+      }
+    });
+
+    test('files that are not archives do not open as one', () {
+      expect(ArchiveService.canOpenNested('notes.txt', 'txt'), isFalse);
+      expect(ArchiveService.canOpenNested('photo.jpg', 'jpg'), isFalse);
+      // An APK is a ZIP but a tap means "install", archive or not.
+      expect(ArchiveService.canOpenNested('app.apk', 'apk'), isFalse);
+    });
+
+    test('split archive parts are not opened: their siblings are not on disk', () {
+      expect(ArchiveService.canOpenNested('backup.7z.001', '7z'), isFalse);
+      expect(ArchiveService.canOpenNested('backup.zip.001', 'zip'), isFalse);
+      expect(ArchiveService.canOpenNested('backup.z01', 'zip'), isFalse);
+    });
+
+    test('nesting deeper than the limit is refused', () async {
+      const empty = ArchiveIndexResult(
+        status: ArchiveOpenStatus.ok,
+        entries: [],
+        isSolid: false,
+        errorMessage: '',
+      );
+      var chain = ArchiveContext.fromScanResult(
+        archivePathInContainer: 'a0.zip',
+        pathStackEntryIndex: 0,
+        indexResult: empty,
+      );
+      for (var depth = 1; depth <= ArchiveContext.maxNestingDepth; depth++) {
+        chain = ArchiveContext.fromScanResult(
+          archivePathInContainer: 'a$depth.zip',
+          pathStackEntryIndex: depth,
+          indexResult: empty,
+          parent: chain,
+        );
+      }
+      expect(chain.nestingDepth, ArchiveContext.maxNestingDepth);
+
+      await expectLater(
+        ArchiveService.openNested(
+          parent: chain,
+          source: StagedArchiveSource(
+            '/cache/archive_browse_1_x.zip',
+            _FakeArchiveApi({}),
+          ),
+          archiveName: 'too-deep.zip',
+          pathStackEntryIndex: ArchiveContext.maxNestingDepth + 1,
+        ),
+        throwsStateError,
+      );
     });
   });
 }

@@ -1752,6 +1752,98 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     }
   }
 
+  /// Opens an archive that is an entry of the archive being browsed (a `.zip`
+  /// inside a `.7z`, say), on top of it. Going back leaves it and returns to
+  /// the outer archive.
+  ///
+  /// The entry can't be read in place: ZIP and 7z need random access, which
+  /// an entry that is still compressed inside its parent doesn't offer. It is
+  /// streamed into the same app-private temporary file archive previews use
+  /// and browsed from there; that file is securely wiped when the nested
+  /// archive is closed (see [StagedArchiveSource]).
+  Future<void> _openNestedArchive(String fullPath, String archiveName) async {
+    final parent = _archiveContext;
+    if (parent == null) return;
+    if (parent.nestingDepth + 1 > ArchiveContext.maxNestingDepth) {
+      _setStatus('Archives are nested too deeply to open', error: true);
+      return;
+    }
+
+    final archiveRootPath = _pathStack[parent.pathStackEntryIndex].fatPath;
+    var subPath = '';
+    if (fullPath.length > archiveRootPath.length) {
+      subPath = fullPath.substring(archiveRootPath.length);
+      if (subPath.startsWith('/')) subPath = subPath.substring(1);
+    }
+    // Read before the awaits below, like _openArchive does, so leaving the
+    // nested archive restores the scroll position of this folder.
+    final currentOffset = _browserScrollController.hasClients
+        ? _browserScrollController.offset
+        : 0.0;
+
+    _signalActivity();
+    _navNotifier.setLoading(true);
+    StagedArchiveSource? source;
+    try {
+      final staged = await _stageArchiveEntryWithPassword(subPath);
+      final stagedPath = staged?.path;
+      if (stagedPath == null) {
+        if (mounted) {
+          _navNotifier.setLoading(false);
+          if (staged != null) {
+            _setStatus(context.l10n.failedToReadFileFromArchive, error: true);
+          }
+        }
+        return;
+      }
+      final stagedSource = ArchiveService.adoptStagedArchive(stagedPath);
+      source = stagedSource;
+      if (!mounted) return;
+
+      String? passphrase;
+      while (true) {
+        final ctx = await _navNotifier.openNestedArchive(
+          stagedSource,
+          fullPath,
+          archiveName,
+          passphrase: passphrase,
+          layoutMode: _getLayoutModeForFolder(fullPath),
+          onActivity: _signalActivity,
+          currentScrollOffset: currentOffset,
+        );
+
+        if (ctx.status == ArchiveOpenStatus.ok) {
+          // The nested archive owns the temporary copy from here on.
+          source = null;
+          final archiveSort = _getSortStateForFolder(fullPath);
+          _sortNotifier.restore(archiveSort.sortBy, archiveSort.sortAscending);
+          if (mounted) _resetBrowserScrollController(initialOffset: 0.0);
+          _clearSearch();
+          return;
+        }
+
+        if (!mounted) return;
+        final entered = await BrowserDialogs.showArchivePasswordPrompt(
+          context,
+          wrongPassword: ctx.status == ArchiveOpenStatus.wrongPassphrase,
+        );
+        if (entered == null) return;
+        passphrase = entered;
+      }
+    } catch (e) {
+      if (mounted) {
+        _navNotifier.setLoading(false);
+        _setStatus(
+          context.l10n.failedToReadArchive('${e.runtimeType}'),
+          error: true,
+        );
+      }
+    } finally {
+      // Still ours only when the open failed or was abandoned: wipe the copy.
+      source?.release();
+    }
+  }
+
   Future<ArchiveEntryExtractResult?> _extractArchiveEntryWithPassword(
     String entryPath,
   ) async {
@@ -2438,8 +2530,18 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             ? parts.last.toLowerCase().replaceFirst(RegExp(r'^\.+'), '').trim()
             : '');
     if (ArchiveService.opensOnTap(ext)) {
-      await _openArchive(fullPath, entry.name);
-      return;
+      if (_archiveContext == null) {
+        await _openArchive(fullPath, entry.name);
+        return;
+      }
+      // Inside an archive the path is virtual, so the file can't be opened
+      // like a container file; it is staged and opened on top of this one.
+      // (A split archive part has no siblings to be read with, so it falls
+      // through to the ordinary in-archive handling below.)
+      if (ArchiveService.canOpenNested(entry.name, ext)) {
+        await _openNestedArchive(fullPath, entry.name);
+        return;
+      }
     }
     if (_archiveContext != null) {
       _signalActivity();
@@ -4836,8 +4938,11 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       _setStatus(context.l10n.readOnlyContainerWarning, error: true);
       return;
     }
+    // For an archive opened from inside another archive the destination is
+    // the folder that holds the outermost one: the nested archive has no file
+    // of its own to sit next to.
     final archivePath =
-        _pathStack[_archiveContext!.pathStackEntryIndex].fatPath;
+        _pathStack[_archiveContext!.outermost.pathStackEntryIndex].fatPath;
     final parentDir = archivePath.contains('/')
         ? archivePath.substring(0, archivePath.lastIndexOf('/'))
         : '';

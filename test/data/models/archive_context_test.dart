@@ -7,7 +7,16 @@ import 'package:vaultexplorer/data/models/archive_models.dart';
 class _CountingArchiveApi extends VaultArchiveApi {
   int extractCalls = 0;
 
+  /// Paths handed to [discardBrowseFile], in order.
+  final List<String> discarded = [];
+
   _CountingArchiveApi() : super(const MethodChannel('test'));
+
+  @override
+  Future<bool> discardBrowseFile(String path) async {
+    discarded.add(path);
+    return true;
+  }
 
   @override
   Future<ArchiveEntryExtractResult> extractVaultArchiveEntry({
@@ -43,6 +52,28 @@ ArchiveEntryInfo _dir(String path, int index) => ArchiveEntryInfo(
   isEncrypted: false,
   isDirectory: true,
   index: index,
+);
+
+/// A scanned archive holding one file; [parent] / [source] make it nested.
+ArchiveContext _context(
+  _CountingArchiveApi api, {
+  String name = 'a.zip',
+  int pathStackEntryIndex = 0,
+  ArchiveContext? parent,
+  StagedArchiveSource? source,
+}) => ArchiveContext.fromScanResult(
+  archivePathInContainer: name,
+  pathStackEntryIndex: pathStackEntryIndex,
+  api: api,
+  localPathOrUri: source?.path,
+  parent: parent,
+  stagedSource: source,
+  indexResult: ArchiveIndexResult(
+    status: ArchiveOpenStatus.ok,
+    isSolid: false,
+    errorMessage: '',
+    entries: [_entry('file.txt', 3, 0)],
+  ),
 );
 
 void main() {
@@ -113,5 +144,167 @@ void main() {
     expect(small.status, ArchiveOpenStatus.ok);
     expect(small.data, Uint8List.fromList([1, 2, 3]));
     expect(api.extractCalls, 1);
+  });
+  group('nested archives', () {
+    test('an archive that lives in a container is not nested', () {
+      final context = _context(_CountingArchiveApi());
+
+      expect(context.isNested, isFalse);
+      expect(context.nestingDepth, 0);
+      expect(context.outermost, same(context));
+    });
+
+    test('a nested archive knows its parent, depth and outermost archive', () {
+      final api = _CountingArchiveApi();
+      final top = _context(api);
+      final middle = _context(
+        api,
+        name: 'b.zip',
+        pathStackEntryIndex: 1,
+        parent: top,
+        source: StagedArchiveSource('/cache/archive_browse_1_b.zip', api),
+      );
+      final inner = _context(
+        api,
+        name: 'c.zip',
+        pathStackEntryIndex: 2,
+        parent: middle,
+        source: StagedArchiveSource('/cache/archive_browse_2_c.zip', api),
+      );
+
+      expect(inner.isNested, isTrue);
+      expect(inner.parent, same(middle));
+      expect(inner.nestingDepth, 2);
+      expect(inner.outermost, same(top));
+      expect(middle.outermost, same(top));
+    });
+
+    test('a nested archive is read from its temporary copy', () {
+      final api = _CountingArchiveApi();
+      final source = StagedArchiveSource('/cache/archive_browse_1_b.zip', api);
+      final nested = _context(api, parent: _context(api), source: source);
+
+      expect(nested.localPathOrUri, '/cache/archive_browse_1_b.zip');
+      expect(nested.stagedSource, same(source));
+    });
+
+    test('a password retry keeps the parent and the temporary copy', () {
+      final api = _CountingArchiveApi();
+      final top = _context(api);
+      final source = StagedArchiveSource('/cache/archive_browse_1_b.zip', api);
+      final nested = _context(api, parent: top, source: source);
+
+      final retried = nested.withPassphrase('secret');
+
+      expect(retried.passphrase, 'secret');
+      expect(retried.parent, same(top));
+      expect(retried.stagedSource, same(source));
+    });
+
+    test('the temporary copy is wiped only when its last owner lets go', () {
+      final api = _CountingArchiveApi();
+      final source = StagedArchiveSource('/cache/archive_browse_1_b.zip', api);
+
+      source.retain(); // e.g. the clipboard
+      source.release();
+      expect(api.discarded, isEmpty);
+      expect(source.isReleased, isFalse);
+
+      source.release(); // the archive view
+      expect(api.discarded, ['/cache/archive_browse_1_b.zip']);
+      expect(source.isReleased, isTrue);
+
+      source.release();
+      source.retain(); // too late: the file is gone
+      source.release();
+      expect(api.discarded, hasLength(1));
+    });
+
+    test('closing a nested archive wipes its copy once, however often it is disposed', () {
+      final api = _CountingArchiveApi();
+      final nested = _context(
+        api,
+        parent: _context(api),
+        source: StagedArchiveSource('/cache/archive_browse_1_b.zip', api),
+      );
+
+      nested.dispose();
+      nested.dispose();
+
+      expect(api.discarded, ['/cache/archive_browse_1_b.zip']);
+    });
+
+    test('closing a nested archive leaves its parent usable', () {
+      final api = _CountingArchiveApi();
+      final parentSource = StagedArchiveSource('/cache/archive_browse_1_b.zip', api);
+      final parent = _context(
+        api,
+        name: 'b.zip',
+        pathStackEntryIndex: 1,
+        parent: _context(api),
+        source: parentSource,
+      );
+      final nested = _context(
+        api,
+        name: 'c.zip',
+        pathStackEntryIndex: 2,
+        parent: parent,
+        source: StagedArchiveSource('/cache/archive_browse_2_c.zip', api),
+      );
+
+      nested.dispose();
+
+      expect(api.discarded, ['/cache/archive_browse_2_c.zip']);
+      expect(parentSource.isReleased, isFalse);
+    });
+
+    test('disposeChain wipes the copy of every archive in the chain', () {
+      final api = _CountingArchiveApi();
+      final middle = _context(
+        api,
+        name: 'b.zip',
+        pathStackEntryIndex: 1,
+        parent: _context(api),
+        source: StagedArchiveSource('/cache/archive_browse_1_b.zip', api),
+      );
+      final inner = _context(
+        api,
+        name: 'c.zip',
+        pathStackEntryIndex: 2,
+        parent: middle,
+        source: StagedArchiveSource('/cache/archive_browse_2_c.zip', api),
+      );
+
+      inner.disposeChain();
+
+      expect(api.discarded, [
+        '/cache/archive_browse_2_c.zip',
+        '/cache/archive_browse_1_b.zip',
+      ]);
+    });
+
+    test('a hold taken with retainSource outlives dispose', () {
+      final api = _CountingArchiveApi();
+      final nested = _context(
+        api,
+        parent: _context(api),
+        source: StagedArchiveSource('/cache/archive_browse_1_b.zip', api),
+      );
+
+      nested.retainSource(); // e.g. an extraction still running
+      nested.dispose();
+      expect(api.discarded, isEmpty);
+
+      nested.releaseSource();
+      expect(api.discarded, ['/cache/archive_browse_1_b.zip']);
+    });
+
+    test('disposing an archive that is not nested touches no file', () {
+      final api = _CountingArchiveApi();
+
+      _context(api).disposeChain();
+
+      expect(api.discarded, isEmpty);
+    });
   });
 }

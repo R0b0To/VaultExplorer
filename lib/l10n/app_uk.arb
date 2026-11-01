@@ -1587,6 +1587,8 @@
   "vaultSyncIntroSubtitle": "Виберіть Ліве і Праве сховище (або дві папки в одному сховищі), щоб побачити відсутні, змінені чи новіші файли з кожного боку.",
   "vaultSyncCompareButton": "Порівняти",
   "vaultSyncComparingLabel": "Порівняння сховищ…",
+  "vaultSyncScanFailedTitle": "Не вдалося прочитати папку",
+  "vaultSyncScanFailedMessage": "Не вдалося прочитати папку в сховищі, тому порівняння зупинено замість припущень. Нічого не змінено. Заблокуйте й знову розблокуйте сховище, потім порівняйте ще раз.",
   "vaultSyncCompareStatsLabel": "Відскановано папок: {dirs} | Знайдено відмінностей: {entries}",
   "vaultSyncCancelCompareButton": "Скасувати",
   "vaultSyncInSyncTitle": "Уже синхронізовано",

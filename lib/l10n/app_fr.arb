@@ -1576,6 +1576,8 @@
   "vaultSyncIntroSubtitle": "Choisissez un coffre à gauche et à droite (ou deux dossiers dans le même coffre) pour voir ce qui manque, a été modifié ou est plus récent de chaque côté.",
   "vaultSyncCompareButton": "Comparer",
   "vaultSyncComparingLabel": "Comparaison des coffres…",
+  "vaultSyncScanFailedTitle": "Impossible de lire un dossier",
+  "vaultSyncScanFailedMessage": "Un dossier d'un coffre n'a pas pu être lu ; la comparaison a été arrêtée plutôt que de deviner. Rien n'a été modifié. Verrouillez puis déverrouillez à nouveau le coffre, puis comparez de nouveau.",
   "vaultSyncCompareStatsLabel": "Dossiers analysés : {dirs} | Différences trouvées : {entries}",
   "vaultSyncCancelCompareButton": "Annuler",
   "vaultSyncInSyncTitle": "Déjà synchronisé",

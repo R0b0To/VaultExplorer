@@ -24,6 +24,25 @@ class _FakeVaultSyncApi extends VaultFileIoApi {
   }
 }
 
+/// A [_FakeVaultSyncApi] whose listing of [throwingKey] throws, like a
+/// platform-channel error from a vault that can't be read.
+class _ThrowingApi extends _FakeVaultSyncApi {
+  final String throwingKey;
+  _ThrowingApi(super.listings, {required this.throwingKey});
+
+  @override
+  Future<List<String>?> listDirectory(
+    MountedContainer container,
+    String dirPath, {
+    bool refresh = false,
+  }) async {
+    if ('${container.uri}::$dirPath' == throwingKey) {
+      throw PlatformException(code: 'LIST_FAILED');
+    }
+    return super.listDirectory(container, dirPath, refresh: refresh);
+  }
+}
+
 /// A [_FakeVaultSyncApi] that also records every listing request.
 class _RecordingApi extends _FakeVaultSyncApi {
   final List<({String uri, bool refresh})> requests = [];
@@ -189,7 +208,8 @@ void main() {
     );
 
     test(
-      'an unreadable side is treated as empty rather than throwing',
+      'an unreadable vault side fails the scan instead of being treated as '
+      'empty',
       () async {
         final left = _container('left-vault');
         final right = _container('right-vault');
@@ -197,8 +217,10 @@ void main() {
         final service = VaultSyncService(
           _FakeVaultSyncApi({
             'right-vault::': ['F|1|1000|onlyOnRight.txt'],
-            // No entry at all for 'left-vault::' -- listDirectory returns null,
-            // mirroring an unreadable/missing directory on that side.
+            // No entry at all for 'left-vault::' -- listDirectory returns
+            // null, which for a vault means the folder couldn't be read.
+            // Diffing against "empty" would offer to copy (and overwrite)
+            // everything from the right.
           }),
         );
 
@@ -210,14 +232,83 @@ void main() {
             .toList();
 
         final finalUpdate = updates.last;
-        expect(finalUpdate.progress.stage, equals(VaultSyncScanStage.complete));
-        expect(finalUpdate.entries, hasLength(1));
-        expect(
-          finalUpdate.entries.single.status,
-          equals(VaultDiffStatus.onlyRight),
-        );
+        expect(finalUpdate.progress.stage, equals(VaultSyncScanStage.failed));
+        expect(finalUpdate.progress.currentPath, equals(''));
+        expect(finalUpdate.entries, isEmpty);
       },
     );
+
+    test('a vault folder that can\'t be read part-way fails the scan and '
+        'offers nothing to sync', () async {
+      final left = _container('left-vault');
+      final right = _container('right-vault');
+
+      final service = VaultSyncService(
+        _FakeVaultSyncApi({
+          'left-vault::': ['F|1|1000|only-left.txt', 'D|0|1000|subdir'],
+          'right-vault::': ['D|0|1000|subdir'],
+          'left-vault::subdir': ['F|1|1000|nested.txt'],
+          // 'right-vault::subdir' is missing -> unreadable.
+        }),
+      );
+
+      final updates = await service
+          .scanDiff(
+            left: VaultSyncSide(container: left, relativePath: ''),
+            right: VaultSyncSide(container: right, relativePath: ''),
+          )
+          .toList();
+
+      final finalUpdate = updates.last;
+      expect(finalUpdate.progress.stage, equals(VaultSyncScanStage.failed));
+      expect(finalUpdate.progress.currentPath, equals('subdir'));
+      // Not even the differences found before the failure are offered.
+      expect(finalUpdate.entries, isEmpty);
+    });
+
+    test('a vault listing that throws fails the scan', () async {
+      final left = _container('left-vault');
+      final right = _container('right-vault');
+
+      final service = VaultSyncService(
+        _ThrowingApi({
+          'left-vault::': ['F|1|1000|a.txt'],
+          'right-vault::': <String>[],
+        }, throwingKey: 'right-vault::'),
+      );
+
+      final updates = await service
+          .scanDiff(
+            left: VaultSyncSide(container: left, relativePath: ''),
+            right: VaultSyncSide(container: right, relativePath: ''),
+          )
+          .toList();
+
+      expect(updates.last.progress.stage, equals(VaultSyncScanStage.failed));
+      expect(updates.last.entries, isEmpty);
+    });
+
+    test('a genuinely empty vault folder still compares normally', () async {
+      final left = _container('left-vault');
+      final right = _container('right-vault');
+
+      final service = VaultSyncService(
+        _FakeVaultSyncApi({
+          'left-vault::': ['F|1|1000|a.txt'],
+          'right-vault::': <String>[],
+        }),
+      );
+
+      final updates = await service
+          .scanDiff(
+            left: VaultSyncSide(container: left, relativePath: ''),
+            right: VaultSyncSide(container: right, relativePath: ''),
+          )
+          .toList();
+
+      expect(updates.last.progress.stage, equals(VaultSyncScanStage.complete));
+      expect(updates.last.entries.single.status, VaultDiffStatus.onlyLeft);
+    });
 
     test(
       'a token cancelled before scanning reports the cancelled stage and no entries',
@@ -274,6 +365,23 @@ void main() {
 
     VaultSyncSide side(MountedContainer c) =>
         VaultSyncSide(container: c, relativePath: '');
+
+    test('an unreadable device-storage or provider side is still treated as '
+        'empty (only vaults fail the scan)', () async {
+      final service = VaultSyncService(
+        _FakeVaultSyncApi({
+          // No listing for '/local::' -> null.
+          'content://provider/tree/x::': ['F|20|1000|a.txt'],
+        }),
+      );
+
+      final updates = await service
+          .scanDiff(left: side(local), right: side(provider))
+          .toList();
+
+      expect(updates.last.progress.stage, VaultSyncScanStage.complete);
+      expect(updates.last.entries.single.status, VaultDiffStatus.onlyRight);
+    });
 
     test('a file whose modified time the storage did not report is left for '
         'the user rather than guessed newer or older', () async {

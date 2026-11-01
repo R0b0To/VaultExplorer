@@ -8,7 +8,10 @@
 
 uint64_t recursiveFatFolderSize(int volumeId, const std::string& path);
 
-void fatListDirectory(int volumeId, const std::string& pathSuffix, std::vector<std::string>& results);
+// Returns false when the listing could not be read reliably (I/O error, volume
+// not mounted, read failing part-way) -- `results` must then not be trusted or
+// cached. A directory that simply doesn't exist lists as empty and returns true.
+bool fatListDirectory(int volumeId, const std::string& pathSuffix, std::vector<std::string>& results);
 uint64_t fatGetFileSize(int volumeId, const std::string& path);
 bool fatReadFileChunk(int volumeId, const std::string& path, uint64_t offset, size_t length, std::vector<uint8_t>& outBuffer);
 bool fatWriteFileChunk(int volumeId, const std::string& path, uint64_t offset, const uint8_t* data, size_t length);

@@ -2159,17 +2159,22 @@ class FileOperationService extends ChangeNotifier {
     return taken;
   }
 
-  /// Whether [dest] genuinely cannot take [neededBytes] more. When free
-  /// space can't be read (null, unsupported backend, error) this answers
-  /// `true`, i.e. the pre-existing "failed write == disk full" behaviour
-  /// stays in place wherever space is not measurable.
+  /// Whether [dest] genuinely cannot take [neededBytes] more.
+  ///
+  /// With readable free space this is a plain comparison. When free space
+  /// can't be read (null: unsupported backend, or the volume itself failing
+  /// the query) the destination's root is probed instead: a destination that
+  /// can't even be listed is a broken volume, not a full one. If it lists
+  /// fine, the pre-existing "failed write == disk full" behaviour applies.
   Future<bool> _destinationLacksSpace(
     MountedContainer dest,
     int neededBytes,
   ) async {
     try {
       final info = await _fileIoApi.getSpaceInfo(dest);
-      if (info == null || info.length < 2 || info[1] < 0) return true;
+      if (info == null || info.length < 2 || info[1] < 0) {
+        return await _fileIoApi.canListDirectory(dest, '');
+      }
       return !fitsWithinSpaceSafetyMargin(neededBytes, info[1]);
     } catch (_) {
       return true;

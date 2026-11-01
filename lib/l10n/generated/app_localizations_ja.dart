@@ -5606,6 +5606,13 @@ class AppLocalizationsJa extends AppLocalizations {
   String get vaultSyncComparingLabel => '保管庫を比較中…';
 
   @override
+  String get vaultSyncScanFailedTitle => 'フォルダを読み取れませんでした';
+
+  @override
+  String get vaultSyncScanFailedMessage =>
+      '保管庫内のフォルダを読み取れなかったため、推測せずに比較を中止しました。何も変更されていません。保管庫をロックして再度ロック解除してから、もう一度比較してください。';
+
+  @override
   String vaultSyncCompareStatsLabel(Object dirs, Object entries) {
     return 'スキャン済みフォルダ: $dirs | 検出された差分: $entries';
   }

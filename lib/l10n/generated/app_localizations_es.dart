@@ -5920,6 +5920,13 @@ class AppLocalizationsEs extends AppLocalizations {
   String get vaultSyncComparingLabel => 'Comparando bóvedas…';
 
   @override
+  String get vaultSyncScanFailedTitle => 'No se pudo leer una carpeta';
+
+  @override
+  String get vaultSyncScanFailedMessage =>
+      'No se pudo leer una carpeta de una bóveda, así que la comparación se detuvo en lugar de adivinar. No se cambió nada. Bloquea y vuelve a desbloquear la bóveda y compara de nuevo.';
+
+  @override
   String vaultSyncCompareStatsLabel(Object dirs, Object entries) {
     return 'Carpetas analizadas: $dirs | Diferencias encontradas: $entries';
   }

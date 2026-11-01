@@ -1576,6 +1576,8 @@
   "vaultSyncIntroSubtitle": "Elige una bóveda Izquierda y otra Derecha (o dos carpetas en la misma bóveda) para ver qué falta, se modificó o es más reciente en cada lado.",
   "vaultSyncCompareButton": "Comparar",
   "vaultSyncComparingLabel": "Comparando bóvedas…",
+  "vaultSyncScanFailedTitle": "No se pudo leer una carpeta",
+  "vaultSyncScanFailedMessage": "No se pudo leer una carpeta de una bóveda, así que la comparación se detuvo en lugar de adivinar. No se cambió nada. Bloquea y vuelve a desbloquear la bóveda y compara de nuevo.",
   "vaultSyncCompareStatsLabel": "Carpetas analizadas: {dirs} | Diferencias encontradas: {entries}",
   "vaultSyncCancelCompareButton": "Cancelar",
   "vaultSyncInSyncTitle": "Ya sincronizadas",

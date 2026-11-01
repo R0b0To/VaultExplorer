@@ -1576,6 +1576,8 @@
   "vaultSyncIntroSubtitle": "选择左侧和右侧的保险库（或同一保险库中的两个文件夹），以查看每一侧缺失、已修改或较新的内容。",
   "vaultSyncCompareButton": "比较",
   "vaultSyncComparingLabel": "正在比较保险库…",
+  "vaultSyncScanFailedTitle": "无法读取文件夹",
+  "vaultSyncScanFailedMessage": "无法读取保险库中的某个文件夹，因此已停止比较，而不是猜测。未做任何更改。请锁定并重新解锁保险库，然后再次比较。",
   "vaultSyncCompareStatsLabel": "已扫描文件夹：{dirs} | 发现差异：{entries}",
   "vaultSyncCancelCompareButton": "取消",
   "vaultSyncInSyncTitle": "已同步",

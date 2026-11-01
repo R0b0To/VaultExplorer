@@ -5991,6 +5991,13 @@ class AppLocalizationsAr extends AppLocalizations {
   String get vaultSyncComparingLabel => 'جارٍ مقارنة الخزنات…';
 
   @override
+  String get vaultSyncScanFailedTitle => 'تعذّرت قراءة مجلد';
+
+  @override
+  String get vaultSyncScanFailedMessage =>
+      'تعذّرت قراءة مجلد داخل الخزنة، لذلك أُوقفت المقارنة بدلاً من التخمين. لم يتم تغيير أي شيء. أقفل الخزنة ثم افتحها مجدداً وقارن مرة أخرى.';
+
+  @override
   String vaultSyncCompareStatsLabel(Object dirs, Object entries) {
     return 'المجلدات التي تم فحصها: $dirs | الفروقات الموجودة: $entries';
   }

@@ -5957,6 +5957,13 @@ class AppLocalizationsUk extends AppLocalizations {
   String get vaultSyncComparingLabel => 'Порівняння сховищ…';
 
   @override
+  String get vaultSyncScanFailedTitle => 'Не вдалося прочитати папку';
+
+  @override
+  String get vaultSyncScanFailedMessage =>
+      'Не вдалося прочитати папку в сховищі, тому порівняння зупинено замість припущень. Нічого не змінено. Заблокуйте й знову розблокуйте сховище, потім порівняйте ще раз.';
+
+  @override
   String vaultSyncCompareStatsLabel(Object dirs, Object entries) {
     return 'Відскановано папок: $dirs | Знайдено відмінностей: $entries';
   }

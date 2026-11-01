@@ -5956,6 +5956,13 @@ class AppLocalizationsFr extends AppLocalizations {
   String get vaultSyncComparingLabel => 'Comparaison des coffres…';
 
   @override
+  String get vaultSyncScanFailedTitle => 'Impossible de lire un dossier';
+
+  @override
+  String get vaultSyncScanFailedMessage =>
+      'Un dossier d\'un coffre n\'a pas pu être lu ; la comparaison a été arrêtée plutôt que de deviner. Rien n\'a été modifié. Verrouillez puis déverrouillez à nouveau le coffre, puis comparez de nouveau.';
+
+  @override
   String vaultSyncCompareStatsLabel(Object dirs, Object entries) {
     return 'Dossiers analysés : $dirs | Différences trouvées : $entries';
   }

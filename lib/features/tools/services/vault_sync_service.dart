@@ -62,8 +62,9 @@ class VaultSyncService {
 
   /// Compares [left] and [right] and streams progress + results as the
   /// walk proceeds. The final update always has
-  /// [VaultSyncScanProgress.stage] of [VaultSyncScanStage.complete] (or
-  /// [VaultSyncScanStage.cancelled] if [cancelToken] was cancelled).
+  /// [VaultSyncScanProgress.stage] of [VaultSyncScanStage.complete],
+  /// [VaultSyncScanStage.cancelled] if [cancelToken] was cancelled, or
+  /// [VaultSyncScanStage.failed] if a folder in a vault couldn't be read.
   Stream<VaultSyncScanUpdate> scanDiff({
     required VaultSyncSide left,
     required VaultSyncSide right,
@@ -83,6 +84,10 @@ class VaultSyncService {
     final entries = <VaultDiffEntry>[];
     var dirsScanned = 0;
     var identicalCount = 0;
+    // Set when a vault folder can't be read. Diffing against a folder that
+    // merely failed to list would make every file on the other side look
+    // "only on Right/Left", and Sync Now overwrites same-named files.
+    String? unreadablePath;
 
     controller.add(
       const VaultSyncScanUpdate(
@@ -97,6 +102,8 @@ class VaultSyncService {
 
       List<String>? leftRaw;
       List<String>? rightRaw;
+      var leftThrew = false;
+      var rightThrew = false;
       try {
         leftRaw = await _fileIoApi.listDirectory(
           left.container,
@@ -106,8 +113,10 @@ class VaultSyncService {
           refresh: left.container.isRawLocal,
         );
       } catch (_) {
-        // Unreadable on the left -- treated as empty, so everything on the
-        // right under this path shows up as "only on Right".
+        // Device storage / document providers: unreadable on the left is
+        // treated as empty, so everything on the right under this path
+        // shows up as "only on Right". Vaults fail the scan instead (below).
+        leftThrew = true;
       }
       if (cancelToken?.isCancelled ?? false) return;
       try {
@@ -118,8 +127,22 @@ class VaultSyncService {
         );
       } catch (_) {
         // Same for the right side.
+        rightThrew = true;
       }
       if (cancelToken?.isCancelled ?? false) return;
+
+      // A null/throwing listing of a vault means the folder couldn't be read
+      // (a real empty folder lists as an empty array).
+      final leftUnreadable =
+          left.kind == VaultSyncTargetKind.vault &&
+          (leftThrew || leftRaw == null);
+      final rightUnreadable =
+          right.kind == VaultSyncTargetKind.vault &&
+          (rightThrew || rightRaw == null);
+      if (leftUnreadable || rightUnreadable) {
+        unreadablePath ??= relDir;
+        return;
+      }
 
       dirsScanned++;
 
@@ -276,7 +299,9 @@ class VaultSyncService {
       }
 
       for (final sub in subDirs) {
-        if (cancelToken?.isCancelled ?? false) return;
+        if ((cancelToken?.isCancelled ?? false) || unreadablePath != null) {
+          return;
+        }
         await walk(sub, depth + 1);
       }
     }
@@ -291,6 +316,21 @@ class VaultSyncService {
               stage: VaultSyncScanStage.cancelled,
             ),
             entries: [],
+            identicalCount: 0,
+          ),
+        );
+        return;
+      }
+
+      if (unreadablePath != null) {
+        controller.add(
+          VaultSyncScanUpdate(
+            progress: VaultSyncScanProgress(
+              stage: VaultSyncScanStage.failed,
+              dirsScanned: dirsScanned,
+              currentPath: unreadablePath,
+            ),
+            entries: const [],
             identicalCount: 0,
           ),
         );

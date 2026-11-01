@@ -5818,6 +5818,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get vaultSyncComparingLabel => 'Comparing folders…';
 
   @override
+  String get vaultSyncScanFailedTitle => 'Couldn\'t Read a Folder';
+
+  @override
+  String get vaultSyncScanFailedMessage =>
+      'A folder in a vault couldn\'t be read, so the comparison was stopped instead of guessing. Nothing was changed. Lock and unlock the vault again, then compare again.';
+
+  @override
   String vaultSyncCompareStatsLabel(Object dirs, Object entries) {
     return 'Folders scanned: $dirs | Differences found: $entries';
   }

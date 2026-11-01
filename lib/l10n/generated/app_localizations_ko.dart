@@ -5603,6 +5603,13 @@ class AppLocalizationsKo extends AppLocalizations {
   String get vaultSyncComparingLabel => '볼트 비교 중…';
 
   @override
+  String get vaultSyncScanFailedTitle => '폴더를 읽을 수 없습니다';
+
+  @override
+  String get vaultSyncScanFailedMessage =>
+      '볼트 안의 폴더를 읽을 수 없어 추측하지 않고 비교를 중단했습니다. 변경된 내용은 없습니다. 볼트를 잠근 뒤 다시 잠금 해제하고 다시 비교하세요.';
+
+  @override
   String vaultSyncCompareStatsLabel(Object dirs, Object entries) {
     return '검사한 폴더: $dirs | 발견된 차이점: $entries';
   }

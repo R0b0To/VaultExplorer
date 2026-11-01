@@ -1576,6 +1576,8 @@
   "vaultSyncIntroSubtitle": "اختر خزنة يسرى وأخرى يمنى (أو مجلدين في نفس الخزنة) لمعرفة ما هو مفقود أو مُعدَّل أو أحدث في كل جانب.",
   "vaultSyncCompareButton": "مقارنة",
   "vaultSyncComparingLabel": "جارٍ مقارنة الخزنات…",
+  "vaultSyncScanFailedTitle": "تعذّرت قراءة مجلد",
+  "vaultSyncScanFailedMessage": "تعذّرت قراءة مجلد داخل الخزنة، لذلك أُوقفت المقارنة بدلاً من التخمين. لم يتم تغيير أي شيء. أقفل الخزنة ثم افتحها مجدداً وقارن مرة أخرى.",
   "vaultSyncCompareStatsLabel": "المجلدات التي تم فحصها: {dirs} | الفروقات الموجودة: {entries}",
   "vaultSyncCancelCompareButton": "إلغاء",
   "vaultSyncInSyncTitle": "متزامنة بالفعل",

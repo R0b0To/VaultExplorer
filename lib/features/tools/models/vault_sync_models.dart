@@ -207,7 +207,9 @@ class VaultDiffEntry {
 }
 
 /// Stages of a `VaultSyncService.scanDiff` run.
-enum VaultSyncScanStage { idle, comparing, complete, cancelled }
+/// [failed]: a folder inside a vault couldn't be read, so the comparison was
+/// abandoned instead of treating that folder as empty.
+enum VaultSyncScanStage { idle, comparing, complete, cancelled, failed }
 
 /// Snapshot of live scan progress emitted while comparing two sides.
 @immutable

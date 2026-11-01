@@ -14,6 +14,14 @@ class _CancelledException implements Exception {
   const _CancelledException();
 }
 
+/// Writes to the destination keep failing although it still has free space,
+/// so continuing the batch would only create more failed/partial entries.
+/// Distinct from [_DiskFullException], which means the space really ran out
+/// and triggers the full rollback.
+class _DestinationWriteFailedException implements Exception {
+  const _DestinationWriteFailedException();
+}
+
 // ── FileOperationService ──────────────────────────────────────────────────────
 
 /// Published by [FileOperationService] once an operation has finished changing
@@ -156,12 +164,17 @@ class FileOperationService extends ChangeNotifier {
   }
 
   static const _maxConcurrentItems = 4;
+
+  /// Consecutive destination write failures (with free space still
+  /// available) after which a batch stops attempting further items.
+  static const _maxWriteFailureStreak = 3;
   static const _chunkSize = 2 * 1024 * 1024; // 2 MB
   static const _kNotificationThrottleDuration = Duration(milliseconds: 250);
 
   // ── State ─────────────────────────────────────────────────────────────────
 
   int _nextId = 1;
+  final Map<int, int> _writeFailureStreak = {}; // op.id -> consecutive failures
   final List<FileOperation> _operations = [];
   final Map<FileOperation, VoidCallback> _opListeners = {};
   int _mirrorPushActiveCount = 0;
@@ -1504,6 +1517,9 @@ class FileOperationService extends ChangeNotifier {
             await semaphore.acquire();
             try {
               if (op.cancelRequested) throw const _CancelledException();
+              if ((_writeFailureStreak[op.id] ?? 0) >= _maxWriteFailureStreak) {
+                throw const _DestinationWriteFailedException();
+              }
 
               if (r.skip) {
                 op._recordItemResult(idx, FileItemResult.skipped);
@@ -1558,6 +1574,13 @@ class FileOperationService extends ChangeNotifier {
                 errorMessage: op.l10n.fileOpDiskFull,
               );
               rethrow;
+            } on _DestinationWriteFailedException {
+              op._recordItemResult(
+                idx,
+                FileItemResult.failed,
+                errorMessage: op.l10n.fileOpCopyFailed,
+              );
+              rethrow;
             } on _CancelledException {
               op._recordItemResult(
                 idx,
@@ -1577,7 +1600,9 @@ class FileOperationService extends ChangeNotifier {
           }),
         );
       } catch (e) {
-        if (e is! _DiskFullException && e is! _CancelledException) {
+        if (e is! _DiskFullException &&
+            e is! _CancelledException &&
+            e is! _DestinationWriteFailedException) {
           VeLog.e(
             'FileOperationService',
             'Unexpected exception escaped batch item handling',
@@ -1621,6 +1646,7 @@ class FileOperationService extends ChangeNotifier {
       op._setError(e.toString());
       op._setStatus(FileOperationStatus.failed);
     } finally {
+      _writeFailureStreak.remove(op.id);
       _engineEvents.removeCopyProgressListener(onCopyProgress);
       try {
         await _fileIoApi.clearCopyState(op.id);
@@ -2133,6 +2159,23 @@ class FileOperationService extends ChangeNotifier {
     return taken;
   }
 
+  /// Whether [dest] genuinely cannot take [neededBytes] more. When free
+  /// space can't be read (null, unsupported backend, error) this answers
+  /// `true`, i.e. the pre-existing "failed write == disk full" behaviour
+  /// stays in place wherever space is not measurable.
+  Future<bool> _destinationLacksSpace(
+    MountedContainer dest,
+    int neededBytes,
+  ) async {
+    try {
+      final info = await _fileIoApi.getSpaceInfo(dest);
+      if (info == null || info.length < 2 || info[1] < 0) return true;
+      return !fitsWithinSpaceSafetyMargin(neededBytes, info[1]);
+    } catch (_) {
+      return true;
+    }
+  }
+
   Future<bool> _copyFile(
     MountedContainer src,
     MountedContainer dest,
@@ -2259,7 +2302,34 @@ class FileOperationService extends ChangeNotifier {
           chunk,
         );
         writeMicros += writeSw.elapsedMicroseconds;
-        if (!ok) throw const _DiskFullException();
+        if (!ok) {
+          // A failed write is not necessarily a full destination: the
+          // native layer only reports success/failure, so an I/O error, a
+          // failed close or a volume in a bad state all arrive here too.
+          // Only call it "disk full" (which rolls back the whole batch)
+          // when the destination really lacks the space.
+          if (await _destinationLacksSpace(dest, chunk.length)) {
+            throw const _DiskFullException();
+          }
+          VeLog.w(
+            'FileOperationService',
+            'DEST_WRITE_FAILED with free space available '
+                'dest=${VeLog.censorName(destPath.split('/').last)} '
+                'offset=$offset chunk=${chunk.length}',
+          );
+          // Don't leave a zero-byte/partial entry behind.
+          try {
+            await _fileIoApi.deleteFile(dest, destPath);
+          } catch (_) {
+            // Best effort: the volume is already misbehaving.
+          }
+          final streak = (_writeFailureStreak[op.id] ?? 0) + 1;
+          _writeFailureStreak[op.id] = streak;
+          if (streak >= _maxWriteFailureStreak) {
+            throw const _DestinationWriteFailedException();
+          }
+          return false;
+        }
         offset += chunk.length;
         chunkCount++;
         op._addTransferredBytes(chunk.length);
@@ -2269,9 +2339,14 @@ class FileOperationService extends ChangeNotifier {
       if (modifiedSecs > 0) {
         await _fileIoApi.setLastModifiedTime(dest, destPath, modifiedSecs);
       }
+      _writeFailureStreak.remove(op.id);
       return true;
     } catch (e) {
-      if (e is _DiskFullException || e is _CancelledException) rethrow;
+      if (e is _DiskFullException ||
+          e is _CancelledException ||
+          e is _DestinationWriteFailedException) {
+        rethrow;
+      }
       return false;
     } finally {
       copyStopwatch.stop();

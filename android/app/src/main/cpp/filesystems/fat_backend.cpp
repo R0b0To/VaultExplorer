@@ -42,6 +42,14 @@ inline bool ensureFatFsValid(int volumeId) {
     return true;
 }
 
+// Failures in this file used to collapse into a bare `false`, which the Dart
+// layer reports as "disk full" whatever the real cause was. Logging the
+// FatFs result code (no file names) keeps a field report diagnosable.
+void logFatFailure(const char* op, int volumeId, FRESULT fr) {
+    __android_log_print(ANDROID_LOG_WARN, "VaultExplorer_FatIO",
+                        "%s failed: vol=%d fr=%d", op, volumeId, static_cast<int>(fr));
+}
+
 int openHostSource(const std::string& sourceHostPath) {
     if (sourceHostPath.rfind("/proc/self/fd/", 0) == 0) {
         int fd = std::atoi(sourceHostPath.c_str() + 14);
@@ -149,12 +157,29 @@ bool fatWriteFileChunk(int volumeId, const std::string& path, uint64_t offset, c
         fr = f_open(&f, fatPath.c_str(), openMode);
     }
     if (fr == FR_OK) {
-        if (f_lseek(&f, static_cast<FSIZE_t>(offset)) == FR_OK) {
+        const FRESULT seekRes = f_lseek(&f, static_cast<FSIZE_t>(offset));
+        if (seekRes == FR_OK) {
             UINT bw = 0;
-            if (f_write(&f, data, static_cast<UINT>(length), &bw) == FR_OK && bw == static_cast<UINT>(length))
+            const FRESULT writeRes = f_write(&f, data, static_cast<UINT>(length), &bw);
+            if (writeRes == FR_OK && bw == static_cast<UINT>(length)) {
                 success = true;
+            } else {
+                // FR_OK with a short write is FatFs's "no free cluster"; any
+                // other result is an I/O or internal error, not a full disk.
+                logFatFailure(writeRes == FR_OK ? "write(short)" : "write", volumeId, writeRes);
+            }
+        } else {
+            logFatFailure("seek", volumeId, seekRes);
         }
-        f_close(&f);
+        // f_close commits the directory entry (size) and syncs. Ignoring its
+        // result reported success for files whose size/data never landed.
+        const FRESULT closeRes = f_close(&f);
+        if (closeRes != FR_OK) {
+            logFatFailure("close", volumeId, closeRes);
+            success = false;
+        }
+    } else {
+        logFatFailure("open(write)", volumeId, fr);
     }
     return success;
 }
@@ -175,8 +200,12 @@ bool fatCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const 
     std::unique_ptr<unsigned char[]> buf(new unsigned char[kBufSize]);
     UINT br = 0, bw = 0;
     bool ok = true;
-    while (f_read(&srcF, buf.get(), kBufSize, &br) == FR_OK && br > 0) {
-        if (f_write(&destF, buf.get(), br, &bw) != FR_OK || bw != br) {
+    FRESULT readRes = FR_OK;
+    while ((readRes = f_read(&srcF, buf.get(), kBufSize, &br)) == FR_OK && br > 0) {
+        const FRESULT writeRes = f_write(&destF, buf.get(), br, &bw);
+        if (writeRes != FR_OK || bw != br) {
+            logFatFailure(writeRes == FR_OK ? "copy write(short)" : "copy write",
+                          destVolId, writeRes);
             ok = false;
             break;
         }
@@ -185,7 +214,17 @@ bool fatCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const 
             break;
         }
     }
-    f_close(&destF);
+    // A read error ends the loop exactly like EOF does; without this check a
+    // source read failure produced a truncated destination reported as OK.
+    if (readRes != FR_OK) {
+        logFatFailure("copy read", srcVolId, readRes);
+        ok = false;
+    }
+    const FRESULT closeRes = f_close(&destF);
+    if (closeRes != FR_OK) {
+        logFatFailure("copy close", destVolId, closeRes);
+        ok = false;
+    }
     f_close(&srcF);
     if (!ok) f_unlink(destFatPath.c_str());
     return ok;
@@ -234,6 +273,8 @@ bool fatWriteBackFile(int volumeId, const std::string& targetPath, const std::st
             writeNanos += (std::chrono::steady_clock::now() - wStart).count();
 
             if (res != FR_OK || bw != static_cast<UINT>(n)) {
+                logFatFailure(res == FR_OK ? "writeback write(short)" : "writeback write",
+                              volumeId, res);
                 writeError = true;
             } else {
                 totalBytes += bw;
@@ -243,8 +284,12 @@ bool fatWriteBackFile(int volumeId, const std::string& targetPath, const std::st
         }
         success = !writeError && !cancelled;
         auto closeStart = std::chrono::steady_clock::now();
-        f_close(&f);
+        const FRESULT closeRes = f_close(&f);
         writeNanos += (std::chrono::steady_clock::now() - closeStart).count();
+        if (closeRes != FR_OK) {
+            logFatFailure("writeback close", volumeId, closeRes);
+            success = false;
+        }
         if (!success) f_unlink(fatPath.c_str());
     }
     close(srcFd);
@@ -274,7 +319,8 @@ bool fatExtractFile(int volumeId, const std::string& targetPath, const std::stri
         UINT br;
         bool readError = false;
         bool cancelled = false;
-        while (f_read(&f, buf.get(), kIoBufferSize, &br) == FR_OK && br > 0) {
+        FRESULT readRes = FR_OK;
+        while ((readRes = f_read(&f, buf.get(), kIoBufferSize, &br)) == FR_OK && br > 0) {
             ssize_t written = write(destFd, buf.get(), br);
             if (written != static_cast<ssize_t>(br)) {
                 readError = true;
@@ -284,6 +330,12 @@ bool fatExtractFile(int volumeId, const std::string& targetPath, const std::stri
                 cancelled = true;
                 break;
             }
+        }
+        // f_read failing mid-file used to look like EOF -> truncated export
+        // reported as a success.
+        if (readRes != FR_OK) {
+            logFatFailure("extract read", volumeId, readRes);
+            readError = true;
         }
         success = !readError && !cancelled;
         f_close(&f);

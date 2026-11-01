@@ -586,6 +586,7 @@ if(NOT ANDROID)
     add_executable(doc_scan_test docscan/test/doc_scan_test.cpp docscan/doc_scan.cpp docscan/doc_pdf.cpp)
     add_executable(kdf_table_test crypto/test/kdf_table_test.cpp crypto/kdf_table.cpp)
     add_executable(decrypted_block_cache_test io/test/decrypted_block_cache_test.cpp)
+    add_executable(fd_write_buffer_test io/test/fd_write_buffer_test.cpp)
     add_executable(cryfs_block_cipher_test
             test/cryfs_block_cipher_test.cpp
             crypto/cryfs_block_cipher.cpp
@@ -668,6 +669,7 @@ if(NOT ANDROID)
             doc_scan_test
             kdf_table_test
             decrypted_block_cache_test
+            fd_write_buffer_test
             cryfs_block_cipher_test
             user_entropy_test
             utf16le_password_test
@@ -692,6 +694,7 @@ if(NOT ANDROID)
     add_test(NAME doc_scan_test COMMAND doc_scan_test)
     add_test(NAME kdf_table_test COMMAND kdf_table_test)
     add_test(NAME decrypted_block_cache_test COMMAND decrypted_block_cache_test)
+    add_test(NAME fd_write_buffer_test COMMAND fd_write_buffer_test)
     add_test(NAME cryfs_block_cipher_test COMMAND cryfs_block_cipher_test)
     add_test(NAME user_entropy_test COMMAND user_entropy_test)
     add_test(NAME utf16le_password_test COMMAND utf16le_password_test)

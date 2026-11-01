@@ -398,6 +398,11 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_getSpaceInfo(
             fsGetSpaceInfo(volId, totalBytes, freeBytes);
         }
     }
+    // A mounted filesystem never has zero total capacity, so 0 means the
+    // query itself failed (mount/f_getfree error). Report "unknown" (null)
+    // instead of [0, 0]: callers treat null as "don't block" but would
+    // treat 0 free bytes as real and reject imports/copies as out of space.
+    if (totalBytes == 0) return nullptr;
     jlongArray ret = env->NewLongArray(2);
     if (!ret) return nullptr;
     const jlong tmp[2] = {static_cast<jlong>(totalBytes), static_cast<jlong>(freeBytes)};

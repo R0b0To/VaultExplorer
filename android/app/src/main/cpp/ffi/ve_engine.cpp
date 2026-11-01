@@ -39,6 +39,7 @@ int ve_win_open_utf8(const char* path, int writable, int create);
 #include "container_create.h"
 #include "container_format.h"
 #include "container_utils.h"
+#include "crypto/single_file_crypto.h"
 #include "crypto/user_entropy.h"
 #include "filesystems/fs_ops.h"
 #include "filesystems/stream_handles.h"
@@ -361,6 +362,77 @@ extern "C" VE_API int32_t ve_create_container_with_hidden(const ve_create_hidden
     mbedtls_platform_zeroize(outerPass.data(), outerPass.size());
     mbedtls_platform_zeroize(hiddenPass.data(), hiddenPass.size());
     return okOrFailed(success);
+    VE_CATCH(VE_ERR_EXCEPTION)
+}
+
+// ── single-file encryption ───────────────────────────────────────────────
+
+extern "C" VE_API int32_t ve_single_file_crypt(const ve_single_file_params* p) {
+    if (!p || p->struct_size < static_cast<int32_t>(sizeof(ve_single_file_params)) || p->password_len < 0 ||
+        p->keyfile_count < 0 || p->src_fd < 0 || p->dest_fd < 0) {
+        if (p) {
+            closeOne(p->src_fd);
+            closeOne(p->dest_fd);
+            closeFds(p->keyfile_fds, p->keyfile_count);
+        }
+        return VE_ERR_INVALID_ARG;
+    }
+    VE_TRY
+    const int opId = p->op_id;
+    auto cancelCheck = [opId]() -> bool { return opId > 0 && isSplitJoinCancelled(opId); };
+    auto progress = [opId](uint64_t done, uint64_t total) {
+        if (opId > 0) reportSplitJoinProgress(opId, done, total);
+    };
+    static const unsigned char kEmpty[1] = {0};
+    const unsigned char* pw = p->password ? p->password : kEmpty;
+    const size_t pwLen = p->password ? static_cast<size_t>(p->password_len) : 0;
+    const int* kf = p->keyfile_count > 0 ? p->keyfile_fds : nullptr;
+
+    const bool ok = p->encrypt
+        ? encryptSingleFile(p->src_fd, p->dest_fd, p->cipher_index, pw, pwLen, kf, p->keyfile_count, opId, cancelCheck, progress)
+        : decryptSingleFile(p->src_fd, p->dest_fd, pw, pwLen, kf, p->keyfile_count, opId, cancelCheck, progress);
+    const bool cancelled = !ok && cancelCheck();
+    closeOne(p->src_fd);   // the engine routine does not close these; keyfile fds it consumes itself
+    closeOne(p->dest_fd);
+    if (ok) return VE_OK;
+    return cancelled ? VE_ERR_CANCELLED : VE_ERR_FAILED;
+    VE_CATCH(VE_ERR_EXCEPTION)
+}
+
+// ── password change ──────────────────────────────────────────────────────
+
+extern "C" VE_API int32_t ve_change_password(const ve_change_password_params* p) {
+    if (!p || p->struct_size < static_cast<int32_t>(sizeof(ve_change_password_params)) ||
+        p->old_password_len < 0 || p->new_password_len < 0 || p->old_keyfile_count < 0 ||
+        p->new_keyfile_count < 0 || (p->new_password_len == 0 && p->new_keyfile_count == 0)) {
+        if (p) {
+            closeOne(p->fd);
+            closeFds(p->old_keyfile_fds, p->old_keyfile_count);
+            closeFds(p->new_keyfile_fds, p->new_keyfile_count);
+        }
+        return VE_ERR_INVALID_ARG;
+    }
+    VE_TRY
+    std::string oldPass(p->old_password ? reinterpret_cast<const char*>(p->old_password) : "",
+                        p->old_password ? static_cast<size_t>(p->old_password_len) : 0);
+    std::string newPass(p->new_password ? reinterpret_cast<const char*>(p->new_password) : "",
+                        p->new_password ? static_cast<size_t>(p->new_password_len) : 0);
+    const int* oldKf = p->old_keyfile_count > 0 ? p->old_keyfile_fds : nullptr;
+    const int* newKf = p->new_keyfile_count > 0 ? p->new_keyfile_fds : nullptr;
+
+    int32_t rc;
+    if (p->container_format == 1 || p->container_format == 2) {
+        const int outcome = changeLuksContainerPassword(p->fd, oldPass.c_str(), newPass.c_str(),
+                                                        oldKf, p->old_keyfile_count, newKf, p->new_keyfile_count);
+        rc = outcome == 0 ? VE_OK : (outcome == 1 ? VE_ERR_AUTH_FAILED : VE_ERR_FAILED);
+    } else {
+        rc = okOrFailed(changeContainerPassword(p->fd, oldPass.c_str(), newPass.c_str(), p->old_pim, p->new_pim,
+                                                p->cipher_id, p->hash_id, oldKf, p->old_keyfile_count, newKf,
+                                                p->new_keyfile_count));
+    }
+    mbedtls_platform_zeroize(oldPass.data(), oldPass.size());
+    mbedtls_platform_zeroize(newPass.data(), newPass.size());
+    return rc;
     VE_CATCH(VE_ERR_EXCEPTION)
 }
 

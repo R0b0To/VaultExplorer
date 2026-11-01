@@ -14,7 +14,7 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
-const int kVeAbiVersion = 3;
+const int kVeAbiVersion = 6;
 
 // Result codes (ve_engine.h)
 const int veOk = 0;
@@ -25,12 +25,20 @@ const int veErrReadOnly = 4;
 const int veErrInvalidArg = 5;
 const int veErrException = 6;
 const int veErrMountFailed = 7;
+const int veErrAuthFailed = 8;
 
 // Operation flavors / event kinds
+// Hash ids for ve_pbkdf2 / ve_hmac
+const int veHashSha1 = 1;
+const int veHashSha256 = 2;
+const int veHashSha512 = 3;
+const int veHashMd5 = 4; // digests only (not valid for pbkdf2 / hmac)
+
 const int veOpCopy = 0;
 const int veOpImport = 1;
 const int veOpExport = 2;
 const int veEventUnlockProgress = 1;
+const int veEventSplitJoinProgress = 2;
 const int veEventCopyProgress = 4;
 const int veEventImportProgress = 5;
 const int veEventExportProgress = 6;
@@ -187,6 +195,56 @@ final class VeVaultInfo extends Struct {
   external Array<Uint8> fileSystem;
 }
 
+final class VeChangePasswordParams extends Struct {
+  @Int32()
+  external int structSize;
+  @Int32()
+  external int fd;
+  @Int32()
+  external int containerFormat;
+  external Pointer<Uint8> oldPassword;
+  @Int32()
+  external int oldPasswordLen;
+  external Pointer<Uint8> newPassword;
+  @Int32()
+  external int newPasswordLen;
+  @Int32()
+  external int oldPim;
+  @Int32()
+  external int newPim;
+  @Int32()
+  external int cipherId;
+  @Int32()
+  external int hashId;
+  external Pointer<Int32> oldKeyfileFds;
+  @Int32()
+  external int oldKeyfileCount;
+  external Pointer<Int32> newKeyfileFds;
+  @Int32()
+  external int newKeyfileCount;
+}
+
+final class VeSingleFileParams extends Struct {
+  @Int32()
+  external int structSize;
+  @Int32()
+  external int srcFd;
+  @Int32()
+  external int destFd;
+  @Int32()
+  external int encrypt;
+  @Int32()
+  external int cipherIndex;
+  external Pointer<Uint8> password;
+  @Int32()
+  external int passwordLen;
+  external Pointer<Int32> keyfileFds;
+  @Int32()
+  external int keyfileCount;
+  @Int32()
+  external int opId;
+}
+
 final class VeEvent extends Struct {
   @Int32()
   external int kind;
@@ -241,6 +299,21 @@ class VeNative {
     _matchedCipher = _lib.lookupFunction<Int32 Function(Int32), int Function(int)>('ve_get_matched_cipher_id');
     _matchedHash = _lib.lookupFunction<Int32 Function(Int32), int Function(int)>('ve_get_matched_hash_id');
     _vaultInfo = _lib.lookupFunction<Int32 Function(Int32, Pointer<VeVaultInfo>), int Function(int, Pointer<VeVaultInfo>)>('ve_get_vault_info');
+    _pbkdf2 = _lib.lookupFunction<Int32 Function(Int32, Pointer<Uint8>, Size, Pointer<Uint8>, Size, Uint32, Pointer<Uint8>, Size), int Function(int, Pointer<Uint8>, int, Pointer<Uint8>, int, int, Pointer<Uint8>, int)>('ve_pbkdf2');
+    _hmac = _lib.lookupFunction<Int32 Function(Int32, Pointer<Uint8>, Size, Pointer<Uint8>, Size, Pointer<Uint8>, Size, Pointer<Size>), int Function(int, Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<Size>)>('ve_hmac');
+    _scrypt = _lib.lookupFunction<Int32 Function(Pointer<Uint8>, Size, Pointer<Uint8>, Size, Uint32, Uint32, Uint32, Pointer<Uint8>, Size), int Function(Pointer<Uint8>, int, Pointer<Uint8>, int, int, int, int, Pointer<Uint8>, int)>('ve_scrypt');
+    _argon2id = _lib.lookupFunction<Int32 Function(Pointer<Uint8>, Size, Pointer<Uint8>, Size, Uint32, Uint32, Uint32, Pointer<Uint8>, Size), int Function(Pointer<Uint8>, int, Pointer<Uint8>, int, int, int, int, Pointer<Uint8>, int)>('ve_argon2id');
+    _gcmSeal = _lib.lookupFunction<Int32 Function(Pointer<Uint8>, Size, Pointer<Uint8>, Size, Pointer<Uint8>, Size, Pointer<Uint8>, Size, Pointer<VeBuffer>), int Function(Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<VeBuffer>)>('ve_aes_gcm_seal');
+    _gcmOpen = _lib.lookupFunction<Int32 Function(Pointer<Uint8>, Size, Pointer<Uint8>, Size, Pointer<Uint8>, Size, Pointer<Uint8>, Size, Pointer<VeBuffer>), int Function(Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<VeBuffer>)>('ve_aes_gcm_open');
+    _cbcDecrypt = _lib.lookupFunction<Int32 Function(Pointer<Uint8>, Size, Pointer<Uint8>, Size, Pointer<Uint8>, Size, Pointer<VeBuffer>), int Function(Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<VeBuffer>)>('ve_aes_cbc_decrypt');
+    _xchachaOpen = _lib.lookupFunction<Int32 Function(Pointer<Uint8>, Size, Pointer<Uint8>, Size, Pointer<Uint8>, Size, Pointer<Uint8>, Size, Pointer<VeBuffer>), int Function(Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<VeBuffer>)>('ve_xchacha20poly1305_open');
+    _changePassword = _lib.lookupFunction<Int32 Function(Pointer<VeChangePasswordParams>), int Function(Pointer<VeChangePasswordParams>)>('ve_change_password');
+    _singleFile = _lib.lookupFunction<Int32 Function(Pointer<VeSingleFileParams>), int Function(Pointer<VeSingleFileParams>)>('ve_single_file_crypt');
+    _hashBegin = _lib.lookupFunction<Int64 Function(Uint32), int Function(int)>('ve_hash_begin');
+    _hashUpdate = _lib.lookupFunction<Int32 Function(Int64, Pointer<Uint8>, Size), int Function(int, Pointer<Uint8>, int)>('ve_hash_update');
+    _hashFinish = _lib.lookupFunction<Int32 Function(Int64, Int32, Pointer<Uint8>, Size, Pointer<Size>), int Function(int, int, Pointer<Uint8>, int, Pointer<Size>)>('ve_hash_finish');
+    _hashFree = _lib.lookupFunction<Void Function(Int64), void Function(int)>('ve_hash_free');
+    _hashBytes = _lib.lookupFunction<Int32 Function(Int32, Pointer<Uint8>, Size, Pointer<Uint8>, Size, Pointer<Size>), int Function(int, Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<Size>)>('ve_hash_bytes');
     _bufferFree = _lib.lookupFunction<Void Function(Pointer<VeBuffer>), void Function(Pointer<VeBuffer>)>('ve_buffer_free');
     _list = _lib.lookupFunction<Int32 Function(Int32, Pointer<Utf8>, Pointer<VeBuffer>), int Function(int, Pointer<Utf8>, Pointer<VeBuffer>)>('ve_list_directory');
     _fileSize = _lib.lookupFunction<Int64 Function(Int32, Pointer<Utf8>), int Function(int, Pointer<Utf8>)>('ve_get_file_size');
@@ -277,6 +350,21 @@ class VeNative {
   late final int Function(int) _matchedCipher;
   late final int Function(int) _matchedHash;
   late final int Function(int, Pointer<VeVaultInfo>) _vaultInfo;
+  late final int Function(int, Pointer<Uint8>, int, Pointer<Uint8>, int, int, Pointer<Uint8>, int) _pbkdf2;
+  late final int Function(int, Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<Size>) _hmac;
+  late final int Function(Pointer<Uint8>, int, Pointer<Uint8>, int, int, int, int, Pointer<Uint8>, int) _scrypt;
+  late final int Function(Pointer<Uint8>, int, Pointer<Uint8>, int, int, int, int, Pointer<Uint8>, int) _argon2id;
+  late final int Function(Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<VeBuffer>) _gcmSeal;
+  late final int Function(Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<VeBuffer>) _gcmOpen;
+  late final int Function(Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<VeBuffer>) _cbcDecrypt;
+  late final int Function(Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<VeBuffer>) _xchachaOpen;
+  late final int Function(Pointer<VeChangePasswordParams>) _changePassword;
+  late final int Function(Pointer<VeSingleFileParams>) _singleFile;
+  late final int Function(int) _hashBegin;
+  late final int Function(int, Pointer<Uint8>, int) _hashUpdate;
+  late final int Function(int, int, Pointer<Uint8>, int, Pointer<Size>) _hashFinish;
+  late final void Function(int) _hashFree;
+  late final int Function(int, Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<Size>) _hashBytes;
   late final void Function(Pointer<VeBuffer>) _bufferFree;
   late final int Function(int, Pointer<Utf8>, Pointer<VeBuffer>) _list;
   late final int Function(int, Pointer<Utf8>) _fileSize;
@@ -494,6 +582,281 @@ class VeNative {
       }
       if (kfp != nullptr) calloc.free(kfp);
       if (hkfp != nullptr) calloc.free(hkfp);
+      calloc.free(params);
+    }
+  }
+
+  // ── crypto primitives ──────────────────────────────────────────────────
+  // Inputs (often passwords or keys) are copied into native memory for the call and wiped before it
+  // is freed. Every function returns (resultCode, bytes?): bytes is null unless the code is veOk.
+
+  (int, Uint8List?) _fixedOut(int outLen, List<Uint8List?> inputs, int Function(List<_Pin> pins, Pointer<Uint8> out) body) {
+    if (outLen <= 0) return (veErrInvalidArg, null);
+    final pins = [for (final i in inputs) _Pin(i)];
+    final out = calloc<Uint8>(outLen);
+    try {
+      final rc = body(pins, out);
+      return (rc, rc == veOk ? Uint8List.fromList(out.asTypedList(outLen)) : null);
+    } finally {
+      out.asTypedList(outLen).fillRange(0, outLen, 0);
+      calloc.free(out);
+      for (final p in pins) {
+        p.release();
+      }
+    }
+  }
+
+  (int, Uint8List?) _bufferOut(List<Uint8List?> inputs, int Function(List<_Pin> pins, Pointer<VeBuffer> out) body) {
+    final pins = [for (final i in inputs) _Pin(i)];
+    try {
+      return _withBuffer((b) => body(pins, b));
+    } finally {
+      for (final p in pins) {
+        p.release();
+      }
+    }
+  }
+
+  (int, Uint8List?) pbkdf2(int hash, Uint8List password, Uint8List salt, int iterations, int outLen) =>
+      _fixedOut(outLen, [password, salt], (p, out) =>
+          _pbkdf2(hash, p[0].ptr, p[0].len, p[1].ptr, p[1].len, iterations, out, outLen));
+
+  (int, Uint8List?) hmac(int hash, Uint8List key, Uint8List data) {
+    final out = calloc<Uint8>(64);
+    final written = calloc<Size>();
+    final kp = _Pin(key);
+    final dp = _Pin(data);
+    try {
+      final rc = _hmac(hash, kp.ptr, kp.len, dp.ptr, dp.len, out, 64, written);
+      return (rc, rc == veOk ? Uint8List.fromList(out.asTypedList(written.value)) : null);
+    } finally {
+      kp.release();
+      dp.release();
+      calloc.free(out);
+      calloc.free(written);
+    }
+  }
+
+  (int, Uint8List?) scrypt(Uint8List password, Uint8List salt, int n, int r, int p, int dkLen) =>
+      _fixedOut(dkLen, [password, salt], (pins, out) =>
+          _scrypt(pins[0].ptr, pins[0].len, pins[1].ptr, pins[1].len, n, r, p, out, dkLen));
+
+  (int, Uint8List?) argon2id(Uint8List password, Uint8List salt, int memoryKiB, int iterations, int parallelism, int outLen) =>
+      _fixedOut(outLen, [password, salt], (pins, out) =>
+          _argon2id(pins[0].ptr, pins[0].len, pins[1].ptr, pins[1].len, memoryKiB, iterations, parallelism, out, outLen));
+
+  (int, Uint8List?) aesGcmSeal(Uint8List key, Uint8List iv, Uint8List? aad, Uint8List plaintext) =>
+      _bufferOut([key, iv, aad, plaintext], (p, b) =>
+          _gcmSeal(p[0].ptr, p[0].len, p[1].ptr, p[1].len, p[2].ptr, p[2].len, p[3].ptr, p[3].len, b));
+
+  (int, Uint8List?) aesGcmOpen(Uint8List key, Uint8List iv, Uint8List? aad, Uint8List ciphertextAndTag) =>
+      _bufferOut([key, iv, aad, ciphertextAndTag], (p, b) =>
+          _gcmOpen(p[0].ptr, p[0].len, p[1].ptr, p[1].len, p[2].ptr, p[2].len, p[3].ptr, p[3].len, b));
+
+  (int, Uint8List?) aesCbcDecrypt(Uint8List key, Uint8List iv, Uint8List ciphertext) =>
+      _bufferOut([key, iv, ciphertext], (p, b) =>
+          _cbcDecrypt(p[0].ptr, p[0].len, p[1].ptr, p[1].len, p[2].ptr, p[2].len, b));
+
+  (int, Uint8List?) xchacha20Poly1305Open(Uint8List key, Uint8List nonce, Uint8List? aad, Uint8List ciphertextAndTag) =>
+      _bufferOut([key, nonce, aad, ciphertextAndTag], (p, b) =>
+          _xchachaOpen(p[0].ptr, p[0].len, p[1].ptr, p[1].len, p[2].ptr, p[2].len, p[3].ptr, p[3].len, b));
+
+  // ── single-file encryption ─────────────────────────────────────────────
+
+  /// Encrypts / decrypts the host file [srcPath] into a NEW file at [destPath]. Returns a ve* code
+  /// (veOk, veErrCancelled, veErrFailed -- a wrong password or a corrupt file on decrypt), or -1
+  /// when a file cannot be opened/created. On any non-ok result the caller deletes [destPath].
+  /// Register [opId] with opRegister() first to make the run cancellable.
+  int singleFileCrypt({
+    required String srcPath,
+    required String destPath,
+    required bool encrypt,
+    required Uint8List password,
+    int cipherIndex = 0,
+    List<String> keyfilePaths = const [],
+    int opId = 0,
+  }) {
+    final kf = <int>[];
+    void closeAll(int a, int b) {
+      if (a >= 0) closeFd(a);
+      if (b >= 0) closeFd(b);
+      for (final x in kf) {
+        closeFd(x);
+      }
+    }
+
+    final src = openFile(srcPath);
+    final dest = src < 0 ? -1 : createFile(destPath);
+    if (src < 0 || dest < 0) {
+      closeAll(src, dest);
+      return -1;
+    }
+    for (final k in keyfilePaths) {
+      final f = openFile(k);
+      if (f < 0) {
+        closeAll(src, dest);
+        return -1;
+      }
+      kf.add(f);
+    }
+
+    final pin = _Pin(password);
+    final params = calloc<VeSingleFileParams>();
+    Pointer<Int32> kfPtr = nullptr;
+    if (kf.isNotEmpty) {
+      kfPtr = calloc<Int32>(kf.length);
+      for (var i = 0; i < kf.length; i++) {
+        kfPtr[i] = kf[i];
+      }
+    }
+    try {
+      final r = params.ref;
+      r.structSize = sizeOf<VeSingleFileParams>();
+      r.srcFd = src;
+      r.destFd = dest;
+      r.encrypt = encrypt ? 1 : 0;
+      r.cipherIndex = cipherIndex;
+      r.password = pin.ptr;
+      r.passwordLen = pin.len;
+      r.keyfileFds = kfPtr;
+      r.keyfileCount = kf.length;
+      r.opId = opId;
+      return _singleFile(params);
+    } finally {
+      pin.release();
+      if (kfPtr != nullptr) calloc.free(kfPtr);
+      calloc.free(params);
+    }
+  }
+
+  // ── streaming digests ──────────────────────────────────────────────────
+
+  /// Opens a digest session for the algorithms in [mask] (bit 1 << veHash*). 0 on failure.
+  int hashBegin(int mask) => _hashBegin(mask);
+  void hashFree(int handle) => _hashFree(handle);
+
+  int hashUpdate(int handle, Uint8List data) {
+    final pin = _Pin(data);
+    try {
+      return _hashUpdate(handle, pin.ptr, pin.len);
+    } finally {
+      pin.release();
+    }
+  }
+
+  (int, Uint8List?) hashFinish(int handle, int algorithm) {
+    final out = calloc<Uint8>(64);
+    final n = calloc<Size>();
+    try {
+      final rc = _hashFinish(handle, algorithm, out, 64, n);
+      return (rc, rc == veOk ? Uint8List.fromList(out.asTypedList(n.value)) : null);
+    } finally {
+      calloc.free(out);
+      calloc.free(n);
+    }
+  }
+
+  (int, Uint8List?) hashBytes(int algorithm, Uint8List data) {
+    final pin = _Pin(data);
+    final out = calloc<Uint8>(64);
+    final n = calloc<Size>();
+    try {
+      final rc = _hashBytes(algorithm, pin.ptr, pin.len, out, 64, n);
+      return (rc, rc == veOk ? Uint8List.fromList(out.asTypedList(n.value)) : null);
+    } finally {
+      pin.release();
+      calloc.free(out);
+      calloc.free(n);
+    }
+  }
+
+  // ── password change ────────────────────────────────────────────────────
+
+  /// Changes the password / PIM / keyfiles of the container FILE at [path] ([containerFormat]: 0 =
+  /// VeraCrypt, 1/2 = LUKS). Returns a ve* code: veOk, veErrAuthFailed (LUKS: the old password did
+  /// not verify), veErrFailed, or -1 when the container / a keyfile cannot be opened.
+  int changePassword({
+    required String path,
+    required int containerFormat,
+    required Uint8List oldPassword,
+    required Uint8List newPassword,
+    int oldPim = 0,
+    int newPim = 0,
+    int cipherId = 255,
+    int hashId = 255,
+    List<String> oldKeyfilePaths = const [],
+    List<String> newKeyfilePaths = const [],
+  }) {
+    final opened = <int>[];
+    List<int>? openKeyfiles(List<String> paths) {
+      final fds = <int>[];
+      for (final k in paths) {
+        final f = openFile(k);
+        if (f < 0) {
+          for (final x in fds) {
+            closeFd(x);
+          }
+          return null;
+        }
+        fds.add(f);
+      }
+      opened.addAll(fds);
+      return fds;
+    }
+
+    final oldKf = openKeyfiles(oldKeyfilePaths);
+    final newKf = oldKf == null ? null : openKeyfiles(newKeyfilePaths);
+    if (oldKf == null || newKf == null) {
+      for (final x in opened) {
+        closeFd(x);
+      }
+      return -1;
+    }
+    final fd = openFile(path, writable: true);
+    if (fd < 0) {
+      for (final x in opened) {
+        closeFd(x);
+      }
+      return -1;
+    }
+
+    final oldPin = _Pin(oldPassword);
+    final newPin = _Pin(newPassword);
+    final params = calloc<VeChangePasswordParams>();
+    Pointer<Int32> fdArray(List<int> fds) {
+      if (fds.isEmpty) return nullptr;
+      final p = calloc<Int32>(fds.length);
+      for (var i = 0; i < fds.length; i++) {
+        p[i] = fds[i];
+      }
+      return p;
+    }
+
+    final oldKfPtr = fdArray(oldKf);
+    final newKfPtr = fdArray(newKf);
+    try {
+      final r = params.ref;
+      r.structSize = sizeOf<VeChangePasswordParams>();
+      r.fd = fd;
+      r.containerFormat = containerFormat;
+      r.oldPassword = oldPin.ptr;
+      r.oldPasswordLen = oldPin.len;
+      r.newPassword = newPin.ptr;
+      r.newPasswordLen = newPin.len;
+      r.oldPim = oldPim;
+      r.newPim = newPim;
+      r.cipherId = cipherId;
+      r.hashId = hashId;
+      r.oldKeyfileFds = oldKfPtr;
+      r.oldKeyfileCount = oldKf.length;
+      r.newKeyfileFds = newKfPtr;
+      r.newKeyfileCount = newKf.length;
+      return _changePassword(params);
+    } finally {
+      oldPin.release();
+      newPin.release();
+      if (oldKfPtr != nullptr) calloc.free(oldKfPtr);
+      if (newKfPtr != nullptr) calloc.free(newKfPtr);
       calloc.free(params);
     }
   }
@@ -779,5 +1142,24 @@ class VeNative {
       calloc.free(ev);
     }
     return out;
+  }
+}
+
+/// An input copied into native memory for one call; [release] wipes it, then frees it.
+/// A null source pins as a null pointer with length 0.
+class _Pin {
+  _Pin(Uint8List? src)
+      : len = src?.length ?? 0,
+        ptr = src == null ? nullptr : calloc<Uint8>(src.isEmpty ? 1 : src.length) {
+    if (src != null && src.isNotEmpty) ptr.asTypedList(src.length).setAll(0, src);
+  }
+
+  final Pointer<Uint8> ptr;
+  final int len;
+
+  void release() {
+    if (ptr == nullptr) return;
+    ptr.asTypedList(len).fillRange(0, len, 0);
+    calloc.free(ptr);
   }
 }

@@ -14,6 +14,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:file_selector/file_selector.dart';
@@ -22,7 +23,12 @@ import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';
 
+import 'desktop_crypto.dart';
+import 'desktop_external.dart';
+import 'desktop_hash.dart';
+import 'desktop_images.dart';
 import 'desktop_secure_store.dart';
+import 'desktop_split_join.dart';
 import 'desktop_transfers.dart';
 import 'engine_worker_pool.dart';
 import 've_native.dart';
@@ -55,6 +61,21 @@ class DesktopEngineHost {
     native: () => _nativeLocal,
     withActivity: (body) => _withActivity<Object?>(body),
   );
+
+  /// Container splitter tool (see desktop_split_join.dart).
+  late final DesktopSplitJoin _splitJoin = DesktopSplitJoin(emit: emit);
+
+  /// Checksum tool + digest sessions (see desktop_hash.dart).
+  late final DesktopHash _hash = DesktopHash(pool);
+
+  /// Hashing / KDF / AEAD primitives backed by the native engine (see desktop_crypto.dart).
+  late final DesktopCrypto _crypto = DesktopCrypto(pool);
+
+  /// Thumbnails / image export (Flutter codecs; see desktop_images.dart).
+  late final DesktopImages _images = DesktopImages(readWhole: _readWholeVaultFile);
+
+  /// Handing files to other apps + a few host-file helpers (see desktop_external.dart).
+  final DesktopExternal _external = DesktopExternal();
 
   final Map<String, int> _volByUri = {};
   final Map<int, String> _uriByVol = {};
@@ -105,6 +126,12 @@ class DesktopEngineHost {
     // Cached derived keys and biometric sentinel keys are Android Keystore features; on desktop
     // there is never one to clear, which is the success case of these idempotent calls.
     'clearDerivedKey': true,
+    'storeDerivedKey': false,
+    'loadDerivedKey': null,
+    'setDerivedKeyExpiry': false,
+    'getDerivedKeyExpiry': null,
+    'deriveDerivedKey': null,
+    'biometricKeyCreate': false,
     'clearCopyState': null,
     // Android window/OS integration with no desktop equivalent (or nothing to do): quiet no-ops.
     'setSecureScreen': null,
@@ -210,6 +237,92 @@ class DesktopEngineHost {
       case ChannelMethods.purgeExpiredDerivedKeys:
         return <String>[]; // no cached derived keys on desktop
 
+      // ── images ──
+      case ChannelMethods.getImageThumbnail:
+        {
+          final t = await _images.thumbnail(_vol(args['filePath']), args['fileName'] as String,
+              targetSize: (args['targetSize'] as num?)?.toInt() ?? 180);
+          return t?.bytes;
+        }
+      case ChannelMethods.getImageThumbnailWithSize:
+        {
+          final t = await _images.thumbnail(_vol(args['filePath']), args['fileName'] as String,
+              targetSize: (args['targetSize'] as num?)?.toInt() ?? 180);
+          return t == null ? null : {'bytes': t.bytes, 'width': t.width, 'height': t.height};
+        }
+      case ChannelMethods.encodeImage:
+        return _images.encode(args);
+
+      // ── other applications ──
+      case ChannelMethods.launchUrl:
+        return _external.launchUrl(args['url'] as String? ?? '');
+      case ChannelMethods.openLocalFileWithApp:
+        return _external.openLocalFile(args['filePath'] as String? ?? '');
+      case ChannelMethods.getLocalFileUri:
+        return args['filePath'] is String ? Uri.file(args['filePath'] as String).toString() : null;
+      case ChannelMethods.openWithApp:
+        return _openVaultFileWithApp(args);
+      case ChannelMethods.readExternalFileBytes:
+        return _external.readFileBytes(args['uri'] as String? ?? '');
+      case ChannelMethods.writeExternalFileBytes:
+        await _external.writeFileBytes(
+          (args['destinationPath'] ?? args['destinationTreeUri']) as String,
+          args['fileName'] as String,
+          args['bytes'] as Uint8List,
+        );
+        return null;
+
+      // ── digests ──
+      case ChannelMethods.hashBytesSha256:
+        return _hash.bytesHex(veHashSha256, args['bytes'] as Uint8List);
+      case ChannelMethods.hashBytesMd5:
+        return _hash.bytesHex(veHashMd5, args['bytes'] as Uint8List);
+      case ChannelMethods.beginHashSession:
+        await _hash.begin((args['opId'] as num).toInt(), (args['algorithms'] as List<Object?>).cast<String>());
+        return null;
+      case ChannelMethods.updateHashSession:
+        await _hash.update((args['opId'] as num).toInt(), args['bytes'] as Uint8List);
+        return null;
+      case ChannelMethods.finishHashSession:
+        return _hash.finish((args['opId'] as num).toInt());
+      case ChannelMethods.discardHashSession:
+        await _hash.discard((args['opId'] as num).toInt());
+        return null;
+      case ChannelMethods.cancelHashCompute:
+        _hash.cancel((args['opId'] as num).toInt());
+        return null;
+      case ChannelMethods.computeExternalFileHash:
+        return _hash.computeExternalFile(
+          args['uri'] as String,
+          (args['algorithms'] as List<Object?>).cast<String>(),
+          (args['opId'] as num?)?.toInt() ?? 0,
+        );
+
+      // ── single-file encryption tool ──
+      case ChannelMethods.encryptSingleFile:
+        return _singleFileCrypt(args, encrypt: true);
+      case ChannelMethods.decryptSingleFile:
+        return _singleFileCrypt(args, encrypt: false);
+      case ChannelMethods.splitContainer:
+        await _splitJoin.split(args);
+        return null;
+      case ChannelMethods.joinContainer:
+        await _splitJoin.join(args);
+        return null;
+      case ChannelMethods.cancelSplitJoin:
+        if (args['opId'] is num) {
+          final id = (args['opId'] as num).toInt();
+          _splitJoin.cancel(id); // split / join run in Dart
+          _nativeLocal.opCancel(id); // single-file encryption runs in the engine
+        }
+        return true; // Android answers true here
+
+      // ── change a container's password ──
+      case ChannelMethods.changeContainerPassword:
+        return _changePassword(args, luks: false);
+      case ChannelMethods.changeLuksContainerPassword:
+        return _changePassword(args, luks: true);
+
       case ChannelMethods.probeContainerFormat:
         return await pool.call('probe', [args['filePath']]) as String;
       case ChannelMethods.unlockContainer:
@@ -280,6 +393,9 @@ class DesktopEngineHost {
           return (r[1] as List<Object?>).cast<int>();
         }
     }
+
+    final (handledByCrypto, cryptoResult) = await _crypto.handle(call.method, args);
+    if (handledByCrypto) return cryptoResult;
 
     if (_androidOnlyDefaults.containsKey(call.method)) return _androidOnlyDefaults[call.method];
 
@@ -476,6 +592,7 @@ class DesktopEngineHost {
     if (vol == null) return true; // already locked
     await pool.call('lock', [vol]);
     _forget(vol);
+    await _external.cleanupVolume(vol);
     return true;
   }
 
@@ -498,6 +615,7 @@ class DesktopEngineHost {
       final r = await pool.call('list', [vol, '']) as List<Object?>;
       if (r[0] == veErrNotUnlocked) {
         _forget(vol);
+        await _external.cleanupVolume(vol);
         continue;
       }
       final meta = _meta[vol];
@@ -520,6 +638,188 @@ class DesktopEngineHost {
     const memoryClassMb = 512;
     final tier = cores <= 4 ? 'LOW' : (cores >= 8 ? 'HIGH' : 'MEDIUM');
     return {'tier': tier, 'cores': cores, 'memoryClassMb': memoryClassMb, 'isLowRamDevice': false};
+  }
+
+  /// Reads a whole vault file in 8 MiB steps. Null on failure; IMAGE_TOO_LARGE above [maxBytes].
+  Future<Uint8List?> _readWholeVaultFile(int vol, String path, int maxBytes) async {
+    final size = await pool.call('fileSize', [vol, path]) as int;
+    if (size < 0) {
+      _throwFor(-size);
+      return null;
+    }
+    if (size == 0) return Uint8List(0);
+    if (size > maxBytes) {
+      throw PlatformException(
+        code: 'IMAGE_TOO_LARGE',
+        message: 'File is $size bytes; the limit for in-memory decoding is $maxBytes',
+      );
+    }
+    final out = Uint8List(size);
+    var offset = 0;
+    while (offset < size) {
+      final r = await pool.call('read', [vol, path, offset, math.min(8 << 20, size - offset)]) as List<Object?>;
+      if (r[0] != veOk) return null;
+      final chunk = r[1] as Uint8List;
+      if (chunk.isEmpty) return null;
+      out.setAll(offset, chunk);
+      offset += chunk.length;
+    }
+    return out;
+  }
+
+  /// "Open with": a desktop app needs a real file, so one decrypted copy is made in a contained
+  /// temp directory (see desktop_external.dart) and removed when the vault is locked.
+  Future<bool> _openVaultFileWithApp(Map<Object?, Object?> args) async {
+    final vol = _vol(args['filePath']);
+    final fileName = args['fileName'] as String;
+    final dest = await _external.reserveTempCopy(vol, fileName);
+    final rc = await _withActivity(() => pool.call('export', [vol, fileName, dest, 0])) as int;
+    if (rc != veOk) {
+      await _external.cleanupVolume(vol);
+      return false;
+    }
+    final opened = await _external.launch(dest);
+    if (!opened) await _external.cleanupVolume(vol);
+    return opened;
+  }
+
+  // ── single-file encryption ─────────────────────────────────────────────
+
+  /// Output file name rules, identical to the Android handler: encrypt appends .vxenc (or .aes for
+  /// cipher index 2); decrypt strips .vxenc / .aes / .enc, otherwise adds .decrypted.
+  static String _singleFileOutName(String source, bool encrypt, int cipherIndex) {
+    final name = p.basename(source);
+    final lower = name.toLowerCase();
+    if (encrypt) {
+      if (cipherIndex == 2) return lower.endsWith('.aes') ? name : '$name.aes';
+      return lower.endsWith('.vxenc') ? name : '$name.vxenc';
+    }
+    final stripped = lower.endsWith('.vxenc')
+        ? name.substring(0, name.length - 6)
+        : (lower.endsWith('.aes') || lower.endsWith('.enc'))
+            ? name.substring(0, name.length - 4)
+            : '$name.decrypted';
+    return stripped.isEmpty ? 'decrypted_file' : stripped;
+  }
+
+  /// The output is built under a temporary name beside its destination and renamed into place only
+  /// when complete, so a wrong password, a cancel or a crash never leaves a partial file.
+  Future<Object?> _singleFileCrypt(Map<Object?, Object?> args, {required bool encrypt}) async {
+    final source = args['sourceUri'] as String?;
+    if (source == null || source.isEmpty) {
+      throw PlatformException(code: 'INVALID_ARGS', message: 'sourceUri is required');
+    }
+    final opId = (args['opId'] as num?)?.toInt() ?? 0;
+    final cipher = encrypt ? ((args['cipherIndex'] as num?)?.toInt() ?? 0) : 0;
+    final destArg = args['destinationPath'] as String?;
+    final dir = (destArg != null && destArg.isNotEmpty && !destArg.startsWith('content:'))
+        ? destArg
+        : p.dirname(source);
+    final dest = p.join(dir, _singleFileOutName(source, encrypt, cipher));
+    if (p.equals(dest, source)) {
+      throw PlatformException(code: 'INVALID_ARGS', message: 'Refusing to overwrite the source file');
+    }
+    await Directory(dir).create(recursive: true);
+    final staging = '$dest.vaultexplorer-part';
+
+    final password = Uint8List.fromList(utf8.encode((args['passphrase'] as String?) ?? ''));
+    if (opId > 0) _nativeLocal.opRegister(opId, veOpCopy);
+    int rc;
+    try {
+      rc = await _withActivity(() async => await pool.call('singleFile', [
+            {
+              'src': source,
+              'dest': staging,
+              'encrypt': encrypt,
+              'cipher': cipher,
+              'password': password,
+              'keyfilePaths': (args['keyfilePaths'] as List<Object?>?)?.cast<String>() ?? const <String>[],
+              'opId': opId,
+            },
+          ]) as int);
+    } finally {
+      password.fillRange(0, password.length, 0);
+      if (opId > 0) _nativeLocal.opUnregister(opId);
+    }
+
+    Future<void> dropStaging() async {
+      try {
+        await File(staging).delete();
+      } on FileSystemException {
+        // nothing was created
+      }
+    }
+
+    if (rc != veOk) {
+      await dropStaging();
+      if (rc == veErrCancelled) {
+        throw PlatformException(code: 'CANCELLED', message: encrypt ? 'Encryption cancelled' : 'Decryption cancelled');
+      }
+      if (rc == -1) {
+        throw PlatformException(code: 'C++_ERROR', message: 'Could not open the source file, a keyfile, or create the output file');
+      }
+      if (encrypt) throw PlatformException(code: 'CRYPTO_ERROR', message: 'Encryption failed');
+      throw PlatformException(code: 'AUTH_FAIL', message: 'Incorrect password or keyfiles, or corrupted file');
+    }
+
+    try {
+      await File(staging).rename(dest);
+    } on FileSystemException catch (e) {
+      await dropStaging();
+      throw PlatformException(code: 'C++_ERROR', message: 'Could not save the result to $dest: ${e.message}');
+    }
+    if (encrypt && args['deleteOriginalAfter'] == true) {
+      try {
+        await File(source).delete();
+      } on FileSystemException {
+        // the encrypted copy exists; failing to remove the original is not a failure of the tool
+      }
+    }
+    return true;
+  }
+
+  // ── password change ────────────────────────────────────────────────────
+
+  /// VeraCrypt answers a bool (like Android); LUKS reports a wrong old password as AUTH_FAIL and any
+  /// other failure as INVALID_VAULT, which the dialog turns into specific messages.
+  Future<Object?> _changePassword(Map<Object?, Object?> args, {required bool luks}) async {
+    final uri = args['uri'] as String?;
+    final newPassword = (args['newPassword'] as String?) ?? '';
+    final newKeyfiles = (args['newKeyfilePaths'] as List<Object?>?)?.cast<String>() ?? const <String>[];
+    if (uri == null || uri.isEmpty || (newPassword.isEmpty && newKeyfiles.isEmpty)) {
+      throw PlatformException(code: 'INVALID_ARGS', message: 'uri and newPassword required');
+    }
+    final oldBytes = Uint8List.fromList(utf8.encode((args['oldPassword'] as String?) ?? ''));
+    final newBytes = Uint8List.fromList(utf8.encode(newPassword));
+    int rc;
+    try {
+      rc = await _withActivity(() async => await pool.call('changePassword', [
+            {
+              'path': uri,
+              'containerFormat': luks ? 1 : 0,
+              'oldPassword': oldBytes,
+              'newPassword': newBytes,
+              'oldPim': (args['oldPim'] as num?)?.toInt() ?? 0,
+              'newPim': (args['newPim'] as num?)?.toInt() ?? 0,
+              'cipherId': (args['cipherId'] as num?)?.toInt() ?? 255,
+              'hashId': (args['hashId'] as num?)?.toInt() ?? 255,
+              'oldKeyfilePaths': (args['oldKeyfilePaths'] as List<Object?>?)?.cast<String>() ?? const <String>[],
+              'newKeyfilePaths': newKeyfiles,
+            },
+          ]) as int);
+    } finally {
+      oldBytes.fillRange(0, oldBytes.length, 0);
+      newBytes.fillRange(0, newBytes.length, 0);
+    }
+    if (rc == -1) {
+      throw PlatformException(code: 'C++_ERROR', message: 'Could not open the container file (or a keyfile)');
+    }
+    if (luks) {
+      if (rc == veOk) return true;
+      if (rc == veErrAuthFailed) throw PlatformException(code: 'AUTH_FAIL', message: 'Incorrect password');
+      throw PlatformException(code: 'INVALID_VAULT', message: "Could not change the LUKS container's password");
+    }
+    return rc == veOk;
   }
 
   // ── helpers ────────────────────────────────────────────────────────────
@@ -582,6 +882,9 @@ class DesktopEngineHost {
           'slot': e.n0,
         });
       }
+      if (e.kind == veEventSplitJoinProgress) {
+        emit('onSplitJoinProgress', {'opId': e.opId, 'bytesDone': e.n0, 'bytesTotal': e.n1});
+      }
       _transfers.onNativeEvent(e); // copy / import / export byte progress
     }
   }
@@ -594,6 +897,8 @@ class DesktopEngineHost {
     _uriByVol.clear();
     _volByUri.clear();
     _meta.clear();
+    await _external.cleanupAll();
+    await _hash.dispose();
     await pool.dispose();
   }
 }

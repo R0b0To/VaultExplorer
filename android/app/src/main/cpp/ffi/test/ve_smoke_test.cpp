@@ -10,8 +10,10 @@
 //        e.g. ve_smoke_test fat exfat ntfs ext4
 // Exit code 0 = every check passed.
 
+#include "ve_crypto_vectors.inc"
 #include "ve_engine.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -333,9 +335,348 @@ static void runHidden() {
     std::remove(path.c_str());
 }
 
+// ---- crypto primitives vs. independent reference implementations ---------------------------------
+static std::vector<uint8_t> unhex(const char* h) {
+    std::vector<uint8_t> out;
+    for (size_t i = 0; h[i] && h[i + 1]; i += 2) {
+        auto nib = [](char c) { return c <= '9' ? c - '0' : (c | 0x20) - 'a' + 10; };
+        out.push_back(static_cast<uint8_t>(nib(h[i]) * 16 + nib(h[i + 1])));
+    }
+    return out;
+}
+static std::vector<uint8_t> vecOf(const char* name) {
+    for (const auto& v : kVectors) if (std::strcmp(v.name, name) == 0) return unhex(v.hex);
+    std::fprintf(stderr, "  FAIL missing vector %s\n", name);
+    ++g_failures;
+    return {};
+}
+static std::vector<uint8_t> bytes(const std::string& s) { return std::vector<uint8_t>(s.begin(), s.end()); }
+static std::vector<uint8_t> seq(int from, int n) {
+    std::vector<uint8_t> v(n);
+    for (int i = 0; i < n; ++i) v[i] = static_cast<uint8_t>(from + i);
+    return v;
+}
+static std::vector<uint8_t> takeBuffer(ve_buffer& b) {
+    std::vector<uint8_t> out(b.data, b.data + b.len);
+    ve_buffer_free(&b);
+    return out;
+}
+
+static void runCrypto() {
+    std::printf("== crypto primitives ==\n");
+    const std::string utf8pw = "p\xC3\xA4ssw\xC3\xB6rd \xF0\x9F\x94\x92";
+    const auto pwBytes = bytes(utf8pw);
+    const auto key32 = seq(0, 32), key16 = seq(0, 16), iv12 = seq(100, 12), iv16 = seq(200, 16), nonce24 = seq(50, 24);
+    const std::string aadS = "header-bytes";
+    std::string ptS;
+    for (int i = 0; i < 3; ++i) ptS += "The quick brown fox jumps over the lazy dog";
+    const auto pt = bytes(ptS), aad = bytes(aadS);
+
+    // PBKDF2 (SHA-1 / SHA-256 / SHA-512), incl. a non-ASCII UTF-8 password and an embedded-NUL salt
+    {
+        std::vector<uint8_t> o(20);
+        CHECK_RC(ve_pbkdf2(VE_HASH_SHA1, (const uint8_t*)"password", 8, (const uint8_t*)"salt", 4, 2, o.data(), o.size()), VE_OK);
+        CHECK(o == vecOf("pbkdf2_sha1"));
+        o.assign(40, 0);
+        CHECK_RC(ve_pbkdf2(VE_HASH_SHA256, pwBytes.data(), pwBytes.size(), (const uint8_t*)"saltSALTsalt", 12, 1000, o.data(), o.size()), VE_OK);
+        CHECK(o == vecOf("pbkdf2_sha256"));
+        o.assign(64, 0);
+        const uint8_t salt[] = {0, 1, 2, 3, 's', 'a', 'l', 't'};
+        CHECK_RC(ve_pbkdf2(VE_HASH_SHA512, pwBytes.data(), pwBytes.size(), salt, sizeof(salt), 1000, o.data(), o.size()), VE_OK);
+        CHECK(o == vecOf("pbkdf2_sha512"));
+        CHECK_RC(ve_pbkdf2(9, pwBytes.data(), 1, salt, 4, 1, o.data(), o.size()), VE_ERR_INVALID_ARG);   // bad hash id
+        CHECK_RC(ve_pbkdf2(VE_HASH_SHA256, pwBytes.data(), 1, salt, 0, 1, o.data(), o.size()), VE_ERR_INVALID_ARG);  // empty salt
+    }
+    // HMAC (RFC 4231 style vectors; the SHA-512 one uses a key longer than the block size)
+    {
+        uint8_t o[64];
+        size_t n = 0;
+        const auto data = bytes("what do ya want for nothing?");
+        CHECK_RC(ve_hmac(VE_HASH_SHA1, (const uint8_t*)"Jefe", 4, data.data(), data.size(), o, sizeof(o), &n), VE_OK);
+        CHECK(std::vector<uint8_t>(o, o + n) == vecOf("hmac_sha1"));
+        CHECK_RC(ve_hmac(VE_HASH_SHA256, (const uint8_t*)"Jefe", 4, data.data(), data.size(), o, sizeof(o), &n), VE_OK);
+        CHECK(std::vector<uint8_t>(o, o + n) == vecOf("hmac_sha256"));
+        std::string longKey(100, 'k'), longData;
+        for (int i = 0; i < 50; ++i) longData += "data";
+        CHECK_RC(ve_hmac(VE_HASH_SHA512, (const uint8_t*)longKey.data(), longKey.size(), (const uint8_t*)longData.data(), longData.size(), o, sizeof(o), &n), VE_OK);
+        CHECK(std::vector<uint8_t>(o, o + n) == vecOf("hmac_sha512"));
+        CHECK_RC(ve_hmac(VE_HASH_SHA512, (const uint8_t*)"k", 1, data.data(), data.size(), o, 32, &n), VE_ERR_INVALID_ARG);  // out_cap too small
+    }
+    // scrypt (RFC 7914 vector 2: N=1024 r=8 p=16) and Argon2id
+    {
+        std::vector<uint8_t> o(64);
+        CHECK_RC(ve_scrypt((const uint8_t*)"password", 8, (const uint8_t*)"NaCl", 4, 1024, 8, 16, o.data(), o.size()), VE_OK);
+        CHECK(o == vecOf("scrypt"));
+        o.assign(32, 0);
+        CHECK_RC(ve_argon2id((const uint8_t*)"password", 8, (const uint8_t*)"somesalt", 8, 1024, 2, 2, o.data(), o.size()), VE_OK);
+        CHECK(o == vecOf("argon2id"));
+    }
+    // AES-GCM: 128/256-bit keys, AAD, a 16-byte IV, empty plaintext, tamper detection
+    {
+        ve_buffer b{};
+        CHECK_RC(ve_aes_gcm_seal(key16.data(), 16, iv12.data(), 12, aad.data(), aad.size(), pt.data(), pt.size(), &b), VE_OK);
+        CHECK(takeBuffer(b) == vecOf("gcm16"));
+        CHECK_RC(ve_aes_gcm_seal(key32.data(), 32, iv12.data(), 12, aad.data(), aad.size(), pt.data(), pt.size(), &b), VE_OK);
+        const auto sealed = takeBuffer(b);
+        CHECK(sealed == vecOf("gcm32"));
+        CHECK_RC(ve_aes_gcm_seal(key32.data(), 32, iv16.data(), 16, nullptr, 0, pt.data(), pt.size(), &b), VE_OK);
+        CHECK(takeBuffer(b) == vecOf("gcm32_iv16"));
+        CHECK_RC(ve_aes_gcm_seal(key32.data(), 32, iv12.data(), 12, nullptr, 0, nullptr, 0, &b), VE_OK);
+        CHECK(takeBuffer(b) == vecOf("gcm_empty"));
+
+        CHECK_RC(ve_aes_gcm_open(key32.data(), 32, iv12.data(), 12, aad.data(), aad.size(), sealed.data(), sealed.size(), &b), VE_OK);
+        CHECK(takeBuffer(b) == pt);
+        auto bad = sealed;
+        bad[3] ^= 1;
+        CHECK_RC(ve_aes_gcm_open(key32.data(), 32, iv12.data(), 12, aad.data(), aad.size(), bad.data(), bad.size(), &b), VE_ERR_FAILED);
+        CHECK(b.data == nullptr && b.len == 0);
+        CHECK_RC(ve_aes_gcm_open(key32.data(), 32, iv12.data(), 12, nullptr, 0, sealed.data(), sealed.size(), &b), VE_ERR_FAILED);  // wrong AAD
+        const auto empty = vecOf("gcm_empty");
+        CHECK_RC(ve_aes_gcm_open(key32.data(), 32, iv12.data(), 12, nullptr, 0, empty.data(), empty.size(), &b), VE_OK);
+        CHECK(takeBuffer(b).empty());
+        CHECK_RC(ve_aes_gcm_seal(key32.data(), 24, iv12.data(), 12, nullptr, 0, pt.data(), pt.size(), &b), VE_ERR_INVALID_ARG);  // 192-bit key unsupported
+    }
+    // AES-CBC decrypt (PKCS#7)
+    {
+        ve_buffer b{};
+        const auto c128 = vecOf("cbc128"), c256 = vecOf("cbc256");
+        CHECK_RC(ve_aes_cbc_decrypt(key16.data(), 16, iv16.data(), 16, c128.data(), c128.size(), &b), VE_OK);
+        CHECK(takeBuffer(b) == pt);
+        CHECK_RC(ve_aes_cbc_decrypt(key32.data(), 32, iv16.data(), 16, c256.data(), c256.size(), &b), VE_OK);
+        CHECK(takeBuffer(b) == bytes("exactly16bytes!!"));
+        CHECK_RC(ve_aes_cbc_decrypt(key16.data(), 16, iv16.data(), 16, c128.data(), c128.size() - 1, &b), VE_ERR_INVALID_ARG);  // not block-aligned
+        CHECK_RC(ve_aes_cbc_decrypt(key32.data(), 32, iv16.data(), 16, c128.data(), c128.size(), &b), VE_ERR_FAILED);  // wrong key: padding check fails
+    }
+    // XChaCha20-Poly1305 open
+    {
+        ve_buffer b{};
+        const auto sealed = vecOf("xchacha");
+        CHECK_RC(ve_xchacha20poly1305_open(key32.data(), 32, nonce24.data(), 24, aad.data(), aad.size(), sealed.data(), sealed.size(), &b), VE_OK);
+        CHECK(takeBuffer(b) == pt);
+        auto bad = sealed;
+        bad.back() ^= 1;
+        CHECK_RC(ve_xchacha20poly1305_open(key32.data(), 32, nonce24.data(), 24, aad.data(), aad.size(), bad.data(), bad.size(), &b), VE_ERR_FAILED);
+        CHECK_RC(ve_xchacha20poly1305_open(key32.data(), 31, nonce24.data(), 24, nullptr, 0, sealed.data(), sealed.size(), &b), VE_ERR_INVALID_ARG);
+    }
+}
+
+static std::string toHex(const uint8_t* d, size_t n) {
+    static const char* k = "0123456789abcdef";
+    std::string s;
+    for (size_t i = 0; i < n; ++i) { s += k[d[i] >> 4]; s += k[d[i] & 15]; }
+    return s;
+}
+
+static void runHashes() {
+    std::printf("== streaming digests ==\n");
+    // known one-shot vectors
+    struct One { int alg; const char* in; const char* hex; } ones[] = {
+        {VE_HASH_MD5, "", "d41d8cd98f00b204e9800998ecf8427e"},
+        {VE_HASH_MD5, "abc", "900150983cd24fb0d6963f7d28e17f72"},
+        {VE_HASH_SHA1, "abc", "a9993e364706816aba3e25717850c26c9cd0d89d"},
+        {VE_HASH_SHA256, "abc", "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"},
+    };
+    for (const auto& o : ones) {
+        uint8_t out[64];
+        size_t n = 0;
+        CHECK_RC(ve_hash_bytes(o.alg, (const uint8_t*)o.in, std::strlen(o.in), out, sizeof(out), &n), VE_OK);
+        CHECK(toHex(out, n) == o.hex);
+    }
+    // one session, four algorithms, chunked at awkward sizes, vs hashlib
+    std::vector<uint8_t> data(1024000);
+    for (size_t i = 0; i < data.size(); ++i) data[i] = (uint8_t)(i & 255);
+    const uint32_t mask = (1u << VE_HASH_MD5) | (1u << VE_HASH_SHA1) | (1u << VE_HASH_SHA256) | (1u << VE_HASH_SHA512);
+    int64_t h = ve_hash_begin(mask);
+    CHECK(h != 0);
+    const size_t steps[] = {1, 7, 4096, 65537, 3, 999983};
+    size_t off = 0, si = 0;
+    while (off < data.size()) {
+        const size_t n = std::min(steps[si++ % 6], data.size() - off);
+        CHECK_RC(ve_hash_update(h, data.data() + off, n), VE_OK);
+        off += n;
+    }
+    const struct { int alg; const char* name; } algs[] = {{VE_HASH_MD5, "digest_md5"}, {VE_HASH_SHA1, "digest_sha1"}, {VE_HASH_SHA256, "digest_sha256"}, {VE_HASH_SHA512, "digest_sha512"}};
+    for (const auto& a : algs) {
+        uint8_t out[64];
+        size_t n = 0;
+        CHECK_RC(ve_hash_finish(h, a.alg, out, sizeof(out), &n), VE_OK);
+        CHECK(out != nullptr && std::vector<uint8_t>(out, out + n) == vecOf(a.name));
+        CHECK_RC(ve_hash_finish(h, a.alg, out, sizeof(out), &n), VE_ERR_INVALID_ARG);  // a digest can be taken only once
+    }
+    ve_hash_free(h);
+    uint8_t scratch[64];
+    size_t sn = 0;
+    CHECK_RC(ve_hash_update(h, data.data(), 1), VE_ERR_INVALID_ARG);                         // freed handle is rejected
+    CHECK_RC(ve_hash_finish(h, VE_HASH_MD5, scratch, sizeof(scratch), &sn), VE_ERR_INVALID_ARG);
+    CHECK_RC(ve_hash_update(0x1234, data.data(), 1), VE_ERR_INVALID_ARG);                    // forged handle too
+    CHECK(ve_hash_begin(0) == 0);
+    CHECK_RC(ve_hash_bytes(9, data.data(), 1, scratch, sizeof(scratch), &sn), VE_ERR_INVALID_ARG);
+    // MD5 is digest-only: it must not be usable as a PBKDF2/HMAC hash
+    CHECK_RC(ve_pbkdf2(VE_HASH_MD5, (const uint8_t*)"p", 1, (const uint8_t*)"s", 1, 1, scratch, 16), VE_ERR_INVALID_ARG);
+    CHECK_RC(ve_hmac(VE_HASH_MD5, (const uint8_t*)"k", 1, (const uint8_t*)"d", 1, scratch, sizeof(scratch), &sn), VE_ERR_INVALID_ARG);
+}
+
+static int32_t changePw(const std::string& path, int format, const char* oldPw, const char* newPw) {
+    int fd = ve_open_file(path.c_str(), 1);
+    if (fd < 0) return -1000;
+    ve_change_password_params p;
+    std::memset(&p, 0, sizeof(p));
+    p.struct_size = sizeof(p);
+    p.fd = fd;
+    p.container_format = format;
+    p.old_password = (const uint8_t*)oldPw;
+    p.old_password_len = (int32_t)std::strlen(oldPw);
+    p.new_password = (const uint8_t*)newPw;
+    p.new_password_len = (int32_t)std::strlen(newPw);
+    p.cipher_id = p.hash_id = 255;
+    return ve_change_password(&p);
+}
+
+static void runChangePassword(int format, const char* fs, int64_t size) {
+    std::printf("== change password (%s, %s) ==\n", format == 0 ? "VeraCrypt" : (format == 1 ? "LUKS1" : "LUKS2"), fs);
+    const std::string path = tempPath("ve_smoke_chpw.hc");
+    std::remove(path.c_str());
+    const char* kOld = "old pass";
+    const char* kNew = "new pass \xC3\xA9";
+    int fd = ve_create_file(path.c_str());
+    CHECK(fd >= 0);
+    ve_create_params cp;
+    std::memset(&cp, 0, sizeof(cp));
+    cp.struct_size = sizeof(cp);
+    cp.fd = fd;
+    cp.password = (const uint8_t*)kOld;
+    cp.password_len = (int32_t)std::strlen(kOld);
+    cp.size_bytes = size;
+    cp.file_system = fs;
+    cp.container_format = format;
+    // Creation takes concrete ids: LUKS has no "auto" (255) the way VeraCrypt unlock does; the app's
+    // create dialog defaults both to 0 (AES / first hash).
+    cp.cipher_id = cp.hash_id = format == 0 ? 255 : 0;
+    cp.quick_format = 1;
+    CHECK_RC(ve_create_container(&cp), VE_OK);
+
+    CHECK_RC(unlock(path, kOld, 0), VE_OK);
+    const std::string data = "survives a password change";
+    CHECK_RC(ve_write_file_chunk(0, "keep.txt", 0, (const uint8_t*)data.data(), data.size()), VE_OK);
+    ve_lock(0);
+
+    CHECK_RC(changePw(path, format, "wrong old password", kNew), format == 0 ? VE_ERR_FAILED : VE_ERR_AUTH_FAILED);
+    CHECK_RC(unlock(path, kOld, 0), VE_OK);  // a failed change must leave the old password working
+    ve_lock(0);
+    CHECK_RC(changePw(path, format, kOld, kNew), VE_OK);
+    CHECK_RC(unlock(path, kOld, 0), VE_ERR_FAILED);
+    CHECK_RC(unlock(path, kNew, 0), VE_OK);
+    CHECK(readAll(0, "keep.txt") == data);
+    ve_lock(0);
+    CHECK_RC(changePw(path, format, kNew, ""), VE_ERR_INVALID_ARG);  // an empty new password is refused
+    std::remove(path.c_str());
+}
+
+static bool writeHostFile(const std::string& path, const std::vector<uint8_t>& data) {
+    FILE* f = std::fopen(path.c_str(), "wb");
+    if (!f) return false;
+    const bool ok = data.empty() || std::fwrite(data.data(), 1, data.size(), f) == data.size();
+    std::fclose(f);
+    return ok;
+}
+static std::vector<uint8_t> readHostFile(const std::string& path) {
+    std::vector<uint8_t> out;
+    FILE* f = std::fopen(path.c_str(), "rb");
+    if (!f) return out;
+    uint8_t buf[65536];
+    size_t n;
+    while ((n = std::fread(buf, 1, sizeof(buf), f)) > 0) out.insert(out.end(), buf, buf + n);
+    std::fclose(f);
+    return out;
+}
+
+static int32_t singleFile(bool encrypt, int cipher, const std::string& src, const std::string& dst, const char* pw,
+                          const std::vector<std::string>& keyfiles = {}, int opId = 0) {
+    std::vector<int32_t> kf;
+    for (const auto& k : keyfiles) kf.push_back(ve_open_file(k.c_str(), 0));
+    ve_single_file_params p;
+    std::memset(&p, 0, sizeof(p));
+    p.struct_size = sizeof(p);
+    p.src_fd = ve_open_file(src.c_str(), 0);
+    p.dest_fd = ve_create_file(dst.c_str());
+    p.encrypt = encrypt;
+    p.cipher_index = cipher;
+    p.password = (const uint8_t*)pw;
+    p.password_len = (int32_t)std::strlen(pw);
+    p.keyfile_fds = kf.empty() ? nullptr : kf.data();
+    p.keyfile_count = (int32_t)kf.size();
+    p.op_id = opId;
+    return ve_single_file_crypt(&p);
+}
+
+static void runSingleFile() {
+    std::printf("== single-file encryption ==\n");
+    const std::string plain = tempPath("ve_sf_plain.bin"), enc = tempPath("ve_sf_enc.vxenc"), dec = tempPath("ve_sf_dec.bin");
+    const std::string keyfile = tempPath("ve_sf_key.bin");
+    std::vector<uint8_t> data(300 * 1024 + 77);
+    for (size_t i = 0; i < data.size(); ++i) data[i] = (uint8_t)((i * 2654435761u) >> 13);
+    CHECK(writeHostFile(plain, data));
+    CHECK(writeHostFile(keyfile, seq(11, 200)));
+
+    for (int cipher : {0, 1, 2, 3}) {
+        CHECK_RC(singleFile(true, cipher, plain, enc, "tool pass \xC3\xA9"), VE_OK);
+        const auto ciphertext = readHostFile(enc);
+        CHECK(ciphertext.size() > data.size());                          // header + tag overhead
+        CHECK(!ciphertext.empty() && std::search(ciphertext.begin(), ciphertext.end(), data.begin(), data.begin() + 64) == ciphertext.end());  // no plaintext leak
+        CHECK_RC(singleFile(false, 0, enc, dec, "tool pass \xC3\xA9"), VE_OK);
+        CHECK(readHostFile(dec) == data);
+        CHECK_RC(singleFile(false, 0, enc, dec, "wrong"), VE_ERR_FAILED);
+    }
+    // keyfile as a second factor
+    CHECK_RC(singleFile(true, 0, plain, enc, "pw", {keyfile}), VE_OK);
+    CHECK_RC(singleFile(false, 0, enc, dec, "pw"), VE_ERR_FAILED);                 // password alone is not enough
+    CHECK_RC(singleFile(false, 0, enc, dec, "pw", {keyfile}), VE_OK);
+    CHECK(readHostFile(dec) == data);
+    // progress events + cancellation
+    {
+        ve_event ev;
+        while (ve_poll_event(&ev)) {}  // drain
+        ve_op_register(7, VE_OP_COPY);
+        CHECK_RC(singleFile(true, 0, plain, enc, "pw", {}, 7), VE_OK);
+        bool sawProgress = false;
+        uint64_t lastDone = 0, lastTotal = 0;
+        while (ve_poll_event(&ev)) {
+            if (ev.kind == VE_EVENT_SPLITJOIN_PROGRESS && ev.op_id == 7) { sawProgress = true; lastDone = ev.n0; lastTotal = ev.n1; }
+        }
+        CHECK(sawProgress && lastDone <= lastTotal && lastTotal >= data.size());
+        ve_op_unregister(7);
+
+        ve_op_register(9, VE_OP_COPY);
+        ve_op_cancel(9);
+        CHECK_RC(singleFile(true, 0, plain, enc, "pw", {}, 9), VE_ERR_CANCELLED);
+        ve_op_unregister(9);
+    }
+    // truncated / foreign input is rejected, not crashed on
+    CHECK(writeHostFile(enc, std::vector<uint8_t>(10, 0xAB)));
+    CHECK_RC(singleFile(false, 0, enc, dec, "pw"), VE_ERR_FAILED);
+    CHECK(writeHostFile(enc, {}));
+    CHECK_RC(singleFile(false, 0, enc, dec, "pw"), VE_ERR_FAILED);
+    for (const auto& f : {plain, enc, dec, keyfile}) std::remove(f.c_str());
+}
+
 int main(int argc, char** argv) {
     std::printf("ve abi %d, %d volume slots\n", ve_abi_version(), ve_max_volumes());
     CHECK(ve_abi_version() == VE_ABI_VERSION);
+
+    if (argc == 2 && std::strcmp(argv[1], "crypto") == 0) {  // fast path: primitives + digests only
+        runCrypto();
+        runHashes();
+        runSingleFile();
+        std::printf("\n%d checks, %d failed\n", g_checks, g_failures);
+        return g_failures == 0 ? 0 : 1;
+    }
+
+    if (argc == 2 && std::strcmp(argv[1], "chpw") == 0) {  // fast path: password change only
+        runChangePassword(0, "fat", 8ll << 20);
+        runChangePassword(1, "ext4", 16ll << 20);
+        std::printf("\n%d checks, %d failed\n", g_checks, g_failures);
+        return g_failures == 0 ? 0 : 1;
+    }
 
     std::vector<std::string> filesystems;
     for (int i = 1; i < argc; ++i) filesystems.push_back(argv[i]);
@@ -348,6 +689,11 @@ int main(int argc, char** argv) {
     }
 
     runHidden();
+    runChangePassword(0, "fat", 8ll << 20);
+    runChangePassword(1, "ext4", 16ll << 20);
+    runCrypto();
+    runHashes();
+    runSingleFile();
 
     std::printf("\n%d checks, %d failed\n", g_checks, g_failures);
     return g_failures == 0 ? 0 : 1;

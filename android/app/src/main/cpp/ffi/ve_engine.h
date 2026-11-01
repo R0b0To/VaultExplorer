@@ -38,7 +38,7 @@ extern "C" {
 #  define VE_API __attribute__((visibility("default")))
 #endif
 
-#define VE_ABI_VERSION 3 /* bump whenever a function/struct is added or changed; the Dart side checks it */
+#define VE_ABI_VERSION 6 /* bump whenever a function/struct is added or changed; the Dart side checks it */
 
 /* ---- result codes ------------------------------------------------------- */
 #define VE_OK 0
@@ -49,6 +49,7 @@ extern "C" {
 #define VE_ERR_INVALID_ARG 5
 #define VE_ERR_EXCEPTION 6     /* a C++ exception was caught at the boundary */
 #define VE_ERR_MOUNT_FAILED 7  /* decrypted OK but the filesystem could not be mounted */
+#define VE_ERR_AUTH_FAILED 8   /* the supplied OLD password / keyfile did not verify (LUKS password change) */
 
 /* ---- library info / logging -------------------------------------------- */
 VE_API int32_t ve_abi_version(void);
@@ -166,6 +167,30 @@ typedef struct ve_create_hidden_params {
 
 VE_API int32_t ve_create_container_with_hidden(const ve_create_hidden_params* params);
 
+/* ---- password change (the container must NOT need to be unlocked) --------
+ * VeraCrypt (container_format 0): re-derives the header key under the new password/PIM/keyfiles; the
+ * result is only success or failure. LUKS1/LUKS2 (1/2): re-wraps the master key's active keyslot; a wrong
+ * old password is reported as VE_ERR_AUTH_FAILED, distinct from I/O or header errors (VE_ERR_FAILED). */
+typedef struct ve_change_password_params {
+    int32_t struct_size;
+    int32_t fd;                     /* opened read/write; owned by the engine */
+    int32_t container_format;       /* 0 = VeraCrypt, 1 or 2 = LUKS (version is auto-detected) */
+    const uint8_t* old_password;
+    int32_t old_password_len;
+    const uint8_t* new_password;
+    int32_t new_password_len;
+    int32_t old_pim;                /* VeraCrypt only */
+    int32_t new_pim;                /* VeraCrypt only */
+    int32_t cipher_id;              /* VeraCrypt only; 255 = auto */
+    int32_t hash_id;                /* VeraCrypt only; 255 = auto */
+    const int32_t* old_keyfile_fds; /* owned by the engine */
+    int32_t old_keyfile_count;
+    const int32_t* new_keyfile_fds; /* owned by the engine */
+    int32_t new_keyfile_count;
+} ve_change_password_params;
+
+VE_API int32_t ve_change_password(const ve_change_password_params* params);
+
 /* ---- filesystem operations on an unlocked slot ---------------------------
  * Paths are UTF-8, '/'-separated, relative to the volume root ("/" or ""). */
 
@@ -225,6 +250,81 @@ VE_API int64_t ve_open_stream(int32_t vol_id, const char* path);
 VE_API int32_t ve_read_stream(int32_t vol_id, int64_t handle, int64_t offset,
                               uint8_t* dest, int32_t length); /* bytes read, or -1 */
 VE_API void ve_close_stream(int32_t vol_id, int64_t handle);
+
+/* ---- crypto primitives ------------------------------------------------------
+ * The same implementations the Android bridge calls (BoringSSL / mbedTLS / the bundled Argon2 and
+ * scrypt), exposed for the app's own features: password hashing for app lock and PIN, thumbnail-cache
+ * encryption, authenticator-backup import, TOTP. All blocking; run them off the UI thread.
+ * Fixed-size outputs are written into a caller buffer; variable-size ones come back in a ve_buffer. */
+#define VE_HASH_SHA1 1
+#define VE_HASH_SHA256 2
+#define VE_HASH_SHA512 3
+
+/* PBKDF2-HMAC. salt must be non-empty, iterations > 0, out_len > 0. */
+VE_API int32_t ve_pbkdf2(int32_t hash, const uint8_t* password, size_t password_len,
+                         const uint8_t* salt, size_t salt_len, uint32_t iterations,
+                         uint8_t* out, size_t out_len);
+/* One-shot HMAC; out_cap must be >= the digest size (20 / 32 / 64). *out_len receives the size. */
+VE_API int32_t ve_hmac(int32_t hash, const uint8_t* key, size_t key_len,
+                       const uint8_t* data, size_t data_len,
+                       uint8_t* out, size_t out_cap, size_t* out_len);
+VE_API int32_t ve_scrypt(const uint8_t* password, size_t password_len,
+                         const uint8_t* salt, size_t salt_len,
+                         uint32_t n, uint32_t r, uint32_t p, uint8_t* out, size_t out_len);
+VE_API int32_t ve_argon2id(const uint8_t* password, size_t password_len,
+                           const uint8_t* salt, size_t salt_len,
+                           uint32_t memory_kib, uint32_t iterations, uint32_t parallelism,
+                           uint8_t* out, size_t out_len);
+/* AES-128/256-GCM (key_len 16 or 32, any non-empty IV). Seal output = ciphertext || 16-byte tag. */
+VE_API int32_t ve_aes_gcm_seal(const uint8_t* key, size_t key_len, const uint8_t* iv, size_t iv_len,
+                               const uint8_t* aad, size_t aad_len,
+                               const uint8_t* plaintext, size_t plaintext_len, ve_buffer* out);
+VE_API int32_t ve_aes_gcm_open(const uint8_t* key, size_t key_len, const uint8_t* iv, size_t iv_len,
+                               const uint8_t* aad, size_t aad_len,
+                               const uint8_t* ciphertext_and_tag, size_t len, ve_buffer* out);
+/* AES-CBC decrypt with PKCS#7 padding removal (key 16/24/32 bytes, IV 16 bytes). */
+VE_API int32_t ve_aes_cbc_decrypt(const uint8_t* key, size_t key_len, const uint8_t* iv, size_t iv_len,
+                                  const uint8_t* ciphertext, size_t len, ve_buffer* out);
+/* XChaCha20-Poly1305 open (key 32 bytes, nonce 24 bytes, input = ciphertext || 16-byte tag). */
+VE_API int32_t ve_xchacha20poly1305_open(const uint8_t* key, size_t key_len,
+                                         const uint8_t* nonce, size_t nonce_len,
+                                         const uint8_t* aad, size_t aad_len,
+                                         const uint8_t* ciphertext_and_tag, size_t len, ve_buffer* out);
+
+/* ---- single-file encryption (the "encrypt / decrypt a file" tool) ----------
+ * Stream-encrypts a host file into another host file (.vxenc, or .aes for cipher_index 2) and back.
+ * Progress is reported as VE_EVENT_SPLITJOIN_PROGRESS for op_id; to make the operation cancellable,
+ * ve_op_register(op_id, ...) first and call ve_op_cancel(op_id) -- a cancelled run returns
+ * VE_ERR_CANCELLED. src_fd and dest_fd are closed by the engine before returning; keyfile descriptors
+ * are consumed as the keyfiles are read. The caller deletes dest on any failure. */
+typedef struct ve_single_file_params {
+    int32_t struct_size;
+    int32_t src_fd;
+    int32_t dest_fd;
+    int32_t encrypt;             /* 1 = encrypt, 0 = decrypt */
+    int32_t cipher_index;        /* encrypt only: the tool's cipher choice (2 = ".aes" format) */
+    const uint8_t* password;
+    int32_t password_len;
+    const int32_t* keyfile_fds;
+    int32_t keyfile_count;
+    int32_t op_id;               /* 0 = not cancellable, no progress */
+} ve_single_file_params;
+
+VE_API int32_t ve_single_file_crypt(const ve_single_file_params* params);
+
+/* ---- streaming digests (checksum tool) -----------------------------------
+ * One session feeds the same bytes into several algorithms in a single pass. Algorithm ids: the
+ * VE_HASH_* values above plus VE_HASH_MD5. The mask has bit (1 << id) set for each wanted algorithm. */
+#define VE_HASH_MD5 4
+
+VE_API int64_t ve_hash_begin(uint32_t algorithm_mask);  /* handle, or 0 */
+VE_API int32_t ve_hash_update(int64_t handle, const uint8_t* data, size_t len);
+/* Finalizes one algorithm of the session into out (raw digest bytes). */
+VE_API int32_t ve_hash_finish(int64_t handle, int32_t algorithm, uint8_t* out, size_t cap, size_t* out_len);
+VE_API void ve_hash_free(int64_t handle);
+/* One-shot digest of a buffer. */
+VE_API int32_t ve_hash_bytes(int32_t algorithm, const uint8_t* data, size_t len,
+                             uint8_t* out, size_t cap, size_t* out_len);
 
 /* ---- operations: progress events + cancellation ------------------------- */
 #define VE_OP_COPY 0

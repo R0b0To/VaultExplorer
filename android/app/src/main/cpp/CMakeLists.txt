@@ -514,6 +514,7 @@ if(VAULTEXPLORER_DESKTOP)
     list(FILTER VE_ENGINE_SOURCES EXCLUDE REGEX "^jni/")
     list(APPEND VE_ENGINE_SOURCES
             ffi/ve_engine.cpp
+            ffi/ve_crypto.cpp
             ffi/ve_callbacks.cpp)
     if(WIN32)
         # pread/pwrite over CRT descriptors + BCryptGenRandom (the only file that includes <windows.h>)

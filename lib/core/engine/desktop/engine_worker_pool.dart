@@ -215,6 +215,94 @@ Object? veExecute(VeNative n, String op, List<Object?> a) {
         final (rc, files) = n.listDirectory(a[0] as int, a[1] as String);
         return [rc, files];
       }
+    // crypto primitives -> [resultCode, bytes?]
+    case 'pbkdf2':
+      {
+        final (rc, b) = n.pbkdf2(a[0] as int, a[1] as Uint8List, a[2] as Uint8List, a[3] as int, a[4] as int);
+        return [rc, b];
+      }
+    case 'hmac':
+      {
+        final (rc, b) = n.hmac(a[0] as int, a[1] as Uint8List, a[2] as Uint8List);
+        return [rc, b];
+      }
+    case 'scrypt':
+      {
+        final (rc, b) = n.scrypt(a[0] as Uint8List, a[1] as Uint8List, a[2] as int, a[3] as int, a[4] as int, a[5] as int);
+        return [rc, b];
+      }
+    case 'argon2id':
+      {
+        final (rc, b) = n.argon2id(a[0] as Uint8List, a[1] as Uint8List, a[2] as int, a[3] as int, a[4] as int, a[5] as int);
+        return [rc, b];
+      }
+    case 'gcmSeal':
+      {
+        final (rc, b) = n.aesGcmSeal(a[0] as Uint8List, a[1] as Uint8List, a[2] as Uint8List?, a[3] as Uint8List);
+        return [rc, b];
+      }
+    case 'gcmOpen':
+      {
+        final (rc, b) = n.aesGcmOpen(a[0] as Uint8List, a[1] as Uint8List, a[2] as Uint8List?, a[3] as Uint8List);
+        return [rc, b];
+      }
+    case 'cbcDecrypt':
+      {
+        final (rc, b) = n.aesCbcDecrypt(a[0] as Uint8List, a[1] as Uint8List, a[2] as Uint8List);
+        return [rc, b];
+      }
+    case 'xchachaOpen':
+      {
+        final (rc, b) = n.xchacha20Poly1305Open(a[0] as Uint8List, a[1] as Uint8List, a[2] as Uint8List?, a[3] as Uint8List);
+        return [rc, b];
+      }
+    case 'singleFile':
+      {
+        final m = Map<String, Object?>.from(a[0] as Map);
+        return n.singleFileCrypt(
+          srcPath: m['src'] as String,
+          destPath: m['dest'] as String,
+          encrypt: m['encrypt'] as bool,
+          password: m['password'] as Uint8List,
+          cipherIndex: m['cipher'] as int,
+          keyfilePaths: (m['keyfilePaths'] as List<Object?>).cast<String>(),
+          opId: m['opId'] as int,
+        );
+      }
+    case 'changePassword':
+      {
+        final m = Map<String, Object?>.from(a[0] as Map);
+        return n.changePassword(
+          path: m['path'] as String,
+          containerFormat: m['containerFormat'] as int,
+          oldPassword: m['oldPassword'] as Uint8List,
+          newPassword: m['newPassword'] as Uint8List,
+          oldPim: m['oldPim'] as int,
+          newPim: m['newPim'] as int,
+          cipherId: m['cipherId'] as int,
+          hashId: m['hashId'] as int,
+          oldKeyfilePaths: (m['oldKeyfilePaths'] as List<Object?>).cast<String>(),
+          newKeyfilePaths: (m['newKeyfilePaths'] as List<Object?>).cast<String>(),
+        );
+      }
+    // streaming digests: [resultCode, ...]
+    case 'hashBegin':
+      return n.hashBegin(a[0] as int);
+    case 'hashUpdate':
+      return n.hashUpdate(a[0] as int, a[1] as Uint8List);
+    case 'hashFinish':
+      {
+        final (rc, b) = n.hashFinish(a[0] as int, a[1] as int);
+        return [rc, b];
+      }
+    case 'hashFree':
+      n.hashFree(a[0] as int);
+      return null;
+    case 'hashBytes':
+      {
+        final (rc, b) = n.hashBytes(a[0] as int, a[1] as Uint8List);
+        return [rc, b];
+      }
     case 'vaultInfo':
       {
         final (rc, map) = n.vaultInfo(a[0] as int);

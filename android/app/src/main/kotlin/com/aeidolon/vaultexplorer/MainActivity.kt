@@ -46,6 +46,7 @@ import com.aeidolon.vaultexplorer.handlers.AppSettingsFileHandlers
 import com.aeidolon.vaultexplorer.handlers.BackgroundServiceHandlers
 import com.aeidolon.vaultexplorer.handlers.CameraRecordingServiceHandlers
 import com.aeidolon.vaultexplorer.handlers.BiometricKeyHandlers
+import com.aeidolon.vaultexplorer.handlers.SecurityKeyHandlers
 import com.aeidolon.vaultexplorer.handlers.DerivedKeyHandlers
 import com.aeidolon.vaultexplorer.handlers.DisguiseModeHandlers
 import com.aeidolon.vaultexplorer.handlers.FileOperationHandlers
@@ -94,6 +95,7 @@ private object ChannelMethods {
     const val UNLOCK_CONTAINER          = "unlockContainer"
     const val DETECTS_AS_PLAIN_DISK_IMAGE = "detectsAsPlainDiskImage"
     const val PROBE_CONTAINER_FORMAT    = "probeContainerFormat"
+    const val PROBE_SECURITY_KEY_VAULT  = "probeSecurityKeyVault"
     const val LOCK_CONTAINER            = "lockContainer"
     const val SYNC_BACKGROUND_SERVICE   = "syncBackgroundService"
     const val SCHEDULE_CONTAINER_AUTO_CLOSE = "scheduleContainerAutoClose"
@@ -388,8 +390,9 @@ open class MainActivity : FlutterFragmentActivity() {
     private val biometricKeyHandlers = BiometricKeyHandlers(this, ioExecutor)
     private val usbHandlers = UsbContainerHandlers(this, ACTION_USB_PERMISSION, ioExecutor, nativeOps, derivedKeyHandlers)
     private val vaultPickerHandlers = VaultPickerHandlers(this, pendingResult, ioExecutor)
-    private val vaultCreationHandlers = VaultCreationHandlers(this, pendingResult, ioExecutor, nativeOps)
-    private val vaultUnlockHandlers = VaultUnlockHandlers(this, ioExecutor, nativeOps, derivedKeyHandlers)
+    private val securityKeyHandlers = SecurityKeyHandlers(this, ioExecutor)
+    private val vaultCreationHandlers = VaultCreationHandlers(this, pendingResult, ioExecutor, nativeOps, securityKeyHandlers)
+    private val vaultUnlockHandlers = VaultUnlockHandlers(this, ioExecutor, nativeOps, derivedKeyHandlers, securityKeyHandlers)
     private val thumbnailHandlers = ThumbnailHandlers(this, imageThumbnailExecutor, videoThumbnailExecutor, nativeOps)
     private val importExportHandlers = ImportExportHandlers(this, pendingResult, ioExecutor, nativeOps)
     private val appSettingsFileHandlers = AppSettingsFileHandlers(this, pendingResult, ioExecutor)
@@ -1142,6 +1145,7 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.UNLOCK_SPLIT_CONTAINER -> vaultUnlockHandlers.handleUnlockContainer(call, result)
                 ChannelMethods.DETECTS_AS_PLAIN_DISK_IMAGE -> vaultUnlockHandlers.handleDetectsAsPlainDiskImage(call, result)
                 ChannelMethods.PROBE_CONTAINER_FORMAT -> vaultUnlockHandlers.handleProbeContainerFormat(call, result)
+                ChannelMethods.PROBE_SECURITY_KEY_VAULT -> securityKeyHandlers.handleProbeSecurityKey(call, result)
                 ChannelMethods.UNLOCK_CRYPTOMATOR_VAULT -> vaultUnlockHandlers.handleUnlockCryptomatorVault(call, result)
                 ChannelMethods.UNLOCK_GOCRYPTFS_VAULT -> vaultUnlockHandlers.handleUnlockGocryptfsVault(call, result)
                 ChannelMethods.UNLOCK_CRYFS_VAULT -> vaultUnlockHandlers.handleUnlockCryfsVault(call, result)

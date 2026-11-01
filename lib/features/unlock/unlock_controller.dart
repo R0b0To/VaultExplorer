@@ -17,6 +17,7 @@ import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
 import 'package:vaultexplorer/features/lock/widgets/pin_lock_view.dart';
 import 'package:vaultexplorer/features/unlock/unlock_lockout_throttle.dart';
+import 'package:vaultexplorer/core/utils/security_key_errors.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
 part 'unlock_controller.g.dart';
@@ -83,6 +84,20 @@ class UnlockState {
   final String? error;
   final int cipherId;
   final int hashId;
+
+  /// The selected gocryptfs vault / LUKS2 container is protected by a FIDO2
+  /// security key (see UnlockController.probeSecurityKey). The password field
+  /// is replaced by a "present your key" prompt and unlocking derives the
+  /// credential from the key natively.
+  final bool securityKeyRequired;
+
+  /// The vault's own metadata says the key's PIN is needed -- or the key
+  /// asked for it during an attempt (e.g. a key configured to always require
+  /// user verification) -- so the sheet shows the PIN field.
+  final bool securityKeyPinRequired;
+
+  /// This phone has NFC, so "tap" is a valid way to present the key.
+  final bool securityKeyNfcAvailable;
 
   /// Set once vaultLifecycleApiProvider's detectsAsPlainDiskImage() comes
   /// back true for selectedUri -- see UnlockController._checkPlainDiskImage.
@@ -200,6 +215,9 @@ class UnlockState {
     this.compositeCarrierNames = const {},
     this.compositeCarrierProfiles = const {},
     this.mountedSuccess,
+    this.securityKeyRequired = false,
+    this.securityKeyPinRequired = false,
+    this.securityKeyNfcAvailable = false,
   });
 
   UnlockState _copy({
@@ -246,6 +264,9 @@ class UnlockState {
     Map<String, CarrierBudget>? compositeCarrierProfiles,
     bool clearCompositeCarrierUris = false,
     ({MountedContainer container, ContainerRecord? record})? mountedSuccess,
+    bool? securityKeyRequired,
+    bool? securityKeyPinRequired,
+    bool? securityKeyNfcAvailable,
   }) => UnlockState(
     selectedUri: clearSelectedUri ? null : (selectedUri ?? this.selectedUri),
     selectedName: clearSelectedName
@@ -293,6 +314,10 @@ class UnlockState {
         ? const {}
         : (compositeCarrierProfiles ?? this.compositeCarrierProfiles),
     mountedSuccess: mountedSuccess ?? this.mountedSuccess,
+    securityKeyRequired: securityKeyRequired ?? this.securityKeyRequired,
+    securityKeyPinRequired: securityKeyPinRequired ?? this.securityKeyPinRequired,
+    securityKeyNfcAvailable:
+        securityKeyNfcAvailable ?? this.securityKeyNfcAvailable,
   );
 }
 
@@ -431,6 +456,39 @@ class UnlockController extends _$UnlockController {
         state = state._copy(checkingContainer: false);
       }
     }
+  }
+
+  /// Asks native whether the selected vault wants a FIDO2 security key instead
+  /// of a password. Only gocryptfs vaults and LUKS2 containers can (the only
+  /// formats with a key scheme shared with other tools); for everything else
+  /// this just clears the flags. Called by the sheet whenever the selected
+  /// vault or its detected format changes.
+  Future<void> probeSecurityKey() async {
+    final uri = state.selectedUri;
+    final format = state.isGocryptfs
+        ? 'gocryptfs'
+        : state.isLuks
+        ? 'luks'
+        : null;
+    if (uri == null || format == null || state.isComposite) {
+      if (state.securityKeyRequired || state.securityKeyPinRequired) {
+        state = state._copy(
+          securityKeyRequired: false,
+          securityKeyPinRequired: false,
+        );
+      }
+      return;
+    }
+    final probe = await ref
+        .read(vaultLifecycleApiProvider)
+        .probeSecurityKeyVault(uri, format);
+    // The selection may have changed while native was reading the header.
+    if (!ref.mounted || state.selectedUri != uri) return;
+    state = state._copy(
+      securityKeyRequired: probe.required,
+      securityKeyPinRequired: probe.required && probe.pinRequired,
+      securityKeyNfcAvailable: probe.nfcAvailable,
+    );
   }
 
   Future<void> _initUnlockMethod(String uri) async {
@@ -1509,11 +1567,23 @@ class UnlockController extends _$UnlockController {
     List<String>? keyfilePathsOverride,
     required AppLocalizations l10n,
     bool passwordPrefilled = false,
+    String? securityKeyPinText,
   }) async {
     final uri = state.selectedUri;
     if (uri == null) return;
 
-    var effectivePassword = (passwordOverride ?? passwordText ?? '').trim();
+    // A key-protected gocryptfs vault / LUKS2 container is unlocked with the
+    // key (plus its PIN when needed), never a typed password; native derives
+    // the credential, so nothing secret passes through Dart.
+    final useSecurityKey =
+        state.securityKeyRequired &&
+        (state.isGocryptfs || state.isLuks) &&
+        !state.isComposite;
+    final securityKeyPin = useSecurityKey ? securityKeyPinText : null;
+
+    var effectivePassword = useSecurityKey
+        ? ''
+        : (passwordOverride ?? passwordText ?? '').trim();
     final effectiveKeyfiles =
         keyfilePathsOverride ?? state.keyfiles.map((k) => k.uri).toList();
     // Keyfiles the user picked for this unlock, as opposed to ones replayed
@@ -1680,6 +1750,8 @@ class UnlockController extends _$UnlockController {
             documentProvider: params.documentProvider,
             autoMountFolders: params.autoMountFolders,
             readOnly: state.readOnly,
+            useSecurityKey: useSecurityKey,
+            securityKeyPin: securityKeyPin,
           );
         } else {
           // CryFS: the only folder-vault format that supports derived-key
@@ -1870,6 +1942,8 @@ class UnlockController extends _$UnlockController {
               hiddenVolumeCipherId: state.hiddenCipherId,
               hiddenVolumeHashId: state.hiddenHashId,
               hiddenVolumeKeyfilePaths: hiddenKeyfiles,
+              useSecurityKey: useSecurityKey,
+              securityKeyPin: securityKeyPin,
             )
           : await _unlockSwallowingStaleAuthFail(
               () => lifecycle.unlockContainer(
@@ -2020,8 +2094,17 @@ class UnlockController extends _$UnlockController {
       }
     } on PlatformException catch (e) {
       if (ref.mounted && e.code != 'CANCELLED') {
-        final authError = _localizedUnlockAuthError(e, l10n);
-        state = state._copy(loading: false, error: authError ?? e.message ?? '$e');
+        final keyError = localizedSecurityKeyError(e, l10n);
+        final authError = keyError ?? _localizedUnlockAuthError(e, l10n);
+        state = state._copy(
+          loading: false,
+          // The key wants its PIN (the vault didn't say so up front): reveal the field.
+          securityKeyPinRequired:
+              e.code == 'SECURITY_KEY_PIN_REQUIRED' ? true : null,
+          error: e.code == 'SECURITY_KEY_CANCELLED'
+              ? null
+              : authError ?? e.message ?? '$e',
+        );
       }
     } catch (e) {
       if (ref.mounted) {

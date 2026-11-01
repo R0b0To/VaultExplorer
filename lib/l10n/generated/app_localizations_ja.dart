@@ -12511,4 +12511,70 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get comicReaderCarouselScrubberSubtitle => 'スライダーの上にページのサムネイルを表示';
+
+  @override
+  String get securityKeyUnlockHintNfc =>
+      'この保管庫はセキュリティキーで保護されています。「ロック解除」をタップし、キーをスマートフォンの背面に当てるか、接続してください。点滅している場合はキーに触れてください。';
+
+  @override
+  String get securityKeyUnlockHintUsb =>
+      'この保管庫はセキュリティキーで保護されています。「ロック解除」をタップし、キーを接続してください。点滅している場合はキーに触れてください。';
+
+  @override
+  String get securityKeyPinFieldLabel => 'セキュリティキーのPIN';
+
+  @override
+  String get securityKeyWaiting => 'セキュリティキーを待っています…';
+
+  @override
+  String get securityKeyErrorTimeout => '時間内にセキュリティキーが検出されませんでした。もう一度お試しください。';
+
+  @override
+  String get securityKeyErrorPinRequired => 'セキュリティキーのPINを入力してください。';
+
+  @override
+  String get securityKeyErrorPinInvalid => 'セキュリティキーのPINが正しくありません。';
+
+  @override
+  String get securityKeyErrorPinBlocked =>
+      'セキュリティキーのPINがブロックされています。キーを抜き差しするか、リセットしてください。';
+
+  @override
+  String get securityKeyErrorPinNotSet =>
+      'このセキュリティキーにはPINが設定されていません。先にPINを設定するか、PIN必須をオフにしてください。';
+
+  @override
+  String get securityKeyErrorNoCredential =>
+      'この保管庫に使われているセキュリティキーではありません。別のキーをお試しください。';
+
+  @override
+  String get securityKeyErrorUnsupported =>
+      'このセキュリティキーはここでは使用できません。hmac-secret拡張に対応したFIDO2とPIN認証が必要です。';
+
+  @override
+  String get securityKeyErrorTouch => '時間内にセキュリティキーに触れませんでした。もう一度お試しください。';
+
+  @override
+  String get securityKeyErrorGeneric => 'セキュリティキーの操作に失敗しました。もう一度お試しください。';
+
+  @override
+  String get securityKeyCreateTitle => 'セキュリティキーで保護';
+
+  @override
+  String get securityKeyCreateSubtitle =>
+      'パスワードの代わりにYubiKeyなどのFIDO2キーを使用します。gocryptfs -fido2と互換性があります。';
+
+  @override
+  String get securityKeyCreateHint =>
+      '「作成」をタップし、キーをスマートフォンの背面に当てるか、接続してください。点滅している場合はキーに触れてください。このキー(必要な場合はPINも)がないと保管庫は開けず、代わりに使えるパスワードもありません。';
+
+  @override
+  String get securityKeyRequirePinTitle => 'キーのPINを必須にする';
+
+  @override
+  String get securityKeyRequirePinSubtitle =>
+      'ロック解除のたびにPINを求めます。キーにあらかじめPINが設定されている必要があります。';
+
+  @override
+  String get wizardSummarySecurityKeyValue => 'セキュリティキー';
 }

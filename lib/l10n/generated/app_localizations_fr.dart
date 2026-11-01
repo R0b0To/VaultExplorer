@@ -13370,4 +13370,75 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get comicReaderCarouselScrubberSubtitle =>
       'Afficher les miniatures des pages au-dessus du curseur';
+
+  @override
+  String get securityKeyUnlockHintNfc =>
+      'Ce coffre est protégé par une clé de sécurité. Appuyez sur Déverrouiller, puis approchez la clé de l\'arrière du téléphone ou branchez-la. Touchez-la si elle clignote.';
+
+  @override
+  String get securityKeyUnlockHintUsb =>
+      'Ce coffre est protégé par une clé de sécurité. Appuyez sur Déverrouiller, puis branchez la clé. Touchez-la si elle clignote.';
+
+  @override
+  String get securityKeyPinFieldLabel => 'PIN de la clé de sécurité';
+
+  @override
+  String get securityKeyWaiting => 'En attente de votre clé de sécurité…';
+
+  @override
+  String get securityKeyErrorTimeout =>
+      'Aucune clé de sécurité détectée à temps. Réessayez.';
+
+  @override
+  String get securityKeyErrorPinRequired =>
+      'Saisissez le PIN de votre clé de sécurité.';
+
+  @override
+  String get securityKeyErrorPinInvalid =>
+      'PIN de la clé de sécurité incorrect.';
+
+  @override
+  String get securityKeyErrorPinBlocked =>
+      'Le PIN de la clé de sécurité est bloqué. Débranchez puis rebranchez la clé, ou réinitialisez-la.';
+
+  @override
+  String get securityKeyErrorPinNotSet =>
+      'Aucun PIN n\'est défini sur cette clé de sécurité. Définissez-en un d\'abord ou désactivez l\'exigence de PIN.';
+
+  @override
+  String get securityKeyErrorNoCredential =>
+      'Ce n\'est pas la clé de sécurité utilisée pour ce coffre. Essayez une autre clé.';
+
+  @override
+  String get securityKeyErrorUnsupported =>
+      'Cette clé de sécurité ne peut pas être utilisée ici. Elle doit prendre en charge FIDO2 avec l\'extension hmac-secret et la vérification par PIN.';
+
+  @override
+  String get securityKeyErrorTouch =>
+      'La clé de sécurité n\'a pas été touchée à temps. Réessayez.';
+
+  @override
+  String get securityKeyErrorGeneric =>
+      'L\'opération avec la clé de sécurité a échoué. Réessayez.';
+
+  @override
+  String get securityKeyCreateTitle => 'Protéger avec une clé de sécurité';
+
+  @override
+  String get securityKeyCreateSubtitle =>
+      'Utilisez une clé FIDO2, comme une YubiKey, au lieu d\'un mot de passe. Compatible avec gocryptfs -fido2.';
+
+  @override
+  String get securityKeyCreateHint =>
+      'Appuyez sur Créer, puis approchez la clé de l\'arrière du téléphone ou branchez-la. Touchez-la si elle clignote. Sans cette clé (et son PIN, s\'il est exigé), le coffre ne peut pas être ouvert et il n\'existe aucun mot de passe de secours.';
+
+  @override
+  String get securityKeyRequirePinTitle => 'Exiger le PIN de la clé';
+
+  @override
+  String get securityKeyRequirePinSubtitle =>
+      'Demande le PIN à chaque déverrouillage. Un PIN doit déjà être défini sur la clé.';
+
+  @override
+  String get wizardSummarySecurityKeyValue => 'Clé de sécurité';
 }

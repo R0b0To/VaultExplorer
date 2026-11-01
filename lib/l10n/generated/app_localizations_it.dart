@@ -13262,4 +13262,75 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get comicReaderCarouselScrubberSubtitle =>
       'Mostra le miniature delle pagine sopra il cursore';
+
+  @override
+  String get securityKeyUnlockHintNfc =>
+      'Questo vault è protetto da una chiave di sicurezza. Tocca Sblocca, poi avvicina la chiave al retro del telefono oppure collegala. Toccala se lampeggia.';
+
+  @override
+  String get securityKeyUnlockHintUsb =>
+      'Questo vault è protetto da una chiave di sicurezza. Tocca Sblocca, poi collega la chiave. Toccala se lampeggia.';
+
+  @override
+  String get securityKeyPinFieldLabel => 'PIN della chiave di sicurezza';
+
+  @override
+  String get securityKeyWaiting => 'In attesa della chiave di sicurezza…';
+
+  @override
+  String get securityKeyErrorTimeout =>
+      'Nessuna chiave di sicurezza rilevata in tempo. Riprova.';
+
+  @override
+  String get securityKeyErrorPinRequired =>
+      'Inserisci il PIN della tua chiave di sicurezza.';
+
+  @override
+  String get securityKeyErrorPinInvalid =>
+      'PIN della chiave di sicurezza errato.';
+
+  @override
+  String get securityKeyErrorPinBlocked =>
+      'Il PIN della chiave di sicurezza è bloccato. Scollega e ricollega la chiave oppure reimpostala.';
+
+  @override
+  String get securityKeyErrorPinNotSet =>
+      'Su questa chiave di sicurezza non è impostato alcun PIN. Impostane uno prima o disattiva l\'obbligo del PIN.';
+
+  @override
+  String get securityKeyErrorNoCredential =>
+      'Questa non è la chiave di sicurezza usata per questo vault. Prova con un\'altra chiave.';
+
+  @override
+  String get securityKeyErrorUnsupported =>
+      'Questa chiave di sicurezza non può essere usata qui. Richiede FIDO2 con l\'estensione hmac-secret e la verifica tramite PIN.';
+
+  @override
+  String get securityKeyErrorTouch =>
+      'La chiave di sicurezza non è stata toccata in tempo. Riprova.';
+
+  @override
+  String get securityKeyErrorGeneric =>
+      'L\'operazione con la chiave di sicurezza non è riuscita. Riprova.';
+
+  @override
+  String get securityKeyCreateTitle => 'Proteggi con una chiave di sicurezza';
+
+  @override
+  String get securityKeyCreateSubtitle =>
+      'Usa una chiave FIDO2, come una YubiKey, al posto di una password. Compatibile con gocryptfs -fido2.';
+
+  @override
+  String get securityKeyCreateHint =>
+      'Tocca Crea, poi avvicina la chiave al retro del telefono oppure collegala. Toccala se lampeggia. Senza questa chiave (e il suo PIN, se richiesto) il vault non può essere aperto e non esiste una password di riserva.';
+
+  @override
+  String get securityKeyRequirePinTitle => 'Richiedi il PIN della chiave';
+
+  @override
+  String get securityKeyRequirePinSubtitle =>
+      'Chiede il PIN a ogni sblocco. Sulla chiave deve essere già impostato un PIN.';
+
+  @override
+  String get wizardSummarySecurityKeyValue => 'Chiave di sicurezza';
 }

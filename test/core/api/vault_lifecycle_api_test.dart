@@ -473,6 +473,78 @@ void main() {
     });
   });
 
+  group('security key (FIDO2) vaults', () {
+    test('probeSecurityKeyVault sends filePath/format and parses the reply', () async {
+      nextResult = <Object?, Object?>{
+        'required': true,
+        'pinRequired': true,
+        'nfcAvailable': true,
+      };
+      final probe = await api.probeSecurityKeyVault('content://v', 'gocryptfs');
+      expect(calls.single.method, 'probeSecurityKeyVault');
+      expect(calls.single.arguments['filePath'], 'content://v');
+      expect(calls.single.arguments['format'], 'gocryptfs');
+      expect(probe, (required: true, pinRequired: true, nfcAvailable: true));
+    });
+
+    test('probeSecurityKeyVault never throws -- failure means "not required"', () async {
+      nextError = PlatformException(code: 'BOOM');
+      final probe = await api.probeSecurityKeyVault('content://v', 'luks');
+      expect(probe, (required: false, pinRequired: false, nfcAvailable: false));
+    });
+
+    test('unlockGocryptfsVault only sends security key args when asked to', () async {
+      nextResult = <Object?, Object?>{'volId': 1, 'files': <Object?>[]};
+      await api.unlockGocryptfsVault('content://v', 'pw');
+      expect(calls.last.arguments.containsKey('useSecurityKey'), isFalse);
+      expect(calls.last.arguments.containsKey('securityKeyPin'), isFalse);
+
+      await api.unlockGocryptfsVault('content://v', '', useSecurityKey: true, securityKeyPin: '1234');
+      expect(calls.last.arguments['useSecurityKey'], isTrue);
+      expect(calls.last.arguments['securityKeyPin'], '1234');
+
+      await api.unlockGocryptfsVault('content://v', '', useSecurityKey: true, securityKeyPin: '');
+      expect(calls.last.arguments.containsKey('securityKeyPin'), isFalse);
+    });
+
+    test('unlockContainer forwards the security key flag and PIN', () async {
+      nextResult = <Object?, Object?>{'volId': 1, 'files': <Object?>[]};
+      await api.unlockContainer('content://c', '', 0, useSecurityKey: true, securityKeyPin: '9876');
+      expect(calls.single.method, 'unlockContainer');
+      expect(calls.single.arguments['useSecurityKey'], isTrue);
+      expect(calls.single.arguments['securityKeyPin'], '9876');
+    });
+
+    test('createGocryptfsVault sends the security key options', () async {
+      nextResult = true;
+      final ok = await api.createGocryptfsVault(
+        'content://v',
+        '',
+        useSecurityKey: true,
+        securityKeyRequirePin: true,
+        securityKeyPin: '1234',
+      );
+      expect(ok, isTrue);
+      expect(calls.single.arguments['useSecurityKey'], isTrue);
+      expect(calls.single.arguments['securityKeyRequirePin'], isTrue);
+      expect(calls.single.arguments['securityKeyPin'], '1234');
+    });
+
+    test('createGocryptfsVault rethrows SECURITY_KEY_* errors instead of returning false', () async {
+      nextError = PlatformException(code: 'SECURITY_KEY_PIN_INVALID', message: 'Incorrect security key PIN.');
+      expect(
+        () => api.createGocryptfsVault('content://v', '', useSecurityKey: true),
+        throwsA(isA<PlatformException>().having((e) => e.code, 'code', 'SECURITY_KEY_PIN_INVALID')),
+      );
+    });
+
+    test('createGocryptfsVault still swallows other errors into false', () async {
+      nextError = PlatformException(code: 'CREATE_FAILED');
+      expect(await api.createGocryptfsVault('content://v', '', useSecurityKey: true), isFalse);
+      expect(await api.createGocryptfsVault('content://v', 'pw'), isFalse);
+    });
+  });
+
   group('unlockUsbContainer', () {
     test('sends deviceName and parses the unlock result', () async {
       nextResult = <Object?, Object?>{

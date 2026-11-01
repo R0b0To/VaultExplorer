@@ -13253,4 +13253,75 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get comicReaderCarouselScrubberSubtitle =>
       'Seitenminiaturen über dem Schieberegler anzeigen';
+
+  @override
+  String get securityKeyUnlockHintNfc =>
+      'Dieser Tresor ist durch einen Sicherheitsschlüssel geschützt. Tippen Sie auf „Entsperren“ und halten Sie den Schlüssel an die Rückseite des Telefons oder stecken Sie ihn an. Berühren Sie ihn, falls er blinkt.';
+
+  @override
+  String get securityKeyUnlockHintUsb =>
+      'Dieser Tresor ist durch einen Sicherheitsschlüssel geschützt. Tippen Sie auf „Entsperren“ und stecken Sie dann den Schlüssel an. Berühren Sie ihn, falls er blinkt.';
+
+  @override
+  String get securityKeyPinFieldLabel => 'PIN des Sicherheitsschlüssels';
+
+  @override
+  String get securityKeyWaiting => 'Warten auf den Sicherheitsschlüssel …';
+
+  @override
+  String get securityKeyErrorTimeout =>
+      'Es wurde rechtzeitig kein Sicherheitsschlüssel erkannt. Versuchen Sie es erneut.';
+
+  @override
+  String get securityKeyErrorPinRequired =>
+      'Geben Sie die PIN Ihres Sicherheitsschlüssels ein.';
+
+  @override
+  String get securityKeyErrorPinInvalid =>
+      'Falsche PIN des Sicherheitsschlüssels.';
+
+  @override
+  String get securityKeyErrorPinBlocked =>
+      'Die PIN des Sicherheitsschlüssels ist gesperrt. Ziehen Sie den Schlüssel ab und stecken Sie ihn erneut an oder setzen Sie ihn zurück.';
+
+  @override
+  String get securityKeyErrorPinNotSet =>
+      'Für diesen Sicherheitsschlüssel ist keine PIN festgelegt. Legen Sie zuerst eine fest oder deaktivieren Sie die PIN-Pflicht.';
+
+  @override
+  String get securityKeyErrorNoCredential =>
+      'Dies ist nicht der Sicherheitsschlüssel dieses Tresors. Versuchen Sie einen anderen Schlüssel.';
+
+  @override
+  String get securityKeyErrorUnsupported =>
+      'Dieser Sicherheitsschlüssel kann hier nicht verwendet werden. Er benötigt FIDO2 mit der hmac-secret-Erweiterung und PIN-Verifizierung.';
+
+  @override
+  String get securityKeyErrorTouch =>
+      'Der Sicherheitsschlüssel wurde nicht rechtzeitig berührt. Versuchen Sie es erneut.';
+
+  @override
+  String get securityKeyErrorGeneric =>
+      'Der Vorgang mit dem Sicherheitsschlüssel ist fehlgeschlagen. Versuchen Sie es erneut.';
+
+  @override
+  String get securityKeyCreateTitle => 'Mit Sicherheitsschlüssel schützen';
+
+  @override
+  String get securityKeyCreateSubtitle =>
+      'Verwenden Sie statt eines Passworts einen FIDO2-Schlüssel wie einen YubiKey. Kompatibel mit gocryptfs -fido2.';
+
+  @override
+  String get securityKeyCreateHint =>
+      'Tippen Sie auf „Erstellen“ und halten Sie den Schlüssel an die Rückseite des Telefons oder stecken Sie ihn an. Berühren Sie ihn, falls er blinkt. Ohne diesen Schlüssel (und seine PIN, falls erforderlich) lässt sich der Tresor nicht öffnen – es gibt kein Passwort als Alternative.';
+
+  @override
+  String get securityKeyRequirePinTitle => 'PIN des Schlüssels verlangen';
+
+  @override
+  String get securityKeyRequirePinSubtitle =>
+      'Bei jedem Entsperren nach der PIN fragen. Für den Schlüssel muss bereits eine PIN festgelegt sein.';
+
+  @override
+  String get wizardSummarySecurityKeyValue => 'Sicherheitsschlüssel';
 }

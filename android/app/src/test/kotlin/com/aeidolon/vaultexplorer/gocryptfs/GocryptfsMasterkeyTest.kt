@@ -244,4 +244,43 @@ class GocryptfsMasterkeyTest {
         assertEquals(GocryptfsCipher.AES_256_GCM, parsed.cipher)
         assertArrayEquals(masterkey, GocryptfsMasterkey.unlock(parsed, password))
     }
+
+    private fun testConfig(encryptedKey: ByteArray, salt: ByteArray) = GocryptfsConfig(
+        encryptedKey = encryptedKey,
+        scryptSalt = salt,
+        scryptN = testScryptN,
+        scryptR = testScryptR,
+        scryptP = 1,
+        scryptKeyLen = testScryptKeyLen,
+        version = 2,
+        featureFlags = setOf("GCMIV128", "DirIV", "EMENames", "LongNames", "Raw64", "HKDF"),
+        longNameMax = 0,
+        cipher = GocryptfsCipher.AES_256_GCM,
+        plaintextNames = false,
+    )
+
+    @Test
+    fun rawSecretWrapAndUnlockRoundTrip() {
+        // A FIDO2 hmac-secret is arbitrary bytes, several of them >= 0x80.
+        val secret = ByteArray(32) { (0x80 + it * 5).toByte() }
+        val masterkey = freshMasterkey()
+        val salt = ByteArray(32).also { random.nextBytes(it) }
+        val encryptedKey = GocryptfsMasterkey.wrap(masterkey, secret, salt, testScryptN, testScryptR, testScryptKeyLen, random)
+        val config = testConfig(encryptedKey, salt)
+        assertArrayEquals(masterkey, GocryptfsMasterkey.unlock(config, secret))
+    }
+
+    @Test
+    fun rawSecretIsNotTheSameAsItsCharArrayForm() {
+        // Guards the interop trap: pushing raw bytes through the CharArray
+        // overload UTF-8-encodes them and derives a different key than
+        // gocryptfs does, so a security-key vault could never unlock.
+        val secret = ByteArray(32) { (0x80 + it * 5).toByte() }
+        val asChars = CharArray(secret.size) { (secret[it].toInt() and 0xFF).toChar() }
+        val masterkey = freshMasterkey()
+        val salt = ByteArray(32).also { random.nextBytes(it) }
+        val encryptedKey = GocryptfsMasterkey.wrap(masterkey, secret, salt, testScryptN, testScryptR, testScryptKeyLen, random)
+        val config = testConfig(encryptedKey, salt)
+        assertThrows(GocryptfsWrongPasswordException::class.java) { GocryptfsMasterkey.unlock(config, asChars) }
+    }
 }

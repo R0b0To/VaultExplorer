@@ -13279,4 +13279,73 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get comicReaderCarouselScrubberSubtitle =>
       'إظهار صور مصغرة للصفحات فوق شريط التمرير';
+
+  @override
+  String get securityKeyUnlockHintNfc =>
+      'هذه الخزنة محمية بمفتاح أمان. اضغط على «فتح القفل»، ثم قرّب المفتاح من الجزء الخلفي للهاتف أو وصّله. المس المفتاح إذا كان يومض.';
+
+  @override
+  String get securityKeyUnlockHintUsb =>
+      'هذه الخزنة محمية بمفتاح أمان. اضغط على «فتح القفل»، ثم وصّل المفتاح. المس المفتاح إذا كان يومض.';
+
+  @override
+  String get securityKeyPinFieldLabel => 'رمز PIN لمفتاح الأمان';
+
+  @override
+  String get securityKeyWaiting => 'في انتظار مفتاح الأمان…';
+
+  @override
+  String get securityKeyErrorTimeout =>
+      'لم يتم اكتشاف مفتاح أمان في الوقت المناسب. حاول مرة أخرى.';
+
+  @override
+  String get securityKeyErrorPinRequired => 'أدخل رمز PIN الخاص بمفتاح الأمان.';
+
+  @override
+  String get securityKeyErrorPinInvalid => 'رمز PIN لمفتاح الأمان غير صحيح.';
+
+  @override
+  String get securityKeyErrorPinBlocked =>
+      'رمز PIN لمفتاح الأمان محظور. افصل المفتاح وأعد توصيله أو أعد ضبطه.';
+
+  @override
+  String get securityKeyErrorPinNotSet =>
+      'لم يتم تعيين رمز PIN لمفتاح الأمان هذا. عيّن رمزًا أولًا أو أوقف اشتراط PIN.';
+
+  @override
+  String get securityKeyErrorNoCredential =>
+      'هذا ليس مفتاح الأمان المستخدم لهذه الخزنة. جرّب مفتاحًا آخر.';
+
+  @override
+  String get securityKeyErrorUnsupported =>
+      'لا يمكن استخدام مفتاح الأمان هذا هنا. يتطلب FIDO2 مع امتداد hmac-secret والتحقق برمز PIN.';
+
+  @override
+  String get securityKeyErrorTouch =>
+      'لم يتم لمس مفتاح الأمان في الوقت المناسب. حاول مرة أخرى.';
+
+  @override
+  String get securityKeyErrorGeneric =>
+      'فشلت العملية مع مفتاح الأمان. حاول مرة أخرى.';
+
+  @override
+  String get securityKeyCreateTitle => 'الحماية بمفتاح أمان';
+
+  @override
+  String get securityKeyCreateSubtitle =>
+      'استخدم مفتاح FIDO2 مثل YubiKey بدلًا من كلمة المرور. متوافق مع gocryptfs -fido2.';
+
+  @override
+  String get securityKeyCreateHint =>
+      'اضغط على «إنشاء»، ثم قرّب المفتاح من الجزء الخلفي للهاتف أو وصّله. المس المفتاح إذا كان يومض. بدون هذا المفتاح (ورمز PIN الخاص به إن كان مطلوبًا) لا يمكن فتح الخزنة ولا توجد كلمة مرور بديلة.';
+
+  @override
+  String get securityKeyRequirePinTitle => 'اشتراط رمز PIN للمفتاح';
+
+  @override
+  String get securityKeyRequirePinSubtitle =>
+      'اطلب رمز PIN عند كل فتح للقفل. يجب أن يكون المفتاح قد عُيّن له رمز PIN مسبقًا.';
+
+  @override
+  String get wizardSummarySecurityKeyValue => 'مفتاح أمان';
 }

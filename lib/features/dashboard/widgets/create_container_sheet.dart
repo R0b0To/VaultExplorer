@@ -44,6 +44,7 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
 
   final _folderVaultPasswordCtrl = TextEditingController();
   final _folderVaultConfirmCtrl = TextEditingController();
+  final _securityKeyPinCtrl = TextEditingController();
 
   bool _obscure = true;
   bool _confirmObscure = true;
@@ -89,6 +90,7 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
     _hiddenSizeCtrl.dispose();
     _folderVaultPasswordCtrl.dispose();
     _folderVaultConfirmCtrl.dispose();
+    _securityKeyPinCtrl.dispose();
     super.dispose();
   }
 
@@ -143,6 +145,7 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
                   confirmPassword: _folderVaultConfirmCtrl.text,
                   l10n: l10n,
                   userEntropy: userEntropy,
+                  securityKeyPin: _securityKeyPinCtrl.text,
                 )
             : ref.read(createContainerProvider.notifier).createContainerFile(
                   nameText: _nameCtrl.text,
@@ -232,7 +235,12 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
       ? state.folderVaultUri != null
       : (_nameCtrl.text.trim().isNotEmpty && (double.tryParse(_sizeCtrl.text) ?? 0) > 0);
 
-  bool _canProceedSecurity(CreateContainerState state) => state.isFolderVault
+  bool _usesSecurityKey(CreateContainerState state) =>
+      state.isFolderVault && state.folderVaultFormat == 'gocryptfs' && state.securityKey;
+
+  bool _canProceedSecurity(CreateContainerState state) => _usesSecurityKey(state)
+      ? (!state.securityKeyRequirePin || _securityKeyPinCtrl.text.isNotEmpty)
+      : state.isFolderVault
       ? (_folderVaultPasswordCtrl.text.isNotEmpty &&
           _folderVaultPasswordCtrl.text == _folderVaultConfirmCtrl.text)
       : ((_passwordCtrl.text.isNotEmpty || state.outerKeyfiles.isNotEmpty) &&
@@ -788,8 +796,24 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
       children: [
         SectionCard(
           children: [
+            if (state.isFolderVault && state.folderVaultFormat == 'gocryptfs')
+              SwitchListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                value: state.securityKey,
+                onChanged: state.loading
+                    ? null
+                    : (val) => ref.read(createContainerProvider.notifier).setSecurityKey(val),
+                title: Text(l10n.securityKeyCreateTitle),
+                subtitle: Text(
+                  l10n.securityKeyCreateSubtitle,
+                  style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                ),
+                secondary: Icon(Icons.key_rounded, color: cs.primary, size: 22),
+              ),
             ...(state.isFolderVault
-                ? _buildFolderVaultPasswordFields(cs, isShortScreen)
+                ? (_usesSecurityKey(state)
+                    ? _buildSecurityKeyFields(state, cs, textTheme)
+                    : _buildFolderVaultPasswordFields(cs, isShortScreen))
                 : [..._buildPasswordFields(cs, isShortScreen), _buildKeyfilesPicker(state)]),
             SwitchListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 16),
@@ -808,6 +832,53 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
         ),
       ],
     );
+  }
+
+  /// Replaces the password fields when the new gocryptfs vault is protected by
+  /// a FIDO2 security key: how to present the key, and the optional PIN.
+  List<Widget> _buildSecurityKeyFields(CreateContainerState state, ColorScheme cs, TextTheme textTheme) {
+    final l10n = context.l10n;
+    final showPin = state.securityKeyRequirePin || state.securityKeyPinNeeded;
+    return [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        child: InlineBanner(
+          l10n.securityKeyCreateHint,
+          tone: AppBannerTone.info,
+          icon: Icons.key_rounded,
+        ),
+      ),
+      SwitchListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+        value: state.securityKeyRequirePin,
+        onChanged: state.loading
+            ? null
+            : (val) => ref.read(createContainerProvider.notifier).setSecurityKeyRequirePin(val),
+        title: Text(l10n.securityKeyRequirePinTitle),
+        subtitle: Text(
+          l10n.securityKeyRequirePinSubtitle,
+          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+        ),
+        secondary: Icon(Icons.pin_outlined, color: cs.primary, size: 22),
+      ),
+      if (showPin)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+          child: TextField(
+            controller: _securityKeyPinCtrl,
+            enabled: !state.loading,
+            obscureText: true,
+            autocorrect: false,
+            enableSuggestions: false,
+            enableIMEPersonalizedLearning: false,
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              labelText: l10n.securityKeyPinFieldLabel,
+              prefixIcon: Icon(Icons.pin_outlined, size: 20, color: cs.primary),
+            ),
+          ),
+        ),
+    ];
   }
 
   List<Widget> _buildPasswordFields(ColorScheme cs, bool isShortScreen) {
@@ -1362,7 +1433,9 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
     rows.add(WizardSummaryRow(
       icon: Icons.key_rounded,
       label: l10n.wizardSummaryPasswordLabel,
-      value: (state.isFolderVault ? _folderVaultPasswordCtrl : _passwordCtrl).text.isNotEmpty
+      value: _usesSecurityKey(state)
+          ? l10n.wizardSummarySecurityKeyValue
+          : (state.isFolderVault ? _folderVaultPasswordCtrl : _passwordCtrl).text.isNotEmpty
           ? l10n.wizardPasswordSetValue
           : l10n.wizardPasswordNotSetValue,
     ));

@@ -49,6 +49,7 @@ class UnlockSheet extends ConsumerStatefulWidget {
 class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingObserver {
   late final TextEditingController _passwordCtrl;
   final _pimCtrl = TextEditingController();
+  final _securityKeyPinCtrl = TextEditingController();
   final _hiddenPasswordCtrl = TextEditingController();
   final _hiddenPimCtrl = TextEditingController();
   final _carrierScrollCtrl = ScrollController();
@@ -107,6 +108,11 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _passwordCtrl = TextEditingController(text: widget.prefillPassword ?? '');
+    // Find out whether the vault wants a security key instead of a password.
+    // Later selection/format changes are picked up by the ref.listen in build.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(unlockControllerProvider(_params).notifier).probeSecurityKey();
+    });
   }
 
   @override
@@ -114,6 +120,7 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
     WidgetsBinding.instance.removeObserver(this);
     _passwordCtrl.dispose();
     _pimCtrl.dispose();
+    _securityKeyPinCtrl.dispose();
     _hiddenPasswordCtrl.dispose();
     _hiddenPimCtrl.dispose();
     _carrierScrollCtrl.dispose();
@@ -130,6 +137,7 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
   void _resetInputFields() {
     _passwordCtrl.clear();
     _pimCtrl.clear();
+    _securityKeyPinCtrl.clear();
     _hiddenPasswordCtrl.clear();
     _hiddenPimCtrl.clear();
     _prefillCleared = false;
@@ -146,6 +154,7 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
           hiddenPimText: _hiddenPimCtrl.text,
           l10n: context.l10n,
           passwordPrefilled: _passwordPrefilled,
+          securityKeyPinText: _securityKeyPinCtrl.text,
         );
   }
 
@@ -221,6 +230,14 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
         } else {
           Navigator.pop(context);
         }
+      }
+    });
+    // Re-check for a security key whenever the selected vault, or its detected
+    // format, changes (the format probe finishes after the file is picked).
+    ref.listen(unlockControllerProvider(_params).select((s) => (s.selectedUri, s.containerFormat)), (prev, next) {
+      if (mounted && prev != next) {
+        _securityKeyPinCtrl.clear();
+        ref.read(unlockControllerProvider(_params).notifier).probeSecurityKey();
       }
     });
     ref.listen(unlockControllerProvider(_params).select((s) => s.biometricAutoTriggerTick), (prev, next) {
@@ -997,6 +1014,49 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
                       context.l10n.plainDiskImageNotice,
                       tone: AppBannerTone.info,
                       icon: Icons.album_outlined,
+                    ),
+                  ),
+                ] else if (state.securityKeyRequired) ...[
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        InlineBanner(
+                          state.securityKeyNfcAvailable
+                              ? context.l10n.securityKeyUnlockHintNfc
+                              : context.l10n.securityKeyUnlockHintUsb,
+                          tone: AppBannerTone.info,
+                          icon: Icons.key_rounded,
+                        ),
+                        if (state.securityKeyPinRequired) ...[
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: _securityKeyPinCtrl,
+                            enabled: canConfigure,
+                            obscureText: true,
+                            autocorrect: false,
+                            enableSuggestions: false,
+                            enableIMEPersonalizedLearning: false,
+                            autofocus: true,
+                            onChanged: (_) => setState(() {}),
+                            onSubmitted: (_) => _onUnlock(),
+                            decoration: InputDecoration(
+                              filled: true,
+                              fillColor: cs.surfaceContainerHighest,
+                              labelText: context.l10n.securityKeyPinFieldLabel,
+                              prefixIcon: Icon(Icons.pin_outlined, size: 20, color: cs.primary),
+                            ),
+                          ),
+                        ],
+                        if (state.loading) ...[
+                          const SizedBox(height: 10),
+                          Text(
+                            context.l10n.securityKeyWaiting,
+                            style: textTheme.bodySmall?.copyWith(color: cs.primary, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                 ] else ...[

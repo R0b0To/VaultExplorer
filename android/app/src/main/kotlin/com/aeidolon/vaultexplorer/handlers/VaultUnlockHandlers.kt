@@ -28,6 +28,7 @@ import com.aeidolon.vaultexplorer.SafSplitResolver
 import com.aeidolon.vaultexplorer.SplitFuseCallback
 import com.aeidolon.vaultexplorer.SplitPartInfo
 import com.aeidolon.vaultexplorer.UriNameResolver
+import com.aeidolon.vaultexplorer.securitykey.SecurityKeyException
 import com.aeidolon.vaultexplorer.VeLog
 
 data class UnlockArgs(
@@ -128,6 +129,7 @@ class VaultUnlockHandlers(
     private val ioExecutor: ExecutorService,
     private val nativeOps: NativeOpSupport,
     private val derivedKeyHandlers: DerivedKeyHandlers,
+    private val securityKeyHandlers: SecurityKeyHandlers,
 ) {
     private val fuseThread = HandlerThread("split-container-fuse").apply { start() }
     private val fuseHandler = Handler(fuseThread.looper)
@@ -280,7 +282,21 @@ class VaultUnlockHandlers(
             return
         }
         activity.methodChannel?.invokeMethod("onUnlockStarted", mapOf("volId" to targetVolId))
+        // LUKS2 containers enrolled with systemd-cryptenroll --fido2-device: the
+        // passphrase is derived from the security key instead of typed.
+        val useSecurityKey = call.argument<Boolean>("useSecurityKey") ?: false
+        val securityKeyPin = call.argument<String>("securityKeyPin")
         ioExecutor.execute {
+            val effectivePassword = if (useSecurityKey) {
+                try {
+                    securityKeyHandlers.resolveLuksPassphrase(Uri.parse(uriString), securityKeyPin)
+                } catch (e: SecurityKeyException) {
+                    activity.runOnUiThread { result.error(e.error.wire, e.message, null) }
+                    return@execute
+                }
+            } else {
+                args.password
+            }
             val keyfileFds = nativeOps.openKeyfileFds(args.keyfilePaths)
             val hiddenKeyfileFds =
                 if (args.protectHiddenVolume) nativeOps.openKeyfileFds(args.hiddenKeyfilePaths) else null
@@ -288,7 +304,7 @@ class VaultUnlockHandlers(
                 context = activity,
                 uriString = uriString,
                 targetVolId = targetVolId,
-                password = args.password,
+                password = effectivePassword,
                 pim = args.pim,
                 cipherId = args.cipherId,
                 hashId = args.hashId,
@@ -379,8 +395,15 @@ class VaultUnlockHandlers(
         val docProvider = call.argument<Boolean>("documentProvider") ?: false
         val autoMountFolders = call.argument<List<String>>("autoMountFolders")
         val readOnly = call.argument<Boolean>("readOnly") ?: false
-        if (uriString == null || (password == null && preservedKey == null)) {
-            result.error("INVALID_ARGS", "filePath and (password or preservedKey) required", null)
+        // gocryptfs only: vault created with `gocryptfs -init -fido2`.
+        val useSecurityKey = call.argument<Boolean>("useSecurityKey") ?: false
+        val securityKeyPin = call.argument<String>("securityKeyPin")
+        if (useSecurityKey && format != ContainerLifecycleCore.DirectoryVaultFormat.GOCRYPTFS) {
+            result.error("INVALID_ARGS", "security keys are only supported for gocryptfs vaults", null)
+            return
+        }
+        if (uriString == null || (password == null && preservedKey == null && !useSecurityKey)) {
+            result.error("INVALID_ARGS", "filePath and (password, preservedKey or security key) required", null)
             return
         }
         val targetVolId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
@@ -391,20 +414,35 @@ class VaultUnlockHandlers(
         }
         activity.methodChannel?.invokeMethod("onUnlockStarted", mapOf("volId" to targetVolId))
         ioExecutor.execute {
-            val outcome = ContainerLifecycleCore.unlockDirectoryVault(
-                context = activity,
-                format = format,
-                uriString = uriString,
-                targetVolId = targetVolId,
-                password = password,
-                readOnly = readOnly,
-                docProvider = docProvider,
-                autoMountFolders = autoMountFolders,
-                displayNameOverride = displayName,
-                preservedKey = preservedKey,
-                cacheDerivedKey = cacheDerivedKey,
-                derivedKeyHandlers = derivedKeyHandlers,
-            )
+            val rawSecret: ByteArray? = if (useSecurityKey) {
+                try {
+                    securityKeyHandlers.resolveGocryptfsSecret(Uri.parse(uriString), securityKeyPin)
+                } catch (e: SecurityKeyException) {
+                    activity.runOnUiThread { result.error(e.error.wire, e.message, null) }
+                    return@execute
+                }
+            } else {
+                null
+            }
+            val outcome = try {
+                ContainerLifecycleCore.unlockDirectoryVault(
+                    context = activity,
+                    format = format,
+                    uriString = uriString,
+                    targetVolId = targetVolId,
+                    password = password,
+                    readOnly = readOnly,
+                    docProvider = docProvider,
+                    autoMountFolders = autoMountFolders,
+                    displayNameOverride = displayName,
+                    preservedKey = preservedKey,
+                    cacheDerivedKey = cacheDerivedKey,
+                    derivedKeyHandlers = derivedKeyHandlers,
+                    rawSecret = rawSecret,
+                )
+            } finally {
+                rawSecret?.fill(0)
+            }
             activity.runOnUiThread {
                 when (outcome) {
                     is ContainerLifecycleCore.DirectoryVaultOutcome.Success -> {
@@ -552,6 +590,8 @@ class VaultUnlockHandlers(
             return
         }
         ContainerEngine.requestUnlockCancellation(volId)
+        // If the unlock is waiting for a security key, stop waiting.
+        securityKeyHandlers.cancel()
         result.success(true)
     }
 

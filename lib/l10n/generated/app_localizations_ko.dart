@@ -12516,4 +12516,70 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get comicReaderCarouselScrubberSubtitle => '스크러버 위에 페이지 썸네일 표시';
+
+  @override
+  String get securityKeyUnlockHintNfc =>
+      '이 볼트는 보안 키로 보호됩니다. 잠금 해제를 탭한 다음 키를 휴대폰 뒷면에 대거나 연결하세요. 깜박이면 키를 터치하세요.';
+
+  @override
+  String get securityKeyUnlockHintUsb =>
+      '이 볼트는 보안 키로 보호됩니다. 잠금 해제를 탭한 다음 키를 연결하세요. 깜박이면 키를 터치하세요.';
+
+  @override
+  String get securityKeyPinFieldLabel => '보안 키 PIN';
+
+  @override
+  String get securityKeyWaiting => '보안 키를 기다리는 중…';
+
+  @override
+  String get securityKeyErrorTimeout => '제때 보안 키가 감지되지 않았습니다. 다시 시도하세요.';
+
+  @override
+  String get securityKeyErrorPinRequired => '보안 키 PIN을 입력하세요.';
+
+  @override
+  String get securityKeyErrorPinInvalid => '보안 키 PIN이 올바르지 않습니다.';
+
+  @override
+  String get securityKeyErrorPinBlocked =>
+      '보안 키 PIN이 차단되었습니다. 키를 뺐다가 다시 연결하거나 초기화하세요.';
+
+  @override
+  String get securityKeyErrorPinNotSet =>
+      '이 보안 키에는 PIN이 설정되어 있지 않습니다. 먼저 PIN을 설정하거나 PIN 필수 옵션을 끄세요.';
+
+  @override
+  String get securityKeyErrorNoCredential =>
+      '이 볼트에 사용된 보안 키가 아닙니다. 다른 키를 사용해 보세요.';
+
+  @override
+  String get securityKeyErrorUnsupported =>
+      '이 보안 키는 여기서 사용할 수 없습니다. hmac-secret 확장을 지원하는 FIDO2와 PIN 인증이 필요합니다.';
+
+  @override
+  String get securityKeyErrorTouch => '제때 보안 키를 터치하지 않았습니다. 다시 시도하세요.';
+
+  @override
+  String get securityKeyErrorGeneric => '보안 키 작업에 실패했습니다. 다시 시도하세요.';
+
+  @override
+  String get securityKeyCreateTitle => '보안 키로 보호';
+
+  @override
+  String get securityKeyCreateSubtitle =>
+      '비밀번호 대신 YubiKey 같은 FIDO2 키를 사용합니다. gocryptfs -fido2와 호환됩니다.';
+
+  @override
+  String get securityKeyCreateHint =>
+      '만들기를 탭한 다음 키를 휴대폰 뒷면에 대거나 연결하세요. 깜박이면 키를 터치하세요. 이 키(필요한 경우 PIN 포함)가 없으면 볼트를 열 수 없으며 대신 사용할 비밀번호도 없습니다.';
+
+  @override
+  String get securityKeyRequirePinTitle => '키 PIN 필수';
+
+  @override
+  String get securityKeyRequirePinSubtitle =>
+      '잠금을 해제할 때마다 PIN을 요구합니다. 키에 PIN이 이미 설정되어 있어야 합니다.';
+
+  @override
+  String get wizardSummarySecurityKeyValue => '보안 키';
 }

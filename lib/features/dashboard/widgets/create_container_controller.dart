@@ -7,6 +7,7 @@ import 'package:vaultexplorer/core/utils/validation_utils.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_wizard_shared.dart';
+import 'package:vaultexplorer/core/utils/security_key_errors.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
 part 'create_container_controller.g.dart';
@@ -27,6 +28,17 @@ class CreateContainerState {
   final int hiddenCipherId;
   final int hiddenHashId;
   final String gocryptfsCipher;
+
+  /// gocryptfs only: protect the new vault with a FIDO2 security key (the
+  /// `gocryptfs -init -fido2` format) instead of a password.
+  final bool securityKey;
+
+  /// With [securityKey]: unlocking will need the key's PIN.
+  final bool securityKeyRequirePin;
+
+  /// The key asked for its PIN during creation (it has one set), so the
+  /// wizard shows the PIN field even though "require PIN" is off.
+  final bool securityKeyPinNeeded;
   final String cryfsCipher;
   final int cryfsBlockSize;
   final String? folderVaultUri;
@@ -60,6 +72,9 @@ class CreateContainerState {
     this.hiddenCipherId = 0,
     this.hiddenHashId = 0,
     this.gocryptfsCipher = 'aes-256-gcm',
+    this.securityKey = false,
+    this.securityKeyRequirePin = false,
+    this.securityKeyPinNeeded = false,
     this.cryfsCipher = 'xchacha20-poly1305',
     this.cryfsBlockSize = 32 * 1024,
     this.folderVaultUri,
@@ -90,6 +105,9 @@ class CreateContainerState {
     int? hiddenCipherId,
     int? hiddenHashId,
     String? gocryptfsCipher,
+    bool? securityKey,
+    bool? securityKeyRequirePin,
+    bool? securityKeyPinNeeded,
     String? cryfsCipher,
     int? cryfsBlockSize,
     String? folderVaultUri,
@@ -121,6 +139,9 @@ class CreateContainerState {
     hiddenCipherId: hiddenCipherId ?? this.hiddenCipherId,
     hiddenHashId: hiddenHashId ?? this.hiddenHashId,
     gocryptfsCipher: gocryptfsCipher ?? this.gocryptfsCipher,
+    securityKey: securityKey ?? this.securityKey,
+    securityKeyRequirePin: securityKeyRequirePin ?? this.securityKeyRequirePin,
+    securityKeyPinNeeded: securityKeyPinNeeded ?? this.securityKeyPinNeeded,
     cryfsCipher: cryfsCipher ?? this.cryfsCipher,
     cryfsBlockSize: cryfsBlockSize ?? this.cryfsBlockSize,
     folderVaultUri: clearFolderVaultUri ? null : (folderVaultUri ?? this.folderVaultUri),
@@ -195,6 +216,16 @@ class CreateContainer extends _$CreateContainer {
   void setHiddenHashId(int hashId) => state = state._copy(hiddenHashId: hashId);
 
   void setGocryptfsCipher(String cipher) => state = state._copy(gocryptfsCipher: cipher);
+
+  void setSecurityKey(bool value) => state = state._copy(
+    securityKey: value,
+    securityKeyRequirePin: value ? state.securityKeyRequirePin : false,
+    securityKeyPinNeeded: false,
+    clearError: true,
+  );
+
+  void setSecurityKeyRequirePin(bool value) =>
+      state = state._copy(securityKeyRequirePin: value);
 
   void setCryfsCipher(String cipher) => state = state._copy(cryfsCipher: cipher);
 
@@ -281,17 +312,26 @@ class CreateContainer extends _$CreateContainer {
     required String confirmPassword,
     required AppLocalizations l10n,
     Uint8List? userEntropy,
+    String? securityKeyPin,
   }) async {
     if (state.folderVaultUri == null) {
       state = state._copy(error: l10n.selectEmptyDestinationFolderFirst);
       return false;
     }
-    if (password.isEmpty) {
-      state = state._copy(error: l10n.passwordRequired);
-      return false;
-    }
-    if (password != confirmPassword) {
-      state = state._copy(error: l10n.passwordsDoNotMatch);
+    final useSecurityKey =
+        state.folderVaultFormat == 'gocryptfs' && state.securityKey;
+    if (!useSecurityKey) {
+      if (password.isEmpty) {
+        state = state._copy(error: l10n.passwordRequired);
+        return false;
+      }
+      if (password != confirmPassword) {
+        state = state._copy(error: l10n.passwordsDoNotMatch);
+        return false;
+      }
+    } else if (state.securityKeyRequirePin &&
+        (securityKeyPin == null || securityKeyPin.isEmpty)) {
+      state = state._copy(error: l10n.securityKeyErrorPinRequired);
       return false;
     }
 
@@ -311,6 +351,9 @@ class CreateContainer extends _$CreateContainer {
                   password,
                   cipher: state.gocryptfsCipher,
                   userEntropy: userEntropy,
+                  useSecurityKey: useSecurityKey,
+                  securityKeyRequirePin: state.securityKeyRequirePin,
+                  securityKeyPin: securityKeyPin,
                 )
               : await lifecycle.createCryfsVault(
                   state.folderVaultUri!,
@@ -340,7 +383,19 @@ class CreateContainer extends _$CreateContainer {
       }
     } on PlatformException catch (e) {
       if (ref.mounted) {
-        state = state._copy(loading: false, error: e.message ?? l10n.unknownErrorOccurred);
+        if (e.code == 'SECURITY_KEY_CANCELLED') {
+          state = state._copy(loading: false);
+        } else {
+          state = state._copy(
+            loading: false,
+            // The key has a PIN set and wants it: reveal the PIN field.
+            securityKeyPinNeeded:
+                e.code == 'SECURITY_KEY_PIN_REQUIRED' ? true : null,
+            error: localizedSecurityKeyError(e, l10n) ??
+                e.message ??
+                l10n.unknownErrorOccurred,
+          );
+        }
       }
       return false;
     } catch (e) {

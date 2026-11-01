@@ -22236,6 +22236,120 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Show page thumbnails above the scrubber'**
   String get comicReaderCarouselScrubberSubtitle;
+
+  /// No description provided for @securityKeyUnlockHintNfc.
+  ///
+  /// In en, this message translates to:
+  /// **'This vault is protected by a security key. Tap Unlock, then hold your key against the back of the phone or plug it in. Touch it if it blinks.'**
+  String get securityKeyUnlockHintNfc;
+
+  /// No description provided for @securityKeyUnlockHintUsb.
+  ///
+  /// In en, this message translates to:
+  /// **'This vault is protected by a security key. Tap Unlock, then plug in your key. Touch it if it blinks.'**
+  String get securityKeyUnlockHintUsb;
+
+  /// No description provided for @securityKeyPinFieldLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Security key PIN'**
+  String get securityKeyPinFieldLabel;
+
+  /// No description provided for @securityKeyWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for your security key…'**
+  String get securityKeyWaiting;
+
+  /// No description provided for @securityKeyErrorTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'No security key was detected in time. Try again.'**
+  String get securityKeyErrorTimeout;
+
+  /// No description provided for @securityKeyErrorPinRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your security key PIN.'**
+  String get securityKeyErrorPinRequired;
+
+  /// No description provided for @securityKeyErrorPinInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect security key PIN.'**
+  String get securityKeyErrorPinInvalid;
+
+  /// No description provided for @securityKeyErrorPinBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'The security key PIN is blocked. Unplug and reconnect the key, or reset it.'**
+  String get securityKeyErrorPinBlocked;
+
+  /// No description provided for @securityKeyErrorPinNotSet.
+  ///
+  /// In en, this message translates to:
+  /// **'This security key has no PIN set. Set one first, or turn off the PIN requirement.'**
+  String get securityKeyErrorPinNotSet;
+
+  /// No description provided for @securityKeyErrorNoCredential.
+  ///
+  /// In en, this message translates to:
+  /// **'This isn\'t the security key used for this vault. Try another key.'**
+  String get securityKeyErrorNoCredential;
+
+  /// No description provided for @securityKeyErrorUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'This security key can\'t be used here. It needs FIDO2 with the hmac-secret extension and PIN verification.'**
+  String get securityKeyErrorUnsupported;
+
+  /// No description provided for @securityKeyErrorTouch.
+  ///
+  /// In en, this message translates to:
+  /// **'The security key wasn\'t touched in time. Try again.'**
+  String get securityKeyErrorTouch;
+
+  /// No description provided for @securityKeyErrorGeneric.
+  ///
+  /// In en, this message translates to:
+  /// **'The security key operation failed. Try again.'**
+  String get securityKeyErrorGeneric;
+
+  /// No description provided for @securityKeyCreateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Protect with a security key'**
+  String get securityKeyCreateTitle;
+
+  /// No description provided for @securityKeyCreateSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Use a FIDO2 key such as a YubiKey instead of a password. Compatible with gocryptfs -fido2.'**
+  String get securityKeyCreateSubtitle;
+
+  /// No description provided for @securityKeyCreateHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap Create, then hold your key against the back of the phone or plug it in. Touch it if it blinks. Without this key (and its PIN, if required) the vault cannot be opened and there is no password to fall back on.'**
+  String get securityKeyCreateHint;
+
+  /// No description provided for @securityKeyRequirePinTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Require the key\'s PIN'**
+  String get securityKeyRequirePinTitle;
+
+  /// No description provided for @securityKeyRequirePinSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask for the PIN on every unlock. The key must already have a PIN set.'**
+  String get securityKeyRequirePinSubtitle;
+
+  /// No description provided for @wizardSummarySecurityKeyValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Security key'**
+  String get wizardSummarySecurityKeyValue;
 }
 
 class _AppLocalizationsDelegate

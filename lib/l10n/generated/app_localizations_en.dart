@@ -13052,4 +13052,73 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get comicReaderCarouselScrubberSubtitle =>
       'Show page thumbnails above the scrubber';
+
+  @override
+  String get securityKeyUnlockHintNfc =>
+      'This vault is protected by a security key. Tap Unlock, then hold your key against the back of the phone or plug it in. Touch it if it blinks.';
+
+  @override
+  String get securityKeyUnlockHintUsb =>
+      'This vault is protected by a security key. Tap Unlock, then plug in your key. Touch it if it blinks.';
+
+  @override
+  String get securityKeyPinFieldLabel => 'Security key PIN';
+
+  @override
+  String get securityKeyWaiting => 'Waiting for your security key…';
+
+  @override
+  String get securityKeyErrorTimeout =>
+      'No security key was detected in time. Try again.';
+
+  @override
+  String get securityKeyErrorPinRequired => 'Enter your security key PIN.';
+
+  @override
+  String get securityKeyErrorPinInvalid => 'Incorrect security key PIN.';
+
+  @override
+  String get securityKeyErrorPinBlocked =>
+      'The security key PIN is blocked. Unplug and reconnect the key, or reset it.';
+
+  @override
+  String get securityKeyErrorPinNotSet =>
+      'This security key has no PIN set. Set one first, or turn off the PIN requirement.';
+
+  @override
+  String get securityKeyErrorNoCredential =>
+      'This isn\'t the security key used for this vault. Try another key.';
+
+  @override
+  String get securityKeyErrorUnsupported =>
+      'This security key can\'t be used here. It needs FIDO2 with the hmac-secret extension and PIN verification.';
+
+  @override
+  String get securityKeyErrorTouch =>
+      'The security key wasn\'t touched in time. Try again.';
+
+  @override
+  String get securityKeyErrorGeneric =>
+      'The security key operation failed. Try again.';
+
+  @override
+  String get securityKeyCreateTitle => 'Protect with a security key';
+
+  @override
+  String get securityKeyCreateSubtitle =>
+      'Use a FIDO2 key such as a YubiKey instead of a password. Compatible with gocryptfs -fido2.';
+
+  @override
+  String get securityKeyCreateHint =>
+      'Tap Create, then hold your key against the back of the phone or plug it in. Touch it if it blinks. Without this key (and its PIN, if required) the vault cannot be opened and there is no password to fall back on.';
+
+  @override
+  String get securityKeyRequirePinTitle => 'Require the key\'s PIN';
+
+  @override
+  String get securityKeyRequirePinSubtitle =>
+      'Ask for the PIN on every unlock. The key must already have a PIN set.';
+
+  @override
+  String get wizardSummarySecurityKeyValue => 'Security key';
 }

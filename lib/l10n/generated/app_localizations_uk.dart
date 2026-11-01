@@ -13346,4 +13346,75 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get comicReaderCarouselScrubberSubtitle =>
       'Показувати мініатюри сторінок над повзунком';
+
+  @override
+  String get securityKeyUnlockHintNfc =>
+      'Це сховище захищене ключем безпеки. Торкніться «Розблокувати», потім прикладіть ключ до задньої панелі телефона або підключіть його. Торкніться ключа, якщо він блимає.';
+
+  @override
+  String get securityKeyUnlockHintUsb =>
+      'Це сховище захищене ключем безпеки. Торкніться «Розблокувати», потім підключіть ключ. Торкніться ключа, якщо він блимає.';
+
+  @override
+  String get securityKeyPinFieldLabel => 'PIN-код ключа безпеки';
+
+  @override
+  String get securityKeyWaiting => 'Очікування ключа безпеки…';
+
+  @override
+  String get securityKeyErrorTimeout =>
+      'Ключ безпеки не виявлено вчасно. Спробуйте ще раз.';
+
+  @override
+  String get securityKeyErrorPinRequired =>
+      'Введіть PIN-код вашого ключа безпеки.';
+
+  @override
+  String get securityKeyErrorPinInvalid =>
+      'Неправильний PIN-код ключа безпеки.';
+
+  @override
+  String get securityKeyErrorPinBlocked =>
+      'PIN-код ключа безпеки заблоковано. Відключіть і знову підключіть ключ або скиньте його.';
+
+  @override
+  String get securityKeyErrorPinNotSet =>
+      'Для цього ключа безпеки не встановлено PIN-код. Спершу встановіть його або вимкніть вимогу PIN-коду.';
+
+  @override
+  String get securityKeyErrorNoCredential =>
+      'Це не той ключ безпеки, що використовується для цього сховища. Спробуйте інший ключ.';
+
+  @override
+  String get securityKeyErrorUnsupported =>
+      'Цей ключ безпеки не можна використати тут. Потрібен FIDO2 з розширенням hmac-secret і перевіркою PIN-кодом.';
+
+  @override
+  String get securityKeyErrorTouch =>
+      'До ключа безпеки не торкнулися вчасно. Спробуйте ще раз.';
+
+  @override
+  String get securityKeyErrorGeneric =>
+      'Не вдалося виконати операцію з ключем безпеки. Спробуйте ще раз.';
+
+  @override
+  String get securityKeyCreateTitle => 'Захистити ключем безпеки';
+
+  @override
+  String get securityKeyCreateSubtitle =>
+      'Використовуйте ключ FIDO2, наприклад YubiKey, замість пароля. Сумісно з gocryptfs -fido2.';
+
+  @override
+  String get securityKeyCreateHint =>
+      'Торкніться «Створити», потім прикладіть ключ до задньої панелі телефона або підключіть його. Торкніться ключа, якщо він блимає. Без цього ключа (і його PIN-коду, якщо потрібен) сховище не відкрити, а запасного пароля немає.';
+
+  @override
+  String get securityKeyRequirePinTitle => 'Вимагати PIN-код ключа';
+
+  @override
+  String get securityKeyRequirePinSubtitle =>
+      'Запитувати PIN-код під час кожного розблокування. На ключі вже має бути встановлено PIN-код.';
+
+  @override
+  String get wizardSummarySecurityKeyValue => 'Ключ безпеки';
 }

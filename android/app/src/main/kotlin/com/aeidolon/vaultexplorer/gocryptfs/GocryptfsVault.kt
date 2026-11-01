@@ -97,7 +97,52 @@ object GocryptfsVault {
         return mirrorSync to vaultDocOps
     }
 
-    fun open(context: Context, vaultRootUri: Uri, password: CharArray, readOnly: Boolean): com.aeidolon.vaultexplorer.engine.VaultOpenResult<GocryptfsSession> {
+    /** Thrown inside [openWith]'s unlock step when a password is offered to a security-key vault. */
+    private class SecurityKeyRequiredException : Exception("This vault is protected by a security key.")
+
+    /**
+     * The parsed gocryptfs.conf, or null when it is missing, unreadable or
+     * malformed. Used to find out BEFORE unlocking whether the vault wants a
+     * password or a FIDO2 security key ([GocryptfsConfig.fido2]).
+     */
+    fun readConfig(context: Context, vaultRootUri: Uri): GocryptfsConfig? {
+        val root = DocumentFile.fromTreeUri(context, vaultRootUri) ?: return null
+        val bytes = try {
+            readConfigBytes(context, root)
+        } catch (_: Exception) {
+            null
+        } ?: return null
+        return try {
+            GocryptfsConfig.parse(bytes)
+        } catch (_: GocryptfsConfigException) {
+            null
+        }
+    }
+
+    fun open(context: Context, vaultRootUri: Uri, password: CharArray, readOnly: Boolean): com.aeidolon.vaultexplorer.engine.VaultOpenResult<GocryptfsSession> =
+        openWith(context, vaultRootUri, readOnly) { config ->
+            // A password can never open a security-key vault; say so instead of reporting "wrong password".
+            if (config.fido2 != null) throw SecurityKeyRequiredException()
+            GocryptfsMasterkey.unlock(config, password)
+        }
+
+    /**
+     * Opens a FIDO2-protected vault with the hmac-secret output obtained from
+     * the security key. [secret] is the raw 32 bytes as upstream feeds them
+     * to scrypt; the caller keeps ownership and should zero it afterwards.
+     */
+    fun openWithSecret(context: Context, vaultRootUri: Uri, secret: ByteArray, readOnly: Boolean): com.aeidolon.vaultexplorer.engine.VaultOpenResult<GocryptfsSession> =
+        openWith(context, vaultRootUri, readOnly) { config ->
+            if (config.fido2 == null) throw IllegalArgumentException("This vault is not protected by a security key.")
+            GocryptfsMasterkey.unlock(config, secret)
+        }
+
+    private fun openWith(
+        context: Context,
+        vaultRootUri: Uri,
+        readOnly: Boolean,
+        unlockMasterkey: (GocryptfsConfig) -> ByteArray,
+    ): com.aeidolon.vaultexplorer.engine.VaultOpenResult<GocryptfsSession> {
         val root = DocumentFile.fromTreeUri(context, vaultRootUri)
             ?: run {
                 VeLog.e(TAG) { "open failed: Cannot access folder URI $vaultRootUri" }
@@ -132,10 +177,15 @@ object GocryptfsVault {
         }
 
         val masterkey = try {
-            GocryptfsMasterkey.unlock(config, password)
+            unlockMasterkey(config)
         } catch (e: GocryptfsWrongPasswordException) {
             VeLog.e(TAG, e) { "open failed: Incorrect password for gocryptfs vault" }
             return com.aeidolon.vaultexplorer.engine.VaultOpenResult.WrongPassword
+        } catch (e: SecurityKeyRequiredException) {
+            VeLog.e(TAG) { "open failed: vault needs a security key but a password was supplied" }
+            return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault(
+                "This vault is protected by a security key. Unlock it with the key instead of a password."
+            )
         } catch (e: Exception) {
             VeLog.e(TAG, e) { "open failed: Unexpected error during masterkey unlock: ${e.message}" }
             return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Failed to unlock masterkey: ${e.message}")
@@ -196,6 +246,8 @@ object GocryptfsVault {
         cipher: GocryptfsCipher = GocryptfsCipher.AES_256_GCM,
         plaintextNames: Boolean = false,
         userEntropy: ByteArray? = null,
+        rawSecret: ByteArray? = null,
+        fido2: GocryptfsFido2Params? = null,
     ): com.aeidolon.vaultexplorer.engine.VaultOpenResult<GocryptfsSession> {
         val root = DocumentFile.fromTreeUri(context, vaultRootUri)
             ?: return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Cannot access the selected folder.")
@@ -209,15 +261,29 @@ object GocryptfsVault {
 
         return try {
             val scryptSalt = ByteArray(SCRYPT_SALT_LEN).also { random.nextBytes(it) }
-            val encryptedKey = GocryptfsMasterkey.wrap(
-                masterkey = masterkey,
-                password = password,
-                scryptSalt = scryptSalt,
-                scryptN = DEFAULT_SCRYPT_N,
-                scryptR = DEFAULT_SCRYPT_R,
-                scryptKeyLen = MASTERKEY_LEN,
-                random = random,
-            )
+            // Security-key vaults wrap the masterkey under the raw hmac-secret
+            // bytes (never the CharArray overload, which would UTF-8 them).
+            val encryptedKey = if (rawSecret != null) {
+                GocryptfsMasterkey.wrap(
+                    masterkey = masterkey,
+                    secret = rawSecret,
+                    scryptSalt = scryptSalt,
+                    scryptN = DEFAULT_SCRYPT_N,
+                    scryptR = DEFAULT_SCRYPT_R,
+                    scryptKeyLen = MASTERKEY_LEN,
+                    random = random,
+                )
+            } else {
+                GocryptfsMasterkey.wrap(
+                    masterkey = masterkey,
+                    password = password,
+                    scryptSalt = scryptSalt,
+                    scryptN = DEFAULT_SCRYPT_N,
+                    scryptR = DEFAULT_SCRYPT_R,
+                    scryptKeyLen = MASTERKEY_LEN,
+                    random = random,
+                )
+            }
 
             val configJson = buildConfigJson(
                 encryptedKey = encryptedKey,
@@ -226,7 +292,9 @@ object GocryptfsVault {
                 scryptR = DEFAULT_SCRYPT_R,
                 scryptP = DEFAULT_SCRYPT_P,
                 longNameMax = 0,
-                featureFlags = featureFlagsFor(cipher, plaintextNames),
+                featureFlags = featureFlagsFor(cipher, plaintextNames) +
+                    (if (fido2 != null) listOf("FIDO2") else emptyList()),
+                fido2 = fido2,
             )
 
             val configDoc = root.createFile("application/octet-stream", CONFIG_FILE_NAME)
@@ -275,7 +343,7 @@ object GocryptfsVault {
         }
     }
 
-    private fun buildConfigJson(
+    internal fun buildConfigJson(
         encryptedKey: ByteArray,
         scryptSalt: ByteArray,
         scryptN: Int,
@@ -283,6 +351,7 @@ object GocryptfsVault {
         scryptP: Int,
         longNameMax: Int,
         featureFlags: List<String>,
+        fido2: GocryptfsFido2Params? = null,
     ): String {
         val scryptObject = JSONObject().apply {
             put("Salt", Base64.encodeToString(scryptSalt, Base64.NO_WRAP))
@@ -299,6 +368,14 @@ object GocryptfsVault {
             put("Version", CONFIG_VERSION)
             put("FeatureFlags", JSONArray(featureFlags))
             if (longNameMax > 0) put("LongNameMax", longNameMax)
+            if (fido2 != null) {
+                // Same field names upstream gocryptfs writes (Go marshals []byte as std base64).
+                put("FIDO2", JSONObject().apply {
+                    put("CredentialID", Base64.encodeToString(fido2.credentialId, Base64.NO_WRAP))
+                    put("HMACSalt", Base64.encodeToString(fido2.hmacSalt, Base64.NO_WRAP))
+                    if (fido2.assertOptions.isNotEmpty()) put("AssertOptions", JSONArray(fido2.assertOptions))
+                })
+            }
         }
         return json.toString(2)
     }
@@ -331,6 +408,13 @@ object GocryptfsVault {
             GocryptfsConfig.parse(configBytes)
         } catch (e: GocryptfsConfigException) {
             return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault(e.message ?: "Malformed gocryptfs.conf")
+        }
+        // Upstream gocryptfs doesn't support this either: the wrapping secret is
+        // the security key's output, not a password that can be swapped.
+        if (config.fido2 != null) {
+            return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault(
+                "This vault is protected by a security key; its password can't be changed."
+            )
         }
 
         val masterkey = try {

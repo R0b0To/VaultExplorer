@@ -30,6 +30,7 @@ class VaultCreationHandlers(
     private val pendingResult: PendingActivityResult,
     private val ioExecutor: ExecutorService,
     private val nativeOps: NativeOpSupport,
+    private val securityKeyHandlers: SecurityKeyHandlers,
 ) {
     companion object {
         /**
@@ -296,22 +297,33 @@ class VaultCreationHandlers(
             com.aeidolon.vaultexplorer.gocryptfs.GocryptfsCipher.AES_256_GCM
         }
         val userEntropy = call.argument<ByteArray>("userEntropy")
-        if (uriString == null || password.isEmpty()) {
+        // `gocryptfs -init -fido2`-compatible vault: protected by a FIDO2 security key instead of a password.
+        val useSecurityKey = call.argument<Boolean>("useSecurityKey") ?: false
+        val securityKeyPin = call.argument<String>("securityKeyPin")
+        val securityKeyRequirePin = call.argument<Boolean>("securityKeyRequirePin") ?: false
+        if (uriString == null || (password.isEmpty() && !useSecurityKey)) {
             userEntropy?.fill(0)
-            result.error("INVALID_ARGS", "filePath and password required", null)
+            result.error("INVALID_ARGS", "filePath and password (or security key) required", null)
             return
         }
         ioExecutor.execute {
+            var enrollment: com.aeidolon.vaultexplorer.securitykey.GocryptfsFido2Enrollment? = null
             try {
                 val uri = Uri.parse(uriString)
+                if (useSecurityKey) {
+                    val folderName = androidx.documentfile.provider.DocumentFile.fromTreeUri(activity, uri)?.name ?: "vault"
+                    enrollment = securityKeyHandlers.enrollGocryptfs(folderName, securityKeyRequirePin, securityKeyPin)
+                }
                 val passwordChars = password.toCharArray()
                 val createResult = try {
                     com.aeidolon.vaultexplorer.gocryptfs.GocryptfsVault.create(
-                        activity, uri, passwordChars, cipher, userEntropy = userEntropy
+                        activity, uri, passwordChars, cipher, userEntropy = userEntropy,
+                        rawSecret = enrollment?.secret, fido2 = enrollment?.params,
                     )
                 } finally {
                     passwordChars.fill('\u0000')
                     userEntropy?.fill(0)
+                    enrollment?.secret?.fill(0)
                 }
                 activity.runOnUiThread {
                     when (createResult) {
@@ -325,6 +337,9 @@ class VaultCreationHandlers(
                         else -> result.error("CREATE_FAILED", "Unexpected result", null)
                     }
                 }
+            } catch (e: com.aeidolon.vaultexplorer.securitykey.SecurityKeyException) {
+                userEntropy?.fill(0)
+                activity.runOnUiThread { result.error(e.error.wire, e.message, null) }
             } catch (e: Exception) {
                 activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
             }

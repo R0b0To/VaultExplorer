@@ -12317,4 +12317,66 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get comicReaderCarouselScrubberSubtitle => '在滑块上方显示页面缩略图';
+
+  @override
+  String get securityKeyUnlockHintNfc =>
+      '此保险库受安全密钥保护。点击“解锁”，然后将密钥贴近手机背面或插入手机。如果密钥闪烁，请触摸它。';
+
+  @override
+  String get securityKeyUnlockHintUsb =>
+      '此保险库受安全密钥保护。点击“解锁”，然后插入密钥。如果密钥闪烁，请触摸它。';
+
+  @override
+  String get securityKeyPinFieldLabel => '安全密钥 PIN';
+
+  @override
+  String get securityKeyWaiting => '正在等待安全密钥…';
+
+  @override
+  String get securityKeyErrorTimeout => '未能及时检测到安全密钥。请重试。';
+
+  @override
+  String get securityKeyErrorPinRequired => '请输入安全密钥的 PIN。';
+
+  @override
+  String get securityKeyErrorPinInvalid => '安全密钥 PIN 不正确。';
+
+  @override
+  String get securityKeyErrorPinBlocked => '安全密钥 PIN 已被锁定。请拔出并重新插入密钥，或将其重置。';
+
+  @override
+  String get securityKeyErrorPinNotSet => '此安全密钥未设置 PIN。请先设置 PIN，或关闭 PIN 要求。';
+
+  @override
+  String get securityKeyErrorNoCredential => '这不是此保险库所用的安全密钥。请尝试其他密钥。';
+
+  @override
+  String get securityKeyErrorUnsupported =>
+      '此安全密钥无法在此使用。它需要支持 hmac-secret 扩展的 FIDO2 以及 PIN 验证。';
+
+  @override
+  String get securityKeyErrorTouch => '未能及时触摸安全密钥。请重试。';
+
+  @override
+  String get securityKeyErrorGeneric => '安全密钥操作失败。请重试。';
+
+  @override
+  String get securityKeyCreateTitle => '使用安全密钥保护';
+
+  @override
+  String get securityKeyCreateSubtitle =>
+      '使用 YubiKey 等 FIDO2 密钥代替密码。与 gocryptfs -fido2 兼容。';
+
+  @override
+  String get securityKeyCreateHint =>
+      '点击“创建”，然后将密钥贴近手机背面或插入手机。如果密钥闪烁，请触摸它。没有此密钥（以及所需的 PIN），将无法打开保险库，也没有可替代的密码。';
+
+  @override
+  String get securityKeyRequirePinTitle => '要求输入密钥 PIN';
+
+  @override
+  String get securityKeyRequirePinSubtitle => '每次解锁都询问 PIN。密钥上必须已设置 PIN。';
+
+  @override
+  String get wizardSummarySecurityKeyValue => '安全密钥';
 }

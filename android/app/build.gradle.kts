@@ -159,6 +159,14 @@ dependencies {
     implementation("androidx.pdf:pdf-viewer-fragment:1.0.0-alpha19")
     implementation("androidx.pdf:pdf-core:1.0.0-alpha19")
     implementation("com.google.android.material:material:1.13.0")
+    // FIDO2 security key (YubiKey etc.) transport + CTAP2 over NFC/USB.
+    // yubikit 3.2.0+ is built against Android API 37 (minCompileSdk 37), so this needs
+    // compileSdk 37 (see the top of this file); with compileSdk 36 use 3.1.0 instead.
+    // The hmac-secret handshake itself is hand-written in Fido2HmacSecret because the
+    // library's extension helper PRF-hashes the salt.
+    implementation("com.yubico.yubikit:android:3.2.1")
+    implementation("com.yubico.yubikit:fido:3.2.1")
+    implementation("com.yubico.yubikit:core:3.2.1")
     implementation("androidx.exifinterface:exifinterface:1.3.7")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")

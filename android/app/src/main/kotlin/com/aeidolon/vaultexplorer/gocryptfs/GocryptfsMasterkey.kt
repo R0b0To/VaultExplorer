@@ -23,6 +23,30 @@ object GocryptfsMasterkey {
             blockSize = config.scryptR,
             keyLengthBytes = config.scryptKeyLen,
         )
+        return unlockWithScryptHash(config, scryptHash)
+    }
+
+    /**
+     * Unlocks with raw secret bytes as the "password" -- the FIDO2 case,
+     * where upstream feeds the 32-byte hmac-secret output to scrypt as-is.
+     * The bytes must NOT go through the CharArray overload: that one
+     * UTF-8-encodes, which would mangle any byte >= 0x80 and derive a
+     * different key than gocryptfs does.
+     */
+    @Throws(GocryptfsWrongPasswordException::class)
+    fun unlock(config: GocryptfsConfig, secret: ByteArray): ByteArray {
+        val scryptHash = Scrypt.scrypt(
+            passphrase = secret,
+            salt = config.scryptSalt,
+            costParam = config.scryptN,
+            blockSize = config.scryptR,
+            keyLengthBytes = config.scryptKeyLen,
+        )
+        return unlockWithScryptHash(config, scryptHash)
+    }
+
+    /** Takes ownership of [scryptHash] and zeroes it. */
+    private fun unlockWithScryptHash(config: GocryptfsConfig, scryptHash: ByteArray): ByteArray {
         try {
             // The master key is ALWAYS wrapped using AES-GCM, even for XChaCha20 vaults
             val gcmKey = Hkdf.deriveSha256(scryptHash, "AES-GCM file content encryption", 32)
@@ -54,6 +78,31 @@ object GocryptfsMasterkey {
             blockSize = scryptR,
             keyLengthBytes = scryptKeyLen,
         )
+        return wrapWithScryptHash(masterkey, scryptHash, random)
+    }
+
+    /** Raw-secret counterpart of [wrap]; see [unlock] for why this is separate. */
+    fun wrap(
+        masterkey: ByteArray,
+        secret: ByteArray,
+        scryptSalt: ByteArray,
+        scryptN: Int,
+        scryptR: Int,
+        scryptKeyLen: Int,
+        random: SecureRandom,
+    ): ByteArray {
+        val scryptHash = Scrypt.scrypt(
+            passphrase = secret,
+            salt = scryptSalt,
+            costParam = scryptN,
+            blockSize = scryptR,
+            keyLengthBytes = scryptKeyLen,
+        )
+        return wrapWithScryptHash(masterkey, scryptHash, random)
+    }
+
+    /** Takes ownership of [scryptHash] and zeroes it. */
+    private fun wrapWithScryptHash(masterkey: ByteArray, scryptHash: ByteArray, random: SecureRandom): ByteArray {
         try {
             // The master key is ALWAYS wrapped using AES-GCM, even for XChaCha20 vaults
             val gcmKey = Hkdf.deriveSha256(scryptHash, "AES-GCM file content encryption", 32)

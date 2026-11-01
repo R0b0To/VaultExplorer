@@ -7,6 +7,23 @@ class GocryptfsConfigException(message: String) : Exception(message)
 
 enum class GocryptfsCipher { AES_256_GCM, XCHACHA20_POLY1305 }
 
+/**
+ * The `FIDO2` object of a gocryptfs.conf for a vault protected with a FIDO2
+ * security key (`gocryptfs -init -fido2`). Upstream derives the vault's
+ * "password" as the 32-byte hmac-secret output for [hmacSalt] using
+ * [credentialId], relying party id [RP_ID]; [assertOptions] are the
+ * `fido2-assert -t` options in effect (e.g. `pin=true`).
+ */
+class GocryptfsFido2Params(
+    val credentialId: ByteArray,
+    val hmacSalt: ByteArray,
+    val assertOptions: List<String>,
+) {
+    companion object {
+        const val RP_ID = "gocryptfs"
+    }
+}
+
 data class GocryptfsConfig(
     val encryptedKey: ByteArray,
     val scryptSalt: ByteArray,
@@ -19,6 +36,7 @@ data class GocryptfsConfig(
     val longNameMax: Int,
     val cipher: GocryptfsCipher,
     val plaintextNames: Boolean,
+    val fido2: GocryptfsFido2Params? = null,
 ) {
     val hasDirIV: Boolean get() = "DirIV" in featureFlags
 
@@ -86,6 +104,8 @@ data class GocryptfsConfig(
                 else -> GocryptfsCipher.AES_256_GCM
             }
 
+            val fido2 = parseFido2(json, "FIDO2" in flags)
+
             return GocryptfsConfig(
                 encryptedKey = b64("EncryptedKey"),
                 scryptSalt = Base64.getDecoder().decode(scrypt.getString("Salt")),
@@ -98,7 +118,34 @@ data class GocryptfsConfig(
                 longNameMax = json.optInt("LongNameMax", 0),
                 cipher = cipher,
                 plaintextNames = hasPlaintextNames,
+                fido2 = fido2,
             )
+        }
+
+        /**
+         * The FIDO2 feature flag and the `FIDO2` object must agree: a
+         * missing object under the flag would make every unlock attempt
+         * fail with a confusing "wrong password", so reject it up front.
+         */
+        private fun parseFido2(json: JSONObject, flagSet: Boolean): GocryptfsFido2Params? {
+            if (!flagSet) return null
+            val obj = json.optJSONObject("FIDO2")
+            if (obj == null) {
+                throw GocryptfsConfigException("gocryptfs.conf has the FIDO2 flag but no FIDO2 section")
+            }
+            return try {
+                val options = mutableListOf<String>()
+                obj.optJSONArray("AssertOptions")?.let { arr ->
+                    for (i in 0 until arr.length()) options.add(arr.getString(i))
+                }
+                GocryptfsFido2Params(
+                    credentialId = Base64.getDecoder().decode(obj.getString("CredentialID")),
+                    hmacSalt = Base64.getDecoder().decode(obj.getString("HMACSalt")),
+                    assertOptions = options,
+                )
+            } catch (e: Exception) {
+                throw GocryptfsConfigException("gocryptfs.conf has a malformed FIDO2 section: ${e.message}")
+            }
         }
     }
 }

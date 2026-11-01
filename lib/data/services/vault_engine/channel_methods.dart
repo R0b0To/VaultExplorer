@@ -8,6 +8,7 @@ abstract final class ChannelMethods {
   static const unlockContainer = 'unlockContainer';
   static const detectsAsPlainDiskImage = 'detectsAsPlainDiskImage';
   static const probeContainerFormat = 'probeContainerFormat';
+  static const probeSecurityKeyVault = 'probeSecurityKeyVault';
   static const lockContainer = 'lockContainer';
   static const syncBackgroundService = 'syncBackgroundService';
   static const scheduleContainerAutoClose = 'scheduleContainerAutoClose';

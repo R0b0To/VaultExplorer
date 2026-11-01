@@ -13292,4 +13292,75 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get comicReaderCarouselScrubberSubtitle =>
       'Mostrar miniaturas de página sobre el control deslizante';
+
+  @override
+  String get securityKeyUnlockHintNfc =>
+      'Esta bóveda está protegida con una llave de seguridad. Toca Desbloquear y acerca la llave a la parte trasera del teléfono o conéctala. Tócala si parpadea.';
+
+  @override
+  String get securityKeyUnlockHintUsb =>
+      'Esta bóveda está protegida con una llave de seguridad. Toca Desbloquear y conecta la llave. Tócala si parpadea.';
+
+  @override
+  String get securityKeyPinFieldLabel => 'PIN de la llave de seguridad';
+
+  @override
+  String get securityKeyWaiting => 'Esperando la llave de seguridad…';
+
+  @override
+  String get securityKeyErrorTimeout =>
+      'No se detectó ninguna llave de seguridad a tiempo. Inténtalo de nuevo.';
+
+  @override
+  String get securityKeyErrorPinRequired =>
+      'Introduce el PIN de tu llave de seguridad.';
+
+  @override
+  String get securityKeyErrorPinInvalid =>
+      'PIN de la llave de seguridad incorrecto.';
+
+  @override
+  String get securityKeyErrorPinBlocked =>
+      'El PIN de la llave de seguridad está bloqueado. Desconecta y vuelve a conectar la llave, o restablécela.';
+
+  @override
+  String get securityKeyErrorPinNotSet =>
+      'Esta llave de seguridad no tiene un PIN configurado. Configura uno primero o desactiva el requisito de PIN.';
+
+  @override
+  String get securityKeyErrorNoCredential =>
+      'Esta no es la llave de seguridad de esta bóveda. Prueba con otra llave.';
+
+  @override
+  String get securityKeyErrorUnsupported =>
+      'Esta llave de seguridad no se puede usar aquí. Necesita FIDO2 con la extensión hmac-secret y verificación por PIN.';
+
+  @override
+  String get securityKeyErrorTouch =>
+      'No se tocó la llave de seguridad a tiempo. Inténtalo de nuevo.';
+
+  @override
+  String get securityKeyErrorGeneric =>
+      'Falló la operación con la llave de seguridad. Inténtalo de nuevo.';
+
+  @override
+  String get securityKeyCreateTitle => 'Proteger con una llave de seguridad';
+
+  @override
+  String get securityKeyCreateSubtitle =>
+      'Usa una llave FIDO2, como una YubiKey, en lugar de una contraseña. Compatible con gocryptfs -fido2.';
+
+  @override
+  String get securityKeyCreateHint =>
+      'Toca Crear y acerca la llave a la parte trasera del teléfono o conéctala. Tócala si parpadea. Sin esta llave (y su PIN, si se exige) no se puede abrir la bóveda y no hay contraseña alternativa.';
+
+  @override
+  String get securityKeyRequirePinTitle => 'Exigir el PIN de la llave';
+
+  @override
+  String get securityKeyRequirePinSubtitle =>
+      'Pide el PIN en cada desbloqueo. La llave debe tener ya un PIN configurado.';
+
+  @override
+  String get wizardSummarySecurityKeyValue => 'Llave de seguridad';
 }

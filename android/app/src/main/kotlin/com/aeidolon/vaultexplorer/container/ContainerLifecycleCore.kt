@@ -350,8 +350,10 @@ object ContainerLifecycleCore {
         preservedKey: ByteArray? = null,
         cacheDerivedKey: Boolean = false,
         derivedKeyHandlers: DerivedKeyHandlers? = null,
+        // Raw credential bytes for security-key (FIDO2) gocryptfs vaults; the caller owns and zeroes them.
+        rawSecret: ByteArray? = null,
     ): DirectoryVaultOutcome {
-        if (password.isNullOrEmpty() && preservedKey == null) {
+        if (password.isNullOrEmpty() && preservedKey == null && rawSecret == null) {
             val err = IllegalArgumentException("password or preservedKey is required")
             VeLog.e(TAG, err) { "unlockDirectoryVault failed: missing credentials for ${censorUri(uriString)}" }
             return DirectoryVaultOutcome.Error(err)
@@ -369,7 +371,9 @@ object ContainerLifecycleCore {
                         chars.fill('\u0000')
                     }
                 }
-                DirectoryVaultFormat.GOCRYPTFS -> {
+                DirectoryVaultFormat.GOCRYPTFS -> if (rawSecret != null) {
+                    GocryptfsVault.openWithSecret(context, uri, rawSecret, readOnly)
+                } else {
                     val chars = (password ?: "").toCharArray()
                     try {
                         GocryptfsVault.open(context, uri, chars, readOnly)

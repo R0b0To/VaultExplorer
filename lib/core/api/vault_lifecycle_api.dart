@@ -794,6 +794,8 @@ class VaultLifecycleApi {
     bool documentProvider = false,
     List<String> autoMountFolders = const [],
     bool readOnly = false,
+    bool useSecurityKey = false,
+    String? securityKeyPin,
   }) async {
     final raw = await _channel.invokeMethod<Map<Object?, Object?>>(
       ChannelMethods.unlockGocryptfsVault,
@@ -804,6 +806,11 @@ class VaultLifecycleApi {
         'documentProvider': documentProvider,
         'autoMountFolders': autoMountFolders,
         'readOnly': readOnly,
+        // FIDO2 security key vault (`gocryptfs -init -fido2`): the secret is
+        // derived natively from the key; `password` is ignored.
+        if (useSecurityKey) 'useSecurityKey': true,
+        if (useSecurityKey && securityKeyPin != null && securityKeyPin.isNotEmpty)
+          'securityKeyPin': securityKeyPin,
       },
     );
     if (raw == null) return null;
@@ -825,11 +832,22 @@ class VaultLifecycleApi {
   /// back to 'aes-256-gcm' on the native side.
   ///
   /// [userEntropy]: see [createContainer].
+  ///
+  /// [useSecurityKey]: protect the vault with a FIDO2 security key instead of
+  /// a password (the same on-disk format as `gocryptfs -init -fido2`);
+  /// [password] is ignored. [securityKeyRequirePin] makes later unlocks
+  /// require the key's PIN; [securityKeyPin] is the PIN to use now (needed
+  /// whenever the key has one set). Key errors (wrong PIN, no key presented
+  /// in time, ...) are rethrown as [PlatformException] with a
+  /// `SECURITY_KEY_*` code rather than collapsing to `false`.
   Future<bool> createGocryptfsVault(
     String folderUri,
     String password, {
     String cipher = 'aes-256-gcm',
     Uint8List? userEntropy,
+    bool useSecurityKey = false,
+    bool securityKeyRequirePin = false,
+    String? securityKeyPin,
   }) async {
     try {
       final success = await _channel.invokeMethod<bool>(
@@ -839,10 +857,21 @@ class VaultLifecycleApi {
           'password': password,
           'cipher': cipher,
           'userEntropy': userEntropy,
+          if (useSecurityKey) ...{
+            'useSecurityKey': true,
+            'securityKeyRequirePin': securityKeyRequirePin,
+            if (securityKeyPin != null && securityKeyPin.isNotEmpty)
+              'securityKeyPin': securityKeyPin,
+          },
         },
       );
       return success ?? false;
     } catch (e) {
+      if (useSecurityKey &&
+          e is PlatformException &&
+          e.code.startsWith('SECURITY_KEY_')) {
+        rethrow;
+      }
       logSwallowed('createGocryptfsVault', e);
       return false;
     }
@@ -1043,6 +1072,30 @@ class VaultLifecycleApi {
     }
   }
 
+  /// Whether the gocryptfs vault or LUKS2 container at [filePath] is
+  /// protected by a FIDO2 security key (only those two formats have a scheme
+  /// shared with other tools), and whether that needs the key's PIN. [format]
+  /// is the container format wire name; anything but gocryptfs/LUKS reports
+  /// "not required". Never throws -- an unreadable vault just reports false
+  /// and the normal password flow surfaces its own error.
+  Future<({bool required, bool pinRequired, bool nfcAvailable})>
+  probeSecurityKeyVault(String filePath, String format) async {
+    try {
+      final raw = await _channel.invokeMethod<Map<Object?, Object?>>(
+        ChannelMethods.probeSecurityKeyVault,
+        {'filePath': filePath, 'format': format},
+      );
+      return (
+        required: raw?['required'] as bool? ?? false,
+        pinRequired: raw?['pinRequired'] as bool? ?? false,
+        nfcAvailable: raw?['nfcAvailable'] as bool? ?? false,
+      );
+    } catch (e) {
+      logSwallowed('probeSecurityKeyVault', e, expected: true);
+      return (required: false, pinRequired: false, nfcAvailable: false);
+    }
+  }
+
   Future<bool> detectsAsPlainDiskImage(String filePath) async {
     try {
       final result = await _channel.invokeMethod<bool>(
@@ -1084,6 +1137,8 @@ class VaultLifecycleApi {
     int? hiddenVolumeCipherId,
     int? hiddenVolumeHashId,
     List<String>? hiddenVolumeKeyfilePaths,
+    bool useSecurityKey = false,
+    String? securityKeyPin,
   }) async {
     final raw = await _channel.invokeMethod<Map<Object?, Object?>>(
       ChannelMethods.unlockContainer,
@@ -1091,6 +1146,11 @@ class VaultLifecycleApi {
         'filePath': filePath,
         'password': password,
         'pim': pim,
+        // LUKS2 container enrolled with `systemd-cryptenroll --fido2-device`:
+        // the passphrase is derived natively from the key; `password` is ignored.
+        if (useSecurityKey) 'useSecurityKey': true,
+        if (useSecurityKey && securityKeyPin != null && securityKeyPin.isNotEmpty)
+          'securityKeyPin': securityKeyPin,
         'displayName': displayName,
         'documentProvider': documentProvider,
         'autoMountFolders': autoMountFolders,

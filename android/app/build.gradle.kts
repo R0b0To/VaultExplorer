@@ -34,8 +34,7 @@ val targetAbi: String? = System.getenv("VAULTEXPLORER_TARGET_ABI")
 
 android {
     namespace = "com.aeidolon.vaultexplorer"
-    compileSdk = flutter.compileSdkVersion
-    compileSdkExtension = 19 
+    compileSdk = maxOf(flutter.compileSdkVersion, 37)
     ndkVersion = ndkVersionPin
     buildToolsVersion = "37.0.0"
 

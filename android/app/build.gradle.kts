@@ -118,6 +118,12 @@ android {
 
             vcsInfo.include = false
         }
+
+        getByName("debug") {
+            if (keystorePropertiesFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
     }
 
     dependenciesInfo {

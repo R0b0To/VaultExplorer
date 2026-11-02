@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
@@ -15,8 +16,10 @@ import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/book_reader_state_store.dart';
 import 'package:vaultexplorer/data/services/full_res_image_cache.dart';
+import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/image_page_item.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/playlist_carousel_overlay.dart';
+import 'package:vaultexplorer/features/browser/viewer/zoom_snap_back.dart';
 
 /// Full-screen comic (.cbz) reader.
 ///
@@ -51,7 +54,8 @@ class ComicReaderScreen extends ConsumerStatefulWidget {
   ConsumerState<ComicReaderScreen> createState() => _ComicReaderScreenState();
 }
 
-class _ComicReaderScreenState extends ConsumerState<ComicReaderScreen> {
+class _ComicReaderScreenState extends ConsumerState<ComicReaderScreen>
+    with SingleTickerProviderStateMixin {
   late final VaultBookApi _api;
   late final VaultEngineEvents _events;
   bool _locked = false;
@@ -76,6 +80,18 @@ class _ComicReaderScreenState extends ConsumerState<ComicReaderScreen> {
   final Set<int> _pointers = <int>{};
   bool _zoomLock = false;
 
+  // Vertical (continuous) mode is zoomed as one piece: see
+  // [_onVerticalTransformChanged].
+  final TransformationController _verticalTransform =
+      TransformationController();
+  late final AnimationController _verticalZoomController;
+  Animation<Matrix4>? _verticalZoomAnimation;
+  double _verticalScale = 1.0;
+  bool _clampingVertical = false;
+  Size _verticalViewport = Size.zero;
+  TapDownDetails? _verticalDoubleTapDetails;
+  Timer? _verticalSnapBackTimer;
+
   int _index = 0;
   double? _scrubValue;
   bool _showUi = true;
@@ -97,6 +113,15 @@ class _ComicReaderScreenState extends ConsumerState<ComicReaderScreen> {
     _events = ref.read(vaultEngineEventsProvider);
     _events.addContainerLockedListener(_onContainerLocked);
     _verticalController.addListener(_onVerticalScroll);
+    _verticalTransform.addListener(_onVerticalTransformChanged);
+    _verticalZoomController =
+        AnimationController(
+          vsync: this,
+          duration: MediaViewerConstants.animationDuration,
+        )..addListener(() {
+          final animation = _verticalZoomAnimation;
+          if (animation != null) _setVerticalMatrix(animation.value);
+        });
     unawaited(_restoreState());
   }
 
@@ -159,6 +184,10 @@ class _ComicReaderScreenState extends ConsumerState<ComicReaderScreen> {
   @override
   void dispose() {
     _events.removeContainerLockedListener(_onContainerLocked);
+    _verticalSnapBackTimer?.cancel();
+    _verticalZoomController.dispose();
+    _verticalTransform.removeListener(_onVerticalTransformChanged);
+    _verticalTransform.dispose();
     _controller.dispose();
     _verticalController.dispose();
     _swipeLocked.dispose();
@@ -219,6 +248,8 @@ class _ComicReaderScreenState extends ConsumerState<ComicReaderScreen> {
     if (i < 0 || i >= widget.pages.length) return;
     if (_mode == 'vertical') {
       if (!_verticalController.hasClients) return;
+      // The scroll offset only means something at 1x.
+      _resetVerticalZoom();
       unawaited(
         _verticalController.animateTo(
           _estimatedVerticalOffset(i),
@@ -315,8 +346,231 @@ class _ComicReaderScreenState extends ConsumerState<ComicReaderScreen> {
     return offset;
   }
 
+  // ---- Vertical (continuous) zoom -----------------------------------------
+  //
+  // Same idea as the media viewer's continuous playlist: the pages have their
+  // own zoom turned off and one InteractiveViewer around the whole list zooms
+  // them all together. "Zoomed" means the list is drawn through a transform,
+  // it is not re-laid out, so it keeps scrolling normally underneath it.
+
+  /// How far a pinch may zoom out before it is held there. Whatever it is
+  /// pinched to, the view glides back to 1x once the fingers lift.
+  static const double _minVerticalZoom = 0.25;
+
+  static double _matrixScale(Matrix4 matrix) {
+    final x = matrix.storage[0];
+    final y = matrix.storage[1];
+    return math.sqrt(x * x + y * y);
+  }
+
+  Matrix4 _verticalMatrix(double dx, double dy, double scale) =>
+      Matrix4.identity()
+        ..translateByDouble(dx, dy, 0.0, 1.0)
+        ..scaleByDouble(scale, scale, scale, 1.0);
+
+  /// Writes the transform without [_onVerticalTransformChanged] stepping in.
+  void _setVerticalMatrix(Matrix4 matrix) {
+    _clampingVertical = true;
+    _verticalTransform.value = matrix;
+    _clampingVertical = false;
+  }
+
+  /// Keeps the zoomed list inside the screen: held at the minimum while
+  /// pinching out, and not pannable past its own edges while zoomed in.
+  void _onVerticalTransformChanged() {
+    if (_clampingVertical || !mounted) return;
+    final vw = _verticalViewport.width;
+    final vh = _verticalViewport.height;
+    if (vw <= 0 || vh <= 0) return;
+
+    final matrix = _verticalTransform.value;
+    final s = _matrixScale(matrix);
+    if (s <= 0) return;
+
+    if (s < _minVerticalZoom) {
+      _setVerticalMatrix(
+        _verticalMatrix(
+          vw * (1.0 - _minVerticalZoom) / 2.0,
+          vh * (1.0 - _minVerticalZoom) / 2.0,
+          _minVerticalZoom,
+        ),
+      );
+      return;
+    }
+
+    if (s >= 1.0) {
+      final scaledW = vw * s;
+      final scaledH = vh * s;
+      final tx = matrix.storage[12];
+      final ty = matrix.storage[13];
+      final clampedTx = scaledW > vw
+          ? tx.clamp(vw - scaledW, 0.0).toDouble()
+          : (vw - scaledW) / 2.0;
+      final clampedTy = scaledH > vh
+          ? ty.clamp(vh - scaledH, 0.0).toDouble()
+          : (vh - scaledH) / 2.0;
+      if ((tx - clampedTx).abs() > 0.001 || (ty - clampedTy).abs() > 0.001) {
+        _setVerticalMatrix(_verticalMatrix(clampedTx, clampedTy, s));
+      }
+    }
+  }
+
+  void _animateVerticalZoomTo(Matrix4 target) {
+    _verticalSnapBackTimer?.cancel();
+    _verticalZoomController.stop();
+    _verticalZoomAnimation = Matrix4Tween(
+      begin: _verticalTransform.value,
+      end: target,
+    ).animate(
+      CurvedAnimation(
+        parent: _verticalZoomController,
+        curve: Curves.easeOutCubic,
+      ),
+    );
+    _verticalZoomController.forward(from: 0.0).then((_) {
+      if (!mounted) return;
+      setState(() => _verticalScale = _matrixScale(_verticalTransform.value));
+    });
+  }
+
+  /// Glides a zoomed-out list back to 1x after [delay] (long enough for the
+  /// viewer's own pinch glide to be over, see [pinchInertiaDuration]).
+  void _scheduleVerticalSnapBack(Duration delay) {
+    _verticalSnapBackTimer?.cancel();
+    void settle() {
+      if (!mounted) return;
+      final s = _matrixScale(_verticalTransform.value);
+      if (s < kZoomedOutThreshold) {
+        _animateVerticalZoomTo(Matrix4.identity());
+      } else {
+        // The glide carried the zoom back up on its own: nothing to undo.
+        setState(() => _verticalScale = s);
+      }
+    }
+
+    if (delay == Duration.zero) {
+      settle();
+    } else {
+      _verticalSnapBackTimer = Timer(delay, settle);
+    }
+  }
+
+  void _handleVerticalDoubleTap(TapDownDetails? details) {
+    final scale = _matrixScale(_verticalTransform.value);
+    if ((scale - 1.0).abs() > 0.01) {
+      // Zoomed in or out: glide back to 1x.
+      _animateVerticalZoomTo(Matrix4.identity());
+      return;
+    }
+
+    const targetScale = 3.0;
+    final vw = _verticalViewport.width;
+    final vh = _verticalViewport.height;
+    if (vw <= 0 || vh <= 0) return;
+
+    // Zoom in around the tapped point, kept inside the screen.
+    final position = details?.localPosition ?? Offset(vw / 2, vh / 2);
+    final tx = (-position.dx * (targetScale - 1.0))
+        .clamp(vw - vw * targetScale, 0.0)
+        .toDouble();
+    final ty = (-position.dy * (targetScale - 1.0))
+        .clamp(vh - vh * targetScale, 0.0)
+        .toDouble();
+    _animateVerticalZoomTo(_verticalMatrix(tx, ty, targetScale));
+  }
+
+  /// Puts the vertical list straight back at 1x.
+  void _resetVerticalZoom() {
+    _verticalSnapBackTimer?.cancel();
+    _verticalZoomController.stop();
+    if (_verticalTransform.value.isIdentity() && _verticalScale == 1.0) {
+      return;
+    }
+    _setVerticalMatrix(Matrix4.identity());
+    if (mounted) setState(() => _verticalScale = 1.0);
+  }
+
+  Widget _buildVerticalReader(BoxConstraints constraints) {
+    final viewport = Size(constraints.maxWidth, constraints.maxHeight);
+    if (viewport != _verticalViewport) {
+      final resized = _verticalViewport != Size.zero;
+      _verticalViewport = viewport;
+      if (resized && !_verticalTransform.value.isIdentity()) {
+        // A zoom is only valid for the screen it was made on.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _resetVerticalZoom();
+        });
+      }
+    }
+
+    final list = ValueListenableBuilder<bool>(
+      valueListenable: _swipeLocked,
+      builder: (context, locked, _) => ListView.builder(
+        controller: _verticalController,
+        physics: locked
+            ? const NeverScrollableScrollPhysics()
+            : const ClampingScrollPhysics(),
+        itemCount: widget.pages.length,
+        itemBuilder: (context, i) => FutureBuilder<void>(
+          future: _ensureLoaded(i),
+          builder: (context, _) {
+            final size = _dimensions[i];
+            final height = size == null || size.$1 <= 0
+                ? constraints.maxHeight
+                : constraints.maxWidth * size.$2 / size.$1;
+            return SizedBox(
+              key: _verticalPageKeys[i],
+              height: height,
+              // Zoom belongs to the whole list (see above), not to a page.
+              child: _buildComicPage(
+                i,
+                imageFit: BoxFit.fitWidth,
+                enableZoom: false,
+              ),
+            );
+          },
+        ),
+      ),
+    );
+
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onDoubleTapDown: (details) => _verticalDoubleTapDetails = details,
+      onDoubleTap: () => _handleVerticalDoubleTap(_verticalDoubleTapDetails),
+      child: InteractiveViewer(
+        transformationController: _verticalTransform,
+        minScale: _minVerticalZoom,
+        maxScale: MediaViewerConstants.maxImageZoom,
+        interactionEndFrictionCoefficient: kZoomInteractionEndFriction,
+        boundaryMargin: const EdgeInsets.all(double.infinity),
+        clipBehavior: Clip.none,
+        // One finger scrolls the list; it only pans sideways once zoomed in.
+        panEnabled: _verticalScale > 1.01,
+        panAxis: PanAxis.free,
+        onInteractionStart: (details) {
+          // A new touch cancels a pending spring back.
+          _verticalSnapBackTimer?.cancel();
+          if (details.pointerCount >= 2) _verticalZoomController.stop();
+        },
+        onInteractionUpdate: (details) {
+          _verticalScale = _matrixScale(_verticalTransform.value);
+        },
+        onInteractionEnd: (details) {
+          final s = _matrixScale(_verticalTransform.value);
+          setState(() => _verticalScale = s);
+          // Pinched out: glide back to 1x instead of settling zoomed out.
+          if (s < kZoomedOutThreshold) {
+            _scheduleVerticalSnapBack(pinchInertiaDuration(details));
+          }
+        },
+        child: list,
+      ),
+    );
+  }
+
   void _setMode(String mode) {
     if (_mode == mode) return;
+    _resetVerticalZoom();
     setState(() => _mode = mode);
     if (mode == 'vertical') {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -596,33 +850,7 @@ class _ComicReaderScreenState extends ConsumerState<ComicReaderScreen> {
                   onPointerUp: _onPointerEnd,
                   onPointerCancel: _onPointerEnd,
                   child: _mode == 'vertical'
-                      ? ValueListenableBuilder<bool>(
-                          valueListenable: _swipeLocked,
-                          builder: (context, locked, _) => ListView.builder(
-                            controller: _verticalController,
-                            physics: locked
-                                ? const NeverScrollableScrollPhysics()
-                                : const ClampingScrollPhysics(),
-                            itemCount: total,
-                            itemBuilder: (context, i) => FutureBuilder<void>(
-                              future: _ensureLoaded(i),
-                              builder: (context, _) {
-                                final size = _dimensions[i];
-                                final height = size == null || size.$1 <= 0
-                                    ? constraints.maxHeight
-                                    : constraints.maxWidth * size.$2 / size.$1;
-                                return SizedBox(
-                                  key: _verticalPageKeys[i],
-                                  height: height,
-                                  child: _buildComicPage(
-                                    i,
-                                    imageFit: BoxFit.fitWidth,
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        )
+                      ? _buildVerticalReader(constraints)
                       : ValueListenableBuilder<bool>(
                           valueListenable: _swipeLocked,
                           builder: (context, locked, _) => PageView.builder(
@@ -740,13 +968,17 @@ class _ComicReaderScreenState extends ConsumerState<ComicReaderScreen> {
     );
   }
 
-  Widget _buildComicPage(int i, {BoxFit imageFit = BoxFit.contain}) =>
-      _ComicPage(
+  Widget _buildComicPage(
+    int i, {
+    BoxFit imageFit = BoxFit.contain,
+    bool enableZoom = true,
+  }) => _ComicPage(
         key: ValueKey('${widget.token}_${_mode}_$i'),
         load: () => _ensureLoaded(i),
         cacheKey: _cacheKey(i),
         container: _cacheContainer,
         imageFit: imageFit,
+        enableZoom: enableZoom,
         isActive: i == _index || (_mode == 'spread' && i == _index + 1),
         showUi: _showUi,
         onToggleUi: _setUiVisible,
@@ -778,6 +1010,9 @@ class _ComicPage extends StatefulWidget {
   final String cacheKey;
   final MountedContainer container;
   final BoxFit imageFit;
+
+  /// Off in vertical mode, where the reader zooms the whole list instead.
+  final bool enableZoom;
   final bool isActive;
   final bool showUi;
   final ValueChanged<bool> onToggleUi;
@@ -790,6 +1025,7 @@ class _ComicPage extends StatefulWidget {
     required this.cacheKey,
     required this.container,
     this.imageFit = BoxFit.contain,
+    this.enableZoom = true,
     required this.isActive,
     required this.showUi,
     required this.onToggleUi,
@@ -845,6 +1081,9 @@ class _ComicPageState extends State<_ComicPage> {
           container: widget.container,
           imageFit: widget.imageFit,
           rotationQuarterTurns: 0,
+          enableZoom: widget.enableZoom,
+          // Pinching a page out springs it back to 1x.
+          snapBackOnZoomOut: true,
           showUI: widget.showUi,
           isActive: widget.isActive,
           onToggleUI: widget.onToggleUi,

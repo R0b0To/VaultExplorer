@@ -298,10 +298,11 @@ class _HoldRangeSelectContainerState extends State<HoldRangeSelectContainer> {
     final item = _findItemAt(event.position);
     if (item == null || item.entry.isPlaceholder) return false;
 
-    // A first hold starts a drag, which selects that item as the drag begins.
-    // In selection mode a hold on an already-selected item drags the whole
-    // selection. Unselected items still use the hold recognizer for range
-    // selection.
+    // A first hold is left to the item's drag recognizer (BrowserItemDragItem):
+    // it selects the item at the hold delay and starts the drag a moment
+    // later. In selection mode a hold on an already-selected item drags the
+    // whole selection. Unselected items still use the hold recognizer for
+    // range selection.
     if (widget.enableHoldDrag &&
         (!widget.isSelectionMode ||
             widget.selectedItems.contains(item.entry))) {

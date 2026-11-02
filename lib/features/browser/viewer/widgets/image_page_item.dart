@@ -13,6 +13,7 @@ import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/playlist_swipe_claim.dart';
 import 'package:vaultexplorer/features/browser/viewer/screen_brightness_bridge.dart';
+import 'package:vaultexplorer/features/browser/viewer/zoom_snap_back.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/edge_swipe_claim_recognizer.dart';
 import 'package:vaultexplorer/features/browser/viewer/models/viewer_adjustments.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/color_adjust_filter.dart';
@@ -37,6 +38,11 @@ class ImagePageItem extends StatefulWidget {
   final bool enableZoom;
   final bool pinchZoomOutEnabled;
   final double minZoomScale;
+
+  /// When the page is pinched out below 1x, glide it back to 1x once the
+  /// fingers are released instead of leaving it zoomed out. Off for the photo
+  /// viewer, where zooming out is a free-form gesture; on for the comic reader.
+  final bool snapBackOnZoomOut;
   final ThumbnailQuality thumbnailQuality;
   final ThumbnailCacheMode thumbnailCacheMode;
   final bool edgeSwipeBrightnessEnabled;
@@ -64,6 +70,7 @@ class ImagePageItem extends StatefulWidget {
     this.enableZoom = true,
     this.pinchZoomOutEnabled = true,
     this.minZoomScale = 0.25,
+    this.snapBackOnZoomOut = false,
     this.thumbnailQuality = ThumbnailQuality.defaultQuality,
     this.thumbnailCacheMode = ThumbnailCacheMode.appCache,
     this.edgeSwipeBrightnessEnabled = true,
@@ -88,6 +95,10 @@ class _ImagePageItemState extends State<ImagePageItem>
   Size? _lastViewportSize;
 
   AnimationController? _zoomAnimationController;
+
+  /// Waits for InteractiveViewer's own pinch glide to finish before the
+  /// zoomed-out page is sent back to 1x (see [pinchInertiaDuration]).
+  Timer? _snapBackTimer;
 
   // -- Edge-swipe brightness gesture --
   final Set<int> _activeTouchPointers = {};
@@ -281,9 +292,33 @@ class _ImagePageItemState extends State<ImagePageItem>
     });
   }
 
+  /// Sends a zoomed-out page back to its 1x position with the usual zoom
+  /// animation, after [delay]. See [ImagePageItem.snapBackOnZoomOut].
+  void _scheduleSnapBack(Duration delay, BoxConstraints constraints) {
+    _snapBackTimer?.cancel();
+    void settle() {
+      if (!mounted) return;
+      final s = _getMatrixScale(_transformationController.value);
+      if (s < kZoomedOutThreshold) {
+        _animateImageZoomTo(_getBaselineMatrix(constraints), toBaseline: true);
+        return;
+      }
+      // The glide carried the zoom back up on its own: nothing to undo.
+      setState(() => _scale = s);
+      widget.onZoomChanged(!_isZoomed);
+    }
+
+    if (delay == Duration.zero) {
+      settle();
+    } else {
+      _snapBackTimer = Timer(delay, settle);
+    }
+  }
+
   @override
   void dispose() {
     _brightnessHudTimer?.cancel();
+    _snapBackTimer?.cancel();
     _zoomAnimationController?.dispose();
     _transformationController.removeListener(_onImageTransformationChanged);
     _transformationController.dispose();
@@ -768,13 +803,16 @@ bool _isClampingMatrix = false;
                           transformationController: _transformationController,
                           maxScale: MediaViewerConstants.maxImageZoom,
                           minScale: _effectiveMinZoomScale,
-                          interactionEndFrictionCoefficient: 0.0005,
+                          interactionEndFrictionCoefficient:
+                              kZoomInteractionEndFriction,
                           boundaryMargin: widget.pinchZoomOutEnabled
                               ? const EdgeInsets.all(double.infinity)
                               : EdgeInsets.zero,
                           constrained: isConstrained,
                           panEnabled: _isZoomedIn,
                     onInteractionStart: (details) {
+                            // A new touch cancels a pending spring back.
+                            _snapBackTimer?.cancel();
                             if (details.pointerCount >= 2) {
                               _zoomAnimationController?.stop();
                             }
@@ -788,6 +826,20 @@ bool _isClampingMatrix = false;
                           },
                          onInteractionEnd: (details) {
                             final s = _getMatrixScale(_transformationController.value);
+                            if (widget.snapBackOnZoomOut &&
+                                s < kZoomedOutThreshold &&
+                                viewportWidth > 0 &&
+                                viewportHeight > 0) {
+                              // Pinched out: glide back to 1x instead of
+                              // settling zoomed out. The page stays locked
+                              // (no swipe to the next one) until it is back.
+                              widget.onZoomChanged(false);
+                              _scheduleSnapBack(
+                                pinchInertiaDuration(details),
+                                constraints,
+                              );
+                              return;
+                            }
                             final clampedS = s.clamp(_effectiveMinZoomScale, MediaViewerConstants.maxImageZoom);
                             if (clampedS < 1.0 && viewportWidth > 0 && viewportHeight > 0) {
                               final cW = canvasWidth ?? viewportWidth;

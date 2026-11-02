@@ -5901,6 +5901,13 @@ class AppLocalizationsIt extends AppLocalizations {
   String get vaultSyncComparingLabel => 'Confronto dei vault…';
 
   @override
+  String get vaultSyncScanFailedTitle => 'Impossibile leggere una cartella';
+
+  @override
+  String get vaultSyncScanFailedMessage =>
+      'Non è stato possibile leggere una cartella di un vault, quindi il confronto è stato interrotto invece di tirare a indovinare. Non è stato modificato nulla. Blocca e sblocca di nuovo il vault, poi confronta di nuovo.';
+
+  @override
   String vaultSyncCompareStatsLabel(Object dirs, Object entries) {
     return 'Cartelle analizzate: $dirs | Differenze trovate: $entries';
   }

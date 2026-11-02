@@ -10,7 +10,7 @@ class GocryptfsContentCryptorTest {
     private val random = SecureRandom()
     
     private fun newCryptor(cipher: GocryptfsCipher = GocryptfsCipher.AES_256_GCM) =
-        GocryptfsContentCryptor(ByteArray(32).also { random.nextBytes(it) }, cipher)
+        GocryptfsContentCryptor(ByteArray(cipher.contentKeyLen).also { random.nextBytes(it) }, cipher)
 
     // Helper to determine if we are running in an environment where NativeEngine JNI calls work
     // (i.e., a real device/emulator rather than a bare host JVM where `System.loadLibrary` fails).
@@ -31,8 +31,10 @@ class GocryptfsContentCryptorTest {
         return if (isNativeAvailable()) {
             GocryptfsCipher.values().toList()
         } else {
-            // JVM-only fallback: only test standard AES ciphers backed by java.crypto.Cipher
-            listOf(GocryptfsCipher.AES_256_GCM)
+            // JVM-only fallback: only the ciphers that have a pure-JCE path. AES-GCM uses
+            // java.crypto.Cipher directly; AES-SIV falls back to SivMode's JCE-only
+            // S2V/CTR implementation when the native library isn't loadable.
+            listOf(GocryptfsCipher.AES_256_GCM, GocryptfsCipher.AES_SIV)
         }
     }
 
@@ -142,7 +144,7 @@ class GocryptfsContentCryptorTest {
         for (cipher in ciphersToTest()) {
             val cryptor = newCryptor(cipher)
             val header = cryptor.createHeader()
-            val nonceLen = if (cipher == GocryptfsCipher.AES_256_GCM) 16 else 24
+            val nonceLen = cipher.nonceLen
             val tooShort = ByteArray(nonceLen + 16 /* TAG_LEN */ - 1)
             assertThrows(GocryptfsContentAuthException::class.java) {
                 cryptor.decryptChunk(tooShort, chunkNumber = 0, header)
@@ -155,7 +157,7 @@ class GocryptfsContentCryptorTest {
         for (cipher in ciphersToTest()) {
             val cryptor = newCryptor(cipher)
             val header = cryptor.createHeader()
-            val nonceLen = if (cipher == GocryptfsCipher.AES_256_GCM) 16 else 24
+            val nonceLen = cipher.nonceLen
             val nonceOnly = ByteArray(nonceLen)
             assertThrows(GocryptfsContentAuthException::class.java) {
                 cryptor.decryptChunk(nonceOnly, chunkNumber = 0, header)

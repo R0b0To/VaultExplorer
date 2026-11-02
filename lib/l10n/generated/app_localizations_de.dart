@@ -5910,6 +5910,13 @@ class AppLocalizationsDe extends AppLocalizations {
   String get vaultSyncComparingLabel => 'Tresore werden verglichen…';
 
   @override
+  String get vaultSyncScanFailedTitle => 'Ordner nicht lesbar';
+
+  @override
+  String get vaultSyncScanFailedMessage =>
+      'Ein Ordner in einem Tresor konnte nicht gelesen werden. Der Vergleich wurde abgebrochen, statt zu raten. Es wurde nichts geändert. Tresor sperren und erneut entsperren, dann noch einmal vergleichen.';
+
+  @override
   String vaultSyncCompareStatsLabel(Object dirs, Object entries) {
     return 'Durchsuchte Ordner: $dirs | Unterschiede gefunden: $entries';
   }

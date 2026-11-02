@@ -186,7 +186,8 @@ class VaultSync extends _$VaultSync {
       if (!ref.mounted) return;
       final isDone =
           update.progress.stage == VaultSyncScanStage.complete ||
-          update.progress.stage == VaultSyncScanStage.cancelled;
+          update.progress.stage == VaultSyncScanStage.cancelled ||
+          update.progress.stage == VaultSyncScanStage.failed;
 
       state = state._copy(
         progress: update.progress,

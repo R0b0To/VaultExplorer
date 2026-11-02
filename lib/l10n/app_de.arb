@@ -1576,6 +1576,8 @@
   "vaultSyncIntroSubtitle": "Wählen Sie einen linken und rechten Tresor (oder zwei Ordner im selben Tresor), um zu sehen, was auf jeder Seite fehlt, geändert oder neuer ist.",
   "vaultSyncCompareButton": "Vergleichen",
   "vaultSyncComparingLabel": "Tresore werden verglichen…",
+  "vaultSyncScanFailedTitle": "Ordner nicht lesbar",
+  "vaultSyncScanFailedMessage": "Ein Ordner in einem Tresor konnte nicht gelesen werden. Der Vergleich wurde abgebrochen, statt zu raten. Es wurde nichts geändert. Tresor sperren und erneut entsperren, dann noch einmal vergleichen.",
   "vaultSyncCompareStatsLabel": "Durchsuchte Ordner: {dirs} | Unterschiede gefunden: {entries}",
   "vaultSyncCancelCompareButton": "Abbrechen",
   "vaultSyncInSyncTitle": "Bereits synchron",

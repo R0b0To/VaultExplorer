@@ -24,12 +24,6 @@ object GocryptfsVault {
     private const val DEFAULT_SCRYPT_P = 1
     private const val CONFIG_VERSION = 2
 
-    // Correctly dispatch the HKDF string depending on the cipher used for the content
-    private fun hkdfInfoForContent(cipher: GocryptfsCipher): String = when (cipher) {
-        GocryptfsCipher.AES_256_GCM -> "AES-GCM file content encryption"
-        GocryptfsCipher.XCHACHA20_POLY1305 -> "XChaCha20-Poly1305 file content encryption"
-    }
-
     fun looksLikeVault(context: Context, treeUri: Uri): Boolean {
         val root = DocumentFile.fromTreeUri(context, treeUri) ?: return false
         val saf = SafDocumentOps(context)
@@ -192,7 +186,7 @@ object GocryptfsVault {
         }
 
         val nameKey = if (config.plaintextNames) ByteArray(0) else Hkdf.deriveSha256(masterkey, "EME filename encryption", 32)
-        val contentKey = Hkdf.deriveSha256(masterkey, hkdfInfoForContent(config.cipher), 32)
+        val contentKey = Hkdf.deriveSha256(masterkey, config.cipher.hkdfInfo, config.cipher.contentKeyLen)
         masterkey.fill(0)
 
         val nameCryptor = GocryptfsFileNameCryptor(nameKey, config.longNameMax, config.plaintextNames)
@@ -313,7 +307,7 @@ object GocryptfsVault {
             }
 
             val nameKey = if (plaintextNames) ByteArray(0) else Hkdf.deriveSha256(masterkey, "EME filename encryption", 32)
-            val contentKey = Hkdf.deriveSha256(masterkey, hkdfInfoForContent(cipher), 32)
+            val contentKey = Hkdf.deriveSha256(masterkey, cipher.hkdfInfo, cipher.contentKeyLen)
 
             val nameCryptor = GocryptfsFileNameCryptor(nameKey, 0, plaintextNames)
             val contentCryptor = GocryptfsContentCryptor(contentKey, cipher)
@@ -390,6 +384,8 @@ object GocryptfsVault {
         return when (cipher) {
             GocryptfsCipher.AES_256_GCM -> listOf("GCMIV128") + base
             GocryptfsCipher.XCHACHA20_POLY1305 -> listOf("XChaCha20Poly1305") + base
+            // gocryptfs validate.go: AESSIV is only valid together with GCMIV128.
+            GocryptfsCipher.AES_SIV -> listOf("GCMIV128") + base + "AESSIV"
         }
     }
 

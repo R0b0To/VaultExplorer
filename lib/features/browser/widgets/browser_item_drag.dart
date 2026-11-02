@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -162,14 +163,179 @@ class _DropMenuRow extends StatelessWidget {
   }
 }
 
-/// A [LongPressDraggable] that asks [tryBegin] before it lets a drag start.
+/// How long a finger rests on a tile before it counts as a hold: the moment
+/// that selects an unselected tile, or starts the drag of an already selected
+/// one.
+///
+/// Must stay *below* [kLongPressTimeout] (500 ms). Every tile also carries a
+/// long-press recognizer with that deadline (an `InkWell` `onLongPress`, a
+/// no-op in the browser views), and whichever recognizer accepts first wins
+/// the gesture arena.
+const Duration kItemDragHoldDelay = Duration(milliseconds: 400);
+
+/// How much later than the select the drag starts, when the hold that began
+/// it is also the one that selected the tile. Change this one value to retime
+/// it: the longer it is, the more deliberate lifting an item out of a fresh
+/// selection feels.
+const Duration kItemDragAfterSelectDelay = Duration(milliseconds: 600);
+
+/// What [_HoldThenDragRecognizer] asks about its tile at the moment a finger
+/// lands.
+///
+/// The recognizer lives as long as the tile does (Flutter creates it once),
+/// while the tile's selection state changes under it, so both are read live
+/// rather than captured when the recognizer was made.
+class _HoldDragGate {
+  const _HoldDragGate({required this.selectsFirst, required this.onSelect});
+
+  /// Whether a hold that starts now is the one that *selects* the tile
+  /// (nothing is selected yet). False when the tile is already part of a
+  /// selection: that hold goes straight to dragging.
+  final bool Function() selectsFirst;
+
+  /// Selects the tile.
+  final VoidCallback onSelect;
+}
+
+/// Per-finger state of [_HoldThenDragRecognizer].
+///
+/// A plain hold behaves exactly like Flutter's own delayed drag: the drag
+/// starts when the hold delay is up, and moving before then hands the touch
+/// to scrolling.
+///
+/// A select-first hold has two stages. When the hold delay is up it claims
+/// the touch (so the tile's own long-press, which fires at 500 ms, can't take
+/// it), selects the tile, and only starts the drag after a further
+/// [afterSelectDelay]. Lifting in between leaves the tile selected and starts
+/// no drag; moving in between changes nothing, the drag still starts when its
+/// delay is up and follows the finger from there.
+class _HoldThenDragPointerState extends MultiDragPointerState {
+  _HoldThenDragPointerState(
+    super.initialPosition,
+    super.kind,
+    super.gestureSettings, {
+    required Duration holdDelay,
+    required this.afterSelectDelay,
+    required this.onSelect,
+  }) {
+    _timer = Timer(holdDelay, _holdPassed);
+  }
+
+  /// Null for a plain hold; otherwise the extra wait before the drag starts.
+  final Duration? afterSelectDelay;
+  final VoidCallback? onSelect;
+
+  Timer? _timer;
+  GestureMultiDragStartCallback? _starter;
+
+  /// True until the hold delay is up: moving then cancels the gesture.
+  bool _holding = true;
+
+  /// Whether the drag may start as soon as the gesture is accepted.
+  bool _dragReady = false;
+
+  void _holdPassed() {
+    _timer = null;
+    _holding = false;
+    final extra = afterSelectDelay;
+    if (extra == null) {
+      _dragReady = true;
+      final starter = _starter;
+      if (starter != null) {
+        _starter = null;
+        starter(initialPosition);
+      } else {
+        resolve(GestureDisposition.accepted);
+      }
+      return;
+    }
+    // Select first, drag a moment later.
+    _timer = Timer(extra, _dragDelayPassed);
+    onSelect?.call();
+    if (_starter == null) resolve(GestureDisposition.accepted);
+  }
+
+  void _dragDelayPassed() {
+    _timer = null;
+    _dragReady = true;
+    final starter = _starter;
+    if (starter != null) {
+      _starter = null;
+      starter(initialPosition);
+    }
+  }
+
+  @override
+  void accepted(GestureMultiDragStartCallback starter) {
+    if (_dragReady) {
+      starter(initialPosition);
+    } else {
+      _starter = starter;
+    }
+  }
+
+  @override
+  void checkForResolutionAfterMove() {
+    if (!_holding) return;
+    if (pendingDelta!.distance > computeHitSlop(kind, gestureSettings)) {
+      resolve(GestureDisposition.rejected);
+      _timer?.cancel();
+      _timer = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _timer = null;
+    super.dispose();
+  }
+}
+
+/// The drag recognizer of a browser tile: Flutter's delayed (long-press) drag,
+/// except that the hold which *selects* a tile starts the drag later than the
+/// select. See [_HoldThenDragPointerState].
+class _HoldThenDragRecognizer extends MultiDragGestureRecognizer {
+  _HoldThenDragRecognizer({
+    required this.holdDelay,
+    required this.gate,
+    AllowedButtonsFilter? allowedButtonsFilter,
+  }) : super(debugOwner: null, allowedButtonsFilter: allowedButtonsFilter);
+
+  final Duration holdDelay;
+  final _HoldDragGate gate;
+
+  @override
+  MultiDragPointerState createNewPointerState(PointerDownEvent event) {
+    final selectsFirst = gate.selectsFirst();
+    return _HoldThenDragPointerState(
+      event.position,
+      event.kind,
+      gestureSettings,
+      holdDelay: holdDelay,
+      afterSelectDelay: selectsFirst ? kItemDragAfterSelectDelay : null,
+      onSelect: selectsFirst ? gate.onSelect : null,
+    );
+  }
+
+  @override
+  String get debugDescription => 'hold then drag';
+}
+
+/// A long-press [Draggable] that asks [tryBegin] before it lets a drag start,
+/// and that starts the drag of a freshly selected tile a moment after the
+/// select (see [_HoldThenDragRecognizer]).
+///
+/// It extends [Draggable] rather than [LongPressDraggable] because the latter
+/// is tied to Flutter's single-delay recognizer; it keeps that widget's
+/// [delay] and [hapticFeedbackOnStart].
 ///
 /// Flutter gives every draggable its own recognizer, so a second finger could
 /// start a second drag (even from the same tile unless `maxSimultaneousDrags`
 /// is capped). The gate is checked at the moment the recognizer would start
 /// the drag, which also settles two fingers that complete their long press in
 /// the same frame: the first claims the slot, the other gets nothing.
-class _GuardedLongPressDraggable<T extends Object> extends LongPressDraggable<T> {
+class _GuardedLongPressDraggable<T extends Object> extends Draggable<T> {
   const _GuardedLongPressDraggable({
     super.key,
     required super.child,
@@ -181,25 +347,42 @@ class _GuardedLongPressDraggable<T extends Object> extends LongPressDraggable<T>
     super.onDragStarted,
     super.onDragUpdate,
     super.onDragEnd,
-    super.delay,
+    this.delay = kItemDragHoldDelay,
+    this.hapticFeedbackOnStart = true,
+    required this.gate,
     required this.tryBegin,
     required this.release,
   });
 
+  /// How long a finger rests on the tile before the hold counts.
+  final Duration delay;
+
+  /// Whether a tick is felt when the drag starts.
+  final bool hapticFeedbackOnStart;
+
+  final _HoldDragGate gate;
   final bool Function(Offset position) tryBegin;
   final VoidCallback release;
 
   @override
-  DelayedMultiDragGestureRecognizer createRecognizer(
+  MultiDragGestureRecognizer createRecognizer(
     GestureMultiDragStartCallback onStart,
   ) {
-    return super.createRecognizer((Offset position) {
+    return _HoldThenDragRecognizer(
+      holdDelay: delay,
+      gate: gate,
+      allowedButtonsFilter: allowedButtonsFilter,
+    )..onStart = (Offset position) {
       if (!tryBegin(position)) return null;
       final Drag? drag = onStart(position);
-      // The draggable itself declined (its own cap): give the slot back.
-      if (drag == null) release();
+      if (drag == null) {
+        // The draggable itself declined (its own cap): give the slot back.
+        release();
+        return null;
+      }
+      if (hapticFeedbackOnStart) HapticFeedback.selectionClick();
       return drag;
-    });
+    };
   }
 }
 
@@ -211,10 +394,15 @@ const TabId _kUnscopedTab = TabId(-1);
 /// for range-selecting unselected rows; a selected row can be held to drag the
 /// complete selection.
 ///
+/// Holding a tile while nothing is selected selects it at the hold delay
+/// ([kItemDragHoldDelay]) and, if the finger stays down, lifts it into a drag
+/// [kItemDragAfterSelectDelay] later. Lifting and holding again on an already
+/// selected tile starts the drag at the plain hold delay.
+///
 /// Also draws the flash on tiles a finished drop just created (see
 /// [BrowserPaneScope.revealNames]) and freezes the tile while the viewport is
 /// locked by a drag that started in another one.
-class BrowserItemDragItem extends StatelessWidget {
+class BrowserItemDragItem extends StatefulWidget {
   final Widget child;
   final RawEntry entry;
   final MountedContainer? container;
@@ -240,6 +428,29 @@ class BrowserItemDragItem extends StatelessWidget {
     required this.onDrop,
   });
 
+  @override
+  State<BrowserItemDragItem> createState() => _BrowserItemDragItemState();
+}
+
+class _BrowserItemDragItemState extends State<BrowserItemDragItem> {
+  late final _HoldDragGate _gate = _HoldDragGate(
+    selectsFirst: () => !widget.isSelectionMode,
+    onSelect: _selectOnHold,
+  );
+
+  /// The first stage of a select-first hold (see [_HoldThenDragPointerState]).
+  void _selectOnHold() {
+    if (!mounted) return;
+    // Another finger is already dragging items: this one only competes for
+    // the same slot, it must not select anything.
+    final session = ProviderScope.containerOf(
+      context,
+      listen: false,
+    ).read(browserDragSessionProvider);
+    if (session.isActive) return;
+    widget.onItemLongPress(widget.entry);
+  }
+
   /// The tile with its overlays. The tile is always the first child of the
   /// same [Stack], so toggling a highlight or the lock never re-parents it
   /// (file tiles own stateful thumbnail and PiP subtrees).
@@ -250,6 +461,7 @@ class BrowserItemDragItem extends StatelessWidget {
     int revealToken = 0,
     bool dropHover = false,
   }) {
+    final child = widget.child;
     final primary = Theme.of(context).colorScheme.primary;
     return Stack(
       fit: StackFit.passthrough,
@@ -284,6 +496,13 @@ class BrowserItemDragItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final entry = widget.entry;
+    final container = widget.container;
+    final currentDirectory = widget.currentDirectory;
+    final visibleItems = widget.visibleItems;
+    final selectedItems = widget.selectedItems;
+    final isSelectionMode = widget.isSelectionMode;
+    final onDrop = widget.onDrop;
     final scope = BrowserPaneScope.maybeOf(context);
     final locked = scope?.interactionLocked ?? false;
     final revealed = scope?.revealNames.contains(entry.name) ?? false;
@@ -291,7 +510,10 @@ class BrowserItemDragItem extends StatelessWidget {
 
     final drawerScope = FullScreenDragDrawerScope.maybeOf(context);
     final source = container;
-    if (!enabled || source == null || entry.isPlaceholder || onDrop == null) {
+    if (!widget.enabled ||
+        source == null ||
+        entry.isPlaceholder ||
+        onDrop == null) {
       return _withOverlays(
         context,
         locked: locked,
@@ -314,7 +536,7 @@ class BrowserItemDragItem extends StatelessWidget {
       source: source,
       sourceDirectory: currentDirectory,
       entries: Set.unmodifiable(dragEntries),
-      onDrop: onDrop!,
+      onDrop: onDrop,
     );
 
     Widget dragChild;
@@ -352,14 +574,17 @@ class BrowserItemDragItem extends StatelessWidget {
     final tabId = scope?.tabId ?? _kUnscopedTab;
     return _GuardedLongPressDraggable<BrowserItemDragData>(
       data: data,
-      delay: const Duration(milliseconds: 400),
+      delay: kItemDragHoldDelay,
       maxSimultaneousDrags: 1,
       dragAnchorStrategy: pointerDragAnchorStrategy,
+      gate: _gate,
       tryBegin: (position) => session.tryBegin(tabId, position),
       release: session.end,
       onDragStarted: () {
         drawerScope?.setDrawerDragBlocked(true);
-        onItemLongPress(entry);
+        // Normally already selected by the hold (see _selectOnHold); a no-op
+        // then.
+        widget.onItemLongPress(entry);
       },
       onDragUpdate: (details) => session.updatePointer(details.globalPosition),
       onDragEnd: (_) {

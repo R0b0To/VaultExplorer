@@ -69,36 +69,60 @@ class _SourceRow extends StatelessWidget {
                 ),
               )
             else
-              for (final algo in algorithms)
-                if (result!.digests[algo] != null)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 24, top: 2),
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          width: 56,
-                          child: Text(
-                            algo.label,
-                            style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
-                          ),
+              // A table rather than a row per digest: the label column sizes to
+              // the widest label ("SHA-256") and never wraps, so the label can't
+              // break onto a second line at large font or display scaling, and
+              // every digest below it still starts at the same x position.
+              Padding(
+                padding: const EdgeInsets.only(left: 24, top: 2),
+                child: Table(
+                  defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+                  columnWidths: const {
+                    0: IntrinsicColumnWidth(),
+                    1: FlexColumnWidth(),
+                    2: FixedColumnWidth(20),
+                  },
+                  children: [
+                    for (final algo in algorithms)
+                      if (result!.digests[algo] != null)
+                        TableRow(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(0, 1, 8, 1),
+                              child: Text(
+                                algo.label,
+                                maxLines: 1,
+                                softWrap: false,
+                                overflow: TextOverflow.visible,
+                                style: textTheme.labelSmall?.copyWith(
+                                  color: cs.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 1),
+                              child: SelectableText(
+                                result!.digests[algo]!,
+                                style: textTheme.labelSmall?.copyWith(
+                                  fontFamily: 'monospace',
+                                ),
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 1),
+                              child: IconButton(
+                                icon: const Icon(Icons.copy_rounded, size: 14),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                visualDensity: VisualDensity.compact,
+                                onPressed: () => onCopy(result!.digests[algo]!),
+                              ),
+                            ),
+                          ],
                         ),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: SelectableText(
-                            result!.digests[algo]!,
-                            style: textTheme.labelSmall?.copyWith(fontFamily: 'monospace'),
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.copy_rounded, size: 14),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          visualDensity: VisualDensity.compact,
-                          onPressed: () => onCopy(result!.digests[algo]!),
-                        ),
-                      ],
-                    ),
-                  ),
+                  ],
+                ),
+              ),
           ],
         ],
       ),

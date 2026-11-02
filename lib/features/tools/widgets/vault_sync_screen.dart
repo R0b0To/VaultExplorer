@@ -206,6 +206,8 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
               const SizedBox(height: 10),
               if (state.isComparing)
                 _buildComparingCard(context, state)
+              else if (state.progress.stage == VaultSyncScanStage.failed)
+                _buildScanFailedCard(context)
               else if (state.progress.stage == VaultSyncScanStage.idle ||
                   state.progress.stage == VaultSyncScanStage.cancelled)
                 _buildIdleCard(context, state)
@@ -523,6 +525,17 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildScanFailedCard(BuildContext context) {
+    return AppEmptyState(
+      icon: Icons.error_outline_rounded,
+      title: context.l10n.vaultSyncScanFailedTitle,
+      message: context.l10n.vaultSyncScanFailedMessage,
+      actionLabel: context.l10n.vaultSyncRecompareButton,
+      actionIcon: Icons.refresh_rounded,
+      onAction: () => ref.read(vaultSyncProvider.notifier).startCompare(),
     );
   }
 

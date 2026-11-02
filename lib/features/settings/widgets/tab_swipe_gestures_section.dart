@@ -152,6 +152,14 @@ class TabSwipeGesturesSection extends ConsumerWidget {
 /// Three tabs with what a right swipe (left end) and a left swipe (right end)
 /// lead to. Always laid out left to right, even in a right-to-left language,
 /// because it pictures what happens on the screen, not the reading order.
+///
+/// Two rows, so no translation is ever squeezed into a fixed-size box:
+///
+///  * the icon row holds the two end icons and the three tabs, which scale
+///    down together if the card is narrow (small screens, large display
+///    scaling) rather than overflowing;
+///  * the label row gives each end label half of the card's width and lets it
+///    wrap onto a second line, however long the translation is.
 class _TabSwipePreview extends StatelessWidget {
   const _TabSwipePreview({required this.gestures, required this.enabled});
 
@@ -198,34 +206,65 @@ class _TabSwipePreview extends StatelessWidget {
         textDirection: TextDirection.ltr,
         child: Container(
           margin: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
           decoration: BoxDecoration(
             color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Row(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _PreviewEnd(
-                icon: leftEnd.$1,
-                label: leftEnd.$2,
-                active: gestures.rightSwipe != TabRightSwipeAction.nothing,
+              Row(
+                children: [
+                  _PreviewEndIcon(
+                    icon: leftEnd.$1,
+                    active: gestures.rightSwipe != TabRightSwipeAction.nothing,
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      // Shrinks the three tabs (never the end icons or the
+                      // labels below) when the card is too narrow for them.
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const _PreviewTab(label: '1'),
+                            connector(),
+                            const _PreviewTab(label: '2', selected: true),
+                            connector(),
+                            const _PreviewTab(label: '3'),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  _PreviewEndIcon(
+                    icon: rightEnd.$1,
+                    active: gestures.leftSwipe != TabLeftSwipeAction.nothing,
+                  ),
+                ],
               ),
-              Expanded(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const _PreviewTab(label: '1'),
-                    connector(),
-                    const _PreviewTab(label: '2', selected: true),
-                    connector(),
-                    const _PreviewTab(label: '3'),
-                  ],
-                ),
-              ),
-              _PreviewEnd(
-                icon: rightEnd.$1,
-                label: rightEnd.$2,
-                active: gestures.leftSwipe != TabLeftSwipeAction.nothing,
+              const SizedBox(height: 6),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: _PreviewEndLabel(
+                      label: leftEnd.$2,
+                      textAlign: TextAlign.left,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _PreviewEndLabel(
+                      label: rightEnd.$2,
+                      textAlign: TextAlign.right,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -266,50 +305,52 @@ class _PreviewTab extends StatelessWidget {
   }
 }
 
-class _PreviewEnd extends StatelessWidget {
-  const _PreviewEnd({
-    required this.icon,
-    required this.label,
-    required this.active,
-  });
+/// The round icon at one end of the preview.
+class _PreviewEndIcon extends StatelessWidget {
+  const _PreviewEndIcon({required this.icon, required this.active});
 
   final IconData icon;
-  final String label;
   final bool active;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return SizedBox(
-      width: 76,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: active ? cs.primaryContainer : cs.surface,
-            ),
-            child: Icon(
-              icon,
-              size: 20,
-              color: active ? cs.onPrimaryContainer : cs.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: cs.onSurfaceVariant,
-              height: 1.2,
-            ),
-          ),
-        ],
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: active ? cs.primaryContainer : cs.surface,
+      ),
+      child: Icon(
+        icon,
+        size: 20,
+        color: active ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+      ),
+    );
+  }
+}
+
+/// The caption under one end icon. It wraps onto a second line instead of
+/// being cut short, so a long translation ("Disattivato", "Primera pestaña",
+/// "علامة تبويب جديدة") stays readable at any card width or text scale.
+class _PreviewEndLabel extends StatelessWidget {
+  const _PreviewEndLabel({required this.label, required this.textAlign});
+
+  final String label;
+  final TextAlign textAlign;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Text(
+      label,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      textAlign: textAlign,
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+        color: cs.onSurfaceVariant,
+        height: 1.2,
       ),
     );
   }

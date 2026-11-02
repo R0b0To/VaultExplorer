@@ -5535,6 +5535,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vaultSyncComparingLabel => '正在比较保险库…';
 
   @override
+  String get vaultSyncScanFailedTitle => '无法读取文件夹';
+
+  @override
+  String get vaultSyncScanFailedMessage =>
+      '无法读取保险库中的某个文件夹，因此已停止比较，而不是猜测。未做任何更改。请锁定并重新解锁保险库，然后再次比较。';
+
+  @override
   String vaultSyncCompareStatsLabel(Object dirs, Object entries) {
     return '已扫描文件夹：$dirs | 发现差异：$entries';
   }

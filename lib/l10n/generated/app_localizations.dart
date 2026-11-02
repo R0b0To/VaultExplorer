@@ -9660,6 +9660,18 @@ abstract class AppLocalizations {
   /// **'Comparing folders…'**
   String get vaultSyncComparingLabel;
 
+  /// Title shown when Vault Sync stops because a folder in a vault could not be read
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t Read a Folder'**
+  String get vaultSyncScanFailedTitle;
+
+  /// Explains that the comparison was stopped without changing anything because a vault folder was unreadable, and suggests locking and unlocking the vault
+  ///
+  /// In en, this message translates to:
+  /// **'A folder in a vault couldn\'t be read, so the comparison was stopped instead of guessing. Nothing was changed. Lock and unlock the vault again, then compare again.'**
+  String get vaultSyncScanFailedMessage;
+
   /// Live stats shown under the progress bar while comparing
   ///
   /// In en, this message translates to:

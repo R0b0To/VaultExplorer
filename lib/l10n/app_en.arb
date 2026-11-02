@@ -7456,6 +7456,14 @@
   "@vaultSyncComparingLabel": {
     "description": "Progress label shown while Vault Sync is walking both sides"
   },
+  "vaultSyncScanFailedTitle": "Couldn't Read a Folder",
+  "@vaultSyncScanFailedTitle": {
+    "description": "Title shown when Vault Sync stops because a folder in a vault could not be read"
+  },
+  "vaultSyncScanFailedMessage": "A folder in a vault couldn't be read, so the comparison was stopped instead of guessing. Nothing was changed. Lock and unlock the vault again, then compare again.",
+  "@vaultSyncScanFailedMessage": {
+    "description": "Explains that the comparison was stopped without changing anything because a vault folder was unreadable, and suggests locking and unlocking the vault"
+  },
   "vaultSyncCompareStatsLabel": "Folders scanned: {dirs} | Differences found: {entries}",
   "@vaultSyncCompareStatsLabel": {
     "description": "Live stats shown under the progress bar while comparing",

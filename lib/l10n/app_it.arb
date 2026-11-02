@@ -1576,6 +1576,8 @@
   "vaultSyncIntroSubtitle": "Scegli un vault a Sinistra e uno a Destra (o due cartelle nello stesso vault) per vedere cosa manca, è stato modificato o è più recente su ciascun lato.",
   "vaultSyncCompareButton": "Confronta",
   "vaultSyncComparingLabel": "Confronto dei vault…",
+  "vaultSyncScanFailedTitle": "Impossibile leggere una cartella",
+  "vaultSyncScanFailedMessage": "Non è stato possibile leggere una cartella di un vault, quindi il confronto è stato interrotto invece di tirare a indovinare. Non è stato modificato nulla. Blocca e sblocca di nuovo il vault, poi confronta di nuovo.",
   "vaultSyncCompareStatsLabel": "Cartelle analizzate: {dirs} | Differenze trovate: {entries}",
   "vaultSyncCancelCompareButton": "Annulla",
   "vaultSyncInSyncTitle": "Già sincronizzati",

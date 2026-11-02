@@ -5918,6 +5918,13 @@ class AppLocalizationsPt extends AppLocalizations {
   String get vaultSyncComparingLabel => 'Comparando cofres…';
 
   @override
+  String get vaultSyncScanFailedTitle => 'Não foi possível ler uma pasta';
+
+  @override
+  String get vaultSyncScanFailedMessage =>
+      'Não foi possível ler uma pasta de um cofre, então a comparação foi interrompida em vez de adivinhar. Nada foi alterado. Bloqueie e desbloqueie o cofre novamente e compare outra vez.';
+
+  @override
   String vaultSyncCompareStatsLabel(Object dirs, Object entries) {
     return 'Pastas verificadas: $dirs | Diferenças encontradas: $entries';
   }

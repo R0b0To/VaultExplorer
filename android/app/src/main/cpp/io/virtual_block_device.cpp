@@ -411,12 +411,16 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
             });
         }
 
-        if (!physicalWrite(pdrv, startByte, encBuf, totalBytes)) return RES_ERROR;
+        const bool wrote = physicalWrite(pdrv, startByte, encBuf, totalBytes);
 
+        // Invalidate even when the write failed: a failure can land after
+        // part of the range reached the container, and a cached plaintext
+        // block for it would then keep being served in place of the disk.
         {
             std::lock_guard<std::mutex> cacheLock(v.decryptedBlockCacheMutex);
             v.decryptedBlockCache.invalidateRange(startByte, totalBytes);
         }
+        if (!wrote) return RES_ERROR;
     }
     return RES_OK;
 }

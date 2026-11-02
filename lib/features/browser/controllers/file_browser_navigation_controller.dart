@@ -329,6 +329,17 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
         return;
       }
 
+      // null means the listing failed (native reports an unreadable folder
+      // as null; a real empty folder is an empty list). Show nothing, but
+      // don't remember it as this folder's contents and re-list as soon as
+      // the view is shown again.
+      final listingFailed = items == null;
+      if (listingFailed) {
+        VeLog.w(
+          'FileBrowserNavigation',
+          'Directory listing failed at ${VeLog.censorUri(path)}',
+        );
+      }
       final isTruncated = items?.any((f) => f == 'System:TRUNCATED') ?? false;
       final parsed =
           items
@@ -338,7 +349,9 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
           <RawEntry>[];
 
       // Save the freshly loaded items on the active path segment
-      if (state.pathStack.isNotEmpty && state.pathStack.last.fatPath == path) {
+      if (!listingFailed &&
+          state.pathStack.isNotEmpty &&
+          state.pathStack.last.fatPath == path) {
         state.pathStack.last.items = List<RawEntry>.of(parsed);
         state.pathStack.last.layoutMode = layoutMode ?? state.layoutMode;
       }
@@ -347,7 +360,7 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
         currentItems: parsed,
         isListingTruncated: isTruncated,
         isLoading: false,
-        needsRefresh: false,
+        needsRefresh: listingFailed,
       );
 
       // Ensure the level directly above has items cached for the back gesture

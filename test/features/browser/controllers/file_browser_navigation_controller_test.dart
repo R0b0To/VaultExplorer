@@ -49,6 +49,7 @@ void main() {
   // handler installed per test.
   List<String>? dirListingResponse;
   Object? dirListingError;
+  bool dirListingNull = false; // native reports an unreadable folder as null
   List<int>? spaceInfoResponse;
   Uint8List? archiveBytesResponse;
   Object? archiveFileError;
@@ -56,6 +57,7 @@ void main() {
   setUp(() {
     dirListingResponse = null;
     dirListingError = null;
+    dirListingNull = false;
     spaceInfoResponse = null;
     archiveBytesResponse = null;
     archiveFileError = null;
@@ -65,6 +67,7 @@ void main() {
       switch (call.method) {
         case 'listDirectory':
           if (dirListingError != null) throw dirListingError!;
+          if (dirListingNull) return null;
           return dirListingResponse ?? <String>[];
         case 'getSpaceInfo':
           return spaceInfoResponse;
@@ -449,6 +452,38 @@ void main() {
         final state = container.read(fileBrowserNavigationProvider(const TabId(1)));
         expect(state.currentItems, hasLength(1));
         expect(state.isListingTruncated, isTrue);
+
+        subscription.close();
+      });
+
+      test('a failed (null) listing is not remembered as the folder\'s contents and is re-listed later', () async {
+        final subscription = container.listen(fileBrowserNavigationProvider(const TabId(1)), (_, _) {});
+        final notifier = container.read(fileBrowserNavigationProvider(const TabId(1)).notifier);
+        notifier.initRoot(rootLabel: 'Vault');
+
+        dirListingResponse = ['F|100|1000|file1.txt'];
+        await notifier.loadDirectoryContents(_testContainer(1), '');
+        var state = container.read(fileBrowserNavigationProvider(const TabId(1)));
+        expect(state.pathStack.last.items, hasLength(1));
+        expect(state.needsRefresh, isFalse);
+
+        // The same folder now fails to list: native answers null.
+        dirListingNull = true;
+        await notifier.loadDirectoryContents(_testContainer(1), '', refresh: true);
+
+        state = container.read(fileBrowserNavigationProvider(const TabId(1)));
+        expect(state.isLoading, isFalse);
+        expect(state.currentItems, isEmpty);
+        // Not cached over the last good listing, and flagged for a re-list.
+        expect(state.pathStack.last.items, hasLength(1));
+        expect(state.needsRefresh, isTrue);
+
+        // A later successful listing clears the flag again.
+        dirListingNull = false;
+        await notifier.loadDirectoryContents(_testContainer(1), '', refresh: true);
+        state = container.read(fileBrowserNavigationProvider(const TabId(1)));
+        expect(state.currentItems, hasLength(1));
+        expect(state.needsRefresh, isFalse);
 
         subscription.close();
       });

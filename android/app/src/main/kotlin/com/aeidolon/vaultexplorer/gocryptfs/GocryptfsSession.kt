@@ -459,6 +459,7 @@ class GocryptfsSession(
         "cipher" to when (cipher) {
             GocryptfsCipher.AES_256_GCM -> "AES-256-GCM"
             GocryptfsCipher.XCHACHA20_POLY1305 -> "XChaCha20-Poly1305"
+            GocryptfsCipher.AES_SIV -> "AES-SIV"
         },
         "plaintextNames" to plaintextNames,
         "readOnly" to readOnly,

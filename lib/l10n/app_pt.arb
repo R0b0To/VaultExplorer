@@ -1576,6 +1576,8 @@
   "vaultSyncIntroSubtitle": "Escolha um cofre Esquerda e Direita (ou duas pastas no mesmo cofre) para ver o que está faltando, modificado ou mais recente em cada lado.",
   "vaultSyncCompareButton": "Comparar",
   "vaultSyncComparingLabel": "Comparando cofres…",
+  "vaultSyncScanFailedTitle": "Não foi possível ler uma pasta",
+  "vaultSyncScanFailedMessage": "Não foi possível ler uma pasta de um cofre, então a comparação foi interrompida em vez de adivinhar. Nada foi alterado. Bloqueie e desbloqueie o cofre novamente e compare outra vez.",
   "vaultSyncCompareStatsLabel": "Pastas verificadas: {dirs} | Diferenças encontradas: {entries}",
   "vaultSyncCancelCompareButton": "Cancelar",
   "vaultSyncInSyncTitle": "Já Sincronizado",

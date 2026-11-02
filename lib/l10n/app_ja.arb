@@ -1576,6 +1576,8 @@
   "vaultSyncIntroSubtitle": "左と右の保管庫（または同じ保管庫内の2つのフォルダ）を選択すると、それぞれの側で欠けている、変更されている、または新しいファイルを確認できます。",
   "vaultSyncCompareButton": "比較",
   "vaultSyncComparingLabel": "保管庫を比較中…",
+  "vaultSyncScanFailedTitle": "フォルダを読み取れませんでした",
+  "vaultSyncScanFailedMessage": "保管庫内のフォルダを読み取れなかったため、推測せずに比較を中止しました。何も変更されていません。保管庫をロックして再度ロック解除してから、もう一度比較してください。",
   "vaultSyncCompareStatsLabel": "スキャン済みフォルダ: {dirs} | 検出された差分: {entries}",
   "vaultSyncCancelCompareButton": "キャンセル",
   "vaultSyncInSyncTitle": "すでに同期済みです",

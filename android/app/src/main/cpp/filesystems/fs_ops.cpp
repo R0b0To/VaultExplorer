@@ -5,12 +5,12 @@
 #include "ntfs_backend.h"
 #include "ext_backend.h"
 
-void fsListDirectory(int volId, const std::string& pathSuffix, std::vector<std::string>& outResults) {
+bool fsListDirectory(int volId, const std::string& pathSuffix, std::vector<std::string>& outResults) {
     switch (volumes[volId].fsType) {
-        case VolumeState::FS_FATFS: fatListDirectory(volId, pathSuffix, outResults); break;
-        case VolumeState::FS_NTFS:  listNtfsDirectory(volId, pathSuffix, outResults); break;
-        case VolumeState::FS_EXT:   extListDirectory(volId, pathSuffix, outResults); break;
-        default: break;
+        case VolumeState::FS_FATFS: return fatListDirectory(volId, pathSuffix, outResults);
+        case VolumeState::FS_NTFS:  listNtfsDirectory(volId, pathSuffix, outResults); return true;
+        case VolumeState::FS_EXT:   extListDirectory(volId, pathSuffix, outResults); return true;
+        default: return true;
     }
 }
 

@@ -27,7 +27,7 @@ VaultExplorer opens VeraCrypt, LUKS, BitLocker, VHD/VHDX, Cryptomator, gocryptfs
 | **BitLocker** | Password or 48-digit recovery key, including BitLocker To Go |
 | **VHD / VHDX** | Fixed and dynamic images containing a VeraCrypt, LUKS, or BitLocker volume, or an unencrypted filesystem |
 | **Cryptomator** | Vault formats 7 and 8 |
-| **gocryptfs** | Format v2, AES-256-GCM or XChaCha20-Poly1305 |
+| **gocryptfs** | Format v2, AES-256-GCM, XChaCha20-Poly1305 or AES-SIV |
 | **CryFS** | Format 0.10 (CryFS 0.10.x–1.0.x), AES or XChaCha20-Poly1305 |
 
 Filesystems: FAT12/16/32, exFAT, NTFS, ext2/3/4.

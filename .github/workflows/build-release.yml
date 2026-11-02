@@ -5,6 +5,14 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type'
+        type: choice
+        options:
+          - release
+          - debug
+        default: release
 
 permissions:
   contents: write
@@ -12,10 +20,12 @@ permissions:
 env:
   BUILD_DIR: /tmp/build
   JAVA_VERSION: '21'
+  # Tag pushes have no inputs, so they always build release.
+  BUILD_TYPE: ${{ inputs.build_type || 'release' }}
 
 jobs:
   build:
-    name: Build Signed APK (${{ matrix.flavor }})
+    name: Build ${{ inputs.build_type || 'release' }} APK (${{ matrix.flavor }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -73,14 +83,14 @@ jobs:
           .flutter/bin/flutter config --no-analytics
           .flutter/bin/flutter pub get --enforce-lockfile
 
-      - name: Build release APK
+      - name: Build ${{ env.BUILD_TYPE }} APK
         working-directory: ${{ env.BUILD_DIR }}
         run: |
           export PUB_CACHE="${{ env.BUILD_DIR }}/.pub-cache"
           BASE_VERSION_CODE=$(grep '^version:' pubspec.yaml | sed -n 's/.*+\([0-9]*\)/\1/p')
           VERSION_CODE=$(( BASE_VERSION_CODE * 100 + ${{ matrix.offset }} ))
 
-          .flutter/bin/flutter build apk --release \
+          .flutter/bin/flutter build apk --${{ env.BUILD_TYPE }} \
             --target-platform=${{ matrix.target_platform }} \
             --build-number=$VERSION_CODE
 
@@ -88,9 +98,14 @@ jobs:
         working-directory: ${{ env.BUILD_DIR }}
         run: |
           VERSION=$(grep '^version:' pubspec.yaml | sed 's/^version: //' | cut -d'+' -f1)
+          if [ "${{ env.BUILD_TYPE }}" = "debug" ]; then
+            NAME="VaultExplorer-v${VERSION}-debug-${{ matrix.flavor }}.apk"
+          else
+            NAME="VaultExplorer-v${VERSION}-${{ matrix.flavor }}.apk"
+          fi
           mkdir -p release-apk
-          cp "build/app/outputs/flutter-apk/app-release.apk" \
-             "release-apk/VaultExplorer-v${VERSION}-${{ matrix.flavor }}.apk"
+          cp "build/app/outputs/flutter-apk/app-${{ env.BUILD_TYPE }}.apk" \
+             "release-apk/${NAME}"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4

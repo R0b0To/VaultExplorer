@@ -9,8 +9,8 @@ import 'package:vaultexplorer/features/skin_editor/skin_target.dart';
 void main() {
   const red = Color(0xFFAA0000);
   const blue = Color(0xFF0000AA);
-  const filesCard = AreaTokenTarget(SkinArea.files, SkinToken.card);
-  const toolsCard = AreaTokenTarget(SkinArea.tools, SkinToken.card);
+  const filesCard = AreaTokenTarget(SkinArea.files, SkinToken.surfaceCard);
+  const toolsCard = AreaTokenTarget(SkinArea.tools, SkinToken.surfaceCard);
 
   late ProviderContainer container;
   late SkinEditSessionNotifier notifier;

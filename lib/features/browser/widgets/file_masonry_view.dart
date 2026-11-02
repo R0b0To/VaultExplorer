@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
+import 'package:vaultexplorer/core/api/vault_book_api.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
@@ -29,6 +30,7 @@ import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/widgets/apk_icon_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/archive_thumbnail_support.dart';
+import 'package:vaultexplorer/features/browser/widgets/book_cover_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_item_drag.dart';
 import 'package:vaultexplorer/features/browser/widgets/fast_scrollbar.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_thumbnail_preview.dart';
@@ -131,6 +133,11 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
   bool _hasPendingRebuild = false;
   int? _anchorItemIndex;
 
+  /// The scroll offset this view was opened at (going back to a folder),
+  /// until it has been reached. See [_restoreInitialScrollOffset].
+  double? _pendingInitialOffset;
+  int _initialOffsetAttemptsLeft = 0;
+
   // Animation controller for smooth column transition morph
   late final AnimationController _morphController;
   late Animation<double> _scaleAnimation;
@@ -142,6 +149,7 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
     _columnCount = widget.initialColumns;
     _prewarmMemoryCache();
     _preloadDiskAspectRatios();
+    _scheduleInitialScrollOffsetRestore();
 
     _morphController = AnimationController(
       vsync: this,
@@ -155,6 +163,48 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
   void dispose() {
     _morphController.dispose();
     super.dispose();
+  }
+
+  /// A masonry grid with more than one column cannot start its first layout
+  /// away from the top: `SliverMasonryGrid` (flutter_staggered_grid_view
+  /// 0.7.0) only knows where a child goes once every child before it has been
+  /// placed, so it corrects an initial offset down to its cache extent
+  /// (letsar/flutter_staggered_grid_view#346). Going back to a folder opens
+  /// it with a controller whose `initialScrollOffset` is where the folder was
+  /// left, so that offset is applied again with `jumpTo` once the grid has
+  /// laid out from the top.
+  void _scheduleInitialScrollOffsetRestore() {
+    final controller = widget.scrollController;
+    if (controller == null || controller.hasClients) return;
+    final target = controller.initialScrollOffset;
+    if (target <= 0) return;
+    _pendingInitialOffset = target;
+    _initialOffsetAttemptsLeft = 10;
+    WidgetsBinding.instance.addPostFrameCallback(_restoreInitialScrollOffset);
+  }
+
+  void _restoreInitialScrollOffset(Duration _) {
+    final target = _pendingInitialOffset;
+    final controller = widget.scrollController;
+    if (!mounted || target == null || controller == null) {
+      _pendingInitialOffset = null;
+      return;
+    }
+    var reached = false;
+    if (controller.hasClients && controller.position.hasContentDimensions) {
+      final position = controller.position;
+      // Past the children laid out so far the extent is only an estimate, so
+      // a target beyond it is approached over the next frames.
+      final clamped = math.min(target, position.maxScrollExtent);
+      if ((position.pixels - clamped).abs() > 0.5) controller.jumpTo(clamped);
+      reached = (target - clamped).abs() <= 0.5;
+    }
+    if (reached || --_initialOffsetAttemptsLeft <= 0) {
+      _pendingInitialOffset = null;
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback(_restoreInitialScrollOffset);
+    WidgetsBinding.instance.scheduleFrame();
   }
 
   @override
@@ -306,6 +356,8 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
   static const _maxRatio = 2.2;
   static const _iconRatio = 1.0;
   static const _videoDefaultRatio = 16.0 / 9.0;
+  // Until a book's cover size is known (and for a book with no cover).
+  static const _bookDefaultRatio = 2.0 / 3.0;
 
   void _prewarmMemoryCache() {
     for (final item in widget.items) {
@@ -373,6 +425,9 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
   double _defaultRatioFor(String fileName) {
     if (MediaViewerConstants.isVideo(fileName)) {
       return _videoDefaultRatio.clamp(_minRatio, _maxRatio);
+    }
+    if (isBookWithCover(fileName)) {
+      return _bookDefaultRatio.clamp(_minRatio, _maxRatio);
     }
     return _iconRatio;
   }
@@ -558,6 +613,9 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
         MediaViewerConstants.isVideo(fileName)) {
       return false;
     }
+    // Not for a book inside an open archive: no cover is fetched there (see
+    // the build below), so it stays an icon cell like any other file.
+    if (widget.archiveContext == null && isBookWithCover(fileName)) return true;
     return MediaViewerConstants.isImage(fileName) ||
         MediaViewerConstants.isVideo(fileName);
   }
@@ -656,6 +714,7 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
     final isVid =
         MediaViewerConstants.isVideo(cleanName) && !entry.isPlaceholder;
     final isApk = isApkFile(cleanName) && !entry.isPlaceholder;
+    final isBook = isBookWithCover(cleanName) && !entry.isPlaceholder;
     final hasRealThumbnail = MediaViewerConstants.hasRealThumbnail(
       cleanName,
       insideArchive: widget.archiveContext != null,
@@ -724,6 +783,17 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
             fallbackIconSize: iconSize,
           ),
         ),
+      );
+    } else if (isBook && widget.archiveContext == null) {
+      previewWidget = _BookCoverMasonryThumb(
+        container: widget.container,
+        filePath: fullPath,
+        cacheMode: widget.thumbnailCacheMode,
+        quality: _effectiveQuality,
+        onSizeKnown: (w, h) => _onSizeKnown(fullPath, w, h),
+        fallbackIcon: skin.fileIcon(cleanName),
+        fallbackColor: skin.fileIconColor(cs, cleanName),
+        fallbackIconSize: iconSize,
       );
     } else {
       previewWidget = Center(
@@ -1219,6 +1289,90 @@ class _ApkIconMasonryThumb extends ConsumerWidget {
           ),
         ),
       ),
+      errorBuilder: (context) => _fallbackWidget(),
+    );
+  }
+
+  Widget _fallbackWidget() => Center(
+    child: Icon(fallbackIcon, size: fallbackIconSize, color: fallbackColor),
+  );
+}
+
+/// A book's cover as its masonry tile. The cell is sized from the cover's own
+/// aspect ratio, exactly as a photo's is (see [_EncryptedImageMasonryThumb]), so
+/// the cover fills it uncropped. A book with no cover keeps its file-type icon
+/// in a default portrait cell.
+class _BookCoverMasonryThumb extends ConsumerWidget {
+  final MountedContainer container;
+  final String filePath;
+  final ThumbnailCacheMode cacheMode;
+  final ThumbnailQuality quality;
+  final void Function(int width, int height) onSizeKnown;
+
+  final IconData fallbackIcon;
+  final Color fallbackColor;
+  final double fallbackIconSize;
+
+  const _BookCoverMasonryThumb({
+    required this.container,
+    required this.filePath,
+    required this.cacheMode,
+    required this.quality,
+    required this.onSizeKnown,
+    required this.fallbackIcon,
+    required this.fallbackColor,
+    required this.fallbackIconSize,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
+    final bookApi = ref.read(vaultBookApiProvider);
+
+    // A memory hit skips fetchFn entirely, so report its size here, as the
+    // image tile does.
+    final syncEntry = thumbnailCache.peekMemoryWithSize(
+      container,
+      filePath,
+      quality,
+    );
+    final syncBytes = syncEntry?.$1;
+    if (syncEntry != null && syncEntry.$1.isNotEmpty) {
+      final (_, width, height) = syncEntry;
+      if (width != null && height != null) onSizeKnown(width, height);
+    }
+
+    return AsyncThumbnail(
+      key: ValueKey('book:$filePath'),
+      container: container,
+      filePath: filePath,
+      cache: ThumbnailConcurrency.inFlightThumbnails,
+      limiter: ThumbnailConcurrency.imageLimiter,
+      quality: quality,
+      fetchFn: (c, p) async {
+        final thumb = await loadBookCoverThumbnail(
+          thumbnailCache: thumbnailCache,
+          bookApi: bookApi,
+          container: c,
+          path: p,
+          mode: cacheMode,
+          quality: quality,
+        );
+        if (thumb.width > 0 && thumb.height > 0) {
+          onSizeKnown(thumb.width, thumb.height);
+        }
+        return thumb.bytes;
+      },
+      debounce: const Duration(milliseconds: 100),
+      syncLookup: () => syncBytes,
+      cacheHeight: quality.scaledSize(180),
+      imageBuilder: (context, bytes, cacheHeight) => Image.memory(
+        bytes,
+        fit: BoxFit.cover,
+        cacheHeight: cacheHeight,
+        errorBuilder: (_, _, _) => _fallbackWidget(),
+      ),
+      loadingBuilder: (context) => _fallbackWidget(),
       errorBuilder: (context) => _fallbackWidget(),
     );
   }

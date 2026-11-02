@@ -3,15 +3,21 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/api/vault_book_api.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/theme/file_manager_skin_scope.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
+import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/models/thumbnail_settings.dart';
 import 'package:vaultexplorer/data/models/vault_marks.dart';
+import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
+import 'package:vaultexplorer/data/services/thumbnail_settings_resolver.dart';
 import 'package:vaultexplorer/features/browser/controllers/bookmark_navigation_request.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_pins_bookmarks_controller.dart';
+import 'package:vaultexplorer/features/browser/widgets/book_cover_support.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_screen.dart';
 
@@ -25,6 +31,9 @@ import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_sc
 /// A tap does what a tap on the vault itself does (switch to it) and then
 /// asks the browser showing it to go to the bookmark; see
 /// [bookmarkNavigationRequestsProvider].
+///
+/// A bookmarked book (.epub, .cbz, ...) shows its cover in place of the generic
+/// file icon, as it does in the file manager; see [_DrawerBookCover].
 class DrawerBookmarksSection extends ConsumerStatefulWidget {
   /// The unlocked vaults, in the order the drawer lists them.
   final List<MountedContainer> vaults;
@@ -186,6 +195,32 @@ class _DrawerBookmarksSectionState
     });
   }
 
+  /// Whether [bookmark] is a book whose cover can stand in for its icon.
+  static bool _showsCover(VaultBookmark bookmark) =>
+      !bookmark.isDir && isBookWithCover(bookmark.name);
+
+  /// The thumbnail settings that apply to [vault]'s files, exactly as its file
+  /// browser resolves them (the vault's own override, else the app-wide
+  /// default; Local Storage has a slot of its own), or null until they have
+  /// loaded.
+  ///
+  /// Waiting matters, not just politeness: the cache mode decides whether a
+  /// cover is written to disk at all, and a vault whose owner turned that off
+  /// must not get one because its settings had not arrived yet.
+  ThumbnailSettings? _coverSettingsFor(MountedContainer vault) {
+    final state = ref.watch(
+      fileManagerToolbarSettingsProvider(
+        vault.isLocalStorage ? null : vault.uri,
+      ),
+    );
+    if (state.loading) return null;
+    return resolveThumbnailSettings(
+      config: state.config,
+      isLocalStorage: vault.isLocalStorage,
+      record: state.record,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final containers = _containers;
@@ -249,6 +284,13 @@ class _DrawerBookmarksSectionState
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final skin = FileManagerSkinScope.of(context);
+    // Watched here, not in the tiles' builders below: those run outside this
+    // State's build, where Riverpod does not allow `ref.watch`. Looked up only
+    // for an expanded group that has a book in it, so a drawer of plain files
+    // and folders touches no thumbnail setting at all.
+    final coverSettings = !collapsed && bookmarks.any(_showsCover)
+        ? _coverSettingsFor(vault)
+        : null;
     return Column(
       key: ValueKey('drawer_bookmarks_${vault.volId}'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -293,6 +335,13 @@ class _DrawerBookmarksSectionState
               builder: (tileContext) {
                 final isDir = bookmark.isDir;
                 final name = bookmark.name;
+                final icon = Icon(
+                  isDir ? skin.folderIcon : skin.fileIcon(name),
+                  size: 20,
+                  color: isDir
+                      ? skin.folderIconColor(cs)
+                      : skin.fileIconColor(cs, name),
+                );
                 return ListTile(
                   key: ValueKey(
                     'drawer_bookmark_${vault.volId}_${bookmark.path}',
@@ -302,13 +351,14 @@ class _DrawerBookmarksSectionState
                     borderRadius: BorderRadius.circular(28),
                   ),
                   contentPadding: const EdgeInsets.only(left: 28, right: 12),
-                  leading: Icon(
-                    isDir ? skin.folderIcon : skin.fileIcon(name),
-                    size: 20,
-                    color: isDir
-                        ? skin.folderIconColor(cs)
-                        : skin.fileIconColor(cs, name),
-                  ),
+                  leading: coverSettings != null && _showsCover(bookmark)
+                      ? _DrawerBookCover(
+                          container: vault,
+                          filePath: bookmark.path,
+                          settings: coverSettings,
+                          fallback: icon,
+                        )
+                      : icon,
                   title: Text(
                     name,
                     maxLines: 1,
@@ -334,6 +384,99 @@ class _DrawerBookmarksSectionState
               },
             ),
       ],
+    );
+  }
+}
+
+/// A bookmarked book's cover, in the slot a bookmark's file icon normally
+/// fills.
+///
+/// Loads through the same path and cache as the file manager's tiles
+/// ([loadBookCoverThumbnail]) and honours the same per-vault thumbnail
+/// settings, so a cover the file manager cached at this quality is reused
+/// here instead of reopening the book. Until it arrives, and for a book with
+/// no cover, it shows [fallback]: the icon the bookmark has always had, in the
+/// same place, so a tile without a cover looks exactly as before.
+class _DrawerBookCover extends ConsumerWidget {
+  /// Fits the drawer's dense tile (48 dp one line, 64 dp with a subtitle) and
+  /// is about the proportions of a book.
+  static const double _width = 28;
+  static const double _height = 40;
+
+  final MountedContainer container;
+  final String filePath;
+  final ThumbnailSettings settings;
+  final Widget fallback;
+
+  const _DrawerBookCover({
+    required this.container,
+    required this.filePath,
+    required this.settings,
+    required this.fallback,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cs = Theme.of(context).colorScheme;
+    final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
+    final bookApi = ref.read(vaultBookApiProvider);
+    final quality = settings.quality;
+    final cacheMode = settings.cacheMode;
+
+    // Left-aligned like the icon it replaces, so the tile's text does not move.
+    final icon = SizedBox(
+      width: _width,
+      height: _height,
+      child: Align(alignment: Alignment.centerLeft, child: fallback),
+    );
+
+    return SizedBox(
+      width: _width,
+      height: _height,
+      child: AsyncThumbnail(
+        key: ValueKey('drawer_book:$filePath'),
+        container: container,
+        filePath: filePath,
+        cache: ThumbnailConcurrency.inFlightThumbnails,
+        limiter: ThumbnailConcurrency.imageLimiter,
+        quality: quality,
+        fetchFn: (c, p) async => (await loadBookCoverThumbnail(
+          thumbnailCache: thumbnailCache,
+          bookApi: bookApi,
+          container: c,
+          path: p,
+          mode: cacheMode,
+          quality: quality,
+        )).bytes,
+        debounce: const Duration(milliseconds: 100),
+        syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
+        cacheHeight: quality.scaledSize(180),
+        imageBuilder: (context, bytes, cacheHeight) => ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: DecoratedBox(
+            // A hairline so a pale cover does not melt into the drawer.
+            position: DecorationPosition.foreground,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(
+                color: cs.outlineVariant.withValues(alpha: 0.6),
+                width: 0.5,
+              ),
+            ),
+            child: Image.memory(
+              bytes,
+              width: _width,
+              height: _height,
+              fit: BoxFit.cover,
+              alignment: Alignment.topCenter,
+              cacheHeight: cacheHeight,
+              errorBuilder: (_, _, _) => icon,
+            ),
+          ),
+        ),
+        loadingBuilder: (context) => icon,
+        errorBuilder: (context) => icon,
+      ),
     );
   }
 }

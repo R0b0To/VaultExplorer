@@ -95,9 +95,10 @@ const appSharedComponentRoles = <String>[
   'fabForeground',
 ];
 
-const _legacyVaultCardTokens = <String, SkinToken>{
-  'vaultCardBackground': SkinToken.card,
-  'mountedVaultCardBackground': SkinToken.cardActive,
+// Old global vault-card keys -> the pre-split page key they used to become.
+const _legacyVaultCardKeys = <String, String>{
+  'vaultCardBackground': 'card',
+  'mountedVaultCardBackground': 'cardActive',
 };
 
 /// Moves the old global vault-card colors onto the Dashboard page so skins
@@ -106,16 +107,19 @@ const _legacyVaultCardTokens = <String, SkinToken>{
   Map<String, int> components,
   Map<String, Map<String, int>> areas,
 ) {
-  if (!_legacyVaultCardTokens.keys.any(components.containsKey)) {
+  if (!_legacyVaultCardKeys.keys.any(components.containsKey)) {
     return (components, areas);
   }
   final nextComponents = Map<String, int>.from(components);
   final dashboard = Map<String, int>.from(
     areas[SkinArea.dashboard.id] ?? const <String, int>{},
   );
-  for (final entry in _legacyVaultCardTokens.entries) {
+  for (final entry in _legacyVaultCardKeys.entries) {
     final value = nextComponents.remove(entry.key);
-    if (value != null) dashboard.putIfAbsent(entry.value.id, () => value);
+    if (value == null) continue;
+    for (final token in SkinToken.fromLegacyId(entry.value)) {
+      dashboard.putIfAbsent(token.id, () => value);
+    }
   }
   return (nextComponents, {...areas, SkinArea.dashboard.id: dashboard});
 }
@@ -369,6 +373,11 @@ class CustomAppSkin {
 
     // Unknown pages and tokens are dropped so a hand-edited or future file can
     // never inject a color the app does not know how to apply.
+    //
+    // Skins saved before the tokens were split use the old keys (`card`,
+    // `accent`, ...). Each old value is copied onto every token that key used
+    // to drive, so the skin looks the same and each token is now independent.
+    // Keys in the current vocabulary are applied last and win.
     Map<String, Map<String, int>> areas(String key) {
       final value = raw[key];
       if (value is! Map) return const {};
@@ -378,6 +387,13 @@ class CustomAppSkin {
         final inner = entry.value;
         if (area == null || inner is! Map) continue;
         final tokens = <String, int>{};
+        for (final legacy in SkinToken.legacyIdsInApplyOrder) {
+          final argb = inner[legacy];
+          if (argb is! num) continue;
+          for (final token in SkinToken.fromLegacyId(legacy)) {
+            tokens[token.id] = argb.toInt();
+          }
+        }
         for (final token in inner.entries) {
           final parsed = SkinToken.tryParse(token.key);
           final argb = token.value;

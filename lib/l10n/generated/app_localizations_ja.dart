@@ -5606,6 +5606,13 @@ class AppLocalizationsJa extends AppLocalizations {
   String get vaultSyncComparingLabel => '保管庫を比較中…';
 
   @override
+  String get vaultSyncScanFailedTitle => 'フォルダを読み取れませんでした';
+
+  @override
+  String get vaultSyncScanFailedMessage =>
+      '保管庫内のフォルダを読み取れなかったため、推測せずに比較を中止しました。何も変更されていません。保管庫をロックして再度ロック解除してから、もう一度比較してください。';
+
+  @override
   String vaultSyncCompareStatsLabel(Object dirs, Object entries) {
     return 'スキャン済みフォルダ: $dirs | 検出された差分: $entries';
   }
@@ -10718,6 +10725,12 @@ class AppLocalizationsJa extends AppLocalizations {
   String get audioEditorNextCutPoint => '次のカット位置';
 
   @override
+  String get audioEditorStepBack => '少し戻る';
+
+  @override
+  String get audioEditorStepForward => '少し進む';
+
+  @override
   String audioEditorReencodeBanner(String format) {
     return '$format のオーディオはそのままコピーできないため、エクスポート時に AAC (.m4a) へ再エンコードされます。';
   }
@@ -12007,6 +12020,12 @@ class AppLocalizationsJa extends AppLocalizations {
   String get floatingPlayerExpandTooltip => '拡大';
 
   @override
+  String get floatingPlayerAudioOnly => '音声のみ';
+
+  @override
+  String get floatingPlayerShowVideo => '動画を表示';
+
+  @override
   String get masterLockTitle => 'マスターロック';
 
   @override
@@ -12040,4 +12059,463 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get duressMasterLockRequired =>
       '強要解除を設定する前に、セキュリティでマスターロックを有効にする必要があります。';
+
+  @override
+  String get skinTokenGroupSurface => 'サーフェス';
+
+  @override
+  String get skinTokenGroupContent => 'テキストとアイコン';
+
+  @override
+  String get skinTokenGroupBorder => '枠線';
+
+  @override
+  String get skinTokenGroupChrome => 'トップバー';
+
+  @override
+  String get skinTokenGroupAction => 'ボタン';
+
+  @override
+  String get skinTokenGroupControl => 'スイッチとスライダー';
+
+  @override
+  String get skinTokenGroupChoice => 'チップとセグメント';
+
+  @override
+  String get skinTokenGroupSelection => '選択項目';
+
+  @override
+  String get skinTokenGroupOverlay => 'メニュー、ダイアログ、シート';
+
+  @override
+  String get skinTokenGroupFloating => 'フローティング要素';
+
+  @override
+  String get skinTokenSurfacePage => 'ページ背景';
+
+  @override
+  String get skinTokenSurfacePageHint => 'このページのすべての要素の背景となるキャンバス。';
+
+  @override
+  String get skinTokenSurfaceCard => 'カードと行';
+
+  @override
+  String get skinTokenSurfaceCardHint => 'カード、リスト行、グループ化されたパネル。';
+
+  @override
+  String get skinTokenSurfaceCardActive => 'アクティブなカード';
+
+  @override
+  String get skinTokenSurfaceCardActiveHint => 'ロック解除された保管庫など、強調表示されたカード。';
+
+  @override
+  String get skinTokenSurfaceTile => 'タイルとサムネイル';
+
+  @override
+  String get skinTokenSurfaceTileHint => 'サムネイルのプレースホルダー、アイコンタイル、コードブロック。';
+
+  @override
+  String get skinTokenSurfaceField => '入力フィールド';
+
+  @override
+  String get skinTokenSurfaceFieldHint => 'テキストフィールドや検索バーの塗りつぶし。';
+
+  @override
+  String get skinTokenContentPrimary => 'メインテキスト';
+
+  @override
+  String get skinTokenContentPrimaryHint => 'タイトル、名前、本文。';
+
+  @override
+  String get skinTokenContentSecondary => 'セカンダリテキスト';
+
+  @override
+  String get skinTokenContentSecondaryHint => '字幕、詳細、ヒント。';
+
+  @override
+  String get skinTokenContentIcon => 'アイコン';
+
+  @override
+  String get skinTokenContentIconHint => 'ボタンやバー上にない通常のアイコン。';
+
+  @override
+  String get skinTokenBorderDivider => '区切り線';
+
+  @override
+  String get skinTokenBorderDividerHint => '行やセクションの間の細い線。';
+
+  @override
+  String get skinTokenBorderOutline => 'アウトライン';
+
+  @override
+  String get skinTokenBorderOutlineHint => 'アウトラインボタンや未選択のオプションボックスの枠線。';
+
+  @override
+  String get skinTokenBorderFocus => 'フォーカスリング';
+
+  @override
+  String get skinTokenBorderFocusHint => '編集中テキストフィールドの枠線。';
+
+  @override
+  String get skinTokenChromeTopBar => 'トップバー';
+
+  @override
+  String get skinTokenChromeTopBarHint => 'トップバーの塗りつぶし。';
+
+  @override
+  String get skinTokenChromeOnTopBar => 'トップバーのテキストとアイコン';
+
+  @override
+  String get skinTokenChromeOnTopBarHint => 'トップバー上のタイトルとアイコンの色。';
+
+  @override
+  String get skinTokenActionPrimary => '塗りつぶしボタン';
+
+  @override
+  String get skinTokenActionPrimaryHint => '塗りつぶしボタンの背景色。';
+
+  @override
+  String get skinTokenActionOnPrimary => '塗りつぶしボタンのラベル';
+
+  @override
+  String get skinTokenActionOnPrimaryHint => '塗りつぶしボタンのラベルとアイコン。';
+
+  @override
+  String get skinTokenActionTonal => 'トナルボタン';
+
+  @override
+  String get skinTokenActionTonalHint => 'レイズドボタンおよびトナルボタンの塗りつぶし。';
+
+  @override
+  String get skinTokenActionOnTonal => 'トナルボタンのラベル';
+
+  @override
+  String get skinTokenActionOnTonalHint => 'トナルボタンのラベルとアイコン。';
+
+  @override
+  String get skinTokenActionText => 'テキストおよびアウトラインボタン';
+
+  @override
+  String get skinTokenActionTextHint => 'テキストボタン、アウトラインボタン、リンクのラベル色。';
+
+  @override
+  String get skinTokenControlActive => 'コントロールのオン状態';
+
+  @override
+  String get skinTokenControlActiveHint =>
+      'オン時のスイッチ軌道、選択されたチェックボックスやラジオ、スライダーや進捗バーの塗りつぶし。';
+
+  @override
+  String get skinTokenControlOnActive => 'スイッチのつまみとチェックマーク';
+
+  @override
+  String get skinTokenControlOnActiveHint => 'オン時のスイッチつまみおよびチェックボックス内のチェックマーク。';
+
+  @override
+  String get skinTokenControlTrack => 'コントロールの軌道';
+
+  @override
+  String get skinTokenControlTrackHint => 'オフ時のスイッチ軌道、スライダーや進捗バーの未選択部分。';
+
+  @override
+  String get skinTokenControlInactive => 'コントロールのオフ状態';
+
+  @override
+  String get skinTokenControlInactiveHint => 'オフ時のスイッチつまみおよび未選択チェックボックスの枠線。';
+
+  @override
+  String get skinTokenChoiceBackground => 'チップ';
+
+  @override
+  String get skinTokenChoiceBackgroundHint => '未選択のチップやセグメントの塗りつぶし。';
+
+  @override
+  String get skinTokenChoiceSelected => '選択されたチップ';
+
+  @override
+  String get skinTokenChoiceSelectedHint => '選択されたチップまたはセグメントの塗りつぶし。';
+
+  @override
+  String get skinTokenChoiceOnSelected => '選択チップのラベル';
+
+  @override
+  String get skinTokenChoiceOnSelectedHint => '選択されたチップまたはセグメントのラベルとアイコン。';
+
+  @override
+  String get skinTokenChoiceBorder => 'チップの枠線';
+
+  @override
+  String get skinTokenChoiceBorderHint => 'チップやセグメント化ボタンのアウトライン。';
+
+  @override
+  String get skinTokenSelectionFill => '選択された行';
+
+  @override
+  String get skinTokenSelectionFillHint => '選択されたファイルや行、強調表示されたアイコンタイル。';
+
+  @override
+  String get skinTokenSelectionOn => '選択行のテキストとアイコン';
+
+  @override
+  String get skinTokenSelectionOnHint => '選択された行に表示されるテキストとアイコン。';
+
+  @override
+  String get skinTokenOverlayMenu => 'メニュー';
+
+  @override
+  String get skinTokenOverlayMenuHint => 'ポップアップ、ドロップダウン、コンテキストメニュー。';
+
+  @override
+  String get skinTokenOverlayOnMenu => 'メニューテキスト';
+
+  @override
+  String get skinTokenOverlayOnMenuHint => 'メニュー内のテキストとアイコン。';
+
+  @override
+  String get skinTokenOverlayDialog => 'ダイアログ';
+
+  @override
+  String get skinTokenOverlayDialogHint => 'ダイアログの塗りつぶし。';
+
+  @override
+  String get skinTokenOverlayOnDialog => 'ダイアログのタイトル';
+
+  @override
+  String get skinTokenOverlayOnDialogHint => 'ダイアログのタイトルテキスト。';
+
+  @override
+  String get skinTokenOverlaySheet => 'ボトムシート';
+
+  @override
+  String get skinTokenOverlaySheetHint => 'ボトムシートの塗りつぶし。';
+
+  @override
+  String get skinTokenOverlayOnSheet => 'ボトムシートのテキスト';
+
+  @override
+  String get skinTokenOverlayOnSheetHint => 'ボトムシート内のテキストとアイコン。';
+
+  @override
+  String get skinTokenOverlayScrim => 'ダイアログ背面の暗転';
+
+  @override
+  String get skinTokenOverlayScrimHint => 'ダイアログやボトムシート背面の暗転効果。';
+
+  @override
+  String get skinTokenFloatingFab => '丸い追加ボタン';
+
+  @override
+  String get skinTokenFloatingFabHint => '丸い追加ボタンの塗りつぶし。';
+
+  @override
+  String get skinTokenFloatingOnFab => '丸い追加ボタンのアイコン';
+
+  @override
+  String get skinTokenFloatingOnFabHint => '丸い追加ボタン上のアイコン。';
+
+  @override
+  String get skinTokenFloatingToast => 'メッセージピル';
+
+  @override
+  String get skinTokenFloatingToastHint => '下部にポップアップ表示される通知メッセージの塗りつぶし。';
+
+  @override
+  String get skinTokenFloatingOnToast => 'メッセージピルのテキスト';
+
+  @override
+  String get skinTokenFloatingOnToastHint => '通知メッセージのテキストとアイコン。';
+
+  @override
+  String get skinTokenFloatingTooltip => 'ツールチップ';
+
+  @override
+  String get skinTokenFloatingTooltipHint => 'ツールチップの塗りつぶし。';
+
+  @override
+  String get skinTokenFloatingOnTooltip => 'ツールチップのテキスト';
+
+  @override
+  String get skinTokenFloatingOnTooltipHint => 'ツールチップ内のテキスト。';
+
+  @override
+  String get skinTokenGroupAccent => 'アクセントカラー';
+
+  @override
+  String get skinTokenGroupStatus => 'ステータスとエラー';
+
+  @override
+  String get skinTokenSurfacePanel => 'パネル';
+
+  @override
+  String get skinTokenSurfacePanelHint => '標準カードウィジェット、ブックマークバー、グリッドセル、情報シート。';
+
+  @override
+  String get skinTokenChromeBar => 'バーとタブストリップ';
+
+  @override
+  String get skinTokenChromeBarHint => 'アクションバー、タブストリップ、選択バー、下部バー。';
+
+  @override
+  String get skinTokenAccentPrimary => 'アクセント';
+
+  @override
+  String get skinTokenAccentPrimaryHint => 'ハイライト、テキスト内のリンク、小さなアクセントアイコン、バッジ。';
+
+  @override
+  String get skinTokenAccentSecondary => 'セカンダリアクセント';
+
+  @override
+  String get skinTokenAccentSecondaryHint => 'セカンダリのハイライトとタグ。';
+
+  @override
+  String get skinTokenAccentTertiary => 'ターシャリアクセント';
+
+  @override
+  String get skinTokenAccentTertiaryHint => 'ターシャリのハイライトとタグ。';
+
+  @override
+  String get skinTokenAccentTertiaryContainer => 'ターシャリアクセントの塗りつぶし';
+
+  @override
+  String get skinTokenAccentTertiaryContainerHint => 'ターシャリハイライトの背景の塗りつぶし。';
+
+  @override
+  String get skinTokenAccentOnTertiaryContainer => 'ターシャリアクセント塗りつぶしのテキスト';
+
+  @override
+  String get skinTokenAccentOnTertiaryContainerHint => 'ターシャリ塗りつぶし上のテキストとアイコン。';
+
+  @override
+  String get skinTokenStatusDanger => 'エラーと削除';
+
+  @override
+  String get skinTokenStatusDangerHint => 'エラーテキスト、削除アクション、エラー枠線。';
+
+  @override
+  String get skinTokenStatusOnDanger => 'エラーカラー上のテキスト';
+
+  @override
+  String get skinTokenStatusOnDangerHint => 'エラーカラー上に描画されるテキストとアイコン。';
+
+  @override
+  String get skinTokenStatusDangerContainer => 'エラーメッセージの塗りつぶし';
+
+  @override
+  String get skinTokenStatusDangerContainerHint => 'エラーメッセージやバナーの塗りつぶし。';
+
+  @override
+  String get skinTokenStatusOnDangerContainer => 'エラーメッセージのテキスト';
+
+  @override
+  String get skinTokenStatusOnDangerContainerHint => 'エラーメッセージ内のテキストとアイコン。';
+
+  @override
+  String get skinTokenStatusInfo => '情報メッセージの塗りつぶし';
+
+  @override
+  String get skinTokenStatusInfoHint => '情報バナーの塗りつぶし。';
+
+  @override
+  String get skinTokenStatusOnInfo => '情報メッセージのテキスト';
+
+  @override
+  String get skinTokenStatusOnInfoHint => '情報バナー内のテキストとアイコン。';
+
+  @override
+  String get bookReaderOpenFailed => 'この本を開けませんでした';
+
+  @override
+  String get comicNoPages => 'このコミックに画像が見つかりません';
+
+  @override
+  String get comicPageLoadFailed => 'このページを読み込めませんでした';
+
+  @override
+  String get comicReadingDirectionRtl => '右から左へ読む';
+
+  @override
+  String get comicReadingDirectionLtr => '左から右へ読む';
+
+  @override
+  String get epubTextSize => '文字サイズ';
+
+  @override
+  String get epubThemeOriginal => 'オリジナル';
+
+  @override
+  String epubChapterFallbackTitle(int number) {
+    return '第$number章';
+  }
+
+  @override
+  String get bookReaderSettingsTitle => 'リーダー設定';
+
+  @override
+  String get bookReaderPageSection => 'ページ';
+
+  @override
+  String get bookReaderTextSection => 'テキスト';
+
+  @override
+  String get bookReaderReadingModeTitle => '読書モード';
+
+  @override
+  String get bookReaderPageFlippingLabel => 'ページめくり';
+
+  @override
+  String get bookReaderColorModeLabel => 'カラーモード';
+
+  @override
+  String get bookReaderTextDirectionLabel => 'テキストの方向';
+
+  @override
+  String get bookReaderTwoPageLandscapeLabel => '横向きで2ページ表示';
+
+  @override
+  String get bookReaderPageMarginsLabel => 'ページ余白';
+
+  @override
+  String get bookReaderFontFaceLabel => 'フォント';
+
+  @override
+  String get bookReaderFontPublisherDefault => '出版社の既定';
+
+  @override
+  String get bookReaderFontSerif => 'セリフ';
+
+  @override
+  String get bookReaderFontSansSerif => 'サンセリフ';
+
+  @override
+  String get bookReaderFontMonospace => '等幅';
+
+  @override
+  String get bookReaderFontWeightLabel => 'フォントの太さ';
+
+  @override
+  String get bookReaderLineSpacingLabel => '行間';
+
+  @override
+  String get bookReaderTextAlignmentLabel => 'テキスト配置';
+
+  @override
+  String get bookReaderTextAlignLeft => '左揃え';
+
+  @override
+  String get bookReaderTextAlignJustified => '両端揃え';
+
+  @override
+  String get bookReaderTextAlignCenter => '中央揃え';
+
+  @override
+  String get bookReaderTextAlignRight => '右揃え';
+
+  @override
+  String get comicReaderModeSinglePage => '単ページ';
+
+  @override
+  String get comicReaderModeTwoPageSpread => '見開き';
+
+  @override
+  String get comicReaderCarouselScrubberSubtitle => 'スライダーの上にページのサムネイルを表示';
 }

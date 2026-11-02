@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/data/models/archive_models.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -48,6 +49,7 @@ void main() {
   // handler installed per test.
   List<String>? dirListingResponse;
   Object? dirListingError;
+  bool dirListingNull = false; // native reports an unreadable folder as null
   List<int>? spaceInfoResponse;
   Uint8List? archiveBytesResponse;
   Object? archiveFileError;
@@ -55,6 +57,7 @@ void main() {
   setUp(() {
     dirListingResponse = null;
     dirListingError = null;
+    dirListingNull = false;
     spaceInfoResponse = null;
     archiveBytesResponse = null;
     archiveFileError = null;
@@ -64,6 +67,7 @@ void main() {
       switch (call.method) {
         case 'listDirectory':
           if (dirListingError != null) throw dirListingError!;
+          if (dirListingNull) return null;
           return dirListingResponse ?? <String>[];
         case 'getSpaceInfo':
           return spaceInfoResponse;
@@ -306,6 +310,117 @@ void main() {
       });
     });
 
+    group('forward history', () {
+      const folder1 = RawEntry(name: 'folder1', isDir: true, sizeBytes: 0, modifiedSecs: 0);
+      const folder2 = RawEntry(name: 'folder2', isDir: true, sizeBytes: 0, modifiedSecs: 0);
+      const folder3 = RawEntry(name: 'folder3', isDir: true, sizeBytes: 0, modifiedSecs: 0);
+      const folderB = RawEntry(name: 'folderB', isDir: true, sizeBytes: 0, modifiedSecs: 0);
+
+      FileBrowserNavigationState read() =>
+          container.read(fileBrowserNavigationProvider(const TabId(1)));
+
+      /// Vault > folder1 > folder2 > folder3.
+      FileBrowserNavigation deepStack() {
+        final notifier = container.read(fileBrowserNavigationProvider(const TabId(1)).notifier);
+        notifier.initRoot(rootLabel: 'Vault');
+        notifier.enterDirectory(folder1, newPath: 'folder1');
+        notifier.enterDirectory(folder2, newPath: 'folder1/folder2');
+        notifier.enterDirectory(folder3, newPath: 'folder1/folder2/folder3');
+        return notifier;
+      }
+
+      test('navigateUp keeps the folder it left as forward history', () {
+        final notifier = deepStack();
+
+        notifier.navigateUp();
+        expect(read().forwardStack.map((s) => s.label), ['folder3']);
+
+        notifier.navigateUp();
+        expect(read().pathStack.map((s) => s.label), ['Vault', 'folder1']);
+        expect(read().forwardStack.map((s) => s.label), ['folder2', 'folder3']);
+      });
+
+      test('jumpTo keeps every skipped folder as forward history, nearest first', () {
+        final notifier = deepStack();
+
+        notifier.jumpTo(1);
+
+        expect(read().pathStack.map((s) => s.label), ['Vault', 'folder1']);
+        expect(read().forwardStack.map((s) => s.label), ['folder2', 'folder3']);
+      });
+
+      test('navigateForward walks back down one step at a time', () {
+        final notifier = deepStack();
+        notifier.jumpTo(1);
+
+        final first = notifier.navigateForward(1);
+
+        expect(first, 'folder1/folder2');
+        expect(read().pathStack.map((s) => s.label), ['Vault', 'folder1', 'folder2']);
+        expect(read().forwardStack.map((s) => s.label), ['folder3']);
+        expect(read().currentDirPath, 'folder1/folder2');
+      });
+
+      test('navigateForward can skip straight to a deeper folder', () {
+        final notifier = deepStack();
+        notifier.jumpTo(1);
+
+        final target = notifier.navigateForward(2);
+
+        expect(target, 'folder1/folder2/folder3');
+        expect(read().pathStack.map((s) => s.label), ['Vault', 'folder1', 'folder2', 'folder3']);
+        expect(read().forwardStack, isEmpty);
+      });
+
+      test('navigateForward without matching history is a no-op', () {
+        final notifier = deepStack();
+
+        expect(notifier.navigateForward(1), isNull);
+        notifier.navigateUp();
+        expect(notifier.navigateForward(0), isNull);
+        expect(notifier.navigateForward(2), isNull);
+        expect(read().forwardStack.map((s) => s.label), ['folder3']);
+      });
+
+      test('entering the next forward folder keeps the rest of the history', () {
+        final notifier = deepStack();
+        notifier.jumpTo(1);
+
+        notifier.enterDirectory(folder2, newPath: 'folder1/folder2');
+
+        expect(read().pathStack.map((s) => s.label), ['Vault', 'folder1', 'folder2']);
+        expect(read().forwardStack.map((s) => s.label), ['folder3']);
+      });
+
+      test('entering a different folder overwrites the forward history', () {
+        final notifier = deepStack();
+        notifier.jumpTo(1);
+
+        notifier.enterDirectory(folderB, newPath: 'folder1/folderB');
+
+        expect(read().pathStack.map((s) => s.label), ['Vault', 'folder1', 'folderB']);
+        expect(read().forwardStack, isEmpty);
+      });
+
+      test('navigateToPath discards the forward history', () {
+        final notifier = deepStack();
+        notifier.navigateUp();
+
+        notifier.navigateToPath(_testContainer(1), 'Elsewhere', isDir: true, rootLabel: 'Vault');
+
+        expect(read().forwardStack, isEmpty);
+      });
+
+      test('a state with forward history is not at an end it cannot leave', () {
+        final notifier = deepStack();
+        notifier.jumpTo(0);
+
+        expect(read().atRoot, isTrue);
+        expect(read().hasForward, isTrue);
+        expect(read().forwardStack, hasLength(3));
+      });
+    });
+
     group('directory loading, error status, space updates', () {
       test('loadDirectoryContents populates currentItems and clears isLoading', () async {
         final subscription = container.listen(fileBrowserNavigationProvider(const TabId(1)), (_, _) {});
@@ -337,6 +452,38 @@ void main() {
         final state = container.read(fileBrowserNavigationProvider(const TabId(1)));
         expect(state.currentItems, hasLength(1));
         expect(state.isListingTruncated, isTrue);
+
+        subscription.close();
+      });
+
+      test('a failed (null) listing is not remembered as the folder\'s contents and is re-listed later', () async {
+        final subscription = container.listen(fileBrowserNavigationProvider(const TabId(1)), (_, _) {});
+        final notifier = container.read(fileBrowserNavigationProvider(const TabId(1)).notifier);
+        notifier.initRoot(rootLabel: 'Vault');
+
+        dirListingResponse = ['F|100|1000|file1.txt'];
+        await notifier.loadDirectoryContents(_testContainer(1), '');
+        var state = container.read(fileBrowserNavigationProvider(const TabId(1)));
+        expect(state.pathStack.last.items, hasLength(1));
+        expect(state.needsRefresh, isFalse);
+
+        // The same folder now fails to list: native answers null.
+        dirListingNull = true;
+        await notifier.loadDirectoryContents(_testContainer(1), '', refresh: true);
+
+        state = container.read(fileBrowserNavigationProvider(const TabId(1)));
+        expect(state.isLoading, isFalse);
+        expect(state.currentItems, isEmpty);
+        // Not cached over the last good listing, and flagged for a re-list.
+        expect(state.pathStack.last.items, hasLength(1));
+        expect(state.needsRefresh, isTrue);
+
+        // A later successful listing clears the flag again.
+        dirListingNull = false;
+        await notifier.loadDirectoryContents(_testContainer(1), '', refresh: true);
+        state = container.read(fileBrowserNavigationProvider(const TabId(1)));
+        expect(state.currentItems, hasLength(1));
+        expect(state.needsRefresh, isFalse);
 
         subscription.close();
       });
@@ -561,6 +708,22 @@ void main() {
         subscription.close();
       });
 
+      test('leaving an open archive does not keep it as forward history', () async {
+        final subscription = container.listen(fileBrowserNavigationProvider(const TabId(1)), (_, _) {});
+        final notifier = container.read(fileBrowserNavigationProvider(const TabId(1)).notifier);
+        notifier.initRoot(rootLabel: 'Vault');
+        archiveBytesResponse = _testArchiveBytes();
+        await notifier.openArchive(_testContainer(1), 'backup.zip', 'backup.zip');
+
+        notifier.navigateUp();
+
+        final state = container.read(fileBrowserNavigationProvider(const TabId(1)));
+        expect(state.archiveContext, isNull);
+        expect(state.forwardStack, isEmpty);
+
+        subscription.close();
+      });
+
       test('navigateToPath closes an open archive before rebuilding the stack', () async {
         final subscription = container.listen(fileBrowserNavigationProvider(const TabId(1)), (_, _) {});
         final notifier = container.read(fileBrowserNavigationProvider(const TabId(1)).notifier);
@@ -590,6 +753,196 @@ void main() {
         final state = container.read(fileBrowserNavigationProvider(const TabId(1)));
         expect(state.isLoading, isFalse);
         expect(state.archiveContext, isNull);
+
+        subscription.close();
+      });
+    });
+
+    group('archives inside archives', () {
+      StagedArchiveSource stagedCopy() => StagedArchiveSource(
+        '/cache/archive_browse_1_inner.zip',
+        container.read(vaultArchiveApiProvider),
+      );
+
+      /// Opens backup.zip, then inner.zip (an entry of backup.zip) on top.
+      Future<(ArchiveContext outer, ArchiveContext nested, StagedArchiveSource source)>
+      openBoth(FileBrowserNavigation notifier) async {
+        notifier.initRoot(rootLabel: 'Vault');
+        archiveBytesResponse = _testArchiveBytes();
+        final outer = await notifier.openArchive(
+          _testContainer(1),
+          'backup.zip',
+          'backup.zip',
+        );
+        final source = stagedCopy();
+        final nested = await notifier.openNestedArchive(
+          source,
+          'backup.zip/inner.zip',
+          'inner.zip',
+        );
+        return (outer, nested, source);
+      }
+
+      test('opening an archive inside an archive stacks it on the outer one', () async {
+        final subscription = container.listen(fileBrowserNavigationProvider(const TabId(1)), (_, _) {});
+        final notifier = container.read(fileBrowserNavigationProvider(const TabId(1)).notifier);
+
+        final (outer, nested, source) = await openBoth(notifier);
+
+        final state = container.read(fileBrowserNavigationProvider(const TabId(1)));
+        expect(nested.status, ArchiveOpenStatus.ok);
+        expect(state.archiveContext, same(nested));
+        expect(nested.parent, same(outer));
+        expect(nested.stagedSource, same(source));
+        expect(state.pathStack.map((s) => s.fatPath), ['', 'backup.zip', 'backup.zip/inner.zip']);
+        expect(state.pathStack.last.isArchiveRoot, isTrue);
+        expect(state.currentDirPath, 'backup.zip/inner.zip');
+        expect(state.isLoading, isFalse);
+        expect(state.currentItems.map((e) => e.name), containsAll(['readme.txt', 'sub']));
+
+        subscription.close();
+      });
+
+      test('a folder inside the nested archive lists its own entries', () async {
+        final subscription = container.listen(fileBrowserNavigationProvider(const TabId(1)), (_, _) {});
+        final notifier = container.read(fileBrowserNavigationProvider(const TabId(1)).notifier);
+        await openBoth(notifier);
+
+        notifier.enterDirectory(
+          const RawEntry(name: 'sub', isDir: true, sizeBytes: 0, modifiedSecs: 0),
+          newPath: 'backup.zip/inner.zip/sub',
+        );
+        await notifier.loadDirectoryContents(_testContainer(1), 'backup.zip/inner.zip/sub');
+
+        final state = container.read(fileBrowserNavigationProvider(const TabId(1)));
+        expect(state.currentItems.map((e) => e.name), ['nested.txt']);
+
+        subscription.close();
+      });
+
+      test('going up from the nested archive returns to the outer archive', () async {
+        final subscription = container.listen(fileBrowserNavigationProvider(const TabId(1)), (_, _) {});
+        final notifier = container.read(fileBrowserNavigationProvider(const TabId(1)).notifier);
+        final (outer, _, source) = await openBoth(notifier);
+
+        notifier.navigateUp();
+
+        final state = container.read(fileBrowserNavigationProvider(const TabId(1)));
+        expect(state.archiveContext, same(outer));
+        expect(state.pathStack.map((s) => s.fatPath), ['', 'backup.zip']);
+        expect(state.currentDirPath, 'backup.zip');
+        expect(state.forwardStack, isEmpty);
+        expect(source.isReleased, isTrue);
+
+        subscription.close();
+      });
+
+      test('going up twice leaves archive mode', () async {
+        final subscription = container.listen(fileBrowserNavigationProvider(const TabId(1)), (_, _) {});
+        final notifier = container.read(fileBrowserNavigationProvider(const TabId(1)).notifier);
+        await openBoth(notifier);
+
+        notifier.navigateUp();
+        notifier.navigateUp();
+
+        final state = container.read(fileBrowserNavigationProvider(const TabId(1)));
+        expect(state.archiveContext, isNull);
+        expect(state.atRoot, isTrue);
+        expect(state.forwardStack, isEmpty);
+
+        subscription.close();
+      });
+
+      test('closeArchive closes only the innermost archive', () async {
+        final subscription = container.listen(fileBrowserNavigationProvider(const TabId(1)), (_, _) {});
+        final notifier = container.read(fileBrowserNavigationProvider(const TabId(1)).notifier);
+        final (outer, _, source) = await openBoth(notifier);
+
+        notifier.closeArchive();
+
+        expect(container.read(fileBrowserNavigationProvider(const TabId(1))).archiveContext, same(outer));
+        expect(source.isReleased, isTrue);
+
+        subscription.close();
+      });
+
+      test('jumping to the outer archive root closes only the nested archive', () async {
+        final subscription = container.listen(fileBrowserNavigationProvider(const TabId(1)), (_, _) {});
+        final notifier = container.read(fileBrowserNavigationProvider(const TabId(1)).notifier);
+        final (outer, _, source) = await openBoth(notifier);
+
+        notifier.jumpTo(1);
+
+        final state = container.read(fileBrowserNavigationProvider(const TabId(1)));
+        expect(state.archiveContext, same(outer));
+        expect(state.currentDirPath, 'backup.zip');
+        expect(source.isReleased, isTrue);
+
+        subscription.close();
+      });
+
+      test('jumping out of both archives closes both', () async {
+        final subscription = container.listen(fileBrowserNavigationProvider(const TabId(1)), (_, _) {});
+        final notifier = container.read(fileBrowserNavigationProvider(const TabId(1)).notifier);
+        final (_, _, source) = await openBoth(notifier);
+
+        notifier.jumpTo(0);
+
+        final state = container.read(fileBrowserNavigationProvider(const TabId(1)));
+        expect(state.archiveContext, isNull);
+        expect(state.atRoot, isTrue);
+        expect(state.forwardStack, isEmpty);
+        expect(source.isReleased, isTrue);
+
+        subscription.close();
+      });
+
+      test('navigateToPath closes every open archive', () async {
+        final subscription = container.listen(fileBrowserNavigationProvider(const TabId(1)), (_, _) {});
+        final notifier = container.read(fileBrowserNavigationProvider(const TabId(1)).notifier);
+        final (_, _, source) = await openBoth(notifier);
+
+        notifier.navigateToPath(_testContainer(1), 'Elsewhere', isDir: true, rootLabel: 'Vault');
+
+        expect(container.read(fileBrowserNavigationProvider(const TabId(1))).archiveContext, isNull);
+        expect(source.isReleased, isTrue);
+
+        subscription.close();
+      });
+
+      test('a failed nested open rethrows, clears isLoading and keeps the outer archive', () async {
+        final subscription = container.listen(fileBrowserNavigationProvider(const TabId(1)), (_, _) {});
+        final notifier = container.read(fileBrowserNavigationProvider(const TabId(1)).notifier);
+        notifier.initRoot(rootLabel: 'Vault');
+        archiveBytesResponse = _testArchiveBytes();
+        final outer = await notifier.openArchive(_testContainer(1), 'backup.zip', 'backup.zip');
+        final source = stagedCopy();
+
+        archiveFileError = PlatformException(code: 'READ_FAIL', message: 'Failed to read archive');
+        await expectLater(
+          () => notifier.openNestedArchive(source, 'backup.zip/inner.zip', 'inner.zip'),
+          throwsA(isA<PlatformException>()),
+        );
+
+        final state = container.read(fileBrowserNavigationProvider(const TabId(1)));
+        expect(state.isLoading, isFalse);
+        expect(state.archiveContext, same(outer));
+        expect(state.pathStack, hasLength(2));
+        // The caller still owns the copy after a failure, so it can wipe it.
+        expect(source.isReleased, isFalse);
+
+        subscription.close();
+      });
+
+      test('openNestedArchive needs an open archive to open from', () async {
+        final subscription = container.listen(fileBrowserNavigationProvider(const TabId(1)), (_, _) {});
+        final notifier = container.read(fileBrowserNavigationProvider(const TabId(1)).notifier);
+        notifier.initRoot(rootLabel: 'Vault');
+
+        await expectLater(
+          () => notifier.openNestedArchive(stagedCopy(), 'inner.zip', 'inner.zip'),
+          throwsStateError,
+        );
 
         subscription.close();
       });

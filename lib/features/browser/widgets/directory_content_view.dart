@@ -65,13 +65,19 @@ import 'package:vaultexplorer/features/browser/file_open_dispatch.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/services/folder_document_provider_service.dart';
 import 'package:vaultexplorer/features/browser/services/media_scan_service.dart';
+import 'package:vaultexplorer/core/api/vault_book_api.dart';
+import 'package:vaultexplorer/features/browser/viewer/books/comic_pages.dart';
+import 'package:vaultexplorer/features/browser/viewer/books/comic_reader_screen.dart';
+import 'package:vaultexplorer/features/browser/viewer/books/epub_reader_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/html_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/pdf_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_screen.dart';
 import 'package:vaultexplorer/features/browser/widgets/add_item_menu_button.dart';
+import 'package:vaultexplorer/features/browser/controllers/browser_drag_session.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_item_drag.dart';
+import 'package:vaultexplorer/features/browser/widgets/browser_pane_scope.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_manager_more_menu_button.dart';
 import 'package:vaultexplorer/features/browser/widgets/bookmark_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/bottom_search_bar.dart';
@@ -331,6 +337,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       ref.read(fileBrowserNavigationProvider(_stateKey).notifier);
 
   List<PathSegment> get _pathStack => _nav.pathStack;
+  List<PathSegment> get _forwardStack => _nav.forwardStack;
   List<RawEntry> get _currentItems => _nav.currentItems;
   bool get _isLoading => _nav.isLoading;
   bool get _isListingTruncated => _nav.isListingTruncated;
@@ -720,6 +727,130 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     _loadDirectoryContents(nav.currentDirPath, refresh: true);
   }
 
+  // ── Drop reveal ──────────────────────────────────────────────────────────
+  // After a drop, the viewport showing the destination folder flashes the
+  // items that arrived and scrolls one of them into view. The announcement can
+  // come before the refreshed listing does, so it waits as "pending" until an
+  // item of that name is actually listed.
+  ProviderSubscription<BrowserDropReveal?>? _dropRevealSub;
+  Set<String> _pendingRevealNames = const {};
+  int _pendingRevealToken = 0;
+  Timer? _pendingRevealExpiry;
+
+  /// Names flashing right now, and the announcement they belong to.
+  Set<String> _revealNames = const {};
+  int _revealToken = 0;
+  Timer? _revealClearTimer;
+
+  void _onDropReveal(BrowserDropReveal reveal) {
+    if (_disposed || !mounted || !_isVisibleTab) return;
+    if (reveal.volId != widget.container.volId) return;
+    final nav = ref.read(fileBrowserNavigationProvider(_stateKey));
+    if (nav.pathStack.isEmpty || nav.archiveContext != null) return;
+    final names = reveal.namesByDir[nav.currentDirPath];
+    if (names == null || names.isEmpty) return;
+
+    _pendingRevealNames = names;
+    _pendingRevealToken = reveal.token;
+    _pendingRevealExpiry?.cancel();
+    // A listing that never shows the items (hidden files, a failed refresh)
+    // must not flash something unrelated much later.
+    _pendingRevealExpiry = Timer(const Duration(seconds: 8), () {
+      _pendingRevealNames = const {};
+    });
+    _applyPendingReveal();
+  }
+
+  void _applyPendingReveal() {
+    if (_pendingRevealNames.isEmpty || _disposed || !mounted) return;
+    final nav = ref.read(fileBrowserNavigationProvider(_stateKey));
+    if (nav.isLoading) return;
+    final listed = <String>{
+      for (final entry in nav.currentItems)
+        if (_pendingRevealNames.contains(entry.name)) entry.name,
+    };
+    if (listed.isEmpty) return;
+
+    final token = _pendingRevealToken;
+    _pendingRevealNames = const {};
+    _pendingRevealExpiry?.cancel();
+    setState(() {
+      _revealNames = listed;
+      _revealToken = token;
+    });
+    _revealClearTimer?.cancel();
+    // Each tile plays its own short pulse (see kDropRevealPulseDuration) and
+    // always finishes it, so the names do not have to stay announced for the
+    // pulse's sake. They only have to outlast the scroll that brings an item
+    // into view (320 ms), so a tile built part-way through it still pulses.
+    _revealClearTimer = Timer(
+      kDropRevealPulseDuration + const Duration(milliseconds: 320),
+      () {
+        if (!mounted) return;
+        setState(() => _revealNames = const {});
+      },
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _scrollToRevealed(listed);
+    });
+  }
+
+  /// Brings at least one of the freshly dropped items clearly into view.
+  void _scrollToRevealed(Set<String> names) {
+    if (!_browserScrollController.hasClients) return;
+    final sorted = _displayedItemsForScroll();
+    final indices = <int>{
+      for (var i = 0; i < sorted.length; i++)
+        if (names.contains(sorted[i].name)) i,
+    };
+    if (indices.isEmpty) return;
+    _ensureTilesVisible(
+      sorted,
+      indices,
+      animate: true,
+      center: true,
+      clearOfToolbar: false,
+    );
+  }
+
+  /// Covers the body of the directory view: hands tiles the drag lock and the
+  /// reveal flash, and tints the whole pane (no border) while another pane's
+  /// drag is over it. The tint is shown only for a pane the drag did not start in -- the
+  /// source pane would otherwise glow for the entire drag.
+  Widget _paneDropChrome(
+    BuildContext context, {
+    required bool hover,
+    required bool locked,
+    required Widget body,
+  }) {
+    final primary = Theme.of(context).colorScheme.primary;
+    return BrowserPaneScope(
+      tabId: widget.tabId,
+      interactionLocked: locked,
+      revealNames: _revealNames,
+      revealToken: _revealToken,
+      child: Stack(
+        fit: StackFit.passthrough,
+        children: [
+          body,
+          Positioned.fill(
+            child: IgnorePointer(
+              child: AnimatedOpacity(
+                opacity: hover && locked ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 150),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: primary.withValues(alpha: 0.08),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -741,6 +872,12 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         if (next != null) _consumeBookmarkRequest();
       },
     );
+    _dropRevealSub = ref.listenManual<BrowserDropReveal?>(
+      browserDropRevealProvider,
+      (_, next) {
+        if (next != null) _onDropReveal(next);
+      },
+    );
     _wasActiveTab = _isActiveTab;
     _wasMultiTab = _hasMultipleTabs;
     _wasVisibleTab = _isVisibleTab;
@@ -754,6 +891,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     _disposed = true;
     _workspaceSubscription?.close();
     _bookmarkRequestSub?.close();
+    _dropRevealSub?.close();
+    _pendingRevealExpiry?.cancel();
+    _revealClearTimer?.cancel();
     _chrome.visibleTabs.removeListener(_onVisibleTabsChanged);
     _mediaScanToken?.cancel();
     WidgetsBinding.instance.removeObserver(this);
@@ -767,12 +907,18 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     super.dispose();
   }
 
+  /// The entries in the order the layout views show them, for working out
+  /// where a tile sits.
+  List<RawEntry> _displayedItemsForScroll() {
+    final query = _searchQuery.trim().toLowerCase();
+    return _searchAwareVisibleItems(_currentItems, query).toList()
+      ..sort(_compareOverall);
+  }
+
   void _scrollToItem(String fullPath) {
     if (!_browserScrollController.hasClients) return;
 
-    final query = _searchQuery.trim().toLowerCase();
-    final sortedItems = _searchAwareVisibleItems(_currentItems, query).toList()
-      ..sort(_compareOverall);
+    final sortedItems = _displayedItemsForScroll();
 
     final targetIndex = sortedItems.indexWhere((e) {
       final itemFullPath =
@@ -784,14 +930,26 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
 
     if (targetIndex == -1) return;
 
-    final position = _browserScrollController.position;
-    final maxScroll = position.maxScrollExtent;
-    final viewportHeight = position.viewportDimension;
+    _ensureTilesVisible(
+      sortedItems,
+      {targetIndex},
+      animate: false,
+      center: false,
+    );
+  }
+
+  /// Where the tiles at [targets] sit, in scroll-content coordinates, when
+  /// [sortedItems] are laid out in a viewport [viewportWidth] wide. Mirrors
+  /// the geometry of the list, grid and masonry views.
+  Map<int, ({double top, double height})> _tileGeometries(
+    List<RawEntry> sortedItems,
+    Set<int> targets,
+    double viewportWidth,
+  ) {
+    final result = <int, ({double top, double height})>{};
+    if (targets.isEmpty) return result;
     final isLandscape =
         MediaQuery.of(context).orientation == Orientation.landscape;
-
-    double itemTop = 0.0;
-    double itemHeight = 0.0;
 
     switch (_layoutMode) {
       case BrowserLayoutMode.list:
@@ -812,8 +970,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         final itemExtent =
             contentHeight + (isCompact ? 8.0 : 20.0) * zoom + 2.0;
 
-        itemHeight = itemExtent;
-        itemTop = targetIndex * itemExtent;
+        for (final index in targets) {
+          result[index] = (top: index * itemExtent, height: itemExtent);
+        }
         break;
 
       case BrowserLayoutMode.grid:
@@ -824,18 +983,20 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                     ? _toolbarConfig.gridColumnsLandscape
                     : _toolbarConfig.gridColumnsPortrait)
                 .clamp(minCols, maxCols);
-        final row = targetIndex ~/ columns;
-        final screenWidth = MediaQuery.sizeOf(context).width;
-        final availableWidth = screenWidth - 20.0;
+        final availableWidth = viewportWidth - 20.0;
         final itemWidth = (availableWidth - (columns - 1) * 8.0) / columns;
         final previewRatio = _toolbarConfig
             .getGridAspectRatioForFolder(widget.container.uri, _currentDirPath)
             .ratio;
         final previewHeight = itemWidth / previewRatio;
         final labelHeight = _toolbarConfig.showGridFileNames ? 36.0 : 0.0;
-        itemHeight = previewHeight + labelHeight;
+        final itemHeight = previewHeight + labelHeight;
         final rowHeight = itemHeight + 8.0;
-        itemTop = 12.0 + (row * rowHeight);
+
+        for (final index in targets) {
+          final row = index ~/ columns;
+          result[index] = (top: 12.0 + (row * rowHeight), height: itemHeight);
+        }
         break;
 
       case BrowserLayoutMode.masonry:
@@ -846,13 +1007,13 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                     ? _toolbarConfig.masonryColumnsLandscape
                     : _toolbarConfig.masonryColumnsPortrait)
                 .clamp(minCols, maxCols);
-        final screenWidth = MediaQuery.sizeOf(context).width;
-        final availableWidth = screenWidth - 20.0;
+        final availableWidth = viewportWidth - 20.0;
         final itemWidth = (availableWidth - (columns - 1) * 8.0) / columns;
         final colHeights = List<double>.filled(columns, 12.0);
         final showNames = _toolbarConfig.showGridFileNames;
+        final lastTarget = targets.reduce(math.max);
 
-        for (int i = 0; i <= targetIndex; i++) {
+        for (int i = 0; i <= lastTarget && i < sortedItems.length; i++) {
           final entry = sortedItems[i];
           int shortestCol = 0;
           for (int c = 1; c < columns; c++) {
@@ -886,37 +1047,93 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
               !MediaViewerConstants.hasRealThumbnail(entry.name);
           final previewHeight = itemWidth / ratio;
           final currentHeight = previewHeight + (hasLabel ? 36.0 : 0.0);
-          if (i == targetIndex) {
-            itemTop = colHeights[shortestCol];
-            itemHeight = currentHeight;
+          if (targets.contains(i)) {
+            result[i] = (top: colHeights[shortestCol], height: currentHeight);
           }
           colHeights[shortestCol] += currentHeight + 8.0;
         }
         break;
     }
+    return result;
+  }
 
+  /// Scrolls so that at least one of the tiles at [indices] (positions in
+  /// [sortedItems]) is clearly in view -- clear of the floating toolbar --
+  /// moving as little as possible. Does nothing when one already is.
+  ///
+  /// With [clearOfToolbar] false, "in view" means simply inside the viewport
+  /// (a small margin aside). The toolbar-clearance band is far taller than a
+  /// landscape pane, so applying it there would call a tile at the top of the
+  /// list "hidden" and scroll for nothing.
+  void _ensureTilesVisible(
+    List<RawEntry> sortedItems,
+    Set<int> indices, {
+    required bool animate,
+    required bool center,
+    bool clearOfToolbar = true,
+  }) {
+    final controller = _browserScrollController;
+    if (!controller.hasClients) return;
+    final position = controller.position;
+
+    // The pane's own width: in dual-pane browsing it is about half the screen.
+    final viewportWidth =
+        position.context.notificationContext?.size?.width ??
+        MediaQuery.sizeOf(context).width;
+    final geometry = _tileGeometries(sortedItems, indices, viewportWidth);
+    if (geometry.isEmpty) return;
+
+    final maxScroll = position.maxScrollExtent;
+    final viewportHeight = position.viewportDimension;
     final currentOffset = position.pixels;
-    const topMargin = 16.0;
+    final topMargin = clearOfToolbar ? 16.0 : 8.0;
 
     // Dynamically calculate bottom clearance to avoid toolbar & bottom padding overlap
     final bottomInset = MediaQuery.paddingOf(context).bottom;
-    final bottomMargin = AppSpacing.floatingStackClearance + bottomInset + 16.0;
+    final bottomMargin = clearOfToolbar
+        ? AppSpacing.floatingStackClearance + bottomInset + 16.0
+        : 8.0;
+    final visibleTop = currentOffset + topMargin;
+    final visibleBottom = currentOffset + viewportHeight - bottomMargin;
+    final bandHeight = viewportHeight - bottomMargin - topMargin;
 
-    if (itemTop >= currentOffset + topMargin &&
-        (itemTop + itemHeight) <=
-            currentOffset + viewportHeight - bottomMargin) {
-      return;
+    double? bestOffset;
+    var bestDistance = double.infinity;
+    for (final tile in geometry.values) {
+      if (tile.top >= visibleTop && (tile.top + tile.height) <= visibleBottom) {
+        return;
+      }
+      final double target;
+      if (center) {
+        target =
+            tile.top -
+            topMargin -
+            math.max(0.0, (bandHeight - tile.height) / 2);
+      } else if (tile.top < visibleTop) {
+        target = tile.top - topMargin;
+      } else {
+        target = (tile.top + tile.height) - viewportHeight + bottomMargin;
+      }
+      final clamped = target.clamp(0.0, maxScroll).toDouble();
+      final distance = (clamped - currentOffset).abs();
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestOffset = clamped;
+      }
     }
 
-    double targetOffset;
-    if (itemTop < currentOffset + topMargin) {
-      targetOffset = itemTop - topMargin;
+    if (bestOffset == null || bestDistance < 1.0) return;
+    if (animate) {
+      unawaited(
+        controller.animateTo(
+          bestOffset,
+          duration: const Duration(milliseconds: 320),
+          curve: Curves.easeOutCubic,
+        ),
+      );
     } else {
-      targetOffset = (itemTop + itemHeight) - viewportHeight + bottomMargin;
+      controller.jumpTo(bestOffset);
     }
-
-    final clampedOffset = targetOffset.clamp(0.0, maxScroll);
-    _browserScrollController.jumpTo(clampedOffset);
   }
 
   BrowserLayoutMode _getLayoutModeForFolder(
@@ -1535,6 +1752,98 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     }
   }
 
+  /// Opens an archive that is an entry of the archive being browsed (a `.zip`
+  /// inside a `.7z`, say), on top of it. Going back leaves it and returns to
+  /// the outer archive.
+  ///
+  /// The entry can't be read in place: ZIP and 7z need random access, which
+  /// an entry that is still compressed inside its parent doesn't offer. It is
+  /// streamed into the same app-private temporary file archive previews use
+  /// and browsed from there; that file is securely wiped when the nested
+  /// archive is closed (see [StagedArchiveSource]).
+  Future<void> _openNestedArchive(String fullPath, String archiveName) async {
+    final parent = _archiveContext;
+    if (parent == null) return;
+    if (parent.nestingDepth + 1 > ArchiveContext.maxNestingDepth) {
+      _setStatus('Archives are nested too deeply to open', error: true);
+      return;
+    }
+
+    final archiveRootPath = _pathStack[parent.pathStackEntryIndex].fatPath;
+    var subPath = '';
+    if (fullPath.length > archiveRootPath.length) {
+      subPath = fullPath.substring(archiveRootPath.length);
+      if (subPath.startsWith('/')) subPath = subPath.substring(1);
+    }
+    // Read before the awaits below, like _openArchive does, so leaving the
+    // nested archive restores the scroll position of this folder.
+    final currentOffset = _browserScrollController.hasClients
+        ? _browserScrollController.offset
+        : 0.0;
+
+    _signalActivity();
+    _navNotifier.setLoading(true);
+    StagedArchiveSource? source;
+    try {
+      final staged = await _stageArchiveEntryWithPassword(subPath);
+      final stagedPath = staged?.path;
+      if (stagedPath == null) {
+        if (mounted) {
+          _navNotifier.setLoading(false);
+          if (staged != null) {
+            _setStatus(context.l10n.failedToReadFileFromArchive, error: true);
+          }
+        }
+        return;
+      }
+      final stagedSource = ArchiveService.adoptStagedArchive(stagedPath);
+      source = stagedSource;
+      if (!mounted) return;
+
+      String? passphrase;
+      while (true) {
+        final ctx = await _navNotifier.openNestedArchive(
+          stagedSource,
+          fullPath,
+          archiveName,
+          passphrase: passphrase,
+          layoutMode: _getLayoutModeForFolder(fullPath),
+          onActivity: _signalActivity,
+          currentScrollOffset: currentOffset,
+        );
+
+        if (ctx.status == ArchiveOpenStatus.ok) {
+          // The nested archive owns the temporary copy from here on.
+          source = null;
+          final archiveSort = _getSortStateForFolder(fullPath);
+          _sortNotifier.restore(archiveSort.sortBy, archiveSort.sortAscending);
+          if (mounted) _resetBrowserScrollController(initialOffset: 0.0);
+          _clearSearch();
+          return;
+        }
+
+        if (!mounted) return;
+        final entered = await BrowserDialogs.showArchivePasswordPrompt(
+          context,
+          wrongPassword: ctx.status == ArchiveOpenStatus.wrongPassphrase,
+        );
+        if (entered == null) return;
+        passphrase = entered;
+      }
+    } catch (e) {
+      if (mounted) {
+        _navNotifier.setLoading(false);
+        _setStatus(
+          context.l10n.failedToReadArchive('${e.runtimeType}'),
+          error: true,
+        );
+      }
+    } finally {
+      // Still ours only when the open failed or was abandoned: wipe the copy.
+      source?.release();
+    }
+  }
+
   Future<ArchiveEntryExtractResult?> _extractArchiveEntryWithPassword(
     String entryPath,
   ) async {
@@ -1850,8 +2159,16 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     unawaited(_openBookmark(request.bookmark));
   }
 
+  /// Remembers where this folder was scrolled to, so walking forward into it
+  /// again (from the breadcrumb's forward path) lands in the same place.
+  void _rememberScrollOffset() {
+    if (_pathStack.isEmpty || !_browserScrollController.hasClients) return;
+    _pathStack.last.scrollOffset = _browserScrollController.offset;
+  }
+
   void _navigateUp() {
     if (_atRoot) return;
+    _rememberScrollOffset();
     final targetSegment = _pathStack.length >= 2
         ? _pathStack[_pathStack.length - 2]
         : null;
@@ -2004,8 +2321,29 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     _navNotifier.clearBackGesturePreview();
   }
 
+  /// Steps forward into the folder history that going back left in place.
+  /// [index] is a position in the forward path: 0 is the folder just left,
+  /// larger values skip straight down to a deeper one.
+  void _navigateForward(int index) {
+    final forward = _forwardStack;
+    if (index < 0 || index >= forward.length) return;
+    final target = forward[index];
+    _rememberScrollOffset();
+    _resetBrowserScrollController(initialOffset: target.scrollOffset);
+    final newPath = _navNotifier.navigateForward(
+      index + 1,
+      layoutMode: _getLayoutModeForFolder(target.fatPath),
+    );
+    if (newPath == null) return;
+    final sort = _getSortStateForFolder(newPath);
+    _sortNotifier.restore(sort.sortBy, sort.sortAscending);
+    _clearSearch();
+    _loadDirectoryContents(newPath);
+  }
+
   void _jumpTo(int index) {
     if (index == _pathStack.length - 1) return;
+    _rememberScrollOffset();
     final targetSegment = index >= 0 && index < _pathStack.length
         ? _pathStack[index]
         : null;
@@ -2192,8 +2530,18 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             ? parts.last.toLowerCase().replaceFirst(RegExp(r'^\.+'), '').trim()
             : '');
     if (ArchiveService.opensOnTap(ext)) {
-      await _openArchive(fullPath, entry.name);
-      return;
+      if (_archiveContext == null) {
+        await _openArchive(fullPath, entry.name);
+        return;
+      }
+      // Inside an archive the path is virtual, so the file can't be opened
+      // like a container file; it is staged and opened on top of this one.
+      // (A split archive part has no siblings to be read with, so it falls
+      // through to the ordinary in-archive handling below.)
+      if (ArchiveService.canOpenNested(entry.name, ext)) {
+        await _openNestedArchive(fullPath, entry.name);
+        return;
+      }
     }
     if (_archiveContext != null) {
       _signalActivity();
@@ -2291,6 +2639,10 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
               ),
             ),
           );
+          // The vault may have been locked (or the tab closed) while the
+          // detail screen was open; `_currentDirPath` reads Riverpod state
+          // through this widget's ref, which throws once unmounted.
+          if (!mounted) return;
           _loadDirectoryContents(_currentDirPath);
         }
       } else {
@@ -2340,6 +2692,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             ),
           ),
         );
+        if (!mounted) return;
         _loadDirectoryContents(_currentDirPath);
       case OpenInMediaViewer():
         await _openMediaViewer(entry.name, fullPath);
@@ -2347,6 +2700,10 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         await _openPdfViewer(fullPath);
       case OpenInHtmlViewer():
         _openHtmlViewer(fullPath);
+      case OpenInComicReader():
+        await _openBook(entry.name, fullPath, BookKind.comic);
+      case OpenInEpubReader():
+        await _openBook(entry.name, fullPath, BookKind.epub);
       case OpenWithSystemApp(packageName: final packageName):
         _openFileWithApp(entry.name, fullPath, packageName: packageName);
       case InstallApk():
@@ -2462,7 +2819,97 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             PdfViewerScreen(container: widget.container, filePath: fullPath),
       ),
     );
+    if (!mounted) return;
     _loadDirectoryContents(_currentDirPath);
+  }
+
+  /// Opens a `.cbz`/`.epub` (or a comic under another name) in the in-app
+  /// reader. The reader takes over the book session and closes it itself.
+  ///
+  /// Anything the reader cannot take -- a real RAR, a password-protected
+  /// archive, an exotic compression method -- goes to the archive browser
+  /// instead, where the pages can still be viewed one at a time.
+  Future<void> _openBook(String name, String fullPath, BookKind kind) async {
+    final api = ref.read(vaultBookApiProvider);
+    _navNotifier.setLoading(true);
+    BookOpenResult result;
+    try {
+      result = await api.open(
+        container: widget.container,
+        path: fullPath,
+        kind: kind,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _navNotifier.setLoading(false);
+      _setStatus(context.l10n.bookReaderOpenFailed, error: true);
+      return;
+    }
+    final token = result.token;
+    if (!mounted) {
+      if (token != null) unawaited(api.close(token));
+      return;
+    }
+    _navNotifier.setLoading(false);
+
+    Future<void> fallBackToArchive() async {
+      if (token != null) unawaited(api.close(token));
+      await _openArchive(fullPath, name);
+    }
+
+    if (result.status != BookOpenStatus.ok || token == null) {
+      if (result.status.archiveBrowserMayHelp) {
+        await fallBackToArchive();
+      } else {
+        _setStatus(context.l10n.bookReaderOpenFailed, error: true);
+      }
+      return;
+    }
+
+    switch (kind) {
+      case BookKind.comic:
+        if (result.hasEncryptedEntries) {
+          await fallBackToArchive();
+          return;
+        }
+        final pages = comicPageNames(result.entries);
+        if (pages.isEmpty) {
+          unawaited(api.close(token));
+          _setStatus(context.l10n.comicNoPages, error: true);
+          return;
+        }
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ComicReaderScreen(
+              container: widget.container,
+              title: name,
+              filePath: fullPath,
+              token: token,
+              pages: pages,
+            ),
+          ),
+        );
+      case BookKind.epub:
+        final info = result.epub;
+        if (info == null || info.spine.isEmpty) {
+          unawaited(api.close(token));
+          _setStatus(context.l10n.bookReaderOpenFailed, error: true);
+          return;
+        }
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => EpubReaderScreen(
+              container: widget.container,
+              fallbackTitle: name,
+              filePath: fullPath,
+              token: token,
+              info: info,
+            ),
+          ),
+        );
+    }
   }
 
   void _openHtmlViewer(String fullPath) {
@@ -2557,11 +3004,29 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     _loadDirectoryContents(_currentDirPath);
   }
 
-  Future<void> _openMediaViewer(String fileName, String fullPath) async {
+  /// Opens [fullPath] in the media viewer. [forceKind] ("Open as...") makes
+  /// the viewer treat the file as that kind regardless of its extension; the
+  /// file then opens on its own, since a playlist built from the folder's
+  /// other media would have no reason to include a file the extension filter
+  /// does not recognise.
+  Future<void> _openMediaViewer(
+    String fileName,
+    String fullPath, {
+    MediaKind? forceKind,
+    bool singleFile = false,
+  }) async {
+    if (forceKind != null) {
+      await MediaViewerConstants.withKindOverride(
+        fullPath,
+        forceKind,
+        () => _openMediaViewer(fileName, fullPath, singleFile: true),
+      );
+      return;
+    }
     List<String> mediaFiles = [fullPath];
     int initialIndex = 0;
 
-    if (_toolbarConfig.autoStartPlaylistMode) {
+    if (!singleFile && _toolbarConfig.autoStartPlaylistMode) {
       final query = _searchQuery.trim().toLowerCase();
       final baseItems = (_searchActive && _isDeepSearch && query.isNotEmpty)
           ? _deepSearchResults
@@ -2755,9 +3220,57 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       }
       _openFileWithApp(fileName, fullPath);
     } else if (choice.action == 'open_as') {
-      if (choice.mimeType != null) {
-        _openFileWithApp(fileName, fullPath, mimeType: choice.mimeType!);
+      final mime = choice.mimeType;
+      if (mime == null) return;
+      if (choice.openExternally) {
+        _openFileWithApp(fileName, fullPath, mimeType: mime);
+        return;
       }
+      if (!mounted) return;
+      await _openFileAs(fileName, fullPath, mime);
+    }
+  }
+
+  /// "Open as..." in the app's own viewers, whatever the file is called.
+  ///
+  /// The type is a hint the user gave, not something the app can check
+  /// up front: a `.dat` the user says is a video may well not be one. Each
+  /// target therefore opens through the same screen a correctly named file
+  /// would, and any failure surfaces there (the player's error state, the
+  /// archive browser's "failed to read archive" status) instead of being
+  /// pre-judged here by extension. [mimeType] is one of the values the
+  /// "Open as" dialog produces.
+  Future<void> _openFileAs(
+    String fileName,
+    String fullPath,
+    String mimeType,
+  ) async {
+    _signalActivity();
+    switch (mimeType) {
+      case 'text/plain':
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => TextEditorScreen(
+              container: widget.container,
+              filePath: fullPath,
+            ),
+          ),
+        );
+        if (mounted) _loadDirectoryContents(_currentDirPath);
+      case 'image/*':
+        await _openMediaViewer(fileName, fullPath, forceKind: MediaKind.image);
+      case 'video/*':
+        await _openMediaViewer(fileName, fullPath, forceKind: MediaKind.video);
+      case 'audio/*':
+        await _openMediaViewer(fileName, fullPath, forceKind: MediaKind.audio);
+      case 'application/zip':
+        // The archive browser sniffs the format from the bytes (zip, 7z, rar,
+        // tar...), same as the APK-as-ZIP path, and asks for a password
+        // itself when needed.
+        await _openArchive(fullPath, fileName);
+      default:
+        _openFileWithApp(fileName, fullPath, mimeType: mimeType);
     }
   }
 
@@ -2885,17 +3398,30 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     }
   }
 
+  /// Runs the copy or move chosen in the drop menu (see
+  /// `handleBrowserItemDrop`). Invoked on the viewport the drag started in.
   Future<void> _handleBrowserItemDrop(
     BrowserItemDragData data,
     MountedContainer destination,
     String destinationPath,
+    BrowserDropMode mode,
   ) async {
     if (!mounted || data.entries.isEmpty) return;
-    if (data.source.readOnly || destination.readOnly) {
-      _setStatus(context.l10n.readOnlyCantMove, error: true);
+    final isMove = mode == BrowserDropMode.move;
+    if (destination.readOnly || (isMove && data.source.readOnly)) {
+      _setStatus(
+        isMove ? context.l10n.readOnlyCantMove : context.l10n.readOnlyCantPaste,
+        error: true,
+      );
       return;
     }
-    if (!data.canDropInto(destination, destinationPath)) return;
+    final allowed = isMove
+        ? data.canMoveInto(destination, destinationPath)
+        : data.canCopyInto(destination, destinationPath);
+    if (!allowed) return;
+
+    // Taken before the first await: the reveal outlives this viewport.
+    final providers = ProviderScope.containerOf(context, listen: false);
 
     final items = data.entries
         .map(
@@ -2916,7 +3442,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
           srcContainer: data.source,
           destDirPath: destinationPath,
           items: items,
-          isCut: true,
+          isCut: isMove,
           isCrossContainer: data.source.volId != destination.volId,
           resolveConflicts: (conflicts) async {
             if (!mounted) return null;
@@ -2928,12 +3454,58 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
           },
           l10n: context.l10n,
         );
-    if (!mounted || op == null) return;
+    if (op == null) return;
+    _bindDropReveal(op, destination, destinationPath, providers);
+    if (!mounted) return;
 
     ref
         .read(fileBrowserSelectionProvider(_stateKey).notifier)
         .exitSelectionMode();
     _bindDroppedMoveListener(op);
+  }
+
+  /// Announces where a finished drop put its items, so the viewport showing
+  /// that folder can flash them and scroll one into view. Deliberately not
+  /// tied to this viewport: its tab may be gone by the time the copy ends.
+  void _bindDropReveal(
+    FileOperation op,
+    MountedContainer destination,
+    String destinationPath,
+    ProviderContainer providers,
+  ) {
+    void onChanged() {
+      final done =
+          op.status != FileOperationStatus.pending &&
+          op.status != FileOperationStatus.running;
+      if (!done) return;
+      op.removeListener(onChanged);
+
+      final arrived = <String>{};
+      for (int i = 0; i < op.items.length; i++) {
+        final status = i < op.itemStatuses.length ? op.itemStatuses[i] : null;
+        if (status?.result != FileItemResult.success) continue;
+        arrived.add(op.resolvedDestName(i) ?? op.items[i].name);
+      }
+      if (arrived.isEmpty) return;
+
+      final namesByDir = <String, Set<String>>{destinationPath: arrived};
+      // A pane showing the folder the items went *into* has nothing new in its
+      // listing, so flash that folder's own tile instead.
+      if (destinationPath.isNotEmpty) {
+        final slash = destinationPath.lastIndexOf('/');
+        final parent = slash < 0 ? '' : destinationPath.substring(0, slash);
+        final name = slash < 0
+            ? destinationPath
+            : destinationPath.substring(slash + 1);
+        (namesByDir[parent] ??= <String>{}).add(name);
+      }
+      providers
+          .read(browserDropRevealProvider.notifier)
+          .publish(volId: destination.volId, namesByDir: namesByDir);
+    }
+
+    op.addListener(onChanged);
+    onChanged();
   }
 
   bool _isSupportedMedia(String fileName) =>
@@ -4366,8 +4938,11 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       _setStatus(context.l10n.readOnlyContainerWarning, error: true);
       return;
     }
+    // For an archive opened from inside another archive the destination is
+    // the folder that holds the outermost one: the nested archive has no file
+    // of its own to sit next to.
     final archivePath =
-        _pathStack[_archiveContext!.pathStackEntryIndex].fatPath;
+        _pathStack[_archiveContext!.outermost.pathStackEntryIndex].fatPath;
     final parentDir = archivePath.contains('/')
         ? archivePath.substring(0, archivePath.lastIndexOf('/'))
         : '';
@@ -4912,6 +5487,17 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         : null;
     final isLandscape =
         MediaQuery.of(context).orientation == Orientation.landscape;
+    // True while another viewport owns a drag: this one is then only a drop
+    // target. Selecting this watch by tab keeps the source viewport (and any
+    // idle one) from rebuilding when a drag starts or ends.
+    final dragLocked = ref.watch(
+      browserDragSessionProvider.select(
+        (session) => session.isLockedFor(widget.tabId),
+      ),
+    );
+    if (_pendingRevealNames.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _applyPendingReveal());
+    }
     final useFab = _toolbarConfig.useFabForToolbar;
     final showActionBar = !_searchActive && !useFab;
     final selectedForBar = _selectedBrowserEntries;
@@ -4920,6 +5506,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     final appBarSearch = _search;
     final appBarPathStack = List<PathSegment>.unmodifiable(
       appBarNavigation.pathStack,
+    );
+    final appBarForwardStack = List<PathSegment>.unmodifiable(
+      appBarNavigation.forwardStack,
     );
     final appBarCurrentDirPath = appBarNavigation.currentDirPath;
     final appBarCurrentFilter = appBarNavigation.currentFilter;
@@ -5111,6 +5700,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         container: widget.container,
         pathStack: appBarPathStack,
         onJumpTo: _jumpTo,
+        forwardStack: appBarForwardStack,
+        onForwardTo: _navigateForward,
         filteredItems: filteredItems,
         dirCount: dirCount,
         fileCount: fileCount,
@@ -5234,10 +5825,18 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         ),
       ),
     );
-    final appBarPathSignature = Object.hashAll(
-      appBarPathStack.map(
-        (segment) =>
-            Object.hash(segment.label, segment.fatPath, segment.isArchiveRoot),
+    final appBarPathSignature = Object.hash(
+      Object.hashAll(
+        appBarPathStack.map(
+          (segment) =>
+              Object.hash(segment.label, segment.fatPath, segment.isArchiveRoot),
+        ),
+      ),
+      Object.hashAll(
+        appBarForwardStack.map(
+          (segment) =>
+              Object.hash(segment.label, segment.fatPath, segment.isArchiveRoot),
+        ),
       ),
     );
     final appBarSignature = Object.hash(
@@ -5488,9 +6087,14 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                 child: Column(
                                   children: [
                                     if (_toolbarConfig.showBreadcrumbBar)
-                                      BreadcrumbBar(
-                                        stack: _pathStack,
-                                        onTap: _jumpTo,
+                                      IgnorePointer(
+                                        ignoring: dragLocked,
+                                        child: BreadcrumbBar(
+                                          stack: _pathStack,
+                                          onTap: _jumpTo,
+                                          forwardStack: _forwardStack,
+                                          onForwardTap: _navigateForward,
+                                        ),
                                       ),
                                     if (!widget.container.isLocalStorage &&
                                         _archiveContext == null)
@@ -5512,10 +6116,10 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                                                     .container,
                                                                 _currentDirPath,
                                                               ),
-                                                  onAcceptWithDetails:
-                                                      (details) => unawaited(
-                                                        details.data.onDrop(
-                                                          details.data,
+                                                  onAcceptWithDetails: (details) => unawaited(
+                                                        handleBrowserItemDrop(
+                                                          context,
+                                                          details,
                                                           widget.container,
                                                           _currentDirPath,
                                                         ),
@@ -5525,7 +6129,13 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                                         context,
                                                         candidates,
                                                         rejected,
-                                                      ) => buildBrowserBody(
+                                                      ) => _paneDropChrome(
+                                                        context,
+                                                        hover:
+                                                            candidates.isNotEmpty &&
+                                                            !widget.container.readOnly,
+                                                        locked: dragLocked,
+                                                        body: buildBrowserBody(
                                               context,
                                               filteredItems,
                                               isLoading: _isLoading,
@@ -5699,6 +6309,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                                   _archiveRootPathForSearch,
                                               sortBy: sortBy,
                                             ),
+                                          ),
                                           ),
                                               ),
                                           if (_backGestureProgress != null)

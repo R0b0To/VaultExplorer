@@ -38,6 +38,8 @@ void VolumeState::reset() {
     matchedCipherId = -1;
     matchedHashId = -1;
     fsType = FS_UNKNOWN;
+    fatActiveFiles = 0;
+    fatNeedsRemount = false;
     ntfsVol = nullptr;
     extFs = nullptr;
     extBitmapsLoaded = false;

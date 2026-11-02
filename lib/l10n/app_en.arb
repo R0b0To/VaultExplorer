@@ -7456,6 +7456,14 @@
   "@vaultSyncComparingLabel": {
     "description": "Progress label shown while Vault Sync is walking both sides"
   },
+  "vaultSyncScanFailedTitle": "Couldn't Read a Folder",
+  "@vaultSyncScanFailedTitle": {
+    "description": "Title shown when Vault Sync stops because a folder in a vault could not be read"
+  },
+  "vaultSyncScanFailedMessage": "A folder in a vault couldn't be read, so the comparison was stopped instead of guessing. Nothing was changed. Lock and unlock the vault again, then compare again.",
+  "@vaultSyncScanFailedMessage": {
+    "description": "Explains that the comparison was stopped without changing anything because a vault folder was unreadable, and suggests locking and unlocking the vault"
+  },
   "vaultSyncCompareStatsLabel": "Folders scanned: {dirs} | Differences found: {entries}",
   "@vaultSyncCompareStatsLabel": {
     "description": "Live stats shown under the progress bar while comparing",
@@ -7769,7 +7777,7 @@
   },
   "copyPathAction": "Copy path",
   "@copyPathAction": {
-    "description": "Menu item label that copies the path of the selected file or folder, or of a storage or vault in the side drawer, to the clipboard"
+    "description": "Menu item label that copies the path of the selected file or folder to the clipboard"
   },
   "automationSectionHeader": "Automation",
   "@automationSectionHeader": {
@@ -12872,6 +12880,14 @@
   "@audioEditorNextCutPoint": {
     "description": "Tooltip of the button that jumps the audio editor playhead to the next segment edge"
   },
+  "audioEditorStepBack": "Step back",
+  "@audioEditorStepBack": {
+    "description": "Tooltip of the button that moves the audio editor playhead back by one small fixed step (0.1 s), the audio counterpart of stepping back one video frame"
+  },
+  "audioEditorStepForward": "Step forward",
+  "@audioEditorStepForward": {
+    "description": "Tooltip of the button that moves the audio editor playhead forward by one small fixed step (0.1 s), the audio counterpart of stepping forward one video frame"
+  },
   "audioEditorReencodeBanner": "{format} audio can't be copied as it is, so it will be re-encoded to AAC (.m4a) when you export.",
   "@audioEditorReencodeBanner": {
     "description": "Info banner in the audio editor for a format that can't be copied and will be re-encoded to AAC on export. {format} is the file extension in capitals, e.g. FLAC",
@@ -14345,6 +14361,14 @@
   "@floatingPlayerExpandTooltip": {
     "description": "Label of the button on the floating video window that reopens the video full screen"
   },
+  "floatingPlayerAudioOnly": "Audio only",
+  "@floatingPlayerAudioOnly": {
+    "description": "Label of the button on the floating video window that stops showing the video and carries on with just the sound"
+  },
+  "floatingPlayerShowVideo": "Show video",
+  "@floatingPlayerShowVideo": {
+    "description": "Label of the small chip that replaces the floating video window while it is audio only; tapping it brings the video back"
+  },
   "masterLockTitle": "Master Lock",
   "@masterLockTitle": {
     "description": "Settings section and toggle title for the app-wide lock (password, PIN or pattern)"
@@ -14388,5 +14412,258 @@
   "duressMasterLockRequired": "A master lock must be enabled in App Security before configuring duress unlock.",
   "@duressMasterLockRequired": {
     "description": "Notice shown when no master lock is set"
+  },
+  "skinTokenGroupSurface": "Surfaces",
+  "skinTokenGroupContent": "Text and icons",
+  "skinTokenGroupBorder": "Borders",
+  "skinTokenGroupChrome": "Top bar",
+  "skinTokenGroupAction": "Buttons",
+  "skinTokenGroupControl": "Switches and sliders",
+  "skinTokenGroupChoice": "Chips and segments",
+  "skinTokenGroupSelection": "Selected items",
+  "skinTokenGroupOverlay": "Menus, dialogs and sheets",
+  "skinTokenGroupFloating": "Floating elements",
+  "skinTokenSurfacePage": "Page background",
+  "skinTokenSurfacePageHint": "The canvas behind everything on this page.",
+  "skinTokenSurfaceCard": "Cards and rows",
+  "skinTokenSurfaceCardHint": "Cards, list rows and grouped panels.",
+  "skinTokenSurfaceCardActive": "Active card",
+  "skinTokenSurfaceCardActiveHint": "The highlighted card, such as an unlocked vault.",
+  "skinTokenSurfaceTile": "Tiles and thumbnails",
+  "skinTokenSurfaceTileHint": "Thumbnail placeholders, icon tiles and code blocks.",
+  "skinTokenSurfaceField": "Input fields",
+  "skinTokenSurfaceFieldHint": "Fill of text fields and search bars.",
+  "skinTokenContentPrimary": "Main text",
+  "skinTokenContentPrimaryHint": "Titles, names and body text.",
+  "skinTokenContentSecondary": "Secondary text",
+  "skinTokenContentSecondaryHint": "Subtitles, details and hints.",
+  "skinTokenContentIcon": "Icons",
+  "skinTokenContentIconHint": "Plain icons that are not on a button or bar.",
+  "skinTokenBorderDivider": "Dividers",
+  "skinTokenBorderDividerHint": "Thin lines between rows and sections.",
+  "skinTokenBorderOutline": "Outlines",
+  "skinTokenBorderOutlineHint": "Borders of outlined buttons and of unselected option boxes.",
+  "skinTokenBorderFocus": "Focus ring",
+  "skinTokenBorderFocusHint": "Border of the text field being edited.",
+  "skinTokenChromeTopBar": "Top bar",
+  "skinTokenChromeTopBarHint": "Fill of the top bar.",
+  "skinTokenChromeOnTopBar": "Top bar text and icons",
+  "skinTokenChromeOnTopBarHint": "Title and icon color on the top bar.",
+  "skinTokenActionPrimary": "Filled buttons",
+  "skinTokenActionPrimaryHint": "Fill of filled buttons.",
+  "skinTokenActionOnPrimary": "Filled button label",
+  "skinTokenActionOnPrimaryHint": "Label and icon on a filled button.",
+  "skinTokenActionTonal": "Raised buttons",
+  "skinTokenActionTonalHint": "Fill of raised and tonal buttons.",
+  "skinTokenActionOnTonal": "Raised button label",
+  "skinTokenActionOnTonalHint": "Label and icon on a raised button.",
+  "skinTokenActionText": "Text and outlined buttons",
+  "skinTokenActionTextHint": "Label color of text buttons, outlined buttons and links.",
+  "skinTokenControlActive": "Control on state",
+  "skinTokenControlActiveHint": "Switch track when on, selected checkbox and radio, slider and progress fill.",
+  "skinTokenControlOnActive": "Switch thumb and checkmark",
+  "skinTokenControlOnActiveHint": "Thumb of a switch that is on and the tick inside a checkbox.",
+  "skinTokenControlTrack": "Control track",
+  "skinTokenControlTrackHint": "Switch track when off and the empty part of sliders and progress bars.",
+  "skinTokenControlInactive": "Control off state",
+  "skinTokenControlInactiveHint": "Thumb of a switch that is off and borders of unchecked boxes.",
+  "skinTokenChoiceBackground": "Chip",
+  "skinTokenChoiceBackgroundHint": "Fill of unselected chips and segments.",
+  "skinTokenChoiceSelected": "Selected chip",
+  "skinTokenChoiceSelectedHint": "Fill of the selected chip or segment.",
+  "skinTokenChoiceOnSelected": "Selected chip label",
+  "skinTokenChoiceOnSelectedHint": "Label and icon on the selected chip or segment.",
+  "skinTokenChoiceBorder": "Chip border",
+  "skinTokenChoiceBorderHint": "Outline of chips and segmented buttons.",
+  "skinTokenSelectionFill": "Selected row",
+  "skinTokenSelectionFillHint": "Selected files and rows, and highlighted icon tiles.",
+  "skinTokenSelectionOn": "Selected row text and icons",
+  "skinTokenSelectionOnHint": "Text and icons drawn on a selected row.",
+  "skinTokenOverlayMenu": "Menus",
+  "skinTokenOverlayMenuHint": "Popup, dropdown and context menus.",
+  "skinTokenOverlayOnMenu": "Menu text",
+  "skinTokenOverlayOnMenuHint": "Text and icons in menus.",
+  "skinTokenOverlayDialog": "Dialogs",
+  "skinTokenOverlayDialogHint": "Fill of dialogs.",
+  "skinTokenOverlayOnDialog": "Dialog title",
+  "skinTokenOverlayOnDialogHint": "Title text of dialogs.",
+  "skinTokenOverlaySheet": "Bottom sheets",
+  "skinTokenOverlaySheetHint": "Fill of bottom sheets.",
+  "skinTokenOverlayOnSheet": "Bottom sheet text",
+  "skinTokenOverlayOnSheetHint": "Text and icons in bottom sheets.",
+  "skinTokenOverlayScrim": "Dim behind dialogs",
+  "skinTokenOverlayScrimHint": "The darkening behind dialogs and bottom sheets.",
+  "skinTokenFloatingFab": "Round add button",
+  "skinTokenFloatingFabHint": "Fill of the round add button.",
+  "skinTokenFloatingOnFab": "Round add button icon",
+  "skinTokenFloatingOnFabHint": "Icon on the round add button.",
+  "skinTokenFloatingToast": "Message pill",
+  "skinTokenFloatingToastHint": "Fill of the info message that pops up at the bottom.",
+  "skinTokenFloatingOnToast": "Message pill text",
+  "skinTokenFloatingOnToastHint": "Text and icon on the info message.",
+  "skinTokenFloatingTooltip": "Tooltips",
+  "skinTokenFloatingTooltipHint": "Fill of tooltips.",
+  "skinTokenFloatingOnTooltip": "Tooltip text",
+  "skinTokenFloatingOnTooltipHint": "Text in tooltips.",
+  "skinTokenGroupAccent": "Accent colors",
+  "skinTokenGroupStatus": "Status and errors",
+  "skinTokenSurfacePanel": "Panels",
+  "skinTokenSurfacePanelHint": "Cards made from the standard card widget, bookmark bar, grid cells and info sheets.",
+  "skinTokenChromeBar": "Bars and tab strips",
+  "skinTokenChromeBarHint": "Action bars, tab strips, selection bar and bottom bars.",
+  "skinTokenAccentPrimary": "Accent",
+  "skinTokenAccentPrimaryHint": "Highlights, links in text, small accent icons and badges.",
+  "skinTokenAccentSecondary": "Secondary accent",
+  "skinTokenAccentSecondaryHint": "Secondary highlights and tags.",
+  "skinTokenAccentTertiary": "Tertiary accent",
+  "skinTokenAccentTertiaryHint": "Tertiary highlights and tags.",
+  "skinTokenAccentTertiaryContainer": "Tertiary accent fill",
+  "skinTokenAccentTertiaryContainerHint": "Fill behind tertiary highlights.",
+  "skinTokenAccentOnTertiaryContainer": "Tertiary accent fill text",
+  "skinTokenAccentOnTertiaryContainerHint": "Text and icons on the tertiary fill.",
+  "skinTokenStatusDanger": "Errors and delete",
+  "skinTokenStatusDangerHint": "Error text, delete actions and error borders.",
+  "skinTokenStatusOnDanger": "Text on error color",
+  "skinTokenStatusOnDangerHint": "Text and icons drawn on the error color.",
+  "skinTokenStatusDangerContainer": "Error message fill",
+  "skinTokenStatusDangerContainerHint": "Fill of error messages and banners.",
+  "skinTokenStatusOnDangerContainer": "Error message text",
+  "skinTokenStatusOnDangerContainerHint": "Text and icons in error messages.",
+  "skinTokenStatusInfo": "Info message fill",
+  "skinTokenStatusInfoHint": "Fill of info banners.",
+  "skinTokenStatusOnInfo": "Info message text",
+  "skinTokenStatusOnInfoHint": "Text and icons in info banners.",
+  "bookReaderOpenFailed": "Couldn't open this book",
+  "@bookReaderOpenFailed": {
+    "description": "Error shown when a comic or e-book file cannot be opened"
+  },
+  "comicNoPages": "No images found in this comic",
+  "@comicNoPages": {
+    "description": "Error shown when a comic archive contains no images"
+  },
+  "comicPageLoadFailed": "Couldn't load this page",
+  "@comicPageLoadFailed": {
+    "description": "Shown in place of a comic page that could not be read from the archive"
+  },
+  "comicReadingDirectionRtl": "Reading right to left",
+  "@comicReadingDirectionRtl": {
+    "description": "Tooltip of the comic reader's reading-direction button while reading right to left (manga)"
+  },
+  "comicReadingDirectionLtr": "Reading left to right",
+  "@comicReadingDirectionLtr": {
+    "description": "Tooltip of the comic reader's reading-direction button while reading left to right"
+  },
+  "epubTextSize": "Text size",
+  "@epubTextSize": {
+    "description": "Label and tooltip for the e-book reader's text size and theme settings"
+  },
+  "epubThemeOriginal": "Original",
+  "@epubThemeOriginal": {
+    "description": "E-book reading theme that keeps the book's own colours"
+  },
+  "epubChapterFallbackTitle": "Chapter {number}",
+  "@epubChapterFallbackTitle": {
+    "description": "Contents entry for a chapter when the book has no table of contents",
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "bookReaderSettingsTitle": "Reader settings",
+  "@bookReaderSettingsTitle": {
+    "description": "Title of the EPUB reader appearance and reading settings sheet"
+  },
+  "bookReaderPageSection": "Page",
+  "@bookReaderPageSection": {
+    "description": "Section heading for page layout options in the EPUB reader settings"
+  },
+  "bookReaderTextSection": "Text",
+  "@bookReaderTextSection": {
+    "description": "Section heading for text appearance options in the EPUB reader settings"
+  },
+  "bookReaderReadingModeTitle": "Reading mode",
+  "@bookReaderReadingModeTitle": {
+    "description": "Label for the comic reader setting that selects single, spread, or continuous pages"
+  },
+  "bookReaderPageFlippingLabel": "Page flipping",
+  "@bookReaderPageFlippingLabel": {
+    "description": "Label for the EPUB page flipping direction or scrolling mode setting"
+  },
+  "bookReaderColorModeLabel": "Color mode",
+  "@bookReaderColorModeLabel": {
+    "description": "Label for choosing the EPUB reader color theme"
+  },
+  "bookReaderTextDirectionLabel": "Text direction",
+  "@bookReaderTextDirectionLabel": {
+    "description": "Label for choosing left-to-right or right-to-left reading direction in book readers"
+  },
+  "bookReaderTwoPageLandscapeLabel": "Two pages in landscape",
+  "@bookReaderTwoPageLandscapeLabel": {
+    "description": "Switch label to show two book pages side by side in landscape orientation"
+  },
+  "bookReaderPageMarginsLabel": "Page margins",
+  "@bookReaderPageMarginsLabel": {
+    "description": "Switch label for enabling margins around reflowable EPUB pages"
+  },
+  "bookReaderFontFaceLabel": "Font face",
+  "@bookReaderFontFaceLabel": {
+    "description": "Label for the font family selector in EPUB reader settings"
+  },
+  "bookReaderFontPublisherDefault": "Publisher default",
+  "@bookReaderFontPublisherDefault": {
+    "description": "Font and alignment option that preserves the publisher setting"
+  },
+  "bookReaderFontSerif": "Serif",
+  "@bookReaderFontSerif": {
+    "description": "Font family option with serifs in EPUB reader settings"
+  },
+  "bookReaderFontSansSerif": "Sans serif",
+  "@bookReaderFontSansSerif": {
+    "description": "Font family option without serifs in EPUB reader settings"
+  },
+  "bookReaderFontMonospace": "Monospace",
+  "@bookReaderFontMonospace": {
+    "description": "Fixed-width font family option in EPUB reader settings"
+  },
+  "bookReaderFontWeightLabel": "Font thickness",
+  "@bookReaderFontWeightLabel": {
+    "description": "Label for the font weight slider in EPUB reader settings"
+  },
+  "bookReaderLineSpacingLabel": "Line spacing",
+  "@bookReaderLineSpacingLabel": {
+    "description": "Label for the line spacing slider in EPUB reader settings"
+  },
+  "bookReaderTextAlignmentLabel": "Text alignment",
+  "@bookReaderTextAlignmentLabel": {
+    "description": "Label for the text alignment selector in EPUB reader settings"
+  },
+  "bookReaderTextAlignLeft": "Left",
+  "@bookReaderTextAlignLeft": {
+    "description": "Text alignment option aligned to the left"
+  },
+  "bookReaderTextAlignJustified": "Justified",
+  "@bookReaderTextAlignJustified": {
+    "description": "Text alignment option that aligns text to both edges"
+  },
+  "bookReaderTextAlignCenter": "Center",
+  "@bookReaderTextAlignCenter": {
+    "description": "Text alignment option centered on the page"
+  },
+  "bookReaderTextAlignRight": "Right",
+  "@bookReaderTextAlignRight": {
+    "description": "Text alignment option aligned to the right"
+  },
+  "comicReaderModeSinglePage": "Single page",
+  "@comicReaderModeSinglePage": {
+    "description": "Comic reading mode showing one page at a time"
+  },
+  "comicReaderModeTwoPageSpread": "Two-page spread",
+  "@comicReaderModeTwoPageSpread": {
+    "description": "Comic reading mode showing two pages side by side"
+  },
+  "comicReaderCarouselScrubberSubtitle": "Show page thumbnails above the scrubber",
+  "@comicReaderCarouselScrubberSubtitle": {
+    "description": "Subtitle for the comic reader switch that shows the page thumbnail carousel"
   }
 }

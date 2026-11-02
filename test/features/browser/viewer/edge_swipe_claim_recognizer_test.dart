@@ -69,22 +69,39 @@ void main() {
   const dragUp = Offset(0, -120);
 
   group('edgeSwipeClaimsMovement', () {
+    // The default slop is Flutter's fallback of 18 px, so a claim needs 13.5 px
+    // of vertical travel (0.75 of a slop).
     test('a clearly vertical drag is claimed once it has travelled far enough',
         () {
-      expect(edgeSwipeClaimsMovement(const Offset(0, 12)), isTrue);
-      expect(edgeSwipeClaimsMovement(const Offset(4, -14)), isTrue);
+      expect(edgeSwipeClaimsMovement(const Offset(0, 14)), isTrue);
+      expect(edgeSwipeClaimsMovement(const Offset(4, -15)), isTrue);
       expect(edgeSwipeClaimsMovement(const Offset(-8, 60)), isTrue);
     });
 
     test('a drag that has not travelled far enough yet is not claimed', () {
       expect(edgeSwipeClaimsMovement(Offset.zero), isFalse);
-      expect(edgeSwipeClaimsMovement(const Offset(0, 11.9)), isFalse);
+      expect(edgeSwipeClaimsMovement(const Offset(0, 13.4)), isFalse);
+    });
+
+    test('the travel needed follows the device touch slop', () {
+      // Android reports a slop of about 8 px, so the claim comes at 6 px,
+      // still before a vertical scrollable's own 8 px.
+      expect(edgeSwipeClaimsMovement(const Offset(0, 6), touchSlop: 8), isTrue);
+      expect(
+        edgeSwipeClaimsMovement(const Offset(0, 5.9), touchSlop: 8),
+        isFalse,
+      );
+      expect(edgeSwipeClaimsMovement(const Offset(0, 6)), isFalse);
     });
 
     test('a diagonal or curved start is left to the swipe', () {
-      expect(edgeSwipeClaimsMovement(const Offset(-12, 12)), isFalse);
+      expect(edgeSwipeClaimsMovement(const Offset(-14, 14)), isFalse);
       expect(edgeSwipeClaimsMovement(const Offset(-14, 24)), isFalse);
       expect(edgeSwipeClaimsMovement(const Offset(-30, 20)), isFalse);
+      expect(
+        edgeSwipeClaimsMovement(const Offset(-5, 7), touchSlop: 8),
+        isFalse,
+      );
     });
 
     test('a horizontal movement is never claimed', () {

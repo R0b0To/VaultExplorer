@@ -1,3 +1,4 @@
+#include <cerrno>
 #include <cstring>
 #include <cstdlib>
 #include <memory>
@@ -410,12 +411,16 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
             });
         }
 
-        if (!physicalWrite(pdrv, startByte, encBuf, totalBytes)) return RES_ERROR;
+        const bool wrote = physicalWrite(pdrv, startByte, encBuf, totalBytes);
 
+        // Invalidate even when the write failed: a failure can land after
+        // part of the range reached the container, and a cached plaintext
+        // block for it would then keep being served in place of the disk.
         {
             std::lock_guard<std::mutex> cacheLock(v.decryptedBlockCacheMutex);
             v.decryptedBlockCache.invalidateRange(startByte, totalBytes);
         }
+        if (!wrote) return RES_ERROR;
     }
     return RES_OK;
 }
@@ -432,8 +437,21 @@ extern "C" DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void* buff) {
             } else if (v.isCompositeSource && v.composite) {
                 v.composite->sync();
             } else if (v.fd >= 0) {
-                v.fdWriteBuffer.flush(v.fd);
+                // FatFs calls CTRL_SYNC from f_sync/f_close and trusts the
+                // result to mean "everything written so far is durable".
+                // A failed write-behind flush has to surface here, otherwise
+                // the file is reported closed OK while its data/size never
+                // reached the container (zero-byte or truncated files).
+                // fsync stays best-effort: some fd types reject it with
+                // EINVAL, which says nothing about the data.
+                const bool flushed = v.fdWriteBuffer.flush(v.fd);
+                const int flushErrno = errno;  // before fsync can overwrite it
                 fsync(v.fd);
+                if (!flushed) {
+                    LOGI("disk_ioctl(CTRL_SYNC): write-behind flush failed on volume %d (errno=%d)",
+                         static_cast<int>(pdrv), flushErrno);
+                    return RES_ERROR;
+                }
             }
             return RES_OK;
         case GET_SECTOR_COUNT:

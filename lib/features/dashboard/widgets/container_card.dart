@@ -268,7 +268,7 @@ class ContainerCard extends StatelessWidget {
       ),
       backgroundColor: SkinAreaScope.colorOf(
         context,
-        SkinToken.cardActive,
+        SkinToken.surfaceCardActive,
         fallback: cardBg,
       ),
       borderRadius: borderRadius,

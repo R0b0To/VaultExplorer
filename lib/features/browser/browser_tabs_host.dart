@@ -21,6 +21,7 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_search_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_chrome_hub.dart';
+import 'package:vaultexplorer/features/browser/controllers/browser_drag_session.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
 import 'package:vaultexplorer/features/browser/models/browser_viewport_options.dart';
 import 'package:vaultexplorer/features/browser/models/tab_id.dart';
@@ -42,7 +43,10 @@ import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_co
 String browserTabDuplicatePath(FileBrowserNavigationState nav) {
   final archive = nav.archiveContext;
   if (archive != null) {
-    final idx = archive.pathStackEntryIndex - 1;
+    // For an archive opened from inside another archive, the folder to use
+    // is the one that holds the outermost archive; the nested ones only exist
+    // as virtual paths.
+    final idx = archive.outermost.pathStackEntryIndex - 1;
     if (idx >= 0 && idx < nav.pathStack.length) {
       return nav.pathStack[idx].fatPath;
     }
@@ -1353,14 +1357,18 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       onNewTab: widget.onNewTab ?? _openNewTabSheet,
       onDuplicate: widget.onDuplicate ?? _duplicate,
     );
-    Widget paneStrip(TabPane pane) => BrowserTabStrip(
-      key: ValueKey<TabPane>(pane),
-      workspaceConfig: _workspace,
-      onNewTab: widget.onNewTab ?? _openNewTabSheet,
-      onDuplicate: widget.onDuplicate ?? _duplicate,
+    Widget paneStrip(TabPane pane) => _DragLockedStrip(
       pane: pane,
-      paneBounds: _paneBounds,
-      onDragOverPane: (over) => _dropPane.value = over,
+      workspaceConfig: _workspace,
+      child: BrowserTabStrip(
+        key: ValueKey<TabPane>(pane),
+        workspaceConfig: _workspace,
+        onNewTab: widget.onNewTab ?? _openNewTabSheet,
+        onDuplicate: widget.onDuplicate ?? _duplicate,
+        pane: pane,
+        paneBounds: _paneBounds,
+        onDragOverPane: (over) => _dropPane.value = over,
+      ),
     );
     final drawer = activeTab == null
         ? null
@@ -1745,6 +1753,43 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
 /// The top app bar stays in the normal auto-hiding layout slot. A selection
 /// bar overlays it separately, so showing selection actions never changes the
 /// viewport's layout.
+/// Freezes a pane's tab strip while a drag of file items that started in the
+/// other pane is in progress: that pane is only a drop target until the drag
+/// ends (its folder view applies the same lock to its own content).
+class _DragLockedStrip extends ConsumerWidget {
+  const _DragLockedStrip({
+    required this.pane,
+    required this.workspaceConfig,
+    required this.child,
+  });
+
+  final TabPane pane;
+  final BrowserTabsConfig workspaceConfig;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sourceTabId = ref.watch(
+      browserDragSessionProvider.select((session) => session.sourceTabId),
+    );
+    TabPane? sourcePane;
+    if (sourceTabId != null) {
+      sourcePane = ref.watch(
+        browserTabsProvider(workspaceConfig).select((state) {
+          for (final tab in state.tabs) {
+            if (tab.tabId == sourceTabId) return tab.pane;
+          }
+          return null;
+        }),
+      );
+    }
+    return IgnorePointer(
+      ignoring: sourcePane != null && sourcePane != pane,
+      child: child,
+    );
+  }
+}
+
 class _TopAppBarSlot extends ConsumerWidget {
   const _TopAppBarSlot({
     required this.workspaceConfig,
@@ -2039,7 +2084,22 @@ class _BrowserTabPageState extends State<_BrowserTabPage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return TickerMode(enabled: _onScreen, child: widget.child);
+    return TickerMode(
+      enabled: _onScreen,
+      // Every page is its own ink surface. Tiles paint their selection
+      // highlight (and ripples) with Ink/InkWell, and those draw on the
+      // nearest Material ancestor rather than on the tile itself. Without a
+      // Material in here that is the shell's Scaffold, which sits *outside*
+      // the pager: the page's content is clipped to its pane while it slides,
+      // but the highlight is not, so a selected row bled across the divider
+      // into the other pane. A clipping Material keeps the ink inside the page
+      // and moves/clips it with the page.
+      child: Material(
+        type: MaterialType.transparency,
+        clipBehavior: Clip.hardEdge,
+        child: widget.child,
+      ),
+    );
   }
 }
 

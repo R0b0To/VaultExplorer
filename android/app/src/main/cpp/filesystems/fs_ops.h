@@ -30,7 +30,10 @@
 #include "copy_progress_callback.h"
 
 // ── Directory listing ──────────────────────────────────────────────────
-void fsListDirectory(int volId, const std::string& pathSuffix,
+// Returns false when the listing failed and outResults can't be trusted (so an
+// unreadable folder isn't mistaken for an empty one). Only the FAT backend
+// reports failures today; NTFS/ext always return true.
+bool fsListDirectory(int volId, const std::string& pathSuffix,
                       std::vector<std::string>& outResults);
 
 // ── Size queries ───────────────────────────────────────────────────────

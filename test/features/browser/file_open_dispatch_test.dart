@@ -225,4 +225,41 @@ void main() {
     });
   });
 
- }
+ 
+  group('decideFileOpenAction — comic and e-book readers', () {
+    FileOpenAction decide(String ext, {String? pref, bool local = false}) =>
+        decideFileOpenAction(
+          ext: ext,
+          extensionPreference: pref,
+          needsSystemAppForLocal: local,
+          isSupportedMedia: false,
+        );
+
+    test('.epub opens in the e-book reader', () {
+      expect(decide('epub'), isA<OpenInEpubReader>());
+    });
+
+    test('.cbz and its siblings open in the comic reader', () {
+      for (final ext in ['cbz', 'cbr', 'cb7', 'cbt']) {
+        expect(decide(ext), isA<OpenInComicReader>(), reason: ext);
+      }
+    });
+
+    test('saved preferences select the readers for any extension', () {
+      expect(decide('zip', pref: 'comic'), isA<OpenInComicReader>());
+      expect(decide('txt', pref: 'epub'), isA<OpenInEpubReader>());
+    });
+
+    test('a saved external-app choice still beats the built-in reader', () {
+      expect(decide('epub', pref: 'external'), isA<OpenWithSystemApp>());
+      expect(
+        decide('cbz', pref: 'package:org.example.reader'),
+        isA<OpenWithSystemApp>(),
+      );
+    });
+
+    test('needsSystemAppForLocal still short-circuits (the caller only sets it for html)', () {
+      expect(decide('epub', local: true), isA<OpenWithSystemApp>());
+    });
+  });
+}

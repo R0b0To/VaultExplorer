@@ -162,6 +162,14 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
   final bool mediaSession;
   double _currentSpeed;
   int _currentVolume = 100;
+  bool _audioOnly = false;
+
+  // What was last asked of the player: false until anything is, so a player
+  // that has not been started yet counts as one that is about to be.
+  bool _pauseRequested = false;
+  // play() asked for before the native player exists (see playWhenReady).
+  bool _playOnInit = false;
+  bool _initFinished = false;
   MediaDecoderMode _videoDecoderMode;
   MediaDecoderMode _audioDecoderMode;
   bool _volumeBoostEnabled;
@@ -212,6 +220,7 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
 
   Future<void> initialize() async {
     if (_disposed) return;
+    _initFinished = false;
     PlaybackThrottleController.setInitializing();
     value = value.copyWith(
       isInitialized: false,
@@ -289,7 +298,18 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
         // session playing at full volume once the player actually starts.
       }
     }
-    if (autoPlay && !_disposed) {
+    if (_audioOnly) {
+      try {
+        await setAudioOnly(true);
+      } catch (_) {
+        // Non-fatal: the video is decoded for a moment longer than asked.
+      }
+    }
+    // Decided and recorded in one go, so a playWhenReady() that comes in from
+    // here on plays at once instead of waiting for an initialize that is over.
+    final startNow = (autoPlay || _playOnInit) && !_disposed;
+    _initFinished = true;
+    if (startNow) {
       await play();
     }
   }
@@ -406,14 +426,37 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
   }
 
   Future<void> play() async {
+    _pauseRequested = false;
     if (!_disposed) {
       await _cmdChannel.invokeMethod('play');
     }
   }
 
   Future<void> pause() async {
+    _pauseRequested = true;
     if (!_disposed) {
       await _cmdChannel.invokeMethod('pause');
+    }
+  }
+
+  /// Whether the last thing asked of the player was to pause it. False for a
+  /// player nobody has started yet: the viewer opens it with auto-play off and
+  /// starts it once the saved position has been looked up, and a player in
+  /// that stretch is about to play, not paused.
+  bool get pauseRequested => _pauseRequested;
+
+  /// Plays as soon as the player can: at once if it is initialized, otherwise
+  /// right after it is. A [play] sent before the native player exists would be
+  /// dropped, which is why this exists: whoever takes over a player that was
+  /// still starting up uses it, because the code that would have started it
+  /// (the viewer's) is gone.
+  Future<void> playWhenReady() async {
+    if (_disposed) return;
+    if (_initFinished) {
+      await play();
+    } else {
+      _pauseRequested = false;
+      _playOnInit = true;
     }
   }
 
@@ -434,6 +477,19 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
     if (!_disposed) {
       final double normalized = (vol / 100.0).clamp(0.0, 1.0);
       await _cmdChannel.invokeMethod('setVolume', {'volume': normalized});
+    }
+  }
+
+  /// Stops decoding (and drawing) the video while the sound carries on, or
+  /// starts again with `false`. Recorded before the native call, like
+  /// [setVolume], and applied again once the native player exists: the
+  /// platform forgets it whenever a player is released, so it never outlives
+  /// the item it was set on, and a call that arrives before the player does
+  /// still takes effect.
+  Future<void> setAudioOnly(bool enabled) async {
+    _audioOnly = enabled;
+    if (!_disposed) {
+      await _cmdChannel.invokeMethod('setAudioOnly', {'enabled': enabled});
     }
   }
 

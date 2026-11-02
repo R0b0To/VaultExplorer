@@ -85,6 +85,17 @@ struct VolumeState {
     std::mutex ioBufMutex;
     std::vector<FIL*> openStreams;
 
+    // FatFs bookkeeping for filesystems/fat_backend.cpp. Both are only
+    // touched while `mutex` is held.
+    //  - fatActiveFiles: FIL objects a copy/extract/write-back keeps open
+    //    across its lock-yield windows. While non-zero, nothing may
+    //    remount the volume: f_mount() invalidates every open FIL.
+    //  - fatNeedsRemount: an I/O-class FatFs error was seen, so the
+    //    in-memory FATFS state (window, free-cluster counters) can't be
+    //    trusted; it is rebuilt once the volume is idle.
+    int fatActiveFiles = 0;
+    bool fatNeedsRemount = false;
+
     DecryptedBlockCache decryptedBlockCache;
     std::mutex decryptedBlockCacheMutex;
 

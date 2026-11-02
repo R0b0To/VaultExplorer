@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/api/vault_book_api.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
@@ -25,6 +26,7 @@ import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/widgets/apk_icon_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/archive_thumbnail_support.dart';
+import 'package:vaultexplorer/features/browser/widgets/book_cover_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_item_drag.dart';
 import 'package:vaultexplorer/features/browser/widgets/fast_scrollbar.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_thumbnail_preview.dart';
@@ -518,6 +520,7 @@ class _FileGridViewState extends State<FileGridView>
     final isVid =
         MediaViewerConstants.isVideo(cleanName) && !entry.isPlaceholder;
     final isApk = isApkFile(cleanName) && !entry.isPlaceholder;
+    final isBook = isBookWithCover(cleanName) && !entry.isPlaceholder;
     final hasRealThumbnail = MediaViewerConstants.hasRealThumbnail(
       cleanName,
       insideArchive: widget.archiveContext != null,
@@ -585,6 +588,18 @@ class _FileGridViewState extends State<FileGridView>
             fallbackIconSize: iconSize,
           ),
         ),
+      );
+    } else if (isBook && widget.archiveContext == null) {
+      // Same restriction as the APK above: a book nested inside an open
+      // archive has no container/local path for the native side to open.
+      previewWidget = _BookCoverGridThumb(
+        container: widget.container,
+        filePath: fullPath,
+        cacheMode: widget.thumbnailCacheMode,
+        quality: _effectiveQuality,
+        fallbackIcon: skin.fileIcon(cleanName),
+        fallbackColor: skin.fileIconColor(cs, cleanName),
+        fallbackIconSize: iconSize,
       );
     } else {
       previewWidget = Center(
@@ -966,6 +981,75 @@ class _ApkIconGridThumb extends ConsumerWidget {
           ),
         ),
       ),
+      errorBuilder: (context) => _fallbackWidget(),
+    );
+  }
+
+  Widget _fallbackWidget() => Center(
+    child: Icon(fallbackIcon, size: fallbackIconSize, color: fallbackColor),
+  );
+}
+
+/// A book's cover as its grid tile, in place of the generic file-type icon.
+///
+/// Whatever has no cover to show -- an EPUB that names none, a "comic" that is
+/// really a RAR -- keeps exactly that icon, so loading and failure both draw
+/// the icon rather than a spinner or a broken-image glyph: most failures are
+/// permanent, and a tile that spun and then switched to an icon would flicker
+/// for every such book.
+class _BookCoverGridThumb extends ConsumerWidget {
+  final MountedContainer container;
+  final String filePath;
+  final ThumbnailCacheMode cacheMode;
+  final ThumbnailQuality quality;
+
+  final IconData fallbackIcon;
+  final Color fallbackColor;
+  final double fallbackIconSize;
+
+  const _BookCoverGridThumb({
+    required this.container,
+    required this.filePath,
+    required this.cacheMode,
+    required this.quality,
+    required this.fallbackIcon,
+    required this.fallbackColor,
+    required this.fallbackIconSize,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
+    final bookApi = ref.read(vaultBookApiProvider);
+
+    return AsyncThumbnail(
+      key: ValueKey('book:$filePath'),
+      container: container,
+      filePath: filePath,
+      cache: ThumbnailConcurrency.inFlightThumbnails,
+      limiter: ThumbnailConcurrency.imageLimiter,
+      quality: quality,
+      fetchFn: (c, p) async => (await loadBookCoverThumbnail(
+        thumbnailCache: thumbnailCache,
+        bookApi: bookApi,
+        container: c,
+        path: p,
+        mode: cacheMode,
+        quality: quality,
+      )).bytes,
+      debounce: const Duration(milliseconds: 100),
+      syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
+      cacheHeight: quality.scaledSize(180),
+      // Covers are portrait and the cell is usually squarer: anchor to the top,
+      // where the title is, so a crop trims the bottom rather than the middle.
+      imageBuilder: (context, bytes, cacheHeight) => Image.memory(
+        bytes,
+        fit: BoxFit.cover,
+        alignment: Alignment.topCenter,
+        cacheHeight: cacheHeight,
+        errorBuilder: (_, _, _) => _fallbackWidget(),
+      ),
+      loadingBuilder: (context) => _fallbackWidget(),
       errorBuilder: (context) => _fallbackWidget(),
     );
   }

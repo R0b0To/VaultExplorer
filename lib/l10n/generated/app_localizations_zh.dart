@@ -5535,6 +5535,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vaultSyncComparingLabel => '正在比较保险库…';
 
   @override
+  String get vaultSyncScanFailedTitle => '无法读取文件夹';
+
+  @override
+  String get vaultSyncScanFailedMessage =>
+      '无法读取保险库中的某个文件夹，因此已停止比较，而不是猜测。未做任何更改。请锁定并重新解锁保险库，然后再次比较。';
+
+  @override
   String vaultSyncCompareStatsLabel(Object dirs, Object entries) {
     return '已扫描文件夹：$dirs | 发现差异：$entries';
   }
@@ -10549,6 +10556,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get audioEditorNextCutPoint => '下一个剪辑点';
 
   @override
+  String get audioEditorStepBack => '后退一步';
+
+  @override
+  String get audioEditorStepForward => '前进一步';
+
+  @override
   String audioEditorReencodeBanner(String format) {
     return '$format 音频无法按原样复制，导出时将重新编码为 AAC (.m4a)。';
   }
@@ -11816,6 +11829,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get floatingPlayerExpandTooltip => '展开';
 
   @override
+  String get floatingPlayerAudioOnly => '仅音频';
+
+  @override
+  String get floatingPlayerShowVideo => '显示视频';
+
+  @override
   String get masterLockTitle => '主锁';
 
   @override
@@ -11847,4 +11866,462 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get duressMasterLockRequired => '配置胁迫解锁前，必须在安全设置中启用主锁。';
+
+  @override
+  String get skinTokenGroupSurface => '表面';
+
+  @override
+  String get skinTokenGroupContent => '文本与图标';
+
+  @override
+  String get skinTokenGroupBorder => '边框';
+
+  @override
+  String get skinTokenGroupChrome => '顶栏';
+
+  @override
+  String get skinTokenGroupAction => '按钮';
+
+  @override
+  String get skinTokenGroupControl => '开关与滑块';
+
+  @override
+  String get skinTokenGroupChoice => '标签与分段';
+
+  @override
+  String get skinTokenGroupSelection => '选中项';
+
+  @override
+  String get skinTokenGroupOverlay => '菜单、对话框与底栏';
+
+  @override
+  String get skinTokenGroupFloating => '浮动元素';
+
+  @override
+  String get skinTokenSurfacePage => '页面背景';
+
+  @override
+  String get skinTokenSurfacePageHint => '本页面所有内容背后的画布。';
+
+  @override
+  String get skinTokenSurfaceCard => '卡片与行';
+
+  @override
+  String get skinTokenSurfaceCardHint => '卡片、列表行和分组面板。';
+
+  @override
+  String get skinTokenSurfaceCardActive => '活动卡片';
+
+  @override
+  String get skinTokenSurfaceCardActiveHint => '高亮显示的卡片，如已解锁的保管库。';
+
+  @override
+  String get skinTokenSurfaceTile => '磁贴与缩略图';
+
+  @override
+  String get skinTokenSurfaceTileHint => '缩略图占位符、图标磁贴和代码块。';
+
+  @override
+  String get skinTokenSurfaceField => '输入框';
+
+  @override
+  String get skinTokenSurfaceFieldHint => '文本输入框和搜索栏的填充色。';
+
+  @override
+  String get skinTokenContentPrimary => '主要文本';
+
+  @override
+  String get skinTokenContentPrimaryHint => '标题、名称和正文。';
+
+  @override
+  String get skinTokenContentSecondary => '次要文本';
+
+  @override
+  String get skinTokenContentSecondaryHint => '副标题、详情和提示。';
+
+  @override
+  String get skinTokenContentIcon => '图标';
+
+  @override
+  String get skinTokenContentIconHint => '不在按钮或栏上的普通图标。';
+
+  @override
+  String get skinTokenBorderDivider => '分割线';
+
+  @override
+  String get skinTokenBorderDividerHint => '行与部分之间的细线。';
+
+  @override
+  String get skinTokenBorderOutline => '轮廓';
+
+  @override
+  String get skinTokenBorderOutlineHint => '轮廓按钮和未选中文本框的边框。';
+
+  @override
+  String get skinTokenBorderFocus => '聚焦环';
+
+  @override
+  String get skinTokenBorderFocusHint => '正在编辑的文本框边框。';
+
+  @override
+  String get skinTokenChromeTopBar => '顶栏';
+
+  @override
+  String get skinTokenChromeTopBarHint => '顶栏的填充色。';
+
+  @override
+  String get skinTokenChromeOnTopBar => '顶栏文本与图标';
+
+  @override
+  String get skinTokenChromeOnTopBarHint => '顶栏上的标题与图标颜色。';
+
+  @override
+  String get skinTokenActionPrimary => '填充按钮';
+
+  @override
+  String get skinTokenActionPrimaryHint => '填充按钮的背景色。';
+
+  @override
+  String get skinTokenActionOnPrimary => '填充按钮标签';
+
+  @override
+  String get skinTokenActionOnPrimaryHint => '填充按钮上的文本和图标。';
+
+  @override
+  String get skinTokenActionTonal => '突起按钮';
+
+  @override
+  String get skinTokenActionTonalHint => '突起和色调按钮的填充色。';
+
+  @override
+  String get skinTokenActionOnTonal => '突起按钮标签';
+
+  @override
+  String get skinTokenActionOnTonalHint => '突起按钮上的文本和图标。';
+
+  @override
+  String get skinTokenActionText => '文本与轮廓按钮';
+
+  @override
+  String get skinTokenActionTextHint => '文本按钮、轮廓按钮和链接的文字颜色。';
+
+  @override
+  String get skinTokenControlActive => '控件开启状态';
+
+  @override
+  String get skinTokenControlActiveHint => '开启时的开关滑轨、选中的复选框与单选框、滑块与进度条填充色。';
+
+  @override
+  String get skinTokenControlOnActive => '开关滑块与对勾';
+
+  @override
+  String get skinTokenControlOnActiveHint => '开启状态的开关滑块以及复选框内的勾选标记。';
+
+  @override
+  String get skinTokenControlTrack => '控件滑轨';
+
+  @override
+  String get skinTokenControlTrackHint => '关闭时的开关滑轨以及滑块和进度条的未填充部分。';
+
+  @override
+  String get skinTokenControlInactive => '控件关闭状态';
+
+  @override
+  String get skinTokenControlInactiveHint => '关闭状态的开关滑块以及未勾选框的边框。';
+
+  @override
+  String get skinTokenChoiceBackground => '标签';
+
+  @override
+  String get skinTokenChoiceBackgroundHint => '未选中的标签和分段的填充色。';
+
+  @override
+  String get skinTokenChoiceSelected => '选中标签';
+
+  @override
+  String get skinTokenChoiceSelectedHint => '选中的标签或分段的填充色。';
+
+  @override
+  String get skinTokenChoiceOnSelected => '选中标签文本';
+
+  @override
+  String get skinTokenChoiceOnSelectedHint => '选中的标签或分段上的文本与图标。';
+
+  @override
+  String get skinTokenChoiceBorder => '标签边框';
+
+  @override
+  String get skinTokenChoiceBorderHint => '标签和分段按钮的轮廓。';
+
+  @override
+  String get skinTokenSelectionFill => '选中行';
+
+  @override
+  String get skinTokenSelectionFillHint => '选中的文件和行，以及高亮的图标磁贴。';
+
+  @override
+  String get skinTokenSelectionOn => '选中行文本与图标';
+
+  @override
+  String get skinTokenSelectionOnHint => '选中行上绘制的文本与图标。';
+
+  @override
+  String get skinTokenOverlayMenu => '菜单';
+
+  @override
+  String get skinTokenOverlayMenuHint => '弹窗菜单、下拉菜单和上下文菜单。';
+
+  @override
+  String get skinTokenOverlayOnMenu => '菜单文本';
+
+  @override
+  String get skinTokenOverlayOnMenuHint => '菜单中的文本与图标。';
+
+  @override
+  String get skinTokenOverlayDialog => '对话框';
+
+  @override
+  String get skinTokenOverlayDialogHint => '对话框的填充色。';
+
+  @override
+  String get skinTokenOverlayOnDialog => '对话框标题';
+
+  @override
+  String get skinTokenOverlayOnDialogHint => '对话框的标题文本。';
+
+  @override
+  String get skinTokenOverlaySheet => '底部工作表';
+
+  @override
+  String get skinTokenOverlaySheetHint => '底部工作表的填充色。';
+
+  @override
+  String get skinTokenOverlayOnSheet => '底部工作表文本';
+
+  @override
+  String get skinTokenOverlayOnSheetHint => '底部工作表中的文本与图标。';
+
+  @override
+  String get skinTokenOverlayScrim => '对话框背景遮罩';
+
+  @override
+  String get skinTokenOverlayScrimHint => '对话框和底部工作表背后的变暗遮罩。';
+
+  @override
+  String get skinTokenFloatingFab => '圆形添加按钮';
+
+  @override
+  String get skinTokenFloatingFabHint => '圆形添加按钮的填充色。';
+
+  @override
+  String get skinTokenFloatingOnFab => '圆形添加按钮图标';
+
+  @override
+  String get skinTokenFloatingOnFabHint => '圆形添加按钮上的图标。';
+
+  @override
+  String get skinTokenFloatingToast => '提示条';
+
+  @override
+  String get skinTokenFloatingToastHint => '底部弹出的信息提示条的填充色。';
+
+  @override
+  String get skinTokenFloatingOnToast => '提示条文本';
+
+  @override
+  String get skinTokenFloatingOnToastHint => '信息提示条上的文本与图标。';
+
+  @override
+  String get skinTokenFloatingTooltip => '工具提示';
+
+  @override
+  String get skinTokenFloatingTooltipHint => '工具提示的填充色。';
+
+  @override
+  String get skinTokenFloatingOnTooltip => '工具提示文本';
+
+  @override
+  String get skinTokenFloatingOnTooltipHint => '工具提示中的文本。';
+
+  @override
+  String get skinTokenGroupAccent => '强调色';
+
+  @override
+  String get skinTokenGroupStatus => '状态与错误';
+
+  @override
+  String get skinTokenSurfacePanel => '面板';
+
+  @override
+  String get skinTokenSurfacePanelHint => '由标准卡片小部件制成的卡片、书签栏、网格单元格和信息表。';
+
+  @override
+  String get skinTokenChromeBar => '栏与标签条';
+
+  @override
+  String get skinTokenChromeBarHint => '操作栏、标签条、选择栏和底部栏。';
+
+  @override
+  String get skinTokenAccentPrimary => '强调';
+
+  @override
+  String get skinTokenAccentPrimaryHint => '高亮、文本中的链接、微型强调图标和角标。';
+
+  @override
+  String get skinTokenAccentSecondary => '次要强调';
+
+  @override
+  String get skinTokenAccentSecondaryHint => '次要高亮和标签。';
+
+  @override
+  String get skinTokenAccentTertiary => '三级强调';
+
+  @override
+  String get skinTokenAccentTertiaryHint => '三级高亮和标签。';
+
+  @override
+  String get skinTokenAccentTertiaryContainer => '三级强调填充';
+
+  @override
+  String get skinTokenAccentTertiaryContainerHint => '三级高亮背后的填充色。';
+
+  @override
+  String get skinTokenAccentOnTertiaryContainer => '三级强调填充文本';
+
+  @override
+  String get skinTokenAccentOnTertiaryContainerHint => '三级填充上的文本与图标。';
+
+  @override
+  String get skinTokenStatusDanger => '错误与删除';
+
+  @override
+  String get skinTokenStatusDangerHint => '错误文本、删除操作和错误边框。';
+
+  @override
+  String get skinTokenStatusOnDanger => '错误颜色上的文本';
+
+  @override
+  String get skinTokenStatusOnDangerHint => '在错误颜色上绘制的文本与图标。';
+
+  @override
+  String get skinTokenStatusDangerContainer => '错误信息填充';
+
+  @override
+  String get skinTokenStatusDangerContainerHint => '错误信息和横幅的填充色。';
+
+  @override
+  String get skinTokenStatusOnDangerContainer => '错误信息文本';
+
+  @override
+  String get skinTokenStatusOnDangerContainerHint => '错误信息中的文本与图标。';
+
+  @override
+  String get skinTokenStatusInfo => '提示信息填充';
+
+  @override
+  String get skinTokenStatusInfoHint => '提示横幅的填充色。';
+
+  @override
+  String get skinTokenStatusOnInfo => '提示信息文本';
+
+  @override
+  String get skinTokenStatusOnInfoHint => '提示横幅中的文本与图标。';
+
+  @override
+  String get bookReaderOpenFailed => '无法打开这本书';
+
+  @override
+  String get comicNoPages => '此漫画中未找到图片';
+
+  @override
+  String get comicPageLoadFailed => '无法加载此页面';
+
+  @override
+  String get comicReadingDirectionRtl => '从右向左阅读';
+
+  @override
+  String get comicReadingDirectionLtr => '从左向右阅读';
+
+  @override
+  String get epubTextSize => '文字大小';
+
+  @override
+  String get epubThemeOriginal => '原始';
+
+  @override
+  String epubChapterFallbackTitle(int number) {
+    return '第 $number 章';
+  }
+
+  @override
+  String get bookReaderSettingsTitle => '阅读器设置';
+
+  @override
+  String get bookReaderPageSection => '页面';
+
+  @override
+  String get bookReaderTextSection => '文本';
+
+  @override
+  String get bookReaderReadingModeTitle => '阅读模式';
+
+  @override
+  String get bookReaderPageFlippingLabel => '翻页方式';
+
+  @override
+  String get bookReaderColorModeLabel => '颜色模式';
+
+  @override
+  String get bookReaderTextDirectionLabel => '文本方向';
+
+  @override
+  String get bookReaderTwoPageLandscapeLabel => '横屏双页';
+
+  @override
+  String get bookReaderPageMarginsLabel => '页边距';
+
+  @override
+  String get bookReaderFontFaceLabel => '字体';
+
+  @override
+  String get bookReaderFontPublisherDefault => '出版商默认';
+
+  @override
+  String get bookReaderFontSerif => '衬线';
+
+  @override
+  String get bookReaderFontSansSerif => '无衬线';
+
+  @override
+  String get bookReaderFontMonospace => '等宽';
+
+  @override
+  String get bookReaderFontWeightLabel => '字体粗细';
+
+  @override
+  String get bookReaderLineSpacingLabel => '行距';
+
+  @override
+  String get bookReaderTextAlignmentLabel => '文本对齐';
+
+  @override
+  String get bookReaderTextAlignLeft => '左对齐';
+
+  @override
+  String get bookReaderTextAlignJustified => '两端对齐';
+
+  @override
+  String get bookReaderTextAlignCenter => '居中';
+
+  @override
+  String get bookReaderTextAlignRight => '右对齐';
+
+  @override
+  String get comicReaderModeSinglePage => '单页';
+
+  @override
+  String get comicReaderModeTwoPageSpread => '双页';
+
+  @override
+  String get comicReaderCarouselScrubberSubtitle => '在滑块上方显示页面缩略图';
 }

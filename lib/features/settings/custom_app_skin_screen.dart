@@ -499,7 +499,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
     );
     if (custom != null) return custom;
     final chrome = _editorColor('chromeForeground');
-    return token == SkinToken.appBar
+    return token == SkinToken.chromeTopBar
         ? Color.alphaBlend(
             chrome.withValues(alpha: 0.04),
             _editorColor('background'),
@@ -747,7 +747,19 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
       title: area.label(l10n),
       subtitle: area.description(l10n),
       children: [
-        for (final token in area.tokens)
+        for (final (index, token) in area.tokens.indexed) ...[
+          // A heading wherever the group changes, so the page's colors read as
+          // surfaces / text / borders / buttons / ... instead of one long list.
+          if (index == 0 || area.tokens[index - 1].group != token.group)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Text(
+                token.group.label(l10n),
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            ),
           ListTile(
             title: Text(token.label(l10n)),
             subtitle: Text(
@@ -764,6 +776,7 @@ class _CustomAppSkinScreenState extends ConsumerState<CustomAppSkinScreen> {
               title: '${token.label(l10n)} · ${area.label(l10n)}',
             ),
           ),
+        ],
         if (overrides != null && overrides.isNotEmpty)
           Align(
             alignment: Alignment.centerRight,

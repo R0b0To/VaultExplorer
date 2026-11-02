@@ -20,3 +20,11 @@ class ImagePreviewUnavailableException implements Exception {
   @override
   String toString() => 'ImagePreviewUnavailableException($reason)';
 }
+
+/// Marks a thumbnail failure that trying again cannot fix: the file simply has
+/// nothing to show (a book with no cover image, say, or a "comic" that is
+/// really a RAR). `AsyncThumbnailLoader` skips its backoff retries for these,
+/// which would otherwise open the same file three times, with a spinner in
+/// between, to learn the same thing. The tile falls straight back to its
+/// file-type icon.
+abstract interface class PermanentThumbnailFailure implements Exception {}

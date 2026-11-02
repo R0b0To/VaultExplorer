@@ -186,15 +186,23 @@ private:
     StreamBuffer dataStream_;
     StreamBuffer metaStream_;
 
+    // The buffered bytes are only dropped once they have actually reached the
+    // fd. Callers (FatFs, via disk_write) were already told those sectors
+    // were written, so discarding them on a failed pwrite would silently
+    // lose acknowledged data -- FAT entries, directory entries, file
+    // contents -- while every later flush reported success. On failure the
+    // stream is kept intact (pwrite at fixed offsets is idempotent, so a
+    // retry rewrites the whole range safely) and false is returned; the
+    // buffer is cleared for a new session by reset().
     bool flushStreamLocked(int fd, StreamBuffer& s) {
         if (!s.active || s.size == 0) {
             s.reset();
             return true;
         }
-        uint64_t off = s.startOffset;
-        size_t len = s.size;
-        const unsigned char* ptr = s.data.data();
+        if (!directWrite(fd, s.startOffset, s.data.data(), s.size)) {
+            return false;
+        }
         s.reset();
-        return directWrite(fd, off, ptr, len);
+        return true;
     }
 };

@@ -1,6 +1,8 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart' show AppBannerTone;
 
 void showAppSnackBar(
@@ -13,7 +15,19 @@ void showAppSnackBar(
   final cs = context.colors;
   final semantic = context.semanticColors;
   final (Color bg, Color fg, IconData defaultIcon) = switch (tone) {
-    AppBannerTone.info => (cs.inverseSurface, cs.onInverseSurface, Icons.info_outline_rounded),
+    AppBannerTone.info => (
+      SkinAreaScope.colorOf(
+        context,
+        SkinToken.floatingToast,
+        fallback: cs.inverseSurface,
+      ),
+      SkinAreaScope.colorOf(
+        context,
+        SkinToken.floatingOnToast,
+        fallback: cs.onInverseSurface,
+      ),
+      Icons.info_outline_rounded,
+    ),
     AppBannerTone.success => (semantic.success, semantic.onSuccess, Icons.check_circle_rounded),
     AppBannerTone.warning => (semantic.warning, semantic.onWarning, Icons.warning_amber_rounded),
     AppBannerTone.error => (cs.error, cs.onError, Icons.error_outline_rounded),

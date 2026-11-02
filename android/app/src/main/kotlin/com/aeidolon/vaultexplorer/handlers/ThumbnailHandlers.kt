@@ -1330,6 +1330,116 @@ class ThumbnailHandlers(
         }
     }
 
+    /** A thumbnail made by [thumbnailFromImageBytes]; sizes are the *source* image's. */
+    class BytesThumbnail(val bytes: ByteArray, val sourceWidth: Int, val sourceHeight: Int)
+
+    /** Why [thumbnailFromImageBytes] gave up; [code] is the wire code the file-based path uses. */
+    class BytesThumbnailException(val code: String, message: String) : Exception(message)
+
+    /**
+     * Same result as [extractImageThumbnail], but from image bytes already in
+     * memory instead of a file or vault path. Used for images that live
+     * *inside* another file -- a book's cover inside its ZIP -- and so have no
+     * path of their own to hand to the stream-based decoder. Nothing is written
+     * to disk.
+     *
+     * Goes through the same memory admission ([ImageDecodeGuard]), sample-size
+     * choice, EXIF correction and scale/compress step ([finishThumbnail]) as an
+     * ordinary image thumbnail, so a cover looks exactly like one and a huge
+     * source is refused (or retried coarser) the same way instead of taking the
+     * process down. Unlike the file-based path there is no progressive-JPEG
+     * DC-scan fallback for an over-large source: that works from a stream, and
+     * a cover that big simply gets no thumbnail.
+     *
+     * Decodes at full colour depth (the file path's RGB_565 saves memory but
+     * bands on the gradients covers are full of), and flattens transparency
+     * onto white since the output is JPEG, which would otherwise render it
+     * black.
+     *
+     * Blocking; call from the image executor, never the main thread.
+     *
+     * @throws BytesThumbnailException
+     */
+    fun thumbnailFromImageBytes(data: ByteArray, targetSize: Int, quality: Int): BytesThumbnail {
+        val exifOrientation = runCatching {
+            ExifInterface(java.io.ByteArrayInputStream(data))
+                .getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+        }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
+
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(data, 0, data.size, bounds)
+        val rawWidth = bounds.outWidth
+        val rawHeight = bounds.outHeight
+        if (rawWidth <= 0 || rawHeight <= 0) {
+            throw BytesThumbnailException("DECODE_FAILED", "Failed to read image bounds")
+        }
+
+        // As in extractImageThumbnail: the header only matters (to spot a
+        // progressive JPEG) when the worst-case estimate is already heavy.
+        val header = if (rawWidth.toLong() * rawHeight.toLong() * ImageDecodeGuard.WORST_CASE_BYTES_PER_PIXEL >=
+            ImageDecodeGuard.HEAVY_ESTIMATE_BYTES
+        ) {
+            data.copyOf(minOf(data.size, ImageDecodeGuard.HEADER_SNIFF_BYTES))
+        } else {
+            null
+        }
+        val permit = try {
+            ImageDecodeGuard.admit(activity, rawWidth, rawHeight, header)
+        } catch (e: ImageDecodeGuard.RefusedException) {
+            VeLog.w(TAG) { "Not decoding ${rawWidth}x$rawHeight embedded image: ${e.message}" }
+            throw BytesThumbnailException(e.code, e.message ?: "Image is too large to decode")
+        }
+
+        try {
+            val inSampleSize = calculateInSampleSize(rawWidth, rawHeight, targetSize)
+            fun decodeAt(sampleSize: Int): Bitmap? = BitmapFactory.decodeByteArray(
+                data,
+                0,
+                data.size,
+                BitmapFactory.Options().apply {
+                    this.inSampleSize = sampleSize
+                    inPreferredConfig = Bitmap.Config.ARGB_8888
+                },
+            )
+
+            val decodedOrNull: Bitmap? = try {
+                decodeAt(inSampleSize)
+            } catch (e: OutOfMemoryError) {
+                VeLog.w(TAG) { "OOM decoding ${rawWidth}x$rawHeight at sample $inSampleSize; retrying coarser" }
+                System.gc()
+                decodeAt(inSampleSize * 2)
+            }
+            val decoded = decodedOrNull
+                ?: throw BytesThumbnailException("DECODE_FAILED", "Failed to decode image bytes")
+
+            val opaque = if (decoded.hasAlpha()) {
+                val flat = Bitmap.createBitmap(decoded.width, decoded.height, Bitmap.Config.ARGB_8888)
+                Canvas(flat).apply {
+                    drawColor(android.graphics.Color.WHITE)
+                    drawBitmap(decoded, 0f, 0f, null)
+                }
+                decoded.recycle()
+                flat
+            } else {
+                decoded
+            }
+
+            return when (val outcome = finishThumbnail(
+                opaque, exifOrientation, rawWidth, rawHeight, targetSize, quality, preserveAlpha = false,
+            )) {
+                is ImageThumbnailOutcome.Success ->
+                    BytesThumbnail(outcome.bytes, outcome.sourceWidth, outcome.sourceHeight)
+                is ImageThumbnailOutcome.Failure ->
+                    throw BytesThumbnailException(outcome.code, outcome.message)
+            }
+        } catch (e: OutOfMemoryError) {
+            VeLog.w(TAG) { "Out of memory decoding ${rawWidth}x$rawHeight embedded image" }
+            throw BytesThumbnailException(ImageDecodeGuard.CODE_OUT_OF_MEMORY, "Not enough memory to decode image")
+        } finally {
+            permit.close()
+        }
+    }
+
     /**
      * Extracts an APK's own launcher icon for use as a file-manager
      * thumbnail, via `PackageManager.getPackageArchiveInfo` +

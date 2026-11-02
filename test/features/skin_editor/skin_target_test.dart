@@ -14,12 +14,12 @@ void main() {
   group('SkinTarget identity', () {
     test('targets with the same id are equal, different kinds never are', () {
       expect(
-        const AreaTokenTarget(SkinArea.files, SkinToken.card),
-        const AreaTokenTarget(SkinArea.files, SkinToken.card),
+        const AreaTokenTarget(SkinArea.files, SkinToken.surfaceCard),
+        const AreaTokenTarget(SkinArea.files, SkinToken.surfaceCard),
       );
       expect(
-        const AreaTokenTarget(SkinArea.files, SkinToken.card),
-        isNot(const AreaTokenTarget(SkinArea.tools, SkinToken.card)),
+        const AreaTokenTarget(SkinArea.files, SkinToken.surfaceCard),
+        isNot(const AreaTokenTarget(SkinArea.tools, SkinToken.surfaceCard)),
       );
       expect(
         const SchemeRoleTarget('primary'),
@@ -30,12 +30,12 @@ void main() {
 
   group('SkinTarget.write', () {
     test('a page token is written to one palette and one page only', () {
-      const card = AreaTokenTarget(SkinArea.files, SkinToken.card);
+      const card = AreaTokenTarget(SkinArea.files, SkinToken.surfaceCard);
       final edited = card.write(skin, red, dark: false);
       expect(card.customValue(edited, dark: false), red);
       expect(card.customValue(edited, dark: true), isNull);
       expect(
-        const AreaTokenTarget(SkinArea.tools, SkinToken.card)
+        const AreaTokenTarget(SkinArea.tools, SkinToken.surfaceCard)
             .customValue(edited, dark: false),
         isNull,
       );
@@ -43,7 +43,7 @@ void main() {
     });
 
     test('writing null puts a page token back to inheriting', () {
-      const card = AreaTokenTarget(SkinArea.files, SkinToken.card);
+      const card = AreaTokenTarget(SkinArea.files, SkinToken.surfaceCard);
       final edited = card.write(skin, red, dark: true);
       final reset = card.write(edited, null, dark: true);
       expect(card.isCustom(reset, dark: true), isFalse);
@@ -156,20 +156,20 @@ void main() {
   group('matchSkinColor', () {
     final table = <(SkinTarget, Color)>[
       (
-        const AreaTokenTarget(SkinArea.files, SkinToken.onAppBar),
+        const AreaTokenTarget(SkinArea.files, SkinToken.chromeOnTopBar),
         const Color(0xFF111111),
       ),
       (
-        const AreaTokenTarget(SkinArea.files, SkinToken.text),
+        const AreaTokenTarget(SkinArea.files, SkinToken.contentPrimary),
         const Color(0xFF111111),
       ),
       (
-        const AreaTokenTarget(SkinArea.files, SkinToken.card),
+        const AreaTokenTarget(SkinArea.files, SkinToken.surfaceCard),
         const Color(0xFFEEEEEE),
       ),
       (const SchemeRoleTarget('surface'), const Color(0xFFEEEEEE)),
       (
-        const AreaTokenTarget(SkinArea.files, SkinToken.accent),
+        const AreaTokenTarget(SkinArea.files, SkinToken.actionPrimary),
         const Color(0xFF3366CC),
       ),
     ];
@@ -182,7 +182,7 @@ void main() {
       );
       expect(match.approximate, isFalse);
       expect(match.targets, [
-        const AreaTokenTarget(SkinArea.files, SkinToken.card),
+        const AreaTokenTarget(SkinArea.files, SkinToken.surfaceCard),
         const SchemeRoleTarget('surface'),
       ]);
     });
@@ -193,17 +193,17 @@ void main() {
         kind: SkinLayerKind.text,
         table: table,
       );
-      expect(plain.targets.first, const AreaTokenTarget(SkinArea.files, SkinToken.text));
+      expect(plain.targets.first, const AreaTokenTarget(SkinArea.files, SkinToken.contentPrimary));
 
       final inAppBar = matchSkinColor(
         color: const Color(0xFF111111),
         kind: SkinLayerKind.text,
         table: table,
-        hints: const {SkinToken.appBar, SkinToken.onAppBar},
+        hints: const {SkinToken.chromeTopBar, SkinToken.chromeOnTopBar},
       );
       expect(
         inAppBar.targets.first,
-        const AreaTokenTarget(SkinArea.files, SkinToken.onAppBar),
+        const AreaTokenTarget(SkinArea.files, SkinToken.chromeOnTopBar),
       );
     });
 
@@ -215,7 +215,7 @@ void main() {
       );
       expect(match.approximate, isTrue);
       expect(match.targets, [
-        const AreaTokenTarget(SkinArea.files, SkinToken.accent),
+        const AreaTokenTarget(SkinArea.files, SkinToken.actionPrimary),
       ]);
     });
 
@@ -227,7 +227,7 @@ void main() {
       );
       expect(match.approximate, isTrue);
       expect(match.targets, [
-        const AreaTokenTarget(SkinArea.files, SkinToken.accent),
+        const AreaTokenTarget(SkinArea.files, SkinToken.actionPrimary),
       ]);
     });
 

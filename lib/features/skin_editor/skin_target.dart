@@ -69,7 +69,8 @@ final class AreaTokenTarget extends SkinTarget {
   String title(BuildContext context) => token.label(context.l10n);
 
   @override
-  String group(BuildContext context) => area.label(context.l10n);
+  String group(BuildContext context) =>
+      '${area.label(context.l10n)} · ${token.group.label(context.l10n)}';
 
   /// What the token's hint says it controls.
   String hint(BuildContext context) => token.hint(context.l10n);
@@ -82,11 +83,11 @@ final class AreaTokenTarget extends SkinTarget {
       // The editor toolbar follows the editor's own colors until overridden.
       final chrome = tokens.editorChromeForeground;
       return switch (token) {
-        SkinToken.appBar => Color.alphaBlend(
+        SkinToken.chromeTopBar => Color.alphaBlend(
           chrome.withValues(alpha: 0.04),
           tokens.editorBackground,
         ),
-        SkinToken.onAppBar => chrome,
+        SkinToken.chromeOnTopBar => chrome,
         _ => tokens.areaColors(area).color(token),
       };
     }
@@ -213,10 +214,12 @@ final class ComponentRoleTarget extends SkinTarget {
   String title(BuildContext context) {
     final l10n = context.l10n;
     return switch (role) {
-      'appBarBackground' => '${l10n.skinAppBar} · ${l10n.textEditorBackgroundSectionTitle}',
-      'appBarForeground' => '${l10n.skinAppBar} · ${l10n.skinTitleAndIcons}',
-      'fabBackground' => '${l10n.skinFloatingActionButton} · ${l10n.skinButtonFill}',
-      'fabForeground' => '${l10n.skinFloatingActionButton} · ${l10n.skinButtonIcon}',
+      // Named after the page tokens they are the shared default of, so the
+      // same thing is never called two different names.
+      'appBarBackground' => SkinToken.chromeTopBar.label(l10n),
+      'appBarForeground' => SkinToken.chromeOnTopBar.label(l10n),
+      'fabBackground' => SkinToken.floatingFab.label(l10n),
+      'fabForeground' => SkinToken.floatingOnFab.label(l10n),
       _ => skinRoleTitle(context, role),
     };
   }
@@ -311,12 +314,12 @@ final class FileItemTarget extends SkinTarget {
       case FileItemPart.fileName:
         return const AreaTokenTarget(
           SkinArea.files,
-          SkinToken.text,
+          SkinToken.contentPrimary,
         ).inherited(base);
       case FileItemPart.details:
         return const AreaTokenTarget(
           SkinArea.files,
-          SkinToken.textSecondary,
+          SkinToken.contentSecondary,
         ).inherited(base);
     }
   }

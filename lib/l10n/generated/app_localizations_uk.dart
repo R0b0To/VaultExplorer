@@ -5957,6 +5957,13 @@ class AppLocalizationsUk extends AppLocalizations {
   String get vaultSyncComparingLabel => 'Порівняння сховищ…';
 
   @override
+  String get vaultSyncScanFailedTitle => 'Не вдалося прочитати папку';
+
+  @override
+  String get vaultSyncScanFailedMessage =>
+      'Не вдалося прочитати папку в сховищі, тому порівняння зупинено замість припущень. Нічого не змінено. Заблокуйте й знову розблокуйте сховище, потім порівняйте ще раз.';
+
+  @override
   String vaultSyncCompareStatsLabel(Object dirs, Object entries) {
     return 'Відскановано папок: $dirs | Знайдено відмінностей: $entries';
   }
@@ -11408,6 +11415,12 @@ class AppLocalizationsUk extends AppLocalizations {
   String get audioEditorNextCutPoint => 'Наступна точка розрізу';
 
   @override
+  String get audioEditorStepBack => 'Крок назад';
+
+  @override
+  String get audioEditorStepForward => 'Крок уперед';
+
+  @override
   String audioEditorReencodeBanner(String format) {
     return 'Аудіо $format не можна скопіювати як є, тож під час експорту його буде перекодовано в AAC (.m4a).';
   }
@@ -12796,6 +12809,12 @@ class AppLocalizationsUk extends AppLocalizations {
   String get floatingPlayerExpandTooltip => 'Розгорнути';
 
   @override
+  String get floatingPlayerAudioOnly => 'Лише аудіо';
+
+  @override
+  String get floatingPlayerShowVideo => 'Показати відео';
+
+  @override
   String get masterLockTitle => 'Головне блокування';
 
   @override
@@ -12830,4 +12849,508 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get duressMasterLockRequired =>
       'Перед налаштуванням розблокування під примусом необхідно увімкнути головне блокування у розділі безпеки.';
+
+  @override
+  String get skinTokenGroupSurface => 'Поверхні';
+
+  @override
+  String get skinTokenGroupContent => 'Текст та іконки';
+
+  @override
+  String get skinTokenGroupBorder => 'Межі';
+
+  @override
+  String get skinTokenGroupChrome => 'Верхня панель';
+
+  @override
+  String get skinTokenGroupAction => 'Кнопки';
+
+  @override
+  String get skinTokenGroupControl => 'Перемикачі та повзунки';
+
+  @override
+  String get skinTokenGroupChoice => 'Чіпи та сегменти';
+
+  @override
+  String get skinTokenGroupSelection => 'Вибрані елементи';
+
+  @override
+  String get skinTokenGroupOverlay => 'Меню, діалоги та панелі';
+
+  @override
+  String get skinTokenGroupFloating => 'Плаваючі елементи';
+
+  @override
+  String get skinTokenSurfacePage => 'Фон сторінки';
+
+  @override
+  String get skinTokenSurfacePageHint =>
+      'Полотно за всіма елементами на цій сторінці.';
+
+  @override
+  String get skinTokenSurfaceCard => 'Картки та рядки';
+
+  @override
+  String get skinTokenSurfaceCardHint =>
+      'Картки, рядки списку та згруповані панелі.';
+
+  @override
+  String get skinTokenSurfaceCardActive => 'Активна картка';
+
+  @override
+  String get skinTokenSurfaceCardActiveHint =>
+      'Виділена картка, наприклад розблоковане сховище.';
+
+  @override
+  String get skinTokenSurfaceTile => 'Плитки та мініатюри';
+
+  @override
+  String get skinTokenSurfaceTileHint =>
+      'Заповнювачі мініатюр, плитки іконок і блоки коду.';
+
+  @override
+  String get skinTokenSurfaceField => 'Поля вводу';
+
+  @override
+  String get skinTokenSurfaceFieldHint =>
+      'Заливка текстових полів і панелей пошуку.';
+
+  @override
+  String get skinTokenContentPrimary => 'Основний текст';
+
+  @override
+  String get skinTokenContentPrimaryHint =>
+      'Заголовки, імена та основний текст.';
+
+  @override
+  String get skinTokenContentSecondary => 'Вторинний текст';
+
+  @override
+  String get skinTokenContentSecondaryHint =>
+      'Підзаголовки, деталі та підказки.';
+
+  @override
+  String get skinTokenContentIcon => 'Іконки';
+
+  @override
+  String get skinTokenContentIconHint =>
+      'Прості іконки, які не знаходяться на кнопці чи панелі.';
+
+  @override
+  String get skinTokenBorderDivider => 'Розділювачі';
+
+  @override
+  String get skinTokenBorderDividerHint =>
+      'Тонкі лінії між рядками та розділами.';
+
+  @override
+  String get skinTokenBorderOutline => 'Контури';
+
+  @override
+  String get skinTokenBorderOutlineHint =>
+      'Межі контурних кнопок і невибраних прапорців.';
+
+  @override
+  String get skinTokenBorderFocus => 'Кільце фокусу';
+
+  @override
+  String get skinTokenBorderFocusHint =>
+      'Межа текстового поля, що редагується.';
+
+  @override
+  String get skinTokenChromeTopBar => 'Верхня панель';
+
+  @override
+  String get skinTokenChromeTopBarHint => 'Заливка верхньої панелі.';
+
+  @override
+  String get skinTokenChromeOnTopBar => 'Текст та іконки верхньої панелі';
+
+  @override
+  String get skinTokenChromeOnTopBarHint =>
+      'Колір заголовка та іконок на верхній панелі.';
+
+  @override
+  String get skinTokenActionPrimary => 'Заповнені кнопки';
+
+  @override
+  String get skinTokenActionPrimaryHint => 'Заливка заповнених кнопок.';
+
+  @override
+  String get skinTokenActionOnPrimary => 'Підпис заповненої кнопки';
+
+  @override
+  String get skinTokenActionOnPrimaryHint =>
+      'Підпис та іконка на заповненій кнопці.';
+
+  @override
+  String get skinTokenActionTonal => 'Підняті кнопки';
+
+  @override
+  String get skinTokenActionTonalHint => 'Заливка піднятих і тональних кнопок.';
+
+  @override
+  String get skinTokenActionOnTonal => 'Підпис піднятої кнопки';
+
+  @override
+  String get skinTokenActionOnTonalHint =>
+      'Підпис та іконка на піднятій кнопці.';
+
+  @override
+  String get skinTokenActionText => 'Текстові та контурні кнопки';
+
+  @override
+  String get skinTokenActionTextHint =>
+      'Колір підпису текстових кнопок, контурних кнопок і посилань.';
+
+  @override
+  String get skinTokenControlActive => 'Елемент увімкнено';
+
+  @override
+  String get skinTokenControlActiveHint =>
+      'Доріжка перемикача у ввімкненому стані, вибрані прапорці та радіокнопки, заливка повзунка та прогресу.';
+
+  @override
+  String get skinTokenControlOnActive => 'Повзунок перемикача та галочка';
+
+  @override
+  String get skinTokenControlOnActiveHint =>
+      'Повзунок увімкненого перемикача та галочка всередині прапорця.';
+
+  @override
+  String get skinTokenControlTrack => 'Доріжка елемента керування';
+
+  @override
+  String get skinTokenControlTrackHint =>
+      'Доріжка вимкненого перемикача та порожня частина повзунків і смуг прогресу.';
+
+  @override
+  String get skinTokenControlInactive => 'Елемент вимкнено';
+
+  @override
+  String get skinTokenControlInactiveHint =>
+      'Повзунок вимкненого перемикача та межі невідмічених прапорців.';
+
+  @override
+  String get skinTokenChoiceBackground => 'Чіп';
+
+  @override
+  String get skinTokenChoiceBackgroundHint =>
+      'Заливка невибраних чіпів і сегментів.';
+
+  @override
+  String get skinTokenChoiceSelected => 'Вибраний чіп';
+
+  @override
+  String get skinTokenChoiceSelectedHint =>
+      'Заливка вибраного чіпа або сегмента.';
+
+  @override
+  String get skinTokenChoiceOnSelected => 'Підпис вибраного чіпа';
+
+  @override
+  String get skinTokenChoiceOnSelectedHint =>
+      'Підпис та іконка на вибраному чіпі або сегменті.';
+
+  @override
+  String get skinTokenChoiceBorder => 'Межа чіпа';
+
+  @override
+  String get skinTokenChoiceBorderHint =>
+      'Контур чіпів і сегментованих кнопок.';
+
+  @override
+  String get skinTokenSelectionFill => 'Вибраний рядок';
+
+  @override
+  String get skinTokenSelectionFillHint =>
+      'Вибрані файли та рядки, а також підсвічені плитки іконок.';
+
+  @override
+  String get skinTokenSelectionOn => 'Текст та іконки вибраного рядка';
+
+  @override
+  String get skinTokenSelectionOnHint =>
+      'Текст та іконки, показані на вибраному рядку.';
+
+  @override
+  String get skinTokenOverlayMenu => 'Меню';
+
+  @override
+  String get skinTokenOverlayMenuHint =>
+      'Спливаючі, випадаючі та контекстні меню.';
+
+  @override
+  String get skinTokenOverlayOnMenu => 'Текст меню';
+
+  @override
+  String get skinTokenOverlayOnMenuHint => 'Текст та іконки в меню.';
+
+  @override
+  String get skinTokenOverlayDialog => 'Діалоги';
+
+  @override
+  String get skinTokenOverlayDialogHint => 'Заливка діалогових вікон.';
+
+  @override
+  String get skinTokenOverlayOnDialog => 'Заголовок діалогу';
+
+  @override
+  String get skinTokenOverlayOnDialogHint =>
+      'Текст заголовка діалогових вікон.';
+
+  @override
+  String get skinTokenOverlaySheet => 'Нижні панелі';
+
+  @override
+  String get skinTokenOverlaySheetHint => 'Заливка нижніх панелей.';
+
+  @override
+  String get skinTokenOverlayOnSheet => 'Текст нижньої панелі';
+
+  @override
+  String get skinTokenOverlayOnSheetHint => 'Текст та іконки в нижніх панелях.';
+
+  @override
+  String get skinTokenOverlayScrim => 'Затемнення за діалогами';
+
+  @override
+  String get skinTokenOverlayScrimHint =>
+      'Затемнення позаду діалогів і нижніх панелей.';
+
+  @override
+  String get skinTokenFloatingFab => 'Кругла кнопка додавання';
+
+  @override
+  String get skinTokenFloatingFabHint => 'Заливка круглої кнопки додавання.';
+
+  @override
+  String get skinTokenFloatingOnFab => 'Іконка круглої кнопки додавання';
+
+  @override
+  String get skinTokenFloatingOnFabHint =>
+      'Іконка на круглій кнопці додавання.';
+
+  @override
+  String get skinTokenFloatingToast => 'Плашка сповіщення';
+
+  @override
+  String get skinTokenFloatingToastHint =>
+      'Заливка інформаційного повідомлення, що з\'являється знизу.';
+
+  @override
+  String get skinTokenFloatingOnToast => 'Текст плашки сповіщення';
+
+  @override
+  String get skinTokenFloatingOnToastHint =>
+      'Текст та іконка на інформаційному повідомленні.';
+
+  @override
+  String get skinTokenFloatingTooltip => 'Підказки';
+
+  @override
+  String get skinTokenFloatingTooltipHint => 'Заливка підказок.';
+
+  @override
+  String get skinTokenFloatingOnTooltip => 'Текст підказки';
+
+  @override
+  String get skinTokenFloatingOnTooltipHint => 'Текст у спливаючих підказках.';
+
+  @override
+  String get skinTokenGroupAccent => 'Акцентні кольори';
+
+  @override
+  String get skinTokenGroupStatus => 'Стан та помилки';
+
+  @override
+  String get skinTokenSurfacePanel => 'Панелі';
+
+  @override
+  String get skinTokenSurfacePanelHint =>
+      'Картки зі стандартного віджета карток, панель закладок, клітинки сітки та інформаційні панелі.';
+
+  @override
+  String get skinTokenChromeBar => 'Панелі та смуги вкладок';
+
+  @override
+  String get skinTokenChromeBarHint =>
+      'Панелі дій, смуги вкладок, панель вибору та нижні панелі.';
+
+  @override
+  String get skinTokenAccentPrimary => 'Акцент';
+
+  @override
+  String get skinTokenAccentPrimaryHint =>
+      'Виділення, посилання в тексті, невеликі акцентні іконки та значки.';
+
+  @override
+  String get skinTokenAccentSecondary => 'Вторинний акцент';
+
+  @override
+  String get skinTokenAccentSecondaryHint => 'Вторинні виділення та теги.';
+
+  @override
+  String get skinTokenAccentTertiary => 'Третинний акцент';
+
+  @override
+  String get skinTokenAccentTertiaryHint => 'Третинні виділення та теги.';
+
+  @override
+  String get skinTokenAccentTertiaryContainer => 'Заливка третинного акценту';
+
+  @override
+  String get skinTokenAccentTertiaryContainerHint =>
+      'Заливка позаду третинних виділень.';
+
+  @override
+  String get skinTokenAccentOnTertiaryContainer =>
+      'Текст заливки третинного акценту';
+
+  @override
+  String get skinTokenAccentOnTertiaryContainerHint =>
+      'Текст та іконки на третинній заливці.';
+
+  @override
+  String get skinTokenStatusDanger => 'Помилки та видалення';
+
+  @override
+  String get skinTokenStatusDangerHint =>
+      'Текст помилки, дії видалення та межі помилок.';
+
+  @override
+  String get skinTokenStatusOnDanger => 'Текст на кольорі помилки';
+
+  @override
+  String get skinTokenStatusOnDangerHint =>
+      'Текст та іконки, відображені на кольорі помилки.';
+
+  @override
+  String get skinTokenStatusDangerContainer =>
+      'Заливка повідомлення про помилку';
+
+  @override
+  String get skinTokenStatusDangerContainerHint =>
+      'Заливка повідомлень про помилки та банерів.';
+
+  @override
+  String get skinTokenStatusOnDangerContainer =>
+      'Текст повідомлення про помилку';
+
+  @override
+  String get skinTokenStatusOnDangerContainerHint =>
+      'Текст та іконки в повідомленнях про помилки.';
+
+  @override
+  String get skinTokenStatusInfo => 'Заливка інформаційного повідомлення';
+
+  @override
+  String get skinTokenStatusInfoHint => 'Заливка інформаційних банерів.';
+
+  @override
+  String get skinTokenStatusOnInfo => 'Текст інформаційного повідомлення';
+
+  @override
+  String get skinTokenStatusOnInfoHint =>
+      'Текст та іконки в інформаційних банерах.';
+
+  @override
+  String get bookReaderOpenFailed => 'Не вдалося відкрити цю книгу';
+
+  @override
+  String get comicNoPages => 'У цьому коміксі не знайдено зображень';
+
+  @override
+  String get comicPageLoadFailed => 'Не вдалося завантажити цю сторінку';
+
+  @override
+  String get comicReadingDirectionRtl => 'Читання справа наліво';
+
+  @override
+  String get comicReadingDirectionLtr => 'Читання зліва направо';
+
+  @override
+  String get epubTextSize => 'Розмір тексту';
+
+  @override
+  String get epubThemeOriginal => 'Оригінал';
+
+  @override
+  String epubChapterFallbackTitle(int number) {
+    return 'Розділ $number';
+  }
+
+  @override
+  String get bookReaderSettingsTitle => 'Налаштування читача';
+
+  @override
+  String get bookReaderPageSection => 'Сторінка';
+
+  @override
+  String get bookReaderTextSection => 'Текст';
+
+  @override
+  String get bookReaderReadingModeTitle => 'Режим читання';
+
+  @override
+  String get bookReaderPageFlippingLabel => 'Перегортання сторінок';
+
+  @override
+  String get bookReaderColorModeLabel => 'Режим кольору';
+
+  @override
+  String get bookReaderTextDirectionLabel => 'Напрямок тексту';
+
+  @override
+  String get bookReaderTwoPageLandscapeLabel =>
+      'Дві сторінки в альбомній орієнтації';
+
+  @override
+  String get bookReaderPageMarginsLabel => 'Поля сторінки';
+
+  @override
+  String get bookReaderFontFaceLabel => 'Шрифт';
+
+  @override
+  String get bookReaderFontPublisherDefault => 'За замовчуванням видавця';
+
+  @override
+  String get bookReaderFontSerif => 'З засічками';
+
+  @override
+  String get bookReaderFontSansSerif => 'Без засічок';
+
+  @override
+  String get bookReaderFontMonospace => 'Моноширинний';
+
+  @override
+  String get bookReaderFontWeightLabel => 'Товщина шрифту';
+
+  @override
+  String get bookReaderLineSpacingLabel => 'Міжрядковий інтервал';
+
+  @override
+  String get bookReaderTextAlignmentLabel => 'Вирівнювання тексту';
+
+  @override
+  String get bookReaderTextAlignLeft => 'Ліворуч';
+
+  @override
+  String get bookReaderTextAlignJustified => 'За шириною';
+
+  @override
+  String get bookReaderTextAlignCenter => 'По центру';
+
+  @override
+  String get bookReaderTextAlignRight => 'Праворуч';
+
+  @override
+  String get comicReaderModeSinglePage => 'Одна сторінка';
+
+  @override
+  String get comicReaderModeTwoPageSpread => 'Розворот на дві сторінки';
+
+  @override
+  String get comicReaderCarouselScrubberSubtitle =>
+      'Показувати мініатюри сторінок над повзунком';
 }

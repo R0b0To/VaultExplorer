@@ -7,7 +7,6 @@ import com.aeidolon.vaultexplorer.saf.SafDocumentOps
 import com.aeidolon.vaultexplorer.saf.SafIOException
 import java.security.SecureRandom
 
-import com.aeidolon.vaultexplorer.gocryptfs.GocryptfsCipher
 import com.aeidolon.vaultexplorer.gocryptfs.GocryptfsConfig
 import com.aeidolon.vaultexplorer.gocryptfs.GocryptfsConfigException
 import com.aeidolon.vaultexplorer.gocryptfs.GocryptfsContentAuthException
@@ -71,11 +70,7 @@ internal object GocryptfsVaultCheck {
                 return FolderVaultCheckOutcome.WrongPassword
             }
             val nameKey = if (config.plaintextNames) ByteArray(0) else Hkdf.deriveSha256(masterkey, "EME filename encryption", 32)
-            val hkdfInfo = when (config.cipher) {
-                GocryptfsCipher.AES_256_GCM -> "AES-GCM file content encryption"
-                GocryptfsCipher.XCHACHA20_POLY1305 -> "XChaCha20-Poly1305 file content encryption"
-            }
-            val contentKey = Hkdf.deriveSha256(masterkey, hkdfInfo, 32)
+            val contentKey = Hkdf.deriveSha256(masterkey, config.cipher.hkdfInfo, config.cipher.contentKeyLen)
             masterkey.fill(0)
             nameCryptor = GocryptfsFileNameCryptor(nameKey, config.longNameMax, config.plaintextNames)
             contentCryptor = GocryptfsContentCryptor(contentKey, config.cipher)
@@ -84,10 +79,7 @@ internal object GocryptfsVaultCheck {
             log("No password given — checking structure only.")
         }
 
-        val nonceLen = when (config.cipher) {
-            GocryptfsCipher.AES_256_GCM -> 16
-            GocryptfsCipher.XCHACHA20_POLY1305 -> 24
-        }
+        val nonceLen = config.cipher.nonceLen
         val expectedChunkSize = nonceLen + GocryptfsContentCryptor.CLEARTEXT_CHUNK_SIZE + 16
         val headerLen = GocryptfsContentCryptor.HEADER_LEN
         var filesScanned = 0
@@ -228,11 +220,7 @@ internal object GocryptfsVaultCheck {
                 return FolderVaultRepairOutcome.WrongPassword
             }
             val nameKey = if (config.plaintextNames) ByteArray(0) else Hkdf.deriveSha256(masterkey, "EME filename encryption", 32)
-            val hkdfInfo = when (config.cipher) {
-                GocryptfsCipher.AES_256_GCM -> "AES-GCM file content encryption"
-                GocryptfsCipher.XCHACHA20_POLY1305 -> "XChaCha20-Poly1305 file content encryption"
-            }
-            val contentKey = Hkdf.deriveSha256(masterkey, hkdfInfo, 32)
+            val contentKey = Hkdf.deriveSha256(masterkey, config.cipher.hkdfInfo, config.cipher.contentKeyLen)
             masterkey.fill(0)
             nameCryptor = GocryptfsFileNameCryptor(nameKey, config.longNameMax, config.plaintextNames)
             contentCryptor = GocryptfsContentCryptor(contentKey, config.cipher)

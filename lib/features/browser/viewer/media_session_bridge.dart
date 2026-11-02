@@ -30,8 +30,63 @@ class MediaSessionBridge {
   static final StreamController<MediaSessionAction> _actions =
       StreamController<MediaSessionAction>.broadcast();
 
+  static final StreamController<void> _openPlayerRequests =
+      StreamController<void>.broadcast();
+  static bool _pendingOpenPlayerRequest = false;
+  static Future<void>? _initialization;
+
   /// Previous / Next / Stop requests from outside the app UI.
   static Stream<MediaSessionAction> get actions => _actions.stream;
+
+  /// Taps on the background media notification, which should bring the
+  /// currently playing item back into the media viewer.
+  static Stream<void> get openPlayerRequests => _openPlayerRequests.stream;
+
+  /// Installs the native-to-Dart handler and picks up a tap that arrived
+  /// before Flutter had mounted its app-level playback layer.
+  static Future<void> ensureInitialized() {
+    if (_initialization != null) return _initialization!;
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'openMediaPlayer') {
+        _requestOpenPlayer();
+        unawaited(_clearPendingNativeRequest());
+      }
+    });
+    return _initialization = _consumePendingNativeRequest();
+  }
+
+  static Future<void> _consumePendingNativeRequest() async {
+    try {
+      if (await _channel.invokeMethod<bool>('consumePendingOpenMediaPlayer') ==
+          true) {
+        _requestOpenPlayer();
+      }
+    } catch (_) {
+      // Older platform implementations do not expose notification tap state.
+    }
+  }
+
+  static Future<void> _clearPendingNativeRequest() async {
+    try {
+      await _channel.invokeMethod<bool>('consumePendingOpenMediaPlayer');
+    } catch (_) {
+      // Older platform implementations do not expose notification tap state.
+    }
+  }
+
+  static void _requestOpenPlayer() {
+    if (_pendingOpenPlayerRequest) return;
+    _pendingOpenPlayerRequest = true;
+    _openPlayerRequests.add(null);
+  }
+
+  /// Clears and reports a queued notification tap. The app-level playback
+  /// layer calls this after subscribing so early taps are not lost.
+  static bool takePendingOpenPlayerRequest() {
+    if (!_pendingOpenPlayerRequest) return false;
+    _pendingOpenPlayerRequest = false;
+    return true;
+  }
 
   /// Called with the raw `action` string of a native `mediaSessionAction`
   /// event. Unknown values are ignored so a newer native side cannot break an

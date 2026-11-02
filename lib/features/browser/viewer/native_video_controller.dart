@@ -191,6 +191,16 @@ class NativeVideoController extends ValueNotifier<NativeVideoValue> {
     await _media3.setVolume(vol);
   }
 
+  Future<void> setAudioOnly(bool enabled) async {
+    await _media3.setAudioOnly(enabled);
+  }
+
+  /// See [NativeMedia3Controller.pauseRequested].
+  bool get pauseRequested => _media3.pauseRequested;
+
+  /// See [NativeMedia3Controller.playWhenReady].
+  Future<void> playWhenReady() => _media3.playWhenReady();
+
   Future<void> setVolumeBoost(bool enabled, int gainMb) async {
     await _media3.setVolumeBoost(enabled, gainMb);
   }

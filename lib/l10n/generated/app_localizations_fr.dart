@@ -5956,6 +5956,13 @@ class AppLocalizationsFr extends AppLocalizations {
   String get vaultSyncComparingLabel => 'Comparaison des coffres…';
 
   @override
+  String get vaultSyncScanFailedTitle => 'Impossible de lire un dossier';
+
+  @override
+  String get vaultSyncScanFailedMessage =>
+      'Un dossier d\'un coffre n\'a pas pu être lu ; la comparaison a été arrêtée plutôt que de deviner. Rien n\'a été modifié. Verrouillez puis déverrouillez à nouveau le coffre, puis comparez de nouveau.';
+
+  @override
   String vaultSyncCompareStatsLabel(Object dirs, Object entries) {
     return 'Dossiers analysés : $dirs | Différences trouvées : $entries';
   }
@@ -11432,6 +11439,12 @@ class AppLocalizationsFr extends AppLocalizations {
   String get audioEditorNextCutPoint => 'Point de coupe suivant';
 
   @override
+  String get audioEditorStepBack => 'Pas en arrière';
+
+  @override
+  String get audioEditorStepForward => 'Pas en avant';
+
+  @override
   String audioEditorReencodeBanner(String format) {
     return 'L\'audio $format ne peut pas être copié tel quel : il sera réencodé en AAC (.m4a) à l\'export.';
   }
@@ -12815,6 +12828,12 @@ class AppLocalizationsFr extends AppLocalizations {
   String get floatingPlayerExpandTooltip => 'Agrandir';
 
   @override
+  String get floatingPlayerAudioOnly => 'Audio uniquement';
+
+  @override
+  String get floatingPlayerShowVideo => 'Afficher la vidéo';
+
+  @override
   String get masterLockTitle => 'Verrouillage principal';
 
   @override
@@ -12850,4 +12869,512 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get duressMasterLockRequired =>
       'Un verrouillage principal doit être activé dans Sécurité avant de pouvoir configurer la contrainte.';
+
+  @override
+  String get skinTokenGroupSurface => 'Surfaces';
+
+  @override
+  String get skinTokenGroupContent => 'Texte et icônes';
+
+  @override
+  String get skinTokenGroupBorder => 'Bordures';
+
+  @override
+  String get skinTokenGroupChrome => 'Barre supérieure';
+
+  @override
+  String get skinTokenGroupAction => 'Boutons';
+
+  @override
+  String get skinTokenGroupControl => 'Interrupteurs et curseurs';
+
+  @override
+  String get skinTokenGroupChoice => 'Puces et segments';
+
+  @override
+  String get skinTokenGroupSelection => 'Éléments sélectionnés';
+
+  @override
+  String get skinTokenGroupOverlay => 'Menus, dialogues et volets';
+
+  @override
+  String get skinTokenGroupFloating => 'Éléments flottants';
+
+  @override
+  String get skinTokenSurfacePage => 'Arrière-plan de la page';
+
+  @override
+  String get skinTokenSurfacePageHint =>
+      'La toile de fond derrière tous les éléments de cette page.';
+
+  @override
+  String get skinTokenSurfaceCard => 'Cartes et lignes';
+
+  @override
+  String get skinTokenSurfaceCardHint =>
+      'Cartes, lignes de liste et panneaux groupés.';
+
+  @override
+  String get skinTokenSurfaceCardActive => 'Carte active';
+
+  @override
+  String get skinTokenSurfaceCardActiveHint =>
+      'La carte mise en évidence, par exemple un coffre déverrouillé.';
+
+  @override
+  String get skinTokenSurfaceTile => 'Tuiles et vignettes';
+
+  @override
+  String get skinTokenSurfaceTileHint =>
+      'Espaces réservés pour vignettes, tuiles d\'icônes et blocs de code.';
+
+  @override
+  String get skinTokenSurfaceField => 'Champs de saisie';
+
+  @override
+  String get skinTokenSurfaceFieldHint =>
+      'Remplissage des champs de texte et des barres de recherche.';
+
+  @override
+  String get skinTokenContentPrimary => 'Texte principal';
+
+  @override
+  String get skinTokenContentPrimaryHint => 'Titres, noms et corps de texte.';
+
+  @override
+  String get skinTokenContentSecondary => 'Texte secondaire';
+
+  @override
+  String get skinTokenContentSecondaryHint =>
+      'Sous-titres, détails et indications.';
+
+  @override
+  String get skinTokenContentIcon => 'Icônes';
+
+  @override
+  String get skinTokenContentIconHint =>
+      'Icônes simples qui ne sont ni sur un bouton ni sur une barre.';
+
+  @override
+  String get skinTokenBorderDivider => 'Séparateurs';
+
+  @override
+  String get skinTokenBorderDividerHint =>
+      'Lignes fines entre les lignes et les sections.';
+
+  @override
+  String get skinTokenBorderOutline => 'Contours';
+
+  @override
+  String get skinTokenBorderOutlineHint =>
+      'Bordures des boutons avec contour et des cases d\'option non sélectionnées.';
+
+  @override
+  String get skinTokenBorderFocus => 'Anneau de focus';
+
+  @override
+  String get skinTokenBorderFocusHint =>
+      'Bordure du champ de texte en cours de modification.';
+
+  @override
+  String get skinTokenChromeTopBar => 'Barre supérieure';
+
+  @override
+  String get skinTokenChromeTopBarHint => 'Remplissage de la barre supérieure.';
+
+  @override
+  String get skinTokenChromeOnTopBar =>
+      'Texte et icônes de la barre supérieure';
+
+  @override
+  String get skinTokenChromeOnTopBarHint =>
+      'Couleur du titre et des icônes sur la barre supérieure.';
+
+  @override
+  String get skinTokenActionPrimary => 'Boutons pleins';
+
+  @override
+  String get skinTokenActionPrimaryHint => 'Remplissage des boutons pleins.';
+
+  @override
+  String get skinTokenActionOnPrimary => 'Libellé de bouton plein';
+
+  @override
+  String get skinTokenActionOnPrimaryHint =>
+      'Libellé et icône sur un bouton plein.';
+
+  @override
+  String get skinTokenActionTonal => 'Boutons surélevés';
+
+  @override
+  String get skinTokenActionTonalHint =>
+      'Remplissage des boutons surélevés et tonals.';
+
+  @override
+  String get skinTokenActionOnTonal => 'Libellé de bouton surélevé';
+
+  @override
+  String get skinTokenActionOnTonalHint =>
+      'Libellé et icône sur un bouton surélevé.';
+
+  @override
+  String get skinTokenActionText => 'Boutons texte et avec contour';
+
+  @override
+  String get skinTokenActionTextHint =>
+      'Couleur de libellé des boutons texte, boutons avec contour et liens.';
+
+  @override
+  String get skinTokenControlActive => 'Contrôle à l\'état activé';
+
+  @override
+  String get skinTokenControlActiveHint =>
+      'Piste de l\'interrupteur activé, case et bouton radio sélectionnés, remplissage de curseurs et progression.';
+
+  @override
+  String get skinTokenControlOnActive => 'Curseur d\'interrupteur et coche';
+
+  @override
+  String get skinTokenControlOnActiveHint =>
+      'Curseur d\'un interrupteur activé et coche dans une case à cocher.';
+
+  @override
+  String get skinTokenControlTrack => 'Piste de contrôle';
+
+  @override
+  String get skinTokenControlTrackHint =>
+      'Piste d\'interrupteur désactivé et zone vide des curseurs et barres de progression.';
+
+  @override
+  String get skinTokenControlInactive => 'Contrôle à l\'état désactivé';
+
+  @override
+  String get skinTokenControlInactiveHint =>
+      'Curseur d\'un interrupteur désactivé et bordures des cases non cochées.';
+
+  @override
+  String get skinTokenChoiceBackground => 'Puce';
+
+  @override
+  String get skinTokenChoiceBackgroundHint =>
+      'Remplissage des puces et segments non sélectionnés.';
+
+  @override
+  String get skinTokenChoiceSelected => 'Puce sélectionnée';
+
+  @override
+  String get skinTokenChoiceSelectedHint =>
+      'Remplissage de la puce ou du segment sélectionné.';
+
+  @override
+  String get skinTokenChoiceOnSelected => 'Libellé de puce sélectionnée';
+
+  @override
+  String get skinTokenChoiceOnSelectedHint =>
+      'Libellé et icône sur la puce ou le segment sélectionné.';
+
+  @override
+  String get skinTokenChoiceBorder => 'Bordure de puce';
+
+  @override
+  String get skinTokenChoiceBorderHint =>
+      'Contour des puces et des boutons segmentés.';
+
+  @override
+  String get skinTokenSelectionFill => 'Ligne sélectionnée';
+
+  @override
+  String get skinTokenSelectionFillHint =>
+      'Fichiers et lignes sélectionnés, et tuiles d\'icônes en surbrillance.';
+
+  @override
+  String get skinTokenSelectionOn => 'Texte et icônes de la ligne sélectionnée';
+
+  @override
+  String get skinTokenSelectionOnHint =>
+      'Texte et icônes affichés sur une ligne sélectionnée.';
+
+  @override
+  String get skinTokenOverlayMenu => 'Menus';
+
+  @override
+  String get skinTokenOverlayMenuHint =>
+      'Menus contextuels, déroulants et pop-up.';
+
+  @override
+  String get skinTokenOverlayOnMenu => 'Texte du menu';
+
+  @override
+  String get skinTokenOverlayOnMenuHint => 'Texte et icônes dans les menus.';
+
+  @override
+  String get skinTokenOverlayDialog => 'Boîtes de dialogue';
+
+  @override
+  String get skinTokenOverlayDialogHint =>
+      'Remplissage des boîtes de dialogue.';
+
+  @override
+  String get skinTokenOverlayOnDialog => 'Titre du dialogue';
+
+  @override
+  String get skinTokenOverlayOnDialogHint =>
+      'Texte du titre des boîtes de dialogue.';
+
+  @override
+  String get skinTokenOverlaySheet => 'Volets inférieurs';
+
+  @override
+  String get skinTokenOverlaySheetHint => 'Remplissage des volets inférieurs.';
+
+  @override
+  String get skinTokenOverlayOnSheet => 'Texte du volet inférieur';
+
+  @override
+  String get skinTokenOverlayOnSheetHint =>
+      'Texte et icônes dans les volets inférieurs.';
+
+  @override
+  String get skinTokenOverlayScrim => 'Assombrissement d\'arrière-plan';
+
+  @override
+  String get skinTokenOverlayScrimHint =>
+      'L\'assombrissement derrière les boîtes de dialogue et les volets inférieurs.';
+
+  @override
+  String get skinTokenFloatingFab => 'Bouton rond d\'ajout';
+
+  @override
+  String get skinTokenFloatingFabHint => 'Remplissage du bouton rond d\'ajout.';
+
+  @override
+  String get skinTokenFloatingOnFab => 'Icône du bouton rond d\'ajout';
+
+  @override
+  String get skinTokenFloatingOnFabHint => 'Icône sur le bouton rond d\'ajout.';
+
+  @override
+  String get skinTokenFloatingToast => 'Bulle de notification';
+
+  @override
+  String get skinTokenFloatingToastHint =>
+      'Remplissage du message d\'information apparaissant en bas.';
+
+  @override
+  String get skinTokenFloatingOnToast => 'Texte de la bulle de notification';
+
+  @override
+  String get skinTokenFloatingOnToastHint =>
+      'Texte et icône sur le message d\'information.';
+
+  @override
+  String get skinTokenFloatingTooltip => 'Infobulles';
+
+  @override
+  String get skinTokenFloatingTooltipHint => 'Remplissage des infobulles.';
+
+  @override
+  String get skinTokenFloatingOnTooltip => 'Texte d\'infobulle';
+
+  @override
+  String get skinTokenFloatingOnTooltipHint => 'Texte dans les infobulles.';
+
+  @override
+  String get skinTokenGroupAccent => 'Couleurs d\'accentuation';
+
+  @override
+  String get skinTokenGroupStatus => 'État et erreurs';
+
+  @override
+  String get skinTokenSurfacePanel => 'Panneaux';
+
+  @override
+  String get skinTokenSurfacePanelHint =>
+      'Cartes créées à partir du widget de carte standard, barre de favoris, cellules de grille et volets d\'informations.';
+
+  @override
+  String get skinTokenChromeBar => 'Barres et onglets';
+
+  @override
+  String get skinTokenChromeBarHint =>
+      'Barres d\'actions, barres d\'onglets, barre de sélection et barres inférieures.';
+
+  @override
+  String get skinTokenAccentPrimary => 'Accentuation';
+
+  @override
+  String get skinTokenAccentPrimaryHint =>
+      'Mises en évidence, liens dans le texte, petites icônes d\'accentuation et badges.';
+
+  @override
+  String get skinTokenAccentSecondary => 'Accentuation secondaire';
+
+  @override
+  String get skinTokenAccentSecondaryHint =>
+      'Mises en évidence secondaires et étiquettes.';
+
+  @override
+  String get skinTokenAccentTertiary => 'Accentuation tertiaire';
+
+  @override
+  String get skinTokenAccentTertiaryHint =>
+      'Mises en évidence tertiaires et étiquettes.';
+
+  @override
+  String get skinTokenAccentTertiaryContainer =>
+      'Remplissage d\'accentuation tertiaire';
+
+  @override
+  String get skinTokenAccentTertiaryContainerHint =>
+      'Remplissage derrière les mises en évidence tertiaires.';
+
+  @override
+  String get skinTokenAccentOnTertiaryContainer =>
+      'Texte sur remplissage d\'accentuation tertiaire';
+
+  @override
+  String get skinTokenAccentOnTertiaryContainerHint =>
+      'Texte et icônes sur le remplissage tertiaire.';
+
+  @override
+  String get skinTokenStatusDanger => 'Erreurs et suppression';
+
+  @override
+  String get skinTokenStatusDangerHint =>
+      'Texte d\'erreur, actions de suppression et bordures d\'erreur.';
+
+  @override
+  String get skinTokenStatusOnDanger => 'Texte sur couleur d\'erreur';
+
+  @override
+  String get skinTokenStatusOnDangerHint =>
+      'Texte et icônes tracés sur la couleur d\'erreur.';
+
+  @override
+  String get skinTokenStatusDangerContainer =>
+      'Remplissage de message d\'erreur';
+
+  @override
+  String get skinTokenStatusDangerContainerHint =>
+      'Remplissage des messages d\'erreur et des bannières.';
+
+  @override
+  String get skinTokenStatusOnDangerContainer => 'Texte de message d\'erreur';
+
+  @override
+  String get skinTokenStatusOnDangerContainerHint =>
+      'Texte et icônes dans les messages d\'erreur.';
+
+  @override
+  String get skinTokenStatusInfo => 'Remplissage de message d\'information';
+
+  @override
+  String get skinTokenStatusInfoHint =>
+      'Remplissage des bannières d\'information.';
+
+  @override
+  String get skinTokenStatusOnInfo => 'Texte de message d\'information';
+
+  @override
+  String get skinTokenStatusOnInfoHint =>
+      'Texte et icônes dans les bannières d\'information.';
+
+  @override
+  String get bookReaderOpenFailed => 'Impossible d\'ouvrir ce livre';
+
+  @override
+  String get comicNoPages => 'Aucune image trouvée dans cette bande dessinée';
+
+  @override
+  String get comicPageLoadFailed => 'Impossible de charger cette page';
+
+  @override
+  String get comicReadingDirectionRtl => 'Lecture de droite à gauche';
+
+  @override
+  String get comicReadingDirectionLtr => 'Lecture de gauche à droite';
+
+  @override
+  String get epubTextSize => 'Taille du texte';
+
+  @override
+  String get epubThemeOriginal => 'Original';
+
+  @override
+  String epubChapterFallbackTitle(int number) {
+    return 'Chapitre $number';
+  }
+
+  @override
+  String get bookReaderSettingsTitle => 'Paramètres du lecteur';
+
+  @override
+  String get bookReaderPageSection => 'Page';
+
+  @override
+  String get bookReaderTextSection => 'Texte';
+
+  @override
+  String get bookReaderReadingModeTitle => 'Mode de lecture';
+
+  @override
+  String get bookReaderPageFlippingLabel => 'Changement de page';
+
+  @override
+  String get bookReaderColorModeLabel => 'Mode de couleur';
+
+  @override
+  String get bookReaderTextDirectionLabel => 'Sens du texte';
+
+  @override
+  String get bookReaderTwoPageLandscapeLabel => 'Deux pages en paysage';
+
+  @override
+  String get bookReaderPageMarginsLabel => 'Marges de page';
+
+  @override
+  String get bookReaderFontFaceLabel => 'Police';
+
+  @override
+  String get bookReaderFontPublisherDefault => 'Par défaut de l’éditeur';
+
+  @override
+  String get bookReaderFontSerif => 'Avec empattement';
+
+  @override
+  String get bookReaderFontSansSerif => 'Sans empattement';
+
+  @override
+  String get bookReaderFontMonospace => 'À chasse fixe';
+
+  @override
+  String get bookReaderFontWeightLabel => 'Épaisseur de police';
+
+  @override
+  String get bookReaderLineSpacingLabel => 'Interligne';
+
+  @override
+  String get bookReaderTextAlignmentLabel => 'Alignement du texte';
+
+  @override
+  String get bookReaderTextAlignLeft => 'À gauche';
+
+  @override
+  String get bookReaderTextAlignJustified => 'Justifié';
+
+  @override
+  String get bookReaderTextAlignCenter => 'Centré';
+
+  @override
+  String get bookReaderTextAlignRight => 'À droite';
+
+  @override
+  String get comicReaderModeSinglePage => 'Page simple';
+
+  @override
+  String get comicReaderModeTwoPageSpread => 'Double page';
+
+  @override
+  String get comicReaderCarouselScrubberSubtitle =>
+      'Afficher les miniatures des pages au-dessus du curseur';
 }

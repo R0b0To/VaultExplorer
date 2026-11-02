@@ -860,27 +860,121 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
     return ListenableBuilder(
       listenable: editor,
       builder: (context, _) {
-        final controls = _buildControls(context, editor, player);
         final landscape =
             MediaQuery.orientationOf(context) == Orientation.landscape;
         if (landscape) {
-          return Row(
-            children: [
-              Expanded(child: preview),
-              SizedBox(
-                width: 380,
-                child: SingleChildScrollView(child: controls),
-              ),
-            ],
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              // Desktop-style layout whenever there is room for it; a very
+              // short screen keeps the controls in a scrolling side column.
+              if (constraints.maxHeight >= _desktopMinHeight) {
+                return _buildDesktopLayout(
+                  context,
+                  editor,
+                  player,
+                  preview,
+                  constraints.maxWidth,
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(child: preview),
+                  SizedBox(
+                    width: 380,
+                    child: SingleChildScrollView(
+                      child: _buildControls(context, editor, player),
+                    ),
+                  ),
+                ],
+              );
+            },
           );
         }
         return Column(
           children: [
             Expanded(child: preview),
-            controls,
+            _buildControls(context, editor, player),
           ],
         );
       },
+    );
+  }
+
+  /// Shortest landscape body height that still gets the desktop-style layout
+  /// ([_buildDesktopLayout]). Below it the transport controls would have
+  /// almost no room, so the scrolling side column is used instead.
+  static const double _desktopMinHeight = 280;
+
+  /// Landscape, desktop-style layout: the preview and the transport / editing
+  /// controls sit side by side on top, and the timeline spans the full width
+  /// underneath (like a desktop video editor).
+  Widget _buildDesktopLayout(
+    BuildContext context,
+    VideoEditorController editor,
+    NativeVideoController player,
+    Widget preview,
+    double maxWidth,
+  ) {
+    final panelWidth = (maxWidth * 0.4).clamp(380.0, 480.0).toDouble();
+    return Column(
+      children: [
+        Expanded(
+          child: Row(
+            children: [
+              Expanded(child: preview),
+              const VerticalDivider(width: 1),
+              SizedBox(
+                width: panelWidth,
+                // Centred while it fits, scrolls on a short screen.
+                child: LayoutBuilder(
+                  builder: (context, constraints) => SingleChildScrollView(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight,
+                      ),
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 6,
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _buildSummaryRow(context, editor, compact: true),
+                              const SizedBox(height: 4),
+                              _buildTransportRow(
+                                context,
+                                player,
+                                compact: true,
+                              ),
+                              const SizedBox(height: 4),
+                              _buildToolsRow(context, editor, compact: true),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 4, 24, 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildTimeRow(context, editor, compact: true),
+              _buildTimeline(editor),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -934,19 +1028,13 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
     );
   }
 
+  /// Portrait layout (and the short-landscape fallback): everything stacked in
+  /// one column under the preview.
   Widget _buildControls(
     BuildContext context,
     VideoEditorController editor,
     NativeVideoController player,
   ) {
-    final l10n = context.l10n;
-    final cs = context.colors;
-    final text = context.typography;
-    final segments = editor.segments;
-    final selected = editor.selected;
-
-    final summaryStyle = text.bodySmall?.copyWith(color: cs.onSurfaceVariant);
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 6, 24, 12),
       child: Column(
@@ -954,310 +1042,376 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Row 1: Time readout and timeline zoom controls.
-          Row(
-            children: [
-              ValueListenableBuilder<int>(
-                valueListenable: _playhead,
-                builder: (context, us, _) => Text(
-                  '${formatTimecode(us)} / ${formatTimecode(editor.durationUs)}',
-                  style: text.labelLarge,
-                ),
-              ),
-              const Spacer(),
-              IconButton(
-                tooltip: l10n.videoEditorZoomOut,
-                visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.zoom_out_rounded),
-                onPressed: () => _timelineKey.currentState?.zoomBy(0.5),
-              ),
-              IconButton(
-                tooltip: l10n.videoEditorZoomIn,
-                visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.zoom_in_rounded),
-                onPressed: () => _timelineKey.currentState?.zoomBy(2),
-              ),
-              IconButton(
-                tooltip: l10n.videoEditorZoomFit,
-                visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.fit_screen_rounded),
-                onPressed: () => _timelineKey.currentState?.resetZoom(),
-              ),
-            ],
-          ),
+          _buildTimeRow(context, editor),
 
           // Row 2: Timeline with draggable handles & filmstrip
-          VideoTimeline(
-            key: _timelineKey,
-            durationUs: editor.durationUs,
-            segments: segments,
-            selectedId: editor.selectedId,
-            mode: editor.mode,
-            keyframes: editor.keyframes,
-            snappedExportRanges: editor.snappedRanges,
-            filmstripFrames: _filmstripFrames,
-            playheadUs: _playhead,
-            onScrubStart: _onScrubStart,
-            onScrub: _onScrub,
-            onScrubEnd: _onScrubEnd,
-            onTapAt: _onTimelineTap,
-            onHandleDragStart: editor.beginHandleDrag,
-            onHandleDragUpdate: (isStart, us) {
-              if (isStart) {
-                editor.updateSelectedStart(us);
-              } else {
-                editor.updateSelectedEnd(us);
-              }
-            },
-            onHandleDragEnd: editor.endHandleDrag,
-          ),
+          _buildTimeline(editor),
           const SizedBox(height: 4),
 
-          // Row 3: Selected segment timestamps + segments chip
-          Row(
-            children: [
-              Expanded(
-                child: selected != null
-                    ? Text(
-                        '${formatTimecode(selected.startUs)} – ${formatTimecode(selected.endUs)}'
-                        '  (${formatTimecode(selected.lengthUs, millis: false)})',
-                        style: summaryStyle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      )
-                    : Text(
-                        segments.isEmpty
-                            ? l10n.videoEditorNoSegments
-                            : '${segments.length} ${segments.length == 1 ? 'segment' : 'segments'}',
-                        style: summaryStyle,
-                        maxLines: 1,
-                      ),
-              ),
-              IconButton.filledTonal(
-                style: IconButton.styleFrom(
-                  backgroundColor: _isMuted ? cs.primaryContainer : null,
-                  foregroundColor: _isMuted ? cs.onPrimaryContainer : null,
-                ),
-                tooltip: _isMuted ? l10n.unmuteTooltip : l10n.muteTooltip,
-                icon: Icon(
-                  _isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
-                  size: 24,
-                ),
-                onPressed: () => unawaited(_toggleMute()),
-              ),
-              PopupMenuButton<double>(
-                tooltip: l10n.playbackSpeedLabel,
-                initialValue: _playbackSpeed,
-                onSelected: _setPlaybackSpeed,
-                itemBuilder: (context) => [
-                  for (final speed in MediaViewerConstants.playbackSpeeds)
-                    PopupMenuItem<double>(
-                      value: speed,
-                      child: Text(
-                        speed == 1.0
-                            ? l10n.playbackSpeedNormal(_speedValue(speed))
-                            : l10n.playbackSpeedValue(_speedValue(speed)),
-                      ),
-                    ),
-                ],
-                child: Container(
-                  height: 40,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  decoration: BoxDecoration(
-                    color: _playbackSpeed == 1.0
-                        ? cs.surfaceContainerHighest
-                        : cs.primaryContainer,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.speed_rounded,
-                        size: 18,
-                        color: _playbackSpeed == 1.0
-                            ? cs.onSurfaceVariant
-                            : cs.onPrimaryContainer,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${_speedValue(_playbackSpeed)}×',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: _playbackSpeed == 1.0
-                              ? cs.onSurfaceVariant
-                              : cs.onPrimaryContainer,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 4),
-              ActionChip(
-                avatar: const Icon(Icons.layers_rounded, size: 18),
-                label: Text('${segments.length}'),
-                tooltip: l10n.videoEditorSegments,
-                onPressed: () => VideoSegmentsSheet.show(
-                  context,
-                  editor: editor,
-                  onSeekTo: (us) => unawaited(_seekToUs(us)),
-                ),
-              ),
-            ],
-          ),
+          // Row 3: Selected segment timestamps, speed, segments chip
+          _buildSummaryRow(context, editor),
           const SizedBox(height: 4),
 
-          // Row 4: Transport and preview cut
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  iconSize: 28,
-                  style: IconButton.styleFrom(
-                    minimumSize: const Size(52, 52),
-                    padding: EdgeInsets.zero,
-                  ),
-                  tooltip: l10n.videoEditorPrevKeyframe,
-                  icon: const Icon(Icons.skip_previous_rounded),
-                  onPressed: () => _jumpKeyframe(forward: false),
-                ),
-                IconButton(
-                  iconSize: 28,
-                  style: IconButton.styleFrom(
-                    minimumSize: const Size(52, 52),
-                    padding: EdgeInsets.zero,
-                  ),
-                  tooltip: l10n.videoEditorPrevFrame,
-                  icon: const Icon(Icons.chevron_left_rounded),
-                  onPressed: () => _stepFrame(forward: false),
-                ),
-                ValueListenableBuilder<NativeVideoValue>(
-                  valueListenable: player,
-                  builder: (context, v, _) => IconButton.filled(
-                    style: IconButton.styleFrom(
-                      minimumSize: const Size(58, 58),
-                      padding: EdgeInsets.zero,
-                      backgroundColor: cs.primary,
-                      foregroundColor: cs.onPrimary,
-                    ),
-                    iconSize: 32,
-                    tooltip: l10n.mediaViewerActionPlayPause,
-                    icon: Icon(
-                      v.isPlaying
-                          ? Icons.pause_rounded
-                          : Icons.play_arrow_rounded,
-                    ),
-                    onPressed: () => unawaited(_togglePlay()),
-                  ),
-                ),
-                IconButton(
-                  iconSize: 28,
-                  style: IconButton.styleFrom(
-                    minimumSize: const Size(52, 52),
-                    padding: EdgeInsets.zero,
-                  ),
-                  tooltip: l10n.videoEditorNextFrame,
-                  icon: const Icon(Icons.chevron_right_rounded),
-                  onPressed: () => _stepFrame(forward: true),
-                ),
-                IconButton(
-                  iconSize: 28,
-                  style: IconButton.styleFrom(
-                    minimumSize: const Size(52, 52),
-                    padding: EdgeInsets.zero,
-                  ),
-                  tooltip: l10n.videoEditorNextKeyframe,
-                  icon: const Icon(Icons.skip_next_rounded),
-                  onPressed: () => _jumpKeyframe(forward: true),
-                ),
-                const SizedBox(width: 8),
-                IconButton.filledTonal(
-                  style: IconButton.styleFrom(
-                    minimumSize: const Size(52, 52),
-                    padding: EdgeInsets.zero,
-                    backgroundColor: _previewResult
-                        ? cs.primaryContainer
-                        : null,
-                    foregroundColor: _previewResult
-                        ? cs.onPrimaryContainer
-                        : null,
-                  ),
-                  iconSize: 28,
-                  tooltip: l10n.videoEditorPreviewCut,
-                  icon: Icon(
-                    _previewResult
-                        ? Icons.content_cut_rounded
-                        : Icons.content_cut_outlined,
-                  ),
-                  onPressed: () {
-                    setState(() => _previewResult = !_previewResult);
-                  },
-                ),
-              ],
-            ),
-          ),
+          // Row 4: Transport, preview cut and mute
+          _buildTransportRow(context, player),
           const SizedBox(height: 4),
 
           // Row 5: Editing tools
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  iconSize: 28,
-                  style: IconButton.styleFrom(
-                    minimumSize: const Size(52, 52),
-                    padding: EdgeInsets.zero,
-                  ),
-                  tooltip: l10n.videoEditorSetStart,
-                  icon: const Icon(Icons.first_page_rounded),
-                  onPressed: selected == null ? null : _setStart,
+          _buildToolsRow(context, editor),
+        ],
+      ),
+    );
+  }
+
+  /// Time readout and the timeline zoom buttons.
+  Widget _buildTimeRow(
+    BuildContext context,
+    VideoEditorController editor, {
+    bool compact = false,
+  }) {
+    final l10n = context.l10n;
+    final text = context.typography;
+    // The compact row drops the 48dp tap-target padding to save height.
+    final zoomStyle = compact
+        ? IconButton.styleFrom(tapTargetSize: MaterialTapTargetSize.shrinkWrap)
+        : null;
+
+    return Row(
+      children: [
+        ValueListenableBuilder<int>(
+          valueListenable: _playhead,
+          builder: (context, us, _) => Text(
+            '${formatTimecode(us)} / ${formatTimecode(editor.durationUs)}',
+            style: text.labelLarge,
+          ),
+        ),
+        const Spacer(),
+        IconButton(
+          tooltip: l10n.videoEditorZoomOut,
+          style: zoomStyle,
+          visualDensity: VisualDensity.compact,
+          icon: const Icon(Icons.zoom_out_rounded),
+          onPressed: () => _timelineKey.currentState?.zoomBy(0.5),
+        ),
+        IconButton(
+          tooltip: l10n.videoEditorZoomIn,
+          style: zoomStyle,
+          visualDensity: VisualDensity.compact,
+          icon: const Icon(Icons.zoom_in_rounded),
+          onPressed: () => _timelineKey.currentState?.zoomBy(2),
+        ),
+        IconButton(
+          tooltip: l10n.videoEditorZoomFit,
+          style: zoomStyle,
+          visualDensity: VisualDensity.compact,
+          icon: const Icon(Icons.fit_screen_rounded),
+          onPressed: () => _timelineKey.currentState?.resetZoom(),
+        ),
+      ],
+    );
+  }
+
+  /// The timeline with draggable handles & filmstrip.
+  Widget _buildTimeline(VideoEditorController editor) {
+    return VideoTimeline(
+      key: _timelineKey,
+      durationUs: editor.durationUs,
+      segments: editor.segments,
+      selectedId: editor.selectedId,
+      mode: editor.mode,
+      keyframes: editor.keyframes,
+      snappedExportRanges: editor.snappedRanges,
+      filmstripFrames: _filmstripFrames,
+      playheadUs: _playhead,
+      onScrubStart: _onScrubStart,
+      onScrub: _onScrub,
+      onScrubEnd: _onScrubEnd,
+      onTapAt: _onTimelineTap,
+      onHandleDragStart: editor.beginHandleDrag,
+      onHandleDragUpdate: (isStart, us) {
+        if (isStart) {
+          editor.updateSelectedStart(us);
+        } else {
+          editor.updateSelectedEnd(us);
+        }
+      },
+      onHandleDragEnd: editor.endHandleDrag,
+    );
+  }
+
+  /// Selected segment range, then playback speed and the segments chip.
+  Widget _buildSummaryRow(
+    BuildContext context,
+    VideoEditorController editor, {
+    bool compact = false,
+  }) {
+    final l10n = context.l10n;
+    final cs = context.colors;
+    final text = context.typography;
+    final segments = editor.segments;
+    final selected = editor.selected;
+    final summaryStyle = text.bodySmall?.copyWith(color: cs.onSurfaceVariant);
+
+    return Row(
+      children: [
+        Expanded(
+          child: selected != null
+              ? Text(
+                  '${formatTimecode(selected.startUs)} – ${formatTimecode(selected.endUs)}'
+                  '  (${formatTimecode(selected.lengthUs, millis: false)})',
+                  style: summaryStyle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                )
+              : Text(
+                  segments.isEmpty
+                      ? l10n.videoEditorNoSegments
+                      : '${segments.length} ${segments.length == 1 ? 'segment' : 'segments'}',
+                  style: summaryStyle,
+                  maxLines: 1,
                 ),
-                IconButton(
-                  iconSize: 28,
-                  style: IconButton.styleFrom(
-                    minimumSize: const Size(52, 52),
-                    padding: EdgeInsets.zero,
-                  ),
-                  tooltip: l10n.videoEditorSetEnd,
-                  icon: const Icon(Icons.last_page_rounded),
-                  onPressed: selected == null ? null : _setEnd,
-                ),
-                IconButton(
-                  iconSize: 28,
-                  style: IconButton.styleFrom(
-                    minimumSize: const Size(52, 52),
-                    padding: EdgeInsets.zero,
-                  ),
-                  tooltip: l10n.videoEditorSplit,
-                  icon: const Icon(Icons.call_split_rounded),
-                  onPressed: _splitSegment,
-                ),
-                IconButton(
-                  iconSize: 28,
-                  style: IconButton.styleFrom(
-                    minimumSize: const Size(52, 52),
-                    padding: EdgeInsets.zero,
-                  ),
-                  tooltip: l10n.videoEditorRemoveSection,
-                  icon: const Icon(Icons.delete_outline_rounded),
-                  onPressed: selected == null ? null : editor.deleteSelected,
-                ),
-                IconButton(
-                  iconSize: 28,
-                  style: IconButton.styleFrom(
-                    minimumSize: const Size(52, 52),
-                    padding: EdgeInsets.zero,
-                  ),
-                  tooltip: l10n.videoEditorAddSegment,
-                  icon: const Icon(Icons.add_rounded),
-                  onPressed: _addSegment,
-                ),
-              ],
+        ),
+        _buildSpeedButton(context),
+        const SizedBox(width: 4),
+        ActionChip(
+          avatar: const Icon(Icons.layers_rounded, size: 18),
+          label: Text('${segments.length}'),
+          tooltip: l10n.videoEditorSegments,
+          materialTapTargetSize: compact
+              ? MaterialTapTargetSize.shrinkWrap
+              : null,
+          onPressed: () => VideoSegmentsSheet.show(
+            context,
+            editor: editor,
+            onSeekTo: (us) => unawaited(_seekToUs(us)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Mute toggle: a square transport-row button of [box] size.
+  Widget _buildMuteButton(
+    BuildContext context, {
+    required double box,
+    required double iconSize,
+  }) {
+    final l10n = context.l10n;
+    final cs = context.colors;
+    return IconButton.filledTonal(
+      style: IconButton.styleFrom(
+        minimumSize: Size(box, box),
+        padding: EdgeInsets.zero,
+        backgroundColor: _isMuted ? cs.primaryContainer : null,
+        foregroundColor: _isMuted ? cs.onPrimaryContainer : null,
+      ),
+      iconSize: iconSize,
+      tooltip: _isMuted ? l10n.unmuteTooltip : l10n.muteTooltip,
+      icon: Icon(_isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded),
+      onPressed: () => unawaited(_toggleMute()),
+    );
+  }
+
+  Widget _buildSpeedButton(BuildContext context) {
+    final l10n = context.l10n;
+    final cs = context.colors;
+    return PopupMenuButton<double>(
+      tooltip: l10n.playbackSpeedLabel,
+      initialValue: _playbackSpeed,
+      onSelected: _setPlaybackSpeed,
+      itemBuilder: (context) => [
+        for (final speed in MediaViewerConstants.playbackSpeeds)
+          PopupMenuItem<double>(
+            value: speed,
+            child: Text(
+              speed == 1.0
+                  ? l10n.playbackSpeedNormal(_speedValue(speed))
+                  : l10n.playbackSpeedValue(_speedValue(speed)),
             ),
+          ),
+      ],
+      child: Container(
+        height: 40,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: _playbackSpeed == 1.0
+              ? cs.surfaceContainerHighest
+              : cs.primaryContainer,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.speed_rounded,
+              size: 18,
+              color: _playbackSpeed == 1.0
+                  ? cs.onSurfaceVariant
+                  : cs.onPrimaryContainer,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '${_speedValue(_playbackSpeed)}×',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: _playbackSpeed == 1.0
+                    ? cs.onSurfaceVariant
+                    : cs.onPrimaryContainer,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Keyframe / frame stepping, play / pause, cut preview and mute. [compact]
+  /// uses slightly smaller buttons.
+  Widget _buildTransportRow(
+    BuildContext context,
+    NativeVideoController player, {
+    bool compact = false,
+  }) {
+    final l10n = context.l10n;
+    final cs = context.colors;
+    final box = compact ? 44.0 : 52.0;
+    final playBox = compact ? 52.0 : 58.0;
+    final iconSize = compact ? 26.0 : 28.0;
+    final playIconSize = compact ? 30.0 : 32.0;
+    final sideStyle = IconButton.styleFrom(
+      minimumSize: Size(box, box),
+      padding: EdgeInsets.zero,
+    );
+
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            iconSize: iconSize,
+            style: sideStyle,
+            tooltip: l10n.videoEditorPrevKeyframe,
+            icon: const Icon(Icons.skip_previous_rounded),
+            onPressed: () => _jumpKeyframe(forward: false),
+          ),
+          IconButton(
+            iconSize: iconSize,
+            style: sideStyle,
+            tooltip: l10n.videoEditorPrevFrame,
+            icon: const Icon(Icons.chevron_left_rounded),
+            onPressed: () => _stepFrame(forward: false),
+          ),
+          ValueListenableBuilder<NativeVideoValue>(
+            valueListenable: player,
+            builder: (context, v, _) => IconButton.filled(
+              style: IconButton.styleFrom(
+                minimumSize: Size(playBox, playBox),
+                padding: EdgeInsets.zero,
+                backgroundColor: cs.primary,
+                foregroundColor: cs.onPrimary,
+              ),
+              iconSize: playIconSize,
+              tooltip: l10n.mediaViewerActionPlayPause,
+              icon: Icon(
+                v.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+              ),
+              onPressed: () => unawaited(_togglePlay()),
+            ),
+          ),
+          IconButton(
+            iconSize: iconSize,
+            style: sideStyle,
+            tooltip: l10n.videoEditorNextFrame,
+            icon: const Icon(Icons.chevron_right_rounded),
+            onPressed: () => _stepFrame(forward: true),
+          ),
+          IconButton(
+            iconSize: iconSize,
+            style: sideStyle,
+            tooltip: l10n.videoEditorNextKeyframe,
+            icon: const Icon(Icons.skip_next_rounded),
+            onPressed: () => _jumpKeyframe(forward: true),
+          ),
+          const SizedBox(width: 8),
+          IconButton.filledTonal(
+            style: IconButton.styleFrom(
+              minimumSize: Size(box, box),
+              padding: EdgeInsets.zero,
+              backgroundColor: _previewResult ? cs.primaryContainer : null,
+              foregroundColor: _previewResult ? cs.onPrimaryContainer : null,
+            ),
+            iconSize: iconSize,
+            tooltip: l10n.videoEditorPreviewCut,
+            icon: Icon(
+              _previewResult
+                  ? Icons.content_cut_rounded
+                  : Icons.content_cut_outlined,
+            ),
+            onPressed: () {
+              setState(() => _previewResult = !_previewResult);
+            },
+          ),
+          _buildMuteButton(context, box: box, iconSize: iconSize),
+        ],
+      ),
+    );
+  }
+
+  /// Set start / set end / split / remove / add segment.
+  Widget _buildToolsRow(
+    BuildContext context,
+    VideoEditorController editor, {
+    bool compact = false,
+  }) {
+    final l10n = context.l10n;
+    final selected = editor.selected;
+    final box = compact ? 44.0 : 52.0;
+    final iconSize = compact ? 26.0 : 28.0;
+    final style = IconButton.styleFrom(
+      minimumSize: Size(box, box),
+      padding: EdgeInsets.zero,
+    );
+
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            iconSize: iconSize,
+            style: style,
+            tooltip: l10n.videoEditorSetStart,
+            icon: const Icon(Icons.first_page_rounded),
+            onPressed: selected == null ? null : _setStart,
+          ),
+          IconButton(
+            iconSize: iconSize,
+            style: style,
+            tooltip: l10n.videoEditorSetEnd,
+            icon: const Icon(Icons.last_page_rounded),
+            onPressed: selected == null ? null : _setEnd,
+          ),
+          IconButton(
+            iconSize: iconSize,
+            style: style,
+            tooltip: l10n.videoEditorSplit,
+            icon: const Icon(Icons.call_split_rounded),
+            onPressed: _splitSegment,
+          ),
+          IconButton(
+            iconSize: iconSize,
+            style: style,
+            tooltip: l10n.videoEditorRemoveSection,
+            icon: const Icon(Icons.delete_outline_rounded),
+            onPressed: selected == null ? null : editor.deleteSelected,
+          ),
+          IconButton(
+            iconSize: iconSize,
+            style: style,
+            tooltip: l10n.videoEditorAddSegment,
+            icon: const Icon(Icons.add_rounded),
+            onPressed: _addSegment,
           ),
         ],
       ),

@@ -31,15 +31,18 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_listDirectory(
         if (ensureMounted(volId)) {
             std::vector<std::string> results;
             results.reserve(256);
-            fsListDirectory(volId, nativePath, results);
-
-            jclass strClass = env->FindClass("java/lang/String");
-            result = env->NewObjectArray(static_cast<jsize>(results.size()), strClass, nullptr);
-            for (size_t i = 0; i < results.size(); i++) {
-                sanitizeString(results[i]);
-                jstring js = env->NewStringUTF(results[i].c_str());
-                env->SetObjectArrayElement(result, i, js);
-                env->DeleteLocalRef(js);
+            // A failed listing returns null ("unreadable"), never an empty
+            // array: callers treat an empty array as a real, empty folder
+            // (and cache it, or sync against it).
+            if (fsListDirectory(volId, nativePath, results)) {
+                jclass strClass = env->FindClass("java/lang/String");
+                result = env->NewObjectArray(static_cast<jsize>(results.size()), strClass, nullptr);
+                for (size_t i = 0; i < results.size(); i++) {
+                    sanitizeString(results[i]);
+                    jstring js = env->NewStringUTF(results[i].c_str());
+                    env->SetObjectArrayElement(result, i, js);
+                    env->DeleteLocalRef(js);
+                }
             }
         }
     }
@@ -398,6 +401,11 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_getSpaceInfo(
             fsGetSpaceInfo(volId, totalBytes, freeBytes);
         }
     }
+    // A mounted filesystem never has zero total capacity, so 0 means the
+    // query itself failed (mount/f_getfree error). Report "unknown" (null)
+    // instead of [0, 0]: callers treat null as "don't block" but would
+    // treat 0 free bytes as real and reject imports/copies as out of space.
+    if (totalBytes == 0) return nullptr;
     jlongArray ret = env->NewLongArray(2);
     if (!ret) return nullptr;
     const jlong tmp[2] = {static_cast<jlong>(totalBytes), static_cast<jlong>(freeBytes)};

@@ -1,9 +1,14 @@
 package com.aeidolon.vaultexplorer.htmlviewer
 
+import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Context
 import android.net.Uri
+import android.view.MotionEvent
+import android.view.VelocityTracker
 import android.view.View
+import android.view.ViewConfiguration
+import android.view.animation.DecelerateInterpolator
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -14,6 +19,9 @@ import android.webkit.WebViewClient
 import com.aeidolon.vaultexplorer.container.ContainerFileSystem
 import com.aeidolon.vaultexplorer.container.ContainerSessionRegistry
 import com.aeidolon.vaultexplorer.MimeTypeHelper
+import com.aeidolon.vaultexplorer.reader.BookSessions
+import com.aeidolon.vaultexplorer.reader.PageMath
+import com.aeidolon.vaultexplorer.reader.ZipReader
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
@@ -23,6 +31,7 @@ import io.flutter.plugin.platform.PlatformView
 import io.flutter.plugin.platform.PlatformViewFactory
 import java.io.ByteArrayInputStream
 import java.io.FileNotFoundException
+import kotlin.math.roundToInt
 
 /** viewType every [HtmlViewerViewFactory] instance is registered under; the
  *  per-instance method/event channels below are namespaced with the
@@ -36,6 +45,336 @@ const val HTML_VIEWER_VIEW_TYPE = "com.aeidolon.vaultexplorer/html_viewer"
  *  vault HTML resolve the way a browser expects. */
 internal const val VAULT_HOST = "vault-local.internal"
 
+/** Virtual origin for an open EPUB. Paths under it are `/<bookToken>/<zip entry>`
+ *  and are answered from the book's [BookSessions] entry, never from a network
+ *  or the file system. */
+internal const val EPUB_HOST = "epub-local.internal"
+
+/** Always injected into EPUB markup: keeps pictures and tables inside the screen
+ *  and gives long words/URLs somewhere to break. Theme CSS from Dart follows it. */
+private const val EPUB_BASE_CSS =
+    "img,svg,video{max-width:100%!important;height:auto!important}" +
+        "html{overflow-x:hidden}body{overflow-wrap:break-word}table{max-width:100%}pre{white-space:pre-wrap}"
+private const val EPUB_FIXED_CSS =
+    "img,svg,video{max-width:100%;max-height:100%}"
+
+private class ReaderWebView(context: Context) : WebView(context) {
+    var pagedMode: Boolean = false
+    var rightToLeft: Boolean = false
+    var twoPageLandscape: Boolean = false
+
+    /** Called with +1 / -1 (reading order) when the reader tries to turn past the
+     *  last / first page of the chapter: the host moves on to the neighbouring chapter. */
+    var onChapterEdge: ((Int) -> Unit)? = null
+    var onPageLayoutChanged: (() -> Unit)? = null
+
+    /** Physical edge a freshly loaded chapter should rest on: 1 = highest scroll
+     *  offset, -1 = lowest, 0 = leave it alone. Chapter layout (images, fonts)
+     *  can finish after the page "finishes", so the host re-applies this for a
+     *  moment; a touch or an explicit scroll position cancels it. */
+    var landingEdge: Int = 0
+
+    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
+    private val flingVelocity = ViewConfiguration.get(context).scaledMinimumFlingVelocity * 6
+    private val edgeSlop = (resources.displayMetrics.density * 4f).toInt().coerceAtLeast(4)
+    private var downX = 0f
+    private var downY = 0f
+    private var downPage = 0
+    private var pagingGesture = false
+    private var horizontalPageGesture = false
+    private var wasHorizontalSpread = false
+    private var pageAnimator: ValueAnimator? = null
+    private var pageAnimatorTargetOffset: Int? = null
+    private var velocityTracker: VelocityTracker? = null
+
+    fun horizontalScrollRange(): Int = computeHorizontalScrollRange()
+
+    fun isHorizontalPaging(): Boolean = pagedMode
+
+    private fun pageViewport(): Int = if (isHorizontalPaging()) width else height
+
+    private fun pageContentRange(): Int = if (isHorizontalPaging()) {
+        horizontalScrollRange()
+    } else {
+        (contentHeight * resources.displayMetrics.density).toInt()
+    }
+
+    private fun currentOffset(): Int = if (isHorizontalPaging()) scrollX else scrollY
+
+    private fun maxPageOffset(): Int = PageMath.maxOffset(pageContentRange(), pageViewport())
+
+    private fun lastPage(): Int = PageMath.lastPage(pageContentRange(), pageViewport(), edgeSlop)
+
+    private fun pageAtOffset(offset: Int): Int =
+        PageMath.pageAtOffset(offset, pageContentRange(), pageViewport(), edgeSlop)
+
+    /** Scroll offset showing [page] (0-based, physical order). */
+    fun offsetOfPage(page: Int): Int =
+        PageMath.offsetOfPage(page, pageContentRange(), pageViewport(), edgeSlop)
+
+    fun pageCount(): Int = lastPage() + 1
+
+    /** The page on screen (0-based, physical order). */
+    fun currentPage(): Int = pageAtOffset(scrollX)
+
+    fun isAtPhysicalStart(): Boolean = scrollX <= edgeSlop
+
+    fun isAtPhysicalEnd(): Boolean = scrollX >= maxPageOffset() - edgeSlop
+
+    /** Moves to [landingEdge] if one is pending; true when the position changed. */
+    fun settleToLandingEdge(): Boolean {
+        if (landingEdge == 0) return false
+        if (!pagedMode) {
+            // Continuous scroll: rest at the very bottom (coming back from the next chapter).
+            val bottom = (computeVerticalScrollRange() - height).coerceAtLeast(0)
+            val targetY = if (landingEdge > 0) bottom else 0
+            if (scrollY == targetY) return false
+            scrollTo(scrollX, targetY)
+            return true
+        }
+        val target = if (landingEdge > 0) maxPageOffset() else 0
+        if (scrollX == target && scrollY == 0) return false
+        cancelPageAnimation()
+        scrollTo(target, 0)
+        return true
+    }
+
+    fun cancelPageAnimation(settleToTarget: Boolean = false) {
+        val targetOffset = pageAnimatorTargetOffset
+        pageAnimator?.cancel()
+        pageAnimator = null
+        pageAnimatorTargetOffset = null
+        if (settleToTarget && targetOffset != null) scrollTo(targetOffset, 0)
+    }
+
+    /** [direction] is in reading order: +1 = next page, -1 = previous page. */
+    fun turnPage(direction: Int, rightToLeft: Boolean) {
+        val progression = if (rightToLeft) -1 else 1
+        val page = pageAtOffset(pageAnimatorTargetOffset ?: currentOffset())
+        val target = page + direction * progression
+        if (target < 0 || target > lastPage()) {
+            // Past the first/last page of the chapter: carry on into the neighbour.
+            onChapterEdge?.invoke(direction)
+            return
+        }
+        scrollToPage(target, animate = true)
+    }
+
+    private fun scrollToPage(page: Int, animate: Boolean = false) {
+        val horizontal = isHorizontalPaging()
+        val viewport = pageViewport()
+        if (viewport <= 0) return
+        val offset = offsetOfPage(page)
+        val current = if (horizontal) scrollX else scrollY
+        cancelPageAnimation()
+        if (!animate || current == offset) {
+            scrollTo(if (horizontal) offset else 0, if (horizontal) 0 else offset)
+            return
+        }
+        pageAnimator = ValueAnimator.ofInt(current, offset).apply {
+            duration = 240
+            interpolator = DecelerateInterpolator(1.4f)
+            pageAnimatorTargetOffset = offset
+            addUpdateListener { animation ->
+                val value = animation.animatedValue as Int
+                scrollTo(if (horizontal) value else 0, if (horizontal) 0 else value)
+            }
+            start()
+        }
+    }
+
+    fun configurePagedMode(enabled: Boolean, twoPageLandscape: Boolean) {
+        cancelPageAnimation()
+        pagedMode = enabled
+        this.twoPageLandscape = twoPageLandscape
+        isHorizontalScrollBarEnabled = false
+        isVerticalScrollBarEnabled = !enabled
+        overScrollMode = if (enabled) View.OVER_SCROLL_NEVER else View.OVER_SCROLL_IF_CONTENT_SCROLLS
+        wasHorizontalSpread = isHorizontalPaging()
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        val isSpread = isHorizontalPaging()
+        if (isSpread != wasHorizontalSpread) {
+            wasHorizontalSpread = isSpread
+            post { onPageLayoutChanged?.invoke() }
+        }
+    }
+
+    override fun onScrollChanged(l: Int, t: Int, oldl: Int, oldt: Int) {
+        super.onScrollChanged(l, t, oldl, oldt)
+        if (pagedMode && t != 0) {
+            // Some EPUB CSS and WebView's own touch slop can still move the
+            // document vertically by a few pixels. Paged reading has no
+            // vertical scroll position, so keep it pinned to the page row.
+            post { if (pagedMode && scrollY != 0) scrollTo(scrollX, 0) }
+        }
+    }
+
+    private fun recycleVelocityTracker() {
+        velocityTracker?.recycle()
+        velocityTracker = null
+    }
+
+    private var scrollStartAtTop = false
+    private var scrollStartAtBottom = false
+    private var scrollMultiTouch = false
+
+    /** Continuous-scroll mode: a deliberate pull past the bottom (or top) of the
+     *  chapter, started while already resting there, moves to the next (or
+     *  previous) chapter. Never consumes events; WebView scrolls as usual. */
+    private fun trackScrollModeEdges(event: MotionEvent) {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                landingEdge = 0
+                recycleVelocityTracker()
+                velocityTracker = VelocityTracker.obtain().also { it.addMovement(event) }
+                downX = event.x
+                downY = event.y
+                scrollStartAtTop = !canScrollVertically(-1)
+                scrollStartAtBottom = !canScrollVertically(1)
+                scrollMultiTouch = false
+            }
+            MotionEvent.ACTION_POINTER_DOWN -> scrollMultiTouch = true
+            MotionEvent.ACTION_MOVE -> velocityTracker?.addMovement(event)
+            MotionEvent.ACTION_UP -> {
+                velocityTracker?.addMovement(event)
+                val tracker = velocityTracker
+                tracker?.computeCurrentVelocity(1000)
+                val vy = tracker?.yVelocity ?: 0f
+                recycleVelocityTracker()
+                val dx = event.x - downX
+                val dy = event.y - downY
+                if (!scrollMultiTouch && kotlin.math.abs(dy) > kotlin.math.abs(dx)) {
+                    val threshold = maxOf(touchSlop * 3, (height * 0.12f).toInt())
+                    val flicked = kotlin.math.abs(vy) >= flingVelocity &&
+                        kotlin.math.abs(dy) >= touchSlop * 2 &&
+                        (vy < 0f) == (dy < 0f)
+                    if (kotlin.math.abs(dy) >= threshold || flicked) {
+                        if (dy < 0 && scrollStartAtBottom && !canScrollVertically(1)) {
+                            onChapterEdge?.invoke(1)
+                        } else if (dy > 0 && scrollStartAtTop && !canScrollVertically(-1)) {
+                            onChapterEdge?.invoke(-1)
+                        }
+                    }
+                }
+            }
+            MotionEvent.ACTION_CANCEL -> recycleVelocityTracker()
+        }
+    }
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (!pagedMode) {
+            trackScrollModeEdges(event)
+            return super.onTouchEvent(event)
+        }
+
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                // A fast second swipe starts from the page already being
+                // turned to, so repeated turns do not get trapped midway.
+                cancelPageAnimation(settleToTarget = true)
+                // The reader has taken over; stop re-applying the landing position.
+                landingEdge = 0
+                recycleVelocityTracker()
+                velocityTracker = VelocityTracker.obtain().also { it.addMovement(event) }
+                downX = event.x
+                downY = event.y
+                downPage = pageAtOffset(currentOffset())
+                scrollToPage(downPage)
+                pagingGesture = false
+                horizontalPageGesture = false
+            }
+            MotionEvent.ACTION_MOVE -> {
+                velocityTracker?.addMovement(event)
+                val dx = event.x - downX
+                val dy = event.y - downY
+                if (
+                    event.pointerCount == 1 &&
+                    !pagingGesture &&
+                    maxOf(kotlin.math.abs(dx), kotlin.math.abs(dy)) > touchSlop
+                ) {
+                    pagingGesture = true
+                    horizontalPageGesture = kotlin.math.abs(dx) > kotlin.math.abs(dy)
+                    // Horizontal drags reveal the neighboring page; on
+                    // release the WebView settles to a full page. Vertical
+                    // drags are consumed and snap back.
+                    val cancel = MotionEvent.obtain(event)
+                    cancel.action = MotionEvent.ACTION_CANCEL
+                    super.onTouchEvent(cancel)
+                    cancel.recycle()
+                    return true
+                }
+                if (pagingGesture) {
+                    if (horizontalPageGesture && event.pointerCount == 1) {
+                        val maxOffset = maxPageOffset()
+                        val startOffset = offsetOfPage(downPage).coerceIn(0, maxOffset)
+                        val offset = (startOffset - dx.roundToInt()).coerceIn(0, maxOffset)
+                        scrollTo(offset, 0)
+                    }
+                    return true
+                }
+            }
+            MotionEvent.ACTION_UP -> {
+                velocityTracker?.addMovement(event)
+                if (pagingGesture) {
+                    val dx = event.x - downX
+                    val tracker = velocityTracker
+                    tracker?.computeCurrentVelocity(1000)
+                    val vx = tracker?.xVelocity ?: 0f
+                    recycleVelocityTracker()
+                    val turnThreshold = maxOf(touchSlop * 2, (width * 0.18f).toInt())
+                    // A quick flick turns the page even if it did not travel far.
+                    val flicked = kotlin.math.abs(vx) >= flingVelocity &&
+                        kotlin.math.abs(dx) >= touchSlop * 2 &&
+                        (vx < 0f) == (dx < 0f)
+                    if (horizontalPageGesture && (kotlin.math.abs(dx) >= turnThreshold || flicked)) {
+                        val direction = if (dx < 0) 1 else -1
+                        val progression = if (rightToLeft) -1 else 1
+                        val target = downPage + direction
+                        if (target < 0 || target > lastPage()) {
+                            // Swiped past the first/last page: settle back and
+                            // hand over to the neighbouring chapter.
+                            scrollToPage(downPage, animate = true)
+                            onChapterEdge?.invoke(direction * progression)
+                        } else {
+                            scrollToPage(target, animate = true)
+                        }
+                    } else {
+                        scrollToPage(downPage, animate = true)
+                    }
+                    pagingGesture = false
+                    horizontalPageGesture = false
+                    return true
+                }
+                recycleVelocityTracker()
+                val moved = kotlin.math.abs(event.x - downX) > 2f ||
+                    kotlin.math.abs(event.y - downY) > 2f
+                val handled = super.onTouchEvent(event)
+                if (moved) {
+                    // WebView starts native scrolling before touchSlop. Snap
+                    // sub-threshold drags back to the page they began on so a
+                    // paged chapter can never be left between pages or nudged
+                    // vertically by a short gesture.
+                    post { scrollToPage(downPage, animate = true) }
+                }
+                return handled
+            }
+            MotionEvent.ACTION_CANCEL -> {
+                recycleVelocityTracker()
+                if (pagingGesture) {
+                    scrollToPage(downPage)
+                    pagingGesture = false
+                    horizontalPageGesture = false
+                    return true
+                }
+            }
+        }
+        return super.onTouchEvent(event)
+    }
+}
+
 class HtmlViewerViewFactory(
     private val messenger: BinaryMessenger,
 ) : PlatformViewFactory(StandardMessageCodec.INSTANCE) {
@@ -45,7 +384,20 @@ class HtmlViewerViewFactory(
         val volId = (params["volId"] as? Number)?.toInt() ?: -1
         val htmlPath = params["htmlPath"] as? String ?: ""
         val jsEnabled = params["javaScriptEnabled"] as? Boolean ?: false
-        return HtmlViewerView(context, messenger, viewId, volId, htmlPath, jsEnabled)
+        val bookToken = params["bookToken"] as? String
+        val bookEntry = params["bookEntry"] as? String ?: ""
+        val bookCss = params["bookCss"] as? String ?: ""
+        val textZoom = (params["textZoom"] as? Number)?.toInt() ?: 100
+        val backgroundColor = (params["backgroundColor"] as? Number)?.toInt()
+        val bookPagedMode = params["bookPagedMode"] as? Boolean ?: true
+        val bookFixedLayout = params["bookFixedLayout"] as? Boolean ?: false
+        val bookRtl = params["bookRtl"] as? Boolean ?: false
+        val bookTwoPageLandscape = params["bookTwoPageLandscape"] as? Boolean ?: false
+        return HtmlViewerView(
+            context, messenger, viewId, volId, htmlPath, jsEnabled,
+            bookToken, bookEntry, bookCss, textZoom, backgroundColor,
+            bookPagedMode, bookFixedLayout, bookRtl, bookTwoPageLandscape,
+        )
     }
 }
 
@@ -57,14 +409,29 @@ class HtmlViewerView(
     private val volId: Int,
     private val initialPath: String,
     jsEnabled: Boolean,
+    /** Non-null puts the view in e-book mode: requests are served from this book session. */
+    private val bookToken: String? = null,
+    private val initialBookEntry: String = "",
+    private var bookCss: String = "",
+    initialTextZoom: Int = 100,
+    initialBackgroundColor: Int? = null,
+    private var bookPagedMode: Boolean = true,
+    private val bookFixedLayout: Boolean = false,
+    private var bookRtl: Boolean = false,
+    private var bookTwoPageLandscape: Boolean = false,
 ) : PlatformView, MethodChannel.MethodCallHandler {
 
-    private val webView = WebView(context)
+    private val webView = ReaderWebView(context)
     private val methodChannel = MethodChannel(messenger, "$HTML_VIEWER_VIEW_TYPE/$viewId")
     private val eventChannel = EventChannel(messenger, "$HTML_VIEWER_VIEW_TYPE/events/$viewId")
     private var eventSink: EventChannel.EventSink? = null
 
     init {
+        webView.configurePagedMode(
+            enabled = bookToken != null && bookPagedMode,
+            twoPageLandscape = bookToken != null && bookTwoPageLandscape,
+        )
+        webView.rightToLeft = bookRtl
         methodChannel.setMethodCallHandler(this)
         eventChannel.setStreamHandler(object : EventChannel.StreamHandler {
             override fun onListen(arguments: Any?, sink: EventChannel.EventSink) { eventSink = sink }
@@ -79,6 +446,7 @@ class HtmlViewerView(
             allowContentAccess = false
             allowFileAccessFromFileURLs = false
             allowUniversalAccessFromFileURLs = false
+            if (bookToken != null) useWideViewPort = true
             // Hard OS-level backstop: even if shouldInterceptRequest below
             // ever failed to catch something, the WebView itself refuses to
             // open a real network socket.
@@ -90,6 +458,16 @@ class HtmlViewerView(
             displayZoomControls = false
             mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
             mediaPlaybackRequiresUserGesture = true
+        }
+        webView.settings.textZoom = initialTextZoom.coerceIn(50, 300)
+        if (initialBackgroundColor != null) webView.setBackgroundColor(initialBackgroundColor)
+        if (bookToken != null) {
+            webView.onChapterEdge = { direction ->
+                eventSink?.success(mapOf("event" to "chapterEdge", "direction" to direction))
+            }
+            webView.landingEdge = startEdge()
+            webView.onPageLayoutChanged = { scheduleScrollEvent() }
+            webView.setOnScrollChangeListener { _, _, _, _, _ -> scheduleScrollEvent() }
         }
         webView.webViewClient = VaultWebViewClient()
         webView.webChromeClient = WebChromeClient()
@@ -108,9 +486,172 @@ class HtmlViewerView(
     }
 
     private fun loadInitialPage() {
+        if (bookToken != null) {
+            if (initialBookEntry.isNotEmpty()) webView.loadUrl(buildBookUri(initialBookEntry, "").toString())
+            return
+        }
         if (initialPath.isEmpty()) return
         webView.loadUrl(buildVaultUri(initialPath).toString())
     }
+
+    private fun buildBookUri(entryPath: String, fragment: String): Uri {
+        val builder = Uri.Builder()
+            .scheme("https")
+            .authority(EPUB_HOST)
+            .appendPath(bookToken ?: "")
+        for (segment in entryPath.split("/")) {
+            if (segment.isNotEmpty()) builder.appendPath(segment)
+        }
+        if (fragment.isNotEmpty()) builder.fragment(fragment)
+        return builder.build()
+    }
+
+    // -- e-book scroll progress (the reader shows it and offers the next chapter at the end) --
+
+    private var scrollEventPending = false
+    private var suppressNextScrollEvent = false
+    private var landingToken = 0
+
+    /** Physical scroll edge that is the start of a chapter in reading order. */
+    private fun startEdge(): Int = if (bookPagedMode && bookRtl) 1 else 0
+
+    /** Physical scroll edge that is the end of a chapter in reading order. */
+    private fun endEdge(): Int = if (bookRtl) -1 else 1
+
+    private fun scheduleScrollEvent() {
+        if (scrollEventPending) return
+        scrollEventPending = true
+        webView.postDelayed({
+            scrollEventPending = false
+            val initial = suppressNextScrollEvent
+            suppressNextScrollEvent = false
+            emitScrollEvent(initial = initial)
+        }, 120)
+    }
+
+    private fun emitScrollEvent(initial: Boolean = false) {
+        val horizontalPages = webView.isHorizontalPaging()
+        val verticalContent = (webView.contentHeight * webView.resources.displayMetrics.density).toInt()
+        val contentPx = if (bookPagedMode && horizontalPages) {
+            webView.horizontalScrollRange()
+        } else {
+            verticalContent
+        }
+        val viewportPx = if (bookPagedMode && horizontalPages) webView.width else webView.height
+        val travel = (contentPx - viewportPx).coerceAtLeast(1)
+        val offset = if (bookPagedMode && horizontalPages) webView.scrollX else webView.scrollY
+        val fraction = if (bookPagedMode && horizontalPages && bookRtl) {
+            ((travel - offset).toFloat() / travel).coerceIn(0f, 1f)
+        } else {
+            (offset.toFloat() / travel).coerceIn(0f, 1f)
+        }
+        val pagedHorizontally = bookPagedMode && horizontalPages
+        val pageCount = if (pagedHorizontally) webView.pageCount() else 1
+        val physicalPage = webView.currentPage()
+        val page = if (pagedHorizontally) {
+            if (bookRtl) pageCount - physicalPage else physicalPage + 1
+        } else {
+            1
+        }
+        // Edges use the same pixel tolerance as page turning, so "at the end"
+        // here and "can't turn further" in the gesture code always agree.
+        val atStart = if (pagedHorizontally) {
+            if (bookRtl) webView.isAtPhysicalEnd() else webView.isAtPhysicalStart()
+        } else !webView.canScrollVertically(-1)
+        val atEnd = if (pagedHorizontally) {
+            if (bookRtl) webView.isAtPhysicalStart() else webView.isAtPhysicalEnd()
+        } else !webView.canScrollVertically(1)
+        eventSink?.success(
+            mapOf(
+                "event" to "scroll",
+                "fraction" to fraction.toDouble(),
+                "page" to page,
+                "pageCount" to pageCount,
+                "atStart" to atStart,
+                "atEnd" to atEnd,
+                "initial" to initial,
+            )
+        )
+    }
+
+    private fun bookMime(path: String): String {
+        val lower = path.lowercase()
+        return when {
+            lower.endsWith(".xhtml") || lower.endsWith(".xht") -> "application/xhtml+xml"
+            lower.endsWith(".html") || lower.endsWith(".htm") -> "text/html"
+            else -> MimeTypeHelper.getMimeType(path)
+        }
+    }
+
+    private fun injectBookStyle(bytes: ByteArray): ByteArray {
+        var text = String(bytes, Charsets.UTF_8)
+        if (!bookFixedLayout) {
+            // Without a device-width viewport the WebView lays the chapter out at
+            // its ~980px default and shrinks it, leaving tiny text to pinch and pan.
+            val viewportPattern = Regex(
+                """<meta\b(?=[^>]*\bname\s*=\s*["']viewport["'])[^>]*>""",
+                RegexOption.IGNORE_CASE,
+            )
+            val viewportTag = "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />"
+            if (viewportPattern.containsMatchIn(text)) {
+                text = viewportPattern.replaceFirst(text, viewportTag)
+            } else {
+                val headEnd = text.indexOf("</head>", ignoreCase = true)
+                val bodyStart = if (headEnd < 0) text.indexOf("<body", ignoreCase = true) else -1
+                val insertAt = if (headEnd >= 0) headEnd else bodyStart
+                if (insertAt >= 0) text = text.substring(0, insertAt) + viewportTag + text.substring(insertAt)
+            }
+        }
+        val baseCss = when {
+            bookFixedLayout -> EPUB_FIXED_CSS
+            bookPagedMode -> "img,svg,video{max-width:100%!important;height:auto!important}table{max-width:100%}pre{white-space:pre-wrap}"
+            else -> EPUB_BASE_CSS
+        }
+        val tag = "<style type=\"text/css\">" + baseCss + bookCss + "</style>"
+        val head = text.indexOf("</head>", ignoreCase = true)
+        val at = if (head >= 0) head else {
+            val body = text.indexOf("<body", ignoreCase = true)
+            if (body >= 0) body else return bytes
+        }
+        return (text.substring(0, at) + tag + text.substring(at)).toByteArray(Charsets.UTF_8)
+    }
+
+    private fun interceptBookRequest(request: WebResourceRequest): WebResourceResponse {
+        val uri = request.url
+        if (uri.scheme != "https" || uri.host != EPUB_HOST) return blockedResponse()
+        val segments = uri.pathSegments.filter { it.isNotEmpty() }
+        if (segments.size < 2 || segments[0] != bookToken) return blockedResponse()
+        val entryParts = segments.drop(1)
+        if (entryParts.any { it == ".." || it == "." }) return blockedResponse()
+        val session = BookSessions.get(bookToken) ?: return notFoundResponse()
+        val entry = session.directory.find(entryParts.joinToString("/")) ?: return notFoundResponse()
+        return try {
+            var bytes = ZipReader.readEntry(session.source, entry)
+            val mime = bookMime(entry.name)
+            session.epub?.fontObfuscation?.get(entry.name)?.let { obfuscation ->
+                val count = minOf(bytes.size, obfuscation.prefixLength)
+                for (i in 0 until count) {
+                    bytes[i] = (bytes[i].toInt() xor obfuscation.key[i % obfuscation.key.size].toInt()).toByte()
+                }
+            }
+            val markup = mime == "application/xhtml+xml" || mime == "text/html"
+            if (markup) bytes = injectBookStyle(bytes)
+            val textual = markup || mime.startsWith("text/") || mime == "image/svg+xml" || mime.endsWith("xml")
+            WebResourceResponse(mime, if (textual) "utf-8" else null, ByteArrayInputStream(bytes)).also {
+                it.responseHeaders = mapOf("Cache-Control" to "no-store")
+            }
+        } catch (e: Exception) {
+            notFoundResponse()
+        }
+    }
+
+    private fun blockedResponse(): WebResourceResponse = WebResourceResponse(
+        "text/plain", "utf-8", 403, "Blocked", emptyMap(), ByteArrayInputStream(ByteArray(0))
+    )
+
+    private fun notFoundResponse(): WebResourceResponse = WebResourceResponse(
+        "text/plain", "utf-8", 404, "Not Found", emptyMap(), ByteArrayInputStream(ByteArray(0))
+    )
 
     private inner class VaultWebViewClient : WebViewClient() {
 
@@ -118,6 +659,7 @@ class HtmlViewerView(
             view: WebView,
             request: WebResourceRequest,
         ): WebResourceResponse {
+            if (bookToken != null) return interceptBookRequest(request)
             val uri = request.url
             if (uri.scheme != "https" || uri.host != VAULT_HOST) {
                 return blockedResponse()
@@ -156,6 +698,10 @@ class HtmlViewerView(
             // to proceed; anything else (real http/https, mailto:, intent:,
             // market:, etc.) is swallowed right here so it can never leave
             // the app or reach the network.
+            if (bookToken != null) {
+                return !(uri.scheme == "https" && uri.host == EPUB_HOST &&
+                    uri.pathSegments.firstOrNull() == bookToken)
+            }
             return !(uri.scheme == "https" && uri.host == VAULT_HOST)
         }
 
@@ -166,8 +712,28 @@ class HtmlViewerView(
                     "title" to view.title,
                     "canGoBack" to view.canGoBack(),
                     "canGoForward" to view.canGoForward(),
+                    "url" to (url ?: ""),
+                    "entry" to bookEntryOf(url),
                 )
             )
+            if (bookToken != null) {
+                // The page can report "finished" before its columns have their
+                // final width (images, web fonts), so the chapter's first/last
+                // page is re-applied for a moment until the layout has settled.
+                val token = ++landingToken
+                for (delayMs in longArrayOf(0, 80, 200, 450, 900)) {
+                    webView.postDelayed({
+                        if (token != landingToken) return@postDelayed
+                        webView.settleToLandingEdge()
+                        if (delayMs == 0L) emitScrollEvent(initial = true)
+                    }, delayMs)
+                }
+            }
+        }
+
+        private fun bookEntryOf(url: String?): String {
+            if (bookToken == null || url == null) return ""
+            return Uri.parse(url).pathSegments.filter { it.isNotEmpty() }.drop(1).joinToString("/")
         }
 
         override fun onReceivedError(
@@ -185,13 +751,6 @@ class HtmlViewerView(
             }
         }
 
-        private fun blockedResponse(): WebResourceResponse = WebResourceResponse(
-            "text/plain", "utf-8", 403, "Blocked", emptyMap(), ByteArrayInputStream(ByteArray(0))
-        )
-
-        private fun notFoundResponse(): WebResourceResponse = WebResourceResponse(
-            "text/plain", "utf-8", 404, "Not Found", emptyMap(), ByteArrayInputStream(ByteArray(0))
-        )
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -212,9 +771,94 @@ class HtmlViewerView(
                 webView.stopLoading()
                 result.success(null)
             }
+            "loadEntry" -> {
+                val entry = call.argument<String>("entry") ?: ""
+                val fragment = call.argument<String>("fragment") ?: ""
+                val atEnd = call.argument<Boolean>("atEnd") ?: false
+                if (bookToken != null && entry.isNotEmpty()) {
+                    webView.cancelPageAnimation()
+                    // Coming back from the next chapter lands on this one's last
+                    // page; an anchor (#fragment) keeps the position it asks for.
+                    webView.landingEdge = when {
+                        fragment.isNotEmpty() -> 0
+                        atEnd -> if (bookPagedMode) endEdge() else 1
+                        else -> startEdge()
+                    }
+                    webView.loadUrl(buildBookUri(entry, fragment).toString())
+                }
+                result.success(null)
+            }
+            "setTextZoom" -> {
+                webView.settings.textZoom = (call.argument<Number>("percent")?.toInt() ?: 100).coerceIn(50, 300)
+                result.success(null)
+            }
+            "setBookStyle" -> {
+                bookCss = call.argument<String>("css") ?: ""
+                bookPagedMode = call.argument<Boolean>("paged") ?: bookPagedMode
+                bookRtl = call.argument<Boolean>("rtl") ?: bookRtl
+                bookTwoPageLandscape = call.argument<Boolean>("twoPageLandscape") ?: bookTwoPageLandscape
+                webView.configurePagedMode(bookPagedMode, bookTwoPageLandscape)
+                webView.rightToLeft = bookRtl
+                webView.landingEdge = startEdge()
+                call.argument<Number>("backgroundColor")?.toInt()?.let { webView.setBackgroundColor(it) }
+                webView.reload()
+                result.success(null)
+            }
+            "setScrollFraction" -> {
+                val fraction = (call.argument<Number>("fraction")?.toFloat() ?: 0f).coerceIn(0f, 1f)
+                // An explicit position overrides any pending first/last-page landing.
+                webView.landingEdge = 0
+                webView.post {
+                    webView.cancelPageAnimation()
+                    val horizontalPages = webView.isHorizontalPaging()
+                    val verticalContent =
+                        (webView.contentHeight * webView.resources.displayMetrics.density).toInt()
+                    val contentPx = if (bookPagedMode && horizontalPages) {
+                        webView.horizontalScrollRange()
+                    } else {
+                        verticalContent
+                    }
+                    val viewportPx = if (bookPagedMode && horizontalPages) webView.width else webView.height
+                    val maxOffset = (contentPx - viewportPx).coerceAtLeast(0)
+                    val logicalFraction = if (bookPagedMode && horizontalPages && bookRtl) 1f - fraction else fraction
+                    val offset = if (bookPagedMode && horizontalPages && viewportPx > 0) {
+                        val page = ((webView.pageCount() - 1) * logicalFraction).roundToInt()
+                        webView.offsetOfPage(page)
+                    } else {
+                        (maxOffset * logicalFraction).toInt()
+                    }
+                    suppressNextScrollEvent = true
+                    webView.scrollTo(
+                        if (bookPagedMode && horizontalPages) offset else 0,
+                        if (bookPagedMode && !horizontalPages || !bookPagedMode) offset else 0,
+                    )
+                    scheduleScrollEvent()
+                }
+                result.success(null)
+            }
+            "turnPage" -> {
+                val direction = call.argument<Number>("direction")?.toInt() ?: 1
+                if (bookPagedMode) {
+                    // Turns the page, or reports a chapterEdge past the first/last one.
+                    webView.turnPage(direction, bookRtl)
+                    scheduleScrollEvent()
+                    webView.postDelayed({ emitScrollEvent() }, 280)
+                } else {
+                    webView.scrollBy(0, if (direction > 0) webView.height else -webView.height)
+                    webView.postDelayed({ emitScrollEvent() }, 180)
+                }
+                result.success(null)
+            }
+            "pageScroll" -> {
+                // One screenful, for the reader's page buttons; false when already at the end.
+                val down = call.argument<Boolean>("down") ?: true
+                val moved = if (down) webView.pageDown(false) else webView.pageUp(false)
+                result.success(moved)
+            }
             "setJavaScriptEnabled" -> {
                 val enabled = call.argument<Boolean>("enabled") ?: false
                 webView.settings.javaScriptEnabled = enabled
+                webView.landingEdge = startEdge()
                 webView.reload()
                 result.success(null)
             }

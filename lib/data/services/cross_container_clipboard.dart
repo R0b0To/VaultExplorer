@@ -82,7 +82,7 @@ class CrossContainerClipboard extends _$CrossContainerClipboard {
     required bool cut,
     required List<ClipboardItem> clipItems,
   }) {
-    state = (
+    _replace((
       sourceVolId: volId,
       sourceDisplayName: displayName,
       action: cut ? ClipboardAction.move : ClipboardAction.copy,
@@ -96,7 +96,7 @@ class CrossContainerClipboard extends _$CrossContainerClipboard {
       splitSizeBytes: 0,
       archiveContext: null,
       selectedEntryPaths: null,
-    );
+    ));
   }
 
   void setArchiveCreate({
@@ -111,7 +111,7 @@ class CrossContainerClipboard extends _$CrossContainerClipboard {
     ArchiveCompressionMethod compressionMethod = ArchiveCompressionMethod.auto,
     int splitSizeBytes = 0,
   }) {
-    state = (
+    _replace((
       sourceVolId: volId,
       sourceDisplayName: displayName,
       action: ClipboardAction.archiveCreate,
@@ -125,7 +125,7 @@ class CrossContainerClipboard extends _$CrossContainerClipboard {
       splitSizeBytes: splitSizeBytes,
       archiveContext: null,
       selectedEntryPaths: null,
-    );
+    ));
   }
 
   void setArchiveExtract({
@@ -136,7 +136,7 @@ class CrossContainerClipboard extends _$CrossContainerClipboard {
     List<String>? selectedEntryPaths,
     List<ClipboardItem>? stagedItems,
   }) {
-    state = (
+    _replace((
       sourceVolId: volId,
       sourceDisplayName: displayName,
       action: ClipboardAction.archiveExtract,
@@ -152,10 +152,25 @@ class CrossContainerClipboard extends _$CrossContainerClipboard {
       selectedEntryPaths: selectedEntryPaths != null
           ? List.unmodifiable(selectedEntryPaths)
           : null,
-    );
+    ));
   }
 
   void clear() {
-    state = _emptyClipboard;
+    _replace(_emptyClipboard);
+  }
+
+  /// Swaps in [next], keeping a nested archive's temporary copy alive for
+  /// exactly as long as the clipboard refers to it. A partial extract staged
+  /// from inside a nested archive is pasted later, possibly after that archive
+  /// was closed; without this hold, closing it would wipe the file the paste
+  /// needs.
+  void _replace(ClipboardState next) {
+    final previous = state.archiveContext;
+    final incoming = next.archiveContext;
+    if (!identical(previous, incoming)) {
+      incoming?.retainSource();
+      previous?.releaseSource();
+    }
+    state = next;
   }
 }

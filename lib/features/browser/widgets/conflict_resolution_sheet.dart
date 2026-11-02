@@ -108,143 +108,166 @@ class _ConflictResolutionSheetState extends State<ConflictResolutionSheet> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final mediaQuery = MediaQuery.of(context);
+    final isLandscape = mediaQuery.orientation == Orientation.landscape;
     final count = widget.conflicts.length;
 
+    final double initialChildSize;
+    final double minChildSize;
+    final double maxChildSize;
+
+    if (isLandscape) {
+      initialChildSize = 0.9;
+      minChildSize = 0.8;
+      maxChildSize = 0.95;
+    } else {
+      initialChildSize = count > 4 ? 0.65 : 0.45;
+      minChildSize = count > 4 ? 0.5 : 0.45;
+      maxChildSize = 0.9;
+    }
+
     return DraggableScrollableSheet(
+      key: ValueKey(isLandscape),
       expand: false,
-      initialChildSize: count > 4 ? 0.65 : 0.45,
-      minChildSize: 0.3,
-      maxChildSize: 0.9,
+      initialChildSize: initialChildSize,
+      minChildSize: minChildSize,
+      maxChildSize: maxChildSize,
       builder: (context, scrollController) {
-        return Column(
-          children: [
-            Container(
-              width: 32,
-              height: 4,
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: cs.onSurfaceVariant.withValues(alpha: 0.4),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-
-            // ── Header ───────────────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-              child: Row(
-                children: [
-                  Icon(Icons.warning_amber_rounded, size: 20, color: cs.error),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      context.l10n.conflictItemsAlreadyExistTitle(count),
-                      style: textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-              child: Text(
-                context.l10n.conflictResolutionSubtitle,
-                style: textTheme.bodySmall?.copyWith(
-                  color: cs.onSurfaceVariant,
+        return SafeArea(
+          top: false,
+          bottom: false,
+          child: Column(
+            children: [
+              Container(
+                width: 32,
+                height: 4,
+                margin: EdgeInsets.symmetric(
+                  vertical: isLandscape ? 6 : 12,
+                ),
+                decoration: BoxDecoration(
+                  color: cs.onSurfaceVariant.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-            ),
 
-            // ── Apply-to-all row ─────────────────────────────────────────────
-            if (count > 1)
+              // ── Header ───────────────────────────────────────────────────────
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                padding: EdgeInsets.fromLTRB(20, 0, 20, isLandscape ? 4 : 8),
                 child: Row(
                   children: [
+                    Icon(Icons.warning_amber_rounded, size: 20, color: cs.error),
+                    const SizedBox(width: 10),
                     Expanded(
-                      child: _ApplyAllChip(
-                        label: context.l10n.skipAllChipLabel,
-                        icon: Icons.block_rounded,
-                        onTap: () => _applyToAll(ConflictResolution.skip),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _ApplyAllChip(
-                        label: context.l10n.overwriteAllChipLabel,
-                        icon: Icons.find_replace_rounded,
-                        isDestructive: true,
-                        onTap: () => _applyToAll(ConflictResolution.overwrite),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _ApplyAllChip(
-                        label: context.l10n.keepBothButton,
-                        icon: Icons.content_copy_rounded,
-                        onTap: () => _applyToAll(ConflictResolution.keepBoth),
+                      child: Text(
+                        context.l10n.conflictItemsAlreadyExistTitle(count),
+                        style: textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
 
-            const Divider(height: 1),
-
-            // ── Per-item list ────────────────────────────────────────────────
-            Expanded(
-              child: ListView.separated(
-                controller: scrollController,
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                itemCount: widget.conflicts.length,
-                separatorBuilder: (_, _) =>
-                    const Divider(height: 1, indent: 56),
-                itemBuilder: (_, i) {
-                  final conflict = widget.conflicts[i];
-                  final key = _keyFor(conflict);
-                  return _ConflictRow(
-                    conflict: conflict,
-                    resolution: _resolutions[key]!,
-                    onChanged: (r) => _setOne(key, r),
-                  );
-                },
+              Padding(
+                padding: EdgeInsets.fromLTRB(20, 0, 20, isLandscape ? 6 : 12),
+                child: Text(
+                  context.l10n.conflictResolutionSubtitle,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
               ),
-            ),
 
-            const Divider(height: 1),
+              // ── Apply-to-all row ─────────────────────────────────────────────
+              if (count > 1)
+                Padding(
+                  padding: EdgeInsets.fromLTRB(16, 0, 16, isLandscape ? 6 : 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _ApplyAllChip(
+                          label: context.l10n.skipAllChipLabel,
+                          icon: Icons.block_rounded,
+                          onTap: () => _applyToAll(ConflictResolution.skip),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _ApplyAllChip(
+                          label: context.l10n.overwriteAllChipLabel,
+                          icon: Icons.find_replace_rounded,
+                          isDestructive: true,
+                          onTap: () => _applyToAll(ConflictResolution.overwrite),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _ApplyAllChip(
+                          label: context.l10n.keepBothButton,
+                          icon: Icons.content_copy_rounded,
+                          onTap: () => _applyToAll(ConflictResolution.keepBoth),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
 
-            // ── Actions ──────────────────────────────────────────────────────
-            Padding(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                12,
-                16,
-                12 + MediaQuery.of(context).padding.bottom,
+              const Divider(height: 1),
+
+              // ── Per-item list ────────────────────────────────────────────────
+              Expanded(
+                child: ListView.separated(
+                  controller: scrollController,
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  itemCount: widget.conflicts.length,
+                  separatorBuilder: (_, _) =>
+                      const Divider(height: 1, indent: 56),
+                  itemBuilder: (_, i) {
+                    final conflict = widget.conflicts[i];
+                    final key = _keyFor(conflict);
+                    return _ConflictRow(
+                      conflict: conflict,
+                      resolution: _resolutions[key]!,
+                      onChanged: (r) => _setOne(key, r),
+                    );
+                  },
+                ),
               ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context, null),
-                      child: Text(
-                        widget.cancelLabel ?? context.l10n.cancelPasteButton,
+
+              const Divider(height: 1),
+
+              // ── Actions ──────────────────────────────────────────────────────
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  isLandscape ? 8 : 12,
+                  16,
+                  (isLandscape ? 8 : 12) + mediaQuery.padding.bottom,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context, null),
+                        child: Text(
+                          widget.cancelLabel ?? context.l10n.cancelPasteButton,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: () =>
-                          Navigator.pop(context, Map.of(_resolutions)),
-                      child: Text(context.l10n.continueButton),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () =>
+                            Navigator.pop(context, Map.of(_resolutions)),
+                        child: Text(context.l10n.continueButton),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         );
       },
     );
@@ -270,6 +293,8 @@ class _ApplyAllChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final color = isDestructive ? cs.error : cs.onSurfaceVariant;
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
 
     return Material(
       color: cs.surfaceContainerHigh,
@@ -278,24 +303,47 @@ class _ApplyAllChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 16, color: color),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w600,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
+          padding: EdgeInsets.symmetric(
+            vertical: isLandscape ? 6 : 10,
+            horizontal: 6,
           ),
+          child: isLandscape
+              ? Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(icon, size: 16, color: color),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        label,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: color,
+                              fontWeight: FontWeight.w600,
+                            ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                )
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, size: 16, color: color),
+                    const SizedBox(height: 4),
+                    Text(
+                      label,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: color,
+                            fontWeight: FontWeight.w600,
+                          ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
         ),
       ),
     );

@@ -54,11 +54,19 @@ class BreadcrumbBar extends StatefulWidget implements PreferredSizeWidget {
   final ValueChanged<int> onTap;
   final Color? backgroundColor;
 
+  /// Segments below the current folder that were just stepped back out of,
+  /// nearest first. Shown dimmed after the current segment; tapping one calls
+  /// [onForwardTap] with its index in this list.
+  final List<PathSegment> forwardStack;
+  final ValueChanged<int>? onForwardTap;
+
   const BreadcrumbBar({
     super.key,
     required this.stack,
     required this.onTap,
     this.backgroundColor,
+    this.forwardStack = const [],
+    this.onForwardTap,
   });
 
   @override
@@ -70,8 +78,11 @@ class BreadcrumbBar extends StatefulWidget implements PreferredSizeWidget {
 
 class _BreadcrumbBarState extends State<BreadcrumbBar> {
   final ScrollController _scrollController = ScrollController();
+  final GlobalKey _currentKey = GlobalKey();
   int _lastStackLength = 0;
   String _lastTailPath = '';
+  int _lastForwardLength = 0;
+  String _lastForwardTailPath = '';
   double? _lastWidth;
 
   Drag? _drag;
@@ -82,6 +93,10 @@ class _BreadcrumbBarState extends State<BreadcrumbBar> {
     super.initState();
     _lastStackLength = widget.stack.length;
     _lastTailPath = widget.stack.isNotEmpty ? widget.stack.last.fatPath : '';
+    _lastForwardLength = widget.forwardStack.length;
+    _lastForwardTailPath = widget.forwardStack.isNotEmpty
+        ? widget.forwardStack.last.fatPath
+        : '';
     _scrollToEnd(animated: false);
   }
 
@@ -101,10 +116,19 @@ class _BreadcrumbBarState extends State<BreadcrumbBar> {
     final currentLength = widget.stack.length;
     final currentTailPath =
         widget.stack.isNotEmpty ? widget.stack.last.fatPath : '';
+    final forwardLength = widget.forwardStack.length;
+    final forwardTailPath = widget.forwardStack.isNotEmpty
+        ? widget.forwardStack.last.fatPath
+        : '';
 
-    if (currentLength != _lastStackLength || currentTailPath != _lastTailPath) {
+    if (currentLength != _lastStackLength ||
+        currentTailPath != _lastTailPath ||
+        forwardLength != _lastForwardLength ||
+        forwardTailPath != _lastForwardTailPath) {
       _lastStackLength = currentLength;
       _lastTailPath = currentTailPath;
+      _lastForwardLength = forwardLength;
+      _lastForwardTailPath = forwardTailPath;
       _scrollToEnd(animated: true);
     }
   }
@@ -112,7 +136,27 @@ class _BreadcrumbBarState extends State<BreadcrumbBar> {
   void _scrollToEnd({bool animated = true}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scrollController.hasClients) return;
-      final target = _scrollController.position.maxScrollExtent;
+      final position = _scrollController.position;
+      var target = position.maxScrollExtent;
+      // With a forward path after the current folder, the end of the bar is
+      // the forward tail. Show as much of it as fits, but never scroll the
+      // current folder itself off the left edge.
+      if (widget.forwardStack.isNotEmpty) {
+        final currentBox = _currentKey.currentContext?.findRenderObject();
+        final barBox = context.findRenderObject();
+        if (currentBox is RenderBox &&
+            currentBox.attached &&
+            barBox is RenderBox &&
+            barBox.attached) {
+          final currentLeft = currentBox
+              .localToGlobal(Offset.zero, ancestor: barBox)
+              .dx;
+          final currentLeftInContent = currentLeft + _scrollController.offset;
+          target = (currentLeftInContent - 8.0)
+              .clamp(0.0, position.maxScrollExtent)
+              .toDouble();
+        }
+      }
       if ((_scrollController.offset - target).abs() < 1.0) return;
 
       if (animated) {
@@ -221,6 +265,7 @@ class _BreadcrumbBarState extends State<BreadcrumbBar> {
                   if (i == widget.stack.length - 1)
                     // Current directory (non-interactive, full 40px height)
                     Container(
+                      key: _currentKey,
                       height: 40,
                       alignment: Alignment.center,
                       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -307,6 +352,57 @@ class _BreadcrumbBarState extends State<BreadcrumbBar> {
                         color: cs.onSurfaceVariant.withValues(alpha: 0.5),
                       ),
                     ),
+                ],
+                // Forward history: the folders just stepped back out of, dimmed
+                // and still tappable so the person can walk back down.
+                for (int f = 0; f < widget.forwardStack.length; f++) ...[
+                  Container(
+                    height: 40,
+                    alignment: Alignment.center,
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    child: Icon(
+                      Icons.chevron_right_rounded,
+                      size: AppIconSize.small,
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.28),
+                    ),
+                  ),
+                  InkWell(
+                    onTap: widget.onForwardTap == null
+                        ? null
+                        : () => widget.onForwardTap!(f),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                    child: Container(
+                      height: 40,
+                      alignment: Alignment.center,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (widget.forwardStack[f].isArchiveRoot)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: Icon(
+                                Icons.archive_rounded,
+                                color: const Color(
+                                  0xFFFF8F00,
+                                ).withValues(alpha: 0.55),
+                                size: 16,
+                              ),
+                            ),
+                          Text(
+                            widget.forwardStack[f].label,
+                            maxLines: 1,
+                            style: textTheme.labelLarge?.copyWith(
+                              color: cs.onSurfaceVariant.withValues(
+                                alpha: 0.6,
+                              ),
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ],
             ),

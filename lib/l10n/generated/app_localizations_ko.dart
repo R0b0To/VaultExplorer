@@ -5603,6 +5603,13 @@ class AppLocalizationsKo extends AppLocalizations {
   String get vaultSyncComparingLabel => '볼트 비교 중…';
 
   @override
+  String get vaultSyncScanFailedTitle => '폴더를 읽을 수 없습니다';
+
+  @override
+  String get vaultSyncScanFailedMessage =>
+      '볼트 안의 폴더를 읽을 수 없어 추측하지 않고 비교를 중단했습니다. 변경된 내용은 없습니다. 볼트를 잠근 뒤 다시 잠금 해제하고 다시 비교하세요.';
+
+  @override
   String vaultSyncCompareStatsLabel(Object dirs, Object entries) {
     return '검사한 폴더: $dirs | 발견된 차이점: $entries';
   }
@@ -10717,6 +10724,12 @@ class AppLocalizationsKo extends AppLocalizations {
   String get audioEditorNextCutPoint => '다음 컷 지점';
 
   @override
+  String get audioEditorStepBack => '한 단계 뒤로';
+
+  @override
+  String get audioEditorStepForward => '한 단계 앞으로';
+
+  @override
   String audioEditorReencodeBanner(String format) {
     return '$format 오디오는 그대로 복사할 수 없어 내보낼 때 AAC(.m4a)로 다시 인코딩됩니다.';
   }
@@ -12010,6 +12023,12 @@ class AppLocalizationsKo extends AppLocalizations {
   String get floatingPlayerExpandTooltip => '확대';
 
   @override
+  String get floatingPlayerAudioOnly => '오디오만';
+
+  @override
+  String get floatingPlayerShowVideo => '동영상 표시';
+
+  @override
   String get masterLockTitle => '마스터 잠금';
 
   @override
@@ -12043,4 +12062,465 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get duressMasterLockRequired =>
       '강요 해제를 설정하려면 먼저 보안 설정에서 마스터 잠금을 활성화해야 합니다.';
+
+  @override
+  String get skinTokenGroupSurface => '표면';
+
+  @override
+  String get skinTokenGroupContent => '텍스트 및 아이콘';
+
+  @override
+  String get skinTokenGroupBorder => '테두리';
+
+  @override
+  String get skinTokenGroupChrome => '상단 표시줄';
+
+  @override
+  String get skinTokenGroupAction => '버튼';
+
+  @override
+  String get skinTokenGroupControl => '스위치 및 슬라이더';
+
+  @override
+  String get skinTokenGroupChoice => '칩 및 세그먼트';
+
+  @override
+  String get skinTokenGroupSelection => '선택된 항목';
+
+  @override
+  String get skinTokenGroupOverlay => '메뉴, 대화상자 및 시트';
+
+  @override
+  String get skinTokenGroupFloating => '플로팅 요소';
+
+  @override
+  String get skinTokenSurfacePage => '페이지 배경';
+
+  @override
+  String get skinTokenSurfacePageHint => '이 페이지의 모든 요소 뒤에 있는 캔버스입니다.';
+
+  @override
+  String get skinTokenSurfaceCard => '카드 및 행';
+
+  @override
+  String get skinTokenSurfaceCardHint => '카드, 목록 행 및 그룹화된 패널입니다.';
+
+  @override
+  String get skinTokenSurfaceCardActive => '활성 카드';
+
+  @override
+  String get skinTokenSurfaceCardActiveHint => '잠금 해제된 보관함과 같이 강조 표시된 카드입니다.';
+
+  @override
+  String get skinTokenSurfaceTile => '타일 및 썸네일';
+
+  @override
+  String get skinTokenSurfaceTileHint => '썸네일 플레이스홀더, 아이콘 타일 및 코드 블록입니다.';
+
+  @override
+  String get skinTokenSurfaceField => '입력 필드';
+
+  @override
+  String get skinTokenSurfaceFieldHint => '텍스트 필드와 검색창의 채우기 색상입니다.';
+
+  @override
+  String get skinTokenContentPrimary => '기본 텍스트';
+
+  @override
+  String get skinTokenContentPrimaryHint => '제목, 이름 및 본문 텍스트입니다.';
+
+  @override
+  String get skinTokenContentSecondary => '보조 텍스트';
+
+  @override
+  String get skinTokenContentSecondaryHint => '부제목, 세부 정보 및 힌트입니다.';
+
+  @override
+  String get skinTokenContentIcon => '아이콘';
+
+  @override
+  String get skinTokenContentIconHint => '버튼이나 바에 있지 않은 일반 아이콘입니다.';
+
+  @override
+  String get skinTokenBorderDivider => '구분선';
+
+  @override
+  String get skinTokenBorderDividerHint => '행과 섹션 사이의 얇은 선입니다.';
+
+  @override
+  String get skinTokenBorderOutline => '윤곽선';
+
+  @override
+  String get skinTokenBorderOutlineHint => '외곽선 버튼과 선택되지 않은 옵션 상자의 테두리입니다.';
+
+  @override
+  String get skinTokenBorderFocus => '포커스 링';
+
+  @override
+  String get skinTokenBorderFocusHint => '현재 편집 중인 텍스트 필드의 테두리입니다.';
+
+  @override
+  String get skinTokenChromeTopBar => '상단 표시줄';
+
+  @override
+  String get skinTokenChromeTopBarHint => '상단 표시줄의 채우기 색상입니다.';
+
+  @override
+  String get skinTokenChromeOnTopBar => '상단 표시줄 텍스트 및 아이콘';
+
+  @override
+  String get skinTokenChromeOnTopBarHint => '상단 표시줄의 제목 및 아이콘 색상입니다.';
+
+  @override
+  String get skinTokenActionPrimary => '채워진 버튼';
+
+  @override
+  String get skinTokenActionPrimaryHint => '채워진 버튼의 채우기 색상입니다.';
+
+  @override
+  String get skinTokenActionOnPrimary => '채워진 버튼 레이블';
+
+  @override
+  String get skinTokenActionOnPrimaryHint => '채워진 버튼의 레이블과 아이콘입니다.';
+
+  @override
+  String get skinTokenActionTonal => '돌출형 버튼';
+
+  @override
+  String get skinTokenActionTonalHint => '돌출형 및 톤 버튼의 채우기 색상입니다.';
+
+  @override
+  String get skinTokenActionOnTonal => '돌출형 버튼 레이블';
+
+  @override
+  String get skinTokenActionOnTonalHint => '돌출형 버튼의 레이블과 아이콘입니다.';
+
+  @override
+  String get skinTokenActionText => '텍스트 및 외곽선 버튼';
+
+  @override
+  String get skinTokenActionTextHint => '텍스트 버튼, 외곽선 버튼 및 링크의 레이블 색상입니다.';
+
+  @override
+  String get skinTokenControlActive => '컨트롤 켜짐 상태';
+
+  @override
+  String get skinTokenControlActiveHint =>
+      '켜졌을 때의 스위치 트랙, 선택된 체크박스 및 라디오, 슬라이더 및 진행률 채우기입니다.';
+
+  @override
+  String get skinTokenControlOnActive => '스위치 손잡이 및 체크 표시';
+
+  @override
+  String get skinTokenControlOnActiveHint => '켜진 스위치의 손잡이와 체크박스 내부의 체크 표시입니다.';
+
+  @override
+  String get skinTokenControlTrack => '컨트롤 트랙';
+
+  @override
+  String get skinTokenControlTrackHint =>
+      '꺼졌을 때의 스위치 트랙과 슬라이더 및 진행률 표시줄의 빈 부분입니다.';
+
+  @override
+  String get skinTokenControlInactive => '컨트롤 꺼짐 상태';
+
+  @override
+  String get skinTokenControlInactiveHint =>
+      '꺼진 스위치의 손잡이와 선택되지 않은 확인란의 테두리입니다.';
+
+  @override
+  String get skinTokenChoiceBackground => '칩';
+
+  @override
+  String get skinTokenChoiceBackgroundHint => '선택되지 않은 칩과 세그먼트의 채우기 색상입니다.';
+
+  @override
+  String get skinTokenChoiceSelected => '선택된 칩';
+
+  @override
+  String get skinTokenChoiceSelectedHint => '선택된 칩 또는 세그먼트의 채우기 색상입니다.';
+
+  @override
+  String get skinTokenChoiceOnSelected => '선택된 칩 레이블';
+
+  @override
+  String get skinTokenChoiceOnSelectedHint => '선택된 칩 또는 세그먼트의 레이블과 아이콘입니다.';
+
+  @override
+  String get skinTokenChoiceBorder => '칩 테두리';
+
+  @override
+  String get skinTokenChoiceBorderHint => '칩 및 분할 버튼의 윤곽선입니다.';
+
+  @override
+  String get skinTokenSelectionFill => '선택된 행';
+
+  @override
+  String get skinTokenSelectionFillHint => '선택된 파일과 행, 강조 표시된 아이콘 타일입니다.';
+
+  @override
+  String get skinTokenSelectionOn => '선택된 행 텍스트 및 아이콘';
+
+  @override
+  String get skinTokenSelectionOnHint => '선택된 행에 표시되는 텍스트와 아이콘입니다.';
+
+  @override
+  String get skinTokenOverlayMenu => '메뉴';
+
+  @override
+  String get skinTokenOverlayMenuHint => '팝업, 드롭다운 및 컨텍스트 메뉴입니다.';
+
+  @override
+  String get skinTokenOverlayOnMenu => '메뉴 텍스트';
+
+  @override
+  String get skinTokenOverlayOnMenuHint => '메뉴의 텍스트와 아이콘입니다.';
+
+  @override
+  String get skinTokenOverlayDialog => '대화상자';
+
+  @override
+  String get skinTokenOverlayDialogHint => '대화상자의 채우기 색상입니다.';
+
+  @override
+  String get skinTokenOverlayOnDialog => '대화상자 제목';
+
+  @override
+  String get skinTokenOverlayOnDialogHint => '대화상자의 제목 텍스트입니다.';
+
+  @override
+  String get skinTokenOverlaySheet => '하단 시트';
+
+  @override
+  String get skinTokenOverlaySheetHint => '하단 시트의 채우기 색상입니다.';
+
+  @override
+  String get skinTokenOverlayOnSheet => '하단 시트 텍스트';
+
+  @override
+  String get skinTokenOverlayOnSheetHint => '하단 시트의 텍스트와 아이콘입니다.';
+
+  @override
+  String get skinTokenOverlayScrim => '대화상자 뒤 어둡게 하기';
+
+  @override
+  String get skinTokenOverlayScrimHint => '대화상자와 하단 시트 뒤의 어두운 배경입니다.';
+
+  @override
+  String get skinTokenFloatingFab => '원형 추가 버튼';
+
+  @override
+  String get skinTokenFloatingFabHint => '원형 추가 버튼의 채우기 색상입니다.';
+
+  @override
+  String get skinTokenFloatingOnFab => '원형 추가 버튼 아이콘';
+
+  @override
+  String get skinTokenFloatingOnFabHint => '원형 추가 버튼 위의 아이콘입니다.';
+
+  @override
+  String get skinTokenFloatingToast => '알림 캡슐';
+
+  @override
+  String get skinTokenFloatingToastHint => '하단에 팝업되는 안내 메시지의 채우기 색상입니다.';
+
+  @override
+  String get skinTokenFloatingOnToast => '알림 캡슐 텍스트';
+
+  @override
+  String get skinTokenFloatingOnToastHint => '안내 메시지의 텍스트와 아이콘입니다.';
+
+  @override
+  String get skinTokenFloatingTooltip => '툴팁';
+
+  @override
+  String get skinTokenFloatingTooltipHint => '툴팁의 채우기 색상입니다.';
+
+  @override
+  String get skinTokenFloatingOnTooltip => '툴팁 텍스트';
+
+  @override
+  String get skinTokenFloatingOnTooltipHint => '툴팁의 텍스트입니다.';
+
+  @override
+  String get skinTokenGroupAccent => '강조 색상';
+
+  @override
+  String get skinTokenGroupStatus => '상태 및 오류';
+
+  @override
+  String get skinTokenSurfacePanel => '패널';
+
+  @override
+  String get skinTokenSurfacePanelHint => '표준 카드 위젯, 북마크 바, 그리드 셀 및 정보 시트입니다.';
+
+  @override
+  String get skinTokenChromeBar => '바 및 탭 스트립';
+
+  @override
+  String get skinTokenChromeBarHint => '작업 표시줄, 탭 스트립, 선택 바 및 하단 바입니다.';
+
+  @override
+  String get skinTokenAccentPrimary => '강조';
+
+  @override
+  String get skinTokenAccentPrimaryHint => '하이라이트, 본문 내 링크, 작은 강조 아이콘 및 배지입니다.';
+
+  @override
+  String get skinTokenAccentSecondary => '보조 강조';
+
+  @override
+  String get skinTokenAccentSecondaryHint => '보조 하이라이트 및 태그입니다.';
+
+  @override
+  String get skinTokenAccentTertiary => '3차 강조';
+
+  @override
+  String get skinTokenAccentTertiaryHint => '3차 하이라이트 및 태그입니다.';
+
+  @override
+  String get skinTokenAccentTertiaryContainer => '3차 강조 채우기';
+
+  @override
+  String get skinTokenAccentTertiaryContainerHint => '3차 하이라이트 배경의 채우기 색상입니다.';
+
+  @override
+  String get skinTokenAccentOnTertiaryContainer => '3차 강조 채우기 텍스트';
+
+  @override
+  String get skinTokenAccentOnTertiaryContainerHint => '3차 채우기 위의 텍스트와 아이콘입니다.';
+
+  @override
+  String get skinTokenStatusDanger => '오류 및 삭제';
+
+  @override
+  String get skinTokenStatusDangerHint => '오류 텍스트, 삭제 작업 및 오류 테두리입니다.';
+
+  @override
+  String get skinTokenStatusOnDanger => '오류 색상 위 텍스트';
+
+  @override
+  String get skinTokenStatusOnDangerHint => '오류 색상 위에 표시되는 텍스트와 아이콘입니다.';
+
+  @override
+  String get skinTokenStatusDangerContainer => '오류 메시지 채우기';
+
+  @override
+  String get skinTokenStatusDangerContainerHint => '오류 메시지 및 배너의 채우기 색상입니다.';
+
+  @override
+  String get skinTokenStatusOnDangerContainer => '오류 메시지 텍스트';
+
+  @override
+  String get skinTokenStatusOnDangerContainerHint => '오류 메시지 내의 텍스트와 아이콘입니다.';
+
+  @override
+  String get skinTokenStatusInfo => '안내 메시지 채우기';
+
+  @override
+  String get skinTokenStatusInfoHint => '안내 배너의 채우기 색상입니다.';
+
+  @override
+  String get skinTokenStatusOnInfo => '안내 메시지 텍스트';
+
+  @override
+  String get skinTokenStatusOnInfoHint => '안내 배너 내의 텍스트와 아이콘입니다.';
+
+  @override
+  String get bookReaderOpenFailed => '이 책을 열 수 없습니다';
+
+  @override
+  String get comicNoPages => '이 만화에서 이미지를 찾을 수 없습니다';
+
+  @override
+  String get comicPageLoadFailed => '이 페이지를 불러올 수 없습니다';
+
+  @override
+  String get comicReadingDirectionRtl => '오른쪽에서 왼쪽으로 읽기';
+
+  @override
+  String get comicReadingDirectionLtr => '왼쪽에서 오른쪽으로 읽기';
+
+  @override
+  String get epubTextSize => '글자 크기';
+
+  @override
+  String get epubThemeOriginal => '원본';
+
+  @override
+  String epubChapterFallbackTitle(int number) {
+    return '$number장';
+  }
+
+  @override
+  String get bookReaderSettingsTitle => '리더 설정';
+
+  @override
+  String get bookReaderPageSection => '페이지';
+
+  @override
+  String get bookReaderTextSection => '텍스트';
+
+  @override
+  String get bookReaderReadingModeTitle => '읽기 모드';
+
+  @override
+  String get bookReaderPageFlippingLabel => '페이지 넘김';
+
+  @override
+  String get bookReaderColorModeLabel => '색상 모드';
+
+  @override
+  String get bookReaderTextDirectionLabel => '텍스트 방향';
+
+  @override
+  String get bookReaderTwoPageLandscapeLabel => '가로 모드에서 두 페이지';
+
+  @override
+  String get bookReaderPageMarginsLabel => '페이지 여백';
+
+  @override
+  String get bookReaderFontFaceLabel => '글꼴';
+
+  @override
+  String get bookReaderFontPublisherDefault => '출판사 기본값';
+
+  @override
+  String get bookReaderFontSerif => '세리프';
+
+  @override
+  String get bookReaderFontSansSerif => '산세리프';
+
+  @override
+  String get bookReaderFontMonospace => '고정폭';
+
+  @override
+  String get bookReaderFontWeightLabel => '글꼴 굵기';
+
+  @override
+  String get bookReaderLineSpacingLabel => '줄 간격';
+
+  @override
+  String get bookReaderTextAlignmentLabel => '텍스트 정렬';
+
+  @override
+  String get bookReaderTextAlignLeft => '왼쪽';
+
+  @override
+  String get bookReaderTextAlignJustified => '양쪽 맞춤';
+
+  @override
+  String get bookReaderTextAlignCenter => '가운데';
+
+  @override
+  String get bookReaderTextAlignRight => '오른쪽';
+
+  @override
+  String get comicReaderModeSinglePage => '한 페이지';
+
+  @override
+  String get comicReaderModeTwoPageSpread => '두 페이지 펼침';
+
+  @override
+  String get comicReaderCarouselScrubberSubtitle => '스크러버 위에 페이지 썸네일 표시';
 }

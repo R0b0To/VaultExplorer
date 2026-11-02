@@ -5991,6 +5991,13 @@ class AppLocalizationsAr extends AppLocalizations {
   String get vaultSyncComparingLabel => 'جارٍ مقارنة الخزنات…';
 
   @override
+  String get vaultSyncScanFailedTitle => 'تعذّرت قراءة مجلد';
+
+  @override
+  String get vaultSyncScanFailedMessage =>
+      'تعذّرت قراءة مجلد داخل الخزنة، لذلك أُوقفت المقارنة بدلاً من التخمين. لم يتم تغيير أي شيء. أقفل الخزنة ثم افتحها مجدداً وقارن مرة أخرى.';
+
+  @override
   String vaultSyncCompareStatsLabel(Object dirs, Object entries) {
     return 'المجلدات التي تم فحصها: $dirs | الفروقات الموجودة: $entries';
   }
@@ -11352,6 +11359,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get audioEditorNextCutPoint => 'نقطة القص التالية';
 
   @override
+  String get audioEditorStepBack => 'خطوة للخلف';
+
+  @override
+  String get audioEditorStepForward => 'خطوة للأمام';
+
+  @override
   String audioEditorReencodeBanner(String format) {
     return 'لا يمكن نسخ صوت $format كما هو، لذا ستتم إعادة ترميزه إلى AAC (.m4a) عند التصدير.';
   }
@@ -12737,6 +12750,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get floatingPlayerExpandTooltip => 'توسيع';
 
   @override
+  String get floatingPlayerAudioOnly => 'الصوت فقط';
+
+  @override
+  String get floatingPlayerShowVideo => 'إظهار الفيديو';
+
+  @override
   String get masterLockTitle => 'القفل الرئيسي';
 
   @override
@@ -12771,4 +12790,500 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get duressMasterLockRequired =>
       'يجب تمكين القفل الرئيسي في أمان التطبيق قبل تكوين فتح الإكراه.';
+
+  @override
+  String get skinTokenGroupSurface => 'الأسطح';
+
+  @override
+  String get skinTokenGroupContent => 'النصوص والأيقونات';
+
+  @override
+  String get skinTokenGroupBorder => 'الحدود';
+
+  @override
+  String get skinTokenGroupChrome => 'الشريط العلوي';
+
+  @override
+  String get skinTokenGroupAction => 'الأزرار';
+
+  @override
+  String get skinTokenGroupControl => 'المفاتيح وأشرطة التمرير';
+
+  @override
+  String get skinTokenGroupChoice => 'الشرائح والأقسام';
+
+  @override
+  String get skinTokenGroupSelection => 'العناصر المحددة';
+
+  @override
+  String get skinTokenGroupOverlay => 'القوائم والحوارات والصفائح';
+
+  @override
+  String get skinTokenGroupFloating => 'العناصر العائمة';
+
+  @override
+  String get skinTokenSurfacePage => 'خلفية الصفحة';
+
+  @override
+  String get skinTokenSurfacePageHint =>
+      'المساحة الخلفية لجميع العناصر في هذه الصفحة.';
+
+  @override
+  String get skinTokenSurfaceCard => 'البطاقات والصفوف';
+
+  @override
+  String get skinTokenSurfaceCardHint =>
+      'البطاقات، وصفوف القوائم، واللوحات المجمعة.';
+
+  @override
+  String get skinTokenSurfaceCardActive => 'البطاقة النشطة';
+
+  @override
+  String get skinTokenSurfaceCardActiveHint =>
+      'البطاقة المميزة، مثل الخزينة غير المقفلة.';
+
+  @override
+  String get skinTokenSurfaceTile => 'المربعات والصور المصغرة';
+
+  @override
+  String get skinTokenSurfaceTileHint =>
+      'عناصر الصور المصغرة المؤقتة، ومربعات الأيقونات، وكتل البرمجة.';
+
+  @override
+  String get skinTokenSurfaceField => 'حقول الإدخال';
+
+  @override
+  String get skinTokenSurfaceFieldHint => 'تعبئة حقول النصوص وأشرطة البحث.';
+
+  @override
+  String get skinTokenContentPrimary => 'النص الأساسي';
+
+  @override
+  String get skinTokenContentPrimaryHint =>
+      'العناوين، والأسماء، والنص الرئيسي.';
+
+  @override
+  String get skinTokenContentSecondary => 'النص الثانوي';
+
+  @override
+  String get skinTokenContentSecondaryHint =>
+      'العناوين الفرعية، والتفاصيل، والتلميحات.';
+
+  @override
+  String get skinTokenContentIcon => 'الأيقونات';
+
+  @override
+  String get skinTokenContentIconHint =>
+      'الأيقونات العادية غير الموجودة على زر أو شريط.';
+
+  @override
+  String get skinTokenBorderDivider => 'الفواصل';
+
+  @override
+  String get skinTokenBorderDividerHint => 'خطوط رفيعة بين الصفوف والأقسام.';
+
+  @override
+  String get skinTokenBorderOutline => 'الخطوط الخارجية';
+
+  @override
+  String get skinTokenBorderOutlineHint =>
+      'حدود الأزرار المحددة ومربعات الخيارات غير المحددة.';
+
+  @override
+  String get skinTokenBorderFocus => 'حلقة التركيز';
+
+  @override
+  String get skinTokenBorderFocusHint => 'إطار حقل النص قيد التعديل.';
+
+  @override
+  String get skinTokenChromeTopBar => 'الشريط العلوي';
+
+  @override
+  String get skinTokenChromeTopBarHint => 'تعبئة الشريط العلوي.';
+
+  @override
+  String get skinTokenChromeOnTopBar => 'نص وأيقونات الشريط العلوي';
+
+  @override
+  String get skinTokenChromeOnTopBarHint =>
+      'لون العنوان والأيقونات في الشريط العلوي.';
+
+  @override
+  String get skinTokenActionPrimary => 'الأزرار الممتلئة';
+
+  @override
+  String get skinTokenActionPrimaryHint => 'تعبئة الأزرار الممتلئة.';
+
+  @override
+  String get skinTokenActionOnPrimary => 'تسمية الزر الممتلئ';
+
+  @override
+  String get skinTokenActionOnPrimaryHint =>
+      'التسمية والأيقونة على الزر الممتلئ.';
+
+  @override
+  String get skinTokenActionTonal => 'الأزرار البارزة';
+
+  @override
+  String get skinTokenActionTonalHint =>
+      'تعبئة الأزرار البارزة والمتناسقة لونياً.';
+
+  @override
+  String get skinTokenActionOnTonal => 'تسمية الزر البارز';
+
+  @override
+  String get skinTokenActionOnTonalHint => 'التسمية والأيقونة على الزر البارز.';
+
+  @override
+  String get skinTokenActionText => 'الأزرار النصية والمحددة';
+
+  @override
+  String get skinTokenActionTextHint =>
+      'لون تسمية الأزرار النصية والمحددة والروابط.';
+
+  @override
+  String get skinTokenControlActive => 'حالة تشغيل عنصر التحكم';
+
+  @override
+  String get skinTokenControlActiveHint =>
+      'مسار المفتاح عند التشغيل، ومربع الاختيار والزر الدائري المحدد، وتعبئة شريط التمرير والتقدم.';
+
+  @override
+  String get skinTokenControlOnActive => 'مقبض المفتاح وعلامة الاختيار';
+
+  @override
+  String get skinTokenControlOnActiveHint =>
+      'مقبض المفتاح قيد التشغيل وعلامة الصح داخل مربع الاختيار.';
+
+  @override
+  String get skinTokenControlTrack => 'مسار عنصر التحكم';
+
+  @override
+  String get skinTokenControlTrackHint =>
+      'مسار المفتاح عند الإيقاف والجزء الفارغ من أشرطة التمرير والتقدم.';
+
+  @override
+  String get skinTokenControlInactive => 'حالة إيقاف عنصر التحكم';
+
+  @override
+  String get skinTokenControlInactiveHint =>
+      'مقبض المفتاح عند إيقافه وحدود المربعات غير المحددة.';
+
+  @override
+  String get skinTokenChoiceBackground => 'الشريحة';
+
+  @override
+  String get skinTokenChoiceBackgroundHint =>
+      'تعبئة الشرائح والأقسام غير المحددة.';
+
+  @override
+  String get skinTokenChoiceSelected => 'الشريحة المحددة';
+
+  @override
+  String get skinTokenChoiceSelectedHint => 'تعبئة الشريحة أو القسم المحدد.';
+
+  @override
+  String get skinTokenChoiceOnSelected => 'تسمية الشريحة المحددة';
+
+  @override
+  String get skinTokenChoiceOnSelectedHint =>
+      'التسمية والأيقونة على الشريحة أو القسم المحدد.';
+
+  @override
+  String get skinTokenChoiceBorder => 'إطار الشريحة';
+
+  @override
+  String get skinTokenChoiceBorderHint =>
+      'الخط الخارجي للشرائح والأزرار المقسمة.';
+
+  @override
+  String get skinTokenSelectionFill => 'الصف المحدد';
+
+  @override
+  String get skinTokenSelectionFillHint =>
+      'الملفات والصفوف المحددة ومربعات الأيقونات البارزة.';
+
+  @override
+  String get skinTokenSelectionOn => 'نص وأيقونات الصف المحدد';
+
+  @override
+  String get skinTokenSelectionOnHint =>
+      'النص والأيقونات المرسومة على صف محدد.';
+
+  @override
+  String get skinTokenOverlayMenu => 'القوائم';
+
+  @override
+  String get skinTokenOverlayMenuHint =>
+      'القوائم المنبثقة، والمنسدلة، وقوائم السياق.';
+
+  @override
+  String get skinTokenOverlayOnMenu => 'نص القائمة';
+
+  @override
+  String get skinTokenOverlayOnMenuHint => 'النص والأيقونات في القوائم.';
+
+  @override
+  String get skinTokenOverlayDialog => 'مربعات الحوار';
+
+  @override
+  String get skinTokenOverlayDialogHint => 'تعبئة مربعات الحوار.';
+
+  @override
+  String get skinTokenOverlayOnDialog => 'عنوان مربع الحوار';
+
+  @override
+  String get skinTokenOverlayOnDialogHint => 'نص عنوان مربعات الحوار.';
+
+  @override
+  String get skinTokenOverlaySheet => 'الصفائح السفلية';
+
+  @override
+  String get skinTokenOverlaySheetHint => 'تعبئة الصفائح السفلية.';
+
+  @override
+  String get skinTokenOverlayOnSheet => 'نص الصفيحة السفلية';
+
+  @override
+  String get skinTokenOverlayOnSheetHint =>
+      'النص والأيقونات في الصفائح السفلية.';
+
+  @override
+  String get skinTokenOverlayScrim => 'تعتيم خلفية الحوارات';
+
+  @override
+  String get skinTokenOverlayScrimHint =>
+      'التعتيم خلف مربعات الحوار والصفائح السفلية.';
+
+  @override
+  String get skinTokenFloatingFab => 'زر الإضافة الدائري';
+
+  @override
+  String get skinTokenFloatingFabHint => 'تعبئة زر الإضافة الدائري.';
+
+  @override
+  String get skinTokenFloatingOnFab => 'أيقونة زر الإضافة الدائري';
+
+  @override
+  String get skinTokenFloatingOnFabHint => 'الأيقونة على زر الإضافة الدائري.';
+
+  @override
+  String get skinTokenFloatingToast => 'كبسولة الرسائل';
+
+  @override
+  String get skinTokenFloatingToastHint =>
+      'تعبئة رسالة المعلومات المنبثقة في الأسفل.';
+
+  @override
+  String get skinTokenFloatingOnToast => 'نص كبسولة الرسائل';
+
+  @override
+  String get skinTokenFloatingOnToastHint =>
+      'النص والأيقونة في رسالة المعلومات.';
+
+  @override
+  String get skinTokenFloatingTooltip => 'تلميحات الأدوات';
+
+  @override
+  String get skinTokenFloatingTooltipHint => 'تعبئة تلميحات الأدوات.';
+
+  @override
+  String get skinTokenFloatingOnTooltip => 'نص تلميح الأداة';
+
+  @override
+  String get skinTokenFloatingOnTooltipHint => 'النص في تلميحات الأدوات.';
+
+  @override
+  String get skinTokenGroupAccent => 'ألوان التمييز';
+
+  @override
+  String get skinTokenGroupStatus => 'الحالة والأخطاء';
+
+  @override
+  String get skinTokenSurfacePanel => 'اللوحات';
+
+  @override
+  String get skinTokenSurfacePanelHint =>
+      'البطاقات المكونة من عنصر البطاقة القياسي، وشريط الإشارات المرجعية، وخلايا الشبكة، وصفائح المعلومات.';
+
+  @override
+  String get skinTokenChromeBar => 'الأشرطة وشرائط علامات التبويب';
+
+  @override
+  String get skinTokenChromeBarHint =>
+      'أشرطة الإجراءات، وشرائط التبويب، وشريط التحديد، والأشرطة السفلية.';
+
+  @override
+  String get skinTokenAccentPrimary => 'لون التمييز';
+
+  @override
+  String get skinTokenAccentPrimaryHint =>
+      'العناصر المميزة، والروابط داخل النصوص، وأيقونات التمييز الصغيرة، والشارات.';
+
+  @override
+  String get skinTokenAccentSecondary => 'لون التمييز الثانوي';
+
+  @override
+  String get skinTokenAccentSecondaryHint =>
+      'العناصر المميزة الثانوية والوسوم.';
+
+  @override
+  String get skinTokenAccentTertiary => 'لون التمييز الثالثي';
+
+  @override
+  String get skinTokenAccentTertiaryHint => 'العناصر المميزة والوسوم الثالثية.';
+
+  @override
+  String get skinTokenAccentTertiaryContainer => 'تعبئة التمييز الثالثي';
+
+  @override
+  String get skinTokenAccentTertiaryContainerHint =>
+      'التعبئة خلف عناصر التمييز الثالثية.';
+
+  @override
+  String get skinTokenAccentOnTertiaryContainer => 'نص تعبئة التمييز الثالثي';
+
+  @override
+  String get skinTokenAccentOnTertiaryContainerHint =>
+      'النص والأيقونات على تعبئة التمييز الثالثي.';
+
+  @override
+  String get skinTokenStatusDanger => 'الأخطاء والحذف';
+
+  @override
+  String get skinTokenStatusDangerHint =>
+      'نصوص الأخطاء، وإجراءات الحذف، وحدود الأخطاء.';
+
+  @override
+  String get skinTokenStatusOnDanger => 'النص على لون الخطأ';
+
+  @override
+  String get skinTokenStatusOnDangerHint =>
+      'النص والأيقونات المعروضة على لون الخطأ.';
+
+  @override
+  String get skinTokenStatusDangerContainer => 'تعبئة رسالة الخطأ';
+
+  @override
+  String get skinTokenStatusDangerContainerHint =>
+      'تعبئة رسائل الأخطاء واللافتات.';
+
+  @override
+  String get skinTokenStatusOnDangerContainer => 'نص رسالة الخطأ';
+
+  @override
+  String get skinTokenStatusOnDangerContainerHint =>
+      'النص والأيقونات في رسائل الأخطاء.';
+
+  @override
+  String get skinTokenStatusInfo => 'تعبئة رسالة المعلومات';
+
+  @override
+  String get skinTokenStatusInfoHint => 'تعبئة لافتات المعلومات.';
+
+  @override
+  String get skinTokenStatusOnInfo => 'نص رسالة المعلومات';
+
+  @override
+  String get skinTokenStatusOnInfoHint =>
+      'النص والأيقونات في لافتات المعلومات.';
+
+  @override
+  String get bookReaderOpenFailed => 'تعذّر فتح هذا الكتاب';
+
+  @override
+  String get comicNoPages => 'لم يتم العثور على صور في هذه القصة المصورة';
+
+  @override
+  String get comicPageLoadFailed => 'تعذّر تحميل هذه الصفحة';
+
+  @override
+  String get comicReadingDirectionRtl => 'القراءة من اليمين إلى اليسار';
+
+  @override
+  String get comicReadingDirectionLtr => 'القراءة من اليسار إلى اليمين';
+
+  @override
+  String get epubTextSize => 'حجم النص';
+
+  @override
+  String get epubThemeOriginal => 'الأصلي';
+
+  @override
+  String epubChapterFallbackTitle(int number) {
+    return 'الفصل $number';
+  }
+
+  @override
+  String get bookReaderSettingsTitle => 'إعدادات القارئ';
+
+  @override
+  String get bookReaderPageSection => 'الصفحة';
+
+  @override
+  String get bookReaderTextSection => 'النص';
+
+  @override
+  String get bookReaderReadingModeTitle => 'وضع القراءة';
+
+  @override
+  String get bookReaderPageFlippingLabel => 'تقليب الصفحات';
+
+  @override
+  String get bookReaderColorModeLabel => 'نمط اللون';
+
+  @override
+  String get bookReaderTextDirectionLabel => 'اتجاه النص';
+
+  @override
+  String get bookReaderTwoPageLandscapeLabel => 'صفحتان في الوضع الأفقي';
+
+  @override
+  String get bookReaderPageMarginsLabel => 'هوامش الصفحة';
+
+  @override
+  String get bookReaderFontFaceLabel => 'نوع الخط';
+
+  @override
+  String get bookReaderFontPublisherDefault => 'الافتراضي للناشر';
+
+  @override
+  String get bookReaderFontSerif => 'خط ذو زوائد';
+
+  @override
+  String get bookReaderFontSansSerif => 'خط بلا زوائد';
+
+  @override
+  String get bookReaderFontMonospace => 'أحادي المسافة';
+
+  @override
+  String get bookReaderFontWeightLabel => 'سُمك الخط';
+
+  @override
+  String get bookReaderLineSpacingLabel => 'تباعد الأسطر';
+
+  @override
+  String get bookReaderTextAlignmentLabel => 'محاذاة النص';
+
+  @override
+  String get bookReaderTextAlignLeft => 'محاذاة لليسار';
+
+  @override
+  String get bookReaderTextAlignJustified => 'ضبط';
+
+  @override
+  String get bookReaderTextAlignCenter => 'توسيط';
+
+  @override
+  String get bookReaderTextAlignRight => 'محاذاة لليمين';
+
+  @override
+  String get comicReaderModeSinglePage => 'صفحة واحدة';
+
+  @override
+  String get comicReaderModeTwoPageSpread => 'صفحتان متقابلتان';
+
+  @override
+  String get comicReaderCarouselScrubberSubtitle =>
+      'إظهار صور مصغرة للصفحات فوق شريط التمرير';
 }

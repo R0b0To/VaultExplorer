@@ -293,6 +293,12 @@ private object ChannelMethods {
     const val ARCHIVE_STAGE_BROWSE_ENTRY = "archiveStageBrowseEntry"
     const val ARCHIVE_DISCARD_BROWSE_FILE = "archiveDiscardBrowseFile"
     const val ARCHIVE_CREATE = "archiveCreate"
+
+    // In-app comic (.cbz) / e-book (.epub) readers (see BookReaderHandlers).
+    const val BOOK_OPEN = "bookOpen"
+    const val BOOK_READ_ENTRY = "bookReadEntry"
+    const val BOOK_COVER = "bookCover"
+    const val BOOK_CLOSE = "bookClose"
     const val PROFILE_CARRIERS = "profileCarriers"
     const val CREATE_COMPOSITE_CONTAINER = "createCompositeContainer"
     const val UNLOCK_COMPOSITE_CONTAINER = "unlockCompositeContainer"
@@ -350,6 +356,8 @@ private object ChannelMethods {
 open class MainActivity : FlutterFragmentActivity() {
     companion object {
         @Volatile var activeMainActivity: MainActivity? = null
+        const val ACTION_OPEN_MEDIA_PLAYER =
+            "com.aeidolon.vaultexplorer.action.OPEN_MEDIA_PLAYER"
     }
 
     protected val CHANNEL = "com.aeidolon.vaultexplorer/engine"
@@ -369,6 +377,7 @@ open class MainActivity : FlutterFragmentActivity() {
     private val pdfExecutor = Executors.newFixedThreadPool(2) as ThreadPoolExecutor
     private var usbDetachReceiver: BroadcastReceiver? = null
     private var screenOffReceiver: BroadcastReceiver? = null
+    private var pendingOpenMediaPlayer = false
     private var vaultCameraPlugin: com.aeidolon.vaultexplorer.camera.VaultCameraPlugin? = null
     private var vaultAudioCapturePlugin: com.aeidolon.vaultexplorer.audiocapture.VaultAudioCapturePlugin? = null
     private var quickCaptureScratchpadPlugin: com.aeidolon.vaultexplorer.camera.QuickCaptureScratchpadPlugin? = null
@@ -406,6 +415,9 @@ open class MainActivity : FlutterFragmentActivity() {
     private val headerBackupHandlers = HeaderBackupHandlers(this, ioExecutor, nativeOps)
     private val pdfViewerHandlers = com.aeidolon.vaultexplorer.pdf.PdfViewerHandlers(this, pdfExecutor)
     private val archiveHandlers = com.aeidolon.vaultexplorer.handlers.ArchiveHandlers(this, ioExecutor, nativeOps)
+    private val bookReaderHandlers = com.aeidolon.vaultexplorer.handlers.BookReaderHandlers(
+        this, ioExecutor, nativeOps, imageThumbnailExecutor, thumbnailHandlers,
+    )
     // Held as a Lazy so onStart/onStop can tell whether a player exists
     // without forcing one into existence.
     private val nativePlayerManagerLazy = lazy { com.aeidolon.vaultexplorer.engine.NativePlayerManager(this) }
@@ -435,6 +447,7 @@ open class MainActivity : FlutterFragmentActivity() {
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         setTheme(R.style.NormalTheme)
         super.onCreate(savedInstanceState)
+        handleMediaPlayerNotificationIntent(intent)
         ioExecutor.execute {
             ScheduledSyncHandlers.rescheduleAll(applicationContext)
         }
@@ -537,9 +550,23 @@ open class MainActivity : FlutterFragmentActivity() {
      override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        handleMediaPlayerNotificationIntent(intent)
         disguiseModeHandlers.updateActivityIdentity()
         if (this is VaultShareActivity) {
             shareIntentHandlers.handleIncomingIntent(intent)
+        }
+    }
+
+    private fun handleMediaPlayerNotificationIntent(intent: Intent?) {
+        if (intent?.action != ACTION_OPEN_MEDIA_PLAYER) return
+        pendingOpenMediaPlayer = true
+        if (nativePlayerManagerLazy.isInitialized()) {
+            runOnUiThread {
+                nativePlayerManager.methodChannel?.invokeMethod(
+                    "openMediaPlayer",
+                    null,
+                )
+            }
         }
     }
 
@@ -779,6 +806,10 @@ open class MainActivity : FlutterFragmentActivity() {
                     nativePlayerManager.setVolume(volume)
                     result.success(null)
                 }
+                "setAudioOnly" -> {
+                    nativePlayerManager.setAudioOnly(call.argument<Boolean>("enabled") ?: false)
+                    result.success(null)
+                }
                 "setVolumeBoost" -> {
                     val enabled = call.argument<Boolean>("enabled") ?: false
                     val gainMb = call.argument<Int>("gainMb") ?: 2000
@@ -928,6 +959,11 @@ open class MainActivity : FlutterFragmentActivity() {
                     com.aeidolon.vaultexplorer.engine.VaultPlaybackSession
                         .setShowFileNames(show)
                     result.success(null)
+                }
+                "consumePendingOpenMediaPlayer" -> {
+                    val pending = pendingOpenMediaPlayer
+                    pendingOpenMediaPlayer = false
+                    result.success(pending)
                 }
                 "release" -> {
                     nativePlayerManager.release()
@@ -1469,6 +1505,10 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.ARCHIVE_STAGE_BROWSE_ENTRY -> archiveHandlers.handleArchiveStageBrowseEntry(call, result)
                 ChannelMethods.ARCHIVE_DISCARD_BROWSE_FILE -> archiveHandlers.handleArchiveDiscardBrowseFile(call, result)
                 ChannelMethods.ARCHIVE_CREATE -> archiveHandlers.handleArchiveCreate(call, result)
+                ChannelMethods.BOOK_OPEN -> bookReaderHandlers.handleBookOpen(call, result)
+                ChannelMethods.BOOK_READ_ENTRY -> bookReaderHandlers.handleBookReadEntry(call, result)
+                ChannelMethods.BOOK_COVER -> bookReaderHandlers.handleBookCover(call, result)
+                ChannelMethods.BOOK_CLOSE -> bookReaderHandlers.handleBookClose(call, result)
                 ChannelMethods.EXPORT_CONTAINER_HEADER -> headerBackupHandlers.handleExportContainerHeader(call, result)
                 ChannelMethods.RESTORE_CONTAINER_HEADER_REGION ->
                     headerBackupHandlers.handleRestoreContainerHeaderRegion(call, result)

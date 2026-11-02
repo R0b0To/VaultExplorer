@@ -5818,6 +5818,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get vaultSyncComparingLabel => 'Comparing folders…';
 
   @override
+  String get vaultSyncScanFailedTitle => 'Couldn\'t Read a Folder';
+
+  @override
+  String get vaultSyncScanFailedMessage =>
+      'A folder in a vault couldn\'t be read, so the comparison was stopped instead of guessing. Nothing was changed. Lock and unlock the vault again, then compare again.';
+
+  @override
   String vaultSyncCompareStatsLabel(Object dirs, Object entries) {
     return 'Folders scanned: $dirs | Differences found: $entries';
   }
@@ -11161,6 +11168,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get audioEditorNextCutPoint => 'Next cut point';
 
   @override
+  String get audioEditorStepBack => 'Step back';
+
+  @override
+  String get audioEditorStepForward => 'Step forward';
+
+  @override
   String audioEditorReencodeBanner(String format) {
     return '$format audio can\'t be copied as it is, so it will be re-encoded to AAC (.m4a) when you export.';
   }
@@ -12514,6 +12527,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get floatingPlayerExpandTooltip => 'Expand';
 
   @override
+  String get floatingPlayerAudioOnly => 'Audio only';
+
+  @override
+  String get floatingPlayerShowVideo => 'Show video';
+
+  @override
   String get masterLockTitle => 'Master Lock';
 
   @override
@@ -12548,4 +12567,496 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get duressMasterLockRequired =>
       'A master lock must be enabled in App Security before configuring duress unlock.';
+
+  @override
+  String get skinTokenGroupSurface => 'Surfaces';
+
+  @override
+  String get skinTokenGroupContent => 'Text and icons';
+
+  @override
+  String get skinTokenGroupBorder => 'Borders';
+
+  @override
+  String get skinTokenGroupChrome => 'Top bar';
+
+  @override
+  String get skinTokenGroupAction => 'Buttons';
+
+  @override
+  String get skinTokenGroupControl => 'Switches and sliders';
+
+  @override
+  String get skinTokenGroupChoice => 'Chips and segments';
+
+  @override
+  String get skinTokenGroupSelection => 'Selected items';
+
+  @override
+  String get skinTokenGroupOverlay => 'Menus, dialogs and sheets';
+
+  @override
+  String get skinTokenGroupFloating => 'Floating elements';
+
+  @override
+  String get skinTokenSurfacePage => 'Page background';
+
+  @override
+  String get skinTokenSurfacePageHint =>
+      'The canvas behind everything on this page.';
+
+  @override
+  String get skinTokenSurfaceCard => 'Cards and rows';
+
+  @override
+  String get skinTokenSurfaceCardHint => 'Cards, list rows and grouped panels.';
+
+  @override
+  String get skinTokenSurfaceCardActive => 'Active card';
+
+  @override
+  String get skinTokenSurfaceCardActiveHint =>
+      'The highlighted card, such as an unlocked vault.';
+
+  @override
+  String get skinTokenSurfaceTile => 'Tiles and thumbnails';
+
+  @override
+  String get skinTokenSurfaceTileHint =>
+      'Thumbnail placeholders, icon tiles and code blocks.';
+
+  @override
+  String get skinTokenSurfaceField => 'Input fields';
+
+  @override
+  String get skinTokenSurfaceFieldHint =>
+      'Fill of text fields and search bars.';
+
+  @override
+  String get skinTokenContentPrimary => 'Main text';
+
+  @override
+  String get skinTokenContentPrimaryHint => 'Titles, names and body text.';
+
+  @override
+  String get skinTokenContentSecondary => 'Secondary text';
+
+  @override
+  String get skinTokenContentSecondaryHint => 'Subtitles, details and hints.';
+
+  @override
+  String get skinTokenContentIcon => 'Icons';
+
+  @override
+  String get skinTokenContentIconHint =>
+      'Plain icons that are not on a button or bar.';
+
+  @override
+  String get skinTokenBorderDivider => 'Dividers';
+
+  @override
+  String get skinTokenBorderDividerHint =>
+      'Thin lines between rows and sections.';
+
+  @override
+  String get skinTokenBorderOutline => 'Outlines';
+
+  @override
+  String get skinTokenBorderOutlineHint =>
+      'Borders of outlined buttons and of unselected option boxes.';
+
+  @override
+  String get skinTokenBorderFocus => 'Focus ring';
+
+  @override
+  String get skinTokenBorderFocusHint =>
+      'Border of the text field being edited.';
+
+  @override
+  String get skinTokenChromeTopBar => 'Top bar';
+
+  @override
+  String get skinTokenChromeTopBarHint => 'Fill of the top bar.';
+
+  @override
+  String get skinTokenChromeOnTopBar => 'Top bar text and icons';
+
+  @override
+  String get skinTokenChromeOnTopBarHint =>
+      'Title and icon color on the top bar.';
+
+  @override
+  String get skinTokenActionPrimary => 'Filled buttons';
+
+  @override
+  String get skinTokenActionPrimaryHint => 'Fill of filled buttons.';
+
+  @override
+  String get skinTokenActionOnPrimary => 'Filled button label';
+
+  @override
+  String get skinTokenActionOnPrimaryHint =>
+      'Label and icon on a filled button.';
+
+  @override
+  String get skinTokenActionTonal => 'Raised buttons';
+
+  @override
+  String get skinTokenActionTonalHint => 'Fill of raised and tonal buttons.';
+
+  @override
+  String get skinTokenActionOnTonal => 'Raised button label';
+
+  @override
+  String get skinTokenActionOnTonalHint => 'Label and icon on a raised button.';
+
+  @override
+  String get skinTokenActionText => 'Text and outlined buttons';
+
+  @override
+  String get skinTokenActionTextHint =>
+      'Label color of text buttons, outlined buttons and links.';
+
+  @override
+  String get skinTokenControlActive => 'Control on state';
+
+  @override
+  String get skinTokenControlActiveHint =>
+      'Switch track when on, selected checkbox and radio, slider and progress fill.';
+
+  @override
+  String get skinTokenControlOnActive => 'Switch thumb and checkmark';
+
+  @override
+  String get skinTokenControlOnActiveHint =>
+      'Thumb of a switch that is on and the tick inside a checkbox.';
+
+  @override
+  String get skinTokenControlTrack => 'Control track';
+
+  @override
+  String get skinTokenControlTrackHint =>
+      'Switch track when off and the empty part of sliders and progress bars.';
+
+  @override
+  String get skinTokenControlInactive => 'Control off state';
+
+  @override
+  String get skinTokenControlInactiveHint =>
+      'Thumb of a switch that is off and borders of unchecked boxes.';
+
+  @override
+  String get skinTokenChoiceBackground => 'Chip';
+
+  @override
+  String get skinTokenChoiceBackgroundHint =>
+      'Fill of unselected chips and segments.';
+
+  @override
+  String get skinTokenChoiceSelected => 'Selected chip';
+
+  @override
+  String get skinTokenChoiceSelectedHint =>
+      'Fill of the selected chip or segment.';
+
+  @override
+  String get skinTokenChoiceOnSelected => 'Selected chip label';
+
+  @override
+  String get skinTokenChoiceOnSelectedHint =>
+      'Label and icon on the selected chip or segment.';
+
+  @override
+  String get skinTokenChoiceBorder => 'Chip border';
+
+  @override
+  String get skinTokenChoiceBorderHint =>
+      'Outline of chips and segmented buttons.';
+
+  @override
+  String get skinTokenSelectionFill => 'Selected row';
+
+  @override
+  String get skinTokenSelectionFillHint =>
+      'Selected files and rows, and highlighted icon tiles.';
+
+  @override
+  String get skinTokenSelectionOn => 'Selected row text and icons';
+
+  @override
+  String get skinTokenSelectionOnHint =>
+      'Text and icons drawn on a selected row.';
+
+  @override
+  String get skinTokenOverlayMenu => 'Menus';
+
+  @override
+  String get skinTokenOverlayMenuHint => 'Popup, dropdown and context menus.';
+
+  @override
+  String get skinTokenOverlayOnMenu => 'Menu text';
+
+  @override
+  String get skinTokenOverlayOnMenuHint => 'Text and icons in menus.';
+
+  @override
+  String get skinTokenOverlayDialog => 'Dialogs';
+
+  @override
+  String get skinTokenOverlayDialogHint => 'Fill of dialogs.';
+
+  @override
+  String get skinTokenOverlayOnDialog => 'Dialog title';
+
+  @override
+  String get skinTokenOverlayOnDialogHint => 'Title text of dialogs.';
+
+  @override
+  String get skinTokenOverlaySheet => 'Bottom sheets';
+
+  @override
+  String get skinTokenOverlaySheetHint => 'Fill of bottom sheets.';
+
+  @override
+  String get skinTokenOverlayOnSheet => 'Bottom sheet text';
+
+  @override
+  String get skinTokenOverlayOnSheetHint => 'Text and icons in bottom sheets.';
+
+  @override
+  String get skinTokenOverlayScrim => 'Dim behind dialogs';
+
+  @override
+  String get skinTokenOverlayScrimHint =>
+      'The darkening behind dialogs and bottom sheets.';
+
+  @override
+  String get skinTokenFloatingFab => 'Round add button';
+
+  @override
+  String get skinTokenFloatingFabHint => 'Fill of the round add button.';
+
+  @override
+  String get skinTokenFloatingOnFab => 'Round add button icon';
+
+  @override
+  String get skinTokenFloatingOnFabHint => 'Icon on the round add button.';
+
+  @override
+  String get skinTokenFloatingToast => 'Message pill';
+
+  @override
+  String get skinTokenFloatingToastHint =>
+      'Fill of the info message that pops up at the bottom.';
+
+  @override
+  String get skinTokenFloatingOnToast => 'Message pill text';
+
+  @override
+  String get skinTokenFloatingOnToastHint =>
+      'Text and icon on the info message.';
+
+  @override
+  String get skinTokenFloatingTooltip => 'Tooltips';
+
+  @override
+  String get skinTokenFloatingTooltipHint => 'Fill of tooltips.';
+
+  @override
+  String get skinTokenFloatingOnTooltip => 'Tooltip text';
+
+  @override
+  String get skinTokenFloatingOnTooltipHint => 'Text in tooltips.';
+
+  @override
+  String get skinTokenGroupAccent => 'Accent colors';
+
+  @override
+  String get skinTokenGroupStatus => 'Status and errors';
+
+  @override
+  String get skinTokenSurfacePanel => 'Panels';
+
+  @override
+  String get skinTokenSurfacePanelHint =>
+      'Cards made from the standard card widget, bookmark bar, grid cells and info sheets.';
+
+  @override
+  String get skinTokenChromeBar => 'Bars and tab strips';
+
+  @override
+  String get skinTokenChromeBarHint =>
+      'Action bars, tab strips, selection bar and bottom bars.';
+
+  @override
+  String get skinTokenAccentPrimary => 'Accent';
+
+  @override
+  String get skinTokenAccentPrimaryHint =>
+      'Highlights, links in text, small accent icons and badges.';
+
+  @override
+  String get skinTokenAccentSecondary => 'Secondary accent';
+
+  @override
+  String get skinTokenAccentSecondaryHint => 'Secondary highlights and tags.';
+
+  @override
+  String get skinTokenAccentTertiary => 'Tertiary accent';
+
+  @override
+  String get skinTokenAccentTertiaryHint => 'Tertiary highlights and tags.';
+
+  @override
+  String get skinTokenAccentTertiaryContainer => 'Tertiary accent fill';
+
+  @override
+  String get skinTokenAccentTertiaryContainerHint =>
+      'Fill behind tertiary highlights.';
+
+  @override
+  String get skinTokenAccentOnTertiaryContainer => 'Tertiary accent fill text';
+
+  @override
+  String get skinTokenAccentOnTertiaryContainerHint =>
+      'Text and icons on the tertiary fill.';
+
+  @override
+  String get skinTokenStatusDanger => 'Errors and delete';
+
+  @override
+  String get skinTokenStatusDangerHint =>
+      'Error text, delete actions and error borders.';
+
+  @override
+  String get skinTokenStatusOnDanger => 'Text on error color';
+
+  @override
+  String get skinTokenStatusOnDangerHint =>
+      'Text and icons drawn on the error color.';
+
+  @override
+  String get skinTokenStatusDangerContainer => 'Error message fill';
+
+  @override
+  String get skinTokenStatusDangerContainerHint =>
+      'Fill of error messages and banners.';
+
+  @override
+  String get skinTokenStatusOnDangerContainer => 'Error message text';
+
+  @override
+  String get skinTokenStatusOnDangerContainerHint =>
+      'Text and icons in error messages.';
+
+  @override
+  String get skinTokenStatusInfo => 'Info message fill';
+
+  @override
+  String get skinTokenStatusInfoHint => 'Fill of info banners.';
+
+  @override
+  String get skinTokenStatusOnInfo => 'Info message text';
+
+  @override
+  String get skinTokenStatusOnInfoHint => 'Text and icons in info banners.';
+
+  @override
+  String get bookReaderOpenFailed => 'Couldn\'t open this book';
+
+  @override
+  String get comicNoPages => 'No images found in this comic';
+
+  @override
+  String get comicPageLoadFailed => 'Couldn\'t load this page';
+
+  @override
+  String get comicReadingDirectionRtl => 'Reading right to left';
+
+  @override
+  String get comicReadingDirectionLtr => 'Reading left to right';
+
+  @override
+  String get epubTextSize => 'Text size';
+
+  @override
+  String get epubThemeOriginal => 'Original';
+
+  @override
+  String epubChapterFallbackTitle(int number) {
+    return 'Chapter $number';
+  }
+
+  @override
+  String get bookReaderSettingsTitle => 'Reader settings';
+
+  @override
+  String get bookReaderPageSection => 'Page';
+
+  @override
+  String get bookReaderTextSection => 'Text';
+
+  @override
+  String get bookReaderReadingModeTitle => 'Reading mode';
+
+  @override
+  String get bookReaderPageFlippingLabel => 'Page flipping';
+
+  @override
+  String get bookReaderColorModeLabel => 'Color mode';
+
+  @override
+  String get bookReaderTextDirectionLabel => 'Text direction';
+
+  @override
+  String get bookReaderTwoPageLandscapeLabel => 'Two pages in landscape';
+
+  @override
+  String get bookReaderPageMarginsLabel => 'Page margins';
+
+  @override
+  String get bookReaderFontFaceLabel => 'Font face';
+
+  @override
+  String get bookReaderFontPublisherDefault => 'Publisher default';
+
+  @override
+  String get bookReaderFontSerif => 'Serif';
+
+  @override
+  String get bookReaderFontSansSerif => 'Sans serif';
+
+  @override
+  String get bookReaderFontMonospace => 'Monospace';
+
+  @override
+  String get bookReaderFontWeightLabel => 'Font thickness';
+
+  @override
+  String get bookReaderLineSpacingLabel => 'Line spacing';
+
+  @override
+  String get bookReaderTextAlignmentLabel => 'Text alignment';
+
+  @override
+  String get bookReaderTextAlignLeft => 'Left';
+
+  @override
+  String get bookReaderTextAlignJustified => 'Justified';
+
+  @override
+  String get bookReaderTextAlignCenter => 'Center';
+
+  @override
+  String get bookReaderTextAlignRight => 'Right';
+
+  @override
+  String get comicReaderModeSinglePage => 'Single page';
+
+  @override
+  String get comicReaderModeTwoPageSpread => 'Two-page spread';
+
+  @override
+  String get comicReaderCarouselScrubberSubtitle =>
+      'Show page thumbnails above the scrubber';
 }

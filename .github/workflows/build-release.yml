@@ -13,6 +13,10 @@ on:
           - release
           - debug
         default: release
+      publish_debug:
+        description: 'Debug only: publish the APKs to the rolling "debug-latest" pre-release'
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -65,6 +69,8 @@ jobs:
           mkdir -p "$(dirname "${{ env.BUILD_DIR }}")"
           cp -a "$GITHUB_WORKSPACE" "${{ env.BUILD_DIR }}"
 
+      # Used for both release and debug builds, so debug APKs carry the same
+      # signature as releases and can be installed over them.
       - name: Set up signing credentials in BUILD_DIR
         working-directory: ${{ env.BUILD_DIR }}
         run: |
@@ -118,7 +124,13 @@ jobs:
     name: Create GitHub Release
     needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    # Tag pushes publish a normal release. A manual debug run publishes only
+    # the rolling "debug-latest" pre-release (when "publish_debug" is ticked).
+    if: >-
+      startsWith(github.ref, 'refs/tags/') ||
+      (github.event_name == 'workflow_dispatch' &&
+       inputs.build_type == 'debug' &&
+       inputs.publish_debug)
     permissions:
       contents: write
     steps:
@@ -126,6 +138,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Extract Build Number & Set Changelog Path
+        if: startsWith(github.ref, 'refs/tags/')
         run: |
           BUILD_NUMBER=$(grep '^version:' pubspec.yaml | sed 's/^version: //' | cut -d'+' -f2)
           CHANGELOG_FILE="fastlane/metadata/android/en-US/changelogs/${BUILD_NUMBER}.txt"
@@ -144,11 +157,40 @@ jobs:
           merge-multiple: true
 
       - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           name: VaultExplorer ${{ github.ref_name }}
           files: release-apk/*.apk
           body_path: ${{ env.CHANGELOG_PATH }}
           generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # One rolling pre-release instead of one per run: delete the previous
+      # one (and its tag) so there is only ever a single "debug-latest" tag.
+      # The tag does not start with "v", so it never triggers this workflow
+      # and does not look like a version to anything that scans tags.
+      - name: Remove previous debug pre-release
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        run: gh release delete debug-latest --cleanup-tag --yes || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+
+      - name: Create GitHub Debug Pre-release
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: debug-latest
+          target_commitish: ${{ github.sha }}
+          name: VaultExplorer debug build (testing only)
+          body: |
+            Debug build for testing, not a release.
+            Branch: `${{ github.ref_name }}`, commit: `${{ github.sha }}`, run #${{ github.run_number }}.
+            Installs next to the release app and is much larger and slower than it.
+          prerelease: true
+          make_latest: false
+          files: release-apk/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

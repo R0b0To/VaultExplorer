@@ -130,6 +130,16 @@ class BrowserTabsShell extends ConsumerStatefulWidget {
   /// [primaryLocalContainer] and back at the root leaves the app.
   final bool appRoot;
 
+  /// A workspace that already exists and should be shown again instead of
+  /// starting an empty one -- the tabs the person left open when this shell
+  /// was last torn down (see `BrowserSessionStore`). The tab list and every
+  /// tab's own location and sort are still held by their providers, so this
+  /// shell simply picks them up where they were; search and selection start
+  /// empty again.
+  /// When the workspace's state is gone by the time it is read, the provider
+  /// rebuilds it from the config's initial data, i.e. a fresh session.
+  final BrowserTabsConfig? restoredWorkspace;
+
   const BrowserTabsShell({
     super.key,
     this.initialContainer,
@@ -147,6 +157,7 @@ class BrowserTabsShell extends ConsumerStatefulWidget {
     this.onDuplicate,
     this.viewportOptions = const BrowserViewportOptions(),
     this.appRoot = false,
+    this.restoredWorkspace,
   });
 
   @override
@@ -296,11 +307,13 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   @override
   void initState() {
     super.initState();
-    _workspace = BrowserTabsConfig.create(
-      initialContainer: widget.initialContainer,
-      includeDashboardTab: widget.includeDashboardTab,
-      appRoot: widget.appRoot,
-    );
+    _workspace =
+        widget.restoredWorkspace ??
+        BrowserTabsConfig.create(
+          initialContainer: widget.initialContainer,
+          includeDashboardTab: widget.includeDashboardTab,
+          appRoot: widget.appRoot,
+        );
     final initialState = ref.read(browserTabsProvider(_workspace));
     // Pages keep taking touches while a swipe is still settling, so a vertical
     // scroll can start right after changing tabs instead of waiting for the

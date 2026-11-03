@@ -23,6 +23,7 @@ import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/viewer/background_playback/background_playback_host.dart';
 import 'package:vaultexplorer/features/browser/browser_tabs_host.dart';
+import 'package:vaultexplorer/features/browser/controllers/browser_session_store.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
 import 'package:vaultexplorer/features/browser/models/browser_tab_origin.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
@@ -125,6 +126,12 @@ class _MainShellState extends ConsumerState<MainShell>
   Timer? _exitArmTimer;
   BrowserTabsConfig? _browserWorkspace;
 
+  /// The tabs the person left open the last time this vault was revealed from
+  /// Mask Mode, picked up again so they resume where they were instead of
+  /// starting from an empty Home. Null for a normal launch, and when nothing
+  /// is left to resume. See [BrowserSessionStore].
+  BrowserTabsConfig? _restoredBrowserWorkspace;
+
   BrowserTabsState? get _browserWorkspaceState {
     final workspace = _browserWorkspace;
     return workspace == null ? null : ref.read(browserTabsProvider(workspace));
@@ -146,6 +153,11 @@ class _MainShellState extends ConsumerState<MainShell>
     // Cached so asynchronous lock callbacks stay safe after this widget is
     // unmounted.
     _container = ProviderScope.containerOf(context, listen: false);
+    if (widget.returnToDecoyOnBackground) {
+      _restoredBrowserWorkspace = _container
+          .read(browserSessionStoreProvider)
+          .resumable();
+    }
     _quickCaptureColdStart = ref.read(pendingQuickCaptureLaunchProvider).take();
     if (!_quickCaptureColdStart) {
       // The Settings tab used to be the thing that created -- and so started
@@ -681,6 +693,12 @@ class _MainShellState extends ConsumerState<MainShell>
 
   void _onBrowserWorkspaceChanged(BrowserTabsConfig? workspace) {
     _browserWorkspace = workspace;
+    if (workspace != null && widget.returnToDecoyOnBackground) {
+      // Revealed from Mask Mode: keep these tabs alive for when the app goes
+      // back to the decoy, so the next reveal resumes them. Nothing to do on
+      // the null call from dispose -- the store simply keeps holding them.
+      _container.read(browserSessionStoreProvider).hold(_container, workspace);
+    }
     final pending = _browserInitialContainer;
     if (workspace != null && pending != null) {
       _browserInitialContainer = null;
@@ -920,6 +938,7 @@ class _MainShellState extends ConsumerState<MainShell>
                 buildDrawer(currentVolId: volId, workspace: workspace),
             closeRouteWhenEmpty: false,
             includeDashboardTab: true,
+            restoredWorkspace: _restoredBrowserWorkspace,
             homeBuilder:
                 ({
                   required workspace,

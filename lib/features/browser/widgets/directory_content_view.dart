@@ -372,11 +372,23 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
 
   bool _initialized = false;
 
+  /// True when this view is picking up a tab whose location already exists --
+  /// the tab was kept when the vault was hidden behind Mask Mode and is being
+  /// shown again (see `BrowserSessionStore`). A brand-new tab always starts
+  /// with an empty path stack, because only this view initializes it. A
+  /// resumed tab must stay where it was left, not jump back to
+  /// [DirectoryContentView.initialPath].
+  bool _resumedNavigation = false;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_initialized) {
       _initialized = true;
+      _resumedNavigation = ref
+          .read(fileBrowserNavigationProvider(_stateKey))
+          .pathStack
+          .isNotEmpty;
       final rootLabel = context.l10n.rootFolderLabel;
 
       // Defer provider mutations and initial loading until after the first frame builds
@@ -1621,12 +1633,20 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       }
     }
     final initialPath = widget.initialPath;
-    if (initialPath != null && initialPath.isNotEmpty && mounted) {
+    if (!_resumedNavigation &&
+        initialPath != null &&
+        initialPath.isNotEmpty &&
+        mounted) {
       // New tab opened on a folder: go straight there (builds the path
       // stack from the root) instead of listing the root first.
       await _navigateToPath(initialPath, isDir: true);
     } else {
-      await _loadDirectoryContents(_currentDirPath);
+      // A resumed tab stays in the folder it was left in; list it again in
+      // case it changed while the vault was hidden.
+      await _loadDirectoryContents(
+        _currentDirPath,
+        refresh: _resumedNavigation,
+      );
     }
     // A bookmark tapped in the drawer opened this vault: now that it has
     // loaded, go where the bookmark points.

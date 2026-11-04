@@ -3733,6 +3733,27 @@ class AppLocalizationsUk extends AppLocalizations {
   String get layoutModeGalleryGrid => 'Галерея (сітка)';
 
   @override
+  String get galleryModeAction => 'Галерея';
+
+  @override
+  String get galleryModeTooltip => 'Режим галереї';
+
+  @override
+  String get optionsAction => 'Options';
+
+  @override
+  String get optionsActionTooltip => 'Options';
+
+  @override
+  String get dateToday => 'Сьогодні';
+
+  @override
+  String get dateYesterday => 'Вчора';
+
+  @override
+  String get dateEarlier => 'Раніше';
+
+  @override
   String get readOnlyCantDeleteTooltip => 'Лише читання — видалення неможливе';
 
   @override

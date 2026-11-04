@@ -3772,5 +3772,10 @@
   "categoryIndexInVaultsSubtitle": "カテゴリを開いたときに各保管庫の設定フォルダー内に暗号化されて保存され、次回からファイルがすぐに表示されます。端末には何も保存されません。",
   "categoryIndexClear": "カテゴリのインデックスを消去",
   "categoryIndexClearSubtitle": "ロック解除されたすべての保管庫からインデックスを削除",
-  "categoryIndexCleared": "カテゴリのインデックスを消去しました"
+  "categoryIndexCleared": "カテゴリのインデックスを消去しました",
+  "galleryModeAction": "ギャラリー",
+  "galleryModeTooltip": "ギャラリーモード",
+  "dateToday": "今日",
+  "dateYesterday": "昨日",
+  "dateEarlier": "以前"
 }

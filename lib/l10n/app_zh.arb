@@ -3772,5 +3772,10 @@
   "categoryIndexInVaultsSubtitle": "打开分类时，以加密形式保存在每个保险库的配置文件夹中，以便下次立即可见文件。手机上不会保存任何内容。",
   "categoryIndexClear": "清除分类索引",
   "categoryIndexClearSubtitle": "从每个已解锁的保险库中移除索引",
-  "categoryIndexCleared": "已清除分类索引"
+  "categoryIndexCleared": "已清除分类索引",
+  "galleryModeAction": "图库",
+  "galleryModeTooltip": "图库模式",
+  "dateToday": "今天",
+  "dateYesterday": "昨天",
+  "dateEarlier": "更早"
 }

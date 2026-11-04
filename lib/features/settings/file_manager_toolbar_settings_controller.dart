@@ -286,6 +286,15 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
     return changed;
   }
 
+  Future<void> setGalleryModeForStorage(
+    String containerUri,
+    bool enabled,
+  ) async {
+    final newConfig =
+        state.config.withGalleryModeForStorage(containerUri, enabled);
+    await _updateConfig(newConfig);
+  }
+
   Future<void> reorderActions(int oldIndex, int newIndex) async {
     final order = List<FileManagerAction>.from(state.config.order);
     final moved = order.removeAt(oldIndex);

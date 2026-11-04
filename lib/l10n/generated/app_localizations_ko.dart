@@ -3528,6 +3528,27 @@ class AppLocalizationsKo extends AppLocalizations {
   String get layoutModeGalleryGrid => '갤러리 그리드';
 
   @override
+  String get galleryModeAction => '갤러리';
+
+  @override
+  String get galleryModeTooltip => '갤러리 모드';
+
+  @override
+  String get optionsAction => 'Options';
+
+  @override
+  String get optionsActionTooltip => 'Options';
+
+  @override
+  String get dateToday => '오늘';
+
+  @override
+  String get dateYesterday => '어제';
+
+  @override
+  String get dateEarlier => '이전';
+
+  @override
   String get readOnlyCantDeleteTooltip => '읽기 전용 — 삭제할 수 없음';
 
   @override

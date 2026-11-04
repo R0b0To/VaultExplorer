@@ -962,6 +962,7 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
     FileCategory.videos => context.l10n.filterVideosOption,
     FileCategory.audio => context.l10n.filterAudioOption,
     FileCategory.documents => context.l10n.filterDocumentsOption,
+    FileCategory.gallery => context.l10n.galleryModeAction,
   };
 
   String _sourceLabel(List<MountedContainer> mounted) {

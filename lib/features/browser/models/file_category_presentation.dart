@@ -12,6 +12,7 @@ extension FileCategoryPresentation on FileCategory {
     FileCategory.videos => l10n.filterVideosOption,
     FileCategory.audio => l10n.filterAudioOption,
     FileCategory.documents => l10n.filterDocumentsOption,
+    FileCategory.gallery => l10n.galleryModeAction,
   };
 
   IconData get icon => switch (this) {
@@ -19,5 +20,6 @@ extension FileCategoryPresentation on FileCategory {
     FileCategory.videos => Icons.movie_rounded,
     FileCategory.audio => Icons.audiotrack_rounded,
     FileCategory.documents => Icons.description_rounded,
+    FileCategory.gallery => Icons.photo_library_rounded,
   };
 }

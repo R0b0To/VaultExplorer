@@ -3655,6 +3655,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get layoutModeGalleryGrid => 'Gallery Grid';
 
   @override
+  String get galleryModeAction => 'Gallery';
+
+  @override
+  String get galleryModeTooltip => 'Gallery mode';
+
+  @override
+  String get optionsAction => 'Options';
+
+  @override
+  String get optionsActionTooltip => 'Options';
+
+  @override
+  String get dateToday => 'Today';
+
+  @override
+  String get dateYesterday => 'Yesterday';
+
+  @override
+  String get dateEarlier => 'Earlier';
+
+  @override
   String get readOnlyCantDeleteTooltip => 'Read-only — can\'t delete';
 
   @override

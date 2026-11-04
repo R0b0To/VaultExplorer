@@ -3772,5 +3772,10 @@
   "categoryIndexInVaultsSubtitle": "Salvo criptografado dentro de cada cofre, em sua pasta de configuração, ao abrir uma categoria, para que seus arquivos apareçam instantaneamente da próxima vez. Nada é salvo no seu telefone.",
   "categoryIndexClear": "Limpar índices de categoria",
   "categoryIndexClearSubtitle": "Remove o índice de cada cofre desbloqueado",
-  "categoryIndexCleared": "Índices de categoria limpos"
+  "categoryIndexCleared": "Índices de categoria limpos",
+  "galleryModeAction": "Galeria",
+  "galleryModeTooltip": "Modo galeria",
+  "dateToday": "Hoje",
+  "dateYesterday": "Ontem",
+  "dateEarlier": "Anteriormente"
 }

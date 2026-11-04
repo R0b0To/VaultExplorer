@@ -3772,5 +3772,10 @@
   "categoryIndexInVaultsSubtitle": "카테고리를 열 때 각 금고의 설정 폴더에 암호화되어 저장되므로 다음에 파일이 즉시 표시됩니다. 휴대전화에는 아무것도 저장되지 않습니다.",
   "categoryIndexClear": "카테고리 색인 지우기",
   "categoryIndexClearSubtitle": "잠금 해제된 모든 금고에서 색인을 삭제합니다",
-  "categoryIndexCleared": "카테고리 색인이 삭제되었습니다"
+  "categoryIndexCleared": "카테고리 색인이 삭제되었습니다",
+  "galleryModeAction": "갤러리",
+  "galleryModeTooltip": "갤러리 모드",
+  "dateToday": "오늘",
+  "dateYesterday": "어제",
+  "dateEarlier": "이전"
 }

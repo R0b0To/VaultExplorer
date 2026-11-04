@@ -3480,6 +3480,27 @@ class AppLocalizationsZh extends AppLocalizations {
   String get layoutModeGalleryGrid => '图库网格';
 
   @override
+  String get galleryModeAction => '图库';
+
+  @override
+  String get galleryModeTooltip => '图库模式';
+
+  @override
+  String get optionsAction => 'Options';
+
+  @override
+  String get optionsActionTooltip => 'Options';
+
+  @override
+  String get dateToday => '今天';
+
+  @override
+  String get dateYesterday => '昨天';
+
+  @override
+  String get dateEarlier => '更早';
+
+  @override
   String get readOnlyCantDeleteTooltip => '只读——无法删除';
 
   @override

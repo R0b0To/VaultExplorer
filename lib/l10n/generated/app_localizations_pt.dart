@@ -3710,6 +3710,27 @@ class AppLocalizationsPt extends AppLocalizations {
   String get layoutModeGalleryGrid => 'Grade de Galeria';
 
   @override
+  String get galleryModeAction => 'Galeria';
+
+  @override
+  String get galleryModeTooltip => 'Modo galeria';
+
+  @override
+  String get optionsAction => 'Options';
+
+  @override
+  String get optionsActionTooltip => 'Options';
+
+  @override
+  String get dateToday => 'Hoje';
+
+  @override
+  String get dateYesterday => 'Ontem';
+
+  @override
+  String get dateEarlier => 'Anteriormente';
+
+  @override
   String get readOnlyCantDeleteTooltip =>
       'Somente leitura — não é possível excluir';
 

@@ -3772,5 +3772,10 @@
   "categoryIndexInVaultsSubtitle": "Wird beim Öffnen einer Kategorie verschlüsselt im Konfigurationsordner des jeweiligen Tresors gespeichert, damit die Dateien beim nächsten Mal sofort erscheinen. Auf Ihrem Smartphone wird nichts gespeichert.",
   "categoryIndexClear": "Kategorie-Indizes löschen",
   "categoryIndexClearSubtitle": "Entfernt den Index aus allen entsperrten Tresoren",
-  "categoryIndexCleared": "Kategorie-Indizes gelöscht"
+  "categoryIndexCleared": "Kategorie-Indizes gelöscht",
+  "galleryModeAction": "Galerie",
+  "galleryModeTooltip": "Galeriemodus",
+  "dateToday": "Heute",
+  "dateYesterday": "Gestern",
+  "dateEarlier": "Früher"
 }

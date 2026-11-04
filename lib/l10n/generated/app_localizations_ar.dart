@@ -3741,6 +3741,27 @@ class AppLocalizationsAr extends AppLocalizations {
   String get layoutModeGalleryGrid => 'شبكة معرض';
 
   @override
+  String get galleryModeAction => 'المعرض';
+
+  @override
+  String get galleryModeTooltip => 'وضع المعرض';
+
+  @override
+  String get optionsAction => 'Options';
+
+  @override
+  String get optionsActionTooltip => 'Options';
+
+  @override
+  String get dateToday => 'اليوم';
+
+  @override
+  String get dateYesterday => 'أمس';
+
+  @override
+  String get dateEarlier => 'سابقًا';
+
+  @override
   String get readOnlyCantDeleteTooltip => 'للقراءة فقط — لا يمكن الحذف';
 
   @override

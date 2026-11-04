@@ -34,6 +34,7 @@ import 'package:vaultexplorer/features/browser/widgets/book_cover_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_item_drag.dart';
 import 'package:vaultexplorer/features/browser/widgets/fast_scrollbar.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_thumbnail_preview.dart';
+import 'package:vaultexplorer/features/browser/widgets/gallery_date_header.dart';
 import 'package:vaultexplorer/features/browser/widgets/grid_card_shell.dart';
 import 'package:vaultexplorer/features/browser/widgets/hold_range_select_container.dart';
 import 'package:vaultexplorer/features/browser/widgets/thumbnail_raw_fallback.dart';
@@ -77,6 +78,7 @@ class FileMasonryView extends ConsumerStatefulWidget {
   final bool Function(RawEntry entry)? isFolderSynced;
   final ScrollController? scrollController;
   final double bottomClearance;
+  final bool groupByDate;
 
   final ArchiveContext? archiveContext;
   final String? archiveRootPath;
@@ -128,6 +130,7 @@ class FileMasonryView extends ConsumerStatefulWidget {
     this.isFolderSynced,
     this.scrollController,
     this.bottomClearance = 0.0,
+    this.groupByDate = false,
     this.archiveContext,
     this.archiveRootPath,
     this.sortBy,
@@ -544,6 +547,40 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
     return false;
   }
 
+  Widget _buildItemCell(BuildContext context, RawEntry entry, int index) {
+    final isDir = entry.isDir;
+    final fullPath = widget.currentDirPath.isEmpty
+        ? entry.name
+        : '${widget.currentDirPath}/${entry.name}';
+    final hasVisualPreview = !isDir && _hasVisualPreview(entry.name);
+    final ratio = _aspectRatioFor(
+      entry,
+      fullPath,
+      hasVisualPreview: hasVisualPreview,
+    );
+
+    final cell = isDir
+        ? _buildDirCell(context, entry, fullPath, ratio)
+        : _buildFileCell(context, entry, fullPath, ratio);
+
+    return HoldSelectableItem(
+      index: index,
+      entry: entry,
+      child: BrowserItemDragItem(
+        entry: entry,
+        container: _containerOf(entry),
+        currentDirectory: widget.currentDirPath,
+        visibleItems: widget.items,
+        selectedItems: widget.selectedItems,
+        isSelectionMode: widget.isSelectionMode,
+        enabled: widget.enableFileDrag && widget.archiveContext == null,
+        onItemLongPress: widget.onItemLongPress,
+        onDrop: widget.onFileDrop,
+        child: cell,
+      ),
+    );
+  }
+
   Widget _buildAnimatedMasonryView(ScrollController? controller, int total) {
     return AnimatedBuilder(
       animation: _morphController,
@@ -566,40 +603,71 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
         cacheExtent: 800,
         padding: EdgeInsets.fromLTRB(10, 12, 10, widget.bottomClearance),
         itemCount: total,
-        itemBuilder: (context, i) {
-          final entry = widget.items[i];
-          final isDir = entry.isDir;
-          final fullPath = widget.currentDirPath.isEmpty
-              ? entry.name
-              : '${widget.currentDirPath}/${entry.name}';
-          final hasVisualPreview = !isDir && _hasVisualPreview(entry.name);
-          final ratio = _aspectRatioFor(
-            entry,
-            fullPath,
-            hasVisualPreview: hasVisualPreview,
-          );
+        itemBuilder: (context, i) =>
+            _buildItemCell(context, widget.items[i], i),
+      ),
+    );
+  }
 
-          final cell = isDir
-              ? _buildDirCell(context, entry, fullPath, ratio)
-              : _buildFileCell(context, entry, fullPath, ratio);
+  Widget _buildDateGroupedMasonryView(ScrollController? controller) {
+    final groups = computeDateGroups(widget.items);
 
-          return HoldSelectableItem(
-            index: i,
-            entry: entry,
-            child: BrowserItemDragItem(
-              entry: entry,
-              container: _containerOf(entry),
-              currentDirectory: widget.currentDirPath,
-              visibleItems: widget.items,
-              selectedItems: widget.selectedItems,
-              isSelectionMode: widget.isSelectionMode,
-              enabled: widget.enableFileDrag && widget.archiveContext == null,
-              onItemLongPress: widget.onItemLongPress,
-              onDrop: widget.onFileDrop,
-              child: cell,
-            ),
-          );
-        },
+    final slivers = <Widget>[
+      SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            final group = groups[index];
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                GalleryDateHeader(
+                  title: formatDateGroupHeader(group.date, context),
+                  count: group.items.length,
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 4, 10, 12),
+                  child: StaggeredGrid.count(
+                    crossAxisCount: _columnCount,
+                    mainAxisSpacing: widget.spacing,
+                    crossAxisSpacing: widget.spacing,
+                    children: [
+                      for (int i = 0; i < group.items.length; i++)
+                        _buildItemCell(
+                          context,
+                          group.items[i],
+                          group.globalIndices[i],
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+          childCount: groups.length,
+        ),
+      ),
+      if (widget.bottomClearance > 0)
+        SliverToBoxAdapter(
+          child: SizedBox(height: widget.bottomClearance),
+        ),
+    ];
+
+    return AnimatedBuilder(
+      animation: _morphController,
+      builder: (context, child) {
+        return ClipRect(
+          child: Transform.scale(
+            scale: _scaleAnimation.value,
+            alignment: Alignment.center,
+            child: child,
+          ),
+        );
+      },
+      child: CustomScrollView(
+        controller: controller,
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: slivers,
       ),
     );
   }
@@ -623,7 +691,9 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
       child: NotificationListener<ScrollNotification>(
         onNotification: _onScrollNotification,
         child: widget.scrollController == null
-            ? _buildAnimatedMasonryView(null, total)
+            ? (widget.groupByDate
+                ? _buildDateGroupedMasonryView(null)
+                : _buildAnimatedMasonryView(null, total))
             : FastScrollbar(
                 controller: widget.scrollController!,
                 items: widget.items,
@@ -632,10 +702,12 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
                   top: 12,
                   bottom: widget.bottomClearance,
                 ),
-                child: _buildAnimatedMasonryView(
-                  widget.scrollController,
-                  total,
-                ),
+                child: widget.groupByDate
+                    ? _buildDateGroupedMasonryView(widget.scrollController)
+                    : _buildAnimatedMasonryView(
+                        widget.scrollController,
+                        total,
+                      ),
               ),
       ),
     );

@@ -3772,5 +3772,10 @@
   "categoryIndexInVaultsSubtitle": "يتم حفظه مشفرًا داخل كل خزينة، في مجلد الإعدادات الخاص بها، عند فتح تصنيف، لتظهر ملفاته فورًا في المرة القادمة. لا يتم حفظ أي شيء على هاتفك.",
   "categoryIndexClear": "مسح فهارس التصنيفات",
   "categoryIndexClearSubtitle": "إزالة الفهرس من كل خزينة تم إلغاء قفلها",
-  "categoryIndexCleared": "تم مسح فهارس التصنيفات"
+  "categoryIndexCleared": "تم مسح فهارس التصنيفات",
+  "galleryModeAction": "المعرض",
+  "galleryModeTooltip": "وضع المعرض",
+  "dateToday": "اليوم",
+  "dateYesterday": "أمس",
+  "dateEarlier": "سابقًا"
 }

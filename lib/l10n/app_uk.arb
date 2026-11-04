@@ -3772,5 +3772,10 @@
   "categoryIndexInVaultsSubtitle": "Зберігається зашифрованим усередині кожного сейфа в його папці конфігурації під час відкриття категорії, щоб наступного разу файли з’являлися миттєво. На телефоні нічого не зберігається.",
   "categoryIndexClear": "Очистити індекси категорій",
   "categoryIndexClearSubtitle": "Видаляє індекс із кожного розблокованого сейфа",
-  "categoryIndexCleared": "Індекси категорій очищено"
+  "categoryIndexCleared": "Індекси категорій очищено",
+  "galleryModeAction": "Галерея",
+  "galleryModeTooltip": "Режим галереї",
+  "dateToday": "Сьогодні",
+  "dateYesterday": "Вчора",
+  "dateEarlier": "Раніше"
 }

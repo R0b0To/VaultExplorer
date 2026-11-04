@@ -3734,6 +3734,27 @@ class AppLocalizationsFr extends AppLocalizations {
   String get layoutModeGalleryGrid => 'Grille galerie';
 
   @override
+  String get galleryModeAction => 'Galerie';
+
+  @override
+  String get galleryModeTooltip => 'Mode galerie';
+
+  @override
+  String get optionsAction => 'Options';
+
+  @override
+  String get optionsActionTooltip => 'Options';
+
+  @override
+  String get dateToday => 'Aujourd\'hui';
+
+  @override
+  String get dateYesterday => 'Hier';
+
+  @override
+  String get dateEarlier => 'Plus tôt';
+
+  @override
   String get readOnlyCantDeleteTooltip =>
       'Lecture seule — impossible de supprimer';
 

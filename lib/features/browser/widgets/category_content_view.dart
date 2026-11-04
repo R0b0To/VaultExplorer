@@ -12,6 +12,8 @@ import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart'
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/external_storage_locations_provider.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 import 'package:vaultexplorer/core/utils/cancellation_token.dart';
 import 'package:vaultexplorer/core/utils/path_clipboard.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
@@ -64,6 +66,8 @@ import 'package:vaultexplorer/features/browser/widgets/file_item_actions_sheet.d
 import 'package:vaultexplorer/features/browser/widgets/file_list_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_manager_action_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_manager_more_menu_button.dart';
+import 'package:vaultexplorer/features/browser/widgets/file_manager_options_menu_button.dart';
+import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_screen.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_masonry_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/filter_menu_button.dart';
 import 'package:vaultexplorer/features/browser/widgets/layout_mode_menu_button.dart';
@@ -173,6 +177,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
 
   String get _categoryKey => widget.category.storageKey;
   bool get _scoped => widget.scopedContainer != null;
+  bool get _isGallery => widget.category == FileCategory.gallery;
   bool get _usesVaults =>
       _scoped ? !widget.scopedContainer!.isLocalStorage : widget.includeVaults;
 
@@ -187,12 +192,16 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     if (widget.scopedContainer != null) {
       _containers = {widget.scopedContainer!.volId: widget.scopedContainer!};
       final initialDir = widget.initialDirPath ?? '';
-      _location = CategoryLocation(widget.scopedContainer!.volId, initialDir);
-      _folderMode = true;
+      _location = CategoryLocation(
+        widget.scopedContainer!.volId,
+        _isGallery ? '' : initialDir,
+      );
+      _folderMode = !_isGallery;
     } else {
       _location = CategoryLocation.top;
       final settings = ref.read(appSettingsControllerProvider).settings;
-      _folderMode = settings.categoryFolderStructure.contains(_categoryKey);
+      _folderMode = !_isGallery &&
+          settings.categoryFolderStructure.contains(_categoryKey);
     }
     _initialLocation = _location;
     final settings = ref.read(appSettingsControllerProvider).settings;
@@ -203,7 +212,8 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           );
     final visual =
         widget.category == FileCategory.images ||
-        widget.category == FileCategory.videos;
+        widget.category == FileCategory.videos ||
+        _isGallery;
     _layout = visual ? BrowserLayoutMode.grid : BrowserLayoutMode.list;
     _sortBy = visual ? SortBy.date : SortBy.name;
     _sortAscending = !visual;
@@ -1374,7 +1384,46 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
         tooltip: l10n.playMediaHereTooltip,
         onPressed: canPlayMedia ? _playMediaFromFirst : null,
       ),
+      FileManagerAction.gallery: (context) => IconButton(
+        icon: Icon(
+          _isGallery
+              ? Icons.photo_library_rounded
+              : Icons.photo_library_outlined,
+          color: _isGallery ? Theme.of(context).colorScheme.primary : null,
+        ),
+        tooltip: l10n.galleryModeTooltip,
+        onPressed: () {
+          if (_scoped) {
+            widget.onScopedFilterChanged?.call(
+              _isGallery ? null : 'gallery',
+              _effectiveLocation.dirPath,
+            );
+          }
+        },
+      ),
+      FileManagerAction.options: (context) => FileManagerOptionsMenuButton(
+        toolbarConfig: toolbarConfig,
+        onToggleShowHiddenFiles: (v) {
+          _updateToolbarConfig((c) => c.copyWith(showHiddenFiles: v));
+          _startScan();
+        },
+        onToggleShowGridFileNames: (v) {
+          _updateToolbarConfig((c) => c.copyWith(showGridFileNames: v));
+        },
+        onToggleShowFileExtensions: (v) {
+          _updateToolbarConfig((c) => c.copyWith(showFileExtensions: v));
+        },
+        onToggleShowListThumbnails: (v) {
+          _updateToolbarConfig((c) => c.copyWith(showListThumbnails: v));
+        },
+        onOpenSettings: _openFileManagerSettings,
+      ),
     };
+
+    final visibleActions = toolbarConfig.visible.where((a) {
+      if (_isGallery && a == FileManagerAction.filter) return false;
+      return actionBuilders.containsKey(a);
+    }).toList();
 
     // 1. Regular AppBar
     PreferredSizeWidget regularAppBarFactory(BuildContext context) {
@@ -1572,9 +1621,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
             onPressed: () => _setFolderMode(!_folderMode),
           ),
           if (isLandscape && showActionBar)
-            ...toolbarConfig.visible
-                .where((a) => actionBuilders.containsKey(a))
-                .map((a) => actionBuilders[a]!(context)),
+            ...visibleActions.map((a) => actionBuilders[a]!(context)),
         ],
       );
     }
@@ -1663,17 +1710,17 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           : (!isLandscape && showActionBar
               ? FileManagerActionBar(
                   axis: Axis.horizontal,
-                  actions: toolbarConfig.visible,
+                  actions: visibleActions,
                   builders: actionBuilders,
                 )
               : null);
       _chrome.setBottomBar(widget.tabId, bottomBarWidget);
 
       final showFloatingAction =
-          useFab && !_searchActive && toolbarConfig.visible.isNotEmpty;
+          useFab && !_searchActive && visibleActions.isNotEmpty;
       final floatingWidget = showFloatingAction
           ? FileManagerMoreMenuButton(
-              actions: toolbarConfig.visible,
+              actions: visibleActions,
               searchActive: _searchActive,
               onToggleSearch: _toggleSearch,
               sortBy: _sortBy,
@@ -1702,6 +1749,31 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
               ),
               canPlayMedia: canPlayMedia,
               onPlayMedia: _playMediaFromFirst,
+              isGalleryMode: _isGallery,
+              onToggleGallery: () {
+                // When inside a scoped category, toggle gallery filter.
+                if (_scoped) {
+                  widget.onScopedFilterChanged?.call(
+                    _isGallery ? null : 'gallery',
+                    _effectiveLocation.dirPath,
+                  );
+                }
+              },
+              toolbarConfig: toolbarConfig,
+              onToggleShowHiddenFiles: (v) {
+                _updateToolbarConfig((c) => c.copyWith(showHiddenFiles: v));
+                _startScan();
+              },
+              onToggleShowGridFileNames: (v) {
+                _updateToolbarConfig((c) => c.copyWith(showGridFileNames: v));
+              },
+              onToggleShowFileExtensions: (v) {
+                _updateToolbarConfig((c) => c.copyWith(showFileExtensions: v));
+              },
+              onToggleShowListThumbnails: (v) {
+                _updateToolbarConfig((c) => c.copyWith(showListThumbnails: v));
+              },
+              onOpenSettings: _openFileManagerSettings,
             )
           : null;
       _chrome.setFloatingAction(widget.tabId, floatingWidget);
@@ -1763,6 +1835,18 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     ref
         .read(fileManagerToolbarSettingsProvider(null).notifier)
         .applyImportedConfig(updated);
+  }
+
+  Future<void> _openFileManagerSettings() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const SkinAreaScope(
+          area: SkinArea.settings,
+          child: FileManagerToolbarSettingsScreen(),
+        ),
+      ),
+    );
   }
 
   Widget _buildBody(
@@ -1943,6 +2027,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           onFileDrop: onFileDrop,
           searchQuery: query,
           sortBy: _sortBy,
+          groupByDate: _isGallery && !_folderMode,
         );
       case BrowserLayoutMode.masonry:
         content = FileMasonryView(
@@ -1982,6 +2067,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           onFileDrop: onFileDrop,
           searchQuery: query,
           sortBy: _sortBy,
+          groupByDate: _isGallery && !_folderMode,
         );
       case BrowserLayoutMode.list:
       case BrowserLayoutMode.detailed:
@@ -2018,6 +2104,8 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           onFileDrop: onFileDrop,
           searchQuery: query,
           sortBy: _sortBy,
+          groupByDate: _isGallery && !_folderMode,
+          largeThumbnail: _isGallery,
         );
     }
     return RefreshIndicator(onRefresh: _startScan, child: content);

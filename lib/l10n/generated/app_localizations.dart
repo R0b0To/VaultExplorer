@@ -6288,6 +6288,48 @@ abstract class AppLocalizations {
   /// **'Gallery Grid'**
   String get layoutModeGalleryGrid;
 
+  /// Label for gallery mode toolbar action
+  ///
+  /// In en, this message translates to:
+  /// **'Gallery'**
+  String get galleryModeAction;
+
+  /// Tooltip for gallery mode toolbar action
+  ///
+  /// In en, this message translates to:
+  /// **'Gallery mode'**
+  String get galleryModeTooltip;
+
+  /// Label for options overflow toolbar action
+  ///
+  /// In en, this message translates to:
+  /// **'Options'**
+  String get optionsAction;
+
+  /// Tooltip for options overflow toolbar action
+  ///
+  /// In en, this message translates to:
+  /// **'Options'**
+  String get optionsActionTooltip;
+
+  /// Section header for files modified today
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get dateToday;
+
+  /// Section header for files modified yesterday
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday'**
+  String get dateYesterday;
+
+  /// Section header for files modified earlier or with unknown date
+  ///
+  /// In en, this message translates to:
+  /// **'Earlier'**
+  String get dateEarlier;
+
   /// Tooltip for the delete action when the container is read-only
   ///
   /// In en, this message translates to:

@@ -4798,6 +4798,34 @@
   "@layoutModeGalleryGrid": {
     "description": "Layout mode option: gallery grid view"
   },
+  "galleryModeAction": "Gallery",
+  "@galleryModeAction": {
+    "description": "Label for gallery mode toolbar action"
+  },
+  "galleryModeTooltip": "Gallery mode",
+  "@galleryModeTooltip": {
+    "description": "Tooltip for gallery mode toolbar action"
+  },
+  "optionsAction": "Options",
+  "@optionsAction": {
+    "description": "Label for options overflow toolbar action"
+  },
+  "optionsActionTooltip": "Options",
+  "@optionsActionTooltip": {
+    "description": "Tooltip for options overflow toolbar action"
+  },
+  "dateToday": "Today",
+  "@dateToday": {
+    "description": "Section header for files modified today"
+  },
+  "dateYesterday": "Yesterday",
+  "@dateYesterday": {
+    "description": "Section header for files modified yesterday"
+  },
+  "dateEarlier": "Earlier",
+  "@dateEarlier": {
+    "description": "Section header for files modified earlier or with unknown date"
+  },
   "readOnlyCantDeleteTooltip": "Read-only — can't delete",
   "@readOnlyCantDeleteTooltip": {
     "description": "Tooltip for the delete action when the container is read-only"

@@ -30,6 +30,7 @@ import 'package:vaultexplorer/features/browser/widgets/book_cover_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_item_drag.dart';
 import 'package:vaultexplorer/features/browser/widgets/fast_scrollbar.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_thumbnail_preview.dart';
+import 'package:vaultexplorer/features/browser/widgets/gallery_date_header.dart';
 import 'package:vaultexplorer/features/browser/widgets/grid_card_shell.dart';
 import 'package:vaultexplorer/features/browser/widgets/hold_range_select_container.dart';
 import 'package:vaultexplorer/features/browser/widgets/thumbnail_raw_fallback.dart';
@@ -78,6 +79,7 @@ class FileGridView extends StatefulWidget {
   final ArchiveContext? archiveContext;
   final String? archiveRootPath;
   final SortBy? sortBy;
+  final bool groupByDate;
 
   /// Resolves the container an entry lives in, for a listing that gathers
   /// files from several containers (the category browser). When null every
@@ -129,6 +131,7 @@ class FileGridView extends StatefulWidget {
     this.archiveContext,
     this.archiveRootPath,
     this.sortBy,
+    this.groupByDate = false,
     this.containerFor,
     this.cacheModeFor,
     this.qualityFor,
@@ -157,7 +160,6 @@ class _FileGridViewState extends State<FileGridView>
   // Animation controller for clearly visible column morph transition
   late final AnimationController _morphController;
   late Animation<double> _scaleAnimation;
-  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
@@ -361,6 +363,28 @@ class _FileGridViewState extends State<FileGridView>
     return false;
   }
 
+  Widget _buildItem(BuildContext context, RawEntry entry, int index) {
+    return HoldSelectableItem(
+      key: ValueKey(entry),
+      index: index,
+      entry: entry,
+      child: BrowserItemDragItem(
+        entry: entry,
+        container: _containerOf(entry),
+        currentDirectory: widget.currentDirPath,
+        visibleItems: widget.items,
+        selectedItems: widget.selectedItems,
+        isSelectionMode: widget.isSelectionMode,
+        enabled: widget.enableFileDrag && widget.archiveContext == null,
+        onItemLongPress: widget.onItemLongPress,
+        onDrop: widget.onFileDrop,
+        child: entry.isDir
+            ? _buildDirCell(context, entry)
+            : _buildFileCell(context, entry),
+      ),
+    );
+  }
+
   Widget _buildAnimatedGridView(ScrollController? controller, int total) {
     return AnimatedBuilder(
       animation: _morphController,
@@ -388,26 +412,71 @@ class _FileGridViewState extends State<FileGridView>
         itemCount: total,
         itemBuilder: (context, index) {
           final entry = widget.items[index];
-          return HoldSelectableItem(
-            key: ValueKey(entry),
-            index: index,
-            entry: entry,
-            child: BrowserItemDragItem(
-              entry: entry,
-              container: _containerOf(entry),
-              currentDirectory: widget.currentDirPath,
-              visibleItems: widget.items,
-              selectedItems: widget.selectedItems,
-              isSelectionMode: widget.isSelectionMode,
-              enabled: widget.enableFileDrag && widget.archiveContext == null,
-              onItemLongPress: widget.onItemLongPress,
-              onDrop: widget.onFileDrop,
-              child: entry.isDir
-                  ? _buildDirCell(context, entry)
-                  : _buildFileCell(context, entry),
-            ),
-          );
+          return _buildItem(context, entry, index);
         },
+      ),
+    );
+  }
+
+  Widget _buildDateGroupedGridView(ScrollController? controller) {
+    final groups = computeDateGroups(widget.items);
+
+    final slivers = <Widget>[];
+    for (final group in groups) {
+      slivers.add(
+        SliverToBoxAdapter(
+          child: GalleryDateHeader(
+            title: formatDateGroupHeader(group.date, context),
+            count: group.items.length,
+          ),
+        ),
+      );
+      slivers.add(
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(10, 4, 10, 12),
+          sliver: SliverGrid(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: _crossAxisCount,
+              crossAxisSpacing: widget.spacing,
+              mainAxisSpacing: widget.spacing,
+              childAspectRatio: _getAspectRatio(_crossAxisCount),
+            ),
+            delegate: SliverChildBuilderDelegate(
+              (context, localIndex) {
+                final entry = group.items[localIndex];
+                final globalIndex = group.globalIndices[localIndex];
+                return _buildItem(context, entry, globalIndex);
+              },
+              childCount: group.items.length,
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (widget.bottomClearance > 0) {
+      slivers.add(
+        SliverToBoxAdapter(
+          child: SizedBox(height: widget.bottomClearance),
+        ),
+      );
+    }
+
+    return AnimatedBuilder(
+      animation: _morphController,
+      builder: (context, child) {
+        return ClipRect(
+          child: Transform.scale(
+            scale: _scaleAnimation.value,
+            alignment: Alignment.center,
+            child: child,
+          ),
+        );
+      },
+      child: CustomScrollView(
+        controller: controller,
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: slivers,
       ),
     );
   }
@@ -437,7 +506,9 @@ class _FileGridViewState extends State<FileGridView>
           child: NotificationListener<ScrollNotification>(
             onNotification: _onScrollNotification,
             child: widget.scrollController == null
-                ? _buildAnimatedGridView(null, total)
+                ? (widget.groupByDate
+                    ? _buildDateGroupedGridView(null)
+                    : _buildAnimatedGridView(null, total))
                 : FastScrollbar(
                     controller: widget.scrollController!,
                     items: widget.items,
@@ -446,10 +517,12 @@ class _FileGridViewState extends State<FileGridView>
                       top: 12,
                       bottom: widget.bottomClearance,
                     ),
-                    child: _buildAnimatedGridView(
-                      widget.scrollController,
-                      total,
-                    ),
+                    child: widget.groupByDate
+                        ? _buildDateGroupedGridView(widget.scrollController)
+                        : _buildAnimatedGridView(
+                            widget.scrollController,
+                            total,
+                          ),
                   ),
           ),
         );

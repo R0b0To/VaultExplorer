@@ -3772,5 +3772,10 @@
   "categoryIndexInVaultsSubtitle": "Salvato crittografato all'interno di ciascuna cassaforte, nella relativa cartella di configurazione, quando apri una categoria, così i file appariranno istantaneamente la volta successiva. Nulla viene salvato sul telefono.",
   "categoryIndexClear": "Cancella indici delle categorie",
   "categoryIndexClearSubtitle": "Rimuove l’indice da ogni cassaforte sbloccata",
-  "categoryIndexCleared": "Indici delle categorie cancellati"
+  "categoryIndexCleared": "Indici delle categorie cancellati",
+  "galleryModeAction": "Galleria",
+  "galleryModeTooltip": "Modalità galleria",
+  "dateToday": "Oggi",
+  "dateYesterday": "Ieri",
+  "dateEarlier": "In precedenza"
 }

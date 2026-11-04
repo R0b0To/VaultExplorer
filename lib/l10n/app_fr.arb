@@ -3772,5 +3772,10 @@
   "categoryIndexInVaultsSubtitle": "Enregistré de manière chiffrée dans chaque coffre-fort, dans son dossier de configuration, lorsque vous ouvrez une catégorie, afin que ses fichiers apparaissent instantanément la prochaine fois. Rien n'est enregistré sur votre téléphone.",
   "categoryIndexClear": "Effacer les index de catégories",
   "categoryIndexClearSubtitle": "Supprime l’index de chaque coffre-fort déverrouillé",
-  "categoryIndexCleared": "Index de catégories effacés"
+  "categoryIndexCleared": "Index de catégories effacés",
+  "galleryModeAction": "Galerie",
+  "galleryModeTooltip": "Mode galerie",
+  "dateToday": "Aujourd'hui",
+  "dateYesterday": "Hier",
+  "dateEarlier": "Plus tôt"
 }

@@ -9,7 +9,8 @@ enum FileCategory {
   images('image'),
   videos('video'),
   audio('audio'),
-  documents('document');
+  documents('document'),
+  gallery('gallery');
 
   const FileCategory(this.filterKey);
 
@@ -18,6 +19,14 @@ enum FileCategory {
 
   /// Stable key for persisting which categories the drawer shows.
   String get storageKey => name;
+
+  /// The categories offered as drawer shortcuts.
+  static const List<FileCategory> drawerCategories = [
+    images,
+    videos,
+    audio,
+    documents,
+  ];
 
   /// The categories in their default drawer order, as storage keys.
   static const List<String> defaultOrderKeys = [
@@ -34,11 +43,11 @@ enum FileCategory {
     final ordered = <FileCategory>[];
     for (final key in keys) {
       final category = fromStorageKey(key);
-      if (category != null && !ordered.contains(category)) {
+      if (category != null && category != gallery && !ordered.contains(category)) {
         ordered.add(category);
       }
     }
-    for (final category in values) {
+    for (final category in drawerCategories) {
       if (!ordered.contains(category)) ordered.add(category);
     }
     return ordered;

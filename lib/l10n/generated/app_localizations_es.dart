@@ -3717,6 +3717,27 @@ class AppLocalizationsEs extends AppLocalizations {
   String get layoutModeGalleryGrid => 'Cuadrícula de galería';
 
   @override
+  String get galleryModeAction => 'Galería';
+
+  @override
+  String get galleryModeTooltip => 'Modo galería';
+
+  @override
+  String get optionsAction => 'Options';
+
+  @override
+  String get optionsActionTooltip => 'Options';
+
+  @override
+  String get dateToday => 'Hoy';
+
+  @override
+  String get dateYesterday => 'Ayer';
+
+  @override
+  String get dateEarlier => 'Anteriormente';
+
+  @override
   String get readOnlyCantDeleteTooltip => 'Solo lectura — no se puede eliminar';
 
   @override

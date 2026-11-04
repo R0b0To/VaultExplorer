@@ -92,6 +92,8 @@ import 'package:vaultexplorer/features/browser/widgets/delete_originals_dialog.d
 import 'package:vaultexplorer/features/browser/widgets/file_item_actions_sheet.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/file_info_sheet.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_manager_action_bar.dart';
+import 'package:vaultexplorer/features/browser/widgets/file_manager_options_menu_button.dart';
+import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_screen.dart';
 import 'package:vaultexplorer/features/browser/models/tab_id.dart';
 import 'package:vaultexplorer/features/browser/widgets/filter_menu_button.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_document_provider_sheet.dart';
@@ -1655,6 +1657,13 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     // loaded, go where the bookmark points.
     _initialLoadDone = true;
     _consumeBookmarkRequest();
+
+    // Auto-activate gallery mode if it was previously enabled for this storage.
+    if (mounted &&
+        _currentFilter == null &&
+        _toolbarConfig.isGalleryModeForStorage(widget.container.uri)) {
+      _onFilterChosen('gallery');
+    }
   }
 
   Future<void> _loadToolbarConfig() async {
@@ -2147,10 +2156,89 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         .exitSelectionMode();
     _signalActivity();
     _navNotifier.setFilter(value);
+
+    // Keep persisted gallery mode in sync with the filter selection.
+    final uri = widget.container.uri;
+    final isGalleryFilter = value == 'gallery';
+    if (_toolbarConfig.isGalleryModeForStorage(uri) != isGalleryFilter) {
+      final effectiveUri =
+          widget.container.isLocalStorage ? null : widget.container.uri;
+      ref
+          .read(fileManagerToolbarSettingsProvider(effectiveUri).notifier)
+          .setGalleryModeForStorage(uri, isGalleryFilter);
+    }
+
     if (value == null &&
         destinationDir != null &&
         destinationDir != _currentDirPath) {
       unawaited(_loadDirectoryContents(destinationDir));
+    }
+  }
+
+  bool get _isGalleryMode =>
+      _toolbarConfig.isGalleryModeForStorage(widget.container.uri);
+
+  /// The visible toolbar actions, excluding the filter button in gallery mode.
+  List<FileManagerAction> get _visibleActions {
+    final actions = _toolbarConfig.visible;
+    if (!_isGalleryMode) return actions;
+    return actions
+        .where((a) => a != FileManagerAction.filter)
+        .toList(growable: false);
+  }
+
+  void _toggleGalleryMode() {
+    final uri = widget.container.uri;
+    final isCurrentlyEnabled = _toolbarConfig.isGalleryModeForStorage(uri);
+    final enable = !isCurrentlyEnabled;
+
+    if (enable) {
+      _onFilterChosen('gallery');
+    } else {
+      _onFilterChosen(null);
+    }
+  }
+
+  Future<void> _updateToolbarConfigField(
+    FileManagerToolbarConfig Function(FileManagerToolbarConfig) update,
+  ) async {
+    final updated = update(_toolbarConfig);
+    setState(() {
+      _toolbarConfig = updated;
+    });
+    try {
+      await _toolbarSvc.save(updated);
+      final effectiveToolbarUri = widget.container.isLocalStorage
+          ? null
+          : widget.container.uri;
+      ref
+          .read(
+            fileManagerToolbarSettingsProvider(effectiveToolbarUri).notifier,
+          )
+          .applyImportedConfig(updated);
+    } catch (e) {
+      if (mounted) {
+        _setStatus(context.l10n.failedToSaveSettings, error: true);
+      }
+    }
+  }
+
+  Future<void> _openFileManagerSettings() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SkinAreaScope(
+          area: SkinArea.settings,
+          child: FileManagerToolbarSettingsScreen(
+            containerUri: widget.container.isLocalStorage
+                ? null
+                : widget.container.uri,
+          ),
+        ),
+      ),
+    );
+    if (mounted) {
+      _loadToolbarConfig();
     }
   }
 
@@ -5285,6 +5373,15 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         onAddVaultItem: _addVaultItem,
         hideImportAndSecureItemActions: widget.container.isLocalStorage,
       ),
+      FileManagerAction.gallery: (context) => IconButton(
+        icon: Icon(
+          toolbarConfig.isGalleryModeForStorage(widget.container.uri)
+              ? Icons.photo_library_rounded
+              : Icons.photo_library_outlined,
+        ),
+        tooltip: context.l10n.galleryModeTooltip,
+        onPressed: _toggleGalleryMode,
+      ),
       FileManagerAction.viewToggle: (context) => LayoutModeMenuButton(
         layoutMode: layoutMode,
         onLayoutModeChanged: _onLayoutModeChanged,
@@ -5308,6 +5405,22 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         icon: const Icon(Icons.play_circle_outline_rounded),
         tooltip: context.l10n.playMediaHereTooltip,
         onPressed: canPlayMedia ? _startMediaViewerFromCurrentLocation : null,
+      ),
+      FileManagerAction.options: (context) => FileManagerOptionsMenuButton(
+        toolbarConfig: toolbarConfig,
+        onToggleShowHiddenFiles: (v) => _updateToolbarConfigField(
+          (c) => c.copyWith(showHiddenFiles: v),
+        ),
+        onToggleShowGridFileNames: (v) => _updateToolbarConfigField(
+          (c) => c.copyWith(showGridFileNames: v),
+        ),
+        onToggleShowFileExtensions: (v) => _updateToolbarConfigField(
+          (c) => c.copyWith(showFileExtensions: v),
+        ),
+        onToggleShowListThumbnails: (v) => _updateToolbarConfigField(
+          (c) => c.copyWith(showListThumbnails: v),
+        ),
+        onOpenSettings: _openFileManagerSettings,
       ),
     };
   }
@@ -5343,8 +5456,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     final rightPadding = MediaQuery.paddingOf(context).right;
     final baseRight = 16.0 + rightPadding;
 
-    final showAddFab = _toolbarConfig.visible.contains(FileManagerAction.add);
-    final moreActions = _toolbarConfig.visible
+    final visibleActions = _visibleActions;
+    final showAddFab = visibleActions.contains(FileManagerAction.add);
+    final moreActions = visibleActions
         .where((a) => a != FileManagerAction.add)
         .toList(growable: false);
     final showMore = moreActions.isNotEmpty;
@@ -5388,6 +5502,24 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             onGridAspectRatioChanged: _onGridAspectRatioChanged,
             canPlayMedia: canPlayMedia,
             onPlayMedia: _startMediaViewerFromCurrentLocation,
+            isGalleryMode: _toolbarConfig.isGalleryModeForStorage(
+              widget.container.uri,
+            ),
+            onToggleGallery: _toggleGalleryMode,
+            toolbarConfig: _toolbarConfig,
+            onToggleShowHiddenFiles: (v) => _updateToolbarConfigField(
+              (c) => c.copyWith(showHiddenFiles: v),
+            ),
+            onToggleShowGridFileNames: (v) => _updateToolbarConfigField(
+              (c) => c.copyWith(showGridFileNames: v),
+            ),
+            onToggleShowFileExtensions: (v) => _updateToolbarConfigField(
+              (c) => c.copyWith(showFileExtensions: v),
+            ),
+            onToggleShowListThumbnails: (v) => _updateToolbarConfigField(
+              (c) => c.copyWith(showListThumbnails: v),
+            ),
+            onOpenSettings: _openFileManagerSettings,
           ),
         ),
       );
@@ -5744,7 +5876,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         !_searchActive &&
         ref.watch(crossContainerClipboardProvider).hasItems;
     final bool hasFabToolbar =
-        useFab && !_searchActive && _toolbarConfig.visible.isNotEmpty;
+        useFab && !_searchActive && _visibleActions.isNotEmpty;
 
     double fabClearance = 0.0;
     if (hasClipboardFab && hasFabToolbar) {
@@ -6003,7 +6135,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             children: [
               FileManagerActionBar(
                 axis: Axis.horizontal,
-                actions: _toolbarConfig.visible,
+                actions: _visibleActions,
                 builders: actionBuilders,
               ),
             ],
@@ -6069,7 +6201,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       _layoutMode,
       sortBy,
       sortAscending,
-      Object.hashAll(_toolbarConfig.visible),
+      Object.hashAll(_visibleActions),
       currentItemsSignature,
       showBookmarkBarInViewport,
       widget.container.readOnly,

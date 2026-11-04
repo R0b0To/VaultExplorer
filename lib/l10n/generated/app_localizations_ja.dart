@@ -3530,6 +3530,27 @@ class AppLocalizationsJa extends AppLocalizations {
   String get layoutModeGalleryGrid => 'ギャラリーグリッド';
 
   @override
+  String get galleryModeAction => 'ギャラリー';
+
+  @override
+  String get galleryModeTooltip => 'ギャラリーモード';
+
+  @override
+  String get optionsAction => 'Options';
+
+  @override
+  String get optionsActionTooltip => 'Options';
+
+  @override
+  String get dateToday => '今日';
+
+  @override
+  String get dateYesterday => '昨日';
+
+  @override
+  String get dateEarlier => '以前';
+
+  @override
   String get readOnlyCantDeleteTooltip => '読み取り専用 — 削除できません';
 
   @override

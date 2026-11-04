@@ -174,8 +174,11 @@ class DrawerCategoriesSection extends ConsumerWidget {
         onSelectContainer?.call(target);
       }
     }
+    final dir = path.contains('/')
+        ? path.substring(0, path.lastIndexOf('/'))
+        : '';
     providers
         .read(bookmarkNavigationRequestsProvider.notifier)
-        .request(target.volId, VaultBookmark(path, isDir: false));
+        .request(target.volId, VaultBookmark(dir, isDir: true));
   }
 }

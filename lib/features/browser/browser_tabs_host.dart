@@ -18,6 +18,8 @@ import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
 import 'package:vaultexplorer/data/models/tab_swipe_gestures.dart';
 import 'package:vaultexplorer/data/models/external_storage_location.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/models/vault_marks.dart';
+import 'package:vaultexplorer/features/browser/controllers/bookmark_navigation_request.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_search_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_chrome_hub.dart';
@@ -548,7 +550,31 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
           includeVaults: tab.includeVaults,
           resolveContainer: widget.resolveContainer,
           onShowInFolder: (container, path) {
-            _workspaceActions.openTab(container, initialPath: path);
+            final dir = path.contains('/')
+                ? path.substring(0, path.lastIndexOf('/'))
+                : '';
+            final currentTabs =
+                ref.read(browserTabsProvider(_workspace)).tabs;
+            final existingTab = currentTabs
+                .where(
+                  (t) =>
+                      !t.isCategory &&
+                      !t.isDashboard &&
+                      t.volId == container.volId,
+                )
+                .firstOrNull;
+            if (existingTab != null) {
+              _workspaceActions.activate(existingTab.tabId);
+              ref
+                  .read(bookmarkNavigationRequestsProvider.notifier)
+                  .request(container.volId, VaultBookmark(dir, isDir: true));
+            } else {
+              final tabId = _workspaceActions.openTab(
+                container,
+                initialPath: dir.isEmpty ? null : dir,
+              );
+              if (tabId == null) _showLimitReached();
+            }
           },
         ),
       );

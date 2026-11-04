@@ -2008,7 +2008,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     _signalActivity();
     if (isSelectionMode) exitSelectionMode();
     final segments = fullPath.isEmpty ? [] : fullPath.split('/');
-    if (segments.isEmpty) return;
+    if (segments.isEmpty && !isDir) return;
     if (isDir) {
       final newPath = _navNotifier.navigateToPath(
         widget.container,
@@ -2179,6 +2179,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   }
 
   Future<bool> _bookmarkTargetExists(VaultBookmark bookmark) async {
+    if (bookmark.isDir && bookmark.path.isEmpty) return true;
     try {
       final raw = await ref
           .read(vaultFileIoApiProvider)

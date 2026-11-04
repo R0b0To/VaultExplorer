@@ -13578,4 +13578,94 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get vaultSyncDirectionRecommendedLabel => 'موصى به';
+
+  @override
+  String get categoriesSectionTitle => 'التصنيفات';
+
+  @override
+  String get manageCategoriesTooltip => 'إدارة التصنيفات';
+
+  @override
+  String get categoryShortcutsTitle => 'اختصارات التصنيفات';
+
+  @override
+  String get categoryShortcutsEnable => 'إظهار اختصارات التصنيفات';
+
+  @override
+  String get categoryShortcutsEnableSubtitle =>
+      'الصور ومقاطع الفيديو والملفات الصوتية والمستندات من جميع وحدات التخزين، في القائمة الجانبية';
+
+  @override
+  String get categoryShortcutsRestore => 'استعادة الاختصارات الافتراضية';
+
+  @override
+  String get categorySourceAll => 'جميع وحدات التخزين';
+
+  @override
+  String get categorySourceTooltip => 'اختيار المصدر';
+
+  @override
+  String get categoryFolderStructure => 'عرض بنية المجلدات الأصلية';
+
+  @override
+  String categoryScanning(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'جارٍ الفحص… تم فحص $count مجلد',
+      many: 'جارٍ الفحص… تم فحص $count مجلدًا',
+      few: 'جارٍ الفحص… تم فحص $count مجلدات',
+      two: 'جارٍ الفحص… تم فحص مجلدين',
+      one: 'جارٍ الفحص… تم فحص مجلد واحد',
+      zero: 'جارٍ الفحص… لم يُفحص أي مجلد',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get categoryEmpty => 'لم يتم العثور على شيء في هذا التصنيف';
+
+  @override
+  String get categoryNoVaultsUnlocked => 'لم يتم إلغاء قفل أي خزينة';
+
+  @override
+  String get categoryScanLimitReached =>
+      'قد تكون النتائج غير مكتملة — توقف الفحص عند حده الأقصى.';
+
+  @override
+  String get categoryShareOneSource =>
+      'اختر ملفات من وحدة تخزين واحدة في كل مرة لمشاركتها.';
+
+  @override
+  String categoryClipboardReady(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count ملف جاهز للصق',
+      many: '$count ملفًا جاهزًا للصق',
+      few: '$count ملفات جاهزة للصق',
+      two: 'ملفان جاهزان للصق',
+      one: 'ملف واحد جاهز للصق',
+      zero: 'لا توجد ملفات جاهزة للصق',
+    );
+    return '$_temp0 — افتح مجلدًا للصق';
+  }
+
+  @override
+  String get categoryIndexInVaultsTitle =>
+      'الاحتفاظ بفهرس التصنيفات في الخزائن';
+
+  @override
+  String get categoryIndexInVaultsSubtitle =>
+      'يتم حفظه مشفرًا داخل كل خزينة، في مجلد الإعدادات الخاص بها، عند فتح تصنيف، لتظهر ملفاته فورًا في المرة القادمة. لا يتم حفظ أي شيء على هاتفك.';
+
+  @override
+  String get categoryIndexClear => 'مسح فهارس التصنيفات';
+
+  @override
+  String get categoryIndexClearSubtitle =>
+      'إزالة الفهرس من كل خزينة تم إلغاء قفلها';
+
+  @override
+  String get categoryIndexCleared => 'تم مسح فهارس التصنيفات';
 }

@@ -13588,4 +13588,89 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get vaultSyncDirectionRecommendedLabel => 'Recomendado';
+
+  @override
+  String get categoriesSectionTitle => 'Categorías';
+
+  @override
+  String get manageCategoriesTooltip => 'Administrar categorías';
+
+  @override
+  String get categoryShortcutsTitle => 'Accesos directos de categorías';
+
+  @override
+  String get categoryShortcutsEnable =>
+      'Mostrar accesos directos de categorías';
+
+  @override
+  String get categoryShortcutsEnableSubtitle =>
+      'Imágenes, videos, audios y documentos de todos tus almacenamientos, en el menú lateral';
+
+  @override
+  String get categoryShortcutsRestore =>
+      'Restaurar accesos directos predeterminados';
+
+  @override
+  String get categorySourceAll => 'Todos los almacenamientos';
+
+  @override
+  String get categorySourceTooltip => 'Elegir origen';
+
+  @override
+  String get categoryFolderStructure =>
+      'Mostrar estructura de carpetas original';
+
+  @override
+  String categoryScanning(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Escaneando… $count carpetas revisadas',
+      one: 'Escaneando… 1 carpeta revisada',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get categoryEmpty => 'No se encontró nada en esta categoría';
+
+  @override
+  String get categoryNoVaultsUnlocked => 'Ninguna bóveda está desbloqueada';
+
+  @override
+  String get categoryScanLimitReached =>
+      'Los resultados pueden estar incompletos: la búsqueda se detuvo en su límite.';
+
+  @override
+  String get categoryShareOneSource =>
+      'Elige archivos de un solo almacenamiento a la vez para compartirlos.';
+
+  @override
+  String categoryClipboardReady(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count archivos listos para pegar',
+      one: '1 archivo listo para pegar',
+    );
+    return '$_temp0 — abre una carpeta para pegar';
+  }
+
+  @override
+  String get categoryIndexInVaultsTitle =>
+      'Guardar índice de categorías en las bóvedas';
+
+  @override
+  String get categoryIndexInVaultsSubtitle =>
+      'Se guarda cifrado dentro de cada bóveda, en su carpeta de configuración, al abrir una categoría, para que sus archivos aparezcan al instante la próxima vez. No se guarda nada en tu teléfono.';
+
+  @override
+  String get categoryIndexClear => 'Borrar índices de categorías';
+
+  @override
+  String get categoryIndexClearSubtitle =>
+      'Elimina el índice de cada bóveda desbloqueada';
+
+  @override
+  String get categoryIndexCleared => 'Índices de categorías borrados';
 }

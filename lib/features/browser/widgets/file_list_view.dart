@@ -93,6 +93,21 @@ class FileListView extends StatefulWidget {
   final String? archiveRootPath;
   final SortBy? sortBy;
 
+  /// Resolves the container an entry lives in, for a listing that gathers
+  /// files from several containers (the category browser). When null every
+  /// entry belongs to [container], as in any ordinary folder listing.
+  final MountedContainer Function(RawEntry entry)? containerFor;
+
+  /// The thumbnail cache policy that applies to an entry, for a listing that
+  /// mixes containers whose owners chose different policies (the category
+  /// browser). When null every entry follows [thumbnailCacheMode].
+  final ThumbnailCacheMode Function(RawEntry entry)? cacheModeFor;
+
+  /// The thumbnail quality that applies to an entry, for a listing that
+  /// mixes containers whose owners chose different qualities (the category
+  /// browser). When null every entry follows [thumbnailQuality].
+  final ThumbnailQuality Function(RawEntry entry)? qualityFor;
+
   const FileListView({
     super.key,
     required this.items,
@@ -129,6 +144,9 @@ class FileListView extends StatefulWidget {
     this.archiveContext,
     this.archiveRootPath,
     this.sortBy,
+    this.containerFor,
+    this.cacheModeFor,
+    this.qualityFor,
   });
 
   @override
@@ -136,6 +154,12 @@ class FileListView extends StatefulWidget {
 }
 
 class _FileListViewState extends State<FileListView> {
+  ThumbnailCacheMode _cacheModeOf(RawEntry entry) =>
+      widget.cacheModeFor?.call(entry) ?? widget.thumbnailCacheMode;
+
+  ThumbnailQuality _qualityOf(RawEntry entry) =>
+      widget.qualityFor?.call(entry) ?? widget.thumbnailQuality;
+
   double _baselineScale = 1.0;
   late double _zoomLevel;
   final Map<Key, int> _keyIndexMap = {};
@@ -358,10 +382,12 @@ class _FileListViewState extends State<FileListView> {
                               isBookmark: isBookmark,
                               isSynced:
                                   widget.isFolderSynced?.call(entry) ?? false,
-                              container: widget.container,
+                              container:
+                                  (widget.containerFor?.call(entry) ??
+                                  widget.container),
                               currentDirPath: widget.currentDirPath,
-                              cacheMode: widget.thumbnailCacheMode,
-                              quality: widget.thumbnailQuality,
+                              cacheMode: _cacheModeOf(entry),
+                              quality: _qualityOf(entry),
                               showThumbnailPreview: widget.showThumbnails,
                               showItemActionsMenu: widget.showItemActionsMenu,
                               onTap: () => widget.onDirTap(entry),
@@ -385,10 +411,12 @@ class _FileListViewState extends State<FileListView> {
                               detailColumns: widget.detailColumns,
                               longFileNameMode: widget.longFileNameMode,
                               searchQuery: widget.searchQuery,
-                              container: widget.container,
+                              container:
+                                  (widget.containerFor?.call(entry) ??
+                                  widget.container),
                               currentDirPath: widget.currentDirPath,
-                              thumbnailCacheMode: widget.thumbnailCacheMode,
-                              thumbnailQuality: widget.thumbnailQuality,
+                              thumbnailCacheMode: _cacheModeOf(entry),
+                              thumbnailQuality: _qualityOf(entry),
                               showThumbnail: widget.showThumbnails,
                               isPinned: isPinned,
                               isBookmark: isBookmark,
@@ -410,7 +438,9 @@ class _FileListViewState extends State<FileListView> {
                             entry: entry,
                             child: BrowserItemDragItem(
                               entry: entry,
-                              container: widget.container,
+                              container:
+                                  (widget.containerFor?.call(entry) ??
+                                  widget.container),
                               currentDirectory: widget.currentDirPath,
                               visibleItems: widget.items,
                               selectedItems: widget.selectedItems,
@@ -475,10 +505,12 @@ class _FileListViewState extends State<FileListView> {
                                 isBookmark: isBookmark,
                                 isSynced:
                                     widget.isFolderSynced?.call(entry) ?? false,
-                                container: widget.container,
+                                container:
+                                    (widget.containerFor?.call(entry) ??
+                                    widget.container),
                                 currentDirPath: widget.currentDirPath,
-                                cacheMode: widget.thumbnailCacheMode,
-                                quality: widget.thumbnailQuality,
+                                cacheMode: _cacheModeOf(entry),
+                                quality: _qualityOf(entry),
                                 showThumbnailPreview: widget.showThumbnails,
                                 showItemActionsMenu: widget.showItemActionsMenu,
                                 onTap: () => widget.onDirTap(entry),
@@ -502,10 +534,12 @@ class _FileListViewState extends State<FileListView> {
                                 detailColumns: widget.detailColumns,
                                 longFileNameMode: widget.longFileNameMode,
                                 searchQuery: widget.searchQuery,
-                                container: widget.container,
+                                container:
+                                    (widget.containerFor?.call(entry) ??
+                                    widget.container),
                                 currentDirPath: widget.currentDirPath,
-                                thumbnailCacheMode: widget.thumbnailCacheMode,
-                                thumbnailQuality: widget.thumbnailQuality,
+                                thumbnailCacheMode: _cacheModeOf(entry),
+                                thumbnailQuality: _qualityOf(entry),
                                 showThumbnail: widget.showThumbnails,
                                 isPinned: isPinned,
                                 isBookmark: isBookmark,
@@ -527,7 +561,9 @@ class _FileListViewState extends State<FileListView> {
                               entry: entry,
                               child: BrowserItemDragItem(
                                 entry: entry,
-                                container: widget.container,
+                                container:
+                                    (widget.containerFor?.call(entry) ??
+                                    widget.container),
                                 currentDirectory: widget.currentDirPath,
                                 visibleItems: widget.items,
                                 selectedItems: widget.selectedItems,

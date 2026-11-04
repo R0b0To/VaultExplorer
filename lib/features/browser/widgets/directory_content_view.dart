@@ -84,6 +84,7 @@ import 'package:vaultexplorer/features/browser/widgets/bookmark_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/bottom_search_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/breadcrumb_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_app_bar_builder.dart';
+import 'package:vaultexplorer/features/browser/widgets/category_content_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_app_bar_factory.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_body_builder.dart';
 import 'package:vaultexplorer/features/browser/widgets/conflict_resolution_sheet.dart';
@@ -115,6 +116,7 @@ import 'package:vaultexplorer/features/vault_item/vault_item_edit_screen.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
+import 'package:vaultexplorer/features/browser/models/file_category.dart';
 
 // PathSegment used to be declared in this file; it now lives in the
 // navigation controller (see FileBrowserNavigation). Re-exported from here
@@ -2130,6 +2132,23 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   /// If it was renamed or deleted since (outside what this app can follow, for
   /// instance by another device), say so rather than opening an empty folder
   /// or a file that isn't there, and offer to drop the dead bookmark.
+  /// The toolbar's type filter.
+  ///
+  /// Images, Videos, Audio and Documents work like the drawer's categories,
+  /// but inside the storage this view shows: every matching file of the whole
+  /// storage, as one list, with the option to browse them by their original
+  /// folders. "All files" and the vault-item filter stay what they were, a
+  /// filter on the folder being shown, and so does the filter inside an
+  /// archive, which is not a storage a category can scan.
+  void _onFilterChosen(String? value) {
+    _lastPublishedFloatingActionSignature = null;
+    ref
+        .read(fileBrowserSelectionProvider(_stateKey).notifier)
+        .exitSelectionMode();
+    _signalActivity();
+    _navNotifier.setFilter(value);
+  }
+
   Future<void> _openBookmark(VaultBookmark bookmark) async {
     if (_disposed || !mounted) return;
     if (!await _bookmarkTargetExists(bookmark)) {
@@ -5276,7 +5295,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       ),
       FileManagerAction.filter: (context) => FilterMenuButton(
         currentFilter: currentFilter,
-        onFilterChanged: (value) => navigationNotifier.setFilter(value),
+        onFilterChanged: _onFilterChosen,
         hideVaultOnlyActions: widget.container.isLocalStorage,
       ),
       FileManagerAction.playMedia: (context) => IconButton(
@@ -5352,7 +5371,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             sortAscending: sortAscending,
             onSortChanged: _onSortChanged,
             currentFilter: _currentFilter,
-            onFilterChanged: (value) => _navNotifier.setFilter(value),
+            onFilterChanged: _onFilterChosen,
             hideVaultOnlyActions: widget.container.isLocalStorage,
             layoutMode: _layoutMode,
             onLayoutModeChanged: _onLayoutModeChanged,
@@ -5427,6 +5446,33 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     ref.watch(fileBrowserSortProvider(_stateKey));
     ref.watch(fileBrowserNavigationProvider(_stateKey));
     ref.watch(vaultSyncedFolderPathsProvider(widget.container));
+
+    final category = _archiveContext == null
+        ? FileCategory.fromFilterKey(_currentFilter)
+        : null;
+    if (category != null) {
+      return CategoryContentView(
+        key: ValueKey(
+          'scoped_category_${widget.container.volId}_${category.storageKey}',
+        ),
+        tabId: widget.tabId,
+        category: category,
+        workspaceConfig: widget.workspaceConfig,
+        primaryLocalContainer:
+            widget.container.isLocalStorage ? widget.container : null,
+        includeVaults: !widget.container.isLocalStorage,
+        scopedContainer: widget.container,
+        resolveContainer: widget.resolveContainer,
+        onScopedFilterChanged: _onFilterChosen,
+        onShowInFolder: (container, path) {
+          _navNotifier.setFilter(null);
+          final dir = path.contains('/')
+              ? path.substring(0, path.lastIndexOf('/'))
+              : '';
+          unawaited(_loadDirectoryContents(dir));
+        },
+      );
+    }
 
     final effectiveToolbarUri = widget.container.isLocalStorage
         ? null

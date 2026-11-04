@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:path_provider/path_provider.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
 import 'package:vaultexplorer/data/models/tab_swipe_gestures.dart';
@@ -13,12 +14,15 @@ import 'package:vaultexplorer/data/models/playlist_scroll_mode.dart';
 import 'package:vaultexplorer/data/models/video_playback_mode.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
+import 'package:vaultexplorer/features/browser/models/file_category.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
+
 export 'container_repository.dart'
     show ContainerRepository, ContainerRecord, ContainerUnlockMethod;
+
 export 'package:vaultexplorer/data/models/audio_recording_quality.dart';
 export 'package:vaultexplorer/data/models/delete_after_import_mode.dart';
 
@@ -135,6 +139,13 @@ class AppSettings {
   bool videoAutoPlay;
   bool blockScreenshots;
   bool keepVaultsRunningInBackground;
+
+  /// Whether opening a category (Images, Videos, ...) may keep an index of the
+  /// matching files inside each writable vault, in the vault's own
+  /// configuration folder, so the next visit shows them straight away. The
+  /// index is encrypted with the vault; nothing is ever written to phone
+  /// storage or storage locations.
+  bool categoryIndexInVaults;
   bool defaultDerivedKeyCacheEnabled;
   bool lockContainersOnScreenLock;
   int autoLockMins;
@@ -185,6 +196,21 @@ class AppSettings {
   bool videoMuted;
   VideoPlaybackMode videoPlaybackMode;
   bool showStorageLocationsInDrawer;
+
+  /// Category shortcuts (Images, Videos, Audio, Documents) in the side drawer.
+  /// [categoryShortcutsEnabled] is the master switch; [categoryShortcutOrder]
+  /// and [hiddenCategoryShortcuts] hold `FileCategory.storageKey`s. Hiding a
+  /// shortcut only removes it from the drawer -- the category itself and the
+  /// files it gathers are untouched.
+  bool categoryShortcutsEnabled;
+  List<String> categoryShortcutOrder;
+  List<String> hiddenCategoryShortcuts;
+
+  /// What each category browser last showed, by `FileCategory.storageKey`:
+  /// the source (`CategorySourceFilter.storageKey`) and whether the original
+  /// folder structure was on (the keys of the categories where it is).
+  Map<String, String> categorySources;
+  List<String> categoryFolderStructure;
   bool autoLockOnShareImport;
   QuickActionLockMode quickActionLockMode;
   bool enableAuthenticator;
@@ -210,6 +236,7 @@ class AppSettings {
     this.videoAutoPlay = true,
     this.blockScreenshots = true,
     this.keepVaultsRunningInBackground = false,
+    this.categoryIndexInVaults = true,
     this.lockContainersOnScreenLock = true,
     this.defaultDerivedKeyCacheEnabled = false,
     this.autoLockMins = 0,
@@ -239,6 +266,11 @@ class AppSettings {
     this.videoMuted = false,
     this.videoPlaybackMode = VideoPlaybackMode.playOnce,
     this.showStorageLocationsInDrawer = true,
+    this.categoryShortcutsEnabled = true,
+    this.categoryShortcutOrder = FileCategory.defaultOrderKeys,
+    this.hiddenCategoryShortcuts = const [],
+    this.categorySources = const {},
+    this.categoryFolderStructure = const [],
     this.autoLockOnShareImport = true,
     this.quickActionLockMode = QuickActionLockMode.leaveAsFound,
     this.enableAuthenticator = true,
@@ -337,6 +369,7 @@ class AppSettings {
     bool? videoAutoPlay,
     bool? blockScreenshots,
     bool? keepVaultsRunningInBackground,
+    bool? categoryIndexInVaults,
     bool? defaultDerivedKeyCacheEnabled,
     bool? lockContainersOnScreenLock,
     int? autoLockMins,
@@ -373,6 +406,11 @@ class AppSettings {
     bool? videoMuted,
     VideoPlaybackMode? videoPlaybackMode,
     bool? showStorageLocationsInDrawer,
+    bool? categoryShortcutsEnabled,
+    List<String>? categoryShortcutOrder,
+    List<String>? hiddenCategoryShortcuts,
+    Map<String, String>? categorySources,
+    List<String>? categoryFolderStructure,
     bool? autoLockOnShareImport,
     QuickActionLockMode? quickActionLockMode,
     bool? enableAuthenticator,
@@ -396,6 +434,8 @@ class AppSettings {
       blockScreenshots: blockScreenshots ?? this.blockScreenshots,
       keepVaultsRunningInBackground:
           keepVaultsRunningInBackground ?? this.keepVaultsRunningInBackground,
+      categoryIndexInVaults:
+          categoryIndexInVaults ?? this.categoryIndexInVaults,
       defaultDerivedKeyCacheEnabled:
           defaultDerivedKeyCacheEnabled ?? this.defaultDerivedKeyCacheEnabled,
       lockContainersOnScreenLock:
@@ -447,6 +487,15 @@ class AppSettings {
       videoPlaybackMode: videoPlaybackMode ?? this.videoPlaybackMode,
       showStorageLocationsInDrawer:
           showStorageLocationsInDrawer ?? this.showStorageLocationsInDrawer,
+      categoryShortcutsEnabled:
+          categoryShortcutsEnabled ?? this.categoryShortcutsEnabled,
+      categoryShortcutOrder:
+          categoryShortcutOrder ?? this.categoryShortcutOrder,
+      hiddenCategoryShortcuts:
+          hiddenCategoryShortcuts ?? this.hiddenCategoryShortcuts,
+      categorySources: categorySources ?? this.categorySources,
+      categoryFolderStructure:
+          categoryFolderStructure ?? this.categoryFolderStructure,
       autoLockOnShareImport:
           autoLockOnShareImport ??
           (quickActionLockMode != null
@@ -497,6 +546,7 @@ class AppSettings {
     'videoAutoPlay': videoAutoPlay,
     'blockScreenshots': blockScreenshots,
     'keepVaultsRunningInBackground': keepVaultsRunningInBackground,
+    'categoryIndexInVaults': categoryIndexInVaults,
     'defaultDerivedKeyCacheEnabled': defaultDerivedKeyCacheEnabled,
     'lockContainersOnScreenLock': lockContainersOnScreenLock,
     'autoLockMins': autoLockMins,
@@ -531,6 +581,11 @@ class AppSettings {
     'defaultFileSortAscending': defaultFileSortAscending,
     'containerSortMode': containerSortMode.toJson(),
     'showStorageLocationsInDrawer': showStorageLocationsInDrawer,
+    'categoryShortcutsEnabled': categoryShortcutsEnabled,
+    'categoryShortcutOrder': categoryShortcutOrder,
+    'hiddenCategoryShortcuts': hiddenCategoryShortcuts,
+    'categorySources': categorySources,
+    'categoryFolderStructure': categoryFolderStructure,
     'appBarAtBottom': appBarAtBottom,
     'predictiveBackAnimations': predictiveBackAnimations,
     'playlistScrollMode': playlistScrollMode.toJson(),
@@ -568,6 +623,7 @@ class AppSettings {
     videoAutoPlay: other.videoAutoPlay,
     blockScreenshots: other.blockScreenshots,
     keepVaultsRunningInBackground: other.keepVaultsRunningInBackground,
+    categoryIndexInVaults: other.categoryIndexInVaults,
     defaultDerivedKeyCacheEnabled: other.defaultDerivedKeyCacheEnabled,
     lockContainersOnScreenLock: other.lockContainersOnScreenLock,
     autoLockMins: other.autoLockMins,
@@ -604,6 +660,11 @@ class AppSettings {
     defaultFileSortAscending: other.defaultFileSortAscending,
     containerSortMode: other.containerSortMode,
     showStorageLocationsInDrawer: other.showStorageLocationsInDrawer,
+    categoryShortcutsEnabled: other.categoryShortcutsEnabled,
+    categoryShortcutOrder: other.categoryShortcutOrder,
+    hiddenCategoryShortcuts: other.hiddenCategoryShortcuts,
+    categorySources: other.categorySources,
+    categoryFolderStructure: other.categoryFolderStructure,
     appBarAtBottom: other.appBarAtBottom,
     predictiveBackAnimations: other.predictiveBackAnimations,
     playlistScrollMode: other.playlistScrollMode,
@@ -630,6 +691,7 @@ class AppSettings {
     blockScreenshots: j['blockScreenshots'] as bool? ?? true,
     keepVaultsRunningInBackground:
         j['keepVaultsRunningInBackground'] as bool? ?? false,
+    categoryIndexInVaults: j['categoryIndexInVaults'] as bool? ?? true,
     defaultDerivedKeyCacheEnabled:
         j['defaultDerivedKeyCacheEnabled'] as bool? ?? false,
     containerSortMode: ContainerSortMode.fromJson(
@@ -703,6 +765,21 @@ class AppSettings {
     ),
     showStorageLocationsInDrawer:
         j['showStorageLocationsInDrawer'] as bool? ?? true,
+    categoryShortcutsEnabled: j['categoryShortcutsEnabled'] as bool? ?? true,
+    categoryShortcutOrder:
+        (j['categoryShortcutOrder'] as List?)?.whereType<String>().toList() ??
+        FileCategory.defaultOrderKeys,
+    hiddenCategoryShortcuts:
+        (j['hiddenCategoryShortcuts'] as List?)?.whereType<String>().toList() ??
+        const [],
+    categorySources: {
+      for (final e in ((j['categorySources'] as Map?) ?? const {}).entries)
+        if (e.key is String && e.value is String)
+          e.key as String: e.value as String,
+    },
+    categoryFolderStructure:
+        (j['categoryFolderStructure'] as List?)?.whereType<String>().toList() ??
+        const [],
     autoLockOnShareImport: j['autoLockOnShareImport'] as bool? ?? true,
     quickActionLockMode: j['quickActionLockMode'] != null
         ? QuickActionLockMode.fromJson(j['quickActionLockMode'] as String?)

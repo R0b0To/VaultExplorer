@@ -13643,4 +13643,90 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get vaultSyncDirectionRecommendedLabel => 'Рекомендовано';
+
+  @override
+  String get categoriesSectionTitle => 'Категорії';
+
+  @override
+  String get manageCategoriesTooltip => 'Керування категоріями';
+
+  @override
+  String get categoryShortcutsTitle => 'Ярлики категорій';
+
+  @override
+  String get categoryShortcutsEnable => 'Показувати ярлики категорій';
+
+  @override
+  String get categoryShortcutsEnableSubtitle =>
+      'Зображення, відео, аудіо та документи з усіх ваших сховищ у бічному меню';
+
+  @override
+  String get categoryShortcutsRestore => 'Відновити типові ярлики';
+
+  @override
+  String get categorySourceAll => 'Усі сховища';
+
+  @override
+  String get categorySourceTooltip => 'Вибрати джерело';
+
+  @override
+  String get categoryFolderStructure => 'Показувати вихідну структуру папок';
+
+  @override
+  String categoryScanning(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Сканування… перевірено $count папки',
+      many: 'Сканування… перевірено $count папок',
+      few: 'Сканування… перевірено $count папки',
+      one: 'Сканування… перевірено $count папку',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get categoryEmpty => 'У цій категорії нічого не знайдено';
+
+  @override
+  String get categoryNoVaultsUnlocked => 'Жоден сейф не розблоковано';
+
+  @override
+  String get categoryScanLimitReached =>
+      'Результати можуть бути неповними — сканування досягло ліміту.';
+
+  @override
+  String get categoryShareOneSource =>
+      'Щоб поділитися файлами, вибирайте їх лише з одного сховища за раз.';
+
+  @override
+  String categoryClipboardReady(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count файлу готово до вставлення',
+      many: '$count файлів готові до вставлення',
+      few: '$count файли готові до вставлення',
+      one: '$count файл готовий до вставлення',
+    );
+    return '$_temp0 — відкрийте папку, щоб вставити';
+  }
+
+  @override
+  String get categoryIndexInVaultsTitle =>
+      'Зберігати індекс категорій у сейфах';
+
+  @override
+  String get categoryIndexInVaultsSubtitle =>
+      'Зберігається зашифрованим усередині кожного сейфа в його папці конфігурації під час відкриття категорії, щоб наступного разу файли з’являлися миттєво. На телефоні нічого не зберігається.';
+
+  @override
+  String get categoryIndexClear => 'Очистити індекси категорій';
+
+  @override
+  String get categoryIndexClearSubtitle =>
+      'Видаляє індекс із кожного розблокованого сейфа';
+
+  @override
+  String get categoryIndexCleared => 'Індекси категорій очищено';
 }

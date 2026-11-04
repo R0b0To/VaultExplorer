@@ -13551,4 +13551,86 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get vaultSyncDirectionRecommendedLabel => 'Recomendado';
+
+  @override
+  String get categoriesSectionTitle => 'Categorias';
+
+  @override
+  String get manageCategoriesTooltip => 'Gerenciar categorias';
+
+  @override
+  String get categoryShortcutsTitle => 'Atalhos de categoria';
+
+  @override
+  String get categoryShortcutsEnable => 'Mostrar atalhos de categoria';
+
+  @override
+  String get categoryShortcutsEnableSubtitle =>
+      'Imagens, vídeos, áudios e documentos de todos os armazenamentos, no menu lateral';
+
+  @override
+  String get categoryShortcutsRestore => 'Restaurar atalhos padrão';
+
+  @override
+  String get categorySourceAll => 'Todos os armazenamentos';
+
+  @override
+  String get categorySourceTooltip => 'Escolher origem';
+
+  @override
+  String get categoryFolderStructure => 'Exibir estrutura original de pastas';
+
+  @override
+  String categoryScanning(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Verificando… $count pastas verificadas',
+      one: 'Verificando… 1 pasta verificada',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get categoryEmpty => 'Nada encontrado nesta categoria';
+
+  @override
+  String get categoryNoVaultsUnlocked => 'Nenhum cofre está desbloqueado';
+
+  @override
+  String get categoryScanLimitReached =>
+      'Os resultados podem estar incompletos — a verificação atingiu seu limite.';
+
+  @override
+  String get categoryShareOneSource =>
+      'Escolha arquivos de apenas um armazenamento por vez para compartilhá-los.';
+
+  @override
+  String categoryClipboardReady(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count arquivos prontos para colar',
+      one: '1 arquivo pronto para colar',
+    );
+    return '$_temp0 — abra uma pasta para colar';
+  }
+
+  @override
+  String get categoryIndexInVaultsTitle =>
+      'Manter índice de categorias nos cofres';
+
+  @override
+  String get categoryIndexInVaultsSubtitle =>
+      'Salvo criptografado dentro de cada cofre, em sua pasta de configuração, ao abrir uma categoria, para que seus arquivos apareçam instantaneamente da próxima vez. Nada é salvo no seu telefone.';
+
+  @override
+  String get categoryIndexClear => 'Limpar índices de categoria';
+
+  @override
+  String get categoryIndexClearSubtitle =>
+      'Remove o índice de cada cofre desbloqueado';
+
+  @override
+  String get categoryIndexCleared => 'Índices de categoria limpos';
 }

@@ -131,7 +131,7 @@ class BrowserSessionStore {
 
     final live = <TabId>{
       for (final tab in next.tabs)
-        if (!tab.isDashboard) tab.tabId,
+        if (!tab.isDashboard && !tab.isCategory) tab.tabId,
     };
 
     for (final id in _tabSubscriptions.keys

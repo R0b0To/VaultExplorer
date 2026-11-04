@@ -24,11 +24,13 @@ import 'package:vaultexplorer/features/browser/controllers/browser_chrome_hub.da
 import 'package:vaultexplorer/features/browser/controllers/browser_drag_session.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
 import 'package:vaultexplorer/features/browser/models/browser_viewport_options.dart';
+import 'package:vaultexplorer/features/browser/models/file_category_presentation.dart';
 import 'package:vaultexplorer/features/browser/models/tab_id.dart';
 import 'package:vaultexplorer/features/browser/widgets/adaptive_browser_app_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_app_bar_factory.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_new_tab_sheet.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_tab_strip.dart';
+import 'package:vaultexplorer/features/browser/widgets/category_content_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/directory_content_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/fast_scrollbar.dart';
 import 'package:vaultexplorer/features/browser/widgets/gated_page_scroll_physics.dart';
@@ -207,6 +209,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     end: 1.0,
   ).animate(_loopTransitionController);
   final Map<TabId, GlobalKey> _directoryViewKeys = {};
+  final Map<TabId, GlobalKey> _categoryViewKeys = {};
   final Map<TabId, GlobalKey> _dashboardViewKeys = {};
   bool _popScheduled = false;
   bool _drawerOpenOrDragging = false;
@@ -413,6 +416,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
 
     final liveTabIds = next.tabs.map((tab) => tab.tabId).toSet();
     _directoryViewKeys.removeWhere((id, _) => !liveTabIds.contains(id));
+    _categoryViewKeys.removeWhere((id, _) => !liveTabIds.contains(id));
     _dashboardViewKeys.removeWhere((id, _) => !liveTabIds.contains(id));
     if (next.tabs.isEmpty && !_popScheduled) {
       _popScheduled = true;
@@ -529,6 +533,24 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
               onBottomBarChanged: (bar) => _chrome.setBottomBar(tab.tabId, bar),
             ) ??
             const SizedBox.expand(),
+      );
+    }
+    if (tab.isCategory) {
+      return SkinAreaScope(
+        area: SkinArea.files,
+        child: CategoryContentView(
+          key: _categoryViewKeys.putIfAbsent(tab.tabId, GlobalKey.new),
+          tabId: tab.tabId,
+          category: tab.category!,
+          workspaceConfig: _workspace,
+          primaryLocalContainer:
+              tab.primaryLocalContainer ?? widget.primaryLocalContainer(),
+          includeVaults: tab.includeVaults,
+          resolveContainer: widget.resolveContainer,
+          onShowInFolder: (container, path) {
+            _workspaceActions.openTab(container, initialPath: path);
+          },
+        ),
       );
     }
     return SkinAreaScope(
@@ -1348,7 +1370,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
         : tabs.where((tab) => tab.pane == TabPane.primary).toList();
     final drawerPaneShownId = !dualPaneForTabStrip
         ? activeTabId
-        : paneTabIds!.$1;
+        : paneTabIds.$1;
     final isFirstTab =
         drawerPaneTabs.isNotEmpty &&
         drawerPaneTabs.first.tabId == drawerPaneShownId;
@@ -1449,7 +1471,9 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       workspaceConfig: _workspace,
       appBarListenable: _chrome.appBar,
       fallback: BrowserAppBarFallback(
-        title: activeTab?.container?.displayName ?? '',
+        title: activeTab?.isCategory == true
+            ? activeTab!.category!.label(context.l10n)
+            : activeTab?.container?.displayName ?? '',
         showBackButton: widget.viewportOptions.showBackButton,
         preferBackButton: !tabsEnabled,
         onBackPressed: tabsEnabled ? null : _handleBackToDashboard,
@@ -1521,7 +1545,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                         }
 
                         if (dualPane) {
-                          final ids = paneTabIds!;
+                          final ids = paneTabIds;
                           final firstId = ids.$1!;
                           final secondId = ids.$2!;
                           final firstTab = tabs.firstWhere(

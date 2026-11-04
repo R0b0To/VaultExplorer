@@ -12791,4 +12791,80 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get vaultSyncDirectionRecommendedLabel => 'おすすめ';
+
+  @override
+  String get categoriesSectionTitle => 'カテゴリ';
+
+  @override
+  String get manageCategoriesTooltip => 'カテゴリを管理';
+
+  @override
+  String get categoryShortcutsTitle => 'カテゴリのショートカット';
+
+  @override
+  String get categoryShortcutsEnable => 'カテゴリのショートカットを表示';
+
+  @override
+  String get categoryShortcutsEnableSubtitle =>
+      'すべてのストレージの画像、動画、音声、ドキュメントをドロワーに表示';
+
+  @override
+  String get categoryShortcutsRestore => 'デフォルトのショートカットに戻す';
+
+  @override
+  String get categorySourceAll => 'すべてのストレージ';
+
+  @override
+  String get categorySourceTooltip => 'ソースを選択';
+
+  @override
+  String get categoryFolderStructure => '元のフォルダー構造を表示';
+
+  @override
+  String categoryScanning(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'スキャン中… $count 個のフォルダーを確認済み',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get categoryEmpty => 'このカテゴリには何も見つかりませんでした';
+
+  @override
+  String get categoryNoVaultsUnlocked => 'ロック解除された保管庫はありません';
+
+  @override
+  String get categoryScanLimitReached => '結果が不完全な可能性があります — スキャンが上限に達しました。';
+
+  @override
+  String get categoryShareOneSource => '共有するには、一度に1つのストレージからファイルを選択してください。';
+
+  @override
+  String categoryClipboardReady(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 個のファイルを貼り付ける準備ができました',
+    );
+    return '$_temp0 — 貼り付けるフォルダーを開いてください';
+  }
+
+  @override
+  String get categoryIndexInVaultsTitle => '保管庫内にカテゴリのインデックスを保持';
+
+  @override
+  String get categoryIndexInVaultsSubtitle =>
+      'カテゴリを開いたときに各保管庫の設定フォルダー内に暗号化されて保存され、次回からファイルがすぐに表示されます。端末には何も保存されません。';
+
+  @override
+  String get categoryIndexClear => 'カテゴリのインデックスを消去';
+
+  @override
+  String get categoryIndexClearSubtitle => 'ロック解除されたすべての保管庫からインデックスを削除';
+
+  @override
+  String get categoryIndexCleared => 'カテゴリのインデックスを消去しました';
 }

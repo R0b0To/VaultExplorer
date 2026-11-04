@@ -327,6 +327,23 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
         }
       },
       onUnlockVault: openItem,
+      onOpenCategory: (category) {
+        if (workspaceActions != null) {
+          final tabId = workspaceActions.openCategoryTab(
+            category,
+            primaryLocalContainer: _localStorageContainer,
+            includeVaults: true,
+          );
+          if (tabId == null && mounted) {
+            showAppSnackBar(
+              context,
+              message: context.l10n.browserTabLimitReached(kMaxBrowserTabs),
+              tone: AppBannerTone.warning,
+            );
+          }
+          return;
+        }
+      },
       onAddVault: _showAddOptionsSheet,
     );
   }

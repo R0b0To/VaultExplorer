@@ -79,6 +79,21 @@ class FileGridView extends StatefulWidget {
   final String? archiveRootPath;
   final SortBy? sortBy;
 
+  /// Resolves the container an entry lives in, for a listing that gathers
+  /// files from several containers (the category browser). When null every
+  /// entry belongs to [container], as in any ordinary folder listing.
+  final MountedContainer Function(RawEntry entry)? containerFor;
+
+  /// The thumbnail cache policy that applies to an entry, for a listing that
+  /// mixes containers whose owners chose different policies (the category
+  /// browser). When null every entry follows [thumbnailCacheMode].
+  final ThumbnailCacheMode Function(RawEntry entry)? cacheModeFor;
+
+  /// The thumbnail quality that applies to an entry, for a listing that
+  /// mixes containers whose owners chose different qualities (the category
+  /// browser). When null every entry follows [thumbnailQuality].
+  final ThumbnailQuality Function(RawEntry entry)? qualityFor;
+
   const FileGridView({
     super.key,
     required this.container,
@@ -114,6 +129,9 @@ class FileGridView extends StatefulWidget {
     this.archiveContext,
     this.archiveRootPath,
     this.sortBy,
+    this.containerFor,
+    this.cacheModeFor,
+    this.qualityFor,
   });
 
   @override
@@ -122,6 +140,12 @@ class FileGridView extends StatefulWidget {
 
 class _FileGridViewState extends State<FileGridView>
     with SingleTickerProviderStateMixin {
+  MountedContainer _containerOf(RawEntry entry) =>
+      widget.containerFor?.call(entry) ?? widget.container;
+
+  ThumbnailCacheMode _cacheModeOf(RawEntry entry) =>
+      widget.cacheModeFor?.call(entry) ?? widget.thumbnailCacheMode;
+
   Orientation? _lastOrientation;
   late int _crossAxisCount;
   double? _viewportWidth;
@@ -222,8 +246,8 @@ class _FileGridViewState extends State<FileGridView>
   /// quality this is derived from the real pixel width of a cell (same
   /// geometry as the grid delegate below), so fewer columns => sharper
   /// thumbnails, matching how Fossify Gallery sizes them.
-  ThumbnailQuality get _effectiveQuality {
-    final q = widget.thumbnailQuality;
+  ThumbnailQuality _effectiveQualityOf(RawEntry entry) {
+    final q = widget.qualityFor?.call(entry) ?? widget.thumbnailQuality;
     if (!q.auto) return q;
     final tileWidth = _getTileWidth(_crossAxisCount, context);
     return q.resolveForCell(
@@ -370,7 +394,7 @@ class _FileGridViewState extends State<FileGridView>
             entry: entry,
             child: BrowserItemDragItem(
               entry: entry,
-              container: widget.container,
+              container: _containerOf(entry),
               currentDirectory: widget.currentDirPath,
               visibleItems: widget.items,
               selectedItems: widget.selectedItems,
@@ -480,11 +504,13 @@ class _FileGridViewState extends State<FileGridView>
       preview: entry.isPlaceholder
           ? Center(child: folderIcon)
           : FolderThumbnailPreview(
-              key: ValueKey('folder_preview:${widget.container.uri}:$fullPath'),
-              container: widget.container,
+              key: ValueKey(
+                'folder_preview:${_containerOf(entry).uri}:$fullPath',
+              ),
+              container: _containerOf(entry),
               folderPath: fullPath,
-              cacheMode: widget.thumbnailCacheMode,
-              quality: _effectiveQuality,
+              cacheMode: _cacheModeOf(entry),
+              quality: _effectiveQualityOf(entry),
               iconSize: iconSize,
               child: folderIcon,
             ),
@@ -545,14 +571,14 @@ class _FileGridViewState extends State<FileGridView>
       );
     } else if (isImg) {
       previewWidget = Hero(
-        tag: 'media_hero_${widget.container.volId}_$fullPath',
+        tag: 'media_hero_${_containerOf(entry).volId}_$fullPath',
         child: Material(
           type: MaterialType.transparency,
           child: _EncryptedImageGridThumb(
-            container: widget.container,
+            container: _containerOf(entry),
             filePath: fullPath,
-            cacheMode: widget.thumbnailCacheMode,
-            quality: _effectiveQuality,
+            cacheMode: _cacheModeOf(entry),
+            quality: _effectiveQualityOf(entry),
             archiveContext: widget.archiveContext,
             archiveRootPath: widget.archiveRootPath,
           ),
@@ -560,14 +586,14 @@ class _FileGridViewState extends State<FileGridView>
       );
     } else if (isVid) {
       previewWidget = Hero(
-        tag: 'media_hero_${widget.container.volId}_$fullPath',
+        tag: 'media_hero_${_containerOf(entry).volId}_$fullPath',
         child: Material(
           type: MaterialType.transparency,
           child: _VideoThumb(
-            container: widget.container,
+            container: _containerOf(entry),
             filePath: fullPath,
-            cacheMode: widget.thumbnailCacheMode,
-            quality: _effectiveQuality,
+            cacheMode: _cacheModeOf(entry),
+            quality: _effectiveQualityOf(entry),
             archiveContext: widget.archiveContext,
             archiveRootPath: widget.archiveRootPath,
           ),
@@ -579,10 +605,10 @@ class _FileGridViewState extends State<FileGridView>
           width: iconSize,
           height: iconSize,
           child: _ApkIconGridThumb(
-            container: widget.container,
+            container: _containerOf(entry),
             filePath: fullPath,
-            cacheMode: widget.thumbnailCacheMode,
-            quality: _effectiveQuality,
+            cacheMode: _cacheModeOf(entry),
+            quality: _effectiveQualityOf(entry),
             fallbackIcon: skin.fileIcon(cleanName),
             fallbackColor: skin.fileIconColor(cs, cleanName),
             fallbackIconSize: iconSize,
@@ -593,10 +619,10 @@ class _FileGridViewState extends State<FileGridView>
       // Same restriction as the APK above: a book nested inside an open
       // archive has no container/local path for the native side to open.
       previewWidget = _BookCoverGridThumb(
-        container: widget.container,
+        container: _containerOf(entry),
         filePath: fullPath,
-        cacheMode: widget.thumbnailCacheMode,
-        quality: _effectiveQuality,
+        cacheMode: _cacheModeOf(entry),
+        quality: _effectiveQualityOf(entry),
         fallbackIcon: skin.fileIcon(cleanName),
         fallbackColor: skin.fileIconColor(cs, cleanName),
         fallbackIconSize: iconSize,

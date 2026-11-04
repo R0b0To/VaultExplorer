@@ -26,6 +26,7 @@ import 'package:vaultexplorer/features/browser/browser_tabs_host.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_session_store.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
 import 'package:vaultexplorer/features/browser/models/browser_tab_origin.dart';
+import 'package:vaultexplorer/features/browser/models/file_category.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_new_tab_sheet.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_screen.dart';
@@ -554,6 +555,29 @@ class _MainShellState extends ConsumerState<MainShell>
     });
   }
 
+  void _openCategoryTab(FileCategory category) {
+    _cacheDashboardLocalStorageContainer();
+    final actions = _browserWorkspaceActions;
+    if (actions == null) return;
+    final tabId = actions.openCategoryTab(
+      category,
+      primaryLocalContainer: _primaryLocalStorageContainer,
+      includeVaults: true,
+    );
+    if (tabId == null && mounted) {
+      showAppSnackBar(
+        context,
+        message: context.l10n.browserTabLimitReached(kMaxBrowserTabs),
+        tone: AppBannerTone.warning,
+      );
+      return;
+    }
+    setState(() {
+      _index = 0;
+      _builtTabs.add(0);
+    });
+  }
+
   /// Drawer "Local storage" tap. With all-files access this opens the
   /// container directly. Without it there is no container, and the tap used
   /// to do nothing; the grant prompt has to be shown instead. That flow lives
@@ -760,6 +784,19 @@ class _MainShellState extends ConsumerState<MainShell>
       actions.openDashboardTab();
       return;
     }
+    if (tab.isCategory) {
+      if (actions.openCategoryTab(
+            tab.category!,
+            primaryLocalContainer: tab.primaryLocalContainer,
+            includeVaults: tab.includeVaults,
+          ) ==
+          null) {
+        _showBrowserTabLimit();
+        return;
+      }
+      setState(() => _index = 0);
+      return;
+    }
     if (container == null) return;
     final nav = ref.read(fileBrowserNavigationProvider(tab.tabId));
     final path = browserTabDuplicatePath(nav);
@@ -911,6 +948,7 @@ class _MainShellState extends ConsumerState<MainShell>
           ),
         ),
         onUnlockVault: _openVaultFromDrawer,
+        onOpenCategory: _openCategoryTab,
         onAddVault: () {
           _onTabTap(0);
           WidgetsBinding.instance.addPostFrameCallback((_) {

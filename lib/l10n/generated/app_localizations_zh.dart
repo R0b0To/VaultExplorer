@@ -12590,4 +12590,79 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get vaultSyncDirectionRecommendedLabel => '推荐';
+
+  @override
+  String get categoriesSectionTitle => '分类';
+
+  @override
+  String get manageCategoriesTooltip => '管理分类';
+
+  @override
+  String get categoryShortcutsTitle => '分类快捷方式';
+
+  @override
+  String get categoryShortcutsEnable => '显示分类快捷方式';
+
+  @override
+  String get categoryShortcutsEnableSubtitle => '在抽屉菜单中显示来自所有存储空间的图片、视频、音频和文档';
+
+  @override
+  String get categoryShortcutsRestore => '恢复默认快捷方式';
+
+  @override
+  String get categorySourceAll => '所有存储';
+
+  @override
+  String get categorySourceTooltip => '选择来源';
+
+  @override
+  String get categoryFolderStructure => '显示原始文件夹结构';
+
+  @override
+  String categoryScanning(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '正在扫描… 已检查 $count 个文件夹',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get categoryEmpty => '此分类中未找到任何内容';
+
+  @override
+  String get categoryNoVaultsUnlocked => '没有已解锁的保险库';
+
+  @override
+  String get categoryScanLimitReached => '结果可能不完整 — 扫描已达到上限。';
+
+  @override
+  String get categoryShareOneSource => '一次只能选择来自同一个存储空间的文件进行共享。';
+
+  @override
+  String categoryClipboardReady(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 个文件准备就绪',
+    );
+    return '$_temp0 — 打开文件夹以粘贴';
+  }
+
+  @override
+  String get categoryIndexInVaultsTitle => '在保险库中保留分类索引';
+
+  @override
+  String get categoryIndexInVaultsSubtitle =>
+      '打开分类时，以加密形式保存在每个保险库的配置文件夹中，以便下次立即可见文件。手机上不会保存任何内容。';
+
+  @override
+  String get categoryIndexClear => '清除分类索引';
+
+  @override
+  String get categoryIndexClearSubtitle => '从每个已解锁的保险库中移除索引';
+
+  @override
+  String get categoryIndexCleared => '已清除分类索引';
 }

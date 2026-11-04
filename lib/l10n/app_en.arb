@@ -15061,5 +15061,95 @@
   "vaultSyncDirectionRecommendedLabel": "Recommended",
   "@vaultSyncDirectionRecommendedLabel": {
     "description": "Badge that marks two-way sync as the recommended mode."
+  },
+  "categoriesSectionTitle": "Categories",
+  "@categoriesSectionTitle": {
+    "description": "Navigation drawer section title for the Images / Videos / Audio / Documents shortcuts"
+  },
+  "manageCategoriesTooltip": "Manage categories",
+  "@manageCategoriesTooltip": {
+    "description": "Tooltip of the drawer button that opens the category shortcut settings"
+  },
+  "categoryShortcutsTitle": "Category shortcuts",
+  "@categoryShortcutsTitle": {
+    "description": "Settings section title and sheet title for choosing which category shortcuts the drawer shows"
+  },
+  "categoryShortcutsEnable": "Show category shortcuts",
+  "@categoryShortcutsEnable": {
+    "description": "Settings switch: show the category shortcuts in the navigation drawer"
+  },
+  "categoryShortcutsEnableSubtitle": "Images, videos, audio and documents from all your storage, in the drawer",
+  "@categoryShortcutsEnableSubtitle": {
+    "description": "Subtitle of the switch that shows the category shortcuts in the drawer"
+  },
+  "categoryShortcutsRestore": "Restore default shortcuts",
+  "@categoryShortcutsRestore": {
+    "description": "Settings action: show all four category shortcuts again in their default order"
+  },
+  "categorySourceAll": "All storage",
+  "@categorySourceAll": {
+    "description": "Category browser source choice: local storage, storage locations and unlocked vaults together"
+  },
+  "categorySourceTooltip": "Choose source",
+  "@categorySourceTooltip": {
+    "description": "Tooltip of the category browser's source selector button"
+  },
+  "categoryFolderStructure": "Display original folder structure",
+  "@categoryFolderStructure": {
+    "description": "Category browser menu switch: browse the matching files grouped in their original folders instead of one flat list"
+  },
+  "categoryScanning": "{count, plural, =1{Scanning… 1 folder checked} other{Scanning… {count} folders checked}}",
+  "@categoryScanning": {
+    "description": "Category browser progress line while it looks through folders for matching files",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "categoryEmpty": "Nothing found in this category",
+  "@categoryEmpty": {
+    "description": "Category browser empty state when no matching file was found"
+  },
+  "categoryNoVaultsUnlocked": "No vault is unlocked",
+  "@categoryNoVaultsUnlocked": {
+    "description": "Category browser empty state when only vaults are selected but none is unlocked"
+  },
+  "categoryScanLimitReached": "Results may be incomplete — the scan stopped at its limit.",
+  "@categoryScanLimitReached": {
+    "description": "Notice in the category browser when the scan stopped at its folder or file limit"
+  },
+  "categoryShareOneSource": "Choose files from one storage at a time to share them.",
+  "@categoryShareOneSource": {
+    "description": "Message when sharing selected category files that live in more than one storage"
+  },
+  "categoryClipboardReady": "{count, plural, =1{1 file ready to paste} other{{count} files ready to paste}} — open a folder to paste",
+  "@categoryClipboardReady": {
+    "description": "Message after copying or cutting files in the category browser",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "categoryIndexInVaultsTitle": "Keep category index in vaults",
+  "@categoryIndexInVaultsTitle": {
+    "description": "Settings switch: keep an index of category files inside each vault"
+  },
+  "categoryIndexInVaultsSubtitle": "Saved encrypted inside each vault, in its configuration folder, when you open a category, so its files appear instantly next time. Nothing is saved on your phone.",
+  "@categoryIndexInVaultsSubtitle": {
+    "description": "Subtitle of the switch that keeps the category index inside vaults"
+  },
+  "categoryIndexClear": "Clear category indexes",
+  "@categoryIndexClear": {
+    "description": "Settings action that removes the category index from the unlocked vaults"
+  },
+  "categoryIndexClearSubtitle": "Removes the index from every unlocked vault",
+  "@categoryIndexClearSubtitle": {
+    "description": "Subtitle of the action that clears the category indexes"
+  },
+  "categoryIndexCleared": "Category indexes cleared",
+  "@categoryIndexCleared": {
+    "description": "Snackbar shown after the category indexes were cleared"
   }
 }

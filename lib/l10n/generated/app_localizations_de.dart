@@ -13548,4 +13548,87 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get vaultSyncDirectionRecommendedLabel => 'Empfohlen';
+
+  @override
+  String get categoriesSectionTitle => 'Kategorien';
+
+  @override
+  String get manageCategoriesTooltip => 'Kategorien verwalten';
+
+  @override
+  String get categoryShortcutsTitle => 'Kategorie-Verknüpfungen';
+
+  @override
+  String get categoryShortcutsEnable => 'Kategorie-Verknüpfungen anzeigen';
+
+  @override
+  String get categoryShortcutsEnableSubtitle =>
+      'Bilder, Videos, Audio und Dokumente aus all Ihren Speichern in der Seitenleiste';
+
+  @override
+  String get categoryShortcutsRestore =>
+      'Standard-Verknüpfungen wiederherstellen';
+
+  @override
+  String get categorySourceAll => 'Alle Speicher';
+
+  @override
+  String get categorySourceTooltip => 'Quelle auswählen';
+
+  @override
+  String get categoryFolderStructure => 'Ursprüngliche Ordnerstruktur anzeigen';
+
+  @override
+  String categoryScanning(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Wird gescannt… $count Ordner überprüft',
+      one: 'Wird gescannt… 1 Ordner überprüft',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get categoryEmpty => 'Nichts in dieser Kategorie gefunden';
+
+  @override
+  String get categoryNoVaultsUnlocked => 'Kein Tresor ist entsperrt';
+
+  @override
+  String get categoryScanLimitReached =>
+      'Ergebnisse sind möglicherweise unvollständig – der Suchlauf hat das Limit erreicht.';
+
+  @override
+  String get categoryShareOneSource =>
+      'Wählen Sie Dateien aus jeweils nur einem Speicher aus, um sie zu teilen.';
+
+  @override
+  String categoryClipboardReady(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Dateien bereit zum Einfügen',
+      one: '1 Datei bereit zum Einfügen',
+    );
+    return '$_temp0 – Ordner zum Einfügen öffnen';
+  }
+
+  @override
+  String get categoryIndexInVaultsTitle =>
+      'Kategorie-Index in Tresoren speichern';
+
+  @override
+  String get categoryIndexInVaultsSubtitle =>
+      'Wird beim Öffnen einer Kategorie verschlüsselt im Konfigurationsordner des jeweiligen Tresors gespeichert, damit die Dateien beim nächsten Mal sofort erscheinen. Auf Ihrem Smartphone wird nichts gespeichert.';
+
+  @override
+  String get categoryIndexClear => 'Kategorie-Indizes löschen';
+
+  @override
+  String get categoryIndexClearSubtitle =>
+      'Entfernt den Index aus allen entsperrten Tresoren';
+
+  @override
+  String get categoryIndexCleared => 'Kategorie-Indizes gelöscht';
 }

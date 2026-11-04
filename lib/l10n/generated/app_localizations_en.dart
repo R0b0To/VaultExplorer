@@ -13340,4 +13340,85 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get vaultSyncDirectionRecommendedLabel => 'Recommended';
+
+  @override
+  String get categoriesSectionTitle => 'Categories';
+
+  @override
+  String get manageCategoriesTooltip => 'Manage categories';
+
+  @override
+  String get categoryShortcutsTitle => 'Category shortcuts';
+
+  @override
+  String get categoryShortcutsEnable => 'Show category shortcuts';
+
+  @override
+  String get categoryShortcutsEnableSubtitle =>
+      'Images, videos, audio and documents from all your storage, in the drawer';
+
+  @override
+  String get categoryShortcutsRestore => 'Restore default shortcuts';
+
+  @override
+  String get categorySourceAll => 'All storage';
+
+  @override
+  String get categorySourceTooltip => 'Choose source';
+
+  @override
+  String get categoryFolderStructure => 'Display original folder structure';
+
+  @override
+  String categoryScanning(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Scanning… $count folders checked',
+      one: 'Scanning… 1 folder checked',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get categoryEmpty => 'Nothing found in this category';
+
+  @override
+  String get categoryNoVaultsUnlocked => 'No vault is unlocked';
+
+  @override
+  String get categoryScanLimitReached =>
+      'Results may be incomplete — the scan stopped at its limit.';
+
+  @override
+  String get categoryShareOneSource =>
+      'Choose files from one storage at a time to share them.';
+
+  @override
+  String categoryClipboardReady(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count files ready to paste',
+      one: '1 file ready to paste',
+    );
+    return '$_temp0 — open a folder to paste';
+  }
+
+  @override
+  String get categoryIndexInVaultsTitle => 'Keep category index in vaults';
+
+  @override
+  String get categoryIndexInVaultsSubtitle =>
+      'Saved encrypted inside each vault, in its configuration folder, when you open a category, so its files appear instantly next time. Nothing is saved on your phone.';
+
+  @override
+  String get categoryIndexClear => 'Clear category indexes';
+
+  @override
+  String get categoryIndexClearSubtitle =>
+      'Removes the index from every unlocked vault';
+
+  @override
+  String get categoryIndexCleared => 'Category indexes cleared';
 }

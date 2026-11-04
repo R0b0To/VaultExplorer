@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/category_shortcuts_editor.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
@@ -2646,6 +2647,11 @@ class AppearanceSettingsScreen extends ConsumerWidget {
                   ],
                 ),
               ],
+              const SizedBox(height: 16),
+
+              // Category shortcuts in the drawer
+              SectionHeader(context.l10n.categoryShortcutsTitle),
+              const SectionCard(children: [CategoryShortcutsEditor()]),
             ],
           ),
         ),

@@ -13559,4 +13559,87 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get vaultSyncDirectionRecommendedLabel => 'Consigliato';
+
+  @override
+  String get categoriesSectionTitle => 'Categorie';
+
+  @override
+  String get manageCategoriesTooltip => 'Gestisci categorie';
+
+  @override
+  String get categoryShortcutsTitle => 'Scorciatoie delle categorie';
+
+  @override
+  String get categoryShortcutsEnable => 'Mostra scorciatoie delle categorie';
+
+  @override
+  String get categoryShortcutsEnableSubtitle =>
+      'Immagini, video, audio e documenti da tutte le memorie, nel pannello laterale';
+
+  @override
+  String get categoryShortcutsRestore => 'Ripristina scorciatoie predefinite';
+
+  @override
+  String get categorySourceAll => 'Tutte le memorie';
+
+  @override
+  String get categorySourceTooltip => 'Scegli sorgente';
+
+  @override
+  String get categoryFolderStructure =>
+      'Mostra struttura originale delle cartelle';
+
+  @override
+  String categoryScanning(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Scansione in corso… $count cartelle controllate',
+      one: 'Scansione in corso… 1 cartella controllata',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get categoryEmpty => 'Nessun file trovato in questa categoria';
+
+  @override
+  String get categoryNoVaultsUnlocked => 'Nessuna cassaforte è sbloccata';
+
+  @override
+  String get categoryScanLimitReached =>
+      'I risultati potrebbero essere incompleti: la scansione ha raggiunto il limite.';
+
+  @override
+  String get categoryShareOneSource =>
+      'Seleziona i file da una sola memoria alla volta per condividerli.';
+
+  @override
+  String categoryClipboardReady(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count file pronti da incollare',
+      one: '1 file pronto da incollare',
+    );
+    return '$_temp0 — apri una cartella per incollare';
+  }
+
+  @override
+  String get categoryIndexInVaultsTitle =>
+      'Mantieni l\'indice delle categorie nelle casseforti';
+
+  @override
+  String get categoryIndexInVaultsSubtitle =>
+      'Salvato crittografato all\'interno di ciascuna cassaforte, nella relativa cartella di configurazione, quando apri una categoria, così i file appariranno istantaneamente la volta successiva. Nulla viene salvato sul telefono.';
+
+  @override
+  String get categoryIndexClear => 'Cancella indici delle categorie';
+
+  @override
+  String get categoryIndexClearSubtitle =>
+      'Rimuove l’indice da ogni cassaforte sbloccata';
+
+  @override
+  String get categoryIndexCleared => 'Indici delle categorie cancellati';
 }

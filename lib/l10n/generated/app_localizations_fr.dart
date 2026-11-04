@@ -13665,4 +13665,88 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get vaultSyncDirectionRecommendedLabel => 'Recommandé';
+
+  @override
+  String get categoriesSectionTitle => 'Catégories';
+
+  @override
+  String get manageCategoriesTooltip => 'Gérer les catégories';
+
+  @override
+  String get categoryShortcutsTitle => 'Raccourcis de catégories';
+
+  @override
+  String get categoryShortcutsEnable => 'Afficher les raccourcis de catégories';
+
+  @override
+  String get categoryShortcutsEnableSubtitle =>
+      'Images, vidéos, fichiers audio et documents de tous vos stockages, dans le volet latéral';
+
+  @override
+  String get categoryShortcutsRestore => 'Restaurer les raccourcis par défaut';
+
+  @override
+  String get categorySourceAll => 'Tous les stockages';
+
+  @override
+  String get categorySourceTooltip => 'Choisir la source';
+
+  @override
+  String get categoryFolderStructure =>
+      'Afficher la structure de dossiers originale';
+
+  @override
+  String categoryScanning(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Analyse en cours… $count dossiers vérifiés',
+      one: 'Analyse en cours… 1 dossier vérifié',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get categoryEmpty => 'Rien n\'a été trouvé dans cette catégorie';
+
+  @override
+  String get categoryNoVaultsUnlocked =>
+      'Aucun coffre-fort n\'est déverrouillé';
+
+  @override
+  String get categoryScanLimitReached =>
+      'Les résultats peuvent être incomplets — l\'analyse a atteint sa limite.';
+
+  @override
+  String get categoryShareOneSource =>
+      'Choisissez des fichiers d\'un seul stockage à la fois pour les partager.';
+
+  @override
+  String categoryClipboardReady(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count fichiers prêts à coller',
+      one: '1 fichier prêt à coller',
+    );
+    return '$_temp0 — ouvrez un dossier pour coller';
+  }
+
+  @override
+  String get categoryIndexInVaultsTitle =>
+      'Conserver l\'index des catégories dans les coffres-forts';
+
+  @override
+  String get categoryIndexInVaultsSubtitle =>
+      'Enregistré de manière chiffrée dans chaque coffre-fort, dans son dossier de configuration, lorsque vous ouvrez une catégorie, afin que ses fichiers apparaissent instantanément la prochaine fois. Rien n\'est enregistré sur votre téléphone.';
+
+  @override
+  String get categoryIndexClear => 'Effacer les index de catégories';
+
+  @override
+  String get categoryIndexClearSubtitle =>
+      'Supprime l’index de chaque coffre-fort déverrouillé';
+
+  @override
+  String get categoryIndexCleared => 'Index de catégories effacés';
 }

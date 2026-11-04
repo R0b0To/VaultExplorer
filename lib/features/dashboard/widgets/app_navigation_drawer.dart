@@ -15,10 +15,12 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/vault_list_item.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
+import 'package:vaultexplorer/features/browser/models/file_category.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_name_label.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_config_sheet.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/drawer_bookmarks_section.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/drawer_categories_section.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/app_settings_screen.dart';
 import 'package:vaultexplorer/features/settings/long_file_name_display_provider.dart';
@@ -39,6 +41,7 @@ class AppNavigationDrawer extends ConsumerWidget {
   /// Set only while the file manager is open with tabs: the long-press menus
   /// of vaults and storages then offer "Open in new tab".
   final ValueChanged<MountedContainer>? onOpenInNewTab;
+  final ValueChanged<FileCategory>? onOpenCategory;
   final bool keepBrowserTabsOnNavigate;
 
   const AppNavigationDrawer({
@@ -54,6 +57,7 @@ class AppNavigationDrawer extends ConsumerWidget {
     this.onDeleteVault,
     this.onAddVault,
     this.onOpenInNewTab,
+    this.onOpenCategory,
     this.keepBrowserTabsOnNavigate = false,
   });
 
@@ -880,6 +884,15 @@ class AppNavigationDrawer extends ConsumerWidget {
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 1),
                     child: Divider(),
+                  ),
+
+                  // 3b. Category shortcuts (Images, Videos, Audio, Documents)
+                  DrawerCategoriesSection(
+                    primaryLocalContainer: primary,
+                    currentVolId: currentVolId,
+                    onOpenLocalStorage: onOpenLocalStorage,
+                    onSelectContainer: onSelectContainer,
+                    onOpenCategory: onOpenCategory,
                   ),
 
                   // 4. Tools Destination

@@ -22674,6 +22674,126 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Recommended'**
   String get vaultSyncDirectionRecommendedLabel;
+
+  /// Navigation drawer section title for the Images / Videos / Audio / Documents shortcuts
+  ///
+  /// In en, this message translates to:
+  /// **'Categories'**
+  String get categoriesSectionTitle;
+
+  /// Tooltip of the drawer button that opens the category shortcut settings
+  ///
+  /// In en, this message translates to:
+  /// **'Manage categories'**
+  String get manageCategoriesTooltip;
+
+  /// Settings section title and sheet title for choosing which category shortcuts the drawer shows
+  ///
+  /// In en, this message translates to:
+  /// **'Category shortcuts'**
+  String get categoryShortcutsTitle;
+
+  /// Settings switch: show the category shortcuts in the navigation drawer
+  ///
+  /// In en, this message translates to:
+  /// **'Show category shortcuts'**
+  String get categoryShortcutsEnable;
+
+  /// Subtitle of the switch that shows the category shortcuts in the drawer
+  ///
+  /// In en, this message translates to:
+  /// **'Images, videos, audio and documents from all your storage, in the drawer'**
+  String get categoryShortcutsEnableSubtitle;
+
+  /// Settings action: show all four category shortcuts again in their default order
+  ///
+  /// In en, this message translates to:
+  /// **'Restore default shortcuts'**
+  String get categoryShortcutsRestore;
+
+  /// Category browser source choice: local storage, storage locations and unlocked vaults together
+  ///
+  /// In en, this message translates to:
+  /// **'All storage'**
+  String get categorySourceAll;
+
+  /// Tooltip of the category browser's source selector button
+  ///
+  /// In en, this message translates to:
+  /// **'Choose source'**
+  String get categorySourceTooltip;
+
+  /// Category browser menu switch: browse the matching files grouped in their original folders instead of one flat list
+  ///
+  /// In en, this message translates to:
+  /// **'Display original folder structure'**
+  String get categoryFolderStructure;
+
+  /// Category browser progress line while it looks through folders for matching files
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Scanning… 1 folder checked} other{Scanning… {count} folders checked}}'**
+  String categoryScanning(int count);
+
+  /// Category browser empty state when no matching file was found
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing found in this category'**
+  String get categoryEmpty;
+
+  /// Category browser empty state when only vaults are selected but none is unlocked
+  ///
+  /// In en, this message translates to:
+  /// **'No vault is unlocked'**
+  String get categoryNoVaultsUnlocked;
+
+  /// Notice in the category browser when the scan stopped at its folder or file limit
+  ///
+  /// In en, this message translates to:
+  /// **'Results may be incomplete — the scan stopped at its limit.'**
+  String get categoryScanLimitReached;
+
+  /// Message when sharing selected category files that live in more than one storage
+  ///
+  /// In en, this message translates to:
+  /// **'Choose files from one storage at a time to share them.'**
+  String get categoryShareOneSource;
+
+  /// Message after copying or cutting files in the category browser
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 file ready to paste} other{{count} files ready to paste}} — open a folder to paste'**
+  String categoryClipboardReady(int count);
+
+  /// Settings switch: keep an index of category files inside each vault
+  ///
+  /// In en, this message translates to:
+  /// **'Keep category index in vaults'**
+  String get categoryIndexInVaultsTitle;
+
+  /// Subtitle of the switch that keeps the category index inside vaults
+  ///
+  /// In en, this message translates to:
+  /// **'Saved encrypted inside each vault, in its configuration folder, when you open a category, so its files appear instantly next time. Nothing is saved on your phone.'**
+  String get categoryIndexInVaultsSubtitle;
+
+  /// Settings action that removes the category index from the unlocked vaults
+  ///
+  /// In en, this message translates to:
+  /// **'Clear category indexes'**
+  String get categoryIndexClear;
+
+  /// Subtitle of the action that clears the category indexes
+  ///
+  /// In en, this message translates to:
+  /// **'Removes the index from every unlocked vault'**
+  String get categoryIndexClearSubtitle;
+
+  /// Snackbar shown after the category indexes were cleared
+  ///
+  /// In en, this message translates to:
+  /// **'Category indexes cleared'**
+  String get categoryIndexCleared;
 }
 
 class _AppLocalizationsDelegate

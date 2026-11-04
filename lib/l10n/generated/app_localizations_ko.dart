@@ -12793,4 +12793,80 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get vaultSyncDirectionRecommendedLabel => '권장';
+
+  @override
+  String get categoriesSectionTitle => '카테고리';
+
+  @override
+  String get manageCategoriesTooltip => '카테고리 관리';
+
+  @override
+  String get categoryShortcutsTitle => '카테고리 바로가기';
+
+  @override
+  String get categoryShortcutsEnable => '카테고리 바로가기 표시';
+
+  @override
+  String get categoryShortcutsEnableSubtitle =>
+      '모든 저장소의 사진, 동영상, 오디오, 문서를 서랍 메뉴에 표시';
+
+  @override
+  String get categoryShortcutsRestore => '기본 바로가기 복원';
+
+  @override
+  String get categorySourceAll => '모든 저장소';
+
+  @override
+  String get categorySourceTooltip => '소스 선택';
+
+  @override
+  String get categoryFolderStructure => '원본 폴더 구조 표시';
+
+  @override
+  String categoryScanning(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '스캔 중… $count개 폴더 확인됨',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get categoryEmpty => '이 카테고리에서 아무것도 찾을 수 없습니다';
+
+  @override
+  String get categoryNoVaultsUnlocked => '잠금 해제된 금고가 없습니다';
+
+  @override
+  String get categoryScanLimitReached => '결과가 불완전할 수 있습니다 — 스캔이 한도에 도달했습니다.';
+
+  @override
+  String get categoryShareOneSource => '공유하려면 한 번에 하나의 저장소에서 파일을 선택하세요.';
+
+  @override
+  String categoryClipboardReady(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '붙여넣을 파일 $count개 준비됨',
+    );
+    return '$_temp0 — 붙여넣을 폴더를 여세요';
+  }
+
+  @override
+  String get categoryIndexInVaultsTitle => '금고에 카테고리 색인 보관';
+
+  @override
+  String get categoryIndexInVaultsSubtitle =>
+      '카테고리를 열 때 각 금고의 설정 폴더에 암호화되어 저장되므로 다음에 파일이 즉시 표시됩니다. 휴대전화에는 아무것도 저장되지 않습니다.';
+
+  @override
+  String get categoryIndexClear => '카테고리 색인 지우기';
+
+  @override
+  String get categoryIndexClearSubtitle => '잠금 해제된 모든 금고에서 색인을 삭제합니다';
+
+  @override
+  String get categoryIndexCleared => '카테고리 색인이 삭제되었습니다';
 }

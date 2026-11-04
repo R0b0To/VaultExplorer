@@ -9624,16 +9624,16 @@ abstract class AppLocalizations {
   /// **'Tap to select a storage & folder'**
   String get vaultSyncTapToSelect;
 
-  /// Tooltip for the button that swaps the Left and Right sides in Vault Sync
+  /// Tooltip of the swap button in Vault Sync
   ///
   /// In en, this message translates to:
-  /// **'Swap Left and Right'**
+  /// **'Swap the two storages'**
   String get vaultSyncSwapTooltip;
 
-  /// Warning shown when Left and Right are set to the exact same vault and folder
+  /// Warning in Vault Sync when both storages point at the same folder
   ///
   /// In en, this message translates to:
-  /// **'Left and Right must be different folders.'**
+  /// **'The two folders must be different.'**
   String get vaultSyncSameLocationWarning;
 
   /// Title of the idle-state intro card in Vault Sync before a comparison has run
@@ -9642,10 +9642,10 @@ abstract class AppLocalizations {
   /// **'Compare Two Folders'**
   String get vaultSyncIntroTitle;
 
-  /// Subtitle of the idle-state intro card in Vault Sync before a comparison has run
+  /// Intro text on the Vault Sync tool
   ///
   /// In en, this message translates to:
-  /// **'Pick a Left and Right folder — in a vault, on device storage or on a document provider such as an SD card or cloud drive — to see what\'s missing, modified, or newer on each side.'**
+  /// **'Pick two folders — in a vault, on device storage or on a document provider such as an SD card or cloud drive — to see what\'s missing, modified, or newer in each.'**
   String get vaultSyncIntroSubtitle;
 
   /// Button label to start comparing the two selected vault locations
@@ -9753,13 +9753,13 @@ abstract class AppLocalizations {
   /// Sync direction option: copy newer/missing files in both directions
   ///
   /// In en, this message translates to:
-  /// **'Two-way (recommended)'**
+  /// **'Two-way'**
   String get vaultSyncDirectionTwoWay;
 
   /// Explanation of the two-way sync direction option
   ///
   /// In en, this message translates to:
-  /// **'Copies each file to whichever side is missing it or has an older copy'**
+  /// **'Copies missing files and newer versions to the other side.'**
   String get vaultSyncDirectionTwoWaySubtitle;
 
   /// Sync direction option: only push Left's changes to Right
@@ -9917,10 +9917,10 @@ abstract class AppLocalizations {
   /// **'Select {side} Folder'**
   String vaultSyncPickLocationTitle(Object side);
 
-  /// Shown on the Vault Sync screen when the two chosen folders are identical or one contains the other
+  /// Warning in Vault Sync when the two folders overlap
   ///
   /// In en, this message translates to:
-  /// **'Left and Right must not be the same folder or nested inside each other.'**
+  /// **'The two folders must not be the same or nested inside each other.'**
   String get vaultSyncOverlapWarning;
 
   /// Extra line in the Vault Sync confirmation when files will flow from an encrypted vault to plain device storage or a document provider. {targets} is a comma-separated list of destination names
@@ -22266,6 +22266,414 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Show page thumbnails above the scrubber'**
   String get comicReaderCarouselScrubberSubtitle;
+
+  /// Button in Vault Sync that opens the folder explorer showing every item in both storages
+  ///
+  /// In en, this message translates to:
+  /// **'Browse all items'**
+  String get vaultSyncBrowseAllButton;
+
+  /// Title of the Vault Sync folder explorer screen
+  ///
+  /// In en, this message translates to:
+  /// **'Browse both storages'**
+  String get vaultSyncExplorerTitle;
+
+  /// Empty state title in the Vault Sync folder explorer
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to show'**
+  String get vaultSyncExplorerEmptyTitle;
+
+  /// Empty state message in the Vault Sync folder explorer
+  ///
+  /// In en, this message translates to:
+  /// **'No items match this filter in this folder.'**
+  String get vaultSyncExplorerEmptyMessage;
+
+  /// Error title when the Vault Sync folder explorer cannot list a folder
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t read this folder'**
+  String get vaultSyncExplorerLoadFailedTitle;
+
+  /// Error message when the Vault Sync folder explorer cannot list a folder
+  ///
+  /// In en, this message translates to:
+  /// **'One of the two storages couldn\'t be listed. Try again, and make sure both are still unlocked and connected.'**
+  String get vaultSyncExplorerLoadFailedMessage;
+
+  /// Vault Sync filter chip: show every difference
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get vaultSyncFilterAll;
+
+  /// Vault Sync folder explorer filter chip: hide items that are already in sync
+  ///
+  /// In en, this message translates to:
+  /// **'Differences'**
+  String get vaultSyncFilterDifferences;
+
+  /// Vault Sync filter chip: files present in both storages where one copy is newer
+  ///
+  /// In en, this message translates to:
+  /// **'Newer copy'**
+  String get vaultSyncFilterNewer;
+
+  /// Vault Sync filter chip: conflicting items that need a decision
+  ///
+  /// In en, this message translates to:
+  /// **'Needs review'**
+  String get vaultSyncFilterConflicts;
+
+  /// Vault Sync filter chip: items the current plan will delete
+  ///
+  /// In en, this message translates to:
+  /// **'Deletions'**
+  String get vaultSyncFilterDeletions;
+
+  /// Empty state message when a Vault Sync filter hides every result
+  ///
+  /// In en, this message translates to:
+  /// **'No items match this filter.'**
+  String get vaultSyncFilterNoMatchesMessage;
+
+  /// Tooltip of the Vault Sync sort button
+  ///
+  /// In en, this message translates to:
+  /// **'Sort'**
+  String get vaultSyncSortTooltip;
+
+  /// Vault Sync sort option: by path
+  ///
+  /// In en, this message translates to:
+  /// **'Path'**
+  String get vaultSyncSortPath;
+
+  /// Vault Sync sort option: by size, largest first
+  ///
+  /// In en, this message translates to:
+  /// **'Largest first'**
+  String get vaultSyncSortSize;
+
+  /// Vault Sync sort option: by modified time, newest first
+  ///
+  /// In en, this message translates to:
+  /// **'Newest first'**
+  String get vaultSyncSortModified;
+
+  /// Vault Sync sort option: grouped by status
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get vaultSyncSortStatus;
+
+  /// Badge for a file that is identical in both storages in the Vault Sync folder explorer
+  ///
+  /// In en, this message translates to:
+  /// **'In sync'**
+  String get vaultSyncStatusInSync;
+
+  /// Badge for a folder present in both storages in the Vault Sync folder explorer
+  ///
+  /// In en, this message translates to:
+  /// **'Folder'**
+  String get vaultSyncStatusFolder;
+
+  /// Bottom bar line in Vault Sync showing how many items the sync will delete
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 deletion} other{{count} deletions}}'**
+  String vaultSyncDeletionsQueuedLabel(num count);
+
+  /// Extra paragraph in the Vault Sync confirmation dialog when the sync deletes items
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 item will be permanently deleted. This can\'t be undone.} other{{count} items will be permanently deleted. This can\'t be undone.}}'**
+  String vaultSyncConfirmDeletionsMessage(num count);
+
+  /// Banner in Vault Sync shown after a delete that the comparison cannot account for
+  ///
+  /// In en, this message translates to:
+  /// **'Results may be out of date after deleting. Compare again to refresh the counts.'**
+  String get vaultSyncResultsStaleMessage;
+
+  /// App bar title in Vault Sync selection mode
+  ///
+  /// In en, this message translates to:
+  /// **'{count} selected'**
+  String vaultSyncSelectedCount(num count);
+
+  /// Entry sheet action in Vault Sync: open the file
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get vaultSyncOpenAction;
+
+  /// Entry sheet action in Vault Sync: open the copy that lives in one storage. {side} is the storage name
+  ///
+  /// In en, this message translates to:
+  /// **'Open copy in {side}'**
+  String vaultSyncOpenCopyAction(String side);
+
+  /// Entry sheet action in Vault Sync: browse inside the folder
+  ///
+  /// In en, this message translates to:
+  /// **'Open folder'**
+  String get vaultSyncOpenFolderAction;
+
+  /// Subtitle of the open-folder action in the Vault Sync entry sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Browse what\'s inside, in both storages'**
+  String get vaultSyncOpenFolderSubtitle;
+
+  /// Entry sheet action in Vault Sync: open the folder that contains the item
+  ///
+  /// In en, this message translates to:
+  /// **'Show in folder'**
+  String get vaultSyncShowInFolderAction;
+
+  /// Subtitle of the show-in-folder action in the Vault Sync entry sheet
+  ///
+  /// In en, this message translates to:
+  /// **'See it next to its neighbours in both storages'**
+  String get vaultSyncShowInFolderSubtitle;
+
+  /// Delete the item from both compared storages immediately
+  ///
+  /// In en, this message translates to:
+  /// **'Delete from both storages'**
+  String get vaultSyncDeleteFromBothAction;
+
+  /// Names both compared storages in the Vault Sync delete confirmation
+  ///
+  /// In en, this message translates to:
+  /// **'{left} and {right}'**
+  String vaultSyncDeleteBothSidesLabel(String left, String right);
+
+  /// Body of the Vault Sync delete confirmation dialog. {where} is one or two storage names
+  ///
+  /// In en, this message translates to:
+  /// **'These items will be permanently deleted from {where}, including everything inside any folder. This can\'t be undone.'**
+  String vaultSyncDeleteConfirmMessage(String where);
+
+  /// Snackbar after a successful delete in Vault Sync
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Deleted 1 item} other{Deleted {count} items}}'**
+  String vaultSyncDeleteDoneMessage(num count);
+
+  /// Snackbar after a delete in Vault Sync where some items failed
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted {deleted}, but {failed} couldn\'t be deleted'**
+  String vaultSyncDeletePartialMessage(int deleted, int failed);
+
+  /// Snackbar after an immediate copy in Vault Sync succeeded
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get vaultSyncCopyDoneMessage;
+
+  /// Snackbar after an immediate copy in Vault Sync failed
+  ///
+  /// In en, this message translates to:
+  /// **'Some items couldn\'t be copied. Check the transfer list for details.'**
+  String get vaultSyncCopyFailedMessage;
+
+  /// Snackbar when a file cannot be opened from Vault Sync
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open {name}'**
+  String vaultSyncOpenFailedMessage(String name);
+
+  /// Entry sheet detail in Vault Sync for a storage that does not hold the item
+  ///
+  /// In en, this message translates to:
+  /// **'Not in this storage'**
+  String get vaultSyncDetailsNotOnThisSide;
+
+  /// Entry sheet detail in Vault Sync for a folder (no size)
+  ///
+  /// In en, this message translates to:
+  /// **'Folder'**
+  String get vaultSyncDetailsFolder;
+
+  /// Status badge: the item exists only in the named storage
+  ///
+  /// In en, this message translates to:
+  /// **'Only in {storage}'**
+  String vaultSyncStatusOnlyIn(String storage);
+
+  /// Status badge: the copy in the named storage is newer
+  ///
+  /// In en, this message translates to:
+  /// **'Newer in {storage}'**
+  String vaultSyncStatusNewerIn(String storage);
+
+  /// Summary badge: how many items exist only in the named storage
+  ///
+  /// In en, this message translates to:
+  /// **'{count} only in {storage}'**
+  String vaultSyncBadgeOnlyIn(int count, String storage);
+
+  /// Summary badge: how many items are newer in the named storage
+  ///
+  /// In en, this message translates to:
+  /// **'{count} newer in {storage}'**
+  String vaultSyncBadgeNewerIn(int count, String storage);
+
+  /// Detail line for a folder that exists only in the named storage
+  ///
+  /// In en, this message translates to:
+  /// **'Folder — only in {storage}'**
+  String vaultSyncFolderOnlyInDetail(String storage);
+
+  /// One-way copy mode label; the user chooses the source and destination separately.
+  ///
+  /// In en, this message translates to:
+  /// **'One-way copy'**
+  String get vaultSyncDirectionOneWay;
+
+  /// Concise explanation of one-way sync; the option title names both storages.
+  ///
+  /// In en, this message translates to:
+  /// **'Copies new and updated files in the direction shown; the source is unchanged.'**
+  String get vaultSyncDirectionOneWaySubtitle;
+
+  /// Mirror sync mode label; the user chooses the source and destination separately.
+  ///
+  /// In en, this message translates to:
+  /// **'Mirror sync'**
+  String get vaultSyncDirectionMirror;
+
+  /// Concise explanation of mirror sync and its deletion behavior; the option title names both storages.
+  ///
+  /// In en, this message translates to:
+  /// **'Replaces the destination with an exact copy; destination-only items are deleted.'**
+  String get vaultSyncDirectionMirrorSubtitle;
+
+  /// Plan menu item and button: copy the item into the named storage
+  ///
+  /// In en, this message translates to:
+  /// **'Copy → {storage}'**
+  String vaultSyncActionCopyTo(String storage);
+
+  /// Entry sheet action in Vault Sync: copy the item into the named storage immediately
+  ///
+  /// In en, this message translates to:
+  /// **'Copy to {storage} now'**
+  String vaultSyncCopyNowToAction(String storage);
+
+  /// Delete the item from the named storage immediately
+  ///
+  /// In en, this message translates to:
+  /// **'Delete from {storage}'**
+  String vaultSyncDeleteFromAction(String storage);
+
+  /// Plan menu item: delete the item from the named storage during the next sync
+  ///
+  /// In en, this message translates to:
+  /// **'Delete from {storage} when syncing'**
+  String vaultSyncPlanDeleteFrom(String storage);
+
+  /// Vault Sync filter chip: items present only in the named storage
+  ///
+  /// In en, this message translates to:
+  /// **'Only in {storage}'**
+  String vaultSyncFilterOnlyIn(String storage);
+
+  /// Title of the first storage card before a storage has been picked
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the first storage'**
+  String get vaultSyncChooseFirstStorage;
+
+  /// Title of the second storage card before a storage has been picked
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the second storage'**
+  String get vaultSyncChooseSecondStorage;
+
+  /// Button on a storage card in Vault Sync that changes the chosen storage
+  ///
+  /// In en, this message translates to:
+  /// **'Change'**
+  String get vaultSyncChangeButton;
+
+  /// Button on an empty storage card in Vault Sync that picks a storage
+  ///
+  /// In en, this message translates to:
+  /// **'Choose'**
+  String get vaultSyncChooseButton;
+
+  /// Title of the screen listing the storages that can be compared
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a storage'**
+  String get vaultSyncChooseStorageTitle;
+
+  /// Hint above the list of storages in the Vault Sync storage chooser
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a storage first, then the folder inside it to compare.'**
+  String get vaultSyncChooseStorageHint;
+
+  /// Badge marking the storage that is already in use in the Vault Sync storage chooser
+  ///
+  /// In en, this message translates to:
+  /// **'Current'**
+  String get vaultSyncCurrentStorageBadge;
+
+  /// Tooltip of the button that returns from the folder picker to the storage list
+  ///
+  /// In en, this message translates to:
+  /// **'Change storage'**
+  String get vaultSyncChangeStorageTooltip;
+
+  /// Title of the Vault Sync folder picker. {storage} is the storage name
+  ///
+  /// In en, this message translates to:
+  /// **'Folder in {storage}'**
+  String vaultSyncPickFolderTitle(String storage);
+
+  /// Heading above the source and destination choices in the sync direction dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Direction'**
+  String get vaultSyncDirectionSectionTitle;
+
+  /// Warning badge on mirror mode because extra destination files are deleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Deletes files'**
+  String get vaultSyncDirectionMirrorWarning;
+
+  /// Label for the storage that is copied from in one-way or mirror sync.
+  ///
+  /// In en, this message translates to:
+  /// **'Source'**
+  String get vaultSyncDirectionSourceLabel;
+
+  /// Label for the storage that receives changes in one-way or mirror sync.
+  ///
+  /// In en, this message translates to:
+  /// **'Target'**
+  String get vaultSyncDirectionTargetLabel;
+
+  /// Button label for reversing source and target in the direction selector.
+  ///
+  /// In en, this message translates to:
+  /// **'Swap'**
+  String get vaultSyncDirectionSwapButton;
+
+  /// Badge that marks two-way sync as the recommended mode.
+  ///
+  /// In en, this message translates to:
+  /// **'Recommended'**
+  String get vaultSyncDirectionRecommendedLabel;
 }
 
 class _AppLocalizationsDelegate

@@ -5937,18 +5937,17 @@ class AppLocalizationsUk extends AppLocalizations {
   String get vaultSyncTapToSelect => 'Торкніться, щоб вибрати сховище та папку';
 
   @override
-  String get vaultSyncSwapTooltip => 'Поміняти місцями Ліве і Праве';
+  String get vaultSyncSwapTooltip => 'Поміняти місцями два сховища';
 
   @override
-  String get vaultSyncSameLocationWarning =>
-      'Ліва і права папки мають відрізнятися.';
+  String get vaultSyncSameLocationWarning => 'Ці дві папки мають відрізнятися.';
 
   @override
   String get vaultSyncIntroTitle => 'Порівняння двох сховищ';
 
   @override
   String get vaultSyncIntroSubtitle =>
-      'Виберіть Ліве і Праве сховище (або дві папки в одному сховищі), щоб побачити відсутні, змінені чи новіші файли з кожного боку.';
+      'Виберіть дві папки (у сховищі, у пам\'яті пристрою чи в провайдера документів, як-от SD-карта або хмарний диск), щоб побачити відсутні, змінені чи новіші файли в кожній.';
 
   @override
   String get vaultSyncCompareButton => 'Порівняти';
@@ -6021,11 +6020,11 @@ class AppLocalizationsUk extends AppLocalizations {
   String get vaultSyncDirectionLabel => 'Напрямок синхронізації';
 
   @override
-  String get vaultSyncDirectionTwoWay => 'Двосторонній (рекомендовано)';
+  String get vaultSyncDirectionTwoWay => 'Двосторонній';
 
   @override
   String get vaultSyncDirectionTwoWaySubtitle =>
-      'Копіює кожен файл на ту сторону, де він відсутній або застарілий';
+      'Копіює відсутні файли й новіші версії на інший бік.';
 
   @override
   String get vaultSyncDirectionLeftToRight => 'Зліва → Справа (в один бік)';
@@ -6122,7 +6121,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get vaultSyncOverlapWarning =>
-      'Ліва та права папки не можуть бути однаковими або вкладеними одна в одну.';
+      'Ці дві папки не можуть бути однаковими або вкладеними одна в одну.';
 
   @override
   String vaultSyncPlaintextWarning(Object targets) {
@@ -13364,4 +13363,284 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get comicReaderCarouselScrubberSubtitle =>
       'Показувати мініатюри сторінок над повзунком';
+
+  @override
+  String get vaultSyncBrowseAllButton => 'Переглянути всі елементи';
+
+  @override
+  String get vaultSyncExplorerTitle => 'Переглянути обидва сховища';
+
+  @override
+  String get vaultSyncExplorerEmptyTitle => 'Нічого показувати';
+
+  @override
+  String get vaultSyncExplorerEmptyMessage =>
+      'У цій папці немає елементів, що відповідають фільтру.';
+
+  @override
+  String get vaultSyncExplorerLoadFailedTitle =>
+      'Не вдалося прочитати цю папку';
+
+  @override
+  String get vaultSyncExplorerLoadFailedMessage =>
+      'Не вдалося отримати список одного з двох сховищ. Спробуйте ще раз і переконайтеся, що обидва розблоковані та підключені.';
+
+  @override
+  String get vaultSyncFilterAll => 'Усі';
+
+  @override
+  String get vaultSyncFilterDifferences => 'Відмінності';
+
+  @override
+  String get vaultSyncFilterNewer => 'Новіша копія';
+
+  @override
+  String get vaultSyncFilterConflicts => 'Потребує перегляду';
+
+  @override
+  String get vaultSyncFilterDeletions => 'Видалення';
+
+  @override
+  String get vaultSyncFilterNoMatchesMessage =>
+      'Жоден елемент не відповідає фільтру.';
+
+  @override
+  String get vaultSyncSortTooltip => 'Сортувати';
+
+  @override
+  String get vaultSyncSortPath => 'Шлях';
+
+  @override
+  String get vaultSyncSortSize => 'Найбільші першими';
+
+  @override
+  String get vaultSyncSortModified => 'Найновіші першими';
+
+  @override
+  String get vaultSyncSortStatus => 'Статус';
+
+  @override
+  String get vaultSyncStatusInSync => 'Синхронізовано';
+
+  @override
+  String get vaultSyncStatusFolder => 'Папка';
+
+  @override
+  String vaultSyncDeletionsQueuedLabel(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count видалення',
+      many: '$count видалень',
+      few: '$count видалення',
+      one: '$count видалення',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String vaultSyncConfirmDeletionsMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count елемента буде видалено назавжди. Цю дію не можна скасувати.',
+      many:
+          '$count елементів буде видалено назавжди. Цю дію не можна скасувати.',
+      few: '$count елементи буде видалено назавжди. Цю дію не можна скасувати.',
+      one: '$count елемент буде видалено назавжди. Цю дію не можна скасувати.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get vaultSyncResultsStaleMessage =>
+      'Після видалення результати можуть бути застарілими. Порівняйте знову, щоб оновити лічильники.';
+
+  @override
+  String vaultSyncSelectedCount(num count) {
+    return 'Вибрано: $count';
+  }
+
+  @override
+  String get vaultSyncOpenAction => 'Відкрити';
+
+  @override
+  String vaultSyncOpenCopyAction(String side) {
+    return 'Відкрити копію в $side';
+  }
+
+  @override
+  String get vaultSyncOpenFolderAction => 'Відкрити папку';
+
+  @override
+  String get vaultSyncOpenFolderSubtitle => 'Переглянути вміст в обох сховищах';
+
+  @override
+  String get vaultSyncShowInFolderAction => 'Показати в папці';
+
+  @override
+  String get vaultSyncShowInFolderSubtitle =>
+      'Побачити поруч з іншими елементами в обох сховищах';
+
+  @override
+  String get vaultSyncDeleteFromBothAction => 'Видалити з обох сховищ';
+
+  @override
+  String vaultSyncDeleteBothSidesLabel(String left, String right) {
+    return '$left і $right';
+  }
+
+  @override
+  String vaultSyncDeleteConfirmMessage(String where) {
+    return 'Ці елементи буде остаточно видалено з $where, включно з усім вмістом папок. Цю дію не можна скасувати.';
+  }
+
+  @override
+  String vaultSyncDeleteDoneMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Видалено $count елемента',
+      many: 'Видалено $count елементів',
+      few: 'Видалено $count елементи',
+      one: 'Видалено $count елемент',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String vaultSyncDeletePartialMessage(int deleted, int failed) {
+    return 'Видалено: $deleted, але не вдалося видалити: $failed';
+  }
+
+  @override
+  String get vaultSyncCopyDoneMessage => 'Скопійовано';
+
+  @override
+  String get vaultSyncCopyFailedMessage =>
+      'Деякі елементи не вдалося скопіювати. Подробиці дивіться у списку передавань.';
+
+  @override
+  String vaultSyncOpenFailedMessage(String name) {
+    return 'Не вдалося відкрити $name';
+  }
+
+  @override
+  String get vaultSyncDetailsNotOnThisSide => 'Немає в цьому сховищі';
+
+  @override
+  String get vaultSyncDetailsFolder => 'Папка';
+
+  @override
+  String vaultSyncStatusOnlyIn(String storage) {
+    return 'Лише в $storage';
+  }
+
+  @override
+  String vaultSyncStatusNewerIn(String storage) {
+    return 'Новіше в $storage';
+  }
+
+  @override
+  String vaultSyncBadgeOnlyIn(int count, String storage) {
+    return '$count лише в $storage';
+  }
+
+  @override
+  String vaultSyncBadgeNewerIn(int count, String storage) {
+    return '$count новіших в $storage';
+  }
+
+  @override
+  String vaultSyncFolderOnlyInDetail(String storage) {
+    return 'Папка — лише в $storage';
+  }
+
+  @override
+  String get vaultSyncDirectionOneWay => 'Одностороннє копіювання';
+
+  @override
+  String get vaultSyncDirectionOneWaySubtitle =>
+      'Копіює нові й оновлені файли у вказаному напрямку; джерело не змінюється.';
+
+  @override
+  String get vaultSyncDirectionMirror => 'Дзеркальна синхронізація';
+
+  @override
+  String get vaultSyncDirectionMirrorSubtitle =>
+      'Замінює ціль точною копією; елементи, що є лише в цілі, видаляються.';
+
+  @override
+  String vaultSyncActionCopyTo(String storage) {
+    return 'Копіювати → $storage';
+  }
+
+  @override
+  String vaultSyncCopyNowToAction(String storage) {
+    return 'Скопіювати в $storage зараз';
+  }
+
+  @override
+  String vaultSyncDeleteFromAction(String storage) {
+    return 'Видалити з $storage';
+  }
+
+  @override
+  String vaultSyncPlanDeleteFrom(String storage) {
+    return 'Видалити з $storage під час синхронізації';
+  }
+
+  @override
+  String vaultSyncFilterOnlyIn(String storage) {
+    return 'Лише в $storage';
+  }
+
+  @override
+  String get vaultSyncChooseFirstStorage => 'Виберіть перше сховище';
+
+  @override
+  String get vaultSyncChooseSecondStorage => 'Виберіть друге сховище';
+
+  @override
+  String get vaultSyncChangeButton => 'Змінити';
+
+  @override
+  String get vaultSyncChooseButton => 'Вибрати';
+
+  @override
+  String get vaultSyncChooseStorageTitle => 'Виберіть сховище';
+
+  @override
+  String get vaultSyncChooseStorageHint =>
+      'Спершу виберіть сховище, а потім папку в ньому для порівняння.';
+
+  @override
+  String get vaultSyncCurrentStorageBadge => 'Поточне';
+
+  @override
+  String get vaultSyncChangeStorageTooltip => 'Змінити сховище';
+
+  @override
+  String vaultSyncPickFolderTitle(String storage) {
+    return 'Папка в $storage';
+  }
+
+  @override
+  String get vaultSyncDirectionSectionTitle => 'Напрямок';
+
+  @override
+  String get vaultSyncDirectionMirrorWarning => 'Видаляє файли';
+
+  @override
+  String get vaultSyncDirectionSourceLabel => 'Джерело';
+
+  @override
+  String get vaultSyncDirectionTargetLabel => 'Ціль';
+
+  @override
+  String get vaultSyncDirectionSwapButton => 'Поміняти місцями';
+
+  @override
+  String get vaultSyncDirectionRecommendedLabel => 'Рекомендовано';
 }

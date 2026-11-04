@@ -110,6 +110,57 @@ class VaultSyncSide {
   String toString() => 'VaultSyncSide(${container.displayName}:$relativePath)';
 }
 
+/// The names the UI shows for the two compared storages, in place of a
+/// generic "left" and "right".
+@immutable
+class VaultSyncNames {
+  final String left;
+  final String right;
+
+  const VaultSyncNames({required this.left, required this.right});
+
+  String of({required bool isLeft}) => isLeft ? left : right;
+}
+
+/// Picks the display name for each compared storage.
+///
+/// Normally that is just the storage's own name. When both sides would read
+/// the same -- two folders in one vault, say -- the folder is added to tell
+/// them apart, and as a last resort a number is. A side that hasn't been
+/// chosen yet gets its [leftFallback] / [rightFallback] text.
+VaultSyncNames vaultSyncNamesFor(
+  VaultSyncSide? left,
+  VaultSyncSide? right, {
+  required String leftFallback,
+  required String rightFallback,
+}) {
+  if (left == null || right == null) {
+    return VaultSyncNames(
+      left: left?.container.displayName ?? leftFallback,
+      right: right?.container.displayName ?? rightFallback,
+    );
+  }
+  String full(VaultSyncSide s) => s.relativePath.isEmpty
+      ? s.container.displayName
+      : '${s.container.displayName} / ${s.relativePath}';
+
+  var l = left.container.displayName;
+  var r = right.container.displayName;
+  if (l == r) {
+    l = left.displayLabel;
+    r = right.displayLabel;
+  }
+  if (l == r) {
+    l = full(left);
+    r = full(right);
+  }
+  if (l == r) {
+    l = '$l (1)';
+    r = '$r (2)';
+  }
+  return VaultSyncNames(left: l, right: r);
+}
+
 /// How a single relative path compares between the left and right side of
 /// a [VaultSyncSide] scan.
 enum VaultDiffStatus {
@@ -129,12 +180,34 @@ enum VaultDiffStatus {
   /// the same modified time with a different size, or a file on one side
   /// and a folder on the other (see [VaultDiffEntry.typeMismatch]).
   conflicted,
+
+  /// Folder explorer only: a file on both sides with the same size, i.e.
+  /// already in sync. A full scan never puts these in its diff list -- they
+  /// only appear when the user browses all items.
+  identical,
+
+  /// Folder explorer only: a folder that exists on both sides. Open it to
+  /// compare what is inside.
+  bothFolders,
 }
 
-/// Which side a sync run should copy a [VaultDiffEntry] to, or whether it's
-/// left untouched. Chosen per-entry, either from a [SyncDirection] default
-/// or an explicit user override.
-enum EntryAction { copyToLeft, copyToRight, skip }
+/// What a sync run does with a [VaultDiffEntry]: copy it to the other side,
+/// delete the copy on one side, or leave it untouched. Chosen per-entry,
+/// either from a [SyncDirection] default or an explicit user override.
+enum EntryAction {
+  copyToLeft,
+  copyToRight,
+
+  /// Permanently delete this path from the left side.
+  deleteLeft,
+
+  /// Permanently delete this path from the right side.
+  deleteRight,
+  skip;
+
+  bool get isCopy => this == copyToLeft || this == copyToRight;
+  bool get isDelete => this == deleteLeft || this == deleteRight;
+}
 
 /// The scope of a one-click Vault Sync run.
 enum SyncDirection {
@@ -148,6 +221,20 @@ enum SyncDirection {
   /// Only push changes from the right side to the left side; the right
   /// side is never modified.
   rightToLeft,
+
+  /// Make the right side an exact copy of the left side: everything on the
+  /// left is copied over (whichever copy is newer), and anything that exists
+  /// only on the right is deleted.
+  mirrorToRight,
+
+  /// Make the left side an exact copy of the right side: everything on the
+  /// right is copied over (whichever copy is newer), and anything that exists
+  /// only on the left is deleted.
+  mirrorToLeft;
+
+  /// Whether this direction deletes items that exist only on the target side.
+  bool get deletesExtras =>
+      this == SyncDirection.mirrorToRight || this == SyncDirection.mirrorToLeft;
 }
 
 /// One differing path discovered by `VaultSyncService.scanDiff`. Identical
@@ -204,6 +291,26 @@ class VaultDiffEntry {
 
   @override
   String toString() => 'VaultDiffEntry($relativePath, $status)';
+}
+
+/// The direct children of one folder as compared by
+/// `VaultSyncService.listFolder`.
+@immutable
+class VaultSyncFolderListing {
+  final List<VaultDiffEntry> entries;
+
+  /// True when a vault folder couldn't be read, so [entries] is empty rather
+  /// than a trustworthy "this folder is empty".
+  final bool unreadable;
+
+  const VaultSyncFolderListing({required this.entries, this.unreadable = false});
+}
+
+/// Which sides a [VaultDiffEntry] exists on. A type-mismatched entry (file on
+/// one side, folder on the other) exists on both.
+extension VaultDiffEntrySides on VaultDiffEntry {
+  bool get existsOnLeft => status != VaultDiffStatus.onlyRight;
+  bool get existsOnRight => status != VaultDiffStatus.onlyLeft;
 }
 
 /// Stages of a `VaultSyncService.scanDiff` run.

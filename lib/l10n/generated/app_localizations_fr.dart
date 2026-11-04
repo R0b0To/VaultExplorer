@@ -5936,18 +5936,18 @@ class AppLocalizationsFr extends AppLocalizations {
       'Appuyez pour sélectionner un coffre et un dossier';
 
   @override
-  String get vaultSyncSwapTooltip => 'Inverser gauche et droite';
+  String get vaultSyncSwapTooltip => 'Intervertir les deux stockages';
 
   @override
   String get vaultSyncSameLocationWarning =>
-      'Les côtés gauche et droit doivent être des dossiers différents.';
+      'Les deux dossiers doivent être différents.';
 
   @override
   String get vaultSyncIntroTitle => 'Comparer deux coffres';
 
   @override
   String get vaultSyncIntroSubtitle =>
-      'Choisissez un coffre à gauche et à droite (ou deux dossiers dans le même coffre) pour voir ce qui manque, a été modifié ou est plus récent de chaque côté.';
+      'Choisissez deux dossiers (dans un coffre, sur le stockage de l\'appareil ou chez un fournisseur de documents comme une carte SD ou un cloud) pour voir ce qui manque, a été modifié ou est plus récent dans chacun.';
 
   @override
   String get vaultSyncCompareButton => 'Comparer';
@@ -6020,11 +6020,11 @@ class AppLocalizationsFr extends AppLocalizations {
   String get vaultSyncDirectionLabel => 'Sens de synchronisation';
 
   @override
-  String get vaultSyncDirectionTwoWay => 'Bidirectionnel (recommandé)';
+  String get vaultSyncDirectionTwoWay => 'Bidirectionnel';
 
   @override
   String get vaultSyncDirectionTwoWaySubtitle =>
-      'Copie chaque fichier vers le côté qui ne l\'a pas ou en a une copie plus ancienne';
+      'Copie les fichiers manquants et les versions les plus récentes de l\'autre côté.';
 
   @override
   String get vaultSyncDirectionLeftToRight =>
@@ -6124,38 +6124,41 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get vaultSyncOverlapWarning =>
-      'Left and Right must not be the same folder or nested inside each other.';
+      'Les deux dossiers ne doivent pas être identiques ni imbriqués l\'un dans l\'autre.';
 
   @override
   String vaultSyncPlaintextWarning(Object targets) {
-    return 'Files copied out of a vault to $targets will be stored unencrypted.';
+    return 'Les fichiers copiés d\'un coffre vers $targets seront stockés sans chiffrement.';
   }
 
   @override
-  String get vaultSyncStorageSelectorLabel => 'Storage';
+  String get vaultSyncStorageSelectorLabel => 'Stockage';
 
   @override
-  String get vaultSyncTargetKindVault => 'Encrypted vault';
+  String get vaultSyncTargetKindVault => 'Coffre chiffré';
 
   @override
-  String get vaultSyncTargetKindDevice => 'Device storage · not encrypted';
+  String get vaultSyncTargetKindDevice =>
+      'Stockage de l\'appareil · non chiffré';
 
   @override
-  String get vaultSyncTargetKindProvider => 'Document provider · not encrypted';
+  String get vaultSyncTargetKindProvider =>
+      'Fournisseur de documents · non chiffré';
 
   @override
-  String get vaultSyncAddStorageTooltip => 'Add storage location';
+  String get vaultSyncAddStorageTooltip => 'Ajouter un emplacement de stockage';
 
   @override
   String get vaultSyncEnableLocalStorageTooltip =>
-      'Enable Local Storage access';
+      'Activer l\'accès au stockage local';
 
   @override
-  String get vaultSyncNoStoragesTitle => 'No storage to sync yet';
+  String get vaultSyncNoStoragesTitle =>
+      'Aucun stockage à synchroniser pour l\'instant';
 
   @override
   String get vaultSyncNoStoragesMessage =>
-      'Add a folder or document provider with the + button, or mount a vault.';
+      'Ajoutez un dossier ou un fournisseur de documents avec le bouton +, ou montez un coffre.';
 
   @override
   String get vaultSyncReadOnlyBadge => 'Lecture seule';
@@ -13387,4 +13390,279 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get comicReaderCarouselScrubberSubtitle =>
       'Afficher les miniatures des pages au-dessus du curseur';
+
+  @override
+  String get vaultSyncBrowseAllButton => 'Parcourir tous les éléments';
+
+  @override
+  String get vaultSyncExplorerTitle => 'Parcourir les deux stockages';
+
+  @override
+  String get vaultSyncExplorerEmptyTitle => 'Rien à afficher';
+
+  @override
+  String get vaultSyncExplorerEmptyMessage =>
+      'Aucun élément de ce dossier ne correspond à ce filtre.';
+
+  @override
+  String get vaultSyncExplorerLoadFailedTitle =>
+      'Impossible de lire ce dossier';
+
+  @override
+  String get vaultSyncExplorerLoadFailedMessage =>
+      'L\'un des deux stockages n\'a pas pu être listé. Réessayez et vérifiez que les deux sont toujours déverrouillés et connectés.';
+
+  @override
+  String get vaultSyncFilterAll => 'Tous';
+
+  @override
+  String get vaultSyncFilterDifferences => 'Différences';
+
+  @override
+  String get vaultSyncFilterNewer => 'Copie plus récente';
+
+  @override
+  String get vaultSyncFilterConflicts => 'Vérification nécessaire';
+
+  @override
+  String get vaultSyncFilterDeletions => 'Suppressions';
+
+  @override
+  String get vaultSyncFilterNoMatchesMessage =>
+      'Aucun élément ne correspond à ce filtre.';
+
+  @override
+  String get vaultSyncSortTooltip => 'Trier';
+
+  @override
+  String get vaultSyncSortPath => 'Chemin';
+
+  @override
+  String get vaultSyncSortSize => 'Plus volumineux d\'abord';
+
+  @override
+  String get vaultSyncSortModified => 'Plus récents d\'abord';
+
+  @override
+  String get vaultSyncSortStatus => 'Statut';
+
+  @override
+  String get vaultSyncStatusInSync => 'Synchronisé';
+
+  @override
+  String get vaultSyncStatusFolder => 'Dossier';
+
+  @override
+  String vaultSyncDeletionsQueuedLabel(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count suppressions',
+      one: '1 suppression',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String vaultSyncConfirmDeletionsMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count éléments seront définitivement supprimés. Cette action est irréversible.',
+      one:
+          '1 élément sera définitivement supprimé. Cette action est irréversible.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get vaultSyncResultsStaleMessage =>
+      'Les résultats peuvent être obsolètes après une suppression. Comparez à nouveau pour actualiser les compteurs.';
+
+  @override
+  String vaultSyncSelectedCount(num count) {
+    return '$count sélectionné(s)';
+  }
+
+  @override
+  String get vaultSyncOpenAction => 'Ouvrir';
+
+  @override
+  String vaultSyncOpenCopyAction(String side) {
+    return 'Ouvrir la copie dans $side';
+  }
+
+  @override
+  String get vaultSyncOpenFolderAction => 'Ouvrir le dossier';
+
+  @override
+  String get vaultSyncOpenFolderSubtitle =>
+      'Parcourir le contenu dans les deux stockages';
+
+  @override
+  String get vaultSyncShowInFolderAction => 'Afficher dans le dossier';
+
+  @override
+  String get vaultSyncShowInFolderSubtitle =>
+      'Le voir à côté des autres éléments dans les deux stockages';
+
+  @override
+  String get vaultSyncDeleteFromBothAction => 'Supprimer des deux stockages';
+
+  @override
+  String vaultSyncDeleteBothSidesLabel(String left, String right) {
+    return '$left et $right';
+  }
+
+  @override
+  String vaultSyncDeleteConfirmMessage(String where) {
+    return 'Ces éléments seront définitivement supprimés de $where, y compris tout le contenu des dossiers. Cette action est irréversible.';
+  }
+
+  @override
+  String vaultSyncDeleteDoneMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count éléments supprimés',
+      one: '1 élément supprimé',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String vaultSyncDeletePartialMessage(int deleted, int failed) {
+    return '$deleted supprimé(s), mais $failed n\'ont pas pu être supprimés';
+  }
+
+  @override
+  String get vaultSyncCopyDoneMessage => 'Copié';
+
+  @override
+  String get vaultSyncCopyFailedMessage =>
+      'Certains éléments n\'ont pas pu être copiés. Consultez la liste des transferts pour les détails.';
+
+  @override
+  String vaultSyncOpenFailedMessage(String name) {
+    return 'Impossible d\'ouvrir $name';
+  }
+
+  @override
+  String get vaultSyncDetailsNotOnThisSide => 'Absent de ce stockage';
+
+  @override
+  String get vaultSyncDetailsFolder => 'Dossier';
+
+  @override
+  String vaultSyncStatusOnlyIn(String storage) {
+    return 'Uniquement dans $storage';
+  }
+
+  @override
+  String vaultSyncStatusNewerIn(String storage) {
+    return 'Plus récent dans $storage';
+  }
+
+  @override
+  String vaultSyncBadgeOnlyIn(int count, String storage) {
+    return '$count uniquement dans $storage';
+  }
+
+  @override
+  String vaultSyncBadgeNewerIn(int count, String storage) {
+    return '$count plus récents dans $storage';
+  }
+
+  @override
+  String vaultSyncFolderOnlyInDetail(String storage) {
+    return 'Dossier — uniquement dans $storage';
+  }
+
+  @override
+  String get vaultSyncDirectionOneWay => 'Copie à sens unique';
+
+  @override
+  String get vaultSyncDirectionOneWaySubtitle =>
+      'Copie les fichiers nouveaux et modifiés dans le sens indiqué ; la source reste inchangée.';
+
+  @override
+  String get vaultSyncDirectionMirror => 'Synchronisation miroir';
+
+  @override
+  String get vaultSyncDirectionMirrorSubtitle =>
+      'Remplace la destination par une copie exacte ; les éléments présents uniquement dans la destination sont supprimés.';
+
+  @override
+  String vaultSyncActionCopyTo(String storage) {
+    return 'Copier → $storage';
+  }
+
+  @override
+  String vaultSyncCopyNowToAction(String storage) {
+    return 'Copier vers $storage maintenant';
+  }
+
+  @override
+  String vaultSyncDeleteFromAction(String storage) {
+    return 'Supprimer de $storage';
+  }
+
+  @override
+  String vaultSyncPlanDeleteFrom(String storage) {
+    return 'Supprimer de $storage lors de la synchronisation';
+  }
+
+  @override
+  String vaultSyncFilterOnlyIn(String storage) {
+    return 'Uniquement dans $storage';
+  }
+
+  @override
+  String get vaultSyncChooseFirstStorage => 'Choisir le premier stockage';
+
+  @override
+  String get vaultSyncChooseSecondStorage => 'Choisir le second stockage';
+
+  @override
+  String get vaultSyncChangeButton => 'Modifier';
+
+  @override
+  String get vaultSyncChooseButton => 'Choisir';
+
+  @override
+  String get vaultSyncChooseStorageTitle => 'Choisir un stockage';
+
+  @override
+  String get vaultSyncChooseStorageHint =>
+      'Choisissez d\'abord un stockage, puis le dossier à comparer à l\'intérieur.';
+
+  @override
+  String get vaultSyncCurrentStorageBadge => 'Actuel';
+
+  @override
+  String get vaultSyncChangeStorageTooltip => 'Changer de stockage';
+
+  @override
+  String vaultSyncPickFolderTitle(String storage) {
+    return 'Dossier dans $storage';
+  }
+
+  @override
+  String get vaultSyncDirectionSectionTitle => 'Direction';
+
+  @override
+  String get vaultSyncDirectionMirrorWarning => 'Supprime des fichiers';
+
+  @override
+  String get vaultSyncDirectionSourceLabel => 'Source';
+
+  @override
+  String get vaultSyncDirectionTargetLabel => 'Destination';
+
+  @override
+  String get vaultSyncDirectionSwapButton => 'Inverser';
+
+  @override
+  String get vaultSyncDirectionRecommendedLabel => 'Recommandé';
 }

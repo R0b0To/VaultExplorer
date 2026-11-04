@@ -5516,17 +5516,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vaultSyncTapToSelect => '点击选择保险库和文件夹';
 
   @override
-  String get vaultSyncSwapTooltip => '交换左右两侧';
+  String get vaultSyncSwapTooltip => '交换两个存储';
 
   @override
-  String get vaultSyncSameLocationWarning => '左侧和右侧必须是不同的文件夹。';
+  String get vaultSyncSameLocationWarning => '这两个文件夹必须不同。';
 
   @override
   String get vaultSyncIntroTitle => '比较两个保险库';
 
   @override
   String get vaultSyncIntroSubtitle =>
-      '选择左侧和右侧的保险库（或同一保险库中的两个文件夹），以查看每一侧缺失、已修改或较新的内容。';
+      '选择两个文件夹（位于保险库、设备存储或 SD 卡、云盘等文档提供程序中），即可查看各自缺失、已修改或较新的内容。';
 
   @override
   String get vaultSyncCompareButton => '比较';
@@ -5599,10 +5599,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vaultSyncDirectionLabel => '同步方向';
 
   @override
-  String get vaultSyncDirectionTwoWay => '双向（推荐）';
+  String get vaultSyncDirectionTwoWay => '双向';
 
   @override
-  String get vaultSyncDirectionTwoWaySubtitle => '将每个文件复制到缺失该文件或副本较旧的一侧';
+  String get vaultSyncDirectionTwoWaySubtitle => '将缺失文件和较新版本复制到另一侧。';
 
   @override
   String get vaultSyncDirectionLeftToRight => '左侧 → 右侧（单向）';
@@ -5697,39 +5697,36 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get vaultSyncOverlapWarning =>
-      'Left and Right must not be the same folder or nested inside each other.';
+  String get vaultSyncOverlapWarning => '这两个文件夹不能相同，也不能互相嵌套。';
 
   @override
   String vaultSyncPlaintextWarning(Object targets) {
-    return 'Files copied out of a vault to $targets will be stored unencrypted.';
+    return '从保险库复制到$targets的文件将以未加密形式存储。';
   }
 
   @override
-  String get vaultSyncStorageSelectorLabel => 'Storage';
+  String get vaultSyncStorageSelectorLabel => '存储';
 
   @override
-  String get vaultSyncTargetKindVault => 'Encrypted vault';
+  String get vaultSyncTargetKindVault => '加密保险库';
 
   @override
-  String get vaultSyncTargetKindDevice => 'Device storage · not encrypted';
+  String get vaultSyncTargetKindDevice => '设备存储 · 未加密';
 
   @override
-  String get vaultSyncTargetKindProvider => 'Document provider · not encrypted';
+  String get vaultSyncTargetKindProvider => '文档提供程序 · 未加密';
 
   @override
-  String get vaultSyncAddStorageTooltip => 'Add storage location';
+  String get vaultSyncAddStorageTooltip => '添加存储位置';
 
   @override
-  String get vaultSyncEnableLocalStorageTooltip =>
-      'Enable Local Storage access';
+  String get vaultSyncEnableLocalStorageTooltip => '启用本地存储访问';
 
   @override
-  String get vaultSyncNoStoragesTitle => 'No storage to sync yet';
+  String get vaultSyncNoStoragesTitle => '还没有可同步的存储';
 
   @override
-  String get vaultSyncNoStoragesMessage =>
-      'Add a folder or document provider with the + button, or mount a vault.';
+  String get vaultSyncNoStoragesMessage => '使用 + 按钮添加文件夹或文档提供程序，或挂载一个保险库。';
 
   @override
   String get vaultSyncReadOnlyBadge => '只读';
@@ -12333,4 +12330,264 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get comicReaderCarouselScrubberSubtitle => '在滑块上方显示页面缩略图';
+
+  @override
+  String get vaultSyncBrowseAllButton => '浏览所有项目';
+
+  @override
+  String get vaultSyncExplorerTitle => '浏览两个存储';
+
+  @override
+  String get vaultSyncExplorerEmptyTitle => '没有可显示的内容';
+
+  @override
+  String get vaultSyncExplorerEmptyMessage => '此文件夹中没有符合该筛选条件的项目。';
+
+  @override
+  String get vaultSyncExplorerLoadFailedTitle => '无法读取此文件夹';
+
+  @override
+  String get vaultSyncExplorerLoadFailedMessage =>
+      '无法列出两个存储中的一个。请重试，并确认两者仍处于解锁和连接状态。';
+
+  @override
+  String get vaultSyncFilterAll => '全部';
+
+  @override
+  String get vaultSyncFilterDifferences => '差异';
+
+  @override
+  String get vaultSyncFilterNewer => '较新的副本';
+
+  @override
+  String get vaultSyncFilterConflicts => '需审核';
+
+  @override
+  String get vaultSyncFilterDeletions => '删除';
+
+  @override
+  String get vaultSyncFilterNoMatchesMessage => '没有符合该筛选条件的项目。';
+
+  @override
+  String get vaultSyncSortTooltip => '排序';
+
+  @override
+  String get vaultSyncSortPath => '路径';
+
+  @override
+  String get vaultSyncSortSize => '从大到小';
+
+  @override
+  String get vaultSyncSortModified => '最新优先';
+
+  @override
+  String get vaultSyncSortStatus => '状态';
+
+  @override
+  String get vaultSyncStatusInSync => '已同步';
+
+  @override
+  String get vaultSyncStatusFolder => '文件夹';
+
+  @override
+  String vaultSyncDeletionsQueuedLabel(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count项删除',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String vaultSyncConfirmDeletionsMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '将永久删除$count个项目。此操作无法撤销。',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get vaultSyncResultsStaleMessage => '删除后结果可能已过期。请重新比较以刷新数量。';
+
+  @override
+  String vaultSyncSelectedCount(num count) {
+    return '已选择$count项';
+  }
+
+  @override
+  String get vaultSyncOpenAction => '打开';
+
+  @override
+  String vaultSyncOpenCopyAction(String side) {
+    return '打开$side中的副本';
+  }
+
+  @override
+  String get vaultSyncOpenFolderAction => '打开文件夹';
+
+  @override
+  String get vaultSyncOpenFolderSubtitle => '在两个存储中浏览其内容';
+
+  @override
+  String get vaultSyncShowInFolderAction => '在文件夹中显示';
+
+  @override
+  String get vaultSyncShowInFolderSubtitle => '在两个存储中与其他项目一起查看';
+
+  @override
+  String get vaultSyncDeleteFromBothAction => '从两个存储中删除';
+
+  @override
+  String vaultSyncDeleteBothSidesLabel(String left, String right) {
+    return '$left和$right';
+  }
+
+  @override
+  String vaultSyncDeleteConfirmMessage(String where) {
+    return '这些项目将从$where中永久删除，包括文件夹内的所有内容。此操作无法撤销。';
+  }
+
+  @override
+  String vaultSyncDeleteDoneMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '已删除$count个项目',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String vaultSyncDeletePartialMessage(int deleted, int failed) {
+    return '已删除$deleted个，但有$failed个无法删除';
+  }
+
+  @override
+  String get vaultSyncCopyDoneMessage => '已复制';
+
+  @override
+  String get vaultSyncCopyFailedMessage => '部分项目无法复制。详情请查看传输列表。';
+
+  @override
+  String vaultSyncOpenFailedMessage(String name) {
+    return '无法打开$name';
+  }
+
+  @override
+  String get vaultSyncDetailsNotOnThisSide => '不在此存储中';
+
+  @override
+  String get vaultSyncDetailsFolder => '文件夹';
+
+  @override
+  String vaultSyncStatusOnlyIn(String storage) {
+    return '仅在$storage中';
+  }
+
+  @override
+  String vaultSyncStatusNewerIn(String storage) {
+    return '$storage中较新';
+  }
+
+  @override
+  String vaultSyncBadgeOnlyIn(int count, String storage) {
+    return '仅在$storage中：$count个';
+  }
+
+  @override
+  String vaultSyncBadgeNewerIn(int count, String storage) {
+    return '$storage中较新：$count个';
+  }
+
+  @override
+  String vaultSyncFolderOnlyInDetail(String storage) {
+    return '文件夹 — 仅在$storage中';
+  }
+
+  @override
+  String get vaultSyncDirectionOneWay => '单向复制';
+
+  @override
+  String get vaultSyncDirectionOneWaySubtitle => '按所示方向复制新增和更新的文件；源位置不会更改。';
+
+  @override
+  String get vaultSyncDirectionMirror => '镜像同步';
+
+  @override
+  String get vaultSyncDirectionMirrorSubtitle => '将目标替换为完全副本；仅存在于目标中的项目会被删除。';
+
+  @override
+  String vaultSyncActionCopyTo(String storage) {
+    return '复制 → $storage';
+  }
+
+  @override
+  String vaultSyncCopyNowToAction(String storage) {
+    return '立即复制到$storage';
+  }
+
+  @override
+  String vaultSyncDeleteFromAction(String storage) {
+    return '从$storage删除';
+  }
+
+  @override
+  String vaultSyncPlanDeleteFrom(String storage) {
+    return '同步时从$storage删除';
+  }
+
+  @override
+  String vaultSyncFilterOnlyIn(String storage) {
+    return '仅在$storage中';
+  }
+
+  @override
+  String get vaultSyncChooseFirstStorage => '选择第一个存储';
+
+  @override
+  String get vaultSyncChooseSecondStorage => '选择第二个存储';
+
+  @override
+  String get vaultSyncChangeButton => '更改';
+
+  @override
+  String get vaultSyncChooseButton => '选择';
+
+  @override
+  String get vaultSyncChooseStorageTitle => '选择存储';
+
+  @override
+  String get vaultSyncChooseStorageHint => '请先选择一个存储，再选择其中要比较的文件夹。';
+
+  @override
+  String get vaultSyncCurrentStorageBadge => '当前';
+
+  @override
+  String get vaultSyncChangeStorageTooltip => '更改存储';
+
+  @override
+  String vaultSyncPickFolderTitle(String storage) {
+    return '$storage中的文件夹';
+  }
+
+  @override
+  String get vaultSyncDirectionSectionTitle => '方向';
+
+  @override
+  String get vaultSyncDirectionMirrorWarning => '删除文件';
+
+  @override
+  String get vaultSyncDirectionSourceLabel => '来源';
+
+  @override
+  String get vaultSyncDirectionTargetLabel => '目标';
+
+  @override
+  String get vaultSyncDirectionSwapButton => '调换';
+
+  @override
+  String get vaultSyncDirectionRecommendedLabel => '推荐';
 }

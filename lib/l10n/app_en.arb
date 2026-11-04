@@ -7432,21 +7432,21 @@
   "@vaultSyncTapToSelect": {
     "description": "Placeholder subtitle shown on a Vault Sync side picker before a location is chosen"
   },
-  "vaultSyncSwapTooltip": "Swap Left and Right",
+  "vaultSyncSwapTooltip": "Swap the two storages",
   "@vaultSyncSwapTooltip": {
-    "description": "Tooltip for the button that swaps the Left and Right sides in Vault Sync"
+    "description": "Tooltip of the swap button in Vault Sync"
   },
-  "vaultSyncSameLocationWarning": "Left and Right must be different folders.",
+  "vaultSyncSameLocationWarning": "The two folders must be different.",
   "@vaultSyncSameLocationWarning": {
-    "description": "Warning shown when Left and Right are set to the exact same vault and folder"
+    "description": "Warning in Vault Sync when both storages point at the same folder"
   },
   "vaultSyncIntroTitle": "Compare Two Folders",
   "@vaultSyncIntroTitle": {
     "description": "Title of the idle-state intro card in Vault Sync before a comparison has run"
   },
-  "vaultSyncIntroSubtitle": "Pick a Left and Right folder — in a vault, on device storage or on a document provider such as an SD card or cloud drive — to see what's missing, modified, or newer on each side.",
+  "vaultSyncIntroSubtitle": "Pick two folders — in a vault, on device storage or on a document provider such as an SD card or cloud drive — to see what's missing, modified, or newer in each.",
   "@vaultSyncIntroSubtitle": {
-    "description": "Subtitle of the idle-state intro card in Vault Sync before a comparison has run"
+    "description": "Intro text on the Vault Sync tool"
   },
   "vaultSyncCompareButton": "Compare",
   "@vaultSyncCompareButton": {
@@ -7544,11 +7544,11 @@
   "@vaultSyncDirectionLabel": {
     "description": "Label for the sync direction option picker"
   },
-  "vaultSyncDirectionTwoWay": "Two-way (recommended)",
+  "vaultSyncDirectionTwoWay": "Two-way",
   "@vaultSyncDirectionTwoWay": {
     "description": "Sync direction option: copy newer/missing files in both directions"
   },
-  "vaultSyncDirectionTwoWaySubtitle": "Copies each file to whichever side is missing it or has an older copy",
+  "vaultSyncDirectionTwoWaySubtitle": "Copies missing files and newer versions to the other side.",
   "@vaultSyncDirectionTwoWaySubtitle": {
     "description": "Explanation of the two-way sync direction option"
   },
@@ -7671,9 +7671,9 @@
       "side": {}
     }
   },
-  "vaultSyncOverlapWarning": "Left and Right must not be the same folder or nested inside each other.",
+  "vaultSyncOverlapWarning": "The two folders must not be the same or nested inside each other.",
   "@vaultSyncOverlapWarning": {
-    "description": "Shown on the Vault Sync screen when the two chosen folders are identical or one contains the other"
+    "description": "Warning in Vault Sync when the two folders overlap"
   },
   "vaultSyncPlaintextWarning": "Files copied out of a vault to {targets} will be stored unencrypted.",
   "@vaultSyncPlaintextWarning": {
@@ -14677,5 +14677,389 @@
   "comicReaderCarouselScrubberSubtitle": "Show page thumbnails above the scrubber",
   "@comicReaderCarouselScrubberSubtitle": {
     "description": "Subtitle for the comic reader switch that shows the page thumbnail carousel"
+  },
+  "vaultSyncBrowseAllButton": "Browse all items",
+  "@vaultSyncBrowseAllButton": {
+    "description": "Button in Vault Sync that opens the folder explorer showing every item in both storages"
+  },
+  "vaultSyncExplorerTitle": "Browse both storages",
+  "@vaultSyncExplorerTitle": {
+    "description": "Title of the Vault Sync folder explorer screen"
+  },
+  "vaultSyncExplorerEmptyTitle": "Nothing to show",
+  "@vaultSyncExplorerEmptyTitle": {
+    "description": "Empty state title in the Vault Sync folder explorer"
+  },
+  "vaultSyncExplorerEmptyMessage": "No items match this filter in this folder.",
+  "@vaultSyncExplorerEmptyMessage": {
+    "description": "Empty state message in the Vault Sync folder explorer"
+  },
+  "vaultSyncExplorerLoadFailedTitle": "Couldn't read this folder",
+  "@vaultSyncExplorerLoadFailedTitle": {
+    "description": "Error title when the Vault Sync folder explorer cannot list a folder"
+  },
+  "vaultSyncExplorerLoadFailedMessage": "One of the two storages couldn't be listed. Try again, and make sure both are still unlocked and connected.",
+  "@vaultSyncExplorerLoadFailedMessage": {
+    "description": "Error message when the Vault Sync folder explorer cannot list a folder"
+  },
+  "vaultSyncFilterAll": "All",
+  "@vaultSyncFilterAll": {
+    "description": "Vault Sync filter chip: show every difference"
+  },
+  "vaultSyncFilterDifferences": "Differences",
+  "@vaultSyncFilterDifferences": {
+    "description": "Vault Sync folder explorer filter chip: hide items that are already in sync"
+  },
+  "vaultSyncFilterNewer": "Newer copy",
+  "@vaultSyncFilterNewer": {
+    "description": "Vault Sync filter chip: files present in both storages where one copy is newer"
+  },
+  "vaultSyncFilterConflicts": "Needs review",
+  "@vaultSyncFilterConflicts": {
+    "description": "Vault Sync filter chip: conflicting items that need a decision"
+  },
+  "vaultSyncFilterDeletions": "Deletions",
+  "@vaultSyncFilterDeletions": {
+    "description": "Vault Sync filter chip: items the current plan will delete"
+  },
+  "vaultSyncFilterNoMatchesMessage": "No items match this filter.",
+  "@vaultSyncFilterNoMatchesMessage": {
+    "description": "Empty state message when a Vault Sync filter hides every result"
+  },
+  "vaultSyncSortTooltip": "Sort",
+  "@vaultSyncSortTooltip": {
+    "description": "Tooltip of the Vault Sync sort button"
+  },
+  "vaultSyncSortPath": "Path",
+  "@vaultSyncSortPath": {
+    "description": "Vault Sync sort option: by path"
+  },
+  "vaultSyncSortSize": "Largest first",
+  "@vaultSyncSortSize": {
+    "description": "Vault Sync sort option: by size, largest first"
+  },
+  "vaultSyncSortModified": "Newest first",
+  "@vaultSyncSortModified": {
+    "description": "Vault Sync sort option: by modified time, newest first"
+  },
+  "vaultSyncSortStatus": "Status",
+  "@vaultSyncSortStatus": {
+    "description": "Vault Sync sort option: grouped by status"
+  },
+  "vaultSyncStatusInSync": "In sync",
+  "@vaultSyncStatusInSync": {
+    "description": "Badge for a file that is identical in both storages in the Vault Sync folder explorer"
+  },
+  "vaultSyncStatusFolder": "Folder",
+  "@vaultSyncStatusFolder": {
+    "description": "Badge for a folder present in both storages in the Vault Sync folder explorer"
+  },
+  "vaultSyncDeletionsQueuedLabel": "{count, plural, =1{1 deletion} other{{count} deletions}}",
+  "@vaultSyncDeletionsQueuedLabel": {
+    "description": "Bottom bar line in Vault Sync showing how many items the sync will delete",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "vaultSyncConfirmDeletionsMessage": "{count, plural, =1{1 item will be permanently deleted. This can't be undone.} other{{count} items will be permanently deleted. This can't be undone.}}",
+  "@vaultSyncConfirmDeletionsMessage": {
+    "description": "Extra paragraph in the Vault Sync confirmation dialog when the sync deletes items",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "vaultSyncResultsStaleMessage": "Results may be out of date after deleting. Compare again to refresh the counts.",
+  "@vaultSyncResultsStaleMessage": {
+    "description": "Banner in Vault Sync shown after a delete that the comparison cannot account for"
+  },
+  "vaultSyncSelectedCount": "{count} selected",
+  "@vaultSyncSelectedCount": {
+    "description": "App bar title in Vault Sync selection mode",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "vaultSyncOpenAction": "Open",
+  "@vaultSyncOpenAction": {
+    "description": "Entry sheet action in Vault Sync: open the file"
+  },
+  "vaultSyncOpenCopyAction": "Open copy in {side}",
+  "@vaultSyncOpenCopyAction": {
+    "description": "Entry sheet action in Vault Sync: open the copy that lives in one storage. {side} is the storage name",
+    "placeholders": {
+      "side": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultSyncOpenFolderAction": "Open folder",
+  "@vaultSyncOpenFolderAction": {
+    "description": "Entry sheet action in Vault Sync: browse inside the folder"
+  },
+  "vaultSyncOpenFolderSubtitle": "Browse what's inside, in both storages",
+  "@vaultSyncOpenFolderSubtitle": {
+    "description": "Subtitle of the open-folder action in the Vault Sync entry sheet"
+  },
+  "vaultSyncShowInFolderAction": "Show in folder",
+  "@vaultSyncShowInFolderAction": {
+    "description": "Entry sheet action in Vault Sync: open the folder that contains the item"
+  },
+  "vaultSyncShowInFolderSubtitle": "See it next to its neighbours in both storages",
+  "@vaultSyncShowInFolderSubtitle": {
+    "description": "Subtitle of the show-in-folder action in the Vault Sync entry sheet"
+  },
+  "vaultSyncDeleteFromBothAction": "Delete from both storages",
+  "@vaultSyncDeleteFromBothAction": {
+    "description": "Delete the item from both compared storages immediately"
+  },
+  "vaultSyncDeleteBothSidesLabel": "{left} and {right}",
+  "@vaultSyncDeleteBothSidesLabel": {
+    "description": "Names both compared storages in the Vault Sync delete confirmation",
+    "placeholders": {
+      "left": {
+        "type": "String"
+      },
+      "right": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultSyncDeleteConfirmMessage": "These items will be permanently deleted from {where}, including everything inside any folder. This can't be undone.",
+  "@vaultSyncDeleteConfirmMessage": {
+    "description": "Body of the Vault Sync delete confirmation dialog. {where} is one or two storage names",
+    "placeholders": {
+      "where": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultSyncDeleteDoneMessage": "{count, plural, =1{Deleted 1 item} other{Deleted {count} items}}",
+  "@vaultSyncDeleteDoneMessage": {
+    "description": "Snackbar after a successful delete in Vault Sync",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "vaultSyncDeletePartialMessage": "Deleted {deleted}, but {failed} couldn't be deleted",
+  "@vaultSyncDeletePartialMessage": {
+    "description": "Snackbar after a delete in Vault Sync where some items failed",
+    "placeholders": {
+      "deleted": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
+  "vaultSyncCopyDoneMessage": "Copied",
+  "@vaultSyncCopyDoneMessage": {
+    "description": "Snackbar after an immediate copy in Vault Sync succeeded"
+  },
+  "vaultSyncCopyFailedMessage": "Some items couldn't be copied. Check the transfer list for details.",
+  "@vaultSyncCopyFailedMessage": {
+    "description": "Snackbar after an immediate copy in Vault Sync failed"
+  },
+  "vaultSyncOpenFailedMessage": "Couldn't open {name}",
+  "@vaultSyncOpenFailedMessage": {
+    "description": "Snackbar when a file cannot be opened from Vault Sync",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultSyncDetailsNotOnThisSide": "Not in this storage",
+  "@vaultSyncDetailsNotOnThisSide": {
+    "description": "Entry sheet detail in Vault Sync for a storage that does not hold the item"
+  },
+  "vaultSyncDetailsFolder": "Folder",
+  "@vaultSyncDetailsFolder": {
+    "description": "Entry sheet detail in Vault Sync for a folder (no size)"
+  },
+  "vaultSyncStatusOnlyIn": "Only in {storage}",
+  "@vaultSyncStatusOnlyIn": {
+    "description": "Status badge: the item exists only in the named storage",
+    "placeholders": {
+      "storage": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultSyncStatusNewerIn": "Newer in {storage}",
+  "@vaultSyncStatusNewerIn": {
+    "description": "Status badge: the copy in the named storage is newer",
+    "placeholders": {
+      "storage": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultSyncBadgeOnlyIn": "{count} only in {storage}",
+  "@vaultSyncBadgeOnlyIn": {
+    "description": "Summary badge: how many items exist only in the named storage",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "storage": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultSyncBadgeNewerIn": "{count} newer in {storage}",
+  "@vaultSyncBadgeNewerIn": {
+    "description": "Summary badge: how many items are newer in the named storage",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "storage": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultSyncFolderOnlyInDetail": "Folder — only in {storage}",
+  "@vaultSyncFolderOnlyInDetail": {
+    "description": "Detail line for a folder that exists only in the named storage",
+    "placeholders": {
+      "storage": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultSyncDirectionOneWay": "One-way copy",
+  "@vaultSyncDirectionOneWay": {
+    "description": "One-way copy mode label; the user chooses the source and destination separately."
+  },
+  "vaultSyncDirectionOneWaySubtitle": "Copies new and updated files in the direction shown; the source is unchanged.",
+  "@vaultSyncDirectionOneWaySubtitle": {
+    "description": "Concise explanation of one-way sync; the option title names both storages."
+  },
+  "vaultSyncDirectionMirror": "Mirror sync",
+  "@vaultSyncDirectionMirror": {
+    "description": "Mirror sync mode label; the user chooses the source and destination separately."
+  },
+  "vaultSyncDirectionMirrorSubtitle": "Replaces the destination with an exact copy; destination-only items are deleted.",
+  "@vaultSyncDirectionMirrorSubtitle": {
+    "description": "Concise explanation of mirror sync and its deletion behavior; the option title names both storages."
+  },
+  "vaultSyncActionCopyTo": "Copy → {storage}",
+  "@vaultSyncActionCopyTo": {
+    "description": "Plan menu item and button: copy the item into the named storage",
+    "placeholders": {
+      "storage": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultSyncCopyNowToAction": "Copy to {storage} now",
+  "@vaultSyncCopyNowToAction": {
+    "description": "Entry sheet action in Vault Sync: copy the item into the named storage immediately",
+    "placeholders": {
+      "storage": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultSyncDeleteFromAction": "Delete from {storage}",
+  "@vaultSyncDeleteFromAction": {
+    "description": "Delete the item from the named storage immediately",
+    "placeholders": {
+      "storage": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultSyncPlanDeleteFrom": "Delete from {storage} when syncing",
+  "@vaultSyncPlanDeleteFrom": {
+    "description": "Plan menu item: delete the item from the named storage during the next sync",
+    "placeholders": {
+      "storage": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultSyncFilterOnlyIn": "Only in {storage}",
+  "@vaultSyncFilterOnlyIn": {
+    "description": "Vault Sync filter chip: items present only in the named storage",
+    "placeholders": {
+      "storage": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultSyncChooseFirstStorage": "Choose the first storage",
+  "@vaultSyncChooseFirstStorage": {
+    "description": "Title of the first storage card before a storage has been picked"
+  },
+  "vaultSyncChooseSecondStorage": "Choose the second storage",
+  "@vaultSyncChooseSecondStorage": {
+    "description": "Title of the second storage card before a storage has been picked"
+  },
+  "vaultSyncChangeButton": "Change",
+  "@vaultSyncChangeButton": {
+    "description": "Button on a storage card in Vault Sync that changes the chosen storage"
+  },
+  "vaultSyncChooseButton": "Choose",
+  "@vaultSyncChooseButton": {
+    "description": "Button on an empty storage card in Vault Sync that picks a storage"
+  },
+  "vaultSyncChooseStorageTitle": "Choose a storage",
+  "@vaultSyncChooseStorageTitle": {
+    "description": "Title of the screen listing the storages that can be compared"
+  },
+  "vaultSyncChooseStorageHint": "Pick a storage first, then the folder inside it to compare.",
+  "@vaultSyncChooseStorageHint": {
+    "description": "Hint above the list of storages in the Vault Sync storage chooser"
+  },
+  "vaultSyncCurrentStorageBadge": "Current",
+  "@vaultSyncCurrentStorageBadge": {
+    "description": "Badge marking the storage that is already in use in the Vault Sync storage chooser"
+  },
+  "vaultSyncChangeStorageTooltip": "Change storage",
+  "@vaultSyncChangeStorageTooltip": {
+    "description": "Tooltip of the button that returns from the folder picker to the storage list"
+  },
+  "vaultSyncPickFolderTitle": "Folder in {storage}",
+  "@vaultSyncPickFolderTitle": {
+    "description": "Title of the Vault Sync folder picker. {storage} is the storage name",
+    "placeholders": {
+      "storage": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultSyncDirectionSectionTitle": "Direction",
+  "@vaultSyncDirectionSectionTitle": {
+    "description": "Heading above the source and destination choices in the sync direction dialog."
+  },
+  "vaultSyncDirectionMirrorWarning": "Deletes files",
+  "@vaultSyncDirectionMirrorWarning": {
+    "description": "Warning badge on mirror mode because extra destination files are deleted."
+  },
+  "vaultSyncDirectionSourceLabel": "Source",
+  "@vaultSyncDirectionSourceLabel": {
+    "description": "Label for the storage that is copied from in one-way or mirror sync."
+  },
+  "vaultSyncDirectionTargetLabel": "Target",
+  "@vaultSyncDirectionTargetLabel": {
+    "description": "Label for the storage that receives changes in one-way or mirror sync."
+  },
+  "vaultSyncDirectionSwapButton": "Swap",
+  "@vaultSyncDirectionSwapButton": {
+    "description": "Button label for reversing source and target in the direction selector."
+  },
+  "vaultSyncDirectionRecommendedLabel": "Recommended",
+  "@vaultSyncDirectionRecommendedLabel": {
+    "description": "Badge that marks two-way sync as the recommended mode."
   }
 }

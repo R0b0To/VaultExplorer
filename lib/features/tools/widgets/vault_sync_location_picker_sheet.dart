@@ -17,8 +17,12 @@ import 'package:vaultexplorer/features/tools/widgets/vault_browser_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/vault_browser_sheet_controller.dart';
 import 'package:vaultexplorer/features/tools/widgets/vault_sync_target_style.dart';
 
-/// Lets the user pick a storage target + folder to use as the Left or Right
-/// side of the Vault Sync tool.
+/// Lets the user pick a storage target + folder for one side of the Vault
+/// Sync tool (or for an auto-sync rule's target).
+///
+/// With [showStorageChooser] it works in two steps: first a plain list of
+/// the available storages (so it's obvious what can be chosen and that it
+/// can be changed), then a folder browser inside the one they tapped.
 ///
 /// The selectable storages are the mounted vaults, the device's Local Storage
 /// (when all-files access is granted) and any saved external / document-
@@ -32,14 +36,21 @@ class VaultSyncLocationPickerSheet extends ConsumerStatefulWidget {
   /// The currently mounted vaults. Device and document-provider storages are
   /// discovered by the sheet itself.
   final List<MountedContainer> mountedContainers;
-  final String sideLabel;
+
+  /// Names what is being picked in the title ("Select {sideLabel} Folder").
+  /// When null the title names the storage being browsed instead.
+  final String? sideLabel;
+
+  /// Start with a list of storages to choose from, before the folder browser.
+  final bool showStorageChooser;
   final VaultSyncSide? initialSide;
   final bool isLeft;
 
   const VaultSyncLocationPickerSheet({
     super.key,
     required this.mountedContainers,
-    required this.sideLabel,
+    this.sideLabel,
+    this.showStorageChooser = false,
     this.initialSide,
     this.isLeft = true,
   });
@@ -59,6 +70,12 @@ class _VaultSyncLocationPickerSheetState
   final Map<String, MountedContainer> _containerCache = {};
 
   bool _accessChecked = false;
+
+  /// True while the storage list is showing, false once a storage has been
+  /// tapped and its folders are being browsed. Starts true when the chooser
+  /// is enabled and there is more than one storage to choose from.
+  bool _choosing = false;
+  bool _choiceInitialized = false;
 
   /// Root of the primary Local Storage, or null while all-files access
   /// hasn't been granted.
@@ -145,6 +162,10 @@ class _VaultSyncLocationPickerSheetState
       setState(() => _params = null);
       return;
     }
+    if (!_choiceInitialized) {
+      _choiceInitialized = true;
+      _choosing = widget.showStorageChooser && targets.length > 1;
+    }
 
     final initial = _pickInitial(selectVolId);
     setState(() {
@@ -193,6 +214,23 @@ class _VaultSyncLocationPickerSheetState
     return _targets.first;
   }
 
+  /// A storage was tapped in the list: browse its folders, starting where
+  /// this side already points if it is the storage already in use.
+  void _chooseStorage(MountedContainer container) {
+    final side = widget.initialSide;
+    final isCurrent = side != null && side.container.volId == container.volId;
+    setState(() {
+      _choosing = false;
+      _initialContainer = container;
+      _initialPath = isCurrent ? side.relativePath : '';
+      _params = VaultBrowserParams(
+        mountedContainers: _targets,
+        initialContainer: container,
+        initialPath: _initialPath,
+      );
+    });
+  }
+
   Future<void> _requestLocalAccess() async {
     // The result arrives via the resumed lifecycle callback.
     await ref
@@ -208,6 +246,7 @@ class _VaultSyncLocationPickerSheetState
 
     final params = _params;
     if (params == null) return _buildPlaceholder(context);
+    if (_choosing) return _buildChooser(context);
     return _buildPicker(context, params);
   }
 
@@ -216,7 +255,9 @@ class _VaultSyncLocationPickerSheetState
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          context.l10n.vaultSyncPickLocationTitle(widget.sideLabel),
+          widget.sideLabel != null
+              ? context.l10n.vaultSyncPickLocationTitle(widget.sideLabel!)
+              : context.l10n.vaultSyncChooseStorageTitle,
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
         ),
         actions: [
@@ -238,6 +279,90 @@ class _VaultSyncLocationPickerSheetState
     );
   }
 
+  /// Step one: every storage that can be compared, as plain tappable rows.
+  Widget _buildChooser(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final currentVolId = widget.initialSide?.container.volId;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          context.l10n.vaultSyncChooseStorageTitle,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+        ),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(12),
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
+            child: Text(
+              context.l10n.vaultSyncChooseStorageHint,
+              style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+            ),
+          ),
+          for (final target in _targets)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Material(
+                color: cs.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+                clipBehavior: Clip.antiAlias,
+                child: ListTile(
+                  leading: Icon(syncTargetKindOf(target).icon, color: cs.primary),
+                  title: Text(
+                    target.displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    [
+                      syncTargetKindOf(target).label(context.l10n),
+                      if (target.readOnly) context.l10n.vaultSyncReadOnlyBadge,
+                    ].join(' · '),
+                  ),
+                  trailing: target.volId == currentVolId
+                      ? Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: cs.primaryContainer,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            context.l10n.vaultSyncCurrentStorageBadge,
+                            style: textTheme.labelSmall?.copyWith(
+                              color: cs.onPrimaryContainer,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        )
+                      : const Icon(Icons.chevron_right_rounded),
+                  onTap: () => _chooseStorage(target),
+                ),
+              ),
+            ),
+          if (_accessChecked && _localRoot == null)
+            Material(
+              color: cs.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(12),
+              clipBehavior: Clip.antiAlias,
+              child: ListTile(
+                leading: Icon(Icons.smartphone_rounded, color: cs.primary),
+                title: Text(context.l10n.vaultSyncEnableLocalStorageTooltip),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: _requestLocalAccess,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPicker(BuildContext context, VaultBrowserParams params) {
     final state = ref.watch(vaultBrowserControllerProvider(params));
     final notifier = ref.read(vaultBrowserControllerProvider(params).notifier);
@@ -245,12 +370,16 @@ class _VaultSyncLocationPickerSheetState
 
     return VaultBrowserScaffold(
       params: params,
-      appBarTitle: (ctx, _) =>
-          ctx.l10n.vaultSyncPickLocationTitle(widget.sideLabel),
+      appBarTitle: (ctx, _) => widget.sideLabel != null
+          ? ctx.l10n.vaultSyncPickLocationTitle(widget.sideLabel!)
+          : ctx.l10n.vaultSyncPickFolderTitle(
+              state.selectedContainer.displayName,
+            ),
       emptyMessage: (ctx) => ctx.l10n.vaultFolderPickerEmptyMessage,
-      selectorLabel: (ctx) => ctx.l10n.vaultSyncStorageSelectorLabel,
-      containerSubtitle: (ctx, container) =>
-          syncTargetKindOf(container).label(ctx.l10n),
+      showStorageSelector: false,
+      onRootBack: widget.showStorageChooser
+          ? () => setState(() => _choosing = true)
+          : null,
       actions: (ctx) => [
         if (_accessChecked && _localRoot == null)
           IconButton(

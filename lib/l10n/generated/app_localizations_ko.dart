@@ -11774,6 +11774,15 @@ class AppLocalizationsKo extends AppLocalizations {
       '앱 바를 화면 위쪽에서 아래쪽으로 옮겨 엄지손가락으로 더 쉽게 닿도록 합니다.';
 
   @override
+  String get sectionNavigation => '탐색';
+
+  @override
+  String get predictiveBackAnimationsLabel => '예측형 뒤로가기 애니메이션';
+
+  @override
+  String get predictiveBackAnimationsDesc => '뒤로 이동할 때 대화형 미리보기와 애니메이션을 표시합니다.';
+
+  @override
   String get selectByIconLabel => '아이콘을 탭하여 선택';
 
   @override

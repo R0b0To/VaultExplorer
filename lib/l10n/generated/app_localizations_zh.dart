@@ -11586,6 +11586,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get appBarAtBottomDesc => '将应用栏从屏幕顶部移到底部，方便用拇指操作。';
 
   @override
+  String get sectionNavigation => '导航';
+
+  @override
+  String get predictiveBackAnimationsLabel => '预测性返回动画';
+
+  @override
+  String get predictiveBackAnimationsDesc => '返回上一页时显示交互式预览和动画。';
+
+  @override
   String get selectByIconLabel => '点按图标选择';
 
   @override

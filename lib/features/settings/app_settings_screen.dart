@@ -7,6 +7,7 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/theme/app_skin_settings_provider.dart';
+import 'package:vaultexplorer/core/theme/predictive_back_preference.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
@@ -55,6 +56,8 @@ class AppSettingsScreen extends ConsumerStatefulWidget {
 
 const _kAndroidSdkR = 30;
 const _kAndroidSdkS = 31;
+// Android 14: the first release that streams back-gesture progress to apps.
+const _kAndroidSdkU = 34;
 
 /// The settings hubs shown in the persistent sidebar on wide/landscape
 /// layouts. Order and membership mirror the hub tiles used in the narrow,
@@ -2604,6 +2607,45 @@ class AppearanceSettingsScreen extends ConsumerWidget {
                   ),
                 ],
               ),
+
+              // Android only streams back-gesture progress from 14 on, so
+              // below that there is nothing for this switch to control.
+              if (state.androidSdkInt >= _kAndroidSdkU) ...[
+                const SizedBox(height: 16),
+                SectionHeader(context.l10n.sectionNavigation),
+                SectionCard(
+                  children: [
+                    SwitchListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                      ),
+                      title: Text(
+                        context.l10n.predictiveBackAnimationsLabel,
+                        style: textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      subtitle: Text(
+                        context.l10n.predictiveBackAnimationsDesc,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                      value: state.settings.predictiveBackAnimations,
+                      onChanged: (v) {
+                        // Takes effect on the very next back gesture, no
+                        // restart: the gesture handlers read this notifier.
+                        appPredictiveBackNotifier.value = v;
+                        ref
+                            .read(appSettingsControllerProvider.notifier)
+                            .updateSettings(
+                              (s) => s.copyWith(predictiveBackAnimations: v),
+                            );
+                      },
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),

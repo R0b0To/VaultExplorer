@@ -14037,6 +14037,18 @@
   "@appBarAtBottomDesc": {
     "description": "Explains the setting that moves the app bar to the bottom of the screen."
   },
+  "sectionNavigation": "Navigation",
+  "@sectionNavigation": {
+    "description": "Settings section header on the Appearance & Interface page that groups navigation-related options."
+  },
+  "predictiveBackAnimationsLabel": "Predictive back animations",
+  "@predictiveBackAnimationsLabel": {
+    "description": "Setting title for the switch that turns the in-app predictive back animations on or off."
+  },
+  "predictiveBackAnimationsDesc": "Show interactive previews and animations when navigating backwards.",
+  "@predictiveBackAnimationsDesc": {
+    "description": "Explains the predictive back animations setting. It only affects the in-app transitions, not the Android system back animations."
+  },
   "selectByIconLabel": "Select by tapping the icon",
   "@selectByIconLabel": {
     "description": "Setting title for selecting files and folders by tapping their icon in list view."

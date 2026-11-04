@@ -12549,6 +12549,17 @@ class AppLocalizationsUk extends AppLocalizations {
       'Переміщує панель програми з верхньої частини екрана донизу, щоб її було легше діставати великим пальцем.';
 
   @override
+  String get sectionNavigation => 'Навігація';
+
+  @override
+  String get predictiveBackAnimationsLabel =>
+      'Анімації прогнозованого жесту «Назад»';
+
+  @override
+  String get predictiveBackAnimationsDesc =>
+      'Показувати інтерактивні попередні перегляди й анімації під час переходу назад.';
+
+  @override
   String get selectByIconLabel => 'Вибір дотиком до значка';
 
   @override

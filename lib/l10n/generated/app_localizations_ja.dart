@@ -11774,6 +11774,16 @@ class AppLocalizationsJa extends AppLocalizations {
   String get appBarAtBottomDesc => 'アプリバーを画面の上部から下部に移動し、親指で届きやすくします。';
 
   @override
+  String get sectionNavigation => 'ナビゲーション';
+
+  @override
+  String get predictiveBackAnimationsLabel => '予測型「戻る」アニメーション';
+
+  @override
+  String get predictiveBackAnimationsDesc =>
+      '前の画面に戻るときに、インタラクティブなプレビューとアニメーションを表示します。';
+
+  @override
   String get selectByIconLabel => 'アイコンのタップで選択';
 
   @override

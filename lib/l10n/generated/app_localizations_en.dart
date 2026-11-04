@@ -12272,6 +12272,16 @@ class AppLocalizationsEn extends AppLocalizations {
       'Move the app bar from the top of the screen to the bottom, where your thumb can reach it more easily.';
 
   @override
+  String get sectionNavigation => 'Navigation';
+
+  @override
+  String get predictiveBackAnimationsLabel => 'Predictive back animations';
+
+  @override
+  String get predictiveBackAnimationsDesc =>
+      'Show interactive previews and animations when navigating backwards.';
+
+  @override
   String get selectByIconLabel => 'Select by tapping the icon';
 
   @override

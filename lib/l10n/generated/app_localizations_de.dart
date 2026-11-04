@@ -12461,6 +12461,16 @@ class AppLocalizationsDe extends AppLocalizations {
       'Verschiebt die App-Leiste vom oberen an den unteren Bildschirmrand, wo sie mit dem Daumen leichter erreichbar ist.';
 
   @override
+  String get sectionNavigation => 'Navigation';
+
+  @override
+  String get predictiveBackAnimationsLabel => 'Zurück-Vorschauanimationen';
+
+  @override
+  String get predictiveBackAnimationsDesc =>
+      'Zeigt interaktive Vorschauen und Animationen beim Zurücknavigieren.';
+
+  @override
   String get selectByIconLabel => 'Per Tippen auf das Symbol auswählen';
 
   @override

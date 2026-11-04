@@ -12490,6 +12490,16 @@ class AppLocalizationsAr extends AppLocalizations {
       'ينقل شريط التطبيق من أعلى الشاشة إلى أسفلها ليسهل الوصول إليه بالإبهام.';
 
   @override
+  String get sectionNavigation => 'التنقل';
+
+  @override
+  String get predictiveBackAnimationsLabel => 'الرسوم المتحركة للرجوع التنبؤي';
+
+  @override
+  String get predictiveBackAnimationsDesc =>
+      'عرض معاينات تفاعلية ورسوم متحركة عند الرجوع للخلف.';
+
+  @override
   String get selectByIconLabel => 'التحديد بالنقر على الأيقونة';
 
   @override

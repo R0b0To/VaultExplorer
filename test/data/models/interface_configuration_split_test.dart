@@ -105,6 +105,7 @@ AppSettings _customSettings() => AppSettings(
   editorFollowsAppSkin: false,
   editorAppearancePrefs: {'fontSize': 18.0, 'showLineNumbers': false},
   appBarAtBottom: true,
+  predictiveBackAnimations: false,
 );
 
 MediaViewerToolbarConfig _customViewer() {
@@ -284,6 +285,7 @@ void main() {
         'defaultLayoutMode',
         'containerSortMode',
         'showStorageLocationsInDrawer',
+        'predictiveBackAnimations',
         'authenticatorShowNumbers',
         'fileManagerSkin',
         'fileManagerFollowsAppSkin',

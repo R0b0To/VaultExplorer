@@ -12460,6 +12460,17 @@ class AppLocalizationsIt extends AppLocalizations {
       'Sposta la barra superiore dalla parte alta dello schermo a quella bassa, dove il pollice la raggiunge più facilmente.';
 
   @override
+  String get sectionNavigation => 'Navigazione';
+
+  @override
+  String get predictiveBackAnimationsLabel =>
+      'Animazioni di ritorno predittivo';
+
+  @override
+  String get predictiveBackAnimationsDesc =>
+      'Mostra anteprime interattive e animazioni quando si torna indietro.';
+
+  @override
   String get selectByIconLabel => 'Seleziona toccando l’icona';
 
   @override

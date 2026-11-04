@@ -12,6 +12,7 @@ import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/theme/file_manager_skin_scope.dart';
+import 'package:vaultexplorer/core/theme/predictive_back_preference.dart';
 import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
 import 'package:vaultexplorer/core/utils/cancellation_token.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
@@ -2296,6 +2297,11 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   bool handleStartBackGesture(PredictiveBackEvent backEvent) {
     if (!_isOwnRouteCurrent) return false;
     if (backEvent.isButtonEvent) return false;
+    // "Predictive back animations" off: leave the gesture unclaimed so it takes
+    // the same path as a back-button press -- on commit the PopScope in
+    // build() calls _onSystemBack(), and a cancel does nothing. Only the start
+    // is gated; update/cancel/commit only reach an observer that claimed it.
+    if (!appPredictiveBackNotifier.value) return false;
     if (!_canPreviewFolderBackGesture) return false;
     final targetSegment = _pathStack.length >= 2
         ? _pathStack[_pathStack.length - 2]

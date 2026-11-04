@@ -127,6 +127,24 @@ void main() {
       expect(_ids(resolved), contains('appearance.material_you'));
     });
 
+    test('the predictive back row appears from Android 14 and not below', () {
+      final android13 = resolveSettingsSearchIndex(l10n, androidSdkInt: 33);
+      final android14 = resolveSettingsSearchIndex(l10n, androidSdkInt: 34);
+      expect(_ids(android13), isNot(contains('appearance.predictive_back')));
+      expect(_ids(android14), contains('appearance.predictive_back'));
+
+      final row = android14.firstWhere(
+        (r) => r.id == 'appearance.predictive_back',
+      );
+      expect(row.title, 'Predictive back animations');
+      expect(row.destination, SettingsDestination.appearance);
+      // People search for it by what it does, not only by its name.
+      expect(
+        _ids(searchSettingsIndex('swipe back', android14, limit: 200)),
+        contains('appearance.predictive_back'),
+      );
+    });
+
     test('screen-only entries do not scroll to a row', () {
       final emergency = resolved.firstWhere((r) => r.id == 'emergency.screen');
       expect(emergency.scrollTo, isFalse);

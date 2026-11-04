@@ -131,6 +131,7 @@ AppSettings _settingsA() => AppSettings(
   themeMode: ThemeMode.dark,
   defaultLayoutMode: BrowserLayoutMode.masonry,
   showStorageLocationsInDrawer: false,
+  predictiveBackAnimations: false,
   editorAppearancePrefs: {'fontSize': 18.0, 'showLineNumbers': false},
   // skins
   appSkinPreset: AppSkinPreset.custom,
@@ -357,6 +358,7 @@ void main() {
       expect(applied.settings.themeMode, ThemeMode.dark);
       expect(applied.settings.defaultLayoutMode, BrowserLayoutMode.masonry);
       expect(applied.settings.showStorageLocationsInDrawer, isFalse);
+      expect(applied.settings.predictiveBackAnimations, isFalse);
       // Text editor.
       expect(applied.settings.editorAppearancePrefs['fontSize'], 18.0);
       expect(applied.settings.editorAppearancePrefs['showLineNumbers'], false);
@@ -600,6 +602,7 @@ void main() {
         expect(app, isNot(contains(key)), reason: key);
       }
       expect(app['showStorageLocationsInDrawer'], isFalse);
+      expect(app['predictiveBackAnimations'], isFalse);
       expect((app['editorAppearancePrefs'] as Map)['showLineNumbers'], isFalse);
 
       final fileManager = interfaceSection['fileManager'] as Map;
@@ -654,6 +657,7 @@ void main() {
       expect(applied.settings.themeMode, ThemeMode.dark);
       expect(applied.settings.defaultLayoutMode, BrowserLayoutMode.masonry);
       expect(applied.settings.showStorageLocationsInDrawer, isFalse);
+      expect(applied.settings.predictiveBackAnimations, isFalse);
       expect(
         applied.settings.editorAppearancePrefs['showLineNumbers'],
         isFalse,

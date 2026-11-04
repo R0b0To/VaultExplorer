@@ -20803,6 +20803,24 @@ abstract class AppLocalizations {
   /// **'Move the app bar from the top of the screen to the bottom, where your thumb can reach it more easily.'**
   String get appBarAtBottomDesc;
 
+  /// Settings section header on the Appearance & Interface page that groups navigation-related options.
+  ///
+  /// In en, this message translates to:
+  /// **'Navigation'**
+  String get sectionNavigation;
+
+  /// Setting title for the switch that turns the in-app predictive back animations on or off.
+  ///
+  /// In en, this message translates to:
+  /// **'Predictive back animations'**
+  String get predictiveBackAnimationsLabel;
+
+  /// Explains the predictive back animations setting. It only affects the in-app transitions, not the Android system back animations.
+  ///
+  /// In en, this message translates to:
+  /// **'Show interactive previews and animations when navigating backwards.'**
+  String get predictiveBackAnimationsDesc;
+
   /// Setting title for selecting files and folders by tapping their icon in list view.
   ///
   /// In en, this message translates to:

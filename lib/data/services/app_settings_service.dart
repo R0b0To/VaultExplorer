@@ -167,6 +167,11 @@ class AppSettings {
   bool useDualPaneBrowsing;
   TabSwipeGestures tabSwipeGestures;
   bool appBarAtBottom;
+
+  /// Whether the app's own predictive-back animations (the page transition
+  /// that follows the back gesture and the folder preview in the file browser)
+  /// are on. Android's system-level Predictive Back is unaffected either way.
+  bool predictiveBackAnimations;
   Map<String, String> extensionPreferences;
   bool autoOpenOnUnlock;
   SortBy defaultFileSortBy;
@@ -217,6 +222,7 @@ class AppSettings {
     this.useDualPaneBrowsing = false,
     this.tabSwipeGestures = const TabSwipeGestures(),
     this.appBarAtBottom = false,
+    this.predictiveBackAnimations = true,
     this.containerSortMode = ContainerSortMode.manual,
     this.themeMode = ThemeMode.system,
     this.useDynamicColor = false,
@@ -347,6 +353,7 @@ class AppSettings {
     bool? useDualPaneBrowsing,
     TabSwipeGestures? tabSwipeGestures,
     bool? appBarAtBottom,
+    bool? predictiveBackAnimations,
     Map<String, String>? extensionPreferences,
     bool? autoOpenOnUnlock,
     String? masterPasswordHash,
@@ -405,6 +412,8 @@ class AppSettings {
       useDualPaneBrowsing: useDualPaneBrowsing ?? this.useDualPaneBrowsing,
       tabSwipeGestures: tabSwipeGestures ?? this.tabSwipeGestures,
       appBarAtBottom: appBarAtBottom ?? this.appBarAtBottom,
+      predictiveBackAnimations:
+          predictiveBackAnimations ?? this.predictiveBackAnimations,
       containerSortMode: containerSortMode ?? this.containerSortMode,
       themeMode: themeMode ?? this.themeMode,
       useDynamicColor: useDynamicColor ?? this.useDynamicColor,
@@ -523,6 +532,7 @@ class AppSettings {
     'containerSortMode': containerSortMode.toJson(),
     'showStorageLocationsInDrawer': showStorageLocationsInDrawer,
     'appBarAtBottom': appBarAtBottom,
+    'predictiveBackAnimations': predictiveBackAnimations,
     'playlistScrollMode': playlistScrollMode.toJson(),
     'playlistScrollDirection':
         playlistScrollMode == PlaylistScrollMode.verticalPage
@@ -595,6 +605,7 @@ class AppSettings {
     containerSortMode: other.containerSortMode,
     showStorageLocationsInDrawer: other.showStorageLocationsInDrawer,
     appBarAtBottom: other.appBarAtBottom,
+    predictiveBackAnimations: other.predictiveBackAnimations,
     playlistScrollMode: other.playlistScrollMode,
     authenticatorShowNumbers: other.authenticatorShowNumbers,
     authenticatorSearchPlacement: other.authenticatorSearchPlacement,
@@ -664,6 +675,7 @@ class AppSettings {
       legacyMode: j['tabEdgeSwipe'] as String?,
     ),
     appBarAtBottom: j['appBarAtBottom'] as bool? ?? false,
+    predictiveBackAnimations: j['predictiveBackAnimations'] as bool? ?? true,
     extensionPreferences:
         (j['extensionPreferences'] as Map<String, dynamic>?)?.map(
           (k, v) => MapEntry(k, v as String),

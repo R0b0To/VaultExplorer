@@ -111,6 +111,7 @@ class CategoryContentView extends ConsumerStatefulWidget {
     this.primaryLocalContainer,
     this.includeVaults = true,
     this.scopedContainer,
+    this.initialDirPath,
     this.onShowInFolder,
     this.resolveContainer,
     this.onScopedFilterChanged,
@@ -122,9 +123,11 @@ class CategoryContentView extends ConsumerStatefulWidget {
   final MountedContainer? primaryLocalContainer;
   final bool includeVaults;
   final MountedContainer? scopedContainer;
+  final String? initialDirPath;
   final CategoryShowInFolderCallback? onShowInFolder;
   final MountedContainer? Function(int volId)? resolveContainer;
-  final ValueChanged<String?>? onScopedFilterChanged;
+  final void Function(String? filter, [String? destinationDir])?
+      onScopedFilterChanged;
 
   @override
   ConsumerState<CategoryContentView> createState() =>
@@ -140,6 +143,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
   late bool _sortAscending;
 
   CategoryLocation _location = CategoryLocation.top;
+  late CategoryLocation _initialLocation;
   List<PathSegment> _forwardStack = const [];
   List<CategoryLocation> _forwardLocations = const [];
   CategoryAggregateSnapshot _snapshot = CategoryAggregateSnapshot.empty;
@@ -182,14 +186,21 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     super.initState();
     if (widget.scopedContainer != null) {
       _containers = {widget.scopedContainer!.volId: widget.scopedContainer!};
+      final initialDir = widget.initialDirPath ?? '';
+      _location = CategoryLocation(widget.scopedContainer!.volId, initialDir);
+      _folderMode = true;
+    } else {
+      _location = CategoryLocation.top;
+      final settings = ref.read(appSettingsControllerProvider).settings;
+      _folderMode = settings.categoryFolderStructure.contains(_categoryKey);
     }
+    _initialLocation = _location;
     final settings = ref.read(appSettingsControllerProvider).settings;
     _source = _scoped || !widget.includeVaults
         ? CategorySourceFilter.all
         : CategorySourceFilter.fromStorageKey(
             settings.categorySources[_categoryKey],
           );
-    _folderMode = settings.categoryFolderStructure.contains(_categoryKey);
     final visual =
         widget.category == FileCategory.images ||
         widget.category == FileCategory.videos;
@@ -497,7 +508,11 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
             labels: {for (final s in _sources.values) s.volId: s.label},
             query: _query,
           )
-        : flatCategoryListing(_snapshot, query: _query);
+        : flatCategoryListing(
+            _snapshot,
+            location: location,
+            query: _query,
+          );
 
     list.sort((a, b) {
       if (_folderMode && a.isDir != b.isDir) return a.isDir ? -1 : 1;
@@ -518,8 +533,14 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     return _items = list;
   }
 
-  bool get _canGoUp =>
-      _folderMode && _buildPathSteps(_effectiveLocation).length > 1;
+  bool get _canGoUp {
+    if (!_folderMode) return false;
+    if (_scoped) {
+      return _location != _initialLocation &&
+          _buildPathSteps(_effectiveLocation).length > 1;
+    }
+    return _buildPathSteps(_effectiveLocation).length > 1;
+  }
 
   void _goUp() {
     final currentSteps = _buildPathSteps(_effectiveLocation);
@@ -630,9 +651,11 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     if (on == _folderMode) return;
     setState(() {
       _folderMode = on;
-      _location = CategoryLocation.top;
-      _forwardStack = const [];
-      _forwardLocations = const [];
+      if (!_scoped) {
+        _location = CategoryLocation.top;
+        _forwardStack = const [];
+        _forwardLocations = const [];
+      }
     });
     _clearSelection();
     ref.read(appSettingsControllerProvider.notifier).updateSettings((s) {
@@ -705,10 +728,22 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
 
   void _onItemLongPress(RawEntry entry) {
     if (entry.isDir) return;
-    HapticFeedback.selectionClick();
-    ref
-        .read(fileBrowserSelectionProvider(widget.tabId).notifier)
-        .toggleSelectItem(entry);
+    final selection = ref.read(fileBrowserSelectionProvider(widget.tabId));
+    if (!selection.isSelectionMode) {
+      // First hold: add to selection (not toggle). The drag recogniser in
+      // BrowserItemDragItem calls this again when a drag starts, and it
+      // must not deselect the item it just selected.
+      HapticFeedback.selectionClick();
+      ref
+          .read(fileBrowserSelectionProvider(widget.tabId).notifier)
+          .setSelectedItems({...selection.items, entry});
+    } else if (!selection.items.contains(entry)) {
+      HapticFeedback.selectionClick();
+      ref
+          .read(fileBrowserSelectionProvider(widget.tabId).notifier)
+          .toggleSelectItem(entry);
+    }
+    // If already selected in selection mode: do nothing (leave it to drag).
   }
 
   Future<void> _open(CategoryEntry entry) async {
@@ -1134,7 +1169,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
         location: topLocation,
       ),
     ];
-    if (!_folderMode || location.volId == null) return steps;
+    if (location.volId == null) return steps;
 
     final multipleSources = _snapshot.contributingSources.length > 1;
     final source = _sources[location.volId];
@@ -1304,7 +1339,10 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           ? FilterMenuButton(
               currentFilter: widget.category.filterKey,
               onFilterChanged: (filter) =>
-                  widget.onScopedFilterChanged?.call(filter),
+                  widget.onScopedFilterChanged?.call(
+                    filter,
+                    _effectiveLocation.dirPath,
+                  ),
               hideVaultOnlyActions: widget.scopedContainer!.isLocalStorage,
             )
           : PopupMenuButton<CategorySourceFilter>(
@@ -1682,7 +1720,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
         } else if (_canGoUp) {
           _goUp();
         } else if (_scoped) {
-          widget.onScopedFilterChanged?.call(null);
+          widget.onScopedFilterChanged?.call(null, _effectiveLocation.dirPath);
         }
       },
       child: Column(
@@ -1703,7 +1741,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
                 ),
               ),
             ),
-          if (toolbarConfig.showBreadcrumbBar && _folderMode)
+          if (toolbarConfig.showBreadcrumbBar && (_folderMode || _scoped))
             BreadcrumbBar(
               stack: _buildPathStack(location),
               onTap: _onJumpTo,

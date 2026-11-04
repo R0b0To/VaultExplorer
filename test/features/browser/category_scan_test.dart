@@ -318,6 +318,23 @@ void main() {
       expect(flatCategoryListing(both, query: 'TOP'), hasLength(2));
     });
 
+    test('flat listing scoped to a directory narrows to that subfolder', () {
+      final camera = flatCategoryListing(
+        both,
+        location: const CategoryLocation(-1, 'DCIM/Camera'),
+      );
+      expect(camera, hasLength(2));
+      expect(camera.map((e) => e.name), ['1.jpg', '2.jpg']);
+      expect(camera.every((e) => e.sourceVolId == -1), isTrue);
+
+      final dcim = flatCategoryListing(
+        both,
+        location: const CategoryLocation(-1, 'DCIM'),
+      );
+      expect(dcim, hasLength(3));
+      expect(dcim.map((e) => e.name), ['x.png', 'Camera/1.jpg', 'Camera/2.jpg']);
+    });
+
     test('with several sources the folder view starts at the sources', () {
       final location = effectiveCategoryLocation(both, CategoryLocation.top);
       expect(location.isTop, isTrue);

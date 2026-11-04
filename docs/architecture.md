@@ -373,6 +373,63 @@ decoy's local explorer); native side builds `ACTION_SEND` /
   `exported=false`; a URI grant matches the exact URI, so a receiver can't
   retarget one.
 
+### 1.6 Category browser (Images / Videos / Audio / Documents)
+
+The drawer's CATEGORIES section opens `CategoryBrowserScreen`, a virtual view
+that gathers one kind of file from every storage the person can reach: phone
+storage, configured storage locations and **unlocked** vaults. Nothing is
+copied or moved; it is a listing over the real files.
+
+- **Scanning.** `CategoryScanner` walks one source through an injected
+  `listDirectory`; `CategoryAggregateScanner` runs one per source under a shared
+  bound on listings in flight, publishes the merged result incrementally, and
+  reports a file reachable from two raw-path sources once. All of it is plain
+  Dart (no vault, SAF or widget types), so it is unit-tested with a map standing
+  in for a disk. What counts as an image or a document is the file manager's
+  type filter (`matchesFilter`), not a second classification.
+- **Source identity.** Results are `CategoryEntry`s: `RawEntry`s that also carry
+  `sourceVolId` and the full `path` in that source. Every action (open, share,
+  rename, delete, copy/cut) goes by those two, never by `name` or by "the folder
+  being shown", because `name` is only what the list/grid view needs (a path from
+  the source root in the flat view, a bare name in the folder view). Copy and
+  cut use the cross-container clipboard, which already carries a source per item.
+  The grid and list views take an optional `containerFor` / `cacheModeFor` so one
+  list can hold entries of several containers, each thumbnailed under its own
+  container's cache policy (disabled until that container's settings load).
+- **Views.** Flat (default) is one list of every match. "Original folder
+  structure" shows only folders that lead to a match, with a source level on top
+  when more than one source has matches; folders are never selectable (a folder
+  stands for files outside the category). The source selector (all / device /
+  vaults / one vault) and the structure toggle are remembered per category in
+  `AppSettings` (`categorySources`, `categoryFolderStructure`).
+- **Vault security.** Only vaults in the dashboard's `mounted` list are scanned.
+  When one locks (the container-locked event or the mounted list shrinking) its
+  entries and selection are removed immediately, and a scan still in flight is
+  filtered against the mounted list before it is shown.
+- **Drawer.** `DrawerCategoriesSection` (between storage and Tools) shows the
+  shortcuts chosen in `CategoryShortcutsEditor` (Settings, and the drawer's
+  manage sheet). Hiding one only removes the shortcut.
+- **Inside one storage.** The file manager's toolbar type filter (Images,
+  Videos, Audio, Documents) opens the same screen with `scopedContainer` set:
+  one source, no selector, same flat/folder views, scanning the whole storage
+  it was used in. "All files", the vault-item filter and any filter inside an
+  archive remain filters on the folder being shown.
+- **Decoy.** The decoy drawer shows the same shortcuts with `includeVaults:
+  false`: the screen then never reads the vault list, listens for vault events
+  or touches the index, ignores a remembered "vaults" source, and the editor
+  leaves out the vault options.
+- **Index inside vaults.** After a category scan finishes, each writable vault
+  it read gets `.vaultexplorer/category_index.json` (the vault's configuration
+  folder, which sync never touches; same idea as `marks.json`): per category,
+  the files found. The next visit seeds that vault's list from it at once
+  (`CategoryScanTarget.seed`) and swaps in the fresh scan when it finishes, so
+  the list neither starts empty nor shrinks while the scan catches up. It is
+  written only when a category was actually opened, never for a scan that hit a
+  limit, never into a read-only vault, and never into phone storage or storage
+  locations (they are the person's own folders). Setting:
+  `AppSettings.categoryIndexInVaults` (configuration group); "Clear category
+  indexes" removes it from the unlocked vaults.
+
 ---
 
 ## 2. Ownership & invariants

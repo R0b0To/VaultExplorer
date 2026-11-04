@@ -2140,13 +2140,18 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   /// folders. "All files" and the vault-item filter stay what they were, a
   /// filter on the folder being shown, and so does the filter inside an
   /// archive, which is not a storage a category can scan.
-  void _onFilterChosen(String? value) {
+  void _onFilterChosen(String? value, [String? destinationDir]) {
     _lastPublishedFloatingActionSignature = null;
     ref
         .read(fileBrowserSelectionProvider(_stateKey).notifier)
         .exitSelectionMode();
     _signalActivity();
     _navNotifier.setFilter(value);
+    if (value == null &&
+        destinationDir != null &&
+        destinationDir != _currentDirPath) {
+      unawaited(_loadDirectoryContents(destinationDir));
+    }
   }
 
   Future<void> _openBookmark(VaultBookmark bookmark) async {
@@ -5462,6 +5467,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             widget.container.isLocalStorage ? widget.container : null,
         includeVaults: !widget.container.isLocalStorage,
         scopedContainer: widget.container,
+        initialDirPath: _currentDirPath,
         resolveContainer: widget.resolveContainer,
         onScopedFilterChanged: _onFilterChosen,
         onShowInFolder: (container, path) {
@@ -5469,7 +5475,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
           final dir = path.contains('/')
               ? path.substring(0, path.lastIndexOf('/'))
               : '';
-          unawaited(_loadDirectoryContents(dir));
+          // Use _navigateToPath to properly rebuild the path stack
+          // from root, so breadcrumbs show the correct hierarchy.
+          unawaited(_navigateToPath(dir, isDir: true));
         },
       );
     }

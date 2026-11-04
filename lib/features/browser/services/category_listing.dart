@@ -61,16 +61,38 @@ bool _matchesQuery(String lowercaseName, String lowercaseQuery) =>
 /// The flat view: every match of every source as one folder. Each entry is
 /// named by its path from its source's root, which keeps same-named files of
 /// different folders apart; [CategoryEntry.sourceVolId] keeps different
-/// sources apart. [query] narrows by name or folder.
+/// sources apart. When [location] specifies a non-empty directory, only
+/// matches inside that directory (and its descendants) are included, named
+/// relative to that directory. [query] narrows by name or folder.
 List<CategoryEntry> flatCategoryListing(
   CategoryAggregateSnapshot snapshot, {
+  CategoryLocation? location,
   String query = '',
 }) {
   final q = query.trim().toLowerCase();
-  if (q.isEmpty) return List<CategoryEntry>.of(snapshot.entries);
-  return snapshot.entries
-      .where((e) => _matchesQuery(e.lowercaseName, q))
-      .toList();
+  final volId = location?.volId;
+  final dir = location?.dirPath ?? '';
+
+  Iterable<CategoryEntry> entries = snapshot.entries;
+  if (volId != null) {
+    entries = entries.where((e) => e.sourceVolId == volId);
+  }
+  if (dir.isNotEmpty) {
+    final prefix = '$dir/';
+    entries = entries.where(
+      (e) => e.parentPath == dir || e.path.startsWith(prefix),
+    );
+  }
+  if (q.isNotEmpty) {
+    entries = entries.where((e) => _matchesQuery(e.lowercaseName, q));
+  }
+  return entries.map((e) {
+    if (dir.isNotEmpty && e.path.startsWith('$dir/')) {
+      final rel = e.path.substring(dir.length + 1);
+      return e.renamedForView(rel);
+    }
+    return e;
+  }).toList();
 }
 
 /// The folder-structure view at [location]: the folders that lead to a match

@@ -1201,6 +1201,11 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     }
     final active = _workspaceState.activeTab;
     if (active == null) return;
+    // Don't offer a picker whose every choice would fail.
+    if (_workspaceState.atLimit) {
+      _showLimitReached();
+      return;
+    }
     // Respect this shell's workspace boundary. In decoy mode this callback
     // intentionally returns no vaults, even if the engine still has sessions
     // left over from an earlier normal-mode run.

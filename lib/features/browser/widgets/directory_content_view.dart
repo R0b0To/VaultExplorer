@@ -4012,6 +4012,51 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     op.addListener(listener);
   }
 
+  void _returnToCategoryAfterOperations(
+    List<FileOperation> operations,
+    int? returnToTabId,
+    String? returnToFilter,
+  ) {
+    if (operations.isEmpty || returnToTabId == null) return;
+
+    void listener() {
+      if (!mounted) {
+        for (final op in operations) {
+          op.removeListener(listener);
+        }
+        return;
+      }
+      final allFinished = operations.every(
+        (op) =>
+            op.status != FileOperationStatus.pending &&
+            op.status != FileOperationStatus.running,
+      );
+      if (!allFinished) return;
+
+      for (final op in operations) {
+        op.removeListener(listener);
+      }
+      if (!operations.any((op) => op.doneCount > 0)) return;
+
+      final returnTab = ref
+          .read(browserTabsProvider(widget.workspaceConfig))
+          .tabs
+          .where((tab) => tab.tabId == TabId(returnToTabId))
+          .firstOrNull;
+      if (returnTab == null) return;
+      if (returnTab.isCategory) {
+        _workspaceNotifier.activate(returnTab.tabId);
+      } else if (returnTab.tabId == widget.tabId && returnToFilter != null) {
+        _navNotifier.setFilter(returnToFilter);
+      }
+    }
+
+    for (final op in operations) {
+      op.addListener(listener);
+    }
+    listener();
+  }
+
   /// Drag drops can target a different tab or volume, so this viewport is not
   /// necessarily the destination viewport. Let the service's volume-change
   /// notifications refresh every affected tab instead of claiming the op as
@@ -4036,6 +4081,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
 
   Future<void> _paste() async {
     final clip = ref.read(crossContainerClipboardProvider);
+    final returnToTabId = clip.returnToTabId;
+    final returnToFilter = clip.returnToFilter;
     if (!clip.hasItems) return;
     if (_isReadOnly) {
       _setStatus(context.l10n.readOnlyCantPaste, error: true);
@@ -4099,6 +4146,11 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       );
       _clip.clear();
       _bindOpListener(op);
+      _returnToCategoryAfterOperations(
+        [op],
+        returnToTabId,
+        returnToFilter,
+      );
       return;
     }
 
@@ -4171,6 +4223,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     }
     final groupContainers = <int, MountedContainer>{srcVolId: srcContainer};
     final remainingItems = <(int, ClipboardItem)>[];
+    final startedOperations = <FileOperation>[];
     for (final group in groups.entries) {
       final groupVolId = group.key;
       final groupIsCross = groupVolId != widget.container.volId;
@@ -4216,6 +4269,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         remainingItems.addAll(group.value.map((item) => (groupVolId, item)));
         continue;
       }
+      startedOperations.add(op);
       _bindOpListener(op);
     }
     if (remainingItems.isEmpty) {
@@ -4230,6 +4284,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             clip.sourceDisplayName ??
             widget.container.displayName,
         cut: isCut,
+        returnToTabId: returnToTabId,
+        returnToFilter: returnToFilter,
         clipItems: [
           for (final (volId, item) in remainingItems)
             ClipboardItem(
@@ -4240,6 +4296,13 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
               volId: volId == remainingSourceVolId ? null : volId,
             ),
         ],
+      );
+    }
+    if (remainingItems.isEmpty) {
+      _returnToCategoryAfterOperations(
+        startedOperations,
+        returnToTabId,
+        returnToFilter,
       );
     }
   }

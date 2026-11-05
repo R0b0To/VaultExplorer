@@ -68,8 +68,8 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
   final VoidCallback onEncrypt;
   final VoidCallback onDecrypt;
 
-  /// The user's item-action configuration. Buttons and overflow show quick
-  /// actions first, preserving the configured order within each section.
+  /// The user's item-action configuration. Buttons prioritize quick actions,
+  /// and overflow puts quick actions before the rest of the configured order.
   final List<FileItemAction> itemActionOrder;
   final Set<FileItemAction> quickItemActions;
   final Set<FileItemAction> hiddenItemActions;

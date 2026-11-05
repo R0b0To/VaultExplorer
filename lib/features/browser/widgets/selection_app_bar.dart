@@ -65,8 +65,8 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback onEncrypt;
   final VoidCallback onDecrypt;
 
-  /// The user's item-action configuration. Buttons and overflow show quick
-  /// actions first, preserving the configured order within each section.
+  /// The user's item-action configuration. Buttons prioritize quick actions,
+  /// and overflow puts quick actions before the rest of the configured order.
   final List<FileItemAction> itemActionOrder;
   final Set<FileItemAction> quickItemActions;
   final Set<FileItemAction> hiddenItemActions;
@@ -165,21 +165,32 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
             .floor()
             .clamp(0, 6);
 
-        // Allocate every action slot in Quick Actions-first order, so a
-        // non-quick action cannot displace a quick action from the bar.
+        // Keep the configured Quick Actions in the bar and let the remaining
+        // actions stay in More, even when the title leaves spare room.
         final configuredAvailableActions = orderFileItemActions(
           [
-            if (canShowExtractButton) FileItemAction.extract,
-            if (canShowShareButton) FileItemAction.share,
-            if (!isInsideArchive && shown(FileItemAction.copy))
+            if (canShowExtractButton &&
+                quickItemActions.contains(FileItemAction.extract))
+              FileItemAction.extract,
+            if (canShowShareButton &&
+                quickItemActions.contains(FileItemAction.share))
+              FileItemAction.share,
+            if (!isInsideArchive &&
+                quickItemActions.contains(FileItemAction.copy) &&
+                shown(FileItemAction.copy))
               FileItemAction.copy,
-            if (!isInsideArchive && shown(FileItemAction.move))
+            if (!isInsideArchive &&
+                quickItemActions.contains(FileItemAction.move) &&
+                shown(FileItemAction.move))
               FileItemAction.move,
             if (!isInsideArchive &&
                 allowRenameAction &&
+                quickItemActions.contains(FileItemAction.rename) &&
                 shown(FileItemAction.rename))
               FileItemAction.rename,
-            if (canShowDeleteButton) FileItemAction.delete,
+            if (canShowDeleteButton &&
+                quickItemActions.contains(FileItemAction.delete))
+              FileItemAction.delete,
           ],
           order: itemActionOrder,
           quickActions: quickItemActions,
@@ -199,6 +210,63 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
         final bool showDeleteButton = visibleActions.contains(
           FileItemAction.delete,
         );
+        final bool hasMoreActions =
+            (onOpenInNewTab != null && shown(FileItemAction.openInNewTab)) ||
+            (canShowExtractButton && !showExtractButton) ||
+            (canShowShareButton && !showShareButton) ||
+            (singleFileSelected && shown(FileItemAction.openWith)) ||
+            (!isInsideArchive &&
+                showEditImageOption &&
+                shown(FileItemAction.editImage)) ||
+            (!isInsideArchive &&
+                showEditVideoOption &&
+                shown(FileItemAction.editVideo)) ||
+            (!isInsideArchive &&
+                showEditAudioOption &&
+                shown(FileItemAction.editAudio)) ||
+            (!isInsideArchive &&
+                allowRenameAction &&
+                !showRename &&
+                shown(FileItemAction.rename)) ||
+            (!isInsideArchive &&
+                !showCopy &&
+                shown(FileItemAction.copy)) ||
+            (!isInsideArchive &&
+                !showCut &&
+                shown(FileItemAction.move)) ||
+            (canShowDeleteButton &&
+                !showDeleteButton &&
+                shown(FileItemAction.delete)) ||
+            (!isInsideArchive &&
+                allowCompressAction &&
+                shown(FileItemAction.archive)) ||
+            (allowExportAction &&
+                !hideVaultOnlyActions &&
+                !isInsideArchive &&
+                shown(FileItemAction.exportToDevice)) ||
+            (!isInsideArchive &&
+                showEncryptOption &&
+                shown(FileItemAction.encrypt)) ||
+            (!isInsideArchive &&
+                showDecryptOption &&
+                shown(FileItemAction.decrypt)) ||
+            (!isInsideArchive &&
+                singleFolderSelected &&
+                !hideVaultOnlyActions &&
+                shown(FileItemAction.docProvider)) ||
+            (!isInsideArchive &&
+                singleFolderSelected &&
+                !hideVaultOnlyActions &&
+                shown(FileItemAction.syncSettings)) ||
+            (!isInsideArchive &&
+                (showPinOption || showUnpinOption) &&
+                shown(FileItemAction.pin)) ||
+            (!isInsideArchive &&
+                (showBookmarkOption || showUnbookmarkOption) &&
+                shown(FileItemAction.bookmark)) ||
+            (onGoToLocation != null && shown(FileItemAction.goToLocation)) ||
+            (onCopyPath != null && shown(FileItemAction.copyPath)) ||
+            singleSelected;
 
         Widget buildActionButton(FileItemAction action) => switch (action) {
           FileItemAction.extract => IconButton(
@@ -316,7 +384,8 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
           ),
           actions: [
             ...visibleActionOrder.map(buildActionButton),
-            PopupMenuButton<String>(
+            if (hasMoreActions)
+              PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert_rounded),
               tooltip: context.l10n.moreOptionsTooltip,
               onSelected: (value) {

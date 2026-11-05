@@ -15,6 +15,8 @@ import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 import 'package:vaultexplorer/core/utils/cancellation_token.dart';
+import 'package:vaultexplorer/core/utils/file_type_utils.dart'
+    show isAppEncryptedFileName;
 import 'package:vaultexplorer/core/utils/path_clipboard.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
@@ -31,6 +33,8 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/models/thumbnail_settings.dart';
+import 'package:vaultexplorer/data/models/vault_marks.dart';
+import 'package:vaultexplorer/data/models/vault_item.dart' show VaultItemType;
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/cross_container_clipboard.dart';
 import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
@@ -40,6 +44,7 @@ import 'package:vaultexplorer/features/browser/controllers/browser_chrome_hub.da
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart'
     show PathSegment;
+import 'package:vaultexplorer/features/browser/controllers/file_browser_pins_bookmarks_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_operations_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_selection_controller.dart';
 import 'package:vaultexplorer/features/browser/file_browser_predicates.dart';
@@ -83,6 +88,9 @@ import 'package:vaultexplorer/features/browser/widgets/sort_menu_button.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
+import 'package:vaultexplorer/features/tools/models/tool_models.dart'
+    show CryptoDestination, CryptoDirection, CryptoSourceItem;
+import 'package:vaultexplorer/features/tools/widgets/single_file_crypto_sheet.dart';
 import 'package:vaultexplorer/features/sync/domain/sync_ignore_matcher.dart'
     show kVaultMetaDir;
 
@@ -1039,10 +1047,117 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     return groups;
   }
 
+  void _openFileManagerForStagedItems(List<CategoryEntry> entries) {
+    final first = entries.where((entry) => !entry.isSourceRoot).firstOrNull;
+    if (first == null) return;
+    final tabs = ref.read(browserTabsProvider(widget.workspaceConfig));
+    final writableFolderTab = tabs.tabs
+        .where(
+          (tab) =>
+              !tab.isCategory &&
+              !tab.isDashboard &&
+              tab.container != null &&
+              !tab.container!.readOnly,
+        )
+        .firstOrNull;
+    final source = _containers[first.sourceVolId];
+    final container = source != null && !source.readOnly
+        ? source
+        : widget.primaryLocalContainer != null &&
+              !widget.primaryLocalContainer!.readOnly
+        ? widget.primaryLocalContainer
+        : _containers.values.where((candidate) => !candidate.readOnly).firstOrNull;
+    if (container == null) {
+      if (writableFolderTab != null) {
+        ref
+            .read(browserTabsProvider(widget.workspaceConfig).notifier)
+            .activate(writableFolderTab.tabId);
+      }
+      return;
+    }
+    if (_scoped && container.volId != widget.scopedContainer!.volId) {
+      final targetTab = tabs.tabs
+          .where((tab) => !tab.isCategory && tab.volId == container.volId)
+          .firstOrNull;
+      if (targetTab != null) {
+        ref
+            .read(browserTabsProvider(widget.workspaceConfig).notifier)
+            .activate(targetTab.tabId);
+      }
+      return;
+    }
+    final path = container.volId == first.sourceVolId ? first.path : '';
+    final showInFolder = widget.onShowInFolder;
+    if (showInFolder != null) {
+      // The category viewport has no paste target. Opening the first staged
+      // item's real folder switches to the regular browser (or clears a
+      // scoped filter), where the shared clipboard's Paste action is shown.
+      showInFolder(container, path);
+      return;
+    }
+
+    setState(() {
+      _folderMode = true;
+      _location = CategoryLocation(
+        container.volId,
+        path.isEmpty ? '' : parentOfPath(path),
+      );
+      _forwardStack = const [];
+      _forwardLocations = const [];
+    });
+    _jumpToTop();
+  }
+
+  Future<void> _toggleSelectedMarks(
+    List<CategoryEntry> entries, {
+    required bool pin,
+    required bool enabled,
+  }) async {
+    final eligible = entries.where((entry) => !entry.isSourceRoot).toList();
+    for (final group in _bySource(eligible).entries) {
+      final container = _containers[group.key];
+      if (container == null) continue;
+      final notifier = ref.read(
+        fileBrowserPinsBookmarksProvider(group.key).notifier,
+      );
+      if (pin) {
+        await notifier.togglePins(
+          container,
+          group.value.map((entry) => entry.path).toSet().toList(),
+          pin: enabled,
+        );
+      } else {
+        await notifier.toggleBookmarks(
+          container,
+          [
+            for (final entry in group.value)
+              VaultBookmark(entry.path, isDir: entry.isDir),
+          ],
+          bookmark: enabled,
+        );
+      }
+    }
+    if (!mounted) return;
+    final count = eligible.length;
+    _notify(
+      pin
+          ? (enabled
+                ? context.l10n.pinnedCount(count)
+                : context.l10n.unpinnedCount(count))
+          : (enabled
+                ? context.l10n.bookmarkedCount(count)
+                : context.l10n.unbookmarkedCount(count)),
+    );
+    _clearSelection();
+  }
+
   Future<void> _share(List<CategoryEntry> entries) async {
-    final files = entries.where((e) => !e.isDir).toList();
-    if (files.isEmpty) return;
-    final groups = _bySource(files);
+    final shareable = entries.where((entry) {
+      return !entry.isSourceRoot &&
+          (entry.isDir || !isVaultItemFileName(entry.baseName));
+    }).toList();
+    if (shareable.isEmpty) return;
+    final groups = _bySource(shareable);
     if (groups.length != 1) {
       _notify(context.l10n.categoryShareOneSource, error: true);
       return;
@@ -1050,12 +1165,27 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     final container = _containers[groups.keys.single];
     if (container == null) return;
     try {
-      final paths = [for (final e in files) e.path];
+      final paths = [for (final e in shareable) e.path];
+      final directoryPaths = [
+        for (final e in shareable)
+          if (e.isDir) e.path,
+      ];
       final ok = container.isRawLocal
-          ? await ref.read(vaultLocalShareApiProvider).shareLocalFiles([
-              for (final e in paths) p.join(container.uri, e),
-            ])
-          : await ref.read(vaultFileIoApiProvider).shareFiles(container, paths);
+          ? await ref.read(vaultLocalShareApiProvider).shareLocalFiles(
+              [for (final path in paths) p.join(container.uri, path)],
+              directoryPaths: [
+                for (final path in directoryPaths) p.join(container.uri, path),
+              ],
+            )
+          : await ref.read(vaultFileIoApiProvider).shareFiles(
+              container,
+              paths,
+              directoryPaths: directoryPaths,
+              skipExtensions: [
+                for (final type in VaultItemType.values)
+                  type.name.toLowerCase(),
+              ],
+            );
       if (!ok && mounted) {
         _notify(context.l10n.couldNotShareFiles, error: true);
       }
@@ -1065,17 +1195,17 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
   }
 
   void _stage(List<CategoryEntry> entries, {required bool cut}) {
-    final files = entries.where((e) => !e.isDir).toList();
-    if (files.isEmpty) return;
+    final eligible = entries.where((e) => !e.isSourceRoot).toList();
+    if (eligible.isEmpty) return;
     final containers = [
-      for (final e in files)
+      for (final e in eligible)
         if (_containers[e.sourceVolId] != null) _containers[e.sourceVolId]!,
     ];
     if (cut && containers.any((c) => c.readOnly)) {
       _notify(context.l10n.readOnlyCantMove, error: true);
       return;
     }
-    final primary = _containers[files.first.sourceVolId];
+    final primary = _containers[eligible.first.sourceVolId];
     if (primary == null) return;
     ref
         .read(crossContainerClipboardProvider.notifier)
@@ -1084,24 +1214,27 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           displayName: primary.displayName,
           cut: cut,
           clipItems: [
-            for (final e in files)
+            for (final e in eligible)
               ClipboardItem(
                 path: e.path,
-                isDir: false,
+                isDir: e.isDir,
                 sizeBytes: e.sizeBytes,
                 modifiedSecs: e.modifiedSecs,
                 volId: e.sourceVolId == primary.volId ? null : e.sourceVolId,
               ),
           ],
+          returnToTabId: widget.tabId.value,
+          returnToFilter: _scoped ? widget.category.filterKey : null,
         );
     _clearSelection();
-    _notify(context.l10n.categoryClipboardReady(files.length));
+    _notify(context.l10n.categoryClipboardReady(eligible.length));
+    _openFileManagerForStagedItems(eligible);
   }
 
   void _delete(List<CategoryEntry> entries) {
-    final files = entries.where((e) => !e.isDir).toList();
-    if (files.isEmpty) return;
-    final groups = _bySource(files);
+    final eligible = entries.where((e) => !e.isSourceRoot).toList();
+    if (eligible.isEmpty) return;
+    final groups = _bySource(eligible);
     if (groups.keys.any((id) => _containers[id]?.readOnly ?? false)) {
       _notify(context.l10n.readOnlyCantDelete, error: true);
       return;
@@ -1109,7 +1242,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     HapticFeedback.heavyImpact();
     BrowserDialogs.showBatchDelete(
       context,
-      toDelete: files,
+      toDelete: eligible,
       onConfirmed: (_) {
         _clearSelection();
         final opService = ref.read(fileOperationServiceProvider);
@@ -1120,7 +1253,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
             container: container,
             items: [
               for (final e in group.value)
-                ClipboardItem(path: e.path, isDir: false),
+                ClipboardItem(path: e.path, isDir: e.isDir),
             ],
             locationLabel: '',
             l10n: context.l10n,
@@ -1146,10 +1279,237 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     );
   }
 
-  Future<void> _rename(CategoryEntry entry) async {
-    final container = _containers[entry.sourceVolId];
-    if (container == null || entry.isDir) return;
-    final parent = entry.parentPath;
+  void _exportSelection(List<CategoryEntry> entries) {
+    final eligible = entries.where((entry) => !entry.isSourceRoot).toList();
+    final groups = _bySource(eligible);
+    if (groups.length != 1) return;
+    final source = _containers[groups.keys.single];
+    if (source == null || source.isLocalStorage) return;
+    final items = [
+      for (final entry in eligible)
+        ClipboardItem(
+          path: entry.path,
+          isDir: entry.isDir,
+          sizeBytes: entry.isDir ? 0 : entry.sizeBytes,
+        ),
+    ];
+    if (items.isEmpty) return;
+
+    _clearSelection();
+    final opService = ref.read(fileOperationServiceProvider);
+    final op = opService.enqueueExport(
+      source: source,
+      items: items,
+      performExport: (opId) => ref
+          .read(vaultFileIoApiProvider)
+          .exportSelectedToFolder(
+            source,
+            [
+              for (final item in items)
+                {'path': item.path, 'isDir': item.isDir},
+            ],
+            opId: opId,
+          ),
+      l10n: context.l10n,
+    );
+    void listener() {
+      if (!mounted) {
+        op.removeListener(listener);
+        return;
+      }
+      if (op.status == FileOperationStatus.running ||
+          op.status == FileOperationStatus.pending) {
+        return;
+      }
+      op.removeListener(listener);
+      opService.dismiss(op.id);
+      _notify(
+        op.doneCount > 0
+            ? context.l10n.exportedCount(op.doneCount)
+            : context.l10n.exportCancelledOrFailed,
+        error: op.doneCount == 0,
+      );
+    }
+
+    op.addListener(listener);
+  }
+
+  Future<void> _compressSelection(List<CategoryEntry> entries) async {
+    final eligible = entries.where((entry) => !entry.isSourceRoot).toList();
+    if (eligible.isEmpty ||
+        eligible.any(
+          (entry) => entry.sourceVolId != eligible.first.sourceVolId,
+        )) {
+      return;
+    }
+    final source = _containers[eligible.first.sourceVolId];
+    if (source == null || source.readOnly) return;
+    final parent = eligible.first.parentPath;
+    final listing =
+        await ref.read(vaultFileIoApiProvider).listDirectory(source, parent) ??
+        const <String>[];
+    if (!mounted) return;
+
+    final selectedEntries = [
+      for (final entry in eligible)
+        RawEntry(
+          name: entry.baseName,
+          isDir: entry.isDir,
+          sizeBytes: entry.sizeBytes,
+          modifiedSecs: entry.modifiedSecs,
+          lowercaseName: entry.baseName.toLowerCase(),
+          extension: entry.extension,
+        ),
+    ];
+    String stem(RawEntry entry) {
+      if (entry.isDir) return entry.name;
+      final dot = entry.name.lastIndexOf('.');
+      return dot > 0 ? entry.name.substring(0, dot) : entry.name;
+    }
+
+    final suggestedName = eligible.length == 1
+        ? '${stem(selectedEntries.first)}.zip'
+        : '${parent.isEmpty ? source.displayName : parent.split('/').last}.zip';
+    _clearSelection();
+    BrowserDialogs.showCreateArchive(
+      context,
+      container: source,
+      currentDirPath: parent,
+      existingEntries: RawEntry.parseAll(listing),
+      suggestedName: suggestedName,
+      selectedEntries: selectedEntries,
+      readOnly: source.readOnly,
+      onCreate:
+          (
+            destPath,
+            format,
+            passphrase,
+            encryptFilenames,
+            compressionLevel,
+            compressionMethod,
+          ) async {
+            ref
+                .read(crossContainerClipboardProvider.notifier)
+                .setArchiveCreate(
+                  volId: source.volId,
+                  displayName: source.displayName,
+                  clipItems: [
+                    for (final entry in eligible)
+                      ClipboardItem(
+                        path: entry.path,
+                        isDir: entry.isDir,
+                        sizeBytes: entry.isDir ? 0 : entry.sizeBytes,
+                        modifiedSecs: entry.modifiedSecs,
+                      ),
+                  ],
+                  archiveName: destPath.split('/').last,
+                  format: format,
+                  passphrase: passphrase,
+                  encryptFilenames: encryptFilenames,
+                  compressionLevel: compressionLevel,
+                  compressionMethod: compressionMethod,
+                  returnToTabId: widget.tabId.value,
+                  returnToFilter: _scoped ? widget.category.filterKey : null,
+                );
+            if (mounted) {
+              _notify(
+                '${context.l10n.verbArchiving}: ${destPath.split('/').last}',
+              );
+              _openFileManagerForStagedItems(eligible);
+            }
+          },
+    );
+  }
+
+  Future<void> _runCategoryCrypto(
+    List<CategoryEntry> entries,
+    CryptoDirection direction,
+  ) async {
+    final files = entries.where((entry) {
+      if (entry.isDir || entry.isSourceRoot) return false;
+      final encrypted = isAppEncryptedFileName(entry.baseName);
+      return direction == CryptoDirection.encrypt ? !encrypted : encrypted;
+    }).toList();
+    if (files.isEmpty) return;
+
+    final sources = <CryptoSourceItem>[];
+    for (final entry in files) {
+      final source = _containers[entry.sourceVolId];
+      if (source == null) continue;
+      if (source.isLocalStorage) {
+        sources.add(
+          CryptoSourceItem.external(
+            displayName: entry.baseName,
+            externalUri: Uri.file(p.join(source.uri, entry.path)).toString(),
+          ),
+        );
+      } else {
+        sources.add(
+          CryptoSourceItem.vault(
+            displayName: entry.baseName,
+            container: source,
+            relativePath: entry.path,
+          ),
+        );
+      }
+    }
+    if (sources.isEmpty) return;
+
+    final first = files.first;
+    final destinationContainer = _containers[first.sourceVolId];
+    if (destinationContainer == null) return;
+    final parent = first.parentPath;
+    final folderLabel = parent.isEmpty
+        ? destinationContainer.displayName
+        : '${destinationContainer.displayName} / ${parent.split('/').last}';
+    final destination = destinationContainer.isLocalStorage
+        ? CryptoDestination.external(
+            displayName: folderLabel,
+            externalPath: parent.isEmpty
+                ? destinationContainer.uri
+                : p.join(destinationContainer.uri, parent),
+          )
+        : CryptoDestination.vault(
+            displayName: folderLabel,
+            container: destinationContainer,
+            relativePath: parent,
+          );
+
+    _clearSelection();
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SkinAreaScope(
+          area: SkinArea.tools,
+          child: SingleFileCryptoSheet(
+            initialSources: sources,
+            initialDestination: destination,
+            initialDirection: direction,
+            allowEditingSelection: false,
+          ),
+        ),
+      ),
+    );
+    if (!mounted) return;
+    await _startScan(deep: true);
+  }
+
+  Future<void> _rename(List<CategoryEntry> entries) async {
+    if (entries.isEmpty) return;
+    final first = entries.first;
+    if (first.isDir || first.isSourceRoot) return;
+    if (entries.any(
+      (entry) =>
+          entry.isDir ||
+          entry.isSourceRoot ||
+          entry.sourceVolId != first.sourceVolId ||
+          entry.parentPath != first.parentPath,
+    )) {
+      return;
+    }
+    final container = _containers[first.sourceVolId];
+    if (container == null || container.readOnly) return;
+    final parent = first.parentPath;
     final listing =
         await ref
             .read(vaultFileIoApiProvider)
@@ -1160,14 +1520,15 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       context,
       container: container,
       oldEntries: [
-        RawEntry(
-          name: entry.baseName,
-          isDir: false,
-          sizeBytes: entry.sizeBytes,
-          modifiedSecs: entry.modifiedSecs,
-          lowercaseName: entry.baseName.toLowerCase(),
-          extension: entry.extension,
-        ),
+        for (final entry in entries)
+          RawEntry(
+            name: entry.baseName,
+            isDir: false,
+            sizeBytes: entry.sizeBytes,
+            modifiedSecs: entry.modifiedSecs,
+            lowercaseName: entry.baseName.toLowerCase(),
+            extension: entry.extension,
+          ),
       ],
       existingEntries: RawEntry.parseAll(listing),
       currentDirPath: parent,
@@ -1289,7 +1650,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           thumbSettings?.cacheMode ?? ThumbnailCacheMode.appCache,
       thumbnailQuality:
           thumbSettings?.quality ?? ThumbnailQuality.defaultAutoQuality,
-      onRename: () => unawaited(_rename(entry)),
+      onRename: () => unawaited(_rename([entry])),
       onDelete: () => _delete([entry]),
       onCopy: () => _stage([entry], cut: false),
       onCut: () => _stage([entry], cut: true),
@@ -1459,6 +1820,24 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     final items = _currentItems();
     final selection = ref.watch(fileBrowserSelectionProvider(widget.tabId));
     final isSelecting = selection.items.isNotEmpty;
+    final selectedForMarks = selection.items
+        .whereType<CategoryEntry>()
+        .where((entry) => !entry.isSourceRoot)
+        .toList(growable: false);
+    final marksBySource = <int, VaultMarks>{};
+    for (final volId in selectedForMarks
+        .map((entry) => entry.sourceVolId)
+        .toSet()) {
+      marksBySource[volId] = ref.watch(fileBrowserPinsBookmarksProvider(volId));
+      final container = _containers[volId];
+      if (container != null) {
+        unawaited(
+          ref
+              .read(fileBrowserPinsBookmarksProvider(volId).notifier)
+              .ensureLoaded(container),
+        );
+      }
+    }
     final location = _effectiveLocation;
     final isLandscape =
         MediaQuery.orientationOf(context) == Orientation.landscape;
@@ -1764,6 +2143,65 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       final selectedList =
           selection.items.whereType<CategoryEntry>().toList();
       final single = selectedList.length == 1 ? selectedList.single : null;
+      final firstSelected = selectedList.isEmpty ? null : selectedList.first;
+      final realSelected = selectedList
+          .where((entry) => !entry.isSourceRoot)
+          .toList(growable: false);
+      final selectedGroups = _bySource(realSelected);
+      final oneSource = selectedGroups.length == 1;
+      final selectedContainer = oneSource
+          ? _containers[selectedGroups.keys.single]
+          : null;
+      final renameContainer = firstSelected == null
+          ? null
+          : _containers[firstSelected.sourceVolId];
+      final canRenameSelection =
+          firstSelected != null &&
+          !firstSelected.isDir &&
+          !firstSelected.isSourceRoot &&
+          renameContainer != null &&
+          !renameContainer.readOnly &&
+          selectedList.every(
+            (entry) =>
+                !entry.isDir &&
+                !entry.isSourceRoot &&
+                entry.sourceVolId == firstSelected.sourceVolId &&
+                entry.parentPath == firstSelected.parentPath,
+          );
+      final canCompressSelection =
+          realSelected.isNotEmpty &&
+          oneSource &&
+          selectedContainer != null &&
+          !selectedContainer.readOnly;
+      final canExportSelection =
+          realSelected.isNotEmpty &&
+          oneSource &&
+          selectedContainer != null &&
+          !selectedContainer.isLocalStorage;
+      final shareableSelection = realSelected
+          .where((entry) => entry.isDir || !isVaultItemFileName(entry.baseName))
+          .toList(growable: false);
+      final shareGroups = _bySource(shareableSelection);
+      final canShareSelection =
+          shareableSelection.isNotEmpty && shareGroups.length == 1;
+      bool isPinned(CategoryEntry entry) =>
+          marksBySource[entry.sourceVolId]?.pinnedPaths.contains(entry.path) ??
+          false;
+      bool isBookmarked(CategoryEntry entry) =>
+          marksBySource[entry.sourceVolId]?.isBookmarked(entry.path) ?? false;
+      final showPin = realSelected.any((entry) => !isPinned(entry));
+      final showUnpin = realSelected.any(isPinned);
+      final showBookmark = realSelected.any((entry) => !isBookmarked(entry));
+      final showUnbookmark = realSelected.any(isBookmarked);
+      final showEncrypt = realSelected.any(
+        (entry) => !entry.isDir && !isAppEncryptedFileName(entry.baseName),
+      );
+      final showDecrypt = realSelected.any(
+        (entry) => !entry.isDir && isAppEncryptedFileName(entry.baseName),
+      );
+      final hasReadOnlySource = selectedList.any(
+        (entry) => _containers[entry.sourceVolId]?.readOnly ?? true,
+      );
 
       return SelectionAppBar(
         selectedCount: selectedList.length,
@@ -1773,15 +2211,15 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
         singleFolderSelected: single != null && single.isDir,
         onClose: _clearSelection,
         onSelectAll: _selectAll,
-        onRename: () {
-          if (single != null) unawaited(_rename(single));
-        },
-        allowRenameAction: single != null && !single.isSourceRoot,
+        onRename: () => unawaited(_rename(selectedList)),
+        allowRenameAction: canRenameSelection,
         onCopy: () => _stage(selectedList, cut: false),
         onCut: () => _stage(selectedList, cut: true),
         onDelete: () => _delete(selectedList),
         onShare: () => _share(selectedList),
-        showShareOption: true,
+        showShareOption: canShareSelection,
+        hideVaultOnlyActions: selectedContainer?.isLocalStorage ?? true,
+        readOnly: hasReadOnlySource,
         onFileInfo: () {
           if (single != null) _showFileInfo(single);
         },
@@ -1795,24 +2233,36 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
             ? () => _showInFolder(single)
             : null,
         onCopyPath: single != null ? () => _copyPath(single) : null,
-        onExport: () {},
-        allowExportAction: false,
+        onExport: () => _exportSelection(selectedList),
+        allowExportAction: canExportSelection,
         allowExtractAction: false,
-        onCompressSelection: () {},
-        allowCompressAction: false,
+        onCompressSelection: () => unawaited(_compressSelection(selectedList)),
+        allowCompressAction: canCompressSelection,
         onExtractSelectedArchive: () {},
-        showPinOption: false,
-        showUnpinOption: false,
-        onPin: () {},
-        onUnpin: () {},
-        showBookmarkOption: false,
-        showUnbookmarkOption: false,
-        onBookmark: () {},
-        onUnbookmark: () {},
-        showEncryptOption: false,
-        showDecryptOption: false,
-        onEncrypt: () {},
-        onDecrypt: () {},
+        showPinOption: showPin,
+        showUnpinOption: showUnpin,
+        onPin: () => unawaited(
+          _toggleSelectedMarks(selectedList, pin: true, enabled: true),
+        ),
+        onUnpin: () => unawaited(
+          _toggleSelectedMarks(selectedList, pin: true, enabled: false),
+        ),
+        showBookmarkOption: showBookmark,
+        showUnbookmarkOption: showUnbookmark,
+        onBookmark: () => unawaited(
+          _toggleSelectedMarks(selectedList, pin: false, enabled: true),
+        ),
+        onUnbookmark: () => unawaited(
+          _toggleSelectedMarks(selectedList, pin: false, enabled: false),
+        ),
+        showEncryptOption: showEncrypt,
+        showDecryptOption: showDecrypt,
+        onEncrypt: () => unawaited(
+          _runCategoryCrypto(selectedList, CryptoDirection.encrypt),
+        ),
+        onDecrypt: () => unawaited(
+          _runCategoryCrypto(selectedList, CryptoDirection.decrypt),
+        ),
         showEditImageOption: single != null &&
             !single.isDir &&
             MediaViewerConstants.isImage(single.baseName) &&

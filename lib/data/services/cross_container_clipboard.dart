@@ -20,6 +20,8 @@ enum ClipboardAction {
 typedef ClipboardState = ({
   int? sourceVolId,
   String? sourceDisplayName,
+  int? returnToTabId,
+  String? returnToFilter,
   ClipboardAction action,
   List<ClipboardItem> items,
   String? archiveName,
@@ -40,6 +42,8 @@ typedef ClipboardState = ({
 const _emptyClipboard = (
   sourceVolId: null,
   sourceDisplayName: null,
+  returnToTabId: null,
+  returnToFilter: null,
   action: ClipboardAction.copy,
   items: <ClipboardItem>[],
   archiveName: null,
@@ -81,10 +85,14 @@ class CrossContainerClipboard extends _$CrossContainerClipboard {
     required String displayName,
     required bool cut,
     required List<ClipboardItem> clipItems,
+    int? returnToTabId,
+    String? returnToFilter,
   }) {
     _replace((
       sourceVolId: volId,
       sourceDisplayName: displayName,
+      returnToTabId: returnToTabId,
+      returnToFilter: returnToFilter,
       action: cut ? ClipboardAction.move : ClipboardAction.copy,
       items: List.unmodifiable(clipItems),
       archiveName: null,
@@ -110,10 +118,14 @@ class CrossContainerClipboard extends _$CrossContainerClipboard {
     ArchiveCompressionLevel? compressionLevel,
     ArchiveCompressionMethod compressionMethod = ArchiveCompressionMethod.auto,
     int splitSizeBytes = 0,
+    int? returnToTabId,
+    String? returnToFilter,
   }) {
     _replace((
       sourceVolId: volId,
       sourceDisplayName: displayName,
+      returnToTabId: returnToTabId,
+      returnToFilter: returnToFilter,
       action: ClipboardAction.archiveCreate,
       items: List.unmodifiable(clipItems),
       archiveName: archiveName,
@@ -139,6 +151,8 @@ class CrossContainerClipboard extends _$CrossContainerClipboard {
     _replace((
       sourceVolId: volId,
       sourceDisplayName: displayName,
+      returnToTabId: null,
+      returnToFilter: null,
       action: ClipboardAction.archiveExtract,
       items: List.unmodifiable(stagedItems ?? [archiveItem]),
       archiveName: archiveItem.name,

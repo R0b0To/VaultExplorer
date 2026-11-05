@@ -744,6 +744,11 @@ class _MainShellState extends ConsumerState<MainShell>
     }
     final actions = _browserWorkspaceActions;
     if (actions == null) return;
+    // Don't offer a picker whose every choice would fail.
+    if (_browserWorkspaceState?.atLimit ?? false) {
+      _showBrowserTabLimit();
+      return;
+    }
     _cacheDashboardLocalStorageContainer();
     final choice = await BrowserNewTabSheet.show(
       context,

@@ -17,6 +17,7 @@ import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 import 'package:vaultexplorer/core/utils/cancellation_token.dart';
 import 'package:vaultexplorer/core/utils/path_clipboard.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_feedback.dart';
 import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart'
     show AppBannerTone;
@@ -455,7 +456,9 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
             ],
           ),
         );
-      } catch (_) {}
+      } catch (e) {
+        VeLog.w('CategoryContentView', 'Could not save the category index', e);
+      }
     }
   }
 

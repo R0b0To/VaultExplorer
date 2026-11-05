@@ -53,9 +53,9 @@ int main() {
             UsbCreatePhase::kWriteMbr,        UsbCreatePhase::kPrepareHeader,
             UsbCreatePhase::kWritePrimaryHeader, UsbCreatePhase::kWriteBackupHeader,
             UsbCreatePhase::kFillData,        UsbCreatePhase::kFormatFilesystem,
-            UsbCreatePhase::kComplete,
+            UsbCreatePhase::kComplete,        UsbCreatePhase::kFlushDevice,
         };
-        std::string seen[9];
+        std::string seen[10];
         size_t n = 0;
         for (UsbCreatePhase p : allPhases) {
             std::string name = usbCreatePhaseName(p);

@@ -632,6 +632,8 @@ if(NOT ANDROID)
             ${CMAKE_CURRENT_SOURCE_DIR}/jni)
     # Header-area arithmetic (backup header offsets, hidden-volume protected range).
     add_executable(vc_geometry_test containers/test/vc_geometry_test.cpp)
+    # Random fill of the reserved header areas (hidden-volume deniability).
+    add_executable(vc_header_areas_test containers/test/vc_header_areas_test.cpp)
     add_executable(cryfs_block_cipher_test
             test/cryfs_block_cipher_test.cpp
             crypto/cryfs_block_cipher.cpp
@@ -731,6 +733,7 @@ if(NOT ANDROID)
             fd_write_buffer_test
             usb_block_cache_test
             vc_geometry_test
+            vc_header_areas_test
             cryfs_block_cipher_test
             user_entropy_test
             utf16le_password_test
@@ -758,6 +761,7 @@ if(NOT ANDROID)
     add_test(NAME fd_write_buffer_test COMMAND fd_write_buffer_test)
     add_test(NAME usb_block_cache_test COMMAND usb_block_cache_test)
     add_test(NAME vc_geometry_test COMMAND vc_geometry_test)
+    add_test(NAME vc_header_areas_test COMMAND vc_header_areas_test)
     add_test(NAME cryfs_block_cipher_test COMMAND cryfs_block_cipher_test)
     add_test(NAME user_entropy_test COMMAND user_entropy_test)
     add_test(NAME utf16le_password_test COMMAND utf16le_password_test)

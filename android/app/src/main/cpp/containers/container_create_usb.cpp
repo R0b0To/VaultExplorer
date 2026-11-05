@@ -8,6 +8,8 @@
 #include "crypto/cascade.h"
 #include "crypto/keyfile_mixing.h"
 #include "crypto/vc_header_layout.h"
+#include "vc_geometry.h"
+#include "vc_header_areas.h"
 #include "crypto/xts_tweak.h"
 #include "volume_state.h"
 #include "ext_backend.h"
@@ -172,6 +174,21 @@ UsbCreateResult createUsbContainer(int volId, uint64_t startSector, const char* 
         memcpy(hdrSector + VC_SALT_SIZE, encBody, VC_HEADER_BODY_SIZE);
 
         uint64_t baseOffset = startSector * 512;
+
+        // Initialise both reserved header groups with random bytes before the real
+        // headers go in (as VeraCrypt does). A reused drive otherwise keeps whatever
+        // was there before -- old filesystem structures, or zeros -- and the
+        // hidden-header slot then reveals whether a hidden volume exists.
+        if (!vcgeom::randomizeHeaderGroups(
+                baseOffset, VOLUME_SIZE,
+                [&](uint64_t off, const unsigned char* p, size_t n) { return physicalWrite(volId, off, p, n); },
+                [](void* out, size_t n) { return userentropy::fillRandom(static_cast<uint8_t*>(out), n); })) {
+            result = UsbCreateResult::Fail(UsbCreatePhase::kWritePrimaryHeader, "USB_HEADER_AREA_FILL_FAILED",
+                                            "Failed to initialise the reserved header areas", baseOffset,
+                                            baseOffset / 512, VC_DATA_AREA_OFFSET / 512);
+            break;
+        }
+
         if (!physicalWrite(volId, baseOffset, hdrSector, VC_FULL_HEADER_SIZE)) {
             result = UsbCreateResult::Fail(UsbCreatePhase::kWritePrimaryHeader, "USB_HEADER_WRITE_FAILED",
                                             "Failed to write the primary volume header", baseOffset,
@@ -273,7 +290,11 @@ UsbCreateResult createUsbContainer(int volId, uint64_t startSector, const char* 
         }
 
         // Flush software buffers and execute hardware SCSI cache barrier
-        usbFlushAndSync(volId);
+        if (!usbFlushAndSync(volId)) {
+            result = UsbCreateResult::Fail(UsbCreatePhase::kFlushDevice, "USB_FLUSH_FAILED",
+                                            "Failed to flush and sync the device after creating the volume");
+            break;
+        }
         success = true;
     } while (false);
 
@@ -507,7 +528,11 @@ UsbCreateResult createUsbLuksContainer(int volId, uint64_t startSector, const ch
             break;
         }
 
-        usbFlushAndSync(volId);
+        if (!usbFlushAndSync(volId)) {
+            result = UsbCreateResult::Fail(UsbCreatePhase::kFlushDevice, "USB_FLUSH_FAILED",
+                                            "Failed to flush and sync the device after creating the volume");
+            break;
+        }
         success = true;
     } while (false);
 
@@ -708,7 +733,21 @@ UsbCreateResult createUsbContainerWithHidden(
         memcpy(hHdrSector + VC_SALT_SIZE, hEncBody, VC_HEADER_BODY_SIZE);
 
         uint64_t baseOffset = startSector * 512;
-        
+
+        // Initialise both reserved header groups with random bytes before the real
+        // headers go in (as VeraCrypt does). A reused drive otherwise keeps whatever
+        // was there before -- old filesystem structures, or zeros -- and the
+        // hidden-header slot then reveals whether a hidden volume exists.
+        if (!vcgeom::randomizeHeaderGroups(
+                baseOffset, VOLUME_SIZE,
+                [&](uint64_t off, const unsigned char* p, size_t n) { return physicalWrite(volId, off, p, n); },
+                [](void* out, size_t n) { return userentropy::fillRandom(static_cast<uint8_t*>(out), n); })) {
+            result = UsbCreateResult::Fail(UsbCreatePhase::kWritePrimaryHeader, "USB_HEADER_AREA_FILL_FAILED",
+                                            "Failed to initialise the reserved header areas", baseOffset,
+                                            baseOffset / 512, VC_DATA_AREA_OFFSET / 512);
+            break;
+        }
+
         // Write Outer Headers
         if (!physicalWrite(volId, baseOffset, oHdrSector, VC_FULL_HEADER_SIZE)) {
             result = UsbCreateResult::Fail(UsbCreatePhase::kWritePrimaryHeader, "USB_HEADER_WRITE_FAILED",
@@ -731,6 +770,26 @@ UsbCreateResult createUsbContainerWithHidden(
                                             "Failed to write the hidden volume header", hiddenHeaderOffset,
                                             hiddenHeaderOffset / 512, VC_FULL_HEADER_SIZE / 512);
             break;
+        }
+
+        // Backup copy of the hidden header at the end of the container, as
+        // VeraCrypt keeps one. It lies in the trailing header group, clear of the
+        // hidden data area [V-A-H, V-A).
+        {
+            uint64_t hiddenBackupRel = 0;
+            if (!vcgeom::backupHeaderOffset(VOLUME_SIZE, true, &hiddenBackupRel) ||
+                !vcgeom::headerClearOfDataArea(hiddenBackupRel, HIDDEN_AREA_START, HIDDEN_DATA_SIZE)) {
+                result = UsbCreateResult::Fail(UsbCreatePhase::kWriteBackupHeader, "USB_HIDDEN_BACKUP_HEADER_INVALID",
+                                                "No valid slot for the hidden backup header");
+                break;
+            }
+            const uint64_t hiddenBackupOffset = baseOffset + hiddenBackupRel;
+            if (!physicalWrite(volId, hiddenBackupOffset, hHdrSector, VC_FULL_HEADER_SIZE)) {
+                result = UsbCreateResult::Fail(UsbCreatePhase::kWriteBackupHeader, "USB_HIDDEN_BACKUP_HEADER_WRITE_FAILED",
+                                                "Failed to write the hidden backup volume header", hiddenBackupOffset,
+                                                hiddenBackupOffset / 512, VC_FULL_HEADER_SIZE / 512);
+                break;
+            }
         }
 
         // Zero Fill
@@ -800,7 +859,11 @@ UsbCreateResult createUsbContainerWithHidden(
             break;
         }
 
-        usbFlushAndSync(volId);
+        if (!usbFlushAndSync(volId)) {
+            result = UsbCreateResult::Fail(UsbCreatePhase::kFlushDevice, "USB_FLUSH_FAILED",
+                                            "Failed to flush and sync the device after creating the volume");
+            break;
+        }
         success = true;
     } while (false);
 

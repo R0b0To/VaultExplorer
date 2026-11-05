@@ -15,6 +15,7 @@
 #include "container_format.h"
 #include "container_utils.h"
 #include "vc_geometry.h"
+#include "vc_header_areas.h"
 #include "crypto/cascade.h"
 #include "crypto/keyfile_mixing.h"
 #include "crypto/luks_header.h"
@@ -107,6 +108,21 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
 
         const uint64_t DATA_SIZE = VOLUME_SIZE - (2 * VC_DATA_AREA_OFFSET);
 
+        // Fill both 128 KiB header groups with random bytes before the real
+        // headers go in, as VeraCrypt does. Otherwise the hidden-header slot
+        // (and the rest of the reserved areas) of a fresh zero-extended file is
+        // all zeros exactly when no hidden volume exists, which tells an
+        // observer whether a hidden volume is there without any secret. The
+        // last piece also ends at VOLUME_SIZE - 1, so this extends the file
+        // even where ftruncate() above is not honoured.
+        if (!vcgeom::randomizeHeaderGroups(
+                0, VOLUME_SIZE,
+                [fd](uint64_t off, const unsigned char* p, size_t n) { return vcgeom::pwriteFully(fd, off, p, n); },
+                [](void* out, size_t n) { return userentropy::fillRandom(static_cast<uint8_t*>(out), n); })) {
+            LOGI("createContainer: failed to initialise the reserved header areas");
+            break;
+        }
+
         unsigned char body[VC_HEADER_BODY_SIZE];
         memset(body, 0, sizeof(body));
         body[0] = 'V'; body[1] = 'E'; body[2] = 'R'; body[3] = 'A';
@@ -177,8 +193,8 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
             LOGI("createContainer: backup header write failed"); break;
         }
 
-        unsigned char eofByte = 0;
-        pwrite(fd, &eofByte, 1, static_cast<off_t>(VOLUME_SIZE - 1));
+        // (No trailing marker byte: the last byte of the container belongs to the
+        // random-filled hidden-volume backup header slot and must stay random.)
 
         if (!quickFormat) {
             CascadeContext dataCtx;
@@ -686,6 +702,25 @@ bool createContainerWithHidden(int fd,
         memcpy(hdrSector + VC_SALT_SIZE,   encBody, VC_HEADER_BODY_SIZE);
 
         if (pwrite(fd, hdrSector, VC_FULL_HEADER_SIZE, VC_HIDDEN_HEADER_OFFSET) != VC_FULL_HEADER_SIZE) break;
+
+        // VeraCrypt keeps a backup of the hidden header too, at the very end of
+        // the container (after the outer backup header). Without it a damaged
+        // primary hidden header cannot be recovered, and a later password
+        // change would have no second copy to keep in step. The slot lies in the
+        // trailing header group, clear of the hidden data area [V-A-H, V-A).
+        {
+            uint64_t hiddenBackupOffset = 0;
+            if (!vcgeom::backupHeaderOffset(VOLUME_SIZE, true, &hiddenBackupOffset) ||
+                !vcgeom::headerClearOfDataArea(hiddenBackupOffset, hiddenDataStartAbsolute, hiddenDataSize)) {
+                LOGI("createContainerWithHidden: no valid hidden backup header slot");
+                break;
+            }
+            if (pwrite(fd, hdrSector, VC_FULL_HEADER_SIZE, static_cast<off_t>(hiddenBackupOffset)) !=
+                VC_FULL_HEADER_SIZE) {
+                LOGI("createContainerWithHidden: hidden backup header write failed");
+                break;
+            }
+        }
 
         if (!quickFormat) {
             CascadeContext dataCtx;

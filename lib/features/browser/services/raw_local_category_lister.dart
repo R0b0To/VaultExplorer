@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
 import 'package:vaultexplorer/features/browser/services/category_scan.dart';
 
 /// Files `stat`ted at once when a folder holds many matches.
@@ -31,20 +32,17 @@ CategoryDirectoryLister rawLocalCategoryLister({
   required String rootPath,
   required bool Function(String fileName) matches,
 }) {
-  final root = rootPath.length > 1 && rootPath.endsWith('/')
-      ? rootPath.substring(0, rootPath.length - 1)
-      : rootPath;
+  final root = p.normalize(rootPath);
 
   return (dirPath) async {
-    final path = dirPath.isEmpty ? root : '$root/$dirPath';
+    final path = dirPath.isEmpty ? root : p.join(root, dirPath);
     final out = <String>[];
     final matching = <File>[];
     var readSomething = false;
     try {
       await for (final entity in Directory(path).list(followLinks: false)) {
         readSomething = true;
-        final slash = entity.path.lastIndexOf('/');
-        final name = slash < 0 ? entity.path : entity.path.substring(slash + 1);
+        final name = p.basename(entity.path);
         if (entity is Directory) {
           out.add('D|0|0|$name');
         } else if (entity is File) {
@@ -80,7 +78,7 @@ CategoryDirectoryLister rawLocalCategoryLister({
           continue;
         }
         final file = batch[j];
-        final name = file.path.substring(file.path.lastIndexOf('/') + 1);
+        final name = p.basename(file.path);
         final modified = stat.modified.millisecondsSinceEpoch ~/ 1000;
         out.add('F|${stat.size}|$modified|$name');
       }

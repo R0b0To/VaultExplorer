@@ -97,11 +97,17 @@ void main() {
       expect(entries.where((e) => e.name.endsWith('.png')), hasLength(100));
     });
 
-    test('a name containing a pipe survives the wire format', () async {
-      await File('${root.path}/a|b.jpg').writeAsBytes([1]);
-      final entries = (await list(''))!;
-      expect(entries.map((e) => e.name), contains('a|b.jpg'));
-    });
+    test(
+      'a name containing a pipe survives the wire format',
+      () async {
+        await File('${root.path}/a|b.jpg').writeAsBytes([1]);
+        final entries = (await list(''))!;
+        expect(entries.map((e) => e.name), contains('a|b.jpg'));
+      },
+      // Windows reserves | in file names, so this wire-format case can only
+      // exercise a real directory entry on platforms that permit it.
+      skip: Platform.isWindows,
+    );
 
     test('symbolic links are not followed or reported', () async {
       await Link('${root.path}/link').create('${root.path}/DCIM');

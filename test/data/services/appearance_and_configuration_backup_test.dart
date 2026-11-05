@@ -10,6 +10,7 @@ import 'package:vaultexplorer/core/api/vault_panic_api.dart';
 import 'package:vaultexplorer/data/models/app_skin_preset.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
 import 'package:vaultexplorer/data/models/custom_app_skin.dart';
+import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/media_viewer_toolbar_config.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
@@ -143,7 +144,7 @@ FileManagerToolbarConfig _toolbarA() {
   final d = FileManagerToolbarConfig.defaults();
   return d.copyWith(
     // layout
-    order: d.order.reversed.toList(),
+    order: [FileManagerAction.playMedia, ...d.order.reversed],
     gridSpacing: 14,
     showStatsBar: false,
     // behavior
@@ -166,13 +167,16 @@ AppSettings _settingsB() => AppSettings(
   editorAppearancePrefs: {'fontSize': 12.0},
 );
 
-FileManagerToolbarConfig _toolbarB() =>
-    FileManagerToolbarConfig.defaults().copyWith(
-      gridSpacing: 4,
-      useFabForToolbar: true,
-      folderLayoutModes: {'b:/': 'list'},
-      folderSortModes: {'b:/': 'date'},
-    );
+FileManagerToolbarConfig _toolbarB() {
+  final d = FileManagerToolbarConfig.defaults();
+  return d.copyWith(
+    order: [...d.order, FileManagerAction.playMedia],
+    gridSpacing: 4,
+    useFabForToolbar: true,
+    folderLayoutModes: {'b:/': 'list'},
+    folderSortModes: {'b:/': 'date'},
+  );
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

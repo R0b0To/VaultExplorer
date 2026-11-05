@@ -62,7 +62,7 @@ Filesystems: FAT12/16/32, exFAT, NTFS, ext2/3/4.
 - **Keyfile & Passphrase Generator** — Diceware passphrases, passwords, keyfiles
 - **Encrypt / Decrypt Files** — individual files, no container needed
 - **Hash Verifier** — check files against MD5/SHA checksums
-- **Vault Sync** — compare two folders and copy missing or newer files
+- **Vault Sync** — compare two folders, browse everything on both sides, and copy, mirror or delete (open files, jump to a folder, bulk-select)
 - **Import / Export Passwords** — see Item vault above
 - **Storage Analyzer** and **Duplicate Finder**
 - **Split & Join** — split a container into chunks or rejoin them

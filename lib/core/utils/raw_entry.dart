@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 
 /// Canonical parser for the directory-entry wire format produced by every
 /// backend (`fat_backend.cpp`, `ntfs_backend.cpp`, `ext_backend.cpp`,
-/// `CryfsSession.kt`, `CryptomatorSession.kt`, `GocryptfsSession.kt`,
+/// `foldervault_bridge.cpp` (gocryptfs / Cryptomator / CryFS),
 /// `archive_context.dart`) — see docs/architecture.md §5.3 and ADR-003.
 ///
 /// Wire layout — an explicit type tag, then three more fields, joined by

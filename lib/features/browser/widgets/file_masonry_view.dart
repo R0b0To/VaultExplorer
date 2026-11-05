@@ -34,6 +34,7 @@ import 'package:vaultexplorer/features/browser/widgets/book_cover_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_item_drag.dart';
 import 'package:vaultexplorer/features/browser/widgets/fast_scrollbar.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_thumbnail_preview.dart';
+import 'package:vaultexplorer/features/browser/widgets/gallery_date_header.dart';
 import 'package:vaultexplorer/features/browser/widgets/grid_card_shell.dart';
 import 'package:vaultexplorer/features/browser/widgets/hold_range_select_container.dart';
 import 'package:vaultexplorer/features/browser/widgets/thumbnail_raw_fallback.dart';
@@ -77,10 +78,26 @@ class FileMasonryView extends ConsumerStatefulWidget {
   final bool Function(RawEntry entry)? isFolderSynced;
   final ScrollController? scrollController;
   final double bottomClearance;
+  final bool groupByDate;
 
   final ArchiveContext? archiveContext;
   final String? archiveRootPath;
   final SortBy? sortBy;
+
+  /// Resolves the container an entry lives in, for a listing that gathers
+  /// files from several containers (the category browser). When null every
+  /// entry belongs to [container], as in any ordinary folder listing.
+  final MountedContainer Function(RawEntry entry)? containerFor;
+
+  /// The thumbnail cache policy that applies to an entry, for a listing that
+  /// mixes containers whose owners chose different policies (the category
+  /// browser). When null every entry follows [thumbnailCacheMode].
+  final ThumbnailCacheMode Function(RawEntry entry)? cacheModeFor;
+
+  /// The thumbnail quality that applies to an entry, for a listing that
+  /// mixes containers whose owners chose different qualities (the category
+  /// browser). When null every entry follows [thumbnailQuality].
+  final ThumbnailQuality Function(RawEntry entry)? qualityFor;
 
   const FileMasonryView({
     super.key,
@@ -113,9 +130,13 @@ class FileMasonryView extends ConsumerStatefulWidget {
     this.isFolderSynced,
     this.scrollController,
     this.bottomClearance = 0.0,
+    this.groupByDate = false,
     this.archiveContext,
     this.archiveRootPath,
     this.sortBy,
+    this.containerFor,
+    this.cacheModeFor,
+    this.qualityFor,
   });
 
   @override
@@ -124,6 +145,11 @@ class FileMasonryView extends ConsumerStatefulWidget {
 
 class _FileMasonryViewState extends ConsumerState<FileMasonryView>
     with SingleTickerProviderStateMixin {
+  MountedContainer _containerOf(RawEntry entry) =>
+      widget.containerFor?.call(entry) ?? widget.container;
+
+  ThumbnailCacheMode _cacheModeOf(RawEntry entry) =>
+      widget.cacheModeFor?.call(entry) ?? widget.thumbnailCacheMode;
   Orientation? _lastOrientation;
   late int _columnCount;
   double _baselineScale = 1.0;
@@ -237,8 +263,8 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
   /// Auto-aware quality for cells built in [build]; see the grid view's
   /// equivalent. A masonry column is as wide as a grid tile, and items keep
   /// their own aspect ratio, so the same cell-width rule applies.
-  ThumbnailQuality get _effectiveQuality {
-    final q = widget.thumbnailQuality;
+  ThumbnailQuality _effectiveQualityOf(RawEntry entry) {
+    final q = widget.qualityFor?.call(entry) ?? widget.thumbnailQuality;
     if (!q.auto) return q;
     final width = MediaQuery.sizeOf(context).width;
     final colWidth =
@@ -365,9 +391,10 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
       final fullPath = widget.currentDirPath.isEmpty
           ? item.name
           : '${widget.currentDirPath}/${item.name}';
-      if (MediaAspectRatioCache.get(widget.container, fullPath) == null) {
+      final container = _containerOf(item);
+      if (MediaAspectRatioCache.get(container, fullPath) == null) {
         final syncEntry = _thumbnailCache.peekMemoryWithSize(
-          widget.container,
+          container,
           fullPath,
           widget.thumbnailQuality,
         );
@@ -375,7 +402,7 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
           final w = syncEntry.$2!;
           final h = syncEntry.$3!;
           if (w > 0 && h > 0) {
-            MediaAspectRatioCache.put(widget.container, fullPath, w, h);
+            MediaAspectRatioCache.put(container, fullPath, w, h);
           }
         }
       }
@@ -383,12 +410,8 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
   }
 
   Future<void> _preloadDiskAspectRatios() async {
-    if (widget.thumbnailCacheMode == ThumbnailCacheMode.disabled) return;
-
-    final container = widget.container;
     final dirPath = widget.currentDirPath;
     final quality = widget.thumbnailQuality;
-    final mode = widget.thumbnailCacheMode;
 
     final mediaItems = widget.items
         .where((e) => !e.isDir && _hasVisualPreview(e.name))
@@ -399,6 +422,9 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
       if (!mounted || PlaybackThrottleController.isPlaybackActive.value) {
         return;
       }
+      final mode = _cacheModeOf(entry);
+      if (mode == ThumbnailCacheMode.disabled) continue;
+      final container = _containerOf(entry);
       final fullPath = dirPath.isEmpty ? entry.name : '$dirPath/${entry.name}';
       if (MediaAspectRatioCache.get(container, fullPath) != null) continue;
 
@@ -410,7 +436,12 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
           quality: quality,
         );
         if (cached != null && cached.$2 != null && cached.$3 != null) {
-          _onSizeKnown(fullPath, cached.$2!, cached.$3!);
+          _onSizeKnown(
+            fullPath,
+            cached.$2!,
+            cached.$3!,
+            container: container,
+          );
         }
       } catch (e) {
         VeLog.w(
@@ -442,11 +473,12 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
       return _iconRatio;
     }
 
-    double? decoded = MediaAspectRatioCache.get(widget.container, fullPath);
+    final container = _containerOf(entry);
+    double? decoded = MediaAspectRatioCache.get(container, fullPath);
 
     if (decoded == null) {
       final syncEntry = _thumbnailCache.peekMemoryWithSize(
-        widget.container,
+        container,
         fullPath,
         widget.thumbnailQuality,
       );
@@ -454,7 +486,7 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
         final w = syncEntry.$2!;
         final h = syncEntry.$3!;
         if (w > 0 && h > 0) {
-          MediaAspectRatioCache.put(widget.container, fullPath, w, h);
+          MediaAspectRatioCache.put(container, fullPath, w, h);
           decoded = w / h;
         }
       }
@@ -468,11 +500,21 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
     return ratioToUse;
   }
 
-  void _onSizeKnown(String fullPath, int width, int height) {
+  void _onSizeKnown(
+    String fullPath,
+    int width,
+    int height, {
+    MountedContainer? container,
+  }) {
     if (width <= 0 || height <= 0) return;
 
     final ratio = (width / height).clamp(_minRatio, _maxRatio).toDouble();
-    MediaAspectRatioCache.put(widget.container, fullPath, width, height);
+    MediaAspectRatioCache.put(
+      container ?? widget.container,
+      fullPath,
+      width,
+      height,
+    );
 
     final renderedRatio = _renderedRatios[fullPath];
     if (renderedRatio == ratio) return;
@@ -505,6 +547,40 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
     return false;
   }
 
+  Widget _buildItemCell(BuildContext context, RawEntry entry, int index) {
+    final isDir = entry.isDir;
+    final fullPath = widget.currentDirPath.isEmpty
+        ? entry.name
+        : '${widget.currentDirPath}/${entry.name}';
+    final hasVisualPreview = !isDir && _hasVisualPreview(entry.name);
+    final ratio = _aspectRatioFor(
+      entry,
+      fullPath,
+      hasVisualPreview: hasVisualPreview,
+    );
+
+    final cell = isDir
+        ? _buildDirCell(context, entry, fullPath, ratio)
+        : _buildFileCell(context, entry, fullPath, ratio);
+
+    return HoldSelectableItem(
+      index: index,
+      entry: entry,
+      child: BrowserItemDragItem(
+        entry: entry,
+        container: _containerOf(entry),
+        currentDirectory: widget.currentDirPath,
+        visibleItems: widget.items,
+        selectedItems: widget.selectedItems,
+        isSelectionMode: widget.isSelectionMode,
+        enabled: widget.enableFileDrag && widget.archiveContext == null,
+        onItemLongPress: widget.onItemLongPress,
+        onDrop: widget.onFileDrop,
+        child: cell,
+      ),
+    );
+  }
+
   Widget _buildAnimatedMasonryView(ScrollController? controller, int total) {
     return AnimatedBuilder(
       animation: _morphController,
@@ -527,42 +603,71 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
         cacheExtent: 800,
         padding: EdgeInsets.fromLTRB(10, 12, 10, widget.bottomClearance),
         itemCount: total,
-        itemBuilder: (context, i) {
-          final entry = widget.items[i];
-          final isDir = entry.isDir;
-          final isPinned = widget.isPinned?.call(entry) ?? false;
-          final isBookmark = widget.isBookmark?.call(entry) ?? false;
-          final fullPath = widget.currentDirPath.isEmpty
-              ? entry.name
-              : '${widget.currentDirPath}/${entry.name}';
-          final hasVisualPreview = !isDir && _hasVisualPreview(entry.name);
-          final ratio = _aspectRatioFor(
-            entry,
-            fullPath,
-            hasVisualPreview: hasVisualPreview,
-          );
+        itemBuilder: (context, i) =>
+            _buildItemCell(context, widget.items[i], i),
+      ),
+    );
+  }
 
-          final cell = isDir
-              ? _buildDirCell(context, entry, fullPath, ratio)
-              : _buildFileCell(context, entry, fullPath, ratio);
+  Widget _buildDateGroupedMasonryView(ScrollController? controller) {
+    final groups = computeDateGroups(widget.items);
 
-          return HoldSelectableItem(
-            index: i,
-            entry: entry,
-            child: BrowserItemDragItem(
-              entry: entry,
-              container: widget.container,
-              currentDirectory: widget.currentDirPath,
-              visibleItems: widget.items,
-              selectedItems: widget.selectedItems,
-              isSelectionMode: widget.isSelectionMode,
-              enabled: widget.enableFileDrag && widget.archiveContext == null,
-              onItemLongPress: widget.onItemLongPress,
-              onDrop: widget.onFileDrop,
-              child: cell,
-            ),
-          );
-        },
+    final slivers = <Widget>[
+      SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            final group = groups[index];
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                GalleryDateHeader(
+                  title: formatDateGroupHeader(group.date, context),
+                  count: group.items.length,
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 4, 10, 12),
+                  child: StaggeredGrid.count(
+                    crossAxisCount: _columnCount,
+                    mainAxisSpacing: widget.spacing,
+                    crossAxisSpacing: widget.spacing,
+                    children: [
+                      for (int i = 0; i < group.items.length; i++)
+                        _buildItemCell(
+                          context,
+                          group.items[i],
+                          group.globalIndices[i],
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+          childCount: groups.length,
+        ),
+      ),
+      if (widget.bottomClearance > 0)
+        SliverToBoxAdapter(
+          child: SizedBox(height: widget.bottomClearance),
+        ),
+    ];
+
+    return AnimatedBuilder(
+      animation: _morphController,
+      builder: (context, child) {
+        return ClipRect(
+          child: Transform.scale(
+            scale: _scaleAnimation.value,
+            alignment: Alignment.center,
+            child: child,
+          ),
+        );
+      },
+      child: CustomScrollView(
+        controller: controller,
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: slivers,
       ),
     );
   }
@@ -586,7 +691,9 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
       child: NotificationListener<ScrollNotification>(
         onNotification: _onScrollNotification,
         child: widget.scrollController == null
-            ? _buildAnimatedMasonryView(null, total)
+            ? (widget.groupByDate
+                ? _buildDateGroupedMasonryView(null)
+                : _buildAnimatedMasonryView(null, total))
             : FastScrollbar(
                 controller: widget.scrollController!,
                 items: widget.items,
@@ -595,10 +702,12 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
                   top: 12,
                   bottom: widget.bottomClearance,
                 ),
-                child: _buildAnimatedMasonryView(
-                  widget.scrollController,
-                  total,
-                ),
+                child: widget.groupByDate
+                    ? _buildDateGroupedMasonryView(widget.scrollController)
+                    : _buildAnimatedMasonryView(
+                        widget.scrollController,
+                        total,
+                      ),
               ),
       ),
     );
@@ -672,11 +781,11 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
       preview: entry.isPlaceholder
           ? Center(child: folderIcon)
           : FolderThumbnailPreview(
-              key: ValueKey('folder_preview:${widget.container.uri}:$fullPath'),
-              container: widget.container,
+              key: ValueKey('folder_preview:${_containerOf(entry).uri}:$fullPath'),
+              container: _containerOf(entry),
               folderPath: fullPath,
-              cacheMode: widget.thumbnailCacheMode,
-              quality: _effectiveQuality,
+              cacheMode: _cacheModeOf(entry),
+              quality: _effectiveQualityOf(entry),
               iconSize: iconSize,
               child: folderIcon,
             ),
@@ -692,6 +801,8 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
     double ratio,
   ) {
     final cs = Theme.of(context).colorScheme;
+    final container = _containerOf(entry);
+    final cacheMode = _cacheModeOf(entry);
     final cleanName = entry.name;
     final isSelected = widget.selectedItems.contains(entry);
     String displayName = cleanName;
@@ -738,15 +849,20 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
       );
     } else if (isImg) {
       previewWidget = Hero(
-        tag: 'media_hero_${widget.container.volId}_$fullPath',
+        tag: 'media_hero_${container.volId}_$fullPath',
         child: Material(
           type: MaterialType.transparency,
           child: _EncryptedImageMasonryThumb(
-            container: widget.container,
+            container: container,
             filePath: fullPath,
-            cacheMode: widget.thumbnailCacheMode,
-            quality: _effectiveQuality,
-            onSizeKnown: (w, h) => _onSizeKnown(fullPath, w, h),
+            cacheMode: cacheMode,
+            quality: _effectiveQualityOf(entry),
+            onSizeKnown: (w, h) => _onSizeKnown(
+              fullPath,
+              w,
+              h,
+              container: container,
+            ),
             archiveContext: widget.archiveContext,
             archiveRootPath: widget.archiveRootPath,
           ),
@@ -754,15 +870,20 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
       );
     } else if (isVid) {
       previewWidget = Hero(
-        tag: 'media_hero_${widget.container.volId}_$fullPath',
+        tag: 'media_hero_${container.volId}_$fullPath',
         child: Material(
           type: MaterialType.transparency,
           child: _VideoMasonryThumb(
-            container: widget.container,
+            container: container,
             filePath: fullPath,
-            cacheMode: widget.thumbnailCacheMode,
-            quality: _effectiveQuality,
-            onSizeKnown: (w, h) => _onSizeKnown(fullPath, w, h),
+            cacheMode: cacheMode,
+            quality: _effectiveQualityOf(entry),
+            onSizeKnown: (w, h) => _onSizeKnown(
+              fullPath,
+              w,
+              h,
+              container: container,
+            ),
             archiveContext: widget.archiveContext,
             archiveRootPath: widget.archiveRootPath,
           ),
@@ -774,10 +895,10 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
           width: iconSize,
           height: iconSize,
           child: _ApkIconMasonryThumb(
-            container: widget.container,
+            container: container,
             filePath: fullPath,
-            cacheMode: widget.thumbnailCacheMode,
-            quality: _effectiveQuality,
+            cacheMode: cacheMode,
+            quality: _effectiveQualityOf(entry),
             fallbackIcon: skin.fileIcon(cleanName),
             fallbackColor: skin.fileIconColor(cs, cleanName),
             fallbackIconSize: iconSize,
@@ -786,11 +907,16 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
       );
     } else if (isBook && widget.archiveContext == null) {
       previewWidget = _BookCoverMasonryThumb(
-        container: widget.container,
+        container: container,
         filePath: fullPath,
-        cacheMode: widget.thumbnailCacheMode,
-        quality: _effectiveQuality,
-        onSizeKnown: (w, h) => _onSizeKnown(fullPath, w, h),
+        cacheMode: cacheMode,
+        quality: _effectiveQualityOf(entry),
+        onSizeKnown: (w, h) => _onSizeKnown(
+          fullPath,
+          w,
+          h,
+          container: container,
+        ),
         fallbackIcon: skin.fileIcon(cleanName),
         fallbackColor: skin.fileIconColor(cs, cleanName),
         fallbackIconSize: iconSize,
@@ -846,7 +972,6 @@ class _EncryptedImageMasonryThumb extends ConsumerWidget {
   final String? archiveRootPath;
 
   const _EncryptedImageMasonryThumb({
-    super.key,
     required this.container,
     required this.filePath,
     required this.cacheMode,
@@ -1050,7 +1175,6 @@ class _VideoMasonryThumb extends ConsumerWidget {
   final String? archiveRootPath;
 
   const _VideoMasonryThumb({
-    super.key,
     required this.container,
     required this.filePath,
     required this.cacheMode,

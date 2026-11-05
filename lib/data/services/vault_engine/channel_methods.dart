@@ -127,6 +127,7 @@ abstract final class ChannelMethods {
   static const openLocalFileWithApp = 'openLocalFileWithApp';
   static const getLocalFileUri = 'getLocalFileUri';
   static const shareLocalFile = 'shareLocalFile';
+  static const queryCategoryIndex = 'queryCategoryIndex';
   static const getVideoThumbnail = 'getVideoThumbnail';
   static const getImageThumbnail = 'getImageThumbnail';
   static const getImageThumbnailWithSize = 'getImageThumbnailWithSize';

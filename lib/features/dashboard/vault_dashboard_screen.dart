@@ -42,11 +42,13 @@ const _kLogTag = 'VaultDashboardScreen';
 
 class VaultDashboard extends ConsumerStatefulWidget {
   final ValueNotifier<List<MountedContainer>>? mountedNotifier;
+  final ValueNotifier<MountedContainer?>? localStorageNotifier;
   final ValueChanged<int>? onNavigateTab;
   final BrowserTabsConfig? workspaceConfig;
   final bool embedded;
   final ValueChanged<Widget?>? onFloatingActionChanged;
   final ValueChanged<Widget?>? onBottomBarChanged;
+
   /// Opens [container] in the browser. Home tiles and unlock flows pass
   /// [BrowserTabOrigin.home] to record that the storage was opened here.
   final void Function(MountedContainer container, {BrowserTabOrigin origin})?
@@ -56,6 +58,7 @@ class VaultDashboard extends ConsumerStatefulWidget {
   const VaultDashboard({
     super.key,
     this.mountedNotifier,
+    this.localStorageNotifier,
     this.onNavigateTab,
     this.workspaceConfig,
     this.embedded = false,
@@ -124,6 +127,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
     if (!mounted) return;
     if (!hasAccess) {
       setState(() => _localStorageContainer = null);
+      widget.localStorageNotifier?.value = null;
       return;
     }
     final displayName = context.l10n.localStorageCardTitle;
@@ -135,6 +139,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
         displayName: displayName,
       );
     });
+    widget.localStorageNotifier?.value = _localStorageContainer;
   }
 
   Future<void> _handleAppResume() async {
@@ -303,6 +308,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
           ? null
           : _openInNewTab,
       primaryLocalContainer: _localStorageContainer,
+      localStorageNotifier: widget.localStorageNotifier,
       onOpenLocalStorage: () =>
           unawaited(_openLocalStorage(currentVolId: currentVolId)),
       selectedTabIndex: 0,
@@ -327,6 +333,23 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
         }
       },
       onUnlockVault: openItem,
+      onOpenCategory: (category) {
+        if (workspaceActions != null) {
+          final tabId = workspaceActions.openCategoryTab(
+            category,
+            primaryLocalContainer: _localStorageContainer,
+            includeVaults: true,
+          );
+          if (tabId == null && mounted) {
+            showAppSnackBar(
+              context,
+              message: context.l10n.browserTabLimitReached(kMaxBrowserTabs),
+              tone: AppBannerTone.warning,
+            );
+          }
+          return;
+        }
+      },
       onAddVault: _showAddOptionsSheet,
     );
   }
@@ -457,6 +480,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
         displayName: context.l10n.localStorageCardTitle,
       );
       setState(() => _localStorageContainer = container);
+      widget.localStorageNotifier?.value = container;
     }
     if (widget.onOpenBrowser != null) {
       widget.onOpenBrowser!(container);

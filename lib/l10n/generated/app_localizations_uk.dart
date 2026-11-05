@@ -3733,6 +3733,27 @@ class AppLocalizationsUk extends AppLocalizations {
   String get layoutModeGalleryGrid => 'Галерея (сітка)';
 
   @override
+  String get galleryModeAction => 'Галерея';
+
+  @override
+  String get galleryModeTooltip => 'Режим галереї';
+
+  @override
+  String get optionsAction => 'Options';
+
+  @override
+  String get optionsActionTooltip => 'Options';
+
+  @override
+  String get dateToday => 'Сьогодні';
+
+  @override
+  String get dateYesterday => 'Вчора';
+
+  @override
+  String get dateEarlier => 'Раніше';
+
+  @override
   String get readOnlyCantDeleteTooltip => 'Лише читання — видалення неможливе';
 
   @override
@@ -4796,7 +4817,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get toolStorageAnalyzerSubtitle =>
-      'Візуалізація зайнятого простору у відкритому сховищі';
+      'Перегляньте, що займає місце в локальному сховищі або відкритому сховищі.';
 
   @override
   String get toolDuplicateFinderTitle => 'Пошук дублікатів файлів';
@@ -5439,7 +5460,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get storageAnalyzerNoTargetsMessage =>
-      'Спочатку відкрийте сховище, а потім поверніться сюди для перегляду аналітики.';
+      'Відкрийте локальне сховище або підключіть сховище, а потім поверніться сюди, щоб переглянути використання місця.';
 
   @override
   String storageAnalyzerUsedOfTotal(String used, String total) {
@@ -5480,6 +5501,178 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get storageCategoryOther => 'Інше';
+
+  @override
+  String get storageAnalyzerTabMap => 'Карта';
+
+  @override
+  String get storageAnalyzerTabFolders => 'Папки';
+
+  @override
+  String get storageAnalyzerTabTypes => 'Типи';
+
+  @override
+  String get storageAnalyzerTabCleanup => 'Очищення';
+
+  @override
+  String storageAnalyzerFreeSpace(String free) {
+    return '$free вільно';
+  }
+
+  @override
+  String storageAnalyzerFileCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count файлів',
+      few: '$count файли',
+      one: '1 файл',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageAnalyzerItemCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count елементів',
+      few: '$count елементи',
+      one: '1 елемент',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageAnalyzerContentSize(String size) {
+    return 'Вміст сховища: $size';
+  }
+
+  @override
+  String storageAnalyzerScanProgress(String files, String size) {
+    return 'Файлів: $files · $size на цей час';
+  }
+
+  @override
+  String get storageAnalyzerPartialNotice =>
+      'Деякі папки не вдалося прочитати повністю, тому підсумкові значення можуть бути меншими за реальні.';
+
+  @override
+  String get storageAnalyzerStaleNotice =>
+      'Цей том було змінено після сканування.';
+
+  @override
+  String get storageAnalyzerUpOneLevel => 'На один рівень вгору';
+
+  @override
+  String get storageAnalyzerEmptyFolder => 'Ця папка порожня.';
+
+  @override
+  String storageAnalyzerSmallerItems(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count менших елементів',
+      few: '$count менші елементи',
+      one: '1 менший елемент',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get storageAnalyzerMapHint =>
+      'Торкніться папки, щоб відкрити її. Натисніть і утримуйте для вибору.';
+
+  @override
+  String get storageAnalyzerSortFiles => 'Кількість файлів';
+
+  @override
+  String get storageAnalyzerAllTypes => 'Усі типи';
+
+  @override
+  String storageAnalyzerLargestOfType(String type) {
+    return 'Найбільші файли · $type';
+  }
+
+  @override
+  String get storageAnalyzerCleanupHeader => 'Пропозиції';
+
+  @override
+  String get storageAnalyzerCleanupLarge => 'Великі файли';
+
+  @override
+  String get storageAnalyzerCleanupStale => 'Не змінювалися понад рік';
+
+  @override
+  String get storageAnalyzerCleanupTemp => 'Тимчасові та непотрібні файли';
+
+  @override
+  String get storageAnalyzerCleanupEmpty => 'Порожні папки';
+
+  @override
+  String get storageAnalyzerCleanupReview => 'Переглянути';
+
+  @override
+  String get storageAnalyzerCleanupNothing =>
+      'Немає очевидних елементів для очищення. Цей том виглядає охайним.';
+
+  @override
+  String get storageAnalyzerBiggestFiles => 'Найбільші файли';
+
+  @override
+  String get storageAnalyzerBiggestFilesSubtitle =>
+      'Переглянути найбільші файли на цьому томі';
+
+  @override
+  String get storageAnalyzerAllSuggestions => 'Усі пропозиції';
+
+  @override
+  String storageAnalyzerSelectedSummary(int count, String size) {
+    return 'Вибрано $count · $size';
+  }
+
+  @override
+  String storageAnalyzerDeleteFilesMessage(String size) {
+    return 'Вибрані елементи буде назавжди видалено з цього сховища, звільнивши $size. Цю дію неможливо скасувати.';
+  }
+
+  @override
+  String storageAnalyzerDeleteFoldersMessage(String files, String size) {
+    return 'Вибрані елементи буде назавжди видалено ($files файлів, включно з усім вмістом вибраних папок), звільнивши $size. Цю дію неможливо скасувати.';
+  }
+
+  @override
+  String storageAnalyzerDeleteDone(String size) {
+    return 'Звільнено $size';
+  }
+
+  @override
+  String storageAnalyzerDeletePartial(
+    String deleted,
+    String failed,
+    String size,
+  ) {
+    return 'Видалено $deleted, але не вдалося видалити $failed. Звільнено $size.';
+  }
+
+  @override
+  String get storageAnalyzerDeleteNone => 'Нічого не було видалено.';
+
+  @override
+  String get storageAnalyzerDeleteError =>
+      'Не вдалося видалити вибрані елементи.';
+
+  @override
+  String get storageAnalyzerRescanFolder => 'Повторно сканувати цю папку';
+
+  @override
+  String get storageAnalyzerSelectAction => 'Вибрати';
+
+  @override
+  String get storageAnalyzerSelectAllHere => 'Вибрати все в цій папці';
+
+  @override
+  String get storageAnalyzerOpenFolder => 'Відкрити папку';
 
   @override
   String get keyfilePassphraseGeneratorTitle =>
@@ -5937,18 +6130,17 @@ class AppLocalizationsUk extends AppLocalizations {
   String get vaultSyncTapToSelect => 'Торкніться, щоб вибрати сховище та папку';
 
   @override
-  String get vaultSyncSwapTooltip => 'Поміняти місцями Ліве і Праве';
+  String get vaultSyncSwapTooltip => 'Поміняти місцями два сховища';
 
   @override
-  String get vaultSyncSameLocationWarning =>
-      'Ліва і права папки мають відрізнятися.';
+  String get vaultSyncSameLocationWarning => 'Ці дві папки мають відрізнятися.';
 
   @override
   String get vaultSyncIntroTitle => 'Порівняння двох сховищ';
 
   @override
   String get vaultSyncIntroSubtitle =>
-      'Виберіть Ліве і Праве сховище (або дві папки в одному сховищі), щоб побачити відсутні, змінені чи новіші файли з кожного боку.';
+      'Виберіть дві папки (у сховищі, у пам\'яті пристрою чи в провайдера документів, як-от SD-карта або хмарний диск), щоб побачити відсутні, змінені чи новіші файли в кожній.';
 
   @override
   String get vaultSyncCompareButton => 'Порівняти';
@@ -6021,11 +6213,11 @@ class AppLocalizationsUk extends AppLocalizations {
   String get vaultSyncDirectionLabel => 'Напрямок синхронізації';
 
   @override
-  String get vaultSyncDirectionTwoWay => 'Двосторонній (рекомендовано)';
+  String get vaultSyncDirectionTwoWay => 'Двосторонній';
 
   @override
   String get vaultSyncDirectionTwoWaySubtitle =>
-      'Копіює кожен файл на ту сторону, де він відсутній або застарілий';
+      'Копіює відсутні файли й новіші версії на інший бік.';
 
   @override
   String get vaultSyncDirectionLeftToRight => 'Зліва → Справа (в один бік)';
@@ -6122,7 +6314,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get vaultSyncOverlapWarning =>
-      'Ліва та права папки не можуть бути однаковими або вкладеними одна в одну.';
+      'Ці дві папки не можуть бути однаковими або вкладеними одна в одну.';
 
   @override
   String vaultSyncPlaintextWarning(Object targets) {
@@ -12549,6 +12741,17 @@ class AppLocalizationsUk extends AppLocalizations {
       'Переміщує панель програми з верхньої частини екрана донизу, щоб її було легше діставати великим пальцем.';
 
   @override
+  String get sectionNavigation => 'Навігація';
+
+  @override
+  String get predictiveBackAnimationsLabel =>
+      'Анімації прогнозованого жесту «Назад»';
+
+  @override
+  String get predictiveBackAnimationsDesc =>
+      'Показувати інтерактивні попередні перегляди й анімації під час переходу назад.';
+
+  @override
   String get selectByIconLabel => 'Вибір дотиком до значка';
 
   @override
@@ -13353,6 +13556,372 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get comicReaderCarouselScrubberSubtitle =>
       'Показувати мініатюри сторінок над повзунком';
+
+  @override
+  String get vaultSyncBrowseAllButton => 'Переглянути всі елементи';
+
+  @override
+  String get vaultSyncExplorerTitle => 'Переглянути обидва сховища';
+
+  @override
+  String get vaultSyncExplorerEmptyTitle => 'Нічого показувати';
+
+  @override
+  String get vaultSyncExplorerEmptyMessage =>
+      'У цій папці немає елементів, що відповідають фільтру.';
+
+  @override
+  String get vaultSyncExplorerLoadFailedTitle =>
+      'Не вдалося прочитати цю папку';
+
+  @override
+  String get vaultSyncExplorerLoadFailedMessage =>
+      'Не вдалося отримати список одного з двох сховищ. Спробуйте ще раз і переконайтеся, що обидва розблоковані та підключені.';
+
+  @override
+  String get vaultSyncFilterAll => 'Усі';
+
+  @override
+  String get vaultSyncFilterDifferences => 'Відмінності';
+
+  @override
+  String get vaultSyncFilterNewer => 'Новіша копія';
+
+  @override
+  String get vaultSyncFilterConflicts => 'Потребує перегляду';
+
+  @override
+  String get vaultSyncFilterDeletions => 'Видалення';
+
+  @override
+  String get vaultSyncFilterNoMatchesMessage =>
+      'Жоден елемент не відповідає фільтру.';
+
+  @override
+  String get vaultSyncSortTooltip => 'Сортувати';
+
+  @override
+  String get vaultSyncSortPath => 'Шлях';
+
+  @override
+  String get vaultSyncSortSize => 'Найбільші першими';
+
+  @override
+  String get vaultSyncSortModified => 'Найновіші першими';
+
+  @override
+  String get vaultSyncSortStatus => 'Статус';
+
+  @override
+  String get vaultSyncStatusInSync => 'Синхронізовано';
+
+  @override
+  String get vaultSyncStatusFolder => 'Папка';
+
+  @override
+  String vaultSyncDeletionsQueuedLabel(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count видалення',
+      many: '$count видалень',
+      few: '$count видалення',
+      one: '$count видалення',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String vaultSyncConfirmDeletionsMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count елемента буде видалено назавжди. Цю дію не можна скасувати.',
+      many:
+          '$count елементів буде видалено назавжди. Цю дію не можна скасувати.',
+      few: '$count елементи буде видалено назавжди. Цю дію не можна скасувати.',
+      one: '$count елемент буде видалено назавжди. Цю дію не можна скасувати.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get vaultSyncResultsStaleMessage =>
+      'Після видалення результати можуть бути застарілими. Порівняйте знову, щоб оновити лічильники.';
+
+  @override
+  String vaultSyncSelectedCount(num count) {
+    return 'Вибрано: $count';
+  }
+
+  @override
+  String get vaultSyncOpenAction => 'Відкрити';
+
+  @override
+  String vaultSyncOpenCopyAction(String side) {
+    return 'Відкрити копію в $side';
+  }
+
+  @override
+  String get vaultSyncOpenFolderAction => 'Відкрити папку';
+
+  @override
+  String get vaultSyncOpenFolderSubtitle => 'Переглянути вміст в обох сховищах';
+
+  @override
+  String get vaultSyncShowInFolderAction => 'Показати в папці';
+
+  @override
+  String get vaultSyncShowInFolderSubtitle =>
+      'Побачити поруч з іншими елементами в обох сховищах';
+
+  @override
+  String get vaultSyncDeleteFromBothAction => 'Видалити з обох сховищ';
+
+  @override
+  String vaultSyncDeleteBothSidesLabel(String left, String right) {
+    return '$left і $right';
+  }
+
+  @override
+  String vaultSyncDeleteConfirmMessage(String where) {
+    return 'Ці елементи буде остаточно видалено з $where, включно з усім вмістом папок. Цю дію не можна скасувати.';
+  }
+
+  @override
+  String vaultSyncDeleteDoneMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Видалено $count елемента',
+      many: 'Видалено $count елементів',
+      few: 'Видалено $count елементи',
+      one: 'Видалено $count елемент',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String vaultSyncDeletePartialMessage(int deleted, int failed) {
+    return 'Видалено: $deleted, але не вдалося видалити: $failed';
+  }
+
+  @override
+  String get vaultSyncCopyDoneMessage => 'Скопійовано';
+
+  @override
+  String get vaultSyncCopyFailedMessage =>
+      'Деякі елементи не вдалося скопіювати. Подробиці дивіться у списку передавань.';
+
+  @override
+  String vaultSyncOpenFailedMessage(String name) {
+    return 'Не вдалося відкрити $name';
+  }
+
+  @override
+  String get vaultSyncDetailsNotOnThisSide => 'Немає в цьому сховищі';
+
+  @override
+  String get vaultSyncDetailsFolder => 'Папка';
+
+  @override
+  String vaultSyncStatusOnlyIn(String storage) {
+    return 'Лише в $storage';
+  }
+
+  @override
+  String vaultSyncStatusNewerIn(String storage) {
+    return 'Новіше в $storage';
+  }
+
+  @override
+  String vaultSyncBadgeOnlyIn(int count, String storage) {
+    return '$count лише в $storage';
+  }
+
+  @override
+  String vaultSyncBadgeNewerIn(int count, String storage) {
+    return '$count новіших в $storage';
+  }
+
+  @override
+  String vaultSyncFolderOnlyInDetail(String storage) {
+    return 'Папка — лише в $storage';
+  }
+
+  @override
+  String get vaultSyncDirectionOneWay => 'Одностороннє копіювання';
+
+  @override
+  String get vaultSyncDirectionOneWaySubtitle =>
+      'Копіює нові й оновлені файли у вказаному напрямку; джерело не змінюється.';
+
+  @override
+  String get vaultSyncDirectionMirror => 'Дзеркальна синхронізація';
+
+  @override
+  String get vaultSyncDirectionMirrorSubtitle =>
+      'Замінює ціль точною копією; елементи, що є лише в цілі, видаляються.';
+
+  @override
+  String vaultSyncActionCopyTo(String storage) {
+    return 'Копіювати → $storage';
+  }
+
+  @override
+  String vaultSyncCopyNowToAction(String storage) {
+    return 'Скопіювати в $storage зараз';
+  }
+
+  @override
+  String vaultSyncDeleteFromAction(String storage) {
+    return 'Видалити з $storage';
+  }
+
+  @override
+  String vaultSyncPlanDeleteFrom(String storage) {
+    return 'Видалити з $storage під час синхронізації';
+  }
+
+  @override
+  String vaultSyncFilterOnlyIn(String storage) {
+    return 'Лише в $storage';
+  }
+
+  @override
+  String get vaultSyncChooseFirstStorage => 'Виберіть перше сховище';
+
+  @override
+  String get vaultSyncChooseSecondStorage => 'Виберіть друге сховище';
+
+  @override
+  String get vaultSyncChangeButton => 'Змінити';
+
+  @override
+  String get vaultSyncChooseButton => 'Вибрати';
+
+  @override
+  String get vaultSyncChooseStorageTitle => 'Виберіть сховище';
+
+  @override
+  String get vaultSyncChooseStorageHint =>
+      'Спершу виберіть сховище, а потім папку в ньому для порівняння.';
+
+  @override
+  String get vaultSyncCurrentStorageBadge => 'Поточне';
+
+  @override
+  String get vaultSyncChangeStorageTooltip => 'Змінити сховище';
+
+  @override
+  String vaultSyncPickFolderTitle(String storage) {
+    return 'Папка в $storage';
+  }
+
+  @override
+  String get vaultSyncDirectionSectionTitle => 'Напрямок';
+
+  @override
+  String get vaultSyncDirectionMirrorWarning => 'Видаляє файли';
+
+  @override
+  String get vaultSyncDirectionSourceLabel => 'Джерело';
+
+  @override
+  String get vaultSyncDirectionTargetLabel => 'Ціль';
+
+  @override
+  String get vaultSyncDirectionSwapButton => 'Поміняти місцями';
+
+  @override
+  String get vaultSyncDirectionRecommendedLabel => 'Рекомендовано';
+
+  @override
+  String get categoriesSectionTitle => 'Категорії';
+
+  @override
+  String get manageCategoriesTooltip => 'Керування категоріями';
+
+  @override
+  String get categoryShortcutsTitle => 'Ярлики категорій';
+
+  @override
+  String get categoryShortcutsEnable => 'Показувати ярлики категорій';
+
+  @override
+  String get categoryShortcutsEnableSubtitle =>
+      'Зображення, відео, аудіо та документи з усіх ваших сховищ у бічному меню';
+
+  @override
+  String get categoryShortcutsRestore => 'Відновити типові ярлики';
+
+  @override
+  String get categorySourceAll => 'Усі сховища';
+
+  @override
+  String get categorySourceTooltip => 'Вибрати джерело';
+
+  @override
+  String get categoryFolderStructure => 'Показувати вихідну структуру папок';
+
+  @override
+  String categoryScanning(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Сканування… перевірено $count папки',
+      many: 'Сканування… перевірено $count папок',
+      few: 'Сканування… перевірено $count папки',
+      one: 'Сканування… перевірено $count папку',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get categoryEmpty => 'У цій категорії нічого не знайдено';
+
+  @override
+  String get categoryNoVaultsUnlocked => 'Жоден сейф не розблоковано';
+
+  @override
+  String get categoryScanLimitReached =>
+      'Результати можуть бути неповними — сканування досягло ліміту.';
+
+  @override
+  String get categoryShareOneSource =>
+      'Щоб поділитися файлами, вибирайте їх лише з одного сховища за раз.';
+
+  @override
+  String categoryClipboardReady(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count файлу готово до вставлення',
+      many: '$count файлів готові до вставлення',
+      few: '$count файли готові до вставлення',
+      one: '$count файл готовий до вставлення',
+    );
+    return '$_temp0 — відкрийте папку, щоб вставити';
+  }
+
+  @override
+  String get categoryIndexInVaultsTitle =>
+      'Зберігати індекс категорій у сейфах';
+
+  @override
+  String get categoryIndexInVaultsSubtitle =>
+      'Зберігається зашифрованим усередині кожного сейфа в його папці конфігурації під час відкриття категорії, щоб наступного разу файли з’являлися миттєво. На телефоні нічого не зберігається.';
+
+  @override
+  String get categoryIndexClear => 'Очистити індекси категорій';
+
+  @override
+  String get categoryIndexClearSubtitle =>
+      'Видаляє індекс із кожного розблокованого сейфа';
+
+  @override
+  String get categoryIndexCleared => 'Індекси категорій очищено';
 
   @override
   String get securityKeyUnlockHintNfc =>

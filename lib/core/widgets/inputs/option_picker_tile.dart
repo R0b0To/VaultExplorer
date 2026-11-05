@@ -28,6 +28,7 @@ class OptionPickerTile<T> extends StatelessWidget {
   final String? subtitle;
   final IconData? prefixIcon;
   final bool enabled;
+  final bool showDropdownArrow;
 
   const OptionPickerTile({
     super.key,
@@ -38,6 +39,7 @@ class OptionPickerTile<T> extends StatelessWidget {
     this.subtitle,
     this.prefixIcon,
     this.enabled = true,
+    this.showDropdownArrow = false,
   });
 
   @override
@@ -69,6 +71,9 @@ class OptionPickerTile<T> extends StatelessWidget {
           ),
         ),
       ),
+      trailing: showDropdownArrow
+          ? Icon(Icons.arrow_drop_down_rounded, color: cs.onSurfaceVariant)
+          : null,
       onTap: enabled ? () => _showPicker(context) : null,
     );
   }

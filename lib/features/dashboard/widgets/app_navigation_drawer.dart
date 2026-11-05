@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
@@ -15,10 +16,13 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/vault_list_item.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
+import 'package:vaultexplorer/features/authenticator/authenticator_screen.dart';
+import 'package:vaultexplorer/features/browser/models/file_category.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_name_label.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_config_sheet.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/drawer_bookmarks_section.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/drawer_categories_section.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/app_settings_screen.dart';
 import 'package:vaultexplorer/features/settings/long_file_name_display_provider.dart';
@@ -27,6 +31,7 @@ import 'package:vaultexplorer/features/tools/tools_screen.dart';
 class AppNavigationDrawer extends ConsumerWidget {
   final int? currentVolId;
   final MountedContainer? primaryLocalContainer;
+  final ValueListenable<MountedContainer?>? localStorageNotifier;
   final VoidCallback? onOpenLocalStorage;
   final int selectedTabIndex;
   final ValueChanged<int>? onSelectTab;
@@ -39,12 +44,14 @@ class AppNavigationDrawer extends ConsumerWidget {
   /// Set only while the file manager is open with tabs: the long-press menus
   /// of vaults and storages then offer "Open in new tab".
   final ValueChanged<MountedContainer>? onOpenInNewTab;
+  final ValueChanged<FileCategory>? onOpenCategory;
   final bool keepBrowserTabsOnNavigate;
 
   const AppNavigationDrawer({
     super.key,
     this.currentVolId,
     this.primaryLocalContainer,
+    this.localStorageNotifier,
     this.onOpenLocalStorage,
     this.selectedTabIndex = 0,
     this.onSelectTab,
@@ -54,6 +61,7 @@ class AppNavigationDrawer extends ConsumerWidget {
     this.onDeleteVault,
     this.onAddVault,
     this.onOpenInNewTab,
+    this.onOpenCategory,
     this.keepBrowserTabsOnNavigate = false,
   });
 
@@ -453,6 +461,7 @@ class AppNavigationDrawer extends ConsumerWidget {
   }
 
   Widget _buildDrawerContent(BuildContext context, WidgetRef ref) {
+    final navigator = Navigator.of(context);
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final dashboardState = ref.watch(vaultDashboardControllerProvider);
@@ -463,6 +472,11 @@ class AppNavigationDrawer extends ConsumerWidget {
     final showStorageLocations = ref.watch(
       appSettingsControllerProvider.select(
         (s) => s.settings.showStorageLocationsInDrawer,
+      ),
+    );
+    final enableAuthenticator = ref.watch(
+      appSettingsControllerProvider.select(
+        (s) => s.settings.enableAuthenticator,
       ),
     );
     final primary = primaryLocalContainer;
@@ -882,6 +896,43 @@ class AppNavigationDrawer extends ConsumerWidget {
                     child: Divider(),
                   ),
 
+                  // 3b. Category shortcuts (Images, Videos, Audio, Documents)
+                  DrawerCategoriesSection(
+                    primaryLocalContainer: primary,
+                    currentVolId: currentVolId,
+                    onOpenLocalStorage: onOpenLocalStorage,
+                    onSelectContainer: onSelectContainer,
+                    onOpenCategory: onOpenCategory,
+                  ),
+
+                  // 3b. Authenticator Destination (same screen as the
+                  // dashboard app bar shortcut, reachable from every tab)
+                  if (enableAuthenticator)
+                    ListTile(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(28),
+                      ),
+                      leading: Icon(
+                        Icons.verified_user_rounded,
+                        color: cs.onSurfaceVariant,
+                      ),
+                      title: Text(
+                        context.l10n.authenticatorScreenTitle,
+                        style: textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const AuthenticatorScreen(),
+                          ),
+                        );
+                      },
+                    ),
+
                   // 4. Tools Destination
                   ListTile(
                     shape: RoundedRectangleBorder(
@@ -912,6 +963,13 @@ class AppNavigationDrawer extends ConsumerWidget {
                               mountedContainers: ValueNotifier(
                                 dashboardState.mounted,
                               ),
+                              localStorageContainer: localStorageNotifier,
+                              onOpenInBrowser: onSelectContainer == null
+                                  ? null
+                                  : (container) {
+                                      if (navigator.canPop()) navigator.pop();
+                                      onSelectContainer!(container);
+                                    },
                             ),
                           ),
                         ),

@@ -94,21 +94,11 @@ class CryfsConcurrencyTest {
     }
 
     @Test
-    fun `CryfsSession declares skipsPerVolumeLock true`() {
+    fun `native folder-vault sessions declare skipsPerVolumeLock true`() {
+        // All three folder-vault formats now share NativeVaultSession; the native core
+        // does its own locking, so the container layer must not add a second one.
         verifySkipsPerVolumeLock(
-            "src/main/kotlin/com/aeidolon/vaultexplorer/cryfs/CryfsSession.kt",
-            expected = true
-        )
-    }
-
-    @Test
-    fun `Cryptomator and Gocryptfs sessions keep skipsPerVolumeLock true`() {
-        verifySkipsPerVolumeLock(
-            "src/main/kotlin/com/aeidolon/vaultexplorer/cryptomator/CryptomatorSession.kt",
-            expected = true
-        )
-        verifySkipsPerVolumeLock(
-            "src/main/kotlin/com/aeidolon/vaultexplorer/gocryptfs/GocryptfsSession.kt",
+            "src/main/kotlin/com/aeidolon/vaultexplorer/foldervault/NativeVaultSession.kt",
             expected = true
         )
     }

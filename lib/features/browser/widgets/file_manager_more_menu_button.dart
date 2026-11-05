@@ -2,8 +2,10 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
+import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/grid_aspect_ratio.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
+import 'package:vaultexplorer/features/browser/widgets/file_manager_options_menu_button.dart';
 import 'package:vaultexplorer/features/browser/widgets/filter_menu_button.dart';
 import 'package:vaultexplorer/features/browser/widgets/layout_mode_menu_button.dart';
 import 'package:vaultexplorer/features/browser/widgets/sort_menu_button.dart';
@@ -54,6 +56,16 @@ class FileManagerMoreMenuButton extends StatelessWidget {
   final bool canPlayMedia;
   final VoidCallback onPlayMedia;
 
+  final bool isGalleryMode;
+  final VoidCallback onToggleGallery;
+
+  final FileManagerToolbarConfig? toolbarConfig;
+  final ValueChanged<bool>? onToggleShowHiddenFiles;
+  final ValueChanged<bool>? onToggleShowGridFileNames;
+  final ValueChanged<bool>? onToggleShowFileExtensions;
+  final ValueChanged<bool>? onToggleShowListThumbnails;
+  final VoidCallback? onOpenSettings;
+
   const FileManagerMoreMenuButton({
     super.key,
     required this.actions,
@@ -71,6 +83,14 @@ class FileManagerMoreMenuButton extends StatelessWidget {
     this.onGridAspectRatioChanged,
     required this.canPlayMedia,
     required this.onPlayMedia,
+    this.isGalleryMode = false,
+    required this.onToggleGallery,
+    this.toolbarConfig,
+    this.onToggleShowHiddenFiles,
+    this.onToggleShowGridFileNames,
+    this.onToggleShowFileExtensions,
+    this.onToggleShowListThumbnails,
+    this.onOpenSettings,
   });
 
   @override
@@ -142,6 +162,31 @@ class FileManagerMoreMenuButton extends StatelessWidget {
             ),
             onPressed: canPlayMedia ? onPlayMedia : null,
             child: Text(l10n.playMediaAction),
+          );
+        case FileManagerAction.gallery:
+          return MenuItemButton(
+            leadingIcon: Icon(
+              isGalleryMode ? Icons.photo_library_rounded : Icons.photo_library_outlined,
+              color: cs.primary,
+            ),
+            onPressed: onToggleGallery,
+            child: Text(l10n.galleryModeAction),
+          );
+        case FileManagerAction.options:
+          if (toolbarConfig == null) return null;
+          return SubmenuButton(
+            leadingIcon: Icon(Icons.more_vert_rounded, color: cs.primary),
+            menuChildren: buildOptionsMenuItems(
+              context: context,
+              cs: cs,
+              toolbarConfig: toolbarConfig!,
+              onToggleShowHiddenFiles: onToggleShowHiddenFiles ?? (_) {},
+              onToggleShowGridFileNames: onToggleShowGridFileNames ?? (_) {},
+              onToggleShowFileExtensions: onToggleShowFileExtensions ?? (_) {},
+              onToggleShowListThumbnails: onToggleShowListThumbnails ?? (_) {},
+              onOpenSettings: onOpenSettings ?? () {},
+            ),
+            child: Text(l10n.optionsAction),
           );
       }
     }
@@ -291,6 +336,34 @@ class FileManagerMoreMenuButton extends StatelessWidget {
             currentFilter: currentFilter,
             onFilterChanged: onFilterChanged,
             hideVaultOnlyActions: hideVaultOnlyActions,
+          ),
+        );
+
+      case FileManagerAction.gallery:
+        return _fabShell(
+          cs: cs,
+          icon: Icon(
+            isGalleryMode ? Icons.photo_library_rounded : Icons.photo_library_outlined,
+            color: isGalleryMode ? cs.primary : cs.onSurface,
+          ),
+          tooltip: l10n.galleryModeTooltip,
+          onTap: onToggleGallery,
+        );
+
+      case FileManagerAction.options:
+        if (toolbarConfig == null) return const SizedBox.shrink();
+        return menuFab(
+          icon: Icon(Icons.more_vert_rounded, color: cs.onSurface),
+          tooltip: l10n.optionsActionTooltip,
+          menuChildren: buildOptionsMenuItems(
+            context: context,
+            cs: cs,
+            toolbarConfig: toolbarConfig!,
+            onToggleShowHiddenFiles: onToggleShowHiddenFiles ?? (_) {},
+            onToggleShowGridFileNames: onToggleShowGridFileNames ?? (_) {},
+            onToggleShowFileExtensions: onToggleShowFileExtensions ?? (_) {},
+            onToggleShowListThumbnails: onToggleShowListThumbnails ?? (_) {},
+            onOpenSettings: onOpenSettings ?? () {},
           ),
         );
     }

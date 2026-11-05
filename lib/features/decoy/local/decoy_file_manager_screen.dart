@@ -18,6 +18,9 @@ import 'package:vaultexplorer/core/providers/external_storage_locations_provider
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_empty_state.dart';
+import 'package:vaultexplorer/core/widgets/feedback/app_feedback.dart';
+import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart'
+    show AppBannerTone;
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/browser_tabs_host.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
@@ -323,6 +326,21 @@ class _DecoyFileManagerScreenState extends ConsumerState<DecoyFileManagerScreen>
             ref
                 .read(browserTabsProvider(workspace).notifier)
                 .replaceActive(selected);
+          },
+          onOpenCategory: (category) {
+            final actions = ref.read(browserTabsProvider(workspace).notifier);
+            final tabId = actions.openCategoryTab(
+              category,
+              primaryLocalContainer: _primaryContainer,
+              includeVaults: false,
+            );
+            if (tabId == null && mounted) {
+              showAppSnackBar(
+                context,
+                message: context.l10n.browserTabLimitReached(kMaxBrowserTabs),
+                tone: AppBannerTone.warning,
+              );
+            }
           },
         ),
       ),

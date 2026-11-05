@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/app/vault_explorer_app.dart';
 import 'package:vaultexplorer/core/theme/app_skin_settings_provider.dart';
+import 'package:vaultexplorer/core/theme/predictive_back_preference.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
@@ -38,6 +39,7 @@ Future<void> refreshLiveSettings(
   VeLog.enabled = settings.debugLoggingEnabled;
   appThemeModeNotifier.value = settings.themeMode;
   appUseDynamicColorNotifier.value = settings.useDynamicColor;
+  appPredictiveBackNotifier.value = settings.predictiveBackAnimations;
   appLocaleNotifier.value = settings.languageCode != null
       ? Locale(settings.languageCode!)
       : null;

@@ -3528,6 +3528,27 @@ class AppLocalizationsKo extends AppLocalizations {
   String get layoutModeGalleryGrid => '갤러리 그리드';
 
   @override
+  String get galleryModeAction => '갤러리';
+
+  @override
+  String get galleryModeTooltip => '갤러리 모드';
+
+  @override
+  String get optionsAction => 'Options';
+
+  @override
+  String get optionsActionTooltip => 'Options';
+
+  @override
+  String get dateToday => '오늘';
+
+  @override
+  String get dateYesterday => '어제';
+
+  @override
+  String get dateEarlier => '이전';
+
+  @override
   String get readOnlyCantDeleteTooltip => '읽기 전용 — 삭제할 수 없음';
 
   @override
@@ -4526,7 +4547,8 @@ class AppLocalizationsKo extends AppLocalizations {
   String get toolStorageAnalyzerTitle => '저장소 분석기';
 
   @override
-  String get toolStorageAnalyzerSubtitle => '마운트된 볼트에서 무엇이 공간을 차지하는지 확인합니다';
+  String get toolStorageAnalyzerSubtitle =>
+      '로컬 저장소 또는 마운트된 볼트에서 공간을 차지하는 항목을 확인합니다.';
 
   @override
   String get toolDuplicateFinderTitle => '중복 파일 찾기';
@@ -5099,7 +5121,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get storageAnalyzerNoTargetsMessage =>
-      '먼저 볼트를 마운트한 후, 여기로 돌아와 저장소 세부 내역을 확인하세요.';
+      '로컬 저장소를 열거나 볼트를 마운트한 다음 여기로 돌아와 저장소 내역을 확인하세요.';
 
   @override
   String storageAnalyzerUsedOfTotal(String used, String total) {
@@ -5140,6 +5162,167 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get storageCategoryOther => '기타';
+
+  @override
+  String get storageAnalyzerTabMap => '지도';
+
+  @override
+  String get storageAnalyzerTabFolders => '폴더';
+
+  @override
+  String get storageAnalyzerTabTypes => '유형';
+
+  @override
+  String get storageAnalyzerTabCleanup => '정리';
+
+  @override
+  String storageAnalyzerFreeSpace(String free) {
+    return '$free 여유 공간';
+  }
+
+  @override
+  String storageAnalyzerFileCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count개 파일',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageAnalyzerItemCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count개 항목',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageAnalyzerContentSize(String size) {
+    return '보관함 크기: $size';
+  }
+
+  @override
+  String storageAnalyzerScanProgress(String files, String size) {
+    return '파일 $files개 · 현재 $size';
+  }
+
+  @override
+  String get storageAnalyzerPartialNotice =>
+      '일부 폴더를 완전히 읽을 수 없어 실제 수치보다 적게 표시될 수 있습니다.';
+
+  @override
+  String get storageAnalyzerStaleNotice => '스캔 이후 이 볼륨이 변경되었습니다.';
+
+  @override
+  String get storageAnalyzerUpOneLevel => '상위 폴더로 이동';
+
+  @override
+  String get storageAnalyzerEmptyFolder => '이 폴더는 비어 있습니다.';
+
+  @override
+  String storageAnalyzerSmallerItems(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count개의 더 작은 항목',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get storageAnalyzerMapHint => '폴더를 탭하여 엽니다. 길게 눌러 선택합니다.';
+
+  @override
+  String get storageAnalyzerSortFiles => '파일 수';
+
+  @override
+  String get storageAnalyzerAllTypes => '모든 유형';
+
+  @override
+  String storageAnalyzerLargestOfType(String type) {
+    return '가장 큰 파일 · $type';
+  }
+
+  @override
+  String get storageAnalyzerCleanupHeader => '제안';
+
+  @override
+  String get storageAnalyzerCleanupLarge => '대용량 파일';
+
+  @override
+  String get storageAnalyzerCleanupStale => '1년 이상 수정되지 않음';
+
+  @override
+  String get storageAnalyzerCleanupTemp => '임시 및 불필요한 파일';
+
+  @override
+  String get storageAnalyzerCleanupEmpty => '빈 폴더';
+
+  @override
+  String get storageAnalyzerCleanupReview => '검토';
+
+  @override
+  String get storageAnalyzerCleanupNothing => '정리할 항목이 없습니다. 볼륨이 잘 정리되어 있습니다.';
+
+  @override
+  String get storageAnalyzerBiggestFiles => '가장 큰 파일';
+
+  @override
+  String get storageAnalyzerBiggestFilesSubtitle => '이 볼륨에서 가장 큰 파일 찾아보기';
+
+  @override
+  String get storageAnalyzerAllSuggestions => '모든 제안';
+
+  @override
+  String storageAnalyzerSelectedSummary(int count, String size) {
+    return '$count개 선택됨 · $size';
+  }
+
+  @override
+  String storageAnalyzerDeleteFilesMessage(String size) {
+    return '선택한 항목이 이 저장소에서 영구적으로 삭제되며 $size의 공간이 확보됩니다. 이 작업은 실행 취소할 수 없습니다.';
+  }
+
+  @override
+  String storageAnalyzerDeleteFoldersMessage(String files, String size) {
+    return '선택한 항목(선택한 폴더 안의 모든 항목을 포함하여 총 $files개 파일)이 영구적으로 삭제되며 $size의 공간이 확보됩니다. 이 작업은 실행 취소할 수 없습니다.';
+  }
+
+  @override
+  String storageAnalyzerDeleteDone(String size) {
+    return '$size 공간을 확보했습니다';
+  }
+
+  @override
+  String storageAnalyzerDeletePartial(
+    String deleted,
+    String failed,
+    String size,
+  ) {
+    return '$deleted개 삭제됨, $failed개 삭제 실패. $size 공간이 확보되었습니다.';
+  }
+
+  @override
+  String get storageAnalyzerDeleteNone => '삭제된 항목이 없습니다.';
+
+  @override
+  String get storageAnalyzerDeleteError => '선택한 항목을 삭제할 수 없습니다.';
+
+  @override
+  String get storageAnalyzerRescanFolder => '이 폴더 다시 검사';
+
+  @override
+  String get storageAnalyzerSelectAction => '선택';
+
+  @override
+  String get storageAnalyzerSelectAllHere => '이 폴더의 모든 항목 선택';
+
+  @override
+  String get storageAnalyzerOpenFolder => '폴더 열기';
 
   @override
   String get keyfilePassphraseGeneratorTitle => '키파일 및 패스프레이즈 생성기';
@@ -5584,17 +5767,17 @@ class AppLocalizationsKo extends AppLocalizations {
   String get vaultSyncTapToSelect => '탭하여 볼트 및 폴더 선택';
 
   @override
-  String get vaultSyncSwapTooltip => '왼쪽/오른쪽 바꾸기';
+  String get vaultSyncSwapTooltip => '두 저장소 서로 바꾸기';
 
   @override
-  String get vaultSyncSameLocationWarning => '왼쪽과 오른쪽은 서로 다른 폴더여야 합니다.';
+  String get vaultSyncSameLocationWarning => '두 폴더는 서로 달라야 합니다.';
 
   @override
   String get vaultSyncIntroTitle => '두 볼트 비교';
 
   @override
   String get vaultSyncIntroSubtitle =>
-      '왼쪽 및 오른쪽 볼트(또는 같은 볼트 내 두 폴더)를 선택하면 각 쪽에서 누락, 수정 또는 최신 항목을 확인할 수 있습니다.';
+      '두 폴더(볼트, 기기 저장소 또는 SD 카드나 클라우드 드라이브 같은 문서 제공자 안)를 선택하면 각각에서 누락, 수정 또는 최신 항목을 확인할 수 있습니다.';
 
   @override
   String get vaultSyncCompareButton => '비교';
@@ -5667,11 +5850,10 @@ class AppLocalizationsKo extends AppLocalizations {
   String get vaultSyncDirectionLabel => '동기화 방향';
 
   @override
-  String get vaultSyncDirectionTwoWay => '양방향(권장)';
+  String get vaultSyncDirectionTwoWay => '양방향';
 
   @override
-  String get vaultSyncDirectionTwoWaySubtitle =>
-      '각 파일을 없거나 이전 사본만 있는 쪽으로 복사합니다';
+  String get vaultSyncDirectionTwoWaySubtitle => '누락된 파일과 더 최신 버전을 반대쪽에 복사합니다.';
 
   @override
   String get vaultSyncDirectionLeftToRight => '왼쪽 → 오른쪽(단방향)';
@@ -5767,39 +5949,37 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String get vaultSyncOverlapWarning =>
-      'Left and Right must not be the same folder or nested inside each other.';
+  String get vaultSyncOverlapWarning => '두 폴더는 같거나 서로 안에 포함되어서는 안 됩니다.';
 
   @override
   String vaultSyncPlaintextWarning(Object targets) {
-    return 'Files copied out of a vault to $targets will be stored unencrypted.';
+    return '볼트에서 $targets(으)로 복사한 파일은 암호화되지 않은 상태로 저장됩니다.';
   }
 
   @override
-  String get vaultSyncStorageSelectorLabel => 'Storage';
+  String get vaultSyncStorageSelectorLabel => '저장소';
 
   @override
-  String get vaultSyncTargetKindVault => 'Encrypted vault';
+  String get vaultSyncTargetKindVault => '암호화된 볼트';
 
   @override
-  String get vaultSyncTargetKindDevice => 'Device storage · not encrypted';
+  String get vaultSyncTargetKindDevice => '기기 저장소 · 암호화되지 않음';
 
   @override
-  String get vaultSyncTargetKindProvider => 'Document provider · not encrypted';
+  String get vaultSyncTargetKindProvider => '문서 제공자 · 암호화되지 않음';
 
   @override
-  String get vaultSyncAddStorageTooltip => 'Add storage location';
+  String get vaultSyncAddStorageTooltip => '저장 위치 추가';
 
   @override
-  String get vaultSyncEnableLocalStorageTooltip =>
-      'Enable Local Storage access';
+  String get vaultSyncEnableLocalStorageTooltip => '로컬 저장소 접근 사용';
 
   @override
-  String get vaultSyncNoStoragesTitle => 'No storage to sync yet';
+  String get vaultSyncNoStoragesTitle => '아직 동기화할 저장소가 없습니다';
 
   @override
   String get vaultSyncNoStoragesMessage =>
-      'Add a folder or document provider with the + button, or mount a vault.';
+      '+ 버튼으로 폴더나 문서 제공자를 추가하거나 볼트를 마운트하세요.';
 
   @override
   String get vaultSyncReadOnlyBadge => '읽기 전용';
@@ -11774,6 +11954,15 @@ class AppLocalizationsKo extends AppLocalizations {
       '앱 바를 화면 위쪽에서 아래쪽으로 옮겨 엄지손가락으로 더 쉽게 닿도록 합니다.';
 
   @override
+  String get sectionNavigation => '탐색';
+
+  @override
+  String get predictiveBackAnimationsLabel => '예측형 뒤로가기 애니메이션';
+
+  @override
+  String get predictiveBackAnimationsDesc => '뒤로 이동할 때 대화형 미리보기와 애니메이션을 표시합니다.';
+
+  @override
   String get selectByIconLabel => '아이콘을 탭하여 선택';
 
   @override
@@ -12523,6 +12712,346 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get comicReaderCarouselScrubberSubtitle => '스크러버 위에 페이지 썸네일 표시';
+
+  @override
+  String get vaultSyncBrowseAllButton => '모든 항목 찾아보기';
+
+  @override
+  String get vaultSyncExplorerTitle => '두 저장소 모두 찾아보기';
+
+  @override
+  String get vaultSyncExplorerEmptyTitle => '표시할 항목이 없습니다';
+
+  @override
+  String get vaultSyncExplorerEmptyMessage => '이 폴더에는 이 필터와 일치하는 항목이 없습니다.';
+
+  @override
+  String get vaultSyncExplorerLoadFailedTitle => '이 폴더를 읽을 수 없습니다';
+
+  @override
+  String get vaultSyncExplorerLoadFailedMessage =>
+      '두 저장소 중 하나의 목록을 가져오지 못했습니다. 다시 시도하고 두 저장소가 모두 잠금 해제되어 연결되어 있는지 확인하세요.';
+
+  @override
+  String get vaultSyncFilterAll => '전체';
+
+  @override
+  String get vaultSyncFilterDifferences => '차이점';
+
+  @override
+  String get vaultSyncFilterNewer => '더 새로운 사본';
+
+  @override
+  String get vaultSyncFilterConflicts => '검토 필요';
+
+  @override
+  String get vaultSyncFilterDeletions => '삭제';
+
+  @override
+  String get vaultSyncFilterNoMatchesMessage => '이 필터와 일치하는 항목이 없습니다.';
+
+  @override
+  String get vaultSyncSortTooltip => '정렬';
+
+  @override
+  String get vaultSyncSortPath => '경로';
+
+  @override
+  String get vaultSyncSortSize => '큰 순';
+
+  @override
+  String get vaultSyncSortModified => '최신 순';
+
+  @override
+  String get vaultSyncSortStatus => '상태';
+
+  @override
+  String get vaultSyncStatusInSync => '동기화됨';
+
+  @override
+  String get vaultSyncStatusFolder => '폴더';
+
+  @override
+  String vaultSyncDeletionsQueuedLabel(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '삭제 $count건',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String vaultSyncConfirmDeletionsMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '항목 $count개가 영구적으로 삭제됩니다. 이 작업은 되돌릴 수 없습니다.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get vaultSyncResultsStaleMessage =>
+      '삭제 후에는 결과가 최신이 아닐 수 있습니다. 다시 비교하면 개수가 갱신됩니다.';
+
+  @override
+  String vaultSyncSelectedCount(num count) {
+    return '$count개 선택됨';
+  }
+
+  @override
+  String get vaultSyncOpenAction => '열기';
+
+  @override
+  String vaultSyncOpenCopyAction(String side) {
+    return '$side의 사본 열기';
+  }
+
+  @override
+  String get vaultSyncOpenFolderAction => '폴더 열기';
+
+  @override
+  String get vaultSyncOpenFolderSubtitle => '두 저장소의 내용 찾아보기';
+
+  @override
+  String get vaultSyncShowInFolderAction => '폴더에서 보기';
+
+  @override
+  String get vaultSyncShowInFolderSubtitle => '두 저장소에서 주변 항목과 함께 보기';
+
+  @override
+  String get vaultSyncDeleteFromBothAction => '두 저장소에서 모두 삭제';
+
+  @override
+  String vaultSyncDeleteBothSidesLabel(String left, String right) {
+    return '$left 및 $right';
+  }
+
+  @override
+  String vaultSyncDeleteConfirmMessage(String where) {
+    return '이 항목은 폴더 안의 모든 내용을 포함하여 $where에서 영구적으로 삭제됩니다. 이 작업은 되돌릴 수 없습니다.';
+  }
+
+  @override
+  String vaultSyncDeleteDoneMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '항목 $count개를 삭제했습니다',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String vaultSyncDeletePartialMessage(int deleted, int failed) {
+    return '$deleted개를 삭제했지만 $failed개는 삭제하지 못했습니다';
+  }
+
+  @override
+  String get vaultSyncCopyDoneMessage => '복사했습니다';
+
+  @override
+  String get vaultSyncCopyFailedMessage =>
+      '일부 항목을 복사하지 못했습니다. 자세한 내용은 전송 목록을 확인하세요.';
+
+  @override
+  String vaultSyncOpenFailedMessage(String name) {
+    return '$name을(를) 열 수 없습니다';
+  }
+
+  @override
+  String get vaultSyncDetailsNotOnThisSide => '이 저장소에 없음';
+
+  @override
+  String get vaultSyncDetailsFolder => '폴더';
+
+  @override
+  String vaultSyncStatusOnlyIn(String storage) {
+    return '$storage에만 있음';
+  }
+
+  @override
+  String vaultSyncStatusNewerIn(String storage) {
+    return '$storage에서 더 최신';
+  }
+
+  @override
+  String vaultSyncBadgeOnlyIn(int count, String storage) {
+    return '$storage에만 $count개';
+  }
+
+  @override
+  String vaultSyncBadgeNewerIn(int count, String storage) {
+    return '$storage에서 더 최신 $count개';
+  }
+
+  @override
+  String vaultSyncFolderOnlyInDetail(String storage) {
+    return '폴더 — $storage에만 있음';
+  }
+
+  @override
+  String get vaultSyncDirectionOneWay => '단방향 복사';
+
+  @override
+  String get vaultSyncDirectionOneWaySubtitle =>
+      '새 파일과 업데이트된 파일을 표시된 방향으로 복사합니다. 원본은 변경되지 않습니다.';
+
+  @override
+  String get vaultSyncDirectionMirror => '미러 동기화';
+
+  @override
+  String get vaultSyncDirectionMirrorSubtitle =>
+      '대상을 정확한 사본으로 바꿉니다. 대상에만 있는 항목은 삭제됩니다.';
+
+  @override
+  String vaultSyncActionCopyTo(String storage) {
+    return '복사 → $storage';
+  }
+
+  @override
+  String vaultSyncCopyNowToAction(String storage) {
+    return '지금 $storage(으)로 복사';
+  }
+
+  @override
+  String vaultSyncDeleteFromAction(String storage) {
+    return '$storage에서 삭제';
+  }
+
+  @override
+  String vaultSyncPlanDeleteFrom(String storage) {
+    return '동기화할 때 $storage에서 삭제';
+  }
+
+  @override
+  String vaultSyncFilterOnlyIn(String storage) {
+    return '$storage에만 있음';
+  }
+
+  @override
+  String get vaultSyncChooseFirstStorage => '첫 번째 저장소 선택';
+
+  @override
+  String get vaultSyncChooseSecondStorage => '두 번째 저장소 선택';
+
+  @override
+  String get vaultSyncChangeButton => '변경';
+
+  @override
+  String get vaultSyncChooseButton => '선택';
+
+  @override
+  String get vaultSyncChooseStorageTitle => '저장소 선택';
+
+  @override
+  String get vaultSyncChooseStorageHint => '먼저 저장소를 고른 다음, 그 안에서 비교할 폴더를 고르세요.';
+
+  @override
+  String get vaultSyncCurrentStorageBadge => '현재';
+
+  @override
+  String get vaultSyncChangeStorageTooltip => '저장소 변경';
+
+  @override
+  String vaultSyncPickFolderTitle(String storage) {
+    return '$storage의 폴더';
+  }
+
+  @override
+  String get vaultSyncDirectionSectionTitle => '방향';
+
+  @override
+  String get vaultSyncDirectionMirrorWarning => '파일 삭제';
+
+  @override
+  String get vaultSyncDirectionSourceLabel => '원본';
+
+  @override
+  String get vaultSyncDirectionTargetLabel => '대상';
+
+  @override
+  String get vaultSyncDirectionSwapButton => '순서 바꾸기';
+
+  @override
+  String get vaultSyncDirectionRecommendedLabel => '권장';
+
+  @override
+  String get categoriesSectionTitle => '카테고리';
+
+  @override
+  String get manageCategoriesTooltip => '카테고리 관리';
+
+  @override
+  String get categoryShortcutsTitle => '카테고리 바로가기';
+
+  @override
+  String get categoryShortcutsEnable => '카테고리 바로가기 표시';
+
+  @override
+  String get categoryShortcutsEnableSubtitle =>
+      '모든 저장소의 사진, 동영상, 오디오, 문서를 서랍 메뉴에 표시';
+
+  @override
+  String get categoryShortcutsRestore => '기본 바로가기 복원';
+
+  @override
+  String get categorySourceAll => '모든 저장소';
+
+  @override
+  String get categorySourceTooltip => '소스 선택';
+
+  @override
+  String get categoryFolderStructure => '원본 폴더 구조 표시';
+
+  @override
+  String categoryScanning(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '스캔 중… $count개 폴더 확인됨',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get categoryEmpty => '이 카테고리에서 아무것도 찾을 수 없습니다';
+
+  @override
+  String get categoryNoVaultsUnlocked => '잠금 해제된 금고가 없습니다';
+
+  @override
+  String get categoryScanLimitReached => '결과가 불완전할 수 있습니다 — 스캔이 한도에 도달했습니다.';
+
+  @override
+  String get categoryShareOneSource => '공유하려면 한 번에 하나의 저장소에서 파일을 선택하세요.';
+
+  @override
+  String categoryClipboardReady(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '붙여넣을 파일 $count개 준비됨',
+    );
+    return '$_temp0 — 붙여넣을 폴더를 여세요';
+  }
+
+  @override
+  String get categoryIndexInVaultsTitle => '금고에 카테고리 색인 보관';
+
+  @override
+  String get categoryIndexInVaultsSubtitle =>
+      '카테고리를 열 때 각 금고의 설정 폴더에 암호화되어 저장되므로 다음에 파일이 즉시 표시됩니다. 휴대전화에는 아무것도 저장되지 않습니다.';
+
+  @override
+  String get categoryIndexClear => '카테고리 색인 지우기';
+
+  @override
+  String get categoryIndexClearSubtitle => '잠금 해제된 모든 금고에서 색인을 삭제합니다';
+
+  @override
+  String get categoryIndexCleared => '카테고리 색인이 삭제되었습니다';
 
   @override
   String get securityKeyUnlockHintNfc =>

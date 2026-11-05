@@ -202,4 +202,124 @@ void main() {
       expect(controller.plaintextExportTargets(), isEmpty);
     });
   });
+
+  group('VaultSyncController delete and copy rules', () {
+    VaultDiffEntry entry(
+      VaultDiffStatus status, {
+      bool isDir = false,
+      bool typeMismatch = false,
+    }) => VaultDiffEntry(
+      name: 'a',
+      relativePath: 'a',
+      status: status,
+      isDir: isDir,
+      typeMismatch: typeMismatch,
+    );
+
+    VaultSync setUpSides({bool rightReadOnly = false}) {
+      final left = _testContainer(volId: 1, uri: 'file:///l.hc', name: 'Left');
+      final right = _testContainer(
+        volId: 2,
+        uri: 'file:///r.hc',
+        name: 'Right',
+        readOnly: rightReadOnly,
+      );
+      final controller = container.read(vaultSyncProvider.notifier);
+      controller.initDefaultSides([left, right]);
+      return controller;
+    }
+
+    test('canApply only offers an action on a side that holds the entry', () {
+      final c = setUpSides();
+      final onlyLeft = entry(VaultDiffStatus.onlyLeft);
+      expect(c.canApply(onlyLeft, EntryAction.copyToRight), isTrue);
+      expect(c.canApply(onlyLeft, EntryAction.copyToLeft), isFalse);
+      expect(c.canApply(onlyLeft, EntryAction.deleteLeft), isTrue);
+      expect(c.canApply(onlyLeft, EntryAction.deleteRight), isFalse);
+      expect(c.canApply(onlyLeft, EntryAction.skip), isTrue);
+
+      final both = entry(VaultDiffStatus.leftNewer);
+      expect(c.canApply(both, EntryAction.deleteLeft), isTrue);
+      expect(c.canApply(both, EntryAction.deleteRight), isTrue);
+    });
+
+    test('a read-only side can be neither copied into nor deleted from', () {
+      final c = setUpSides(rightReadOnly: true);
+      final both = entry(VaultDiffStatus.leftNewer);
+      expect(c.canApply(both, EntryAction.copyToRight), isFalse);
+      expect(c.canApply(both, EntryAction.deleteRight), isFalse);
+      expect(c.canApply(both, EntryAction.copyToLeft), isTrue);
+      expect(c.canApply(both, EntryAction.deleteLeft), isTrue);
+    });
+
+    test('actionFor never plans a delete on a read-only side', () {
+      final c = setUpSides(rightReadOnly: true);
+      final onlyRight = entry(VaultDiffStatus.onlyRight);
+      c.setOverride(onlyRight.id, EntryAction.deleteRight);
+      expect(c.actionFor(onlyRight), EntryAction.skip);
+    });
+
+    test('mirroring onto a writable side plans the delete of extras', () {
+      final c = setUpSides();
+      c.setDirection(SyncDirection.mirrorToRight);
+      expect(
+        c.actionFor(entry(VaultDiffStatus.onlyRight)),
+        EntryAction.deleteRight,
+      );
+    });
+
+    test('items already in sync and folders on both sides are never copied',
+        () {
+      final c = setUpSides();
+      expect(
+        c.canApply(entry(VaultDiffStatus.identical), EntryAction.copyToRight),
+        isFalse,
+      );
+      expect(
+        c.canApply(
+          entry(VaultDiffStatus.bothFolders, isDir: true),
+          EntryAction.copyToLeft,
+        ),
+        isFalse,
+      );
+      // ...but they can still be deleted.
+      expect(
+        c.canApply(
+          entry(VaultDiffStatus.bothFolders, isDir: true),
+          EntryAction.deleteRight,
+        ),
+        isTrue,
+      );
+    });
+
+    test('a file-versus-folder mismatch cannot be copied but can be deleted',
+        () {
+      final c = setUpSides();
+      final mismatch = entry(VaultDiffStatus.conflicted, typeMismatch: true);
+      expect(c.canApply(mismatch, EntryAction.copyToRight), isFalse);
+      expect(c.canApply(mismatch, EntryAction.copyToLeft), isFalse);
+      expect(c.canApply(mismatch, EntryAction.deleteLeft), isTrue);
+      expect(c.canApply(mismatch, EntryAction.deleteRight), isTrue);
+    });
+
+    test('selection toggles and clears', () {
+      final c = container.read(vaultSyncProvider.notifier);
+      c.toggleSelected('a');
+      c.toggleSelected('b');
+      expect(container.read(vaultSyncProvider).selectedIds, {'a', 'b'});
+      c.toggleSelected('a');
+      expect(container.read(vaultSyncProvider).selectedIds, {'b'});
+      c.clearSelection();
+      expect(container.read(vaultSyncProvider).selectedIds, isEmpty);
+    });
+
+    test('changing the filter and sort is reflected in state', () {
+      final c = container.read(vaultSyncProvider.notifier);
+      c.setFilter(VaultSyncFilter.deletions);
+      c.setSort(VaultSyncSort.size);
+      final state = container.read(vaultSyncProvider);
+      expect(state.filter, VaultSyncFilter.deletions);
+      expect(state.sort, VaultSyncSort.size);
+    });
+  });
 }

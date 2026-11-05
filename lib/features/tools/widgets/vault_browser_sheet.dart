@@ -17,10 +17,15 @@ class VaultBrowserScaffold extends ConsumerWidget {
   final Widget Function(BuildContext context) buildBottomBar;
   final List<Widget> Function(BuildContext context)? actions;
 
-  /// Optional overrides for the storage selector shown when
-  /// [VaultBrowserParams.mountedContainers] has more than one entry. Left
-  /// `null` by every caller except the Vault Sync picker, so the selector
-  /// keeps its "Vault" label and plain container names elsewhere.
+  /// Hide the built-in storage selector row when storage is chosen on a
+  /// separate screen before browsing.
+  final bool showStorageSelector;
+
+  /// Optional root-level back behavior. When provided, both the app-bar back
+  /// button and system back return to the caller's previous picker step.
+  final VoidCallback? onRootBack;
+
+  /// Optional label and subtitle builders for the built-in storage selector.
   final String Function(BuildContext context)? selectorLabel;
   final String? Function(BuildContext context, MountedContainer container)?
       containerSubtitle;
@@ -42,6 +47,8 @@ class VaultBrowserScaffold extends ConsumerWidget {
     required this.buildEntryTile,
     required this.buildBottomBar,
     this.actions,
+    this.showStorageSelector = true,
+    this.onRootBack,
     this.wrapAppBarTitle,
     this.selectorLabel,
     this.containerSubtitle,
@@ -68,33 +75,38 @@ class VaultBrowserScaffold extends ConsumerWidget {
       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
     );
 
-    final canPop = state.pathStack.length <= 1;
+    final atRoot = state.pathStack.length <= 1;
+    final canPop = atRoot && onRootBack == null;
 
     return PopScope(
       canPop: canPop,
       onPopInvokedWithResult: (bool didPop, Object? result) {
         if (didPop) return;
-        if (state.pathStack.length > 1) {
+        if (!atRoot) {
           notifier.navigateUp();
+        } else {
+          onRootBack?.call();
         }
       },
       child: Scaffold(
       appBar: AppBar(
           title: wrapAppBarTitle?.call(titleText) ?? titleText,
           actions: actions?.call(context),
-          leading: state.pathStack.length > 1
-              ? IconButton(
-                  icon: const Icon(Icons.arrow_back_rounded),
-                  onPressed: notifier.navigateUp,
-                )
-              : IconButton(
-                  icon: const Icon(Icons.close_rounded),
-                  onPressed: () => Navigator.pop(context),
-                ),
+          leading: IconButton(
+            icon: Icon(
+              !atRoot || onRootBack != null
+                  ? Icons.arrow_back_rounded
+                  : Icons.close_rounded,
+            ),
+            onPressed: !atRoot
+                ? notifier.navigateUp
+                : onRootBack ?? () => Navigator.pop(context),
+          ),
         ),
         body: Column(
           children: [
-            if (params.mountedContainers.length > 1)
+            if (showStorageSelector &&
+                params.mountedContainers.length > 1)
               Container(
                 padding: const EdgeInsets.only(top: 8, bottom: 8),
                 color: cs.surfaceContainerLow,

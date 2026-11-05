@@ -1149,11 +1149,9 @@ class VaultFileIoApi {
     return renameFile(container, tmpPath, fileName);
   }
 
-  /// No local-storage branch: `dart:io` has no cross-platform way to read
-  /// a volume's free/total space, so callers get `null` for real device
-  /// storage the same as they would for any other unavailable stat -- the
-  /// stats bar already handles a `null` result by simply not showing a
-  /// free-space figure.
+  /// Returns capacity and available bytes for this storage. Raw local paths
+  /// use the native SAF space query with a file URI so Android can read the
+  /// backing filesystem's StatFs values.
   Future<List<int>?> getSpaceInfo(MountedContainer container) async {
     if (_isSaf(container)) {
       final res = await _channel.invokeMethod<List<Object?>>(
@@ -1162,7 +1160,13 @@ class VaultFileIoApi {
       );
       return res?.cast<int>();
     }
-    if (container.isLocalStorage) return null;
+    if (container.isLocalStorage) {
+      final res = await _channel.invokeMethod<List<Object?>>(
+        ChannelMethods.safGetSpaceInfo,
+        {'treeUri': Uri.file(container.uri).toString()},
+      );
+      return res?.cast<int>();
+    }
     final result = await _channel.invokeMethod<List<Object?>>(
       ChannelMethods.getSpaceInfo,
       {'filePath': container.uri},

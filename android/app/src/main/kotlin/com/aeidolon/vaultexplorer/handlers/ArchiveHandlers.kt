@@ -813,7 +813,7 @@ class ArchiveHandlers(
                     val localSrcPaths = if (srcIsSaf) {
                         val dir = File(activity.cacheDir, "arch_src_${System.nanoTime()}").apply { mkdirs() }
                         tempSrcDir = dir
-                        stageSafArchiveSources(srcUri!!, srcPaths, dir)
+                        stageSafArchiveSources(srcUri!!, srcPaths, entryNames, dir)
                     } else {
                         srcPaths
                     }
@@ -959,6 +959,12 @@ class ArchiveHandlers(
                     for (i in srcPaths.indices) {
                         val sp = srcPaths[i]
                         val en = entryNames[i]
+                        if (isDirectoryEntry(en)) {
+                            files.add(dir.absolutePath)
+                            names.add(en)
+                            modified.add(sourceModifiedSecs[i])
+                            continue
+                        }
                         val tmp = File(dir, "f_${i}_${en.substringAfterLast('/')}")
                         val ok = ContainerFileSystem.extractToFile(srcVolId!!, sp, tmp.absolutePath, opId)
                         if (ok && tmp.exists()) {
@@ -973,7 +979,7 @@ class ArchiveHandlers(
                 } else if (srcIsSaf) {
                     val dir = File(activity.cacheDir, "arch_src_${System.nanoTime()}").apply { mkdirs() }
                     tempSrcDir = dir
-                    localSourcePaths = stageSafArchiveSources(srcUri!!, srcPaths, dir)
+                    localSourcePaths = stageSafArchiveSources(srcUri!!, srcPaths, entryNames, dir)
                     localEntryNames = entryNames
                     localModifiedSecs = sourceModifiedSecs
                 } else {
@@ -1101,6 +1107,12 @@ class ArchiveHandlers(
                     val modified = mutableListOf<Long>()
                     for (i in srcPaths.indices) {
                         val en = entryNames[i]
+                        if (isDirectoryEntry(en)) {
+                            files.add(dir.absolutePath)
+                            names.add(en)
+                            modified.add(sourceModifiedSecs[i])
+                            continue
+                        }
                         val tmp = File(dir, "f_${i}_${en.substringAfterLast('/')}")
                         val ok = ContainerFileSystem.extractToFile(srcVolId!!, srcPaths[i], tmp.absolutePath, opId)
                         if (ok && tmp.exists()) {
@@ -1117,7 +1129,7 @@ class ArchiveHandlers(
                     val dir = File(activity.cacheDir, "arch_src_${System.nanoTime()}").apply { mkdirs() }
                     tempSrcDir = dir
                     nativeSrcVol = -1
-                    nativeSrcPaths = stageSafArchiveSources(srcUri!!, srcPaths, dir)
+                    nativeSrcPaths = stageSafArchiveSources(srcUri!!, srcPaths, entryNames, dir)
                 }
 
                 // Where the archive (= its parts) goes
@@ -1230,9 +1242,22 @@ class ArchiveHandlers(
         }
     }
 
-    private fun stageSafArchiveSources(treeUri: String, relativePaths: List<String>, destinationDir: File): List<String> {
+    /**
+     * An entry name ending in '/' is a folder kept in the archive on its own (an empty folder).
+     * Its source path is never read, so the steps that copy or extract sources skip it.
+     */
+    private fun isDirectoryEntry(entryName: String): Boolean = entryName.endsWith("/")
+
+    private fun stageSafArchiveSources(
+        treeUri: String,
+        relativePaths: List<String>,
+        entryNames: List<String>,
+        destinationDir: File,
+    ): List<String> {
         val tree = Uri.parse(treeUri)
         return relativePaths.mapIndexed { index, relativePath ->
+            // A folder entry has nothing to copy; any existing path will do as its placeholder.
+            if (isDirectoryEntry(entryNames[index])) return@mapIndexed destinationDir.absolutePath
             val stagedFile = File(destinationDir, "source_$index")
             val copied = activity.safStorageManager.copyFile(tree, relativePath, null, stagedFile.absolutePath)
             if (!copied || !stagedFile.isFile) {

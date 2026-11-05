@@ -68,6 +68,7 @@ import com.aeidolon.vaultexplorer.handlers.VaultPickerHandlers
 import com.aeidolon.vaultexplorer.handlers.VaultUnlockHandlers
 import com.aeidolon.vaultexplorer.handlers.AudioEditHandlers
 import com.aeidolon.vaultexplorer.handlers.VideoEditHandlers
+import com.aeidolon.vaultexplorer.handlers.CategoryIndexHandlers
 import com.aeidolon.vaultexplorer.handlers.LocalFileHandlers
 import com.aeidolon.vaultexplorer.handlers.ShareIntentHandlers
 import com.aeidolon.vaultexplorer.handlers.PanicSettingsHandlers
@@ -287,6 +288,7 @@ private object ChannelMethods {
     const val RESTORE_FOLDER_VAULT_CONFIG = "restoreFolderVaultConfig"
     const val OPEN_LOCAL_FILE_WITH_APP = "openLocalFileWithApp"
     const val SHARE_LOCAL_FILE = "shareLocalFile"
+    const val QUERY_CATEGORY_INDEX = "queryCategoryIndex"
     const val ARCHIVE_SCAN_VAULT = "archiveScanVault"
     const val ARCHIVE_EXTRACT_VAULT_ENTRY = "archiveExtractVaultEntry"
     const val ARCHIVE_EXTRACT_VAULT_ALL = "archiveExtractVaultAll"
@@ -404,6 +406,7 @@ open class MainActivity : FlutterFragmentActivity() {
     private val fileOperationHandlers = FileOperationHandlers(nativeOps, fullResExecutor)
     private val systemHandlers = SystemPermissionHandlers(this)
     private val localFileHandlers = LocalFileHandlers(this, ioExecutor)
+    private val categoryIndexHandlers = CategoryIndexHandlers(this, ioExecutor)
     private val shareIntentHandlers = ShareIntentHandlers(this, ioExecutor)
     private val backgroundServiceHandlers = BackgroundServiceHandlers(this)
     private val scheduledSyncHandlers by lazy(LazyThreadSafetyMode.NONE) {
@@ -1127,6 +1130,7 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.OPEN_LOCAL_FILE_WITH_APP -> localFileHandlers.handleOpenLocalFileWithApp(call, result)
                 ChannelMethods.GET_LOCAL_FILE_URI -> localFileHandlers.handleGetLocalFileUri(call, result)
                 ChannelMethods.SHARE_LOCAL_FILE -> localFileHandlers.handleShareLocalFile(call, result)
+                ChannelMethods.QUERY_CATEGORY_INDEX -> categoryIndexHandlers.handleQueryCategoryIndex(call, result)
                 ChannelMethods.LIST_USB_DEVICES -> usbHandlers.handleListUsbDevices(call, result)
                 ChannelMethods.REQUEST_USB_PERMISSION -> usbHandlers.handleRequestUsbPermission(call, result)
                 ChannelMethods.UNLOCK_USB_CONTAINER -> usbHandlers.handleUnlockUsbContainer(call, result)

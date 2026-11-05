@@ -4,15 +4,15 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/features/authenticator/authenticator_screen.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 
-/// App bar action that appears only once at least one currently unlocked
-/// vault has a TOTP-capable item (a standalone Authenticator entry, or a
-/// `password` item with its optional 2FA field filled in), opening the
-/// aggregated [AuthenticatorScreen].
+/// App bar action that opens the aggregated [AuthenticatorScreen] whenever
+/// the Authenticator feature is enabled in settings.
 ///
-/// Mirrors [AppBarTransferButton]'s show-only-when-relevant placement in
-/// the dashboard's AppBar, but with no debounce/linger timers -- TOTP item
-/// presence doesn't flicker the way transient file-operation status does,
-/// so there's nothing here that needs smoothing over.
+/// It is shown regardless of whether any unlocked vault currently holds a
+/// TOTP-capable item (a standalone Authenticator entry, or a `password`
+/// item with its optional 2FA field filled in): the screen's own empty
+/// states explain what to unlock or add, which keeps the feature
+/// discoverable. The side drawer offers the same destination so it is
+/// reachable from every tab, not only the dashboard.
 class AppBarAuthenticatorButton extends ConsumerWidget {
   const AppBarAuthenticatorButton({super.key});
 

@@ -43,6 +43,7 @@ class FileTile extends StatelessWidget {
 
   /// Two-row layout -- see `FileListView.isDetailed`.
   final bool isDetailed;
+  final bool largeThumbnail;
   final bool showItemActionsMenu;
 
   /// Whether [entry]'s name is shown with its extension. Off hides it, except
@@ -84,6 +85,7 @@ class FileTile extends StatelessWidget {
     this.onIconTap,
     this.isCompact = false,
     this.isDetailed = false,
+    this.largeThumbnail = false,
     this.showItemActionsMenu = true,
     this.showFileExtensions = true,
     this.zoomLevel = 1.0,
@@ -274,6 +276,7 @@ class FileTile extends StatelessWidget {
       onIconTap: onIconTap,
       isCompact: isCompact,
       isDetailed: isDetailed,
+      largeThumbnail: largeThumbnail,
       zoomLevel: zoomLevel,
       customLeading: customLeading,
       customLeadingIsIcon: customLeadingIsIcon,

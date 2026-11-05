@@ -21,9 +21,21 @@ import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
 class ToolsScreen extends StatelessWidget {
   final ValueListenable<List<MountedContainer>> mountedContainers;
+  final ValueListenable<MountedContainer?>? localStorageContainer;
   final ValueChanged<int>? onNavigateTab;
 
-  const ToolsScreen({super.key, required this.mountedContainers, this.onNavigateTab});
+  /// Opens a vault in the file browser. Lets tools such as the Storage
+  /// Analyzer offer "show in file browser"; tools hide that action when this
+  /// is null (e.g. when ToolsScreen is pushed from the drawer).
+  final ValueChanged<MountedContainer>? onOpenInBrowser;
+
+  const ToolsScreen({
+    super.key,
+    required this.mountedContainers,
+    this.localStorageContainer,
+    this.onNavigateTab,
+    this.onOpenInBrowser,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -276,6 +288,8 @@ class ToolsScreen extends StatelessWidget {
         MaterialPageRoute(
           builder: (_) => SkinAreaScope(area: SkinArea.tools, child: StorageAnalyzerScreen(
             mountedContainers: mountedContainers,
+            localStorageContainer: localStorageContainer,
+            onOpenInBrowser: onOpenInBrowser,
           )),
         ),
       ),

@@ -3655,6 +3655,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get layoutModeGalleryGrid => 'Gallery Grid';
 
   @override
+  String get galleryModeAction => 'Gallery';
+
+  @override
+  String get galleryModeTooltip => 'Gallery mode';
+
+  @override
+  String get optionsAction => 'Options';
+
+  @override
+  String get optionsActionTooltip => 'Options';
+
+  @override
+  String get dateToday => 'Today';
+
+  @override
+  String get dateYesterday => 'Yesterday';
+
+  @override
+  String get dateEarlier => 'Earlier';
+
+  @override
   String get readOnlyCantDeleteTooltip => 'Read-only — can\'t delete';
 
   @override
@@ -4693,7 +4714,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get toolStorageAnalyzerSubtitle =>
-      'See what\'s taking up space in a mounted vault';
+      'See what\'s taking up space in Local Storage or a mounted vault';
 
   @override
   String get toolDuplicateFinderTitle => 'Duplicate File Finder';
@@ -5301,7 +5322,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get storageAnalyzerNoTargetsMessage =>
-      'Mount a vault first, then come back here to see its storage breakdown.';
+      'Open Local Storage or mount a vault first, then come back here to see its storage breakdown.';
 
   @override
   String storageAnalyzerUsedOfTotal(String used, String total) {
@@ -5342,6 +5363,175 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get storageCategoryOther => 'Other';
+
+  @override
+  String get storageAnalyzerTabMap => 'Map';
+
+  @override
+  String get storageAnalyzerTabFolders => 'Folders';
+
+  @override
+  String get storageAnalyzerTabTypes => 'Types';
+
+  @override
+  String get storageAnalyzerTabCleanup => 'Cleanup';
+
+  @override
+  String storageAnalyzerFreeSpace(String free) {
+    return '$free free';
+  }
+
+  @override
+  String storageAnalyzerFileCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count files',
+      one: '1 file',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageAnalyzerItemCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items',
+      one: '1 item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageAnalyzerContentSize(String size) {
+    return 'Vault content: $size';
+  }
+
+  @override
+  String storageAnalyzerScanProgress(String files, String size) {
+    return '$files files · $size so far';
+  }
+
+  @override
+  String get storageAnalyzerPartialNotice =>
+      'Some folders couldn\'t be fully read, so totals may be lower than the real figures.';
+
+  @override
+  String get storageAnalyzerStaleNotice =>
+      'This volume has changed since it was scanned.';
+
+  @override
+  String get storageAnalyzerUpOneLevel => 'Up one level';
+
+  @override
+  String get storageAnalyzerEmptyFolder => 'This folder is empty.';
+
+  @override
+  String storageAnalyzerSmallerItems(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count smaller items',
+      one: '1 smaller item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get storageAnalyzerMapHint =>
+      'Tap a folder to open it. Press and hold to select.';
+
+  @override
+  String get storageAnalyzerSortFiles => 'File count';
+
+  @override
+  String get storageAnalyzerAllTypes => 'All types';
+
+  @override
+  String storageAnalyzerLargestOfType(String type) {
+    return 'Largest files · $type';
+  }
+
+  @override
+  String get storageAnalyzerCleanupHeader => 'Suggestions';
+
+  @override
+  String get storageAnalyzerCleanupLarge => 'Large files';
+
+  @override
+  String get storageAnalyzerCleanupStale => 'Not modified in over a year';
+
+  @override
+  String get storageAnalyzerCleanupTemp => 'Temporary and junk files';
+
+  @override
+  String get storageAnalyzerCleanupEmpty => 'Empty folders';
+
+  @override
+  String get storageAnalyzerCleanupReview => 'Review';
+
+  @override
+  String get storageAnalyzerCleanupNothing =>
+      'Nothing obvious to clean up. This volume looks tidy.';
+
+  @override
+  String get storageAnalyzerBiggestFiles => 'Biggest files';
+
+  @override
+  String get storageAnalyzerBiggestFilesSubtitle =>
+      'Browse the largest files on this volume';
+
+  @override
+  String get storageAnalyzerAllSuggestions => 'All suggestions';
+
+  @override
+  String storageAnalyzerSelectedSummary(int count, String size) {
+    return '$count selected · $size';
+  }
+
+  @override
+  String storageAnalyzerDeleteFilesMessage(String size) {
+    return 'This permanently deletes the selected items from this storage and frees $size. It can\'t be undone.';
+  }
+
+  @override
+  String storageAnalyzerDeleteFoldersMessage(String files, String size) {
+    return 'This permanently deletes the selected items ($files files, including everything inside selected folders) and frees $size. It can\'t be undone.';
+  }
+
+  @override
+  String storageAnalyzerDeleteDone(String size) {
+    return 'Freed $size';
+  }
+
+  @override
+  String storageAnalyzerDeletePartial(
+    String deleted,
+    String failed,
+    String size,
+  ) {
+    return 'Deleted $deleted, but $failed couldn\'t be deleted. Freed $size.';
+  }
+
+  @override
+  String get storageAnalyzerDeleteNone => 'Nothing was deleted.';
+
+  @override
+  String get storageAnalyzerDeleteError =>
+      'Couldn\'t delete the selected items.';
+
+  @override
+  String get storageAnalyzerRescanFolder => 'Rescan this folder';
+
+  @override
+  String get storageAnalyzerSelectAction => 'Select';
+
+  @override
+  String get storageAnalyzerSelectAllHere => 'Select all in this folder';
+
+  @override
+  String get storageAnalyzerOpenFolder => 'Open folder';
 
   @override
   String get keyfilePassphraseGeneratorTitle =>
@@ -5798,18 +5988,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get vaultSyncTapToSelect => 'Tap to select a storage & folder';
 
   @override
-  String get vaultSyncSwapTooltip => 'Swap Left and Right';
+  String get vaultSyncSwapTooltip => 'Swap the two storages';
 
   @override
   String get vaultSyncSameLocationWarning =>
-      'Left and Right must be different folders.';
+      'The two folders must be different.';
 
   @override
   String get vaultSyncIntroTitle => 'Compare Two Folders';
 
   @override
   String get vaultSyncIntroSubtitle =>
-      'Pick a Left and Right folder — in a vault, on device storage or on a document provider such as an SD card or cloud drive — to see what\'s missing, modified, or newer on each side.';
+      'Pick two folders — in a vault, on device storage or on a document provider such as an SD card or cloud drive — to see what\'s missing, modified, or newer in each.';
 
   @override
   String get vaultSyncCompareButton => 'Compare';
@@ -5882,11 +6072,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get vaultSyncDirectionLabel => 'Sync Direction';
 
   @override
-  String get vaultSyncDirectionTwoWay => 'Two-way (recommended)';
+  String get vaultSyncDirectionTwoWay => 'Two-way';
 
   @override
   String get vaultSyncDirectionTwoWaySubtitle =>
-      'Copies each file to whichever side is missing it or has an older copy';
+      'Copies missing files and newer versions to the other side.';
 
   @override
   String get vaultSyncDirectionLeftToRight => 'Left → Right (one-way)';
@@ -5983,7 +6173,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get vaultSyncOverlapWarning =>
-      'Left and Right must not be the same folder or nested inside each other.';
+      'The two folders must not be the same or nested inside each other.';
 
   @override
   String vaultSyncPlaintextWarning(Object targets) {
@@ -12272,6 +12462,16 @@ class AppLocalizationsEn extends AppLocalizations {
       'Move the app bar from the top of the screen to the bottom, where your thumb can reach it more easily.';
 
   @override
+  String get sectionNavigation => 'Navigation';
+
+  @override
+  String get predictiveBackAnimationsLabel => 'Predictive back animations';
+
+  @override
+  String get predictiveBackAnimationsDesc =>
+      'Show interactive previews and animations when navigating backwards.';
+
+  @override
   String get selectByIconLabel => 'Select by tapping the icon';
 
   @override
@@ -13059,6 +13259,358 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get comicReaderCarouselScrubberSubtitle =>
       'Show page thumbnails above the scrubber';
+
+  @override
+  String get vaultSyncBrowseAllButton => 'Browse all items';
+
+  @override
+  String get vaultSyncExplorerTitle => 'Browse both storages';
+
+  @override
+  String get vaultSyncExplorerEmptyTitle => 'Nothing to show';
+
+  @override
+  String get vaultSyncExplorerEmptyMessage =>
+      'No items match this filter in this folder.';
+
+  @override
+  String get vaultSyncExplorerLoadFailedTitle => 'Couldn\'t read this folder';
+
+  @override
+  String get vaultSyncExplorerLoadFailedMessage =>
+      'One of the two storages couldn\'t be listed. Try again, and make sure both are still unlocked and connected.';
+
+  @override
+  String get vaultSyncFilterAll => 'All';
+
+  @override
+  String get vaultSyncFilterDifferences => 'Differences';
+
+  @override
+  String get vaultSyncFilterNewer => 'Newer copy';
+
+  @override
+  String get vaultSyncFilterConflicts => 'Needs review';
+
+  @override
+  String get vaultSyncFilterDeletions => 'Deletions';
+
+  @override
+  String get vaultSyncFilterNoMatchesMessage => 'No items match this filter.';
+
+  @override
+  String get vaultSyncSortTooltip => 'Sort';
+
+  @override
+  String get vaultSyncSortPath => 'Path';
+
+  @override
+  String get vaultSyncSortSize => 'Largest first';
+
+  @override
+  String get vaultSyncSortModified => 'Newest first';
+
+  @override
+  String get vaultSyncSortStatus => 'Status';
+
+  @override
+  String get vaultSyncStatusInSync => 'In sync';
+
+  @override
+  String get vaultSyncStatusFolder => 'Folder';
+
+  @override
+  String vaultSyncDeletionsQueuedLabel(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count deletions',
+      one: '1 deletion',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String vaultSyncConfirmDeletionsMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items will be permanently deleted. This can\'t be undone.',
+      one: '1 item will be permanently deleted. This can\'t be undone.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get vaultSyncResultsStaleMessage =>
+      'Results may be out of date after deleting. Compare again to refresh the counts.';
+
+  @override
+  String vaultSyncSelectedCount(num count) {
+    return '$count selected';
+  }
+
+  @override
+  String get vaultSyncOpenAction => 'Open';
+
+  @override
+  String vaultSyncOpenCopyAction(String side) {
+    return 'Open copy in $side';
+  }
+
+  @override
+  String get vaultSyncOpenFolderAction => 'Open folder';
+
+  @override
+  String get vaultSyncOpenFolderSubtitle =>
+      'Browse what\'s inside, in both storages';
+
+  @override
+  String get vaultSyncShowInFolderAction => 'Show in folder';
+
+  @override
+  String get vaultSyncShowInFolderSubtitle =>
+      'See it next to its neighbours in both storages';
+
+  @override
+  String get vaultSyncDeleteFromBothAction => 'Delete from both storages';
+
+  @override
+  String vaultSyncDeleteBothSidesLabel(String left, String right) {
+    return '$left and $right';
+  }
+
+  @override
+  String vaultSyncDeleteConfirmMessage(String where) {
+    return 'These items will be permanently deleted from $where, including everything inside any folder. This can\'t be undone.';
+  }
+
+  @override
+  String vaultSyncDeleteDoneMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Deleted $count items',
+      one: 'Deleted 1 item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String vaultSyncDeletePartialMessage(int deleted, int failed) {
+    return 'Deleted $deleted, but $failed couldn\'t be deleted';
+  }
+
+  @override
+  String get vaultSyncCopyDoneMessage => 'Copied';
+
+  @override
+  String get vaultSyncCopyFailedMessage =>
+      'Some items couldn\'t be copied. Check the transfer list for details.';
+
+  @override
+  String vaultSyncOpenFailedMessage(String name) {
+    return 'Couldn\'t open $name';
+  }
+
+  @override
+  String get vaultSyncDetailsNotOnThisSide => 'Not in this storage';
+
+  @override
+  String get vaultSyncDetailsFolder => 'Folder';
+
+  @override
+  String vaultSyncStatusOnlyIn(String storage) {
+    return 'Only in $storage';
+  }
+
+  @override
+  String vaultSyncStatusNewerIn(String storage) {
+    return 'Newer in $storage';
+  }
+
+  @override
+  String vaultSyncBadgeOnlyIn(int count, String storage) {
+    return '$count only in $storage';
+  }
+
+  @override
+  String vaultSyncBadgeNewerIn(int count, String storage) {
+    return '$count newer in $storage';
+  }
+
+  @override
+  String vaultSyncFolderOnlyInDetail(String storage) {
+    return 'Folder — only in $storage';
+  }
+
+  @override
+  String get vaultSyncDirectionOneWay => 'One-way copy';
+
+  @override
+  String get vaultSyncDirectionOneWaySubtitle =>
+      'Copies new and updated files in the direction shown; the source is unchanged.';
+
+  @override
+  String get vaultSyncDirectionMirror => 'Mirror sync';
+
+  @override
+  String get vaultSyncDirectionMirrorSubtitle =>
+      'Replaces the destination with an exact copy; destination-only items are deleted.';
+
+  @override
+  String vaultSyncActionCopyTo(String storage) {
+    return 'Copy → $storage';
+  }
+
+  @override
+  String vaultSyncCopyNowToAction(String storage) {
+    return 'Copy to $storage now';
+  }
+
+  @override
+  String vaultSyncDeleteFromAction(String storage) {
+    return 'Delete from $storage';
+  }
+
+  @override
+  String vaultSyncPlanDeleteFrom(String storage) {
+    return 'Delete from $storage when syncing';
+  }
+
+  @override
+  String vaultSyncFilterOnlyIn(String storage) {
+    return 'Only in $storage';
+  }
+
+  @override
+  String get vaultSyncChooseFirstStorage => 'Choose the first storage';
+
+  @override
+  String get vaultSyncChooseSecondStorage => 'Choose the second storage';
+
+  @override
+  String get vaultSyncChangeButton => 'Change';
+
+  @override
+  String get vaultSyncChooseButton => 'Choose';
+
+  @override
+  String get vaultSyncChooseStorageTitle => 'Choose a storage';
+
+  @override
+  String get vaultSyncChooseStorageHint =>
+      'Pick a storage first, then the folder inside it to compare.';
+
+  @override
+  String get vaultSyncCurrentStorageBadge => 'Current';
+
+  @override
+  String get vaultSyncChangeStorageTooltip => 'Change storage';
+
+  @override
+  String vaultSyncPickFolderTitle(String storage) {
+    return 'Folder in $storage';
+  }
+
+  @override
+  String get vaultSyncDirectionSectionTitle => 'Direction';
+
+  @override
+  String get vaultSyncDirectionMirrorWarning => 'Deletes files';
+
+  @override
+  String get vaultSyncDirectionSourceLabel => 'Source';
+
+  @override
+  String get vaultSyncDirectionTargetLabel => 'Target';
+
+  @override
+  String get vaultSyncDirectionSwapButton => 'Swap';
+
+  @override
+  String get vaultSyncDirectionRecommendedLabel => 'Recommended';
+
+  @override
+  String get categoriesSectionTitle => 'Categories';
+
+  @override
+  String get manageCategoriesTooltip => 'Manage categories';
+
+  @override
+  String get categoryShortcutsTitle => 'Category shortcuts';
+
+  @override
+  String get categoryShortcutsEnable => 'Show category shortcuts';
+
+  @override
+  String get categoryShortcutsEnableSubtitle =>
+      'Images, videos, audio and documents from all your storage, in the drawer';
+
+  @override
+  String get categoryShortcutsRestore => 'Restore default shortcuts';
+
+  @override
+  String get categorySourceAll => 'All storage';
+
+  @override
+  String get categorySourceTooltip => 'Choose source';
+
+  @override
+  String get categoryFolderStructure => 'Display original folder structure';
+
+  @override
+  String categoryScanning(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Scanning… $count folders checked',
+      one: 'Scanning… 1 folder checked',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get categoryEmpty => 'Nothing found in this category';
+
+  @override
+  String get categoryNoVaultsUnlocked => 'No vault is unlocked';
+
+  @override
+  String get categoryScanLimitReached =>
+      'Results may be incomplete — the scan stopped at its limit.';
+
+  @override
+  String get categoryShareOneSource =>
+      'Choose files from one storage at a time to share them.';
+
+  @override
+  String categoryClipboardReady(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count files ready to paste',
+      one: '1 file ready to paste',
+    );
+    return '$_temp0 — open a folder to paste';
+  }
+
+  @override
+  String get categoryIndexInVaultsTitle => 'Keep category index in vaults';
+
+  @override
+  String get categoryIndexInVaultsSubtitle =>
+      'Saved encrypted inside each vault, in its configuration folder, when you open a category, so its files appear instantly next time. Nothing is saved on your phone.';
+
+  @override
+  String get categoryIndexClear => 'Clear category indexes';
+
+  @override
+  String get categoryIndexClearSubtitle =>
+      'Removes the index from every unlocked vault';
+
+  @override
+  String get categoryIndexCleared => 'Category indexes cleared';
 
   @override
   String get securityKeyUnlockHintNfc =>

@@ -65,9 +65,10 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback onEncrypt;
   final VoidCallback onDecrypt;
 
-  /// The user's item-action configuration: hidden actions are removed from
-  /// the buttons and the overflow menu, and the menu follows this order.
+  /// The user's item-action configuration. Buttons prioritize quick actions,
+  /// and overflow puts quick actions before the rest of the configured order.
   final List<FileItemAction> itemActionOrder;
+  final Set<FileItemAction> quickItemActions;
   final Set<FileItemAction> hiddenItemActions;
 
   const SelectionAppBar({
@@ -123,6 +124,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.onEncrypt,
     required this.onDecrypt,
     this.itemActionOrder = FileItemAction.values,
+    this.quickItemActions = FileItemAction.defaultQuickActions,
     this.hiddenItemActions = const {},
   });
 
@@ -134,13 +136,13 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     bool shown(FileItemAction action) => !hiddenItemActions.contains(action);
-    final bool showExtractButton =
+    final bool canShowExtractButton =
         allowExtractAction &&
         (singleArchiveSelected || isInsideArchive) &&
         shown(FileItemAction.extract);
-    final bool showShareButton =
+    final bool canShowShareButton =
         showShareOption && shown(FileItemAction.share);
-    final bool showDeleteButton =
+    final bool canShowDeleteButton =
         !isInsideArchive && shown(FileItemAction.delete);
 
     return LayoutBuilder(
@@ -148,44 +150,160 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
         final double barWidth = constraints.maxWidth;
 
         const double leadingWidth = 40.0;
-        final double deleteBtnWidth = showDeleteButton ? 48.0 : 0.0;
-        final double extractBtnWidth = showExtractButton ? 48.0 : 0.0;
         const double overflowBtnWidth = 48.0;
         const double endPadding = 4.0;
         const double minTitleWidth = 100.0;
         const double actionButtonWidth = 48.0;
 
-        final double shareBtnWidth = showShareButton ? 48.0 : 0.0;
-
         final double fixedOverhead = leadingWidth +
-            deleteBtnWidth +
-            shareBtnWidth +
-            extractBtnWidth +
             overflowBtnWidth +
             endPadding +
             minTitleWidth;
 
         final double availableWidth = barWidth - fixedOverhead;
-        final int availableSlots = (availableWidth / actionButtonWidth).floor().clamp(0, 3);
+        final int availableSlots = (availableWidth / actionButtonWidth)
+            .floor()
+            .clamp(0, 6);
 
-        // Copy, move and rename take the free slots in that order; an action
-        // the user hid does not use one up, so the next one moves into it.
-        var freeSlots = availableSlots;
-        bool takeSlot(bool wanted) {
-          if (!wanted || freeSlots <= 0) return false;
-          freeSlots--;
-          return true;
-        }
-
-        final bool showCopy =
-            takeSlot(!isInsideArchive && shown(FileItemAction.copy));
-        final bool showCut =
-            takeSlot(!isInsideArchive && shown(FileItemAction.move));
-        final bool showRename = takeSlot(
-          !isInsideArchive &&
-              allowRenameAction &&
-              shown(FileItemAction.rename),
+        // Keep the configured Quick Actions in the bar and let the remaining
+        // actions stay in More, even when the title leaves spare room.
+        final configuredAvailableActions = orderFileItemActions(
+          [
+            if (canShowExtractButton &&
+                quickItemActions.contains(FileItemAction.extract))
+              FileItemAction.extract,
+            if (canShowShareButton &&
+                quickItemActions.contains(FileItemAction.share))
+              FileItemAction.share,
+            if (!isInsideArchive &&
+                quickItemActions.contains(FileItemAction.copy) &&
+                shown(FileItemAction.copy))
+              FileItemAction.copy,
+            if (!isInsideArchive &&
+                quickItemActions.contains(FileItemAction.move) &&
+                shown(FileItemAction.move))
+              FileItemAction.move,
+            if (!isInsideArchive &&
+                allowRenameAction &&
+                quickItemActions.contains(FileItemAction.rename) &&
+                shown(FileItemAction.rename))
+              FileItemAction.rename,
+            if (canShowDeleteButton &&
+                quickItemActions.contains(FileItemAction.delete))
+              FileItemAction.delete,
+          ],
+          order: itemActionOrder,
+          quickActions: quickItemActions,
         );
+        final visibleActionOrder = configuredAvailableActions
+            .take(availableSlots)
+            .toList(growable: false);
+        final visibleActions = visibleActionOrder.toSet();
+        final bool showExtractButton =
+            visibleActions.contains(FileItemAction.extract);
+        final bool showShareButton = visibleActions.contains(
+          FileItemAction.share,
+        );
+        final bool showCopy = visibleActions.contains(FileItemAction.copy);
+        final bool showCut = visibleActions.contains(FileItemAction.move);
+        final bool showRename = visibleActions.contains(FileItemAction.rename);
+        final bool showDeleteButton = visibleActions.contains(
+          FileItemAction.delete,
+        );
+        final bool hasMoreActions =
+            (onOpenInNewTab != null && shown(FileItemAction.openInNewTab)) ||
+            (canShowExtractButton && !showExtractButton) ||
+            (canShowShareButton && !showShareButton) ||
+            (singleFileSelected && shown(FileItemAction.openWith)) ||
+            (!isInsideArchive &&
+                showEditImageOption &&
+                shown(FileItemAction.editImage)) ||
+            (!isInsideArchive &&
+                showEditVideoOption &&
+                shown(FileItemAction.editVideo)) ||
+            (!isInsideArchive &&
+                showEditAudioOption &&
+                shown(FileItemAction.editAudio)) ||
+            (!isInsideArchive &&
+                allowRenameAction &&
+                !showRename &&
+                shown(FileItemAction.rename)) ||
+            (!isInsideArchive &&
+                !showCopy &&
+                shown(FileItemAction.copy)) ||
+            (!isInsideArchive &&
+                !showCut &&
+                shown(FileItemAction.move)) ||
+            (canShowDeleteButton &&
+                !showDeleteButton &&
+                shown(FileItemAction.delete)) ||
+            (!isInsideArchive &&
+                allowCompressAction &&
+                shown(FileItemAction.archive)) ||
+            (allowExportAction &&
+                !hideVaultOnlyActions &&
+                !isInsideArchive &&
+                shown(FileItemAction.exportToDevice)) ||
+            (!isInsideArchive &&
+                showEncryptOption &&
+                shown(FileItemAction.encrypt)) ||
+            (!isInsideArchive &&
+                showDecryptOption &&
+                shown(FileItemAction.decrypt)) ||
+            (!isInsideArchive &&
+                singleFolderSelected &&
+                !hideVaultOnlyActions &&
+                shown(FileItemAction.docProvider)) ||
+            (!isInsideArchive &&
+                singleFolderSelected &&
+                !hideVaultOnlyActions &&
+                shown(FileItemAction.syncSettings)) ||
+            (!isInsideArchive &&
+                (showPinOption || showUnpinOption) &&
+                shown(FileItemAction.pin)) ||
+            (!isInsideArchive &&
+                (showBookmarkOption || showUnbookmarkOption) &&
+                shown(FileItemAction.bookmark)) ||
+            (onGoToLocation != null && shown(FileItemAction.goToLocation)) ||
+            (onCopyPath != null && shown(FileItemAction.copyPath)) ||
+            singleSelected;
+
+        Widget buildActionButton(FileItemAction action) => switch (action) {
+          FileItemAction.extract => IconButton(
+            icon: const Icon(Icons.unarchive_outlined),
+            tooltip: context.l10n.extract,
+            onPressed: onExtractSelectedArchive,
+          ),
+          FileItemAction.share => IconButton(
+            icon: const Icon(Icons.share_rounded),
+            tooltip: context.l10n.shareAction,
+            onPressed: onShare,
+          ),
+          FileItemAction.copy => IconButton(
+            icon: const Icon(Icons.copy_rounded),
+            tooltip: context.l10n.copyTooltip,
+            onPressed: onCopy,
+          ),
+          FileItemAction.move => IconButton(
+            icon: const Icon(Icons.cut_rounded),
+            tooltip: readOnly ? context.l10n.readOnlyContainerTooltip : context.l10n.moveAction,
+            onPressed: readOnly ? null : onCut,
+          ),
+          FileItemAction.rename => IconButton(
+            icon: const Icon(Icons.drive_file_rename_outline_rounded),
+            tooltip: readOnly ? context.l10n.readOnlyContainerTooltip : context.l10n.renameTooltip,
+            onPressed: readOnly ? null : onRename,
+          ),
+          FileItemAction.delete => IconButton(
+            icon: Icon(
+              Icons.delete_outline_rounded,
+              color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.5) : cs.error,
+            ),
+            tooltip: readOnly ? context.l10n.readOnlyContainerTooltip : context.l10n.delete,
+            onPressed: readOnly ? null : onDelete,
+          ),
+          _ => throw StateError('Unexpected selection-bar action: $action'),
+        };
 
           return AppBar(
           backgroundColor: cs.surfaceContainer,
@@ -265,49 +383,15 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
             ],
           ),
           actions: [
-            if (showExtractButton)
-              IconButton(
-                icon: const Icon(Icons.unarchive_outlined),
-                tooltip: context.l10n.extract,
-                onPressed: onExtractSelectedArchive,
-              ),
-            if (showShareButton)
-              IconButton(
-                icon: const Icon(Icons.share_rounded),
-                tooltip: context.l10n.shareAction,
-                onPressed: onShare,
-              ),
-            if (showCopy)
-              IconButton(
-                icon: const Icon(Icons.copy_rounded),
-                tooltip: context.l10n.copyTooltip,
-                onPressed: onCopy,
-              ),
-            if (showCut)
-              IconButton(
-                icon: const Icon(Icons.cut_rounded),
-                tooltip: readOnly ? context.l10n.readOnlyContainerTooltip : context.l10n.moveAction,
-                onPressed: readOnly ? null : onCut,
-              ),
-            if (showRename)
-              IconButton(
-                icon: const Icon(Icons.drive_file_rename_outline_rounded),
-                tooltip: readOnly ? context.l10n.readOnlyContainerTooltip : context.l10n.renameTooltip,
-                onPressed: readOnly ? null : onRename,
-              ),
-            if (showDeleteButton)
-              IconButton(
-                icon: Icon(
-                  Icons.delete_outline_rounded,
-                  color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.5) : cs.error,
-                ),
-                tooltip: readOnly ? context.l10n.readOnlyContainerTooltip : context.l10n.delete,
-                onPressed: readOnly ? null : onDelete,
-              ),
-            PopupMenuButton<String>(
+            ...visibleActionOrder.map(buildActionButton),
+            if (hasMoreActions)
+              PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert_rounded),
               tooltip: context.l10n.moreOptionsTooltip,
               onSelected: (value) {
+                if (value == 'extract') onExtractSelectedArchive();
+                if (value == 'share') onShare();
+                if (value == 'delete') onDelete();
                 if (value == 'open_in_new_tab') onOpenInNewTab?.call();
                 if (value == 'open_with_app') onOpenWithApp();
                 if (value == 'edit_image') onEditImage();
@@ -341,6 +425,28 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                         Icon(Icons.tab_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
                         const SizedBox(width: 12),
                         Text(context.l10n.browserTabOpenInNewTab),
+                      ],
+                    ),
+                  ),
+                if (canShowExtractButton && !showExtractButton)
+                  PopupMenuItem<String>(
+                    value: 'extract',
+                    child: Row(
+                      children: [
+                        Icon(Icons.unarchive_outlined, color: cs.onSurfaceVariant, size: AppIconSize.small),
+                        const SizedBox(width: 12),
+                        Text(context.l10n.extract),
+                      ],
+                    ),
+                  ),
+                if (canShowShareButton && !showShareButton)
+                  PopupMenuItem<String>(
+                    value: 'share',
+                    child: Row(
+                      children: [
+                        Icon(Icons.share_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
+                        const SizedBox(width: 12),
+                        Text(context.l10n.shareAction),
                       ],
                     ),
                   ),
@@ -445,6 +551,18 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                         ),
                         const SizedBox(width: 12),
                         Text(context.l10n.moveAction),
+                      ],
+                    ),
+                  ),
+                if (canShowDeleteButton && !showDeleteButton)
+                  PopupMenuItem<String>(
+                    value: 'delete',
+                    enabled: !readOnly,
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete_outline_rounded, color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.4) : cs.onSurfaceVariant, size: AppIconSize.small),
+                        const SizedBox(width: 12),
+                        Text(context.l10n.delete),
                       ],
                     ),
                   ),
@@ -611,7 +729,10 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                     ),
                   ),
                 ],
-                order: itemActionOrder,
+                order: quickActionsFirstOrder(
+                  itemActionOrder,
+                  quickItemActions,
+                ),
                 hidden: hiddenItemActions,
               ),
             ),

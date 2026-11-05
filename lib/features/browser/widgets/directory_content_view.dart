@@ -12,6 +12,7 @@ import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/theme/file_manager_skin_scope.dart';
+import 'package:vaultexplorer/core/theme/predictive_back_preference.dart';
 import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
 import 'package:vaultexplorer/core/utils/cancellation_token.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
@@ -83,6 +84,7 @@ import 'package:vaultexplorer/features/browser/widgets/bookmark_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/bottom_search_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/breadcrumb_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_app_bar_builder.dart';
+import 'package:vaultexplorer/features/browser/widgets/category_content_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_app_bar_factory.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_body_builder.dart';
 import 'package:vaultexplorer/features/browser/widgets/conflict_resolution_sheet.dart';
@@ -90,6 +92,8 @@ import 'package:vaultexplorer/features/browser/widgets/delete_originals_dialog.d
 import 'package:vaultexplorer/features/browser/widgets/file_item_actions_sheet.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/file_info_sheet.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_manager_action_bar.dart';
+import 'package:vaultexplorer/features/browser/widgets/file_manager_options_menu_button.dart';
+import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_screen.dart';
 import 'package:vaultexplorer/features/browser/models/tab_id.dart';
 import 'package:vaultexplorer/features/browser/widgets/filter_menu_button.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_document_provider_sheet.dart';
@@ -114,6 +118,7 @@ import 'package:vaultexplorer/features/vault_item/vault_item_edit_screen.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
+import 'package:vaultexplorer/features/browser/models/file_category.dart';
 
 // PathSegment used to be declared in this file; it now lives in the
 // navigation controller (see FileBrowserNavigation). Re-exported from here
@@ -372,11 +377,23 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
 
   bool _initialized = false;
 
+  /// True when this view is picking up a tab whose location already exists --
+  /// the tab was kept when the vault was hidden behind Mask Mode and is being
+  /// shown again (see `BrowserSessionStore`). A brand-new tab always starts
+  /// with an empty path stack, because only this view initializes it. A
+  /// resumed tab must stay where it was left, not jump back to
+  /// [DirectoryContentView.initialPath].
+  bool _resumedNavigation = false;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_initialized) {
       _initialized = true;
+      _resumedNavigation = ref
+          .read(fileBrowserNavigationProvider(_stateKey))
+          .pathStack
+          .isNotEmpty;
       final rootLabel = context.l10n.rootFolderLabel;
 
       // Defer provider mutations and initial loading until after the first frame builds
@@ -793,6 +810,17 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _scrollToRevealed(listed);
     });
+  }
+
+  void _queueItemReveal(String name) {
+    if (name.isEmpty) return;
+    _pendingRevealNames = {name};
+    _pendingRevealToken = _revealToken + 1;
+    _pendingRevealExpiry?.cancel();
+    _pendingRevealExpiry = Timer(const Duration(seconds: 8), () {
+      _pendingRevealNames = const {};
+    });
+    _applyPendingReveal();
   }
 
   /// Brings at least one of the freshly dropped items clearly into view.
@@ -1621,17 +1649,33 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       }
     }
     final initialPath = widget.initialPath;
-    if (initialPath != null && initialPath.isNotEmpty && mounted) {
+    if (!_resumedNavigation &&
+        initialPath != null &&
+        initialPath.isNotEmpty &&
+        mounted) {
       // New tab opened on a folder: go straight there (builds the path
       // stack from the root) instead of listing the root first.
       await _navigateToPath(initialPath, isDir: true);
     } else {
-      await _loadDirectoryContents(_currentDirPath);
+      // A resumed tab stays in the folder it was left in; list it again in
+      // case it changed while the vault was hidden.
+      await _loadDirectoryContents(
+        _currentDirPath,
+        refresh: _resumedNavigation,
+      );
     }
     // A bookmark tapped in the drawer opened this vault: now that it has
     // loaded, go where the bookmark points.
     _initialLoadDone = true;
-    _consumeBookmarkRequest();
+    final hasGoToLocationRequest = _consumeBookmarkRequest();
+
+    // Auto-activate gallery mode if it was previously enabled for this storage.
+    if (mounted &&
+        !hasGoToLocationRequest &&
+        _currentFilter == null &&
+        _toolbarConfig.isGalleryModeForStorage(widget.container.uri)) {
+      _onFilterChosen('gallery');
+    }
   }
 
   Future<void> _loadToolbarConfig() async {
@@ -1985,7 +2029,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     _signalActivity();
     if (isSelectionMode) exitSelectionMode();
     final segments = fullPath.isEmpty ? [] : fullPath.split('/');
-    if (segments.isEmpty) return;
+    if (segments.isEmpty && !isDir) return;
     if (isDir) {
       final newPath = _navNotifier.navigateToPath(
         widget.container,
@@ -2109,7 +2153,120 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   /// If it was renamed or deleted since (outside what this app can follow, for
   /// instance by another device), say so rather than opening an empty folder
   /// or a file that isn't there, and offer to drop the dead bookmark.
-  Future<void> _openBookmark(VaultBookmark bookmark) async {
+  /// The toolbar's type filter.
+  ///
+  /// Images, Videos, Audio and Documents work like the drawer's categories,
+  /// but inside the storage this view shows: every matching file of the whole
+  /// storage, as one list, with the option to browse them by their original
+  /// folders. "All files" and the vault-item filter stay what they were, a
+  /// filter on the folder being shown, and so does the filter inside an
+  /// archive, which is not a storage a category can scan.
+  void _onFilterChosen(String? value, [String? destinationDir]) {
+    _lastPublishedFloatingActionSignature = null;
+    ref
+        .read(fileBrowserSelectionProvider(_stateKey).notifier)
+        .exitSelectionMode();
+    _signalActivity();
+    _navNotifier.setFilter(value);
+
+    // Keep persisted gallery mode in sync with the filter selection.
+    final uri = widget.container.uri;
+    final isGalleryFilter = value == 'gallery';
+    if (_toolbarConfig.isGalleryModeForStorage(uri) != isGalleryFilter) {
+      final effectiveUri =
+          widget.container.isLocalStorage ? null : widget.container.uri;
+      ref
+          .read(fileManagerToolbarSettingsProvider(effectiveUri).notifier)
+          .setGalleryModeForStorage(uri, isGalleryFilter);
+    }
+
+    if (value == null &&
+        destinationDir != null &&
+        destinationDir != _currentDirPath) {
+      unawaited(_loadDirectoryContents(destinationDir));
+    }
+  }
+
+  Future<void> _showCategoryItemInFolder(String fullPath) async {
+    final (:parent, :name) = splitParentAndName(fullPath);
+    // Go To Location leaves gallery mode for the regular folder view. Keep
+    // the persisted toggle in sync so one tap can enable gallery again.
+    _onFilterChosen(null);
+    await _navigateToPath(parent, isDir: true);
+    if (mounted) _queueItemReveal(name);
+  }
+
+  bool get _isGalleryMode =>
+      _toolbarConfig.isGalleryModeForStorage(widget.container.uri);
+
+  /// The visible toolbar actions, excluding the filter button in gallery mode.
+  List<FileManagerAction> get _visibleActions {
+    final actions = _toolbarConfig.visible;
+    if (!_isGalleryMode) return actions;
+    return actions
+        .where((a) => a != FileManagerAction.filter)
+        .toList(growable: false);
+  }
+
+  void _toggleGalleryMode() {
+    final uri = widget.container.uri;
+    final isCurrentlyEnabled = _toolbarConfig.isGalleryModeForStorage(uri);
+    final enable = !isCurrentlyEnabled;
+
+    if (enable) {
+      _onFilterChosen('gallery');
+    } else {
+      _onFilterChosen(null);
+    }
+  }
+
+  Future<void> _updateToolbarConfigField(
+    FileManagerToolbarConfig Function(FileManagerToolbarConfig) update,
+  ) async {
+    final updated = update(_toolbarConfig);
+    setState(() {
+      _toolbarConfig = updated;
+    });
+    try {
+      await _toolbarSvc.save(updated);
+      final effectiveToolbarUri = widget.container.isLocalStorage
+          ? null
+          : widget.container.uri;
+      ref
+          .read(
+            fileManagerToolbarSettingsProvider(effectiveToolbarUri).notifier,
+          )
+          .applyImportedConfig(updated);
+    } catch (e) {
+      if (mounted) {
+        _setStatus(context.l10n.failedToSaveSettings, error: true);
+      }
+    }
+  }
+
+  Future<void> _openFileManagerSettings() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SkinAreaScope(
+          area: SkinArea.settings,
+          child: FileManagerToolbarSettingsScreen(
+            containerUri: widget.container.isLocalStorage
+                ? null
+                : widget.container.uri,
+          ),
+        ),
+      ),
+    );
+    if (mounted) {
+      _loadToolbarConfig();
+    }
+  }
+
+  Future<void> _openBookmark(
+    VaultBookmark bookmark, {
+    String? revealName,
+  }) async {
     if (_disposed || !mounted) return;
     if (!await _bookmarkTargetExists(bookmark)) {
       if (_disposed || !mounted) return;
@@ -2130,10 +2287,16 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       return;
     }
     if (_disposed || !mounted) return;
+    if (bookmark.isDir && bookmark.path == _currentDirPath) {
+      if (revealName != null) _queueItemReveal(revealName);
+      return;
+    }
     await _navigateToPath(bookmark.path, isDir: bookmark.isDir);
+    if (revealName != null && mounted) _queueItemReveal(revealName);
   }
 
   Future<bool> _bookmarkTargetExists(VaultBookmark bookmark) async {
+    if (bookmark.isDir && bookmark.path.isEmpty) return true;
     try {
       final raw = await ref
           .read(vaultFileIoApiProvider)
@@ -2150,13 +2313,22 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
 
   /// Takes a bookmark the drawer asked for, if it is for this vault and this
   /// is the tab in front. See [bookmarkNavigationRequestsProvider].
-  void _consumeBookmarkRequest() {
-    if (_disposed || !mounted || !_initialLoadDone || !_isActiveTab) return;
+  bool _consumeBookmarkRequest() {
+    if (_disposed || !mounted || !_initialLoadDone || !_isActiveTab) {
+      return false;
+    }
     final request = ref
         .read(bookmarkNavigationRequestsProvider.notifier)
         .take(widget.container.volId);
-    if (request == null) return;
-    unawaited(_openBookmark(request.bookmark));
+    if (request == null) return false;
+    if (request.revealName != null) _onFilterChosen(null);
+    unawaited(
+      _openBookmark(
+        request.bookmark,
+        revealName: request.revealName,
+      ),
+    );
+    return request.revealName != null;
   }
 
   /// Remembers where this folder was scrolled to, so walking forward into it
@@ -2227,6 +2399,10 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   );
 
   void _onSystemBack() {
+    // Scoped category views own their back behavior. In gallery mode, for
+    // example, back moves through the category's folder tree while retaining
+    // the filter; the directory path stack must not clear that filter here.
+    if (_hasScopedCategoryFilter) return;
     switch (_resolveBack()) {
       case BrowserBackAction.exitSelection:
         exitSelectionMode();
@@ -2262,8 +2438,15 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     });
   }
 
+  bool get _hasScopedCategoryFilter =>
+      _archiveContext == null &&
+      FileCategory.fromFilterKey(_currentFilter) != null;
+
   bool get _canPreviewFolderBackGesture =>
-      !_atRoot && !isSelectionMode && !_searchActive;
+      !_hasScopedCategoryFilter &&
+      !_atRoot &&
+      !isSelectionMode &&
+      !_searchActive;
 
   /// Whether this screen should answer predictive-back events: its route is
   /// on top AND (inside tabs) it is the visible tab. Every mounted tab is a
@@ -2276,6 +2459,11 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   bool handleStartBackGesture(PredictiveBackEvent backEvent) {
     if (!_isOwnRouteCurrent) return false;
     if (backEvent.isButtonEvent) return false;
+    // "Predictive back animations" off: leave the gesture unclaimed so it takes
+    // the same path as a back-button press -- on commit the PopScope in
+    // build() calls _onSystemBack(), and a cancel does nothing. Only the start
+    // is gated; update/cancel/commit only reach an observer that claimed it.
+    if (!appPredictiveBackNotifier.value) return false;
     if (!_canPreviewFolderBackGesture) return false;
     final targetSegment = _pathStack.length >= 2
         ? _pathStack[_pathStack.length - 2]
@@ -3862,6 +4050,51 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     op.addListener(listener);
   }
 
+  void _returnToCategoryAfterOperations(
+    List<FileOperation> operations,
+    int? returnToTabId,
+    String? returnToFilter,
+  ) {
+    if (operations.isEmpty || returnToTabId == null) return;
+
+    void listener() {
+      if (!mounted) {
+        for (final op in operations) {
+          op.removeListener(listener);
+        }
+        return;
+      }
+      final allFinished = operations.every(
+        (op) =>
+            op.status != FileOperationStatus.pending &&
+            op.status != FileOperationStatus.running,
+      );
+      if (!allFinished) return;
+
+      for (final op in operations) {
+        op.removeListener(listener);
+      }
+      if (!operations.any((op) => op.doneCount > 0)) return;
+
+      final returnTab = ref
+          .read(browserTabsProvider(widget.workspaceConfig))
+          .tabs
+          .where((tab) => tab.tabId == TabId(returnToTabId))
+          .firstOrNull;
+      if (returnTab == null) return;
+      if (returnTab.isCategory) {
+        _workspaceNotifier.activate(returnTab.tabId);
+      } else if (returnTab.tabId == widget.tabId && returnToFilter != null) {
+        _navNotifier.setFilter(returnToFilter);
+      }
+    }
+
+    for (final op in operations) {
+      op.addListener(listener);
+    }
+    listener();
+  }
+
   /// Drag drops can target a different tab or volume, so this viewport is not
   /// necessarily the destination viewport. Let the service's volume-change
   /// notifications refresh every affected tab instead of claiming the op as
@@ -3886,6 +4119,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
 
   Future<void> _paste() async {
     final clip = ref.read(crossContainerClipboardProvider);
+    final returnToTabId = clip.returnToTabId;
+    final returnToFilter = clip.returnToFilter;
     if (!clip.hasItems) return;
     if (_isReadOnly) {
       _setStatus(context.l10n.readOnlyCantPaste, error: true);
@@ -3949,6 +4184,11 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       );
       _clip.clear();
       _bindOpListener(op);
+      _returnToCategoryAfterOperations(
+        [op],
+        returnToTabId,
+        returnToFilter,
+      );
       return;
     }
 
@@ -4021,6 +4261,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     }
     final groupContainers = <int, MountedContainer>{srcVolId: srcContainer};
     final remainingItems = <(int, ClipboardItem)>[];
+    final startedOperations = <FileOperation>[];
     for (final group in groups.entries) {
       final groupVolId = group.key;
       final groupIsCross = groupVolId != widget.container.volId;
@@ -4066,6 +4307,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         remainingItems.addAll(group.value.map((item) => (groupVolId, item)));
         continue;
       }
+      startedOperations.add(op);
       _bindOpListener(op);
     }
     if (remainingItems.isEmpty) {
@@ -4080,6 +4322,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             clip.sourceDisplayName ??
             widget.container.displayName,
         cut: isCut,
+        returnToTabId: returnToTabId,
+        returnToFilter: returnToFilter,
         clipItems: [
           for (final (volId, item) in remainingItems)
             ClipboardItem(
@@ -4090,6 +4334,13 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
               volId: volId == remainingSourceVolId ? null : volId,
             ),
         ],
+      );
+    }
+    if (remainingItems.isEmpty) {
+      _returnToCategoryAfterOperations(
+        startedOperations,
+        returnToTabId,
+        returnToFilter,
       );
     }
   }
@@ -5234,6 +5485,15 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         onAddVaultItem: _addVaultItem,
         hideImportAndSecureItemActions: widget.container.isLocalStorage,
       ),
+      FileManagerAction.gallery: (context) => IconButton(
+        icon: Icon(
+          toolbarConfig.isGalleryModeForStorage(widget.container.uri)
+              ? Icons.photo_library_rounded
+              : Icons.photo_library_outlined,
+        ),
+        tooltip: context.l10n.galleryModeTooltip,
+        onPressed: _toggleGalleryMode,
+      ),
       FileManagerAction.viewToggle: (context) => LayoutModeMenuButton(
         layoutMode: layoutMode,
         onLayoutModeChanged: _onLayoutModeChanged,
@@ -5250,13 +5510,29 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       ),
       FileManagerAction.filter: (context) => FilterMenuButton(
         currentFilter: currentFilter,
-        onFilterChanged: (value) => navigationNotifier.setFilter(value),
+        onFilterChanged: _onFilterChosen,
         hideVaultOnlyActions: widget.container.isLocalStorage,
       ),
       FileManagerAction.playMedia: (context) => IconButton(
         icon: const Icon(Icons.play_circle_outline_rounded),
         tooltip: context.l10n.playMediaHereTooltip,
         onPressed: canPlayMedia ? _startMediaViewerFromCurrentLocation : null,
+      ),
+      FileManagerAction.options: (context) => FileManagerOptionsMenuButton(
+        toolbarConfig: toolbarConfig,
+        onToggleShowHiddenFiles: (v) => _updateToolbarConfigField(
+          (c) => c.copyWith(showHiddenFiles: v),
+        ),
+        onToggleShowGridFileNames: (v) => _updateToolbarConfigField(
+          (c) => c.copyWith(showGridFileNames: v),
+        ),
+        onToggleShowFileExtensions: (v) => _updateToolbarConfigField(
+          (c) => c.copyWith(showFileExtensions: v),
+        ),
+        onToggleShowListThumbnails: (v) => _updateToolbarConfigField(
+          (c) => c.copyWith(showListThumbnails: v),
+        ),
+        onOpenSettings: _openFileManagerSettings,
       ),
     };
   }
@@ -5292,8 +5568,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     final rightPadding = MediaQuery.paddingOf(context).right;
     final baseRight = 16.0 + rightPadding;
 
-    final showAddFab = _toolbarConfig.visible.contains(FileManagerAction.add);
-    final moreActions = _toolbarConfig.visible
+    final visibleActions = _visibleActions;
+    final showAddFab = visibleActions.contains(FileManagerAction.add);
+    final moreActions = visibleActions
         .where((a) => a != FileManagerAction.add)
         .toList(growable: false);
     final showMore = moreActions.isNotEmpty;
@@ -5326,7 +5603,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             sortAscending: sortAscending,
             onSortChanged: _onSortChanged,
             currentFilter: _currentFilter,
-            onFilterChanged: (value) => _navNotifier.setFilter(value),
+            onFilterChanged: _onFilterChosen,
             hideVaultOnlyActions: widget.container.isLocalStorage,
             layoutMode: _layoutMode,
             onLayoutModeChanged: _onLayoutModeChanged,
@@ -5337,6 +5614,24 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             onGridAspectRatioChanged: _onGridAspectRatioChanged,
             canPlayMedia: canPlayMedia,
             onPlayMedia: _startMediaViewerFromCurrentLocation,
+            isGalleryMode: _toolbarConfig.isGalleryModeForStorage(
+              widget.container.uri,
+            ),
+            onToggleGallery: _toggleGalleryMode,
+            toolbarConfig: _toolbarConfig,
+            onToggleShowHiddenFiles: (v) => _updateToolbarConfigField(
+              (c) => c.copyWith(showHiddenFiles: v),
+            ),
+            onToggleShowGridFileNames: (v) => _updateToolbarConfigField(
+              (c) => c.copyWith(showGridFileNames: v),
+            ),
+            onToggleShowFileExtensions: (v) => _updateToolbarConfigField(
+              (c) => c.copyWith(showFileExtensions: v),
+            ),
+            onToggleShowListThumbnails: (v) => _updateToolbarConfigField(
+              (c) => c.copyWith(showListThumbnails: v),
+            ),
+            onOpenSettings: _openFileManagerSettings,
           ),
         ),
       );
@@ -5401,6 +5696,29 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     ref.watch(fileBrowserSortProvider(_stateKey));
     ref.watch(fileBrowserNavigationProvider(_stateKey));
     ref.watch(vaultSyncedFolderPathsProvider(widget.container));
+
+    final category = _archiveContext == null
+        ? FileCategory.fromFilterKey(_currentFilter)
+        : null;
+    if (category != null) {
+      return CategoryContentView(
+        key: ValueKey(
+          'scoped_category_${widget.container.volId}_${category.storageKey}',
+        ),
+        tabId: widget.tabId,
+        category: category,
+        workspaceConfig: widget.workspaceConfig,
+        primaryLocalContainer:
+            widget.container.isLocalStorage ? widget.container : null,
+        includeVaults: !widget.container.isLocalStorage,
+        scopedContainer: widget.container,
+        initialDirPath: _currentDirPath,
+        resolveContainer: widget.resolveContainer,
+        onScopedFilterChanged: _onFilterChosen,
+        onShowInFolder: (_, path) =>
+            unawaited(_showCategoryItemInFolder(path)),
+      );
+    }
 
     final effectiveToolbarUri = widget.container.isLocalStorage
         ? null
@@ -5663,7 +5981,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         !_searchActive &&
         ref.watch(crossContainerClipboardProvider).hasItems;
     final bool hasFabToolbar =
-        useFab && !_searchActive && _toolbarConfig.visible.isNotEmpty;
+        useFab && !_searchActive && _visibleActions.isNotEmpty;
 
     double fabClearance = 0.0;
     if (hasClipboardFab && hasFabToolbar) {
@@ -5863,6 +6181,19 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         appBarToolbarConfig.useFabForToolbar,
         Object.hashAll(appBarToolbarConfig.visible),
         Object.hashAll(appBarToolbarConfig.hidden),
+        Object.hashAll(appBarToolbarConfig.itemActionsOrder),
+        Object.hashAll(
+          appBarToolbarConfig.hiddenItemActions
+              .map((action) => action.index)
+              .toList()
+            ..sort(),
+        ),
+        Object.hashAll(
+          appBarToolbarConfig.quickItemActions
+              .map((action) => action.index)
+              .toList()
+            ..sort(),
+        ),
         Object.hashAll(appBarMountedDocProviderFolders),
         Object.hashAll(appBarPinnedPaths.toList()..sort()),
         Object.hashAll(appBarBookmarkPaths),
@@ -5922,7 +6253,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             children: [
               FileManagerActionBar(
                 axis: Axis.horizontal,
-                actions: _toolbarConfig.visible,
+                actions: _visibleActions,
                 builders: actionBuilders,
               ),
             ],
@@ -5988,7 +6319,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       _layoutMode,
       sortBy,
       sortAscending,
-      Object.hashAll(_toolbarConfig.visible),
+      Object.hashAll(_visibleActions),
       currentItemsSignature,
       showBookmarkBarInViewport,
       widget.container.readOnly,

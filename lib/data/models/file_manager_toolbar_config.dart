@@ -68,6 +68,10 @@ class FileManagerToolbarConfig {
   final Map<String, String> folderGridAspectRatios;
   final Map<String, String> folderSortModes;
 
+  /// URIs of storages (vaults, local storage, external drives) that currently
+  /// have gallery mode active.
+  final Set<String> galleryModeStorageUris;
+
   /// URIs of vaults or storage locations whose bookmark groups are collapsed
   /// in the navigation drawer. This is device-local UI state; bookmark data
   /// stays with its existing store.
@@ -77,8 +81,8 @@ class FileManagerToolbarConfig {
   final Set<FileDetailColumn> hiddenDetailColumns;
 
   /// Order and visibility of the actions in the item actions sheet and the
-  /// selection bar's overflow menu. Always holds every [FileItemAction]
-  /// exactly once (see [fromJson]).
+  /// selection bar. Always holds every [FileItemAction] exactly once (see
+  /// [fromJson]).
   final List<FileItemAction> itemActionsOrder;
   final Set<FileItemAction> hiddenItemActions;
 
@@ -151,6 +155,7 @@ class FileManagerToolbarConfig {
     this.folderLayoutModes = const {},
     this.folderGridAspectRatios = const {},
     this.folderSortModes = const {},
+    this.galleryModeStorageUris = const {},
     this.collapsedBookmarkGroupUris = const {},
     this.detailColumnsOrder = const [
       FileDetailColumn.date,
@@ -188,10 +193,11 @@ class FileManagerToolbarConfig {
         order: [
           FileManagerAction.search,
           FileManagerAction.add,
+          FileManagerAction.gallery,
           FileManagerAction.viewToggle,
           FileManagerAction.sort,
           FileManagerAction.filter,
-          FileManagerAction.playMedia,
+          FileManagerAction.options,
         ],
         hidden: {},
         showBreadcrumbBar: true,
@@ -209,6 +215,7 @@ class FileManagerToolbarConfig {
         folderLayoutModes: {},
         folderGridAspectRatios: {},
         folderSortModes: {},
+        galleryModeStorageUris: {},
         detailColumnsOrder: [
           FileDetailColumn.date,
           FileDetailColumn.size,
@@ -237,7 +244,7 @@ class FileManagerToolbarConfig {
         defaultThumbnailQuality: ThumbnailQuality.defaultAutoQuality,
         localStorageThumbnailCacheMode: ThumbnailCacheMode.disabled,
         localStorageThumbnailQuality: ThumbnailQuality.defaultAutoQuality,
-        mediaViewerToolbarConfig: const MediaViewerToolbarConfig(),
+        mediaViewerToolbarConfig: MediaViewerToolbarConfig(),
         skin: FileManagerSkin.classic,
       );
 
@@ -311,6 +318,22 @@ class FileManagerToolbarConfig {
     return folderSortModes[folderKey(containerUri, dirPath)];
   }
 
+  bool isGalleryModeForStorage(String containerUri) =>
+      galleryModeStorageUris.contains(containerUri);
+
+  FileManagerToolbarConfig withGalleryModeForStorage(
+    String containerUri,
+    bool enabled,
+  ) {
+    final next = Set<String>.from(galleryModeStorageUris);
+    if (enabled) {
+      next.add(containerUri);
+    } else {
+      next.remove(containerUri);
+    }
+    return copyWith(galleryModeStorageUris: next);
+  }
+
   FileManagerToolbarConfig copyWith({
     List<FileManagerAction>? order,
     Set<FileManagerAction>? hidden,
@@ -329,6 +352,7 @@ class FileManagerToolbarConfig {
     Map<String, String>? folderLayoutModes,
     Map<String, String>? folderGridAspectRatios,
     Map<String, String>? folderSortModes,
+    Set<String>? galleryModeStorageUris,
     Set<String>? collapsedBookmarkGroupUris,
     List<FileDetailColumn>? detailColumnsOrder,
     Set<FileDetailColumn>? hiddenDetailColumns,
@@ -379,6 +403,8 @@ class FileManagerToolbarConfig {
         folderGridAspectRatios:
             folderGridAspectRatios ?? this.folderGridAspectRatios,
         folderSortModes: folderSortModes ?? this.folderSortModes,
+        galleryModeStorageUris:
+            galleryModeStorageUris ?? this.galleryModeStorageUris,
         collapsedBookmarkGroupUris:
             collapsedBookmarkGroupUris ?? this.collapsedBookmarkGroupUris,
         detailColumnsOrder: detailColumnsOrder ?? this.detailColumnsOrder,
@@ -484,6 +510,7 @@ class FileManagerToolbarConfig {
     'folderLayoutModes',
     'folderGridAspectRatios',
     'folderSortModes',
+    'galleryModeStorageUris',
     'collapsedBookmarkGroupUris',
   };
 
@@ -547,6 +574,7 @@ class FileManagerToolbarConfig {
         'folderLayoutModes': folderLayoutModes,
         'folderGridAspectRatios': folderGridAspectRatios,
         'folderSortModes': folderSortModes,
+        'galleryModeStorageUris': galleryModeStorageUris.toList()..sort(),
         'collapsedBookmarkGroupUris': collapsedBookmarkGroupUris.toList()
           ..sort(),
         'detailColumnsOrder':
@@ -653,6 +681,11 @@ class FileManagerToolbarConfig {
             .whereType<String>()
             .where((uri) => uri.isNotEmpty)
             .toSet();
+    final galleryModeStorageUris =
+        (j['galleryModeStorageUris'] as List<dynamic>? ?? const [])
+            .whereType<String>()
+            .where((uri) => uri.isNotEmpty)
+            .toSet();
     final defaultThumbnailCacheMode = ThumbnailCacheMode.fromJson(
           j['defaultThumbnailCacheMode'] as String?,
         ) ??
@@ -704,6 +737,7 @@ class FileManagerToolbarConfig {
       folderLayoutModes: rawFolderLayoutModes,
       folderGridAspectRatios: rawFolderGridAspectRatios,
       folderSortModes: rawFolderSortModes,
+      galleryModeStorageUris: galleryModeStorageUris,
       collapsedBookmarkGroupUris: collapsedBookmarkGroupUris,
       detailColumnsOrder: rawDetailColumns.isEmpty
           ? const [

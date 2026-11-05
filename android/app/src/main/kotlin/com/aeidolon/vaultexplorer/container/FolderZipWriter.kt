@@ -115,13 +115,14 @@ class FolderZipWriter(
      */
     @Throws(IOException::class)
     fun write(rootPath: String, out: OutputStream) {
-        val rootName = rootPath.trimEnd('/').substringAfterLast('/')
+        val trimmedRoot = rootPath.trimEnd('/', '\\')
+        val rootName = trimmedRoot.substringAfterLast('/').substringAfterLast('\\')
         if (rootName.isEmpty()) throw IOException("Cannot archive the vault root")
 
         val sink = DiscardableOutput(out)
         val zos = ZipOutputStream(sink)
         try {
-            writeDirectory(zos, rootPath.trimEnd('/'), "$rootName/", depth = 0, mtimeSecs = 0L, buffer = ByteArray(CHUNK_BYTES))
+            writeDirectory(zos, trimmedRoot, "$rootName/", depth = 0, mtimeSecs = 0L, buffer = ByteArray(CHUNK_BYTES))
             zos.finish()
             zos.flush()
         } catch (e: Throwable) {

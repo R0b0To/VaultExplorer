@@ -8,6 +8,8 @@ import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/external_storage_location.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
+import 'package:vaultexplorer/features/browser/models/file_category.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/drawer_categories_section.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_screen.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
@@ -16,12 +18,14 @@ class StorageLocationsDrawer extends ConsumerWidget {
   final int activeVolId;
   final MountedContainer? primaryLocalContainer;
   final ValueChanged<MountedContainer> onSelected;
+  final ValueChanged<FileCategory>? onOpenCategory;
 
   const StorageLocationsDrawer({
     super.key,
     required this.activeVolId,
     required this.primaryLocalContainer,
     required this.onSelected,
+    this.onOpenCategory,
   });
 
   IconData _iconForStorage(String path) {
@@ -282,6 +286,19 @@ class StorageLocationsDrawer extends ConsumerWidget {
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 1),
                     child: Divider(),
+                  ),
+
+                  // Category shortcuts: the same ones the real drawer has, over
+                  // phone storage and storage locations only.
+                  DrawerCategoriesSection(
+                    primaryLocalContainer: primary,
+                    currentVolId: activeVolId,
+                    onOpenLocalStorage: primary == null
+                        ? null
+                        : () => onSelected(primary),
+                    onSelectContainer: onSelected,
+                    onOpenCategory: onOpenCategory,
+                    includeVaults: false,
                   ),
 
                   // Decoy Settings (Only shows File Manager / Interface settings, no vault security)

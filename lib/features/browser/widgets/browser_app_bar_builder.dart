@@ -364,6 +364,7 @@ PreferredSizeWidget buildBrowserAppBar(
         showEditAudioOption: showEditAudioOption,
         onEditAudio: doEditAudio,
         itemActionOrder: toolbarConfig.itemActionsOrder,
+        quickItemActions: toolbarConfig.quickItemActions,
         hiddenItemActions: toolbarConfig.hiddenItemActions,
       );
     }
@@ -421,6 +422,7 @@ PreferredSizeWidget buildBrowserAppBar(
       showEditAudioOption: showEditAudioOption,
       onEditAudio: doEditAudio,
       itemActionOrder: toolbarConfig.itemActionsOrder,
+      quickItemActions: toolbarConfig.quickItemActions,
       hiddenItemActions: toolbarConfig.hiddenItemActions,
     );
   }

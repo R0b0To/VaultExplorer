@@ -277,13 +277,23 @@ class _FolderThumbnailPreviewState
   @override
   Widget build(BuildContext context) {
     _tickerEnabled = TickerMode.valuesOf(context).enabled;
-    final showPreview =
-        _tickerEnabled && widget.cacheMode != ThumbnailCacheMode.disabled;
+    final bytes = _previewBytes;
+
+    // The collage layout (folder icon pushed to the top-left corner, with the
+    // thumbnail badge overlapping its bottom-right) only makes sense once
+    // there is a thumbnail to show. A folder with no thumbnail -- nothing
+    // cached yet, no image/video inside, or still scanning -- keeps the plain
+    // folder icon, centered in its slot exactly like any other folder, rather
+    // than being laid out as if it had a badge that never appears.
+    final hasPreview =
+        _tickerEnabled &&
+        widget.cacheMode != ThumbnailCacheMode.disabled &&
+        bytes != null;
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final requestedIconSize = _resolvedIconSize;
-        final requestedBadgeSize = showPreview
+        final requestedBadgeSize = hasPreview
             ? widget.previewSize ?? requestedIconSize * 0.8
             : 0.0;
         final requestedExtent = math.max(
@@ -309,40 +319,48 @@ class _FolderThumbnailPreviewState
           child: FittedBox(fit: BoxFit.contain, child: widget.child),
         );
 
-        if (!showPreview) return Center(child: fittedIcon);
-
-        final bytes = _previewBytes;
-        return Center(
-          child: SizedBox(
-            width: contentExtent,
-            height: contentExtent,
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Positioned(
-                  left: 0,
-                  top: 0,
-                  width: iconSize,
-                  height: iconSize,
-                  child: fittedIcon,
-                ),
-                Positioned(
-                  left: iconSize * 0.5,
-                  top: iconSize * 0.5,
-                  width: badgeSize,
-                  height: badgeSize,
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 180),
-                    switchInCurve: Curves.easeOut,
-                    switchOutCurve: Curves.easeIn,
-                    child: bytes != null
-                        ? _buildBadge(context, bytes, badgeSize)
-                        : const SizedBox.shrink(key: ValueKey('empty_badge')),
+        final Widget content;
+        if (!hasPreview) {
+          content = Center(
+            key: const ValueKey('folder_plain_icon'),
+            child: fittedIcon,
+          );
+        } else {
+          content = Center(
+            key: const ValueKey('folder_collage'),
+            child: SizedBox(
+              width: contentExtent,
+              height: contentExtent,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    width: iconSize,
+                    height: iconSize,
+                    child: fittedIcon,
                   ),
-                ),
-              ],
+                  Positioned(
+                    left: iconSize * 0.5,
+                    top: iconSize * 0.5,
+                    width: badgeSize,
+                    height: badgeSize,
+                    child: _buildBadge(context, bytes!, badgeSize),
+                  ),
+                ],
+              ),
             ),
-          ),
+          );
+        }
+
+        // Cross-fade when a thumbnail turns up for a folder that was showing
+        // the plain icon, instead of snapping to the collage layout.
+        return AnimatedSwitcher(
+          duration: const Duration(milliseconds: 180),
+          switchInCurve: Curves.easeOut,
+          switchOutCurve: Curves.easeIn,
+          child: content,
         );
       },
     );

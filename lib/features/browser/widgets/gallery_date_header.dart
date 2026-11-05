@@ -1,0 +1,120 @@
+import 'package:intl/intl.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/utils/raw_entry.dart';
+
+class DateGroup<T> {
+  final DateTime? date;
+  final List<T> items;
+  final List<int> globalIndices;
+
+  DateGroup({
+    required this.date,
+    required this.items,
+    required this.globalIndices,
+  });
+}
+
+List<DateGroup<RawEntry>> computeDateGroups(
+  List<RawEntry> items, {
+  bool ascending = false,
+}) {
+  final Map<DateTime, DateGroup<RawEntry>> dayGroups = {};
+  DateGroup<RawEntry>? undatedGroup;
+
+  for (int i = 0; i < items.length; i++) {
+    final entry = items[i];
+    final secs = entry.modifiedSecs;
+    if (secs > 0) {
+      final dt = DateTime.fromMillisecondsSinceEpoch(secs * 1000);
+      final dayKey = DateTime(dt.year, dt.month, dt.day);
+      final group = dayGroups.putIfAbsent(
+        dayKey,
+        () => DateGroup(date: dayKey, items: [], globalIndices: []),
+      );
+      group.items.add(entry);
+      group.globalIndices.add(i);
+    } else {
+      undatedGroup ??= DateGroup(date: null, items: [], globalIndices: []);
+      undatedGroup.items.add(entry);
+      undatedGroup.globalIndices.add(i);
+    }
+  }
+
+  final sortedKeys = dayGroups.keys.toList()
+    ..sort((a, b) => ascending ? a.compareTo(b) : b.compareTo(a));
+
+  final result = <DateGroup<RawEntry>>[
+    for (final key in sortedKeys) dayGroups[key]!,
+  ];
+  if (undatedGroup != null) {
+    result.add(undatedGroup);
+  }
+  return result;
+}
+
+String formatDateGroupHeader(DateTime? date, BuildContext context) {
+  if (date == null) {
+    return context.l10n.dateEarlier;
+  }
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final yesterday = today.subtract(const Duration(days: 1));
+  final itemDay = DateTime(date.year, date.month, date.day);
+
+  final locale = Localizations.localeOf(context).toString();
+  if (itemDay == today) {
+    return context.l10n.dateToday;
+  } else if (itemDay == yesterday) {
+    return context.l10n.dateYesterday;
+  } else if (date.year == now.year) {
+    return DateFormat('EEEE, MMMM d', locale).format(date);
+  } else {
+    return DateFormat('EEEE, MMMM d, y', locale).format(date);
+  }
+}
+
+class GalleryDateHeader extends StatelessWidget {
+  final String title;
+  final int count;
+
+  const GalleryDateHeader({
+    super.key,
+    required this.title,
+    required this.count,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bg = theme.scaffoldBackgroundColor;
+    final isDark =
+        theme.brightness == Brightness.dark || bg.computeLuminance() < 0.5;
+    final titleColor = isDark ? Colors.white : const Color(0xFF1F1F1F);
+    final countColor = isDark
+        ? Colors.white.withValues(alpha: 0.7)
+        : const Color(0xFF1F1F1F).withValues(alpha: 0.6);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: titleColor,
+                letterSpacing: -0.2,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

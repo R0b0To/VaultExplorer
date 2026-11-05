@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:ui' show Color;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/data/models/file_item_action.dart';
 import 'package:vaultexplorer/data/models/file_manager_skin.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
@@ -11,6 +12,25 @@ import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/models/thumbnail_settings.dart';
 
 void main() {
+  group('FileManagerToolbarConfig toolbar action order', () {
+    test('play media is not shown in the fresh-install defaults', () {
+      expect(
+        FileManagerToolbarConfig.defaults().order,
+        isNot(contains(FileManagerAction.playMedia)),
+      );
+    });
+
+    test('an older saved order gains the newly added play media action', () {
+      final legacy = FileManagerToolbarConfig.defaults();
+      final restored = FileManagerToolbarConfig.fromJson(legacy.toJson());
+
+      expect(
+        restored.order,
+        [...legacy.order, FileManagerAction.playMedia],
+      );
+    });
+  });
+
   group('FileManagerToolbarConfig autoStartPlaylistMode', () {
     test('defaults to false in defaults() factory', () {
       final config = FileManagerToolbarConfig.defaults();

@@ -25,6 +25,28 @@ helper.
 * **LUKS2**: relying party from the token (`io.systemd.cryptsetup` by default);
   the LUKS passphrase is the standard padded base64 text of the 32-byte output.
 
+## Where the work happens
+
+The key handshake (CTAP2, PIN, NFC/USB) is Kotlin (`securitykey/`,
+`SecurityKeyHandlers`). Everything after it is the native folder-vault core:
+
+* **Unlock** -- Kotlin reads `gocryptfs.conf` (`GocryptfsVault.readConfig`) to
+  learn the credential id, salt and assert options, derives the 32-byte secret
+  from the key, and passes it to `FolderVaultOpener.open(rawSecret = ...)`. The
+  core receives those bytes untouched (`fv::openGocryptfs`) -- there is no
+  UTF-8 step, which is what makes a vault enrolled with `gocryptfs -init -fido2`
+  open.
+* **Create** -- `NativeFolderVault.nativeCreate(fido2Json = ...)`: the core
+  writes the `FIDO2` feature flag and section (`fv::GocryptfsCreateOptions::fido2`)
+  and wraps the master key under the raw secret.
+* **Change credentials** -- refused in the core (`fv::changeGocryptfsPassword`)
+  before anything is read or written, so the `FIDO2` section can never be
+  dropped from a config by a re-wrap.
+
+Host tests for the format side are in `cpp/foldervault/test/fv_tests.cpp`
+(`testGocryptfsFido2`); the Kotlin side of the config parser has
+`GocryptfsConfigFido2Test`.
+
 ## PIN and user verification
 
 A key derives a *different* hmac-secret depending on whether the assertion was

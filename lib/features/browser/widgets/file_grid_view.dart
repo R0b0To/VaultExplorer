@@ -30,6 +30,7 @@ import 'package:vaultexplorer/features/browser/widgets/book_cover_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_item_drag.dart';
 import 'package:vaultexplorer/features/browser/widgets/fast_scrollbar.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_thumbnail_preview.dart';
+import 'package:vaultexplorer/features/browser/widgets/gallery_date_header.dart';
 import 'package:vaultexplorer/features/browser/widgets/grid_card_shell.dart';
 import 'package:vaultexplorer/features/browser/widgets/hold_range_select_container.dart';
 import 'package:vaultexplorer/features/browser/widgets/thumbnail_raw_fallback.dart';
@@ -78,6 +79,22 @@ class FileGridView extends StatefulWidget {
   final ArchiveContext? archiveContext;
   final String? archiveRootPath;
   final SortBy? sortBy;
+  final bool groupByDate;
+
+  /// Resolves the container an entry lives in, for a listing that gathers
+  /// files from several containers (the category browser). When null every
+  /// entry belongs to [container], as in any ordinary folder listing.
+  final MountedContainer Function(RawEntry entry)? containerFor;
+
+  /// The thumbnail cache policy that applies to an entry, for a listing that
+  /// mixes containers whose owners chose different policies (the category
+  /// browser). When null every entry follows [thumbnailCacheMode].
+  final ThumbnailCacheMode Function(RawEntry entry)? cacheModeFor;
+
+  /// The thumbnail quality that applies to an entry, for a listing that
+  /// mixes containers whose owners chose different qualities (the category
+  /// browser). When null every entry follows [thumbnailQuality].
+  final ThumbnailQuality Function(RawEntry entry)? qualityFor;
 
   const FileGridView({
     super.key,
@@ -114,6 +131,10 @@ class FileGridView extends StatefulWidget {
     this.archiveContext,
     this.archiveRootPath,
     this.sortBy,
+    this.groupByDate = false,
+    this.containerFor,
+    this.cacheModeFor,
+    this.qualityFor,
   });
 
   @override
@@ -122,6 +143,12 @@ class FileGridView extends StatefulWidget {
 
 class _FileGridViewState extends State<FileGridView>
     with SingleTickerProviderStateMixin {
+  MountedContainer _containerOf(RawEntry entry) =>
+      widget.containerFor?.call(entry) ?? widget.container;
+
+  ThumbnailCacheMode _cacheModeOf(RawEntry entry) =>
+      widget.cacheModeFor?.call(entry) ?? widget.thumbnailCacheMode;
+
   Orientation? _lastOrientation;
   late int _crossAxisCount;
   double? _viewportWidth;
@@ -133,7 +160,6 @@ class _FileGridViewState extends State<FileGridView>
   // Animation controller for clearly visible column morph transition
   late final AnimationController _morphController;
   late Animation<double> _scaleAnimation;
-  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
@@ -222,8 +248,8 @@ class _FileGridViewState extends State<FileGridView>
   /// quality this is derived from the real pixel width of a cell (same
   /// geometry as the grid delegate below), so fewer columns => sharper
   /// thumbnails, matching how Fossify Gallery sizes them.
-  ThumbnailQuality get _effectiveQuality {
-    final q = widget.thumbnailQuality;
+  ThumbnailQuality _effectiveQualityOf(RawEntry entry) {
+    final q = widget.qualityFor?.call(entry) ?? widget.thumbnailQuality;
     if (!q.auto) return q;
     final tileWidth = _getTileWidth(_crossAxisCount, context);
     return q.resolveForCell(
@@ -337,6 +363,28 @@ class _FileGridViewState extends State<FileGridView>
     return false;
   }
 
+  Widget _buildItem(BuildContext context, RawEntry entry, int index) {
+    return HoldSelectableItem(
+      key: ValueKey(entry),
+      index: index,
+      entry: entry,
+      child: BrowserItemDragItem(
+        entry: entry,
+        container: _containerOf(entry),
+        currentDirectory: widget.currentDirPath,
+        visibleItems: widget.items,
+        selectedItems: widget.selectedItems,
+        isSelectionMode: widget.isSelectionMode,
+        enabled: widget.enableFileDrag && widget.archiveContext == null,
+        onItemLongPress: widget.onItemLongPress,
+        onDrop: widget.onFileDrop,
+        child: entry.isDir
+            ? _buildDirCell(context, entry)
+            : _buildFileCell(context, entry),
+      ),
+    );
+  }
+
   Widget _buildAnimatedGridView(ScrollController? controller, int total) {
     return AnimatedBuilder(
       animation: _morphController,
@@ -364,26 +412,71 @@ class _FileGridViewState extends State<FileGridView>
         itemCount: total,
         itemBuilder: (context, index) {
           final entry = widget.items[index];
-          return HoldSelectableItem(
-            key: ValueKey(entry),
-            index: index,
-            entry: entry,
-            child: BrowserItemDragItem(
-              entry: entry,
-              container: widget.container,
-              currentDirectory: widget.currentDirPath,
-              visibleItems: widget.items,
-              selectedItems: widget.selectedItems,
-              isSelectionMode: widget.isSelectionMode,
-              enabled: widget.enableFileDrag && widget.archiveContext == null,
-              onItemLongPress: widget.onItemLongPress,
-              onDrop: widget.onFileDrop,
-              child: entry.isDir
-                  ? _buildDirCell(context, entry)
-                  : _buildFileCell(context, entry),
-            ),
-          );
+          return _buildItem(context, entry, index);
         },
+      ),
+    );
+  }
+
+  Widget _buildDateGroupedGridView(ScrollController? controller) {
+    final groups = computeDateGroups(widget.items);
+
+    final slivers = <Widget>[];
+    for (final group in groups) {
+      slivers.add(
+        SliverToBoxAdapter(
+          child: GalleryDateHeader(
+            title: formatDateGroupHeader(group.date, context),
+            count: group.items.length,
+          ),
+        ),
+      );
+      slivers.add(
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(10, 4, 10, 12),
+          sliver: SliverGrid(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: _crossAxisCount,
+              crossAxisSpacing: widget.spacing,
+              mainAxisSpacing: widget.spacing,
+              childAspectRatio: _getAspectRatio(_crossAxisCount),
+            ),
+            delegate: SliverChildBuilderDelegate(
+              (context, localIndex) {
+                final entry = group.items[localIndex];
+                final globalIndex = group.globalIndices[localIndex];
+                return _buildItem(context, entry, globalIndex);
+              },
+              childCount: group.items.length,
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (widget.bottomClearance > 0) {
+      slivers.add(
+        SliverToBoxAdapter(
+          child: SizedBox(height: widget.bottomClearance),
+        ),
+      );
+    }
+
+    return AnimatedBuilder(
+      animation: _morphController,
+      builder: (context, child) {
+        return ClipRect(
+          child: Transform.scale(
+            scale: _scaleAnimation.value,
+            alignment: Alignment.center,
+            child: child,
+          ),
+        );
+      },
+      child: CustomScrollView(
+        controller: controller,
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: slivers,
       ),
     );
   }
@@ -413,7 +506,9 @@ class _FileGridViewState extends State<FileGridView>
           child: NotificationListener<ScrollNotification>(
             onNotification: _onScrollNotification,
             child: widget.scrollController == null
-                ? _buildAnimatedGridView(null, total)
+                ? (widget.groupByDate
+                    ? _buildDateGroupedGridView(null)
+                    : _buildAnimatedGridView(null, total))
                 : FastScrollbar(
                     controller: widget.scrollController!,
                     items: widget.items,
@@ -422,10 +517,12 @@ class _FileGridViewState extends State<FileGridView>
                       top: 12,
                       bottom: widget.bottomClearance,
                     ),
-                    child: _buildAnimatedGridView(
-                      widget.scrollController,
-                      total,
-                    ),
+                    child: widget.groupByDate
+                        ? _buildDateGroupedGridView(widget.scrollController)
+                        : _buildAnimatedGridView(
+                            widget.scrollController,
+                            total,
+                          ),
                   ),
           ),
         );
@@ -480,11 +577,13 @@ class _FileGridViewState extends State<FileGridView>
       preview: entry.isPlaceholder
           ? Center(child: folderIcon)
           : FolderThumbnailPreview(
-              key: ValueKey('folder_preview:${widget.container.uri}:$fullPath'),
-              container: widget.container,
+              key: ValueKey(
+                'folder_preview:${_containerOf(entry).uri}:$fullPath',
+              ),
+              container: _containerOf(entry),
               folderPath: fullPath,
-              cacheMode: widget.thumbnailCacheMode,
-              quality: _effectiveQuality,
+              cacheMode: _cacheModeOf(entry),
+              quality: _effectiveQualityOf(entry),
               iconSize: iconSize,
               child: folderIcon,
             ),
@@ -545,14 +644,14 @@ class _FileGridViewState extends State<FileGridView>
       );
     } else if (isImg) {
       previewWidget = Hero(
-        tag: 'media_hero_${widget.container.volId}_$fullPath',
+        tag: 'media_hero_${_containerOf(entry).volId}_$fullPath',
         child: Material(
           type: MaterialType.transparency,
           child: _EncryptedImageGridThumb(
-            container: widget.container,
+            container: _containerOf(entry),
             filePath: fullPath,
-            cacheMode: widget.thumbnailCacheMode,
-            quality: _effectiveQuality,
+            cacheMode: _cacheModeOf(entry),
+            quality: _effectiveQualityOf(entry),
             archiveContext: widget.archiveContext,
             archiveRootPath: widget.archiveRootPath,
           ),
@@ -560,14 +659,14 @@ class _FileGridViewState extends State<FileGridView>
       );
     } else if (isVid) {
       previewWidget = Hero(
-        tag: 'media_hero_${widget.container.volId}_$fullPath',
+        tag: 'media_hero_${_containerOf(entry).volId}_$fullPath',
         child: Material(
           type: MaterialType.transparency,
           child: _VideoThumb(
-            container: widget.container,
+            container: _containerOf(entry),
             filePath: fullPath,
-            cacheMode: widget.thumbnailCacheMode,
-            quality: _effectiveQuality,
+            cacheMode: _cacheModeOf(entry),
+            quality: _effectiveQualityOf(entry),
             archiveContext: widget.archiveContext,
             archiveRootPath: widget.archiveRootPath,
           ),
@@ -579,10 +678,10 @@ class _FileGridViewState extends State<FileGridView>
           width: iconSize,
           height: iconSize,
           child: _ApkIconGridThumb(
-            container: widget.container,
+            container: _containerOf(entry),
             filePath: fullPath,
-            cacheMode: widget.thumbnailCacheMode,
-            quality: _effectiveQuality,
+            cacheMode: _cacheModeOf(entry),
+            quality: _effectiveQualityOf(entry),
             fallbackIcon: skin.fileIcon(cleanName),
             fallbackColor: skin.fileIconColor(cs, cleanName),
             fallbackIconSize: iconSize,
@@ -593,10 +692,10 @@ class _FileGridViewState extends State<FileGridView>
       // Same restriction as the APK above: a book nested inside an open
       // archive has no container/local path for the native side to open.
       previewWidget = _BookCoverGridThumb(
-        container: widget.container,
+        container: _containerOf(entry),
         filePath: fullPath,
-        cacheMode: widget.thumbnailCacheMode,
-        quality: _effectiveQuality,
+        cacheMode: _cacheModeOf(entry),
+        quality: _effectiveQualityOf(entry),
         fallbackIcon: skin.fileIcon(cleanName),
         fallbackColor: skin.fileIconColor(cs, cleanName),
         fallbackIconSize: iconSize,

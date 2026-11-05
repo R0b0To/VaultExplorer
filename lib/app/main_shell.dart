@@ -23,8 +23,10 @@ import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/viewer/background_playback/background_playback_host.dart';
 import 'package:vaultexplorer/features/browser/browser_tabs_host.dart';
+import 'package:vaultexplorer/features/browser/controllers/browser_session_store.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
 import 'package:vaultexplorer/features/browser/models/browser_tab_origin.dart';
+import 'package:vaultexplorer/features/browser/models/file_category.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_new_tab_sheet.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_screen.dart';
@@ -63,6 +65,9 @@ class _MainShellState extends ConsumerState<MainShell>
   late bool _hideDashboard = widget.hideDashboardUntilShareHandled;
   final ValueNotifier<List<MountedContainer>> _mountedNotifier = ValueNotifier(
     const [],
+  );
+  final ValueNotifier<MountedContainer?> _localStorageNotifier = ValueNotifier(
+    null,
   );
   final GlobalKey<VaultDashboardState> _dashboardKey =
       GlobalKey<VaultDashboardState>();
@@ -125,6 +130,12 @@ class _MainShellState extends ConsumerState<MainShell>
   Timer? _exitArmTimer;
   BrowserTabsConfig? _browserWorkspace;
 
+  /// The tabs the person left open the last time this vault was revealed from
+  /// Mask Mode, picked up again so they resume where they were instead of
+  /// starting from an empty Home. Null for a normal launch, and when nothing
+  /// is left to resume. See [BrowserSessionStore].
+  BrowserTabsConfig? _restoredBrowserWorkspace;
+
   BrowserTabsState? get _browserWorkspaceState {
     final workspace = _browserWorkspace;
     return workspace == null ? null : ref.read(browserTabsProvider(workspace));
@@ -146,6 +157,11 @@ class _MainShellState extends ConsumerState<MainShell>
     // Cached so asynchronous lock callbacks stay safe after this widget is
     // unmounted.
     _container = ProviderScope.containerOf(context, listen: false);
+    if (widget.returnToDecoyOnBackground) {
+      _restoredBrowserWorkspace = _container
+          .read(browserSessionStoreProvider)
+          .resumable();
+    }
     _quickCaptureColdStart = ref.read(pendingQuickCaptureLaunchProvider).take();
     if (!_quickCaptureColdStart) {
       // The Settings tab used to be the thing that created -- and so started
@@ -425,6 +441,7 @@ class _MainShellState extends ConsumerState<MainShell>
     WidgetsBinding.instance.removeObserver(this);
     _exitArmTimer?.cancel();
     _mountedNotifier.dispose();
+    _localStorageNotifier.dispose();
     _vaultEngineEvents.removeIncomingShareRequestListener(
       _onIncomingShareRequest,
     );
@@ -535,6 +552,29 @@ class _MainShellState extends ConsumerState<MainShell>
       // Regular navigation from the sidebar or Dashboard stays in the current
       // tab. The drawer's explicit long-press action owns new-tab creation.
       actions.replaceActive(container, origin: origin);
+    }
+    setState(() {
+      _index = 0;
+      _builtTabs.add(0);
+    });
+  }
+
+  void _openCategoryTab(FileCategory category) {
+    _cacheDashboardLocalStorageContainer();
+    final actions = _browserWorkspaceActions;
+    if (actions == null) return;
+    final tabId = actions.openCategoryTab(
+      category,
+      primaryLocalContainer: _primaryLocalStorageContainer,
+      includeVaults: true,
+    );
+    if (tabId == null && mounted) {
+      showAppSnackBar(
+        context,
+        message: context.l10n.browserTabLimitReached(kMaxBrowserTabs),
+        tone: AppBannerTone.warning,
+      );
+      return;
     }
     setState(() {
       _index = 0;
@@ -681,6 +721,12 @@ class _MainShellState extends ConsumerState<MainShell>
 
   void _onBrowserWorkspaceChanged(BrowserTabsConfig? workspace) {
     _browserWorkspace = workspace;
+    if (workspace != null && widget.returnToDecoyOnBackground) {
+      // Revealed from Mask Mode: keep these tabs alive for when the app goes
+      // back to the decoy, so the next reveal resumes them. Nothing to do on
+      // the null call from dispose -- the store simply keeps holding them.
+      _container.read(browserSessionStoreProvider).hold(_container, workspace);
+    }
     final pending = _browserInitialContainer;
     if (workspace != null && pending != null) {
       _browserInitialContainer = null;
@@ -702,6 +748,11 @@ class _MainShellState extends ConsumerState<MainShell>
     }
     final actions = _browserWorkspaceActions;
     if (actions == null) return;
+    // Don't offer a picker whose every choice would fail.
+    if (_browserWorkspaceState?.atLimit ?? false) {
+      _showBrowserTabLimit();
+      return;
+    }
     _cacheDashboardLocalStorageContainer();
     final choice = await BrowserNewTabSheet.show(
       context,
@@ -740,6 +791,19 @@ class _MainShellState extends ConsumerState<MainShell>
     if (actions == null) return;
     if (tab.isDashboard) {
       actions.openDashboardTab();
+      return;
+    }
+    if (tab.isCategory) {
+      if (actions.openCategoryTab(
+            tab.category!,
+            primaryLocalContainer: tab.primaryLocalContainer,
+            includeVaults: tab.includeVaults,
+          ) ==
+          null) {
+        _showBrowserTabLimit();
+        return;
+      }
+      setState(() => _index = 0);
       return;
     }
     if (container == null) return;
@@ -807,6 +871,7 @@ class _MainShellState extends ConsumerState<MainShell>
       child: VaultDashboard(
         key: backPreviewOnly ? null : _dashboardKey,
         mountedNotifier: backPreviewOnly ? null : _mountedNotifier,
+        localStorageNotifier: backPreviewOnly ? null : _localStorageNotifier,
         onNavigateTab: _onTabTap,
         workspaceConfig: backPreviewOnly ? null : workspaceConfig,
         backPreviewOnly: backPreviewOnly,
@@ -829,7 +894,9 @@ class _MainShellState extends ConsumerState<MainShell>
             area: SkinArea.tools,
             child: ToolsScreen(
               mountedContainers: _mountedNotifier,
+              localStorageContainer: _localStorageNotifier,
               onNavigateTab: _onTabTap,
+              onOpenInBrowser: _openBrowser,
             ),
           )
         else
@@ -869,6 +936,7 @@ class _MainShellState extends ConsumerState<MainShell>
       return AppNavigationDrawer(
         currentVolId: currentVolId,
         primaryLocalContainer: _primaryLocalStorageContainer,
+        localStorageNotifier: _localStorageNotifier,
         onOpenInNewTab: workspaceActions == null || !tabsEnabled
             ? null
             : (container) {
@@ -893,6 +961,7 @@ class _MainShellState extends ConsumerState<MainShell>
           ),
         ),
         onUnlockVault: _openVaultFromDrawer,
+        onOpenCategory: _openCategoryTab,
         onAddVault: () {
           _onTabTap(0);
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -920,6 +989,7 @@ class _MainShellState extends ConsumerState<MainShell>
                 buildDrawer(currentVolId: volId, workspace: workspace),
             closeRouteWhenEmpty: false,
             includeDashboardTab: true,
+            restoredWorkspace: _restoredBrowserWorkspace,
             homeBuilder:
                 ({
                   required workspace,

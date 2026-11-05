@@ -3741,6 +3741,27 @@ class AppLocalizationsAr extends AppLocalizations {
   String get layoutModeGalleryGrid => 'شبكة معرض';
 
   @override
+  String get galleryModeAction => 'المعرض';
+
+  @override
+  String get galleryModeTooltip => 'وضع المعرض';
+
+  @override
+  String get optionsAction => 'Options';
+
+  @override
+  String get optionsActionTooltip => 'Options';
+
+  @override
+  String get dateToday => 'اليوم';
+
+  @override
+  String get dateYesterday => 'أمس';
+
+  @override
+  String get dateEarlier => 'سابقًا';
+
+  @override
   String get readOnlyCantDeleteTooltip => 'للقراءة فقط — لا يمكن الحذف';
 
   @override
@@ -4825,7 +4846,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get toolStorageAnalyzerSubtitle =>
-      'معرفة ما يشغل المساحة في خزنة مثبَّتة';
+      'اعرف ما الذي يشغل مساحة في التخزين المحلي أو في خزنة مركّبة.';
 
   @override
   String get toolDuplicateFinderTitle => 'أداة العثور على الملفات المكررة';
@@ -5477,7 +5498,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get storageAnalyzerNoTargetsMessage =>
-      'قم بتحميل خزنة أولاً، ثم عد إلى هنا لعرض توزيع مساحة التخزين الخاصة بها.';
+      'افتح التخزين المحلي أو حمّل خزنة أولاً، ثم عُد إلى هنا لعرض تفاصيل التخزين.';
 
   @override
   String storageAnalyzerUsedOfTotal(String used, String total) {
@@ -5518,6 +5539,174 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get storageCategoryOther => 'أخرى';
+
+  @override
+  String get storageAnalyzerTabMap => 'المخطط';
+
+  @override
+  String get storageAnalyzerTabFolders => 'المجلدات';
+
+  @override
+  String get storageAnalyzerTabTypes => 'الأنواع';
+
+  @override
+  String get storageAnalyzerTabCleanup => 'تنظيف';
+
+  @override
+  String storageAnalyzerFreeSpace(String free) {
+    return '$free فارغ';
+  }
+
+  @override
+  String storageAnalyzerFileCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count ملفات',
+      one: 'ملف واحد',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageAnalyzerItemCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count عناصر',
+      one: 'عنصر واحد',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageAnalyzerContentSize(String size) {
+    return 'محتوى الخزنة: $size';
+  }
+
+  @override
+  String storageAnalyzerScanProgress(String files, String size) {
+    return '$files ملفات · $size حتى الآن';
+  }
+
+  @override
+  String get storageAnalyzerPartialNotice =>
+      'تعذر قراءة بعض المجلدات بالكامل، لذا قد تكون الإجماليات أقل من الأرقام الفعلية.';
+
+  @override
+  String get storageAnalyzerStaleNotice =>
+      'تم تعديل وحدة التخزين هذه منذ آخر فحص.';
+
+  @override
+  String get storageAnalyzerUpOneLevel => 'مستوى للأعلى';
+
+  @override
+  String get storageAnalyzerEmptyFolder => 'هذا المجلد فارغ.';
+
+  @override
+  String storageAnalyzerSmallerItems(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count عناصر أصغر',
+      one: 'عنصر واحد أصغر',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get storageAnalyzerMapHint =>
+      'اضغط على مجلد لفتحه. اضغط مطولاً للتحديد.';
+
+  @override
+  String get storageAnalyzerSortFiles => 'عدد الملفات';
+
+  @override
+  String get storageAnalyzerAllTypes => 'جميع الأنواع';
+
+  @override
+  String storageAnalyzerLargestOfType(String type) {
+    return 'أكبر الملفات · $type';
+  }
+
+  @override
+  String get storageAnalyzerCleanupHeader => 'اقتراحات';
+
+  @override
+  String get storageAnalyzerCleanupLarge => 'ملفات كبيرة';
+
+  @override
+  String get storageAnalyzerCleanupStale => 'لم يتم تعديلها منذ أكثر من عام';
+
+  @override
+  String get storageAnalyzerCleanupTemp => 'ملفات مؤقتة وغير ضرورية';
+
+  @override
+  String get storageAnalyzerCleanupEmpty => 'مجلدات فارغة';
+
+  @override
+  String get storageAnalyzerCleanupReview => 'مراجعة';
+
+  @override
+  String get storageAnalyzerCleanupNothing =>
+      'لا توجد ملفات واضحة للتنظيف. وحدة التخزين هذه مرتبة.';
+
+  @override
+  String get storageAnalyzerBiggestFiles => 'أكبر الملفات';
+
+  @override
+  String get storageAnalyzerBiggestFilesSubtitle =>
+      'استعرض أكبر الملفات في وحدة التخزين هذه';
+
+  @override
+  String get storageAnalyzerAllSuggestions => 'جميع الاقتراحات';
+
+  @override
+  String storageAnalyzerSelectedSummary(int count, String size) {
+    return 'تم تحديد $count · $size';
+  }
+
+  @override
+  String storageAnalyzerDeleteFilesMessage(String size) {
+    return 'سيؤدي هذا إلى حذف العناصر المحددة نهائياً من وحدة التخزين هذه وتوفير $size. لا يمكن التراجع عن ذلك.';
+  }
+
+  @override
+  String storageAnalyzerDeleteFoldersMessage(String files, String size) {
+    return 'سيؤدي هذا إلى حذف العناصر المحددة نهائياً ($files ملفاً، بما في ذلك كل ما داخل المجلدات المحددة) وتوفير $size. لا يمكن التراجع عن ذلك.';
+  }
+
+  @override
+  String storageAnalyzerDeleteDone(String size) {
+    return 'تم توفير $size';
+  }
+
+  @override
+  String storageAnalyzerDeletePartial(
+    String deleted,
+    String failed,
+    String size,
+  ) {
+    return 'تم حذف $deleted، ولكن تعذر حذف $failed. تم توفير $size.';
+  }
+
+  @override
+  String get storageAnalyzerDeleteNone => 'لم يتم حذف أي شيء.';
+
+  @override
+  String get storageAnalyzerDeleteError => 'تعذر حذف العناصر المحددة.';
+
+  @override
+  String get storageAnalyzerRescanFolder => 'إعادة فحص هذا المجلد';
+
+  @override
+  String get storageAnalyzerSelectAction => 'تحديد';
+
+  @override
+  String get storageAnalyzerSelectAllHere => 'تحديد الكل في هذا المجلد';
+
+  @override
+  String get storageAnalyzerOpenFolder => 'فتح المجلد';
 
   @override
   String get keyfilePassphraseGeneratorTitle =>
@@ -5971,18 +6160,17 @@ class AppLocalizationsAr extends AppLocalizations {
   String get vaultSyncTapToSelect => 'اضغط لاختيار خزنة ومجلد';
 
   @override
-  String get vaultSyncSwapTooltip => 'تبديل اليسار واليمين';
+  String get vaultSyncSwapTooltip => 'تبديل وحدتي التخزين';
 
   @override
-  String get vaultSyncSameLocationWarning =>
-      'يجب أن يكون اليسار واليمين مجلدين مختلفين.';
+  String get vaultSyncSameLocationWarning => 'يجب أن يكون المجلدان مختلفين.';
 
   @override
   String get vaultSyncIntroTitle => 'مقارنة خزنتين';
 
   @override
   String get vaultSyncIntroSubtitle =>
-      'اختر خزنة يسرى وأخرى يمنى (أو مجلدين في نفس الخزنة) لمعرفة ما هو مفقود أو مُعدَّل أو أحدث في كل جانب.';
+      'اختر مجلدين (في خزنة أو على تخزين الجهاز أو لدى موفّر مستندات مثل بطاقة SD أو مساحة سحابية) لمعرفة ما هو مفقود أو مُعدَّل أو أحدث في كل منهما.';
 
   @override
   String get vaultSyncCompareButton => 'مقارنة';
@@ -6055,11 +6243,11 @@ class AppLocalizationsAr extends AppLocalizations {
   String get vaultSyncDirectionLabel => 'اتجاه المزامنة';
 
   @override
-  String get vaultSyncDirectionTwoWay => 'ثنائي الاتجاه (موصى به)';
+  String get vaultSyncDirectionTwoWay => 'ثنائي الاتجاه';
 
   @override
   String get vaultSyncDirectionTwoWaySubtitle =>
-      'ينسخ كل ملف إلى الجانب الذي يفتقده أو لديه نسخة أقدم';
+      'ينسخ الملفات المفقودة أو الأحدث إلى الجانب الآخر.';
 
   @override
   String get vaultSyncDirectionLeftToRight => 'اليسار ← اليمين (اتجاه واحد)';
@@ -6156,38 +6344,38 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get vaultSyncOverlapWarning =>
-      'Left and Right must not be the same folder or nested inside each other.';
+      'يجب ألا يكون المجلدان متطابقين أو أحدهما داخل الآخر.';
 
   @override
   String vaultSyncPlaintextWarning(Object targets) {
-    return 'Files copied out of a vault to $targets will be stored unencrypted.';
+    return 'ستُخزَّن الملفات المنسوخة من خزنة إلى $targets بدون تشفير.';
   }
 
   @override
-  String get vaultSyncStorageSelectorLabel => 'Storage';
+  String get vaultSyncStorageSelectorLabel => 'التخزين';
 
   @override
-  String get vaultSyncTargetKindVault => 'Encrypted vault';
+  String get vaultSyncTargetKindVault => 'خزنة مشفّرة';
 
   @override
-  String get vaultSyncTargetKindDevice => 'Device storage · not encrypted';
+  String get vaultSyncTargetKindDevice => 'تخزين الجهاز · غير مشفّر';
 
   @override
-  String get vaultSyncTargetKindProvider => 'Document provider · not encrypted';
+  String get vaultSyncTargetKindProvider => 'موفّر مستندات · غير مشفّر';
 
   @override
-  String get vaultSyncAddStorageTooltip => 'Add storage location';
+  String get vaultSyncAddStorageTooltip => 'إضافة موقع تخزين';
 
   @override
   String get vaultSyncEnableLocalStorageTooltip =>
-      'Enable Local Storage access';
+      'تفعيل الوصول إلى التخزين المحلي';
 
   @override
-  String get vaultSyncNoStoragesTitle => 'No storage to sync yet';
+  String get vaultSyncNoStoragesTitle => 'لا توجد وحدة تخزين للمزامنة بعد';
 
   @override
   String get vaultSyncNoStoragesMessage =>
-      'Add a folder or document provider with the + button, or mount a vault.';
+      'أضف مجلدًا أو موفّر مستندات بزر + أو قم بتركيب خزنة.';
 
   @override
   String get vaultSyncReadOnlyBadge => 'للقراءة فقط';
@@ -12490,6 +12678,16 @@ class AppLocalizationsAr extends AppLocalizations {
       'ينقل شريط التطبيق من أعلى الشاشة إلى أسفلها ليسهل الوصول إليه بالإبهام.';
 
   @override
+  String get sectionNavigation => 'التنقل';
+
+  @override
+  String get predictiveBackAnimationsLabel => 'الرسوم المتحركة للرجوع التنبؤي';
+
+  @override
+  String get predictiveBackAnimationsDesc =>
+      'عرض معاينات تفاعلية ورسوم متحركة عند الرجوع للخلف.';
+
+  @override
   String get selectByIconLabel => 'التحديد بالنقر على الأيقونة';
 
   @override
@@ -13286,6 +13484,379 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get comicReaderCarouselScrubberSubtitle =>
       'إظهار صور مصغرة للصفحات فوق شريط التمرير';
+
+  @override
+  String get vaultSyncBrowseAllButton => 'تصفح كل العناصر';
+
+  @override
+  String get vaultSyncExplorerTitle => 'تصفح وحدتي التخزين';
+
+  @override
+  String get vaultSyncExplorerEmptyTitle => 'لا شيء للعرض';
+
+  @override
+  String get vaultSyncExplorerEmptyMessage =>
+      'لا توجد عناصر في هذا المجلد تطابق هذا المرشح.';
+
+  @override
+  String get vaultSyncExplorerLoadFailedTitle => 'تعذّرت قراءة هذا المجلد';
+
+  @override
+  String get vaultSyncExplorerLoadFailedMessage =>
+      'تعذّر عرض محتويات إحدى وحدتي التخزين. حاول مرة أخرى وتأكد من أن كلتيهما غير مقفلة ومتصلة.';
+
+  @override
+  String get vaultSyncFilterAll => 'الكل';
+
+  @override
+  String get vaultSyncFilterDifferences => 'الاختلافات';
+
+  @override
+  String get vaultSyncFilterNewer => 'نسخة أحدث';
+
+  @override
+  String get vaultSyncFilterConflicts => 'بحاجة إلى مراجعة';
+
+  @override
+  String get vaultSyncFilterDeletions => 'عمليات الحذف';
+
+  @override
+  String get vaultSyncFilterNoMatchesMessage =>
+      'لا توجد عناصر تطابق هذا المرشح.';
+
+  @override
+  String get vaultSyncSortTooltip => 'ترتيب';
+
+  @override
+  String get vaultSyncSortPath => 'المسار';
+
+  @override
+  String get vaultSyncSortSize => 'الأكبر أولًا';
+
+  @override
+  String get vaultSyncSortModified => 'الأحدث أولًا';
+
+  @override
+  String get vaultSyncSortStatus => 'الحالة';
+
+  @override
+  String get vaultSyncStatusInSync => 'متزامن';
+
+  @override
+  String get vaultSyncStatusFolder => 'مجلد';
+
+  @override
+  String vaultSyncDeletionsQueuedLabel(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count عملية حذف',
+      many: '$count عملية حذف',
+      few: '$count عمليات حذف',
+      two: 'عمليتا حذف',
+      one: 'عملية حذف واحدة',
+      zero: 'لا عمليات حذف',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String vaultSyncConfirmDeletionsMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'سيتم حذف $count عنصر نهائيًا. لا يمكن التراجع عن ذلك.',
+      many: 'سيتم حذف $count عنصرًا نهائيًا. لا يمكن التراجع عن ذلك.',
+      few: 'سيتم حذف $count عناصر نهائيًا. لا يمكن التراجع عن ذلك.',
+      two: 'سيتم حذف عنصرين نهائيًا. لا يمكن التراجع عن ذلك.',
+      one: 'سيتم حذف عنصر واحد نهائيًا. لا يمكن التراجع عن ذلك.',
+      zero: 'لن يُحذف أي عنصر.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get vaultSyncResultsStaleMessage =>
+      'قد تكون النتائج قديمة بعد الحذف. قارن مرة أخرى لتحديث الأعداد.';
+
+  @override
+  String vaultSyncSelectedCount(num count) {
+    return 'تم تحديد $count';
+  }
+
+  @override
+  String get vaultSyncOpenAction => 'فتح';
+
+  @override
+  String vaultSyncOpenCopyAction(String side) {
+    return 'فتح النسخة في $side';
+  }
+
+  @override
+  String get vaultSyncOpenFolderAction => 'فتح المجلد';
+
+  @override
+  String get vaultSyncOpenFolderSubtitle => 'تصفح المحتوى في وحدتي التخزين';
+
+  @override
+  String get vaultSyncShowInFolderAction => 'إظهار في المجلد';
+
+  @override
+  String get vaultSyncShowInFolderSubtitle =>
+      'عرضه بجانب العناصر الأخرى في وحدتي التخزين';
+
+  @override
+  String get vaultSyncDeleteFromBothAction => 'حذف من وحدتي التخزين';
+
+  @override
+  String vaultSyncDeleteBothSidesLabel(String left, String right) {
+    return '$left و$right';
+  }
+
+  @override
+  String vaultSyncDeleteConfirmMessage(String where) {
+    return 'سيتم حذف هذه العناصر نهائيًا من $where، بما في ذلك كل ما بداخل أي مجلد. لا يمكن التراجع عن ذلك.';
+  }
+
+  @override
+  String vaultSyncDeleteDoneMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'تم حذف $count عنصر',
+      many: 'تم حذف $count عنصرًا',
+      few: 'تم حذف $count عناصر',
+      two: 'تم حذف عنصرين',
+      one: 'تم حذف عنصر واحد',
+      zero: 'لم يُحذف أي عنصر',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String vaultSyncDeletePartialMessage(int deleted, int failed) {
+    return 'تم حذف $deleted، لكن تعذّر حذف $failed';
+  }
+
+  @override
+  String get vaultSyncCopyDoneMessage => 'تم النسخ';
+
+  @override
+  String get vaultSyncCopyFailedMessage =>
+      'تعذّر نسخ بعض العناصر. راجع قائمة النقل للتفاصيل.';
+
+  @override
+  String vaultSyncOpenFailedMessage(String name) {
+    return 'تعذّر فتح $name';
+  }
+
+  @override
+  String get vaultSyncDetailsNotOnThisSide => 'غير موجود في وحدة التخزين هذه';
+
+  @override
+  String get vaultSyncDetailsFolder => 'مجلد';
+
+  @override
+  String vaultSyncStatusOnlyIn(String storage) {
+    return 'في $storage فقط';
+  }
+
+  @override
+  String vaultSyncStatusNewerIn(String storage) {
+    return 'أحدث في $storage';
+  }
+
+  @override
+  String vaultSyncBadgeOnlyIn(int count, String storage) {
+    return '$count في $storage فقط';
+  }
+
+  @override
+  String vaultSyncBadgeNewerIn(int count, String storage) {
+    return '$count أحدث في $storage';
+  }
+
+  @override
+  String vaultSyncFolderOnlyInDetail(String storage) {
+    return 'مجلد — في $storage فقط';
+  }
+
+  @override
+  String get vaultSyncDirectionOneWay => 'نسخ أحادي الاتجاه';
+
+  @override
+  String get vaultSyncDirectionOneWaySubtitle =>
+      'ينسخ الملفات الجديدة والمحدَّثة في الاتجاه الموضح؛ المصدر لا يتغير.';
+
+  @override
+  String get vaultSyncDirectionMirror => 'مزامنة مرآة';
+
+  @override
+  String get vaultSyncDirectionMirrorSubtitle =>
+      'يستبدل الوجهة بنسخة مطابقة؛ تُحذف العناصر الموجودة في الوجهة فقط.';
+
+  @override
+  String vaultSyncActionCopyTo(String storage) {
+    return 'نسخ ← $storage';
+  }
+
+  @override
+  String vaultSyncCopyNowToAction(String storage) {
+    return 'نسخ إلى $storage الآن';
+  }
+
+  @override
+  String vaultSyncDeleteFromAction(String storage) {
+    return 'حذف من $storage';
+  }
+
+  @override
+  String vaultSyncPlanDeleteFrom(String storage) {
+    return 'حذف من $storage عند المزامنة';
+  }
+
+  @override
+  String vaultSyncFilterOnlyIn(String storage) {
+    return 'في $storage فقط';
+  }
+
+  @override
+  String get vaultSyncChooseFirstStorage => 'اختر وحدة التخزين الأولى';
+
+  @override
+  String get vaultSyncChooseSecondStorage => 'اختر وحدة التخزين الثانية';
+
+  @override
+  String get vaultSyncChangeButton => 'تغيير';
+
+  @override
+  String get vaultSyncChooseButton => 'اختيار';
+
+  @override
+  String get vaultSyncChooseStorageTitle => 'اختر وحدة تخزين';
+
+  @override
+  String get vaultSyncChooseStorageHint =>
+      'اختر وحدة التخزين أولًا، ثم المجلد الذي بداخلها للمقارنة.';
+
+  @override
+  String get vaultSyncCurrentStorageBadge => 'الحالية';
+
+  @override
+  String get vaultSyncChangeStorageTooltip => 'تغيير وحدة التخزين';
+
+  @override
+  String vaultSyncPickFolderTitle(String storage) {
+    return 'مجلد في $storage';
+  }
+
+  @override
+  String get vaultSyncDirectionSectionTitle => 'الاتجاه';
+
+  @override
+  String get vaultSyncDirectionMirrorWarning => 'يحذف ملفات';
+
+  @override
+  String get vaultSyncDirectionSourceLabel => 'المصدر';
+
+  @override
+  String get vaultSyncDirectionTargetLabel => 'الوجهة';
+
+  @override
+  String get vaultSyncDirectionSwapButton => 'تبديل';
+
+  @override
+  String get vaultSyncDirectionRecommendedLabel => 'موصى به';
+
+  @override
+  String get categoriesSectionTitle => 'التصنيفات';
+
+  @override
+  String get manageCategoriesTooltip => 'إدارة التصنيفات';
+
+  @override
+  String get categoryShortcutsTitle => 'اختصارات التصنيفات';
+
+  @override
+  String get categoryShortcutsEnable => 'إظهار اختصارات التصنيفات';
+
+  @override
+  String get categoryShortcutsEnableSubtitle =>
+      'الصور ومقاطع الفيديو والملفات الصوتية والمستندات من جميع وحدات التخزين، في القائمة الجانبية';
+
+  @override
+  String get categoryShortcutsRestore => 'استعادة الاختصارات الافتراضية';
+
+  @override
+  String get categorySourceAll => 'جميع وحدات التخزين';
+
+  @override
+  String get categorySourceTooltip => 'اختيار المصدر';
+
+  @override
+  String get categoryFolderStructure => 'عرض بنية المجلدات الأصلية';
+
+  @override
+  String categoryScanning(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'جارٍ الفحص… تم فحص $count مجلد',
+      many: 'جارٍ الفحص… تم فحص $count مجلدًا',
+      few: 'جارٍ الفحص… تم فحص $count مجلدات',
+      two: 'جارٍ الفحص… تم فحص مجلدين',
+      one: 'جارٍ الفحص… تم فحص مجلد واحد',
+      zero: 'جارٍ الفحص… لم يُفحص أي مجلد',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get categoryEmpty => 'لم يتم العثور على شيء في هذا التصنيف';
+
+  @override
+  String get categoryNoVaultsUnlocked => 'لم يتم إلغاء قفل أي خزينة';
+
+  @override
+  String get categoryScanLimitReached =>
+      'قد تكون النتائج غير مكتملة — توقف الفحص عند حده الأقصى.';
+
+  @override
+  String get categoryShareOneSource =>
+      'اختر ملفات من وحدة تخزين واحدة في كل مرة لمشاركتها.';
+
+  @override
+  String categoryClipboardReady(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count ملف جاهز للصق',
+      many: '$count ملفًا جاهزًا للصق',
+      few: '$count ملفات جاهزة للصق',
+      two: 'ملفان جاهزان للصق',
+      one: 'ملف واحد جاهز للصق',
+      zero: 'لا توجد ملفات جاهزة للصق',
+    );
+    return '$_temp0 — افتح مجلدًا للصق';
+  }
+
+  @override
+  String get categoryIndexInVaultsTitle =>
+      'الاحتفاظ بفهرس التصنيفات في الخزائن';
+
+  @override
+  String get categoryIndexInVaultsSubtitle =>
+      'يتم حفظه مشفرًا داخل كل خزينة، في مجلد الإعدادات الخاص بها، عند فتح تصنيف، لتظهر ملفاته فورًا في المرة القادمة. لا يتم حفظ أي شيء على هاتفك.';
+
+  @override
+  String get categoryIndexClear => 'مسح فهارس التصنيفات';
+
+  @override
+  String get categoryIndexClearSubtitle =>
+      'إزالة الفهرس من كل خزينة تم إلغاء قفلها';
+
+  @override
+  String get categoryIndexCleared => 'تم مسح فهارس التصنيفات';
 
   @override
   String get securityKeyUnlockHintNfc =>

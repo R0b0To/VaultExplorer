@@ -166,7 +166,13 @@ void unmountVolume(int volId) {
 
     // Flush dirty buffers and synchronize physical hardware caches
     if (v.isUsbSource) {
-        v.usbCache.sync(volId);
+        // unmountVolume() has no way to report failure, but a failed flush
+        // here means buffered writes never reached the device and are about
+        // to be dropped -- at least leave a trace in the log.
+        if (!v.usbCache.sync(volId)) {
+            LOGI("unmountVolume(vol=%d): USB flush/sync failed; buffered writes were not persisted",
+                 volId);
+        }
     } else if (v.isCompositeSource && v.composite) {
         v.composite->sync();
     } else if (v.fd >= 0) {
@@ -433,7 +439,14 @@ extern "C" DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void* buff) {
     switch (cmd) {
         case CTRL_SYNC:
             if (v.isUsbSource) {
-                v.usbCache.sync(pdrv);
+                // Same contract as the fd branch below: FatFs treats RES_OK
+                // as "everything written so far is durable", so a failed
+                // flush or device sync must not be swallowed here.
+                if (!v.usbCache.sync(pdrv)) {
+                    LOGI("disk_ioctl(CTRL_SYNC): USB flush/sync failed on volume %d",
+                         static_cast<int>(pdrv));
+                    return RES_ERROR;
+                }
             } else if (v.isCompositeSource && v.composite) {
                 v.composite->sync();
             } else if (v.fd >= 0) {

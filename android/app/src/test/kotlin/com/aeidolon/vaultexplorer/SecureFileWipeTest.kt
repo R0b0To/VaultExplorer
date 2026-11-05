@@ -24,6 +24,9 @@ import java.io.FileOutputStream
 @Config(sdk = [33])
 class SecureFileWipeTest {
 
+    private val hostCanUnlinkOpenFiles =
+        !System.getProperty("os.name").orEmpty().startsWith("Windows", ignoreCase = true)
+
     private lateinit var context: Context
     private lateinit var testDir: File
 
@@ -59,8 +62,12 @@ class SecureFileWipeTest {
         // retains the allocated blocks so we can verify their contents.
         FileInputStream(file).use { keptOpenStream ->
             val success = SecureFileWipe.secureDeleteFile(file)
-            assertTrue("secureDeleteFile should return true", success)
-            assertFalse("File must be unlinked from disk", file.exists())
+            assertEquals(
+                "The host's open-file unlink behavior determines whether delete can finish",
+                hostCanUnlinkOpenFiles,
+                success,
+            )
+            assertEquals("File unlink state should match the host", !hostCanUnlinkOpenFiles, file.exists())
 
             // Verify every single byte was zeroed
             val buffer = ByteArray(size)
@@ -73,6 +80,7 @@ class SecureFileWipeTest {
             assertEquals("Should read all bytes from open descriptor", size, bytesRead)
             assertTrue("Every byte must be 0x00", buffer.all { it == 0.toByte() })
         }
+        if (file.exists()) assertTrue("Close the test handle, then clean up", file.delete())
     }
 
     @Test
@@ -86,14 +94,19 @@ class SecureFileWipeTest {
 
         FileInputStream(file).use { keptOpenStream ->
             val success = SecureFileWipe.secureDeleteSafDocument(context, doc)
-            assertTrue("secureDeleteSafDocument should return true", success)
-            assertFalse("File should be deleted", file.exists())
-            assertFalse("DocumentFile should not exist", doc.exists())
+            assertEquals(
+                "The host's open-file unlink behavior determines whether delete can finish",
+                hostCanUnlinkOpenFiles,
+                success,
+            )
+            assertEquals("File state should match the host", !hostCanUnlinkOpenFiles, file.exists())
+            assertEquals("Document state should match the host", !hostCanUnlinkOpenFiles, doc.exists())
 
             val buffer = ByteArray(size)
             keptOpenStream.read(buffer)
             assertTrue("Every byte must be 0x00", buffer.all { it == 0.toByte() })
         }
+        if (file.exists()) assertTrue("Close the test handle, then clean up", file.delete())
     }
 
     @Test

@@ -7,6 +7,7 @@ import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
 import 'package:vaultexplorer/data/models/tab_swipe_gestures.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
 import 'package:vaultexplorer/data/models/file_item_action.dart';
+import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/data/models/file_manager_skin.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/grid_aspect_ratio.dart';
@@ -80,6 +81,7 @@ AppSettings _customSettings() => AppSettings(
   audioRecordingQuality: AudioRecordingQuality.high,
   videoMuted: true,
   videoPlaybackMode: VideoPlaybackMode.loop,
+  categoryIndexInVaults: false,
   autoLockOnShareImport: false,
   quickActionLockMode: QuickActionLockMode.alwaysLock,
   enableAuthenticator: false,
@@ -97,6 +99,11 @@ AppSettings _customSettings() => AppSettings(
   defaultFileSortAscending: false,
   containerSortMode: ContainerSortMode.nameZA,
   showStorageLocationsInDrawer: false,
+  categoryShortcutsEnabled: false,
+  categoryShortcutOrder: AppSettings().categoryShortcutOrder.reversed.toList(),
+  hiddenCategoryShortcuts: ['videos'],
+  categorySources: {'images': 'vault:3', 'audio': 'device'},
+  categoryFolderStructure: ['documents'],
   playlistScrollMode: PlaylistScrollMode.verticalPage,
   authenticatorShowNumbers: false,
   authenticatorSearchPlacement: AuthenticatorSearchPlacement.top,
@@ -105,6 +112,7 @@ AppSettings _customSettings() => AppSettings(
   editorFollowsAppSkin: false,
   editorAppearancePrefs: {'fontSize': 18.0, 'showLineNumbers': false},
   appBarAtBottom: true,
+  predictiveBackAnimations: false,
 );
 
 MediaViewerToolbarConfig _customViewer() {
@@ -137,7 +145,7 @@ FileManagerToolbarConfig _customToolbar() {
   final d = FileManagerToolbarConfig.defaults();
   return d.copyWith(
     // layout
-    order: d.order.reversed.toList(),
+    order: [FileManagerAction.playMedia, ...d.order.reversed],
     hidden: {d.order.first},
     showBreadcrumbBar: !d.showBreadcrumbBar,
     showStatsBar: !d.showStatsBar,
@@ -284,6 +292,7 @@ void main() {
         'defaultLayoutMode',
         'containerSortMode',
         'showStorageLocationsInDrawer',
+        'predictiveBackAnimations',
         'authenticatorShowNumbers',
         'fileManagerSkin',
         'fileManagerFollowsAppSkin',
@@ -416,12 +425,17 @@ void main() {
     });
 
     test('withBehaviorFrom takes the behavior, keeps layout and folders', () {
-      final base = FileManagerToolbarConfig.defaults().copyWith(
-        gridSpacing: 2,
-        folderSortModes: {'d:/x': 'date'},
-        mediaViewerToolbarConfig: const MediaViewerToolbarConfig().copyWith(
-          showProgressBar: false,
-        ),
+      final base = FileManagerToolbarConfig.fromJson(
+        FileManagerToolbarConfig.defaults()
+            .copyWith(
+              gridSpacing: 2,
+              folderSortModes: {'d:/x': 'date'},
+              mediaViewerToolbarConfig: const MediaViewerToolbarConfig()
+                  .copyWith(
+                showProgressBar: false,
+              ),
+            )
+            .toJson(),
       );
 
       final merged = base.withBehaviorFrom(_customToolbar());

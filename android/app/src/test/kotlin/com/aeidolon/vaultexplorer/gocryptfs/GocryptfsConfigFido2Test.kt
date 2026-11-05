@@ -84,34 +84,4 @@ class GocryptfsConfigFido2Test {
         val bad = JSONObject().put("CredentialID", "***not base64***").put("HMACSalt", b64(hmacSalt))
         assertThrows(GocryptfsConfigException::class.java) { GocryptfsConfig.parse(config(base + "FIDO2", bad)) }
     }
-
-    @Test
-    fun writtenConfigRoundTripsThroughTheParser() {
-        // The creator and the parser must agree on field names and encodings.
-        // The creator uses android.util.Base64, which a bare host JVM stubs out.
-        Assume.assumeTrue(
-            "Skipping: android.util.Base64 not available on this host JVM",
-            try {
-                android.util.Base64.encodeToString(byteArrayOf(1), android.util.Base64.NO_WRAP)
-                true
-            } catch (e: RuntimeException) {
-                false
-            },
-        )
-        val params = GocryptfsFido2Params(credential, hmacSalt, listOf("pin=true"))
-        val json = GocryptfsVault.buildConfigJson(
-            encryptedKey = ByteArray(48),
-            scryptSalt = ByteArray(32),
-            scryptN = 65536,
-            scryptR = 8,
-            scryptP = 1,
-            longNameMax = 255,
-            featureFlags = base + "FIDO2",
-            fido2 = params,
-        )
-        val cfg = GocryptfsConfig.parse(json.toByteArray())
-        assertArrayEquals(credential, cfg.fido2!!.credentialId)
-        assertArrayEquals(hmacSalt, cfg.fido2!!.hmacSalt)
-        assertEquals(listOf("pin=true"), cfg.fido2!!.assertOptions)
-    }
 }

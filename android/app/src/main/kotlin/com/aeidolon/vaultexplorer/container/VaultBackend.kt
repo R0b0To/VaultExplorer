@@ -47,14 +47,8 @@ object VaultBackendRegistry {
     private val sessions = java.util.concurrent.ConcurrentHashMap<Int, VaultBackend>()
     fun put(volId: Int, session: VaultBackend) {
         sessions[volId] = session
-        if (session is com.aeidolon.vaultexplorer.cryfs.CryfsSession) {
-            session.volId = volId
-            session.dataTree.volId = volId
-        }
-        if (session is com.aeidolon.vaultexplorer.cryptomator.CryptomatorSession) {
-            session.volId = volId
-        }
-        if (session is com.aeidolon.vaultexplorer.gocryptfs.GocryptfsSession) {
+        // Folder vaults run natively; the session needs its volume id to label mirror-pull progress.
+        if (session is com.aeidolon.vaultexplorer.foldervault.NativeVaultSession) {
             session.volId = volId
         }
     }

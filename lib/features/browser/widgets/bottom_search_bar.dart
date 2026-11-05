@@ -10,6 +10,10 @@ class BottomSearchBar extends StatefulWidget {
   final ValueChanged<bool>? onDeepSearchToggle;
   final bool isSearchingSubfolders;
 
+  /// Overrides the default hint, which assumes a folder search. Screens that
+  /// search something else (a category's files across storages) pass their own.
+  final String? hintText;
+
   const BottomSearchBar({
     super.key,
     required this.initialQuery,
@@ -18,6 +22,7 @@ class BottomSearchBar extends StatefulWidget {
     this.isDeepSearch = false,
     this.onDeepSearchToggle,
     this.isSearchingSubfolders = false,
+    this.hintText,
   });
 
   @override
@@ -94,9 +99,11 @@ class _BottomSearchBarState extends State<BottomSearchBar> {
                     textInputAction: TextInputAction.search,
                     style: const TextStyle(fontSize: 14),
                     decoration: InputDecoration(
-                      hintText: widget.isDeepSearch
-                          ? context.l10n.searchInSubfoldersHint
-                          : context.l10n.searchInThisFolderHint,
+                      hintText:
+                          widget.hintText ??
+                          (widget.isDeepSearch
+                              ? context.l10n.searchInSubfoldersHint
+                              : context.l10n.searchInThisFolderHint),
                       hintStyle: TextStyle(
                         color: cs.onSurfaceVariant,
                         fontSize: 14,

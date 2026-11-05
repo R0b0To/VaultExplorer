@@ -812,6 +812,17 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     });
   }
 
+  void _queueItemReveal(String name) {
+    if (name.isEmpty) return;
+    _pendingRevealNames = {name};
+    _pendingRevealToken = _revealToken + 1;
+    _pendingRevealExpiry?.cancel();
+    _pendingRevealExpiry = Timer(const Duration(seconds: 8), () {
+      _pendingRevealNames = const {};
+    });
+    _applyPendingReveal();
+  }
+
   /// Brings at least one of the freshly dropped items clearly into view.
   void _scrollToRevealed(Set<String> names) {
     if (!_browserScrollController.hasClients) return;
@@ -1656,10 +1667,11 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     // A bookmark tapped in the drawer opened this vault: now that it has
     // loaded, go where the bookmark points.
     _initialLoadDone = true;
-    _consumeBookmarkRequest();
+    final hasGoToLocationRequest = _consumeBookmarkRequest();
 
     // Auto-activate gallery mode if it was previously enabled for this storage.
     if (mounted &&
+        !hasGoToLocationRequest &&
         _currentFilter == null &&
         _toolbarConfig.isGalleryModeForStorage(widget.container.uri)) {
       _onFilterChosen('gallery');
@@ -2175,6 +2187,15 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     }
   }
 
+  Future<void> _showCategoryItemInFolder(String fullPath) async {
+    final (:parent, :name) = splitParentAndName(fullPath);
+    // Go To Location leaves gallery mode for the regular folder view. Keep
+    // the persisted toggle in sync so one tap can enable gallery again.
+    _onFilterChosen(null);
+    await _navigateToPath(parent, isDir: true);
+    if (mounted) _queueItemReveal(name);
+  }
+
   bool get _isGalleryMode =>
       _toolbarConfig.isGalleryModeForStorage(widget.container.uri);
 
@@ -2242,7 +2263,10 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     }
   }
 
-  Future<void> _openBookmark(VaultBookmark bookmark) async {
+  Future<void> _openBookmark(
+    VaultBookmark bookmark, {
+    String? revealName,
+  }) async {
     if (_disposed || !mounted) return;
     if (!await _bookmarkTargetExists(bookmark)) {
       if (_disposed || !mounted) return;
@@ -2263,7 +2287,12 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       return;
     }
     if (_disposed || !mounted) return;
+    if (bookmark.isDir && bookmark.path == _currentDirPath) {
+      if (revealName != null) _queueItemReveal(revealName);
+      return;
+    }
     await _navigateToPath(bookmark.path, isDir: bookmark.isDir);
+    if (revealName != null && mounted) _queueItemReveal(revealName);
   }
 
   Future<bool> _bookmarkTargetExists(VaultBookmark bookmark) async {
@@ -2284,13 +2313,22 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
 
   /// Takes a bookmark the drawer asked for, if it is for this vault and this
   /// is the tab in front. See [bookmarkNavigationRequestsProvider].
-  void _consumeBookmarkRequest() {
-    if (_disposed || !mounted || !_initialLoadDone || !_isActiveTab) return;
+  bool _consumeBookmarkRequest() {
+    if (_disposed || !mounted || !_initialLoadDone || !_isActiveTab) {
+      return false;
+    }
     final request = ref
         .read(bookmarkNavigationRequestsProvider.notifier)
         .take(widget.container.volId);
-    if (request == null) return;
-    unawaited(_openBookmark(request.bookmark));
+    if (request == null) return false;
+    if (request.revealName != null) _onFilterChosen(null);
+    unawaited(
+      _openBookmark(
+        request.bookmark,
+        revealName: request.revealName,
+      ),
+    );
+    return request.revealName != null;
   }
 
   /// Remembers where this folder was scrolled to, so walking forward into it
@@ -5677,15 +5715,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         initialDirPath: _currentDirPath,
         resolveContainer: widget.resolveContainer,
         onScopedFilterChanged: _onFilterChosen,
-        onShowInFolder: (container, path) {
-          _navNotifier.setFilter(null);
-          final dir = path.contains('/')
-              ? path.substring(0, path.lastIndexOf('/'))
-              : '';
-          // Use _navigateToPath to properly rebuild the path stack
-          // from root, so breadcrumbs show the correct hierarchy.
-          unawaited(_navigateToPath(dir, isDir: true));
-        },
+        onShowInFolder: (_, path) =>
+            unawaited(_showCategoryItemInFolder(path)),
       );
     }
 

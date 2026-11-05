@@ -550,9 +550,11 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
           includeVaults: tab.includeVaults,
           resolveContainer: widget.resolveContainer,
           onShowInFolder: (container, path) {
+            final slash = path.lastIndexOf('/');
             final dir = path.contains('/')
-                ? path.substring(0, path.lastIndexOf('/'))
+                ? path.substring(0, slash)
                 : '';
+            final revealName = slash < 0 ? path : path.substring(slash + 1);
             final currentTabs =
                 ref.read(browserTabsProvider(_workspace)).tabs;
             final existingTab = currentTabs
@@ -567,13 +569,27 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
               _workspaceActions.activate(existingTab.tabId);
               ref
                   .read(bookmarkNavigationRequestsProvider.notifier)
-                  .request(container.volId, VaultBookmark(dir, isDir: true));
+                  .request(
+                  container.volId,
+                  VaultBookmark(dir, isDir: true),
+                  revealName: revealName,
+                );
             } else {
               final tabId = _workspaceActions.openTab(
                 container,
                 initialPath: dir.isEmpty ? null : dir,
               );
-              if (tabId == null) _showLimitReached();
+              if (tabId == null) {
+                _showLimitReached();
+              } else {
+                ref
+                    .read(bookmarkNavigationRequestsProvider.notifier)
+                    .request(
+                      container.volId,
+                      VaultBookmark(dir, isDir: true),
+                      revealName: revealName,
+                    );
+              }
             }
           },
         ),

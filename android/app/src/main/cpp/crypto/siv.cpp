@@ -86,7 +86,7 @@ static bool s2v(mbedtls_aes_context* macCtx, const std::vector<std::vector<uint8
         aesCmac(macCtx, T.data(), T.size(), out);
     } else {
         uint8_t padded[16] = {0};
-        std::memcpy(padded, last.data(), last.size());
+        if (!last.empty()) std::memcpy(padded, last.data(), last.size());   // empty element: data() may be null
         padded[last.size()] = 0x80;
         sivDouble(D);
         xorBytes(D, padded, 16);

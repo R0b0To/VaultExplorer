@@ -402,6 +402,38 @@ set(NTFS3G_MKNTFS_SOURCE ${ntfs3g_SOURCE_DIR}/ntfsprogs/mkntfs.c)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/filesystems/mkntfs_embedded.c.in ${MKNTFS_EMBEDDED_SOURCE} @ONLY)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/filesystems/mkntfs_embedded.c.in)
 
+# Folder-vault core (gocryptfs / Cryptomator / CryFS): platform-neutral C++ with
+# no JNI/Android dependency -- the Android app reaches it through
+# jni/foldervault_bridge.cpp, a desktop build can link it as-is (see
+# foldervault/fv_vault.h). The shared primitives it builds on (scrypt, EME,
+# AES-SIV, XChaCha20, the CryFS block cipher) stay in crypto/ and are linked in
+# by the final target, so they are deliberately not listed here.
+add_library(foldervault_core STATIC
+        foldervault/fv_common.cpp
+        foldervault/fv_crypto.cpp
+        foldervault/fv_storage.cpp
+        foldervault/fv_engine.cpp
+        foldervault/fv_json.cpp
+        foldervault/fv_gocryptfs.cpp
+        foldervault/fv_gocryptfs_vault.cpp
+        foldervault/fv_cryptomator.cpp
+        foldervault/fv_cryptomator_vault.cpp
+        foldervault/fv_cryfs.cpp
+        foldervault/fv_cryfs_vault.cpp)
+set_target_properties(foldervault_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_compile_features(foldervault_core PUBLIC cxx_std_20)
+target_compile_options(foldervault_core PRIVATE -Wall -Wextra)
+target_include_directories(foldervault_core PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${mbedtls_SOURCE_DIR}/include)
+target_link_libraries(foldervault_core PUBLIC mbedcrypto)
+if(ANDROID)
+    # Bulk AEAD through BoringSSL's EVP (what the app used before the move to
+    # C++; ARMv8 AES+PMULL) and the user-entropy mixing for creation flows.
+    target_compile_definitions(foldervault_core PRIVATE FV_AEAD_EVP=1 FV_USE_USERENTROPY=1)
+    target_link_libraries(foldervault_core PUBLIC crypto)
+endif()
+
 # 4. Build target
 add_library(
         vaultexplorer
@@ -409,6 +441,7 @@ add_library(
         io/virtual_block_device.cpp
         jni/jni_bridge_common.cpp
         jni/crypto_bridge.cpp
+        jni/foldervault_bridge.cpp
         jni/session_bridge.cpp
         jni/container_lifecycle_bridge.cpp
         jni/filesystem_bridge.cpp
@@ -557,7 +590,8 @@ target_link_libraries(
         avif
         libgav1_static
         ${ARCHIVE_ENGINE_LIBRARY}
-        ZXing::ZXing)
+        ZXing::ZXing
+        foldervault_core)
 
 
 set_source_files_properties(
@@ -566,6 +600,7 @@ set_source_files_properties(
         crypto/siv.cpp
         crypto/xchacha20poly1305.cpp
         jni/crypto_bridge.cpp
+        jni/foldervault_bridge.cpp
         PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra"
 )
 
@@ -673,6 +708,20 @@ if(NOT ANDROID)
     target_link_libraries(archive_split_test ${ARCHIVE_ENGINE_LIBRARY})
     list(APPEND VAULTEXPLORER_HOST_TESTS archive_split_test)
 
+    # Folder-vault core: known-answer vectors, per-format scenarios, tamper /
+    # rollback / legacy-name handling and thread stress. The interop scripts in
+    # foldervault/test/interop additionally drive `fvcli` against the real
+    # gocryptfs, Cryptomator and CryFS binaries (not part of ctest: they need
+    # those programs and FUSE).
+    set(FV_CRYPTO_SOURCES
+            crypto/eme.cpp crypto/siv.cpp crypto/scrypt.cpp
+            crypto/xchacha20poly1305.cpp crypto/cryfs_block_cipher.cpp)
+    add_executable(foldervault_test foldervault/test/fv_tests.cpp ${FV_CRYPTO_SOURCES})
+    target_link_libraries(foldervault_test foldervault_core mbedcrypto)
+    add_executable(fvcli foldervault/test/fvcli.cpp ${FV_CRYPTO_SOURCES})
+    target_link_libraries(fvcli foldervault_core mbedcrypto)
+    list(APPEND VAULTEXPLORER_HOST_TESTS foldervault_test)
+
     set(VAULTEXPLORER_HOST_TESTS
             sector_batching_test
             fs_scan_test
@@ -712,6 +761,7 @@ if(NOT ANDROID)
     add_test(NAME cryfs_block_cipher_test COMMAND cryfs_block_cipher_test)
     add_test(NAME user_entropy_test COMMAND user_entropy_test)
     add_test(NAME utf16le_password_test COMMAND utf16le_password_test)
+    add_test(NAME foldervault_test COMMAND foldervault_test)
     add_test(NAME container_header_test COMMAND container_header_test)
     add_test(NAME container_utils_crc32_test COMMAND container_utils_crc32_test)
     add_test(NAME chunked_block_device_test COMMAND chunked_block_device_test)

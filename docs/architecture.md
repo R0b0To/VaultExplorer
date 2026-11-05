@@ -13,7 +13,7 @@ structurally different families of encrypted volume:
 | Family | Formats | Session lives in |
 |---|---|---|
 | **Block-device containers** | VeraCrypt, LUKS1, LUKS2, BitLocker (+ VHD/VHDX wrapping), Composite | C++ `VolumeState` slot array, driven through the `NativeEngine` JNI shim |
-| **Directory-based vaults** | Cryptomator, gocryptfs, CryFS | Pure-Kotlin `VaultBackend` session objects in `VaultBackendRegistry` |
+| **Directory-based vaults** | Cryptomator, gocryptfs, CryFS | C++ `foldervault` core (`cpp/foldervault/`) reached through `jni/foldervault_bridge.cpp`; thin Kotlin `NativeVaultSession` objects (`VaultBackend`) in `VaultBackendRegistry` |
 
 **Composite** (`containers/container_create_composite.*`, `containers/composite_block_device.*`,
 `jni/composite_bridge.cpp`) is not a third family -- it is a VeraCrypt-format
@@ -27,6 +27,32 @@ trailer" (`carrier_profiler.cpp`'s `probeBlindTrailer`), not a distinct
 header signature, so a composite carrier is not identifiable as such by
 format inspection alone -- every carrier must be supplied together to
 reassemble and unlock the volume.
+
+**Folder-vault core** (`cpp/foldervault/`). The three directory formats share one
+platform-neutral C++ library with no JNI, Android or Flutter dependency (the
+same sources build into a desktop binary -- `foldervault/test/fvcli.cpp` is a
+complete command-line front-end). Its seams:
+
+- `fv::Vault` (`fv_vault.h`) -- the `VaultBackend` method set, one object per
+  unlocked vault, produced by `open*/create*/change*Password`.
+- `fv::Storage` (`fv_storage.h`) -- where the *encrypted* files live, addressed
+  by path relative to the vault root. `PosixStorage` is a plain directory (desktop,
+  and Android whenever `RawFileResolver` verifies a raw path -- the core then does
+  all file I/O itself). Otherwise `jni/foldervault_bridge.cpp`'s `JniStorage`
+  forwards each call to Kotlin's `FolderVaultStorage` (`SafFolderVaultStorage` over
+  `VaultDocumentOps` and the mirror; `CryfsMirrorFolderVaultStorage` for CryFS
+  blocks), so all SAF/mirror policy stays in Kotlin.
+- Format code: `fv_gocryptfs*` (AES-256-GCM / XChaCha20-Poly1305 / AES-SIV,
+  EME names, long names, plaintext-names mode), `fv_cryptomator*` (format 7
+  SIV_CTRMAC and 8 SIV_GCM, `.c9s` shortening), `fv_cryfs*` (block store with
+  local integrity state, blob data tree, directory blobs), sharing the
+  chunked file engine in `fv_engine*`. scrypt, EME, AES-SIV, XChaCha20 and the
+  CryFS block cipher are the existing `crypto/` sources, not copies.
+- Concurrency lives in the core: each session serialises namespace changes with
+  its own `shared_mutex` and drains in-flight calls on `close()`, so the Kotlin
+  `NativeVaultSession` declares `skipsPerVolumeLock` (no second lock on top).
+- Check & Repair (`foldercheck/`) still runs on the Kotlin primitives; it gets
+  the key material of a live session through `NativeVaultSession.keyMaterial()`.
 
 Both families are unified above the crypto layer by **`volId`** (an `Int`,
 `0..7`): every caller — Dart, `ContainerFileSystem`, the SAF
@@ -67,7 +93,8 @@ Flutter/Dart UI  ──MethodChannel──▶  MainActivity + *Handlers (Kotlin)
                                ▼                        ▼
                     VaultBackendRegistry        NativeEngine (JNI shim)
                     (Cryptomator/gocryptfs/            │
-                     CryFS — pure Kotlin)               ▼
+                     CryFS — Kotlin shim over           ▼
+                     the C++ foldervault core)
                                               VolumeState[8] (C++)
                                               FatFs / NTFS-3G / libext2fs /
                                               dislocker / mbedTLS
@@ -1229,7 +1256,11 @@ than take this summary on faith:
 - **The native crypto/filesystem engine's automated regression tests are
   plain host-side C++ binaries** — `g++`-buildable, `assert`-based, zero
   Android toolchain required, registered with CTest and gated behind
-  `if(NOT ANDROID)` (`CMakeLists.txt`). Eleven tests are registered today —
+  `if(NOT ANDROID)` (`CMakeLists.txt`). Twelve tests are registered today —
+  `foldervault_test` (the folder-vault core: known-answer vectors, per-format
+  scenarios, tamper/rollback/legacy-name handling, thread stress; the
+  `foldervault/test/interop/` scripts additionally drive `fvcli` against the real
+  gocryptfs, Cryptomator and CryFS and are not part of CTest),
   `composite_block_device_test`, `sector_batching_test`, `fs_scan_test`,
   `kdf_table_test`, `decrypted_block_cache_test`, `cryfs_block_cipher_test`,
   `utf16le_password_test`, `container_header_test`,

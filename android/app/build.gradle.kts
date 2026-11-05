@@ -127,8 +127,7 @@ android {
 
     // Robolectric needs the merged manifest/resources available to unit
     // tests (Context, ContentResolver, DocumentFile.fromFile all rely on
-    // it). Added alongside the ChunkedFileEngineTest suite -- see that
-    // test's class doc for what it covers.
+    // it).
     testOptions {
         unitTests {
             isIncludeAndroidResources = true

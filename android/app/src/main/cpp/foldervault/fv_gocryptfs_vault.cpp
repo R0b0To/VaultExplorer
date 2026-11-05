@@ -697,10 +697,6 @@ PlainResult createGocryptfs(Storage& s, const uint8_t* pw, size_t pwLen, const G
         cfg.featureFlags.push_back("HKDF");
         if (o.plaintextNames) cfg.featureFlags.push_back("PlaintextNames");
         else for (const char* f : {"Raw64", "DirIV", "EMENames", "LongNames"}) cfg.featureFlags.push_back(f);
-        if (o.fido2) {
-            cfg.featureFlags.push_back("FIDO2");
-            cfg.fido2 = *o.fido2;
-        }
 
         Secret masterkey(crypto::randomKeyBytes(32));
         cfg.scryptSalt = crypto::randomKeyBytes(32);
@@ -727,9 +723,6 @@ PlainResult changeGocryptfsPassword(Storage& s, const uint8_t* oldPw, size_t old
     PlainResult r;
     Config cfg;
     if (!loadConfig(s, cfg, r.message, r.status)) return r;
-    // Upstream gocryptfs doesn't support this either: the wrapping secret is the security
-    // key's output, not a password that can be swapped.
-    if (cfg.fido2) return plainFail(OpenStatus::InvalidVault, "This vault is protected by a security key; its password can't be changed.");
     try {
         Secret masterkey = unlockMasterkey(cfg, oldPw, oldLen);
         cfg.scryptSalt = crypto::randomKeyBytes(32);

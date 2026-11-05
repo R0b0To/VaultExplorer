@@ -34,11 +34,6 @@ if (r.status == fv::OpenStatus::Ok) {
 }
 ```
 
-gocryptfs security-key (`-fido2`) vaults need no separate entry point: the host performs the CTAP2
-hmac-secret exchange itself and passes the raw 32-byte output as the "password" bytes (`fv::Config::fido2`
-carries the credential id / salt / assert options the host needs; `GocryptfsCreateOptions::fido2` makes
-`createGocryptfs` write the `FIDO2` flag and section, and `changeGocryptfsPassword` refuses such a vault).
-
 `create*` writes only the vault skeleton; unlock it with `open*` afterwards (that
 two-step shape lets a host choose the *session* storage after it knows what is on
 disk -- see `fv::StorageFactory`).

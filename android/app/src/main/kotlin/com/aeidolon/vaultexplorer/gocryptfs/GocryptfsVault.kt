@@ -21,7 +21,6 @@ import java.util.Base64
  * vault's files are read from.
  */
 object GocryptfsVault {
-    private const val TAG = "GocryptfsVault"
     private const val CONFIG_FILE_NAME = "gocryptfs.conf"
 
     fun looksLikeVault(context: Context, treeUri: Uri): Boolean {
@@ -114,6 +113,10 @@ object GocryptfsVault {
     /** Refused for a security-key vault: there is no password to change (same as upstream gocryptfs). */
     fun changePassword(
         context: Context, vaultRootUri: Uri, oldPassword: CharArray, newPassword: CharArray,
+    ): VaultOpenResult<Unit> =
+        FolderVaultOpener.changePassword(context, vaultRootUri, NativeFolderVault.GOCRYPTFS, CONFIG_FILE_NAME, oldPassword, newPassword)
+}
+
     ): VaultOpenResult<Unit> =
         FolderVaultOpener.changePassword(context, vaultRootUri, NativeFolderVault.GOCRYPTFS, CONFIG_FILE_NAME, oldPassword, newPassword)
 }

@@ -41,28 +41,6 @@ static Bytes needB64(const json::Value& obj, const char* key) {
     return out;
 }
 
-// The FIDO2 flag and the object must agree: a flag without an object would make every
-// unlock fail with a confusing "wrong password", so it is rejected up front.
-static Fido2Params fido2FromObject(const json::Value& obj) {
-    try {
-        Fido2Params p;
-        p.credentialId = needB64(obj, "CredentialID");
-        p.hmacSalt = needB64(obj, "HMACSalt");
-        if (const json::Value* opts = obj.find("AssertOptions")) {
-            if (!opts->isNull()) {   // Go marshals a nil slice as null
-                if (!opts->isArray()) throw Error(Err::InvalidVault, "AssertOptions must be an array");
-                for (const auto& it : opts->items()) {
-                    if (!it.isString()) throw Error(Err::InvalidVault, "AssertOptions must be strings");
-                    p.assertOptions.push_back(it.asString());
-                }
-            }
-        }
-        return p;
-    } catch (const Error& e) {
-        throw Error(Err::InvalidVault, std::string("gocryptfs.conf has a malformed FIDO2 section: ") + e.what());
-    }
-}
-
 Config Config::parse(const std::string& text) {
     json::Value root;
     try {
@@ -124,11 +102,6 @@ Config Config::parse(const std::string& text) {
     c.scryptKeyLen = (uint32_t)need(scrypt, "KeyLen").asInt();
     if (const json::Value* l = root.find("LongNameMax")) c.longNameMax = (int)l->asInt();
     c.plaintextNames = plain;
-    if (c.hasFlag("FIDO2")) {
-        const json::Value* obj = root.find("FIDO2");
-        if (!obj || !obj->isObject()) throw Error(Err::InvalidVault, "gocryptfs.conf has the FIDO2 flag but no FIDO2 section");
-        c.fido2 = fido2FromObject(*obj);
-    }
     return c;
 }
 
@@ -148,18 +121,6 @@ std::string Config::toJson() const {
     root.set("Version", json::Value::integer(2));
     root.set("FeatureFlags", std::move(flags));
     if (longNameMax > 0) root.set("LongNameMax", json::Value::integer(longNameMax));
-    if (fido2) {
-        // Same field names upstream gocryptfs writes (Go marshals []byte as std base64).
-        json::Value f = json::Value::object();
-        f.set("CredentialID", json::Value::string(base64Encode(fido2->credentialId.data(), fido2->credentialId.size(), false, true)));
-        f.set("HMACSalt", json::Value::string(base64Encode(fido2->hmacSalt.data(), fido2->hmacSalt.size(), false, true)));
-        if (!fido2->assertOptions.empty()) {
-            json::Value opts = json::Value::array();
-            for (auto& o : fido2->assertOptions) opts.push(json::Value::string(o));
-            f.set("AssertOptions", std::move(opts));
-        }
-        root.set("FIDO2", std::move(f));
-    }
     return root.dump(2);
 }
 
@@ -395,18 +356,3 @@ int64_t ContentFormat::cleartextSize(int64_t physical) const {
 }
 
 }  // namespace fv::gocryptfs
-
-namespace fv {
-
-Fido2Params parseFido2Json(const std::string& text) {
-    json::Value v;
-    try {
-        v = json::parse(text);
-    } catch (const Error& e) {
-        throw Error(Err::InvalidVault, std::string("gocryptfs.conf has a malformed FIDO2 section: ") + e.what());
-    }
-    if (!v.isObject()) throw Error(Err::InvalidVault, "gocryptfs.conf has a malformed FIDO2 section: not an object");
-    return gocryptfs::fido2FromObject(v);
-}
-
-}  // namespace fv

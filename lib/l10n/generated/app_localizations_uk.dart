@@ -3733,10 +3733,10 @@ class AppLocalizationsUk extends AppLocalizations {
   String get layoutModeGalleryGrid => 'Галерея (сітка)';
 
   @override
-  String get galleryModeAction => 'Галерея';
+  String get galleryModeAction => 'Gallery';
 
   @override
-  String get galleryModeTooltip => 'Режим галереї';
+  String get galleryModeTooltip => 'Gallery mode';
 
   @override
   String get optionsAction => 'Options';
@@ -3745,13 +3745,13 @@ class AppLocalizationsUk extends AppLocalizations {
   String get optionsActionTooltip => 'Options';
 
   @override
-  String get dateToday => 'Сьогодні';
+  String get dateToday => 'Today';
 
   @override
-  String get dateYesterday => 'Вчора';
+  String get dateYesterday => 'Yesterday';
 
   @override
-  String get dateEarlier => 'Раніше';
+  String get dateEarlier => 'Earlier';
 
   @override
   String get readOnlyCantDeleteTooltip => 'Лише читання — видалення неможливе';
@@ -5503,20 +5503,20 @@ class AppLocalizationsUk extends AppLocalizations {
   String get storageCategoryOther => 'Інше';
 
   @override
-  String get storageAnalyzerTabMap => 'Карта';
+  String get storageAnalyzerTabMap => 'Map';
 
   @override
-  String get storageAnalyzerTabFolders => 'Папки';
+  String get storageAnalyzerTabFolders => 'Folders';
 
   @override
-  String get storageAnalyzerTabTypes => 'Типи';
+  String get storageAnalyzerTabTypes => 'Types';
 
   @override
-  String get storageAnalyzerTabCleanup => 'Очищення';
+  String get storageAnalyzerTabCleanup => 'Cleanup';
 
   @override
   String storageAnalyzerFreeSpace(String free) {
-    return '$free вільно';
+    return '$free free';
   }
 
   @override
@@ -5524,9 +5524,8 @@ class AppLocalizationsUk extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count файлів',
-      few: '$count файли',
-      one: '1 файл',
+      other: '$count files',
+      one: '1 file',
     );
     return '$_temp0';
   }
@@ -5536,114 +5535,112 @@ class AppLocalizationsUk extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count елементів',
-      few: '$count елементи',
-      one: '1 елемент',
+      other: '$count items',
+      one: '1 item',
     );
     return '$_temp0';
   }
 
   @override
   String storageAnalyzerContentSize(String size) {
-    return 'Вміст сховища: $size';
+    return 'Vault content: $size';
   }
 
   @override
   String storageAnalyzerScanProgress(String files, String size) {
-    return 'Файлів: $files · $size на цей час';
+    return '$files files · $size so far';
   }
 
   @override
   String get storageAnalyzerPartialNotice =>
-      'Деякі папки не вдалося прочитати повністю, тому підсумкові значення можуть бути меншими за реальні.';
+      'Some folders couldn\'t be fully read, so totals may be lower than the real figures.';
 
   @override
   String get storageAnalyzerStaleNotice =>
-      'Цей том було змінено після сканування.';
+      'This volume has changed since it was scanned.';
 
   @override
-  String get storageAnalyzerUpOneLevel => 'На один рівень вгору';
+  String get storageAnalyzerUpOneLevel => 'Up one level';
 
   @override
-  String get storageAnalyzerEmptyFolder => 'Ця папка порожня.';
+  String get storageAnalyzerEmptyFolder => 'This folder is empty.';
 
   @override
   String storageAnalyzerSmallerItems(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count менших елементів',
-      few: '$count менші елементи',
-      one: '1 менший елемент',
+      other: '$count smaller items',
+      one: '1 smaller item',
     );
     return '$_temp0';
   }
 
   @override
   String get storageAnalyzerMapHint =>
-      'Торкніться папки, щоб відкрити її. Натисніть і утримуйте для вибору.';
+      'Tap a folder to open it. Press and hold to select.';
 
   @override
-  String get storageAnalyzerSortFiles => 'Кількість файлів';
+  String get storageAnalyzerSortFiles => 'File count';
 
   @override
-  String get storageAnalyzerAllTypes => 'Усі типи';
+  String get storageAnalyzerAllTypes => 'All types';
 
   @override
   String storageAnalyzerLargestOfType(String type) {
-    return 'Найбільші файли · $type';
+    return 'Largest files · $type';
   }
 
   @override
-  String get storageAnalyzerCleanupHeader => 'Пропозиції';
+  String get storageAnalyzerCleanupHeader => 'Suggestions';
 
   @override
-  String get storageAnalyzerCleanupLarge => 'Великі файли';
+  String get storageAnalyzerCleanupLarge => 'Large files';
 
   @override
-  String get storageAnalyzerCleanupStale => 'Не змінювалися понад рік';
+  String get storageAnalyzerCleanupStale => 'Not modified in over a year';
 
   @override
-  String get storageAnalyzerCleanupTemp => 'Тимчасові та непотрібні файли';
+  String get storageAnalyzerCleanupTemp => 'Temporary and junk files';
 
   @override
-  String get storageAnalyzerCleanupEmpty => 'Порожні папки';
+  String get storageAnalyzerCleanupEmpty => 'Empty folders';
 
   @override
-  String get storageAnalyzerCleanupReview => 'Переглянути';
+  String get storageAnalyzerCleanupReview => 'Review';
 
   @override
   String get storageAnalyzerCleanupNothing =>
-      'Немає очевидних елементів для очищення. Цей том виглядає охайним.';
+      'Nothing obvious to clean up. This volume looks tidy.';
 
   @override
-  String get storageAnalyzerBiggestFiles => 'Найбільші файли';
+  String get storageAnalyzerBiggestFiles => 'Biggest files';
 
   @override
   String get storageAnalyzerBiggestFilesSubtitle =>
-      'Переглянути найбільші файли на цьому томі';
+      'Browse the largest files on this volume';
 
   @override
-  String get storageAnalyzerAllSuggestions => 'Усі пропозиції';
+  String get storageAnalyzerAllSuggestions => 'All suggestions';
 
   @override
   String storageAnalyzerSelectedSummary(int count, String size) {
-    return 'Вибрано $count · $size';
+    return '$count selected · $size';
   }
 
   @override
   String storageAnalyzerDeleteFilesMessage(String size) {
-    return 'Вибрані елементи буде назавжди видалено з цього сховища, звільнивши $size. Цю дію неможливо скасувати.';
+    return 'This permanently deletes the selected items from this storage and frees $size. It can\'t be undone.';
   }
 
   @override
   String storageAnalyzerDeleteFoldersMessage(String files, String size) {
-    return 'Вибрані елементи буде назавжди видалено ($files файлів, включно з усім вмістом вибраних папок), звільнивши $size. Цю дію неможливо скасувати.';
+    return 'This permanently deletes the selected items ($files files, including everything inside selected folders) and frees $size. It can\'t be undone.';
   }
 
   @override
   String storageAnalyzerDeleteDone(String size) {
-    return 'Звільнено $size';
+    return 'Freed $size';
   }
 
   @override
@@ -5652,27 +5649,27 @@ class AppLocalizationsUk extends AppLocalizations {
     String failed,
     String size,
   ) {
-    return 'Видалено $deleted, але не вдалося видалити $failed. Звільнено $size.';
+    return 'Deleted $deleted, but $failed couldn\'t be deleted. Freed $size.';
   }
 
   @override
-  String get storageAnalyzerDeleteNone => 'Нічого не було видалено.';
+  String get storageAnalyzerDeleteNone => 'Nothing was deleted.';
 
   @override
   String get storageAnalyzerDeleteError =>
-      'Не вдалося видалити вибрані елементи.';
+      'Couldn\'t delete the selected items.';
 
   @override
-  String get storageAnalyzerRescanFolder => 'Повторно сканувати цю папку';
+  String get storageAnalyzerRescanFolder => 'Rescan this folder';
 
   @override
-  String get storageAnalyzerSelectAction => 'Вибрати';
+  String get storageAnalyzerSelectAction => 'Select';
 
   @override
-  String get storageAnalyzerSelectAllHere => 'Вибрати все в цій папці';
+  String get storageAnalyzerSelectAllHere => 'Select all in this folder';
 
   @override
-  String get storageAnalyzerOpenFolder => 'Відкрити папку';
+  String get storageAnalyzerOpenFolder => 'Open folder';
 
   @override
   String get keyfilePassphraseGeneratorTitle =>
@@ -13556,441 +13553,4 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get comicReaderCarouselScrubberSubtitle =>
       'Показувати мініатюри сторінок над повзунком';
-
-  @override
-  String get vaultSyncBrowseAllButton => 'Переглянути всі елементи';
-
-  @override
-  String get vaultSyncExplorerTitle => 'Переглянути обидва сховища';
-
-  @override
-  String get vaultSyncExplorerEmptyTitle => 'Нічого показувати';
-
-  @override
-  String get vaultSyncExplorerEmptyMessage =>
-      'У цій папці немає елементів, що відповідають фільтру.';
-
-  @override
-  String get vaultSyncExplorerLoadFailedTitle =>
-      'Не вдалося прочитати цю папку';
-
-  @override
-  String get vaultSyncExplorerLoadFailedMessage =>
-      'Не вдалося отримати список одного з двох сховищ. Спробуйте ще раз і переконайтеся, що обидва розблоковані та підключені.';
-
-  @override
-  String get vaultSyncFilterAll => 'Усі';
-
-  @override
-  String get vaultSyncFilterDifferences => 'Відмінності';
-
-  @override
-  String get vaultSyncFilterNewer => 'Новіша копія';
-
-  @override
-  String get vaultSyncFilterConflicts => 'Потребує перегляду';
-
-  @override
-  String get vaultSyncFilterDeletions => 'Видалення';
-
-  @override
-  String get vaultSyncFilterNoMatchesMessage =>
-      'Жоден елемент не відповідає фільтру.';
-
-  @override
-  String get vaultSyncSortTooltip => 'Сортувати';
-
-  @override
-  String get vaultSyncSortPath => 'Шлях';
-
-  @override
-  String get vaultSyncSortSize => 'Найбільші першими';
-
-  @override
-  String get vaultSyncSortModified => 'Найновіші першими';
-
-  @override
-  String get vaultSyncSortStatus => 'Статус';
-
-  @override
-  String get vaultSyncStatusInSync => 'Синхронізовано';
-
-  @override
-  String get vaultSyncStatusFolder => 'Папка';
-
-  @override
-  String vaultSyncDeletionsQueuedLabel(num count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count видалення',
-      many: '$count видалень',
-      few: '$count видалення',
-      one: '$count видалення',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String vaultSyncConfirmDeletionsMessage(num count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other:
-          '$count елемента буде видалено назавжди. Цю дію не можна скасувати.',
-      many:
-          '$count елементів буде видалено назавжди. Цю дію не можна скасувати.',
-      few: '$count елементи буде видалено назавжди. Цю дію не можна скасувати.',
-      one: '$count елемент буде видалено назавжди. Цю дію не можна скасувати.',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String get vaultSyncResultsStaleMessage =>
-      'Після видалення результати можуть бути застарілими. Порівняйте знову, щоб оновити лічильники.';
-
-  @override
-  String vaultSyncSelectedCount(num count) {
-    return 'Вибрано: $count';
-  }
-
-  @override
-  String get vaultSyncOpenAction => 'Відкрити';
-
-  @override
-  String vaultSyncOpenCopyAction(String side) {
-    return 'Відкрити копію в $side';
-  }
-
-  @override
-  String get vaultSyncOpenFolderAction => 'Відкрити папку';
-
-  @override
-  String get vaultSyncOpenFolderSubtitle => 'Переглянути вміст в обох сховищах';
-
-  @override
-  String get vaultSyncShowInFolderAction => 'Показати в папці';
-
-  @override
-  String get vaultSyncShowInFolderSubtitle =>
-      'Побачити поруч з іншими елементами в обох сховищах';
-
-  @override
-  String get vaultSyncDeleteFromBothAction => 'Видалити з обох сховищ';
-
-  @override
-  String vaultSyncDeleteBothSidesLabel(String left, String right) {
-    return '$left і $right';
-  }
-
-  @override
-  String vaultSyncDeleteConfirmMessage(String where) {
-    return 'Ці елементи буде остаточно видалено з $where, включно з усім вмістом папок. Цю дію не можна скасувати.';
-  }
-
-  @override
-  String vaultSyncDeleteDoneMessage(num count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'Видалено $count елемента',
-      many: 'Видалено $count елементів',
-      few: 'Видалено $count елементи',
-      one: 'Видалено $count елемент',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String vaultSyncDeletePartialMessage(int deleted, int failed) {
-    return 'Видалено: $deleted, але не вдалося видалити: $failed';
-  }
-
-  @override
-  String get vaultSyncCopyDoneMessage => 'Скопійовано';
-
-  @override
-  String get vaultSyncCopyFailedMessage =>
-      'Деякі елементи не вдалося скопіювати. Подробиці дивіться у списку передавань.';
-
-  @override
-  String vaultSyncOpenFailedMessage(String name) {
-    return 'Не вдалося відкрити $name';
-  }
-
-  @override
-  String get vaultSyncDetailsNotOnThisSide => 'Немає в цьому сховищі';
-
-  @override
-  String get vaultSyncDetailsFolder => 'Папка';
-
-  @override
-  String vaultSyncStatusOnlyIn(String storage) {
-    return 'Лише в $storage';
-  }
-
-  @override
-  String vaultSyncStatusNewerIn(String storage) {
-    return 'Новіше в $storage';
-  }
-
-  @override
-  String vaultSyncBadgeOnlyIn(int count, String storage) {
-    return '$count лише в $storage';
-  }
-
-  @override
-  String vaultSyncBadgeNewerIn(int count, String storage) {
-    return '$count новіших в $storage';
-  }
-
-  @override
-  String vaultSyncFolderOnlyInDetail(String storage) {
-    return 'Папка — лише в $storage';
-  }
-
-  @override
-  String get vaultSyncDirectionOneWay => 'Одностороннє копіювання';
-
-  @override
-  String get vaultSyncDirectionOneWaySubtitle =>
-      'Копіює нові й оновлені файли у вказаному напрямку; джерело не змінюється.';
-
-  @override
-  String get vaultSyncDirectionMirror => 'Дзеркальна синхронізація';
-
-  @override
-  String get vaultSyncDirectionMirrorSubtitle =>
-      'Замінює ціль точною копією; елементи, що є лише в цілі, видаляються.';
-
-  @override
-  String vaultSyncActionCopyTo(String storage) {
-    return 'Копіювати → $storage';
-  }
-
-  @override
-  String vaultSyncCopyNowToAction(String storage) {
-    return 'Скопіювати в $storage зараз';
-  }
-
-  @override
-  String vaultSyncDeleteFromAction(String storage) {
-    return 'Видалити з $storage';
-  }
-
-  @override
-  String vaultSyncPlanDeleteFrom(String storage) {
-    return 'Видалити з $storage під час синхронізації';
-  }
-
-  @override
-  String vaultSyncFilterOnlyIn(String storage) {
-    return 'Лише в $storage';
-  }
-
-  @override
-  String get vaultSyncChooseFirstStorage => 'Виберіть перше сховище';
-
-  @override
-  String get vaultSyncChooseSecondStorage => 'Виберіть друге сховище';
-
-  @override
-  String get vaultSyncChangeButton => 'Змінити';
-
-  @override
-  String get vaultSyncChooseButton => 'Вибрати';
-
-  @override
-  String get vaultSyncChooseStorageTitle => 'Виберіть сховище';
-
-  @override
-  String get vaultSyncChooseStorageHint =>
-      'Спершу виберіть сховище, а потім папку в ньому для порівняння.';
-
-  @override
-  String get vaultSyncCurrentStorageBadge => 'Поточне';
-
-  @override
-  String get vaultSyncChangeStorageTooltip => 'Змінити сховище';
-
-  @override
-  String vaultSyncPickFolderTitle(String storage) {
-    return 'Папка в $storage';
-  }
-
-  @override
-  String get vaultSyncDirectionSectionTitle => 'Напрямок';
-
-  @override
-  String get vaultSyncDirectionMirrorWarning => 'Видаляє файли';
-
-  @override
-  String get vaultSyncDirectionSourceLabel => 'Джерело';
-
-  @override
-  String get vaultSyncDirectionTargetLabel => 'Ціль';
-
-  @override
-  String get vaultSyncDirectionSwapButton => 'Поміняти місцями';
-
-  @override
-  String get vaultSyncDirectionRecommendedLabel => 'Рекомендовано';
-
-  @override
-  String get categoriesSectionTitle => 'Категорії';
-
-  @override
-  String get manageCategoriesTooltip => 'Керування категоріями';
-
-  @override
-  String get categoryShortcutsTitle => 'Ярлики категорій';
-
-  @override
-  String get categoryShortcutsEnable => 'Показувати ярлики категорій';
-
-  @override
-  String get categoryShortcutsEnableSubtitle =>
-      'Зображення, відео, аудіо та документи з усіх ваших сховищ у бічному меню';
-
-  @override
-  String get categoryShortcutsRestore => 'Відновити типові ярлики';
-
-  @override
-  String get categorySourceAll => 'Усі сховища';
-
-  @override
-  String get categorySourceTooltip => 'Вибрати джерело';
-
-  @override
-  String get categoryFolderStructure => 'Показувати вихідну структуру папок';
-
-  @override
-  String categoryScanning(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'Сканування… перевірено $count папки',
-      many: 'Сканування… перевірено $count папок',
-      few: 'Сканування… перевірено $count папки',
-      one: 'Сканування… перевірено $count папку',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String get categoryEmpty => 'У цій категорії нічого не знайдено';
-
-  @override
-  String get categoryNoVaultsUnlocked => 'Жоден сейф не розблоковано';
-
-  @override
-  String get categoryScanLimitReached =>
-      'Результати можуть бути неповними — сканування досягло ліміту.';
-
-  @override
-  String get categoryShareOneSource =>
-      'Щоб поділитися файлами, вибирайте їх лише з одного сховища за раз.';
-
-  @override
-  String categoryClipboardReady(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count файлу готово до вставлення',
-      many: '$count файлів готові до вставлення',
-      few: '$count файли готові до вставлення',
-      one: '$count файл готовий до вставлення',
-    );
-    return '$_temp0 — відкрийте папку, щоб вставити';
-  }
-
-  @override
-  String get categoryIndexInVaultsTitle =>
-      'Зберігати індекс категорій у сейфах';
-
-  @override
-  String get categoryIndexInVaultsSubtitle =>
-      'Зберігається зашифрованим усередині кожного сейфа в його папці конфігурації під час відкриття категорії, щоб наступного разу файли з’являлися миттєво. На телефоні нічого не зберігається.';
-
-  @override
-  String get categoryIndexClear => 'Очистити індекси категорій';
-
-  @override
-  String get categoryIndexClearSubtitle =>
-      'Видаляє індекс із кожного розблокованого сейфа';
-
-  @override
-  String get categoryIndexCleared => 'Індекси категорій очищено';
-
-  @override
-  String get securityKeyUnlockHintNfc =>
-      'Це сховище захищене ключем безпеки. Торкніться «Розблокувати», потім прикладіть ключ до задньої панелі телефона або підключіть його. Торкніться ключа, якщо він блимає.';
-
-  @override
-  String get securityKeyUnlockHintUsb =>
-      'Це сховище захищене ключем безпеки. Торкніться «Розблокувати», потім підключіть ключ. Торкніться ключа, якщо він блимає.';
-
-  @override
-  String get securityKeyPinFieldLabel => 'PIN-код ключа безпеки';
-
-  @override
-  String get securityKeyWaiting => 'Очікування ключа безпеки…';
-
-  @override
-  String get securityKeyErrorTimeout =>
-      'Ключ безпеки не виявлено вчасно. Спробуйте ще раз.';
-
-  @override
-  String get securityKeyErrorPinRequired =>
-      'Введіть PIN-код вашого ключа безпеки.';
-
-  @override
-  String get securityKeyErrorPinInvalid =>
-      'Неправильний PIN-код ключа безпеки.';
-
-  @override
-  String get securityKeyErrorPinBlocked =>
-      'PIN-код ключа безпеки заблоковано. Відключіть і знову підключіть ключ або скиньте його.';
-
-  @override
-  String get securityKeyErrorPinNotSet =>
-      'Для цього ключа безпеки не встановлено PIN-код. Спершу встановіть його або вимкніть вимогу PIN-коду.';
-
-  @override
-  String get securityKeyErrorNoCredential =>
-      'Це не той ключ безпеки, що використовується для цього сховища. Спробуйте інший ключ.';
-
-  @override
-  String get securityKeyErrorUnsupported =>
-      'Цей ключ безпеки не можна використати тут. Потрібен FIDO2 з розширенням hmac-secret і перевіркою PIN-кодом.';
-
-  @override
-  String get securityKeyErrorTouch =>
-      'До ключа безпеки не торкнулися вчасно. Спробуйте ще раз.';
-
-  @override
-  String get securityKeyErrorGeneric =>
-      'Не вдалося виконати операцію з ключем безпеки. Спробуйте ще раз.';
-
-  @override
-  String get securityKeyCreateTitle => 'Захистити ключем безпеки';
-
-  @override
-  String get securityKeyCreateSubtitle =>
-      'Використовуйте ключ FIDO2, наприклад YubiKey, замість пароля. Сумісно з gocryptfs -fido2.';
-
-  @override
-  String get securityKeyCreateHint =>
-      'Торкніться «Створити», потім прикладіть ключ до задньої панелі телефона або підключіть його. Торкніться ключа, якщо він блимає. Без цього ключа (і його PIN-коду, якщо потрібен) сховище не відкрити, а запасного пароля немає.';
-
-  @override
-  String get securityKeyRequirePinTitle => 'Вимагати PIN-код ключа';
-
-  @override
-  String get securityKeyRequirePinSubtitle =>
-      'Запитувати PIN-код під час кожного розблокування. На ключі вже має бути встановлено PIN-код.';
-
-  @override
-  String get wizardSummarySecurityKeyValue => 'Ключ безпеки';
 }

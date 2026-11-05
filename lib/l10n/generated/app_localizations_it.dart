@@ -3708,10 +3708,10 @@ class AppLocalizationsIt extends AppLocalizations {
   String get layoutModeGalleryGrid => 'Griglia galleria';
 
   @override
-  String get galleryModeAction => 'Galleria';
+  String get galleryModeAction => 'Gallery';
 
   @override
-  String get galleryModeTooltip => 'Modalità galleria';
+  String get galleryModeTooltip => 'Gallery mode';
 
   @override
   String get optionsAction => 'Options';
@@ -3720,13 +3720,13 @@ class AppLocalizationsIt extends AppLocalizations {
   String get optionsActionTooltip => 'Options';
 
   @override
-  String get dateToday => 'Oggi';
+  String get dateToday => 'Today';
 
   @override
-  String get dateYesterday => 'Ieri';
+  String get dateYesterday => 'Yesterday';
 
   @override
-  String get dateEarlier => 'In precedenza';
+  String get dateEarlier => 'Earlier';
 
   @override
   String get readOnlyCantDeleteTooltip =>
@@ -5441,20 +5441,20 @@ class AppLocalizationsIt extends AppLocalizations {
   String get storageCategoryOther => 'Altro';
 
   @override
-  String get storageAnalyzerTabMap => 'Mappa';
+  String get storageAnalyzerTabMap => 'Map';
 
   @override
-  String get storageAnalyzerTabFolders => 'Cartelle';
+  String get storageAnalyzerTabFolders => 'Folders';
 
   @override
-  String get storageAnalyzerTabTypes => 'Tipi';
+  String get storageAnalyzerTabTypes => 'Types';
 
   @override
-  String get storageAnalyzerTabCleanup => 'Pulizia';
+  String get storageAnalyzerTabCleanup => 'Cleanup';
 
   @override
   String storageAnalyzerFreeSpace(String free) {
-    return '$free liberi';
+    return '$free free';
   }
 
   @override
@@ -5462,7 +5462,7 @@ class AppLocalizationsIt extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count file',
+      other: '$count files',
       one: '1 file',
     );
     return '$_temp0';
@@ -5473,112 +5473,112 @@ class AppLocalizationsIt extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count elementi',
-      one: '1 elemento',
+      other: '$count items',
+      one: '1 item',
     );
     return '$_temp0';
   }
 
   @override
   String storageAnalyzerContentSize(String size) {
-    return 'Contenuto della cassaforte: $size';
+    return 'Vault content: $size';
   }
 
   @override
   String storageAnalyzerScanProgress(String files, String size) {
-    return '$files file · $size finora';
+    return '$files files · $size so far';
   }
 
   @override
   String get storageAnalyzerPartialNotice =>
-      'Alcune cartelle non sono state lette completamente, quindi i totali potrebbero essere inferiori ai valori effettivi.';
+      'Some folders couldn\'t be fully read, so totals may be lower than the real figures.';
 
   @override
   String get storageAnalyzerStaleNotice =>
-      'Questo volume è stato modificato dopo la scansione.';
+      'This volume has changed since it was scanned.';
 
   @override
-  String get storageAnalyzerUpOneLevel => 'Livello superiore';
+  String get storageAnalyzerUpOneLevel => 'Up one level';
 
   @override
-  String get storageAnalyzerEmptyFolder => 'Questa cartella è vuota.';
+  String get storageAnalyzerEmptyFolder => 'This folder is empty.';
 
   @override
   String storageAnalyzerSmallerItems(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count elementi più piccoli',
-      one: '1 elemento più piccolo',
+      other: '$count smaller items',
+      one: '1 smaller item',
     );
     return '$_temp0';
   }
 
   @override
   String get storageAnalyzerMapHint =>
-      'Tocca una cartella per aprirla. Tieni premuto per selezionare.';
+      'Tap a folder to open it. Press and hold to select.';
 
   @override
-  String get storageAnalyzerSortFiles => 'Numero di file';
+  String get storageAnalyzerSortFiles => 'File count';
 
   @override
-  String get storageAnalyzerAllTypes => 'Tutti i tipi';
+  String get storageAnalyzerAllTypes => 'All types';
 
   @override
   String storageAnalyzerLargestOfType(String type) {
-    return 'File più grandi · $type';
+    return 'Largest files · $type';
   }
 
   @override
-  String get storageAnalyzerCleanupHeader => 'Suggerimenti';
+  String get storageAnalyzerCleanupHeader => 'Suggestions';
 
   @override
-  String get storageAnalyzerCleanupLarge => 'File grandi';
+  String get storageAnalyzerCleanupLarge => 'Large files';
 
   @override
-  String get storageAnalyzerCleanupStale => 'Non modificati da oltre un anno';
+  String get storageAnalyzerCleanupStale => 'Not modified in over a year';
 
   @override
-  String get storageAnalyzerCleanupTemp => 'File temporanei e superflui';
+  String get storageAnalyzerCleanupTemp => 'Temporary and junk files';
 
   @override
-  String get storageAnalyzerCleanupEmpty => 'Cartelle vuote';
+  String get storageAnalyzerCleanupEmpty => 'Empty folders';
 
   @override
-  String get storageAnalyzerCleanupReview => 'Controlla';
+  String get storageAnalyzerCleanupReview => 'Review';
 
   @override
   String get storageAnalyzerCleanupNothing =>
-      'Nessun elemento evidente da eliminare. Questo volume sembra in ordine.';
+      'Nothing obvious to clean up. This volume looks tidy.';
 
   @override
-  String get storageAnalyzerBiggestFiles => 'File più grandi';
+  String get storageAnalyzerBiggestFiles => 'Biggest files';
 
   @override
   String get storageAnalyzerBiggestFilesSubtitle =>
-      'Sfoglia i file più grandi su questo volume';
+      'Browse the largest files on this volume';
 
   @override
-  String get storageAnalyzerAllSuggestions => 'Tutti i suggerimenti';
+  String get storageAnalyzerAllSuggestions => 'All suggestions';
 
   @override
   String storageAnalyzerSelectedSummary(int count, String size) {
-    return '$count selezionati · $size';
+    return '$count selected · $size';
   }
 
   @override
   String storageAnalyzerDeleteFilesMessage(String size) {
-    return 'Gli elementi selezionati verranno eliminati definitivamente da questa archiviazione e verranno liberati $size. L’operazione non può essere annullata.';
+    return 'This permanently deletes the selected items from this storage and frees $size. It can\'t be undone.';
   }
 
   @override
   String storageAnalyzerDeleteFoldersMessage(String files, String size) {
-    return 'Gli elementi selezionati verranno eliminati definitivamente ($files file, compreso tutto il contenuto delle cartelle selezionate) e verranno liberati $size. L’operazione non può essere annullata.';
+    return 'This permanently deletes the selected items ($files files, including everything inside selected folders) and frees $size. It can\'t be undone.';
   }
 
   @override
   String storageAnalyzerDeleteDone(String size) {
-    return '$size liberati';
+    return 'Freed $size';
   }
 
   @override
@@ -5587,29 +5587,27 @@ class AppLocalizationsIt extends AppLocalizations {
     String failed,
     String size,
   ) {
-    return 'Eliminati $deleted, ma non è stato possibile eliminare $failed. Liberati $size.';
+    return 'Deleted $deleted, but $failed couldn\'t be deleted. Freed $size.';
   }
 
   @override
-  String get storageAnalyzerDeleteNone => 'Non è stato eliminato nulla.';
+  String get storageAnalyzerDeleteNone => 'Nothing was deleted.';
 
   @override
   String get storageAnalyzerDeleteError =>
-      'Impossibile eliminare gli elementi selezionati.';
+      'Couldn\'t delete the selected items.';
 
   @override
-  String get storageAnalyzerRescanFolder =>
-      'Scansiona di nuovo questa cartella';
+  String get storageAnalyzerRescanFolder => 'Rescan this folder';
 
   @override
-  String get storageAnalyzerSelectAction => 'Seleziona';
+  String get storageAnalyzerSelectAction => 'Select';
 
   @override
-  String get storageAnalyzerSelectAllHere =>
-      'Seleziona tutto in questa cartella';
+  String get storageAnalyzerSelectAllHere => 'Select all in this folder';
 
   @override
-  String get storageAnalyzerOpenFolder => 'Apri cartella';
+  String get storageAnalyzerOpenFolder => 'Open folder';
 
   @override
   String get keyfilePassphraseGeneratorTitle =>
@@ -13476,433 +13474,4 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get comicReaderCarouselScrubberSubtitle =>
       'Mostra le miniature delle pagine sopra il cursore';
-
-  @override
-  String get vaultSyncBrowseAllButton => 'Sfoglia tutti gli elementi';
-
-  @override
-  String get vaultSyncExplorerTitle => 'Sfoglia entrambi gli archivi';
-
-  @override
-  String get vaultSyncExplorerEmptyTitle => 'Niente da mostrare';
-
-  @override
-  String get vaultSyncExplorerEmptyMessage =>
-      'Nessun elemento di questa cartella corrisponde al filtro.';
-
-  @override
-  String get vaultSyncExplorerLoadFailedTitle =>
-      'Impossibile leggere questa cartella';
-
-  @override
-  String get vaultSyncExplorerLoadFailedMessage =>
-      'Non è stato possibile elencare uno dei due archivi. Riprova e verifica che entrambi siano ancora sbloccati e connessi.';
-
-  @override
-  String get vaultSyncFilterAll => 'Tutti';
-
-  @override
-  String get vaultSyncFilterDifferences => 'Differenze';
-
-  @override
-  String get vaultSyncFilterNewer => 'Copia più recente';
-
-  @override
-  String get vaultSyncFilterConflicts => 'Da rivedere';
-
-  @override
-  String get vaultSyncFilterDeletions => 'Eliminazioni';
-
-  @override
-  String get vaultSyncFilterNoMatchesMessage =>
-      'Nessun elemento corrisponde al filtro.';
-
-  @override
-  String get vaultSyncSortTooltip => 'Ordina';
-
-  @override
-  String get vaultSyncSortPath => 'Percorso';
-
-  @override
-  String get vaultSyncSortSize => 'Più grandi prima';
-
-  @override
-  String get vaultSyncSortModified => 'Più recenti prima';
-
-  @override
-  String get vaultSyncSortStatus => 'Stato';
-
-  @override
-  String get vaultSyncStatusInSync => 'Sincronizzato';
-
-  @override
-  String get vaultSyncStatusFolder => 'Cartella';
-
-  @override
-  String vaultSyncDeletionsQueuedLabel(num count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count eliminazioni',
-      one: '1 eliminazione',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String vaultSyncConfirmDeletionsMessage(num count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other:
-          '$count elementi verranno eliminati definitivamente. Questa azione non può essere annullata.',
-      one:
-          '1 elemento verrà eliminato definitivamente. Questa azione non può essere annullata.',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String get vaultSyncResultsStaleMessage =>
-      'I risultati potrebbero non essere aggiornati dopo l\'eliminazione. Confronta di nuovo per aggiornare i conteggi.';
-
-  @override
-  String vaultSyncSelectedCount(num count) {
-    return '$count selezionati';
-  }
-
-  @override
-  String get vaultSyncOpenAction => 'Apri';
-
-  @override
-  String vaultSyncOpenCopyAction(String side) {
-    return 'Apri la copia in $side';
-  }
-
-  @override
-  String get vaultSyncOpenFolderAction => 'Apri cartella';
-
-  @override
-  String get vaultSyncOpenFolderSubtitle =>
-      'Sfoglia il contenuto in entrambi gli archivi';
-
-  @override
-  String get vaultSyncShowInFolderAction => 'Mostra nella cartella';
-
-  @override
-  String get vaultSyncShowInFolderSubtitle =>
-      'Vedilo accanto agli altri elementi in entrambi gli archivi';
-
-  @override
-  String get vaultSyncDeleteFromBothAction => 'Elimina da entrambi gli archivi';
-
-  @override
-  String vaultSyncDeleteBothSidesLabel(String left, String right) {
-    return '$left e $right';
-  }
-
-  @override
-  String vaultSyncDeleteConfirmMessage(String where) {
-    return 'Questi elementi verranno eliminati definitivamente da $where, compreso tutto il contenuto delle cartelle. Questa azione non può essere annullata.';
-  }
-
-  @override
-  String vaultSyncDeleteDoneMessage(num count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count elementi eliminati',
-      one: '1 elemento eliminato',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String vaultSyncDeletePartialMessage(int deleted, int failed) {
-    return '$deleted eliminati, ma non è stato possibile eliminarne $failed';
-  }
-
-  @override
-  String get vaultSyncCopyDoneMessage => 'Copiato';
-
-  @override
-  String get vaultSyncCopyFailedMessage =>
-      'Alcuni elementi non sono stati copiati. Controlla l\'elenco dei trasferimenti per i dettagli.';
-
-  @override
-  String vaultSyncOpenFailedMessage(String name) {
-    return 'Impossibile aprire $name';
-  }
-
-  @override
-  String get vaultSyncDetailsNotOnThisSide => 'Non presente in questo archivio';
-
-  @override
-  String get vaultSyncDetailsFolder => 'Cartella';
-
-  @override
-  String vaultSyncStatusOnlyIn(String storage) {
-    return 'Solo in $storage';
-  }
-
-  @override
-  String vaultSyncStatusNewerIn(String storage) {
-    return 'Più recente in $storage';
-  }
-
-  @override
-  String vaultSyncBadgeOnlyIn(int count, String storage) {
-    return '$count solo in $storage';
-  }
-
-  @override
-  String vaultSyncBadgeNewerIn(int count, String storage) {
-    return '$count più recenti in $storage';
-  }
-
-  @override
-  String vaultSyncFolderOnlyInDetail(String storage) {
-    return 'Cartella — solo in $storage';
-  }
-
-  @override
-  String get vaultSyncDirectionOneWay => 'Copia unidirezionale';
-
-  @override
-  String get vaultSyncDirectionOneWaySubtitle =>
-      'Copia i file nuovi e aggiornati nella direzione indicata; la sorgente resta invariata.';
-
-  @override
-  String get vaultSyncDirectionMirror => 'Sincronizzazione speculare';
-
-  @override
-  String get vaultSyncDirectionMirrorSubtitle =>
-      'Sostituisce la destinazione con una copia esatta; gli elementi presenti solo nella destinazione vengono eliminati.';
-
-  @override
-  String vaultSyncActionCopyTo(String storage) {
-    return 'Copia → $storage';
-  }
-
-  @override
-  String vaultSyncCopyNowToAction(String storage) {
-    return 'Copia ora in $storage';
-  }
-
-  @override
-  String vaultSyncDeleteFromAction(String storage) {
-    return 'Elimina da $storage';
-  }
-
-  @override
-  String vaultSyncPlanDeleteFrom(String storage) {
-    return 'Elimina da $storage durante la sincronizzazione';
-  }
-
-  @override
-  String vaultSyncFilterOnlyIn(String storage) {
-    return 'Solo in $storage';
-  }
-
-  @override
-  String get vaultSyncChooseFirstStorage => 'Scegli il primo archivio';
-
-  @override
-  String get vaultSyncChooseSecondStorage => 'Scegli il secondo archivio';
-
-  @override
-  String get vaultSyncChangeButton => 'Cambia';
-
-  @override
-  String get vaultSyncChooseButton => 'Scegli';
-
-  @override
-  String get vaultSyncChooseStorageTitle => 'Scegli un archivio';
-
-  @override
-  String get vaultSyncChooseStorageHint =>
-      'Scegli prima un archivio, poi la cartella al suo interno da confrontare.';
-
-  @override
-  String get vaultSyncCurrentStorageBadge => 'Attuale';
-
-  @override
-  String get vaultSyncChangeStorageTooltip => 'Cambia archivio';
-
-  @override
-  String vaultSyncPickFolderTitle(String storage) {
-    return 'Cartella in $storage';
-  }
-
-  @override
-  String get vaultSyncDirectionSectionTitle => 'Direzione';
-
-  @override
-  String get vaultSyncDirectionMirrorWarning => 'Elimina file';
-
-  @override
-  String get vaultSyncDirectionSourceLabel => 'Sorgente';
-
-  @override
-  String get vaultSyncDirectionTargetLabel => 'Destinazione';
-
-  @override
-  String get vaultSyncDirectionSwapButton => 'Inverti';
-
-  @override
-  String get vaultSyncDirectionRecommendedLabel => 'Consigliato';
-
-  @override
-  String get categoriesSectionTitle => 'Categorie';
-
-  @override
-  String get manageCategoriesTooltip => 'Gestisci categorie';
-
-  @override
-  String get categoryShortcutsTitle => 'Scorciatoie delle categorie';
-
-  @override
-  String get categoryShortcutsEnable => 'Mostra scorciatoie delle categorie';
-
-  @override
-  String get categoryShortcutsEnableSubtitle =>
-      'Immagini, video, audio e documenti da tutte le memorie, nel pannello laterale';
-
-  @override
-  String get categoryShortcutsRestore => 'Ripristina scorciatoie predefinite';
-
-  @override
-  String get categorySourceAll => 'Tutte le memorie';
-
-  @override
-  String get categorySourceTooltip => 'Scegli sorgente';
-
-  @override
-  String get categoryFolderStructure =>
-      'Mostra struttura originale delle cartelle';
-
-  @override
-  String categoryScanning(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'Scansione in corso… $count cartelle controllate',
-      one: 'Scansione in corso… 1 cartella controllata',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String get categoryEmpty => 'Nessun file trovato in questa categoria';
-
-  @override
-  String get categoryNoVaultsUnlocked => 'Nessuna cassaforte è sbloccata';
-
-  @override
-  String get categoryScanLimitReached =>
-      'I risultati potrebbero essere incompleti: la scansione ha raggiunto il limite.';
-
-  @override
-  String get categoryShareOneSource =>
-      'Seleziona i file da una sola memoria alla volta per condividerli.';
-
-  @override
-  String categoryClipboardReady(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: '$count file pronti da incollare',
-      one: '1 file pronto da incollare',
-    );
-    return '$_temp0 — apri una cartella per incollare';
-  }
-
-  @override
-  String get categoryIndexInVaultsTitle =>
-      'Mantieni l\'indice delle categorie nelle casseforti';
-
-  @override
-  String get categoryIndexInVaultsSubtitle =>
-      'Salvato crittografato all\'interno di ciascuna cassaforte, nella relativa cartella di configurazione, quando apri una categoria, così i file appariranno istantaneamente la volta successiva. Nulla viene salvato sul telefono.';
-
-  @override
-  String get categoryIndexClear => 'Cancella indici delle categorie';
-
-  @override
-  String get categoryIndexClearSubtitle =>
-      'Rimuove l’indice da ogni cassaforte sbloccata';
-
-  @override
-  String get categoryIndexCleared => 'Indici delle categorie cancellati';
-
-  @override
-  String get securityKeyUnlockHintNfc =>
-      'Questo vault è protetto da una chiave di sicurezza. Tocca Sblocca, poi avvicina la chiave al retro del telefono oppure collegala. Toccala se lampeggia.';
-
-  @override
-  String get securityKeyUnlockHintUsb =>
-      'Questo vault è protetto da una chiave di sicurezza. Tocca Sblocca, poi collega la chiave. Toccala se lampeggia.';
-
-  @override
-  String get securityKeyPinFieldLabel => 'PIN della chiave di sicurezza';
-
-  @override
-  String get securityKeyWaiting => 'In attesa della chiave di sicurezza…';
-
-  @override
-  String get securityKeyErrorTimeout =>
-      'Nessuna chiave di sicurezza rilevata in tempo. Riprova.';
-
-  @override
-  String get securityKeyErrorPinRequired =>
-      'Inserisci il PIN della tua chiave di sicurezza.';
-
-  @override
-  String get securityKeyErrorPinInvalid =>
-      'PIN della chiave di sicurezza errato.';
-
-  @override
-  String get securityKeyErrorPinBlocked =>
-      'Il PIN della chiave di sicurezza è bloccato. Scollega e ricollega la chiave oppure reimpostala.';
-
-  @override
-  String get securityKeyErrorPinNotSet =>
-      'Su questa chiave di sicurezza non è impostato alcun PIN. Impostane uno prima o disattiva l\'obbligo del PIN.';
-
-  @override
-  String get securityKeyErrorNoCredential =>
-      'Questa non è la chiave di sicurezza usata per questo vault. Prova con un\'altra chiave.';
-
-  @override
-  String get securityKeyErrorUnsupported =>
-      'Questa chiave di sicurezza non può essere usata qui. Richiede FIDO2 con l\'estensione hmac-secret e la verifica tramite PIN.';
-
-  @override
-  String get securityKeyErrorTouch =>
-      'La chiave di sicurezza non è stata toccata in tempo. Riprova.';
-
-  @override
-  String get securityKeyErrorGeneric =>
-      'L\'operazione con la chiave di sicurezza non è riuscita. Riprova.';
-
-  @override
-  String get securityKeyCreateTitle => 'Proteggi con una chiave di sicurezza';
-
-  @override
-  String get securityKeyCreateSubtitle =>
-      'Usa una chiave FIDO2, come una YubiKey, al posto di una password. Compatibile con gocryptfs -fido2.';
-
-  @override
-  String get securityKeyCreateHint =>
-      'Tocca Crea, poi avvicina la chiave al retro del telefono oppure collegala. Toccala se lampeggia. Senza questa chiave (e il suo PIN, se richiesto) il vault non può essere aperto e non esiste una password di riserva.';
-
-  @override
-  String get securityKeyRequirePinTitle => 'Richiedi il PIN della chiave';
-
-  @override
-  String get securityKeyRequirePinSubtitle =>
-      'Chiede il PIN a ogni sblocco. Sulla chiave deve essere già impostato un PIN.';
-
-  @override
-  String get wizardSummarySecurityKeyValue => 'Chiave di sicurezza';
 }

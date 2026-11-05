@@ -313,99 +313,6 @@ static void testGocryptfs(GocryptfsCipher cipher, bool plain, const char* label)
     CHECK(openGocryptfs(st, np, 3, false, {}).status == OpenStatus::Ok);
 }
 
-// gocryptfs -fido2 vaults: the FIDO2 flag + section, with the raw hmac-secret output as the
-// "password". Covers the config format and the places a raw secret could be mangled.
-static void testGocryptfsFido2() {
-    std::printf("gocryptfs FIDO2 (security key)\n");
-    const Bytes credential = rnd(96, 21), salt = rnd(32, 22);
-    auto b64 = [](const Bytes& b) { return base64Encode(b.data(), b.size(), false, true); };
-    auto cfg = [&](const std::string& flags, const std::string& extra) {
-        return std::string("{\"EncryptedKey\":\"") + b64(Bytes(48, 1)) + "\",\"ScryptObject\":{\"Salt\":\"" + b64(Bytes(32, 2)) +
-               "\",\"N\":1024,\"R\":8,\"P\":1,\"KeyLen\":32},\"Version\":2,\"FeatureFlags\":[" + flags + "]" + extra + "}";
-    };
-    const std::string base = "\"GCMIV128\",\"HKDF\",\"DirIV\",\"EMENames\",\"LongNames\",\"Raw64\"";
-
-    // Parsing: section + options, absent/null options, ordinary vault, flag without a section, garbage section.
-    auto section = [&](const std::string& opts) {
-        return ",\"FIDO2\":{\"CredentialID\":\"" + b64(credential) + "\",\"HMACSalt\":\"" + b64(salt) + "\"" + opts + "}";
-    };
-    auto c = gocryptfs::Config::parse(cfg(base + ",\"FIDO2\"", section(",\"AssertOptions\":[\"pin=true\"]")));
-    CHECK(c.fido2.has_value());
-    if (c.fido2) {
-        CHECK(c.fido2->credentialId == credential);
-        CHECK(c.fido2->hmacSalt == salt);
-        CHECK(c.fido2->assertOptions == std::vector<std::string>{"pin=true"});
-    }
-    CHECK(gocryptfs::Config::parse(cfg(base + ",\"FIDO2\"", section(""))).fido2->assertOptions.empty());
-    CHECK(gocryptfs::Config::parse(cfg(base + ",\"FIDO2\"", section(",\"AssertOptions\":null"))).fido2->assertOptions.empty());
-    CHECK(!gocryptfs::Config::parse(cfg(base, "")).fido2.has_value());
-    bool noSection = false, badSection = false;
-    try { gocryptfs::Config::parse(cfg(base + ",\"FIDO2\"", "")); } catch (const Error& e) { noSection = e.code() == Err::InvalidVault; }
-    try { gocryptfs::Config::parse(cfg(base + ",\"FIDO2\"", ",\"FIDO2\":{\"CredentialID\":\"***\",\"HMACSalt\":\"AAAA\"}")); } catch (const Error& e) { badSection = e.code() == Err::InvalidVault; }
-    CHECK(noSection); CHECK(badSection);
-
-    // The JSON form the JNI bridge receives.
-    {
-        auto p = parseFido2Json("{\"CredentialID\":\"" + b64(credential) + "\",\"HMACSalt\":\"" + b64(salt) + "\",\"AssertOptions\":[\"pin=true\"]}");
-        CHECK(p.credentialId == credential); CHECK(p.hmacSalt == salt); CHECK(p.assertOptions.size() == 1);
-        bool threw = false;
-        try { parseFido2Json("[]"); } catch (const Error&) { threw = true; }
-        CHECK(threw);
-    }
-
-    // Full create / open round trip. The secret is arbitrary bytes, many >= 0x80 (and one NUL): it must
-    // reach scrypt untouched, so it differs from its UTF-8 re-encoding.
-    Bytes secret(32);
-    for (size_t i = 0; i < secret.size(); i++) secret[i] = (uint8_t)(0x80 + i * 5);
-    secret[7] = 0;
-    TmpDir t; std::string root = t.sub("v");
-    auto st = std::make_shared<PosixStorage>(root);
-    GocryptfsCreateOptions o;
-    o.fido2 = Fido2Params{credential, salt, {"pin=true"}};
-    CHECK(createGocryptfs(*st, secret.data(), secret.size(), o).status == OpenStatus::Ok);
-
-    Bytes conf;
-    CHECK(st->readWhole(gocryptfs::kConfigName, conf));
-    auto written = gocryptfs::Config::parse(std::string(conf.begin(), conf.end()));
-    CHECK(written.hasFlag("FIDO2"));
-    CHECK(written.fido2.has_value());
-    if (written.fido2) {
-        CHECK(written.fido2->credentialId == credential);
-        CHECK(written.fido2->hmacSalt == salt);
-        CHECK(written.fido2->assertOptions == std::vector<std::string>{"pin=true"});
-    }
-    // ... and it survives a re-serialise (what a password change would do to the file).
-    CHECK(gocryptfs::Config::parse(written.toJson()).fido2.has_value());
-
-    auto r = openGocryptfs(st, secret.data(), secret.size(), false, {});
-    CHECK(r.status == OpenStatus::Ok);
-    if (r.vault) {
-        CHECK(put(*r.vault, "hello.txt", rnd(5000, 33)));
-        r.vault->close();
-    }
-    Bytes asUtf8;   // each byte as a code point, UTF-8 encoded: what the CharArray path would have produced
-    for (uint8_t b : secret) { if (b < 0x80) asUtf8.push_back(b); else { asUtf8.push_back(0xC0 | (b >> 6)); asUtf8.push_back(0x80 | (b & 0x3F)); } }
-    CHECK(openGocryptfs(st, asUtf8.data(), asUtf8.size(), false, {}).status == OpenStatus::WrongPassword);
-    Bytes other = secret; other[31] ^= 1;
-    CHECK(openGocryptfs(st, other.data(), other.size(), false, {}).status == OpenStatus::WrongPassword);
-
-    // Credentials of a security-key vault can't be changed (as upstream) -- and a refusal must not touch the file.
-    const uint8_t np[] = "new";
-    CHECK(changeGocryptfsPassword(*st, secret.data(), secret.size(), np, 3).status == OpenStatus::InvalidVault);
-    Bytes conf2;
-    CHECK(st->readWhole(gocryptfs::kConfigName, conf2));
-    CHECK(conf2 == conf);
-    CHECK(openGocryptfs(st, secret.data(), secret.size(), false, {}).status == OpenStatus::Ok);
-
-    // A plain vault is unaffected: no flag, no section.
-    TmpDir t2; auto st2 = std::make_shared<PosixStorage>(t2.sub("v"));
-    const uint8_t pw[] = "pw";
-    CHECK(createGocryptfs(*st2, pw, 2, {}).status == OpenStatus::Ok);
-    Bytes plain;
-    CHECK(st2->readWhole(gocryptfs::kConfigName, plain));
-    CHECK(std::string(plain.begin(), plain.end()).find("FIDO2") == std::string::npos);
-}
-
 static void testCryptomator(bool ctrmac) {
     std::printf("cryptomator %s\n", ctrmac ? "SIV_CTRMAC (format 7)" : "SIV_GCM (format 8)");
     TmpDir t; std::string root = t.sub("v");
@@ -587,7 +494,6 @@ int main(int argc, char** argv) {
         testGocryptfs(GocryptfsCipher::XChaCha20Poly1305, false, "XChaCha20-Poly1305");
         testGocryptfs(GocryptfsCipher::AesSiv, false, "AES-SIV");
         testGocryptfs(GocryptfsCipher::Aes256Gcm, true, "plaintext names");
-        testGocryptfsFido2();
     }
     if (want("cryptomator")) { testCryptomator(false); testCryptomator(true); }
     if (want("cryfs")) { testCryfs("xchacha20-poly1305", 32768); testCryfs("aes-256-gcm", 4096); testCryfs("aes-256-cfb", 8192); }

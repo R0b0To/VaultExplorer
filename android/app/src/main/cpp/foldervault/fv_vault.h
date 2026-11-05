@@ -136,42 +136,20 @@ bool looksLikeGocryptfs(Storage& s);
 bool looksLikeCryptomator(Storage& s);
 bool looksLikeCryfs(Storage& s);
 
-// The `FIDO2` object of a gocryptfs.conf (`gocryptfs -init -fido2`). Upstream derives
-// the vault "password" as the 32-byte CTAP2 hmac-secret output for [hmacSalt] using
-// [credentialId] and relying party id kFido2RpId; the host does that dance and hands
-// the raw output to open*/create* as the password bytes. [assertOptions] are the
-// `fido2-assert -t` options in effect (e.g. "pin=true").
-constexpr const char* kFido2RpId = "gocryptfs";
-struct Fido2Params {
-    Bytes credentialId;
-    Bytes hmacSalt;
-    std::vector<std::string> assertOptions;
-};
-
-// Parses a bare FIDO2 object ({"CredentialID","HMACSalt","AssertOptions"}, base64 std alphabet)
-// -- the form a host hands across a language boundary. Throws Error(InvalidVault).
-Fido2Params parseFido2Json(const std::string& jsonText);
-
 struct GocryptfsCreateOptions {
     GocryptfsCipher cipher = GocryptfsCipher::Aes256Gcm;
     bool plaintextNames = false;
-    // Set for a security-key vault: the FIDO2 feature flag and section are written, and the
-    // password bytes passed to createGocryptfs are the raw hmac-secret output.
-    std::optional<Fido2Params> fido2;
 };
 struct CryfsCreateOptions {
     std::string cipher = "xchacha20-poly1305";
     int blocksizeBytes = 32 * 1024;
 };
 
-// [password] is raw bytes: UTF-8 text for a normal vault, the raw hmac-secret output for a
-// security-key (FIDO2) vault -- never re-encode it. The caller keeps ownership and wipes it.
+// [password] is raw UTF-8 bytes. The caller keeps ownership and wipes it.
 OpenResult openGocryptfs(std::shared_ptr<Storage> s, const uint8_t* pw, size_t pwLen, bool readOnly, const HostEnv& env, const StorageFactory& sessionStorage = {});
 // create* only writes the vault's on-disk skeleton through [s]; unlock it with open*
 // afterwards (that is what lets the host choose its session storage after creation).
 PlainResult createGocryptfs(Storage& s, const uint8_t* pw, size_t pwLen, const GocryptfsCreateOptions& o);
-// Refused (InvalidVault) for a security-key vault: its secret is the key's output, not a
-// password that can be swapped -- same as upstream gocryptfs.
 PlainResult changeGocryptfsPassword(Storage& s, const uint8_t* oldPw, size_t oldLen, const uint8_t* newPw, size_t newLen);
 
 OpenResult openCryptomator(std::shared_ptr<Storage> s, const uint8_t* pw, size_t pwLen, bool readOnly, const HostEnv& env, const StorageFactory& sessionStorage = {});

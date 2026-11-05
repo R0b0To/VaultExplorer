@@ -4,10 +4,8 @@
 #pragma once
 
 #include <memory>
-#include <optional>
 #include <set>
 #include <string>
-#include <vector>
 
 #include "fv_crypto.h"
 #include "fv_engine.h"
@@ -38,7 +36,6 @@ struct Config {
     int longNameMax = 0;
     GocryptfsCipher cipher = GocryptfsCipher::Aes256Gcm;
     bool plaintextNames = false;
-    std::optional<Fido2Params> fido2;   // set exactly when the FIDO2 feature flag is present
 
     bool hasFlag(const std::string& f) const;
     bool hasDirIV() const { return hasFlag("DirIV"); }

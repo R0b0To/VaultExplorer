@@ -528,7 +528,7 @@ FV_JNI(jlong, nativeOpen)(JNIEnv* env, jclass, jint format, jstring rawRoot, job
 // Returns fv::OpenStatus as int (0 Ok, 1 WrongPassword, 2 InvalidVault); out[0] = message.
 FV_JNI(jint, nativeCreate)(JNIEnv* env, jclass, jint format, jstring rawRoot, jobject storageCb, jbyteArray password,
                            jintArray options, jstring cipherName, jstring localState, jstring tempDir,
-                           jbyteArray userEntropy, jstring fido2Json, jobjectArray out) {
+                           jbyteArray userEntropy, jobjectArray out) {
     ScopedJniUserEntropy entropyScope(env, userEntropy);
     PwGuard pw{toBytes(env, password)};
     auto st = makeStorage(env, rawRoot, storageCb);
@@ -540,17 +540,6 @@ FV_JNI(jint, nativeCreate)(JNIEnv* env, jclass, jint format, jstring rawRoot, jo
         fv::GocryptfsCreateOptions o;
         o.cipher = opt[0] == 1 ? fv::GocryptfsCipher::XChaCha20Poly1305 : opt[0] == 2 ? fv::GocryptfsCipher::AesSiv : fv::GocryptfsCipher::Aes256Gcm;
         o.plaintextNames = opt[1] != 0;
-        // Security-key vault: [password] is the raw hmac-secret output, [fido2Json] the section to record.
-        const std::string fj = fido2Json ? toUtf8(env, fido2Json) : std::string();
-        if (!fj.empty()) {
-            try {
-                o.fido2 = fv::parseFido2Json(fj);
-            } catch (const std::exception& e) {
-                st->close();
-                setOut(env, out, 0, fromUtf8(env, e.what()));
-                return 2;
-            }
-        }
         r = fv::createGocryptfs(*st, pw.b.data(), pw.b.size(), o);
     } else if (format == 1) {
         r = fv::createCryptomator(*st, pw.b.data(), pw.b.size());

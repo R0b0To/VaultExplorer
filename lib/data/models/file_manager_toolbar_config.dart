@@ -81,8 +81,8 @@ class FileManagerToolbarConfig {
   final Set<FileDetailColumn> hiddenDetailColumns;
 
   /// Order and visibility of the actions in the item actions sheet and the
-  /// selection bar's overflow menu. Always holds every [FileItemAction]
-  /// exactly once (see [fromJson]).
+  /// selection bar. Always holds every [FileItemAction] exactly once (see
+  /// [fromJson]).
   final List<FileItemAction> itemActionsOrder;
   final Set<FileItemAction> hiddenItemActions;
 

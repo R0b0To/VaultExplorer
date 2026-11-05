@@ -69,7 +69,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
   final VoidCallback onDecrypt;
 
   /// The user's item-action configuration: hidden actions are removed from
-  /// the buttons and the overflow menu, and the menu follows this order.
+  /// the buttons and the overflow menu, and both follow this order.
   final List<FileItemAction> itemActionOrder;
   final Set<FileItemAction> hiddenItemActions;
 
@@ -143,6 +143,67 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
         allowExtractAction &&
         (singleArchiveSelected || isInsideArchive) &&
         shown(FileItemAction.extract);
+    final visibleActionOrder = orderFileItemActions(
+      [
+        if (showExtractButton) FileItemAction.extract,
+        if (showShareOption && shown(FileItemAction.share))
+          FileItemAction.share,
+        if (!isInsideArchive && shown(FileItemAction.copy))
+          FileItemAction.copy,
+        if (!isInsideArchive && shown(FileItemAction.move))
+          FileItemAction.move,
+        if (!isInsideArchive &&
+            allowRenameAction &&
+            shown(FileItemAction.rename))
+          FileItemAction.rename,
+        if (!isInsideArchive && shown(FileItemAction.delete))
+          FileItemAction.delete,
+      ],
+      order: itemActionOrder,
+    );
+
+    Widget buildActionButton(FileItemAction action) => switch (action) {
+      FileItemAction.extract => IconButton(
+        icon: const Icon(Icons.unarchive_outlined),
+        tooltip: context.l10n.extract,
+        onPressed: onExtractSelectedArchive,
+      ),
+      FileItemAction.share => IconButton(
+        icon: const Icon(Icons.share_rounded),
+        tooltip: context.l10n.shareAction,
+        onPressed: onShare,
+      ),
+      FileItemAction.copy => IconButton(
+        icon: const Icon(Icons.copy_rounded),
+        tooltip: context.l10n.copyTooltip,
+        onPressed: onCopy,
+      ),
+      FileItemAction.move => IconButton(
+        icon: Icon(
+          Icons.cut_rounded,
+          color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.5) : null,
+        ),
+        tooltip: readOnly ? context.l10n.readOnlyCantMoveTooltip : context.l10n.moveAction,
+        onPressed: onCut,
+      ),
+      FileItemAction.rename => IconButton(
+        icon: Icon(
+          Icons.drive_file_rename_outline_rounded,
+          color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.5) : null,
+        ),
+        tooltip: readOnly ? context.l10n.readOnlyCantRenameTooltip : context.l10n.renameTooltip,
+        onPressed: onRename,
+      ),
+      FileItemAction.delete => IconButton(
+        icon: Icon(
+          Icons.delete_outline_rounded,
+          color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.5) : cs.error,
+        ),
+        tooltip: readOnly ? context.l10n.readOnlyCantDeleteTooltip : context.l10n.delete,
+        onPressed: onDelete,
+      ),
+      _ => throw StateError('Unexpected selection-bar action: $action'),
+    };
 
     return AppBar(
       leading: IconButton(
@@ -179,51 +240,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
         ],
       ),
       actions: [
-        if (showExtractButton)
-          IconButton(
-            icon: const Icon(Icons.unarchive_outlined),
-            tooltip: context.l10n.extract,
-            onPressed: onExtractSelectedArchive,
-          ),
-        if (showShareOption && shown(FileItemAction.share))
-          IconButton(
-            icon: const Icon(Icons.share_rounded),
-            tooltip: context.l10n.shareAction,
-            onPressed: onShare,
-          ),
-        if (!isInsideArchive && shown(FileItemAction.copy))
-          IconButton(
-            icon: const Icon(Icons.copy_rounded),
-            tooltip: context.l10n.copyTooltip,
-            onPressed: onCopy,
-          ),
-        if (!isInsideArchive && shown(FileItemAction.move))
-          IconButton(
-            icon: Icon(
-              Icons.cut_rounded,
-              color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.5) : null,
-            ),
-            tooltip: readOnly ? context.l10n.readOnlyCantMoveTooltip : context.l10n.moveAction,
-            onPressed: onCut,
-          ),
-        if (!isInsideArchive && allowRenameAction && shown(FileItemAction.rename))
-          IconButton(
-            icon: Icon(
-              Icons.drive_file_rename_outline_rounded,
-              color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.5) : null,
-            ),
-            tooltip: readOnly ? context.l10n.readOnlyCantRenameTooltip : context.l10n.renameTooltip,
-            onPressed: onRename,
-          ),
-        if (!isInsideArchive && shown(FileItemAction.delete))
-          IconButton(
-            icon: Icon(
-              Icons.delete_outline_rounded,
-              color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.5) : cs.error,
-            ),
-            tooltip: readOnly ? context.l10n.readOnlyCantDeleteTooltip : context.l10n.delete,
-            onPressed: onDelete,
-          ),
+        ...visibleActionOrder.map(buildActionButton),
         PopupMenuButton<String>(
           icon: const Icon(Icons.more_vert_rounded),
           tooltip: context.l10n.moreOptionsTooltip,

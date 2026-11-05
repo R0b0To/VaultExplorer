@@ -28,6 +28,26 @@ const Map<String, FileItemAction> _actionForMenuValue = {
   'copy_path': FileItemAction.copyPath,
 };
 
+/// Orders a set of visible selection-bar actions by the user's configured
+/// item-action order. Actions absent from [order] keep their relative order
+/// after the configured actions, matching [applyItemActionMenuConfig].
+List<FileItemAction> orderFileItemActions(
+  Iterable<FileItemAction> actions, {
+  required List<FileItemAction> order,
+}) {
+  final rank = <FileItemAction, int>{
+    for (var i = 0; i < order.length; i++) order[i]: i,
+  };
+  final indexed = actions.indexed.toList();
+  indexed.sort((a, b) {
+    final byRank = (rank[a.$2] ?? order.length).compareTo(
+      rank[b.$2] ?? order.length,
+    );
+    return byRank != 0 ? byRank : a.$1.compareTo(b.$1);
+  });
+  return [for (final entry in indexed) entry.$2];
+}
+
 /// Applies the user's item-action configuration to a selection-bar overflow
 /// menu: drops the [hidden] actions and re-orders the rest by [order].
 ///

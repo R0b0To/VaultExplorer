@@ -6087,6 +6087,13 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         appBarToolbarConfig.useFabForToolbar,
         Object.hashAll(appBarToolbarConfig.visible),
         Object.hashAll(appBarToolbarConfig.hidden),
+        Object.hashAll(appBarToolbarConfig.itemActionsOrder),
+        Object.hashAll(
+          appBarToolbarConfig.hiddenItemActions
+              .map((action) => action.index)
+              .toList()
+            ..sort(),
+        ),
         Object.hashAll(appBarMountedDocProviderFolders),
         Object.hashAll(appBarPinnedPaths.toList()..sort()),
         Object.hashAll(appBarBookmarkPaths),

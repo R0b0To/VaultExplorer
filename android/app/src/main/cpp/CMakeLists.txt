@@ -587,6 +587,16 @@ if(NOT ANDROID)
     add_executable(kdf_table_test crypto/test/kdf_table_test.cpp crypto/kdf_table.cpp)
     add_executable(decrypted_block_cache_test io/test/decrypted_block_cache_test.cpp)
     add_executable(fd_write_buffer_test io/test/fd_write_buffer_test.cpp)
+    # UsbBlockCache coherence (write ordering across the two streams, read-ahead
+    # invalidation, failed-flush retry). Header-only class; jni_callbacks.h only
+    # declares JNI globals, so the stub <jni.h> from the ext backend host test
+    # is enough and no JDK is needed.
+    add_executable(usb_block_cache_test io/test/usb_block_cache_test.cpp)
+    target_include_directories(usb_block_cache_test PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/filesystems/test/host_stubs
+            ${CMAKE_CURRENT_SOURCE_DIR}/jni)
+    # Header-area arithmetic (backup header offsets, hidden-volume protected range).
+    add_executable(vc_geometry_test containers/test/vc_geometry_test.cpp)
     add_executable(cryfs_block_cipher_test
             test/cryfs_block_cipher_test.cpp
             crypto/cryfs_block_cipher.cpp
@@ -670,6 +680,8 @@ if(NOT ANDROID)
             kdf_table_test
             decrypted_block_cache_test
             fd_write_buffer_test
+            usb_block_cache_test
+            vc_geometry_test
             cryfs_block_cipher_test
             user_entropy_test
             utf16le_password_test
@@ -695,6 +707,8 @@ if(NOT ANDROID)
     add_test(NAME kdf_table_test COMMAND kdf_table_test)
     add_test(NAME decrypted_block_cache_test COMMAND decrypted_block_cache_test)
     add_test(NAME fd_write_buffer_test COMMAND fd_write_buffer_test)
+    add_test(NAME usb_block_cache_test COMMAND usb_block_cache_test)
+    add_test(NAME vc_geometry_test COMMAND vc_geometry_test)
     add_test(NAME cryfs_block_cipher_test COMMAND cryfs_block_cipher_test)
     add_test(NAME user_entropy_test COMMAND user_entropy_test)
     add_test(NAME utf16le_password_test COMMAND utf16le_password_test)

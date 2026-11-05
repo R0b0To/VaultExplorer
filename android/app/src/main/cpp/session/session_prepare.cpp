@@ -21,6 +21,7 @@
 #include "vhd_image.h"
 #include "container_header.h"
 #include "container_utils.h"
+#include "vc_geometry.h"
 #include "crypto/cascade.h"
 #include "crypto/cipher_shim.h"
 #include "crypto/keyfile_mixing.h"
@@ -1367,6 +1368,11 @@ bool enableHiddenVolumeProtection(
     // header, always equals VC_DATA_AREA_OFFSET past the container's own
     // byte 0 -- so this recovers that byte 0 in the same absolute
     // coordinate space physicalWrite() operates in, for either transport.
+    if (dataOffset < VC_DATA_AREA_OFFSET) {
+        LOGI("enableHiddenVolumeProtection(vol=%d): outer data offset %llu precedes the header group",
+             volId, (unsigned long long)dataOffset);
+        return false;
+    }
     const uint64_t containerBase = dataOffset - VC_DATA_AREA_OFFSET;
     const uint64_t hiddenHeaderOffset = containerBase + TC_HIDDEN_VOLUME_HEADER_OFFSET;
 
@@ -1391,40 +1397,45 @@ bool enableHiddenVolumeProtection(
         LOGI("enableHiddenVolumeProtection(vol=%d): hidden password/keyfiles did not match", volId);
         return false;
     }
-    // Mirrors createContainerWithHidden's own validity check (see
-    // container_create.cpp): a hidden volume can occupy at most everything
-    // past the outer volume's reserved header area.
-    if (!fields.isHiddenVolume() || fields.hiddenVolumeSize == 0 ||
-        fields.hiddenVolumeSize >= dataAreaLengthBytes + VC_DATA_AREA_OFFSET) {
+    if (!fields.isHiddenVolume() || fields.hiddenVolumeSize == 0) {
         LOGI("enableHiddenVolumeProtection(vol=%d): decrypted header is not a valid hidden volume", volId);
         return false;
     }
 
-    // See container_create.cpp's createContainerWithHidden: the hidden
-    // volume's data area always occupies the last hiddenVolumeSize bytes
-    // of the outer container, and the outer container's own total size is
-    // dataOffset + dataAreaLengthBytes + VC_DATA_AREA_OFFSET (the trailing
-    // header-group-sized area reserved, but never used for data, by every
-    // outer volume this app creates).
-    const uint64_t outerContainerEnd = dataOffset + dataAreaLengthBytes + VC_DATA_AREA_OFFSET;
+    // Protect exactly the interval the hidden header says its data occupies.
+    // For hidden volumes this app creates, that is [V-A-H, V-A): the data ends
+    // at the outer volume's trailing backup-header group, NOT at the end of the
+    // container. (Arming [V-H, V) instead left the first A bytes of the hidden
+    // volume -- where its boot sector and allocation tables are -- writable.)
+    // The helper also rejects a header whose area does not fit inside the
+    // container the outer volume implies, and returns coordinates in the same
+    // absolute space physicalWrite() compares against, for either transport.
+    uint64_t protectedStart = 0, protectedEnd = 0;
+    const uint64_t hiddenAreaLength =
+        fields.encryptedAreaLength != 0 ? fields.encryptedAreaLength : fields.hiddenVolumeSize;
+    if (!vcgeom::hiddenProtectedRange(dataOffset, dataAreaLengthBytes,
+                                      fields.encryptedAreaStart, hiddenAreaLength,
+                                      &protectedStart, &protectedEnd)) {
+        LOGI("enableHiddenVolumeProtection(vol=%d): hidden header geometry does not fit the container "
+             "(start=%llu length=%llu)", volId,
+             (unsigned long long)fields.encryptedAreaStart, (unsigned long long)hiddenAreaLength);
+        return false;
+    }
 
     {
         std::unique_lock<std::shared_mutex> lock(v.mutex);
         v.hiddenVolumeProtectionEnabled = true;
-        v.hiddenProtectedStart = outerContainerEnd - fields.hiddenVolumeSize;
-        v.hiddenProtectedEnd = outerContainerEnd;
+        v.hiddenProtectedStart = protectedStart;
+        v.hiddenProtectedEnd = protectedEnd;
         v.hiddenVolumeProtectionTriggered = false;
     }
-    LOGI("enableHiddenVolumeProtection(vol=%d): armed -- outerEnd=%llu hiddenSize=%llu "
+    LOGI("enableHiddenVolumeProtection(vol=%d): armed -- hiddenSize=%llu "
          "protected=[%llu,%llu) outerDataOffset=%llu outerDataAreaLen=%llu writableBytes=%llu",
          volId,
-         (unsigned long long)outerContainerEnd, (unsigned long long)fields.hiddenVolumeSize,
-         (unsigned long long)(outerContainerEnd - fields.hiddenVolumeSize),
-         (unsigned long long)outerContainerEnd,
+         (unsigned long long)hiddenAreaLength,
+         (unsigned long long)protectedStart, (unsigned long long)protectedEnd,
          (unsigned long long)dataOffset, (unsigned long long)dataAreaLengthBytes,
-         (unsigned long long)((outerContainerEnd - fields.hiddenVolumeSize) > dataOffset
-                                   ? (outerContainerEnd - fields.hiddenVolumeSize) - dataOffset
-                                   : 0));
+         (unsigned long long)(protectedStart > dataOffset ? protectedStart - dataOffset : 0));
     return true;
 }
 

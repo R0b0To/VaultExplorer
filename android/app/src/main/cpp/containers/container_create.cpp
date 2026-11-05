@@ -14,6 +14,7 @@
 #include "mbedtls/platform_util.h"
 #include "container_format.h"
 #include "container_utils.h"
+#include "vc_geometry.h"
 #include "crypto/cascade.h"
 #include "crypto/keyfile_mixing.h"
 #include "crypto/luks_header.h"
@@ -883,12 +884,63 @@ bool changeContainerPassword(int fd,
         memcpy(hdrSector,                  newSalt, VC_SALT_SIZE);
         memcpy(hdrSector + VC_SALT_SIZE,   encBody, VC_HEADER_BODY_SIZE);
 
-        if (pwrite(fd, hdrSector, VC_FULL_HEADER_SIZE, targetOffset) != VC_FULL_HEADER_SIZE) break;
+        // Locate the backup copy of this header slot from the real size of the
+        // container, the way VeraCrypt does (relative to its END). The header's
+        // volume-size field is the size of the data area, i.e. 2*A smaller than
+        // the container, so it cannot be used for this -- doing so used to put
+        // the "backup" 2*A too early, inside user data, and leave the genuine
+        // backup holding the old credentials. Everything is validated before
+        // the first byte is written so a refusal leaves the container untouched.
+        const bool hiddenSlot = (targetOffset != 0);
+        uint64_t containerSize = 0;
+        {
+            struct stat st;
+            if (fstat(fd, &st) == 0 && st.st_size > 0) {
+                containerSize = static_cast<uint64_t>(st.st_size);
+            } else {
+                const off_t end = lseek(fd, 0, SEEK_END);
+                if (end > 0) containerSize = static_cast<uint64_t>(end);
+            }
+        }
+        uint64_t backupOffset = 0;
+        if (!vcgeom::backupHeaderOffset(containerSize, hiddenSlot, &backupOffset)) {
+            LOGI("changeContainerPassword: cannot determine container size");
+            break;
+        }
+        const uint64_t dataAreaLen =
+            fields.encryptedAreaLength != 0 ? fields.encryptedAreaLength : fields.volumeSize;
+        const bool backupClearOfData =
+            vcgeom::headerClearOfDataArea(backupOffset, fields.encryptedAreaStart, dataAreaLen);
+        bool writeBackup = true;
+        if (!backupClearOfData) {
+            if (!hiddenSlot) {
+                // A normal volume whose data area reaches its own backup header
+                // is not a layout we understand; never write over user data.
+                LOGI("changeContainerPassword: backup header would overlap the data area");
+                break;
+            }
+            // Hidden volume laid out by an older version of this app: its data
+            // extends over the hidden backup slot, so there is none to update.
+            writeBackup = false;
+        }
 
-        if (targetOffset == 0) {
-            uint64_t containerVolumeSize = fields.volumeSize;
-            if (pwrite(fd, hdrSector, VC_FULL_HEADER_SIZE,
-                       static_cast<off_t>(containerVolumeSize - VC_DATA_AREA_OFFSET)) != VC_FULL_HEADER_SIZE) {
+        if (pwrite(fd, hdrSector, VC_FULL_HEADER_SIZE, static_cast<off_t>(targetOffset)) != VC_FULL_HEADER_SIZE) break;
+        if (writeBackup &&
+            pwrite(fd, hdrSector, VC_FULL_HEADER_SIZE, static_cast<off_t>(backupOffset)) != VC_FULL_HEADER_SIZE) {
+            break;
+        }
+
+        // Read both copies back: a header that did not land where intended must
+        // not be reported as a successful password change.
+        {
+            unsigned char verify[VC_FULL_HEADER_SIZE];
+            if (pread(fd, verify, VC_FULL_HEADER_SIZE, static_cast<off_t>(targetOffset)) != VC_FULL_HEADER_SIZE ||
+                memcmp(verify, hdrSector, VC_FULL_HEADER_SIZE) != 0) {
+                break;
+            }
+            if (writeBackup &&
+                (pread(fd, verify, VC_FULL_HEADER_SIZE, static_cast<off_t>(backupOffset)) != VC_FULL_HEADER_SIZE ||
+                 memcmp(verify, hdrSector, VC_FULL_HEADER_SIZE) != 0)) {
                 break;
             }
         }

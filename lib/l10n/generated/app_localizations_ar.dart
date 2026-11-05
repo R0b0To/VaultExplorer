@@ -5541,6 +5541,174 @@ class AppLocalizationsAr extends AppLocalizations {
   String get storageCategoryOther => 'أخرى';
 
   @override
+  String get storageAnalyzerTabMap => 'المخطط';
+
+  @override
+  String get storageAnalyzerTabFolders => 'المجلدات';
+
+  @override
+  String get storageAnalyzerTabTypes => 'الأنواع';
+
+  @override
+  String get storageAnalyzerTabCleanup => 'تنظيف';
+
+  @override
+  String storageAnalyzerFreeSpace(String free) {
+    return '$free فارغ';
+  }
+
+  @override
+  String storageAnalyzerFileCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count ملفات',
+      one: 'ملف واحد',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageAnalyzerItemCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count عناصر',
+      one: 'عنصر واحد',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageAnalyzerContentSize(String size) {
+    return 'محتوى الخزنة: $size';
+  }
+
+  @override
+  String storageAnalyzerScanProgress(String files, String size) {
+    return '$files ملفات · $size حتى الآن';
+  }
+
+  @override
+  String get storageAnalyzerPartialNotice =>
+      'تعذر قراءة بعض المجلدات بالكامل، لذا قد تكون الإجماليات أقل من الأرقام الفعلية.';
+
+  @override
+  String get storageAnalyzerStaleNotice =>
+      'تم تعديل وحدة التخزين هذه منذ آخر فحص.';
+
+  @override
+  String get storageAnalyzerUpOneLevel => 'مستوى للأعلى';
+
+  @override
+  String get storageAnalyzerEmptyFolder => 'هذا المجلد فارغ.';
+
+  @override
+  String storageAnalyzerSmallerItems(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count عناصر أصغر',
+      one: 'عنصر واحد أصغر',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get storageAnalyzerMapHint =>
+      'اضغط على مجلد لفتحه. اضغط مطولاً للتحديد.';
+
+  @override
+  String get storageAnalyzerSortFiles => 'عدد الملفات';
+
+  @override
+  String get storageAnalyzerAllTypes => 'جميع الأنواع';
+
+  @override
+  String storageAnalyzerLargestOfType(String type) {
+    return 'أكبر الملفات · $type';
+  }
+
+  @override
+  String get storageAnalyzerCleanupHeader => 'اقتراحات';
+
+  @override
+  String get storageAnalyzerCleanupLarge => 'ملفات كبيرة';
+
+  @override
+  String get storageAnalyzerCleanupStale => 'لم يتم تعديلها منذ أكثر من عام';
+
+  @override
+  String get storageAnalyzerCleanupTemp => 'ملفات مؤقتة وغير ضرورية';
+
+  @override
+  String get storageAnalyzerCleanupEmpty => 'مجلدات فارغة';
+
+  @override
+  String get storageAnalyzerCleanupReview => 'مراجعة';
+
+  @override
+  String get storageAnalyzerCleanupNothing =>
+      'لا توجد ملفات واضحة للتنظيف. وحدة التخزين هذه مرتبة.';
+
+  @override
+  String get storageAnalyzerBiggestFiles => 'أكبر الملفات';
+
+  @override
+  String get storageAnalyzerBiggestFilesSubtitle =>
+      'استعرض أكبر الملفات في وحدة التخزين هذه';
+
+  @override
+  String get storageAnalyzerAllSuggestions => 'جميع الاقتراحات';
+
+  @override
+  String storageAnalyzerSelectedSummary(int count, String size) {
+    return 'تم تحديد $count · $size';
+  }
+
+  @override
+  String storageAnalyzerDeleteFilesMessage(String size) {
+    return 'سيؤدي هذا إلى مسح العناصر المحددة نهائياً من وحدة التخزين المشفرة وتوفير $size. لا يمكن التراجع عن هذا الإجراء.';
+  }
+
+  @override
+  String storageAnalyzerDeleteFoldersMessage(String files, String size) {
+    return 'سيؤدي هذا إلى مسح العناصر المحددة نهائياً ($files ملفات في الإجمالي بما في ذلك كل شيء داخل أي مجلد محدد) وتوفير $size. لا يمكن التراجع عن هذا الإجراء.';
+  }
+
+  @override
+  String storageAnalyzerDeleteDone(String size) {
+    return 'تم توفير $size';
+  }
+
+  @override
+  String storageAnalyzerDeletePartial(
+    String deleted,
+    String failed,
+    String size,
+  ) {
+    return 'تم حذف $deleted، ولكن تعذر حذف $failed. تم توفير $size.';
+  }
+
+  @override
+  String get storageAnalyzerDeleteNone => 'لم يتم حذف أي شيء.';
+
+  @override
+  String get storageAnalyzerDeleteError => 'تعذر حذف العناصر المحددة.';
+
+  @override
+  String get storageAnalyzerRescanFolder => 'إعادة فحص هذا المجلد';
+
+  @override
+  String get storageAnalyzerSelectAction => 'تحديد';
+
+  @override
+  String get storageAnalyzerSelectAllHere => 'تحديد الكل في هذا المجلد';
+
+  @override
+  String get storageAnalyzerOpenFolder => 'فتح المجلد';
+
+  @override
   String get keyfilePassphraseGeneratorTitle =>
       'مولّد ملفات المفاتيح وعبارات المرور';
 

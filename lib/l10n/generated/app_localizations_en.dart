@@ -5365,6 +5365,175 @@ class AppLocalizationsEn extends AppLocalizations {
   String get storageCategoryOther => 'Other';
 
   @override
+  String get storageAnalyzerTabMap => 'Map';
+
+  @override
+  String get storageAnalyzerTabFolders => 'Folders';
+
+  @override
+  String get storageAnalyzerTabTypes => 'Types';
+
+  @override
+  String get storageAnalyzerTabCleanup => 'Cleanup';
+
+  @override
+  String storageAnalyzerFreeSpace(String free) {
+    return '$free free';
+  }
+
+  @override
+  String storageAnalyzerFileCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count files',
+      one: '1 file',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageAnalyzerItemCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items',
+      one: '1 item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageAnalyzerContentSize(String size) {
+    return 'Vault content: $size';
+  }
+
+  @override
+  String storageAnalyzerScanProgress(String files, String size) {
+    return '$files files · $size so far';
+  }
+
+  @override
+  String get storageAnalyzerPartialNotice =>
+      'Some folders couldn\'t be fully read, so totals may be lower than the real figures.';
+
+  @override
+  String get storageAnalyzerStaleNotice =>
+      'This volume has changed since it was scanned.';
+
+  @override
+  String get storageAnalyzerUpOneLevel => 'Up one level';
+
+  @override
+  String get storageAnalyzerEmptyFolder => 'This folder is empty.';
+
+  @override
+  String storageAnalyzerSmallerItems(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count smaller items',
+      one: '1 smaller item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get storageAnalyzerMapHint =>
+      'Tap a folder to open it. Press and hold to select.';
+
+  @override
+  String get storageAnalyzerSortFiles => 'File count';
+
+  @override
+  String get storageAnalyzerAllTypes => 'All types';
+
+  @override
+  String storageAnalyzerLargestOfType(String type) {
+    return 'Largest files · $type';
+  }
+
+  @override
+  String get storageAnalyzerCleanupHeader => 'Suggestions';
+
+  @override
+  String get storageAnalyzerCleanupLarge => 'Large files';
+
+  @override
+  String get storageAnalyzerCleanupStale => 'Not modified in over a year';
+
+  @override
+  String get storageAnalyzerCleanupTemp => 'Temporary and junk files';
+
+  @override
+  String get storageAnalyzerCleanupEmpty => 'Empty folders';
+
+  @override
+  String get storageAnalyzerCleanupReview => 'Review';
+
+  @override
+  String get storageAnalyzerCleanupNothing =>
+      'Nothing obvious to clean up. This volume looks tidy.';
+
+  @override
+  String get storageAnalyzerBiggestFiles => 'Biggest files';
+
+  @override
+  String get storageAnalyzerBiggestFilesSubtitle =>
+      'Browse the largest files on this volume';
+
+  @override
+  String get storageAnalyzerAllSuggestions => 'All suggestions';
+
+  @override
+  String storageAnalyzerSelectedSummary(int count, String size) {
+    return '$count selected · $size';
+  }
+
+  @override
+  String storageAnalyzerDeleteFilesMessage(String size) {
+    return 'This permanently erases the selected items from your encrypted volume and frees $size. It can\'t be undone.';
+  }
+
+  @override
+  String storageAnalyzerDeleteFoldersMessage(String files, String size) {
+    return 'This permanently erases the selected items, $files files in total including everything inside any selected folder, and frees $size. It can\'t be undone.';
+  }
+
+  @override
+  String storageAnalyzerDeleteDone(String size) {
+    return 'Freed $size';
+  }
+
+  @override
+  String storageAnalyzerDeletePartial(
+    String deleted,
+    String failed,
+    String size,
+  ) {
+    return 'Deleted $deleted, but $failed couldn\'t be deleted. Freed $size.';
+  }
+
+  @override
+  String get storageAnalyzerDeleteNone => 'Nothing was deleted.';
+
+  @override
+  String get storageAnalyzerDeleteError =>
+      'Couldn\'t delete the selected items.';
+
+  @override
+  String get storageAnalyzerRescanFolder => 'Rescan this folder';
+
+  @override
+  String get storageAnalyzerSelectAction => 'Select';
+
+  @override
+  String get storageAnalyzerSelectAllHere => 'Select all in this folder';
+
+  @override
+  String get storageAnalyzerOpenFolder => 'Open folder';
+
+  @override
   String get keyfilePassphraseGeneratorTitle =>
       'Keyfile & Passphrase Generator';
 

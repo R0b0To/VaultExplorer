@@ -6869,6 +6869,237 @@
   "@storageCategoryOther": {
     "description": "Storage Analyzer file-type category: everything not otherwise classified"
   },
+  "storageAnalyzerTabMap": "Map",
+  "@storageAnalyzerTabMap": {
+    "description": "Storage Analyzer tab: treemap of the current folder"
+  },
+  "storageAnalyzerTabFolders": "Folders",
+  "@storageAnalyzerTabFolders": {
+    "description": "Storage Analyzer tab: sortable list of the current folder"
+  },
+  "storageAnalyzerTabTypes": "Types",
+  "@storageAnalyzerTabTypes": {
+    "description": "Storage Analyzer tab: usage grouped by file type"
+  },
+  "storageAnalyzerTabCleanup": "Cleanup",
+  "@storageAnalyzerTabCleanup": {
+    "description": "Storage Analyzer tab: suggestions for freeing space"
+  },
+  "storageAnalyzerFreeSpace": "{free} free",
+  "@storageAnalyzerFreeSpace": {
+    "description": "Free space on the volume, shown beside the capacity gauge",
+    "placeholders": {
+      "free": {
+        "type": "String"
+      }
+    }
+  },
+  "storageAnalyzerFileCount": "{count, plural, =1{1 file} other{{count} files}}",
+  "@storageAnalyzerFileCount": {
+    "description": "Number of files in a folder or selection",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "storageAnalyzerItemCount": "{count, plural, =1{1 item} other{{count} items}}",
+  "@storageAnalyzerItemCount": {
+    "description": "Number of items in a cleanup suggestion",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "storageAnalyzerContentSize": "Vault content: {size}",
+  "@storageAnalyzerContentSize": {
+    "description": "Total size of the files found, shown when the volume capacity is unknown",
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "storageAnalyzerScanProgress": "{files} files · {size} so far",
+  "@storageAnalyzerScanProgress": {
+    "description": "Live tally while the volume is being scanned",
+    "placeholders": {
+      "files": {
+        "type": "String"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "storageAnalyzerPartialNotice": "Some folders couldn't be fully read, so totals may be lower than the real figures.",
+  "@storageAnalyzerPartialNotice": {
+    "description": "Banner shown when some folders could not be listed completely during a scan"
+  },
+  "storageAnalyzerStaleNotice": "This volume has changed since it was scanned.",
+  "@storageAnalyzerStaleNotice": {
+    "description": "Banner shown when the volume was modified elsewhere after the scan"
+  },
+  "storageAnalyzerUpOneLevel": "Up one level",
+  "@storageAnalyzerUpOneLevel": {
+    "description": "Tooltip for the button that goes to the parent folder"
+  },
+  "storageAnalyzerEmptyFolder": "This folder is empty.",
+  "@storageAnalyzerEmptyFolder": {
+    "description": "Shown when the folder being viewed has no content"
+  },
+  "storageAnalyzerSmallerItems": "{count, plural, =1{1 smaller item} other{{count} smaller items}}",
+  "@storageAnalyzerSmallerItems": {
+    "description": "Label of the treemap tile that groups many items too small to draw",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "storageAnalyzerMapHint": "Tap a folder to open it. Press and hold to select.",
+  "@storageAnalyzerMapHint": {
+    "description": "Hint below the storage treemap"
+  },
+  "storageAnalyzerSortFiles": "File count",
+  "@storageAnalyzerSortFiles": {
+    "description": "Sort option: folders with the most files first"
+  },
+  "storageAnalyzerAllTypes": "All types",
+  "@storageAnalyzerAllTypes": {
+    "description": "Button that clears the file-type filter"
+  },
+  "storageAnalyzerLargestOfType": "Largest files · {type}",
+  "@storageAnalyzerLargestOfType": {
+    "description": "Header above the biggest files of one file type",
+    "placeholders": {
+      "type": {
+        "type": "String"
+      }
+    }
+  },
+  "storageAnalyzerCleanupHeader": "Suggestions",
+  "@storageAnalyzerCleanupHeader": {
+    "description": "Section header for cleanup suggestions"
+  },
+  "storageAnalyzerCleanupLarge": "Large files",
+  "@storageAnalyzerCleanupLarge": {
+    "description": "Cleanup suggestion title: the biggest files"
+  },
+  "storageAnalyzerCleanupStale": "Not modified in over a year",
+  "@storageAnalyzerCleanupStale": {
+    "description": "Cleanup suggestion title: files nobody has touched for a year"
+  },
+  "storageAnalyzerCleanupTemp": "Temporary and junk files",
+  "@storageAnalyzerCleanupTemp": {
+    "description": "Cleanup suggestion title: leftover download, backup and cache files"
+  },
+  "storageAnalyzerCleanupEmpty": "Empty folders",
+  "@storageAnalyzerCleanupEmpty": {
+    "description": "Cleanup suggestion title: folders with nothing in them"
+  },
+  "storageAnalyzerCleanupReview": "Review",
+  "@storageAnalyzerCleanupReview": {
+    "description": "Button that opens a cleanup suggestion for review"
+  },
+  "storageAnalyzerCleanupNothing": "Nothing obvious to clean up. This volume looks tidy.",
+  "@storageAnalyzerCleanupNothing": {
+    "description": "Shown when there are no cleanup suggestions"
+  },
+  "storageAnalyzerBiggestFiles": "Biggest files",
+  "@storageAnalyzerBiggestFiles": {
+    "description": "Card title that opens a list of the largest files"
+  },
+  "storageAnalyzerBiggestFilesSubtitle": "Browse the largest files on this volume",
+  "@storageAnalyzerBiggestFilesSubtitle": {
+    "description": "Card subtitle for the biggest-files list"
+  },
+  "storageAnalyzerAllSuggestions": "All suggestions",
+  "@storageAnalyzerAllSuggestions": {
+    "description": "Button that returns from a reviewed suggestion to the list of suggestions"
+  },
+  "storageAnalyzerSelectedSummary": "{count} selected · {size}",
+  "@storageAnalyzerSelectedSummary": {
+    "description": "Selection bar: how many items are selected and how much space they use",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "storageAnalyzerDeleteFilesMessage": "This permanently erases the selected items from your encrypted volume and frees {size}. It can't be undone.",
+  "@storageAnalyzerDeleteFilesMessage": {
+    "description": "Confirmation text for deleting files from the Storage Analyzer",
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "storageAnalyzerDeleteFoldersMessage": "This permanently erases the selected items, {files} files in total including everything inside any selected folder, and frees {size}. It can't be undone.",
+  "@storageAnalyzerDeleteFoldersMessage": {
+    "description": "Confirmation text for deleting a selection that includes folders",
+    "placeholders": {
+      "files": {
+        "type": "String"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "storageAnalyzerDeleteDone": "Freed {size}",
+  "@storageAnalyzerDeleteDone": {
+    "description": "Snackbar after a successful delete from the Storage Analyzer",
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "storageAnalyzerDeletePartial": "Deleted {deleted}, but {failed} couldn't be deleted. Freed {size}.",
+  "@storageAnalyzerDeletePartial": {
+    "description": "Snackbar when only some of the selected items could be deleted",
+    "placeholders": {
+      "deleted": {
+        "type": "String"
+      },
+      "failed": {
+        "type": "String"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "storageAnalyzerDeleteNone": "Nothing was deleted.",
+  "@storageAnalyzerDeleteNone": {
+    "description": "Snackbar when none of the selected items could be deleted"
+  },
+  "storageAnalyzerDeleteError": "Couldn't delete the selected items.",
+  "@storageAnalyzerDeleteError": {
+    "description": "Snackbar when a delete from the Storage Analyzer failed unexpectedly"
+  },
+  "storageAnalyzerRescanFolder": "Rescan this folder",
+  "@storageAnalyzerRescanFolder": {
+    "description": "Action: rescan only the folder being acted on"
+  },
+  "storageAnalyzerSelectAction": "Select",
+  "@storageAnalyzerSelectAction": {
+    "description": "Action that starts selecting items in the Storage Analyzer"
+  },
+  "storageAnalyzerSelectAllHere": "Select all in this folder",
+  "@storageAnalyzerSelectAllHere": {
+    "description": "Action: tick every item in the folder being viewed"
+  },
+  "storageAnalyzerOpenFolder": "Open folder",
+  "@storageAnalyzerOpenFolder": {
+    "description": "Action: drill into a folder in the Storage Analyzer"
+  },
   "keyfilePassphraseGeneratorTitle": "Keyfile & Passphrase Generator",
   "@keyfilePassphraseGeneratorTitle": {
     "description": "Title for Keyfile & Passphrase Generator tool"

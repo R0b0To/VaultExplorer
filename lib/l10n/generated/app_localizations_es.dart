@@ -5458,6 +5458,175 @@ class AppLocalizationsEs extends AppLocalizations {
   String get storageCategoryOther => 'Otro';
 
   @override
+  String get storageAnalyzerTabMap => 'Mapa';
+
+  @override
+  String get storageAnalyzerTabFolders => 'Carpetas';
+
+  @override
+  String get storageAnalyzerTabTypes => 'Tipos';
+
+  @override
+  String get storageAnalyzerTabCleanup => 'Limpieza';
+
+  @override
+  String storageAnalyzerFreeSpace(String free) {
+    return '$free libre';
+  }
+
+  @override
+  String storageAnalyzerFileCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count archivos',
+      one: '1 archivo',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageAnalyzerItemCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count elementos',
+      one: '1 elemento',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageAnalyzerContentSize(String size) {
+    return 'Contenido de la bóveda: $size';
+  }
+
+  @override
+  String storageAnalyzerScanProgress(String files, String size) {
+    return '$files archivos · $size hasta ahora';
+  }
+
+  @override
+  String get storageAnalyzerPartialNotice =>
+      'No se pudieron leer algunas carpetas por completo, por lo que los totales pueden ser inferiores a las cifras reales.';
+
+  @override
+  String get storageAnalyzerStaleNotice =>
+      'Este volumen ha cambiado desde que se analizó.';
+
+  @override
+  String get storageAnalyzerUpOneLevel => 'Subir un nivel';
+
+  @override
+  String get storageAnalyzerEmptyFolder => 'Esta carpeta está vacía.';
+
+  @override
+  String storageAnalyzerSmallerItems(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count elementos más pequeños',
+      one: '1 elemento más pequeño',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get storageAnalyzerMapHint =>
+      'Toca una carpeta para abrirla. Mantén presionado para seleccionar.';
+
+  @override
+  String get storageAnalyzerSortFiles => 'Cantidad de archivos';
+
+  @override
+  String get storageAnalyzerAllTypes => 'Todos los tipos';
+
+  @override
+  String storageAnalyzerLargestOfType(String type) {
+    return 'Archivos más grandes · $type';
+  }
+
+  @override
+  String get storageAnalyzerCleanupHeader => 'Sugerencias';
+
+  @override
+  String get storageAnalyzerCleanupLarge => 'Archivos grandes';
+
+  @override
+  String get storageAnalyzerCleanupStale => 'No modificado en más de un año';
+
+  @override
+  String get storageAnalyzerCleanupTemp => 'Archivos temporales y basura';
+
+  @override
+  String get storageAnalyzerCleanupEmpty => 'Carpetas vacías';
+
+  @override
+  String get storageAnalyzerCleanupReview => 'Revisar';
+
+  @override
+  String get storageAnalyzerCleanupNothing =>
+      'Nada obvio para limpiar. Este volumen se ve ordenado.';
+
+  @override
+  String get storageAnalyzerBiggestFiles => 'Archivos más grandes';
+
+  @override
+  String get storageAnalyzerBiggestFilesSubtitle =>
+      'Explora los archivos más grandes en este volumen';
+
+  @override
+  String get storageAnalyzerAllSuggestions => 'Todas las sugerencias';
+
+  @override
+  String storageAnalyzerSelectedSummary(int count, String size) {
+    return '$count seleccionados · $size';
+  }
+
+  @override
+  String storageAnalyzerDeleteFilesMessage(String size) {
+    return 'Esto borrará permanentemente los elementos seleccionados de tu volumen cifrado y liberará $size. Esta acción no se puede deshacer.';
+  }
+
+  @override
+  String storageAnalyzerDeleteFoldersMessage(String files, String size) {
+    return 'Esto borrará permanentemente los elementos seleccionados ($files archivos en total, incluyendo todo el contenido de las carpetas seleccionadas) y liberará $size. Esta acción no se puede deshacer.';
+  }
+
+  @override
+  String storageAnalyzerDeleteDone(String size) {
+    return '$size liberados';
+  }
+
+  @override
+  String storageAnalyzerDeletePartial(
+    String deleted,
+    String failed,
+    String size,
+  ) {
+    return 'Se eliminaron $deleted, pero no se pudieron eliminar $failed. Se liberaron $size.';
+  }
+
+  @override
+  String get storageAnalyzerDeleteNone => 'No se eliminó nada.';
+
+  @override
+  String get storageAnalyzerDeleteError =>
+      'No se pudieron eliminar los elementos seleccionados.';
+
+  @override
+  String get storageAnalyzerRescanFolder => 'Volver a analizar esta carpeta';
+
+  @override
+  String get storageAnalyzerSelectAction => 'Seleccionar';
+
+  @override
+  String get storageAnalyzerSelectAllHere => 'Seleccionar todo en esta carpeta';
+
+  @override
+  String get storageAnalyzerOpenFolder => 'Abrir carpeta';
+
+  @override
   String get keyfilePassphraseGeneratorTitle =>
       'Generador de archivos clave y frases de contraseña';
 

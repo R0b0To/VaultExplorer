@@ -890,6 +890,7 @@ class _MainShellState extends ConsumerState<MainShell>
             child: ToolsScreen(
               mountedContainers: _mountedNotifier,
               onNavigateTab: _onTabTap,
+              onOpenInBrowser: _openBrowser,
             ),
           )
         else

@@ -5503,6 +5503,178 @@ class AppLocalizationsUk extends AppLocalizations {
   String get storageCategoryOther => 'Інше';
 
   @override
+  String get storageAnalyzerTabMap => 'Карта';
+
+  @override
+  String get storageAnalyzerTabFolders => 'Папки';
+
+  @override
+  String get storageAnalyzerTabTypes => 'Типи';
+
+  @override
+  String get storageAnalyzerTabCleanup => 'Очищення';
+
+  @override
+  String storageAnalyzerFreeSpace(String free) {
+    return '$free вільно';
+  }
+
+  @override
+  String storageAnalyzerFileCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count файлів',
+      few: '$count файли',
+      one: '1 файл',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageAnalyzerItemCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count елементів',
+      few: '$count елементи',
+      one: '1 елемент',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageAnalyzerContentSize(String size) {
+    return 'Вміст сховища: $size';
+  }
+
+  @override
+  String storageAnalyzerScanProgress(String files, String size) {
+    return 'Файлів: $files · $size на цей час';
+  }
+
+  @override
+  String get storageAnalyzerPartialNotice =>
+      'Деякі папки не вдалося прочитати повністю, тому підсумкові значення можуть бути меншими за реальні.';
+
+  @override
+  String get storageAnalyzerStaleNotice =>
+      'Цей том було змінено після сканування.';
+
+  @override
+  String get storageAnalyzerUpOneLevel => 'На один рівень вгору';
+
+  @override
+  String get storageAnalyzerEmptyFolder => 'Ця папка порожня.';
+
+  @override
+  String storageAnalyzerSmallerItems(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count менших елементів',
+      few: '$count менші елементи',
+      one: '1 менший елемент',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get storageAnalyzerMapHint =>
+      'Торкніться папки, щоб відкрити її. Натисніть і утримуйте для вибору.';
+
+  @override
+  String get storageAnalyzerSortFiles => 'Кількість файлів';
+
+  @override
+  String get storageAnalyzerAllTypes => 'Усі типи';
+
+  @override
+  String storageAnalyzerLargestOfType(String type) {
+    return 'Найбільші файли · $type';
+  }
+
+  @override
+  String get storageAnalyzerCleanupHeader => 'Пропозиції';
+
+  @override
+  String get storageAnalyzerCleanupLarge => 'Великі файли';
+
+  @override
+  String get storageAnalyzerCleanupStale => 'Не змінювалися понад рік';
+
+  @override
+  String get storageAnalyzerCleanupTemp => 'Тимчасові та непотрібні файли';
+
+  @override
+  String get storageAnalyzerCleanupEmpty => 'Порожні папки';
+
+  @override
+  String get storageAnalyzerCleanupReview => 'Переглянути';
+
+  @override
+  String get storageAnalyzerCleanupNothing =>
+      'Немає очевидних елементів для очищення. Цей том виглядає охайним.';
+
+  @override
+  String get storageAnalyzerBiggestFiles => 'Найбільші файли';
+
+  @override
+  String get storageAnalyzerBiggestFilesSubtitle =>
+      'Переглянути найбільші файли на цьому томі';
+
+  @override
+  String get storageAnalyzerAllSuggestions => 'Усі пропозиції';
+
+  @override
+  String storageAnalyzerSelectedSummary(int count, String size) {
+    return 'Вибрано $count · $size';
+  }
+
+  @override
+  String storageAnalyzerDeleteFilesMessage(String size) {
+    return 'Це назавжди видалить вибрані елементи із зашифрованого тому та звільнить $size. Цю дію неможливо скасувати.';
+  }
+
+  @override
+  String storageAnalyzerDeleteFoldersMessage(String files, String size) {
+    return 'Це назавжди видалить вибрані елементи ($files файлів загалом, включно з усім вмістом вибраних папок) та звільнить $size. Цю дію неможливо скасувати.';
+  }
+
+  @override
+  String storageAnalyzerDeleteDone(String size) {
+    return 'Звільнено $size';
+  }
+
+  @override
+  String storageAnalyzerDeletePartial(
+    String deleted,
+    String failed,
+    String size,
+  ) {
+    return 'Видалено $deleted, але не вдалося видалити $failed. Звільнено $size.';
+  }
+
+  @override
+  String get storageAnalyzerDeleteNone => 'Нічого не було видалено.';
+
+  @override
+  String get storageAnalyzerDeleteError =>
+      'Не вдалося видалити вибрані елементи.';
+
+  @override
+  String get storageAnalyzerRescanFolder => 'Повторно сканувати цю папку';
+
+  @override
+  String get storageAnalyzerSelectAction => 'Вибрати';
+
+  @override
+  String get storageAnalyzerSelectAllHere => 'Вибрати все в цій папці';
+
+  @override
+  String get storageAnalyzerOpenFolder => 'Відкрити папку';
+
+  @override
   String get keyfilePassphraseGeneratorTitle =>
       'Генератор паролів і ключових файлів';
 

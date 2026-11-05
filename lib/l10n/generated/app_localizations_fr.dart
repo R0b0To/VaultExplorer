@@ -5491,6 +5491,176 @@ class AppLocalizationsFr extends AppLocalizations {
   String get storageCategoryOther => 'Autre';
 
   @override
+  String get storageAnalyzerTabMap => 'Carte';
+
+  @override
+  String get storageAnalyzerTabFolders => 'Dossiers';
+
+  @override
+  String get storageAnalyzerTabTypes => 'Types';
+
+  @override
+  String get storageAnalyzerTabCleanup => 'Nettoyage';
+
+  @override
+  String storageAnalyzerFreeSpace(String free) {
+    return '$free libre';
+  }
+
+  @override
+  String storageAnalyzerFileCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count fichiers',
+      one: '1 fichier',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageAnalyzerItemCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count éléments',
+      one: '1 élément',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageAnalyzerContentSize(String size) {
+    return 'Contenu du coffre-fort : $size';
+  }
+
+  @override
+  String storageAnalyzerScanProgress(String files, String size) {
+    return '$files fichiers · $size jusqu\'à présent';
+  }
+
+  @override
+  String get storageAnalyzerPartialNotice =>
+      'Certains dossiers n\'ont pas pu être entièrement lus, les totaux peuvent donc être inférieurs aux chiffres réels.';
+
+  @override
+  String get storageAnalyzerStaleNotice =>
+      'Ce volume a été modifié depuis sa dernière analyse.';
+
+  @override
+  String get storageAnalyzerUpOneLevel => 'Dossier parent';
+
+  @override
+  String get storageAnalyzerEmptyFolder => 'Ce dossier est vide.';
+
+  @override
+  String storageAnalyzerSmallerItems(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count éléments plus petits',
+      one: '1 élément plus petit',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get storageAnalyzerMapHint =>
+      'Appuyez sur un dossier pour l\'ouvrir. Maintenez enfoncé pour sélectionner.';
+
+  @override
+  String get storageAnalyzerSortFiles => 'Nombre de fichiers';
+
+  @override
+  String get storageAnalyzerAllTypes => 'Tous les types';
+
+  @override
+  String storageAnalyzerLargestOfType(String type) {
+    return 'Fichiers les plus volumineux · $type';
+  }
+
+  @override
+  String get storageAnalyzerCleanupHeader => 'Suggestions';
+
+  @override
+  String get storageAnalyzerCleanupLarge => 'Fichiers volumineux';
+
+  @override
+  String get storageAnalyzerCleanupStale => 'Non modifié depuis plus d\'un an';
+
+  @override
+  String get storageAnalyzerCleanupTemp => 'Fichiers temporaires et superflus';
+
+  @override
+  String get storageAnalyzerCleanupEmpty => 'Dossiers vides';
+
+  @override
+  String get storageAnalyzerCleanupReview => 'Examiner';
+
+  @override
+  String get storageAnalyzerCleanupNothing =>
+      'Rien d\'évident à nettoyer. Ce volume semble bien ordonné.';
+
+  @override
+  String get storageAnalyzerBiggestFiles => 'Fichiers les plus volumineux';
+
+  @override
+  String get storageAnalyzerBiggestFilesSubtitle =>
+      'Parcourir les fichiers les plus volumineux de ce volume';
+
+  @override
+  String get storageAnalyzerAllSuggestions => 'Toutes les suggestions';
+
+  @override
+  String storageAnalyzerSelectedSummary(int count, String size) {
+    return '$count sélectionné(s) · $size';
+  }
+
+  @override
+  String storageAnalyzerDeleteFilesMessage(String size) {
+    return 'Cette opération effacera définitivement les éléments sélectionnés de votre volume chiffré et libérera $size. Cette action est irréversible.';
+  }
+
+  @override
+  String storageAnalyzerDeleteFoldersMessage(String files, String size) {
+    return 'Cette opération effacera définitivement les éléments sélectionnés ($files fichiers au total, y compris tout le contenu des dossiers sélectionnés) et libérera $size. Cette action est irréversible.';
+  }
+
+  @override
+  String storageAnalyzerDeleteDone(String size) {
+    return '$size libérés';
+  }
+
+  @override
+  String storageAnalyzerDeletePartial(
+    String deleted,
+    String failed,
+    String size,
+  ) {
+    return '$deleted supprimés, mais $failed n\'ont pas pu être supprimés. $size libérés.';
+  }
+
+  @override
+  String get storageAnalyzerDeleteNone => 'Rien n\'a été supprimé.';
+
+  @override
+  String get storageAnalyzerDeleteError =>
+      'Impossible de supprimer les éléments sélectionnés.';
+
+  @override
+  String get storageAnalyzerRescanFolder => 'Réanalyser ce dossier';
+
+  @override
+  String get storageAnalyzerSelectAction => 'Sélectionner';
+
+  @override
+  String get storageAnalyzerSelectAllHere =>
+      'Tout sélectionner dans ce dossier';
+
+  @override
+  String get storageAnalyzerOpenFolder => 'Ouvrir le dossier';
+
+  @override
   String get keyfilePassphraseGeneratorTitle =>
       'Générateur de fichiers-clés et de phrases de passe';
 

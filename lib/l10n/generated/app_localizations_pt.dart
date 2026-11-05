@@ -5456,6 +5456,176 @@ class AppLocalizationsPt extends AppLocalizations {
   String get storageCategoryOther => 'Outro';
 
   @override
+  String get storageAnalyzerTabMap => 'Mapa';
+
+  @override
+  String get storageAnalyzerTabFolders => 'Pastas';
+
+  @override
+  String get storageAnalyzerTabTypes => 'Tipos';
+
+  @override
+  String get storageAnalyzerTabCleanup => 'Limpeza';
+
+  @override
+  String storageAnalyzerFreeSpace(String free) {
+    return '$free livre';
+  }
+
+  @override
+  String storageAnalyzerFileCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count arquivos',
+      one: '1 arquivo',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageAnalyzerItemCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count itens',
+      one: '1 item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageAnalyzerContentSize(String size) {
+    return 'Conteúdo do cofre: $size';
+  }
+
+  @override
+  String storageAnalyzerScanProgress(String files, String size) {
+    return '$files arquivos · $size até agora';
+  }
+
+  @override
+  String get storageAnalyzerPartialNotice =>
+      'Algumas pastas não puderam ser totalmente lidas, portanto os totais podem ser inferiores aos reais.';
+
+  @override
+  String get storageAnalyzerStaleNotice =>
+      'Este volume foi alterado desde a verificação.';
+
+  @override
+  String get storageAnalyzerUpOneLevel => 'Um nível acima';
+
+  @override
+  String get storageAnalyzerEmptyFolder => 'Esta pasta está vazia.';
+
+  @override
+  String storageAnalyzerSmallerItems(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count itens menores',
+      one: '1 item menor',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get storageAnalyzerMapHint =>
+      'Toque em uma pasta para abri-la. Mantenha pressionado para selecionar.';
+
+  @override
+  String get storageAnalyzerSortFiles => 'Contagem de arquivos';
+
+  @override
+  String get storageAnalyzerAllTypes => 'Todos os tipos';
+
+  @override
+  String storageAnalyzerLargestOfType(String type) {
+    return 'Maiores arquivos · $type';
+  }
+
+  @override
+  String get storageAnalyzerCleanupHeader => 'Sugestões';
+
+  @override
+  String get storageAnalyzerCleanupLarge => 'Arquivos grandes';
+
+  @override
+  String get storageAnalyzerCleanupStale => 'Não modificado há mais de um ano';
+
+  @override
+  String get storageAnalyzerCleanupTemp =>
+      'Arquivos temporários e desnecessários';
+
+  @override
+  String get storageAnalyzerCleanupEmpty => 'Pastas vazias';
+
+  @override
+  String get storageAnalyzerCleanupReview => 'Revisar';
+
+  @override
+  String get storageAnalyzerCleanupNothing =>
+      'Nada óbvio para limpar. Este volume parece organizado.';
+
+  @override
+  String get storageAnalyzerBiggestFiles => 'Maiores arquivos';
+
+  @override
+  String get storageAnalyzerBiggestFilesSubtitle =>
+      'Navegue pelos maiores arquivos neste volume';
+
+  @override
+  String get storageAnalyzerAllSuggestions => 'Todas as sugestões';
+
+  @override
+  String storageAnalyzerSelectedSummary(int count, String size) {
+    return '$count selecionados · $size';
+  }
+
+  @override
+  String storageAnalyzerDeleteFilesMessage(String size) {
+    return 'Isso apagará permanentemente os itens selecionados do seu volume criptografado e liberará $size. Essa ação não pode ser desfeita.';
+  }
+
+  @override
+  String storageAnalyzerDeleteFoldersMessage(String files, String size) {
+    return 'Isso apagará permanentemente os itens selecionados ($files arquivos no total, incluindo tudo dentro de qualquer pasta selecionada) e liberará $size. Essa ação não pode ser desfeita.';
+  }
+
+  @override
+  String storageAnalyzerDeleteDone(String size) {
+    return '$size liberados';
+  }
+
+  @override
+  String storageAnalyzerDeletePartial(
+    String deleted,
+    String failed,
+    String size,
+  ) {
+    return '$deleted excluídos, mas $failed não puderam ser excluídos. $size liberados.';
+  }
+
+  @override
+  String get storageAnalyzerDeleteNone => 'Nada foi excluído.';
+
+  @override
+  String get storageAnalyzerDeleteError =>
+      'Não foi possível excluir os itens selecionados.';
+
+  @override
+  String get storageAnalyzerRescanFolder => 'Verificar esta pasta novamente';
+
+  @override
+  String get storageAnalyzerSelectAction => 'Selecionar';
+
+  @override
+  String get storageAnalyzerSelectAllHere => 'Selecionar tudo nesta pasta';
+
+  @override
+  String get storageAnalyzerOpenFolder => 'Abrir pasta';
+
+  @override
   String get keyfilePassphraseGeneratorTitle =>
       'Gerador de Arquivo-chave e Frase-senha';
 

@@ -5097,6 +5097,166 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageCategoryOther => '其他';
 
   @override
+  String get storageAnalyzerTabMap => '分布图';
+
+  @override
+  String get storageAnalyzerTabFolders => '文件夹';
+
+  @override
+  String get storageAnalyzerTabTypes => '类型';
+
+  @override
+  String get storageAnalyzerTabCleanup => '清理';
+
+  @override
+  String storageAnalyzerFreeSpace(String free) {
+    return '剩余 $free';
+  }
+
+  @override
+  String storageAnalyzerFileCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 个文件',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageAnalyzerItemCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 个项目',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageAnalyzerContentSize(String size) {
+    return '保管库内容：$size';
+  }
+
+  @override
+  String storageAnalyzerScanProgress(String files, String size) {
+    return '已扫描 $files 个文件 · $size';
+  }
+
+  @override
+  String get storageAnalyzerPartialNotice => '部分文件夹无法完全读取，因此统计数据可能低于实际数值。';
+
+  @override
+  String get storageAnalyzerStaleNotice => '此卷在扫描后已被修改。';
+
+  @override
+  String get storageAnalyzerUpOneLevel => '返回上一级';
+
+  @override
+  String get storageAnalyzerEmptyFolder => '此文件夹为空。';
+
+  @override
+  String storageAnalyzerSmallerItems(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 个较小项目',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get storageAnalyzerMapHint => '点击文件夹以打开，长按可进行选择。';
+
+  @override
+  String get storageAnalyzerSortFiles => '文件数量';
+
+  @override
+  String get storageAnalyzerAllTypes => '所有类型';
+
+  @override
+  String storageAnalyzerLargestOfType(String type) {
+    return '最大文件 · $type';
+  }
+
+  @override
+  String get storageAnalyzerCleanupHeader => '建议';
+
+  @override
+  String get storageAnalyzerCleanupLarge => '大文件';
+
+  @override
+  String get storageAnalyzerCleanupStale => '超过一年未修改';
+
+  @override
+  String get storageAnalyzerCleanupTemp => '临时文件与垃圾文件';
+
+  @override
+  String get storageAnalyzerCleanupEmpty => '空文件夹';
+
+  @override
+  String get storageAnalyzerCleanupReview => '查看';
+
+  @override
+  String get storageAnalyzerCleanupNothing => '没有需要清理的内容，此卷井井有条。';
+
+  @override
+  String get storageAnalyzerBiggestFiles => '最大的文件';
+
+  @override
+  String get storageAnalyzerBiggestFilesSubtitle => '浏览此卷中体积最大的文件';
+
+  @override
+  String get storageAnalyzerAllSuggestions => '所有建议';
+
+  @override
+  String storageAnalyzerSelectedSummary(int count, String size) {
+    return '已选 $count 项 · $size';
+  }
+
+  @override
+  String storageAnalyzerDeleteFilesMessage(String size) {
+    return '这将从加密卷中永久删除所选项目并释放 $size 空间。此操作无法撤销。';
+  }
+
+  @override
+  String storageAnalyzerDeleteFoldersMessage(String files, String size) {
+    return '这将永久删除所选项目（包含选中文件夹内的所有内容，共计 $files 个文件）并释放 $size 空间。此操作无法撤销。';
+  }
+
+  @override
+  String storageAnalyzerDeleteDone(String size) {
+    return '已释放 $size';
+  }
+
+  @override
+  String storageAnalyzerDeletePartial(
+    String deleted,
+    String failed,
+    String size,
+  ) {
+    return '已删除 $deleted 项，但有 $failed 项无法删除。已释放 $size。';
+  }
+
+  @override
+  String get storageAnalyzerDeleteNone => '未删除任何内容。';
+
+  @override
+  String get storageAnalyzerDeleteError => '无法删除所选项目。';
+
+  @override
+  String get storageAnalyzerRescanFolder => '重新扫描此文件夹';
+
+  @override
+  String get storageAnalyzerSelectAction => '选择';
+
+  @override
+  String get storageAnalyzerSelectAllHere => '选择此文件夹中的全部项目';
+
+  @override
+  String get storageAnalyzerOpenFolder => '打开文件夹';
+
+  @override
   String get keyfilePassphraseGeneratorTitle => '密钥文件与密码短语生成器';
 
   @override

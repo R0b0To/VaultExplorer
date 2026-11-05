@@ -8926,6 +8926,244 @@ abstract class AppLocalizations {
   /// **'Other'**
   String get storageCategoryOther;
 
+  /// Storage Analyzer tab: treemap of the current folder
+  ///
+  /// In en, this message translates to:
+  /// **'Map'**
+  String get storageAnalyzerTabMap;
+
+  /// Storage Analyzer tab: sortable list of the current folder
+  ///
+  /// In en, this message translates to:
+  /// **'Folders'**
+  String get storageAnalyzerTabFolders;
+
+  /// Storage Analyzer tab: usage grouped by file type
+  ///
+  /// In en, this message translates to:
+  /// **'Types'**
+  String get storageAnalyzerTabTypes;
+
+  /// Storage Analyzer tab: suggestions for freeing space
+  ///
+  /// In en, this message translates to:
+  /// **'Cleanup'**
+  String get storageAnalyzerTabCleanup;
+
+  /// Free space on the volume, shown beside the capacity gauge
+  ///
+  /// In en, this message translates to:
+  /// **'{free} free'**
+  String storageAnalyzerFreeSpace(String free);
+
+  /// Number of files in a folder or selection
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 file} other{{count} files}}'**
+  String storageAnalyzerFileCount(num count);
+
+  /// Number of items in a cleanup suggestion
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 item} other{{count} items}}'**
+  String storageAnalyzerItemCount(num count);
+
+  /// Total size of the files found, shown when the volume capacity is unknown
+  ///
+  /// In en, this message translates to:
+  /// **'Vault content: {size}'**
+  String storageAnalyzerContentSize(String size);
+
+  /// Live tally while the volume is being scanned
+  ///
+  /// In en, this message translates to:
+  /// **'{files} files · {size} so far'**
+  String storageAnalyzerScanProgress(String files, String size);
+
+  /// Banner shown when some folders could not be listed completely during a scan
+  ///
+  /// In en, this message translates to:
+  /// **'Some folders couldn\'t be fully read, so totals may be lower than the real figures.'**
+  String get storageAnalyzerPartialNotice;
+
+  /// Banner shown when the volume was modified elsewhere after the scan
+  ///
+  /// In en, this message translates to:
+  /// **'This volume has changed since it was scanned.'**
+  String get storageAnalyzerStaleNotice;
+
+  /// Tooltip for the button that goes to the parent folder
+  ///
+  /// In en, this message translates to:
+  /// **'Up one level'**
+  String get storageAnalyzerUpOneLevel;
+
+  /// Shown when the folder being viewed has no content
+  ///
+  /// In en, this message translates to:
+  /// **'This folder is empty.'**
+  String get storageAnalyzerEmptyFolder;
+
+  /// Label of the treemap tile that groups many items too small to draw
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 smaller item} other{{count} smaller items}}'**
+  String storageAnalyzerSmallerItems(num count);
+
+  /// Hint below the storage treemap
+  ///
+  /// In en, this message translates to:
+  /// **'Tap a folder to open it. Press and hold to select.'**
+  String get storageAnalyzerMapHint;
+
+  /// Sort option: folders with the most files first
+  ///
+  /// In en, this message translates to:
+  /// **'File count'**
+  String get storageAnalyzerSortFiles;
+
+  /// Button that clears the file-type filter
+  ///
+  /// In en, this message translates to:
+  /// **'All types'**
+  String get storageAnalyzerAllTypes;
+
+  /// Header above the biggest files of one file type
+  ///
+  /// In en, this message translates to:
+  /// **'Largest files · {type}'**
+  String storageAnalyzerLargestOfType(String type);
+
+  /// Section header for cleanup suggestions
+  ///
+  /// In en, this message translates to:
+  /// **'Suggestions'**
+  String get storageAnalyzerCleanupHeader;
+
+  /// Cleanup suggestion title: the biggest files
+  ///
+  /// In en, this message translates to:
+  /// **'Large files'**
+  String get storageAnalyzerCleanupLarge;
+
+  /// Cleanup suggestion title: files nobody has touched for a year
+  ///
+  /// In en, this message translates to:
+  /// **'Not modified in over a year'**
+  String get storageAnalyzerCleanupStale;
+
+  /// Cleanup suggestion title: leftover download, backup and cache files
+  ///
+  /// In en, this message translates to:
+  /// **'Temporary and junk files'**
+  String get storageAnalyzerCleanupTemp;
+
+  /// Cleanup suggestion title: folders with nothing in them
+  ///
+  /// In en, this message translates to:
+  /// **'Empty folders'**
+  String get storageAnalyzerCleanupEmpty;
+
+  /// Button that opens a cleanup suggestion for review
+  ///
+  /// In en, this message translates to:
+  /// **'Review'**
+  String get storageAnalyzerCleanupReview;
+
+  /// Shown when there are no cleanup suggestions
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing obvious to clean up. This volume looks tidy.'**
+  String get storageAnalyzerCleanupNothing;
+
+  /// Card title that opens a list of the largest files
+  ///
+  /// In en, this message translates to:
+  /// **'Biggest files'**
+  String get storageAnalyzerBiggestFiles;
+
+  /// Card subtitle for the biggest-files list
+  ///
+  /// In en, this message translates to:
+  /// **'Browse the largest files on this volume'**
+  String get storageAnalyzerBiggestFilesSubtitle;
+
+  /// Button that returns from a reviewed suggestion to the list of suggestions
+  ///
+  /// In en, this message translates to:
+  /// **'All suggestions'**
+  String get storageAnalyzerAllSuggestions;
+
+  /// Selection bar: how many items are selected and how much space they use
+  ///
+  /// In en, this message translates to:
+  /// **'{count} selected · {size}'**
+  String storageAnalyzerSelectedSummary(int count, String size);
+
+  /// Confirmation text for deleting files from the Storage Analyzer
+  ///
+  /// In en, this message translates to:
+  /// **'This permanently erases the selected items from your encrypted volume and frees {size}. It can\'t be undone.'**
+  String storageAnalyzerDeleteFilesMessage(String size);
+
+  /// Confirmation text for deleting a selection that includes folders
+  ///
+  /// In en, this message translates to:
+  /// **'This permanently erases the selected items, {files} files in total including everything inside any selected folder, and frees {size}. It can\'t be undone.'**
+  String storageAnalyzerDeleteFoldersMessage(String files, String size);
+
+  /// Snackbar after a successful delete from the Storage Analyzer
+  ///
+  /// In en, this message translates to:
+  /// **'Freed {size}'**
+  String storageAnalyzerDeleteDone(String size);
+
+  /// Snackbar when only some of the selected items could be deleted
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted {deleted}, but {failed} couldn\'t be deleted. Freed {size}.'**
+  String storageAnalyzerDeletePartial(
+    String deleted,
+    String failed,
+    String size,
+  );
+
+  /// Snackbar when none of the selected items could be deleted
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing was deleted.'**
+  String get storageAnalyzerDeleteNone;
+
+  /// Snackbar when a delete from the Storage Analyzer failed unexpectedly
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t delete the selected items.'**
+  String get storageAnalyzerDeleteError;
+
+  /// Action: rescan only the folder being acted on
+  ///
+  /// In en, this message translates to:
+  /// **'Rescan this folder'**
+  String get storageAnalyzerRescanFolder;
+
+  /// Action that starts selecting items in the Storage Analyzer
+  ///
+  /// In en, this message translates to:
+  /// **'Select'**
+  String get storageAnalyzerSelectAction;
+
+  /// Action: tick every item in the folder being viewed
+  ///
+  /// In en, this message translates to:
+  /// **'Select all in this folder'**
+  String get storageAnalyzerSelectAllHere;
+
+  /// Action: drill into a folder in the Storage Analyzer
+  ///
+  /// In en, this message translates to:
+  /// **'Open folder'**
+  String get storageAnalyzerOpenFolder;
+
   /// Title for Keyfile & Passphrase Generator tool
   ///
   /// In en, this message translates to:

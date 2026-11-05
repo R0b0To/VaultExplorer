@@ -5165,6 +5165,168 @@ class AppLocalizationsJa extends AppLocalizations {
   String get storageCategoryOther => 'その他';
 
   @override
+  String get storageAnalyzerTabMap => 'マップ';
+
+  @override
+  String get storageAnalyzerTabFolders => 'フォルダー';
+
+  @override
+  String get storageAnalyzerTabTypes => '種類';
+
+  @override
+  String get storageAnalyzerTabCleanup => 'クリーンアップ';
+
+  @override
+  String storageAnalyzerFreeSpace(String free) {
+    return '空き容量: $free';
+  }
+
+  @override
+  String storageAnalyzerFileCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count個のファイル',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageAnalyzerItemCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count個のアイテム',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageAnalyzerContentSize(String size) {
+    return '保管庫の容量: $size';
+  }
+
+  @override
+  String storageAnalyzerScanProgress(String files, String size) {
+    return '$files個のファイル · 現在 $size';
+  }
+
+  @override
+  String get storageAnalyzerPartialNotice =>
+      '一部のフォルダーを完全に読み取れなかったため、合計が実際の数値より少なくなる可能性があります。';
+
+  @override
+  String get storageAnalyzerStaleNotice => 'このボリュームはスキャン後に変更されました。';
+
+  @override
+  String get storageAnalyzerUpOneLevel => '1つ上の階層へ';
+
+  @override
+  String get storageAnalyzerEmptyFolder => 'このフォルダーは空です。';
+
+  @override
+  String storageAnalyzerSmallerItems(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count個の小さなアイテム',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get storageAnalyzerMapHint => 'タップしてフォルダーを開きます。長押しで選択します。';
+
+  @override
+  String get storageAnalyzerSortFiles => 'ファイル数';
+
+  @override
+  String get storageAnalyzerAllTypes => 'すべての種類';
+
+  @override
+  String storageAnalyzerLargestOfType(String type) {
+    return 'サイズの大きいファイル · $type';
+  }
+
+  @override
+  String get storageAnalyzerCleanupHeader => 'おすすめ';
+
+  @override
+  String get storageAnalyzerCleanupLarge => '大容量ファイル';
+
+  @override
+  String get storageAnalyzerCleanupStale => '1年以上変更されていません';
+
+  @override
+  String get storageAnalyzerCleanupTemp => '一時ファイルと不要ファイル';
+
+  @override
+  String get storageAnalyzerCleanupEmpty => '空のフォルダー';
+
+  @override
+  String get storageAnalyzerCleanupReview => '確認';
+
+  @override
+  String get storageAnalyzerCleanupNothing =>
+      '整理が必要な項目はありません。このボリュームは整理されています。';
+
+  @override
+  String get storageAnalyzerBiggestFiles => '最大のファイル';
+
+  @override
+  String get storageAnalyzerBiggestFilesSubtitle => 'このボリュームで最もサイズの大きいファイルを表示';
+
+  @override
+  String get storageAnalyzerAllSuggestions => 'すべてのおすすめ';
+
+  @override
+  String storageAnalyzerSelectedSummary(int count, String size) {
+    return '$count個を選択中 · $size';
+  }
+
+  @override
+  String storageAnalyzerDeleteFilesMessage(String size) {
+    return '暗号化ボリュームから選択したアイテムが完全に削除され、$sizeの空き容量が増えます。この操作は取り消せません。';
+  }
+
+  @override
+  String storageAnalyzerDeleteFoldersMessage(String files, String size) {
+    return '選択したアイテム（フォルダー内のすべてのファイルを含む計$files個）が完全に削除され、$sizeの空き容量が増えます。この操作は取り消せません。';
+  }
+
+  @override
+  String storageAnalyzerDeleteDone(String size) {
+    return '$sizeを解放しました';
+  }
+
+  @override
+  String storageAnalyzerDeletePartial(
+    String deleted,
+    String failed,
+    String size,
+  ) {
+    return '$deleted個を削除しましたが、$failed個を削除できませんでした。$sizeを解放しました。';
+  }
+
+  @override
+  String get storageAnalyzerDeleteNone => '何も削除されませんでした。';
+
+  @override
+  String get storageAnalyzerDeleteError => '選択したアイテムを削除できませんでした。';
+
+  @override
+  String get storageAnalyzerRescanFolder => 'このフォルダーを再スキャン';
+
+  @override
+  String get storageAnalyzerSelectAction => '選択';
+
+  @override
+  String get storageAnalyzerSelectAllHere => 'このフォルダー内をすべて選択';
+
+  @override
+  String get storageAnalyzerOpenFolder => 'フォルダーを開く';
+
+  @override
   String get keyfilePassphraseGeneratorTitle => 'キーファイル・パスフレーズ生成ツール';
 
   @override

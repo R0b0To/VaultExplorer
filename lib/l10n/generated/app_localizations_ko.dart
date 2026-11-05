@@ -5163,6 +5163,167 @@ class AppLocalizationsKo extends AppLocalizations {
   String get storageCategoryOther => '기타';
 
   @override
+  String get storageAnalyzerTabMap => '지도';
+
+  @override
+  String get storageAnalyzerTabFolders => '폴더';
+
+  @override
+  String get storageAnalyzerTabTypes => '유형';
+
+  @override
+  String get storageAnalyzerTabCleanup => '정리';
+
+  @override
+  String storageAnalyzerFreeSpace(String free) {
+    return '$free 여유 공간';
+  }
+
+  @override
+  String storageAnalyzerFileCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count개 파일',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageAnalyzerItemCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count개 항목',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageAnalyzerContentSize(String size) {
+    return '보관함 크기: $size';
+  }
+
+  @override
+  String storageAnalyzerScanProgress(String files, String size) {
+    return '파일 $files개 · 현재 $size';
+  }
+
+  @override
+  String get storageAnalyzerPartialNotice =>
+      '일부 폴더를 완전히 읽을 수 없어 실제 수치보다 적게 표시될 수 있습니다.';
+
+  @override
+  String get storageAnalyzerStaleNotice => '스캔 이후 이 볼륨이 변경되었습니다.';
+
+  @override
+  String get storageAnalyzerUpOneLevel => '상위 폴더로 이동';
+
+  @override
+  String get storageAnalyzerEmptyFolder => '이 폴더는 비어 있습니다.';
+
+  @override
+  String storageAnalyzerSmallerItems(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count개의 더 작은 항목',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get storageAnalyzerMapHint => '폴더를 탭하여 엽니다. 길게 눌러 선택합니다.';
+
+  @override
+  String get storageAnalyzerSortFiles => '파일 수';
+
+  @override
+  String get storageAnalyzerAllTypes => '모든 유형';
+
+  @override
+  String storageAnalyzerLargestOfType(String type) {
+    return '가장 큰 파일 · $type';
+  }
+
+  @override
+  String get storageAnalyzerCleanupHeader => '제안';
+
+  @override
+  String get storageAnalyzerCleanupLarge => '대용량 파일';
+
+  @override
+  String get storageAnalyzerCleanupStale => '1년 이상 수정되지 않음';
+
+  @override
+  String get storageAnalyzerCleanupTemp => '임시 및 불필요한 파일';
+
+  @override
+  String get storageAnalyzerCleanupEmpty => '빈 폴더';
+
+  @override
+  String get storageAnalyzerCleanupReview => '검토';
+
+  @override
+  String get storageAnalyzerCleanupNothing => '정리할 항목이 없습니다. 볼륨이 잘 정리되어 있습니다.';
+
+  @override
+  String get storageAnalyzerBiggestFiles => '가장 큰 파일';
+
+  @override
+  String get storageAnalyzerBiggestFilesSubtitle => '이 볼륨에서 가장 큰 파일 찾아보기';
+
+  @override
+  String get storageAnalyzerAllSuggestions => '모든 제안';
+
+  @override
+  String storageAnalyzerSelectedSummary(int count, String size) {
+    return '$count개 선택됨 · $size';
+  }
+
+  @override
+  String storageAnalyzerDeleteFilesMessage(String size) {
+    return '암호화된 볼륨에서 선택한 항목이 영구적으로 삭제되며 $size의 공간이 확보됩니다. 이 작업은 실행 취소할 수 없습니다.';
+  }
+
+  @override
+  String storageAnalyzerDeleteFoldersMessage(String files, String size) {
+    return '선택한 항목(선택한 폴더 내부의 모든 항목을 포함하여 총 $files개 파일)이 영구적으로 삭제되며 $size의 공간이 확보됩니다. 이 작업은 실행 취소할 수 없습니다.';
+  }
+
+  @override
+  String storageAnalyzerDeleteDone(String size) {
+    return '$size 공간을 확보했습니다';
+  }
+
+  @override
+  String storageAnalyzerDeletePartial(
+    String deleted,
+    String failed,
+    String size,
+  ) {
+    return '$deleted개 삭제됨, $failed개 삭제 실패. $size 공간이 확보되었습니다.';
+  }
+
+  @override
+  String get storageAnalyzerDeleteNone => '삭제된 항목이 없습니다.';
+
+  @override
+  String get storageAnalyzerDeleteError => '선택한 항목을 삭제할 수 없습니다.';
+
+  @override
+  String get storageAnalyzerRescanFolder => '이 폴더 다시 검사';
+
+  @override
+  String get storageAnalyzerSelectAction => '선택';
+
+  @override
+  String get storageAnalyzerSelectAllHere => '이 폴더의 모든 항목 선택';
+
+  @override
+  String get storageAnalyzerOpenFolder => '폴더 열기';
+
+  @override
   String get keyfilePassphraseGeneratorTitle => '키파일 및 패스프레이즈 생성기';
 
   @override

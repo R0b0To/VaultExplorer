@@ -44,6 +44,7 @@ import 'package:vaultexplorer/features/browser/controllers/file_browser_selectio
 import 'package:vaultexplorer/features/browser/file_browser_predicates.dart';
 import 'package:vaultexplorer/features/browser/file_open_dispatch.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
+import 'package:vaultexplorer/features/browser/models/browser_back_policy.dart';
 import 'package:vaultexplorer/features/browser/models/category_index.dart';
 import 'package:vaultexplorer/features/browser/models/category_source.dart';
 import 'package:vaultexplorer/features/browser/models/file_category.dart';
@@ -157,6 +158,8 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
   CancellationToken? _token;
   bool _scanning = true;
   bool _disposed = false;
+  bool _exitArmed = false;
+  Timer? _exitArmTimer;
 
   bool _searchActive = false;
   String _query = '';
@@ -192,10 +195,10 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     if (widget.scopedContainer != null) {
       _containers = {widget.scopedContainer!.volId: widget.scopedContainer!};
       final initialDir = widget.initialDirPath ?? '';
-      _location = CategoryLocation(
-        widget.scopedContainer!.volId,
-        _isGallery ? '' : initialDir,
-      );
+      // A scoped gallery keeps the folder it was opened from as its album
+      // root; the category scan may cover the whole container, but the listing
+      // is limited to this location.
+      _location = CategoryLocation(widget.scopedContainer!.volId, initialDir);
       _folderMode = !_isGallery;
     } else {
       _location = CategoryLocation.top;
@@ -236,6 +239,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
   void dispose() {
     _disposed = true;
     _token?.cancel();
+    _exitArmTimer?.cancel();
     _events?.removeContainerLockedListener(_onVaultLocked);
     _searchController.dispose();
     _scrollController.dispose();
@@ -544,12 +548,84 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
   }
 
   bool get _canGoUp {
+    if (_scoped && _isGallery) {
+      return _effectiveLocation.dirPath.isNotEmpty;
+    }
     if (!_folderMode) return false;
     if (_scoped) {
       return _location != _initialLocation &&
           _buildPathSteps(_effectiveLocation).length > 1;
     }
     return _buildPathSteps(_effectiveLocation).length > 1;
+  }
+
+  /// Leaves a scoped category, including gallery mode, at the folder it
+  /// represents in the underlying file manager.
+  void _exitScopedCategory() {
+    if (!_scoped) return;
+    widget.onScopedFilterChanged?.call(null, _effectiveLocation.dirPath);
+  }
+
+  void _toggleScopedGallery() {
+    if (!_scoped) return;
+    if (_isGallery) {
+      _exitScopedCategory();
+    } else {
+      widget.onScopedFilterChanged?.call(
+        'gallery',
+        _effectiveLocation.dirPath,
+      );
+    }
+  }
+
+  void _handleScopedGalleryBackAtRoot() {
+    final settings = ref.read(appSettingsControllerProvider).settings;
+    final action = resolveBrowserBack(
+      selectionMode: false,
+      searchActive: false,
+      atRoot: true,
+      appRoot: widget.workspaceConfig.appRoot,
+      hostsHome: widget.workspaceConfig.includeDashboardTab,
+      tabsEnabled: settings.useBrowserTabs,
+    );
+    switch (action) {
+      case BrowserBackAction.returnHome:
+        final tabs = ref.read(
+          browserTabsProvider(widget.workspaceConfig).notifier,
+        );
+        if (!tabs.returnToDashboardAtRoot(widget.tabId)) {
+          tabs.replaceActiveWithDashboard();
+        }
+      case BrowserBackAction.popRoute:
+        final navigator = Navigator.of(context);
+        if (navigator.canPop()) navigator.pop();
+      case BrowserBackAction.leave:
+        if (_exitArmed) {
+          final navigator = Navigator.of(context);
+          if (navigator.canPop()) navigator.pop();
+        } else {
+          _armExit();
+        }
+      case BrowserBackAction.stay:
+        break;
+      case BrowserBackAction.exitSelection:
+      case BrowserBackAction.clearSearch:
+      case BrowserBackAction.navigateUp:
+        break;
+    }
+  }
+
+  void _armExit() {
+    _exitArmTimer?.cancel();
+    setState(() => _exitArmed = true);
+    showAppSnackBar(
+      context,
+      message: context.l10n.pressBackAgainToExit,
+      tone: AppBannerTone.info,
+    );
+    _exitArmTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _exitArmed = false);
+    });
   }
 
   void _goUp() {
@@ -1392,14 +1468,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           color: _isGallery ? Theme.of(context).colorScheme.primary : null,
         ),
         tooltip: l10n.galleryModeTooltip,
-        onPressed: () {
-          if (_scoped) {
-            widget.onScopedFilterChanged?.call(
-              _isGallery ? null : 'gallery',
-              _effectiveLocation.dirPath,
-            );
-          }
-        },
+        onPressed: _toggleScopedGallery,
       ),
       FileManagerAction.options: (context) => FileManagerOptionsMenuButton(
         toolbarConfig: toolbarConfig,
@@ -1750,15 +1819,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
               canPlayMedia: canPlayMedia,
               onPlayMedia: _playMediaFromFirst,
               isGalleryMode: _isGallery,
-              onToggleGallery: () {
-                // When inside a scoped category, toggle gallery filter.
-                if (_scoped) {
-                  widget.onScopedFilterChanged?.call(
-                    _isGallery ? null : 'gallery',
-                    _effectiveLocation.dirPath,
-                  );
-                }
-              },
+              onToggleGallery: _toggleScopedGallery,
               toolbarConfig: toolbarConfig,
               onToggleShowHiddenFiles: (v) {
                 _updateToolbarConfig((c) => c.copyWith(showHiddenFiles: v));
@@ -1791,8 +1852,10 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           _toggleSearch();
         } else if (_canGoUp) {
           _goUp();
-        } else if (_scoped) {
-          widget.onScopedFilterChanged?.call(null, _effectiveLocation.dirPath);
+        } else if (_scoped && _isGallery) {
+          _handleScopedGalleryBackAtRoot();
+        } else if (_scoped && !_isGallery) {
+          _exitScopedCategory();
         }
       },
       child: Column(
@@ -1910,8 +1973,10 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     final effectiveThumbnailCacheMode =
         fallbackThumb?.cacheMode ?? ThumbnailCacheMode.appCache;
     final location = _effectiveLocation;
-    final currentDirPath =
-        _folderMode && !location.isTop ? location.dirPath : '';
+    // Flat scoped categories still display names relative to the folder the
+    // filter was opened in. Keep that folder as the base path for thumbnail
+    // lookup so `currentDirPath + entry.name` resolves to the source path.
+    final currentDirPath = !location.isTop ? location.dirPath : '';
     final landscape =
         MediaQuery.orientationOf(context) == Orientation.landscape;
     final query = _searchActive && _query.trim().isNotEmpty

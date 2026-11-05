@@ -197,7 +197,6 @@ class FileManagerToolbarConfig {
           FileManagerAction.viewToggle,
           FileManagerAction.sort,
           FileManagerAction.filter,
-          FileManagerAction.playMedia,
           FileManagerAction.options,
         ],
         hidden: {},

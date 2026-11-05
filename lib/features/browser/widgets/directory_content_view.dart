@@ -2361,6 +2361,10 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   );
 
   void _onSystemBack() {
+    // Scoped category views own their back behavior. In gallery mode, for
+    // example, back moves through the category's folder tree while retaining
+    // the filter; the directory path stack must not clear that filter here.
+    if (_hasScopedCategoryFilter) return;
     switch (_resolveBack()) {
       case BrowserBackAction.exitSelection:
         exitSelectionMode();
@@ -2396,8 +2400,15 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     });
   }
 
+  bool get _hasScopedCategoryFilter =>
+      _archiveContext == null &&
+      FileCategory.fromFilterKey(_currentFilter) != null;
+
   bool get _canPreviewFolderBackGesture =>
-      !_atRoot && !isSelectionMode && !_searchActive;
+      !_hasScopedCategoryFilter &&
+      !_atRoot &&
+      !isSelectionMode &&
+      !_searchActive;
 
   /// Whether this screen should answer predictive-back events: its route is
   /// on top AND (inside tabs) it is the visible tab. Every mounted tab is a

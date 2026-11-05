@@ -871,16 +871,30 @@ class FileOperationService extends ChangeNotifier {
       final modifiedSecs = <int>[];
       int totalInputBytes = 0;
 
-      Future<void> collect(String containerPath, String archivePath) async {
+      // Returns how many entries the folder put into the archive. A folder that
+      // ends up with none is an empty folder: it goes in as an entry of its own
+      // (a name with a trailing '/', which the native side reads as "folder"),
+      // otherwise it would vanish from the archive, and archiving only empty
+      // folders would produce nothing at all.
+      Future<int> collect(
+        String containerPath,
+        String archivePath,
+        int folderModifiedSecs,
+      ) async {
         if (op.cancelRequested) throw const _CancelledException();
         final rawList = await _fileIoApi.listDirectory(source, containerPath);
         final children = RawEntry.parseAll(rawList ?? const []);
+        var added = 0;
         for (final child in children) {
           if (child.name.startsWith('System:')) continue;
           final childContainerPath = '$containerPath/${child.name}';
           final childArchivePath = '$archivePath/${child.name}';
           if (child.isDir) {
-            await collect(childContainerPath, childArchivePath);
+            added += await collect(
+              childContainerPath,
+              childArchivePath,
+              child.modifiedSecs,
+            );
           } else {
             srcPaths.add(
               source.isRawLocal
@@ -890,14 +904,24 @@ class FileOperationService extends ChangeNotifier {
             entryNames.add(childArchivePath);
             modifiedSecs.add(child.modifiedSecs);
             totalInputBytes += child.sizeBytes;
+            added++;
           }
         }
+        if (added == 0) {
+          srcPaths.add(
+            source.isRawLocal ? p.join(source.uri, containerPath) : containerPath,
+          );
+          entryNames.add('$archivePath/');
+          modifiedSecs.add(folderModifiedSecs);
+          added++;
+        }
+        return added;
       }
 
       for (final item in items) {
         if (op.cancelRequested) throw const _CancelledException();
         if (item.isDir) {
-          await collect(item.path, item.name);
+          await collect(item.path, item.name, item.modifiedSecs);
         } else {
           srcPaths.add(
             source.isRawLocal ? p.join(source.uri, item.path) : item.path,
@@ -910,8 +934,10 @@ class FileOperationService extends ChangeNotifier {
 
       if (op.cancelRequested) throw const _CancelledException();
 
+      // Never finish silently without an archive: the person pasted one.
       if (srcPaths.isEmpty) {
-        op._setStatus(FileOperationStatus.completed);
+        op._setError(op.l10n.failedToArchiveGeneric('Nothing to archive'));
+        op._setStatus(FileOperationStatus.failed);
         return;
       }
 

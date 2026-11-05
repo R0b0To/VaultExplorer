@@ -1948,8 +1948,46 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       ),
     };
 
+    // The storage picker behind the Filter action of the categories shortcut
+    // screen, as menu entries for the floating toolbar's cascading menu (the
+    // app bar keeps its PopupMenuButton with the same choices).
+    List<Widget> buildSourceMenuItems(BuildContext menuContext) {
+      MenuItemButton entry(
+        CategorySourceFilter filter,
+        String label, {
+        bool indent = false,
+      }) {
+        final selected = _source == filter;
+        return MenuItemButton(
+          leadingIcon: Icon(selected ? Icons.check_rounded : null, size: 18),
+          onPressed: () => _setSource(filter),
+          child: Padding(
+            padding: EdgeInsets.only(left: indent ? 16 : 0),
+            child: Text(label, overflow: TextOverflow.ellipsis),
+          ),
+        );
+      }
+
+      return [
+        entry(CategorySourceFilter.all, l10n.categorySourceAll),
+        if (widget.primaryLocalContainer != null || hasLocations)
+          entry(CategorySourceFilter.device, l10n.localStorageCardTitle),
+        if (mountedVaults.isNotEmpty)
+          entry(CategorySourceFilter.vaults, l10n.vaultsSectionTitle),
+        for (final vault in mountedVaults)
+          entry(
+            CategorySourceFilter.vault(vault.volId),
+            vault.displayName,
+            indent: true,
+          ),
+      ];
+    }
+
     final visibleActions = toolbarConfig.visible.where((a) {
       if (_isGallery && a == FileManagerAction.filter) return false;
+      // Gallery mode is a view of one storage's files; the categories
+      // shortcut screen spans storages, so toggling it there did nothing.
+      if (!_scoped && a == FileManagerAction.gallery) return false;
       return actionBuilders.containsKey(a);
     }).toList();
 
@@ -2289,8 +2327,34 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
             : null,
       );
 
+      // SelectionAppBar is an AppBar, which fills whatever height it is
+      // given and pads for the status bar. In the shell's bottom slot that
+      // made it span the screen, so it is fitted to one toolbar height here,
+      // as the file manager does, and lifted by the keyboard's inset.
       final bottomBarWidget = isSelecting && toolbarConfig.bottomSelectionBar
-          ? Builder(builder: (c) => selectionAppBarFactory(c))
+          ? Builder(
+              builder: (slotContext) => Padding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.viewInsetsOf(slotContext).bottom,
+                ),
+                child: Material(
+                  color: Theme.of(slotContext).colorScheme.surfaceContainer,
+                  elevation: 0,
+                  child: SafeArea(
+                    top: false,
+                    child: SizedBox(
+                      height: kToolbarHeight,
+                      child: MediaQuery.removePadding(
+                        context: slotContext,
+                        removeTop: true,
+                        removeBottom: true,
+                        child: selectionAppBarFactory(slotContext),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            )
           : (!isLandscape && showActionBar
               ? FileManagerActionBar(
                   axis: Axis.horizontal,
@@ -2325,6 +2389,10 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
                   : (_) {},
               hideVaultOnlyActions:
                   !_scoped || widget.scopedContainer!.isLocalStorage,
+              customFilterMenuBuilder: _scoped ? null : buildSourceMenuItems,
+              customFilterActive: _source != CategorySourceFilter.all,
+              customFilterIcon: Icons.storage_rounded,
+              customFilterTooltip: l10n.categorySourceTooltip,
               layoutMode: _layout,
               onLayoutModeChanged: (mode) => setState(() => _layout = mode),
               gridAspectRatio: toolbarConfig.gridAspectRatio,

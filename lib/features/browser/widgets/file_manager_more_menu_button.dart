@@ -48,6 +48,19 @@ class FileManagerMoreMenuButton extends StatelessWidget {
   final ValueChanged<String?> onFilterChanged;
   final bool hideVaultOnlyActions;
 
+  /// Replaces the file-type filter menu behind the Filter action. The
+  /// categories shortcut screen has no type filter (the category is the
+  /// filter); its Filter action picks which storages are listed instead, and
+  /// supplies that picker here so the floating toolbar offers it as well.
+  final List<Widget> Function(BuildContext context)? customFilterMenuBuilder;
+
+  /// Whether the custom filter is narrowing the listing (highlights the icon).
+  final bool customFilterActive;
+
+  /// Icon and tooltip for the custom filter menu.
+  final IconData? customFilterIcon;
+  final String? customFilterTooltip;
+
   final BrowserLayoutMode layoutMode;
   final ValueChanged<BrowserLayoutMode> onLayoutModeChanged;
   final GridAspectRatio gridAspectRatio;
@@ -77,6 +90,10 @@ class FileManagerMoreMenuButton extends StatelessWidget {
     required this.currentFilter,
     required this.onFilterChanged,
     required this.hideVaultOnlyActions,
+    this.customFilterMenuBuilder,
+    this.customFilterActive = false,
+    this.customFilterIcon,
+    this.customFilterTooltip,
     required this.layoutMode,
     required this.onLayoutModeChanged,
     required this.gridAspectRatio,
@@ -139,6 +156,17 @@ class FileManagerMoreMenuButton extends StatelessWidget {
             child: Text(l10n.sortAction),
           );
         case FileManagerAction.filter:
+          final customFilter = customFilterMenuBuilder;
+          if (customFilter != null) {
+            return SubmenuButton(
+              leadingIcon: Icon(
+                customFilterIcon ?? Icons.storage_rounded,
+                color: cs.primary,
+              ),
+              menuChildren: customFilter(context),
+              child: Text(customFilterTooltip ?? l10n.filterAction),
+            );
+          }
           final isFilterActive = currentFilter != null;
           return SubmenuButton(
             leadingIcon: Icon(
@@ -323,6 +351,17 @@ class FileManagerMoreMenuButton extends StatelessWidget {
         );
 
       case FileManagerAction.filter:
+        final customFilter = customFilterMenuBuilder;
+        if (customFilter != null) {
+          return menuFab(
+            icon: Icon(
+              customFilterIcon ?? Icons.storage_rounded,
+              color: customFilterActive ? cs.primary : cs.onSurface,
+            ),
+            tooltip: customFilterTooltip ?? l10n.filtersMenuItem,
+            menuChildren: customFilter(context),
+          );
+        }
         final isFilterActive = currentFilter != null;
         return menuFab(
           icon: Icon(

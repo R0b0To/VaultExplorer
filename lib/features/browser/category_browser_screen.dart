@@ -1122,9 +1122,35 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
         // Same as the file manager: the search bar lifts itself by the
         // keyboard's inset instead of the whole body being squeezed above it.
         resizeToAvoidBottomInset: false,
-        appBar: selecting
+        appBar: selecting && !toolbarConfig.bottomSelectionBar
             ? _buildSelectionBar(l10n)
             : _buildAppBar(l10n, mountedVaults, hasLocations),
+        bottomNavigationBar: selecting && toolbarConfig.bottomSelectionBar
+            ? Builder(
+                builder: (slotContext) => Padding(
+                  // The search bar rides above the keyboard; so does this.
+                  padding: EdgeInsets.only(
+                    bottom: MediaQuery.viewInsetsOf(slotContext).bottom,
+                  ),
+                  child: Material(
+                    color: Theme.of(slotContext).colorScheme.surfaceContainer,
+                    elevation: 0,
+                    child: SafeArea(
+                      top: false,
+                      child: SizedBox(
+                        height: kToolbarHeight,
+                        child: MediaQuery.removePadding(
+                          context: slotContext,
+                          removeTop: true,
+                          removeBottom: true,
+                          child: _buildSelectionBar(l10n),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              )
+            : null,
         body: Stack(
           children: [
             Positioned.fill(

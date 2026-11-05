@@ -245,6 +245,7 @@ class ThumbnailHandlers(
             var player: ExoPlayer? = null
             var surface: Surface? = null
             var surfaceTexture: SurfaceTexture? = null
+            var released = false
 
             try {
                 surfaceTexture = SurfaceTexture(10)
@@ -252,6 +253,15 @@ class ThumbnailHandlers(
                 surface = Surface(surfaceTexture)
 
                 player = ExoPlayer.Builder(activity).build()
+                // A frame grab needs the video track only. Leaving audio and
+                // text enabled spun up audio codecs (and their buffers) for
+                // files whose audio stream is the corrupt part, which is how a
+                // failed thumbnail could take the native decoder down with it.
+                player.trackSelectionParameters = player.trackSelectionParameters
+                    .buildUpon()
+                    .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, true)
+                    .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+                    .build()
                 player.setVideoSurface(surface)
 
                 val dataSourceFactory: DataSource.Factory = if (isLocalStorage) {
@@ -266,20 +276,46 @@ class ThumbnailHandlers(
 
                             override fun addTransferListener(transferListener: TransferListener) {}
 
+                            private var remaining: Long = C.LENGTH_UNSET.toLong()
+
                             override fun open(dataSpec: DataSpec): Long {
                                 openUri = dataSpec.uri
                                 currentPosition = dataSpec.position
                                 val totalSize = mediaDataSource.size
-                                if (totalSize <= 0) return C.LENGTH_UNSET.toLong()
-                                return totalSize - currentPosition
+                                if (totalSize <= 0) {
+                                    remaining = C.LENGTH_UNSET.toLong()
+                                    return C.LENGTH_UNSET.toLong()
+                                }
+                                if (currentPosition > totalSize) {
+                                    throw androidx.media3.datasource.DataSourceException(
+                                        PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE
+                                    )
+                                }
+                                remaining = totalSize - currentPosition
+                                return remaining
                             }
 
                             override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
                                 if (length == 0) return 0
-                                val bytesRead = mediaDataSource.readAt(currentPosition, buffer, offset, length)
-                                if (bytesRead > 0) {
-                                    currentPosition += bytesRead
+                                if (remaining == 0L) return C.RESULT_END_OF_INPUT
+                                val request = if (remaining > 0L) {
+                                    minOf(length.toLong(), remaining).toInt()
+                                } else {
+                                    length
                                 }
+                                val bytesRead = mediaDataSource.readAt(currentPosition, buffer, offset, request)
+                                if (bytesRead <= 0) {
+                                    // Promised bytes that never arrive are a truncated
+                                    // or undecryptable file, not a clean end of input.
+                                    if (remaining > 0L) {
+                                        throw java.io.IOException(
+                                            "Vault stream ended early at $currentPosition: $fileName"
+                                        )
+                                    }
+                                    return C.RESULT_END_OF_INPUT
+                                }
+                                currentPosition += bytesRead
+                                if (remaining > 0L) remaining -= bytesRead
                                 return bytesRead
                             }
 
@@ -327,6 +363,13 @@ class ThumbnailHandlers(
                  * this can retry at most once.
                  */
                 fun capturePixelCopy(allowBlankRetry: Boolean) {
+                    // The 4s budget below releases the player and surface; a
+                    // delayed capture that fires afterwards would hit a dead
+                    // Surface (PixelCopy throws) on the main thread.
+                    if (released || surface?.isValid != true) {
+                        latch.countDown()
+                        return
+                    }
                     val bitmap = Bitmap.createBitmap(dstW, dstH, Bitmap.Config.ARGB_8888)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                         PixelCopy.request(
@@ -420,6 +463,7 @@ class ThumbnailHandlers(
                 Thread {
                     latch.await(4, TimeUnit.SECONDS)
                     activity.runOnUiThread {
+                        released = true
                         runCatching {
                             player?.release()
                             surface?.release()

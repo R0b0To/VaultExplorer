@@ -324,6 +324,14 @@ fun endBatchDelete(volId: Int) {
             readBufferPool.set(tmp)
         }
         val bytesRead = readStream(volId, streamPtr, offset, tmp, length)
+        // A count the caller's buffer cannot hold means the native read
+        // misreported; copying it would overrun `out`, so treat it as a failed
+        // read instead of corrupting memory or throwing mid-playback.
+        if (bytesRead > length || bytesRead > tmp.size || bufferOffset < 0 ||
+            (bytesRead > 0 && bufferOffset + bytesRead > out.size)
+        ) {
+            return -1
+        }
         if (bytesRead > 0) {
             System.arraycopy(tmp, 0, out, bufferOffset, bytesRead)
         }

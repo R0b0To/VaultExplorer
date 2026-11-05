@@ -85,9 +85,20 @@ abstract final class StorageCategory {
     'tar',
     'gz',
     'bz2',
+    'bz',
     'xz',
     'tgz',
+    'tbz',
+    'tbz2',
+    'txz',
+    'tzst',
     'zst',
+    'lzma',
+    'tlz',
+    'lz',
+    'cab',
+    'iso',
+    'z',
   };
 
   /// The bucket for a file called [fileName], from its extension alone.

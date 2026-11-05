@@ -7,6 +7,7 @@
 //   Cleanup  suggestions (large, stale, temporary, empty) and the biggest files
 // -- and one shared selection. Long-press (or the row menu) selects; the bar
 // at the bottom deletes, copies a path, or jumps to the file browser.
+// File previews open above the analyzer, keeping the current scan intact.
 //
 // Deleting goes through the same background file operation the browser uses,
 // after a confirmation that states how much space it frees and that it cannot
@@ -17,14 +18,33 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:path/path.dart' as p;
+import 'package:vaultexplorer/core/api/vault_book_api.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/path_clipboard.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
+import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
+import 'package:vaultexplorer/data/models/vault_item.dart';
 import 'package:vaultexplorer/data/models/vault_marks.dart';
+import 'package:vaultexplorer/data/services/vault_items_service.dart';
 import 'package:vaultexplorer/features/browser/controllers/bookmark_navigation_request.dart';
+import 'package:vaultexplorer/features/browser/viewer/books/comic_pages.dart';
+import 'package:vaultexplorer/features/browser/viewer/books/comic_reader_screen.dart';
+import 'package:vaultexplorer/features/browser/viewer/books/epub_reader_screen.dart';
+import 'package:vaultexplorer/features/browser/viewer/html_viewer_screen.dart';
+import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
+import 'package:vaultexplorer/features/browser/viewer/media_viewer_screen.dart';
+import 'package:vaultexplorer/features/browser/viewer/pdf_viewer_screen.dart';
+import 'package:vaultexplorer/features/browser/viewer/text_editor_screen.dart';
+import 'package:vaultexplorer/features/vault_item/vault_item_detail_screen.dart';
 import 'package:vaultexplorer/features/tools/widgets/storage_analyzer_controller.dart';
 import 'package:vaultexplorer/features/tools/widgets/storage_analyzer_views.dart';
 import 'package:vaultexplorer/features/tools/widgets/storage_analyzer_widgets.dart';
@@ -92,6 +112,7 @@ class _StorageAnalyzerScreenState extends ConsumerState<StorageAnalyzerScreen> {
         .read(storageAnalyzerProvider.notifier)
         .onTargetsChanged(_availableTargets());
   }
+
   Future<void> _showTargetPickerSheet(
     BuildContext context,
     List<MountedContainer> targets,
@@ -109,7 +130,10 @@ class _StorageAnalyzerScreenState extends ConsumerState<StorageAnalyzerScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 8,
+                ),
                 child: Text(
                   l10n.storageAnalyzerTargetLabel,
                   style: context.typography.titleMedium?.copyWith(
@@ -204,7 +228,7 @@ class _StorageAnalyzerScreenState extends ConsumerState<StorageAnalyzerScreen> {
             children: [
               Text(
                 node.name,
-                maxLines: 1,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
@@ -212,19 +236,35 @@ class _StorageAnalyzerScreenState extends ConsumerState<StorageAnalyzerScreen> {
               ),
               const SizedBox(height: 2),
               Text(
-                '${formatBytes(node.sizeBytes)} · '
-                '${l10n.storageAnalyzerFileCount(node.fileCount)}',
+                node.isDir
+                    ? '${formatBytes(node.sizeBytes)} · ${l10n.storageAnalyzerFileCount(node.fileCount)}'
+                    : '${formatBytes(node.sizeBytes)} · ${storageCategoryLabel(context, node.category)}',
                 style: textTheme.bodyMedium?.copyWith(
                   color: cs.onSurfaceVariant,
                 ),
               ),
-              Text(
-                node.path.isEmpty ? '/' : node.path,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: textTheme.bodySmall?.copyWith(
-                  color: cs.onSurfaceVariant,
-                ),
+              const SizedBox(height: 1),
+              Row(
+                children: [
+                  Icon(
+                    Icons.folder_outlined,
+                    size: 14,
+                    color: cs.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      node.isDir
+                          ? (node.path.isEmpty ? '/' : node.path)
+                          : (node.parentPath.isEmpty ? '/' : node.parentPath),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: AppSpacing.md),
               if (node.isDir)
@@ -248,6 +288,12 @@ class _StorageAnalyzerScreenState extends ConsumerState<StorageAnalyzerScreen> {
                   onTap: () => closeThen(
                     () => unawaited(notifier.refreshFolder(node.path)),
                   ),
+                ),
+              if (!node.isDir)
+                SheetOptionTile(
+                  icon: Icons.open_in_new_rounded,
+                  title: l10n.openAction,
+                  onTap: () => closeThen(() => unawaited(_openItem(node))),
                 ),
               if (canBrowse)
                 SheetOptionTile(
@@ -284,20 +330,203 @@ class _StorageAnalyzerScreenState extends ConsumerState<StorageAnalyzerScreen> {
 
   /// Leaves the analyzer for the file browser, opened on the folder holding
   /// [node] (or on [node] itself if it is a folder).
-  void _showInBrowser(StorageNode node) {
+  void _showInBrowser(StorageNode node) => _openInBrowser(node);
+
+  void _openInBrowser(StorageNode node) {
     final open = widget.onOpenInBrowser;
     final container = ref.read(storageAnalyzerProvider).selected;
     if (open == null || container == null) return;
-    // Everything the hand-off needs is taken before popping: this screen's
-    // ref is gone once the route closes.
     final requests = ref.read(bookmarkNavigationRequestsProvider.notifier);
     final navigator = Navigator.of(context);
     final dir = node.isDir ? node.path : node.parentPath;
+    final bookmark = VaultBookmark(dir, isDir: true);
     navigator.pop();
-    // Same order the drawer uses: bring the storage's browser to the front
-    // first, then ask it to go to the folder.
     open(container);
-    requests.request(container.volId, VaultBookmark(dir, isDir: true));
+    requests.request(container.volId, bookmark);
+  }
+
+  /// Opens a file above the analyzer route so Back returns to the same scan,
+  /// folder, tab, and selection. The browser hand-off is reserved for the
+  /// separate "Go to location" action.
+  Future<void> _openItem(StorageNode node) async {
+    final container = ref.read(storageAnalyzerProvider).selected;
+    if (container == null || node.isDir) return;
+
+    final extension = node.name.contains('.')
+        ? node.name.split('.').last.toLowerCase().trim()
+        : '';
+    try {
+      if (!container.isLocalStorage &&
+          VaultItemType.values.any(
+            (type) => type.name.toLowerCase() == extension,
+          )) {
+        final item = await ref
+            .read(vaultItemsServiceProvider)
+            .loadItem(container, node.path);
+        if (!mounted) return;
+        if (item == null) {
+          _showOpenError(context.l10n.failedToReadSecureItem);
+          return;
+        }
+        final dot = node.name.lastIndexOf('.');
+        item.title = dot > 0 ? node.name.substring(0, dot) : node.name;
+        await _pushItemViewer(
+          VaultItemDetailScreen(
+            container: container,
+            item: item,
+            filePath: node.path,
+          ),
+        );
+        return;
+      }
+
+      if (MediaViewerConstants.isSupported(node.name)) {
+        await _pushMediaViewer(container, node.path);
+        return;
+      }
+      if (extension == 'pdf') {
+        await _pushItemViewer(
+          PdfViewerScreen(container: container, filePath: node.path),
+        );
+        return;
+      }
+      if (const {
+        'txt',
+        'md',
+        'markdown',
+        'csv',
+        'json',
+        'xml',
+      }.contains(extension)) {
+        await _pushItemViewer(
+          TextEditorScreen(container: container, filePath: node.path),
+        );
+        return;
+      }
+      if ((extension == 'html' || extension == 'htm') &&
+          !container.isLocalStorage) {
+        await _pushItemViewer(
+          HtmlViewerScreen(container: container, filePath: node.path),
+        );
+        return;
+      }
+      if (extension == 'epub' ||
+          const {'cbz', 'cbr', 'cb7', 'cbt'}.contains(extension)) {
+        await _openBookItem(container, node, extension == 'epub');
+        return;
+      }
+
+      await _openWithSystemApp(container, node);
+    } catch (_) {
+      if (!mounted) return;
+      _showOpenError(context.l10n.couldNotOpenFile(node.name));
+    }
+  }
+
+  Future<void> _pushItemViewer(Widget viewer) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => SkinAreaScope(area: SkinArea.files, child: viewer),
+      ),
+    );
+  }
+
+  Future<void> _pushMediaViewer(
+    MountedContainer container,
+    String filePath,
+  ) async {
+    await Navigator.of(context).push<void>(
+      PageRouteBuilder<void>(
+        opaque: false,
+        barrierColor: Colors.transparent,
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: const Duration(milliseconds: 250),
+        pageBuilder: (_, _, _) => SkinAreaScope(
+          area: SkinArea.files,
+          child: MediaViewerScreen(
+            container: container,
+            mediaFiles: [filePath],
+            initialIndex: 0,
+            startingFolder: filePath.contains('/')
+                ? filePath.substring(0, filePath.lastIndexOf('/'))
+                : '',
+            thumbnailQuality: ThumbnailQuality.defaultQuality,
+            thumbnailCacheMode: ThumbnailCacheMode.appCache,
+          ),
+        ),
+        transitionsBuilder: (_, animation, _, child) => FadeTransition(
+          opacity: CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+            reverseCurve: Curves.easeInCubic,
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openBookItem(
+    MountedContainer container,
+    StorageNode node,
+    bool isEpub,
+  ) async {
+    final api = ref.read(vaultBookApiProvider);
+    final result = await api.open(
+      container: container,
+      path: node.path,
+      kind: isEpub ? BookKind.epub : BookKind.comic,
+    );
+    final token = result.token;
+    if (result.status == BookOpenStatus.ok && token != null) {
+      if (isEpub && result.epub != null && result.epub!.spine.isNotEmpty) {
+        await _pushItemViewer(
+          EpubReaderScreen(
+            container: container,
+            fallbackTitle: node.name,
+            filePath: node.path,
+            token: token,
+            info: result.epub!,
+          ),
+        );
+        return;
+      }
+      if (!isEpub && !result.hasEncryptedEntries) {
+        final pages = comicPageNames(result.entries);
+        if (pages.isNotEmpty) {
+          await _pushItemViewer(
+            ComicReaderScreen(
+              container: container,
+              title: node.name,
+              filePath: node.path,
+              token: token,
+              pages: pages,
+            ),
+          );
+          return;
+        }
+      }
+      unawaited(api.close(token));
+    }
+    await _openWithSystemApp(container, node);
+  }
+
+  Future<void> _openWithSystemApp(
+    MountedContainer container,
+    StorageNode node,
+  ) async {
+    final ok = container.isRawLocal
+        ? await ref
+              .read(vaultLocalShareApiProvider)
+              .openLocalFileWithApp(p.join(container.uri, node.path))
+        : await ref
+              .read(vaultFileIoApiProvider)
+              .openWithApp(container, node.path);
+    if (!ok && mounted) _showOpenError(context.l10n.noAppFoundForFileType);
+  }
+
+  void _showOpenError(String message) {
+    showAppSnackBar(context, message: message, tone: AppBannerTone.error);
   }
 
   Future<void> _confirmAndDelete(List<StorageNode> nodes) async {
@@ -409,7 +638,12 @@ class _StorageAnalyzerScreenState extends ConsumerState<StorageAnalyzerScreen> {
           title: InkWell(
             borderRadius: BorderRadius.circular(AppRadius.sm),
             onTap: (!st.busy && mountedTargets.length > 1)
-                ? () => _showTargetPickerSheet(context, mountedTargets, st, notifier)
+                ? () => _showTargetPickerSheet(
+                    context,
+                    mountedTargets,
+                    st,
+                    notifier,
+                  )
                 : null,
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
@@ -419,7 +653,10 @@ class _StorageAnalyzerScreenState extends ConsumerState<StorageAnalyzerScreen> {
                 children: [
                   Text(
                     l10n.toolStorageAnalyzerTitle,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
                   ),
                   if (st.selected != null) ...[
                     const SizedBox(height: 2),

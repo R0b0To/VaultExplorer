@@ -96,15 +96,47 @@ class _StorageTreemapState extends State<StorageTreemap> {
           final r = t.rect;
           final Widget tile;
           if (e.isGroup) {
+            final comp = <String, int>{};
+            for (final n in e.grouped) {
+              if (n.isDir) {
+                final dirComp = _compositionOf(n);
+                for (final entry in dirComp.entries) {
+                  comp[entry.key] = (comp[entry.key] ?? 0) + entry.value;
+                }
+              } else {
+                comp[n.category] = (comp[n.category] ?? 0) + n.sizeBytes;
+              }
+            }
+
+            String dominantCategory = '';
+            var maxBytes = 0;
+            for (final entry in comp.entries) {
+              if (entry.value > maxBytes) {
+                maxBytes = entry.value;
+                dominantCategory = entry.key;
+              }
+            }
+
+            final isPureOrDominant = dominantCategory.isNotEmpty &&
+                (comp.length == 1 || (maxBytes / math.max(1, e.bytes)) >= 0.75);
+            final groupCategory = isPureOrDominant ? dominantCategory : '';
+
+            final filter = widget.typeFilter;
+            final matches = filter == null ||
+                (comp[filter] ?? 0) > 0 ||
+                (groupCategory.isNotEmpty && groupCategory == filter);
+
             tile = _TreemapTile(
               label: l10n.storageAnalyzerItemCount(e.grouped.length),
               sizeText: formatBytes(e.bytes),
-              icon: Icons.grid_view_rounded,
-              style: storageCategoryStyle(context, ''),
+              icon: isPureOrDominant
+                  ? storageCategoryIcon(dominantCategory)
+                  : Icons.grid_view_rounded,
+              style: storageCategoryStyle(context, groupCategory),
               rect: r,
               selected: false,
-              dimmed: false,
-              composition: const <String, int>{},
+              dimmed: !matches,
+              composition: comp,
               onTap: widget.onGroupTap,
               onLongPress: null,
             );

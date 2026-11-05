@@ -461,6 +461,7 @@ class AppNavigationDrawer extends ConsumerWidget {
   }
 
   Widget _buildDrawerContent(BuildContext context, WidgetRef ref) {
+    final navigator = Navigator.of(context);
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final dashboardState = ref.watch(vaultDashboardControllerProvider);
@@ -963,6 +964,12 @@ class AppNavigationDrawer extends ConsumerWidget {
                                 dashboardState.mounted,
                               ),
                               localStorageContainer: localStorageNotifier,
+                              onOpenInBrowser: onSelectContainer == null
+                                  ? null
+                                  : (container) {
+                                      if (navigator.canPop()) navigator.pop();
+                                      onSelectContainer!(container);
+                                    },
                             ),
                           ),
                         ),

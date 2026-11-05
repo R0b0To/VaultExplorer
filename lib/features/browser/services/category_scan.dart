@@ -20,6 +20,10 @@ const categoryScanMaxFolders = 30000;
 /// this is far above the media scan's, but it still bounds memory.
 const categoryScanMaxResults = 50000;
 
+/// The file whose presence marks a folder (and everything below it) as not
+/// meant for browsing; see [CategoryScanner.respectNoMedia].
+const kNoMediaMarkerName = '.nomedia';
+
 /// Lists one folder of the scanned storage in the directory-entry wire format
 /// (see [RawEntry]); null when the folder cannot be listed.
 typedef CategoryDirectoryLister = Future<List<String>?> Function(
@@ -114,6 +118,7 @@ class CategoryScanner {
     required this.isHidden,
     required this.showHidden,
     this.skipDirectory,
+    this.respectNoMedia = false,
     this.onError,
     this.sharedSemaphore,
     this.maxDepth = categoryScanMaxDepth,
@@ -134,6 +139,18 @@ class CategoryScanner {
   /// Folders (given by their path from the scan root) not worth descending
   /// into, e.g. ones the OS never lets the app list.
   final bool Function(String dirPath)? skipDirectory;
+
+  /// Treat a folder holding a `.nomedia` file as off limits, together with
+  /// everything beneath it: the convention Android's media scanner and every
+  /// gallery app follow for "nothing in here is for browsing".
+  ///
+  /// The marker is read from the listing that was fetched anyway, so honouring
+  /// it costs nothing and spares the whole subtree. It is not applied to the
+  /// scan root (a storage someone chose to open is never pruned away), and not
+  /// while [showHidden] is on, since that is asking to see what is normally
+  /// left out. A lister has to report the marker (see
+  /// [kNoMediaMarkerName]); it is hidden by name, so [matches] never sees it.
+  final bool respectNoMedia;
 
   /// Called when one folder could not be listed. The walk carries on.
   final void Function(String dirPath, Object error)? onError;
@@ -211,7 +228,16 @@ class CategoryScanner {
 
       final subdirs = <String>[];
       try {
-        for (final entry in RawEntry.parseAll(raw)) {
+        final listed = RawEntry.parseAll(raw);
+        if (respectNoMedia && !showHidden && depth > 0) {
+          for (final entry in listed) {
+            if (!entry.isDir && entry.name == kNoMediaMarkerName) {
+              publishIfDue();
+              return;
+            }
+          }
+        }
+        for (final entry in listed) {
           if (!showHidden && isHidden(entry.name)) continue;
           final path = dirPath.isEmpty ? entry.name : '$dirPath/${entry.name}';
           if (entry.isDir) {

@@ -429,6 +429,34 @@ copied or moved; it is a listing over the real files.
   locations (they are the person's own folders). Setting:
   `AppSettings.categoryIndexInVaults` (configuration group); "Clear category
   indexes" removes it from the unlocked vaults.
+- **Phone storage is remembered, not walked from scratch.** Opening a category
+  or gallery mode of phone storage (or a raw-path storage location) used to
+  start from nothing: an empty screen, then a walk over up to thousands of
+  folders. `DeviceCategoryIndex` (one instance, `deviceCategoryIndexProvider`)
+  now puts three things in front of the walk, cheapest first:
+  1. *What the last scan found* (`seed`): in memory for the life of the app and,
+     encrypted, on disk (`DeviceCategoryIndexStore`, under the app's private
+     support folder, AES-GCM with the thumbnail cache's key, so wiping that key
+     makes it unreadable). Shown at once; the fresh answer replaces it. Nothing
+     is written into the person's folders, so the vault rule above still holds.
+  2. *The platform's file index* (`lookup`, Android 11+): one `queryCategoryIndex`
+     call asks MediaStore for every match under the root and visits no folder.
+     MediaStore only supplies candidate paths; the native side confirms each with
+     one `stat` and reports the file's real size and date, so a stale row never
+     shows up. The same hidden / skip rules a walk applies are applied to the
+     result (`filterCategoryIndexRows`), so both agree. It answers null, which
+     means "walk", when the index finds nothing, when hidden files are shown, or
+     before Android 11 (where file writes do not keep the index current).
+  3. *The walk*, only when 2 cannot answer or the person asks for it (pull to
+     refresh, and a rescan after an operation that wrote files, both `deep`).
+     It is cheaper per folder: `rawLocalCategoryLister` `stat`s only files that
+     match instead of every entry, `skipDeviceCategoryFolder` never enters
+     `Android/data`, `Android/obb`, `node_modules`, `cache` and similar
+     (`kCategoryPrunedFolderNames`), and `CategoryScanner.respectNoMedia` skips a
+     folder holding `.nomedia` with everything under it (media categories only,
+     never the scan root, never while hidden files are shown).
+  A finished, uncut scan is remembered per (root, category, show-hidden);
+  "Clear category indexes" also clears it.
 
 ---
 
@@ -950,7 +978,7 @@ not every constant is spelled out by name.
 | Panic & quick capture | `getPanicSettings`, `setPanicTier`, `setQuickTileEnabled`, `triggerPanic`, the `*PanicKit*` and `*PanicBootTrigger*` settings calls, `getQuickCaptureSettings`, `setQuickCaptureTileEnabled`, `checkPendingQuickCaptureRequest`, `requestPinQuickCaptureShortcut` |
 | Security | `setSecureScreen`, `setDebugLogging`, `setRecentsSnapshotBlocked`, `notifyResumedFramePainted`, `set/clearSensitiveClipboardText` |
 | Background service & camera | `syncBackgroundService`, `updateBackgroundServiceProgress`, `start/stopBackgroundRecording` |
-| Local/decoy file ops (plain device storage, no vault involved) | `getLocalFileUri`, `openLocalFileWithApp`, `shareLocalFile` |
+| Local/decoy file ops (plain device storage, no vault involved) | `getLocalFileUri`, `openLocalFileWithApp`, `shareLocalFile`, `queryCategoryIndex` (MediaStore candidate paths for the category views) |
 | USB | `listUsbDevices`, `requestUsbPermission`, `unlockUsbContainer`, `createUsbContainer`, `getUsbDeviceCapacity`, `set/isUsbAttachPromptEnabled` |
 | System | `documentExists`, `warmContainer`, `getDeviceCapabilityProfile`, `probeContainerFormat`, `getAppVersion`, `getAndroidSdkInt`, `launchUrl`, `installApk`, `getApkIcon`, `hasOverlayPermission`/`requestOverlayPermission`, `setNotificationLocale`, `exportLogFile` (in-app log viewer), `setKeepScreenOn`, `requestNotificationPermission`, `exportAppSettingsFile`/`importAppSettingsFile` |
 

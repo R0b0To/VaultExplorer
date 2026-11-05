@@ -53,6 +53,10 @@ import 'package:vaultexplorer/features/browser/models/file_category_presentation
 import 'package:vaultexplorer/features/browser/models/tab_id.dart';
 import 'package:vaultexplorer/features/browser/services/category_aggregate_scan.dart';
 import 'package:vaultexplorer/features/browser/services/category_listing.dart';
+import 'package:vaultexplorer/features/browser/services/category_walk_policy.dart';
+import 'package:vaultexplorer/features/browser/services/device_category_index.dart';
+import 'package:vaultexplorer/features/browser/services/device_category_index_provider.dart';
+import 'package:vaultexplorer/features/browser/services/raw_local_category_lister.dart';
 import 'package:vaultexplorer/features/browser/services/vault_category_index_io.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_screen.dart';
@@ -326,12 +330,17 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     return bundles;
   }
 
-  static bool _skipPrivateAndroidFolders(String dirPath) =>
-      dirPath == 'Android/data' || dirPath == 'Android/obb';
-
   static bool _skipVaultMetaFolder(String dirPath) => dirPath == kVaultMetaDir;
 
-  Future<void> _startScan() async {
+  /// Gathers the category's files from every source in play.
+  ///
+  /// Phone storage is not walked from scratch each time: the last result is
+  /// shown at once, the platform's file index supplies the fresh one, and the
+  /// folders are only visited when that cannot answer (see
+  /// [DeviceCategoryIndex]). [deep] skips the index and walks, for the cases
+  /// where it must not be trusted to know about a change: a pull to refresh,
+  /// and a rescan after an operation that wrote files.
+  Future<void> _startScan({bool deep = false}) async {
     _token?.cancel();
     final token = _token = CancellationToken();
     final showHidden = ref
@@ -372,21 +381,53 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       if (_disposed || token.isCancelled) return;
     }
 
+    bool matches(String name) => matchesFilter(name, widget.category.filterKey);
+    final deviceIndex = ref.read(deviceCategoryIndexProvider);
+    final extensions = categoryFileExtensions(widget.category);
+    // Phone storage remembers its last result, so the view opens filled.
+    await Future.wait([
+      for (final b in bundles)
+        if (b.container.isRawLocal)
+          deviceIndex.seed(_deviceKey(b, showHidden)).then((seed) {
+            if (seed != null) seeds[b.source.volId] = seed;
+          }),
+    ]);
+    if (_disposed || token.isCancelled) return;
+
     final scanner = CategoryAggregateScanner(
       targets: [
         for (final b in bundles)
-          CategoryScanTarget(
-            source: b.source,
-            listDirectory: (dir) => api.listDirectory(b.container, dir),
-            skipDirectory: b.container.isRawLocal
-                ? _skipPrivateAndroidFolders
-                : b.source.isVault
-                ? _skipVaultMetaFolder
-                : null,
-            seed: seeds[b.source.volId],
-          ),
+          if (b.container.isRawLocal)
+            CategoryScanTarget(
+              source: b.source,
+              listDirectory: rawLocalCategoryLister(
+                rootPath: b.container.uri,
+                matches: matches,
+              ),
+              skipDirectory: skipDeviceCategoryFolder,
+              // `.nomedia` means "not for browsing" for media; documents are
+              // not media, so a marker does not hide them.
+              respectNoMedia: widget.category != FileCategory.documents,
+              indexLookup: deep
+                  ? null
+                  : () => deviceIndex.lookup(
+                      _deviceKey(b, showHidden),
+                      extensions: extensions,
+                      matches: matches,
+                      isHidden: isHiddenEntryName,
+                      skipDirectory: skipDeviceCategoryFolder,
+                    ),
+              seed: seeds[b.source.volId],
+            )
+          else
+            CategoryScanTarget(
+              source: b.source,
+              listDirectory: (dir) => api.listDirectory(b.container, dir),
+              skipDirectory: b.source.isVault ? _skipVaultMetaFolder : null,
+              seed: seeds[b.source.volId],
+            ),
       ],
-      matches: (name) => matchesFilter(name, widget.category.filterKey),
+      matches: matches,
       isHidden: isHiddenEntryName,
       showHidden: showHidden,
     );
@@ -404,6 +445,44 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       _scanning = false;
     });
     if (indexEnabled) unawaited(_saveIndex(api, bundles, result));
+    unawaited(_rememberDevice(deviceIndex, bundles, result, showHidden));
+  }
+
+  DeviceCategoryIndexKey _deviceKey(
+    _CategorySourceBundle bundle,
+    bool showHidden,
+  ) => DeviceCategoryIndexKey(
+    rootPath: bundle.container.uri,
+    categoryKey: _categoryKey,
+    showHidden: showHidden,
+  );
+
+  /// Keeps what a finished scan found in phone storage, to show at once the
+  /// next time this category opens. A scan that was cut off, or that could
+  /// not read a source, would leave a wrong list behind, so it keeps nothing.
+  Future<void> _rememberDevice(
+    DeviceCategoryIndex index,
+    List<_CategorySourceBundle> bundles,
+    CategoryAggregateSnapshot result,
+    bool showHidden,
+  ) async {
+    if (!result.finished || result.limitReached) return;
+    for (final b in bundles) {
+      if (!b.container.isRawLocal ||
+          result.failedSources.contains(b.source.volId)) {
+        continue;
+      }
+      await index.remember(_deviceKey(b, showHidden), [
+        for (final e in result.entries)
+          if (e.sourceVolId == b.source.volId)
+            RawEntry(
+              name: e.path,
+              isDir: false,
+              sizeBytes: e.sizeBytes,
+              modifiedSecs: e.modifiedSecs,
+            ),
+      ]);
+    }
   }
 
   Future<List<RawEntry>?> _loadIndexSeed(
@@ -1096,7 +1175,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       onSuccess: () {
         if (!mounted) return;
         _clearSelection();
-        unawaited(_startScan());
+        unawaited(_startScan(deep: true));
       },
     );
   }
@@ -1114,7 +1193,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       ),
     );
     if (!mounted) return;
-    unawaited(_startScan());
+    unawaited(_startScan(deep: true));
   }
 
   void _showInFolder(CategoryEntry entry) {
@@ -1936,7 +2015,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           _source.kind != CategorySourceKind.device &&
           mountedVaults.isEmpty;
       return RefreshIndicator(
-        onRefresh: _startScan,
+        onRefresh: () => _startScan(deep: true),
         child: LayoutBuilder(
           builder: (context, constraints) => ListView(
             physics: const AlwaysScrollableScrollPhysics(),
@@ -2066,7 +2145,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           );
       if (op == null) return;
       _clearSelection();
-      if (mounted) unawaited(_startScan());
+      if (mounted) unawaited(_startScan(deep: true));
     }
 
     final Widget content;
@@ -2194,6 +2273,9 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           largeThumbnail: _isGallery,
         );
     }
-    return RefreshIndicator(onRefresh: _startScan, child: content);
+    return RefreshIndicator(
+      onRefresh: () => _startScan(deep: true),
+      child: content,
+    );
   }
 }

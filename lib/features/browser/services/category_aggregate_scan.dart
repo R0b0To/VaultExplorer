@@ -95,18 +95,47 @@ String parentOfPath(String path) {
   return slash < 0 ? '' : path.substring(0, slash);
 }
 
+/// What a source's cheap answer to "which files are in this category" holds.
+///
+/// See [CategoryScanTarget.indexLookup].
+class CategoryIndexHit {
+  const CategoryIndexHit(this.entries, {this.limitReached = false});
+
+  /// The matching files, each named by its path from the source's root.
+  final List<RawEntry> entries;
+
+  /// True when there were more matches than [entries] holds.
+  final bool limitReached;
+}
+
+/// Answers a source's category from something cheaper than walking it (the
+/// platform's own file index), or null when it cannot, which sends the scan
+/// down the walk. May throw: that counts as null.
+typedef CategoryIndexLookup = Future<CategoryIndexHit?> Function();
+
 /// One source to scan, with the means to list it.
 class CategoryScanTarget {
   const CategoryScanTarget({
     required this.source,
     required this.listDirectory,
     this.skipDirectory,
+    this.respectNoMedia = false,
+    this.indexLookup,
     this.seed,
   });
 
   final CategorySource source;
   final CategoryDirectoryLister listDirectory;
   final bool Function(String dirPath)? skipDirectory;
+
+  /// See [CategoryScanner.respectNoMedia].
+  final bool respectNoMedia;
+
+  /// A way to get this source's matches without visiting its folders. It is
+  /// tried first; only when it gives null (or throws) does the source get
+  /// walked. A result replaces the [seed] at once and is final: nothing is
+  /// listed, so [CategoryAggregateSnapshot.foldersChecked] stays 0 for it.
+  final CategoryIndexLookup? indexLookup;
 
   /// What an earlier scan of this source found (entries named by their path
   /// from the source's root), such as a vault's stored category index.
@@ -350,12 +379,47 @@ class CategoryAggregateScanner {
     await Future.wait(
       targets.map((target) async {
         final volId = target.source.volId;
+        final lookup = target.indexLookup;
+        if (lookup != null) {
+          CategoryIndexHit? hit;
+          try {
+            hit = await lookup();
+          } catch (_) {
+            hit = null;
+          }
+          if (token.isCancelled) return;
+          if (hit != null) {
+            final folders = <String>{};
+            for (final entry in hit.entries) {
+              var dir = parentOfPath(entry.name);
+              while (dir.isNotEmpty && folders.add(dir)) {
+                dir = parentOfPath(dir);
+              }
+            }
+            latest[volId] = CategoryScanSnapshot(
+              entries: List<RawEntry>.of(hit.entries),
+              folderPaths: folders,
+              foldersChecked: 0,
+              finished: true,
+              limitReached: hit.limitReached,
+            );
+            // Replaces the stand-in as a whole; see the walk's result below.
+            wrapped[volId]!.clear();
+            seeded.remove(volId);
+            if (onProgress != null) {
+              lastPublishedMs = clock.elapsedMilliseconds;
+              onProgress(merge(finished: false));
+            }
+            return;
+          }
+        }
         final scanner = CategoryScanner(
           listDirectory: target.listDirectory,
           matches: matches,
           isHidden: isHidden,
           showHidden: showHidden,
           skipDirectory: target.skipDirectory,
+          respectNoMedia: target.respectNoMedia,
           onError: onError == null
               ? null
               : (dir, error) => onError!(target.source, dir, error),

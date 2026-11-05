@@ -7,6 +7,7 @@ import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart'
     show AppBannerTone;
 import 'package:vaultexplorer/features/browser/models/file_category.dart';
 import 'package:vaultexplorer/features/browser/models/file_category_presentation.dart';
+import 'package:vaultexplorer/features/browser/services/device_category_index_provider.dart';
 import 'package:vaultexplorer/features/browser/services/vault_category_index_io.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
@@ -24,11 +25,13 @@ class CategoryShortcutsEditor extends ConsumerWidget {
   /// mention vaults.
   final bool showVaultOptions;
 
-  /// Removes the category index from every unlocked vault. A vault that is
-  /// locked keeps its index until it is next unlocked and this runs again; a
-  /// read-only vault cannot be changed and is skipped.
+  /// Removes the category index from every unlocked vault, and what the
+  /// category views remembered of phone storage. A vault that is locked keeps
+  /// its index until it is next unlocked and this runs again; a read-only
+  /// vault cannot be changed and is skipped.
   Future<void> _clearIndexes(BuildContext context, WidgetRef ref) async {
     final io = ref.read(vaultFileIoApiProvider);
+    await ref.read(deviceCategoryIndexProvider).clear();
     for (final vault in ref.read(vaultDashboardControllerProvider).mounted) {
       try {
         await categoryIndexStoreFor(io, vault)?.delete();

@@ -4794,7 +4794,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get toolStorageAnalyzerSubtitle =>
-      'Consulta qué está ocupando espacio en una bóveda montada';
+      'Consulta qué ocupa espacio en el almacenamiento local o en una bóveda montada.';
 
   @override
   String get toolDuplicateFinderTitle => 'Buscador de archivos duplicados';
@@ -5415,7 +5415,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get storageAnalyzerNoTargetsMessage =>
-      'Monta primero una bóveda y vuelve aquí para ver su desglose de almacenamiento.';
+      'Abre el almacenamiento local o monta una bóveda primero y vuelve aquí para consultar su desglose de almacenamiento.';
 
   @override
   String storageAnalyzerUsedOfTotal(String used, String total) {
@@ -5585,12 +5585,12 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String storageAnalyzerDeleteFilesMessage(String size) {
-    return 'Esto borrará permanentemente los elementos seleccionados de tu volumen cifrado y liberará $size. Esta acción no se puede deshacer.';
+    return 'Esto eliminará permanentemente los elementos seleccionados de este almacenamiento y liberará $size. No se puede deshacer.';
   }
 
   @override
   String storageAnalyzerDeleteFoldersMessage(String files, String size) {
-    return 'Esto borrará permanentemente los elementos seleccionados ($files archivos en total, incluyendo todo el contenido de las carpetas seleccionadas) y liberará $size. Esta acción no se puede deshacer.';
+    return 'Esto eliminará permanentemente los elementos seleccionados ($files archivos, incluido todo el contenido de las carpetas seleccionadas) y liberará $size. No se puede deshacer.';
   }
 
   @override

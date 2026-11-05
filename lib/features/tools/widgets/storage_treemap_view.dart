@@ -97,9 +97,9 @@ class _StorageTreemapState extends State<StorageTreemap> {
           final Widget tile;
           if (e.isGroup) {
             tile = _TreemapTile(
-              label: l10n.storageAnalyzerSmallerItems(e.grouped.length),
+              label: l10n.storageAnalyzerItemCount(e.grouped.length),
               sizeText: formatBytes(e.bytes),
-              icon: Icons.more_horiz_rounded,
+              icon: Icons.grid_view_rounded,
               style: storageCategoryStyle(context, ''),
               rect: r,
               selected: false,
@@ -214,7 +214,10 @@ class _TreemapTile extends StatelessWidget {
         label: '$label, $sizeText',
         child: Material(
           color: fill,
-          borderRadius: BorderRadius.circular(6),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(6),
+            side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.35)),
+          ),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: onTap,

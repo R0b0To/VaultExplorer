@@ -4817,7 +4817,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get toolStorageAnalyzerSubtitle =>
-      'Візуалізація зайнятого простору у відкритому сховищі';
+      'Перегляньте, що займає місце в локальному сховищі або відкритому сховищі.';
 
   @override
   String get toolDuplicateFinderTitle => 'Пошук дублікатів файлів';
@@ -5460,7 +5460,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get storageAnalyzerNoTargetsMessage =>
-      'Спочатку відкрийте сховище, а потім поверніться сюди для перегляду аналітики.';
+      'Відкрийте локальне сховище або підключіть сховище, а потім поверніться сюди, щоб переглянути використання місця.';
 
   @override
   String storageAnalyzerUsedOfTotal(String used, String total) {
@@ -5633,12 +5633,12 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String storageAnalyzerDeleteFilesMessage(String size) {
-    return 'Це назавжди видалить вибрані елементи із зашифрованого тому та звільнить $size. Цю дію неможливо скасувати.';
+    return 'Вибрані елементи буде назавжди видалено з цього сховища, звільнивши $size. Цю дію неможливо скасувати.';
   }
 
   @override
   String storageAnalyzerDeleteFoldersMessage(String files, String size) {
-    return 'Це назавжди видалить вибрані елементи ($files файлів загалом, включно з усім вмістом вибраних папок) та звільнить $size. Цю дію неможливо скасувати.';
+    return 'Вибрані елементи буде назавжди видалено ($files файлів, включно з усім вмістом вибраних папок), звільнивши $size. Цю дію неможливо скасувати.';
   }
 
   @override

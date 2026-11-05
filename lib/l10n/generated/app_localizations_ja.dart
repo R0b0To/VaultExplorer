@@ -4548,7 +4548,8 @@ class AppLocalizationsJa extends AppLocalizations {
   String get toolStorageAnalyzerTitle => 'ストレージ分析';
 
   @override
-  String get toolStorageAnalyzerSubtitle => 'マウント中の保管庫で何が容量を占めているか確認します';
+  String get toolStorageAnalyzerSubtitle =>
+      'ローカルストレージまたはマウント済みの保管庫で容量を使っている項目を確認します。';
 
   @override
   String get toolDuplicateFinderTitle => '重複ファイル検出';
@@ -5122,7 +5123,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get storageAnalyzerNoTargetsMessage =>
-      'まず保管庫をマウントしてから、ここに戻ってストレージの内訳を確認してください。';
+      'ローカルストレージを開くか保管庫をマウントしてから、ここに戻ってストレージの内訳を確認してください。';
 
   @override
   String storageAnalyzerUsedOfTotal(String used, String total) {
@@ -5286,12 +5287,12 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String storageAnalyzerDeleteFilesMessage(String size) {
-    return '暗号化ボリュームから選択したアイテムが完全に削除され、$sizeの空き容量が増えます。この操作は取り消せません。';
+    return '選択した項目はこのストレージから完全に削除され、$sizeの空き容量が増えます。この操作は取り消せません。';
   }
 
   @override
   String storageAnalyzerDeleteFoldersMessage(String files, String size) {
-    return '選択したアイテム（フォルダー内のすべてのファイルを含む計$files個）が完全に削除され、$sizeの空き容量が増えます。この操作は取り消せません。';
+    return '選択した項目（選択したフォルダー内のすべてを含む$files個のファイル）が完全に削除され、$sizeの空き容量が増えます。この操作は取り消せません。';
   }
 
   @override

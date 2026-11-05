@@ -4826,7 +4826,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get toolStorageAnalyzerSubtitle =>
-      'Voir ce qui occupe de l\'espace dans un coffre monté';
+      'Voir ce qui occupe de l’espace dans le stockage local ou un coffre monté.';
 
   @override
   String get toolDuplicateFinderTitle => 'Détecteur de fichiers en double';
@@ -5447,7 +5447,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get storageAnalyzerNoTargetsMessage =>
-      'Montez d\'abord un coffre, puis revenez ici pour voir la répartition de son stockage.';
+      'Ouvrez le stockage local ou montez un coffre, puis revenez ici pour voir la répartition du stockage.';
 
   @override
   String storageAnalyzerUsedOfTotal(String used, String total) {
@@ -5618,12 +5618,12 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String storageAnalyzerDeleteFilesMessage(String size) {
-    return 'Cette opération effacera définitivement les éléments sélectionnés de votre volume chiffré et libérera $size. Cette action est irréversible.';
+    return 'Cette action supprimera définitivement les éléments sélectionnés de ce stockage et libérera $size. Elle est irréversible.';
   }
 
   @override
   String storageAnalyzerDeleteFoldersMessage(String files, String size) {
-    return 'Cette opération effacera définitivement les éléments sélectionnés ($files fichiers au total, y compris tout le contenu des dossiers sélectionnés) et libérera $size. Cette action est irréversible.';
+    return 'Cette action supprimera définitivement les éléments sélectionnés ($files fichiers, y compris tout le contenu des dossiers sélectionnés) et libérera $size. Elle est irréversible.';
   }
 
   @override

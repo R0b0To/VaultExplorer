@@ -367,7 +367,6 @@ class StorageBreadcrumb extends StatelessWidget {
           Expanded(
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              reverse: true,
               child: Row(children: crumbs),
             ),
           ),

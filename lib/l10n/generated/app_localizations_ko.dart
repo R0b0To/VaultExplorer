@@ -4547,7 +4547,8 @@ class AppLocalizationsKo extends AppLocalizations {
   String get toolStorageAnalyzerTitle => '저장소 분석기';
 
   @override
-  String get toolStorageAnalyzerSubtitle => '마운트된 볼트에서 무엇이 공간을 차지하는지 확인합니다';
+  String get toolStorageAnalyzerSubtitle =>
+      '로컬 저장소 또는 마운트된 볼트에서 공간을 차지하는 항목을 확인합니다.';
 
   @override
   String get toolDuplicateFinderTitle => '중복 파일 찾기';
@@ -5120,7 +5121,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get storageAnalyzerNoTargetsMessage =>
-      '먼저 볼트를 마운트한 후, 여기로 돌아와 저장소 세부 내역을 확인하세요.';
+      '로컬 저장소를 열거나 볼트를 마운트한 다음 여기로 돌아와 저장소 내역을 확인하세요.';
 
   @override
   String storageAnalyzerUsedOfTotal(String used, String total) {
@@ -5283,12 +5284,12 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String storageAnalyzerDeleteFilesMessage(String size) {
-    return '암호화된 볼륨에서 선택한 항목이 영구적으로 삭제되며 $size의 공간이 확보됩니다. 이 작업은 실행 취소할 수 없습니다.';
+    return '선택한 항목이 이 저장소에서 영구적으로 삭제되며 $size의 공간이 확보됩니다. 이 작업은 실행 취소할 수 없습니다.';
   }
 
   @override
   String storageAnalyzerDeleteFoldersMessage(String files, String size) {
-    return '선택한 항목(선택한 폴더 내부의 모든 항목을 포함하여 총 $files개 파일)이 영구적으로 삭제되며 $size의 공간이 확보됩니다. 이 작업은 실행 취소할 수 없습니다.';
+    return '선택한 항목(선택한 폴더 안의 모든 항목을 포함하여 총 $files개 파일)이 영구적으로 삭제되며 $size의 공간이 확보됩니다. 이 작업은 실행 취소할 수 없습니다.';
   }
 
   @override

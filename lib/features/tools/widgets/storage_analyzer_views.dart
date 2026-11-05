@@ -60,31 +60,48 @@ List<Widget> buildStorageMapSlivers(
     if (state.breakdown.isNotEmpty)
       SliverToBoxAdapter(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 4,
-            children: [
-              for (final b in state.breakdown)
-                FilterChip(
-                  avatar: Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: storageCategoryStyle(context, b.category).accent,
-                      shape: BoxShape.circle,
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final itemWidth = (constraints.maxWidth - 8) / 2;
+              return Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  for (final b in state.breakdown)
+                    SizedBox(
+                      width: itemWidth,
+                      child: FilterChip(
+                        avatar: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: storageCategoryStyle(
+                              context,
+                              b.category,
+                            ).accent,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        labelPadding: const EdgeInsets.only(left: 2, right: 4),
+                        label: Text(
+                          '${storageCategoryLabel(context, b.category)} · ${formatBytes(b.sizeBytes)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: context.typography.labelSmall,
+                        ),
+                        visualDensity: VisualDensity.compact,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        selected: state.typeFilter == b.category,
+                        showCheckmark: false,
+                        onSelected: (on) =>
+                            notifier.setTypeFilter(on ? b.category : null),
+                      ),
                     ),
-                  ),
-                  label: Text(
-                    '${storageCategoryLabel(context, b.category)} · '
-                    '${formatBytes(b.sizeBytes)}',
-                  ),
-                  selected: state.typeFilter == b.category,
-                  showCheckmark: false,
-                  onSelected: (on) =>
-                      notifier.setTypeFilter(on ? b.category : null),
-                ),
-            ],
+                ],
+              );
+            },
           ),
         ),
       ),

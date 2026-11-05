@@ -4488,7 +4488,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get toolStorageAnalyzerTitle => '存储分析器';
 
   @override
-  String get toolStorageAnalyzerSubtitle => '查看已挂载保险库中哪些内容占用了空间';
+  String get toolStorageAnalyzerSubtitle => '查看本地存储或已挂载保险库中哪些内容占用了空间。';
 
   @override
   String get toolDuplicateFinderTitle => '重复文件查找器';
@@ -5054,7 +5054,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageAnalyzerNoTargetsTitle => '没有可分析的内容';
 
   @override
-  String get storageAnalyzerNoTargetsMessage => '请先挂载一个保险库，然后返回此处查看其存储明细。';
+  String get storageAnalyzerNoTargetsMessage =>
+      '请先打开本地存储或挂载一个保险库，然后返回此处查看存储明细。';
 
   @override
   String storageAnalyzerUsedOfTotal(String used, String total) {
@@ -5216,12 +5217,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String storageAnalyzerDeleteFilesMessage(String size) {
-    return '这将从加密卷中永久删除所选项目并释放 $size 空间。此操作无法撤销。';
+    return '这将从此存储中永久删除所选项目并释放 $size 空间。此操作无法撤销。';
   }
 
   @override
   String storageAnalyzerDeleteFoldersMessage(String files, String size) {
-    return '这将永久删除所选项目（包含选中文件夹内的所有内容，共计 $files 个文件）并释放 $size 空间。此操作无法撤销。';
+    return '这将永久删除所选项目（共 $files 个文件，包括所选文件夹中的所有内容）并释放 $size 空间。此操作无法撤销。';
   }
 
   @override

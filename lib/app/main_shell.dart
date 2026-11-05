@@ -66,6 +66,9 @@ class _MainShellState extends ConsumerState<MainShell>
   final ValueNotifier<List<MountedContainer>> _mountedNotifier = ValueNotifier(
     const [],
   );
+  final ValueNotifier<MountedContainer?> _localStorageNotifier = ValueNotifier(
+    null,
+  );
   final GlobalKey<VaultDashboardState> _dashboardKey =
       GlobalKey<VaultDashboardState>();
   MountedContainer? _cachedLocalStorageContainer;
@@ -438,6 +441,7 @@ class _MainShellState extends ConsumerState<MainShell>
     WidgetsBinding.instance.removeObserver(this);
     _exitArmTimer?.cancel();
     _mountedNotifier.dispose();
+    _localStorageNotifier.dispose();
     _vaultEngineEvents.removeIncomingShareRequestListener(
       _onIncomingShareRequest,
     );
@@ -867,6 +871,7 @@ class _MainShellState extends ConsumerState<MainShell>
       child: VaultDashboard(
         key: backPreviewOnly ? null : _dashboardKey,
         mountedNotifier: backPreviewOnly ? null : _mountedNotifier,
+        localStorageNotifier: backPreviewOnly ? null : _localStorageNotifier,
         onNavigateTab: _onTabTap,
         workspaceConfig: backPreviewOnly ? null : workspaceConfig,
         backPreviewOnly: backPreviewOnly,
@@ -889,6 +894,7 @@ class _MainShellState extends ConsumerState<MainShell>
             area: SkinArea.tools,
             child: ToolsScreen(
               mountedContainers: _mountedNotifier,
+              localStorageContainer: _localStorageNotifier,
               onNavigateTab: _onTabTap,
               onOpenInBrowser: _openBrowser,
             ),
@@ -930,6 +936,7 @@ class _MainShellState extends ConsumerState<MainShell>
       return AppNavigationDrawer(
         currentVolId: currentVolId,
         primaryLocalContainer: _primaryLocalStorageContainer,
+        localStorageNotifier: _localStorageNotifier,
         onOpenInNewTab: workspaceActions == null || !tabsEnabled
             ? null
             : (container) {

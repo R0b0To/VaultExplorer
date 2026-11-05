@@ -4783,7 +4783,7 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get toolStorageAnalyzerSubtitle =>
-      'Scopri cosa occupa spazio in un vault montato';
+      'Scopri cosa occupa spazio nell’archiviazione locale o in un vault montato.';
 
   @override
   String get toolDuplicateFinderTitle => 'Ricerca file duplicati';
@@ -5398,7 +5398,7 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get storageAnalyzerNoTargetsMessage =>
-      'Monta prima un vault, poi torna qui per vedere la ripartizione dell\'archiviazione.';
+      'Apri l’archiviazione locale o monta un vault, poi torna qui per visualizzare la ripartizione dello spazio.';
 
   @override
   String storageAnalyzerUsedOfTotal(String used, String total) {
@@ -5568,12 +5568,12 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String storageAnalyzerDeleteFilesMessage(String size) {
-    return 'Questo cancellerà definitivamente gli elementi selezionati dal volume cifrato liberando $size. L\'operazione non può essere annullata.';
+    return 'Gli elementi selezionati verranno eliminati definitivamente da questa archiviazione e verranno liberati $size. L’operazione non può essere annullata.';
   }
 
   @override
   String storageAnalyzerDeleteFoldersMessage(String files, String size) {
-    return 'Questo cancellerà definitivamente gli elementi selezionati ($files file in totale, compreso tutto il contenuto delle cartelle selezionate) liberando $size. L\'operazione non può essere annullata.';
+    return 'Gli elementi selezionati verranno eliminati definitivamente ($files file, compreso tutto il contenuto delle cartelle selezionate) e verranno liberati $size. L’operazione non può essere annullata.';
   }
 
   @override

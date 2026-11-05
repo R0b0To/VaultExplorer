@@ -10,11 +10,10 @@
 // of Flutter and unit-tested). This notifier is the thin layer that wires them
 // to the engine and to Riverpod.
 //
-// The widget still owns `widget.mountedContainers` (a ValueListenable<List
-// <MountedContainer>> passed down from the app shell) since that's shared
-// infrastructure well beyond this one screen's scope -- this controller
-// just reacts to it via [onMountedListChanged], called from the widget's
-// listener.
+// The widget still owns the target listenables passed down from the app shell
+// since that shared infrastructure is used well beyond this screen. This
+// controller reacts through [onTargetsChanged] when mounted vaults or the
+// permission-backed Local Storage target changes.
 import 'dart:async';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -218,16 +217,20 @@ class StorageAnalyzer extends _$StorageAnalyzer {
     return const StorageAnalyzerState();
   }
 
-  /// Reacts to the shared mounted-container list changing: clears results
-  /// if nothing is mounted anymore, or re-targets (and rescans) if the
-  /// currently selected container was the one that unmounted.
-  void onMountedListChanged(List<MountedContainer> list) {
+  /// Reacts to the available analyzer targets changing: clears results if
+  /// there are none, or re-targets if the selected storage is no longer
+  /// available.
+  void onMountedListChanged(List<MountedContainer> list) =>
+      onTargetsChanged(list);
+
+  /// Same as [onMountedListChanged], with a name that includes Local Storage.
+  void onTargetsChanged(List<MountedContainer> list) {
     final selected = state.selected;
     if (list.isEmpty) {
       _generation++;
       state = const StorageAnalyzerState();
     } else if (selected == null ||
-        !list.any((c) => c.volId == selected.volId)) {
+        !list.any((c) => c.volId == selected.volId && c.uri == selected.uri)) {
       unawaited(selectTarget(list.first));
     }
   }

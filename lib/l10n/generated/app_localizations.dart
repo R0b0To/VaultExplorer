@@ -7995,7 +7995,7 @@ abstract class AppLocalizations {
   /// Tool card subtitle for the Storage Analyzer
   ///
   /// In en, this message translates to:
-  /// **'See what\'s taking up space in a mounted vault'**
+  /// **'See what\'s taking up space in Local Storage or a mounted vault'**
   String get toolStorageAnalyzerSubtitle;
 
   /// Tool card title for Duplicate File Finder
@@ -8851,7 +8851,7 @@ abstract class AppLocalizations {
   /// Empty state message when no volumes are mounted
   ///
   /// In en, this message translates to:
-  /// **'Mount a vault first, then come back here to see its storage breakdown.'**
+  /// **'Open Local Storage or mount a vault first, then come back here to see its storage breakdown.'**
   String get storageAnalyzerNoTargetsMessage;
 
   /// Capacity gauge caption
@@ -9103,13 +9103,13 @@ abstract class AppLocalizations {
   /// Confirmation text for deleting files from the Storage Analyzer
   ///
   /// In en, this message translates to:
-  /// **'This permanently erases the selected items from your encrypted volume and frees {size}. It can\'t be undone.'**
+  /// **'This permanently deletes the selected items from this storage and frees {size}. It can\'t be undone.'**
   String storageAnalyzerDeleteFilesMessage(String size);
 
   /// Confirmation text for deleting a selection that includes folders
   ///
   /// In en, this message translates to:
-  /// **'This permanently erases the selected items, {files} files in total including everything inside any selected folder, and frees {size}. It can\'t be undone.'**
+  /// **'This permanently deletes the selected items ({files} files, including everything inside selected folders) and frees {size}. It can\'t be undone.'**
   String storageAnalyzerDeleteFoldersMessage(String files, String size);
 
   /// Snackbar after a successful delete from the Storage Analyzer

@@ -1,4 +1,4 @@
-// Storage Analyzer: see where a vault's space goes, then do something about it.
+// Storage Analyzer: see where storage space goes, then do something about it.
 //
 // Four views over one scanned folder tree --
 //   Map      the current folder as a treemap; big tiles are big files/folders
@@ -10,7 +10,7 @@
 //
 // Deleting goes through the same background file operation the browser uses,
 // after a confirmation that states how much space it frees and that it cannot
-// be undone (a vault has no recycle bin).
+// be undone (storage has no recycle bin).
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -33,15 +33,17 @@ enum _StorageTab { map, folders, types, cleanup }
 
 class StorageAnalyzerScreen extends ConsumerStatefulWidget {
   final ValueListenable<List<MountedContainer>> mountedContainers;
+  final ValueListenable<MountedContainer?>? localStorageContainer;
 
-  /// Opens a vault in the file browser. When null (the tool was opened
-  /// somewhere with no browser to go to) the "show in file browser" action is
-  /// hidden.
+  /// Opens a storage target in the file browser. When null (the tool was
+  /// opened somewhere with no browser to go to) the "show in file browser"
+  /// action is hidden.
   final ValueChanged<MountedContainer>? onOpenInBrowser;
 
   const StorageAnalyzerScreen({
     super.key,
     required this.mountedContainers,
+    this.localStorageContainer,
     this.onOpenInBrowser,
   });
 
@@ -60,26 +62,81 @@ class _StorageAnalyzerScreenState extends ConsumerState<StorageAnalyzerScreen> {
   @override
   void initState() {
     super.initState();
-    final list = widget.mountedContainers.value;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final notifier = ref.read(storageAnalyzerProvider.notifier);
       notifier.watchContentChanges();
-      if (list.isNotEmpty) unawaited(notifier.selectTarget(list.first));
+      notifier.onTargetsChanged(_availableTargets());
     });
     widget.mountedContainers.addListener(_onMountedChanged);
+    widget.localStorageContainer?.addListener(_onMountedChanged);
   }
 
   @override
   void dispose() {
     widget.mountedContainers.removeListener(_onMountedChanged);
+    widget.localStorageContainer?.removeListener(_onMountedChanged);
     super.dispose();
+  }
+
+  List<MountedContainer> _availableTargets() {
+    final localStorage = widget.localStorageContainer?.value;
+    return [
+      ...widget.mountedContainers.value,
+      if (localStorage != null) localStorage,
+    ];
   }
 
   void _onMountedChanged() {
     ref
         .read(storageAnalyzerProvider.notifier)
-        .onMountedListChanged(widget.mountedContainers.value);
+        .onTargetsChanged(_availableTargets());
+  }
+  Future<void> _showTargetPickerSheet(
+    BuildContext context,
+    List<MountedContainer> targets,
+    StorageAnalyzerState st,
+    StorageAnalyzer notifier,
+  ) async {
+    final l10n = context.l10n;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: Text(
+                  l10n.storageAnalyzerTargetLabel,
+                  style: context.typography.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const Divider(height: 1),
+              for (final target in targets)
+                ListTile(
+                  leading: const Icon(Icons.storage_rounded),
+                  title: Text(target.displayName),
+                  selected: st.selected?.volId == target.volId,
+                  trailing: st.selected?.volId == target.volId
+                      ? Icon(Icons.check_rounded, color: context.colors.primary)
+                      : null,
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    unawaited(notifier.selectTarget(target));
+                  },
+                ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   void _setTab(_StorageTab tab) {
@@ -237,7 +294,7 @@ class _StorageAnalyzerScreenState extends ConsumerState<StorageAnalyzerScreen> {
     final navigator = Navigator.of(context);
     final dir = node.isDir ? node.path : node.parentPath;
     navigator.pop();
-    // Same order the drawer uses: bring the vault's browser to the front
+    // Same order the drawer uses: bring the storage's browser to the front
     // first, then ask it to go to the folder.
     open(container);
     requests.request(container.volId, VaultBookmark(dir, isDir: true));
@@ -339,6 +396,7 @@ class _StorageAnalyzerScreenState extends ConsumerState<StorageAnalyzerScreen> {
     final l10n = context.l10n;
     final selection = st.selection;
     final showBar = st.hasSelection && !selection.isEmpty;
+    final mountedTargets = _availableTargets();
 
     return PopScope(
       // Back leaves selection mode before it leaves the screen.
@@ -348,9 +406,75 @@ class _StorageAnalyzerScreenState extends ConsumerState<StorageAnalyzerScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text(
-            l10n.toolStorageAnalyzerTitle,
-            style: const TextStyle(fontWeight: FontWeight.bold),
+          title: InkWell(
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            onTap: (!st.busy && mountedTargets.length > 1)
+                ? () => _showTargetPickerSheet(context, mountedTargets, st, notifier)
+                : null,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    l10n.toolStorageAnalyzerTitle,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                  if (st.selected != null) ...[
+                    const SizedBox(height: 2),
+                    if (mountedTargets.length > 1)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: context.colors.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(AppRadius.full),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.storage_rounded,
+                              size: 13,
+                              color: context.colors.primary,
+                            ),
+                            const SizedBox(width: 5),
+                            Flexible(
+                              child: Text(
+                                st.selected!.displayName,
+                                style: context.typography.labelSmall?.copyWith(
+                                  color: context.colors.onSurface,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 2),
+                            Icon(
+                              Icons.arrow_drop_down_rounded,
+                              size: 16,
+                              color: context.colors.onSurfaceVariant,
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      Text(
+                        st.selected!.displayName,
+                        style: context.typography.bodySmall?.copyWith(
+                          color: context.colors.onSurfaceVariant,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ],
+              ),
+            ),
           ),
           actions: [
             IconButton(
@@ -378,18 +502,48 @@ class _StorageAnalyzerScreenState extends ConsumerState<StorageAnalyzerScreen> {
         body: ValueListenableBuilder<List<MountedContainer>>(
           valueListenable: widget.mountedContainers,
           builder: (context, mountedList, _) {
-            if (mountedList.isEmpty) {
-              return AppEmptyState(
-                icon: Icons.pie_chart_outline_rounded,
-                title: l10n.storageAnalyzerNoTargetsTitle,
-                message: l10n.storageAnalyzerNoTargetsMessage,
+            final localStorageListenable = widget.localStorageContainer;
+            if (localStorageListenable == null) {
+              return _buildTargetsBody(
+                context,
+                mountedList,
+                null,
+                st,
+                notifier,
               );
             }
-            return _buildBody(context, mountedList, st, notifier);
+            return ValueListenableBuilder<MountedContainer?>(
+              valueListenable: localStorageListenable,
+              builder: (context, localStorage, _) => _buildTargetsBody(
+                context,
+                mountedList,
+                localStorage,
+                st,
+                notifier,
+              ),
+            );
           },
         ),
       ),
     );
+  }
+
+  Widget _buildTargetsBody(
+    BuildContext context,
+    List<MountedContainer> mountedList,
+    MountedContainer? localStorage,
+    StorageAnalyzerState st,
+    StorageAnalyzer notifier,
+  ) {
+    final targets = [...mountedList, if (localStorage != null) localStorage];
+    if (targets.isEmpty) {
+      return AppEmptyState(
+        icon: Icons.pie_chart_outline_rounded,
+        title: context.l10n.storageAnalyzerNoTargetsTitle,
+        message: context.l10n.storageAnalyzerNoTargetsMessage,
+      );
+    }
+    return _buildBody(context, targets, st, notifier);
   }
 
   Widget _buildBody(
@@ -399,33 +553,12 @@ class _StorageAnalyzerScreenState extends ConsumerState<StorageAnalyzerScreen> {
     StorageAnalyzer notifier,
   ) {
     final l10n = context.l10n;
+    final cs = context.colors;
     final selected = st.selected;
     final actions = _actions(notifier);
     final rootLabel = selected?.displayName ?? '';
 
-    final slivers = <Widget>[
-      SliverToBoxAdapter(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: OptionPickerTile<int>(
-            label: l10n.storageAnalyzerTargetLabel,
-            value: selected?.volId ?? mountedList.first.volId,
-            subtitle: selected?.displayName ?? mountedList.first.displayName,
-            prefixIcon: Icons.lock_open_rounded,
-            enabled: !st.busy,
-            options: mountedList
-                .map((c) => SelectOption(value: c.volId, label: c.displayName))
-                .toList(),
-            onChanged: (volId) {
-              final match = mountedList.where((c) => c.volId == volId);
-              if (match.isNotEmpty) {
-                unawaited(notifier.selectTarget(match.first));
-              }
-            },
-          ),
-        ),
-      ),
-    ];
+    final slivers = <Widget>[];
 
     final tree = st.tree;
     if (st.loading || (selected != null && tree == null)) {
@@ -539,45 +672,61 @@ class _StorageAnalyzerScreenState extends ConsumerState<StorageAnalyzerScreen> {
 
   Widget _buildTabs(BuildContext context) {
     final l10n = context.l10n;
-    Widget chip(_StorageTab tab, IconData icon, String label) {
-      return Padding(
-        padding: const EdgeInsets.only(right: 8),
-        child: ChoiceChip(
-          avatar: Icon(icon, size: AppIconSize.small),
-          label: Text(label),
-          selected: _tab == tab,
-          showCheckmark: false,
-          onSelected: (_) => _setTab(tab),
-        ),
-      );
-    }
+    final textTheme = context.typography;
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.fromLTRB(16, 12, 8, 0),
-      child: Row(
-        children: [
-          chip(
-            _StorageTab.map,
-            Icons.dashboard_outlined,
-            l10n.storageAnalyzerTabMap,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: SizedBox(
+        width: double.infinity,
+        child: SegmentedButton<_StorageTab>(
+          showSelectedIcon: false,
+          style: const ButtonStyle(
+            visualDensity: VisualDensity.compact,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
-          chip(
-            _StorageTab.folders,
-            Icons.folder_outlined,
-            l10n.storageAnalyzerTabFolders,
-          ),
-          chip(
-            _StorageTab.types,
-            Icons.pie_chart_outline_rounded,
-            l10n.storageAnalyzerTabTypes,
-          ),
-          chip(
-            _StorageTab.cleanup,
-            Icons.cleaning_services_outlined,
-            l10n.storageAnalyzerTabCleanup,
-          ),
-        ],
+          segments: [
+            ButtonSegment<_StorageTab>(
+              value: _StorageTab.map,
+              label: Text(
+                l10n.storageAnalyzerTabMap,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.labelMedium,
+              ),
+            ),
+            ButtonSegment<_StorageTab>(
+              value: _StorageTab.folders,
+              label: Text(
+                l10n.storageAnalyzerTabFolders,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.labelMedium,
+              ),
+            ),
+            ButtonSegment<_StorageTab>(
+              value: _StorageTab.types,
+              label: Text(
+                l10n.storageAnalyzerTabTypes,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.labelMedium,
+              ),
+            ),
+            ButtonSegment<_StorageTab>(
+              value: _StorageTab.cleanup,
+              label: Text(
+                l10n.storageAnalyzerTabCleanup,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.labelMedium,
+              ),
+            ),
+          ],
+          selected: {_tab},
+          onSelectionChanged: (selectedSet) {
+            if (selectedSet.isNotEmpty) _setTab(selectedSet.first);
+          },
+        ),
       ),
     );
   }

@@ -4796,7 +4796,7 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get toolStorageAnalyzerSubtitle =>
-      'Veja o que está ocupando espaço em um cofre montado';
+      'Veja o que está ocupando espaço no armazenamento local ou em um cofre montado.';
 
   @override
   String get toolDuplicateFinderTitle => 'Localizador de Arquivos Duplicados';
@@ -5413,7 +5413,7 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get storageAnalyzerNoTargetsMessage =>
-      'Monte um cofre primeiro e depois volte aqui para ver a distribuição de armazenamento.';
+      'Abra o armazenamento local ou monte um cofre e volte aqui para ver a distribuição do armazenamento.';
 
   @override
   String storageAnalyzerUsedOfTotal(String used, String total) {
@@ -5584,12 +5584,12 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String storageAnalyzerDeleteFilesMessage(String size) {
-    return 'Isso apagará permanentemente os itens selecionados do seu volume criptografado e liberará $size. Essa ação não pode ser desfeita.';
+    return 'Isso excluirá permanentemente os itens selecionados deste armazenamento e liberará $size. Não é possível desfazer essa ação.';
   }
 
   @override
   String storageAnalyzerDeleteFoldersMessage(String files, String size) {
-    return 'Isso apagará permanentemente os itens selecionados ($files arquivos no total, incluindo tudo dentro de qualquer pasta selecionada) e liberará $size. Essa ação não pode ser desfeita.';
+    return 'Isso excluirá permanentemente os itens selecionados ($files arquivos, incluindo tudo dentro das pastas selecionadas) e liberará $size. Não é possível desfazer essa ação.';
   }
 
   @override

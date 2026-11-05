@@ -4714,7 +4714,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get toolStorageAnalyzerSubtitle =>
-      'See what\'s taking up space in a mounted vault';
+      'See what\'s taking up space in Local Storage or a mounted vault';
 
   @override
   String get toolDuplicateFinderTitle => 'Duplicate File Finder';
@@ -5322,7 +5322,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get storageAnalyzerNoTargetsMessage =>
-      'Mount a vault first, then come back here to see its storage breakdown.';
+      'Open Local Storage or mount a vault first, then come back here to see its storage breakdown.';
 
   @override
   String storageAnalyzerUsedOfTotal(String used, String total) {
@@ -5492,12 +5492,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String storageAnalyzerDeleteFilesMessage(String size) {
-    return 'This permanently erases the selected items from your encrypted volume and frees $size. It can\'t be undone.';
+    return 'This permanently deletes the selected items from this storage and frees $size. It can\'t be undone.';
   }
 
   @override
   String storageAnalyzerDeleteFoldersMessage(String files, String size) {
-    return 'This permanently erases the selected items, $files files in total including everything inside any selected folder, and frees $size. It can\'t be undone.';
+    return 'This permanently deletes the selected items ($files files, including everything inside selected folders) and frees $size. It can\'t be undone.';
   }
 
   @override

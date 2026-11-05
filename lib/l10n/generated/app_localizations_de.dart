@@ -4796,7 +4796,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get toolStorageAnalyzerSubtitle =>
-      'Sehen Sie, was in einem eingebundenen Tresor Speicherplatz belegt';
+      'Sieh nach, was im lokalen Speicher oder in einem eingebundenen Tresor Platz belegt.';
 
   @override
   String get toolDuplicateFinderTitle => 'Duplikat-Dateisuche';
@@ -5411,7 +5411,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get storageAnalyzerNoTargetsMessage =>
-      'Binden Sie zuerst einen Tresor ein und kommen Sie dann hierher zurück, um dessen Speicherbelegung zu sehen.';
+      'Öffne zuerst den lokalen Speicher oder binde einen Tresor ein. Kehre dann hierher zurück, um die Speicherbelegung anzusehen.';
 
   @override
   String storageAnalyzerUsedOfTotal(String used, String total) {
@@ -5582,12 +5582,12 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String storageAnalyzerDeleteFilesMessage(String size) {
-    return 'Dadurch werden die ausgewählten Elemente dauerhaft von Ihrem verschlüsselten Volume gelöscht und $size freigegeben. Dies kann nicht rückgängig gemacht werden.';
+    return 'Dadurch werden die ausgewählten Elemente dauerhaft aus diesem Speicher gelöscht und $size freigegeben. Das lässt sich nicht rückgängig machen.';
   }
 
   @override
   String storageAnalyzerDeleteFoldersMessage(String files, String size) {
-    return 'Dadurch werden die ausgewählten Elemente dauerhaft gelöscht ($files Dateien insgesamt, einschließlich aller Inhalte ausgewählter Ordner) und $size freigegeben. Dies kann nicht rückgängig gemacht werden.';
+    return 'Dadurch werden die ausgewählten Elemente dauerhaft gelöscht ($files Dateien, einschließlich aller Inhalte ausgewählter Ordner) und $size freigegeben. Das lässt sich nicht rückgängig machen.';
   }
 
   @override

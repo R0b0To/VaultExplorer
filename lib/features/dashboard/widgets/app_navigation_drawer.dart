@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
@@ -30,6 +31,7 @@ import 'package:vaultexplorer/features/tools/tools_screen.dart';
 class AppNavigationDrawer extends ConsumerWidget {
   final int? currentVolId;
   final MountedContainer? primaryLocalContainer;
+  final ValueListenable<MountedContainer?>? localStorageNotifier;
   final VoidCallback? onOpenLocalStorage;
   final int selectedTabIndex;
   final ValueChanged<int>? onSelectTab;
@@ -49,6 +51,7 @@ class AppNavigationDrawer extends ConsumerWidget {
     super.key,
     this.currentVolId,
     this.primaryLocalContainer,
+    this.localStorageNotifier,
     this.onOpenLocalStorage,
     this.selectedTabIndex = 0,
     this.onSelectTab,
@@ -959,6 +962,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                               mountedContainers: ValueNotifier(
                                 dashboardState.mounted,
                               ),
+                              localStorageContainer: localStorageNotifier,
                             ),
                           ),
                         ),

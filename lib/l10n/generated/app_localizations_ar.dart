@@ -4846,7 +4846,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get toolStorageAnalyzerSubtitle =>
-      'معرفة ما يشغل المساحة في خزنة مثبَّتة';
+      'اعرف ما الذي يشغل مساحة في التخزين المحلي أو في خزنة مركّبة.';
 
   @override
   String get toolDuplicateFinderTitle => 'أداة العثور على الملفات المكررة';
@@ -5498,7 +5498,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get storageAnalyzerNoTargetsMessage =>
-      'قم بتحميل خزنة أولاً، ثم عد إلى هنا لعرض توزيع مساحة التخزين الخاصة بها.';
+      'افتح التخزين المحلي أو حمّل خزنة أولاً، ثم عُد إلى هنا لعرض تفاصيل التخزين.';
 
   @override
   String storageAnalyzerUsedOfTotal(String used, String total) {
@@ -5668,12 +5668,12 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String storageAnalyzerDeleteFilesMessage(String size) {
-    return 'سيؤدي هذا إلى مسح العناصر المحددة نهائياً من وحدة التخزين المشفرة وتوفير $size. لا يمكن التراجع عن هذا الإجراء.';
+    return 'سيؤدي هذا إلى حذف العناصر المحددة نهائياً من وحدة التخزين هذه وتوفير $size. لا يمكن التراجع عن ذلك.';
   }
 
   @override
   String storageAnalyzerDeleteFoldersMessage(String files, String size) {
-    return 'سيؤدي هذا إلى مسح العناصر المحددة نهائياً ($files ملفات في الإجمالي بما في ذلك كل شيء داخل أي مجلد محدد) وتوفير $size. لا يمكن التراجع عن هذا الإجراء.';
+    return 'سيؤدي هذا إلى حذف العناصر المحددة نهائياً ($files ملفاً، بما في ذلك كل ما داخل المجلدات المحددة) وتوفير $size. لا يمكن التراجع عن ذلك.';
   }
 
   @override

@@ -58,6 +58,7 @@ import 'package:vaultexplorer/features/browser/viewer/media_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/pdf_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/file_info_sheet.dart';
+import 'package:vaultexplorer/features/browser/widgets/bottom_search_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/breadcrumb_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_item_drag.dart';
 import 'package:vaultexplorer/features/browser/widgets/conflict_resolution_sheet.dart';
@@ -163,7 +164,6 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
 
   bool _searchActive = false;
   String _query = '';
-  final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
   List<CategoryEntry> _items = const [];
@@ -241,7 +241,6 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     _token?.cancel();
     _exitArmTimer?.cancel();
     _events?.removeContainerLockedListener(_onVaultLocked);
-    _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -756,7 +755,6 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       _searchActive = !_searchActive;
       if (!_searchActive) {
         _query = '';
-        _searchController.clear();
       }
     });
   }
@@ -1508,12 +1506,6 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       return AppBar(
         leading: Builder(
           builder: (ctx) {
-            if (_searchActive) {
-              return IconButton(
-                icon: Icon(Icons.arrow_back, color: appBarTheme.foregroundColor),
-                onPressed: _toggleSearch,
-              );
-            }
             final fullScreenDrawer = FullScreenDragDrawerScope.maybeOf(ctx);
             final scaffold = Scaffold.maybeOf(ctx);
             return IconButton(
@@ -1530,154 +1522,144 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           },
         ),
         automaticallyImplyLeading: false,
-        title: _searchActive
-            ? TextField(
-                controller: _searchController,
-                autofocus: true,
-                decoration: InputDecoration(
-                  hintText: l10n.search,
-                  border: InputBorder.none,
-                ),
-                onChanged: (value) => setState(() => _query = value),
-              )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      final reservedSpace = 22.0 + 12.0;
-                      final availableWidth =
-                          (constraints.maxWidth - reservedSpace).clamp(
-                        60.0,
-                        2000.0,
-                      );
-                      final displayTitle = _buildLeftTruncatedPath(
-                        widget.category.label(l10n),
-                        pathStack,
-                        availableWidth,
-                        titleStyle,
-                      );
-                      return MenuAnchor(
-                        builder: (ctx, controller, child) => InkWell(
-                          borderRadius: BorderRadius.circular(8),
-                          onTap: () {
-                            if (controller.isOpen) {
-                              controller.close();
-                            } else {
-                              controller.open();
-                            }
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 2,
-                              horizontal: 2,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final reservedSpace = 22.0 + 12.0;
+                final availableWidth =
+                    (constraints.maxWidth - reservedSpace).clamp(
+                  60.0,
+                  2000.0,
+                );
+                final displayTitle = _buildLeftTruncatedPath(
+                  widget.category.label(l10n),
+                  pathStack,
+                  availableWidth,
+                  titleStyle,
+                );
+                return MenuAnchor(
+                  builder: (ctx, controller, child) => InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () {
+                      if (controller.isOpen) {
+                        controller.close();
+                      } else {
+                        controller.open();
+                      }
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 2,
+                        horizontal: 2,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              displayTitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: titleStyle,
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Flexible(
-                                  child: Text(
-                                    displayTitle,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: titleStyle,
-                                  ),
-                                ),
-                                Icon(
-                                  Icons.arrow_drop_down_rounded,
-                                  size: 22,
-                                  color: cs.primary,
-                                ),
-                              ],
+                          ),
+                          Icon(
+                            Icons.arrow_drop_down_rounded,
+                            size: 22,
+                            color: cs.primary,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  menuChildren: [
+                    for (int i = 0; i < pathStack.length; i++) ...[
+                      (() {
+                        final segment = pathStack[i];
+                        final isCurrent = i == pathStack.length - 1;
+                        final isRoot = i == 0;
+                        final IconData icon = isRoot
+                            ? (_scoped
+                                ? Icons.home_rounded
+                                : widget.category.icon)
+                            : (i == 1 &&
+                                    _snapshot.contributingSources.length > 1
+                                ? Icons.storage_rounded
+                                : Icons.folder_rounded);
+                        final Color iconColor = isRoot
+                            ? cs.primary
+                            : cs.secondary;
+                        return MenuItemButton(
+                          onPressed: isCurrent ? null : () => _onJumpTo(i),
+                          leadingIcon: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (i > 0) SizedBox(width: (i - 1) * 12.0),
+                              Icon(
+                                icon,
+                                size: 18,
+                                color: isCurrent ? cs.primary : iconColor,
+                              ),
+                            ],
+                          ),
+                          child: Text(
+                            segment.label,
+                            style: TextStyle(
+                              fontWeight: isCurrent
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                              color: isCurrent ? cs.primary : cs.onSurface,
+                            ),
+                          ),
+                        );
+                      })(),
+                    ],
+                    for (int f = 0; f < _forwardStack.length; f++)
+                      MenuItemButton(
+                        onPressed: () => _onForwardTo(f),
+                        leadingIcon: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              width: (pathStack.length + f - 1) * 12.0,
+                            ),
+                            Icon(
+                              Icons.folder_rounded,
+                              size: 18,
+                              color: cs.onSurfaceVariant.withValues(
+                                alpha: 0.55,
+                              ),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          _forwardStack[f].label,
+                          style: TextStyle(
+                            color: cs.onSurfaceVariant.withValues(
+                              alpha: 0.7,
                             ),
                           ),
                         ),
-                        menuChildren: [
-                          for (int i = 0; i < pathStack.length; i++) ...[
-                            (() {
-                              final segment = pathStack[i];
-                              final isCurrent = i == pathStack.length - 1;
-                              final isRoot = i == 0;
-                              final IconData icon = isRoot
-                                  ? (_scoped
-                                      ? Icons.home_rounded
-                                      : widget.category.icon)
-                                  : (i == 1 &&
-                                          _snapshot.contributingSources.length > 1
-                                      ? Icons.storage_rounded
-                                      : Icons.folder_rounded);
-                              final Color iconColor = isRoot
-                                  ? cs.primary
-                                  : cs.secondary;
-                              return MenuItemButton(
-                                onPressed: isCurrent ? null : () => _onJumpTo(i),
-                                leadingIcon: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (i > 0) SizedBox(width: (i - 1) * 12.0),
-                                    Icon(
-                                      icon,
-                                      size: 18,
-                                      color: isCurrent ? cs.primary : iconColor,
-                                    ),
-                                  ],
-                                ),
-                                child: Text(
-                                  segment.label,
-                                  style: TextStyle(
-                                    fontWeight: isCurrent
-                                        ? FontWeight.bold
-                                        : FontWeight.normal,
-                                    color: isCurrent ? cs.primary : cs.onSurface,
-                                  ),
-                                ),
-                              );
-                            })(),
-                          ],
-                          for (int f = 0; f < _forwardStack.length; f++)
-                            MenuItemButton(
-                              onPressed: () => _onForwardTo(f),
-                              leadingIcon: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  SizedBox(
-                                    width: (pathStack.length + f - 1) * 12.0,
-                                  ),
-                                  Icon(
-                                    Icons.folder_rounded,
-                                    size: 18,
-                                    color: cs.onSurfaceVariant.withValues(
-                                      alpha: 0.55,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              child: Text(
-                                _forwardStack[f].label,
-                                style: TextStyle(
-                                  color: cs.onSurfaceVariant.withValues(
-                                    alpha: 0.7,
-                                  ),
-                                ),
-                              ),
-                            ),
-
-                        ],
-                      );
-                    },
-                  ),
-                  if (toolbarConfig.showStatsBar)
-                    Text(
-                      _scanning
-                          ? l10n.categoryScanning(_snapshot.foldersChecked)
-                          : _buildStatsSubtitle(items, mountedVaults),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
-                    ),
-                ],
+
+                  ],
+                );
+              },
+            ),
+            if (toolbarConfig.showStatsBar)
+              Text(
+                _scanning
+                    ? l10n.categoryScanning(_snapshot.foldersChecked)
+                    : _buildStatsSubtitle(items, mountedVaults),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
+          ],
+        ),
         actions: [
           IconButton(
             icon: Icon(
@@ -1858,7 +1840,10 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           _exitScopedCategory();
         }
       },
-      child: Column(
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: Column(
         children: [
           if (_scanning) const LinearProgressIndicator(minHeight: 2),
           if (_snapshot.limitReached && !_scanning)
@@ -1884,6 +1869,28 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
               onForwardTap: _onForwardTo,
             ),
           Expanded(child: _buildBody(items, toolbarConfig, mountedVaults)),
+        ],
+            ),
+          ),
+          // Same docked search bar as the file manager's folder view.
+          if (_searchActive)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 600),
+                  child: BottomSearchBar(
+                    initialQuery: _query,
+                    hintText: l10n.search,
+                    onChanged: (value) => setState(() => _query = value),
+                    onClose: _toggleSearch,
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -1982,6 +1989,13 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     final query = _searchActive && _query.trim().isNotEmpty
         ? _query.trim().toLowerCase()
         : null;
+    // The docked search bar floats over the results, so they have to clear it
+    // and the keyboard it rides on, as in the file manager.
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final systemInset = MediaQuery.viewPaddingOf(context).bottom;
+    final searchClearance = _searchActive
+        ? 64.0 + (keyboardInset > systemInset ? keyboardInset : systemInset)
+        : 0.0;
     final selection = ref.watch(fileBrowserSelectionProvider(widget.tabId));
 
     void onMoreTap(RawEntry e) {
@@ -2091,6 +2105,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           enableFileDrag: enableDrag,
           onFileDrop: onFileDrop,
           searchQuery: query,
+          bottomClearance: searchClearance,
           sortBy: _sortBy,
           groupByDate: _isGallery && !_folderMode,
         );
@@ -2131,6 +2146,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           enableFileDrag: enableDrag,
           onFileDrop: onFileDrop,
           searchQuery: query,
+          bottomClearance: searchClearance,
           sortBy: _sortBy,
           groupByDate: _isGallery && !_folderMode,
         );
@@ -2168,6 +2184,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           enableFileDrag: enableDrag,
           onFileDrop: onFileDrop,
           searchQuery: query,
+          bottomClearance: searchClearance,
           sortBy: _sortBy,
           groupByDate: _isGallery && !_folderMode,
           largeThumbnail: _isGallery,

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -40,6 +41,7 @@ import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dar
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/pdf_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_screen.dart';
+import 'package:vaultexplorer/features/browser/widgets/bottom_search_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_grid_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_list_view.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
@@ -125,7 +127,6 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
 
   bool _searchActive = false;
   String _query = '';
-  final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   Set<RawEntry> _selected = {};
 
@@ -190,7 +191,6 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
     _disposed = true;
     _token?.cancel();
     _events?.removeContainerLockedListener(_onVaultLocked);
-    _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -990,14 +990,17 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
     if (_selected.isNotEmpty) {
       _clearSelection();
     } else if (_searchActive) {
-      setState(() {
-        _searchActive = false;
-        _query = '';
-        _searchController.clear();
-      });
+      _closeSearch();
     } else if (_canGoUp) {
       _goUp();
     }
+  }
+
+  void _closeSearch() {
+    setState(() {
+      _searchActive = false;
+      _query = '';
+    });
   }
 
   @override
@@ -1039,16 +1042,40 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
         if (!didPop) _handleBack();
       },
       child: Scaffold(
+        // Same as the file manager: the search bar lifts itself by the
+        // keyboard's inset instead of the whole body being squeezed above it.
+        resizeToAvoidBottomInset: false,
         appBar: selecting
             ? _buildSelectionBar(l10n)
             : _buildAppBar(l10n, mountedVaults, hasLocations),
-        body: Column(
+        body: Stack(
           children: [
-            if (_scanning) const LinearProgressIndicator(minHeight: 2),
-            if (_snapshot.limitReached && !_scanning)
-              _NoticeBar(message: l10n.categoryScanLimitReached),
-            if (_folderMode && !location.isTop) _buildLocationBar(location),
-            Expanded(child: _buildBody(items, toolbarConfig, mountedVaults)),
+            Positioned.fill(
+              child: Column(
+                children: [
+                  if (_scanning) const LinearProgressIndicator(minHeight: 2),
+                  if (_snapshot.limitReached && !_scanning)
+                    _NoticeBar(message: l10n.categoryScanLimitReached),
+                  if (_folderMode && !location.isTop)
+                    _buildLocationBar(location),
+                  Expanded(
+                    child: _buildBody(items, toolbarConfig, mountedVaults),
+                  ),
+                ],
+              ),
+            ),
+            if (_searchActive)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: BottomSearchBar(
+                  initialQuery: _query,
+                  hintText: l10n.search,
+                  onChanged: (value) => setState(() => _query = value),
+                  onClose: _closeSearch,
+                ),
+              ),
           ],
         ),
       ),
@@ -1064,41 +1091,34 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
         ? l10n.categoryScanning(_snapshot.foldersChecked)
         : '${_snapshot.entries.length} · ${_sourceLabel(mountedVaults)}';
     return AppBar(
-      title: _searchActive
-          ? TextField(
-              controller: _searchController,
-              autofocus: true,
-              decoration: InputDecoration(
-                hintText: l10n.search,
-                border: InputBorder.none,
-              ),
-              onChanged: (value) => setState(() => _query = value),
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(_categoryLabel()),
-                Text(
-                  subtitle,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(_categoryLabel()),
+          Text(
+            subtitle,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
+          ),
+        ],
+      ),
       actions: [
         IconButton(
           icon: Icon(
-            _searchActive ? Icons.close_rounded : Icons.search_rounded,
+            _searchActive ? Icons.search_off_rounded : Icons.search_rounded,
+            color: _searchActive
+                ? Theme.of(context).colorScheme.primary
+                : null,
           ),
-          tooltip: l10n.search,
-          onPressed: () => setState(() {
-            _searchActive = !_searchActive;
-            if (!_searchActive) {
-              _query = '';
-              _searchController.clear();
+          tooltip: _searchActive ? l10n.closeSearchTooltip : l10n.search,
+          onPressed: () {
+            if (_searchActive) {
+              _closeSearch();
+            } else {
+              setState(() => _searchActive = true);
             }
-          }),
+          },
         ),
         if (!_scoped && widget.includeVaults)
           PopupMenuButton<CategorySourceFilter>(
@@ -1374,6 +1394,15 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
         ? _query.trim().toLowerCase()
         : null;
     final isGrid = _layout == BrowserLayoutMode.grid;
+    // The docked search bar floats over the results, so they have to clear it
+    // (and the keyboard it rides on), as in the file manager.
+    final searchClearance = _searchActive
+        ? 64.0 +
+              math.max(
+                MediaQuery.viewInsetsOf(context).bottom,
+                MediaQuery.viewPaddingOf(context).bottom,
+              )
+        : 0.0;
     final Widget content = isGrid
         ? FileGridView(
             scrollController: _scrollController,
@@ -1405,6 +1434,7 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
                 setState(() => _selected = _filesOnly(set)),
             searchQuery: query,
             sortBy: _sortBy,
+            bottomClearance: searchClearance,
           )
         : FileListView(
             scrollController: _scrollController,
@@ -1435,6 +1465,7 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
                 setState(() => _selected = _filesOnly(set)),
             searchQuery: query,
             sortBy: _sortBy,
+            bottomClearance: searchClearance,
           );
     return RefreshIndicator(onRefresh: _startScan, child: content);
   }

@@ -17,7 +17,8 @@ import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 /// [CategoryBrowserScreen] gathering one kind of file from every storage.
 ///
 /// What it shows is the user's choice (see [CategoryShortcutsEditor]); hiding
-/// a shortcut here never touches the category or any file.
+/// a shortcut here never touches the category or any file. Long-pressing any
+/// shortcut opens that editor in a bottom sheet.
 class DrawerCategoriesSection extends ConsumerWidget {
   const DrawerCategoriesSection({
     super.key,
@@ -60,29 +61,14 @@ class DrawerCategoriesSection extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 2, 2),
-          child: Row(
-            children: [
-              Text(
-                l10n.categoriesSectionTitle.toUpperCase(),
-                style: textTheme.labelSmall?.copyWith(
-                  color: cs.onSurfaceVariant,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.1,
-                ),
-              ),
-              const Spacer(),
-              IconButton(
-                icon: Icon(
-                  Icons.tune_rounded,
-                  size: 20,
-                  color: cs.onSurfaceVariant,
-                ),
-                tooltip: l10n.manageCategoriesTooltip,
-                visualDensity: VisualDensity.compact,
-                onPressed: () => _manage(context),
-              ),
-            ],
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+          child: Text(
+            l10n.categoriesSectionTitle.toUpperCase(),
+            style: textTheme.labelSmall?.copyWith(
+              color: cs.onSurfaceVariant,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.1,
+            ),
           ),
         ),
         for (final category in categories)
@@ -98,6 +84,7 @@ class DrawerCategoriesSection extends ConsumerWidget {
               style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
             ),
             onTap: () => _open(context, category),
+            onLongPress: () => _manage(context),
           ),
         const Padding(
           padding: EdgeInsets.symmetric(vertical: 1),

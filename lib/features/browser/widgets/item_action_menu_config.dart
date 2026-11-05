@@ -7,6 +7,7 @@ import 'package:vaultexplorer/data/models/file_item_action.dart';
 const Map<String, FileItemAction> _actionForMenuValue = {
   'go_to_location': FileItemAction.goToLocation,
   'open_in_new_tab': FileItemAction.openInNewTab,
+  'extract': FileItemAction.extract,
   'open_with_app': FileItemAction.openWith,
   'share': FileItemAction.share,
   'edit_image': FileItemAction.editImage,
@@ -15,6 +16,7 @@ const Map<String, FileItemAction> _actionForMenuValue = {
   'rename': FileItemAction.rename,
   'copy': FileItemAction.copy,
   'cut': FileItemAction.move,
+  'delete': FileItemAction.delete,
   'compress': FileItemAction.archive,
   'export': FileItemAction.exportToDevice,
   'encrypt': FileItemAction.encrypt,
@@ -28,20 +30,31 @@ const Map<String, FileItemAction> _actionForMenuValue = {
   'copy_path': FileItemAction.copyPath,
 };
 
-/// Orders a set of visible selection-bar actions by the user's configured
-/// item-action order. Actions absent from [order] keep their relative order
-/// after the configured actions, matching [applyItemActionMenuConfig].
+/// Puts the configured quick-action section before the remaining actions.
+List<FileItemAction> quickActionsFirstOrder(
+  List<FileItemAction> order,
+  Set<FileItemAction> quickActions,
+) => [
+  ...order.where(quickActions.contains),
+  ...order.where((action) => !quickActions.contains(action)),
+];
+
+/// Orders visible selection-bar actions with quick actions first, preserving
+/// [order] within each section. Actions absent from [order] keep their
+/// relative order after configured actions.
 List<FileItemAction> orderFileItemActions(
   Iterable<FileItemAction> actions, {
   required List<FileItemAction> order,
+  required Set<FileItemAction> quickActions,
 }) {
+  final quickFirstOrder = quickActionsFirstOrder(order, quickActions);
   final rank = <FileItemAction, int>{
-    for (var i = 0; i < order.length; i++) order[i]: i,
+    for (var i = 0; i < quickFirstOrder.length; i++) quickFirstOrder[i]: i,
   };
   final indexed = actions.indexed.toList();
   indexed.sort((a, b) {
-    final byRank = (rank[a.$2] ?? order.length).compareTo(
-      rank[b.$2] ?? order.length,
+    final byRank = (rank[a.$2] ?? quickFirstOrder.length).compareTo(
+      rank[b.$2] ?? quickFirstOrder.length,
     );
     return byRank != 0 ? byRank : a.$1.compareTo(b.$1);
   });

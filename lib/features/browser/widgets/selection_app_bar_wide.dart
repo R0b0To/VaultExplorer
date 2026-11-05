@@ -68,9 +68,10 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
   final VoidCallback onEncrypt;
   final VoidCallback onDecrypt;
 
-  /// The user's item-action configuration: hidden actions are removed from
-  /// the buttons and the overflow menu, and both follow this order.
+  /// The user's item-action configuration. Buttons and overflow show quick
+  /// actions first, preserving the configured order within each section.
   final List<FileItemAction> itemActionOrder;
+  final Set<FileItemAction> quickItemActions;
   final Set<FileItemAction> hiddenItemActions;
 
   const SelectionAppBarWide({
@@ -128,6 +129,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
     required this.onEncrypt,
     required this.onDecrypt,
     this.itemActionOrder = FileItemAction.values,
+    this.quickItemActions = FileItemAction.defaultQuickActions,
     this.hiddenItemActions = const {},
   });
 
@@ -160,6 +162,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
           FileItemAction.delete,
       ],
       order: itemActionOrder,
+      quickActions: quickItemActions,
     );
 
     Widget buildActionButton(FileItemAction action) => switch (action) {
@@ -516,7 +519,10 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
                 ),
               ),
             ],
-            order: itemActionOrder,
+            order: quickActionsFirstOrder(
+              itemActionOrder,
+              quickItemActions,
+            ),
             hidden: hiddenItemActions,
           ),
         ),

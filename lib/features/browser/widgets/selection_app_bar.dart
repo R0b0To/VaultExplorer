@@ -65,9 +65,10 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback onEncrypt;
   final VoidCallback onDecrypt;
 
-  /// The user's item-action configuration: hidden actions are removed from
-  /// the buttons and the overflow menu, and both follow this order.
+  /// The user's item-action configuration. Buttons and overflow show quick
+  /// actions first, preserving the configured order within each section.
   final List<FileItemAction> itemActionOrder;
+  final Set<FileItemAction> quickItemActions;
   final Set<FileItemAction> hiddenItemActions;
 
   const SelectionAppBar({
@@ -123,6 +124,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.onEncrypt,
     required this.onDecrypt,
     this.itemActionOrder = FileItemAction.values,
+    this.quickItemActions = FileItemAction.defaultQuickActions,
     this.hiddenItemActions = const {},
   });
 
@@ -134,13 +136,13 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     bool shown(FileItemAction action) => !hiddenItemActions.contains(action);
-    final bool showExtractButton =
+    final bool canShowExtractButton =
         allowExtractAction &&
         (singleArchiveSelected || isInsideArchive) &&
         shown(FileItemAction.extract);
-    final bool showShareButton =
+    final bool canShowShareButton =
         showShareOption && shown(FileItemAction.share);
-    final bool showDeleteButton =
+    final bool canShowDeleteButton =
         !isInsideArchive && shown(FileItemAction.delete);
 
     return LayoutBuilder(
@@ -148,30 +150,27 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
         final double barWidth = constraints.maxWidth;
 
         const double leadingWidth = 40.0;
-        final double deleteBtnWidth = showDeleteButton ? 48.0 : 0.0;
-        final double extractBtnWidth = showExtractButton ? 48.0 : 0.0;
         const double overflowBtnWidth = 48.0;
         const double endPadding = 4.0;
         const double minTitleWidth = 100.0;
         const double actionButtonWidth = 48.0;
 
-        final double shareBtnWidth = showShareButton ? 48.0 : 0.0;
-
         final double fixedOverhead = leadingWidth +
-            deleteBtnWidth +
-            shareBtnWidth +
-            extractBtnWidth +
             overflowBtnWidth +
             endPadding +
             minTitleWidth;
 
         final double availableWidth = barWidth - fixedOverhead;
-        final int availableSlots = (availableWidth / actionButtonWidth).floor().clamp(0, 3);
+        final int availableSlots = (availableWidth / actionButtonWidth)
+            .floor()
+            .clamp(0, 6);
 
-        // Fill the flexible slots in the configured order, then order every
-        // visible action button the same way below.
-        final configuredCoreActions = orderFileItemActions(
+        // Allocate every action slot in Quick Actions-first order, so a
+        // non-quick action cannot displace a quick action from the bar.
+        final configuredAvailableActions = orderFileItemActions(
           [
+            if (canShowExtractButton) FileItemAction.extract,
+            if (canShowShareButton) FileItemAction.share,
             if (!isInsideArchive && shown(FileItemAction.copy))
               FileItemAction.copy,
             if (!isInsideArchive && shown(FileItemAction.move))
@@ -180,25 +179,25 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                 allowRenameAction &&
                 shown(FileItemAction.rename))
               FileItemAction.rename,
+            if (canShowDeleteButton) FileItemAction.delete,
           ],
           order: itemActionOrder,
+          quickActions: quickItemActions,
         );
-        final visibleCoreActions = configuredCoreActions
+        final visibleActionOrder = configuredAvailableActions
             .take(availableSlots)
-            .toSet();
-        final bool showCopy = visibleCoreActions.contains(FileItemAction.copy);
-        final bool showCut = visibleCoreActions.contains(FileItemAction.move);
-        final bool showRename = visibleCoreActions.contains(FileItemAction.rename);
-        final visibleActionOrder = orderFileItemActions(
-          [
-            if (showExtractButton) FileItemAction.extract,
-            if (showShareButton) FileItemAction.share,
-            if (showCopy) FileItemAction.copy,
-            if (showCut) FileItemAction.move,
-            if (showRename) FileItemAction.rename,
-            if (showDeleteButton) FileItemAction.delete,
-          ],
-          order: itemActionOrder,
+            .toList(growable: false);
+        final visibleActions = visibleActionOrder.toSet();
+        final bool showExtractButton =
+            visibleActions.contains(FileItemAction.extract);
+        final bool showShareButton = visibleActions.contains(
+          FileItemAction.share,
+        );
+        final bool showCopy = visibleActions.contains(FileItemAction.copy);
+        final bool showCut = visibleActions.contains(FileItemAction.move);
+        final bool showRename = visibleActions.contains(FileItemAction.rename);
+        final bool showDeleteButton = visibleActions.contains(
+          FileItemAction.delete,
         );
 
         Widget buildActionButton(FileItemAction action) => switch (action) {
@@ -321,6 +320,9 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
               icon: const Icon(Icons.more_vert_rounded),
               tooltip: context.l10n.moreOptionsTooltip,
               onSelected: (value) {
+                if (value == 'extract') onExtractSelectedArchive();
+                if (value == 'share') onShare();
+                if (value == 'delete') onDelete();
                 if (value == 'open_in_new_tab') onOpenInNewTab?.call();
                 if (value == 'open_with_app') onOpenWithApp();
                 if (value == 'edit_image') onEditImage();
@@ -354,6 +356,28 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                         Icon(Icons.tab_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
                         const SizedBox(width: 12),
                         Text(context.l10n.browserTabOpenInNewTab),
+                      ],
+                    ),
+                  ),
+                if (canShowExtractButton && !showExtractButton)
+                  PopupMenuItem<String>(
+                    value: 'extract',
+                    child: Row(
+                      children: [
+                        Icon(Icons.unarchive_outlined, color: cs.onSurfaceVariant, size: AppIconSize.small),
+                        const SizedBox(width: 12),
+                        Text(context.l10n.extract),
+                      ],
+                    ),
+                  ),
+                if (canShowShareButton && !showShareButton)
+                  PopupMenuItem<String>(
+                    value: 'share',
+                    child: Row(
+                      children: [
+                        Icon(Icons.share_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
+                        const SizedBox(width: 12),
+                        Text(context.l10n.shareAction),
                       ],
                     ),
                   ),
@@ -458,6 +482,18 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                         ),
                         const SizedBox(width: 12),
                         Text(context.l10n.moveAction),
+                      ],
+                    ),
+                  ),
+                if (canShowDeleteButton && !showDeleteButton)
+                  PopupMenuItem<String>(
+                    value: 'delete',
+                    enabled: !readOnly,
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete_outline_rounded, color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.4) : cs.onSurfaceVariant, size: AppIconSize.small),
+                        const SizedBox(width: 12),
+                        Text(context.l10n.delete),
                       ],
                     ),
                   ),
@@ -624,7 +660,10 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                     ),
                   ),
                 ],
-                order: itemActionOrder,
+                order: quickActionsFirstOrder(
+                  itemActionOrder,
+                  quickItemActions,
+                ),
                 hidden: hiddenItemActions,
               ),
             ),

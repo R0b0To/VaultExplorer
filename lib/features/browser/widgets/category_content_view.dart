@@ -1741,6 +1741,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
         showEditVideoOption: false,
         onEditVideo: () {},
         itemActionOrder: toolbarConfig.itemActionsOrder,
+        quickItemActions: toolbarConfig.quickItemActions,
         hiddenItemActions: toolbarConfig.hiddenItemActions,
       );
     }

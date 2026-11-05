@@ -6094,6 +6094,12 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
               .toList()
             ..sort(),
         ),
+        Object.hashAll(
+          appBarToolbarConfig.quickItemActions
+              .map((action) => action.index)
+              .toList()
+            ..sort(),
+        ),
         Object.hashAll(appBarMountedDocProviderFolders),
         Object.hashAll(appBarPinnedPaths.toList()..sort()),
         Object.hashAll(appBarBookmarkPaths),

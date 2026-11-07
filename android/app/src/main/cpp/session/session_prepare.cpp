@@ -237,21 +237,6 @@ static bool tryDecryptHeader(
         outFields->encryptedAreaLength = readHeaderBE64(decH, VC_HDR_OFF_KEY_SCOPE_SIZE);
         outFields->sectorSize          = readHeaderBE32(decH, VC_HDR_OFF_SECTOR_SIZE);
 
-        if (cipherId == CascadeId::kAes) {
-            constexpr size_t kBenchBytes = 64 * 1024 * 1024;
-            constexpr size_t kSectors = kBenchBytes / 512;
-            std::vector<unsigned char> plain(512, 0), cipher(512);
-            auto start = std::chrono::steady_clock::now();
-            for (size_t i = 0; i < kSectors; i++) {
-                cascadeEncryptSector(tempCtx, i, plain.data(), cipher.data());
-            }
-            auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::steady_clock::now() - start).count();
-            double mbPerSec = (kBenchBytes / (1024.0 * 1024.0)) / (ms > 0 ? (ms / 1000.0) : 0.001);
-            __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_Bench",
-                "BORINGSSL_AES_XTS_BENCH bytes=%zu ms=%lld throughputMBs=%.1f",
-                kBenchBytes, (long long)ms, mbPerSec);
-        }
     }
 
     return true;

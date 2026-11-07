@@ -21,6 +21,7 @@
 #include "filesystems/ext_backend.h"
 #include "filesystems/filesystem_paths.h"
 #include "containers/container_utils.h"
+#include "containers/vc_header_build.h"
 #include "ff.h"
 
 #undef min
@@ -204,8 +205,7 @@ CompositeCreateResult createCompositeContainer(
     }
 
     unsigned char body[VC_HEADER_BODY_SIZE] = {0};
-    body[0] = 'V'; body[1] = 'E'; body[2] = 'R'; body[3] = 'A';
-    body[4] = 0x00; body[5] = 0x02; body[6] = 0x01; body[7] = 0x0b;
+    vcStampHeaderPreamble(body);
 
     for (int i = 7; i >= 0; --i) body[VC_HDR_OFF_VOLUME_SIZE + (7 - i)] = (DATA_SIZE >> (i * 8)) & 0xFF;
     for (int i = 7; i >= 0; --i) body[VC_HDR_OFF_KEY_SCOPE_START + (7 - i)] = (VC_DATA_AREA_OFFSET >> (i * 8)) & 0xFF;
@@ -246,7 +246,15 @@ CompositeCreateResult createCompositeContainer(
     }
 
     mbedtls_platform_zeroize(headerKey, sizeof(headerKey));
+
+    // Backup header = separate salt + KDF run (see vc_header_build.h).
+    unsigned char backupSector[VC_FULL_HEADER_SIZE];
+    const bool backupBuilt = vcBuildFreshlySaltedHeaderSector(
+        body, createCipher, createHash, mixedPassword, mixedPasswordLen, clampPim(pim), backupSector);
     mbedtls_platform_zeroize(body, sizeof(body));
+    if (!backupBuilt) {
+        return {false, "BACKUP_HEADER_BUILD_FAILED", "Failed to generate backup header", 0};
+    }
 
     unsigned char hdrSector[VC_FULL_HEADER_SIZE];
     std::memcpy(hdrSector, salt, VC_SALT_SIZE);
@@ -257,7 +265,7 @@ CompositeCreateResult createCompositeContainer(
     }
 
     uint64_t backupOffset = VOLUME_SIZE - VC_DATA_AREA_OFFSET;
-    if (!physicalWrite(volId, backupOffset, hdrSector, VC_FULL_HEADER_SIZE)) {
+    if (!physicalWrite(volId, backupOffset, backupSector, VC_FULL_HEADER_SIZE)) {
         return {false, "BACKUP_HEADER_WRITE_FAILED", "Failed to write backup header", 0};
     }
 

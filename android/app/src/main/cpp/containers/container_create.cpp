@@ -16,6 +16,7 @@
 #include "container_utils.h"
 #include "vc_geometry.h"
 #include "vc_header_areas.h"
+#include "vc_header_build.h"
 #include "crypto/cascade.h"
 #include "crypto/keyfile_mixing.h"
 #include "crypto/luks_header.h"
@@ -125,9 +126,7 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
 
         unsigned char body[VC_HEADER_BODY_SIZE];
         memset(body, 0, sizeof(body));
-        body[0] = 'V'; body[1] = 'E'; body[2] = 'R'; body[3] = 'A';
-        body[4] = 0x00; body[5] = 0x02;
-        body[6] = 0x01; body[7] = 0x0b;
+        vcStampHeaderPreamble(body);
 
         for (int i = 7; i >= 0; --i)
             body[VC_HDR_OFF_VOLUME_SIZE + (7 - i)] = (DATA_SIZE >> (i * 8)) & 0xFF;
@@ -178,7 +177,15 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
         }
 
         mbedtls_platform_zeroize(headerKey, sizeof(headerKey));
+
+        // The backup header is its own encryption of the same header: fresh
+        // salt, fresh KDF run (what VeraCrypt does). A byte-identical copy would
+        // fingerprint the container -- see vc_header_build.h.
+        unsigned char backupSector[VC_FULL_HEADER_SIZE];
+        const bool backupBuilt = vcBuildFreshlySaltedHeaderSector(
+            body, createCipher, createHash, mixedPassword, mixedPasswordLen, safePim, backupSector);
         mbedtls_platform_zeroize(body, sizeof(body));
+        if (!backupBuilt) { LOGI("createContainer: backup header generation failed"); break; }
 
         unsigned char hdrSector[VC_FULL_HEADER_SIZE];
         memcpy(hdrSector,                  salt,    VC_SALT_SIZE);
@@ -188,7 +195,7 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
             LOGI("createContainer: primary header write failed"); break;
         }
 
-        if (pwrite(fd, hdrSector, VC_FULL_HEADER_SIZE,
+        if (pwrite(fd, backupSector, VC_FULL_HEADER_SIZE,
                    static_cast<off_t>(VOLUME_SIZE - VC_DATA_AREA_OFFSET)) != VC_FULL_HEADER_SIZE) {
             LOGI("createContainer: backup header write failed"); break;
         }
@@ -647,14 +654,7 @@ bool createContainerWithHidden(int fd,
         }
 
         unsigned char body[VC_HEADER_BODY_SIZE] = {0};
-        const char magic[] = "VERA";
-        memcpy(body, magic, 4);
-        uint16_t version = 5;
-        body[4] = (version >> 8) & 0xFF;
-        body[5] = version & 0xFF;
-        uint16_t reqVersion = 6;
-        body[6] = (reqVersion >> 8) & 0xFF;
-        body[7] = reqVersion & 0xFF;
+        vcStampHeaderPreamble(body);
 
         auto writeBE64 = [](unsigned char* buf, int offset, uint64_t val) {
             for (int i = 7; i >= 0; --i) { buf[offset + i] = val & 0xFF; val >>= 8; }
@@ -696,7 +696,15 @@ bool createContainerWithHidden(int fd,
             }
         }
 
+        // Separate salt + KDF run for the hidden backup header. Two identical
+        // copies (64 KiB and V-64 KiB) would reveal that a hidden volume exists
+        // to anyone who compares them -- no password needed.
+        unsigned char backupSector[VC_FULL_HEADER_SIZE];
+        const bool backupBuilt = vcBuildFreshlySaltedHeaderSector(
+            body, createCipher, createHash, hiddenMixedPassword, hiddenMixedPasswordLen, clampedPim, backupSector);
         mbedtls_platform_zeroize(body, sizeof(body));
+        if (!backupBuilt) { LOGI("createContainerWithHidden: backup header generation failed"); break; }
+
         unsigned char hdrSector[VC_FULL_HEADER_SIZE];
         memcpy(hdrSector,                  hiddenSalt,    VC_SALT_SIZE);
         memcpy(hdrSector + VC_SALT_SIZE,   encBody, VC_HEADER_BODY_SIZE);
@@ -715,7 +723,7 @@ bool createContainerWithHidden(int fd,
                 LOGI("createContainerWithHidden: no valid hidden backup header slot");
                 break;
             }
-            if (pwrite(fd, hdrSector, VC_FULL_HEADER_SIZE, static_cast<off_t>(hiddenBackupOffset)) !=
+            if (pwrite(fd, backupSector, VC_FULL_HEADER_SIZE, static_cast<off_t>(hiddenBackupOffset)) !=
                 VC_FULL_HEADER_SIZE) {
                 LOGI("createContainerWithHidden: hidden backup header write failed");
                 break;
@@ -878,11 +886,26 @@ bool changeContainerPassword(int fd,
         if (!foundMatch) break;
 
         mbedtls_platform_zeroize(recoveredKeyMaterial, sizeof(recoveredKeyMaterial));
-        FILE* urandom = fopen("/dev/urandom", "rb");
-        if (!urandom) break;
+
+        // Like upstream (VolumeHeader::EncryptNew writes the current header
+        // version on every re-encryption): a header written by an older build of
+        // this app carries format version 2, which upstream treats as a legacy
+        // header without CRC protection. Bring it to version 5 and refresh the
+        // header CRC. Headers that are already version >= 5 are left untouched.
+        {
+            const unsigned oldVersion = (static_cast<unsigned>(decryptedBody[VC_HDR_OFF_VERSION]) << 8) |
+                                         decryptedBody[VC_HDR_OFF_VERSION + 1];
+            if (oldVersion < VC_HEADER_FORMAT_VERSION) {
+                vcStampHeaderPreamble(decryptedBody);
+                const uint32_t crc = container_crc32(decryptedBody, VC_HDR_CRC_COVERAGE_LEN);
+                for (int i = 0; i < 4; i++) {
+                    decryptedBody[VC_HDR_OFF_HEADER_CRC + i] = static_cast<unsigned char>(crc >> (24 - 8 * i));
+                }
+            }
+        }
+
         unsigned char newSalt[VC_SALT_SIZE];
-        fread(newSalt, 1, sizeof(newSalt), urandom);
-        fclose(urandom);
+        if (!userentropy::fillRandom(newSalt, sizeof(newSalt))) break;
 
         int clampedNewPim = clampPim(newPim);
         unsigned char newHeaderKey[192] = {0};
@@ -914,7 +937,15 @@ bool changeContainerPassword(int fd,
             }
         }
 
+        // Primary and backup each get their own salt and KDF run, as in
+        // upstream's CoreBase::ChangePassword (one pass per header copy).
+        unsigned char backupSector[VC_FULL_HEADER_SIZE];
+        const bool backupBuilt = vcBuildFreshlySaltedHeaderSector(
+            decryptedBody, matchedCipher, matchedHash, newMixedPassword, newMixedPasswordLen,
+            clampedNewPim, backupSector);
         mbedtls_platform_zeroize(decryptedBody, sizeof(decryptedBody));
+        if (!backupBuilt) break;
+
         unsigned char hdrSector[VC_FULL_HEADER_SIZE];
         memcpy(hdrSector,                  newSalt, VC_SALT_SIZE);
         memcpy(hdrSector + VC_SALT_SIZE,   encBody, VC_HEADER_BODY_SIZE);
@@ -961,7 +992,7 @@ bool changeContainerPassword(int fd,
 
         if (pwrite(fd, hdrSector, VC_FULL_HEADER_SIZE, static_cast<off_t>(targetOffset)) != VC_FULL_HEADER_SIZE) break;
         if (writeBackup &&
-            pwrite(fd, hdrSector, VC_FULL_HEADER_SIZE, static_cast<off_t>(backupOffset)) != VC_FULL_HEADER_SIZE) {
+            pwrite(fd, backupSector, VC_FULL_HEADER_SIZE, static_cast<off_t>(backupOffset)) != VC_FULL_HEADER_SIZE) {
             break;
         }
 
@@ -975,7 +1006,7 @@ bool changeContainerPassword(int fd,
             }
             if (writeBackup &&
                 (pread(fd, verify, VC_FULL_HEADER_SIZE, static_cast<off_t>(backupOffset)) != VC_FULL_HEADER_SIZE ||
-                 memcmp(verify, hdrSector, VC_FULL_HEADER_SIZE) != 0)) {
+                 memcmp(verify, backupSector, VC_FULL_HEADER_SIZE) != 0)) {
                 break;
             }
         }

@@ -10,6 +10,7 @@
 #include "crypto/vc_header_layout.h"
 #include "vc_geometry.h"
 #include "vc_header_areas.h"
+#include "vc_header_build.h"
 #include "crypto/xts_tweak.h"
 #include "volume_state.h"
 #include "ext_backend.h"
@@ -121,9 +122,7 @@ UsbCreateResult createUsbContainer(int volId, uint64_t startSector, const char* 
 
         unsigned char body[VC_HEADER_BODY_SIZE];
         memset(body, 0, sizeof(body));
-        body[0] = 'V'; body[1] = 'E'; body[2] = 'R'; body[3] = 'A';
-        body[4] = 0x00; body[5] = 0x02;
-        body[6] = 0x01; body[7] = 0x0b;
+        vcStampHeaderPreamble(body);
 
         for (int i = 7; i >= 0; --i) body[VC_HDR_OFF_VOLUME_SIZE + (7 - i)] = (DATA_SIZE >> (i * 8)) & 0xFF;
         for (int i = 7; i >= 0; --i) body[VC_HDR_OFF_KEY_SCOPE_START + (7 - i)] = (VC_DATA_AREA_OFFSET >> (i * 8)) & 0xFF;
@@ -167,7 +166,17 @@ UsbCreateResult createUsbContainer(int volId, uint64_t startSector, const char* 
         }
 
         mbedtls_platform_zeroize(headerKey, sizeof(headerKey));
+
+        // Backup header = separate salt + KDF run (see vc_header_build.h).
+        unsigned char backupSector[VC_FULL_HEADER_SIZE];
+        const bool backupBuilt = vcBuildFreshlySaltedHeaderSector(
+            body, createCipher, createHash, mixedPassword, mixedPasswordLen, safePim, backupSector);
         mbedtls_platform_zeroize(body, sizeof(body));
+        if (!backupBuilt) {
+            result = UsbCreateResult::Fail(UsbCreatePhase::kPrepareHeader, "USB_BACKUP_HEADER_BUILD_FAILED",
+                                            "Failed to generate the backup volume header");
+            break;
+        }
 
         unsigned char hdrSector[VC_FULL_HEADER_SIZE];
         memcpy(hdrSector, salt, VC_SALT_SIZE);
@@ -197,7 +206,7 @@ UsbCreateResult createUsbContainer(int volId, uint64_t startSector, const char* 
         }
 
         uint64_t backupOffset = baseOffset + VOLUME_SIZE - VC_DATA_AREA_OFFSET;
-        if (!physicalWrite(volId, backupOffset, hdrSector, VC_FULL_HEADER_SIZE)) {
+        if (!physicalWrite(volId, backupOffset, backupSector, VC_FULL_HEADER_SIZE)) {
             result = UsbCreateResult::Fail(UsbCreatePhase::kWriteBackupHeader, "USB_BACKUP_HEADER_WRITE_FAILED",
                                             "Failed to write the backup volume header", backupOffset,
                                             backupOffset / 512, VC_FULL_HEADER_SIZE / 512);
@@ -652,9 +661,7 @@ UsbCreateResult createUsbContainerWithHidden(
         // --- Generate Outer Header (Field 28 left as 0 for plausible deniability) ---
         unsigned char oBody[VC_HEADER_BODY_SIZE];
         memset(oBody, 0, sizeof(oBody));
-        oBody[0] = 'V'; oBody[1] = 'E'; oBody[2] = 'R'; oBody[3] = 'A';
-        oBody[4] = 0x00; oBody[5] = 0x02;
-        oBody[6] = 0x01; oBody[7] = 0x0b;
+        vcStampHeaderPreamble(oBody);
         for (int i = 7; i >= 0; --i) oBody[VC_HDR_OFF_VOLUME_SIZE + (7 - i)] = (OUTER_DATA_SIZE >> (i * 8)) & 0xFF;
         for (int i = 7; i >= 0; --i) oBody[VC_HDR_OFF_KEY_SCOPE_START + (7 - i)] = (VC_DATA_AREA_OFFSET >> (i * 8)) & 0xFF;
         for (int i = 7; i >= 0; --i) oBody[VC_HDR_OFF_KEY_SCOPE_SIZE + (7 - i)] = (OUTER_DATA_SIZE >> (i * 8)) & 0xFF;
@@ -688,9 +695,7 @@ UsbCreateResult createUsbContainerWithHidden(
         // SPEC FIX: Populate Field 28 (hiddenVolSize) so Windows/Linux VeraCrypt can mount it!
         unsigned char hBody[VC_HEADER_BODY_SIZE];
         memset(hBody, 0, sizeof(hBody));
-        hBody[0] = 'V'; hBody[1] = 'E'; hBody[2] = 'R'; hBody[3] = 'A';
-        hBody[4] = 0x00; hBody[5] = 0x02;
-        hBody[6] = 0x01; hBody[7] = 0x0b;
+        vcStampHeaderPreamble(hBody);
         for (int i = 7; i >= 0; --i) hBody[VC_HDR_OFF_HIDDEN_VOL_SIZE + (7 - i)] = (HIDDEN_DATA_SIZE >> (i * 8)) & 0xFF;
         for (int i = 7; i >= 0; --i) hBody[VC_HDR_OFF_VOLUME_SIZE + (7 - i)] = (HIDDEN_DATA_SIZE >> (i * 8)) & 0xFF;
         for (int i = 7; i >= 0; --i) hBody[VC_HDR_OFF_KEY_SCOPE_START + (7 - i)] = (HIDDEN_AREA_START >> (i * 8)) & 0xFF;
@@ -721,8 +726,22 @@ UsbCreateResult createUsbContainerWithHidden(
             }
         }
         
+        // Backup copies get their own salts and KDF runs. Identical hidden
+        // header copies (64 KiB vs V-64 KiB) would betray the hidden volume.
+        unsigned char oBackupSector[VC_FULL_HEADER_SIZE];
+        unsigned char hBackupSector[VC_FULL_HEADER_SIZE];
+        const bool backupsBuilt =
+            vcBuildFreshlySaltedHeaderSector(oBody, oCipher, oHash, mixedOuterPass, mixedOuterLen,
+                                             clampPim(outerPim), oBackupSector) &&
+            vcBuildFreshlySaltedHeaderSector(hBody, hCipher, hHash, mixedHiddenPass, mixedHiddenLen,
+                                             clampPim(hiddenPim), hBackupSector);
         mbedtls_platform_zeroize(oBody, sizeof(oBody));
         mbedtls_platform_zeroize(hBody, sizeof(hBody));
+        if (!backupsBuilt) {
+            result = UsbCreateResult::Fail(UsbCreatePhase::kPrepareHeader, "USB_BACKUP_HEADER_BUILD_FAILED",
+                                            "Failed to generate the backup volume headers");
+            break;
+        }
 
         unsigned char oHdrSector[VC_FULL_HEADER_SIZE];
         memcpy(oHdrSector, oSalt, VC_SALT_SIZE);
@@ -756,7 +775,7 @@ UsbCreateResult createUsbContainerWithHidden(
             break;
         }
         const uint64_t outerBackupOffset = baseOffset + VOLUME_SIZE - VC_DATA_AREA_OFFSET;
-        if (!physicalWrite(volId, outerBackupOffset, oHdrSector, VC_FULL_HEADER_SIZE)) {
+        if (!physicalWrite(volId, outerBackupOffset, oBackupSector, VC_FULL_HEADER_SIZE)) {
             result = UsbCreateResult::Fail(UsbCreatePhase::kWriteBackupHeader, "USB_BACKUP_HEADER_WRITE_FAILED",
                                             "Failed to write the outer backup volume header", outerBackupOffset,
                                             outerBackupOffset / 512, VC_FULL_HEADER_SIZE / 512);
@@ -784,7 +803,7 @@ UsbCreateResult createUsbContainerWithHidden(
                 break;
             }
             const uint64_t hiddenBackupOffset = baseOffset + hiddenBackupRel;
-            if (!physicalWrite(volId, hiddenBackupOffset, hHdrSector, VC_FULL_HEADER_SIZE)) {
+            if (!physicalWrite(volId, hiddenBackupOffset, hBackupSector, VC_FULL_HEADER_SIZE)) {
                 result = UsbCreateResult::Fail(UsbCreatePhase::kWriteBackupHeader, "USB_HIDDEN_BACKUP_HEADER_WRITE_FAILED",
                                                 "Failed to write the hidden backup volume header", hiddenBackupOffset,
                                                 hiddenBackupOffset / 512, VC_FULL_HEADER_SIZE / 512);

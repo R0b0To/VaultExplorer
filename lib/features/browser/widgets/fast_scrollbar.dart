@@ -443,7 +443,6 @@ void _onControllerChange() {
       _scrollFraction = fraction;
       widget.controller.jumpTo(_dragTargetOffset(fraction, previousFraction));
       _popupBadge = _computePopupBadge(fraction);
-      ThumbnailConcurrency.imageLimiter.cancelTier(TaskPriority.visible);
       setState(() {});
     }
   }

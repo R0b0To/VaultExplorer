@@ -50,7 +50,7 @@ class AsyncThumbnail extends ConsumerStatefulWidget {
     required this.limiter,
     required this.fetchFn,
     required this.imageBuilder,
-    this.debounce = const Duration(milliseconds: 100),
+    this.debounce = const Duration(milliseconds: 30),
     this.syncLookup,
     this.cacheHeight,
     this.priority = TaskPriority.visible,
@@ -141,6 +141,14 @@ class _AsyncThumbnailState extends ConsumerState<AsyncThumbnail> {
     _ensureLoaded();
     final state = ref.watch(_provider);
     if (state.isLoading) {
+      // A tile re-entering the viewport gets a fresh provider instance whose
+      // state starts as "loading" until the deferred microtask in
+      // ensureLoaded runs. If the bytes are already in the memory cache,
+      // paint them now instead of flashing a placeholder for a frame.
+      final hit = widget.syncLookup?.call();
+      if (hit != null && hit.isNotEmpty) {
+        return widget.imageBuilder(context, hit, widget.cacheHeight);
+      }
       return widget.loadingBuilder?.call(context) ?? const SizedBox.shrink();
     }
     if (state.hasError || state.bytes == null || state.bytes!.isEmpty) {

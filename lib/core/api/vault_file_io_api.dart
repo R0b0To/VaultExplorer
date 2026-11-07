@@ -532,6 +532,48 @@ class VaultFileIoApi {
     }
   }
 
+  /// Upright pixel size of each of [fileNames] (paths inside [container]) from
+  /// the image headers alone -- no thumbnail is decoded or cached. One entry
+  /// per requested name, in order; null where the size could not be read (not
+  /// an image the device can parse, unreadable, SAF-backed browsing).
+  ///
+  /// This is what lets the gallery lay a folder out with the right tile shapes
+  /// before any thumbnail exists. Keep batches modest: the native side runs one
+  /// batch as a single task on the thumbnail executor.
+  Future<List<({int width, int height})?>> probeImageDimensions(
+    MountedContainer container,
+    List<String> fileNames,
+  ) async {
+    if (fileNames.isEmpty) return const [];
+    try {
+      final result = await _channel.invokeMethod<Object?>(
+        ChannelMethods.probeImageDimensions,
+        {
+          'filePath': container.uri,
+          'fileNames': fileNames,
+          'isLocalStorage': container.isLocalStorage,
+        },
+      );
+      if (result is! List || result.length < fileNames.length * 2) {
+        return List.filled(fileNames.length, null);
+      }
+      return [
+        for (var i = 0; i < fileNames.length; i++)
+          () {
+            final w = result[i * 2];
+            final h = result[i * 2 + 1];
+            if (w is int && h is int && w > 0 && h > 0) {
+              return (width: w, height: h);
+            }
+            return null;
+          }(),
+      ];
+    } catch (e) {
+      logSwallowed('probeImageDimensions', e, expected: true);
+      return List.filled(fileNames.length, null);
+    }
+  }
+
   /// Extracts an APK's own launcher icon via `PackageManager` on the
   /// native side -- full adaptive-icon compositing included, since it's
   /// the OS's own icon-resolution code doing the work, not a hand-rolled

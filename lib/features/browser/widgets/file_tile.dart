@@ -395,7 +395,7 @@ class _ListImageThumb extends ConsumerWidget {
         archiveContext,
         archiveRootPath,
       ),
-      debounce: const Duration(milliseconds: 100),
+      debounce: const Duration(milliseconds: 30),
       syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
       cacheHeight: quality.scaledSize(180),
       imageBuilder: (context, bytes, cacheHeight) => Image.memory(
@@ -408,18 +408,6 @@ class _ListImageThumb extends ConsumerWidget {
       ),
       loadingBuilder: (context) => Container(
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        child: Center(
-          child: SizedBox(
-            width: 14 * zoomLevel,
-            height: 14 * zoomLevel,
-            child: CircularProgressIndicator(
-              strokeWidth: 1.5,
-              color: Theme.of(
-                context,
-              ).colorScheme.primary.withValues(alpha: 0.6),
-            ),
-          ),
-        ),
       ),
       errorBuilder: (context) => _fallbackWidget(),
     );
@@ -503,7 +491,7 @@ class _ListVideoThumb extends ConsumerWidget {
             archiveContext,
             archiveRootPath,
           ),
-          debounce: const Duration(milliseconds: 150),
+          debounce: const Duration(milliseconds: 60),
           syncLookup: () =>
               thumbnailCache.peekMemory(container, filePath, quality),
           cacheHeight: quality.scaledSize(180),
@@ -517,18 +505,6 @@ class _ListVideoThumb extends ConsumerWidget {
           ),
           loadingBuilder: (context) => Container(
             color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            child: Center(
-              child: SizedBox(
-                width: 14 * zoomLevel,
-                height: 14 * zoomLevel,
-                child: CircularProgressIndicator(
-                  strokeWidth: 1.5,
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.primary.withValues(alpha: 0.6),
-                ),
-              ),
-            ),
           ),
           errorBuilder: (context) => _fallbackWidget(),
         ),
@@ -636,7 +612,7 @@ class _ListApkIconThumb extends ConsumerWidget {
       cache: ThumbnailConcurrency.inFlightThumbnails,
       limiter: ThumbnailConcurrency.imageLimiter,
       fetchFn: (c, p) => _fetch(thumbnailCache, fileIoApi, c, p, cacheMode, quality),
-      debounce: const Duration(milliseconds: 100),
+      debounce: const Duration(milliseconds: 30),
       syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
       cacheHeight: quality.scaledSize(180),
       // An app icon is meant to be seen whole, unlike a photo -- contain
@@ -718,7 +694,7 @@ class _ListBookCoverThumb extends ConsumerWidget {
         mode: cacheMode,
         quality: quality,
       )).bytes,
-      debounce: const Duration(milliseconds: 100),
+      debounce: const Duration(milliseconds: 30),
       syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
       cacheHeight: quality.scaledSize(180),
       imageBuilder: (context, bytes, cacheHeight) => Image.memory(

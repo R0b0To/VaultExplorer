@@ -153,6 +153,7 @@ private object ChannelMethods {
     const val GET_VIDEO_THUMBNAIL       = "getVideoThumbnail"
     const val GET_IMAGE_THUMBNAIL       = "getImageThumbnail"
     const val GET_IMAGE_THUMBNAIL_WITH_SIZE = "getImageThumbnailWithSize"
+    const val PROBE_IMAGE_DIMENSIONS    = "probeImageDimensions"
     const val GET_VIDEO_THUMBNAIL_WITH_SIZE = "getVideoThumbnailWithSize"
     const val GET_APK_ICON              = "getApkIcon"
     const val ENCODE_IMAGE              = "encodeImage"
@@ -1205,6 +1206,7 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.GET_VIDEO_THUMBNAIL -> thumbnailHandlers.handleGetVideoThumbnail(call, result)
                 ChannelMethods.GET_IMAGE_THUMBNAIL -> thumbnailHandlers.handleGetImageThumbnail(call, result)
                 ChannelMethods.GET_IMAGE_THUMBNAIL_WITH_SIZE -> thumbnailHandlers.handleGetImageThumbnailWithSize(call, result)
+                ChannelMethods.PROBE_IMAGE_DIMENSIONS -> thumbnailHandlers.handleProbeImageDimensions(call, result)
                 ChannelMethods.GET_VIDEO_THUMBNAIL_WITH_SIZE -> thumbnailHandlers.handleGetVideoThumbnailWithSize(call, result)
                 ChannelMethods.GET_APK_ICON -> thumbnailHandlers.handleGetApkIcon(call, result)
                 ChannelMethods.ENCODE_IMAGE -> thumbnailHandlers.handleEncodeImage(call, result)

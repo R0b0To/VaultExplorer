@@ -74,14 +74,31 @@ String formatDateGroupHeader(DateTime? date, BuildContext context) {
   }
 }
 
+/// Height a [GalleryDateHeader] needs, for gallery layouts that reserve the
+/// header's space up front instead of measuring it: its padding, one line of
+/// the title style, and a little air above the first row of the day.
+double galleryDateHeaderExtent(BuildContext context) {
+  final style = Theme.of(context).textTheme.titleMedium;
+  final line = MediaQuery.textScalerOf(
+    context,
+  ).scale((style?.fontSize ?? 16.0) * 1.5);
+  return 16.0 + line + 8.0 + 4.0;
+}
+
 class GalleryDateHeader extends StatelessWidget {
   final String title;
   final int count;
+
+  /// Inset of the title from each side. A header that sits inside a sliver
+  /// which is already padded passes the difference to the 16 it wants from
+  /// the screen edge.
+  final double horizontalPadding;
 
   const GalleryDateHeader({
     super.key,
     required this.title,
     required this.count,
+    this.horizontalPadding = 16.0,
   });
 
   @override
@@ -96,7 +113,7 @@ class GalleryDateHeader extends StatelessWidget {
         : const Color(0xFF1F1F1F).withValues(alpha: 0.6);
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      padding: EdgeInsets.fromLTRB(horizontalPadding, 16, horizontalPadding, 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.baseline,
         textBaseline: TextBaseline.alphabetic,

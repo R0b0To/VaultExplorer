@@ -130,6 +130,7 @@ abstract final class ChannelMethods {
   static const getVideoThumbnail = 'getVideoThumbnail';
   static const getImageThumbnail = 'getImageThumbnail';
   static const getImageThumbnailWithSize = 'getImageThumbnailWithSize';
+  static const probeImageDimensions = 'probeImageDimensions';
   static const getVideoThumbnailWithSize = 'getVideoThumbnailWithSize';
   static const getApkIcon = 'getApkIcon';
   static const encodeImage = 'encodeImage';

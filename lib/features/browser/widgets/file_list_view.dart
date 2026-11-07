@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
-import 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
@@ -307,13 +306,8 @@ class _FileListViewState extends State<FileListView> {
   }
 
   bool _onScrollNotification(ScrollNotification notification) {
-    if (notification is ScrollUpdateNotification) {
-      final delta = notification.scrollDelta?.abs() ?? 0.0;
-      if (delta > 25.0) {
-        ThumbnailConcurrency.imageLimiter.cancelTier(TaskPriority.visible);
-        ThumbnailConcurrency.videoLimiter.cancelTier(TaskPriority.visible);
-      }
-    }
+    // Disposed tiles already drop their queued request; cancelling the whole
+    // visible tier also cancelled tiles still on screen (see masonry view).
     return false;
   }
 
@@ -433,6 +427,7 @@ class _FileListViewState extends State<FileListView> {
     }
     return CustomScrollView(
       controller: controller,
+      cacheExtent: MediaQuery.sizeOf(context).height * 1.5,
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: slivers,
     );
@@ -441,6 +436,7 @@ class _FileListViewState extends State<FileListView> {
   Widget _buildListView(ScrollController? controller, double itemExtent, ScrollPhysics scrollPhysics, int total) {
     return ListView.builder(
       controller: controller,
+      cacheExtent: MediaQuery.sizeOf(context).height * 1.5,
       physics: scrollPhysics,
       itemExtent: itemExtent,
       findChildIndexCallback: (Key key) => _keyIndexMap[key],

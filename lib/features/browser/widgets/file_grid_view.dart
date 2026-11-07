@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -22,6 +23,8 @@ import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
+import 'package:vaultexplorer/features/browser/gallery/gallery_layout.dart';
+import 'package:vaultexplorer/features/browser/gallery/gallery_sliver.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/widgets/apk_icon_support.dart';
@@ -156,6 +159,13 @@ class _FileGridViewState extends State<FileGridView>
   final Map<Key, int> _keyIndexMap = {};
 
   int? _anchorItemIndex;
+
+  // The date-grouped layout: one sliver for every day (see GallerySliverGrid).
+  final GalleryLayoutHost _groupHost = GalleryLayoutHost(
+    flow: GalleryFlow.columns,
+  );
+  _GridGroups? _groups;
+  String _groupHostKey = '';
 
   // Animation controller for clearly visible column morph transition
   late final AnimationController _morphController;
@@ -292,6 +302,12 @@ class _FileGridViewState extends State<FileGridView>
     final oldColumns = _crossAxisCount;
     final isZoomIn = newColumns < oldColumns;
 
+    // Grouped mode keeps whatever is at the top of the screen in place through
+    // the sliver's own layout pass; the row-estimate jump below is for the
+    // plain grid.
+    final groupedAnchor = widget.groupByDate
+        ? _groupHost.captureTopAnchor()
+        : null;
     setState(() {
       _crossAxisCount = newColumns;
       _baselineScale = newBaseline;
@@ -304,6 +320,11 @@ class _FileGridViewState extends State<FileGridView>
       CurvedAnimation(parent: _morphController, curve: Curves.easeOutCubic),
     );
     _morphController.forward(from: 0.0);
+
+    if (widget.groupByDate) {
+      _groupHost.pendingAnchor = groupedAnchor;
+      return;
+    }
 
     final controller = widget.scrollController;
     final anchor = _anchorItemIndex;
@@ -353,13 +374,8 @@ class _FileGridViewState extends State<FileGridView>
   }
 
   bool _onScrollNotification(ScrollNotification notification) {
-    if (notification is ScrollUpdateNotification) {
-      final delta = notification.scrollDelta?.abs() ?? 0.0;
-      if (delta > 25.0) {
-        ThumbnailConcurrency.imageLimiter.cancelTier(TaskPriority.visible);
-        ThumbnailConcurrency.videoLimiter.cancelTier(TaskPriority.visible);
-      }
-    }
+    // Disposed tiles already drop their queued request; cancelling the whole
+    // visible tier also cancelled tiles still on screen (see masonry view).
     return false;
   }
 
@@ -399,6 +415,7 @@ class _FileGridViewState extends State<FileGridView>
       },
       child: GridView.builder(
         controller: controller,
+        cacheExtent: MediaQuery.sizeOf(context).height * 1.5,
         physics:
             const AlwaysScrollableScrollPhysics(), // Native scroll physics that cannot freeze
         findChildIndexCallback: (Key key) => _keyIndexMap[key],
@@ -418,49 +435,38 @@ class _FileGridViewState extends State<FileGridView>
     );
   }
 
+  _GridGroups _groupsFor(List<RawEntry> items) {
+    final cached = _groups;
+    if (cached != null && identical(cached.source, items)) return cached;
+    return _groups = _GridGroups(items, computeDateGroups(items));
+  }
+
+  void _syncGroupHost(_GridGroups groups, double aspect, double headerExtent) {
+    final key =
+        '${identityHashCode(groups)}|$_crossAxisCount|${widget.spacing}|$aspect|$headerExtent';
+    if (key == _groupHostKey) return;
+    _groupHostKey = key;
+    _groupHost
+      ..columnCount = _crossAxisCount
+      ..spacing = widget.spacing
+      ..sectionGap = 12.0
+      ..sections = [
+        for (final g in groups.groups)
+          GallerySection(itemCount: g.items.length, headerExtent: headerExtent),
+      ]
+      ..ratioOf = ((_) => aspect)
+      ..footerOf = null
+      ..invalidate();
+  }
+
   Widget _buildDateGroupedGridView(ScrollController? controller) {
-    final groups = computeDateGroups(widget.items);
-
-    final slivers = <Widget>[];
-    for (final group in groups) {
-      slivers.add(
-        SliverToBoxAdapter(
-          child: GalleryDateHeader(
-            title: formatDateGroupHeader(group.date, context),
-            count: group.items.length,
-          ),
-        ),
-      );
-      slivers.add(
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(10, 4, 10, 12),
-          sliver: SliverGrid(
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: _crossAxisCount,
-              crossAxisSpacing: widget.spacing,
-              mainAxisSpacing: widget.spacing,
-              childAspectRatio: _getAspectRatio(_crossAxisCount),
-            ),
-            delegate: SliverChildBuilderDelegate(
-              (context, localIndex) {
-                final entry = group.items[localIndex];
-                final globalIndex = group.globalIndices[localIndex];
-                return _buildItem(context, entry, globalIndex);
-              },
-              childCount: group.items.length,
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (widget.bottomClearance > 0) {
-      slivers.add(
-        SliverToBoxAdapter(
-          child: SizedBox(height: widget.bottomClearance),
-        ),
-      );
-    }
+    final groups = _groupsFor(widget.items);
+    final aspect = _getAspectRatio(_crossAxisCount);
+    _syncGroupHost(
+      groups,
+      aspect.isFinite && aspect > 0 ? aspect : 1.0,
+      galleryDateHeaderExtent(context),
+    );
 
     return AnimatedBuilder(
       animation: _morphController,
@@ -475,8 +481,48 @@ class _FileGridViewState extends State<FileGridView>
       },
       child: CustomScrollView(
         controller: controller,
+        cacheExtent: MediaQuery.sizeOf(context).height * 1.5,
         physics: const AlwaysScrollableScrollPhysics(),
-        slivers: slivers,
+        slivers: [
+          SliverPadding(
+            // The last day's gap is not part of the sliver's extent.
+            padding: EdgeInsets.fromLTRB(10, 0, 10, widget.bottomClearance + 12),
+            // One sliver for every day, headers included: a sliver per day
+            // makes the viewport lay out (and build a tile in) every one of
+            // them on every scrolled frame.
+            sliver: GallerySliverGrid(
+              host: _groupHost,
+              delegate: SliverChildBuilderDelegate(
+                (context, child) {
+                  final g = groups.childGroup[child];
+                  final local = groups.childLocal[child];
+                  final group = groups.groups[g];
+                  if (local < 0) {
+                    return Align(
+                      key: ValueKey('gallery_header:$g'),
+                      alignment: Alignment.topLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: GalleryDateHeader(
+                          title: formatDateGroupHeader(group.date, context),
+                          count: group.items.length,
+                          horizontalPadding: 6,
+                        ),
+                      ),
+                    );
+                  }
+                  return _buildItem(
+                    context,
+                    group.items[local],
+                    group.globalIndices[local],
+                  );
+                },
+                childCount: groups.childCount,
+                addAutomaticKeepAlives: false,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -836,7 +882,7 @@ class _EncryptedImageGridThumb extends ConsumerWidget {
         archiveContext,
         archiveRootPath,
       ),
-      debounce: const Duration(milliseconds: 100),
+      debounce: const Duration(milliseconds: 30),
       syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
       cacheHeight: quality.scaledSize(180),
       imageBuilder: (context, bytes, cacheHeight) => Image.memory(
@@ -847,17 +893,8 @@ class _EncryptedImageGridThumb extends ConsumerWidget {
       ),
       loadingBuilder: (context) => Container(
         color: cs.surfaceContainerLow,
-        child: Center(
-          child: SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(
-              strokeWidth: 1.5,
-              color: cs.primary.withValues(alpha: 0.6),
-            ),
-          ),
+        child: const SizedBox.expand(),
         ),
-      ),
       errorBuilder: (context) => _errorPlaceholder(cs),
     );
   }
@@ -938,7 +975,7 @@ class _VideoThumb extends ConsumerWidget {
             archiveContext,
             archiveRootPath,
           ),
-          debounce: const Duration(milliseconds: 150),
+          debounce: const Duration(milliseconds: 60),
           syncLookup: () =>
               thumbnailCache.peekMemory(container, filePath, quality),
           cacheHeight: quality.scaledSize(180),
@@ -950,17 +987,8 @@ class _VideoThumb extends ConsumerWidget {
           ),
           loadingBuilder: (context) => Container(
             color: cs.surfaceContainerLow,
-            child: Center(
-              child: SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 1.5,
-                  color: cs.primary.withValues(alpha: 0.6),
-                ),
-              ),
+            child: const SizedBox.expand(),
             ),
-          ),
           errorBuilder: (context) => _errorPlaceholder(cs),
         ),
         Align(
@@ -1061,7 +1089,7 @@ class _ApkIconGridThumb extends ConsumerWidget {
       quality: quality,
       fetchFn: (c, p) =>
           _fetch(thumbnailCache, fileIoApi, c, p, cacheMode, quality),
-      debounce: const Duration(milliseconds: 100),
+      debounce: const Duration(milliseconds: 30),
       syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
       cacheHeight: quality.scaledSize(180),
       imageBuilder: (context, bytes, cacheHeight) => Image.memory(
@@ -1070,16 +1098,7 @@ class _ApkIconGridThumb extends ConsumerWidget {
         cacheHeight: cacheHeight,
         errorBuilder: (_, _, _) => _fallbackWidget(),
       ),
-      loadingBuilder: (context) => Center(
-        child: SizedBox(
-          width: 18,
-          height: 18,
-          child: CircularProgressIndicator(
-            strokeWidth: 1.5,
-            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.6),
-          ),
-        ),
-      ),
+      loadingBuilder: (context) => const SizedBox.expand(),
       errorBuilder: (context) => _fallbackWidget(),
     );
   }
@@ -1136,7 +1155,7 @@ class _BookCoverGridThumb extends ConsumerWidget {
         mode: cacheMode,
         quality: quality,
       )).bytes,
-      debounce: const Duration(milliseconds: 100),
+      debounce: const Duration(milliseconds: 30),
       syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
       cacheHeight: quality.scaledSize(180),
       // Covers are portrait and the cell is usually squarer: anchor to the top,
@@ -1156,4 +1175,35 @@ class _BookCoverGridThumb extends ConsumerWidget {
   Widget _fallbackWidget() => Center(
     child: Icon(fallbackIcon, size: fallbackIconSize, color: fallbackColor),
   );
+}
+
+/// The date groups of a list, plus the map from a child index of the grouped
+/// sliver (a header per group, then its items) back to a group and an item.
+class _GridGroups {
+  _GridGroups(this.source, this.groups)
+    : childCount = source.length + groups.length,
+      childGroup = Int32List(source.length + groups.length),
+      childLocal = Int32List(source.length + groups.length) {
+    var c = 0;
+    for (var g = 0; g < groups.length; g++) {
+      childGroup[c] = g;
+      childLocal[c] = -1;
+      c++;
+      for (var j = 0; j < groups[g].items.length; j++) {
+        childGroup[c] = g;
+        childLocal[c] = j;
+        c++;
+      }
+    }
+  }
+
+  final List<RawEntry> source;
+  final List<DateGroup<RawEntry>> groups;
+  final int childCount;
+
+  /// Child index -> group.
+  final Int32List childGroup;
+
+  /// Child index -> index inside the group, or -1 for the group's header.
+  final Int32List childLocal;
 }

@@ -96,7 +96,7 @@ object VideoThumbnailCoordinator {
      *  `MainActivity.resizeExecutorPools()` — only the ownership of the
      *  pool moved here, not the sizing policy. */
     val imageExecutor: ThreadPoolExecutor =
-        Executors.newFixedThreadPool(2) as ThreadPoolExecutor
+        Executors.newFixedThreadPool(3) as ThreadPoolExecutor
 
     /** Bounded pool for video thumbnail decode work from the **in-app**
      *  pipeline only. Single-threaded by default — video frame extraction

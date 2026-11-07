@@ -26,7 +26,7 @@ class DeviceCapabilityService {
       switch (tier.toUpperCase()) {
         case 'LOW':
           ThumbnailConcurrency.resizeForDevice(
-            imageConcurrency: 1,
+            imageConcurrency: 2,
             videoConcurrency: 1,
             inFlightCapacity: 80,
           );
@@ -36,22 +36,22 @@ class DeviceCapabilityService {
 
         case 'HIGH':
           ThumbnailConcurrency.resizeForDevice(
-            imageConcurrency: 3,
+            imageConcurrency: 6,
             videoConcurrency: 2,
             inFlightCapacity: 240,
           );
-          ThumbnailCacheService.resizeMemoryBudget(48 * 1024 * 1024); // 48 MB
+          ThumbnailCacheService.resizeMemoryBudget(64 * 1024 * 1024); // 64 MB
           FullResImageCache.resize(300 * 1024 * 1024); // 300 MB
           break;
 
         case 'MEDIUM':
         default:
           ThumbnailConcurrency.resizeForDevice(
-            imageConcurrency: 2,
+            imageConcurrency: 4,
             videoConcurrency: 1,
             inFlightCapacity: 160,
           );
-          ThumbnailCacheService.resizeMemoryBudget(24 * 1024 * 1024); // 24 MB
+          ThumbnailCacheService.resizeMemoryBudget(40 * 1024 * 1024); // 40 MB
           FullResImageCache.resize(150 * 1024 * 1024); // 150 MB
           break;
       }

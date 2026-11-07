@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/usb_device_info.dart';
+import 'package:vaultexplorer/data/services/media_index/media_index_service.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';
 import 'package:vaultexplorer/features/camera/active_recording_registry.dart';
@@ -1359,6 +1360,15 @@ class VaultLifecycleApi {
       ).timeout(const Duration(seconds: 3));
     } catch (e) {
       logSwallowed('lockContainer/flushThumbnailCache', e, expected: true);
+    }
+    // Same for the media index: its last measurements are only buffered for a
+    // few seconds before they are written into the vault.
+    try {
+      await MediaIndexService.flushForUri(
+        filePath,
+      ).timeout(const Duration(seconds: 3));
+    } catch (e) {
+      logSwallowed('lockContainer/flushMediaIndex', e, expected: true);
     }
     final result = await _channel.invokeMethod<bool>(
       ChannelMethods.lockContainer,

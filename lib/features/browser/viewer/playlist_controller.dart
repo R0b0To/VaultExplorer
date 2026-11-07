@@ -81,6 +81,22 @@ class PlaylistController extends ChangeNotifier {
     }
   }
 
+  /// Replaces the active queue with a music-library selection. This keeps the
+  /// existing player session alive while the library starts a different track.
+  void replaceLibraryQueue(List<String> files, {required int index}) {
+    if (files.isEmpty) return;
+    _generation++;
+    _originalList = List<String>.of(files);
+    _currentPlaylist = List<String>.of(files);
+    _currentIndex = index.clamp(0, files.length - 1).toInt();
+    _isShuffled = false;
+    _allFilesScanned = true;
+    _isScanningSubfolders = false;
+    _isPlaylistMode = files.length > 1;
+    _selectedFolder = 'All';
+    notifyListeners();
+  }
+
   String getBaseDir() {
     if (startingFolder != null) return startingFolder!;
     if (_originalList.isEmpty) return '';

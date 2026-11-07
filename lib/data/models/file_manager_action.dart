@@ -9,6 +9,7 @@ enum FileManagerAction {
   sort,
   filter,
   playMedia,
+  musicMode,
   options;
 
   String get label => switch (this) {
@@ -19,6 +20,7 @@ enum FileManagerAction {
         FileManagerAction.sort => 'Sort',
         FileManagerAction.filter => 'Filter',
         FileManagerAction.playMedia => 'Play media',
+        FileManagerAction.musicMode => 'Music mode',
         FileManagerAction.options => 'Options',
       };
 
@@ -30,6 +32,7 @@ enum FileManagerAction {
         FileManagerAction.sort => l10n.sortAction,
         FileManagerAction.filter => l10n.filterAction,
         FileManagerAction.playMedia => l10n.playMediaAction,
+        FileManagerAction.musicMode => l10n.musicModeAction,
         FileManagerAction.options => l10n.optionsAction,
       };
 
@@ -41,6 +44,7 @@ enum FileManagerAction {
         FileManagerAction.sort => Icons.sort_by_alpha_rounded,
         FileManagerAction.filter => Icons.filter_alt_outlined,
         FileManagerAction.playMedia => Icons.play_circle_outline_rounded,
+        FileManagerAction.musicMode => Icons.library_music_outlined,
         FileManagerAction.options => Icons.more_vert_rounded,
       };
 

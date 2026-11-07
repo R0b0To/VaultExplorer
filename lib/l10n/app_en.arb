@@ -5723,6 +5723,316 @@
   "@playMediaAction": {
     "description": "Label for play media toolbar action"
   },
+  "libraryTabAlbums": "Albums",
+  "@libraryTabAlbums": {
+    "description": "Music library tab label"
+  },
+  "libraryTabArtists": "Artists",
+  "@libraryTabArtists": {
+    "description": "Music library tab label"
+  },
+  "libraryTabGenres": "Genres",
+  "@libraryTabGenres": {
+    "description": "Music library tab label"
+  },
+  "libraryTabTracks": "Tracks",
+  "@libraryTabTracks": {
+    "description": "Music library tab label"
+  },
+  "librarySearchHint": "Search music",
+  "@librarySearchHint": {
+    "description": "Hint text of the music library search field"
+  },
+  "libraryScanListing": "Looking through folders... {count, plural, =1{1 audio file so far} other{{count} audio files so far}}",
+  "@libraryScanListing": {
+    "description": "Progress text while the music library walks the vault folders; count is audio files found so far",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "libraryScanReading": "Reading tags... {read} of {total}",
+  "@libraryScanReading": {
+    "description": "Progress text while the music library reads audio tags; read and total are file counts",
+    "placeholders": {
+      "read": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "libraryScanStop": "Stop",
+  "@libraryScanStop": {
+    "description": "Button that stops the music library scan"
+  },
+  "libraryEmptyTitle": "No music found",
+  "@libraryEmptyTitle": {
+    "description": "Music library empty state title when the vault has no audio files"
+  },
+  "libraryEmptyMessage": "This vault has no audio files, or they are in folders that could not be read.",
+  "@libraryEmptyMessage": {
+    "description": "Music library empty state message when the vault has no audio files"
+  },
+  "libraryNoResults": "Nothing matches your search",
+  "@libraryNoResults": {
+    "description": "Music library message when a search has no matches"
+  },
+  "libraryUnknownArtist": "Unknown artist",
+  "@libraryUnknownArtist": {
+    "description": "Label for tracks with no artist tag"
+  },
+  "libraryUnknownAlbum": "Unknown album",
+  "@libraryUnknownAlbum": {
+    "description": "Label for tracks with no album tag or folder name"
+  },
+  "libraryUnknownGenre": "Unknown genre",
+  "@libraryUnknownGenre": {
+    "description": "Label for tracks with no genre tag"
+  },
+  "libraryVariousArtists": "Various artists",
+  "@libraryVariousArtists": {
+    "description": "Label for an album whose tracks are by different artists"
+  },
+  "libraryTrackCount": "{count, plural, =1{1 track} other{{count} tracks}}",
+  "@libraryTrackCount": {
+    "description": "Number of tracks",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "libraryAlbumCount": "{count, plural, =1{1 album} other{{count} albums}}",
+  "@libraryAlbumCount": {
+    "description": "Number of albums",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "libraryPlayAll": "Play",
+  "@libraryPlayAll": {
+    "description": "Music library button that plays a list from the start"
+  },
+  "libraryShuffleAll": "Shuffle",
+  "@libraryShuffleAll": {
+    "description": "Music library button that plays a list in random order"
+  },
+  "libraryMenuRescan": "Scan for changes",
+  "@libraryMenuRescan": {
+    "description": "Music library menu item that looks for new, changed and deleted files"
+  },
+  "libraryMenuRebuild": "Re-read all tags",
+  "@libraryMenuRebuild": {
+    "description": "Music library menu item that re-reads the tags of every file"
+  },
+  "libraryMenuDeleteSaved": "Delete saved index",
+  "@libraryMenuDeleteSaved": {
+    "description": "Music library menu item that deletes the saved index"
+  },
+  "libraryMenuDeleteSavedDone": "Saved index deleted",
+  "@libraryMenuDeleteSavedDone": {
+    "description": "Snackbar after the saved music library index was deleted"
+  },
+  "libraryIncompleteNote": "Some folders could not be read, so files that may have been removed are still listed.",
+  "@libraryIncompleteNote": {
+    "description": "Music library note shown when the last scan could not read every folder"
+  },
+  "libraryReadFailuresNote": "{count, plural, =1{1 file could not be read} other{{count} files could not be read}}",
+  "@libraryReadFailuresNote": {
+    "description": "Music library note: number of files whose tags could not be read",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "libraryArtistAlbumsHeader": "Albums",
+  "@libraryArtistAlbumsHeader": {
+    "description": "Heading above an artist's albums"
+  },
+  "libraryArtistTracksHeader": "Tracks",
+  "@libraryArtistTracksHeader": {
+    "description": "Heading above a list of tracks"
+  },
+  "librarySortTooltip": "Sort",
+  "@librarySortTooltip": {
+    "description": "Tooltip of the music library sort button"
+  },
+  "librarySortTitle": "Title",
+  "@librarySortTitle": {
+    "description": "Music library sort option"
+  },
+  "librarySortArtist": "Artist",
+  "@librarySortArtist": {
+    "description": "Music library sort option"
+  },
+  "librarySortAlbum": "Album",
+  "@librarySortAlbum": {
+    "description": "Music library sort option"
+  },
+  "librarySortYear": "Year",
+  "@librarySortYear": {
+    "description": "Music library sort option"
+  },
+  "librarySortRecentlyAdded": "Recently added",
+  "@librarySortRecentlyAdded": {
+    "description": "Music library sort option: newest files first"
+  },
+  "librarySortName": "Name",
+  "@librarySortName": {
+    "description": "Music library sort option for artists"
+  },
+  "librarySortTrackCount": "Number of tracks",
+  "@librarySortTrackCount": {
+    "description": "Music library sort option for artists"
+  },
+  "librarySortLength": "Length",
+  "@librarySortLength": {
+    "description": "Music library sort option: track duration"
+  },
+  "librarySortReverse": "Reverse order",
+  "@librarySortReverse": {
+    "description": "Music library sort option that reverses the current order"
+  },
+  "musicModeAction": "Music mode",
+  "@musicModeAction": {
+    "description": "File manager toolbar action that turns music mode on or off for this location"
+  },
+  "musicModeFiles": "Files",
+  "@musicModeFiles": {
+    "description": "Music mode bar: the normal file listing"
+  },
+  "musicModeMenuFolders": "Music folders",
+  "@musicModeMenuFolders": {
+    "description": "Music mode menu item that changes which folders are included"
+  },
+  "musicModeMenuTurnOff": "Turn off music mode",
+  "@musicModeMenuTurnOff": {
+    "description": "Music mode menu item that turns the mode off"
+  },
+  "libraryStorageInVault": "Index saved inside this vault",
+  "@libraryStorageInVault": {
+    "description": "Music mode note: the index is stored in the vault itself"
+  },
+  "libraryStorageThisDevice": "Index saved encrypted on this device",
+  "@libraryStorageThisDevice": {
+    "description": "Music mode note: the index is stored encrypted in app storage"
+  },
+  "musicScopeTitle": "Music mode",
+  "@musicScopeTitle": {
+    "description": "Title of the sheet where music mode folders are chosen"
+  },
+  "musicScopeMessage": "Choose what music mode should include.",
+  "@musicScopeMessage": {
+    "description": "Message in the music mode folders sheet"
+  },
+  "musicScopeAll": "Everything in this location",
+  "@musicScopeAll": {
+    "description": "Option: index the whole location"
+  },
+  "musicScopeAllHint": "Looks through every folder. Slower on large locations.",
+  "@musicScopeAllHint": {
+    "description": "Hint under the whole-location option"
+  },
+  "musicScopeChoose": "Only some folders",
+  "@musicScopeChoose": {
+    "description": "Option: index only chosen folders"
+  },
+  "musicScopeAddFolder": "Add a folder",
+  "@musicScopeAddFolder": {
+    "description": "Button that opens the folder picker"
+  },
+  "musicScopeNoFolders": "No folders chosen yet",
+  "@musicScopeNoFolders": {
+    "description": "Shown when only-some-folders is selected but none are chosen"
+  },
+  "musicScopeStart": "Start",
+  "@musicScopeStart": {
+    "description": "Button that turns music mode on with the chosen folders"
+  },
+  "musicScopePickerAdd": "Add this folder",
+  "@musicScopePickerAdd": {
+    "description": "Button that adds the folder being viewed"
+  },
+  "musicScopePickerEmpty": "No subfolders here",
+  "@musicScopePickerEmpty": {
+    "description": "Folder picker empty state"
+  },
+  "musicScopePickerRoot": "Top level",
+  "@musicScopePickerRoot": {
+    "description": "Folder picker name for the root of a location"
+  },
+  "musicScopeRemoveFolder": "Remove folder",
+  "@musicScopeRemoveFolder": {
+    "description": "Tooltip of the button that removes a chosen folder"
+  },
+  "libraryArtistCount": "{count, plural, =1{1 artist} other{{count} artists}}",
+  "@libraryArtistCount": {
+    "description": "Number of artists",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "libraryGenreCount": "{count, plural, =1{1 genre} other{{count} genres}}",
+  "@libraryGenreCount": {
+    "description": "Number of genres",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "musicPlayPartialNote": "Playing {count, plural, =1{1 track} other{{count} tracks}} from {source}. The rest of this list is in other locations.",
+  "@musicPlayPartialNote": {
+    "description": "Shown when a mixed list is played: only the tracks in one location can play together",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      },
+      "source": {
+        "type": "String"
+      }
+    }
+  },
+  "musicCoverChoose": "Choose a cover image",
+  "@musicCoverChoose": {
+    "description": "Menu item that picks an image from the location's files as an album or artist cover"
+  },
+  "musicCoverRemove": "Remove custom cover",
+  "@musicCoverRemove": {
+    "description": "Menu item that removes a cover chosen by hand"
+  },
+  "musicCoverFailed": "That image could not be used as a cover",
+  "@musicCoverFailed": {
+    "description": "Snackbar when the chosen image could not be read or decoded"
+  },
+  "musicMiniPrevious": "Previous",
+  "@musicMiniPrevious": {
+    "description": "Tooltip of the mini player previous-track button"
+  },
+  "musicMiniNext": "Next",
+  "@musicMiniNext": {
+    "description": "Tooltip of the mini player next-track button"
+  },
+  "musicMiniPlay": "Play",
+  "@musicMiniPlay": {
+    "description": "Tooltip of the mini player play button"
+  },
+  "musicMiniPause": "Pause",
+  "@musicMiniPause": {
+    "description": "Tooltip of the mini player pause button"
+  },
+  "musicMiniStop": "Stop playback",
+  "@musicMiniStop": {
+    "description": "Tooltip of the mini player button that stops the music"
+  },
   "containerSpaceSummary": "{free} free / {total}",
   "@containerSpaceSummary": {
     "description": "Storage space summary shown on mounted container card",

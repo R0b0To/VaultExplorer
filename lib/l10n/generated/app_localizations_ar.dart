@@ -4476,6 +4476,265 @@ class AppLocalizationsAr extends AppLocalizations {
   String get playMediaAction => 'تشغيل الوسائط';
 
   @override
+  String get libraryTabAlbums => 'الألبومات';
+
+  @override
+  String get libraryTabArtists => 'الفنانون';
+
+  @override
+  String get libraryTabGenres => 'الأنواع';
+
+  @override
+  String get libraryTabTracks => 'المسارات';
+
+  @override
+  String get librarySearchHint => 'البحث في الموسيقى';
+
+  @override
+  String libraryScanListing(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count ملفات صوتية حتى الآن',
+      one: 'ملف صوتي واحد حتى الآن',
+    );
+    return 'جارٍ فحص المجلدات... $_temp0';
+  }
+
+  @override
+  String libraryScanReading(int read, int total) {
+    return 'جارٍ قراءة الوسوم... $read من $total';
+  }
+
+  @override
+  String get libraryScanStop => 'إيقاف';
+
+  @override
+  String get libraryEmptyTitle => 'لم يتم العثور على موسيقى';
+
+  @override
+  String get libraryEmptyMessage =>
+      'لا تحتوي هذه الخزينة على ملفات صوتية، أو أنها موجودة في مجلدات تعذر قراءتها.';
+
+  @override
+  String get libraryNoResults => 'لا توجد نتائج تطابق بحثك';
+
+  @override
+  String get libraryUnknownArtist => 'فنان غير معروف';
+
+  @override
+  String get libraryUnknownAlbum => 'ألبوم غير معروف';
+
+  @override
+  String get libraryUnknownGenre => 'نوع غير معروف';
+
+  @override
+  String get libraryVariousArtists => 'فنانون متنوعون';
+
+  @override
+  String libraryTrackCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count مسارات',
+      one: 'مسار واحد',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String libraryAlbumCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count ألبومات',
+      one: 'ألبوم واحد',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get libraryPlayAll => 'تشغيل';
+
+  @override
+  String get libraryShuffleAll => 'خلط';
+
+  @override
+  String get libraryMenuRescan => 'البحث عن تغييرات';
+
+  @override
+  String get libraryMenuRebuild => 'إعادة قراءة جميع الوسوم';
+
+  @override
+  String get libraryMenuDeleteSaved => 'حذف الفهرس المحفوظ';
+
+  @override
+  String get libraryMenuDeleteSavedDone => 'تم حذف الفهرس المحفوظ';
+
+  @override
+  String get libraryIncompleteNote =>
+      'تعذر قراءة بعض المجلدات، لذا لا تزال الملفات التي ربما تمت إزالتها مدرجة في القائمة.';
+
+  @override
+  String libraryReadFailuresNote(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'تعذر قراءة $count ملفات',
+      one: 'تعذر قراءة ملف واحد',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get libraryArtistAlbumsHeader => 'الألبومات';
+
+  @override
+  String get libraryArtistTracksHeader => 'المسارات';
+
+  @override
+  String get librarySortTooltip => 'فرز';
+
+  @override
+  String get librarySortTitle => 'العنوان';
+
+  @override
+  String get librarySortArtist => 'الفنان';
+
+  @override
+  String get librarySortAlbum => 'الألبوم';
+
+  @override
+  String get librarySortYear => 'السنة';
+
+  @override
+  String get librarySortRecentlyAdded => 'المضاف حديثاً';
+
+  @override
+  String get librarySortName => 'الاسم';
+
+  @override
+  String get librarySortTrackCount => 'عدد المسارات';
+
+  @override
+  String get librarySortLength => 'المدة';
+
+  @override
+  String get librarySortReverse => 'ترتيب عكسي';
+
+  @override
+  String get musicModeAction => 'وضع الموسيقى';
+
+  @override
+  String get musicModeFiles => 'الملفات';
+
+  @override
+  String get musicModeMenuFolders => 'مجلدات الموسيقى';
+
+  @override
+  String get musicModeMenuTurnOff => 'إيقاف وضع الموسيقى';
+
+  @override
+  String get libraryStorageInVault => 'تم حفظ الفهرس داخل هذه الخزينة';
+
+  @override
+  String get libraryStorageThisDevice => 'تم حفظ الفهرس مشفراً على هذا الجهاز';
+
+  @override
+  String get musicScopeTitle => 'وضع الموسيقى';
+
+  @override
+  String get musicScopeMessage => 'اختر ما يجب أن يتضمنه وضع الموسيقى.';
+
+  @override
+  String get musicScopeAll => 'كل شيء في هذا الموقع';
+
+  @override
+  String get musicScopeAllHint =>
+      'يفحص كل المجلدات. يكون أبطأ في المواقع الكبيرة.';
+
+  @override
+  String get musicScopeChoose => 'بعض المجلدات فقط';
+
+  @override
+  String get musicScopeAddFolder => 'إضافة مجلد';
+
+  @override
+  String get musicScopeNoFolders => 'لم يتم اختيار أي مجلدات بعد';
+
+  @override
+  String get musicScopeStart => 'بدء';
+
+  @override
+  String get musicScopePickerAdd => 'إضافة هذا المجلد';
+
+  @override
+  String get musicScopePickerEmpty => 'لا توجد مجلدات فرعية هنا';
+
+  @override
+  String get musicScopePickerRoot => 'المستوى الأعلى';
+
+  @override
+  String get musicScopeRemoveFolder => 'إزالة المجلد';
+
+  @override
+  String libraryArtistCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count فنانين',
+      one: 'فنان واحد',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String libraryGenreCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count أنواع',
+      one: 'نوع واحد',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String musicPlayPartialNote(num count, String source) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count مسارات',
+      one: 'مسار واحد',
+    );
+    return 'جارٍ تشغيل $_temp0 من $source. بقية هذه القائمة في مواقع أخرى.';
+  }
+
+  @override
+  String get musicCoverChoose => 'اختيار صورة غلاف';
+
+  @override
+  String get musicCoverRemove => 'إزالة الغلاف المخصص';
+
+  @override
+  String get musicCoverFailed => 'تعذر استخدام هذه الصورة كغلاف';
+
+  @override
+  String get musicMiniPrevious => 'السابق';
+
+  @override
+  String get musicMiniNext => 'التالي';
+
+  @override
+  String get musicMiniPlay => 'تشغيل';
+
+  @override
+  String get musicMiniPause => 'إيقاف مؤقت';
+
+  @override
+  String get musicMiniStop => 'إيقاف التشغيل';
+
+  @override
   String containerSpaceSummary(String free, String total) {
     return '$free متاح / $total';
   }

@@ -96,6 +96,20 @@ class MediaViewerScreen extends ConsumerStatefulWidget {
   final SortBy sortBy;
   final bool sortAscending;
   final Set<String>? pinnedPaths;
+
+  /// Overrides the "keep audio playing after closing" setting for this viewer:
+  /// true hands music over to the background session whatever the setting is
+  /// (the music library's mini player takes it from there), null follows the
+  /// setting.
+  final bool? keepAudioPlayingOnClose;
+
+  /// Initializes and starts this viewer's audio, then hands it to the mini
+  /// player without drawing the full viewer first.
+  final bool startInMiniPlayer;
+
+  /// Marks sessions created by the music library so its mini player can
+  /// change tracks without creating a second player session.
+  final bool isLibraryPlayback;
   final ValueChanged<String>? onCurrentFileChanged;
   final ValueChanged<String>? onFileDeleted;
 
@@ -115,6 +129,9 @@ class MediaViewerScreen extends ConsumerStatefulWidget {
     this.sortBy = SortBy.name,
     this.sortAscending = true,
     this.pinnedPaths,
+    this.keepAudioPlayingOnClose,
+    this.startInMiniPlayer = false,
+    this.isLibraryPlayback = false,
     this.onCurrentFileChanged,
     this.onFileDeleted,
     this.isArchivePreview = false,
@@ -441,7 +458,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
         duration > Duration.zero &&
         savedPosition < duration - const Duration(seconds: 5);
     var shouldResume = canResume && mode == ResumePlaybackMode.always;
-    if (canResume && mode == ResumePlaybackMode.askEveryTime) {
+    if (!widget.startInMiniPlayer &&
+        canResume &&
+        mode == ResumePlaybackMode.askEveryTime) {
       if (_isAppInBackground) {
         // Nobody can answer the prompt (e.g. background playback moved on to
         // an item with a saved position): start over rather than leave the
@@ -489,6 +508,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       }
     }
     await controller.play();
+    _handoffToMiniPlayerIfReady();
   }
 
   String get _sessionKey => widget.container.uri;
@@ -600,7 +620,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       thumbnailCacheMode: widget.thumbnailCacheMode,
     );
     ThumbnailConcurrency.videoLimiter.cancelAll();
-    SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+    if (!widget.startInMiniPlayer) {
+      SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+    }
     _engineEvents.addUsbContainerDetachedListener(_onContainerDetached);
     _mediaSessionSubscription = MediaSessionBridge.actions.listen(
       _onMediaSessionAction,
@@ -633,10 +655,21 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     _wasEmpty = _playlistController.isEmpty;
     _zoomLockFile = _playlistController.currentFile;
     _playbackManager = carried?.playbackManager ?? VideoPlaybackManager();
+    if (widget.isLibraryPlayback) {
+      // A library queue advances through tracks by default, regardless of the
+      // media viewer's saved single-file playback mode.
+      _updatePlaybackMode(VideoPlaybackMode.playAndAdvance, persist: false);
+    }
     if (carried != null) {
       _adoptedFile = _playbackManager.currentFileName;
       // The player is already past its resume decision; don't run it again.
       _resumeFlowStarted = true;
+      if (widget.startInMiniPlayer) {
+        final controller = _playbackManager.activeController;
+        if (controller != null && !controller.value.isPlaying) {
+          unawaited(controller.playWhenReady());
+        }
+      }
       // Opened from the floating player: the video grows out of the window
       // instead of appearing full screen. Until it is drawn where the window
       // is, the viewer's own copy stays hidden and the window stays up.
@@ -685,6 +718,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
         _sessionController.setPlaybackSpeed(carried.playbackSpeed);
       }
       unawaited(_activateCurrentMedia());
+      if (carried != null) _handoffToMiniPlayerIfReady();
       _startSlideshowTimerIfNeeded();
       await PlaybackThrottleController.initGate;
       if (mounted) _prefetchSurroundingItems();
@@ -788,7 +822,10 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
         .config
         .mediaViewerToolbarConfig;
     if (isAudio) {
-      if (!config.keepAudioPlayingAfterClose) return;
+      if (!(widget.keepAudioPlayingOnClose ??
+          config.keepAudioPlayingAfterClose)) {
+        return;
+      }
       _backgroundPlaybackHandoff = _newBackgroundPlaybackSession(
         pipWindow: false,
       );
@@ -799,6 +836,10 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
         floatingPlayer: true,
       );
     }
+    final handoff = _backgroundPlaybackHandoff;
+    if (handoff?.libraryPlayback == true) {
+      BackgroundPlaybackHost.instance.previewMiniPlayerTransition(handoff!);
+    }
     if (_backgroundPlaybackHandoff != null && !value.isPlaying) {
       // It was about to start, and the code that would have started it (this
       // viewer's) is going away: whoever takes the player over must see that
@@ -808,6 +849,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   }
 
   bool _closingFromBackPress = false;
+  bool _miniPlayerBootstrapDismissScheduled = false;
 
   /// True once a close has begun. The start-up chain that would otherwise go
   /// on to ask about resuming, seek and play (see [_resolveInitialPlayback])
@@ -835,6 +877,36 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     }
   }
 
+  void _handoffToMiniPlayerIfReady() {
+    if (!widget.startInMiniPlayer ||
+        !mounted ||
+        _closing ||
+        _closingFromBackPress) {
+      return;
+    }
+    final controller = _playbackManager.activeController;
+    if (controller == null ||
+        controller.isDisposed ||
+        !controller.value.isPlaying) {
+      return;
+    }
+    unawaited(_closeFromBackPress());
+  }
+
+  void _dismissMiniPlayerBootstrapAfterError() {
+    if (!widget.startInMiniPlayer || _miniPlayerBootstrapDismissScheduled) {
+      return;
+    }
+    _miniPlayerBootstrapDismissScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _miniPlayerBootstrapDismissScheduled = false;
+      if (!mounted || !widget.startInMiniPlayer) return;
+      if (ModalRoute.of(context)?.isCurrent == true) {
+        Navigator.of(context).pop();
+      }
+    });
+  }
+
   /// Returns once the player for the item on screen exists (or after a
   /// moment, whichever is first). Only waits when there would be something to
   /// hand over: a video with the floating player on, or an audio file with
@@ -851,7 +923,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
         .mediaViewerToolbarConfig;
     final wouldHandOver = isVideo
         ? config.floatingPlayerEnabled
-        : config.keepAudioPlayingAfterClose;
+        : (widget.keepAudioPlayingOnClose ?? config.keepAudioPlayingAfterClose);
     if (!wouldHandOver) return;
     bool exists() {
       final controller = _playbackManager.activeController;
@@ -1052,6 +1124,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     sortBy: widget.sortBy,
     sortAscending: widget.sortAscending,
     pinnedPaths: widget.pinnedPaths,
+    libraryPlayback: widget.isLibraryPlayback,
     pipWindow: pipWindow,
     floatingPlayer: floatingPlayer,
   );
@@ -1239,7 +1312,12 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       );
       _sessionController.setIsMuted(appSettings.videoMuted);
       if (playbackModeRevision == _playbackModeInteractionRevision) {
-        _updatePlaybackMode(appSettings.videoPlaybackMode, persist: false);
+        _updatePlaybackMode(
+          widget.isLibraryPlayback
+              ? VideoPlaybackMode.playAndAdvance
+              : appSettings.videoPlaybackMode,
+          persist: false,
+        );
       }
 
       if (appSettings.videoMuted) {
@@ -1475,7 +1553,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     }
 
     controller.addListener(_onControllerTickUpdate);
-    _updateWakelock(controller.value.isPlaying);
+    if (!widget.startInMiniPlayer) {
+      _updateWakelock(controller.value.isPlaying);
+    }
     _syncPictureInPicture();
     // Each playlist item gets its own native controller, which otherwise
     // starts at the platform's default volume -- reapply the persisted
@@ -1521,12 +1601,20 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
 
   void _onControllerTickUpdate() {
     final controller = _playbackManager.activeController;
-    if (controller == null || controller.value.hasError) return;
+    if (controller == null) return;
+    if (controller.value.hasError) {
+      _dismissMiniPlayerBootstrapAfterError();
+      return;
+    }
 
-    _updateWakelock(controller.value.isPlaying);
+    if (!widget.startInMiniPlayer) {
+      _updateWakelock(controller.value.isPlaying);
+    }
 
     final isInitialized = controller.value.isInitialized;
     if (!isInitialized) return;
+
+    _handoffToMiniPlayerIfReady();
 
     final position = controller.value.position;
     final duration = controller.value.duration;
@@ -3561,11 +3649,13 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     _abLoopToastTimer?.cancel();
     _abLoopToast.dispose();
     _scrubPreviewHost.dispose();
-    SystemChrome.setEnabledSystemUIMode(
-      SystemUiMode.manual,
-      overlays: SystemUiOverlay.values,
-    );
-    SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+    if (!widget.startInMiniPlayer) {
+      SystemChrome.setEnabledSystemUIMode(
+        SystemUiMode.manual,
+        overlays: SystemUiOverlay.values,
+      );
+      SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+    }
     // Best-effort: don't let a brightness edge-swipe made in this viewer
     // leak into the rest of the app once the person leaves it. Fire-and-
     // forget since the screen is already tearing down.
@@ -3856,6 +3946,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
         body: SizedBox.expand(),
       );
     }
+    if (widget.startInMiniPlayer) return const SizedBox.shrink();
     final cs = Theme.of(context).colorScheme;
     if (_playlistController.isEmpty) {
       return Scaffold(
@@ -4139,18 +4230,24 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
               },
             );
 
-            final swipeDismissAxis = _swipeDismissAxis;
+            final minimizeMusicPlayer =
+                widget.isLibraryPlayback &&
+                MediaViewerConstants.isAudio(_playlistController.currentFile);
+            final swipeDismissAxis = minimizeMusicPlayer
+                ? Axis.vertical
+                : _swipeDismissAxis;
             return MediaSwipeDismissLayer(
               enabled:
-                  mediaViewerConfig.swipeToDismissEnabled &&
+                  (mediaViewerConfig.swipeToDismissEnabled ||
+                      minimizeMusicPlayer) &&
                   !_isEditingLayout &&
                   !_controlsLocked,
               axis: swipeDismissAxis,
-              bothDirections: true,
+              bothDirections: !minimizeMusicPlayer,
               canStart: _canStartSwipeDismiss,
               onDismiss: _closeViewerFromSwipe,
               progress: _swipeDismissProgress,
-              transformChild: false,
+              transformChild: minimizeMusicPlayer,
               child: Stack(
               children: [
                 Listener(

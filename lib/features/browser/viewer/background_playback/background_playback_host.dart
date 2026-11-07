@@ -49,6 +49,7 @@ class BackgroundPlaybackSession {
     required this.sortBy,
     required this.sortAscending,
     required this.pinnedPaths,
+    this.libraryPlayback = false,
     this.pipWindow = false,
     this.floatingPlayer = false,
   });
@@ -81,6 +82,10 @@ class BackgroundPlaybackSession {
   final SortBy sortBy;
   final bool sortAscending;
   final Set<String>? pinnedPaths;
+
+  /// True when this session was started from the music library. The library
+  /// can then switch tracks in place without replacing its mini player.
+  final bool libraryPlayback;
 }
 
 /// A video taking off for the floating player: the viewer announces it as a
@@ -173,6 +178,7 @@ class BackgroundPlaybackHost {
   Rect? Function()? _floatingRect;
 
   bool _audioOnly = false;
+  Timer? _activeSessionTransitionTimer;
 
   /// Whether the floating player is in "audio only": the video is neither
   /// decoded nor drawn, the sound carries on through its media notification,
@@ -185,6 +191,13 @@ class BackgroundPlaybackHost {
   /// session changes from `State.dispose`, where a notifier that widgets
   /// listen to must not be touched.
   final ValueNotifier<BackgroundPlaybackSession?> floatingSession =
+      ValueNotifier<BackgroundPlaybackSession?>(null);
+
+  /// The session that owns playback right now, whatever its kind: audio kept
+  /// playing after its viewer closed, a floating player, a PiP window. Null
+  /// while a viewer owns playback. In-app controls (the music mini player)
+  /// follow this. Published from a microtask, like [floatingSession].
+  final ValueNotifier<BackgroundPlaybackSession?> activeSession =
       ValueNotifier<BackgroundPlaybackSession?>(null);
 
   StreamSubscription<MediaSessionAction>? _actionSubscription;
@@ -206,6 +219,53 @@ class BackgroundPlaybackHost {
 
   /// The running session, if any.
   BackgroundPlaybackSession? get session => _session;
+
+  /// Keeps the mini-player source available underneath a library viewer while
+  /// its closing route transition returns playback to the background host.
+  void previewMiniPlayerTransition(BackgroundPlaybackSession session) {
+    _activeSessionTransitionTimer?.cancel();
+    activeSession.value = session;
+    _activeSessionTransitionTimer = Timer(
+      const Duration(milliseconds: 500),
+      () {
+        _activeSessionTransitionTimer = null;
+        if (identical(activeSession.value, session) &&
+            !identical(_session, session)) {
+          activeSession.value = _session;
+        }
+      },
+    );
+  }
+
+  /// Starts a selected library track in the current library session without
+  /// tearing down and recreating the mini player. Returns false if the active
+  /// session belongs to another source or wasn't started from the library.
+  bool playLibrarySelection({
+    required MountedContainer container,
+    required List<String> paths,
+    required int index,
+  }) {
+    final session = _session;
+    if (session == null ||
+        !session.libraryPlayback ||
+        session.container.uri != container.uri ||
+        session.container.volId != container.volId ||
+        session.floatingPlayer ||
+        session.pipWindow ||
+        paths.isEmpty) {
+      return false;
+    }
+
+    final targetIndex = index.clamp(0, paths.length - 1).toInt();
+    final targetPath = paths[targetIndex];
+    // Selecting the current row should not restart playback, even if the
+    // player is still preparing or currently paused.
+    if (session.playlist.currentFile == targetPath) return true;
+
+    session.playlist.replaceLibraryQueue(paths, index: targetIndex);
+    unawaited(_playIndex(session, targetIndex));
+    return true;
+  }
 
   /// Brings the full viewer back on the running session. Without a root to do
   /// it, there is nothing to show the video in, so playback ends.
@@ -332,11 +392,27 @@ class BackgroundPlaybackHost {
     });
   }
 
-  void _publishFloatingSession() {
+  void _publishFloatingSession({
+    BackgroundPlaybackSession? retainedMiniPlayer,
+    Duration retainMiniPlayerFor = Duration.zero,
+  }) {
     scheduleMicrotask(() {
       final current = _session;
       final next = current != null && current.floatingPlayer ? current : null;
       if (!identical(floatingSession.value, next)) floatingSession.value = next;
+      _activeSessionTransitionTimer?.cancel();
+      _activeSessionTransitionTimer = null;
+      final active = retainedMiniPlayer ?? current;
+      if (!identical(activeSession.value, active)) activeSession.value = active;
+      if (retainedMiniPlayer != null && retainMiniPlayerFor > Duration.zero) {
+        _activeSessionTransitionTimer = Timer(retainMiniPlayerFor, () {
+          _activeSessionTransitionTimer = null;
+          if (identical(activeSession.value, retainedMiniPlayer) &&
+              !identical(_session, retainedMiniPlayer)) {
+            activeSession.value = _session;
+          }
+        });
+      }
     });
   }
 
@@ -413,7 +489,18 @@ class BackgroundPlaybackHost {
     }
     _detach(session);
     _session = null;
-    _publishFloatingSession();
+    if (session.libraryPlayback &&
+        !session.floatingPlayer &&
+        !session.pipWindow) {
+      // Keep the mini player's cover in the source route long enough for the
+      // expanding viewer's Hero transition to capture and fly it forward.
+      _publishFloatingSession(
+        retainedMiniPlayer: session,
+        retainMiniPlayerFor: const Duration(milliseconds: 420),
+      );
+    } else {
+      _publishFloatingSession();
+    }
     _publishFloatingExit();
     // The viewer shows the video again: the window has nothing left to do.
     _closePipWindow();

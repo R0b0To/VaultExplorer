@@ -7452,6 +7452,402 @@ abstract class AppLocalizations {
   /// **'Play media'**
   String get playMediaAction;
 
+  /// Music library tab label
+  ///
+  /// In en, this message translates to:
+  /// **'Albums'**
+  String get libraryTabAlbums;
+
+  /// Music library tab label
+  ///
+  /// In en, this message translates to:
+  /// **'Artists'**
+  String get libraryTabArtists;
+
+  /// Music library tab label
+  ///
+  /// In en, this message translates to:
+  /// **'Genres'**
+  String get libraryTabGenres;
+
+  /// Music library tab label
+  ///
+  /// In en, this message translates to:
+  /// **'Tracks'**
+  String get libraryTabTracks;
+
+  /// Hint text of the music library search field
+  ///
+  /// In en, this message translates to:
+  /// **'Search music'**
+  String get librarySearchHint;
+
+  /// Progress text while the music library walks the vault folders; count is audio files found so far
+  ///
+  /// In en, this message translates to:
+  /// **'Looking through folders... {count, plural, =1{1 audio file so far} other{{count} audio files so far}}'**
+  String libraryScanListing(num count);
+
+  /// Progress text while the music library reads audio tags; read and total are file counts
+  ///
+  /// In en, this message translates to:
+  /// **'Reading tags... {read} of {total}'**
+  String libraryScanReading(int read, int total);
+
+  /// Button that stops the music library scan
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get libraryScanStop;
+
+  /// Music library empty state title when the vault has no audio files
+  ///
+  /// In en, this message translates to:
+  /// **'No music found'**
+  String get libraryEmptyTitle;
+
+  /// Music library empty state message when the vault has no audio files
+  ///
+  /// In en, this message translates to:
+  /// **'This vault has no audio files, or they are in folders that could not be read.'**
+  String get libraryEmptyMessage;
+
+  /// Music library message when a search has no matches
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing matches your search'**
+  String get libraryNoResults;
+
+  /// Label for tracks with no artist tag
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown artist'**
+  String get libraryUnknownArtist;
+
+  /// Label for tracks with no album tag or folder name
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown album'**
+  String get libraryUnknownAlbum;
+
+  /// Label for tracks with no genre tag
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown genre'**
+  String get libraryUnknownGenre;
+
+  /// Label for an album whose tracks are by different artists
+  ///
+  /// In en, this message translates to:
+  /// **'Various artists'**
+  String get libraryVariousArtists;
+
+  /// Number of tracks
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 track} other{{count} tracks}}'**
+  String libraryTrackCount(num count);
+
+  /// Number of albums
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 album} other{{count} albums}}'**
+  String libraryAlbumCount(num count);
+
+  /// Music library button that plays a list from the start
+  ///
+  /// In en, this message translates to:
+  /// **'Play'**
+  String get libraryPlayAll;
+
+  /// Music library button that plays a list in random order
+  ///
+  /// In en, this message translates to:
+  /// **'Shuffle'**
+  String get libraryShuffleAll;
+
+  /// Music library menu item that looks for new, changed and deleted files
+  ///
+  /// In en, this message translates to:
+  /// **'Scan for changes'**
+  String get libraryMenuRescan;
+
+  /// Music library menu item that re-reads the tags of every file
+  ///
+  /// In en, this message translates to:
+  /// **'Re-read all tags'**
+  String get libraryMenuRebuild;
+
+  /// Music library menu item that deletes the saved index
+  ///
+  /// In en, this message translates to:
+  /// **'Delete saved index'**
+  String get libraryMenuDeleteSaved;
+
+  /// Snackbar after the saved music library index was deleted
+  ///
+  /// In en, this message translates to:
+  /// **'Saved index deleted'**
+  String get libraryMenuDeleteSavedDone;
+
+  /// Music library note shown when the last scan could not read every folder
+  ///
+  /// In en, this message translates to:
+  /// **'Some folders could not be read, so files that may have been removed are still listed.'**
+  String get libraryIncompleteNote;
+
+  /// Music library note: number of files whose tags could not be read
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 file could not be read} other{{count} files could not be read}}'**
+  String libraryReadFailuresNote(num count);
+
+  /// Heading above an artist's albums
+  ///
+  /// In en, this message translates to:
+  /// **'Albums'**
+  String get libraryArtistAlbumsHeader;
+
+  /// Heading above a list of tracks
+  ///
+  /// In en, this message translates to:
+  /// **'Tracks'**
+  String get libraryArtistTracksHeader;
+
+  /// Tooltip of the music library sort button
+  ///
+  /// In en, this message translates to:
+  /// **'Sort'**
+  String get librarySortTooltip;
+
+  /// Music library sort option
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get librarySortTitle;
+
+  /// Music library sort option
+  ///
+  /// In en, this message translates to:
+  /// **'Artist'**
+  String get librarySortArtist;
+
+  /// Music library sort option
+  ///
+  /// In en, this message translates to:
+  /// **'Album'**
+  String get librarySortAlbum;
+
+  /// Music library sort option
+  ///
+  /// In en, this message translates to:
+  /// **'Year'**
+  String get librarySortYear;
+
+  /// Music library sort option: newest files first
+  ///
+  /// In en, this message translates to:
+  /// **'Recently added'**
+  String get librarySortRecentlyAdded;
+
+  /// Music library sort option for artists
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get librarySortName;
+
+  /// Music library sort option for artists
+  ///
+  /// In en, this message translates to:
+  /// **'Number of tracks'**
+  String get librarySortTrackCount;
+
+  /// Music library sort option: track duration
+  ///
+  /// In en, this message translates to:
+  /// **'Length'**
+  String get librarySortLength;
+
+  /// Music library sort option that reverses the current order
+  ///
+  /// In en, this message translates to:
+  /// **'Reverse order'**
+  String get librarySortReverse;
+
+  /// File manager toolbar action that turns music mode on or off for this location
+  ///
+  /// In en, this message translates to:
+  /// **'Music mode'**
+  String get musicModeAction;
+
+  /// Music mode bar: the normal file listing
+  ///
+  /// In en, this message translates to:
+  /// **'Files'**
+  String get musicModeFiles;
+
+  /// Music mode menu item that changes which folders are included
+  ///
+  /// In en, this message translates to:
+  /// **'Music folders'**
+  String get musicModeMenuFolders;
+
+  /// Music mode menu item that turns the mode off
+  ///
+  /// In en, this message translates to:
+  /// **'Turn off music mode'**
+  String get musicModeMenuTurnOff;
+
+  /// Music mode note: the index is stored in the vault itself
+  ///
+  /// In en, this message translates to:
+  /// **'Index saved inside this vault'**
+  String get libraryStorageInVault;
+
+  /// Music mode note: the index is stored encrypted in app storage
+  ///
+  /// In en, this message translates to:
+  /// **'Index saved encrypted on this device'**
+  String get libraryStorageThisDevice;
+
+  /// Title of the sheet where music mode folders are chosen
+  ///
+  /// In en, this message translates to:
+  /// **'Music mode'**
+  String get musicScopeTitle;
+
+  /// Message in the music mode folders sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Choose what music mode should include.'**
+  String get musicScopeMessage;
+
+  /// Option: index the whole location
+  ///
+  /// In en, this message translates to:
+  /// **'Everything in this location'**
+  String get musicScopeAll;
+
+  /// Hint under the whole-location option
+  ///
+  /// In en, this message translates to:
+  /// **'Looks through every folder. Slower on large locations.'**
+  String get musicScopeAllHint;
+
+  /// Option: index only chosen folders
+  ///
+  /// In en, this message translates to:
+  /// **'Only some folders'**
+  String get musicScopeChoose;
+
+  /// Button that opens the folder picker
+  ///
+  /// In en, this message translates to:
+  /// **'Add a folder'**
+  String get musicScopeAddFolder;
+
+  /// Shown when only-some-folders is selected but none are chosen
+  ///
+  /// In en, this message translates to:
+  /// **'No folders chosen yet'**
+  String get musicScopeNoFolders;
+
+  /// Button that turns music mode on with the chosen folders
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get musicScopeStart;
+
+  /// Button that adds the folder being viewed
+  ///
+  /// In en, this message translates to:
+  /// **'Add this folder'**
+  String get musicScopePickerAdd;
+
+  /// Folder picker empty state
+  ///
+  /// In en, this message translates to:
+  /// **'No subfolders here'**
+  String get musicScopePickerEmpty;
+
+  /// Folder picker name for the root of a location
+  ///
+  /// In en, this message translates to:
+  /// **'Top level'**
+  String get musicScopePickerRoot;
+
+  /// Tooltip of the button that removes a chosen folder
+  ///
+  /// In en, this message translates to:
+  /// **'Remove folder'**
+  String get musicScopeRemoveFolder;
+
+  /// Number of artists
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 artist} other{{count} artists}}'**
+  String libraryArtistCount(num count);
+
+  /// Number of genres
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 genre} other{{count} genres}}'**
+  String libraryGenreCount(num count);
+
+  /// Shown when a mixed list is played: only the tracks in one location can play together
+  ///
+  /// In en, this message translates to:
+  /// **'Playing {count, plural, =1{1 track} other{{count} tracks}} from {source}. The rest of this list is in other locations.'**
+  String musicPlayPartialNote(num count, String source);
+
+  /// Menu item that picks an image from the location's files as an album or artist cover
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a cover image'**
+  String get musicCoverChoose;
+
+  /// Menu item that removes a cover chosen by hand
+  ///
+  /// In en, this message translates to:
+  /// **'Remove custom cover'**
+  String get musicCoverRemove;
+
+  /// Snackbar when the chosen image could not be read or decoded
+  ///
+  /// In en, this message translates to:
+  /// **'That image could not be used as a cover'**
+  String get musicCoverFailed;
+
+  /// Tooltip of the mini player previous-track button
+  ///
+  /// In en, this message translates to:
+  /// **'Previous'**
+  String get musicMiniPrevious;
+
+  /// Tooltip of the mini player next-track button
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get musicMiniNext;
+
+  /// Tooltip of the mini player play button
+  ///
+  /// In en, this message translates to:
+  /// **'Play'**
+  String get musicMiniPlay;
+
+  /// Tooltip of the mini player pause button
+  ///
+  /// In en, this message translates to:
+  /// **'Pause'**
+  String get musicMiniPause;
+
+  /// Tooltip of the mini player button that stops the music
+  ///
+  /// In en, this message translates to:
+  /// **'Stop playback'**
+  String get musicMiniStop;
+
   /// Storage space summary shown on mounted container card
   ///
   /// In en, this message translates to:

@@ -14,6 +14,7 @@ import 'package:vaultexplorer/features/browser/viewer/video_scrub_preview_contro
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_player_widget.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_action_button.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/video_scrub_progress_bar.dart';
+import 'package:vaultexplorer/features/library/widgets/audio_waveform_seek_bar.dart';
 
 class MediaViewerBottomControls extends StatelessWidget {
   final PlaylistController playlistController;
@@ -240,15 +241,19 @@ class MediaViewerBottomControls extends StatelessWidget {
           if (!isImage && toolbarConfig.showProgressBar) ...[
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-              child: VideoScrubProgressBar(
-                playbackManager: playbackManager,
-                videoProgressNotifier: videoProgressNotifier,
-                abLoopNotifier: abLoopNotifier,
-                onShowUIChanged: onShowUIChanged,
-                onStartHideTimer: onStartHideTimer,
-                previewStyle: toolbarConfig.scrubPreviewStyle,
-                previewHost: scrubPreviewHost,
-              ),
+              // Music gets its waveform as the timeline; the ordinary slider is
+              // the fallback while it loads, for very long files and for files
+              // that cannot be decoded.
+              child: isAudio
+                  ? AudioWaveformSeekBar(
+                      playbackManager: playbackManager,
+                      videoProgressNotifier: videoProgressNotifier,
+                      abLoopNotifier: abLoopNotifier,
+                      onShowUIChanged: onShowUIChanged,
+                      onStartHideTimer: onStartHideTimer,
+                      fallback: _scrubBar(),
+                    )
+                  : _scrubBar(),
             ),
             const SizedBox(height: AppSpacing.xs),
           ],
@@ -258,6 +263,16 @@ class MediaViewerBottomControls extends StatelessWidget {
       ),
     );
   }
+
+  Widget _scrubBar() => VideoScrubProgressBar(
+        playbackManager: playbackManager,
+        videoProgressNotifier: videoProgressNotifier,
+        abLoopNotifier: abLoopNotifier,
+        onShowUIChanged: onShowUIChanged,
+        onStartHideTimer: onStartHideTimer,
+        previewStyle: toolbarConfig.scrubPreviewStyle,
+        previewHost: scrubPreviewHost,
+      );
 
   Widget _buildTransparentDock(
     BuildContext context,

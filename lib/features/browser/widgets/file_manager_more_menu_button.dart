@@ -69,6 +69,10 @@ class FileManagerMoreMenuButton extends StatelessWidget {
   final bool canPlayMedia;
   final VoidCallback onPlayMedia;
 
+  /// Whether music mode is on for this location, and the switch for it.
+  final bool musicModeActive;
+  final VoidCallback? onToggleMusicMode;
+
   final bool isGalleryMode;
   final VoidCallback onToggleGallery;
 
@@ -100,6 +104,8 @@ class FileManagerMoreMenuButton extends StatelessWidget {
     this.onGridAspectRatioChanged,
     required this.canPlayMedia,
     required this.onPlayMedia,
+    this.musicModeActive = false,
+    this.onToggleMusicMode,
     this.isGalleryMode = false,
     required this.onToggleGallery,
     this.toolbarConfig,
@@ -190,6 +196,15 @@ class FileManagerMoreMenuButton extends StatelessWidget {
             ),
             onPressed: canPlayMedia ? onPlayMedia : null,
             child: Text(l10n.playMediaAction),
+          );
+        case FileManagerAction.musicMode:
+          return MenuItemButton(
+            leadingIcon: Icon(
+              musicModeActive ? Icons.library_music_rounded : Icons.library_music_outlined,
+              color: musicModeActive ? cs.primary : cs.onSurface,
+            ),
+            onPressed: onToggleMusicMode,
+            child: Text(l10n.musicModeAction),
           );
         case FileManagerAction.gallery:
           return MenuItemButton(
@@ -314,6 +329,17 @@ class FileManagerMoreMenuButton extends StatelessWidget {
           ),
           tooltip: l10n.playMediaAction,
           onTap: canPlayMedia ? onPlayMedia : null,
+        );
+
+      case FileManagerAction.musicMode:
+        return _fabShell(
+          cs: cs,
+          icon: Icon(
+            musicModeActive ? Icons.library_music_rounded : Icons.library_music_outlined,
+            color: musicModeActive ? cs.primary : cs.onSurface,
+          ),
+          tooltip: l10n.musicModeAction,
+          onTap: onToggleMusicMode,
         );
 
       case FileManagerAction.viewToggle:

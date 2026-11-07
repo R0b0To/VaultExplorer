@@ -4215,6 +4215,263 @@ class AppLocalizationsJa extends AppLocalizations {
   String get playMediaAction => 'メディアを再生';
 
   @override
+  String get libraryTabAlbums => 'アルバム';
+
+  @override
+  String get libraryTabArtists => 'アーティスト';
+
+  @override
+  String get libraryTabGenres => 'ジャンル';
+
+  @override
+  String get libraryTabTracks => 'トラック';
+
+  @override
+  String get librarySearchHint => '音楽を検索';
+
+  @override
+  String libraryScanListing(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '現在 $count 件の音声ファイル',
+      one: '現在 1 件の音声ファイル',
+    );
+    return 'フォルダーを確認中... $_temp0';
+  }
+
+  @override
+  String libraryScanReading(int read, int total) {
+    return 'タグを読み込み中... $read / $total';
+  }
+
+  @override
+  String get libraryScanStop => '停止';
+
+  @override
+  String get libraryEmptyTitle => '音楽が見つかりません';
+
+  @override
+  String get libraryEmptyMessage => 'この保管庫には音声ファイルがないか、読み取れないフォルダー内にあります。';
+
+  @override
+  String get libraryNoResults => '一致する検索結果がありません';
+
+  @override
+  String get libraryUnknownArtist => '不明なアーティスト';
+
+  @override
+  String get libraryUnknownAlbum => '不明なアルバム';
+
+  @override
+  String get libraryUnknownGenre => '不明なジャンル';
+
+  @override
+  String get libraryVariousArtists => 'オムニバス';
+
+  @override
+  String libraryTrackCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 曲',
+      one: '1 曲',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String libraryAlbumCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 枚のアルバム',
+      one: '1 枚のアルバム',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get libraryPlayAll => '再生';
+
+  @override
+  String get libraryShuffleAll => 'シャッフル';
+
+  @override
+  String get libraryMenuRescan => '変更を確認';
+
+  @override
+  String get libraryMenuRebuild => 'すべてのタグを再読み込み';
+
+  @override
+  String get libraryMenuDeleteSaved => '保存されたインデックスを削除';
+
+  @override
+  String get libraryMenuDeleteSavedDone => '保存されたインデックスを削除しました';
+
+  @override
+  String get libraryIncompleteNote =>
+      '一部のフォルダーを読み取れなかったため、削除された可能性のあるファイルが一覧に残っています。';
+
+  @override
+  String libraryReadFailuresNote(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 件のファイルを読み取れませんでした',
+      one: '1 件のファイルを読み取れませんでした',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get libraryArtistAlbumsHeader => 'アルバム';
+
+  @override
+  String get libraryArtistTracksHeader => 'トラック';
+
+  @override
+  String get librarySortTooltip => '並べ替え';
+
+  @override
+  String get librarySortTitle => 'タイトル';
+
+  @override
+  String get librarySortArtist => 'アーティスト';
+
+  @override
+  String get librarySortAlbum => 'アルバム';
+
+  @override
+  String get librarySortYear => 'リリース年';
+
+  @override
+  String get librarySortRecentlyAdded => '最近追加された順';
+
+  @override
+  String get librarySortName => '名前';
+
+  @override
+  String get librarySortTrackCount => 'トラック数';
+
+  @override
+  String get librarySortLength => '再生時間';
+
+  @override
+  String get librarySortReverse => '逆順';
+
+  @override
+  String get musicModeAction => 'ミュージックモード';
+
+  @override
+  String get musicModeFiles => 'ファイル';
+
+  @override
+  String get musicModeMenuFolders => '音楽フォルダー';
+
+  @override
+  String get musicModeMenuTurnOff => 'ミュージックモードをオフにする';
+
+  @override
+  String get libraryStorageInVault => 'インデックスはこの保管庫内に保存されています';
+
+  @override
+  String get libraryStorageThisDevice => 'インデックスはこの端末に暗号化されて保存されています';
+
+  @override
+  String get musicScopeTitle => 'ミュージックモード';
+
+  @override
+  String get musicScopeMessage => 'ミュージックモードに含める対象を選択してください。';
+
+  @override
+  String get musicScopeAll => 'この場所のすべて';
+
+  @override
+  String get musicScopeAllHint => 'すべてのフォルダーを検索します。データ量が多い場合は時間がかかります。';
+
+  @override
+  String get musicScopeChoose => '特定のフォルダーのみ';
+
+  @override
+  String get musicScopeAddFolder => 'フォルダーを追加';
+
+  @override
+  String get musicScopeNoFolders => '選択されたフォルダーはありません';
+
+  @override
+  String get musicScopeStart => '開始';
+
+  @override
+  String get musicScopePickerAdd => 'このフォルダーを追加';
+
+  @override
+  String get musicScopePickerEmpty => 'サブフォルダーはありません';
+
+  @override
+  String get musicScopePickerRoot => 'トップレベル';
+
+  @override
+  String get musicScopeRemoveFolder => 'フォルダーを削除';
+
+  @override
+  String libraryArtistCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 組のアーティスト',
+      one: '1 組のアーティスト',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String libraryGenreCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count ジャンル',
+      one: '1 ジャンル',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String musicPlayPartialNote(num count, String source) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 曲',
+      one: '1 曲',
+    );
+    return '$source から $_temp0 を再生しています。このリストの残りは別の場所にあります。';
+  }
+
+  @override
+  String get musicCoverChoose => 'カバー画像を選択';
+
+  @override
+  String get musicCoverRemove => 'カスタムカバーを削除';
+
+  @override
+  String get musicCoverFailed => 'その画像はカバーとして使用できませんでした';
+
+  @override
+  String get musicMiniPrevious => '前の曲';
+
+  @override
+  String get musicMiniNext => '次の曲';
+
+  @override
+  String get musicMiniPlay => '再生';
+
+  @override
+  String get musicMiniPause => '一時停止';
+
+  @override
+  String get musicMiniStop => '再生を停止';
+
+  @override
   String containerSpaceSummary(String free, String total) {
     return '$free 空き / $total';
   }

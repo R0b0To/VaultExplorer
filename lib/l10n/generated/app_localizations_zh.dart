@@ -4157,6 +4157,262 @@ class AppLocalizationsZh extends AppLocalizations {
   String get playMediaAction => '播放媒体';
 
   @override
+  String get libraryTabAlbums => '专辑';
+
+  @override
+  String get libraryTabArtists => '艺术家';
+
+  @override
+  String get libraryTabGenres => '流派';
+
+  @override
+  String get libraryTabTracks => '曲目';
+
+  @override
+  String get librarySearchHint => '搜索音乐';
+
+  @override
+  String libraryScanListing(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '已找到 $count 个音频文件',
+      one: '已找到 1 个音频文件',
+    );
+    return '正在扫描文件夹... $_temp0';
+  }
+
+  @override
+  String libraryScanReading(int read, int total) {
+    return '正在读取标签... $read / $total';
+  }
+
+  @override
+  String get libraryScanStop => '停止';
+
+  @override
+  String get libraryEmptyTitle => '未找到音乐';
+
+  @override
+  String get libraryEmptyMessage => '此保管库中没有音频文件，或文件所在的文件夹无法读取。';
+
+  @override
+  String get libraryNoResults => '没有与搜索匹配的结果';
+
+  @override
+  String get libraryUnknownArtist => '未知艺术家';
+
+  @override
+  String get libraryUnknownAlbum => '未知专辑';
+
+  @override
+  String get libraryUnknownGenre => '未知流派';
+
+  @override
+  String get libraryVariousArtists => '群星';
+
+  @override
+  String libraryTrackCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 首曲目',
+      one: '1 首曲目',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String libraryAlbumCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 张专辑',
+      one: '1 张专辑',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get libraryPlayAll => '播放';
+
+  @override
+  String get libraryShuffleAll => '随机播放';
+
+  @override
+  String get libraryMenuRescan => '扫描更改';
+
+  @override
+  String get libraryMenuRebuild => '重新读取所有标签';
+
+  @override
+  String get libraryMenuDeleteSaved => '删除已保存的索引';
+
+  @override
+  String get libraryMenuDeleteSavedDone => '已删除保存的索引';
+
+  @override
+  String get libraryIncompleteNote => '某些文件夹无法读取，因此可能已被移除的文件仍显示在列表中。';
+
+  @override
+  String libraryReadFailuresNote(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 个文件无法读取',
+      one: '1 个文件无法读取',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get libraryArtistAlbumsHeader => '专辑';
+
+  @override
+  String get libraryArtistTracksHeader => '曲目';
+
+  @override
+  String get librarySortTooltip => '排序';
+
+  @override
+  String get librarySortTitle => '标题';
+
+  @override
+  String get librarySortArtist => '艺术家';
+
+  @override
+  String get librarySortAlbum => '专辑';
+
+  @override
+  String get librarySortYear => '年份';
+
+  @override
+  String get librarySortRecentlyAdded => '最近添加';
+
+  @override
+  String get librarySortName => '名称';
+
+  @override
+  String get librarySortTrackCount => '曲目数量';
+
+  @override
+  String get librarySortLength => '时长';
+
+  @override
+  String get librarySortReverse => '倒序';
+
+  @override
+  String get musicModeAction => '音乐模式';
+
+  @override
+  String get musicModeFiles => '文件';
+
+  @override
+  String get musicModeMenuFolders => '音乐文件夹';
+
+  @override
+  String get musicModeMenuTurnOff => '关闭音乐模式';
+
+  @override
+  String get libraryStorageInVault => '索引保存在此保管库内';
+
+  @override
+  String get libraryStorageThisDevice => '索引加密保存在此设备上';
+
+  @override
+  String get musicScopeTitle => '音乐模式';
+
+  @override
+  String get musicScopeMessage => '选择音乐模式应包含的内容。';
+
+  @override
+  String get musicScopeAll => '此位置的全部内容';
+
+  @override
+  String get musicScopeAllHint => '检索所有文件夹。在大型存储位置上扫描可能较慢。';
+
+  @override
+  String get musicScopeChoose => '仅部分文件夹';
+
+  @override
+  String get musicScopeAddFolder => '添加文件夹';
+
+  @override
+  String get musicScopeNoFolders => '尚未选择文件夹';
+
+  @override
+  String get musicScopeStart => '开始';
+
+  @override
+  String get musicScopePickerAdd => '添加此文件夹';
+
+  @override
+  String get musicScopePickerEmpty => '此处没有子文件夹';
+
+  @override
+  String get musicScopePickerRoot => '顶级目录';
+
+  @override
+  String get musicScopeRemoveFolder => '移除文件夹';
+
+  @override
+  String libraryArtistCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 位艺术家',
+      one: '1 位艺术家',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String libraryGenreCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 个流派',
+      one: '1 个流派',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String musicPlayPartialNote(num count, String source) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 首曲目',
+      one: '1 首曲目',
+    );
+    return '正在播放来自 $source 的 $_temp0。此列表中的其余内容位于其他位置。';
+  }
+
+  @override
+  String get musicCoverChoose => '选择封面图片';
+
+  @override
+  String get musicCoverRemove => '移除自定义封面';
+
+  @override
+  String get musicCoverFailed => '无法将该图片用作封面';
+
+  @override
+  String get musicMiniPrevious => '上一首';
+
+  @override
+  String get musicMiniNext => '下一首';
+
+  @override
+  String get musicMiniPlay => '播放';
+
+  @override
+  String get musicMiniPause => '暂停';
+
+  @override
+  String get musicMiniStop => '停止播放';
+
+  @override
   String containerSpaceSummary(String free, String total) {
     return '$free 可用 / $total';
   }

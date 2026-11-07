@@ -4433,6 +4433,268 @@ class AppLocalizationsIt extends AppLocalizations {
   String get playMediaAction => 'Riproduci contenuto multimediale';
 
   @override
+  String get libraryTabAlbums => 'Album';
+
+  @override
+  String get libraryTabArtists => 'Artisti';
+
+  @override
+  String get libraryTabGenres => 'Generi';
+
+  @override
+  String get libraryTabTracks => 'Brani';
+
+  @override
+  String get librarySearchHint => 'Cerca musica';
+
+  @override
+  String libraryScanListing(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count file audio finora',
+      one: '1 file audio finora',
+    );
+    return 'Scansione delle cartelle in corso... $_temp0';
+  }
+
+  @override
+  String libraryScanReading(int read, int total) {
+    return 'Lettura tag in corso... $read di $total';
+  }
+
+  @override
+  String get libraryScanStop => 'Interrompi';
+
+  @override
+  String get libraryEmptyTitle => 'Nessun brano trovato';
+
+  @override
+  String get libraryEmptyMessage =>
+      'Questa cassaforte non contiene file audio o si trovano in cartelle non leggibili.';
+
+  @override
+  String get libraryNoResults => 'Nessun risultato corrispondente alla ricerca';
+
+  @override
+  String get libraryUnknownArtist => 'Artista sconosciuto';
+
+  @override
+  String get libraryUnknownAlbum => 'Album sconosciuto';
+
+  @override
+  String get libraryUnknownGenre => 'Genere sconosciuto';
+
+  @override
+  String get libraryVariousArtists => 'Artisti vari';
+
+  @override
+  String libraryTrackCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count brani',
+      one: '1 brano',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String libraryAlbumCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count album',
+      one: '1 album',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get libraryPlayAll => 'Riproduci';
+
+  @override
+  String get libraryShuffleAll => 'Riproduzione casuale';
+
+  @override
+  String get libraryMenuRescan => 'Cerca modifiche';
+
+  @override
+  String get libraryMenuRebuild => 'Rileggi tutti i tag';
+
+  @override
+  String get libraryMenuDeleteSaved => 'Elimina indice salvato';
+
+  @override
+  String get libraryMenuDeleteSavedDone => 'Indice salvato eliminato';
+
+  @override
+  String get libraryIncompleteNote =>
+      'Alcune cartelle non sono state lette; i file eventualmente rimossi risultano ancora elencati.';
+
+  @override
+  String libraryReadFailuresNote(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Impossibile leggere $count file',
+      one: 'Impossibile leggere 1 file',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get libraryArtistAlbumsHeader => 'Album';
+
+  @override
+  String get libraryArtistTracksHeader => 'Brani';
+
+  @override
+  String get librarySortTooltip => 'Ordina';
+
+  @override
+  String get librarySortTitle => 'Titolo';
+
+  @override
+  String get librarySortArtist => 'Artista';
+
+  @override
+  String get librarySortAlbum => 'Album';
+
+  @override
+  String get librarySortYear => 'Anno';
+
+  @override
+  String get librarySortRecentlyAdded => 'Aggiunti di recente';
+
+  @override
+  String get librarySortName => 'Nome';
+
+  @override
+  String get librarySortTrackCount => 'Numero di brani';
+
+  @override
+  String get librarySortLength => 'Durata';
+
+  @override
+  String get librarySortReverse => 'Ordine inverso';
+
+  @override
+  String get musicModeAction => 'Modalità musica';
+
+  @override
+  String get musicModeFiles => 'File';
+
+  @override
+  String get musicModeMenuFolders => 'Cartelle musicali';
+
+  @override
+  String get musicModeMenuTurnOff => 'Disattiva modalità musica';
+
+  @override
+  String get libraryStorageInVault => 'Indice salvato in questa cassaforte';
+
+  @override
+  String get libraryStorageThisDevice =>
+      'Indice salvato crittografato su questo dispositivo';
+
+  @override
+  String get musicScopeTitle => 'Modalità musica';
+
+  @override
+  String get musicScopeMessage =>
+      'Scegli cosa includere nella modalità musica.';
+
+  @override
+  String get musicScopeAll => 'Tutto in questa posizione';
+
+  @override
+  String get musicScopeAllHint =>
+      'Esamina tutte le cartelle. Più lento su posizioni molto ampie.';
+
+  @override
+  String get musicScopeChoose => 'Solo alcune cartelle';
+
+  @override
+  String get musicScopeAddFolder => 'Aggiungi una cartella';
+
+  @override
+  String get musicScopeNoFolders => 'Nessuna cartella ancora selezionata';
+
+  @override
+  String get musicScopeStart => 'Avvia';
+
+  @override
+  String get musicScopePickerAdd => 'Aggiungi questa cartella';
+
+  @override
+  String get musicScopePickerEmpty => 'Nessuna sottocartella presente';
+
+  @override
+  String get musicScopePickerRoot => 'Livello principale';
+
+  @override
+  String get musicScopeRemoveFolder => 'Rimuovi cartella';
+
+  @override
+  String libraryArtistCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count artisti',
+      one: '1 artista',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String libraryGenreCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count generi',
+      one: '1 genere',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String musicPlayPartialNote(num count, String source) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count brani',
+      one: '1 brano',
+    );
+    return 'Riproduzione di $_temp0 da $source. Il resto della lista è in altre posizioni.';
+  }
+
+  @override
+  String get musicCoverChoose => 'Scegli un\'immagine di copertina';
+
+  @override
+  String get musicCoverRemove => 'Rimuovi copertina personalizzata';
+
+  @override
+  String get musicCoverFailed =>
+      'Impossibile utilizzare questa immagine come copertina';
+
+  @override
+  String get musicMiniPrevious => 'Precedente';
+
+  @override
+  String get musicMiniNext => 'Successivo';
+
+  @override
+  String get musicMiniPlay => 'Riproduci';
+
+  @override
+  String get musicMiniPause => 'Pausa';
+
+  @override
+  String get musicMiniStop => 'Interrompi riproduzione';
+
+  @override
   String containerSpaceSummary(String free, String total) {
     return '$free liberi / $total';
   }

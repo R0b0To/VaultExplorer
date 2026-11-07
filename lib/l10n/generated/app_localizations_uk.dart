@@ -4458,6 +4458,268 @@ class AppLocalizationsUk extends AppLocalizations {
   String get playMediaAction => 'Відтворити';
 
   @override
+  String get libraryTabAlbums => 'Альбоми';
+
+  @override
+  String get libraryTabArtists => 'Виконавці';
+
+  @override
+  String get libraryTabGenres => 'Жанри';
+
+  @override
+  String get libraryTabTracks => 'Треки';
+
+  @override
+  String get librarySearchHint => 'Пошук музики';
+
+  @override
+  String libraryScanListing(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'наразі $count аудіофайлів',
+      one: 'наразі 1 аудіофайл',
+    );
+    return 'Перегляд папок... $_temp0';
+  }
+
+  @override
+  String libraryScanReading(int read, int total) {
+    return 'Зчитування тегів... $read із $total';
+  }
+
+  @override
+  String get libraryScanStop => 'Зупинити';
+
+  @override
+  String get libraryEmptyTitle => 'Музику не знайдено';
+
+  @override
+  String get libraryEmptyMessage =>
+      'У цьому сховищі немає аудіофайлів або вони знаходяться в папках, які не вдалося прочитати.';
+
+  @override
+  String get libraryNoResults => 'Нічого не відповідає вашому запиту';
+
+  @override
+  String get libraryUnknownArtist => 'Невідомий виконавець';
+
+  @override
+  String get libraryUnknownAlbum => 'Невідомий альбом';
+
+  @override
+  String get libraryUnknownGenre => 'Невідомий жанр';
+
+  @override
+  String get libraryVariousArtists => 'Різні виконавці';
+
+  @override
+  String libraryTrackCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count треків',
+      one: '1 трек',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String libraryAlbumCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count альбомів',
+      one: '1 альбом',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get libraryPlayAll => 'Відтворити';
+
+  @override
+  String get libraryShuffleAll => 'Перемішати';
+
+  @override
+  String get libraryMenuRescan => 'Перевірити зміни';
+
+  @override
+  String get libraryMenuRebuild => 'Перечитати всі теги';
+
+  @override
+  String get libraryMenuDeleteSaved => 'Видалити збережений індекс';
+
+  @override
+  String get libraryMenuDeleteSavedDone => 'Збережений індекс видалено';
+
+  @override
+  String get libraryIncompleteNote =>
+      'Деякі папки не вдалося прочитати, тому файли, які могли бути видалені, все ще відображаються.';
+
+  @override
+  String libraryReadFailuresNote(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count файлів не вдалося прочитати',
+      one: '1 файл не вдалося прочитати',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get libraryArtistAlbumsHeader => 'Альбоми';
+
+  @override
+  String get libraryArtistTracksHeader => 'Треки';
+
+  @override
+  String get librarySortTooltip => 'Сортування';
+
+  @override
+  String get librarySortTitle => 'Назва';
+
+  @override
+  String get librarySortArtist => 'Виконавець';
+
+  @override
+  String get librarySortAlbum => 'Альбом';
+
+  @override
+  String get librarySortYear => 'Рік';
+
+  @override
+  String get librarySortRecentlyAdded => 'Нещодавно додані';
+
+  @override
+  String get librarySortName => 'Ім\'я';
+
+  @override
+  String get librarySortTrackCount => 'Кількість треків';
+
+  @override
+  String get librarySortLength => 'Тривалість';
+
+  @override
+  String get librarySortReverse => 'Зворотний порядок';
+
+  @override
+  String get musicModeAction => 'Музичний режим';
+
+  @override
+  String get musicModeFiles => 'Файли';
+
+  @override
+  String get musicModeMenuFolders => 'Музичні папки';
+
+  @override
+  String get musicModeMenuTurnOff => 'Вимкнути музичний режим';
+
+  @override
+  String get libraryStorageInVault =>
+      'Індекс збережено всередині цього сховища';
+
+  @override
+  String get libraryStorageThisDevice =>
+      'Індекс збережено в зашифрованому вигляді на цьому пристрої';
+
+  @override
+  String get musicScopeTitle => 'Музичний режим';
+
+  @override
+  String get musicScopeMessage => 'Виберіть, що має включати музичний режим.';
+
+  @override
+  String get musicScopeAll => 'Усе в цьому розташуванні';
+
+  @override
+  String get musicScopeAllHint =>
+      'Перевіряє кожну папку. Працює повільніше у великих каталогах.';
+
+  @override
+  String get musicScopeChoose => 'Лише деякі папки';
+
+  @override
+  String get musicScopeAddFolder => 'Додати папку';
+
+  @override
+  String get musicScopeNoFolders => 'Папки ще не вибрано';
+
+  @override
+  String get musicScopeStart => 'Почати';
+
+  @override
+  String get musicScopePickerAdd => 'Додати цю папку';
+
+  @override
+  String get musicScopePickerEmpty => 'Тут немає підпапок';
+
+  @override
+  String get musicScopePickerRoot => 'Верхній рівень';
+
+  @override
+  String get musicScopeRemoveFolder => 'Видалити папку';
+
+  @override
+  String libraryArtistCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count виконавців',
+      one: '1 виконавець',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String libraryGenreCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count жанрів',
+      one: '1 жанр',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String musicPlayPartialNote(num count, String source) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count треків',
+      one: '1 треку',
+    );
+    return 'Відтворення $_temp0 із $source. Решта треків списку знаходиться в інших місцях.';
+  }
+
+  @override
+  String get musicCoverChoose => 'Вибрати обкладинку';
+
+  @override
+  String get musicCoverRemove => 'Видалити власну обкладинку';
+
+  @override
+  String get musicCoverFailed =>
+      'Не вдалося використати це зображення як обкладинку';
+
+  @override
+  String get musicMiniPrevious => 'Попередній';
+
+  @override
+  String get musicMiniNext => 'Наступний';
+
+  @override
+  String get musicMiniPlay => 'Відтворити';
+
+  @override
+  String get musicMiniPause => 'Пауза';
+
+  @override
+  String get musicMiniStop => 'Зупинити відтворення';
+
+  @override
   String containerSpaceSummary(String free, String total) {
     return '$free вільно / $total';
   }

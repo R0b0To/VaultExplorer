@@ -37,6 +37,7 @@ import 'package:vaultexplorer/features/browser/widgets/directory_content_view.da
 import 'package:vaultexplorer/features/browser/widgets/fast_scrollbar.dart';
 import 'package:vaultexplorer/features/browser/widgets/gated_page_scroll_physics.dart';
 import 'package:vaultexplorer/features/browser/widgets/settle_touch_page_controller.dart';
+import 'package:vaultexplorer/features/library/widgets/music_mode_host.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 
@@ -597,7 +598,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     }
     return SkinAreaScope(
       area: SkinArea.files,
-      child: DirectoryContentView(
+      child: MusicModeHost(container: tab.container!, child: DirectoryContentView(
         key: _directoryViewKeys.putIfAbsent(tab.tabId, GlobalKey.new),
         container: tab.container!,
         tabId: tab.tabId,
@@ -612,7 +613,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
         onUserActivity: isActive
             ? widget.userActivityFor?.call(tab.volId!)
             : null,
-      ),
+      )),
     );
   }
 

@@ -163,7 +163,7 @@ Secret scrypt(const uint8_t* pass, size_t passLen, const uint8_t* salt, size_t s
               uint32_t N, uint32_t r, uint32_t p, size_t outLen) {
     Secret out(outLen);
     if (!scrypt_crypto(pass, passLen, salt, saltLen, N, r, p, out.data(), outLen))
-        throw Error(Err::Unsupported, "scrypt parameters are invalid or exceed the supported limits");
+        throw Error(Err::Unsupported, "scrypt parameters are invalid, exceed the supported limits, or need more memory than is available");
     return out;
 }
 

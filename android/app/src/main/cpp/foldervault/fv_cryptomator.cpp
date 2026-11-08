@@ -58,9 +58,44 @@ Masterkey unlockMasterkey(const MasterkeyFile& f, const uint8_t* pw, size_t pwLe
     return Masterkey(std::move(raw));
 }
 
-std::string lockMasterkey(const Masterkey& mk, const uint8_t* pw, size_t pwLen, int vaultVersion) {
+static bool isValidUtf8(const uint8_t* p, size_t n) {
+    size_t i = 0;
+    while (i < n) {
+        uint8_t c = p[i];
+        size_t len = c < 0x80 ? 1 : (c >> 5) == 0x6 ? 2 : (c >> 4) == 0xE ? 3 : (c >> 3) == 0x1E ? 4 : 0;
+        if (len == 0 || c == 0xC0 || c == 0xC1 || c > 0xF4 || i + len > n) return false;
+        for (size_t k = 1; k < len; k++) if ((p[i + k] & 0xC0) != 0x80) return false;
+        i += len;
+    }
+    return true;
+}
+
+Secret normalizedPassphrase(const uint8_t* pw, size_t pwLen) {
+    bool ascii = true;
+    for (size_t i = 0; i < pwLen; i++) if (pw[i] >= 0x80) { ascii = false; break; }
+    if (ascii || !isValidUtf8(pw, pwLen)) return Secret(pw, pwLen);
+    std::string in((const char*)pw, pwLen);
+    std::string out = nfc(in);
+    Secret r = out.empty() ? Secret(pw, pwLen) : Secret((const uint8_t*)out.data(), out.size());
+    secureZero(in.data(), in.size());
+    secureZero(out.data(), out.size());
+    return r;
+}
+
+Masterkey unlockMasterkeyCompat(const MasterkeyFile& f, const uint8_t* pw, size_t pwLen) {
+    Secret norm = normalizedPassphrase(pw, pwLen);
+    try {
+        return unlockMasterkey(f, norm.data(), norm.size());
+    } catch (const Error& e) {
+        bool differs = norm.size() != pwLen || (pwLen && std::memcmp(norm.data(), pw, pwLen) != 0);
+        if (e.code() != Err::WrongPassword || !differs) throw;
+    }
+    return unlockMasterkey(f, pw, pwLen);
+}
+
+std::string lockMasterkey(const Masterkey& mk, const uint8_t* pw, size_t pwLen, int vaultVersion,
+                          uint32_t N, uint32_t R) {
     Bytes salt = crypto::randomKeyBytes(8);
-    constexpr uint32_t N = 1u << 15, R = 8;
     Secret kek = crypto::scrypt(pw, pwLen, salt.data(), salt.size(), N, R, 1, 32);
     Bytes encWrapped = crypto::aesKeyWrap(kek.data(), kek.size(), mk.enc(), 32);
     Bytes macWrapped = crypto::aesKeyWrap(kek.data(), kek.size(), mk.mac(), 32);
@@ -123,9 +158,11 @@ VaultConfig verifyVaultConfig(const std::string& jwtRaw, const Masterkey& mk) {
     const json::Value* cc = payload.find("cipherCombo");
     c.cipherCombo = cc && cc->isString() ? cc->asString() : "";
     const json::Value* fm = payload.find("format");
-    c.vaultFormat = fm && fm->isInt() ? (int)fm->asInt() : -1;
+    if (!fm || !fm->isInt()) throw Error(Err::InvalidVault, "vault.cryptomator is missing the 'format' claim");
+    c.vaultFormat = (int)fm->asInt();
     const json::Value* st = payload.find("shorteningThreshold");
-    c.shorteningThreshold = st && st->isInt() ? (int)st->asInt() : kDefaultShortening;
+    if (!st || !st->isInt()) throw Error(Err::InvalidVault, "vault.cryptomator is missing the 'shorteningThreshold' claim");
+    c.shorteningThreshold = (int)st->asInt();
     if (c.cipherCombo != "SIV_GCM" && c.cipherCombo != "SIV_CTRMAC")
         throw Error(Err::InvalidVault, "Unsupported cipherCombo: " + c.cipherCombo);
     return c;

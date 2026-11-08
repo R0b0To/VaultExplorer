@@ -40,7 +40,21 @@ struct MasterkeyFile {
 };
 // Throws WrongPassword / InvalidVault.
 Masterkey unlockMasterkey(const MasterkeyFile& f, const uint8_t* pw, size_t pwLen);
-std::string lockMasterkey(const Masterkey& mk, const uint8_t* pw, size_t pwLen, int vaultVersion);
+
+// The official apps (desktop SecurePasswordField, Android normalizePassword) NFC-normalize the
+// passphrase before it reaches cryptolib, so every vault they create is keyed from the NFC form.
+// Returns the NFC form of a UTF-8 passphrase; ASCII, invalid UTF-8 or a missing host normalizer
+// yield the bytes unchanged.
+Secret normalizedPassphrase(const uint8_t* pw, size_t pwLen);
+// Unlocks with the NFC-normalized passphrase first and, only if that fails with WrongPassword
+// and differs from the typed bytes, retries the raw bytes (vaults that earlier versions of this
+// app created from un-normalized input). Throws WrongPassword / InvalidVault.
+Masterkey unlockMasterkeyCompat(const MasterkeyFile& f, const uint8_t* pw, size_t pwLen);
+
+// scryptN / scryptR default to the official defaults (2^15, 8); password changes pass the vault's
+// existing values so the key-derivation cost is never silently lowered.
+std::string lockMasterkey(const Masterkey& mk, const uint8_t* pw, size_t pwLen, int vaultVersion,
+                          uint32_t scryptN = 1u << 15, uint32_t scryptR = 8);
 
 struct VaultConfig {
     int vaultFormat = 8;

@@ -2,6 +2,8 @@
 //   Known-answer vectors were produced with Python's `cryptography` package
 //   (an independent implementation); the format engines are additionally
 //   checked against the real gocryptfs / Cryptomator / CryFS in test/interop.
+#include <cctype>
+#include <filesystem>
 #include <atomic>
 #include <cstdio>
 #include <cstdlib>
@@ -319,12 +321,17 @@ static void testCryptomator(bool ctrmac) {
     auto st = std::make_shared<PosixStorage>(root);
     const uint8_t pw[] = "secret";
     CHECK(createCryptomator(*st, pw, 6).status == OpenStatus::Ok);
-    if (ctrmac) {   // re-sign the vault config as a legacy format-7 vault
-        Bytes mkRaw, vcRaw;
+    if (ctrmac) {   // turn it into a genuine format-7 vault (the exact inverse of official Version8Migrator):
+                    // version-7 masterkey file, NO vault.cryptomator, NO dirid.c9r backups
+        Bytes mkRaw;
         CHECK(st->readWhole("masterkey.cryptomator", mkRaw));
         auto mk = cryptomator::unlockMasterkey(cryptomator::MasterkeyFile::parse(std::string(mkRaw.begin(), mkRaw.end())), pw, 6);
-        std::string jwt = cryptomator::createVaultConfig(7, "SIV_CTRMAC", 220, mk, "00000000-0000-4000-8000-000000000000");
-        CHECK(st->writeWhole("vault.cryptomator", (const uint8_t*)jwt.data(), jwt.size()));
+        std::string mkJson = cryptomator::lockMasterkey(mk, pw, 6, 7);
+        CHECK(st->writeWhole("masterkey.cryptomator", (const uint8_t*)mkJson.data(), mkJson.size()));
+        CHECK(st->remove("vault.cryptomator"));
+        cryptomator::NameCryptor nc0(mk);
+        std::string h0 = nc0.hashDirectoryId("");
+        CHECK(st->remove("d/" + h0.substr(0, 2) + "/" + h0.substr(2) + "/dirid.c9r"));
     }
     CHECK(openCryptomator(st, (const uint8_t*)"bad", 3, false, {}).status == OpenStatus::WrongPassword);
     auto r = openCryptomator(st, pw, 6, false, {});
@@ -363,6 +370,178 @@ static void testCryptomator(bool ctrmac) {
     CHECK(changeCryptomatorPassword(*st, pw, 6, np, 5).status == OpenStatus::Ok);
     CHECK(openCryptomator(st, pw, 6, false, {}).status == OpenStatus::WrongPassword);
     CHECK(openCryptomator(st, np, 5, false, {}).status == OpenStatus::Ok);
+}
+
+// ---- Cryptomator compatibility fixes. Each behaviour below was checked against the official
+// ---- cryptofs 2.8.0 / cryptolib 2.2.0 (Cryptomator CLI 0.6.2) and the official apps' source.
+static std::string nfcStandIn(const std::string& in) {   // stand-in for java.text.Normalizer (Android installs it over JNI)
+    static const char* const tbl[][2] = {{"a\xCC\x88", "\xC3\xA4"}, {"o\xCC\x88", "\xC3\xB6"}, {"e\xCC\x81", "\xC3\xA9"}};
+    std::string r = in;
+    for (auto& m : tbl) { size_t pos = 0; std::string from = m[0]; while ((pos = r.find(from, pos)) != std::string::npos) { r.replace(pos, from.size(), m[1]); pos += std::strlen(m[1]); } }
+    return r;
+}
+
+static std::string readText(Storage& st, const char* p) { Bytes b; st.readWhole(p, b); return std::string(b.begin(), b.end()); }
+
+static void testCryptomatorCompat() {
+    std::printf("cryptomator compatibility fixes\n");
+    const uint8_t pw[] = "secret";
+    namespace cm = cryptomator;
+    auto mkOf = [&](Storage& st) { return cm::unlockMasterkey(cm::MasterkeyFile::parse(readText(st, "masterkey.cryptomator")), pw, 6); };
+    auto backingOf = [&](const cm::Masterkey& mk, const std::string& dirId) {
+        cm::NameCryptor nc(mk); std::string h = nc.hashDirectoryId(dirId);
+        return "d/" + h.substr(0, 2) + "/" + h.substr(2);
+    };
+
+    {   // (1) a format 8 vault without vault.cryptomator is refused -- never opened as format 7 (it used to be,
+        //     and writes then put CTRMAC files into a GCM vault)
+        TmpDir t; auto st = std::make_shared<PosixStorage>(t.sub("v"));
+        CHECK(createCryptomator(*st, pw, 6).status == OpenStatus::Ok);
+        Bytes cfg; CHECK(st->readWhole("vault.cryptomator", cfg));
+        CHECK(st->remove("vault.cryptomator"));
+        auto r = openCryptomator(st, pw, 6, false, {});
+        CHECK(r.status == OpenStatus::InvalidVault);
+        CHECK(r.message.find("vault.cryptomator is missing") != std::string::npos);
+        CHECK(!r.vault);
+        CHECK(st->writeWhole("vault.cryptomator", cfg.data(), cfg.size()));
+        CHECK(openCryptomator(st, pw, 6, false, {}).status == OpenStatus::Ok);
+    }
+    {   // (2) legacy masterkey versions without a config are refused with a clear message
+        TmpDir t; auto st = std::make_shared<PosixStorage>(t.sub("v"));
+        CHECK(createCryptomator(*st, pw, 6).status == OpenStatus::Ok);
+        auto mk = mkOf(*st);
+        CHECK(st->remove("vault.cryptomator"));
+        for (int ver : {5, 6}) {
+            std::string j = cm::lockMasterkey(mk, pw, 6, ver);
+            CHECK(st->writeWhole("masterkey.cryptomator", (const uint8_t*)j.data(), j.size()));
+            auto r = openCryptomator(st, pw, 6, false, {});
+            CHECK(r.status == OpenStatus::InvalidVault);
+            CHECK(r.message.find("not supported") != std::string::npos);
+        }
+    }
+    {   // (3) vault.cryptomator claims are validated like official cryptofs
+        TmpDir t; auto st = std::make_shared<PosixStorage>(t.sub("v"));
+        CHECK(createCryptomator(*st, pw, 6).status == OpenStatus::Ok);
+        auto mk = mkOf(*st);
+        auto sign = [&](const std::string& payload) {
+            std::string h = R"({"alg":"HS256","typ":"JWT","kid":"masterkeyfile:masterkey.cryptomator"})";
+            std::string in = base64Encode((const uint8_t*)h.data(), h.size(), true, false) + "." +
+                             base64Encode((const uint8_t*)payload.data(), payload.size(), true, false);
+            Bytes sig = crypto::hmac(crypto::Md::Sha256, mk.raw().data(), mk.raw().size(), (const uint8_t*)in.data(), in.size());
+            std::string j = in + "." + base64Encode(sig.data(), sig.size(), true, false);
+            st->writeWhole("vault.cryptomator", (const uint8_t*)j.data(), j.size());
+            return openCryptomator(st, pw, 6, false, {});
+        };
+        CHECK(sign(R"({"jti":"x","format":8,"cipherCombo":"SIV_GCM","shorteningThreshold":220})").status == OpenStatus::Ok);
+        CHECK(sign(R"({"jti":"x","format":8,"cipherCombo":"SIV_CTRMAC","shorteningThreshold":100})").status == OpenStatus::Ok);
+        CHECK(sign(R"({"jti":"x","format":7,"cipherCombo":"SIV_GCM","shorteningThreshold":220})").status == OpenStatus::InvalidVault);
+        auto newer = sign(R"({"jti":"x","format":9,"cipherCombo":"SIV_GCM","shorteningThreshold":220})");
+        CHECK(newer.status == OpenStatus::InvalidVault && newer.message.find("newer") != std::string::npos);
+        CHECK(sign(R"({"jti":"x","format":8,"cipherCombo":"SIV_FOO","shorteningThreshold":220})").status == OpenStatus::InvalidVault);
+        CHECK(sign(R"({"jti":"x","format":8,"cipherCombo":"SIV_GCM"})").status == OpenStatus::InvalidVault);      // no threshold
+        CHECK(sign(R"({"jti":"x","cipherCombo":"SIV_GCM","shorteningThreshold":220})").status == OpenStatus::InvalidVault); // no format
+    }
+    {   // (4) passphrases are NFC-normalized like the official apps do; vaults keyed from raw bytes still open
+        setNfcNormalizer(nfcStandIn);
+        const std::string composed = "p\xC3\xA4ss", decomposed = "pa\xCC\x88ss", other = "p\xC3\xB6ss";
+        auto U = [](const std::string& s) { return (const uint8_t*)s.data(); };
+        {   // new vault typed in decomposed form is keyed from the NFC form
+            TmpDir t; auto st = std::make_shared<PosixStorage>(t.sub("v"));
+            CHECK(createCryptomator(*st, U(decomposed), decomposed.size()).status == OpenStatus::Ok);
+            auto parsed = cm::MasterkeyFile::parse(readText(*st, "masterkey.cryptomator"));
+            CHECK(cm::unlockMasterkey(parsed, U(composed), composed.size()).raw().size() == 64);   // really keyed by NFC
+            CHECK(openCryptomator(st, U(composed), composed.size(), false, {}).status == OpenStatus::Ok);
+            CHECK(openCryptomator(st, U(decomposed), decomposed.size(), false, {}).status == OpenStatus::Ok);
+            CHECK(openCryptomator(st, U(other), other.size(), false, {}).status == OpenStatus::WrongPassword);
+        }
+        {   // vault created by an earlier version of this app from the raw decomposed bytes
+            TmpDir t; auto st = std::make_shared<PosixStorage>(t.sub("v"));
+            CHECK(createCryptomator(*st, pw, 6).status == OpenStatus::Ok);
+            auto mk = mkOf(*st);
+            std::string j = cm::lockMasterkey(mk, U(decomposed), decomposed.size(), 999);
+            CHECK(st->writeWhole("masterkey.cryptomator", (const uint8_t*)j.data(), j.size()));
+            CHECK(openCryptomator(st, U(decomposed), decomposed.size(), false, {}).status == OpenStatus::Ok);   // raw fallback
+            CHECK(openCryptomator(st, U(composed), composed.size(), false, {}).status == OpenStatus::WrongPassword);
+            // changing the password re-keys it from the NFC form of the new passphrase
+            const std::string np = "n\xC3\xB6w", npDec = "no\xCC\x88w";
+            CHECK(changeCryptomatorPassword(*st, U(decomposed), decomposed.size(), U(npDec), npDec.size()).status == OpenStatus::Ok);
+            CHECK(openCryptomator(st, U(np), np.size(), false, {}).status == OpenStatus::Ok);
+            CHECK(openCryptomator(st, U(npDec), npDec.size(), false, {}).status == OpenStatus::Ok);
+        }
+        setNfcNormalizer(nullptr);
+    }
+    {   // (5) a read-only session never writes (it used to re-create a missing backing folder); read-write still heals
+        TmpDir t; std::string root = t.sub("v"); auto st = std::make_shared<PosixStorage>(root);
+        CHECK(createCryptomator(*st, pw, 6).status == OpenStatus::Ok);
+        auto mk = mkOf(*st);
+        { auto r = openCryptomator(st, pw, 6, false, {}); CHECK(r.status == OpenStatus::Ok); if (!r.vault) return;
+          CHECK(r.vault->createDirectory("sub")); CHECK(put(*r.vault, "sub/f.txt", rnd(100))); r.vault->close(); }
+        std::string ptr; walkFiles(root, [&](const std::string& p, off_t) { if (p.size() > 7 && p.substr(p.size() - 7) == "dir.c9r") ptr = p; });
+        std::string dirId = readText(*st, ptr.substr(root.size() + 1).c_str());
+        std::string backing = root + "/" + backingOf(mk, dirId);
+        CHECK(std::filesystem::exists(backing));
+        std::filesystem::remove_all(backing);
+        { auto ro = openCryptomator(st, pw, 6, true, {}); CHECK(ro.status == OpenStatus::Ok); if (!ro.vault) return;
+          std::vector<DirEntry> es; ro.vault->listDirectory("sub", es); CHECK(es.empty());
+          ro.vault->close(); }
+        CHECK(!std::filesystem::exists(backing));                      // read-only left the vault untouched
+        { auto rw = openCryptomator(st, pw, 6, false, {}); CHECK(rw.status == OpenStatus::Ok); if (!rw.vault) return;
+          std::vector<DirEntry> es; rw.vault->listDirectory("sub", es); rw.vault->close(); }
+        CHECK(std::filesystem::exists(backing));                       // read-write healing is unchanged
+    }
+    {   // (6) password change keeps the vault's scrypt cost and leaves an official-style masterkey backup
+        TmpDir t; auto st = std::make_shared<PosixStorage>(t.sub("v"));
+        CHECK(createCryptomator(*st, pw, 6).status == OpenStatus::Ok);
+        auto mk = mkOf(*st);
+        std::string j = cm::lockMasterkey(mk, pw, 6, 999, 1u << 14, 16);
+        CHECK(st->writeWhole("masterkey.cryptomator", (const uint8_t*)j.data(), j.size()));
+        Bytes before; CHECK(st->readWhole("masterkey.cryptomator", before));
+        const uint8_t np[] = "new-secret";
+        CHECK(changeCryptomatorPassword(*st, (const uint8_t*)"bad", 3, np, 10).status == OpenStatus::WrongPassword);
+        CHECK(changeCryptomatorPassword(*st, pw, 6, np, 10).status == OpenStatus::Ok);
+        auto parsed = cm::MasterkeyFile::parse(readText(*st, "masterkey.cryptomator"));
+        CHECK_EQ(parsed.scryptCostParam, 1 << 14);
+        CHECK_EQ(parsed.scryptBlockSize, 16);
+        CHECK_EQ(parsed.version, 999);
+        std::string bkup; std::vector<DirEntry> es; st->list("", es);
+        for (auto& e : es) if (e.name.rfind("masterkey.cryptomator.", 0) == 0) bkup = e.name;
+        const std::string prefix = "masterkey.cryptomator.";
+        CHECK(bkup.size() == prefix.size() + 8 + 5 && bkup.substr(bkup.size() - 5) == ".bkup");   // .XXXXXXXX.bkup
+        bool upperHex = bkup.size() == prefix.size() + 13;
+        for (size_t i = prefix.size(); upperHex && i < prefix.size() + 8; i++) upperHex = std::isxdigit((unsigned char)bkup[i]) && !std::islower((unsigned char)bkup[i]);
+        CHECK(upperHex);
+        Bytes bk; CHECK(st->readWhole(bkup, bk));
+        CHECK(bk == before);
+        CHECK(openCryptomator(st, pw, 6, false, {}).status == OpenStatus::WrongPassword);
+        CHECK(openCryptomator(st, np, 10, false, {}).status == OpenStatus::Ok);
+    }
+    {   // (7) root dirid.c9r exists (header only, like official); a genuine v7 vault gets one on first write
+        TmpDir t; auto st = std::make_shared<PosixStorage>(t.sub("v"));
+        CHECK(createCryptomator(*st, pw, 6).status == OpenStatus::Ok);
+        auto mk = mkOf(*st);
+        Bytes b; CHECK(st->readWhole(backingOf(mk, "") + "/dirid.c9r", b));
+        CHECK_EQ(b.size(), (size_t)68);                                  // SIV_GCM header only
+        std::string j = cm::lockMasterkey(mk, pw, 6, 7);
+        CHECK(st->writeWhole("masterkey.cryptomator", (const uint8_t*)j.data(), j.size()));
+        CHECK(st->remove("vault.cryptomator")); CHECK(st->remove(backingOf(mk, "") + "/dirid.c9r"));
+        auto r = openCryptomator(st, pw, 6, false, {}); CHECK(r.status == OpenStatus::Ok); if (!r.vault) return;
+        CHECK(put(*r.vault, "a.txt", rnd(10))); r.vault->close();
+        CHECK(st->readWhole(backingOf(mk, "") + "/dirid.c9r", b));
+        CHECK_EQ(b.size(), (size_t)88);                                  // SIV_CTRMAC header only
+    }
+    {   // (8) scrypt block size up to official's 64 is accepted, above is not
+        for (uint32_t rr : {16u, 64u}) {
+            TmpDir t; auto st = std::make_shared<PosixStorage>(t.sub("v"));
+            CHECK(createCryptomator(*st, pw, 6).status == OpenStatus::Ok);
+            auto mk = mkOf(*st);
+            std::string j = cm::lockMasterkey(mk, pw, 6, 999, 1u << 10, rr);
+            CHECK(st->writeWhole("masterkey.cryptomator", (const uint8_t*)j.data(), j.size()));
+            CHECK(openCryptomator(st, pw, 6, false, {}).status == OpenStatus::Ok);
+        }
+        bool threw = false;
+        try { Bytes salt(8, 1); crypto::scrypt(pw, 6, salt.data(), salt.size(), 1u << 10, 65, 1, 32); } catch (const Error&) { threw = true; }
+        CHECK(threw);
+    }
 }
 
 static void testCryfs(const char* cipher, int bsz) {
@@ -495,7 +674,7 @@ int main(int argc, char** argv) {
         testGocryptfs(GocryptfsCipher::AesSiv, false, "AES-SIV");
         testGocryptfs(GocryptfsCipher::Aes256Gcm, true, "plaintext names");
     }
-    if (want("cryptomator")) { testCryptomator(false); testCryptomator(true); }
+    if (want("cryptomator")) { testCryptomator(false); testCryptomator(true); testCryptomatorCompat(); }
     if (want("cryfs")) { testCryfs("xchacha20-poly1305", 32768); testCryfs("aes-256-gcm", 4096); testCryfs("aes-256-cfb", 8192); }
     if (want("concurrency")) { testConcurrency("gocryptfs"); testConcurrency("cryptomator"); testConcurrency("cryfs"); }
     std::printf("\n%d checks, %d failed\n", g_checks, g_failed);

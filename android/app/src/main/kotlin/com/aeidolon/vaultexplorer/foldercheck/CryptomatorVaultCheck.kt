@@ -59,7 +59,19 @@ internal object CryptomatorVaultCheck {
                 return FolderVaultCheckOutcome.InvalidVault(e.message ?: "Malformed vault.cryptomator")
             }
         } else {
-            issues += FolderVaultIssue(WARNING, "/", "No vault.cryptomator found — assuming format-7 vault.")
+            // Only a genuine format-7 masterkey file may be treated as a config-less vault; anything else would be
+            // scanned with the wrong cipher and layout (same gate as the native engine / official Android).
+            when {
+                parsedMasterkey.version == 7 ->
+                    issues += FolderVaultIssue(WARNING, "/", "No vault.cryptomator found — treating this as a format-7 vault.")
+                parsedMasterkey.version >= 8 ->
+                    return FolderVaultCheckOutcome.InvalidVault(
+                        "vault.cryptomator is missing. This is a format 8 vault and cannot be checked without it. " +
+                            "If it is stored with a cloud provider, wait for it to finish syncing and try again.")
+                else ->
+                    return FolderVaultCheckOutcome.InvalidVault(
+                        "Vault format ${parsedMasterkey.version} is not supported (only 7 and 8 are). Open it once in Cryptomator to migrate it.")
+            }
         }
 
         val dataDir = saf.childOf(root, "d")
@@ -242,11 +254,29 @@ internal object CryptomatorVaultCheck {
             val jwt = vaultConfigDoc?.let { doc ->
                 context.contentResolver.openInputStream(doc.uri)?.use { it.readBytes() }?.toString(Charsets.UTF_8)
             }
-            var cipherCombo = "SIV_GCM"
+            // Repair moves and deletes files, so it must never run on a guessed cipher: a wrong one makes every
+            // header look corrupt. Without a verified vault.cryptomator only a genuine format-7 vault (SIV_CTRMAC)
+            // is accepted.
+            val cipherCombo: String
             if (jwt != null) {
-                try {
-                    cipherCombo = CryptomatorVaultConfigParser.verify(jwt, masterkey).cipherCombo
-                } catch (_: Exception) {}
+                cipherCombo = try {
+                    CryptomatorVaultConfigParser.verify(jwt, masterkey).cipherCombo
+                } catch (e: Exception) {
+                    masterkey.destroy()
+                    return FolderVaultRepairOutcome.InvalidVault(
+                        "vault.cryptomator could not be verified (${e.message}). Refusing to repair with an unknown cipher.")
+                }
+            } else if (parsedMasterkey.version == 7) {
+                cipherCombo = "SIV_CTRMAC"
+            } else {
+                masterkey.destroy()
+                return FolderVaultRepairOutcome.InvalidVault(
+                    if (parsedMasterkey.version >= 8) {
+                        "vault.cryptomator is missing. This is a format 8 vault and cannot be repaired without it. " +
+                            "If it is stored with a cloud provider, wait for it to finish syncing and try again."
+                    } else {
+                        "Vault format ${parsedMasterkey.version} is not supported (only 7 and 8 are). Open it once in Cryptomator to migrate it."
+                    })
             }
             contentCryptor = CryptomatorContentCryptor.forCipherCombo(cipherCombo)
         }

@@ -1,5 +1,7 @@
 // Cryptomator vault: directory tree, session (fv::Vault) and the open /
 // create / change-password entry points.
+#include <cctype>
+#include <cstring>
 #include <algorithm>
 #include <map>
 #include <mutex>
@@ -52,9 +54,21 @@ bool hasNonAscii(const std::string& s) {
     return false;
 }
 
+// dirid.c9r = the directory's OWN id encrypted like a regular file (cryptolib DirectoryIdBackup).
+static bool writeDirIdBackupFile(Storage& st, const ContentFormat& fmt, const std::string& physFolder,
+                                 const std::string& ownDirId) {
+    Bytes file;
+    auto key = fmt.newHeader(file);
+    Bytes enc(fmt.encryptedSize(ownDirId.size()));
+    fmt.encrypt(*key, 0, (const uint8_t*)ownDirId.data(), ownDirId.size(), enc.data());
+    file.insert(file.end(), enc.begin(), enc.end());
+    return st.writeWhole(joinPath(physFolder, kDirIdBackup), file.data(), file.size());
+}
+
 class Tree {
 public:
-    Tree(Storage& st, const NameCryptor& nc, int shortening) : st_(st), nc_(nc), shortening_(shortening) {
+    Tree(Storage& st, const NameCryptor& nc, int shortening, bool readOnly = false)
+        : st_(st), nc_(nc), shortening_(shortening), readOnly_(readOnly) {
         dirIds_[""] = "";
     }
 
@@ -78,6 +92,10 @@ public:
         std::string p = dataPathFor(dirId);
         DirEntry de;
         if (st_.stat(p, de) && de.isDir) { cacheData(dirId, p); return p; }
+        if (readOnly_) {
+            // A read-only session must never write to the vault (the folder may simply not have synced yet).
+            throw Error(Err::NotFound, "Backing directory for dirId '" + dirId + "' is missing (read-only, not repairing)");
+        }
         logMsg(LogLevel::Warn, TAG, "Auto-healing missing backing directory for dirId '" + dirId + "'");
         return createPhysicalFolderForDirId(dirId);
     }
@@ -294,6 +312,7 @@ private:
     std::mutex mu_;
     std::unordered_map<std::string, std::string> dirIds_;     // cleartext dir path -> dirId
     std::unordered_map<std::string, std::string> dataDirs_;   // dirId -> d/xx/yyyy
+    const bool readOnly_;
 };
 
 class CryptomatorVault final : public Vault, private EngineHost {
@@ -301,7 +320,7 @@ public:
     CryptomatorVault(std::shared_ptr<Storage> st, Masterkey mk, const VaultConfig& cfg, bool readOnly)
         : st_(std::move(st)), mk_(std::move(mk)), cfg_(cfg), readOnly_(readOnly), nc_(mk_),
           fmt_(mk_, cfg.cipherCombo == "SIV_GCM" ? Combo::SivGcm : Combo::SivCtrMac),
-          tree_(*st_, nc_, cfg.shorteningThreshold),
+          tree_(*st_, nc_, cfg.shorteningThreshold, readOnly),
           engine_(*st_, fmt_, *this, readOnly, batchWrite_) {}
     ~CryptomatorVault() override { close(); }
 
@@ -654,19 +673,14 @@ private:
     // (cryptolib DirectoryIdBackup). The Kotlin version stored the parent's id.
     void writeDirIdBackup(const std::string& physFolder, const std::string& ownDirId) {
         try {
-            Bytes file;
-            auto key = fmt_.newHeader(file);
-            Bytes enc(fmt_.encryptedSize(ownDirId.size()));
-            fmt_.encrypt(*key, 0, (const uint8_t*)ownDirId.data(), ownDirId.size(), enc.data());
-            file.insert(file.end(), enc.begin(), enc.end());
-            if (!st_->writeWhole(joinPath(physFolder, kDirIdBackup), file.data(), file.size()))
+            if (!writeDirIdBackupFile(*st_, fmt_, physFolder, ownDirId))
                 logMsg(LogLevel::Warn, TAG, "could not write dirid.c9r in " + physFolder);
         } catch (const std::exception& e) {
             logMsg(LogLevel::Warn, TAG, std::string("writeDirIdBackup failed: ") + e.what());
         }
     }
+    // The root directory (empty id) gets a backup too, exactly like official cryptofs: a header-only file.
     void ensureDirIdBackup(const std::string& physFolder, const std::string& dirId) {
-        if (dirId.empty()) return;
         DirEntry de;
         if (!st_->stat(joinPath(physFolder, kDirIdBackup), de)) writeDirIdBackup(physFolder, dirId);
     }
@@ -770,9 +784,10 @@ OpenResult openCryptomator(std::shared_ptr<Storage> s, const uint8_t* pw, size_t
     if (!s->readWhole(kMasterkeyFile, raw)) return fail(OpenStatus::InvalidVault, "Could not read masterkey.cryptomator");
 
     Masterkey mk;
+    MasterkeyFile parsed;
     try {
-        MasterkeyFile parsed = MasterkeyFile::parse(std::string(raw.begin(), raw.end()));
-        mk = unlockMasterkey(parsed, pw, pwLen);
+        parsed = MasterkeyFile::parse(std::string(raw.begin(), raw.end()));
+        mk = unlockMasterkeyCompat(parsed, pw, pwLen);
     } catch (const Error& e) {
         if (e.code() == Err::WrongPassword) return fail(OpenStatus::WrongPassword, e.what());
         return fail(OpenStatus::InvalidVault, std::string("Failed to unlock masterkey: ") + e.what());
@@ -781,15 +796,32 @@ OpenResult openCryptomator(std::shared_ptr<Storage> s, const uint8_t* pw, size_t
     }
 
     VaultConfig cfg;
-    cfg.vaultFormat = 7; cfg.cipherCombo = "SIV_CTRMAC"; cfg.shorteningThreshold = kDefaultShortening;
     if (s->stat(kVaultFile, de)) {
         Bytes jwt;
         if (!s->readWhole(kVaultFile, jwt)) return fail(OpenStatus::InvalidVault, "Could not read vault.cryptomator");
         try { cfg = verifyVaultConfig(std::string(jwt.begin(), jwt.end()), mk); }
         catch (const Error& e) { return fail(OpenStatus::InvalidVault, e.what()); }
+        // A format 7 vault has no vault.cryptomator at all, so a config can only describe format 8.
+        if (cfg.vaultFormat < 8)
+            return fail(OpenStatus::InvalidVault, "Vault format " + std::to_string(cfg.vaultFormat) + " is not supported (only 7 and 8 are).");
+        if (cfg.vaultFormat > 8)
+            return fail(OpenStatus::InvalidVault, "Vault format " + std::to_string(cfg.vaultFormat) + " was created by a newer version of Cryptomator and is not supported.");
+    } else {
+        // No vault.cryptomator: only a genuine format 7 masterkey file may be treated as one. Anything else
+        // would be opened with the wrong cipher/layout and writes would corrupt it (official Android applies
+        // the same masterkey-version gate: assertLegacyVaultVersionIsSupported).
+        if (parsed.version == 7) {
+            cfg.vaultFormat = 7; cfg.cipherCombo = "SIV_CTRMAC"; cfg.shorteningThreshold = kDefaultShortening;
+        } else if (parsed.version >= 8) {
+            return fail(OpenStatus::InvalidVault,
+                        "vault.cryptomator is missing. This is a format 8 vault and cannot be opened without it. "
+                        "If the vault is stored with a cloud provider, wait for it to finish syncing and try again.");
+        } else {
+            return fail(OpenStatus::InvalidVault,
+                        "Vault format " + std::to_string(parsed.version) + " is not supported (only 7 and 8 are). "
+                        "Open it once in Cryptomator to migrate it.");
+        }
     }
-    if (cfg.vaultFormat < 7 || cfg.vaultFormat > 8)
-        return fail(OpenStatus::InvalidVault, "Vault format " + std::to_string(cfg.vaultFormat) + " is not supported (only 7 and 8 are).");
 
     std::shared_ptr<Storage> sessionStorage = s;
     try { if (factory) { auto f = factory(); if (f) sessionStorage = std::move(f); } }
@@ -810,7 +842,8 @@ PlainResult createCryptomator(Storage& s, const uint8_t* pw, size_t pwLen) {
         std::vector<DirEntry> existing;
         if (s.list("", existing) && !existing.empty()) return plainFail(OpenStatus::InvalidVault, "Selected folder is not empty.");
         Masterkey mk(Secret(crypto::randomKeyBytes(64)));
-        std::string mkJson = lockMasterkey(mk, pw, pwLen, 999);
+        Secret npw = normalizedPassphrase(pw, pwLen);
+        std::string mkJson = lockMasterkey(mk, npw.data(), npw.size(), 999);
         if (!s.writeWhole(kMasterkeyFile, (const uint8_t*)mkJson.data(), mkJson.size()))
             return plainFail(OpenStatus::InvalidVault, "Could not create masterkey.cryptomator");
         std::string jwt = createVaultConfig(kCurrentVaultFormat, kCurrentCipherCombo, kDefaultShortening, mk, newUuid());
@@ -822,6 +855,11 @@ PlainResult createCryptomator(Storage& s, const uint8_t* pw, size_t pwLen) {
         std::string lvl1 = joinPath(kDataDir, h.substr(0, 2));
         if (!s.mkdir(lvl1) || !s.mkdir(joinPath(lvl1, h.substr(2))))
             return plainFail(OpenStatus::InvalidVault, "Could not create data subdirectory");
+        {
+            ContentFormat fmt(mk, kCurrentCipherCombo == std::string("SIV_GCM") ? Combo::SivGcm : Combo::SivCtrMac);
+            if (!writeDirIdBackupFile(s, fmt, joinPath(lvl1, h.substr(2)), ""))
+                logMsg(LogLevel::Warn, TAG, "could not write the root dirid.c9r");
+        }
         PlainResult ok;
         ok.status = OpenStatus::Ok;
         return ok;
@@ -839,8 +877,21 @@ PlainResult changeCryptomatorPassword(Storage& s, const uint8_t* oldPw, size_t o
     if (!s.readWhole(kMasterkeyFile, raw)) return plainFail(OpenStatus::InvalidVault, "Could not read masterkey.cryptomator");
     try {
         MasterkeyFile parsed = MasterkeyFile::parse(std::string(raw.begin(), raw.end()));
-        Masterkey mk = unlockMasterkey(parsed, oldPw, oldLen);
-        std::string json = lockMasterkey(mk, newPw, newLen, parsed.version);
+        Masterkey mk = unlockMasterkeyCompat(parsed, oldPw, oldLen);
+        Secret npw = normalizedPassphrase(newPw, newLen);
+        // Keep the vault's own scrypt cost (never silently downgrade it), like official changePassphrase.
+        std::string json = lockMasterkey(mk, npw.data(), npw.size(), parsed.version,
+                                         (uint32_t)parsed.scryptCostParam, (uint32_t)parsed.scryptBlockSize);
+        // Official keeps the previous key file as masterkey.cryptomator.<first 4 bytes of its SHA-256, hex>.bkup
+        {
+            Bytes digest = crypto::hash(crypto::Md::Sha256, raw.data(), raw.size());
+            std::string hex = toHex(digest.data(), 4);
+            for (char& c : hex) c = (char)std::toupper((unsigned char)c);   // Guava base16 is upper-case
+            std::string bkup = std::string(kMasterkeyFile) + "." + hex + ".bkup";
+            DirEntry be;
+            if (!s.stat(bkup, be) && !s.writeWhole(bkup, raw.data(), raw.size()))
+                logMsg(LogLevel::Warn, TAG, "could not write " + bkup);
+        }
         if (!s.writeWholeAtomic(kMasterkeyFile, (const uint8_t*)json.data(), json.size()))
             return plainFail(OpenStatus::InvalidVault, "Could not write masterkey.cryptomator");
         PlainResult ok;

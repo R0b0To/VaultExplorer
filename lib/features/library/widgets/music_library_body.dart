@@ -318,6 +318,13 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
                   _searchFocus.requestFocus();
                 },
               ),
+            MusicModeMenuButton(
+              entry: widget.entry,
+              hub: _hub,
+              compact: true,
+              onEditFolders: () =>
+                  unawaited(editMusicFolders(context, ref, widget.container)),
+            ),
             IconButton(
               visualDensity: VisualDensity.compact,
               tooltip: l10n.libraryPlayAll,

@@ -46,6 +46,18 @@ enum FileDetailColumn {
 }
 
 class FileManagerToolbarConfig {
+  static const List<FileManagerAction> defaultActionOrder = [
+    FileManagerAction.search,
+    FileManagerAction.add,
+    FileManagerAction.gallery,
+    FileManagerAction.viewToggle,
+    FileManagerAction.sort,
+    FileManagerAction.filter,
+    FileManagerAction.options,
+    FileManagerAction.playMedia,
+    FileManagerAction.musicMode,
+  ];
+
   final List<FileManagerAction> order;
   final Set<FileManagerAction> hidden;
   final bool showBreadcrumbBar;
@@ -190,16 +202,8 @@ class FileManagerToolbarConfig {
   });
 
   factory FileManagerToolbarConfig.defaults() => const FileManagerToolbarConfig(
-        order: [
-          FileManagerAction.search,
-          FileManagerAction.add,
-          FileManagerAction.gallery,
-          FileManagerAction.viewToggle,
-          FileManagerAction.sort,
-          FileManagerAction.filter,
-          FileManagerAction.options,
-        ],
-        hidden: {},
+        order: defaultActionOrder,
+        hidden: {FileManagerAction.playMedia},
         showBreadcrumbBar: true,
         showStatsBar: true,
         showBookmarkBar: false,
@@ -614,13 +618,20 @@ class FileManagerToolbarConfig {
         .map((v) => FileManagerAction.fromJson(v as String?))
         .whereType<FileManagerAction>()
         .toList();
-    for (final a in FileManagerAction.values) {
+    final actionsInSavedOrder = rawOrder.toSet();
+    for (final a in defaultActionOrder) {
       if (!rawOrder.contains(a)) rawOrder.add(a);
     }
     final hidden = (j['hidden'] as List<dynamic>? ?? [])
         .map((v) => FileManagerAction.fromJson(v as String?))
         .whereType<FileManagerAction>()
         .toSet();
+    // Older configs predate the media-play action. Keep it available in the
+    // toolbar settings, but don't crowd the default bar with a newly appended
+    // button unless it was already part of the saved order.
+    if (!actionsInSavedOrder.contains(FileManagerAction.playMedia)) {
+      hidden.add(FileManagerAction.playMedia);
+    }
     final rawDetailColumns = (j['detailColumnsOrder'] as List<dynamic>? ?? [])
         .map((v) => FileDetailColumn.fromJson(v as String?))
         .whereType<FileDetailColumn>()

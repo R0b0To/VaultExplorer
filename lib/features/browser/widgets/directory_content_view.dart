@@ -5534,19 +5534,11 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         final music = musicModeEntryFor(ref, widget.container);
         return ListenableBuilder(
           listenable: music,
-          builder: (context, _) => IconButton(
-            icon: Icon(
-              music.config.enabled
-                  ? Icons.library_music_rounded
-                  : Icons.library_music_outlined,
-              color: music.config.enabled
-                  ? Theme.of(context).colorScheme.primary
-                  : null,
-        ),
-            tooltip: context.l10n.musicModeAction,
+          builder: (context, _) => MusicModeSwitchButton(
+            musicMode: music.config.enabled,
             onPressed: () =>
                 unawaited(toggleMusicMode(context, ref, widget.container)),
-        ),
+          ),
         );
       },
       FileManagerAction.options: (context) => FileManagerOptionsMenuButton(
@@ -6335,6 +6327,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         ? MusicModeBar(
             entry: _music,
             hub: ref.read(musicLibraryProvider).hub,
+            showMenu: false,
             onToggleMode: () =>
                 unawaited(toggleMusicMode(context, ref, widget.container)),
             onEditFolders: () =>

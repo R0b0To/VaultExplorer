@@ -13,21 +13,45 @@ import 'package:vaultexplorer/data/models/thumbnail_settings.dart';
 
 void main() {
   group('FileManagerToolbarConfig toolbar action order', () {
-    test('play media is not shown in the fresh-install defaults', () {
-      expect(
-        FileManagerToolbarConfig.defaults().order,
-        isNot(contains(FileManagerAction.playMedia)),
-      );
+    test('play media is available but hidden in the fresh-install defaults', () {
+      final defaults = FileManagerToolbarConfig.defaults();
+
+      expect(defaults.order, contains(FileManagerAction.playMedia));
+      expect(defaults.hidden, contains(FileManagerAction.playMedia));
+      expect(defaults.visible, isNot(contains(FileManagerAction.playMedia)));
+      expect(defaults.visible.last, FileManagerAction.musicMode);
     });
 
-    test('an older saved order gains the newly added play media action', () {
-      final legacy = FileManagerToolbarConfig.defaults();
-      final restored = FileManagerToolbarConfig.fromJson(legacy.toJson());
+    test('legacy orders gain the mode action and hide newly added play media', () {
+      final legacy = FileManagerToolbarConfig.defaults().toJson()
+        ..['order'] = [
+          FileManagerAction.search.name,
+          FileManagerAction.add.name,
+          FileManagerAction.gallery.name,
+          FileManagerAction.viewToggle.name,
+          FileManagerAction.sort.name,
+          FileManagerAction.filter.name,
+          FileManagerAction.options.name,
+        ]
+        ..['hidden'] = <String>[];
+      final restored = FileManagerToolbarConfig.fromJson(legacy);
 
       expect(
         restored.order,
-        [...legacy.order, FileManagerAction.playMedia],
+        [
+          FileManagerAction.search,
+          FileManagerAction.add,
+          FileManagerAction.gallery,
+          FileManagerAction.viewToggle,
+          FileManagerAction.sort,
+          FileManagerAction.filter,
+          FileManagerAction.options,
+          FileManagerAction.playMedia,
+          FileManagerAction.musicMode,
+        ],
       );
+      expect(restored.hidden, contains(FileManagerAction.playMedia));
+      expect(restored.visible.last, FileManagerAction.musicMode);
     });
   });
 

@@ -4488,6 +4488,41 @@ class AppLocalizationsAr extends AppLocalizations {
   String get libraryTabTracks => 'المسارات';
 
   @override
+  String get libraryTabFolders => 'المجلدات';
+
+  @override
+  String get nowPlayingQueue => 'قائمة الانتظار';
+
+  @override
+  String get nowPlayingShuffle => 'خلط';
+
+  @override
+  String get nowPlayingRepeatOff => 'إيقاف التكرار';
+
+  @override
+  String get nowPlayingRepeatAll => 'تكرار الكل';
+
+  @override
+  String get nowPlayingRepeatOne => 'تكرار هذا المسار';
+
+  @override
+  String get nowPlayingOpenViewer => 'فتح في مشغل الوسائط';
+
+  @override
+  String get nowPlayingCollapse => 'تصغير المشغل';
+
+  @override
+  String libraryFolderCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count مجلدات',
+      one: 'مجلد واحد',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get librarySearchHint => 'البحث في الموسيقى';
 
   @override

@@ -3882,5 +3882,14 @@
   "musicMiniNext": "Próxima",
   "musicMiniPlay": "Reproduzir",
   "musicMiniPause": "Pausar",
-  "musicMiniStop": "Parar reprodução"
+  "musicMiniStop": "Parar reprodução",
+  "libraryTabFolders": "Pastas",
+  "nowPlayingQueue": "Fila de reprodução",
+  "nowPlayingShuffle": "Ordem aleatória",
+  "nowPlayingRepeatOff": "Repetição desativada",
+  "nowPlayingRepeatAll": "Repetir tudo",
+  "nowPlayingRepeatOne": "Repetir esta faixa",
+  "nowPlayingOpenViewer": "Abrir no reprodutor de mídia",
+  "nowPlayingCollapse": "Minimizar reprodutor",
+  "libraryFolderCount": "{count, plural, =1{1 pasta} other{{count} pastas}}"
 }

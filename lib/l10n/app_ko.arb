@@ -3882,5 +3882,14 @@
   "musicMiniNext": "다음",
   "musicMiniPlay": "재생",
   "musicMiniPause": "일시 중지",
-  "musicMiniStop": "재생 중지"
+  "musicMiniStop": "재생 중지",
+  "libraryTabFolders": "폴더",
+  "nowPlayingQueue": "재생 대기열",
+  "nowPlayingShuffle": "셔플",
+  "nowPlayingRepeatOff": "반복 안 함",
+  "nowPlayingRepeatAll": "전체 반복",
+  "nowPlayingRepeatOne": "이 트랙 반복",
+  "nowPlayingOpenViewer": "미디어 플레이어에서 열기",
+  "nowPlayingCollapse": "플레이어 최소화",
+  "libraryFolderCount": "{count, plural, =1{폴더 1개} other{폴더 {count}개}}"
 }

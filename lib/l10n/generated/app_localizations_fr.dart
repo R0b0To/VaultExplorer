@@ -4485,6 +4485,41 @@ class AppLocalizationsFr extends AppLocalizations {
   String get libraryTabTracks => 'Pistes';
 
   @override
+  String get libraryTabFolders => 'Dossiers';
+
+  @override
+  String get nowPlayingQueue => 'File d\'attente';
+
+  @override
+  String get nowPlayingShuffle => 'Aléatoire';
+
+  @override
+  String get nowPlayingRepeatOff => 'Répétition désactivée';
+
+  @override
+  String get nowPlayingRepeatAll => 'Tout répéter';
+
+  @override
+  String get nowPlayingRepeatOne => 'Répéter cette piste';
+
+  @override
+  String get nowPlayingOpenViewer => 'Ouvrir dans le lecteur multimédia';
+
+  @override
+  String get nowPlayingCollapse => 'Réduire le lecteur';
+
+  @override
+  String libraryFolderCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count dossiers',
+      one: '1 dossier',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get librarySearchHint => 'Rechercher de la musique';
 
   @override

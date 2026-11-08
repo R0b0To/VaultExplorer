@@ -4227,6 +4227,41 @@ class AppLocalizationsKo extends AppLocalizations {
   String get libraryTabTracks => '트랙';
 
   @override
+  String get libraryTabFolders => '폴더';
+
+  @override
+  String get nowPlayingQueue => '재생 대기열';
+
+  @override
+  String get nowPlayingShuffle => '셔플';
+
+  @override
+  String get nowPlayingRepeatOff => '반복 안 함';
+
+  @override
+  String get nowPlayingRepeatAll => '전체 반복';
+
+  @override
+  String get nowPlayingRepeatOne => '이 트랙 반복';
+
+  @override
+  String get nowPlayingOpenViewer => '미디어 플레이어에서 열기';
+
+  @override
+  String get nowPlayingCollapse => '플레이어 최소화';
+
+  @override
+  String libraryFolderCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '폴더 $count개',
+      one: '폴더 1개',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get librarySearchHint => '음악 검색';
 
   @override

@@ -3882,5 +3882,14 @@
   "musicMiniNext": "Successivo",
   "musicMiniPlay": "Riproduci",
   "musicMiniPause": "Pausa",
-  "musicMiniStop": "Interrompi riproduzione"
+  "musicMiniStop": "Interrompi riproduzione",
+  "libraryTabFolders": "Cartelle",
+  "nowPlayingQueue": "Coda di riproduzione",
+  "nowPlayingShuffle": "Casuale",
+  "nowPlayingRepeatOff": "Ripetizione disattivata",
+  "nowPlayingRepeatAll": "Ripeti tutto",
+  "nowPlayingRepeatOne": "Ripeti questo brano",
+  "nowPlayingOpenViewer": "Apri nel lettore multimediale",
+  "nowPlayingCollapse": "Riduci lettore",
+  "libraryFolderCount": "{count, plural, =1{1 cartella} other{{count} cartelle}}"
 }

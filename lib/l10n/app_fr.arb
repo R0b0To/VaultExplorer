@@ -3882,5 +3882,14 @@
   "musicMiniNext": "Suivant",
   "musicMiniPlay": "Lire",
   "musicMiniPause": "Pause",
-  "musicMiniStop": "Arrêter la lecture"
+  "musicMiniStop": "Arrêter la lecture",
+  "libraryTabFolders": "Dossiers",
+  "nowPlayingQueue": "File d'attente",
+  "nowPlayingShuffle": "Aléatoire",
+  "nowPlayingRepeatOff": "Répétition désactivée",
+  "nowPlayingRepeatAll": "Tout répéter",
+  "nowPlayingRepeatOne": "Répéter cette piste",
+  "nowPlayingOpenViewer": "Ouvrir dans le lecteur multimédia",
+  "nowPlayingCollapse": "Réduire le lecteur",
+  "libraryFolderCount": "{count, plural, =1{1 dossier} other{{count} dossiers}}"
 }

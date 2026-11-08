@@ -246,11 +246,61 @@ class GenreGroup {
   late final String searchText = LibraryText.fold(name);
 }
 
+/// A folder that directly holds at least one audio file.
+///
+/// Folders that only contain other folders are not listed: the view is about
+/// where the music is, not a copy of the file tree. [path] is relative to the
+/// container root (empty for files in the root itself) and [source] is the
+/// container, so two vaults can both have a "Music" folder.
+class FolderGroup {
+  final String key;
+  final String source;
+  final String path;
+  final List<LibraryTrack> tracks;
+
+  FolderGroup({
+    required this.key,
+    required this.source,
+    required this.path,
+    required this.tracks,
+  });
+
+  /// True for the container root (files that are not in any folder).
+  bool get isRoot => path.isEmpty;
+
+  /// The last segment of [path], empty for the root.
+  String get name =>
+      path.contains('/') ? path.substring(path.lastIndexOf('/') + 1) : path;
+
+  /// Where the folder sits, shown under its name; empty at the top level.
+  String get parentPath =>
+      path.contains('/') ? path.substring(0, path.lastIndexOf('/')) : '';
+
+  int get durationMs => tracks.fold(0, (sum, t) => sum + t.durationMs);
+
+  LibraryTrack? get coverTrack {
+    for (final t in tracks) {
+      if (t.hasCover) return t;
+    }
+    return null;
+  }
+
+  /// When the newest file in the folder was added or changed (0 when unknown).
+  late final int addedSecs = tracks.fold(
+    0,
+    (latest, t) => t.modifiedSecs > latest ? t.modifiedSecs : latest,
+  );
+
+  late final String searchText = LibraryText.fold(path);
+}
+
 enum AlbumSort { title, artist, year, recentlyAdded }
 
 enum ArtistSort { name, trackCount }
 
 enum TrackSort { title, artist, album, duration, recentlyAdded }
+
+enum FolderSort { name, trackCount, recentlyAdded }
 
 /// Alternative orderings of the lists [LibraryIndex] builds.
 ///
@@ -306,6 +356,27 @@ class LibrarySorting {
         ArtistSort.trackCount => [a.tracks.length, LibraryText.fold(a.name), a.key],
       },
       isBlank: (a) => a.isUnknown,
+    );
+  }
+
+  static List<FolderGroup> folders(
+    List<FolderGroup> folders,
+    FolderSort by, {
+    bool descending = false,
+  }) {
+    return _sort<FolderGroup>(
+      folders,
+      descending: descending,
+      key: (f) => switch (by) {
+        FolderSort.name => [LibraryText.fold(f.name), LibraryText.fold(f.path), f.key],
+        FolderSort.trackCount => [f.tracks.length, LibraryText.fold(f.name), f.key],
+        FolderSort.recentlyAdded => [f.addedSecs, LibraryText.fold(f.name), f.key],
+      },
+      isBlank: (f) => switch (by) {
+        FolderSort.name => f.isRoot,
+        FolderSort.trackCount => false,
+        FolderSort.recentlyAdded => f.addedSecs == 0,
+      },
     );
   }
 
@@ -675,6 +746,38 @@ class LibraryIndex {
     return List.unmodifiable(groups);
   }
 
+  // ── Folders ────────────────────────────────────────────────────────────────
+
+  /// Every folder that directly holds audio files, by name. Built on first use.
+  late final List<FolderGroup> folders = _buildFolders();
+
+  List<FolderGroup> _buildFolders() {
+    final lists = <String, List<LibraryTrack>>{};
+    final sources = <String, String>{};
+    final paths = <String, String>{};
+    for (final t in tracks) {
+      final id = _folderId(t);
+      sources.putIfAbsent(id, () => t.source);
+      paths.putIfAbsent(id, () => t.folder);
+      lists.putIfAbsent(id, () => []).add(t);
+    }
+    final groups = <FolderGroup>[];
+    lists.forEach((id, v) {
+      v.sort(compareAlbumOrder);
+      groups.add(
+        FolderGroup(
+          key: id,
+          source: sources[id] ?? '',
+          path: paths[id] ?? '',
+          tracks: List.unmodifiable(v),
+        ),
+      );
+    });
+    return List.unmodifiable(
+      LibrarySorting.folders(groups, FolderSort.name),
+    );
+  }
+
   /// Named groups alphabetically, the unnamed "unknown" group last.
   static int Function(T, T) _namedGroupOrder<T>(
     String Function(T) key,
@@ -724,6 +827,12 @@ class LibraryIndex {
     final tokens = _tokens(query);
     if (tokens.isEmpty) return artists;
     return [for (final a in artists) if (_matchesAll(a.searchText, tokens)) a];
+  }
+
+  List<FolderGroup> searchFolders(String query) {
+    final tokens = _tokens(query);
+    if (tokens.isEmpty) return folders;
+    return [for (final f in folders) if (_matchesAll(f.searchText, tokens)) f];
   }
 
   List<GenreGroup> searchGenres(String query) {

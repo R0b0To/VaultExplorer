@@ -4456,6 +4456,41 @@ class AppLocalizationsEs extends AppLocalizations {
   String get libraryTabTracks => 'Pistas';
 
   @override
+  String get libraryTabFolders => 'Carpetas';
+
+  @override
+  String get nowPlayingQueue => 'Cola de reproducción';
+
+  @override
+  String get nowPlayingShuffle => 'Aleatorio';
+
+  @override
+  String get nowPlayingRepeatOff => 'Repetición desactivada';
+
+  @override
+  String get nowPlayingRepeatAll => 'Repetir todo';
+
+  @override
+  String get nowPlayingRepeatOne => 'Repetir esta pista';
+
+  @override
+  String get nowPlayingOpenViewer => 'Abrir en el reproductor multimedia';
+
+  @override
+  String get nowPlayingCollapse => 'Minimizar reproductor';
+
+  @override
+  String libraryFolderCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count carpetas',
+      one: '1 carpeta',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get librarySearchHint => 'Buscar música';
 
   @override

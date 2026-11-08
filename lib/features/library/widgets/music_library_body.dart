@@ -110,14 +110,18 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
   bool _artistDescending = false;
   TrackSort _trackSort = TrackSort.title;
   bool _trackDescending = false;
+  FolderSort _folderSort = FolderSort.name;
+  bool _folderDescending = false;
   final _albumMemo = _SortMemo<AlbumGroup>();
   final _artistMemo = _SortMemo<ArtistGroup>();
   final _trackMemo = _SortMemo<LibraryTrack>();
+  final _folderMemo = _SortMemo<FolderGroup>();
 
   final _albumsScroll = ScrollController();
   final _artistsScroll = ScrollController();
   final _genresScroll = ScrollController();
   final _tracksScroll = ScrollController();
+  final _foldersScroll = ScrollController();
 
   MusicHub get _hub => widget.library.hub;
 
@@ -134,6 +138,8 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
     _albumMemo.reset();
     _artistMemo.reset();
     _trackMemo.reset();
+    _folderMemo.reset();
+    _foldersScroll.dispose();
     _albumsScroll.dispose();
     _artistsScroll.dispose();
     _genresScroll.dispose();
@@ -183,6 +189,7 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
       MusicCategory.artists => l10n.libraryArtistCount(count),
       MusicCategory.genres => l10n.libraryGenreCount(count),
       MusicCategory.tracks => l10n.libraryTrackCount(count),
+      MusicCategory.folders => l10n.libraryFolderCount(count),
       _ => l10n.libraryAlbumCount(count),
     };
   }
@@ -268,6 +275,12 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
     switch (category) {
       case MusicCategory.artists:
         return [l10n.librarySortName, l10n.librarySortTrackCount];
+      case MusicCategory.folders:
+        return [
+          l10n.librarySortName,
+          l10n.librarySortTrackCount,
+          l10n.librarySortRecentlyAdded,
+        ];
       case MusicCategory.tracks:
         return [
           l10n.librarySortTitle,
@@ -288,12 +301,14 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
 
   int _currentSort(MusicCategory category) => switch (category) {
         MusicCategory.artists => _artistSort.index,
+        MusicCategory.folders => _folderSort.index,
         MusicCategory.tracks => _trackSort.index,
         _ => _albumSort.index,
       };
 
   bool _currentDescending(MusicCategory category) => switch (category) {
         MusicCategory.artists => _artistDescending,
+        MusicCategory.folders => _folderDescending,
         MusicCategory.tracks => _trackDescending,
         _ => _albumDescending,
       };
@@ -337,6 +352,13 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
           } else {
             _artistSort = ArtistSort.values[i];
             _artistDescending = _artistSort == ArtistSort.trackCount;
+          }
+        case MusicCategory.folders:
+          if (i == null) {
+            _folderDescending = !_folderDescending;
+          } else {
+            _folderSort = FolderSort.values[i];
+            _folderDescending = _folderSort != FolderSort.name;
           }
         case MusicCategory.tracks:
           if (i == null) {
@@ -443,6 +465,7 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
       MusicCategory.artists => _artists(context, index),
       MusicCategory.genres => _genres(context, index),
       MusicCategory.tracks => _tracks(context, index),
+      MusicCategory.folders => _folders(context, index),
       _ => _albums(context, index),
     };
   }
@@ -601,6 +624,69 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
     );
   }
 
+  /// Folders that directly hold audio, nothing else: where the music lives, not
+  /// a copy of the file tree.
+  _View _folders(BuildContext context, LibraryIndex index) {
+    final folders = _folderMemo.get(index, _query, _folderSort, _folderDescending, () {
+      final found = index.searchFolders(_query);
+      if (_folderSort == FolderSort.name && !_folderDescending) return found;
+      return LibrarySorting.folders(found, _folderSort, descending: _folderDescending);
+    });
+    final l10n = context.l10n;
+    final covers = widget.library.covers;
+    return _View(
+      folders.length,
+      folders.isEmpty
+          ? _noResults(context)
+          : FastScrollbar(
+              controller: _foldersScroll,
+              child: ListView.builder(
+                key: const PageStorageKey('music-folders'),
+                controller: _foldersScroll,
+                itemCount: folders.length,
+                itemBuilder: (context, i) {
+                  final f = folders[i];
+                  final album = f.tracks.isEmpty ? null : index.albumOf(f.tracks.first);
+                  final source = _hub.sourceCount > 1
+                      ? _hub.containerOf(f.source)?.displayName
+                      : null;
+                  final where = [
+                    if (f.parentPath.isNotEmpty) f.parentPath,
+                    l10n.libraryTrackCount(f.tracks.length),
+                    if (source != null) source,
+                  ].join(' · ');
+                  return ListTile(
+                    contentPadding: const EdgeInsets.only(left: AppSpacing.md, right: AppSpacing.xs),
+                    leading: LibraryCover(
+                      covers: covers,
+                      track: album?.coverTrack ?? f.coverTrack,
+                      groupKey: album == null ? null : albumCoverKey(album),
+                      size: 48,
+                      borderRadius: 8,
+                      placeholderIcon: Icons.folder_rounded,
+                    ),
+                    title: Text(
+                      _folderLabel(f),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(where, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    trailing: _quickPlay(f.tracks),
+                    onTap: () => _openFolder(index, f),
+                  );
+                },
+              ),
+            ),
+      () => _flatten([for (final f in folders) f.tracks]),
+    );
+  }
+
+  /// A folder's name; the container's own name for files sitting in its root.
+  String _folderLabel(FolderGroup f) {
+    if (!f.isRoot) return f.name;
+    return _hub.containerOf(f.source)?.displayName ?? '/';
+  }
+
   _View _tracks(BuildContext context, LibraryIndex index) {
     final tracks = _trackMemo.get(index, _query, _trackSort, _trackDescending, () {
       final found = index.searchTracks(_query);
@@ -682,6 +768,19 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
       placeholderIcon: Icons.person_rounded,
       coverKey: artistCoverKey(a),
       onChooseCover: () => _chooseCover(artistCoverKey(a), a.tracks.isEmpty ? null : a.tracks.first),
+    ));
+  }
+
+  void _openFolder(LibraryIndex index, FolderGroup f) {
+    _push(LibraryDetailScreen(
+      hub: _hub,
+      covers: widget.library.covers,
+      title: _folderLabel(f),
+      subtitle: f.parentPath,
+      coverTrack: f.coverTrack,
+      tracks: f.tracks,
+      coverOf: (t) => index.albumOf(t)?.coverTrack,
+      placeholderIcon: Icons.folder_rounded,
     ));
   }
 

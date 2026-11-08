@@ -3882,5 +3882,14 @@
   "musicMiniNext": "Наступний",
   "musicMiniPlay": "Відтворити",
   "musicMiniPause": "Пауза",
-  "musicMiniStop": "Зупинити відтворення"
+  "musicMiniStop": "Зупинити відтворення",
+  "libraryTabFolders": "Папки",
+  "nowPlayingQueue": "Черга відтворення",
+  "nowPlayingShuffle": "Перемішати",
+  "nowPlayingRepeatOff": "Повторення вимкнено",
+  "nowPlayingRepeatAll": "Повторювати все",
+  "nowPlayingRepeatOne": "Повторювати цей трек",
+  "nowPlayingOpenViewer": "Відкрити в медіаплеєрі",
+  "nowPlayingCollapse": "Згорнути плеєр",
+  "libraryFolderCount": "{count, plural, =1{1 папка} other{{count} папок}}"
 }

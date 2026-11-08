@@ -118,6 +118,10 @@ class FloatingPlayerExit {
   const FloatingPlayerExit({required this.playbackManager, required this.from});
 }
 
+/// How the in-app music controls repeat: nothing, the whole queue, or the
+/// current track. Applies to sessions started from the music library only.
+enum PlaybackRepeat { off, all, one }
+
 /// Keeps media playing after the media viewer has been closed.
 ///
 /// The viewer normally owns the player and releases it when it goes away.
@@ -200,6 +204,16 @@ class BackgroundPlaybackHost {
   final ValueNotifier<BackgroundPlaybackSession?> activeSession =
       ValueNotifier<BackgroundPlaybackSession?>(null);
 
+  /// Repeat mode of the music controls (see [PlaybackRepeat]). Kept between
+  /// sessions, like the shuffle and repeat buttons of any music player.
+  final ValueNotifier<PlaybackRepeat> repeat = ValueNotifier<PlaybackRepeat>(
+    PlaybackRepeat.off,
+  );
+
+  /// Whether the library queue was shuffled with [toggleLibraryShuffle].
+  final ValueNotifier<bool> libraryShuffled = ValueNotifier<bool>(false);
+  List<String>? _unshuffledQueue;
+
   StreamSubscription<MediaSessionAction>? _actionSubscription;
   StreamSubscription<String>? _windowSubscription;
   bool _pipWindowOpen = false;
@@ -262,9 +276,51 @@ class BackgroundPlaybackHost {
     // player is still preparing or currently paused.
     if (session.playlist.currentFile == targetPath) return true;
 
+    _unshuffledQueue = null;
+    libraryShuffled.value = false;
     session.playlist.replaceLibraryQueue(paths, index: targetIndex);
     unawaited(_playIndex(session, targetIndex));
     return true;
+  }
+
+  /// Jumps to [index] of the current library queue without replacing it, as
+  /// a tap on a row of the queue list does. False when there is no library
+  /// session or the index is out of range.
+  bool playQueueIndex(int index) {
+    final session = _session;
+    if (session == null || !session.libraryPlayback) return false;
+    final count = session.playlist.playlist.length;
+    if (index < 0 || index >= count) return false;
+    if (index == session.playlist.currentIndex) return true;
+    unawaited(_playIndex(session, index));
+    return true;
+  }
+
+  /// Shuffles the rest of the library queue (the current track stays first),
+  /// or puts the queue back in the order it had before. The track that is
+  /// playing keeps playing either way.
+  void toggleLibraryShuffle() {
+    final session = _session;
+    if (session == null || !session.libraryPlayback) return;
+    final playlist = session.playlist;
+    final current = playlist.currentFile;
+    if (current.isEmpty) return;
+    if (!libraryShuffled.value) {
+      _unshuffledQueue = List<String>.of(playlist.playlist);
+      final rest = List<String>.of(playlist.playlist)
+        ..remove(current)
+        ..shuffle();
+      playlist.replaceLibraryQueue(<String>[current, ...rest], index: 0);
+      libraryShuffled.value = true;
+    } else {
+      final original = _unshuffledQueue;
+      _unshuffledQueue = null;
+      libraryShuffled.value = false;
+      if (original == null || original.isEmpty) return;
+      final at = original.indexOf(current);
+      playlist.replaceLibraryQueue(original, index: at < 0 ? 0 : at);
+    }
+    _syncNavigation(session);
   }
 
   /// Brings the full viewer back on the running session. Without a root to do
@@ -531,6 +587,9 @@ class BackgroundPlaybackHost {
 
   Future<void> _teardown(BackgroundPlaybackSession session) async {
     // The player is released below, which ends it natively too.
+    _unshuffledQueue = null;
+    // Listeners are widgets; this may run while the tree is being torn down.
+    scheduleMicrotask(() => libraryShuffled.value = false);
     _audioOnly = false;
     _publishAudioOnly();
     _detach(session);
@@ -739,7 +798,8 @@ class BackgroundPlaybackHost {
     }
     if (duration <= Duration.zero) return;
 
-    if (session.playbackMode == VideoPlaybackMode.loop) {
+    if (session.playbackMode == VideoPlaybackMode.loop ||
+        (session.libraryPlayback && repeat.value == PlaybackRepeat.one)) {
       if (value.isPlaying && position >= duration) {
         unawaited(controller.seekTo(Duration.zero));
         unawaited(controller.play());
@@ -820,7 +880,8 @@ class BackgroundPlaybackHost {
     final playlist = session.playlist;
     final count = playlist.playlist.length;
     if (count <= 1) return null;
-    final loop = _config(session).loopPlaylist;
+    final loop = _config(session).loopPlaylist ||
+        (session.libraryPlayback && repeat.value == PlaybackRepeat.all);
     var index = playlist.currentIndex;
     for (var i = 0; i < count - 1; i++) {
       var candidate = index + direction;

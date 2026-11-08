@@ -3882,5 +3882,14 @@
   "musicMiniNext": "Nächster Titel",
   "musicMiniPlay": "Abspielen",
   "musicMiniPause": "Pause",
-  "musicMiniStop": "Wiedergabe stoppen"
+  "musicMiniStop": "Wiedergabe stoppen",
+  "libraryTabFolders": "Ordner",
+  "nowPlayingQueue": "Warteschlange",
+  "nowPlayingShuffle": "Zufallswiedergabe",
+  "nowPlayingRepeatOff": "Wiederholung aus",
+  "nowPlayingRepeatAll": "Alle wiederholen",
+  "nowPlayingRepeatOne": "Diesen Titel wiederholen",
+  "nowPlayingOpenViewer": "Im Mediaplayer öffnen",
+  "nowPlayingCollapse": "Player minimieren",
+  "libraryFolderCount": "{count, plural, =1{1 Ordner} other{{count} Ordner}}"
 }

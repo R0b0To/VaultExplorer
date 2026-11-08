@@ -4445,6 +4445,41 @@ class AppLocalizationsIt extends AppLocalizations {
   String get libraryTabTracks => 'Brani';
 
   @override
+  String get libraryTabFolders => 'Cartelle';
+
+  @override
+  String get nowPlayingQueue => 'Coda di riproduzione';
+
+  @override
+  String get nowPlayingShuffle => 'Casuale';
+
+  @override
+  String get nowPlayingRepeatOff => 'Ripetizione disattivata';
+
+  @override
+  String get nowPlayingRepeatAll => 'Ripeti tutto';
+
+  @override
+  String get nowPlayingRepeatOne => 'Ripeti questo brano';
+
+  @override
+  String get nowPlayingOpenViewer => 'Apri nel lettore multimediale';
+
+  @override
+  String get nowPlayingCollapse => 'Riduci lettore';
+
+  @override
+  String libraryFolderCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count cartelle',
+      one: '1 cartella',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get librarySearchHint => 'Cerca musica';
 
   @override

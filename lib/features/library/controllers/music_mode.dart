@@ -7,7 +7,7 @@ import 'package:vaultexplorer/features/library/models/music_config.dart';
 
 /// What the library shows while music mode is on. Files is retained as the
 /// inactive-mode state; it is not a selectable library tab.
-enum MusicCategory { files, albums, artists, genres, tracks }
+enum MusicCategory { files, albums, artists, genres, tracks, folders }
 
 /// Music mode for one container: whether it is on, which folders it covers,
 /// and which view is showing.

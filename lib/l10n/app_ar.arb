@@ -3882,5 +3882,14 @@
   "musicMiniNext": "التالي",
   "musicMiniPlay": "تشغيل",
   "musicMiniPause": "إيقاف مؤقت",
-  "musicMiniStop": "إيقاف التشغيل"
+  "musicMiniStop": "إيقاف التشغيل",
+  "libraryTabFolders": "المجلدات",
+  "nowPlayingQueue": "قائمة الانتظار",
+  "nowPlayingShuffle": "خلط",
+  "nowPlayingRepeatOff": "إيقاف التكرار",
+  "nowPlayingRepeatAll": "تكرار الكل",
+  "nowPlayingRepeatOne": "تكرار هذا المسار",
+  "nowPlayingOpenViewer": "فتح في مشغل الوسائط",
+  "nowPlayingCollapse": "تصغير المشغل",
+  "libraryFolderCount": "{count, plural, =1{مجلد واحد} other{{count} مجلدات}}"
 }

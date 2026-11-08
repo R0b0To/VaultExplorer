@@ -3882,5 +3882,14 @@
   "musicMiniNext": "下一首",
   "musicMiniPlay": "播放",
   "musicMiniPause": "暂停",
-  "musicMiniStop": "停止播放"
+  "musicMiniStop": "停止播放",
+  "libraryTabFolders": "文件夹",
+  "nowPlayingQueue": "播放队列",
+  "nowPlayingShuffle": "随机播放",
+  "nowPlayingRepeatOff": "关闭循环",
+  "nowPlayingRepeatAll": "全部循环",
+  "nowPlayingRepeatOne": "单曲循环",
+  "nowPlayingOpenViewer": "在媒体播放器中打开",
+  "nowPlayingCollapse": "最小化播放器",
+  "libraryFolderCount": "{count, plural, =1{1 个文件夹} other{{count} 个文件夹}}"
 }

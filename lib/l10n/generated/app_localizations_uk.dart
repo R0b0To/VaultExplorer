@@ -4470,6 +4470,41 @@ class AppLocalizationsUk extends AppLocalizations {
   String get libraryTabTracks => 'Треки';
 
   @override
+  String get libraryTabFolders => 'Папки';
+
+  @override
+  String get nowPlayingQueue => 'Черга відтворення';
+
+  @override
+  String get nowPlayingShuffle => 'Перемішати';
+
+  @override
+  String get nowPlayingRepeatOff => 'Повторення вимкнено';
+
+  @override
+  String get nowPlayingRepeatAll => 'Повторювати все';
+
+  @override
+  String get nowPlayingRepeatOne => 'Повторювати цей трек';
+
+  @override
+  String get nowPlayingOpenViewer => 'Відкрити в медіаплеєрі';
+
+  @override
+  String get nowPlayingCollapse => 'Згорнути плеєр';
+
+  @override
+  String libraryFolderCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count папок',
+      one: '1 папка',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get librarySearchHint => 'Пошук музики';
 
   @override

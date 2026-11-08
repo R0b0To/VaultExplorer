@@ -50,6 +50,7 @@ class MusicModeBar extends StatelessWidget {
                     MusicCategory.albums,
                     MusicCategory.artists,
                     MusicCategory.genres,
+                    MusicCategory.folders,
                   ])
                     _buildDestination(context, category),
                   if (hub.isScanning)
@@ -129,6 +130,7 @@ class MusicModeBar extends StatelessWidget {
     MusicCategory.albums => Icons.album_rounded,
     MusicCategory.artists => Icons.people_alt_rounded,
     MusicCategory.genres => Icons.category_rounded,
+    MusicCategory.folders => Icons.folder_copy_outlined,
   };
 
   String _label(BuildContext context, MusicCategory c) {
@@ -139,6 +141,7 @@ class MusicModeBar extends StatelessWidget {
       MusicCategory.artists => l10n.libraryTabArtists,
       MusicCategory.genres => l10n.libraryTabGenres,
       MusicCategory.tracks => l10n.libraryTabTracks,
+      MusicCategory.folders => l10n.libraryTabFolders,
     };
   }
 

@@ -4169,6 +4169,41 @@ class AppLocalizationsZh extends AppLocalizations {
   String get libraryTabTracks => '曲目';
 
   @override
+  String get libraryTabFolders => '文件夹';
+
+  @override
+  String get nowPlayingQueue => '播放队列';
+
+  @override
+  String get nowPlayingShuffle => '随机播放';
+
+  @override
+  String get nowPlayingRepeatOff => '关闭循环';
+
+  @override
+  String get nowPlayingRepeatAll => '全部循环';
+
+  @override
+  String get nowPlayingRepeatOne => '单曲循环';
+
+  @override
+  String get nowPlayingOpenViewer => '在媒体播放器中打开';
+
+  @override
+  String get nowPlayingCollapse => '最小化播放器';
+
+  @override
+  String libraryFolderCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 个文件夹',
+      one: '1 个文件夹',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get librarySearchHint => '搜索音乐';
 
   @override

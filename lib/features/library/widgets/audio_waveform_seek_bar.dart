@@ -35,6 +35,13 @@ class AudioWaveformSeekBar extends ConsumerStatefulWidget {
   /// Shown whenever there is no waveform to draw.
   final Widget fallback;
 
+  /// Colour of the elapsed and total time. White suits the viewer's dark
+  /// background; the music player panel passes its own theme colours.
+  final Color timeColor;
+
+  /// Colour of the part of the waveform that has not played yet.
+  final Color restColor;
+
   const AudioWaveformSeekBar({
     super.key,
     required this.playbackManager,
@@ -43,6 +50,8 @@ class AudioWaveformSeekBar extends ConsumerStatefulWidget {
     required this.onShowUIChanged,
     required this.onStartHideTimer,
     required this.fallback,
+    this.timeColor = Colors.white,
+    this.restColor = Colors.white24,
   });
 
   /// Longer files keep the plain slider: decoding them would compete with
@@ -219,8 +228,8 @@ class _AudioWaveformSeekBarState extends ConsumerState<AudioWaveformSeekBar> {
             children: [
               Text(
                 formatClockDuration(progress.position),
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: widget.timeColor,
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),
@@ -254,7 +263,7 @@ class _AudioWaveformSeekBarState extends ConsumerState<AudioWaveformSeekBar> {
                             bars: bars,
                             progress: progress.sliderValue.clamp(0.0, 1.0),
                             playedColor: cs.primary,
-                            restColor: Colors.white24,
+                            restColor: widget.restColor,
                             loop: loop,
                             duration: progress.duration,
                             loopColor: cs.tertiary,
@@ -269,7 +278,7 @@ class _AudioWaveformSeekBarState extends ConsumerState<AudioWaveformSeekBar> {
               Text(
                 formatClockDuration(progress.duration),
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.8),
+                  color: widget.timeColor.withValues(alpha: 0.8),
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),
@@ -344,6 +353,7 @@ class _WaveformPainter extends CustomPainter {
       old.progress != progress ||
       !identical(old.bars, bars) ||
       old.playedColor != playedColor ||
+      old.restColor != restColor ||
       old.loop.a != loop.a ||
       old.loop.b != loop.b ||
       old.duration != duration;

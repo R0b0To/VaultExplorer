@@ -7476,6 +7476,60 @@ abstract class AppLocalizations {
   /// **'Tracks'**
   String get libraryTabTracks;
 
+  /// Music library tab label
+  ///
+  /// In en, this message translates to:
+  /// **'Folders'**
+  String get libraryTabFolders;
+
+  /// Tooltip and title of the music player's play queue
+  ///
+  /// In en, this message translates to:
+  /// **'Queue'**
+  String get nowPlayingQueue;
+
+  /// Tooltip of the shuffle toggle in the music player
+  ///
+  /// In en, this message translates to:
+  /// **'Shuffle'**
+  String get nowPlayingShuffle;
+
+  /// Tooltip of the repeat button when repeat is off
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat off'**
+  String get nowPlayingRepeatOff;
+
+  /// Tooltip of the repeat button when the whole queue repeats
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat all'**
+  String get nowPlayingRepeatAll;
+
+  /// Tooltip of the repeat button when the current track repeats
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat this track'**
+  String get nowPlayingRepeatOne;
+
+  /// Menu entry of the music player that opens the full media player (equalizer, A-B loop, more)
+  ///
+  /// In en, this message translates to:
+  /// **'Open in media player'**
+  String get nowPlayingOpenViewer;
+
+  /// Tooltip of the button that collapses the music player to the mini player
+  ///
+  /// In en, this message translates to:
+  /// **'Minimize player'**
+  String get nowPlayingCollapse;
+
+  /// Number of folders that contain music
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 folder} other{{count} folders}}'**
+  String libraryFolderCount(num count);
+
   /// Hint text of the music library search field
   ///
   /// In en, this message translates to:

@@ -3882,5 +3882,14 @@
   "musicMiniNext": "次の曲",
   "musicMiniPlay": "再生",
   "musicMiniPause": "一時停止",
-  "musicMiniStop": "再生を停止"
+  "musicMiniStop": "再生を停止",
+  "libraryTabFolders": "フォルダー",
+  "nowPlayingQueue": "再生キュー",
+  "nowPlayingShuffle": "シャッフル",
+  "nowPlayingRepeatOff": "リピートオフ",
+  "nowPlayingRepeatAll": "すべてリピート",
+  "nowPlayingRepeatOne": "この曲をリピート",
+  "nowPlayingOpenViewer": "メディアプレーヤーで開く",
+  "nowPlayingCollapse": "プレーヤーを最小化",
+  "libraryFolderCount": "{count, plural, =1{1 件のフォルダー} other{{count} 件のフォルダー}}"
 }

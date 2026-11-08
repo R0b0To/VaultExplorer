@@ -5739,6 +5739,47 @@
   "@libraryTabTracks": {
     "description": "Music library tab label"
   },
+  "libraryTabFolders": "Folders",
+  "@libraryTabFolders": {
+    "description": "Music library tab label"
+  },
+  "nowPlayingQueue": "Queue",
+  "@nowPlayingQueue": {
+    "description": "Tooltip and title of the music player's play queue"
+  },
+  "nowPlayingShuffle": "Shuffle",
+  "@nowPlayingShuffle": {
+    "description": "Tooltip of the shuffle toggle in the music player"
+  },
+  "nowPlayingRepeatOff": "Repeat off",
+  "@nowPlayingRepeatOff": {
+    "description": "Tooltip of the repeat button when repeat is off"
+  },
+  "nowPlayingRepeatAll": "Repeat all",
+  "@nowPlayingRepeatAll": {
+    "description": "Tooltip of the repeat button when the whole queue repeats"
+  },
+  "nowPlayingRepeatOne": "Repeat this track",
+  "@nowPlayingRepeatOne": {
+    "description": "Tooltip of the repeat button when the current track repeats"
+  },
+  "nowPlayingOpenViewer": "Open in media player",
+  "@nowPlayingOpenViewer": {
+    "description": "Menu entry of the music player that opens the full media player (equalizer, A-B loop, more)"
+  },
+  "nowPlayingCollapse": "Minimize player",
+  "@nowPlayingCollapse": {
+    "description": "Tooltip of the button that collapses the music player to the mini player"
+  },
+  "libraryFolderCount": "{count, plural, =1{1 folder} other{{count} folders}}",
+  "@libraryFolderCount": {
+    "description": "Number of folders that contain music",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
   "librarySearchHint": "Search music",
   "@librarySearchHint": {
     "description": "Hint text of the music library search field"

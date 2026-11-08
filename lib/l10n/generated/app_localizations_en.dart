@@ -4378,6 +4378,41 @@ class AppLocalizationsEn extends AppLocalizations {
   String get libraryTabTracks => 'Tracks';
 
   @override
+  String get libraryTabFolders => 'Folders';
+
+  @override
+  String get nowPlayingQueue => 'Queue';
+
+  @override
+  String get nowPlayingShuffle => 'Shuffle';
+
+  @override
+  String get nowPlayingRepeatOff => 'Repeat off';
+
+  @override
+  String get nowPlayingRepeatAll => 'Repeat all';
+
+  @override
+  String get nowPlayingRepeatOne => 'Repeat this track';
+
+  @override
+  String get nowPlayingOpenViewer => 'Open in media player';
+
+  @override
+  String get nowPlayingCollapse => 'Minimize player';
+
+  @override
+  String libraryFolderCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count folders',
+      one: '1 folder',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get librarySearchHint => 'Search music';
 
   @override

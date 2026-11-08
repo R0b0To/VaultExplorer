@@ -22,7 +22,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_createContainerNative(
     ScopedJniUserEntropy entropyScope(env, userEntropy);
 
     std::vector<int> kfFds = extractKeyfileFds(env, keyfileFds);
-    const char* nativePass = env->GetStringUTFChars(password, nullptr);
+    const char* nativePass = vcGetPasswordUtf8(env, password);
     const char* nativeFS   = env->GetStringUTFChars(fileSystem, nullptr);
 
     bool success;
@@ -41,7 +41,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_createContainerNative(
                                   quickFormat);
     }
 
-    env->ReleaseStringUTFChars(password, nativePass);
+    vcReleasePasswordUtf8(nativePass);
     env->ReleaseStringUTFChars(fileSystem, nativeFS);
 
     return success ? JNI_TRUE : JNI_FALSE;
@@ -65,8 +65,8 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_createContainerWithHiddenNative(
     std::vector<int> outerKfFds = extractKeyfileFds(env, outerKeyfileFds);
     std::vector<int> hiddenKfFds = extractKeyfileFds(env, hiddenKeyfileFds);
     
-    const char* nativeOuterPass = env->GetStringUTFChars(outerPassword, nullptr);
-    const char* nativeHiddenPass = env->GetStringUTFChars(hiddenPassword, nullptr);
+    const char* nativeOuterPass = vcGetPasswordUtf8(env, outerPassword);
+    const char* nativeHiddenPass = vcGetPasswordUtf8(env, hiddenPassword);
     const char* nativeOuterFS   = env->GetStringUTFChars(outerFileSystem, nullptr);
     const char* nativeHiddenFS   = env->GetStringUTFChars(hiddenFileSystem, nullptr);
 
@@ -78,8 +78,8 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_createContainerWithHiddenNative(
                                              hiddenKfFds.empty() ? nullptr : hiddenKfFds.data(), static_cast<int>(hiddenKfFds.size()),
                                              quickFormat);
 
-    env->ReleaseStringUTFChars(outerPassword, nativeOuterPass);
-    env->ReleaseStringUTFChars(hiddenPassword, nativeHiddenPass);
+    vcReleasePasswordUtf8(nativeOuterPass);
+    vcReleasePasswordUtf8(nativeHiddenPass);
     env->ReleaseStringUTFChars(outerFileSystem, nativeOuterFS);
     env->ReleaseStringUTFChars(hiddenFileSystem, nativeHiddenFS);
 
@@ -172,7 +172,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_createUsbContainerNative(
     }
 
     std::vector<int> kfFds = extractKeyfileFds(env, keyfileFds);
-    const char* nativePass = env->GetStringUTFChars(password, nullptr);
+    const char* nativePass = vcGetPasswordUtf8(env, password);
     const char* nativeFS   = env->GetStringUTFChars(fileSystem, nullptr);
     const char* nativeOpId = operationId ? env->GetStringUTFChars(operationId, nullptr) : nullptr;
 
@@ -208,7 +208,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_createUsbContainerNative(
 
     LOGI("[%s] createUsbContainerNative: EXIT success=%d phase=%s",
          nativeOpId ? nativeOpId : "-", createResult.success ? 1 : 0, usbCreatePhaseName(createResult.phase));
-    env->ReleaseStringUTFChars(password, nativePass);
+    vcReleasePasswordUtf8(nativePass);
     env->ReleaseStringUTFChars(fileSystem, nativeFS);
     if (operationId && nativeOpId) env->ReleaseStringUTFChars(operationId, nativeOpId);
     return buildUsbCreateResultMap(env, createResult);
@@ -237,8 +237,8 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_createUsbContainerWithHiddenNative(
     std::vector<int> outerKfFds = extractKeyfileFds(env, outerKeyfileFds);
     std::vector<int> hiddenKfFds = extractKeyfileFds(env, hiddenKeyfileFds);
     
-    const char* nativeOuterPass = env->GetStringUTFChars(outerPassword, nullptr);
-    const char* nativeHiddenPass = env->GetStringUTFChars(hiddenPassword, nullptr);
+    const char* nativeOuterPass = vcGetPasswordUtf8(env, outerPassword);
+    const char* nativeHiddenPass = vcGetPasswordUtf8(env, hiddenPassword);
     const char* nativeOuterFS   = env->GetStringUTFChars(outerFileSystem, nullptr);
     const char* nativeHiddenFS   = env->GetStringUTFChars(hiddenFileSystem, nullptr);
     const char* nativeOpId = operationId ? env->GetStringUTFChars(operationId, nullptr) : nullptr;
@@ -266,8 +266,8 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_createUsbContainerWithHiddenNative(
         createResult = mbrResult;
     }
 
-    env->ReleaseStringUTFChars(outerPassword, nativeOuterPass);
-    env->ReleaseStringUTFChars(hiddenPassword, nativeHiddenPass);
+    vcReleasePasswordUtf8(nativeOuterPass);
+    vcReleasePasswordUtf8(nativeHiddenPass);
     env->ReleaseStringUTFChars(outerFileSystem, nativeOuterFS);
     env->ReleaseStringUTFChars(hiddenFileSystem, nativeHiddenFS);
     if (operationId && nativeOpId) env->ReleaseStringUTFChars(operationId, nativeOpId);
@@ -281,23 +281,25 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_changeContainerPasswordNative(
         JNIEnv* env, jobject,
         jint fd, jstring oldPassword, jstring newPassword,
         jint oldPim, jint newPim,
-        jint cipherId, jint hashId, jintArray oldKeyfileFds, jintArray newKeyfileFds) {
+        jint cipherId, jint hashId, jintArray oldKeyfileFds, jintArray newKeyfileFds,
+        jint newHashId) {
     JNI_TRY
 
 
     std::vector<int> oldKfFds = extractKeyfileFds(env, oldKeyfileFds);
     std::vector<int> newKfFds = extractKeyfileFds(env, newKeyfileFds);
     
-    const char* nativeOldPass = env->GetStringUTFChars(oldPassword, nullptr);
-    const char* nativeNewPass = env->GetStringUTFChars(newPassword, nullptr);
+    const char* nativeOldPass = vcGetPasswordUtf8(env, oldPassword);
+    const char* nativeNewPass = vcGetPasswordUtf8(env, newPassword);
 
     bool success = changeContainerPassword(fd, nativeOldPass, nativeNewPass, oldPim, newPim,
                                            cipherId, hashId,
                                            oldKfFds.empty() ? nullptr : oldKfFds.data(), static_cast<int>(oldKfFds.size()),
-                                           newKfFds.empty() ? nullptr : newKfFds.data(), static_cast<int>(newKfFds.size()));
+                                           newKfFds.empty() ? nullptr : newKfFds.data(), static_cast<int>(newKfFds.size()),
+                                           newHashId);
 
-    env->ReleaseStringUTFChars(oldPassword, nativeOldPass);
-    env->ReleaseStringUTFChars(newPassword, nativeNewPass);
+    vcReleasePasswordUtf8(nativeOldPass);
+    vcReleasePasswordUtf8(nativeNewPass);
 
     return success ? JNI_TRUE : JNI_FALSE;
 
@@ -320,15 +322,15 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_changeLuksContainerPasswordNative(
     std::vector<int> oldKfFds = extractKeyfileFds(env, oldKeyfileFds);
     std::vector<int> newKfFds = extractKeyfileFds(env, newKeyfileFds);
 
-    const char* nativeOldPass = env->GetStringUTFChars(oldPassword, nullptr);
-    const char* nativeNewPass = env->GetStringUTFChars(newPassword, nullptr);
+    const char* nativeOldPass = vcGetPasswordUtf8(env, oldPassword);
+    const char* nativeNewPass = vcGetPasswordUtf8(env, newPassword);
 
     int result = changeLuksContainerPassword(fd, nativeOldPass, nativeNewPass,
                                              oldKfFds.empty() ? nullptr : oldKfFds.data(), static_cast<int>(oldKfFds.size()),
                                              newKfFds.empty() ? nullptr : newKfFds.data(), static_cast<int>(newKfFds.size()));
 
-    env->ReleaseStringUTFChars(oldPassword, nativeOldPass);
-    env->ReleaseStringUTFChars(newPassword, nativeNewPass);
+    vcReleasePasswordUtf8(nativeOldPass);
+    vcReleasePasswordUtf8(nativeNewPass);
 
     return result;
 

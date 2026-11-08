@@ -45,7 +45,14 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
     bool success = false;
     unsigned char mixedPassword[MAX_PASSWORD_LEN] = {0};
     ScopeZeroize mixedPasswordGuard(mixedPassword, sizeof(mixedPassword));
-    size_t mixedPasswordLen = std::min(strlen(password), sizeof(mixedPassword));
+    if (strlen(password) > VC_MAX_PASSWORD_BYTES) {
+        // Upstream refuses passwords over 128 UTF-8 bytes (VolumePassword::MaxSize) instead of cutting them.
+        LOGI("createContainer: password longer than %zu bytes (UTF-8)", VC_MAX_PASSWORD_BYTES);
+        close(fd);
+        if (keyfileFds != nullptr) for (int i = 0; i < keyfileCount; i++) if (keyfileFds[i] >= 0) close(keyfileFds[i]);
+        return false;
+    }
+    size_t mixedPasswordLen = strlen(password);
     memcpy(mixedPassword, password, mixedPasswordLen);
     if (keyfileCount > 0 && keyfileFds != nullptr) {
         if (!applyKeyfilesToPassword(keyfileFds, keyfileCount, mixedPassword, &mixedPasswordLen)) {
@@ -591,7 +598,13 @@ bool createContainerWithHidden(int fd,
     bool success = false;
     unsigned char hiddenMixedPassword[MAX_PASSWORD_LEN] = {0};
     ScopeZeroize hiddenMixedPasswordGuard(hiddenMixedPassword, sizeof(hiddenMixedPassword));
-    size_t hiddenMixedPasswordLen = std::min(strlen(hiddenPassword), sizeof(hiddenMixedPassword));
+    if (strlen(hiddenPassword) > VC_MAX_PASSWORD_BYTES) {
+        LOGI("createContainerWithHidden: hidden password longer than %zu bytes (UTF-8)", VC_MAX_PASSWORD_BYTES);
+        close(fd);
+        if (hiddenKeyfileFds) for (int i = 0; i < hiddenKeyfileCount; i++) if (hiddenKeyfileFds[i] >= 0) close(hiddenKeyfileFds[i]);
+        return false;
+    }
+    size_t hiddenMixedPasswordLen = strlen(hiddenPassword);
     memcpy(hiddenMixedPassword, hiddenPassword, hiddenMixedPasswordLen);
 
     if (hiddenKeyfileCount > 0 && hiddenKeyfileFds != nullptr) {
@@ -832,10 +845,14 @@ bool changeContainerPassword(int fd,
                              int oldPim, int newPim,
                              int cipherId, int hashId,
                              const int* oldKeyfileFds, int oldKeyfileCount,
-                             const int* newKeyfileFds, int newKeyfileCount) {
+                             const int* newKeyfileFds, int newKeyfileCount,
+                             int newHashId) {
     bool success = false;
     unsigned char oldMixedPassword[MAX_PASSWORD_LEN] = {0};
     ScopeZeroize oldMixedPasswordGuard(oldMixedPassword, sizeof(oldMixedPassword));
+    // The OLD password keeps the lenient truncation (a volume made by an older build of this
+    // app from a >128-byte password was keyed from its first 128 bytes). The NEW password
+    // must fit, like upstream requires.
     size_t oldMixedPasswordLen = std::min(strlen(oldPassword), sizeof(oldMixedPassword));
     memcpy(oldMixedPassword, oldPassword, oldMixedPasswordLen);
 
@@ -849,7 +866,13 @@ bool changeContainerPassword(int fd,
 
     unsigned char newMixedPassword[MAX_PASSWORD_LEN] = {0};
     ScopeZeroize newMixedPasswordGuard(newMixedPassword, sizeof(newMixedPassword));
-    size_t newMixedPasswordLen = std::min(strlen(newPassword), sizeof(newMixedPassword));
+    if (strlen(newPassword) > VC_MAX_PASSWORD_BYTES) {
+        LOGI("changeContainerPassword: new password longer than %zu bytes (UTF-8)", VC_MAX_PASSWORD_BYTES);
+        close(fd);
+        if (newKeyfileFds) for (int i = 0; i < newKeyfileCount; i++) if (newKeyfileFds[i] >= 0) close(newKeyfileFds[i]);
+        return false;
+    }
+    size_t newMixedPasswordLen = strlen(newPassword);
     memcpy(newMixedPassword, newPassword, newMixedPasswordLen);
 
     if (newKeyfileCount > 0 && newKeyfileFds != nullptr) {

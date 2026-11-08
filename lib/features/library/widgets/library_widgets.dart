@@ -294,56 +294,65 @@ class LibraryTrackTile extends StatelessWidget {
             : Colors.transparent,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: ListTile(
-        onTap: onTap,
-        selected: isPlaying,
-        selectedTileColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-        leading: leadingLabel != null
-            ? SizedBox(
-                width: 44,
-                child: Center(
-                  child: Text(
-                    leadingLabel!,
-                    style: context.typography.bodyMedium?.copyWith(
-                      color: cs.onSurfaceVariant,
+      child: Material(
+        color: Colors.transparent,
+        child: ListTile(
+          onTap: onTap,
+          selected: isPlaying,
+          selectedTileColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          leading: leadingLabel != null
+              ? SizedBox(
+                  width: 44,
+                  child: Center(
+                    child: Text(
+                      leadingLabel!,
+                      style: context.typography.bodyMedium?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
                     ),
                   ),
+                )
+              : LibraryCover(
+                  covers: covers,
+                  track: coverTrack ?? track,
+                  groupKey: coverGroupKey,
+                  size: 44,
                 ),
-              )
-            : LibraryCover(
-                covers: covers,
-                track: coverTrack ?? track,
-                groupKey: coverGroupKey,
-                size: 44,
-              ),
-        title: AnimatedDefaultTextStyle(
-          duration: const Duration(milliseconds: 280),
-          curve: Curves.easeInOutCubic,
-          style: titleStyle,
-          child: Text(
-            track.title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          title: AnimatedDefaultTextStyle(
+            duration: const Duration(milliseconds: 280),
+            curve: Curves.easeInOutCubic,
+            style: titleStyle,
+            child: Text(
+              track.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
-        ),
-        subtitle: line.isEmpty
-            ? null
-            : AnimatedDefaultTextStyle(
-                duration: const Duration(milliseconds: 280),
-                curve: Curves.easeInOutCubic,
-                style: subtitleStyle,
-                child: Text(line, maxLines: 1, overflow: TextOverflow.ellipsis),
-              ),
-        trailing: duration.isEmpty
-            ? null
-            : Text(
-                duration,
-                style: context.typography.bodySmall?.copyWith(
-                  color: cs.onSurfaceVariant,
+          subtitle: line.isEmpty
+              ? null
+              : AnimatedDefaultTextStyle(
+                  duration: const Duration(milliseconds: 280),
+                  curve: Curves.easeInOutCubic,
+                  style: subtitleStyle,
+                  child: Text(
+                    line,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-              ),
+          trailing: duration.isEmpty
+              ? null
+              : Text(
+                  duration,
+                  style: context.typography.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+        ),
       ),
     );
   }

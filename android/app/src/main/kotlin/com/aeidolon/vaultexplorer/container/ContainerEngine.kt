@@ -37,9 +37,11 @@ object ContainerEngine {
         readOnly: Boolean = false,
         hiddenPassword: String? = null, hiddenPim: Int = 0, hiddenCipherId: Int = 255,
         hiddenHashId: Int = 255, hiddenKeyfileFds: IntArray? = null,
+        useBackupHeader: Boolean = false,
     ): Array<String>? = NativeEngine.unlockAndListNative(
         fd, password, pim, volId, cipherId, hashId, preservedKey, keyfileFds, readOnly,
         hiddenPassword, hiddenPim, hiddenCipherId, hiddenHashId, hiddenKeyfileFds,
+        useBackupHeader,
     )
 
     fun unlockUsb(
@@ -48,10 +50,12 @@ object ContainerEngine {
         keyfileFds: IntArray? = null, readOnly: Boolean = false,
         hiddenPassword: String? = null, hiddenPim: Int = 0, hiddenCipherId: Int = 255,
         hiddenHashId: Int = 255, hiddenKeyfileFds: IntArray? = null,
+        useBackupHeader: Boolean = false,
     ): Array<String>? = NativeEngine.unlockUsbAndListNative(
         password, pim, volId, deviceSizeBytes, cipherId, hashId, preservedKey,
         partitionOffsetHint, keyfileFds, readOnly,
         hiddenPassword, hiddenPim, hiddenCipherId, hiddenHashId, hiddenKeyfileFds,
+        useBackupHeader,
     )
 
     fun create(
@@ -121,9 +125,10 @@ object ContainerEngine {
         oldPim: Int, newPim: Int,
         cipherId: Int = 255, hashId: Int = 255,
         oldKeyfileFds: IntArray? = null, newKeyfileFds: IntArray? = null,
+        newHashId: Int = 255,
     ): Boolean = NativeEngine.changeContainerPasswordNative(
         fd, oldPassword, newPassword, oldPim, newPim, cipherId, hashId,
-        oldKeyfileFds, newKeyfileFds
+        oldKeyfileFds, newKeyfileFds, newHashId
     )
 
     fun changeLuksPassword(

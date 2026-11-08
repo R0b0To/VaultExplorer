@@ -240,7 +240,7 @@ class _MiniBarState extends State<_MiniBar> with TickerProviderStateMixin {
       handle.release(velocityY);
       return;
     }
-    final closes = _squish.value >= 0.55 || velocityY > 600;
+    final closes = _squish.value >= 0.35 || velocityY > 350;
     if (closes && _dragDy > 0) {
       _squish
           .animateTo(
@@ -369,12 +369,20 @@ class _MiniBarState extends State<_MiniBar> with TickerProviderStateMixin {
                       const SizedBox(width: AppSpacing.md - 4),
                       Expanded(
                         child: SizedBox(
-                          height: 40,
+                          height: 44,
                           child: ClipRect(
                             child: AnimatedSwitcher(
                               duration: const Duration(milliseconds: 240),
                               switchInCurve: Curves.easeOutCubic,
                               switchOutCurve: Curves.easeInCubic,
+                              layoutBuilder: (currentChild, previousChildren) =>
+                                  Stack(
+                                    alignment: Alignment.centerLeft,
+                                    children: [
+                                      ...previousChildren,
+                                      if (currentChild != null) currentChild,
+                                    ],
+                                  ),
                               transitionBuilder: (child, animation) =>
                                   FadeTransition(
                                     opacity: animation,

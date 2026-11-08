@@ -29,6 +29,9 @@ class ChangePasswordState {
   /// used by LockGateScreen.
   final int successTick;
 
+  /// PKCS-5 PRF for the re-encrypted header (VeraCrypt only); 255 = keep the current one.
+  final int newHashId;
+
   const ChangePasswordState({
     this.oldKeyfiles = const [],
     this.pickingOldKeyfiles = false,
@@ -37,6 +40,7 @@ class ChangePasswordState {
     this.isProcessing = false,
     this.errorMsg,
     this.successTick = 0,
+    this.newHashId = 255,
   });
 }
 
@@ -65,6 +69,7 @@ class ChangePassword extends _$ChangePassword {
     String? errorMsg,
     bool clearError = false,
     int? successTick,
+    int? newHashId,
   }) => ChangePasswordState(
     oldKeyfiles: oldKeyfiles ?? state.oldKeyfiles,
     pickingOldKeyfiles: pickingOldKeyfiles ?? state.pickingOldKeyfiles,
@@ -73,7 +78,10 @@ class ChangePassword extends _$ChangePassword {
     isProcessing: isProcessing ?? state.isProcessing,
     errorMsg: clearError ? null : (errorMsg ?? state.errorMsg),
     successTick: successTick ?? state.successTick,
+    newHashId: newHashId ?? state.newHashId,
   );
+
+  void setNewHashId(int value) => state = _copy(newHashId: value);
 
   Future<void> pickOldKeyfiles(AppLocalizations l10n) async {
     state = _copy(pickingOldKeyfiles: true);
@@ -175,6 +183,7 @@ class ChangePassword extends _$ChangePassword {
           hashId: initialHashId,
           oldKeyfilePaths: state.oldKeyfiles.map((k) => k.uri).toList(),
           newKeyfilePaths: state.newKeyfiles.map((k) => k.uri).toList(),
+          newHashId: state.newHashId,
         );
       }
       if (!ref.mounted) return;

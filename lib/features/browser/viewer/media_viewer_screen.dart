@@ -655,11 +655,6 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     _wasEmpty = _playlistController.isEmpty;
     _zoomLockFile = _playlistController.currentFile;
     _playbackManager = carried?.playbackManager ?? VideoPlaybackManager();
-    if (widget.isLibraryPlayback) {
-      // A library queue advances through tracks by default, regardless of the
-      // media viewer's saved single-file playback mode.
-      _updatePlaybackMode(VideoPlaybackMode.playAndAdvance, persist: false);
-    }
     if (carried != null) {
       _adoptedFile = _playbackManager.currentFileName;
       // The player is already past its resume decision; don't run it again.
@@ -716,6 +711,12 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (carried != null && mounted) {
         _sessionController.setPlaybackSpeed(carried.playbackSpeed);
+      }
+      if (widget.isLibraryPlayback && mounted) {
+        // Set this after the first build: changing the viewer-session provider
+        // from initState is rejected by Riverpod. Do it before activation so
+        // the initial audio track starts with the library's advance behavior.
+        _updatePlaybackMode(VideoPlaybackMode.playAndAdvance, persist: false);
       }
       unawaited(_activateCurrentMedia());
       if (carried != null) _handoffToMiniPlayerIfReady();

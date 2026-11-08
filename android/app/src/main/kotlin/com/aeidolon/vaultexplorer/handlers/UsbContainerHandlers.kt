@@ -264,6 +264,7 @@ class UsbContainerHandlers(
                         hiddenPassword = if (args.protectHiddenVolume) args.hiddenPassword ?: "" else null,
                         hiddenPim = args.hiddenPim, hiddenCipherId = args.hiddenCipherId,
                         hiddenHashId = args.hiddenHashId, hiddenKeyfileFds = hiddenKeyfileFds,
+                        useBackupHeader = args.useBackupHeader,
                     )
                 }
 

@@ -24,6 +24,15 @@ static constexpr size_t MASTER_KEYDATA_SIZE                    = 256;
 static constexpr uint16_t VC_HEADER_FORMAT_VERSION = 0x0005;
 static constexpr uint16_t VC_MIN_PROGRAM_VERSION   = 0x010b;
 
+// Acceptance limits mirrored from upstream VeraCrypt (VolumeHeader.cpp,
+// Common/Tcdefs.h and VolumePassword::MaxSize).
+static constexpr unsigned VC_MIN_HEADER_FORMAT_VERSION = 1;
+static constexpr unsigned VC_PROGRAM_VERSION           = 0x0126;
+static constexpr uint32_t VC_MIN_SECTOR_SIZE           = 512;
+static constexpr uint32_t VC_MAX_SECTOR_SIZE           = 4096;
+static constexpr uint32_t VC_ENCRYPTION_DATA_UNIT_SIZE = 512;
+static constexpr size_t   VC_MAX_PASSWORD_BYTES        = 128;
+
 static constexpr uint64_t TC_VOLUME_HEADER_SIZE          = 64ULL * 1024;              // 65536
 static constexpr uint64_t TC_VOLUME_HEADER_GROUP_SIZE    = 2 * TC_VOLUME_HEADER_SIZE; // 131072
 static constexpr uint64_t TC_VOLUME_DATA_OFFSET          = TC_VOLUME_HEADER_GROUP_SIZE;

@@ -42,7 +42,8 @@ internal object NativeEngine {
         cipherId: Int = 255, hashId: Int = 255, preservedKey: ByteArray? = null,
         keyfileFds: IntArray? = null, readOnly: Boolean = false,
         hiddenPassword: String? = null, hiddenPim: Int = 0,
-        hiddenCipherId: Int = 255, hiddenHashId: Int = 255, hiddenKeyfileFds: IntArray? = null
+        hiddenCipherId: Int = 255, hiddenHashId: Int = 255, hiddenKeyfileFds: IntArray? = null,
+        useBackupHeader: Boolean = false
     ): Array<String>?
 
     @JvmStatic external fun getAvifInfoNative(avifBytes: ByteArray): IntArray?
@@ -80,7 +81,8 @@ internal object NativeEngine {
         fd: Int, oldPassword: String, newPassword: String,
         oldPim: Int, newPim: Int,
         cipherId: Int = 255, hashId: Int = 255,
-        oldKeyfileFds: IntArray? = null, newKeyfileFds: IntArray? = null
+        oldKeyfileFds: IntArray? = null, newKeyfileFds: IntArray? = null,
+        newHashId: Int = 255
     ): Boolean
 
     @JvmStatic
@@ -172,7 +174,8 @@ internal object NativeEngine {
         cipherId: Int = 255, hashId: Int = 255, preservedKey: ByteArray? = null,
         partitionOffsetHint: Long = -1L, keyfileFds: IntArray? = null, readOnly: Boolean = false,
         hiddenPassword: String? = null, hiddenPim: Int = 0,
-        hiddenCipherId: Int = 255, hiddenHashId: Int = 255, hiddenKeyfileFds: IntArray? = null
+        hiddenCipherId: Int = 255, hiddenHashId: Int = 255, hiddenKeyfileFds: IntArray? = null,
+        useBackupHeader: Boolean = false
     ): Array<String>?
 
     // Returns a structured result map instead of a bare Boolean:

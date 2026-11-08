@@ -46,9 +46,17 @@ class FileManagerActionBar extends StatelessWidget {
           top: false,
           child: SizedBox(
             height: 56,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: children,
+            child: LayoutBuilder(
+              builder: (context, constraints) => SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: children,
+                  ),
+                ),
+              ),
             ),
           ),
         ),

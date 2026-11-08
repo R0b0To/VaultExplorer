@@ -271,6 +271,8 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
   String? _lastTrackPath;
   double _trackSlide = 1;
   bool _pendingTrackSlide = false;
+  bool _dragActive = false;
+  int _dragDirection = 0;
 
   double get _travel => math.max(widget.handle.miniRect.top, 1.0);
 
@@ -431,8 +433,28 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
 
   // ── Dragging ─────────────────────────────────────────────────────────────
 
+  void _beginDrag() {
+    _dragActive = true;
+    _closing = false;
+    _dragDirection = 0;
+    _c.stop();
+  }
+
+  void _endDrag(double velocityY) {
+    if (!_dragActive) return;
+    _dragActive = false;
+    _release(velocityY);
+  }
+
+  void _cancelDrag() {
+    if (!_dragActive) return;
+    _dragActive = false;
+    _release(0);
+  }
+
   void _dragBy(double dy) {
-    if (_closing) return;
+    if (dy != 0) _dragDirection = dy > 0 ? 1 : -1;
+    _closing = false;
     _c.stop();
     _c.value = (_c.value - dy / _travel).clamp(0.0, 1.0);
   }
@@ -440,8 +462,15 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
   void _release(double velocityY) {
     if (_closing) return;
     final double target;
-    if (velocityY.abs() > 600) {
+    if (velocityY.abs() > 350) {
       target = velocityY < 0 ? 1.0 : 0.0;
+    } else if (_dragDirection < 0) {
+      // Let a deliberate slow upward drag open without needing half the
+      // screen's travel.
+      target = _c.value >= 0.2 ? 1.0 : 0.0;
+    } else if (_dragDirection > 0) {
+      // Use a matching threshold when dragging the full player down.
+      target = _c.value <= 0.8 ? 0.0 : 1.0;
     } else {
       target = _c.value > 0.5 ? 1.0 : 0.0;
     }
@@ -587,7 +616,9 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
     );
 
     // Expanded geometry.
-    final below = 24 + 76 + 8 + 52 + 12 + _expandedPlay + 24 + pad.bottom;
+    const titleHeight = 84.0;
+    final below =
+        24 + titleHeight + 8 + 52 + 12 + _expandedPlay + 24 + pad.bottom;
     final coverSize = math
         .min(size.width - 64, size.height - pad.top - _topBar - 8 - below)
         .clamp(96.0, 440.0)
@@ -600,7 +631,7 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
       coverSize,
     );
     final titleTop = coverTop + coverSize + 24;
-    final seekTop = titleTop + 76 + 8;
+    final seekTop = titleTop + titleHeight + 8;
     final controlsTop = seekTop + 52 + 12;
     final expPlayCenter = Offset(
       size.width / 2,
@@ -653,10 +684,28 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
       );
     }
 
-    final titleStyle = text.bodyMedium?.copyWith(fontWeight: FontWeight.w600);
     final miniTextLeft = miniCoverRect.right + AppSpacing.md - 4;
     final miniTextRight =
         mini.right - AppSpacing.xs - _miniButton * 3 - AppSpacing.sm;
+    final titleStyle = TextStyle.lerp(
+      text.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+      text.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+      e,
+    );
+    final artistStyle = TextStyle.lerp(
+      text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+      text.bodyLarge?.copyWith(color: cs.onSurfaceVariant),
+      e,
+    );
+    final titleLeft = _lerp(miniTextLeft, 32, e);
+    final titleRight = _lerp(miniTextRight, size.width - 32, e);
+    final titleAreaTop = _lerp(mini.top + miniDy + 1, titleTop, e);
+    final titleAreaHeight = _lerp(mini.height - 1, titleHeight, e);
+    final titleAlignment = Alignment.lerp(
+      Alignment.centerLeft,
+      Alignment.topCenter,
+      e,
+    )!;
 
     return Stack(
       clipBehavior: Clip.none,
@@ -700,36 +749,83 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
             ),
           ),
 
-        // The bar's title and artist.
+        // The title and artist travel between the bar and full-player layouts.
         Positioned(
-          left: miniTextLeft,
-          width: math.max(0.0, miniTextRight - miniTextLeft),
-          top: mini.top + miniDy + 1,
-          height: mini.height - 1,
-          child: fade(
-            miniOpacity,
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    info.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: titleStyle,
+          left: titleLeft,
+          width: math.max(0.0, titleRight - titleLeft),
+          top: titleAreaTop,
+          height: titleAreaHeight,
+          child: Align(
+            alignment: titleAlignment,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: math.max(0.0, titleRight - titleLeft),
+              ),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 260),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                layoutBuilder: (currentChild, previousChildren) => Stack(
+                  alignment: titleAlignment,
+                  clipBehavior: Clip.none,
+                  children: [
+                    ...previousChildren,
+                    if (currentChild != null) currentChild,
+                  ],
+                ),
+                transitionBuilder: (child, animation) => FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: Offset(_trackSlide * 0.16, 0),
+                      end: Offset.zero,
+                    ).animate(animation),
+                    child: child,
                   ),
-                  if (info.artist.isNotEmpty)
+                ),
+                child: Column(
+                  key: ValueKey<String>('t${info.path}'),
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      info.artist,
+                      info.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: text.bodySmall?.copyWith(
-                        color: cs.onSurfaceVariant,
-                      ),
+                      style: titleStyle,
                     ),
-                ],
+                    if (info.artist.isNotEmpty)
+                      Padding(
+                        padding: EdgeInsets.only(top: 2 * e),
+                        child: Text(
+                          info.artist,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: artistStyle,
+                        ),
+                      ),
+                    if (info.album.isNotEmpty)
+                      ClipRect(
+                        child: Align(
+                          alignment: Alignment.topCenter,
+                          heightFactor: fullOpacity,
+                          child: Opacity(
+                            opacity: fullOpacity,
+                            child: Text(
+                              info.album,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: text.bodyMedium?.copyWith(
+                                color: cs.onSurfaceVariant.withValues(
+                                  alpha: 0.8,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -828,70 +924,6 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
                     ),
                   ),
                 ),
-              ),
-            ),
-          ),
-        ),
-
-        // Title, artist and album of the full player.
-        Positioned(
-          left: 32,
-          right: 32,
-          top: titleTop + 8 * (1 - fullOpacity),
-          height: 76,
-          child: fade(
-            fullOpacity,
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 260),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeInCubic,
-              transitionBuilder: (child, animation) => FadeTransition(
-                opacity: animation,
-                child: SlideTransition(
-                  position: Tween<Offset>(
-                    begin: Offset(_trackSlide * 0.16, 0),
-                    end: Offset.zero,
-                  ).animate(animation),
-                  child: child,
-                ),
-              ),
-              child: Column(
-                key: ValueKey<String>('t${info.path}'),
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    info.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: text.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  if (info.artist.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text(
-                        info.artist,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: text.bodyLarge?.copyWith(
-                          color: cs.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  if (info.album.isNotEmpty)
-                    Text(
-                      info.album,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                      style: text.bodyMedium?.copyWith(
-                        color: cs.onSurfaceVariant.withValues(alpha: 0.8),
-                      ),
-                    ),
-                ],
               ),
             ),
           ),
@@ -1047,14 +1079,12 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
         // cover-free background only.
         Positioned.fromRect(
           rect: panel,
-          child: IgnorePointer(
-            ignoring: p < 0.5,
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onVerticalDragUpdate: (d) => _dragBy(d.delta.dy),
-              onVerticalDragEnd: (d) => _release(d.primaryVelocity ?? 0),
-              onVerticalDragCancel: () => _release(0),
-            ),
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onVerticalDragStart: (_) => _beginDrag(),
+            onVerticalDragUpdate: (d) => _dragBy(d.delta.dy),
+            onVerticalDragEnd: (d) => _endDrag(d.primaryVelocity ?? 0),
+            onVerticalDragCancel: _cancelDrag,
           ),
         ),
       ],

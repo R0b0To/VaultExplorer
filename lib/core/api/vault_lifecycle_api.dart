@@ -482,10 +482,12 @@ class VaultLifecycleApi {
     int hashId = 255,
     List<String>? oldKeyfilePaths,
     List<String>? newKeyfilePaths,
+    int newHashId = 255,
   }) async {
     try {
       final success = await _channel
           .invokeMethod<bool>(ChannelMethods.changeContainerPassword, {
+            'newHashId': newHashId,
             'uri': uri,
             'oldPassword': oldPassword,
             'newPassword': newPassword,
@@ -1085,6 +1087,7 @@ class VaultLifecycleApi {
     int? hiddenVolumeCipherId,
     int? hiddenVolumeHashId,
     List<String>? hiddenVolumeKeyfilePaths,
+    bool useBackupHeader = false,
   }) async {
     final raw = await _channel.invokeMethod<Map<Object?, Object?>>(
       ChannelMethods.unlockContainer,
@@ -1102,6 +1105,7 @@ class VaultLifecycleApi {
         if (keyfilePaths != null && keyfilePaths.isNotEmpty)
           'keyfilePaths': keyfilePaths,
         'readOnly': readOnly,
+        'useBackupHeader': useBackupHeader,
         'protectHiddenVolume': protectHiddenVolume,
         if (protectHiddenVolume) ...{
           'hiddenVolumePassword': hiddenVolumePassword ?? '',
@@ -1289,6 +1293,7 @@ class VaultLifecycleApi {
     int? hiddenVolumeCipherId,
     int? hiddenVolumeHashId,
     List<String>? hiddenVolumeKeyfilePaths,
+    bool useBackupHeader = false,
   }) async {
     final raw = await _channel.invokeMethod<Map<Object?, Object?>>(
       ChannelMethods.unlockUsbContainer,
@@ -1306,6 +1311,7 @@ class VaultLifecycleApi {
         if (keyfilePaths != null && keyfilePaths.isNotEmpty)
           'keyfilePaths': keyfilePaths,
         'readOnly': readOnly,
+        'useBackupHeader': useBackupHeader,
         'protectHiddenVolume': protectHiddenVolume,
         if (protectHiddenVolume) ...{
           'hiddenVolumePassword': hiddenVolumePassword ?? '',

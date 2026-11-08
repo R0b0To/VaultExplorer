@@ -48,6 +48,7 @@ data class UnlockArgs(
     val hiddenCipherId: Int,
     val hiddenHashId: Int,
     val hiddenKeyfilePaths: List<String>?,
+    val useBackupHeader: Boolean = false,
 )
 
 fun parseUnlockArgs(
@@ -73,6 +74,7 @@ fun parseUnlockArgs(
     val cacheDerivedKey = call.argument<Boolean>("cacheDerivedKey") ?: false
     val keyfilePaths = call.argument<List<String>>("keyfilePaths")
     val readOnly = call.argument<Boolean>("readOnly") ?: false
+    val useBackupHeader = call.argument<Boolean>("useBackupHeader") ?: false
     val protectHiddenVolume = call.argument<Boolean>("protectHiddenVolume") ?: false
     val hiddenPassword = call.argument<String>("hiddenVolumePassword")
     val hiddenPim = call.argument<Number>("hiddenVolumePim")?.toInt() ?: 0
@@ -120,6 +122,7 @@ fun parseUnlockArgs(
         hiddenCipherId = hiddenCipherId,
         hiddenHashId = hiddenHashId,
         hiddenKeyfilePaths = hiddenKeyfilePaths,
+        useBackupHeader = useBackupHeader,
     )
 }
 
@@ -304,6 +307,7 @@ class VaultUnlockHandlers(
                 hiddenCipherId = args.hiddenCipherId,
                 hiddenHashId = args.hiddenHashId,
                 hiddenKeyfileFds = hiddenKeyfileFds,
+                useBackupHeader = args.useBackupHeader,
                 cacheDerivedKey = args.cacheDerivedKey,
                 derivedKeyHandlers = derivedKeyHandlers,
                 fuseHandler = fuseHandler,
@@ -563,6 +567,7 @@ class VaultUnlockHandlers(
         val newPim = call.argument<Number>("newPim")?.toInt() ?: 0
         val cipherId = call.argument<Number>("cipherId")?.toInt() ?: 255
         val hashId = call.argument<Number>("hashId")?.toInt() ?: 255
+        val newHashId = call.argument<Number>("newHashId")?.toInt() ?: 255
         val oldKeyfilePaths = call.argument<List<String>>("oldKeyfilePaths")
         val newKeyfilePaths = call.argument<List<String>>("newKeyfilePaths")
 
@@ -581,7 +586,7 @@ class VaultUnlockHandlers(
                 val success = ContainerEngine.changePassword(
                     pfd.detachFd(), oldPassword, newPassword,
                     oldPim, newPim, cipherId, hashId,
-                    oldKfFds, newKfFds
+                    oldKfFds, newKfFds, newHashId
                 )
                 activity.runOnUiThread { result.success(success) }
             } catch (e: Exception) {

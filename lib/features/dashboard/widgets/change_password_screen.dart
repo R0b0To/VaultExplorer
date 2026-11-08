@@ -5,6 +5,9 @@ import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/change_password_controller.dart';
+import 'package:vaultexplorer/core/widgets/inputs/utf8_byte_limit_formatter.dart';
+import 'package:vaultexplorer/core/widgets/inputs/option_picker_tile.dart';
+import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
 
 class ChangePasswordScreen extends ConsumerStatefulWidget {
   final String uri;
@@ -140,6 +143,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
               child: TextField(
                 controller: _newPasswordCtrl,
                 obscureText: _newObscure,
+                inputFormatters: (_isFolderVault || _isLuks) ? null : const [Utf8ByteLimitingFormatter(128)],
                 onChanged: (_) => setState(() {}),
                 autofillHints: null,
                 decoration: InputDecoration(
@@ -157,6 +161,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
               child: TextField(
                 controller: _confirmPasswordCtrl,
                 obscureText: _confirmObscure,
+                inputFormatters: (_isFolderVault || _isLuks) ? null : const [Utf8ByteLimitingFormatter(128)],
                 onChanged: (_) => setState(() {}),
                 autofillHints: null,
                 decoration: InputDecoration(
@@ -185,6 +190,21 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                       onToggle: () => setState(() => _newPimObscure = !_newPimObscure),
                     ),
                   ),
+                ),
+              ),
+            if (!_hidePim)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: OptionPickerTile<int>(
+                  label: context.l10n.hashAlgorithmLabel,
+                  value: state.newHashId,
+                  prefixIcon: Icons.tag_rounded,
+                  options: [
+                    SelectOption<int>(value: 255, label: context.l10n.keepCurrentOption),
+                    for (final h in HashAlgo.concrete) SelectOption<int>(value: h.id, label: h.label),
+                  ],
+                  onChanged: ref.read(changePasswordProvider(widget.uri, widget.containerFormat, widget.initialCipherId, widget.initialHashId).notifier).setNewHashId,
+                  enabled: !state.isProcessing,
                 ),
               ),
             if (!_isFolderVault)

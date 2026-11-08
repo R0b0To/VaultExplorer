@@ -171,6 +171,7 @@ object ContainerLifecycleCore {
         cacheDerivedKey: Boolean = false,
         derivedKeyHandlers: DerivedKeyHandlers? = null,
         fuseHandler: Handler,
+        useBackupHeader: Boolean = false,
     ): UnlockCoreOutcome {
         var pfd: ParcelFileDescriptor? = null
         var proxyPfd: ParcelFileDescriptor? = null
@@ -238,6 +239,7 @@ object ContainerLifecycleCore {
                     fd, password, pim, targetVolId, cipherId, hashId, preservedKey, keyfileFds, readOnly,
                     if (protectHiddenVolume) hiddenPassword ?: "" else null,
                     hiddenPim, hiddenCipherId, hiddenHashId, hiddenKeyfileFds,
+                    useBackupHeader,
                 )
             }
 

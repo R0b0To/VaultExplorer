@@ -231,10 +231,10 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_deriveKeyMaterialNative(
     JNI_TRY
     if (fd < 0 || password == nullptr) return nullptr;
     std::vector<int> kfFds = extractKeyfileFds(env, keyfileFds);
-    const char* nativePass = env->GetStringUTFChars(password, nullptr);
+    const char* nativePass = vcGetPasswordUtf8(env, password);
     unsigned char headerBuf[VC_FULL_HEADER_SIZE];
     if (pread(fd, headerBuf, VC_FULL_HEADER_SIZE, 0) != VC_FULL_HEADER_SIZE) {
-        env->ReleaseStringUTFChars(password, nativePass);
+        vcReleasePasswordUtf8(nativePass);
         closeUnusedKeyfileFds(kfFds.data(), static_cast<int>(kfFds.size()));
         return nullptr;
     }
@@ -242,7 +242,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_deriveKeyMaterialNative(
     ScopeZeroize mixedPasswordGuard(mixedPassword, sizeof(mixedPassword));
     size_t mixedPasswordLen = std::min(strlen(nativePass), sizeof(mixedPassword));
     memcpy(mixedPassword, nativePass, mixedPasswordLen);
-    env->ReleaseStringUTFChars(password, nativePass);
+    vcReleasePasswordUtf8(nativePass);
     if (!kfFds.empty() && !applyKeyfilesToPassword(kfFds.data(), static_cast<int>(kfFds.size()), mixedPassword, &mixedPasswordLen)) {
         return nullptr;
     }

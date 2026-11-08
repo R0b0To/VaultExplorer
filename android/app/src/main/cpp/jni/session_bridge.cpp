@@ -43,16 +43,17 @@ static void rollBackUnprotectedSession(int volId) {
 
 static bool applyHiddenVolumeProtectionOrRollBack(
         JNIEnv* env, int volId, jstring hiddenPassword, jint hiddenPim,
-        jint hiddenCipherId, jint hiddenHashId, jintArray hiddenKeyfileFds) {
+        jint hiddenCipherId, jint hiddenHashId, jintArray hiddenKeyfileFds, bool useBackupHeader) {
     if (hiddenPassword == nullptr) return true;
 
-    const char* nativeHiddenPass = env->GetStringUTFChars(hiddenPassword, nullptr);
+    const char* nativeHiddenPass = vcGetPasswordUtf8(env, hiddenPassword);
     std::vector<int> hiddenKfFds = extractKeyfileFds(env, hiddenKeyfileFds);
     const bool ok = enableHiddenVolumeProtection(
         volId, reinterpret_cast<const unsigned char*>(nativeHiddenPass), strlen(nativeHiddenPass),
         hiddenPim, hiddenCipherId, hiddenHashId,
-        hiddenKfFds.empty() ? nullptr : hiddenKfFds.data(), static_cast<int>(hiddenKfFds.size()));
-    env->ReleaseStringUTFChars(hiddenPassword, nativeHiddenPass);
+        hiddenKfFds.empty() ? nullptr : hiddenKfFds.data(), static_cast<int>(hiddenKfFds.size()),
+        useBackupHeader);
+    vcReleasePasswordUtf8(nativeHiddenPass);
 
     if (!ok) {
         rollBackUnprotectedSession(volId);
@@ -64,7 +65,8 @@ static bool applyHiddenVolumeProtectionOrRollBack(
 extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_unlockAndListNative(
         JNIEnv* env, jobject, jint fd, jstring password, jint pim, jint volId, jint cipherId, jint hashId, jbyteArray preservedKey, jintArray keyfileFds, jboolean readOnly,
-        jstring hiddenPassword, jint hiddenPim, jint hiddenCipherId, jint hiddenHashId, jintArray hiddenKeyfileFds) {
+        jstring hiddenPassword, jint hiddenPim, jint hiddenCipherId, jint hiddenHashId, jintArray hiddenKeyfileFds,
+        jboolean useBackupHeader) {
     JNI_TRY
 
     clearUnlockCancellation(volId);
@@ -77,15 +79,15 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_unlockAndListNative(
     }
 
     std::vector<int> kfFds = extractKeyfileFds(env, keyfileFds);
-    const char* nativePass = env->GetStringUTFChars(password, nullptr);
+    const char* nativePass = vcGetPasswordUtf8(env, password);
     
     if (!prepareSession(fd, reinterpret_cast<const unsigned char*>(nativePass), strlen(nativePass), pim, volId, true, cipherId, hashId, preservedBytes, preservedLen,
                              kfFds.empty() ? nullptr : kfFds.data(), static_cast<int>(kfFds.size()),
-                             readOnly == JNI_TRUE)) {
+                             readOnly == JNI_TRUE, useBackupHeader == JNI_TRUE)) {
         if (preservedKey != nullptr) {
             env->ReleaseByteArrayElements(preservedKey, reinterpret_cast<jbyte*>(const_cast<unsigned char*>(preservedBytes)), JNI_ABORT);
         }
-        env->ReleaseStringUTFChars(password, nativePass);
+        vcReleasePasswordUtf8(nativePass);
         if (isUnlockCancelled(volId)) throwUnlockCancelledException(env);
         return nullptr;
     }
@@ -99,7 +101,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_unlockAndListNative(
     if (preservedKey != nullptr) {
         env->ReleaseByteArrayElements(preservedKey, reinterpret_cast<jbyte*>(const_cast<unsigned char*>(preservedBytes)), JNI_ABORT);
     }
-    env->ReleaseStringUTFChars(password, nativePass);
+    vcReleasePasswordUtf8(nativePass);
 
     if (!mountOk) {
         LOGI("FATFS/NTFS Mount failed on volume %d", volId);
@@ -107,7 +109,8 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_unlockAndListNative(
     }
 
     if (!applyHiddenVolumeProtectionOrRollBack(env, volId, hiddenPassword, hiddenPim,
-                                               hiddenCipherId, hiddenHashId, hiddenKeyfileFds)) {
+                                               hiddenCipherId, hiddenHashId, hiddenKeyfileFds,
+                                               useBackupHeader == JNI_TRUE)) {
         return nullptr;
     }
 
@@ -263,7 +266,8 @@ extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_unlockUsbAndListNative(
         JNIEnv* env, jobject, jstring password, jint pim, jint volId, jlong deviceSizeBytes, jint cipherId, jint hashId, jbyteArray preservedKey,
         jlong partitionOffsetHint, jintArray keyfileFds, jboolean readOnly,
-        jstring hiddenPassword, jint hiddenPim, jint hiddenCipherId, jint hiddenHashId, jintArray hiddenKeyfileFds) {
+        jstring hiddenPassword, jint hiddenPim, jint hiddenCipherId, jint hiddenHashId, jintArray hiddenKeyfileFds,
+        jboolean useBackupHeader) {
     JNI_TRY
 
     clearUnlockCancellation(volId);
@@ -276,17 +280,18 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_unlockUsbAndListNative(
     }
 
     std::vector<int> kfFds = extractKeyfileFds(env, keyfileFds);
-    const char* nativePass = env->GetStringUTFChars(password, nullptr);
+    const char* nativePass = vcGetPasswordUtf8(env, password);
     
     const bool ok = prepareUsbSession(reinterpret_cast<const unsigned char*>(nativePass), strlen(nativePass), pim, volId, cipherId, hashId, preservedBytes, preservedLen,
                                        static_cast<int64_t>(partitionOffsetHint),
                                        kfFds.empty() ? nullptr : kfFds.data(), static_cast<int>(kfFds.size()),
-                                       readOnly == JNI_TRUE);
+                                       readOnly == JNI_TRUE, useBackupHeader == JNI_TRUE,
+                                       static_cast<int64_t>(deviceSizeBytes));
     
     if (preservedKey != nullptr) {
         env->ReleaseByteArrayElements(preservedKey, reinterpret_cast<jbyte*>(const_cast<unsigned char*>(preservedBytes)), JNI_ABORT);
     }
-    env->ReleaseStringUTFChars(password, nativePass);
+    vcReleasePasswordUtf8(nativePass);
     if (!ok) {
         if (isUnlockCancelled(volId)) throwUnlockCancelledException(env);
         return nullptr;
@@ -308,7 +313,8 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_unlockUsbAndListNative(
     }
 
     if (!applyHiddenVolumeProtectionOrRollBack(env, volId, hiddenPassword, hiddenPim,
-                                               hiddenCipherId, hiddenHashId, hiddenKeyfileFds)) {
+                                               hiddenCipherId, hiddenHashId, hiddenKeyfileFds,
+                                               useBackupHeader == JNI_TRUE)) {
         return nullptr;
     }
 

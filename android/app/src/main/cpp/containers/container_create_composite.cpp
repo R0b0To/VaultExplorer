@@ -161,7 +161,10 @@ CompositeCreateResult createCompositeContainer(
 
     unsigned char mixedPassword[MAX_PASSWORD_LEN] = {0};
     ScopeZeroize mixedPasswordGuard(mixedPassword, sizeof(mixedPassword));
-    size_t mixedPasswordLen = std::min(std::strlen(password), sizeof(mixedPassword));
+    if (std::strlen(password) > VC_MAX_PASSWORD_BYTES) {
+        return {false, "PASSWORD_TOO_LONG", "Password is longer than 128 bytes (UTF-8)", 0};
+    }
+    size_t mixedPasswordLen = std::strlen(password);
     std::memcpy(mixedPassword, password, mixedPasswordLen);
 
     if (keyfileCount > 0 && keyfileFds != nullptr) {
@@ -494,6 +497,7 @@ CompositeUnlockResult prepareCompositeSession(
         v.cascade = candidateCascade;
         v.dataOffset = fields.encryptedAreaStart;
         v.dataAreaLengthBytes = fields.encryptedAreaLength;
+        v.luksSectorSize = fields.sectorSize;   // logical sector size from the header
         v.isHiddenVolume = fields.isHiddenVolume();
         v.fileSize = requiredBytes;
         v.matchedCipherId = static_cast<int>(matchedCipher);

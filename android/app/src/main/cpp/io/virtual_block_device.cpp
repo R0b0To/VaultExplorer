@@ -233,8 +233,7 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
     if (count == 0) return RES_PARERR;
 
     VolumeState& v = volumes[pdrv];
-    const bool isLuks = (v.containerFormat != ContainerFormat::kVeraCrypt);
-    const uint32_t luksUnit = (isLuks && v.luksSectorSize >= 512) ? v.luksSectorSize : 512;
+    const uint32_t luksUnit = (v.luksSectorSize >= 512) ? v.luksSectorSize : 512;
 
     if (v.containerFormat == ContainerFormat::kBitLocker) {
         const bool ok = bitlockerRead(pdrv, static_cast<uint64_t>(sector) * luksUnit,
@@ -296,7 +295,10 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
         std::unique_ptr<unsigned char[]> decryptedOut(new unsigned char[totalBytes]);
 
         if (v.containerFormat == ContainerFormat::kVeraCrypt) {
-            parallelCryptoLoop(batch.count, [&](uint32_t i) {
+            // XTS data units are always 512 bytes, also on 1024/2048/4096-byte-sector
+            // volumes (upstream: hostOffset / ENCRYPTION_DATA_UNIT_SIZE), so a logical
+            // sector is processed as luksUnit/512 consecutive data units.
+            parallelCryptoLoop(batch.count * (luksUnit / 512), [&](uint32_t i) {
                 const uint64_t phys512Sector = (startByte / 512) + i;
                 const uint64_t tweak = phys512Sector - v.partitionStartSector;
                 cascadeDecryptSector(v.cascade, tweak, encBuf + (i * 512),
@@ -341,8 +343,7 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
     if (count == 0) return RES_PARERR;
 
     VolumeState& v = volumes[pdrv];
-    const bool isLuks = (v.containerFormat != ContainerFormat::kVeraCrypt);
-    const uint32_t luksUnit = (isLuks && v.luksSectorSize >= 512) ? v.luksSectorSize : 512;
+    const uint32_t luksUnit = (v.luksSectorSize >= 512) ? v.luksSectorSize : 512;
 
     if (volumes[pdrv].containerFormat == ContainerFormat::kBitLocker) {
         const bool ok = bitlockerWrite(pdrv, static_cast<uint64_t>(sector) * luksUnit,
@@ -391,7 +392,10 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
         }
 
         if (v.containerFormat == ContainerFormat::kVeraCrypt) {
-            parallelCryptoLoop(batch.count, [&](uint32_t i) {
+            // XTS data units are always 512 bytes, also on 1024/2048/4096-byte-sector
+            // volumes (upstream: hostOffset / ENCRYPTION_DATA_UNIT_SIZE), so a logical
+            // sector is processed as luksUnit/512 consecutive data units.
+            parallelCryptoLoop(batch.count * (luksUnit / 512), [&](uint32_t i) {
                 const uint64_t phys512Sector = (startByte / 512) + i;
                 const uint64_t tweak = phys512Sector - v.partitionStartSector;
                 cascadeEncryptSector(v.cascade, tweak, curBuf + (i * 512), encBuf + (i * 512));

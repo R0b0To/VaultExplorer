@@ -46,7 +46,11 @@ UsbCreateResult createUsbContainer(int volId, uint64_t startSector, const char* 
     UsbCreateResult result = UsbCreateResult::Fail(UsbCreatePhase::kValidate, "USB_CREATE_FAILED", "Unknown failure");
     unsigned char mixedPassword[MAX_PASSWORD_LEN] = {0};
     ScopeZeroize mixedPasswordGuard(mixedPassword, sizeof(mixedPassword));
-    size_t mixedPasswordLen = std::min(strlen(password), sizeof(mixedPassword));
+    if (strlen(password) > VC_MAX_PASSWORD_BYTES) {
+        return UsbCreateResult::Fail(UsbCreatePhase::kValidate, "USB_PASSWORD_TOO_LONG",
+                                      "Password is longer than 128 bytes (UTF-8)");
+    }
+    size_t mixedPasswordLen = strlen(password);
     memcpy(mixedPassword, password, mixedPasswordLen);
     if (keyfileCount > 0 && keyfileFds != nullptr) {
         if (!applyKeyfilesToPassword(keyfileFds, keyfileCount, mixedPassword, &mixedPasswordLen)) {
@@ -574,9 +578,13 @@ UsbCreateResult createUsbContainerWithHidden(
     ScopeZeroize outerPassGuard(mixedOuterPass, sizeof(mixedOuterPass));
     ScopeZeroize hiddenPassGuard(mixedHiddenPass, sizeof(mixedHiddenPass));
 
-    size_t mixedOuterLen = std::min(strlen(outerPassword), sizeof(mixedOuterPass));
+    if (strlen(outerPassword) > VC_MAX_PASSWORD_BYTES || strlen(hiddenPassword) > VC_MAX_PASSWORD_BYTES) {
+        return UsbCreateResult::Fail(UsbCreatePhase::kValidate, "USB_PASSWORD_TOO_LONG",
+                                      "Password is longer than 128 bytes (UTF-8)");
+    }
+    size_t mixedOuterLen = strlen(outerPassword);
     memcpy(mixedOuterPass, outerPassword, mixedOuterLen);
-    size_t mixedHiddenLen = std::min(strlen(hiddenPassword), sizeof(mixedHiddenPass));
+    size_t mixedHiddenLen = strlen(hiddenPassword);
     memcpy(mixedHiddenPass, hiddenPassword, mixedHiddenLen);
 
     if (outerKeyfileCount > 0 && outerKeyfileFds) {

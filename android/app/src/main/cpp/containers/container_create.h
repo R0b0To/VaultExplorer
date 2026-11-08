@@ -142,7 +142,8 @@ bool changeContainerPassword(int fd,
                               int oldPim, int newPim,
                               int cipherId, int hashId,
                               const int* oldKeyfileFds = nullptr, int oldKeyfileCount = 0,
-                              const int* newKeyfileFds = nullptr, int newKeyfileCount = 0);
+                              const int* newKeyfileFds = nullptr, int newKeyfileCount = 0,
+                              int newHashId = 255);   // 255 = keep the PRF the header was found with
 
 // Rewraps a LUKS1/LUKS2 container's master key (whichever version [fd]
 // already is, auto-detected) under a new password: unlocks with

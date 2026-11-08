@@ -17,6 +17,7 @@ import 'package:vaultexplorer/features/composite/presentation/composite_create_s
 import 'package:vaultexplorer/features/dashboard/widgets/quick_password_generator_sheet.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
+import 'package:vaultexplorer/core/widgets/inputs/utf8_byte_limit_formatter.dart';
 
 enum _WizStep { basics, security, advanced, hiddenVolume, randomness, review }
 
@@ -819,6 +820,7 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
         child: TextField(
           controller: _passwordCtrl,
           obscureText: _obscure,
+          inputFormatters: const [Utf8ByteLimitingFormatter(128)],
           onChanged: (_) => setState(() {}),
           autofillHints: null,
           decoration: InputDecoration(
@@ -846,6 +848,7 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
         child: TextField(
           controller: _confirmPasswordCtrl,
           obscureText: _confirmObscure,
+          inputFormatters: const [Utf8ByteLimitingFormatter(128)],
           onChanged: (_) => setState(() {}),
           autofillHints: null,
           decoration: InputDecoration(
@@ -1130,6 +1133,7 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
               child: TextField(
                 controller: _hiddenPasswordCtrl,
                 obscureText: _hiddenObscure,
+                inputFormatters: const [Utf8ByteLimitingFormatter(128)],
                 onChanged: (_) => setState(() {}),
                 autofillHints: null,
                 decoration: InputDecoration(
@@ -1157,6 +1161,7 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
               child: TextField(
                 controller: _hiddenConfirmPasswordCtrl,
                 obscureText: _hiddenConfirmObscure,
+                inputFormatters: const [Utf8ByteLimitingFormatter(128)],
                 onChanged: (_) => setState(() {}),
                 autofillHints: null,
                 decoration: InputDecoration(

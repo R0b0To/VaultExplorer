@@ -206,9 +206,22 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
   Timer? _followTimer;
   bool _diskPreloadRunning = false;
 
-  /// Only decides how a reflow is applied (see [GalleryLayoutHost.reflow]);
-  /// nothing in this view waits for it to become false.
+  /// Only decide how a reflow is applied (see [GalleryLayoutHost.reflow]);
+  /// nothing in this view waits for them to become false.
   bool _isScrolling = false;
+
+  /// The scroll handle is held. Dragging it moves the list with `jumpTo`,
+  /// whose scroll notifications start and end within the same call, so
+  /// [_isScrolling] alone never sees it.
+  bool _handleDragging = false;
+
+  /// Set by the scrollbar while the list moves too fast to read. A layout
+  /// change that lands mid-sweep would only reshuffle a blur (at a different
+  /// rate than the scroll itself); it is applied as soon as the speed drops,
+  /// which is well before the scroll stops.
+  final ValueNotifier<bool> _scrollSpeed = ValueNotifier<bool>(false);
+
+  bool get _freezeLayout => _isScrolling || _handleDragging;
 
   // ── The persisted media index ──────────────────────────────────────────────
   late final MediaIndexService _index;
@@ -282,6 +295,7 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
     _indexGeneration++;
     _flushTimer?.cancel();
     _followTimer?.cancel();
+    _scrollSpeed.dispose();
     _morphController.dispose();
     super.dispose();
   }
@@ -774,9 +788,13 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
       _scheduleFlush(const Duration(milliseconds: 60));
       return;
     }
+    if (_scrollSpeed.value) {
+      _scheduleFlush(const Duration(milliseconds: 120));
+      return;
+    }
     final result = _host.reflow(
       crossExtent: width,
-      freezeAboveViewport: _isScrolling,
+      freezeAboveViewport: _freezeLayout,
     );
     _ratiosDirty = false;
     if (result == GalleryReflowResult.applied) setState(() {});
@@ -989,6 +1007,14 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
     _zoomAnchor = null;
   }
 
+  void _onHandleDragChanged(bool dragging) {
+    _handleDragging = dragging;
+    if (!dragging && (_ratiosDirty || _host.hasStalePrefix)) {
+      // Let go: bring the rows above the screen up to date, anchored.
+      _scheduleFlush(const Duration(milliseconds: 30));
+    }
+  }
+
   bool _onScrollNotification(ScrollNotification notification) {
     // Tiles that scroll out of the viewport are disposed, which already
     // drops their *queued* request. (Cancelling the whole visible tier here
@@ -1127,6 +1153,8 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
             ? _buildScrollView(null)
             : FastScrollbar(
                 controller: widget.scrollController!,
+                scrollSpeed: _scrollSpeed,
+                onDragStateChanged: _onHandleDragChanged,
                 items: widget.items,
                 sortBy: widget.sortBy,
                 padding: EdgeInsets.only(

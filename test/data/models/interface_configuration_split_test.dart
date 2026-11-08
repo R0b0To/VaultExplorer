@@ -103,6 +103,7 @@ AppSettings _customSettings() => AppSettings(
   categoryShortcutOrder: AppSettings().categoryShortcutOrder.reversed.toList(),
   hiddenCategoryShortcuts: ['videos'],
   categorySources: {'images': 'vault:3', 'audio': 'device'},
+  categoryLayouts: {'gallery': 'masonry', 'images': 'list'},
   categoryFolderStructure: ['documents'],
   playlistScrollMode: PlaylistScrollMode.verticalPage,
   authenticatorShowNumbers: false,

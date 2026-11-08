@@ -230,7 +230,11 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
         widget.category == FileCategory.images ||
         widget.category == FileCategory.videos ||
         _isGallery;
-    _layout = visual ? BrowserLayoutMode.grid : BrowserLayoutMode.list;
+    // The layout this category was last left in; the default grid/list only
+    // the first time.
+    _layout =
+        BrowserLayoutMode.fromJson(settings.categoryLayouts[_categoryKey]) ??
+        (visual ? BrowserLayoutMode.grid : BrowserLayoutMode.list);
     _sortBy = visual ? SortBy.date : SortBy.name;
     _sortAscending = !visual;
 
@@ -807,6 +811,19 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     });
     _persistSource(source);
     unawaited(_startScan());
+  }
+
+  /// Switches the layout and remembers it for this category.
+  void _setLayout(BrowserLayoutMode mode) {
+    if (mode == _layout) return;
+    setState(() => _layout = mode);
+    ref
+        .read(appSettingsControllerProvider.notifier)
+        .updateSettings(
+          (s) => s.copyWith(
+            categoryLayouts: {...s.categoryLayouts, _categoryKey: mode.toJson()},
+          ),
+        );
   }
 
   void _persistSource(CategorySourceFilter source) {
@@ -1860,7 +1877,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       ),
       FileManagerAction.viewToggle: (context) => LayoutModeMenuButton(
         layoutMode: _layout,
-        onLayoutModeChanged: (mode) => setState(() => _layout = mode),
+        onLayoutModeChanged: _setLayout,
         gridAspectRatio: toolbarConfig.gridAspectRatio,
         onGridAspectRatioChanged: (ratio) => _updateToolbarConfig(
           (c) => c.copyWith(gridAspectRatio: ratio),
@@ -2394,7 +2411,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
               customFilterIcon: Icons.storage_rounded,
               customFilterTooltip: l10n.categorySourceTooltip,
               layoutMode: _layout,
-              onLayoutModeChanged: (mode) => setState(() => _layout = mode),
+              onLayoutModeChanged: _setLayout,
               gridAspectRatio: toolbarConfig.gridAspectRatio,
               onGridAspectRatioChanged: (ratio) => _updateToolbarConfig(
                 (c) => c.copyWith(gridAspectRatio: ratio),

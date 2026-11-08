@@ -77,6 +77,31 @@ layout keeps the scale.
     loop that re-reads the viewport before every batch, not something started
     when a scroll ends.
 
+## Scrolling fast (the scroll handle, flings)
+
+Dragging the handle across thousands of items replaces the whole screen on
+every frame, which is what made the old pass-by look like a rolling-shutter
+smear. Three things keep it smooth without making anything wait for the scroll
+to *stop*:
+
+* **A speed verdict, not a "settled" signal.** `FastScrollbar` feeds every
+  scroll-offset change (fingers, flings, and the handle's own `jumpTo`s) to
+  `ScrollSpeedTracker`, which measures speed in viewport heights per second:
+  *fast* above 2.5, no longer fast below 1.2 (hysteresis, so it cannot flicker).
+  Everything below resumes the moment the speed drops under that, long before the
+  scroll ends. Set `ScrollSpeedTracker.enterScreensPerSecond` to infinity to
+  switch the whole mechanism off.
+* **Thumbnails.** While the verdict is "fast", a tile that has not asked for its
+  thumbnail yet does not create a loader (`ScrollSpeedScope`, read by
+  `AsyncThumbnail`); one whose bytes are already in memory is shown anyway, and
+  a tile that has already asked keeps loading. When the speed drops, the tiles
+  on screen are rebuilt once and load.
+* **Layout.** A held handle counts as scrolling (`jumpTo` fires its start and
+  end notifications inside one call, so the notification-based flag never saw
+  it, and anchored corrections used to fight the handle). While the handle is
+  held the layout is frozen above the top row (see above), and reflows are
+  postponed while the verdict is "fast".
+
 ## Privacy
 
 The probe reads a few KB per file through the normal decrypting stream and

@@ -211,6 +211,11 @@ class AppSettings {
   /// folder structure was on (the keys of the categories where it is).
   Map<String, String> categorySources;
   List<String> categoryFolderStructure;
+
+  /// The layout each category browser (and the gallery) was last left in, by
+  /// `FileCategory.storageKey`, as [BrowserLayoutMode.toJson]. Without it every
+  /// visit started again from the default grid.
+  Map<String, String> categoryLayouts;
   bool autoLockOnShareImport;
   QuickActionLockMode quickActionLockMode;
   bool enableAuthenticator;
@@ -270,6 +275,7 @@ class AppSettings {
     this.categoryShortcutOrder = FileCategory.defaultOrderKeys,
     this.hiddenCategoryShortcuts = const [],
     this.categorySources = const {},
+    this.categoryLayouts = const {},
     this.categoryFolderStructure = const [],
     this.autoLockOnShareImport = true,
     this.quickActionLockMode = QuickActionLockMode.leaveAsFound,
@@ -410,6 +416,7 @@ class AppSettings {
     List<String>? categoryShortcutOrder,
     List<String>? hiddenCategoryShortcuts,
     Map<String, String>? categorySources,
+    Map<String, String>? categoryLayouts,
     List<String>? categoryFolderStructure,
     bool? autoLockOnShareImport,
     QuickActionLockMode? quickActionLockMode,
@@ -494,6 +501,7 @@ class AppSettings {
       hiddenCategoryShortcuts:
           hiddenCategoryShortcuts ?? this.hiddenCategoryShortcuts,
       categorySources: categorySources ?? this.categorySources,
+      categoryLayouts: categoryLayouts ?? this.categoryLayouts,
       categoryFolderStructure:
           categoryFolderStructure ?? this.categoryFolderStructure,
       autoLockOnShareImport:
@@ -585,6 +593,7 @@ class AppSettings {
     'categoryShortcutOrder': categoryShortcutOrder,
     'hiddenCategoryShortcuts': hiddenCategoryShortcuts,
     'categorySources': categorySources,
+    'categoryLayouts': categoryLayouts,
     'categoryFolderStructure': categoryFolderStructure,
     'appBarAtBottom': appBarAtBottom,
     'predictiveBackAnimations': predictiveBackAnimations,
@@ -664,6 +673,7 @@ class AppSettings {
     categoryShortcutOrder: other.categoryShortcutOrder,
     hiddenCategoryShortcuts: other.hiddenCategoryShortcuts,
     categorySources: other.categorySources,
+    categoryLayouts: other.categoryLayouts,
     categoryFolderStructure: other.categoryFolderStructure,
     appBarAtBottom: other.appBarAtBottom,
     predictiveBackAnimations: other.predictiveBackAnimations,
@@ -775,6 +785,13 @@ class AppSettings {
     categorySources: {
       for (final e in ((j['categorySources'] as Map?) ?? const {}).entries)
         if (e.key is String && e.value is String)
+          e.key as String: e.value as String,
+    },
+    categoryLayouts: {
+      for (final e in ((j['categoryLayouts'] as Map?) ?? const {}).entries)
+        if (e.key is String &&
+            e.value is String &&
+            BrowserLayoutMode.fromJson(e.value as String) != null)
           e.key as String: e.value as String,
     },
     categoryFolderStructure:

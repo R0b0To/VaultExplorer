@@ -10,6 +10,7 @@ void main() {
       expect(settings.categoryShortcutOrder, FileCategory.defaultOrderKeys);
       expect(settings.hiddenCategoryShortcuts, isEmpty);
       expect(settings.categorySources, isEmpty);
+      expect(settings.categoryLayouts, isEmpty);
       expect(settings.categoryFolderStructure, isEmpty);
     });
 
@@ -19,6 +20,7 @@ void main() {
         categoryShortcutOrder: ['audio', 'images', 'videos', 'documents'],
         hiddenCategoryShortcuts: ['videos'],
         categorySources: {'images': 'vault:3', 'audio': 'device'},
+        categoryLayouts: {'gallery': 'masonry', 'images': 'grid'},
         categoryFolderStructure: ['documents'],
       );
 
@@ -28,7 +30,21 @@ void main() {
       expect(restored.categoryShortcutOrder, settings.categoryShortcutOrder);
       expect(restored.hiddenCategoryShortcuts, ['videos']);
       expect(restored.categorySources, settings.categorySources);
+      expect(restored.categoryLayouts, {'gallery': 'masonry', 'images': 'grid'});
       expect(restored.categoryFolderStructure, ['documents']);
+    });
+
+    test('a remembered layout that no longer exists is dropped, not crashed on', () {
+      final restored = AppSettings.fromJson(<String, dynamic>{
+        'categoryLayouts': {
+          'gallery': 'masonry',
+          'images': 'hologram',
+          'videos': 7,
+          3: 'grid',
+        },
+      });
+
+      expect(restored.categoryLayouts, {'gallery': 'masonry'});
     });
 
     test('an old settings file without them gets the defaults', () {

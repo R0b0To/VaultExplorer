@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/core/utils/scroll_speed_tracker.dart';
+import 'package:vaultexplorer/core/widgets/scroll_speed_scope.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 
@@ -38,6 +40,12 @@ class FastScrollbar extends StatefulWidget {
   /// for instance) can use this to ignore those jumps.
   final ValueChanged<bool>? onDragStateChanged;
 
+  /// Becomes true while the content is moving too fast to read (a fling, or
+  /// the handle being dragged across the list), and false again as soon as it
+  /// slows down. The list below gets the same answer through
+  /// [ScrollSpeedScope] (thumbnails wait on it); pass one to be told too.
+  final ValueNotifier<bool>? scrollSpeed;
+
   const FastScrollbar({
     super.key,
     required this.controller,
@@ -48,6 +56,7 @@ class FastScrollbar extends StatefulWidget {
     this.touchWidth = 28.0,
     this.axis = Axis.vertical,
     this.onDragStateChanged,
+    this.scrollSpeed,
   });
 
   @override
@@ -86,6 +95,35 @@ class _FastScrollbarState extends State<FastScrollbar>
 
   bool _postFrameCallbackPending = false;
 
+  late final bool _ownsSpeedNotifier = widget.scrollSpeed == null;
+  late final ValueNotifier<bool> _speedNotifier =
+      widget.scrollSpeed ?? ValueNotifier<bool>(false);
+  late final ScrollSpeedTracker _speedTracker = ScrollSpeedTracker(
+    onFastChanged: _setFast,
+  );
+  final Stopwatch _clock = Stopwatch()..start();
+  bool? _pendingFast;
+
+  /// Publishes the speed verdict. It can arrive in the middle of a frame (a
+  /// `jumpTo` made while the viewport is laying out), when tiles must not be
+  /// told to rebuild: then it waits for the end of the frame.
+  void _setFast(bool fast) {
+    if (!mounted) return;
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      final alreadyPending = _pendingFast != null;
+      _pendingFast = fast;
+      if (alreadyPending) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final value = _pendingFast;
+        _pendingFast = null;
+        if (mounted && value != null) _speedNotifier.value = value;
+      });
+      return;
+    }
+    _speedNotifier.value = fast;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -114,6 +152,7 @@ class _FastScrollbarState extends State<FastScrollbar>
   void dispose() {
     _autoHideTimer?.cancel();
     widget.controller.removeListener(_onControllerChange);
+    _speedTracker.dispose();
     if (_isDragging) {
       // Never leave an owner thinking the handle is still held.
       _isDragging = false;
@@ -122,6 +161,7 @@ class _FastScrollbarState extends State<FastScrollbar>
       widget.onDragStateChanged?.call(false);
     }
     _fadeController.dispose();
+    if (_ownsSpeedNotifier) _speedNotifier.dispose();
     super.dispose();
   }
 
@@ -159,7 +199,20 @@ class _FastScrollbarState extends State<FastScrollbar>
   }
 
 void _onControllerChange() {
-    if (!mounted || !_canScroll) return;
+    if (!mounted) return;
+    final position = widget.controller.hasClients
+        ? widget.controller.position
+        : null;
+    if (position != null && position.hasPixels && position.hasViewportDimension) {
+      // Every change of the offset counts, whoever made it: a finger, a fling,
+      // or this handle's own jumpTo.
+      _speedTracker.sample(
+        position.pixels,
+        position.viewportDimension,
+        _clock.elapsed,
+      );
+    }
+    if (!_canScroll) return;
     if (_isDragging && _scrollFraction >= 0.999) {
       if (widget.controller.position.pixels < widget.controller.position.maxScrollExtent) {
         widget.controller.jumpTo(widget.controller.position.maxScrollExtent);
@@ -489,7 +542,7 @@ void _onControllerChange() {
       child: Stack(
         fit: StackFit.passthrough,
         children: [
-          widget.child,
+          ScrollSpeedScope(fast: _speedNotifier, child: widget.child),
           Positioned.fill(
             child: LayoutBuilder(
               builder: (context, constraints) {

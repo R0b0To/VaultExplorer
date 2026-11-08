@@ -171,7 +171,19 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
     final visual =
         widget.category == FileCategory.images ||
         widget.category == FileCategory.videos;
-    _layout = visual ? BrowserLayoutMode.grid : BrowserLayoutMode.list;
+    // This screen only has grid, list and detailed: a layout remembered from
+    // the tabbed browser that it cannot show becomes the closest one it can.
+    final remembered = BrowserLayoutMode.fromJson(
+      settings.categoryLayouts[_categoryKey],
+    );
+    _layout = switch (remembered) {
+      BrowserLayoutMode.grid ||
+      BrowserLayoutMode.masonry => BrowserLayoutMode.grid,
+      BrowserLayoutMode.list ||
+      BrowserLayoutMode.compact => BrowserLayoutMode.list,
+      BrowserLayoutMode.detailed => BrowserLayoutMode.detailed,
+      null => visual ? BrowserLayoutMode.grid : BrowserLayoutMode.list,
+    };
     _sortBy = visual ? SortBy.date : SortBy.name;
     _sortAscending = !visual;
 
@@ -582,6 +594,19 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
     });
     _persistSource(source);
     unawaited(_startScan());
+  }
+
+  /// Switches the layout and remembers it for this category.
+  void _setLayout(BrowserLayoutMode mode) {
+    if (mode == _layout) return;
+    setState(() => _layout = mode);
+    ref
+        .read(appSettingsControllerProvider.notifier)
+        .updateSettings(
+          (s) => s.copyWith(
+            categoryLayouts: {...s.categoryLayouts, _categoryKey: mode.toJson()},
+          ),
+        );
   }
 
   void _persistSource(CategorySourceFilter source) {
@@ -1255,11 +1280,11 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
               case 'folders':
                 _setFolderMode(!_folderMode);
               case 'grid':
-                setState(() => _layout = BrowserLayoutMode.grid);
+                _setLayout(BrowserLayoutMode.grid);
               case 'list':
-                setState(() => _layout = BrowserLayoutMode.list);
+                _setLayout(BrowserLayoutMode.list);
               case 'detailed':
-                setState(() => _layout = BrowserLayoutMode.detailed);
+                _setLayout(BrowserLayoutMode.detailed);
               case 'refresh':
                 unawaited(_startScan(deep: true));
               default:

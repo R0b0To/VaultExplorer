@@ -1,7 +1,7 @@
 # Music mode
 
 Music mode turns the file manager into a music library: **Albums**, **Artists**,
-**Genres** and **Tracks**, with search and sorting, next to the normal **Files** listing.
+**Genres**, **Folders** and **Tracks**, with search and sorting, next to the normal **Files** listing.
 
 It is off by default and **per location** (a vault, phone storage, external storage).
 Nothing is indexed until you turn it on.
@@ -14,7 +14,7 @@ Nothing is indexed until you turn it on.
    (folder picker). Phone and external storage start on "Only some folders", because
    their root is everything on the device.
 3. The file toolbar is replaced by a **music strip at the bottom**:
-   `Tracks | Albums | Artists | Genres`,
+   `Tracks | Albums | Artists | Genres | Folders`,
    the selected music mode icon, a spinner while a scan runs, and a menu (scan for
    changes, re-read all tags, music folders, delete saved index, turn off). Dragging
    the pills does not open the side drawer.
@@ -43,16 +43,36 @@ per-track location in the viewer's playlist; it is not part of this change.
 Play and shuffle are available from the header of Albums, Artists, Genres and Tracks (they
 start whatever list is shown, in its order), from each album tile, from each artist and
 genre row, and from every album/artist/genre screen. Library playback starts in the
-**mini player**. Tap it or swipe up to expand the full media player.
+**mini player**. Tap it or drag it up to open the music player.
 
-### Mini player
+### Folders
+
+The **Folders** tab lists every folder that directly holds audio files, and nothing else:
+folders that only contain other folders are left out, so it shows where the music is rather
+than a copy of the file tree. Each row shows the folder name, where it sits, and its track
+count, with play and shuffle buttons; tapping opens the folder's tracks. Files that sit in the
+root of a location are listed under the location's name. It can be searched and sorted by name,
+track count or recently added.
+
+### Mini player and music player
 
 While music plays without a viewer open, a bar above the music strip (or at the bottom of
-album, artist or genre detail screens) shows the track (tags and cover from the library when
-the file is in it) with previous, play/pause, next and stop; tapping it or swiping up reopens
-the full player. The playing track is highlighted in the list. It follows
-`BackgroundPlaybackHost.activeSession`, so it disappears when the music stops or a viewer
-takes over.
+album, artist, genre and folder screens) shows the track (tags and cover from the library when
+the file is in it) with previous, play/pause and next. It follows
+`BackgroundPlaybackHost.activeSession`, so it disappears when the music stops or a viewer takes
+over.
+
+Tapping the bar or dragging it up opens the **music player**, which grows out of the bar
+(`NowPlayingPanel`): one animation drives everything, so the thumbnail becomes the big cover,
+the play button travels to the middle of the controls, and the panel follows the finger. Drag it
+down, press Back, or tap the chevron to return to the bar. The player has the waveform seek bar,
+shuffle, previous, play/pause, next and repeat (off / all / one), a queue list (tap a track to
+jump to it), and a menu with *Open in media player* (equalizer, A-B loop and the rest of the
+viewer) and *Stop playback*. Swiping the cover or the bar sideways skips a track; dragging the bar
+down stops playback.
+
+Shuffle keeps the playing track and shuffles the rest of the queue; turning it off restores the
+previous order. Repeat applies to music started from the library only.
 
 ### Waveform seek bar
 

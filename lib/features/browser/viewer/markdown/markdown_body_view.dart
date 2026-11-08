@@ -9,6 +9,7 @@ import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/viewer/markdown/markdown_ast.dart';
 import 'package:vaultexplorer/features/browser/viewer/markdown/markdown_image_cache.dart';
+import 'package:vaultexplorer/features/browser/viewer/markdown/markdown_link_syntax.dart';
 import 'package:vaultexplorer/features/browser/viewer/markdown/markdown_parser.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/markdown_image.dart';
 
@@ -134,7 +135,7 @@ class MarkdownBodyViewState extends ConsumerState<MarkdownBodyView> {
   void _handleLink(String url) {
     if (url.startsWith('#')) {
       final rawTarget = url.substring(1).trim();
-      final decodedTarget = Uri.decodeComponent(rawTarget).toLowerCase();
+      final decodedTarget = decodeLinkPath(rawTarget).toLowerCase();
 
       if (decodedTarget.isEmpty || decodedTarget == 'top') {
         if (_scrollController.hasClients) {
@@ -188,7 +189,7 @@ class MarkdownBodyViewState extends ConsumerState<MarkdownBodyView> {
         }
       }
     }
-    widget.onLinkTap(url);
+    widget.onLinkTap(normalizeLinkUri(url));
   }
 
   GlobalKey? _resolveHeadingKey(String target) {
@@ -986,9 +987,12 @@ class MarkdownBodyViewState extends ConsumerState<MarkdownBodyView> {
   }
 
   static String _resolveVaultPath(String currentFilePath, String reference) {
-    if (p.isAbsolute(reference)) return p.normalize(reference);
+    // Destinations are percent-encoded Markdown (`my%20image.png`); the vault
+    // path is the decoded file name.
+    final path = decodeLinkPath(reference);
+    if (p.isAbsolute(path)) return p.normalize(path);
     final dir = p.dirname(currentFilePath);
-    return p.normalize(p.join(dir, reference));
+    return p.normalize(p.join(dir, path));
   }
 
   TextStyle _headingStyle(TextTheme textTheme, int level) {

@@ -70,10 +70,14 @@ class MdList extends MdBlock {
   final bool ordered;
   final int startNumber;
   final List<MdListItem> items;
+
+  /// CommonMark "tight" list: no blank lines between items or their blocks.
+  final bool tight;
   const MdList({
     required this.ordered,
     required this.startNumber,
     required this.items,
+    this.tight = true,
     super.sourceLine,
   });
 }

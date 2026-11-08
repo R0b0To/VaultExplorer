@@ -10,6 +10,7 @@ import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/viewer/markdown/markdown_body_view.dart';
 import 'package:vaultexplorer/features/browser/viewer/markdown/markdown_image_picker_dialog.dart';
+import 'package:vaultexplorer/features/browser/viewer/markdown/markdown_link_syntax.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_controller.dart';
 
 class SearchableTextEditingController extends TextEditingController {
@@ -458,7 +459,10 @@ class _MarkdownViewerScreenState extends ConsumerState<MarkdownViewerScreen> {
     );
     final text = _textController.text;
     final selection = _textController.selection;
-    final template = '![$selectedImage]($relativePath)';
+    final template = markdownImageTemplate(
+      alt: selectedImage,
+      path: relativePath,
+    );
 
     if (!selection.isValid || selection.baseOffset < 0) {
       _textController.text = '$text\n$template\n';

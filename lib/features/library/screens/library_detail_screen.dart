@@ -17,6 +17,12 @@ enum _DetailMenu { chooseCover, removeCover }
 /// An artist can also show a strip of its albums; [onOpenAlbum] opens one. When
 /// [coverKey] is given the cover can be chosen by hand (an image from the
 /// location's own files), since the app has no internet to fetch one.
+/// The route a library detail screen (album, artist, genre, folder) is shown
+/// on. The bar inside those screens uses it to find its way back to the library.
+class LibraryDetailRoute<T> extends MaterialPageRoute<T> {
+  LibraryDetailRoute({required super.builder});
+}
+
 class LibraryDetailScreen extends StatelessWidget {
   final MusicHub hub;
   final MusicCovers covers;
@@ -44,6 +50,10 @@ class LibraryDetailScreen extends StatelessWidget {
   /// Opens the image picker and saves the result; null hides the menu.
   final Future<void> Function()? onChooseCover;
 
+  /// The music mode bar, kept at the bottom so the library's views stay one tap
+  /// away while a folder, album, artist or genre is open.
+  final Widget? modeBar;
+
   const LibraryDetailScreen({
     super.key,
     required this.hub,
@@ -59,6 +69,7 @@ class LibraryDetailScreen extends StatelessWidget {
     this.placeholderIcon = Icons.music_note_rounded,
     this.coverKey,
     this.onChooseCover,
+    this.modeBar,
   });
 
   @override
@@ -104,7 +115,13 @@ class LibraryDetailScreen extends StatelessWidget {
             ),
         ],
       ),
-      bottomNavigationBar: MusicMiniPlayer(hub: hub, covers: covers),
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          MusicMiniPlayer(hub: hub, covers: covers),
+          if (modeBar != null) modeBar!,
+        ],
+      ),
       body: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(

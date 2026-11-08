@@ -210,6 +210,16 @@ class BackgroundPlaybackHost {
     PlaybackRepeat.off,
   );
 
+  /// Whether playback is running, for the play / pause buttons of the music
+  /// controls. Unlike the player's own flag it does not flip while the next or
+  /// previous track is loading: the new player starts out not playing, and
+  /// showing that would make the button blink on every skip.
+  final ValueNotifier<bool> playing = ValueNotifier<bool>(false);
+
+  /// While a track is loading after a skip, "not playing" reports are ignored
+  /// until it really plays (or this moment passes).
+  int _holdPlayingUntilMs = 0;
+
   /// Whether the library queue was shuffled with [toggleLibraryShuffle].
   final ValueNotifier<bool> libraryShuffled = ValueNotifier<bool>(false);
   List<String>? _unshuffledQueue;
@@ -281,6 +291,26 @@ class BackgroundPlaybackHost {
     session.playlist.replaceLibraryQueue(paths, index: targetIndex);
     unawaited(_playIndex(session, targetIndex));
     return true;
+  }
+
+  /// Pauses or resumes the running player, for the music controls. The shown
+  /// state flips at once, and a skip that is still loading no longer overrides
+  /// it.
+  Future<void> togglePlayback() async {
+    final controller = _tickController;
+    if (controller == null || controller.isDisposed) return;
+    final wasPlaying = playing.value;
+    _holdPlayingUntilMs = 0;
+    playing.value = !wasPlaying;
+    try {
+      if (wasPlaying) {
+        await controller.pause();
+      } else {
+        await controller.play();
+      }
+    } catch (e) {
+      VeLog.w(_kTag, 'Could not toggle playback', e);
+    }
   }
 
   /// Jumps to [index] of the current library queue without replacing it, as
@@ -589,7 +619,11 @@ class BackgroundPlaybackHost {
     // The player is released below, which ends it natively too.
     _unshuffledQueue = null;
     // Listeners are widgets; this may run while the tree is being torn down.
-    scheduleMicrotask(() => libraryShuffled.value = false);
+    _holdPlayingUntilMs = 0;
+    scheduleMicrotask(() {
+      libraryShuffled.value = false;
+      playing.value = false;
+    });
     _audioOnly = false;
     _publishAudioOnly();
     _detach(session);
@@ -756,6 +790,19 @@ class BackgroundPlaybackHost {
     );
   }
 
+  void _publishPlaying(NativeVideoValue value) {
+    var isPlaying = value.isPlaying;
+    if (isPlaying) {
+      _holdPlayingUntilMs = 0;
+    } else if (!value.isInitialized ||
+        DateTime.now().millisecondsSinceEpoch < _holdPlayingUntilMs) {
+      // Still loading what was just skipped to: keep showing "playing".
+      if (playing.value) return;
+      isPlaying = false;
+    }
+    if (playing.value != isPlaying) playing.value = isPlaying;
+  }
+
   void _onTick() {
     final session = _session;
     final controller = _tickController;
@@ -766,6 +813,7 @@ class BackgroundPlaybackHost {
       unawaited(closeAndWait());
       return;
     }
+    _publishPlaying(value);
     _reportPlaying(session, value.isPlaying);
     if (!value.isInitialized) return;
 
@@ -926,6 +974,9 @@ class BackgroundPlaybackHost {
         ),
       );
     }
+    // Skipping always plays the new track, so the buttons keep saying so.
+    _holdPlayingUntilMs = DateTime.now().millisecondsSinceEpoch + 4000;
+    if (!playing.value) playing.value = true;
     session.playlist.updateIndex(index);
     final file = session.playlist.currentFile;
     final config = _config(session);

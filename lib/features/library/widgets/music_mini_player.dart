@@ -1,9 +1,11 @@
+import 'dart:async' show unawaited;
 import 'dart:ui' show Rect;
 
 import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
 import 'package:vaultexplorer/features/browser/viewer/background_playback/background_playback_host.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
@@ -12,6 +14,7 @@ import 'package:vaultexplorer/features/library/widgets/library_cover.dart';
 import 'package:vaultexplorer/features/library/widgets/music_covers.dart';
 import 'package:vaultexplorer/features/library/widgets/now_playing_info.dart';
 import 'package:vaultexplorer/features/library/widgets/now_playing_panel.dart';
+import 'package:vaultexplorer/features/library/widgets/smooth_playback_position.dart';
 
 /// Playback controls for music that keeps playing after its viewer is closed:
 /// what is playing, previous, play or pause, next, stop. Tapping the bar
@@ -87,11 +90,106 @@ class _MiniBar extends StatefulWidget {
   State<_MiniBar> createState() => _MiniBarState();
 }
 
-class _MiniBarState extends State<_MiniBar> {
+class _MiniBarState extends State<_MiniBar> with TickerProviderStateMixin {
+  /// How far down (in pixels) a drag has to go for the bar to be fully
+  /// squished, which is also where letting go closes it.
+  static const double _squishExtent = 72;
+
   final GlobalKey _barKey = GlobalKey();
+
+  /// 0 normal, 1 fully squished. Follows a downward drag so the bar shows it
+  /// is about to close, and springs back when the drag is given up.
+  late final AnimationController _squish = AnimationController(
+    vsync: this,
+    lowerBound: 0,
+    upperBound: 1,
+    value: 0,
+  );
+
+  /// Played fraction for the progress line, glided between the player's
+  /// position reports.
+  final ValueNotifier<double> _progress = ValueNotifier<double>(0);
+  late final SmoothPlaybackPosition _smooth = SmoothPlaybackPosition(
+    vsync: this,
+    onFrame: _onFrame,
+  );
+  NativeVideoController? _bound;
 
   double _dragDy = 0;
   NowPlayingHandle? _handle;
+  double _trackSlide = 1;
+  bool _pendingTrackSlide = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _bind(widget.controller);
+  }
+
+  @override
+  void didUpdateWidget(_MiniBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.path != widget.path) {
+      if (!_pendingTrackSlide) _trackSlide = 1;
+      _pendingTrackSlide = false;
+    }
+    if (!identical(oldWidget.controller, widget.controller)) {
+      _bind(widget.controller);
+    }
+  }
+
+  @override
+  void dispose() {
+    _unbind();
+    _smooth.dispose();
+    _squish.dispose();
+    _progress.dispose();
+    super.dispose();
+  }
+
+  void _bind(NativeVideoController? controller) {
+    _unbind();
+    _bound = controller;
+    controller?.addListener(_onTick);
+    _onTick();
+  }
+
+  void _unbind() {
+    final controller = _bound;
+    _bound = null;
+    if (controller == null) return;
+    try {
+      controller.removeListener(_onTick);
+    } catch (_) {
+      // Disposed along with the player.
+    }
+  }
+
+  void _onTick() {
+    final controller = _bound;
+    if (controller == null || controller.isDisposed) return;
+    _smooth.report(controller.value, speed: widget.session.playbackSpeed);
+  }
+
+  void _onFrame(Duration position, Duration duration) {
+    final total = duration.inMilliseconds;
+    _progress.value = total > 0
+        ? (position.inMilliseconds / total).clamp(0.0, 1.0)
+        : 0.0;
+  }
+
+  void _stepTrack(int direction) {
+    final currentPath = widget.session.playlist.currentFile;
+    _trackSlide = direction > 0 ? 1 : -1;
+    _pendingTrackSlide = true;
+    unawaited(
+      widget.host.stepItem(direction).then((_) {
+        if (mounted && widget.session.playlist.currentFile == currentPath) {
+          _pendingTrackSlide = false;
+        }
+      }),
+    );
+  }
 
   /// The bar's rectangle on screen, which the player grows out of.
   Rect? _measure() {
@@ -115,6 +213,7 @@ class _MiniBarState extends State<_MiniBar> {
   void _onDragStart() {
     _dragDy = 0;
     _handle = null;
+    _squish.stop();
   }
 
   void _onDragUpdate(double dy) {
@@ -124,9 +223,13 @@ class _MiniBarState extends State<_MiniBar> {
       handle.dragBy(dy);
     } else if (_dragDy < -6) {
       // The player opens underneath the finger and takes over the drag.
+      if (_squish.value != 0) _squish.value = 0;
       final opened = _open(expand: false);
       _handle = opened;
       opened?.dragBy(_dragDy);
+    } else {
+      // Going down: squish the bar in step with the finger.
+      _squish.value = (_dragDy / _squishExtent).clamp(0.0, 1.0);
     }
   }
 
@@ -135,8 +238,39 @@ class _MiniBarState extends State<_MiniBar> {
     _handle = null;
     if (handle != null) {
       handle.release(velocityY);
-    } else if (_dragDy > 24 || velocityY > 300) {
-      widget.host.closeAndWait();
+      return;
+    }
+    final closes = _squish.value >= 0.55 || velocityY > 600;
+    if (closes && _dragDy > 0) {
+      _squish
+          .animateTo(
+            1,
+            duration: const Duration(milliseconds: 110),
+            curve: Curves.easeIn,
+          )
+          .then((_) {
+            if (mounted) widget.host.closeAndWait();
+          });
+    } else {
+      _squish.animateTo(
+        0,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutBack,
+      );
+    }
+  }
+
+  void _onDragCancel() {
+    final handle = _handle;
+    _handle = null;
+    if (handle != null) {
+      handle.release(0);
+    } else {
+      _squish.animateTo(
+        0,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      );
     }
   }
 
@@ -147,21 +281,14 @@ class _MiniBarState extends State<_MiniBar> {
     final l10n = context.l10n;
     final host = widget.host;
     final session = widget.session;
-    final controller = widget.controller;
     final info = NowPlayingInfo.resolve(widget.hub, session, widget.path);
+    final drawerScope = FullScreenDragDrawerScope.maybeOf(context);
 
-    final listenable = Listenable.merge([
-      if (controller != null) controller,
-      session.playlist,
-    ]);
-
-    // The player takes the bar's place while it is open.
-    return ValueListenableBuilder<bool>(
-      valueListenable: NowPlayingPanel.isOpen,
-      builder: (context, open, child) => IgnorePointer(
-        ignoring: open,
-        child: Opacity(opacity: open ? 0 : 1, child: child),
-      ),
+    final bar = Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (_) => drawerScope?.setDrawerDragBlocked(true),
+      onPointerUp: (_) => drawerScope?.setDrawerDragBlocked(false),
+      onPointerCancel: (_) => drawerScope?.setDrawerDragBlocked(false),
       child: Material(
         key: _barKey,
         color: cs.surfaceContainerHigh,
@@ -171,140 +298,223 @@ class _MiniBarState extends State<_MiniBar> {
           onVerticalDragStart: (_) => _onDragStart(),
           onVerticalDragUpdate: (d) => _onDragUpdate(d.delta.dy),
           onVerticalDragEnd: (d) => _onDragEnd(d.primaryVelocity ?? 0),
+          onVerticalDragCancel: _onDragCancel,
           onHorizontalDragEnd: (d) {
             final v = d.primaryVelocity ?? 0;
             if (v < -300 && host.canStepNext) {
-              host.stepItem(1);
+              _stepTrack(1);
             } else if (v > 300 && host.canStepPrevious) {
-              host.stepItem(-1);
+              _stepTrack(-1);
             }
           },
           child: InkWell(
             onTap: () => _open(expand: true),
-            child: ListenableBuilder(
-              listenable: listenable,
-              builder: (context, _) {
-                final value = controller?.value;
-                final playing = value?.isPlaying ?? false;
-                final total = value?.duration.inMilliseconds ?? 0;
-                final done = value?.position.inMilliseconds ?? 0;
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    LinearProgressIndicator(
-                      minHeight: 2,
-                      value: total > 0 ? (done / total).clamp(0.0, 1.0) : 0,
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.md,
-                        6,
-                        AppSpacing.xs,
-                        6,
-                      ),
-                      child: Row(
-                        children: [
-                          Hero(
-                            tag: 'media_hero_${session.container.volId}_${widget.path}',
-                            createRectTween: (begin, end) =>
-                                MaterialRectArcTween(begin: begin, end: end),
-                            child: Material(
-                              color: Colors.transparent,
-                              child: LibraryCover(
-                                covers: widget.covers,
-                                track: info.coverTrack,
-                                groupKey: info.coverKey,
-                                size: 44,
-                                borderRadius: 6,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ValueListenableBuilder<double>(
+                  valueListenable: _progress,
+                  builder: (context, value, _) =>
+                      LinearProgressIndicator(minHeight: 2, value: value),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.md,
+                    6,
+                    AppSpacing.xs,
+                    6,
+                  ),
+                  child: Row(
+                    children: [
+                      Hero(
+                        tag:
+                            'media_hero_${session.container.volId}_${widget.path}',
+                        createRectTween: (begin, end) =>
+                            MaterialRectArcTween(begin: begin, end: end),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: SizedBox(
+                            width: 44,
+                            height: 44,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(6),
+                              child: AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 240),
+                                switchInCurve: Curves.easeOutCubic,
+                                switchOutCurve: Curves.easeInCubic,
+                                transitionBuilder: (child, animation) =>
+                                    FadeTransition(
+                                      opacity: animation,
+                                      child: SlideTransition(
+                                        position: Tween<Offset>(
+                                          begin: Offset(_trackSlide * 0.2, 0),
+                                          end: Offset.zero,
+                                        ).animate(animation),
+                                        child: child,
+                                      ),
+                                    ),
+                                child: LibraryCover(
+                                  key: ValueKey<String>(widget.path),
+                                  covers: widget.covers,
+                                  track: info.coverTrack,
+                                  groupKey: info.coverKey,
+                                  size: 44,
+                                  borderRadius: 6,
+                                ),
                               ),
                             ),
                           ),
-                          const SizedBox(width: AppSpacing.md - 4),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  info.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: text.bodyMedium?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                if (info.artist.isNotEmpty)
-                                  Text(
-                                    info.artist,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: text.bodySmall?.copyWith(
-                                      color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.md - 4),
+                      Expanded(
+                        child: SizedBox(
+                          height: 40,
+                          child: ClipRect(
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 240),
+                              switchInCurve: Curves.easeOutCubic,
+                              switchOutCurve: Curves.easeInCubic,
+                              transitionBuilder: (child, animation) =>
+                                  FadeTransition(
+                                    opacity: animation,
+                                    child: SlideTransition(
+                                      position: Tween<Offset>(
+                                        begin: Offset(_trackSlide * 0.18, 0),
+                                        end: Offset.zero,
+                                      ).animate(animation),
+                                      child: child,
                                     ),
                                   ),
-                              ],
+                              child: Column(
+                                key: ValueKey<String>(widget.path),
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    info.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: text.bodyMedium?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  if (info.artist.isNotEmpty)
+                                    Text(
+                                      info.artist,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: text.bodySmall?.copyWith(
+                                        color: cs.onSurfaceVariant,
+                                      ),
+                                    ),
+                                ],
+                              ),
                             ),
                           ),
-                          const SizedBox(width: AppSpacing.sm),
-                          IconButton(
-                            tooltip: l10n.musicMiniPrevious,
-                            icon: const Icon(Icons.skip_previous_rounded),
-                            onPressed: host.canStepPrevious
-                                ? () => host.stepItem(-1)
-                                : null,
-                          ),
-                          // Same 48 px slot and 40 px circle the player's
-                          // play button starts from when it opens.
-                          SizedBox(
-                            width: 48,
-                            height: 48,
-                            child: Center(
-                              child: Material(
-                                color: cs.primary,
-                                shape: const CircleBorder(),
-                                clipBehavior: Clip.antiAlias,
-                                child: InkWell(
-                                  onTap: controller == null
-                                      ? null
-                                      : () => playing
-                                            ? controller.pause()
-                                            : controller.play(),
-                                  child: SizedBox(
-                                    width: 40,
-                                    height: 40,
-                                    child: Tooltip(
-                                      message: playing
-                                          ? l10n.musicMiniPause
-                                          : l10n.musicMiniPlay,
-                                      child: Icon(
-                                        playing
-                                            ? Icons.pause_rounded
-                                            : Icons.play_arrow_rounded,
-                                        size: 24,
-                                        color: cs.onPrimary,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      ListenableBuilder(
+                        listenable: Listenable.merge([
+                          session.playlist,
+                          host.repeat,
+                        ]),
+                        builder: (context, _) => Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              tooltip: l10n.musicMiniPrevious,
+                              icon: const Icon(Icons.skip_previous_rounded),
+                              onPressed: host.canStepPrevious
+                                  ? () => _stepTrack(-1)
+                                  : null,
+                            ),
+                            // Same 48 px slot and 40 px circle the player's
+                            // play button starts from when it opens.
+                            SizedBox(
+                              width: 48,
+                              height: 48,
+                              child: Center(
+                                child: Material(
+                                  color: cs.primary,
+                                  shape: const CircleBorder(),
+                                  clipBehavior: Clip.antiAlias,
+                                  child: InkWell(
+                                    onTap: () => host.togglePlayback(),
+                                    child: SizedBox(
+                                      width: 40,
+                                      height: 40,
+                                      child: ValueListenableBuilder<bool>(
+                                        valueListenable: host.playing,
+                                        builder: (context, playing, _) =>
+                                            Tooltip(
+                                              message: playing
+                                                  ? l10n.musicMiniPause
+                                                  : l10n.musicMiniPlay,
+                                              child: Icon(
+                                                playing
+                                                    ? Icons.pause_rounded
+                                                    : Icons.play_arrow_rounded,
+                                                size: 24,
+                                                color: cs.onPrimary,
+                                              ),
+                                            ),
                                       ),
                                     ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                          IconButton(
-                            tooltip: l10n.musicMiniNext,
-                            icon: const Icon(Icons.skip_next_rounded),
-                            onPressed: host.canStepNext
-                                ? () => host.stepItem(1)
-                                : null,
-                          ),
-                        ],
+                            IconButton(
+                              tooltip: l10n.musicMiniNext,
+                              icon: const Icon(Icons.skip_next_rounded),
+                              onPressed: host.canStepNext
+                                  ? () => _stepTrack(1)
+                                  : null,
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                );
-              },
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ),
+      ),
+    );
+
+    // The player takes the bar's place while it is open; a downward drag
+    // squishes the bar towards the strip below it to say "this closes".
+    return ValueListenableBuilder<bool>(
+      valueListenable: NowPlayingPanel.isOpen,
+      builder: (context, open, child) => IgnorePointer(
+        ignoring: open,
+        child: Opacity(opacity: open ? 0 : 1, child: child),
+      ),
+      child: AnimatedBuilder(
+        animation: _squish,
+        child: bar,
+        builder: (context, child) {
+          // Always wrapped, even at 0: moving the bar between parents in the
+          // middle of a drag would be needless risk for the gesture.
+          final squish = _squish.value;
+          return Opacity(
+            opacity: 1 - 0.5 * squish,
+            child: Transform(
+              alignment: Alignment.bottomCenter,
+              transform: Matrix4.diagonal3Values(
+                1 + 0.04 * squish,
+                1 - 0.55 * squish,
+                1,
+              ),
+              child: child,
+            ),
+          );
+        },
       ),
     );
   }

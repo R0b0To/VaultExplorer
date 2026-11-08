@@ -17,12 +17,18 @@ class MusicModeBar extends StatelessWidget {
   final VoidCallback onToggleMode;
   final VoidCallback onEditFolders;
 
+  /// Called when a view is picked. Null just switches the view; the copy of the
+  /// bar inside a folder / album / artist / genre screen passes one that first
+  /// returns to the library.
+  final ValueChanged<MusicCategory>? onSelectCategory;
+
   const MusicModeBar({
     super.key,
     required this.entry,
     required this.hub,
     required this.onToggleMode,
     required this.onEditFolders,
+    this.onSelectCategory,
   });
 
   @override
@@ -53,15 +59,6 @@ class MusicModeBar extends StatelessWidget {
                     MusicCategory.folders,
                   ])
                     _buildDestination(context, category),
-                  if (hub.isScanning)
-                    const Padding(
-                      padding: EdgeInsets.only(right: AppSpacing.xs),
-                      child: SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    ),
                   IconButton(
                     icon: const Icon(Icons.library_music_rounded),
                     color: Theme.of(context).colorScheme.primary,
@@ -87,7 +84,7 @@ class MusicModeBar extends StatelessWidget {
     return Expanded(
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
-        onTap: () => entry.setCategory(category),
+        onTap: () => (onSelectCategory ?? entry.setCategory)(category),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 6),
           child: Column(

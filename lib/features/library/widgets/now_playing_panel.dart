@@ -19,6 +19,7 @@ import 'package:vaultexplorer/features/library/widgets/library_cover.dart';
 import 'package:vaultexplorer/features/library/widgets/now_playing_info.dart';
 import 'package:vaultexplorer/features/library/widgets/music_covers.dart';
 import 'package:vaultexplorer/features/library/widgets/music_queue_sheet.dart';
+import 'package:vaultexplorer/features/library/widgets/smooth_playback_position.dart';
 
 double _lerp(double a, double b, double t) => a + (b - a) * t;
 
@@ -30,16 +31,34 @@ Rect _lerpRect(Rect a, Rect b, double t) => Rect.fromLTRB(
 );
 
 /// 0 until [a], 1 from [b] on, linear in between.
-double _seg(double p, double a, double b) => ((p - a) / (b - a)).clamp(0.0, 1.0);
+double _seg(double p, double a, double b) =>
+    ((p - a) / (b - a)).clamp(0.0, 1.0);
 
 /// Lets the mini bar steer the player while its finger is still down: the
 /// drag starts on the bar, the player opens underneath it, and the rest of the
 /// drag (and its release) is forwarded here.
 class NowPlayingHandle {
-  NowPlayingHandle._({required this.expand});
+  NowPlayingHandle._({
+    required this.expand,
+    required this.hub,
+    required this.covers,
+    required this.miniRect,
+    required this.navigator,
+  });
 
-  /// Open all the way by itself (a tap) instead of following a drag.
-  final bool expand;
+  /// Open all the way by itself (a tap, or a drag that was let go of upwards)
+  /// instead of following a drag.
+  bool expand;
+
+  final MusicHub hub;
+  final MusicCovers covers;
+  final Rect miniRect;
+  final NavigatorState navigator;
+
+  /// While a drag is being followed the player lives in the overlay, not on a
+  /// route: pushing a route would cancel the gesture the finger is making.
+  OverlayEntry? _entry;
+  bool _handedOff = false;
 
   _NowPlayingPageState? _page;
   double _pendingDy = 0;
@@ -87,10 +106,10 @@ class NowPlayingHandle {
 /// Entry point of the music player that grows out of the mini bar.
 ///
 /// One animation value drives the whole thing: the cover grows
-/// from the bar's thumbnail to the big cover, the play button travels to the
-/// middle of the controls, the title and the waveform fade in, and the panel
-/// itself rises from the bar to the full screen, tracking the finger while it
-/// is dragged. Dragging it back down (or Back) returns it to the bar.
+/// from the bar's thumbnail to the big cover, the play, previous and next
+/// buttons travel to their places, the title and the waveform fade in, and the
+/// panel itself rises from the bar to the full screen, tracking the finger
+/// while it is dragged. Dragging it back down (or Back) returns it to the bar.
 class NowPlayingPanel {
   NowPlayingPanel._();
 
@@ -101,8 +120,10 @@ class NowPlayingPanel {
   static NowPlayingHandle? _current;
 
   /// Opens the player over [miniRect], the bar's rectangle on screen. With
-  /// [expand] it opens by itself; otherwise the caller feeds it the drag
-  /// through the returned handle. Null when there is nothing to open on.
+  /// [expand] it opens by itself (on a route, so Back works); otherwise the
+  /// caller feeds it the drag through the returned handle (in the overlay, so
+  /// the gesture survives) and it moves onto a route once it is let go open.
+  /// Null when there is nothing to open on.
   static NowPlayingHandle? open(
     BuildContext context, {
     required MusicHub hub,
@@ -114,25 +135,71 @@ class NowPlayingPanel {
     if (existing != null) return existing;
     final navigator = Navigator.maybeOf(context, rootNavigator: true);
     if (navigator == null) return null;
-    final handle = NowPlayingHandle._(expand: expand);
+    final handle = NowPlayingHandle._(
+      expand: expand,
+      hub: hub,
+      covers: covers,
+      miniRect: miniRect,
+      navigator: navigator,
+    );
+    if (expand) {
+      _current = handle;
+      isOpen.value = true;
+      _pushRoute(handle, initialP: 0);
+      return handle;
+    }
+    final overlay = Overlay.maybeOf(context, rootOverlay: true);
+    if (overlay == null) return null;
     _current = handle;
     isOpen.value = true;
-    navigator.push(
+    final entry = OverlayEntry(
+      builder: (context) =>
+          _NowPlayingPage(handle: handle, inOverlay: true, initialP: 0),
+    );
+    handle._entry = entry;
+    overlay.insert(entry);
+    return handle;
+  }
+
+  static void _pushRoute(NowPlayingHandle handle, {required double initialP}) {
+    handle.navigator.push(
       PageRouteBuilder<void>(
         opaque: false,
         barrierColor: Colors.transparent,
         transitionDuration: Duration.zero,
         reverseTransitionDuration: Duration.zero,
         pageBuilder: (context, _, _) => _NowPlayingPage(
-          hub: hub,
-          covers: covers,
           handle: handle,
-          miniRect: miniRect,
+          inOverlay: false,
+          initialP: initialP,
         ),
         transitionsBuilder: (_, _, _, child) => child,
       ),
     );
-    return handle;
+  }
+
+  /// The finger let go with the player open enough to stay: carry on from the
+  /// same spot on a real route (which Back understands) and drop the overlay
+  /// copy, in the same frame so nothing blinks.
+  static void _handOff(NowPlayingHandle handle, double p) {
+    final entry = handle._entry;
+    if (entry == null) return;
+    handle._handedOff = true;
+    handle._entry = null;
+    handle.expand = true;
+    _pushRoute(handle, initialP: p);
+    entry.remove();
+    entry.dispose();
+  }
+
+  /// Takes the overlay copy away (collapsed, or playback ended).
+  static void _dismissOverlay(NowPlayingHandle handle) {
+    final entry = handle._entry;
+    handle._entry = null;
+    if (entry != null) {
+      entry.remove();
+      entry.dispose();
+    }
   }
 
   static void _closed(NowPlayingHandle handle) {
@@ -147,16 +214,20 @@ class NowPlayingPanel {
 enum _PanelMenu { openViewer, stop }
 
 class _NowPlayingPage extends StatefulWidget {
-  final MusicHub hub;
-  final MusicCovers covers;
   final NowPlayingHandle handle;
-  final Rect miniRect;
+
+  /// Shown in the overlay while a drag is followed (see [NowPlayingHandle]),
+  /// not on a route.
+  final bool inOverlay;
+
+  /// How far open the panel starts: 0 out of the bar, or where the finger let
+  /// go when carrying on from the overlay copy.
+  final double initialP;
 
   const _NowPlayingPage({
-    required this.hub,
-    required this.covers,
     required this.handle,
-    required this.miniRect,
+    required this.inOverlay,
+    required this.initialP,
   });
 
   @override
@@ -164,7 +235,7 @@ class _NowPlayingPage extends StatefulWidget {
 }
 
 class _NowPlayingPageState extends State<_NowPlayingPage>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   static const double _miniCover = 44;
   static const double _miniButton = 48;
   static const double _expandedPlay = 72;
@@ -175,7 +246,13 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
     vsync: this,
     lowerBound: 0,
     upperBound: 1,
-    value: 0,
+    value: widget.initialP,
+  );
+
+  /// Glides the progress between the player's position reports.
+  late final SmoothPlaybackPosition _smooth = SmoothPlaybackPosition(
+    vsync: this,
+    onFrame: _onSmoothFrame,
   );
 
   final ValueNotifier<VideoPlaybackProgress> _progress =
@@ -183,7 +260,6 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
   final ValueNotifier<AbLoopState> _noLoop = ValueNotifier<AbLoopState>(
     AbLoopState.empty,
   );
-  final ValueNotifier<bool> _playing = ValueNotifier<bool>(false);
 
   BackgroundPlaybackSession? _session;
   NativeVideoController? _controller;
@@ -191,14 +267,19 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
   bool _removalRequested = false;
   bool _removed = false;
   bool _closing = false;
+  bool _ready = false;
+  String? _lastTrackPath;
+  double _trackSlide = 1;
+  bool _pendingTrackSlide = false;
 
-  double get _travel => math.max(widget.miniRect.top, 1.0);
+  double get _travel => math.max(widget.handle.miniRect.top, 1.0);
 
   @override
   void initState() {
     super.initState();
     _host.activeSession.addListener(_syncSession);
     _syncSession();
+    _ready = true;
     widget.handle._attach(this);
   }
 
@@ -217,8 +298,11 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
     _c.dispose();
     _progress.dispose();
     _noLoop.dispose();
-    _playing.dispose();
-    NowPlayingPanel._closed(widget.handle);
+    _smooth.dispose();
+    // Handing over from the overlay copy to the route is not a closing.
+    if (!(widget.inOverlay && widget.handle._handedOff)) {
+      NowPlayingPanel._closed(widget.handle);
+    }
     super.dispose();
   }
 
@@ -229,6 +313,8 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
     if (identical(next, _session)) return;
     _unbindSession();
     _session = next;
+    _lastTrackPath = next?.playlist.currentFile;
+    _pendingTrackSlide = false;
     if (next == null) {
       _removeSelf();
       return;
@@ -240,7 +326,7 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
       _removeSelf();
       return;
     }
-    if (mounted && _route != null) setState(() {});
+    if (mounted && _ready) setState(() {});
   }
 
   void _unbindSession() {
@@ -270,6 +356,12 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
       _removeSelf();
       return;
     }
+    final path = session.playlist.currentFile;
+    if (path != _lastTrackPath) {
+      if (!_pendingTrackSlide) _trackSlide = 1;
+      _pendingTrackSlide = false;
+      _lastTrackPath = path;
+    }
     if (mounted) setState(() {});
   }
 
@@ -298,18 +390,15 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
   void _onTick() {
     final controller = _controller;
     if (controller == null || controller.isDisposed) return;
-    final value = controller.value;
-    if (_playing.value != value.isPlaying) _playing.value = value.isPlaying;
+    _smooth.report(controller.value, speed: _session?.playbackSpeed ?? 1.0);
+  }
+
+  /// Called every frame while playing (and on each report): the position as
+  /// it is estimated now, so the seek bar glides.
+  void _onSmoothFrame(Duration position, Duration duration) {
     final current = _progress.value;
     if (current.isDragging) return;
-    if (current.position == value.position &&
-        current.duration == value.duration) {
-      return;
-    }
-    _progress.value = current.copyWith(
-      position: value.position,
-      duration: value.duration,
-    );
+    _progress.value = current.copyWith(position: position, duration: duration);
   }
 
   /// Takes this page off the stack wherever it is in it, so a viewer pushed
@@ -322,6 +411,14 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
   /// Does the removal once the route is known (it is not yet in `initState`).
   void _tryRemove() {
     if (!_removalRequested || _removed) return;
+    if (widget.inOverlay) {
+      _removed = true;
+      scheduleMicrotask(() {
+        NowPlayingPanel._dismissOverlay(widget.handle);
+        NowPlayingPanel._closed(widget.handle);
+      });
+      return;
+    }
     final route = _route;
     final navigator = route?.navigator;
     if (route == null || navigator == null) return;
@@ -348,6 +445,10 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
     } else {
       target = _c.value > 0.5 ? 1.0 : 0.0;
     }
+    if (widget.inOverlay && target == 1.0) {
+      NowPlayingPanel._handOff(widget.handle, _c.value);
+      return;
+    }
     _settleTo(target);
   }
 
@@ -360,11 +461,11 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
       _closing = false;
       HapticFeedback.selectionClick();
     }
-    _c
-        .animateTo(target, duration: duration, curve: Curves.easeOutCubic)
-        .then((_) {
-          if (target == 0.0 && mounted) _finishCollapse();
-        });
+    _c.animateTo(target, duration: duration, curve: Curves.easeOutCubic).then((
+      _,
+    ) {
+      if (target == 0.0 && mounted) _finishCollapse();
+    });
   }
 
   void _collapse() => _settleTo(0.0);
@@ -373,13 +474,20 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
 
   // ── Actions ──────────────────────────────────────────────────────────────
 
-  void _step(int direction) => unawaited(_host.stepItem(direction));
-
-  void _togglePlay() {
-    final controller = _controller;
-    if (controller == null || controller.isDisposed) return;
-    unawaited(controller.value.isPlaying ? controller.pause() : controller.play());
+  void _step(int direction) {
+    final currentPath = _session?.playlist.currentFile;
+    _trackSlide = direction > 0 ? 1 : -1;
+    _pendingTrackSlide = true;
+    unawaited(
+      _host.stepItem(direction).then((_) {
+        if (mounted && _session?.playlist.currentFile == currentPath) {
+          _pendingTrackSlide = false;
+        }
+      }),
+    );
   }
+
+  void _togglePlay() => unawaited(_host.togglePlayback());
 
   void _cycleRepeat() {
     final next = switch (_host.repeat.value) {
@@ -394,7 +502,11 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
   void _openQueue() {
     final session = _session;
     if (session == null) return;
-    showMusicQueueSheet(context, hub: widget.hub, covers: widget.covers);
+    showMusicQueueSheet(
+      context,
+      hub: widget.handle.hub,
+      covers: widget.handle.covers,
+    );
   }
 
   Future<void> _onMenu(_PanelMenu item) async {
@@ -418,30 +530,29 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
     final path = session?.playlist.currentFile ?? '';
     final info = session == null || path.isEmpty
         ? null
-        : NowPlayingInfo.resolve(widget.hub, session, path);
+        : NowPlayingInfo.resolve(widget.handle.hub, session, path);
 
+    final content = Material(
+      type: MaterialType.transparency,
+      child: SizedBox.expand(
+        child: info == null
+            ? const SizedBox.shrink()
+            : AnimatedBuilder(
+                animation: _c,
+                builder: (context, _) =>
+                    _layers(context, media.size, media.padding, info, session!),
+              ),
+      ),
+    );
+    // The overlay copy lives only while a finger is down: Back has nothing to
+    // do there. The route copy turns Back into "minimize".
+    if (widget.inOverlay) return content;
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _collapse();
       },
-      child: Material(
-        type: MaterialType.transparency,
-        child: SizedBox.expand(
-          child: info == null
-              ? const SizedBox.shrink()
-              : AnimatedBuilder(
-                  animation: _c,
-                  builder: (context, _) => _layers(
-                    context,
-                    media.size,
-                    media.padding,
-                    info,
-                    session!,
-                  ),
-                ),
-        ),
-      ),
+      child: content,
     );
   }
 
@@ -456,7 +567,7 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
     final text = context.typography;
     final l10n = context.l10n;
     final p = _c.value;
-    final mini = widget.miniRect;
+    final mini = widget.handle.miniRect;
     final screen = Offset.zero & size;
     final panel = _lerpRect(mini, screen, p);
 
@@ -496,10 +607,11 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
       controlsTop + _expandedPlay / 2,
     );
 
-    // Shared elements.
-    final e = Curves.easeInOutCubic.transform(p);
-    // The shared elements start out riding on the panel's rising edge, like
-    // the bar's other content, and settle into their full-size places.
+    // Shared elements. They move linearly with the panel, so they follow the
+    // finger going up exactly as they do going down.
+    final e = p;
+    // The cover follows the panel's rising edge; the controls take the direct
+    // path from their mini-player positions to their full-player positions.
     final coverRect = _lerpRect(
       miniCoverRect.shift(Offset(0, miniDy)),
       expCoverRect,
@@ -510,11 +622,27 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
     final playSize = _lerp(40, _expandedPlay, e);
     final playCenter = Offset(
       _lerp(miniPlayCenter.dx, expPlayCenter.dx, e),
-      _lerp(miniPlayCenter.dy + miniDy, expPlayCenter.dy, e),
+      _lerp(miniPlayCenter.dy, expPlayCenter.dy, e),
     );
 
-    final miniOpacity = 1 - _seg(p, 0.0, 0.3);
-    final fullOpacity = _seg(p, 0.6, 1.0);
+    // Previous and next are shared too: they sit either side of the play
+    // button in the bar and in the full player, and travel between the two.
+    final step = ((size.width - 48) / 5).clamp(64.0, 84.0).toDouble();
+    Offset sideCenter(int direction) => Offset(
+      _lerp(
+        miniPlayCenter.dx + direction * _miniButton,
+        expPlayCenter.dx + direction * step,
+        e,
+      ),
+      playCenter.dy,
+    );
+    final prevCenter = sideCenter(-1);
+    final nextCenter = sideCenter(1);
+    final sideBox = _lerp(_miniButton, 56, e);
+    final sideIcon = _lerp(24, 36, e);
+
+    final miniOpacity = 1 - _seg(p, 0.0, 0.35);
+    final fullOpacity = _seg(p, 0.55, 1.0);
     final shadow = 1 - _seg(p, 0.0, 0.5);
 
     Widget fade(double opacity, Widget child) {
@@ -527,7 +655,8 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
 
     final titleStyle = text.bodyMedium?.copyWith(fontWeight: FontWeight.w600);
     final miniTextLeft = miniCoverRect.right + AppSpacing.md - 4;
-    final miniTextRight = mini.right - AppSpacing.xs - _miniButton * 3 - AppSpacing.sm;
+    final miniTextRight =
+        mini.right - AppSpacing.xs - _miniButton * 3 - AppSpacing.sm;
 
     return Stack(
       clipBehavior: Clip.none,
@@ -596,41 +725,11 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
                       info.artist,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                      style: text.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
                     ),
                 ],
-              ),
-            ),
-          ),
-        ),
-
-        // The bar's previous and next.
-        Positioned(
-          left: mini.right - AppSpacing.xs - _miniButton * 3,
-          top: mini.top + miniDy + 1,
-          height: mini.height - 1,
-          child: fade(
-            miniOpacity,
-            Align(
-              alignment: Alignment.center,
-              child: ListenableBuilder(
-                listenable: Listenable.merge([session.playlist, _host.repeat]),
-                builder: (context, _) => Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      tooltip: l10n.musicMiniPrevious,
-                      icon: const Icon(Icons.skip_previous_rounded),
-                      onPressed: _host.canStepPrevious ? () => _step(-1) : null,
-                    ),
-                    const SizedBox(width: _miniButton),
-                    IconButton(
-                      tooltip: l10n.musicMiniNext,
-                      icon: const Icon(Icons.skip_next_rounded),
-                      onPressed: _host.canStepNext ? () => _step(1) : null,
-                    ),
-                  ],
-                ),
               ),
             ),
           ),
@@ -700,17 +799,28 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
                 height: coverSize,
                 child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 260),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
                   transitionBuilder: (child, animation) => FadeTransition(
                     opacity: animation,
-                    child: ScaleTransition(
-                      scale: Tween<double>(begin: 0.94, end: 1).animate(animation),
-                      child: child,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: Offset(_trackSlide * 0.12, 0),
+                        end: Offset.zero,
+                      ).animate(animation),
+                      child: ScaleTransition(
+                        scale: Tween<double>(
+                          begin: 0.94,
+                          end: 1,
+                        ).animate(animation),
+                        child: child,
+                      ),
                     ),
                   ),
                   child: KeyedSubtree(
                     key: ValueKey<String>(info.path),
                     child: LibraryCover(
-                      covers: widget.covers,
+                      covers: widget.handle.covers,
                       track: info.coverTrack,
                       groupKey: info.coverKey,
                       size: coverSize,
@@ -733,6 +843,18 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
             fullOpacity,
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 260),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: Offset(_trackSlide * 0.16, 0),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: child,
+                ),
+              ),
               child: Column(
                 key: ValueKey<String>('t${info.path}'),
                 mainAxisSize: MainAxisSize.min,
@@ -742,7 +864,9 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
-                    style: text.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                    style: text.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   if (info.artist.isNotEmpty)
                     Padding(
@@ -752,7 +876,9 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,
-                        style: text.bodyLarge?.copyWith(color: cs.onSurfaceVariant),
+                        style: text.bodyLarge?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
                       ),
                     ),
                   if (info.album.isNotEmpty)
@@ -795,7 +921,8 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
           ),
         ),
 
-        // Shuffle, previous, next and repeat of the full player.
+        // Shuffle and repeat of the full player, either side of the transport
+        // buttons. They only exist in the full player, so they fade in.
         Positioned(
           left: 0,
           right: 0,
@@ -805,54 +932,45 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
             fullOpacity,
             ListenableBuilder(
               listenable: Listenable.merge([
-                session.playlist,
                 _host.repeat,
                 _host.libraryShuffled,
               ]),
               builder: (context, _) {
                 final repeat = _host.repeat.value;
                 final shuffled = _host.libraryShuffled.value;
-                return Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                return Stack(
                   children: [
-                    IconButton(
-                      tooltip: l10n.nowPlayingShuffle,
-                      icon: Icon(
-                        Icons.shuffle_rounded,
-                        color: shuffled ? cs.primary : cs.onSurfaceVariant,
+                    Positioned(
+                      left: size.width / 2 - 2 * step - 24,
+                      top: (_expandedPlay - 48) / 2,
+                      child: IconButton(
+                        tooltip: l10n.nowPlayingShuffle,
+                        icon: Icon(
+                          Icons.shuffle_rounded,
+                          color: shuffled ? cs.primary : cs.onSurfaceVariant,
+                        ),
+                        onPressed: _host.toggleLibraryShuffle,
                       ),
-                      onPressed: _host.toggleLibraryShuffle,
                     ),
-                    const SizedBox(width: AppSpacing.sm),
-                    IconButton(
-                      iconSize: 36,
-                      tooltip: l10n.musicMiniPrevious,
-                      icon: const Icon(Icons.skip_previous_rounded),
-                      onPressed: _host.canStepPrevious ? () => _step(-1) : null,
-                    ),
-                    SizedBox(width: _expandedPlay + AppSpacing.md),
-                    IconButton(
-                      iconSize: 36,
-                      tooltip: l10n.musicMiniNext,
-                      icon: const Icon(Icons.skip_next_rounded),
-                      onPressed: _host.canStepNext ? () => _step(1) : null,
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    IconButton(
-                      tooltip: switch (repeat) {
-                        PlaybackRepeat.off => l10n.nowPlayingRepeatOff,
-                        PlaybackRepeat.all => l10n.nowPlayingRepeatAll,
-                        PlaybackRepeat.one => l10n.nowPlayingRepeatOne,
-                      },
-                      icon: Icon(
-                        repeat == PlaybackRepeat.one
-                            ? Icons.repeat_one_rounded
-                            : Icons.repeat_rounded,
-                        color: repeat == PlaybackRepeat.off
-                            ? cs.onSurfaceVariant
-                            : cs.primary,
+                    Positioned(
+                      left: size.width / 2 + 2 * step - 24,
+                      top: (_expandedPlay - 48) / 2,
+                      child: IconButton(
+                        tooltip: switch (repeat) {
+                          PlaybackRepeat.off => l10n.nowPlayingRepeatOff,
+                          PlaybackRepeat.all => l10n.nowPlayingRepeatAll,
+                          PlaybackRepeat.one => l10n.nowPlayingRepeatOne,
+                        },
+                        icon: Icon(
+                          repeat == PlaybackRepeat.one
+                              ? Icons.repeat_one_rounded
+                              : Icons.repeat_rounded,
+                          color: repeat == PlaybackRepeat.off
+                              ? cs.onSurfaceVariant
+                              : cs.primary,
+                        ),
+                        onPressed: _cycleRepeat,
                       ),
-                      onPressed: _cycleRepeat,
                     ),
                   ],
                 );
@@ -860,6 +978,41 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
             ),
           ),
         ),
+
+        // Previous and next: the same two buttons in the bar and in the full
+        // player, moving from one to the other with the panel.
+        for (final side in const [-1, 1])
+          Positioned(
+            left: (side < 0 ? prevCenter.dx : nextCenter.dx) - sideBox / 2,
+            top: (side < 0 ? prevCenter.dy : nextCenter.dy) - sideBox / 2,
+            width: sideBox,
+            height: sideBox,
+            child: ListenableBuilder(
+              listenable: Listenable.merge([session.playlist, _host.repeat]),
+              builder: (context, _) {
+                final can = side < 0
+                    ? _host.canStepPrevious
+                    : _host.canStepNext;
+                return IconButton(
+                  tooltip: side < 0
+                      ? l10n.musicMiniPrevious
+                      : l10n.musicMiniNext,
+                  iconSize: sideIcon,
+                  padding: EdgeInsets.zero,
+                  constraints: BoxConstraints.tightFor(
+                    width: sideBox,
+                    height: sideBox,
+                  ),
+                  icon: Icon(
+                    side < 0
+                        ? Icons.skip_previous_rounded
+                        : Icons.skip_next_rounded,
+                  ),
+                  onPressed: can ? () => _step(side) : null,
+                );
+              },
+            ),
+          ),
 
         // The play button: one widget that travels from the bar to the middle
         // of the full player's controls.
@@ -869,7 +1022,7 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
           width: playSize,
           height: playSize,
           child: ValueListenableBuilder<bool>(
-            valueListenable: _playing,
+            valueListenable: _host.playing,
             builder: (context, playing, _) => Material(
               color: cs.primary,
               shape: const CircleBorder(),
@@ -957,7 +1110,9 @@ class _PlainSeek extends StatelessWidget {
                         final ms = progress.value.duration.inMilliseconds;
                         final target = Duration(milliseconds: (v * ms).round());
                         final c = controller();
-                        if (c != null && !c.isDisposed && c.value.isInitialized) {
+                        if (c != null &&
+                            !c.isDisposed &&
+                            c.value.isInitialized) {
                           await c.seekTo(target);
                         }
                         progress.value = progress.value.copyWith(

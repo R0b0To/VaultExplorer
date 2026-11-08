@@ -74,6 +74,25 @@ down stops playback.
 Shuffle keeps the playing track and shuffles the rest of the queue; turning it off restores the
 previous order. Repeat applies to music started from the library only.
 
+Details worth knowing:
+
+- **The drag is followed, not triggered.** While a finger drags the bar up, the player lives in
+  the root overlay, not on a route: pushing a route would cancel the gesture. Let go open and it
+  moves onto a route (so Back minimizes it) from exactly where it was, in the same frame.
+- **Previous and next are shared elements**, like the play button: they sit either side of it in
+  the bar and in the full player and travel between the two, so they never disappear.
+- **Skipping never blinks the play button.** `BackgroundPlaybackHost.playing` ignores the new
+  track's "not playing yet" reports until it really plays. Skipping always plays.
+- **Progress glides.** The player reports its position a few times a second; `PositionExtrapolator`
+  adds the time since the last report (at the playback speed), so the bar in the mini player and
+  the waveform advance every frame instead of in steps. It never moves backwards on a late report
+  and stops estimating if the player stalls.
+- **Dragging the bar down squishes it** towards the music strip as a preview that letting go closes
+  playback; give up the drag and it springs back.
+- **The music strip stays** in folder, album, artist and genre screens; picking a view returns to
+  the library on it.
+- **Library pages slide** towards the side of the new tab instead of cutting.
+
 ### Waveform seek bar
 
 In the media player, music uses its waveform as the timeline (tap or drag to seek; an A-B

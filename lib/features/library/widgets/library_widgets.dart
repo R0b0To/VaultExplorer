@@ -263,46 +263,88 @@ class LibraryTrackTile extends StatelessWidget {
 
   Widget _buildTile(BuildContext context, {required bool isPlaying}) {
     final cs = context.colors;
+    final theme = Theme.of(context);
     final duration = libraryDurationLabel(track.durationMs);
     final base = subtitle ?? libraryTrackSubtitle(context, track);
     final line = sourceLabel == null || sourceLabel!.isEmpty
         ? base
         : (base.isEmpty ? sourceLabel! : '$base · $sourceLabel');
-    return ListTile(
-      onTap: onTap,
-      selected: isPlaying,
-      selectedTileColor: isPlaying ? cs.primary.withValues(alpha: 0.17) : null,
-      contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-      leading: leadingLabel != null
-          ? SizedBox(
-              width: 44,
-              child: Center(
-                child: Text(
-                  leadingLabel!,
-                  style: context.typography.bodyMedium?.copyWith(
-                    color: cs.onSurfaceVariant,
+    final titleStyle =
+        (theme.listTileTheme.titleTextStyle ??
+                context.typography.bodyLarge ??
+                theme.textTheme.bodyLarge ??
+                const TextStyle())
+            .copyWith(color: isPlaying ? cs.primary : cs.onSurface);
+    final subtitleStyle =
+        (theme.listTileTheme.subtitleTextStyle ??
+                context.typography.bodyMedium ??
+                theme.textTheme.bodyMedium ??
+                const TextStyle())
+            .copyWith(
+              color: isPlaying
+                  ? cs.primary.withValues(alpha: 0.86)
+                  : cs.onSurfaceVariant,
+            );
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeInOutCubic,
+      decoration: BoxDecoration(
+        color: isPlaying
+            ? cs.primary.withValues(alpha: 0.17)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ListTile(
+        onTap: onTap,
+        selected: isPlaying,
+        selectedTileColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+        leading: leadingLabel != null
+            ? SizedBox(
+                width: 44,
+                child: Center(
+                  child: Text(
+                    leadingLabel!,
+                    style: context.typography.bodyMedium?.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
                   ),
                 ),
+              )
+            : LibraryCover(
+                covers: covers,
+                track: coverTrack ?? track,
+                groupKey: coverGroupKey,
+                size: 44,
               ),
-            )
-          : LibraryCover(
-              covers: covers,
-              track: coverTrack ?? track,
-              groupKey: coverGroupKey,
-              size: 44,
-            ),
-      title: Text(track.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-      subtitle: line.isEmpty
-          ? null
-          : Text(line, maxLines: 1, overflow: TextOverflow.ellipsis),
-      trailing: duration.isEmpty
-          ? null
-          : Text(
-              duration,
-              style: context.typography.bodySmall?.copyWith(
-                color: cs.onSurfaceVariant,
+        title: AnimatedDefaultTextStyle(
+          duration: const Duration(milliseconds: 280),
+          curve: Curves.easeInOutCubic,
+          style: titleStyle,
+          child: Text(
+            track.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        subtitle: line.isEmpty
+            ? null
+            : AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 280),
+                curve: Curves.easeInOutCubic,
+                style: subtitleStyle,
+                child: Text(line, maxLines: 1, overflow: TextOverflow.ellipsis),
               ),
-            ),
+        trailing: duration.isEmpty
+            ? null
+            : Text(
+                duration,
+                style: context.typography.bodySmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+      ),
     );
   }
 }

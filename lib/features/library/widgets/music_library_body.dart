@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
@@ -19,6 +20,8 @@ import 'package:vaultexplorer/features/library/models/library_track.dart';
 import 'package:vaultexplorer/features/library/screens/library_detail_screen.dart';
 import 'package:vaultexplorer/features/library/widgets/library_cover.dart';
 import 'package:vaultexplorer/features/library/widgets/library_widgets.dart';
+import 'package:vaultexplorer/features/library/widgets/music_mode_actions.dart';
+import 'package:vaultexplorer/features/library/widgets/music_mode_bar.dart';
 
 /// One entry of the sort menu: a criterion index, or null for "reverse order".
 class _SortChoice {
@@ -161,17 +164,77 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
         return Column(
           children: [
             _buildHeader(context, category, view),
-            if (_hub.isScanning) _buildScanBanner(context) else _buildNotes(context),
-            Expanded(child: view?.content ?? _buildEmpty(context)),
+            if (_hub.isScanning)
+              _buildScanBanner(context)
+            else
+              _buildNotes(context),
+            Expanded(
+              child: _switchPage(
+                category,
+                waiting,
+                view?.content ?? _buildEmpty(context),
+              ),
+            ),
           ],
         );
       },
     );
   }
 
+  /// The order of the tabs in the bar, which decides which way a page slides.
+  static const _tabOrder = [
+    MusicCategory.tracks,
+    MusicCategory.albums,
+    MusicCategory.artists,
+    MusicCategory.genres,
+    MusicCategory.folders,
+  ];
+
+  MusicCategory? _shown;
+  int _slide = 1;
+
+  /// Slides and fades from one library page to the next, towards the side the
+  /// new tab is on, instead of cutting.
+  Widget _switchPage(MusicCategory category, bool waiting, Widget content) {
+    final from = _shown;
+    if (from != null && from != category) {
+      _slide = _tabOrder.indexOf(category) >= _tabOrder.indexOf(from) ? 1 : -1;
+    }
+    _shown = category;
+
+    final key = ValueKey<Object>(waiting ? 'waiting' : category);
+    return ClipRect(
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 260),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        layoutBuilder: (current, previous) => Stack(
+          fit: StackFit.expand,
+          children: [...previous, if (current != null) current],
+        ),
+        transitionBuilder: (child, animation) {
+          // The page coming in starts a little to the side it is on; the one
+          // going out leaves towards the opposite side.
+          final incoming = child.key == key;
+          final dx = 0.12 * _slide;
+          final offset = Tween<Offset>(
+            begin: Offset(incoming ? dx : -dx, 0),
+            end: Offset.zero,
+          ).animate(animation);
+          return FadeTransition(
+            opacity: animation,
+            child: SlideTransition(position: offset, child: child),
+          );
+        },
+        child: KeyedSubtree(key: key, child: content),
+      ),
+    );
+  }
+
   Widget _buildEmpty(BuildContext context) {
     final l10n = context.l10n;
-    if (_hub.isLoading || _hub.isScanning || _hub.sourceCount == 0) {
+    if (_hub.isScanning) return const SizedBox.shrink();
+    if (_hub.isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
     return AppEmptyState(
@@ -194,7 +257,11 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
     };
   }
 
-  Widget _buildHeader(BuildContext context, MusicCategory category, _View? view) {
+  Widget _buildHeader(
+    BuildContext context,
+    MusicCategory category,
+    _View? view,
+  ) {
     final l10n = context.l10n;
     final cs = context.colors;
     final searching = _searchOpen || _query.isNotEmpty;
@@ -223,8 +290,12 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
                       ),
                     )
                   : Text(
-                      view == null ? '' : _summary(context, category, view.count),
-                      style: context.typography.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                      view == null
+                          ? ''
+                          : _summary(context, category, view.count),
+                      style: context.typography.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
                     ),
             ),
             if (searching)
@@ -259,7 +330,8 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
               icon: const Icon(Icons.shuffle_rounded, size: 20),
               onPressed: canPlay ? () => _playShown(view, shuffle: true) : null,
             ),
-            if (category != MusicCategory.genres) _buildSortButton(context, category),
+            if (category != MusicCategory.genres)
+              _buildSortButton(context, category),
           ],
         ),
       ),
@@ -267,7 +339,12 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
   }
 
   void _playShown(_View view, {bool shuffle = false}) {
-    playLibraryTracks(context, hub: _hub, tracks: view.playTracks(), shuffle: shuffle);
+    playLibraryTracks(
+      context,
+      hub: _hub,
+      tracks: view.playTracks(),
+      shuffle: shuffle,
+    );
   }
 
   List<String> _sortLabels(BuildContext context, MusicCategory category) {
@@ -300,18 +377,18 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
   }
 
   int _currentSort(MusicCategory category) => switch (category) {
-        MusicCategory.artists => _artistSort.index,
-        MusicCategory.folders => _folderSort.index,
-        MusicCategory.tracks => _trackSort.index,
-        _ => _albumSort.index,
-      };
+    MusicCategory.artists => _artistSort.index,
+    MusicCategory.folders => _folderSort.index,
+    MusicCategory.tracks => _trackSort.index,
+    _ => _albumSort.index,
+  };
 
   bool _currentDescending(MusicCategory category) => switch (category) {
-        MusicCategory.artists => _artistDescending,
-        MusicCategory.folders => _folderDescending,
-        MusicCategory.tracks => _trackDescending,
-        _ => _albumDescending,
-      };
+    MusicCategory.artists => _artistDescending,
+    MusicCategory.folders => _folderDescending,
+    MusicCategory.tracks => _trackDescending,
+    _ => _albumDescending,
+  };
 
   Widget _buildSortButton(BuildContext context, MusicCategory category) {
     final l10n = context.l10n;
@@ -365,7 +442,8 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
             _trackDescending = !_trackDescending;
           } else {
             _trackSort = TrackSort.values[i];
-            _trackDescending = _trackSort == TrackSort.duration ||
+            _trackDescending =
+                _trackSort == TrackSort.duration ||
                 _trackSort == TrackSort.recentlyAdded;
           }
         default:
@@ -409,13 +487,17 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
                   ),
                 ),
               ),
-              TextButton(onPressed: _hub.cancelAll, child: Text(l10n.libraryScanStop)),
+              TextButton(
+                onPressed: _hub.cancelAll,
+                child: Text(l10n.libraryScanStop),
+              ),
             ],
           ),
-          Padding(
-            padding: const EdgeInsets.only(right: AppSpacing.md),
-            child: LinearProgressIndicator(value: value),
-          ),
+          if (value != null)
+            Padding(
+              padding: const EdgeInsets.only(right: AppSpacing.md),
+              child: LinearProgressIndicator(value: value),
+            ),
           const SizedBox(height: AppSpacing.xs),
         ],
       ),
@@ -426,15 +508,25 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
     final l10n = context.l10n;
     final lines = [
       if (_hub.walkIncomplete) l10n.libraryIncompleteNote,
-      if (_hub.readFailures > 0) l10n.libraryReadFailuresNote(_hub.readFailures),
+      if (_hub.readFailures > 0)
+        l10n.libraryReadFailuresNote(_hub.readFailures),
     ];
     if (lines.isEmpty) return const SizedBox.shrink();
     return Padding(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.xs),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        0,
+        AppSpacing.md,
+        AppSpacing.xs,
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.info_outline_rounded, size: 16, color: context.colors.onSurfaceVariant),
+          Icon(
+            Icons.info_outline_rounded,
+            size: 16,
+            color: context.colors.onSurfaceVariant,
+          ),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
@@ -450,17 +542,21 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
   }
 
   Widget _noResults(BuildContext context) => Center(
-        child: Text(
-          context.l10n.libraryNoResults,
-          style: context.typography.bodyMedium?.copyWith(
-            color: context.colors.onSurfaceVariant,
-          ),
-        ),
-      );
+    child: Text(
+      context.l10n.libraryNoResults,
+      style: context.typography.bodyMedium?.copyWith(
+        color: context.colors.onSurfaceVariant,
+      ),
+    ),
+  );
 
   // ── Views ────────────────────────────────────────────────────────────────
 
-  _View _viewFor(BuildContext context, LibraryIndex index, MusicCategory category) {
+  _View _viewFor(
+    BuildContext context,
+    LibraryIndex index,
+    MusicCategory category,
+  ) {
     return switch (category) {
       MusicCategory.artists => _artists(context, index),
       MusicCategory.genres => _genres(context, index),
@@ -484,11 +580,21 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
       _hub.sourceCount > 1 ? _hub.containerOf(t.source)?.displayName : null;
 
   _View _albums(BuildContext context, LibraryIndex index) {
-    final albums = _albumMemo.get(index, _query, _albumSort, _albumDescending, () {
-      final found = index.searchAlbums(_query);
-      if (_albumSort == AlbumSort.title && !_albumDescending) return found;
-      return LibrarySorting.albums(found, _albumSort, descending: _albumDescending);
-    });
+    final albums = _albumMemo.get(
+      index,
+      _query,
+      _albumSort,
+      _albumDescending,
+      () {
+        final found = index.searchAlbums(_query);
+        if (_albumSort == AlbumSort.title && !_albumDescending) return found;
+        return LibrarySorting.albums(
+          found,
+          _albumSort,
+          descending: _albumDescending,
+        );
+      },
+    );
     final covers = widget.library.covers;
     return _View(
       albums.length,
@@ -511,7 +617,11 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
                   album: albums[i],
                   covers: covers,
                   onTap: () => _openAlbum(albums[i]),
-                  onPlay: () => playLibraryTracks(context, hub: _hub, tracks: albums[i].tracks),
+                  onPlay: () => playLibraryTracks(
+                    context,
+                    hub: _hub,
+                    tracks: albums[i].tracks,
+                  ),
                 ),
               ),
             ),
@@ -520,11 +630,21 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
   }
 
   _View _artists(BuildContext context, LibraryIndex index) {
-    final artists = _artistMemo.get(index, _query, _artistSort, _artistDescending, () {
-      final found = index.searchArtists(_query);
-      if (_artistSort == ArtistSort.name && !_artistDescending) return found;
-      return LibrarySorting.artists(found, _artistSort, descending: _artistDescending);
-    });
+    final artists = _artistMemo.get(
+      index,
+      _query,
+      _artistSort,
+      _artistDescending,
+      () {
+        final found = index.searchArtists(_query);
+        if (_artistSort == ArtistSort.name && !_artistDescending) return found;
+        return LibrarySorting.artists(
+          found,
+          _artistSort,
+          descending: _artistDescending,
+        );
+      },
+    );
     final l10n = context.l10n;
     final covers = widget.library.covers;
     return _View(
@@ -541,7 +661,10 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
                   final a = artists[i];
                   final albumCount = index.albumsOfArtist(a).length;
                   return ListTile(
-                    contentPadding: const EdgeInsets.only(left: AppSpacing.md, right: AppSpacing.xs),
+                    contentPadding: const EdgeInsets.only(
+                      left: AppSpacing.md,
+                      right: AppSpacing.xs,
+                    ),
                     leading: LibraryCover(
                       covers: covers,
                       track: a.coverTrack,
@@ -584,8 +707,13 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
                 itemBuilder: (context, i) {
                   final g = genres[i];
                   return ListTile(
-                    contentPadding: const EdgeInsets.only(left: AppSpacing.md, right: AppSpacing.xs),
-                    leading: const CircleAvatar(child: Icon(Icons.piano_rounded)),
+                    contentPadding: const EdgeInsets.only(
+                      left: AppSpacing.md,
+                      right: AppSpacing.xs,
+                    ),
+                    leading: const CircleAvatar(
+                      child: Icon(Icons.piano_rounded),
+                    ),
                     title: Text(
                       libraryGenreLabel(context, g.name),
                       maxLines: 1,
@@ -612,13 +740,19 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
           visualDensity: VisualDensity.compact,
           tooltip: l10n.libraryPlayAll,
           icon: const Icon(Icons.play_arrow_rounded),
-          onPressed: () => playLibraryTracks(context, hub: _hub, tracks: tracks),
+          onPressed: () =>
+              playLibraryTracks(context, hub: _hub, tracks: tracks),
         ),
         IconButton(
           visualDensity: VisualDensity.compact,
           tooltip: l10n.libraryShuffleAll,
           icon: const Icon(Icons.shuffle_rounded, size: 20),
-          onPressed: () => playLibraryTracks(context, hub: _hub, tracks: tracks, shuffle: true),
+          onPressed: () => playLibraryTracks(
+            context,
+            hub: _hub,
+            tracks: tracks,
+            shuffle: true,
+          ),
         ),
       ],
     );
@@ -627,11 +761,21 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
   /// Folders that directly hold audio, nothing else: where the music lives, not
   /// a copy of the file tree.
   _View _folders(BuildContext context, LibraryIndex index) {
-    final folders = _folderMemo.get(index, _query, _folderSort, _folderDescending, () {
-      final found = index.searchFolders(_query);
-      if (_folderSort == FolderSort.name && !_folderDescending) return found;
-      return LibrarySorting.folders(found, _folderSort, descending: _folderDescending);
-    });
+    final folders = _folderMemo.get(
+      index,
+      _query,
+      _folderSort,
+      _folderDescending,
+      () {
+        final found = index.searchFolders(_query);
+        if (_folderSort == FolderSort.name && !_folderDescending) return found;
+        return LibrarySorting.folders(
+          found,
+          _folderSort,
+          descending: _folderDescending,
+        );
+      },
+    );
     final l10n = context.l10n;
     final covers = widget.library.covers;
     return _View(
@@ -646,7 +790,9 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
                 itemCount: folders.length,
                 itemBuilder: (context, i) {
                   final f = folders[i];
-                  final album = f.tracks.isEmpty ? null : index.albumOf(f.tracks.first);
+                  final album = f.tracks.isEmpty
+                      ? null
+                      : index.albumOf(f.tracks.first);
                   final source = _hub.sourceCount > 1
                       ? _hub.containerOf(f.source)?.displayName
                       : null;
@@ -656,7 +802,10 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
                     if (source != null) source,
                   ].join(' · ');
                   return ListTile(
-                    contentPadding: const EdgeInsets.only(left: AppSpacing.md, right: AppSpacing.xs),
+                    contentPadding: const EdgeInsets.only(
+                      left: AppSpacing.md,
+                      right: AppSpacing.xs,
+                    ),
                     leading: LibraryCover(
                       covers: covers,
                       track: album?.coverTrack ?? f.coverTrack,
@@ -670,7 +819,11 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    subtitle: Text(where, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    subtitle: Text(
+                      where,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     trailing: _quickPlay(f.tracks),
                     onTap: () => _openFolder(index, f),
                   );
@@ -688,11 +841,21 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
   }
 
   _View _tracks(BuildContext context, LibraryIndex index) {
-    final tracks = _trackMemo.get(index, _query, _trackSort, _trackDescending, () {
-      final found = index.searchTracks(_query);
-      if (_trackSort == TrackSort.title && !_trackDescending) return found;
-      return LibrarySorting.tracks(found, _trackSort, descending: _trackDescending);
-    });
+    final tracks = _trackMemo.get(
+      index,
+      _query,
+      _trackSort,
+      _trackDescending,
+      () {
+        final found = index.searchTracks(_query);
+        if (_trackSort == TrackSort.title && !_trackDescending) return found;
+        return LibrarySorting.tracks(
+          found,
+          _trackSort,
+          descending: _trackDescending,
+        );
+      },
+    );
     final covers = widget.library.covers;
     return _View(
       tracks.length,
@@ -734,54 +897,94 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
   // ── Navigation and covers ────────────────────────────────────────────────
 
   void _push(Widget screen) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
+    Navigator.of(
+      context,
+    ).push(LibraryDetailRoute<void>(builder: (_) => screen));
   }
+
+  /// Back to the library itself, closing any folder / album / artist / genre
+  /// screens that were opened over it.
+  void _popDetails() {
+    Navigator.of(context).popUntil((route) => route is! LibraryDetailRoute);
+  }
+
+  /// The music mode bar for the detail screens, so they keep the library's
+  /// views one tap away (picking one returns to the library first).
+  Widget _detailBar() => MusicModeBar(
+    entry: widget.entry,
+    hub: _hub,
+    onSelectCategory: (category) {
+      _popDetails();
+      widget.entry.setCategory(category);
+    },
+    onToggleMode: () {
+      _popDetails();
+      unawaited(toggleMusicMode(context, ref, widget.container));
+    },
+    onEditFolders: () =>
+        unawaited(editMusicFolders(context, ref, widget.container)),
+  );
 
   void _openAlbum(AlbumGroup a) {
     final index = _hub.index;
-    _push(LibraryDetailScreen(
-      hub: _hub,
-      covers: widget.library.covers,
-      title: libraryAlbumTitle(context, a),
-      subtitle: libraryAlbumSubtitle(context, a),
-      coverTrack: a.coverTrack,
-      tracks: a.tracks,
-      numbered: true,
-      placeholderIcon: Icons.album_rounded,
-      coverKey: albumCoverKey(a),
-      onChooseCover: () => _chooseCover(albumCoverKey(a), a.tracks.isEmpty ? null : a.tracks.first),
-      coverOf: (t) => index.albumOf(t)?.coverTrack,
-    ));
+    _push(
+      LibraryDetailScreen(
+        hub: _hub,
+        modeBar: _detailBar(),
+        covers: widget.library.covers,
+        title: libraryAlbumTitle(context, a),
+        subtitle: libraryAlbumSubtitle(context, a),
+        coverTrack: a.coverTrack,
+        tracks: a.tracks,
+        numbered: true,
+        placeholderIcon: Icons.album_rounded,
+        coverKey: albumCoverKey(a),
+        onChooseCover: () => _chooseCover(
+          albumCoverKey(a),
+          a.tracks.isEmpty ? null : a.tracks.first,
+        ),
+        coverOf: (t) => index.albumOf(t)?.coverTrack,
+      ),
+    );
   }
 
   void _openArtist(LibraryIndex index, ArtistGroup a) {
-    _push(LibraryDetailScreen(
-      hub: _hub,
-      covers: widget.library.covers,
-      title: libraryArtistLabel(context, a.name),
-      subtitle: '',
-      coverTrack: a.coverTrack,
-      tracks: a.tracks,
-      albums: index.albumsOfArtist(a),
-      onOpenAlbum: _openAlbum,
-      coverOf: (t) => index.albumOf(t)?.coverTrack,
-      placeholderIcon: Icons.person_rounded,
-      coverKey: artistCoverKey(a),
-      onChooseCover: () => _chooseCover(artistCoverKey(a), a.tracks.isEmpty ? null : a.tracks.first),
-    ));
+    _push(
+      LibraryDetailScreen(
+        hub: _hub,
+        modeBar: _detailBar(),
+        covers: widget.library.covers,
+        title: libraryArtistLabel(context, a.name),
+        subtitle: '',
+        coverTrack: a.coverTrack,
+        tracks: a.tracks,
+        albums: index.albumsOfArtist(a),
+        onOpenAlbum: _openAlbum,
+        coverOf: (t) => index.albumOf(t)?.coverTrack,
+        placeholderIcon: Icons.person_rounded,
+        coverKey: artistCoverKey(a),
+        onChooseCover: () => _chooseCover(
+          artistCoverKey(a),
+          a.tracks.isEmpty ? null : a.tracks.first,
+        ),
+      ),
+    );
   }
 
   void _openFolder(LibraryIndex index, FolderGroup f) {
-    _push(LibraryDetailScreen(
-      hub: _hub,
-      covers: widget.library.covers,
-      title: _folderLabel(f),
-      subtitle: f.parentPath,
-      coverTrack: f.coverTrack,
-      tracks: f.tracks,
-      coverOf: (t) => index.albumOf(t)?.coverTrack,
-      placeholderIcon: Icons.folder_rounded,
-    ));
+    _push(
+      LibraryDetailScreen(
+        hub: _hub,
+        modeBar: _detailBar(),
+        covers: widget.library.covers,
+        title: _folderLabel(f),
+        subtitle: f.parentPath,
+        coverTrack: f.coverTrack,
+        tracks: f.tracks,
+        coverOf: (t) => index.albumOf(t)?.coverTrack,
+        placeholderIcon: Icons.folder_rounded,
+      ),
+    );
   }
 
   void _openGenre(LibraryIndex index, GenreGroup g) {
@@ -792,16 +995,19 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
         break;
       }
     }
-    _push(LibraryDetailScreen(
-      hub: _hub,
-      covers: widget.library.covers,
-      title: libraryGenreLabel(context, g.name),
-      subtitle: '',
-      coverTrack: cover,
-      tracks: g.tracks,
-      coverOf: (t) => index.albumOf(t)?.coverTrack,
-      placeholderIcon: Icons.piano_rounded,
-    ));
+    _push(
+      LibraryDetailScreen(
+        hub: _hub,
+        modeBar: _detailBar(),
+        covers: widget.library.covers,
+        title: libraryGenreLabel(context, g.name),
+        subtitle: '',
+        coverTrack: cover,
+        tracks: g.tracks,
+        coverOf: (t) => index.albumOf(t)?.coverTrack,
+        placeholderIcon: Icons.piano_rounded,
+      ),
+    );
   }
 
   /// Lets the person pick an image from this location's own files as the cover
@@ -815,7 +1021,9 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
     final l10n = context.l10n;
     final messenger = ScaffoldMessenger.maybeOf(context);
 
-    final startFile = (hint != null && hint.source == home.uri) ? hint.path : 'x';
+    final startFile = (hint != null && hint.source == home.uri)
+        ? hint.path
+        : 'x';
     final picked = await showMarkdownImagePicker(
       context: context,
       container: home,

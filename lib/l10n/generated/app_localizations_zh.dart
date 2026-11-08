@@ -2307,6 +2307,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get selectContainerFileOrFolder => '选择文件或文件夹';
 
   @override
+  String get useBackupHeaderToggleTitle => '使用备份卷头';
+
+  @override
+  String get useBackupHeaderToggleSubtitle => '使用存储在卷末尾的备份卷头打开。若主卷头损坏时请使用此选项。';
+
+  @override
+  String get keepCurrentOption => '保持当前';
+
+  @override
   String get readOnlyModeLabel => '只读模式';
 
   @override
@@ -3486,10 +3495,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get galleryModeTooltip => '图库模式';
 
   @override
-  String get optionsAction => 'Options';
+  String get optionsAction => '选项';
 
   @override
-  String get optionsActionTooltip => 'Options';
+  String get optionsActionTooltip => '选项';
 
   @override
   String get dateToday => '今天';

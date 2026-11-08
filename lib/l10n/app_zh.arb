@@ -3891,5 +3891,10 @@
   "nowPlayingRepeatOne": "单曲循环",
   "nowPlayingOpenViewer": "在媒体播放器中打开",
   "nowPlayingCollapse": "最小化播放器",
-  "libraryFolderCount": "{count, plural, =1{1 个文件夹} other{{count} 个文件夹}}"
+  "libraryFolderCount": "{count, plural, =1{1 个文件夹} other{{count} 个文件夹}}",
+  "useBackupHeaderToggleTitle": "使用备份卷头",
+  "useBackupHeaderToggleSubtitle": "使用存储在卷末尾的备份卷头打开。若主卷头损坏时请使用此选项。",
+  "keepCurrentOption": "保持当前",
+  "optionsAction": "选项",
+  "optionsActionTooltip": "选项"
 }

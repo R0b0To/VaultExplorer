@@ -2476,6 +2476,16 @@ class AppLocalizationsEs extends AppLocalizations {
   String get selectContainerFileOrFolder => 'Selecciona archivo o carpeta';
 
   @override
+  String get useBackupHeaderToggleTitle => 'Usar encabezado de respaldo';
+
+  @override
+  String get useBackupHeaderToggleSubtitle =>
+      'Abrir con la copia de seguridad del encabezado almacenada al final del volumen. Úselo si el encabezado principal está dañado.';
+
+  @override
+  String get keepCurrentOption => 'Mantener actual';
+
+  @override
   String get readOnlyModeLabel => 'Modo de solo lectura';
 
   @override
@@ -3723,10 +3733,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get galleryModeTooltip => 'Modo galería';
 
   @override
-  String get optionsAction => 'Options';
+  String get optionsAction => 'Opciones';
 
   @override
-  String get optionsActionTooltip => 'Options';
+  String get optionsActionTooltip => 'Opciones';
 
   @override
   String get dateToday => 'Hoy';

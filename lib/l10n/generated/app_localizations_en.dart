@@ -2438,6 +2438,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get selectContainerFileOrFolder => 'Select File or Folder';
 
   @override
+  String get useBackupHeaderToggleTitle => 'Use backup header';
+
+  @override
+  String get useBackupHeaderToggleSubtitle =>
+      'Open with the backup copy of the header stored at the end of the volume. Use it if the main header is damaged.';
+
+  @override
+  String get keepCurrentOption => 'Keep current';
+
+  @override
   String get readOnlyModeLabel => 'Read-only mode';
 
   @override

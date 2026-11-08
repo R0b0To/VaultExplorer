@@ -3891,5 +3891,10 @@
   "nowPlayingRepeatOne": "Diesen Titel wiederholen",
   "nowPlayingOpenViewer": "Im Mediaplayer öffnen",
   "nowPlayingCollapse": "Player minimieren",
-  "libraryFolderCount": "{count, plural, =1{1 Ordner} other{{count} Ordner}}"
+  "libraryFolderCount": "{count, plural, =1{1 Ordner} other{{count} Ordner}}",
+  "useBackupHeaderToggleTitle": "Backup-Header verwenden",
+  "useBackupHeaderToggleSubtitle": "Mit der am Ende des Volumes gespeicherten Sicherungskopie des Headers öffnen. Verwenden, wenn der Haupt-Header beschädigt ist.",
+  "keepCurrentOption": "Aktuelle beibehalten",
+  "optionsAction": "Optionen",
+  "optionsActionTooltip": "Optionen"
 }

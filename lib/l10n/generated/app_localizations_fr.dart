@@ -2489,6 +2489,16 @@ class AppLocalizationsFr extends AppLocalizations {
       'Sélectionner un fichier ou un dossier';
 
   @override
+  String get useBackupHeaderToggleTitle => 'Utiliser l\'en-tête de sauvegarde';
+
+  @override
+  String get useBackupHeaderToggleSubtitle =>
+      'Ouvrir avec la copie de sauvegarde de l\'en-tête stockée à la fin du volume. À utiliser si l\'en-tête principal est endommagé.';
+
+  @override
+  String get keepCurrentOption => 'Conserver l\'actuel';
+
+  @override
   String get readOnlyModeLabel => 'Mode lecture seule';
 
   @override

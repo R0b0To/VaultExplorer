@@ -2512,6 +2512,16 @@ class AppLocalizationsAr extends AppLocalizations {
   String get selectContainerFileOrFolder => 'اختيار ملف أو مجلد';
 
   @override
+  String get useBackupHeaderToggleTitle => 'استخدام الرأس الاحتياطي';
+
+  @override
+  String get useBackupHeaderToggleSubtitle =>
+      'الفتح باستخدام نسخة الرأس الاحتياطية المخزنة في نهاية وحدة التخزين. استخدم هذا الخيار إذا كان الرأس الرئيسي تالفاً.';
+
+  @override
+  String get keepCurrentOption => 'الاحتفاظ بالحالي';
+
+  @override
   String get readOnlyModeLabel => 'وضع القراءة فقط';
 
   @override
@@ -3747,10 +3757,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get galleryModeTooltip => 'وضع المعرض';
 
   @override
-  String get optionsAction => 'Options';
+  String get optionsAction => 'خيارات';
 
   @override
-  String get optionsActionTooltip => 'Options';
+  String get optionsActionTooltip => 'خيارات';
 
   @override
   String get dateToday => 'اليوم';

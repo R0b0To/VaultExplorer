@@ -3891,5 +3891,10 @@
   "nowPlayingRepeatOne": "Répéter cette piste",
   "nowPlayingOpenViewer": "Ouvrir dans le lecteur multimédia",
   "nowPlayingCollapse": "Réduire le lecteur",
-  "libraryFolderCount": "{count, plural, =1{1 dossier} other{{count} dossiers}}"
+  "libraryFolderCount": "{count, plural, =1{1 dossier} other{{count} dossiers}}",
+  "useBackupHeaderToggleTitle": "Utiliser l'en-tête de sauvegarde",
+  "useBackupHeaderToggleSubtitle": "Ouvrir avec la copie de sauvegarde de l'en-tête stockée à la fin du volume. À utiliser si l'en-tête principal est endommagé.",
+  "keepCurrentOption": "Conserver l'actuel",
+  "optionsAction": "Options",
+  "optionsActionTooltip": "Options"
 }

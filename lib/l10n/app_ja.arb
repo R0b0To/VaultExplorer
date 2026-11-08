@@ -3891,5 +3891,10 @@
   "nowPlayingRepeatOne": "この曲をリピート",
   "nowPlayingOpenViewer": "メディアプレーヤーで開く",
   "nowPlayingCollapse": "プレーヤーを最小化",
-  "libraryFolderCount": "{count, plural, =1{1 件のフォルダー} other{{count} 件のフォルダー}}"
+  "libraryFolderCount": "{count, plural, =1{1 件のフォルダー} other{{count} 件のフォルダー}}",
+  "useBackupHeaderToggleTitle": "バックアップヘッダーを使用",
+  "useBackupHeaderToggleSubtitle": "ボリュームの末尾に保存されているヘッダーのバックアップコピーを使用して開きます。メインヘッダーが破損している場合に使用してください。",
+  "keepCurrentOption": "現在の設定を維持",
+  "optionsAction": "オプション",
+  "optionsActionTooltip": "オプション"
 }

@@ -3891,5 +3891,10 @@
   "nowPlayingRepeatOne": "Повторювати цей трек",
   "nowPlayingOpenViewer": "Відкрити в медіаплеєрі",
   "nowPlayingCollapse": "Згорнути плеєр",
-  "libraryFolderCount": "{count, plural, =1{1 папка} other{{count} папок}}"
+  "libraryFolderCount": "{count, plural, =1{1 папка} other{{count} папок}}",
+  "useBackupHeaderToggleTitle": "Використовувати резервний заголовок",
+  "useBackupHeaderToggleSubtitle": "Відкрити з резервною копією заголовка, збереженою в кінці тому. Використовуйте, якщо основний заголовок пошкоджено.",
+  "keepCurrentOption": "Зберегти поточний",
+  "optionsAction": "Параметри",
+  "optionsActionTooltip": "Параметри"
 }

@@ -4062,6 +4062,24 @@ abstract class AppLocalizations {
   /// **'Select File or Folder'**
   String get selectContainerFileOrFolder;
 
+  /// Unlock option: open the volume using the backup header embedded at its end
+  ///
+  /// In en, this message translates to:
+  /// **'Use backup header'**
+  String get useBackupHeaderToggleTitle;
+
+  /// Explains the Use backup header unlock option
+  ///
+  /// In en, this message translates to:
+  /// **'Open with the backup copy of the header stored at the end of the volume. Use it if the main header is damaged.'**
+  String get useBackupHeaderToggleSubtitle;
+
+  /// Picker choice that leaves a setting unchanged (e.g. keep the header PRF when changing a password)
+  ///
+  /// In en, this message translates to:
+  /// **'Keep current'**
+  String get keepCurrentOption;
+
   /// Checkbox label for mounting in read-only mode
   ///
   /// In en, this message translates to:

@@ -3891,5 +3891,10 @@
   "nowPlayingRepeatOne": "이 트랙 반복",
   "nowPlayingOpenViewer": "미디어 플레이어에서 열기",
   "nowPlayingCollapse": "플레이어 최소화",
-  "libraryFolderCount": "{count, plural, =1{폴더 1개} other{폴더 {count}개}}"
+  "libraryFolderCount": "{count, plural, =1{폴더 1개} other{폴더 {count}개}}",
+  "useBackupHeaderToggleTitle": "백업 헤더 사용",
+  "useBackupHeaderToggleSubtitle": "볼륨 끝에 저장된 헤더의 백업 복사본으로 엽니다. 메인 헤더가 손상된 경우 사용하세요.",
+  "keepCurrentOption": "현재 설정 유지",
+  "optionsAction": "옵션",
+  "optionsActionTooltip": "옵션"
 }

@@ -3891,5 +3891,10 @@
   "nowPlayingRepeatOne": "تكرار هذا المسار",
   "nowPlayingOpenViewer": "فتح في مشغل الوسائط",
   "nowPlayingCollapse": "تصغير المشغل",
-  "libraryFolderCount": "{count, plural, =1{مجلد واحد} other{{count} مجلدات}}"
+  "libraryFolderCount": "{count, plural, =1{مجلد واحد} other{{count} مجلدات}}",
+  "useBackupHeaderToggleTitle": "استخدام الرأس الاحتياطي",
+  "useBackupHeaderToggleSubtitle": "الفتح باستخدام نسخة الرأس الاحتياطية المخزنة في نهاية وحدة التخزين. استخدم هذا الخيار إذا كان الرأس الرئيسي تالفاً.",
+  "keepCurrentOption": "الاحتفاظ بالحالي",
+  "optionsAction": "خيارات",
+  "optionsActionTooltip": "خيارات"
 }

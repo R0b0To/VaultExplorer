@@ -2345,6 +2345,16 @@ class AppLocalizationsKo extends AppLocalizations {
   String get selectContainerFileOrFolder => '파일 또는 폴더 선택';
 
   @override
+  String get useBackupHeaderToggleTitle => '백업 헤더 사용';
+
+  @override
+  String get useBackupHeaderToggleSubtitle =>
+      '볼륨 끝에 저장된 헤더의 백업 복사본으로 엽니다. 메인 헤더가 손상된 경우 사용하세요.';
+
+  @override
+  String get keepCurrentOption => '현재 설정 유지';
+
+  @override
   String get readOnlyModeLabel => '읽기 전용 모드';
 
   @override
@@ -3534,10 +3544,10 @@ class AppLocalizationsKo extends AppLocalizations {
   String get galleryModeTooltip => '갤러리 모드';
 
   @override
-  String get optionsAction => 'Options';
+  String get optionsAction => '옵션';
 
   @override
-  String get optionsActionTooltip => 'Options';
+  String get optionsActionTooltip => '옵션';
 
   @override
   String get dateToday => '오늘';

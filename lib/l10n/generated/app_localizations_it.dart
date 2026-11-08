@@ -2474,6 +2474,16 @@ class AppLocalizationsIt extends AppLocalizations {
   String get selectContainerFileOrFolder => 'Seleziona file o cartella';
 
   @override
+  String get useBackupHeaderToggleTitle => 'Usa intestazione di backup';
+
+  @override
+  String get useBackupHeaderToggleSubtitle =>
+      'Apri con la copia di backup dell\'intestazione memorizzata alla fine del volume. Usala se l\'intestazione principale è danneggiata.';
+
+  @override
+  String get keepCurrentOption => 'Mantieni attuale';
+
+  @override
   String get readOnlyModeLabel => 'Modalità sola lettura';
 
   @override
@@ -3714,10 +3724,10 @@ class AppLocalizationsIt extends AppLocalizations {
   String get galleryModeTooltip => 'Modalità galleria';
 
   @override
-  String get optionsAction => 'Options';
+  String get optionsAction => 'Opzioni';
 
   @override
-  String get optionsActionTooltip => 'Options';
+  String get optionsActionTooltip => 'Opzioni';
 
   @override
   String get dateToday => 'Oggi';

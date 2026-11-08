@@ -3891,5 +3891,10 @@
   "nowPlayingRepeatOne": "Repetir esta pista",
   "nowPlayingOpenViewer": "Abrir en el reproductor multimedia",
   "nowPlayingCollapse": "Minimizar reproductor",
-  "libraryFolderCount": "{count, plural, =1{1 carpeta} other{{count} carpetas}}"
+  "libraryFolderCount": "{count, plural, =1{1 carpeta} other{{count} carpetas}}",
+  "useBackupHeaderToggleTitle": "Usar encabezado de respaldo",
+  "useBackupHeaderToggleSubtitle": "Abrir con la copia de seguridad del encabezado almacenada al final del volumen. Úselo si el encabezado principal está dañado.",
+  "keepCurrentOption": "Mantener actual",
+  "optionsAction": "Opciones",
+  "optionsActionTooltip": "Opciones"
 }

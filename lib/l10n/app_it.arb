@@ -3891,5 +3891,10 @@
   "nowPlayingRepeatOne": "Ripeti questo brano",
   "nowPlayingOpenViewer": "Apri nel lettore multimediale",
   "nowPlayingCollapse": "Riduci lettore",
-  "libraryFolderCount": "{count, plural, =1{1 cartella} other{{count} cartelle}}"
+  "libraryFolderCount": "{count, plural, =1{1 cartella} other{{count} cartelle}}",
+  "useBackupHeaderToggleTitle": "Usa intestazione di backup",
+  "useBackupHeaderToggleSubtitle": "Apri con la copia di backup dell'intestazione memorizzata alla fine del volume. Usala se l'intestazione principale è danneggiata.",
+  "keepCurrentOption": "Mantieni attuale",
+  "optionsAction": "Opzioni",
+  "optionsActionTooltip": "Opzioni"
 }

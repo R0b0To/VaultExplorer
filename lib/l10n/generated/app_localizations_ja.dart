@@ -2345,6 +2345,16 @@ class AppLocalizationsJa extends AppLocalizations {
   String get selectContainerFileOrFolder => 'ファイルまたはフォルダを選択';
 
   @override
+  String get useBackupHeaderToggleTitle => 'バックアップヘッダーを使用';
+
+  @override
+  String get useBackupHeaderToggleSubtitle =>
+      'ボリュームの末尾に保存されているヘッダーのバックアップコピーを使用して開きます。メインヘッダーが破損している場合に使用してください。';
+
+  @override
+  String get keepCurrentOption => '現在の設定を維持';
+
+  @override
   String get readOnlyModeLabel => '読み取り専用モード';
 
   @override
@@ -3536,10 +3546,10 @@ class AppLocalizationsJa extends AppLocalizations {
   String get galleryModeTooltip => 'ギャラリーモード';
 
   @override
-  String get optionsAction => 'Options';
+  String get optionsAction => 'オプション';
 
   @override
-  String get optionsActionTooltip => 'Options';
+  String get optionsActionTooltip => 'オプション';
 
   @override
   String get dateToday => '今日';

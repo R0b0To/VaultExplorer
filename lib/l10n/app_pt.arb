@@ -3891,5 +3891,10 @@
   "nowPlayingRepeatOne": "Repetir esta faixa",
   "nowPlayingOpenViewer": "Abrir no reprodutor de mídia",
   "nowPlayingCollapse": "Minimizar reprodutor",
-  "libraryFolderCount": "{count, plural, =1{1 pasta} other{{count} pastas}}"
+  "libraryFolderCount": "{count, plural, =1{1 pasta} other{{count} pastas}}",
+  "useBackupHeaderToggleTitle": "Usar cabeçalho de backup",
+  "useBackupHeaderToggleSubtitle": "Abrir com a cópia de backup do cabeçalho armazenada no final do volume. Use se o cabeçalho principal estiver danificado.",
+  "keepCurrentOption": "Manter atual",
+  "optionsAction": "Opções",
+  "optionsActionTooltip": "Opções"
 }

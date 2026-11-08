@@ -2501,6 +2501,17 @@ class AppLocalizationsUk extends AppLocalizations {
   String get selectContainerFileOrFolder => 'Виберіть файл або папку';
 
   @override
+  String get useBackupHeaderToggleTitle =>
+      'Використовувати резервний заголовок';
+
+  @override
+  String get useBackupHeaderToggleSubtitle =>
+      'Відкрити з резервною копією заголовка, збереженою в кінці тому. Використовуйте, якщо основний заголовок пошкоджено.';
+
+  @override
+  String get keepCurrentOption => 'Зберегти поточний';
+
+  @override
   String get readOnlyModeLabel => 'Режим лише для читання';
 
   @override
@@ -3739,10 +3750,10 @@ class AppLocalizationsUk extends AppLocalizations {
   String get galleryModeTooltip => 'Режим галереї';
 
   @override
-  String get optionsAction => 'Options';
+  String get optionsAction => 'Параметри';
 
   @override
-  String get optionsActionTooltip => 'Options';
+  String get optionsActionTooltip => 'Параметри';
 
   @override
   String get dateToday => 'Сьогодні';

@@ -3216,6 +3216,18 @@
   "@selectContainerFileOrFolder": {
     "description": "Label for picking a container file or folder"
   },
+  "useBackupHeaderToggleTitle": "Use backup header",
+  "@useBackupHeaderToggleTitle": {
+    "description": "Unlock option: open the volume using the backup header embedded at its end"
+  },
+  "useBackupHeaderToggleSubtitle": "Open with the backup copy of the header stored at the end of the volume. Use it if the main header is damaged.",
+  "@useBackupHeaderToggleSubtitle": {
+    "description": "Explains the Use backup header unlock option"
+  },
+  "keepCurrentOption": "Keep current",
+  "@keepCurrentOption": {
+    "description": "Picker choice that leaves a setting unchanged (e.g. keep the header PRF when changing a password)"
+  },
   "readOnlyModeLabel": "Read-only mode",
   "@readOnlyModeLabel": {
     "description": "Checkbox label for mounting in read-only mode"

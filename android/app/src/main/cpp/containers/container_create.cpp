@@ -933,7 +933,19 @@ bool changeContainerPassword(int fd,
         int clampedNewPim = clampPim(newPim);
         unsigned char newHeaderKey[192] = {0};
         ScopeZeroize newHeaderKeyGuard(newHeaderKey, sizeof(newHeaderKey));
-        if (!deriveHeaderKey(matchedHash, newMixedPassword, newMixedPasswordLen,
+        // PRF for the re-encrypted header (both copies): the caller's choice, otherwise the one this
+        // header was found with. An id outside the known range is refused before anything is written
+        // instead of being silently replaced -- the caller asked for a specific algorithm.
+        HashId newHash = matchedHash;
+        if (newHashId != 255) {
+            if (newHashId < 0 || newHashId > static_cast<int>(HashId::kArgon2id)) {
+                LOGI("changeContainerPassword: unknown PRF id %d", newHashId);
+                break;
+            }
+            newHash = static_cast<HashId>(newHashId);
+        }
+
+        if (!deriveHeaderKey(newHash, newMixedPassword, newMixedPasswordLen,
                              newSalt, clampedNewPim, newHeaderKey, sizeof(newHeaderKey))) {
             break;
         }
@@ -964,7 +976,7 @@ bool changeContainerPassword(int fd,
         // upstream's CoreBase::ChangePassword (one pass per header copy).
         unsigned char backupSector[VC_FULL_HEADER_SIZE];
         const bool backupBuilt = vcBuildFreshlySaltedHeaderSector(
-            decryptedBody, matchedCipher, matchedHash, newMixedPassword, newMixedPasswordLen,
+            decryptedBody, matchedCipher, newHash, newMixedPassword, newMixedPasswordLen,
             clampedNewPim, backupSector);
         mbedtls_platform_zeroize(decryptedBody, sizeof(decryptedBody));
         if (!backupBuilt) break;

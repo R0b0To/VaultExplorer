@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
@@ -61,7 +62,8 @@ class MusicQueueRow extends StatelessWidget {
   }
 }
 
-/// The queue that rises from the bottom of the full player. Meant to be the child of a `DraggableScrollableSheet`, whose
+/// The queue that rises from the bottom of the full player
+/// Meant to be the child of a `DraggableScrollableSheet`, whose
 /// [scrollController] it uses so dragging its handle or list moves the sheet.
 ///
 /// Its first [kMusicQueuePeekHeight] (plus [bottomInset]) is what shows while
@@ -71,6 +73,9 @@ class MusicInlineQueue extends StatelessWidget {
   final MusicCovers covers;
   final ScrollController scrollController;
   final double bottomInset;
+
+  /// How far the sheet is open, 0 to 1 (turns the chevron).
+  final ValueListenable<double> openness;
   final VoidCallback onHeaderTap;
 
   const MusicInlineQueue({
@@ -79,6 +84,7 @@ class MusicInlineQueue extends StatelessWidget {
     required this.covers,
     required this.scrollController,
     required this.bottomInset,
+    required this.openness,
     required this.onHeaderTap,
   });
 
@@ -148,6 +154,19 @@ class MusicInlineQueue extends StatelessWidget {
                                   Text(
                                     '${current + 1} / ${queue.length}',
                                     style: text.bodySmall?.copyWith(
+                                      color: cs.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  const SizedBox(width: AppSpacing.sm),
+                                  ValueListenableBuilder<double>(
+                                    valueListenable: openness,
+                                    builder: (context, q, child) =>
+                                        Transform.rotate(
+                                          angle: math.pi * q,
+                                          child: child,
+                                        ),
+                                    child: Icon(
+                                      Icons.keyboard_arrow_up_rounded,
                                       color: cs.onSurfaceVariant,
                                     ),
                                   ),

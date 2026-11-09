@@ -1,8 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui' show Rect;
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart' show SchedulerPhase;
 import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -54,7 +53,7 @@ List<BoxShadow> miniPlayerShadows(double strength) => [
 /// into the minimized state.
 const double _kMinimizeDip = 120;
 
-/// bouncing curve: overshoots its target a little, then settles.
+///bouncing curve: overshoots its target a little, then settles.
 const Curve _kBounce = Cubic(0.175, 0.885, 0.32, 1.125);
 
 /// Lets the mini bar steer the player while its finger is still down: the
@@ -311,6 +310,13 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
   /// This drag moved the queue sheet (so its release settles the sheet).
   bool _sheetDragged = false;
 
+  /// Fingers currently down on the panel (see [_onPointerEnd]).
+  int _pointersDown = 0;
+
+  /// How far the queue is open, 0 down to 1 up: what the cover, title and
+  /// transport buttons follow on their way to the top.
+  final ValueNotifier<double> _queueP = ValueNotifier<double>(0);
+
   double get _travel => math.max(widget.handle.miniRect.top, 1.0);
 
   @override
@@ -335,6 +341,7 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
     widget.handle._detach(this);
     _sheet.removeListener(_onSheetChanged);
     _sheet.dispose();
+    _queueP.dispose();
     _host.activeSession.removeListener(_syncSession);
     _unbindSession();
     _c.dispose();
@@ -587,8 +594,15 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
   /// player is neither being dragged nor moving, it must be at rest. If it
   /// is anywhere else it is settled, so it can never stay stuck mid-page.
   void _onPointerEnd(Object? _) {
+    if (_pointersDown > 0) _pointersDown--;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _removed || _dragActive || _c.isAnimating) return;
+      if (!mounted || _removed || _pointersDown > 0 || _c.isAnimating) return;
+      // The drag detector never reported the end of the drag: end it here.
+      if (_dragActive) {
+        _dragActive = false;
+        _release(0);
+        return;
+      }
       final v = _c.value;
       if (v > 0.001 && v < 0.999) {
         _dragDirection = 0;
@@ -601,8 +615,30 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
 
   // ── The queue ────────────────────────────────────────────────────────────
 
+  /// The list must be at its top whenever the queue is down: otherwise a drag
+  /// on the little that shows would scroll it instead of raising the sheet.
+  void _resetQueueScroll() {
+    final c = _queueScroll;
+    if (c != null && c.hasClients && c.position.pixels > 0.5) c.jumpTo(0);
+  }
+
+  void _setQueueProgress(double v) {
+    if (v == _queueP.value) return;
+    // Notified while the tree is being built or laid out, the update waits for
+    // the frame to end.
+    if (WidgetsBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _queueP.value = v;
+      });
+    } else {
+      _queueP.value = v;
+    }
+  }
+
   void _sheetTo(double target) {
     if (!_sheetReady) return;
+    if (target <= _sheetMin + 0.001) _resetQueueScroll();
     if (((target - _sheet.size) * _screenHeight).abs() > 60) {
       HapticFeedback.selectionClick();
     }
@@ -620,12 +656,15 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
   /// Opening the queue brings the playing track into view.
   void _onSheetChanged() {
     if (!_sheetReady) return;
+    final span = math.max(_sheetMax - _sheetMin, 0.001);
+    _setQueueProgress(((_sheet.size - _sheetMin) / span).clamp(0.0, 1.0));
     final open = _sheet.size > _sheetMin + 0.01;
     if (open && _sheetClosed) {
       _sheetClosed = false;
       WidgetsBinding.instance.addPostFrameCallback((_) => _queueToCurrent());
     } else if (!open) {
       _sheetClosed = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _resetQueueScroll());
     }
   }
 
@@ -643,7 +682,12 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
     );
   }
 
-  void _collapse() => _settleTo(0.0);
+  void _collapse() {
+    if (_sheetReady && _sheet.size > _sheetMin + 0.001) {
+      _sheetTo(_sheetMin);
+    }
+    _settleTo(0.0);
+  }
 
   void _finishCollapse() => _removeSelf();
 
@@ -704,12 +748,18 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
         .clamp(0.04, 0.3)
         .toDouble();
     _sheetMax =
-        ((size.height - media.padding.top - _topBar - 8) / size.height)
+        ((size.height -
+                    media.padding.top -
+                    8 -
+                    widget.handle.miniRect.height -
+                    8) /
+                size.height)
             .clamp(_sheetMin + 0.2, 0.95)
             .toDouble();
 
     final content = Listener(
       behavior: HitTestBehavior.translucent,
+      onPointerDown: (_) => _pointersDown++,
       onPointerUp: _onPointerEnd,
       onPointerCancel: _onPointerEnd,
       child: Material(
@@ -721,7 +771,7 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
                   children: [
                     Positioned.fill(
                       child: AnimatedBuilder(
-                        animation: _c,
+                        animation: Listenable.merge([_c, _queueP]),
                         builder: (context, _) => _layers(
                           context,
                           media.size,
@@ -754,9 +804,10 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
     );
   }
 
-  /// The queue sheet, built once (not on every animation frame) and shown only
-  /// when the player is fully open. Taking it out of the tree otherwise also
-  /// closes it, so the player always opens with the queue down.
+  /// The queue sheet, built once (not on every animation frame) and kept in
+  /// the tree via [Offstage] when the full player is minimized or opening.
+  /// Keeping it mounted prevents [DraggableScrollableController] assertion
+  /// failures from re-attaching a controller during animation frames.
   Widget _queueLayer() {
     return AnimatedBuilder(
       animation: _c,
@@ -773,19 +824,35 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
             covers: widget.handle.covers,
             scrollController: scroll,
             bottomInset: _padBottom,
+            openness: _queueP,
             onHeaderTap: _toggleQueue,
           );
         },
       ),
       builder: (context, child) {
         final opacity = _seg(_c.value.clamp(0.0, 1.0), 0.55, 1.0);
-        if (opacity <= 0.001) {
-          _sheetClosed = true; // the sheet is gone, so it opens fresh next time
-          return const SizedBox.shrink();
+        final isOffstage = opacity <= 0.001;
+        if (isOffstage) {
+          _sheetClosed = true;
+          if (_queueP.value != 0 ||
+              (_sheetReady && _sheet.size > _sheetMin + 0.001)) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              if (_sheetReady && _sheet.size > _sheetMin + 0.001) {
+                _sheet.reset();
+              }
+              if (_queueP.value != 0) {
+                _queueP.value = 0;
+              }
+            });
+          }
         }
-        return IgnorePointer(
-          ignoring: opacity < 0.95,
-          child: Opacity(opacity: opacity, child: child),
+        return Offstage(
+          offstage: isOffstage,
+          child: IgnorePointer(
+            ignoring: opacity < 0.95,
+            child: Opacity(opacity: opacity.clamp(0.0, 1.0), child: child),
+          ),
         );
       },
     );
@@ -853,22 +920,41 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
       controlsTop + _expandedPlay / 2,
     );
 
+    // The queue state: the bar's layout again, but at the top of the screen,
+    // above the queue. It is laid out like the bar, so the cover,
+    // title and buttons make the same journey as when the bar opens.
+    final q = p >= 0.999 ? _queueP.value : 0.0;
+    final qBar = Rect.fromLTWH(0, pad.top + 8, size.width, mini.height);
+    final qCoverRect = Rect.fromLTWH(
+      qBar.left + AppSpacing.md,
+      qBar.top + (qBar.height - _miniCover) / 2 + 1,
+      _miniCover,
+      _miniCover,
+    );
+    final qPlayCenter = Offset(
+      qBar.right - AppSpacing.xs - _miniButton * 1.5,
+      qBar.top + 1 + (qBar.height - 1) / 2,
+    );
+    final qTextLeft = qCoverRect.right + AppSpacing.md - 4;
+    final qTextRight =
+        qBar.right - AppSpacing.xs - _miniButton * 3 - AppSpacing.sm;
+
     // Shared elements. They move linearly with the panel, so they follow the
     // finger going up exactly as they do going down.
     final e = p;
     // The cover follows the panel's rising edge; the controls take the direct
     // path from their mini-player positions to their full-player positions.
     final coverRect = _lerpRect(
-      miniCoverRect.shift(Offset(0, miniDy)),
-      expCoverRect,
-      e,
+      _lerpRect(miniCoverRect.shift(Offset(0, miniDy)), expCoverRect, e),
+      qCoverRect,
+      q,
     );
     final coverScale = coverRect.width / coverSize;
-    final coverRadius = _lerp(6, 20, e);
-    final playSize = _lerp(40, _expandedPlay, e);
+    final coverRadius = _lerp(_lerp(6, 20, e), 6, q);
+    final playSize = _lerp(_lerp(40, _expandedPlay, e), 40, q);
     final playCenter = Offset(
-      _lerp(miniPlayCenter.dx, expPlayCenter.dx, e),
-      _lerp(miniPlayCenter.dy, expPlayCenter.dy, e),
+      _lerp(_lerp(miniPlayCenter.dx, expPlayCenter.dx, e), qPlayCenter.dx, q),
+      _lerp(_lerp(miniPlayCenter.dy, expPlayCenter.dy, e), qPlayCenter.dy, q),
     );
 
     // Previous and next are shared too: they sit either side of the play
@@ -876,19 +962,25 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
     final step = ((size.width - 48) / 5).clamp(64.0, 84.0).toDouble();
     Offset sideCenter(int direction) => Offset(
       _lerp(
-        miniPlayCenter.dx + direction * _miniButton,
-        expPlayCenter.dx + direction * step,
-        e,
+        _lerp(
+          miniPlayCenter.dx + direction * _miniButton,
+          expPlayCenter.dx + direction * step,
+          e,
+        ),
+        qPlayCenter.dx + direction * _miniButton,
+        q,
       ),
       playCenter.dy,
     );
     final prevCenter = sideCenter(-1);
     final nextCenter = sideCenter(1);
-    final sideBox = _lerp(_miniButton, 56, e);
-    final sideIcon = _lerp(24, 36, e);
+    final sideBox = _lerp(_lerp(_miniButton, 56, e), _miniButton, q);
+    final sideIcon = _lerp(_lerp(24, 36, e), 24, q);
 
     final miniOpacity = 1 - _seg(p, 0.0, 0.35);
     final fullOpacity = _seg(p, 0.55, 1.0);
+    // What the queue state takes away: top bar, waveform, shuffle and repeat.
+    final fullFade = fullOpacity * (1 - q);
     final shadow = 1 - _seg(p, 0.0, 0.5);
     // Rounded like the card at the start, square once it fills the screen.
     final panelRadius = BorderRadius.circular(
@@ -906,24 +998,38 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
     final miniTextLeft = miniCoverRect.right + AppSpacing.md - 4;
     final miniTextRight =
         mini.right - AppSpacing.xs - _miniButton * 3 - AppSpacing.sm;
+    // Title and artist: bar -> full player -> (queue) bar-like row on top.
+    final eT = e * (1 - q);
     final titleStyle = TextStyle.lerp(
       text.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
       text.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-      e,
+      eT,
     );
     final artistStyle = TextStyle.lerp(
       text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
       text.bodyLarge?.copyWith(color: cs.onSurfaceVariant),
-      e,
+      eT,
     );
-    final titleLeft = _lerp(miniTextLeft, 32, e);
-    final titleRight = _lerp(miniTextRight, size.width - 32, e);
-    final titleAreaTop = _lerp(mini.top + miniDy + 1, titleTop, e);
-    final titleAreaHeight = _lerp(mini.height - 1, titleHeight, e);
+    final titleLeft = _lerp(_lerp(miniTextLeft, 32, e), qTextLeft, q);
+    final titleRight = _lerp(
+      _lerp(miniTextRight, size.width - 32, e),
+      qTextRight,
+      q,
+    );
+    final titleAreaTop = _lerp(
+      _lerp(mini.top + miniDy + 1, titleTop, e),
+      qBar.top + 1,
+      q,
+    );
+    final titleAreaHeight = _lerp(
+      _lerp(mini.height - 1, titleHeight, e),
+      qBar.height - 1,
+      q,
+    );
     final titleAlignment = Alignment.lerp(
+      Alignment.lerp(Alignment.centerLeft, Alignment.topCenter, e)!,
       Alignment.centerLeft,
-      Alignment.topCenter,
-      e,
+      q,
     )!;
 
     return Transform.translate(
@@ -944,10 +1050,14 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
         ),
 
         // Thin progress line of the bar.
-        if (miniOpacity > 0.001)
-          Positioned.fromRect(
-            rect: panel,
-            child: IgnorePointer(
+        // Always present (never `if`): a child that comes and goes shifts the
+        // ones after it, and the drag detector at the end of this list would be
+        // rebuilt in the middle of a drag, losing the finger's release.
+        Positioned.fromRect(
+          key: const ValueKey<String>('mini-progress'),
+          rect: panel,
+          child: miniOpacity > 0.001
+              ? IgnorePointer(
               // Clipped to the card's corners, like the bar's own line.
               child: ClipRRect(
                 borderRadius: panelRadius,
@@ -971,8 +1081,9 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
                   ),
                 ),
               ),
-            ),
-          ),
+            )
+              : const SizedBox.shrink(),
+        ),
 
         // The title and artist travel between the bar and full-player layouts.
         Positioned(
@@ -995,7 +1106,7 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
                   clipBehavior: Clip.none,
                   children: [
                     ...previousChildren,
-                    if (currentChild != null) currentChild,
+                    ?currentChild,
                   ],
                 ),
                 transitionBuilder: (child, animation) => FadeTransition(
@@ -1021,7 +1132,7 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
                     ),
                     if (info.artist.isNotEmpty)
                       Padding(
-                        padding: EdgeInsets.only(top: 2 * e),
+                        padding: EdgeInsets.only(top: 2 * eT),
                         child: Text(
                           info.artist,
                           maxLines: 1,
@@ -1033,9 +1144,9 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
                       ClipRect(
                         child: Align(
                           alignment: Alignment.topCenter,
-                          heightFactor: fullOpacity,
+                          heightFactor: fullFade,
                           child: Opacity(
-                            opacity: fullOpacity,
+                            opacity: fullFade,
                             child: Text(
                               info.album,
                               maxLines: 1,
@@ -1063,7 +1174,7 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
           top: pad.top,
           height: _topBar,
           child: fade(
-            fullOpacity,
+            fullFade,
             Row(
               children: [
                 const SizedBox(width: AppSpacing.xs),
@@ -1161,7 +1272,7 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
           top: seekTop,
           height: 52,
           child: fade(
-            fullOpacity,
+            fullFade,
             AudioWaveformSeekBar(
               playbackManager: session.playbackManager,
               videoProgressNotifier: _progress,
@@ -1186,7 +1297,7 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
           top: controlsTop,
           height: _expandedPlay,
           child: fade(
-            fullOpacity,
+            fullFade,
             ListenableBuilder(
               listenable: Listenable.merge([
                 _host.repeat,
@@ -1303,6 +1414,7 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
         // the controls it must not swallow, so it is an opaque strip over the
         // cover-free background only.
         Positioned.fromRect(
+          key: const ValueKey<String>('panel-drag'),
           rect: panel,
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,

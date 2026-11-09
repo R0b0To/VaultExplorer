@@ -80,6 +80,9 @@ import 'package:vaultexplorer/features/browser/controllers/browser_drag_session.
 import 'package:vaultexplorer/features/browser/widgets/browser_item_drag.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_pane_scope.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_manager_more_menu_button.dart';
+import 'package:vaultexplorer/features/browser/gallery/gallery_layout.dart';
+import 'package:vaultexplorer/features/browser/widgets/book_cover_support.dart';
+import 'package:vaultexplorer/features/browser/widgets/file_masonry_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/bookmark_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/bottom_search_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/breadcrumb_bar.dart';
@@ -348,6 +351,10 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   List<PathSegment> get _pathStack => _nav.pathStack;
   List<PathSegment> get _forwardStack => _nav.forwardStack;
   List<RawEntry> get _currentItems => _nav.currentItems;
+  List<RawEntry> get _activePlaceholders =>
+      _opSvc.getActivePlaceholders(widget.container.volId, _currentDirPath);
+  Set<String> get _pendingDeletedNames =>
+      _opSvc.getPendingDeletedNames(widget.container.volId, _currentDirPath);
   bool get _isLoading => _nav.isLoading;
   bool get _isListingTruncated => _nav.isListingTruncated;
   String? get _statusMessage => _nav.statusMessage;
@@ -417,6 +424,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   }
 
   ScrollController _browserScrollController = ScrollController();
+  final GlobalKey<FileMasonryViewState> _masonryKey =
+      GlobalKey<FileMasonryViewState>();
   ScrollController _backGesturePreviewScrollController = ScrollController();
 
   void _resetBrowserScrollController({double initialOffset = 0.0}) {
@@ -608,79 +617,6 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
 
   /// Pinned items first, then folders before files, then [compareItems]'s
   /// sort order within each group. Was independently redefined as a local
-  /// closure at four separate call sites in this file (jump-to-item
-  /// scrolling, the media-viewer swipe list built from the visible list,
-  /// the media-viewer swipe list built from a fresh directory scan, and
-  /// the main visible-list build) -- pulled out once here since all four
-  /// were identical and needed to stay that way.
-  int _compareOverall(RawEntry ea, RawEntry eb) {
-    final sort = ref.read(fileBrowserSortProvider(_stateKey));
-    return compareBrowserEntries(
-      ea,
-      eb,
-      currentDirPath: _currentDirPath,
-      pinnedPaths: _pinnedPaths,
-      sortBy: sort.sortBy,
-      sortAscending: sort.sortAscending,
-    );
-  }
-
-  /// Whether [item] should be shown in the current directory listing --
-  /// respects the hidden-files toggle, the active search [query], and the
-  /// current type filter. Was duplicated identically between the main
-  /// list build and _scrollToItem's own re-derivation of "what's
-  /// currently visible" (needed to compute the same index the visible
-  /// list uses) -- pulled out once here since both copies needed to stay
-  /// identical for jump-to-item to land on the right row.
-  ///
-  /// [skipQueryCheck] is for entries sourced from the search controller's
-  /// own scan (`_deepSearchResults`) rather than straight from the
-  /// directory listing: the scan already matched [item] against [query] --
-  /// by name *or*, for an Item Vault entry, by username/email (see
-  /// file_browser_search_controller.dart) -- so re-checking [item].name
-  /// here would wrongly drop a content-only match, whose name doesn't
-  /// contain [query] at all. Hidden-files and the type filter still apply
-  /// either way.
-  bool _isVisibleInCurrentListing(
-    RawEntry item,
-    String query, {
-    bool skipQueryCheck = false,
-  }) => isVisibleInListing(
-    item,
-    query: query,
-    showHidden: _toolbarConfig.showHiddenFiles,
-    typeFilter: _currentFilter,
-    skipQueryCheck: skipQueryCheck,
-  );
-
-  /// Search-aware view of [localItems] (the current directory's listing,
-  /// already merged with placeholders/pending-deletes where the caller
-  /// does that): folds in the search controller's own results so an Item
-  /// Vault entry found by username/email -- not just by name -- shows up
-  /// too, without waiting on it for the common case of a plain name
-  /// search.
-  ///
-  /// Deep-search mode aside, [localItems] is filtered synchronously and
-  /// instantly (same as before this existed) for the name-match case;
-  /// `_deepSearchResults` (populated by a debounced scan even in
-  /// non-deep-search mode now -- see file_browser_search_controller.dart's
-  /// onQueryChanged) only has to contribute entries that check adds that
-  /// the instant pass couldn't already find, so a plain name search never
-  /// waits on it. In deep-search mode, `_deepSearchResults` already spans
-  /// every matched folder, so it's used as-is instead -- `localItems`
-  /// alone could never represent that.
-  List<RawEntry> _searchAwareVisibleItems(
-    List<RawEntry> localItems,
-    String query,
-  ) => searchAwareVisibleItems(
-    localItems,
-    query: query,
-    searchActive: _searchActive,
-    deepSearch: _isDeepSearch,
-    deepSearchResults: _deepSearchResults,
-    showHidden: _toolbarConfig.showHiddenFiles,
-    typeFilter: _currentFilter,
-  );
 
   void _onContainerLockedEvent(int volId) {
     if (_disposed || volId != widget.container.volId || !mounted) return;
@@ -959,8 +895,11 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   /// where a tile sits.
   List<RawEntry> _displayedItemsForScroll() {
     final query = _searchQuery.trim().toLowerCase();
-    return _searchAwareVisibleItems(_currentItems, query).toList()
-      ..sort(_compareOverall);
+    return _getFilteredAndSortedItems(
+      query,
+      _activePlaceholders,
+      _pendingDeletedNames,
+    ).items;
   }
 
   void _scrollToItem(String fullPath) {
@@ -968,12 +907,16 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
 
     final sortedItems = _displayedItemsForScroll();
 
+    final targetName = fullPath.contains('/')
+        ? fullPath.substring(fullPath.lastIndexOf('/') + 1)
+        : fullPath;
+    final isDeepSearch = _searchActive && _isDeepSearch;
+
     final targetIndex = sortedItems.indexWhere((e) {
-      final itemFullPath =
-          (_searchActive && _isDeepSearch && e.name.contains('/'))
-          ? e.name
-          : (_currentDirPath.isEmpty ? e.name : '$_currentDirPath/${e.name}');
-      return itemFullPath == fullPath;
+      if (isDeepSearch && e.name.contains('/')) {
+        return e.name == fullPath;
+      }
+      return e.name == targetName;
     });
 
     if (targetIndex == -1) return;
@@ -1048,57 +991,72 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         break;
 
       case BrowserLayoutMode.masonry:
+        final liveGeometries =
+            _masonryKey.currentState?.geometriesForGlobalIndices(targets);
+        if (liveGeometries != null && liveGeometries.isNotEmpty) {
+          result.addAll(liveGeometries);
+          break;
+        }
+
         final minCols = isLandscape ? 2 : 1;
         final maxCols = isLandscape ? 6 : 3;
-        final columns =
-            (isLandscape
-                    ? _toolbarConfig.masonryColumnsLandscape
-                    : _toolbarConfig.masonryColumnsPortrait)
-                .clamp(minCols, maxCols);
-        final availableWidth = viewportWidth - 20.0;
-        final itemWidth = (availableWidth - (columns - 1) * 8.0) / columns;
-        final colHeights = List<double>.filled(columns, 12.0);
-        final showNames = _toolbarConfig.showGridFileNames;
-        final lastTarget = targets.reduce(math.max);
+        final columns = (isLandscape
+                ? _toolbarConfig.masonryColumnsLandscape
+                : _toolbarConfig.masonryColumnsPortrait)
+            .clamp(minCols, maxCols);
+        final availableWidth = math.max(1.0, viewportWidth - 20.0);
+        final spec = GalleryLayoutSpec(
+          crossExtent: availableWidth,
+          spacing: _toolbarConfig.gridSpacing.toDouble(),
+          flow: GalleryFlow.rows,
+          columnCount: columns,
+          minTileWidth: 72.0,
+          sectionGap: 0.0,
+        );
 
-        for (int i = 0; i <= lastTarget && i < sortedItems.length; i++) {
+        double ratioOf(int i) {
+          if (i < 0 || i >= sortedItems.length) return 1.0;
           final entry = sortedItems[i];
-          int shortestCol = 0;
-          for (int c = 1; c < columns; c++) {
-            if (colHeights[c] < colHeights[shortestCol]) {
-              shortestCol = c;
-            }
-          }
-
-          final fullEntryPath = entry.name.contains('/')
+          if (entry.isDir) return 1.0;
+          final fullPath = _currentDirPath.isEmpty
               ? entry.name
-              : (_currentDirPath.isEmpty
-                    ? entry.name
-                    : '$_currentDirPath/${entry.name}');
-
-          double ratio = 1.0;
-          if (!entry.isDir) {
-            final cachedRatio = MediaAspectRatioCache.get(
-              widget.container,
-              fullEntryPath,
-            );
-            if (cachedRatio != null && cachedRatio > 0) {
-              ratio = cachedRatio.clamp(0.5, 2.2);
-            } else if (MediaViewerConstants.isVideo(entry.name)) {
-              ratio = (16.0 / 9.0).clamp(0.5, 2.2);
-            }
+              : '$_currentDirPath/${entry.name}';
+          final cached = MediaAspectRatioCache.get(widget.container, fullPath);
+          if (cached != null && cached > 0) return cached.clamp(0.4, 3.2);
+          if (MediaViewerConstants.isVideo(entry.name)) {
+            return (16.0 / 9.0).clamp(0.4, 3.2);
           }
+          if (isBookWithCover(entry.name)) return (2.0 / 3.0).clamp(0.4, 3.2);
+          return 1.0;
+        }
 
-          final hasLabel =
-              showNames ||
-              entry.isDir ||
-              !MediaViewerConstants.hasRealThumbnail(entry.name);
-          final previewHeight = itemWidth / ratio;
-          final currentHeight = previewHeight + (hasLabel ? 36.0 : 0.0);
-          if (targets.contains(i)) {
-            result[i] = (top: colHeights[shortestCol], height: currentHeight);
+        double footerOf(int i, double tileWidth) {
+          if (!_toolbarConfig.showGridFileNames) return 0.0;
+          final textScaler = MediaQuery.textScalerOf(context);
+          final lineHeight = textScaler.scale(16.0);
+          final hasMoreSlot = _toolbarConfig.showItemActionsMenu;
+          if (hasMoreSlot) {
+            final compact = tileWidth < 100;
+            final slot = compact ? 24.0 + 8.0 : 28.0 + 6.0;
+            return math.max(slot, lineHeight + 6.0);
           }
-          colHeights[shortestCol] += currentHeight + 8.0;
+          return 18.0 + lineHeight;
+        }
+
+        final model = GalleryLayoutModel.compute(
+          sections: [GallerySection(itemCount: sortedItems.length)],
+          spec: spec,
+          ratioOf: ratioOf,
+          footerOf: footerOf,
+        );
+
+        const topInset = 12.0;
+        for (final index in targets) {
+          if (index < 0 || index >= model.childCount) continue;
+          result[index] = (
+            top: topInset + model.tops[index],
+            height: model.heights[index],
+          );
         }
         break;
     }
@@ -3151,7 +3109,11 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             sortBy: sortBy,
             sortAscending: sortAscending,
             pinnedPaths: _pinnedPaths,
-            onCurrentFileChanged: isArchivePreview ? null : _scrollToItem,
+            onCurrentFileChanged: isArchivePreview
+                ? null
+                : (newFile) {
+                    // Intentionally avoid scrolling background directory during swipe
+                  },
             isArchivePreview: isArchivePreview,
           ),
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
@@ -3230,37 +3192,37 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     List<String> mediaFiles = [fullPath];
     int initialIndex = 0;
 
+    final openStopwatch = Stopwatch()..start();
     if (!singleFile && _toolbarConfig.autoStartPlaylistMode) {
       final query = _searchQuery.trim().toLowerCase();
-      final baseItems = (_searchActive && _isDeepSearch && query.isNotEmpty)
-          ? _deepSearchResults
-          : _currentItems;
-      final sortedItems = baseItems.where((item) {
-        if (!_toolbarConfig.showHiddenFiles && isHiddenEntryName(item.name)) {
-          return false;
-        }
-        final name = item.name;
-        if (query.isNotEmpty && !name.toLowerCase().contains(query)) {
-          return false;
-        }
-        if (item.isDir) return false;
-        if (!_matchesFilter(name) || !_isSupportedMedia(name)) return false;
-        return true;
-      }).toList()..sort(_compareOverall);
+      final displayedListing = _getFilteredAndSortedItems(
+        query,
+        _activePlaceholders,
+        _pendingDeletedNames,
+      );
 
-      final resolvedMedia = sortedItems.map((e) {
-        if (_searchActive && _isDeepSearch && e.name.contains('/')) {
-          return e.name;
+      final resolvedMedia = <String>[];
+      int foundIdx = -1;
+      for (final item in displayedListing.items) {
+        if (item.isDir || !_isSupportedMedia(item.name)) continue;
+        final itemPath = (_searchActive && _isDeepSearch && item.name.contains('/'))
+            ? item.name
+            : (_currentDirPath.isEmpty ? item.name : '$_currentDirPath/${item.name}');
+        if (itemPath == fullPath) {
+          foundIdx = resolvedMedia.length;
         }
-        return _currentDirPath.isEmpty ? e.name : '$_currentDirPath/${e.name}';
-      }).toList();
+        resolvedMedia.add(itemPath);
+      }
 
-      final foundIdx = resolvedMedia.indexOf(fullPath);
       if (foundIdx != -1) {
         mediaFiles = resolvedMedia;
         initialIndex = foundIdx;
       }
     }
+    VeLog.d(
+      'MediaViewer',
+      'Prepared playlist of ${mediaFiles.length} items in ${openStopwatch.elapsedMilliseconds}ms',
+    );
 
     final initialOffset = _browserScrollController.hasClients
         ? _browserScrollController.offset
@@ -3289,7 +3251,6 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
               pinnedPaths: _pinnedPaths,
               onCurrentFileChanged: (newFile) {
                 lastViewedFile = newFile;
-                _scrollToItem(newFile);
               },
               onFileDeleted: (_) => filesDeletedInViewer = true,
             ),
@@ -3329,6 +3290,13 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         if ((position.pixels - restoredOffset).abs() > 0.5) {
           _browserScrollController.jumpTo(restoredOffset);
         }
+      });
+    } else if (lastViewedFile != fullPath &&
+        _browserScrollController.hasClients) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_browserScrollController.hasClients) return;
+        if (ModalRoute.of(context)?.isCurrent == false) return;
+        _scrollToItem(lastViewedFile);
       });
     }
 
@@ -3494,16 +3462,15 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
 
   Future<void> _startMediaViewerFromCurrentLocation() async {
     _signalActivity();
-    final sortedItems = _currentItems.where((e) {
-      if (!_toolbarConfig.showHiddenFiles && isHiddenEntryName(e.name)) {
-        return false;
-      }
-      return !e.isDir && _matchesFilter(e.name);
-    }).toList()..sort(_compareOverall);
+    final displayedListing = _getFilteredAndSortedItems(
+      _searchQuery.trim().toLowerCase(),
+      _activePlaceholders,
+      _pendingDeletedNames,
+    );
 
-    final localMedia = sortedItems
+    final localMedia = displayedListing.items
+        .where((e) => !e.isDir && _isSupportedMedia(e.name))
         .map((e) => e.name)
-        .where(_isSupportedMedia)
         .toList();
     if (localMedia.isNotEmpty) {
       final resolvedPaths = localMedia.map(_joinPath).toList();
@@ -3908,6 +3875,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     if (!ref.read(appSettingsControllerProvider).settings.useBrowserTabs) {
       return null;
     }
+    if (_selectedBrowserEntryCount != 1) {
+      return null;
+    }
     final selected = _selectedBrowserEntries;
     if (selected.length != 1 ||
         !selected.single.entry.isDir ||
@@ -4143,6 +4113,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       return;
     }
     _signalActivity();
+    final fileIoApi = ref.read(vaultFileIoApiProvider);
     final srcVolId = clip.sourceVolId;
     if (srcVolId == null) {
       _setStatus(context.l10n.clipboardSourceInvalid, error: true);
@@ -4172,6 +4143,31 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
 
     // ── Archive Create Paste ────────────────────────────────────────────
     if (clip.isArchiveCreate) {
+      final surviving = <ClipboardItem>[];
+      final missingPaths = <String>[];
+      for (final item in clip.items) {
+        final exists = await fileIoApi.entryExists(
+          srcContainer,
+          item.path,
+          isDir: item.isDir,
+        );
+        if (exists) {
+          surviving.add(item);
+        } else {
+          missingPaths.add(item.path);
+        }
+      }
+      if (missingPaths.isNotEmpty) {
+        ref
+            .read(crossContainerClipboardProvider.notifier)
+            .removeDeletedPaths(srcVolId, missingPaths);
+      }
+      if (surviving.isEmpty) {
+        _setStatus(context.l10n.bookmarkTargetMissing, error: true);
+        _clip.clear();
+        return;
+      }
+
       final archiveName = clip.archiveName ?? 'archive.zip';
       final options = await ArchivePasteOptionsSheet.show(
         context,
@@ -4187,7 +4183,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         dest: widget.container,
         destDirPath: _currentDirPath,
         archiveName: archiveName,
-        items: List.of(clip.items),
+        items: List.of(surviving),
         format: clip.archiveFormat ?? ArchiveFormatType.zip,
         passphrase: clip.passphrase,
         encryptFilenames: clip.encryptFilenames,
@@ -4209,6 +4205,22 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       final archiveName = clip.archiveName ?? 'archive.zip';
       var archiveContext = clip.archiveContext;
       if (archiveContext == null) return;
+
+      final targetArchivePath = clip.isPartialExtract
+          ? archiveContext.archivePathInContainer
+          : clip.items.firstOrNull?.path;
+      if (targetArchivePath != null) {
+        final exists = await fileIoApi.entryExists(
+          srcContainer,
+          targetArchivePath,
+          isDir: false,
+        );
+        if (!exists) {
+          _setStatus(context.l10n.bookmarkTargetMissing, error: true);
+          _clip.clear();
+          return;
+        }
+      }
 
       final options = await ArchivePasteOptionsSheet.show(
         context,
@@ -4271,10 +4283,53 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     for (final item in clip.items) {
       groups.putIfAbsent(item.volId ?? srcVolId, () => []).add(item);
     }
+
+    final survivingGroups = <int, List<ClipboardItem>>{};
+    final missingPathsByVol = <int, List<String>>{};
+    for (final group in groups.entries) {
+      final groupVolId = group.key;
+      final groupIsCross = groupVolId != widget.container.volId;
+      final groupSrc = !groupIsCross
+          ? widget.container
+          : (groupVolId == srcVolId
+              ? srcContainer
+              : widget.resolveContainer?.call(groupVolId));
+      if (groupSrc == null) {
+        survivingGroups[groupVolId] = group.value;
+        continue;
+      }
+      final surviving = <ClipboardItem>[];
+      for (final item in group.value) {
+        final exists = await fileIoApi.entryExists(
+          groupSrc,
+          item.path,
+          isDir: item.isDir,
+        );
+        if (exists) {
+          surviving.add(item);
+        } else {
+          missingPathsByVol.putIfAbsent(groupVolId, () => []).add(item.path);
+        }
+      }
+      if (surviving.isNotEmpty) {
+        survivingGroups[groupVolId] = surviving;
+      }
+    }
+    for (final entry in missingPathsByVol.entries) {
+      ref
+          .read(crossContainerClipboardProvider.notifier)
+          .removeDeletedPaths(entry.key, entry.value);
+    }
+    if (survivingGroups.isEmpty) {
+      _setStatus(context.l10n.bookmarkTargetMissing, error: true);
+      _clip.clear();
+      return;
+    }
+
     final groupContainers = <int, MountedContainer>{srcVolId: srcContainer};
     final remainingItems = <(int, ClipboardItem)>[];
     final startedOperations = <FileOperation>[];
-    for (final group in groups.entries) {
+    for (final group in survivingGroups.entries) {
       final groupVolId = group.key;
       final groupIsCross = groupVolId != widget.container.volId;
       MountedContainer? groupSrc;
@@ -4446,6 +4501,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         await ref
             .read(fileBrowserPinsBookmarksProvider(container.volId).notifier)
             .removeDeletedPaths(container, successfulPaths);
+        ref
+            .read(crossContainerClipboardProvider.notifier)
+            .removeDeletedPaths(container.volId, successfulPaths);
         if (!mounted) return;
         if (container.volId == widget.container.volId) {
           if (_isVisibleTab) {
@@ -4483,6 +4541,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       widget.container,
       deletedPaths,
     );
+    ref
+        .read(crossContainerClipboardProvider.notifier)
+        .removeDeletedPaths(widget.container.volId, deletedPaths);
     if (!mounted) return;
     if (_isVisibleTab) {
       await _loadDirectoryContents(_currentDirPath, refresh: true);
@@ -5192,8 +5253,6 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     }
   }
 
-  bool _matchesFilter(String fileName) =>
-      matchesFilter(fileName, _currentFilter);
 
   Future<void> _extractArchive() async {
     if (_archiveContext == null) return;
@@ -5846,7 +5905,6 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     }
     final useFab = _toolbarConfig.useFabForToolbar;
     final showActionBar = !_searchActive && !useFab && !_music.libraryVisible;
-    final selectedForBar = _selectedBrowserEntries;
     final workspace = widget.workspaceConfig;
     final appBarNavigation = _nav;
     final appBarSearch = _search;
@@ -5873,57 +5931,141 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     final appBarBookmarkPaths = _bookmarkPaths;
     final appBarSettingsService = ref.read(appSettingsServiceProvider);
     final appBarSingleSelectedFolderForNewTab = _singleSelectedFolderForNewTab;
-    final appBarSelectionCount = selectedForBar.length;
-    final appBarSelectionHasReadOnlySource = selectedForBar.any(
-      (item) => item.container.readOnly,
-    );
-    final appBarSelectedTotalBytes = selectedForBar.isEmpty
-        ? 0
-        : _allSelectedTotalBytes;
-    final appBarHasPendingFolderSizes = selectedForBar.isNotEmpty
-        ? _anySelectedFolderSizePending
-        : false;
+
+    final localSelection = ref.read(fileBrowserSelectionProvider(_stateKey));
+    final localSelectionIsNonEmpty = localSelection.items.isNotEmpty;
+    final aggregateSelection = _isActiveTab
+        ? ref.watch(aggregatedTabsSelectionProvider(workspace))
+        : localSelectionIsNonEmpty
+        ? ref.read(aggregatedTabsSelectionProvider(workspace))
+        : null;
+
+    final selectedTabs = <({
+      TabId tabId,
+      MountedContainer container,
+      String currentDirPath,
+      bool insideArchive,
+      Set<RawEntry> items,
+    })>[];
+
+    for (final tab in _workspaceTabs) {
+      if (tab.isDashboard) continue;
+      final items = aggregateSelection != null
+          ? (aggregateSelection.itemsByTab[tab.tabId] ?? const <RawEntry>{})
+          : ref.read(fileBrowserSelectionProvider(tab.tabId)).items;
+      if (items.isEmpty) continue;
+      final nav = ref.read(fileBrowserNavigationProvider(tab.tabId));
+      selectedTabs.add((
+        tabId: tab.tabId,
+        container: tab.container!,
+        currentDirPath: nav.currentDirPath,
+        insideArchive: nav.archiveContext != null,
+        items: items,
+      ));
+    }
+
+    final hasAnySelection =
+        aggregateSelection?.hasSelection ?? selectedTabs.isNotEmpty;
+    final selectionBarVisible = _isActiveTab && hasAnySelection;
+    final selectionInBottomBar =
+        selectionBarVisible && _toolbarConfig.bottomSelectionBar;
+    final selectionInTopBar =
+        hasAnySelection && !_toolbarConfig.bottomSelectionBar;
+
+    final appBarSelectionCount = aggregateSelection?.count ??
+        selectedTabs.fold<int>(0, (sum, t) => sum + t.items.length);
+    final appBarSelectionHasReadOnlySource =
+        selectedTabs.any((t) => t.container.readOnly);
+    final appBarSelectedTotalBytes = aggregateSelection?.bytes ??
+        (hasAnySelection ? _allSelectedTotalBytes : 0);
+    final appBarHasPendingFolderSizes =
+        aggregateSelection?.hasPendingFolderSizes ??
+        (hasAnySelection ? _anySelectedFolderSizePending : false);
+
+    final allSelectionInOneTab =
+        selectedTabs.length == 1 && selectedTabs.first.tabId == _stateKey;
+    final allSelectionOutsideArchives =
+        selectedTabs.every((t) => !t.insideArchive);
+    final selectedInOneContainer =
+        selectedTabs.map((t) => t.container.volId).toSet().length == 1;
+    final singleSelectionInCurrentTab = allSelectionInOneTab &&
+        selectedTabs.first.items.length == 1 &&
+        !selectedTabs.first.insideArchive;
+    final hideVaultOnlyActionsForSelection =
+        selectedTabs.isNotEmpty &&
+        selectedTabs.every((t) => t.container.isLocalStorage);
+    final canExtractCurrentSelection = allSelectionInOneTab &&
+        (selectedTabs.first.insideArchive ||
+            selectedTabs.first.items.length == 1);
+
+    final Set<RawEntry> selectedForBarSet;
+    if (!hasAnySelection) {
+      selectedForBarSet = const <RawEntry>{};
+    } else if (allSelectionInOneTab) {
+      selectedForBarSet = selectedTabs.first.items;
+    } else {
+      selectedForBarSet = {for (final t in selectedTabs) ...t.items};
+    }
+
     final appBarPinsByVolId = <int, Set<String>>{};
     final appBarBookmarksByVolId = <int, List<String>>{};
-    for (final item in selectedForBar) {
+    for (final t in selectedTabs) {
       appBarPinsByVolId.putIfAbsent(
-        item.container.volId,
+        t.container.volId,
         () => ref
-            .read(fileBrowserPinsBookmarksProvider(item.container.volId))
+            .read(fileBrowserPinsBookmarksProvider(t.container.volId))
             .pinnedPaths,
       );
       appBarBookmarksByVolId.putIfAbsent(
-        item.container.volId,
+        t.container.volId,
         () => ref
-            .read(fileBrowserPinsBookmarksProvider(item.container.volId))
+            .read(fileBrowserPinsBookmarksProvider(t.container.volId))
             .bookmarkPaths,
       );
     }
+
+    final hasAnyPins = _pinnedPaths.isNotEmpty ||
+        appBarPinsByVolId.values.any((s) => s.isNotEmpty);
+    final hasAnyBookmarks = _bookmarkPaths.isNotEmpty ||
+        appBarBookmarksByVolId.values.any((l) => l.isNotEmpty);
+    final currentBookmarksSet =
+        _bookmarkPaths.isNotEmpty ? _bookmarkPaths.toSet() : const <String>{};
+
     bool appBarIsFolderMounted(RawEntry entry) => isFolderMounted(
       entry,
       appBarCurrentDirPath,
       appBarMountedDocProviderFolders,
     );
+
     bool appBarIsPinned(RawEntry entry) {
-      final matches = selectedForBar.where((item) => item.entry == entry);
-      if (matches.isEmpty) {
-        return isPinned(entry, appBarCurrentDirPath, appBarPinnedPaths);
+      if (!hasAnyPins) return false;
+      if (allSelectionInOneTab || selectedTabs.isEmpty) {
+        return _pinnedPaths.contains(fullPathOf(entry, appBarCurrentDirPath));
       }
-      return matches.any((item) {
-        final paths = appBarPinsByVolId[item.container.volId];
-        return paths != null && isPinned(entry, item.currentDirPath, paths);
-      });
+      for (final t in selectedTabs) {
+        if (t.items.contains(entry)) {
+          final paths = appBarPinsByVolId[t.container.volId];
+          return paths != null &&
+              paths.contains(fullPathOf(entry, t.currentDirPath));
+        }
+      }
+      return false;
     }
 
     bool appBarIsBookmarked(RawEntry entry) {
-      final matches = selectedForBar.where((item) => item.entry == entry);
-      if (matches.isEmpty) {
-        return isBookmark(entry, appBarCurrentDirPath, appBarBookmarkPaths);
+      if (!hasAnyBookmarks) return false;
+      if (allSelectionInOneTab || selectedTabs.isEmpty) {
+        return currentBookmarksSet
+            .contains(fullPathOf(entry, appBarCurrentDirPath));
       }
-      return matches.any((item) {
-        final paths = appBarBookmarksByVolId[item.container.volId];
-        return paths != null && isBookmark(entry, item.currentDirPath, paths);
-      });
+      for (final t in selectedTabs) {
+        if (t.items.contains(entry)) {
+          final paths = appBarBookmarksByVolId[t.container.volId];
+          return paths != null &&
+              paths.contains(fullPathOf(entry, t.currentDirPath));
+        }
+      }
+      return false;
     }
 
     final actionBuilders = _buildActionBuilders(
@@ -5943,20 +6085,6 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     final isFiltered = query.isNotEmpty || _currentFilter != null;
     final showBookmarkBar =
         _toolbarConfig.showBookmarkBar && _bookmarkPaths.isNotEmpty;
-    final localSelectionIsNonEmpty = ref
-        .read(fileBrowserSelectionProvider(_stateKey))
-        .items
-        .isNotEmpty;
-    final aggregateSelection = _isActiveTab
-        ? ref.watch(aggregatedTabsSelectionProvider(workspace))
-        : localSelectionIsNonEmpty
-        ? ref.read(aggregatedTabsSelectionProvider(workspace))
-        : null;
-    final selectionBarVisible =
-        _isActiveTab &&
-        (aggregateSelection?.hasSelection ?? _selectedBrowserEntryCount > 0);
-    final selectionInBottomBar =
-        selectionBarVisible && _toolbarConfig.bottomSelectionBar;
     final hasBookmarkBarViewportSlot = !isLandscape && !selectionInBottomBar;
     final showBookmarkBarInViewport =
         hasBookmarkBarViewportSlot && showBookmarkBar;
@@ -5970,32 +6098,6 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         bookmark.path,
       ),
     );
-
-    final selectedForBarSet = {for (final item in selectedForBar) item.entry};
-    final selectedVolIds = selectedForBar
-        .map((item) => item.container.volId)
-        .toSet();
-    final allSelectionInOneTab =
-        selectedForBar.isNotEmpty &&
-        selectedForBar.every((item) => item.stateKey == _stateKey);
-    final allSelectionOutsideArchives = selectedForBar.every(
-      (item) => !item.insideArchive,
-    );
-    final selectedInOneContainer = selectedVolIds.length == 1;
-    final canExtractCurrentSelection =
-        selectedForBar.isNotEmpty &&
-        selectedForBar.every(
-          (item) =>
-              item.stateKey == _stateKey &&
-              (item.insideArchive || selectedForBar.length == 1),
-        );
-    final singleSelectionInCurrentTab =
-        selectedForBar.length == 1 &&
-        selectedForBar.single.stateKey == _stateKey &&
-        !selectedForBar.single.insideArchive;
-    final hideVaultOnlyActionsForSelection =
-        selectedForBar.isNotEmpty &&
-        selectedForBar.every((item) => item.container.isLocalStorage);
 
     final hasBottomNavBar = !isLandscape && showActionBar;
     final bottomSystemInset = hasBottomNavBar
@@ -6092,12 +6194,21 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         isFolderMounted: appBarIsFolderMounted,
         isPinned: appBarIsPinned,
         isBookmark: appBarIsBookmarked,
+        hasAnyPins: hasAnyPins,
+        hasAnyBookmarks: hasAnyBookmarks,
         isInsideArchive: selectionMode
-            ? selectedForBar.any((item) => item.insideArchive)
+            ? (!allSelectionOutsideArchives)
             : appBarArchiveContext != null,
         onExitSelectionMode: exitSelectionMode,
-        onSelectAll: () =>
-            setSelectedItems({...selectedItems, ...filteredItems}),
+        onSelectAll: () {
+          final target = filteredItems.toSet();
+          if (selectedItems.length == target.length &&
+              selectedItems.isNotEmpty &&
+              selectedItems.length == filteredItems.length) {
+            return;
+          }
+          setSelectedItems(target);
+        },
         onCopy: () => _initClipboard(cut: false),
         onCut: () => _initClipboard(cut: true),
         onCopyPath: (entry) => unawaited(_copyItemPath(entry)),
@@ -6149,27 +6260,19 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       );
     }
 
-    final selectionInTopBar =
-        selectedForBar.isNotEmpty && !_toolbarConfig.bottomSelectionBar;
     // App-bar factories are handed to the chrome hub. Recreating the closure on
     // every directory build makes its ValueListenable rebuild the AppBar for
     // unrelated viewport work (scrolling, thumbnails, banners), which appears
     // as a toolbar flash. Keep one factory per visible app-bar state and have
     // it delegate to the latest snapshot captured by this mounted view.
     final appBarEntriesSignature = identityHashCode(filteredItems);
-    final selectedEntriesSignature = Object.hashAll(
-      selectedForBar.map(
-        (item) => Object.hash(
-          item.stateKey,
-          item.container.volId,
-          item.currentDirPath,
-          item.entry.name,
-          item.entry.isDir,
-          item.entry.sizeBytes,
-          item.insideArchive,
-          item.container.readOnly,
-        ),
-      ),
+    final selectedEntriesSignature = Object.hash(
+      appBarSelectionCount,
+      allSelectionInOneTab,
+      allSelectionOutsideArchives,
+      appBarSelectedTotalBytes,
+      appBarHasPendingFolderSizes,
+      singleSelectionInCurrentTab ? selectedTabs.first.items.first : null,
     );
     final appBarPathSignature = Object.hash(
       Object.hashAll(
@@ -6264,7 +6367,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         }
         _chrome.setSelectionAppBar(
           widget.tabId,
-          selectedForBar.isEmpty || _toolbarConfig.bottomSelectionBar
+          !hasAnySelection || _toolbarConfig.bottomSelectionBar
               ? null
               : selectionAppBarFactory,
         );
@@ -6650,6 +6753,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                               archiveRootPath:
                                                   _archiveRootPathForSearch,
                                               sortBy: sortBy,
+                                              masonryKey: _masonryKey,
                                             ),
                                           ),
                                           ),

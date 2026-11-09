@@ -147,9 +147,10 @@ class MediaPrefetchController {
     required bool Function() isStillWanted,
     required void Function() onRatioLearned,
     int startIndex = 0,
+    int maxPreloadCount = 60,
   }) async {
     if (_cacheMode == ThumbnailCacheMode.disabled) return;
-    for (final index in _expandingIndexOrder(startIndex, playlist.length)) {
+    for (final index in _expandingIndexOrder(startIndex, playlist.length, maxPreloadCount)) {
       if (!isStillWanted()) return;
       final fileName = playlist[index];
       if (!MediaViewerConstants.isImage(fileName)) continue;
@@ -177,20 +178,21 @@ class MediaPrefetchController {
     }
   }
 
-  /// Every index in `[0, length)` exactly once, nearest-to-[startIndex]
+  /// Up to [maxCount] indices in `[0, length)`, nearest-to-[startIndex]
   /// first (0, +1, -1, +2, -2, ... relative to a [startIndex] clamped into
   /// range), alternating outward in both directions and simply omitting
   /// whichever side has run off the end once it does.
-  static List<int> _expandingIndexOrder(int startIndex, int length) {
-    if (length <= 0) return const [];
+  static List<int> _expandingIndexOrder(int startIndex, int length, [int maxCount = 60]) {
+    if (length <= 0 || maxCount <= 0) return const [];
+    final targetCount = length < maxCount ? length : maxCount;
     final start = startIndex.clamp(0, length - 1);
     final order = <int>[start];
     var offset = 1;
-    while (order.length < length) {
+    while (order.length < targetCount && (start + offset < length || start - offset >= 0)) {
       final forward = start + offset;
       final backward = start - offset;
       if (forward < length) order.add(forward);
-      if (backward >= 0) order.add(backward);
+      if (order.length < targetCount && backward >= 0) order.add(backward);
       offset++;
     }
     return order;

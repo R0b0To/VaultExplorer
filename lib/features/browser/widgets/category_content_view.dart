@@ -1287,6 +1287,10 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
                 if (status.result == FileItemResult.success)
                   (group.key, status.item.path),
             };
+            ref.read(crossContainerClipboardProvider.notifier).removeDeletedPaths(
+              group.key,
+              removed.map((e) => e.$2),
+            );
             setState(() => _snapshot = _snapshot.withoutPaths(removed));
           }
 

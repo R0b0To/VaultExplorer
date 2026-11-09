@@ -59,6 +59,8 @@ PreferredSizeWidget buildBrowserAppBar(
   required bool Function(RawEntry entry) isFolderMounted,
   required bool Function(RawEntry entry) isPinned,
   required bool Function(RawEntry entry) isBookmark,
+  bool hasAnyPins = true,
+  bool hasAnyBookmarks = true,
   required VoidCallback onExitSelectionMode,
   required VoidCallback onSelectAll,
   required VoidCallback onCopy,
@@ -139,15 +141,19 @@ PreferredSizeWidget buildBrowserAppBar(
                   ? selectedItems.first.name.split('.').last.toLowerCase()
                   : ''),
         );
-    final showPinOption =
-        allowPinBookmarkActions && selectedItems.any((item) => !isPinned(item));
-    final showUnpinOption =
-        allowPinBookmarkActions && selectedItems.any((item) => isPinned(item));
-    final showBookmarkOption =
-        allowPinBookmarkActions &&
-        selectedItems.any((item) => !isBookmark(item));
-    final showUnbookmarkOption =
-        allowPinBookmarkActions &&
+    final showPinOption = allowPinBookmarkActions &&
+        (!hasAnyPins
+            ? selectedItems.isNotEmpty
+            : selectedItems.any((item) => !isPinned(item)));
+    final showUnpinOption = allowPinBookmarkActions &&
+        hasAnyPins &&
+        selectedItems.any((item) => isPinned(item));
+    final showBookmarkOption = allowPinBookmarkActions &&
+        (!hasAnyBookmarks
+            ? selectedItems.isNotEmpty
+            : selectedItems.any((item) => !isBookmark(item)));
+    final showUnbookmarkOption = allowPinBookmarkActions &&
+        hasAnyBookmarks &&
         selectedItems.any((item) => isBookmark(item));
     final showEncryptOption = selectedItems.any(
       (item) => !item.isDir && !isAppEncryptedFileName(item.name),

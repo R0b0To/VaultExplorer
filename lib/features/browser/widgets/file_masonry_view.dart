@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -148,11 +147,55 @@ class FileMasonryView extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<FileMasonryView> createState() => _FileMasonryViewState();
+  ConsumerState<FileMasonryView> createState() => FileMasonryViewState();
 }
 
-class _FileMasonryViewState extends ConsumerState<FileMasonryView>
+class FileMasonryViewState extends ConsumerState<FileMasonryView>
     with SingleTickerProviderStateMixin {
+  /// Returns the geometries (top offset and height) in scroll-content coordinates
+  /// for the items at [globalIndices] in `widget.items`.
+  Map<int, ({double top, double height})> geometriesForGlobalIndices(
+    Set<int> globalIndices,
+  ) {
+    final result = <int, ({double top, double height})>{};
+    final model = _host.current;
+    if (model == null || model.childCount == 0 || globalIndices.isEmpty) {
+      return result;
+    }
+
+    final topInset = _groups == null ? 12.0 : 0.0;
+    final childOfItem = model.childOfItem;
+
+    if (_groups == null) {
+      for (final index in globalIndices) {
+        if (index < 0 || index >= childOfItem.length) continue;
+        final child = childOfItem[index];
+        if (child >= 0 && child < model.childCount) {
+          result[index] = (
+            top: topInset + model.tops[child],
+            height: model.heights[child],
+          );
+        }
+      }
+    } else {
+      final global = _displayGlobal;
+      if (global != null) {
+        for (var d = 0; d < global.length; d++) {
+          final gIdx = global[d];
+          if (globalIndices.contains(gIdx) && d < childOfItem.length) {
+            final child = childOfItem[d];
+            if (child >= 0 && child < model.childCount) {
+              result[gIdx] = (
+                top: topInset + model.tops[child],
+                height: model.heights[child],
+              );
+            }
+          }
+        }
+      }
+    }
+    return result;
+  }
   /// How the masonry view lays tiles out. [GalleryFlow.rows] is the justified
   /// "mosaic" (every row fills the width, each tile keeps its picture's
   /// proportions); [GalleryFlow.columns] is the original column-based masonry.

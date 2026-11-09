@@ -156,7 +156,7 @@ class _FileGridViewState extends State<FileGridView>
   late int _crossAxisCount;
   double? _viewportWidth;
   double _baselineScale = 1.0;
-  final Map<Key, int> _keyIndexMap = {};
+  final Map<RawEntry, int> _entryIndexMap = {};
 
   int? _anchorItemIndex;
 
@@ -175,7 +175,6 @@ class _FileGridViewState extends State<FileGridView>
   void initState() {
     super.initState();
     _crossAxisCount = widget.initialColumns;
-    _updateKeyIndexMap();
 
     _morphController = AnimationController(
       vsync: this,
@@ -191,11 +190,16 @@ class _FileGridViewState extends State<FileGridView>
     super.dispose();
   }
 
-  void _updateKeyIndexMap() {
-    _keyIndexMap.clear();
-    for (int i = 0; i < widget.items.length; i++) {
-      _keyIndexMap[ValueKey(widget.items[i])] = i;
+  int? _findChildIndex(Key key) {
+    if (key is ValueKey<RawEntry>) {
+      if (_entryIndexMap.isEmpty && widget.items.isNotEmpty) {
+        for (int i = 0; i < widget.items.length; i++) {
+          _entryIndexMap[widget.items[i]] = i;
+        }
+      }
+      return _entryIndexMap[key.value];
     }
+    return null;
   }
 
   @override
@@ -218,7 +222,7 @@ class _FileGridViewState extends State<FileGridView>
       }
     }
     if (oldWidget.items != widget.items) {
-      _updateKeyIndexMap();
+      _entryIndexMap.clear();
     }
   }
 
@@ -418,7 +422,7 @@ class _FileGridViewState extends State<FileGridView>
         cacheExtent: MediaQuery.sizeOf(context).height * 1.5,
         physics:
             const AlwaysScrollableScrollPhysics(), // Native scroll physics that cannot freeze
-        findChildIndexCallback: (Key key) => _keyIndexMap[key],
+        findChildIndexCallback: _findChildIndex,
         padding: EdgeInsets.fromLTRB(10, 12, 10, widget.bottomClearance),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: _crossAxisCount,

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:isolate';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
@@ -69,42 +70,7 @@ class DecoyLocalRepository {
       return _cachedRootEntries!;
     }
 
-    final dir = Directory(path);
-    final out = <RawEntry>[];
-    if (!await dir.exists()) return out;
-    try {
-      await for (final item in dir.list(followLinks: false)) {
-        try {
-          if (item is Directory) {
-            int modifiedSecs = 0;
-            try {
-              final stat = await item.stat();
-              modifiedSecs = stat.modified.millisecondsSinceEpoch ~/ 1000;
-            } catch (e) {
-              VeLog.d('DecoyLocalRepository', 'stat() failed for a directory entry: $e');
-            }
-            out.add(RawEntry(
-              name: p.basename(item.path),
-              isDir: true,
-              sizeBytes: 0,
-              modifiedSecs: modifiedSecs,
-            ));
-          } else if (item is File) {
-            final stat = await item.stat();
-            out.add(RawEntry(
-              name: p.basename(item.path),
-              isDir: false,
-              sizeBytes: stat.size,
-              modifiedSecs: stat.modified.millisecondsSinceEpoch ~/ 1000,
-            ));
-          }
-        } catch (_) {
-          continue;
-        }
-      }
-    } catch (_) {
-      // Unreadable directory or stream error mid-listing
-    }
+    final out = await Isolate.run(() => _listDirectorySync(path));
 
     final result = List<RawEntry>.unmodifiable(out);
     _cachedRootPath = path;
@@ -234,4 +200,52 @@ Future<Directory> createFolder(String parentPath, String desiredName) async {
       i++;
     }
   }
+}
+
+List<RawEntry> _listDirectorySync(String path) {
+  final dir = Directory(path);
+  if (!dir.existsSync()) return <RawEntry>[];
+  final entries = <RawEntry>[];
+  try {
+    final items = dir.listSync(followLinks: false);
+    for (final item in items) {
+      try {
+        if (item is Directory) {
+          int modifiedSecs = 0;
+          try {
+            final stat = item.statSync();
+            modifiedSecs = stat.modified.millisecondsSinceEpoch ~/ 1000;
+          } catch (_) {}
+          final name = p.basename(item.path);
+          final lower = name.toLowerCase();
+          entries.add(RawEntry(
+            name: name,
+            isDir: true,
+            sizeBytes: 0,
+            modifiedSecs: modifiedSecs,
+            lowercaseName: lower,
+            extension: '',
+          ));
+        } else if (item is File) {
+          final stat = item.statSync();
+          final name = p.basename(item.path);
+          final lower = name.toLowerCase();
+          final ext = lower.contains('.') ? lower.split('.').last : '';
+          entries.add(RawEntry(
+            name: name,
+            isDir: false,
+            sizeBytes: stat.size,
+            modifiedSecs: stat.modified.millisecondsSinceEpoch ~/ 1000,
+            lowercaseName: lower,
+            extension: ext,
+          ));
+        }
+      } catch (_) {
+        continue;
+      }
+    }
+  } catch (_) {
+    // Unreadable directory or stream error mid-listing
+  }
+  return entries;
 }

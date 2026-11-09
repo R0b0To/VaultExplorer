@@ -166,7 +166,7 @@ class _FileListViewState extends State<FileListView> {
 
   double _baselineScale = 1.0;
   late double _zoomLevel;
-  final Map<Key, int> _keyIndexMap = {};
+  final Map<RawEntry, int> _entryIndexMap = {};
   int _lastPointerCount = 0;
   bool _isZooming = false;
   bool _isAtBottomAnchor = false;
@@ -177,14 +177,18 @@ class _FileListViewState extends State<FileListView> {
   void initState() {
     super.initState();
     _zoomLevel = widget.initialZoomLevel;
-    _updateKeyIndexMap();
   }
 
-  void _updateKeyIndexMap() {
-    _keyIndexMap.clear();
-    for (int i = 0; i < widget.items.length; i++) {
-      _keyIndexMap[ValueKey(widget.items[i])] = i;
+  int? _findChildIndex(Key key) {
+    if (key is ValueKey<RawEntry>) {
+      if (_entryIndexMap.isEmpty && widget.items.isNotEmpty) {
+        for (int i = 0; i < widget.items.length; i++) {
+          _entryIndexMap[widget.items[i]] = i;
+        }
+      }
+      return _entryIndexMap[key.value];
     }
+    return null;
   }
 
   @override
@@ -194,7 +198,7 @@ class _FileListViewState extends State<FileListView> {
       _zoomLevel = widget.initialZoomLevel;
     }
     if (oldWidget.items != widget.items) {
-      _updateKeyIndexMap();
+      _entryIndexMap.clear();
     }
   }
 
@@ -214,7 +218,7 @@ class _FileListViewState extends State<FileListView> {
     final verticalPadding = widget.largeThumbnail
         ? (widget.isCompact ? 12.0 : 16.0) * zoom
         : (widget.isCompact ? 8.0 : 20.0) * zoom;
-    return contentHeight + verticalPadding + 2.0;
+    return (contentHeight + verticalPadding + 2.0).roundToDouble();
   }
 
   double _computeMaxScroll(double itemExtent, double viewport) {
@@ -439,7 +443,7 @@ class _FileListViewState extends State<FileListView> {
       cacheExtent: MediaQuery.sizeOf(context).height * 1.5,
       physics: scrollPhysics,
       itemExtent: itemExtent,
-      findChildIndexCallback: (Key key) => _keyIndexMap[key],
+      findChildIndexCallback: _findChildIndex,
       padding: EdgeInsets.only(
         top: 0,
         bottom: widget.bottomClearance,

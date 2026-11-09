@@ -259,11 +259,7 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
             .read(vaultFileIoApiProvider)
             .listDirectory(container, parentSegment.fatPath);
         if (raw != null) {
-          final parsed = raw
-              .where((f) => !f.startsWith('System:'))
-              .map(RawEntry.parse)
-              .toList();
-          parentSegment.items = parsed;
+          parentSegment.items = RawEntry.parseAll(raw);
         }
       } catch (e) {
         VeLog.w(
@@ -341,12 +337,7 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
         );
       }
       final isTruncated = items?.any((f) => f == 'System:TRUNCATED') ?? false;
-      final parsed =
-          items
-              ?.where((f) => !f.startsWith('System:'))
-              .map(RawEntry.parse)
-              .toList() ??
-          <RawEntry>[];
+      final parsed = items == null ? <RawEntry>[] : RawEntry.parseAll(items);
 
       // Save the freshly loaded items on the active path segment
       if (!listingFailed &&

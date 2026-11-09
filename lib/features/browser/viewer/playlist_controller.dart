@@ -105,14 +105,18 @@ class PlaylistController extends ChangeNotifier {
     return first.substring(0, first.lastIndexOf('/'));
   }
 
+  static bool _isDirectChild(String file, String baseDir, int baseLen) {
+    if (baseLen == 0) return !file.contains('/');
+    if (!file.startsWith(baseDir)) return false;
+    if (file.length <= baseLen || file.codeUnitAt(baseLen) != 47) return false;
+    return file.indexOf('/', baseLen + 1) == -1;
+  }
+
   void _initializeFolderFilter() {
     final baseDir = getBaseDir();
-    final hasSubfolderItems = _originalList.any((file) {
-      final dir = file.contains('/')
-          ? file.substring(0, file.lastIndexOf('/'))
-          : '';
-      return dir != baseDir;
-    });
+    final baseLen = baseDir.length;
+    final hasSubfolderItems =
+        _originalList.any((file) => !_isDirectChild(file, baseDir, baseLen));
     if (hasSubfolderItems) {
       _selectedFolder = 'All';
       _allFilesScanned = true;
@@ -200,12 +204,10 @@ class PlaylistController extends ChangeNotifier {
     if (folder == 'All') {
       filteredList = List.from(_originalList);
     } else {
-      filteredList = _originalList.where((file) {
-        final dir = file.contains('/')
-            ? file.substring(0, file.lastIndexOf('/'))
-            : '';
-        return dir == baseDir;
-      }).toList();
+      final baseLen = baseDir.length;
+      filteredList = _originalList
+          .where((file) => _isDirectChild(file, baseDir, baseLen))
+          .toList();
     }
 
     int newIndex = filteredList.indexOf(fileAnchor);

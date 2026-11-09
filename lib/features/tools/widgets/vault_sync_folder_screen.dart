@@ -53,7 +53,7 @@ class _VaultSyncFolderScreenState extends ConsumerState<VaultSyncFolderScreen> {
   /// a row never overflow, and stays fixed per build so the list can jump
   /// straight to a highlighted row.
   double _rowExtentFor(BuildContext context) =>
-      MediaQuery.textScalerOf(context).scale(62) + 30;
+      (MediaQuery.textScalerOf(context).scale(62) + 30).roundToDouble();
 
   late String _path = widget.initialPath;
   String? _highlight;

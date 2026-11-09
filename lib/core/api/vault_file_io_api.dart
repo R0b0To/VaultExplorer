@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
+import 'package:path/path.dart' as p;
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
 import 'package:vaultexplorer/core/utils/image_preview_exception.dart';
@@ -202,7 +203,47 @@ class VaultFileIoApi {
       ChannelMethods.getFileSize,
       {'filePath': container.uri, 'fileName': fileName},
     );
-    return result ?? 0;
+    return result ?? -1;
+  }
+
+  /// Returns whether an entry (file or folder) exists at [path] within [container].
+  Future<bool> entryExists(
+    MountedContainer container,
+    String path, {
+    required bool isDir,
+  }) async {
+    if (isDir) {
+      return canListDirectory(container, path);
+    }
+    if (container.isLocalStorage) {
+      return _local.entryExists(container.uri, path, isDir: false);
+    }
+    if (_isSaf(container)) {
+      final size = await getFileSize(container, path);
+      return size >= 0;
+    }
+    final size = await getFileSize(container, path);
+    if (size > 0) return true;
+    if (size < 0) return false;
+    // When size == 0, it might be an actual 0-byte file, or a legacy backend
+    // returning 0 on failure. Disambiguate by checking parent directory listing.
+    final parentDir = p.posix.dirname(path);
+    final dirToQuery = (parentDir == '.' || parentDir == '/') ? '' : parentDir;
+    final rawList = await listDirectory(container, dirToQuery);
+    if (rawList == null) return false;
+    final targetName = p.posix.basename(path);
+    final caseSensitive = namesAreCaseSensitive(container);
+    for (final raw in rawList) {
+      if (raw.startsWith('System:')) continue;
+      final e = RawEntry.parse(raw);
+      if (!e.isDir) {
+        final matches = caseSensitive
+            ? e.name == targetName
+            : e.name.toLowerCase() == targetName.toLowerCase();
+        if (matches) return true;
+      }
+    }
+    return false;
   }
 
   Future<int> getMediaFileSize(
@@ -665,7 +706,12 @@ class VaultFileIoApi {
           'safListDirectory response item count: ${rawList?.length}',
         );
         if (rawList == null) return const [];
-        final items = (rawList as List).map((it) {
+        final list = rawList as List;
+        if (list.isEmpty) return const [];
+        if (list.first is String) {
+          return list.cast<String>();
+        }
+        final items = list.map((it) {
           final m = it as Map;
           final name = m['name'] as String? ?? '';
           final isDir = m['isDir'] as bool? ?? false;

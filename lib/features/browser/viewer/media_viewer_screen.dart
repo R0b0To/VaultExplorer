@@ -703,7 +703,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     _playbackManager.currentFileNotifier.addListener(
       _onCurrentMediaFileChanged,
     );
-    _kickOffAspectRatioPreload();
+    if (_scrollMode.isContinuous) {
+      _kickOffAspectRatioPreload();
+    }
     if (carried != null) _onActiveVideoControllerChanged();
 
     _loadConfig();
@@ -1207,6 +1209,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   int _activateToken = 0;
   Future<void> _activateCurrentMedia() async {
     if (_playlistController.isEmpty) return;
+    final sw = Stopwatch()..start();
     await _saveActivePlaybackPosition();
     final file = _playlistController.currentFile;
     try {
@@ -1286,6 +1289,10 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     } else {
       _playbackManager.pauseActive();
     }
+    VeLog.d(
+      'MediaViewer',
+      'Activated media item index ${_playlistController.currentIndex} in ${sw.elapsedMilliseconds}ms',
+    );
   }
 
   Future<void> _loadConfig() async {
@@ -1363,10 +1370,13 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       _wasEmpty = nowEmpty;
       setState(() {});
     }
-    _kickOffAspectRatioPreload();
+    if (_scrollMode.isContinuous) {
+      _kickOffAspectRatioPreload();
+    }
   }
 
   void _scheduleGeometryRebuild() {
+    if (!_scrollMode.isContinuous) return;
     if (_hasPendingGeometryRebuild) return;
     _hasPendingGeometryRebuild = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1392,31 +1402,25 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   // next. Kicked off once per distinct folder scope so re-entering the
   // same folder doesn't repeat the walk.
   void _kickOffAspectRatioPreload([int? startIndex]) {
+    if (!_scrollMode.isContinuous) return;
     final folder = _playlistController.selectedFolder;
     final start = startIndex ?? _playlistController.currentIndex;
     if (_aspectRatioPreloadFolder == folder && startIndex == null) return;
     _aspectRatioPreloadFolder = folder;
-    final playlist = List<String>.from(_playlistController.playlist);
+    final playlist = _playlistController.playlist;
     unawaited(
       _prefetchController.preloadAspectRatios(
         playlist,
         startIndex: start,
         isStillWanted: () =>
-            mounted && _playlistController.selectedFolder == folder,
+            mounted &&
+            _scrollMode.isContinuous &&
+            _playlistController.selectedFolder == folder,
         onRatioLearned: _scheduleGeometryRebuild,
       ),
     );
   }
 
-  int get _knownAspectRatioCount {
-    int count = 0;
-    for (final file in _playlistController.playlist) {
-      if (MediaAspectRatioCache.get(widget.container, file) != null) {
-        count++;
-      }
-    }
-    return count;
-  }
 
   // Freezes measured item heights while the user is actively swiping or coasting
   // so items do not resize mid-gesture and cause screen jitter.
@@ -1715,8 +1719,15 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       _playlistController.playlist,
       isStillWanted: (fileName) {
         if (!mounted) return false;
-        final idx = _playlistController.playlist.indexOf(fileName);
-        return idx != -1 && (idx - _playlistController.currentIndex).abs() <= 2;
+        final cur = _playlistController.currentIndex;
+        final playlist = _playlistController.playlist;
+        for (int delta = -2; delta <= 2; delta++) {
+          final i = cur + delta;
+          if (i >= 0 && i < playlist.length && playlist[i] == fileName) {
+            return true;
+          }
+        }
+        return false;
       },
     );
   }
@@ -3934,6 +3945,12 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       (previous, next) {
         if (previous?.scrollMode != next.scrollMode) {
           _updateSwipePhysics();
+          if (next.scrollMode.isContinuous) {
+            _kickOffAspectRatioPreload();
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _scrollToCurrentIndex(animate: false);
+            });
+          }
         }
       },
     );
@@ -4192,22 +4209,36 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                 );
               }
 
-              return PageView.builder(
-                key: builderKey,
-                controller: _pageController,
-                scrollDirection: _scrollMode.axis,
-                physics: physics,
-                itemCount: _playlistController.playlist.length,
-                onPageChanged: (index) {
-                  if (_playlistController.currentIndex != index) {
-                    _playlistController.updateIndex(index);
-                    unawaited(_activateCurrentMedia());
-                  }
-                  _scheduleSurroundingPrefetch();
-                },
-                itemBuilder: (context, index) {
-                  return _buildMediaItem(index);
-                },
+              final roundedWidth = math.max(1.0, constraints.maxWidth.floorToDouble());
+              final roundedHeight = math.max(1.0, constraints.maxHeight.floorToDouble());
+
+              return Center(
+                child: SizedBox(
+                  width: roundedWidth,
+                  height: roundedHeight,
+                  child: PageView.builder(
+                    key: builderKey,
+                    controller: _pageController,
+                    scrollDirection: _scrollMode.axis,
+                    physics: physics,
+                    itemCount: _playlistController.playlist.length,
+                    onPageChanged: (index) {
+                      if (_playlistController.currentIndex != index) {
+                        final sw = Stopwatch()..start();
+                        _playlistController.updateIndex(index);
+                        unawaited(_activateCurrentMedia());
+                        VeLog.d(
+                          'MediaViewer',
+                          'Switched to item $index in ${sw.elapsedMilliseconds}ms',
+                        );
+                      }
+                      _scheduleSurroundingPrefetch();
+                    },
+                    itemBuilder: (context, index) {
+                      return _buildMediaItem(index);
+                    },
+                  ),
+                ),
               );
             }
 

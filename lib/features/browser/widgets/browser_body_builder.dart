@@ -55,6 +55,7 @@ Widget buildBrowserBody(
   ArchiveContext? archiveContext,
   String? archiveRootPath,
   SortBy? sortBy,
+  GlobalKey<FileMasonryViewState>? masonryKey,
 }) {
   if (isLoading && currentItems.isEmpty) {
     return const Center(child: CircularProgressIndicator(strokeWidth: 2.5));
@@ -136,6 +137,7 @@ Widget buildBrowserBody(
       sortBy: sortBy,
     ),
     BrowserLayoutMode.masonry => FileMasonryView(
+      key: masonryKey,
       scrollController: scrollController,
       bottomClearance: bottomClearance,
       container: container,

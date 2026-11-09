@@ -853,17 +853,21 @@ class _ComicReaderScreenState extends ConsumerState<ComicReaderScreen>
                       ? _buildVerticalReader(constraints)
                       : ValueListenableBuilder<bool>(
                           valueListenable: _swipeLocked,
-                          builder: (context, locked, _) => PageView.builder(
-                            controller: _controller,
-                            reverse: _rtl,
-                            physics: locked
-                                ? const NeverScrollableScrollPhysics()
-                                : const PageScrollPhysics(),
-                            itemCount: _mode == 'spread'
-                                ? _spreadStarts.length
-                                : total,
-                            onPageChanged: _onPageChanged,
-                            itemBuilder: (context, page) {
+                          builder: (context, locked, _) => Center(
+                            child: SizedBox(
+                              width: math.max(1.0, constraints.maxWidth.floorToDouble()),
+                              height: math.max(1.0, constraints.maxHeight.floorToDouble()),
+                              child: PageView.builder(
+                                controller: _controller,
+                                reverse: _rtl,
+                                physics: locked
+                                    ? const NeverScrollableScrollPhysics()
+                                    : const PageScrollPhysics(),
+                                itemCount: _mode == 'spread'
+                                    ? _spreadStarts.length
+                                    : total,
+                                onPageChanged: _onPageChanged,
+                                itemBuilder: (context, page) {
                               if (_mode != 'spread') {
                                 return _buildComicPage(page);
                               }
@@ -886,6 +890,8 @@ class _ComicReaderScreenState extends ConsumerState<ComicReaderScreen>
                             },
                           ),
                         ),
+                      ),
+                    ),
                 );
               },
             ),

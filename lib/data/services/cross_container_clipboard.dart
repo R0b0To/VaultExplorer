@@ -173,6 +173,49 @@ class CrossContainerClipboard extends _$CrossContainerClipboard {
     _replace(_emptyClipboard);
   }
 
+  /// Removes any clipboard items that match [deletedPaths] on volume [volId],
+  /// or are children of deleted directories. If all items were removed, the
+  /// clipboard is cleared entirely.
+  void removeDeletedPaths(int volId, Iterable<String> deletedPaths) {
+    if (!state.hasItems) return;
+    final deletedSet = deletedPaths.toSet();
+    if (deletedSet.isEmpty) return;
+
+    bool matches(ClipboardItem item) {
+      final itemVol = item.volId ?? state.sourceVolId;
+      if (itemVol != volId) return false;
+      for (final dp in deletedSet) {
+        if (item.path == dp || item.path.startsWith('$dp/')) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    final remaining = state.items.where((it) => !matches(it)).toList();
+    if (remaining.isEmpty) {
+      clear();
+    } else if (remaining.length != state.items.length) {
+      _replace((
+        sourceVolId: state.sourceVolId,
+        sourceDisplayName: state.sourceDisplayName,
+        returnToTabId: state.returnToTabId,
+        returnToFilter: state.returnToFilter,
+        action: state.action,
+        items: List.unmodifiable(remaining),
+        archiveName: state.archiveName,
+        archiveFormat: state.archiveFormat,
+        passphrase: state.passphrase,
+        encryptFilenames: state.encryptFilenames,
+        compressionLevel: state.compressionLevel,
+        compressionMethod: state.compressionMethod,
+        splitSizeBytes: state.splitSizeBytes,
+        archiveContext: state.archiveContext,
+        selectedEntryPaths: state.selectedEntryPaths,
+      ));
+    }
+  }
+
   /// Swaps in [next], keeping a nested archive's temporary copy alive for
   /// exactly as long as the clipboard refers to it. A partial extract staged
   /// from inside a nested archive is pasted later, possibly after that archive

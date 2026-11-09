@@ -495,7 +495,7 @@ class _LogcatScreenState extends ConsumerState<LogcatScreen> {
     );
     final contentWidth =
         longestLineLength * _fontSize + horizontalPadding + 40;
-    _logRowExtent = (_fontSize * 1.55 + 8).clamp(32.0, 64.0);
+    _logRowExtent = (_fontSize * 1.55 + 8).clamp(32.0, 64.0).roundToDouble();
     _visibleLineCount = lines.length;
 
     return Listener(

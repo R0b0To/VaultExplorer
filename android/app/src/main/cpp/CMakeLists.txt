@@ -423,6 +423,10 @@ add_library(foldervault_core STATIC
 set_target_properties(foldervault_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_compile_features(foldervault_core PUBLIC cxx_std_20)
 target_compile_options(foldervault_core PRIVATE -Wall -Wextra)
+# 32-bit ABIs (armeabi-v7a, x86) have a 32-bit off_t unless this is defined. Without it, files >= 2 GiB are
+# invisible in directory listings (fstatat -> EOVERFLOW) and cannot be read. The vaultexplorer target already
+# sets it, but this library is a separate target. No header exposes off_t, so PRIVATE is safe.
+target_compile_definitions(foldervault_core PRIVATE _FILE_OFFSET_BITS=64)
 target_include_directories(foldervault_core PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${mbedtls_SOURCE_DIR}/include)

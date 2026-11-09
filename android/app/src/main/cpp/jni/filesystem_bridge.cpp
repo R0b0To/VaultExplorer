@@ -58,10 +58,10 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_getFileSize(
     JNI_TRY
 
     if (!requireActiveSession(volId, "getFileSize")) {
-        throwNotUnlocked(env, volId, "getFileSize"); return 0L;
+        throwNotUnlocked(env, volId, "getFileSize"); return -1L;
     }
     const char* targetName = env->GetStringUTFChars(fileName, nullptr);
-    jlong size = 0;
+    jlong size = -1;
     {
         std::unique_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
         if (ensureMounted(volId)) {

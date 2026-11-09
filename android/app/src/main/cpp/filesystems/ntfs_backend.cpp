@@ -704,13 +704,13 @@ extern "C" const char *ntfs_libntfs_version(void) {
     return "vaultexplorer-ntfs3g-edge";
 }
 
-uint64_t ntfsGetFileSize(int volumeId, const std::string& path) {
+int64_t ntfsGetFileSize(int volumeId, const std::string& path) {
     auto& v = volumes[volumeId];
-    uint64_t size = 0;
+    int64_t size = -1;
     std::string fullPath = "/" + path;
     ntfs_inode* ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullPath.c_str());
     if (ni) {
-        size = static_cast<uint64_t>(ni->data_size);
+        size = static_cast<int64_t>(ni->data_size);
         ntfs_inode_close(ni);
     }
     return size;

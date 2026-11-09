@@ -1264,14 +1264,7 @@ open class MainActivity : FlutterFragmentActivity() {
                     val refresh = call.argument<Boolean>("refresh") ?: false
                     ioExecutor.execute {
                         val entries = safStorageManager.listDirectory(treeUri, dirPath, refresh)
-                        val list = entries.map { entry ->
-                            mapOf(
-                                "name" to entry.name,
-                                "isDir" to entry.isDir,
-                                "size" to entry.size,
-                                "lastModified" to entry.lastModified
-                            )
-                        }
+                        val list = entries.map { it.toWire() }
                         runOnUiThread { result.success(list) }
                     }
                 }

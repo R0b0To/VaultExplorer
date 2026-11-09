@@ -784,22 +784,21 @@ void extListDirectory(int volumeId, const std::string& pathSuffix, std::vector<s
         if (results.size() >= EXT_DIRECTORY_MAX_ENTRIES) results.push_back("System:TRUNCATED");
     }
 }
-uint64_t extGetFileSize(int volumeId, const std::string& path) {
+int64_t extGetFileSize(int volumeId, const std::string& path) {
     auto& v = volumes[volumeId];
-    uint64_t size = 0;
     ext2_ino_t ino = 0;
     struct ext2_inode inode{};
     if (!extResolvePath(v.extFs, path, &ino)) {
         EXT_LOGE("extGetFileSize: path resolution failed for %s", path.c_str());
-        return 0;
+        return -1;
     }
     const errcode_t readErr = ext2fs_read_inode(v.extFs, ino, &inode);
     if (readErr != 0) {
         EXT_LOGE("extGetFileSize: ext2fs_read_inode failed for '%s' inode=%u err=%lu (%s)",
                  path.c_str(), ino, (unsigned long)readErr, error_message(readErr));
-        return 0;
+        return -1;
     }
-    size = (static_cast<uint64_t>(inode.i_size_high) << 32) | inode.i_size;
+    int64_t size = static_cast<int64_t>((static_cast<uint64_t>(inode.i_size_high) << 32) | inode.i_size);
     return size;
 }
 bool extReadFileChunk(int volumeId, const std::string& path, uint64_t offset, size_t length, std::vector<uint8_t>& outBuffer) {

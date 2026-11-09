@@ -16,8 +16,9 @@ Nothing is indexed until you turn it on.
 3. The file toolbar is replaced by a **music strip at the bottom**:
    `Tracks | Albums | Artists | Genres | Folders`,
    the selected music mode icon, a spinner while a scan runs, and a menu (scan for
-   changes, re-read all tags, music folders, delete saved index, turn off). Dragging
-   the pills does not open the side drawer.
+   changes, re-read all tags, music folders, delete saved index, turn off). Only the view in use shows its
+   name, under a highlighted pill; the others are icon-only, with their name as a
+   tooltip. Dragging the pills does not open the side drawer.
 4. Tap the selected music mode icon to turn music mode off and return to the file
    listing. Reopening music mode starts on Tracks. System back follows normal browser
    navigation and does not switch to Files.

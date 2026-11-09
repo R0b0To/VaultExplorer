@@ -14,12 +14,12 @@ bool fsListDirectory(int volId, const std::string& pathSuffix, std::vector<std::
     }
 }
 
-uint64_t fsGetFileSize(int volId, const std::string& path) {
+int64_t fsGetFileSize(int volId, const std::string& path) {
     switch (volumes[volId].fsType) {
         case VolumeState::FS_FATFS: return fatGetFileSize(volId, path);
         case VolumeState::FS_NTFS:  return ntfsGetFileSize(volId, path);
         case VolumeState::FS_EXT:   return extGetFileSize(volId, path);
-        default: return 0;
+        default: return -1;
     }
 }
 

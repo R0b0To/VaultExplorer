@@ -109,7 +109,7 @@ object ContainerLifecycleCore {
         return size ?: 0L
     }
 
-    fun lockContainer(context: Context, uriString: String): Boolean {
+    fun lockContainer(context: Context, uriString: String, force: Boolean = false): Boolean {
         val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString) ?: return false
         val session = ContainerSessionRegistry.activeSessions[volId]
         val lockPermit = ContainerDocumentIoRegistry.beginLock(volId) ?: run {
@@ -125,8 +125,10 @@ object ContainerLifecycleCore {
             lockPermit.awaitHandlesClosed()
             com.aeidolon.vaultexplorer.pdf.PdfRendererRegistry.closeAllForVolume(volId)
             com.aeidolon.vaultexplorer.pdf.VaultPdfSessionRegistry.revokeAllForVolume(volId)
+            // Throws when the USB device refuses the final flush (and force is false): the
+            // bridge and session below are then left in place so the lock can be retried.
             ContainerSessionRegistry.locks[volId].writeLock().withLock {
-                ContainerEngine.lock(volId)
+                ContainerEngine.lock(volId, force)
             }
             if (session?.isUsbSource == true) {
                 UsbBlockBridge.unregister(volId)

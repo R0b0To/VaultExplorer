@@ -1339,7 +1339,11 @@ class VaultLifecycleApi {
     );
   }
 
-  Future<bool> lockContainer(String filePath) async {
+  /// Locks the container at [filePath]. Resolves `false` when it could not be locked --
+  /// including when a USB device refused the final flush, in which case the container
+  /// stays open with its unwritten data pending and locking can simply be retried.
+  /// [force] is the explicit "lock anyway" choice that discards that data.
+  Future<bool> lockContainer(String filePath, {bool force = false}) async {
     // If a video is currently being recorded into this container (whether
     // the camera screen is in the foreground or the recording is
     // continuing in the background via VaultCameraRecordingService),
@@ -1378,7 +1382,7 @@ class VaultLifecycleApi {
     }
     final result = await _channel.invokeMethod<bool>(
       ChannelMethods.lockContainer,
-      {'filePath': filePath},
+      {'filePath': filePath, if (force) 'force': true},
     );
     return result ?? false;
   }

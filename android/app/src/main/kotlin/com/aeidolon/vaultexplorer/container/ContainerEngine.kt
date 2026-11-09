@@ -138,9 +138,19 @@ object ContainerEngine {
         fd, oldPassword, newPassword, oldKeyfileFds, newKeyfileFds
     )
 
-    fun lock(volId: Int) {
+    /**
+     * Locks [volId]. A native volume whose USB device refuses the final flush throws
+     * (the session stays registered and native state is kept, so locking can be retried)
+     * instead of silently dropping acknowledged writes; [force] locks regardless.
+     */
+    fun lock(volId: Int, force: Boolean = false) {
         val session = VaultBackendRegistry.get(volId)
-        if (session != null) VaultBackendRegistry.remove(volId) else NativeEngine.lockNative(volId)
+        if (session != null) {
+            VaultBackendRegistry.remove(volId)
+        } else if (!NativeEngine.lockNative(volId, force)) {
+            throw java.io.IOException(
+                "Buffered writes could not be flushed to the device; the volume was not locked")
+        }
     }
     
     fun requestUnlockCancellation(volId: Int) = NativeEngine.requestCancelUnlockNative(volId)

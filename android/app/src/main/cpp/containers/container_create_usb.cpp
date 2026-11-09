@@ -11,6 +11,7 @@
 #include "vc_geometry.h"
 #include "vc_header_areas.h"
 #include "vc_header_build.h"
+#include "vc_free_space_fill.h"
 #include "crypto/xts_tweak.h"
 #include "volume_state.h"
 #include "ext_backend.h"
@@ -217,38 +218,16 @@ UsbCreateResult createUsbContainer(int volId, uint64_t startSector, const char* 
             break;
         }
 
-        {
-            CascadeContext dataCtx;
-            if (!cascadeSetKeys(dataCtx, createCipher, combinedMasterKey, masterKeyLen)) {
-                result = UsbCreateResult::Fail(UsbCreatePhase::kFillData, "USB_CASCADE_INIT_FAILED", "Cipher initialization failed for data area");
+        if (!quickFormat) {
+            // Free space gets encrypted zeros under a TEMPORARY random key, not the real
+            // data key (see vc_free_space_fill.h), so untouched space decrypts to noise.
+            if (!vcfill::fillWithRandomizedKey(
+                    createCipher, masterKeyLen, VC_DATA_AREA_OFFSET / 512, DATA_SIZE / 512, CREATE_FILL_BATCH,
+                    [&](uint64_t off, const unsigned char* p, size_t n) { return physicalWrite(volId, baseOffset + off, p, n); })) {
+                result = UsbCreateResult::Fail(UsbCreatePhase::kFillData, "USB_FILL_WRITE_FAILED",
+                                                "Failed to write the data area fill", baseOffset + VC_DATA_AREA_OFFSET,
+                                                VC_DATA_AREA_OFFSET / 512, 0);
                 break;
-            }
-
-            const uint64_t START_SECTOR  = VC_DATA_AREA_OFFSET / 512;
-            const uint64_t TOTAL_SECTORS = (VOLUME_SIZE - VC_DATA_AREA_OFFSET) / 512;
-
-            if (!quickFormat) {
-                const unsigned char ZERO_SECTOR[512] = {0};
-                const size_t batchBufBytes = CREATE_FILL_BATCH * 512;
-                std::unique_ptr<unsigned char[]> batch(new unsigned char[batchBufBytes]);
-                bool writeOk = true;
-
-                for (uint64_t s = START_SECTOR; s < TOTAL_SECTORS && writeOk; ) {
-                    const uint64_t rem   = TOTAL_SECTORS - s;
-                    const uint64_t count = (rem < CREATE_FILL_BATCH) ? rem : CREATE_FILL_BATCH;
-                    for (uint64_t i = 0; i < count; ++i) {
-                        cascadeEncryptSector(dataCtx, s + i, ZERO_SECTOR, batch.get() + i * 512);
-                    }
-                    const size_t want = count * 512;
-                    if (!physicalWrite(volId, baseOffset + s * 512, batch.get(), want)) {
-                        result = UsbCreateResult::Fail(UsbCreatePhase::kFillData, "USB_FILL_WRITE_FAILED",
-                                                        "Failed to write the zero-fill data area", baseOffset + s * 512,
-                                                        s, static_cast<uint32_t>(count));
-                        writeOk = false;
-                    }
-                    s += count;
-                }
-                if (!writeOk) break;
             }
         }
 
@@ -821,26 +800,16 @@ UsbCreateResult createUsbContainerWithHidden(
 
         // Zero Fill
         if (!quickFormat) {
-            CascadeContext dataCtx;
-            cascadeSetKeys(dataCtx, oCipher, oMasterKey, oMasterKeyLen);
-            const uint64_t START_SECTOR  = VC_DATA_AREA_OFFSET / 512;
-            const uint64_t TOTAL_SECTORS = (VOLUME_SIZE - VC_DATA_AREA_OFFSET) / 512;
-            const unsigned char ZERO_SECTOR[512] = {0};
-            std::unique_ptr<unsigned char[]> batch(new unsigned char[CREATE_FILL_BATCH * 512]);
-            bool writeOk = true;
-
-            for (uint64_t s = START_SECTOR; s < TOTAL_SECTORS && writeOk; ) {
-                const uint64_t count = std::min<uint64_t>(TOTAL_SECTORS - s, CREATE_FILL_BATCH);
-                for (uint64_t i = 0; i < count; ++i) cascadeEncryptSector(dataCtx, s + i, ZERO_SECTOR, batch.get() + i * 512);
-                if (!physicalWrite(volId, baseOffset + s * 512, batch.get(), count * 512)) {
-                    result = UsbCreateResult::Fail(UsbCreatePhase::kFillData, "USB_FILL_WRITE_FAILED",
-                                                    "Failed to write the zero-fill data area", baseOffset + s * 512,
-                                                    s, static_cast<uint32_t>(count));
-                    writeOk = false;
-                }
-                s += count;
+            // Temporary random key for the free-space fill (see vc_free_space_fill.h): under
+            // the outer key the hidden volume's area must look like the rest of the free space.
+            if (!vcfill::fillWithRandomizedKey(
+                    oCipher, oMasterKeyLen, VC_DATA_AREA_OFFSET / 512, OUTER_DATA_SIZE / 512, CREATE_FILL_BATCH,
+                    [&](uint64_t off, const unsigned char* p, size_t n) { return physicalWrite(volId, baseOffset + off, p, n); })) {
+                result = UsbCreateResult::Fail(UsbCreatePhase::kFillData, "USB_FILL_WRITE_FAILED",
+                                                "Failed to write the data area fill", baseOffset + VC_DATA_AREA_OFFSET,
+                                                VC_DATA_AREA_OFFSET / 512, 0);
+                break;
             }
-            if (!writeOk) break;
         }
 
         // Format filesystems

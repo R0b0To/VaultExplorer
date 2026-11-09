@@ -133,8 +133,13 @@ internal object NativeEngine {
         fileIdOrHeaderNonce: ByteArray, startChunkNumber: Long, inputBuffer: ByteArray
     ): ByteArray?
 
+    /**
+     * Tears the volume down. Returns false -- and leaves it retryable, with any
+     * unwritten USB data still pending -- when the device refused the final flush.
+     * [force] = true gives up on that data (removed device, or "lock anyway").
+     */
     @JvmStatic
-    external fun lockNative(volId: Int)
+    external fun lockNative(volId: Int, force: Boolean): Boolean
 
     @JvmStatic
     external fun requestCancelUnlockNative(volId: Int)

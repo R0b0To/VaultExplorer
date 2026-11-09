@@ -683,9 +683,12 @@ class VaultUnlockHandlers(
             result.error("INVALID_ARGS", "filePath is required", null)
             return
         }
+        // Optional: the explicit "lock anyway" choice after a normal lock was refused because a
+        // USB device would not accept the final flush. Absent/false = the safe default.
+        val force = call.argument<Boolean>("force") ?: false
         ioExecutor.execute {
             try {
-                val locked = ContainerLifecycleCore.lockContainer(activity, uriString)
+                val locked = ContainerLifecycleCore.lockContainer(activity, uriString, force)
                 activity.runOnUiThread { result.success(locked) }
             } catch (e: Exception) {
                 activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }

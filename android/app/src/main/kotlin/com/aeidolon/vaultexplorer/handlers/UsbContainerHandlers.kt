@@ -563,8 +563,10 @@ class UsbContainerHandlers(
         ioExecutor.execute {
             UsbBlockBridge.unregister(volId)
             try {
+                // The device is gone, so its unwritten data can't be saved any more:
+                // this is the one lock that must discard rather than retry.
                 ContainerSessionRegistry.locks[volId].writeLock().withLock {
-                    ContainerEngine.lock(volId)
+                    ContainerEngine.lock(volId, force = true)
                 }
             } catch (e: Exception) {
                 VeLog.w("VaultExplorer_C++") { "lockNative on USB detach failed for volId=$volId: ${e.message}" }

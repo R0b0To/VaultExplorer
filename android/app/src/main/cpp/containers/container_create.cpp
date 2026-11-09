@@ -17,6 +17,7 @@
 #include "vc_geometry.h"
 #include "vc_header_areas.h"
 #include "vc_header_build.h"
+#include "vc_free_space_fill.h"
 #include "crypto/cascade.h"
 #include "crypto/keyfile_mixing.h"
 #include "crypto/luks_header.h"
@@ -211,33 +212,15 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
         // random-filled hidden-volume backup header slot and must stay random.)
 
         if (!quickFormat) {
-            CascadeContext dataCtx;
-            if (!cascadeSetKeys(dataCtx, createCipher, combinedMasterKey, masterKeyLen)) {
-                LOGI("createContainer: cascadeSetKeys failed for data");
+            // Free space gets encrypted zeros under a TEMPORARY random key, not the
+            // real data key (see vc_free_space_fill.h): otherwise untouched space
+            // decrypts to zeros under the outer key and a hidden volume stands out.
+            if (!vcfill::fillWithRandomizedKey(
+                    createCipher, masterKeyLen, VC_DATA_AREA_OFFSET / 512, DATA_SIZE / 512, CREATE_FILL_BATCH,
+                    [fd](uint64_t off, const unsigned char* p, size_t n) { return vcgeom::pwriteFully(fd, off, p, n); })) {
+                LOGI("createContainer: data fill failed");
                 break;
             }
-
-            const uint64_t START_SECTOR  = VC_DATA_AREA_OFFSET / 512;
-            const uint64_t TOTAL_SECTORS = (VOLUME_SIZE - VC_DATA_AREA_OFFSET) / 512;
-            const unsigned char ZERO_SECTOR[512] = {0};
-            const size_t batchBufBytes = CREATE_FILL_BATCH * 512;
-            std::unique_ptr<unsigned char[]> batch(new unsigned char[batchBufBytes]);
-            bool writeOk = true;
-
-            for (uint64_t s = START_SECTOR; s < TOTAL_SECTORS && writeOk; ) {
-                const uint64_t rem   = TOTAL_SECTORS - s;
-                const uint64_t count = (rem < CREATE_FILL_BATCH) ? rem : CREATE_FILL_BATCH;
-                for (uint64_t i = 0; i < count; ++i) {
-                    cascadeEncryptSector(dataCtx, s + i, ZERO_SECTOR, batch.get() + i * 512);
-                }
-                const ssize_t want = static_cast<ssize_t>(count * 512);
-                if (pwrite(fd, batch.get(), want, static_cast<off_t>(s * 512)) != want) {
-                    LOGI("createContainer: data fill write failed at sector %llu", (unsigned long long)s);
-                    writeOk = false;
-                }
-                s += count;
-            }
-            if (!writeOk) break;
         }
 
         fsync(fd);
@@ -744,29 +727,12 @@ bool createContainerWithHidden(int fd,
         }
 
         if (!quickFormat) {
-            CascadeContext dataCtx;
-            if (!cascadeSetKeys(dataCtx, createCipher, hiddenCombinedMasterKey, masterKeyLen)) break;
-
-            const uint64_t START_SECTOR  = hiddenDataStartAbsolute / 512;
-            const uint64_t TOTAL_SECTORS = hiddenDataSize / 512;
-            const unsigned char ZERO_SECTOR[512] = {0};
-            const size_t batchBufBytes = CREATE_FILL_BATCH * 512;
-            std::unique_ptr<unsigned char[]> batch(new unsigned char[batchBufBytes]);
-            bool writeOk = true;
-
-            for (uint64_t s = 0; s < TOTAL_SECTORS && writeOk; ) {
-                const uint64_t rem   = TOTAL_SECTORS - s;
-                const uint64_t count = (rem < CREATE_FILL_BATCH) ? rem : CREATE_FILL_BATCH;
-                for (uint64_t i = 0; i < count; ++i) {
-                    cascadeEncryptSector(dataCtx, START_SECTOR + s + i, ZERO_SECTOR, batch.get() + i * 512);
-                }
-                const ssize_t want = static_cast<ssize_t>(count * 512);
-                if (pwrite(fd, batch.get(), want, static_cast<off_t>((START_SECTOR + s) * 512)) != want) {
-                    writeOk = false;
-                }
-                s += count;
+            if (!vcfill::fillWithRandomizedKey(
+                    createCipher, masterKeyLen, hiddenDataStartAbsolute / 512, hiddenDataSize / 512, CREATE_FILL_BATCH,
+                    [fd](uint64_t off, const unsigned char* p, size_t n) { return vcgeom::pwriteFully(fd, off, p, n); })) {
+                LOGI("createContainerWithHidden: data fill failed");
+                break;
             }
-            if (!writeOk) break;
         }
 
         fsync(fd);

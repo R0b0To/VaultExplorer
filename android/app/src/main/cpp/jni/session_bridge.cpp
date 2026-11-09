@@ -14,6 +14,7 @@
 
 #include "session_prepare.h"
 #include "session_guard.h"
+#include "lock_policy.h"
 #include "volume_state.h"
 #include "container_format.h"
 #include "filesystems/stream_handles.h"
@@ -151,34 +152,66 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_probeContainerFormatNative(
     JNI_CATCH_RETURN(nullptr)
 }
 
-extern "C" JNIEXPORT void JNICALL
-Java_com_aeidolon_vaultexplorer_NativeEngine_lockNative(JNIEnv* env, jobject, jint volId) {
+// Locks one volume; the caller holds volumes[volId].mutex exclusively. The ordering is
+// session/lock_policy.h: a normal lock of a USB volume never throws away data it has
+// already acknowledged. If the device refuses the flush it returns false and keeps the
+// pending write cache and the volume state, so locking can simply be retried (the
+// keep-alive service and the Lock button do). `force` is the explicit "give up on the
+// unwritten data" path -- a removed device, or the user choosing to lock anyway.
+static bool lockVolumeLocked(int volId, bool force) {
+    VolumeState& v = volumes[volId];
+    bool discarded = false;
+    const bool locked = lockpolicy::lockVolume(
+        v.isUsbSource, force,
+        // Flush while the filesystem is still mounted: if the device is already failing,
+        // nothing has been torn down and the vault stays fully usable.
+        [&] {
+            const bool ok = v.usbCache.sync(volId);
+            if (!ok) LOGI("lockNative(vol=%d): USB flush failed, volume left open for retry", volId);
+            return ok;
+        },
+        [&] {
+            // Close FAT streams
+            for (FIL* f : v.openStreams) {
+                f_close(f);
+                delete f;
+            }
+            v.openStreams.clear();
+
+            // Close NTFS streams
+            for (NtfsStream* ns : v.openNtfsStreams) {
+                ntfs_attr_close(ns->attr);
+                ntfs_inode_close(ns->inode);
+                delete ns;
+            }
+            v.openNtfsStreams.clear();
+
+            const bool durable = unmountVolume(volId);
+            if (!durable) LOGI("lockNative(vol=%d): final USB flush failed", volId);
+            return durable;
+        },
+        // reset() clears the USB write cache, so it only runs once that is intended.
+        [&] { v.reset(); },
+        &discarded);
+    if (!locked) {
+        LOGI("lockNative(vol=%d): not locked, pending writes kept for retry", volId);
+    } else if (discarded) {
+        LOGI("lockNative(vol=%d): forced lock discarded buffered USB writes", volId);
+    }
+    return locked;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_aeidolon_vaultexplorer_NativeEngine_lockNative(JNIEnv* env, jobject, jint volId, jboolean force) {
     JNI_TRY
 
-    if (volId < 0 || volId >= MAX_VOLUMES) return;
+    if (volId < 0 || volId >= MAX_VOLUMES) return JNI_TRUE;
 
     VolumeState& v = volumes[volId];
     std::unique_lock<std::shared_mutex> lock(v.mutex);
+    return lockVolumeLocked(volId, force == JNI_TRUE) ? JNI_TRUE : JNI_FALSE;
 
-    // Close FAT streams
-    for (FIL* f : v.openStreams) {
-        f_close(f);
-        delete f;
-    }
-    v.openStreams.clear();
-
-    // Close NTFS streams
-    for (NtfsStream* ns : v.openNtfsStreams) {
-        ntfs_attr_close(ns->attr);
-        ntfs_inode_close(ns->inode);
-        delete ns;
-    }
-    v.openNtfsStreams.clear();
-
-    unmountVolume(volId);
-    v.reset();
-
-    JNI_CATCH_VOID
+    JNI_CATCH_RETURN(JNI_FALSE)
 }
 
 extern "C" JNIEXPORT void JNICALL

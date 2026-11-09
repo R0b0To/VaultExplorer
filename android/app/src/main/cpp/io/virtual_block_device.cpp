@@ -138,8 +138,8 @@ bool ensureMounted(int volId) {
     }
 }
 
-void unmountVolume(int volId) {
-    if (volId < 0 || volId >= MAX_VOLUMES) return;
+bool unmountVolume(int volId) {
+    if (volId < 0 || volId >= MAX_VOLUMES) return true;
     auto& v = volumes[volId];
     if (v.fsMounted) {
         if (v.fsType == VolumeState::FS_FATFS) {
@@ -165,13 +165,15 @@ void unmountVolume(int volId) {
     }
 
     // Flush dirty buffers and synchronize physical hardware caches
+    bool durable = true;
     if (v.isUsbSource) {
-        // unmountVolume() has no way to report failure, but a failed flush
-        // here means buffered writes never reached the device and are about
-        // to be dropped -- at least leave a trace in the log.
+        // A failed flush leaves the acknowledged bytes pending inside usbCache.
+        // Report it instead of swallowing it: the caller must not clear the
+        // cache (VolumeState::reset) unless it has decided to discard them.
         if (!v.usbCache.sync(volId)) {
-            LOGI("unmountVolume(vol=%d): USB flush/sync failed; buffered writes were not persisted",
+            LOGI("unmountVolume(vol=%d): USB flush/sync failed; buffered writes are still pending",
                  volId);
+            durable = false;
         }
     } else if (v.isCompositeSource && v.composite) {
         v.composite->sync();
@@ -185,6 +187,7 @@ void unmountVolume(int volId) {
     v.ioBufSize = 0;
     std::lock_guard<std::mutex> cacheLock(v.decryptedBlockCacheMutex);
     v.decryptedBlockCache.clear();
+    return durable;
 }
 
 static unsigned char* getVolIoBuf(VolumeState& v, size_t neededBytes) {

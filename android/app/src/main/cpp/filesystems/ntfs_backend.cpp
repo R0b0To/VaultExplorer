@@ -356,6 +356,15 @@ int ntfsSync(ntfs_device* device) {
     const int volumeId = ntfsVolumeId(device);
     if (volumeId < 0 || volumeId >= kMaxVolumes) return 0;
     auto& v = volumes[volumeId];
+    if (v.isUsbSource) {
+        // USB sessions have no fd (it is -1): without this branch the sync did
+        // nothing and reported success while writes were still in the USB cache.
+        if (!v.usbCache.sync(volumeId)) {
+            errno = EIO;
+            return -1;
+        }
+        return 0;
+    }
     if (v.isCompositeSource && v.composite) {
         v.composite->sync();
     } else if (v.fd >= 0) {

@@ -22,6 +22,7 @@
 #include "filesystems/filesystem_paths.h"
 #include "containers/container_utils.h"
 #include "containers/vc_header_build.h"
+#include "vc_free_space_fill.h"
 #include "ff.h"
 
 #undef min
@@ -273,22 +274,11 @@ CompositeCreateResult createCompositeContainer(
     }
 
     if (!quickFormat) {
-        CascadeContext dataCtx;
-        cascadeSetKeys(dataCtx, createCipher, combinedMasterKey, masterKeyLen);
-        const uint64_t START_SECTOR = VC_DATA_AREA_OFFSET / 512;
-        const uint64_t TOTAL_SECTORS = (VOLUME_SIZE - VC_DATA_AREA_OFFSET) / 512;
-        const unsigned char ZERO_SECTOR[512] = {0};
-        std::unique_ptr<unsigned char[]> batch(new unsigned char[CREATE_FILL_BATCH * 512]);
-
-        for (uint64_t s = START_SECTOR; s < TOTAL_SECTORS;) {
-            uint64_t count = std::min<uint64_t>(TOTAL_SECTORS - s, CREATE_FILL_BATCH);
-            for (uint64_t i = 0; i < count; ++i) {
-                cascadeEncryptSector(dataCtx, s + i, ZERO_SECTOR, batch.get() + i * 512);
-            }
-            if (!physicalWrite(volId, s * 512, batch.get(), count * 512)) {
-                return {false, "FILL_FAILED", "Failed zero-filling data area", 0};
-            }
-            s += count;
+        // Temporary random key for the free-space fill (see vc_free_space_fill.h).
+        if (!vcfill::fillWithRandomizedKey(
+                createCipher, masterKeyLen, VC_DATA_AREA_OFFSET / 512, DATA_SIZE / 512, CREATE_FILL_BATCH,
+                [&](uint64_t off, const unsigned char* p, size_t n) { return physicalWrite(volId, off, p, n); })) {
+            return {false, "FILL_FAILED", "Failed filling data area", 0};
         }
     }
 

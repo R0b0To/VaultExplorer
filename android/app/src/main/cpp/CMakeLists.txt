@@ -638,6 +638,16 @@ if(NOT ANDROID)
     add_executable(vc_geometry_test containers/test/vc_geometry_test.cpp)
     # Random fill of the reserved header areas (hidden-volume deniability).
     add_executable(vc_header_areas_test containers/test/vc_header_areas_test.cpp)
+    # Free-space fill: uses stand-in crypto headers, which must win over the real
+    # crypto/ ones on the include path (hence BEFORE).
+    add_executable(vc_free_space_fill_test containers/test/vc_free_space_fill_test.cpp)
+    target_include_directories(vc_free_space_fill_test BEFORE PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/containers/test/host_stubs)
+    # Lock ordering policy, driven with the real UsbBlockCache (stub <jni.h> as above).
+    add_executable(lock_policy_test session/test/lock_policy_test.cpp)
+    target_include_directories(lock_policy_test PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/filesystems/test/host_stubs
+            ${CMAKE_CURRENT_SOURCE_DIR}/jni)
     add_executable(cryfs_block_cipher_test
             test/cryfs_block_cipher_test.cpp
             crypto/cryfs_block_cipher.cpp
@@ -738,6 +748,8 @@ if(NOT ANDROID)
             usb_block_cache_test
             vc_geometry_test
             vc_header_areas_test
+            vc_free_space_fill_test
+            lock_policy_test
             cryfs_block_cipher_test
             user_entropy_test
             utf16le_password_test
@@ -766,6 +778,8 @@ if(NOT ANDROID)
     add_test(NAME usb_block_cache_test COMMAND usb_block_cache_test)
     add_test(NAME vc_geometry_test COMMAND vc_geometry_test)
     add_test(NAME vc_header_areas_test COMMAND vc_header_areas_test)
+    add_test(NAME vc_free_space_fill_test COMMAND vc_free_space_fill_test)
+    add_test(NAME lock_policy_test COMMAND lock_policy_test)
     add_test(NAME cryfs_block_cipher_test COMMAND cryfs_block_cipher_test)
     add_test(NAME user_entropy_test COMMAND user_entropy_test)
     add_test(NAME utf16le_password_test COMMAND utf16le_password_test)

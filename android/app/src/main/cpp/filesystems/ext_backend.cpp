@@ -293,8 +293,14 @@ errcode_t extIoWriteByte(io_channel c, unsigned long offset, int n, const void* 
 }
 errcode_t extIoFlush(io_channel c) {
     if (!c || !c->private_data) return EXT2_ET_INVALID_ARGUMENT;
-    auto& volume = volumes[*static_cast<int*>(c->private_data)];
-    if (volume.isUsbSource) return 0;
+    const int volumeId = *static_cast<int*>(c->private_data);
+    auto& volume = volumes[volumeId];
+    if (volume.isUsbSource) {
+        // Writes sit in the USB write cache until flushed: returning success here
+        // told libext2fs its metadata was durable while it was still pending. Flush
+        // and issue the device barrier, and report failure like the other backends.
+        return volume.usbCache.sync(volumeId) ? 0 : EXT2_ET_SHORT_WRITE;
+    }
     if (volume.isCompositeSource) {
         return (volume.composite && !volume.composite->sync()) ? EXT2_ET_SHORT_WRITE : 0;
     }

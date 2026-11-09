@@ -109,12 +109,33 @@ object ContainerLifecycleCore {
         return size ?: 0L
     }
 
-    fun lockContainer(context: Context, uriString: String, force: Boolean = false): Boolean {
-        val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString) ?: return false
+    /** Why a lock did or did not happen; [lockContainer] collapses this to a Boolean. */
+    enum class LockOutcome {
+        LOCKED,
+
+        /** Not mounted at all, or a lock for this volume is already running. */
+        NOT_LOCKED,
+
+        /** USB device refused the final flush; the volume is still open and retryable. */
+        FLUSH_REFUSED,
+
+        /** Any other failure. */
+        FAILED,
+    }
+
+    fun lockContainer(context: Context, uriString: String, force: Boolean = false): Boolean =
+        lockContainerOutcome(context, uriString, force) == LockOutcome.LOCKED
+
+    fun lockContainerOutcome(
+        context: Context,
+        uriString: String,
+        force: Boolean = false,
+    ): LockOutcome {
+        val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString) ?: return LockOutcome.NOT_LOCKED
         val session = ContainerSessionRegistry.activeSessions[volId]
         val lockPermit = ContainerDocumentIoRegistry.beginLock(volId) ?: run {
             VeLog.w(TAG) { "lockContainer already pending for volId=$volId" }
-            return false
+            return LockOutcome.NOT_LOCKED
         }
         return try {
             if (lockPermit.handlesAtStart > 0) {
@@ -141,10 +162,13 @@ object ContainerLifecycleCore {
                 "lockContainer succeeded for volId=$volId, remaining active sessions=" +
                     "${ContainerSessionRegistry.activeSessions.keys.toList()}"
             }
-            true
+            LockOutcome.LOCKED
+        } catch (e: LockFlushRefusedException) {
+            VeLog.w(TAG) { "lockContainer refused by device for volId=$volId; vault left open" }
+            LockOutcome.FLUSH_REFUSED
         } catch (e: Exception) {
             VeLog.e(TAG, e) { "lockContainer failed for ${censorUri(uriString)} (volId=$volId)" }
-            false
+            LockOutcome.FAILED
         } finally {
             lockPermit.close()
         }

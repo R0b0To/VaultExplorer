@@ -5,6 +5,13 @@ import com.aeidolon.vaultexplorer.SecureFileWipe
 import com.aeidolon.vaultexplorer.VaultStreamRegistry
 import com.aeidolon.vaultexplorer.VeLog
 
+/**
+ * The device refused to accept buffered writes while locking a volume. Nothing was discarded:
+ * the volume stays open with its pending data, so the caller may retry or explicitly force
+ * the lock (which discards what could not be written).
+ */
+class LockFlushRefusedException(message: String) : java.io.IOException(message)
+
 object ContainerEngine {
     fun maxVolumes(): Int = try {
         val count = NativeEngine.getMaxVolumesNative()
@@ -148,7 +155,7 @@ object ContainerEngine {
         if (session != null) {
             VaultBackendRegistry.remove(volId)
         } else if (!NativeEngine.lockNative(volId, force)) {
-            throw java.io.IOException(
+            throw LockFlushRefusedException(
                 "Buffered writes could not be flushed to the device; the volume was not locked")
         }
     }

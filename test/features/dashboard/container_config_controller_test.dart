@@ -625,7 +625,7 @@ class _FakeVaultLifecycleApi implements VaultLifecycleApi {
   final List<String> lockedUris = [];
 
   @override
-  Future<bool> lockContainer(String filePath) async {
+  Future<bool> lockContainer(String filePath, {bool force = false}) async {
     lockedUris.add(filePath);
     return true;
   }

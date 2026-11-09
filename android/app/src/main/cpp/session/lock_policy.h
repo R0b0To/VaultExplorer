@@ -9,7 +9,9 @@
 //   * normal lock: flush FIRST, while everything is still mounted; if the device
 //     refuses, change nothing and report failure (the vault stays usable).
 //   * then tear down; if that final flush fails, report failure WITHOUT resetting, so
-//     the pending bytes survive and a retry only has to flush again.
+//     the pending bytes survive and a retry only has to flush again. The filesystem is
+//     then unmounted but the session stays open and usable: ensureMounted() remounts it
+//     on the next operation (see unmountVolume in io/virtual_block_device.h).
 //   * force (removed device, or the user chose "lock anyway"): always tear down and
 //     reset, discarding whatever could not be written; `discarded` says so.
 namespace lockpolicy {

@@ -1343,7 +1343,18 @@ class VaultLifecycleApi {
   /// including when a USB device refused the final flush, in which case the container
   /// stays open with its unwritten data pending and locking can simply be retried.
   /// [force] is the explicit "lock anyway" choice that discards that data.
-  Future<bool> lockContainer(String filePath, {bool force = false}) async {
+  ///
+  /// Never throws for a refused flush, so loops that lock several containers keep going.
+  /// Use [lockContainerDetailed] where the person should be able to retry or force.
+  Future<bool> lockContainer(String filePath, {bool force = false}) async =>
+      (await lockContainerDetailed(filePath, force: force)) == LockResult.locked;
+
+  /// Like [lockContainer], but tells a refused flush ([LockResult.flushRefused]) apart
+  /// from every other failure so the UI can offer "Retry" and "Lock anyway".
+  Future<LockResult> lockContainerDetailed(
+    String filePath, {
+    bool force = false,
+  }) async {
     // If a video is currently being recorded into this container (whether
     // the camera screen is in the foreground or the recording is
     // continuing in the background via VaultCameraRecordingService),
@@ -1380,11 +1391,18 @@ class VaultLifecycleApi {
     } catch (e) {
       logSwallowed('lockContainer/flushMediaIndex', e, expected: true);
     }
-    final result = await _channel.invokeMethod<bool>(
-      ChannelMethods.lockContainer,
-      {'filePath': filePath, if (force) 'force': true},
-    );
-    return result ?? false;
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        ChannelMethods.lockContainer,
+        {'filePath': filePath, if (force) 'force': true},
+      );
+      return result == true ? LockResult.locked : LockResult.failed;
+    } on PlatformException catch (e) {
+      // Native reports a device that refused the final flush under its own code;
+      // anything else keeps propagating exactly as before.
+      if (e.code == 'LOCK_FLUSH_REFUSED') return LockResult.flushRefused;
+      rethrow;
+    }
   }
 
   /// Starts or stops the "keep vaults running in background" foreground

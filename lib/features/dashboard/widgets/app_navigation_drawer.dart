@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/external_storage_locations_provider.dart';
+import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
@@ -25,6 +26,7 @@ import 'package:vaultexplorer/features/dashboard/widgets/drawer_bookmarks_sectio
 import 'package:vaultexplorer/features/dashboard/widgets/drawer_categories_section.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/app_settings_screen.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/lock_flush_prompt.dart';
 import 'package:vaultexplorer/features/settings/long_file_name_display_provider.dart';
 import 'package:vaultexplorer/features/tools/tools_screen.dart';
 
@@ -308,10 +310,18 @@ class AppNavigationDrawer extends ConsumerWidget {
       return;
     }
     try {
-      final locked = await ref
-          .read(vaultLifecycleApiProvider)
-          .lockContainer(container.uri);
-      if (!locked) throw StateError('Container lock did not complete');
+      final result = await lockWithFlushPrompt(
+        context: context,
+        lifecycle: ref.read(vaultLifecycleApiProvider),
+        uri: container.uri,
+        displayName: container.displayName,
+      );
+      // The device refused the write-back and the person chose to keep the
+      // container open: nothing failed, so there is no error to report.
+      if (result == LockResult.flushRefused) return;
+      if (result != LockResult.locked) {
+        throw StateError('Container lock did not complete');
+      }
       VeLog.i(
         'AppNavigationDrawer',
         '_lockSingleVault: native lockContainer succeeded for volId=${container.volId}',
@@ -350,6 +360,9 @@ class AppNavigationDrawer extends ConsumerWidget {
     }
     var currentVaultGuardHeld = currentVaultGuardAcquired;
     var skippedBusyVault = false;
+    // Vaults whose USB device refused the final write-back. They stay open; the
+    // person is asked about each one only after every other vault has been locked.
+    final flushRefused = <MountedContainer>[];
     try {
       for (final c in mounted) {
         final guardAlreadyHeld =
@@ -359,11 +372,13 @@ class AppNavigationDrawer extends ConsumerWidget {
           continue;
         }
         try {
-          final locked = await ref
+          final result = await ref
               .read(vaultLifecycleApiProvider)
-              .lockContainer(c.uri);
-          if (locked) {
+              .lockContainerDetailed(c.uri);
+          if (result == LockResult.locked) {
             controller.onContainerLocked(c.volId);
+          } else if (result == LockResult.flushRefused) {
+            flushRefused.add(c);
           } else {
             skippedBusyVault = true;
           }
@@ -377,6 +392,27 @@ class AppNavigationDrawer extends ConsumerWidget {
     } finally {
       if (currentVaultGuardHeld) {
         controller.releaseLockGuard(currentVolId!);
+      }
+    }
+    for (final c in flushRefused) {
+      if (!controller.acquireLockGuard(c.volId)) continue;
+      try {
+        final result = await lockWithFlushPrompt(
+          context: context,
+          lifecycle: ref.read(vaultLifecycleApiProvider),
+          uri: c.uri,
+          displayName: c.displayName,
+          firstResult: LockResult.flushRefused,
+        );
+        if (result == LockResult.locked) {
+          controller.onContainerLocked(c.volId);
+        } else if (result == LockResult.failed) {
+          skippedBusyVault = true;
+        }
+      } catch (_) {
+        skippedBusyVault = true;
+      } finally {
+        controller.releaseLockGuard(c.volId);
       }
     }
     if (skippedBusyVault && context.mounted) {

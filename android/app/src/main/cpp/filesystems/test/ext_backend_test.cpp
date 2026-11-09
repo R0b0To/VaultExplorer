@@ -55,6 +55,7 @@ DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT count) {
 }
 
 #include "fs_test_support.h"
+#include "usb_test_support.h"
 
 static const bool g_haveFsck = commandExists("e2fsck");
 static const bool g_haveMkfs = commandExists("mkfs.ext4");
@@ -585,6 +586,52 @@ static void test_read_only_mount_changes_nothing() {
     v.fsckClean("read-only session");
 }
 
+// ---- USB write-back -----------------------------------------------------------------
+// With a USB source, the filesystem's writes sit in volumes[].usbCache until they are
+// flushed. extIoFlush used to return success without flushing, so libext2fs believed its
+// metadata was durable while it was still pending. These pin that libext2fs's own flush
+// request (io_channel_flush -> extIoFlush) reaches the device, and that a device failure
+// comes back as an error with the bytes still pending for a retry.
+static void test_usb_io_flush_reaches_the_device() {
+    Vol v;
+    CHECK(v.format("ext4", 8));
+    VolumeState& vs = volumes[0];
+    g_usbDevice[0].reset(8u << 20);
+    vs.isUsbSource = true;
+
+    const uint64_t kFirst = 4096 * 5, kSecond = 4096 * 9, kThird = 4096 * 13;
+    const Bytes first(512, 0xA7), second(512, 0x5C), third(512, 0x3E);
+
+    // Healthy device: pending bytes are written and the device barrier is issued.
+    CHECK(vs.usbCache.write(0, kFirst, first.data(), first.size()));
+    CHECK_EQ(g_usbDevice[0].media[kFirst], 0);   // only pending in the cache so far
+    const int syncsBefore = g_usbDevice[0].syncCalls;
+    CHECK_EQ(io_channel_flush(vs.extFs->io), 0);
+    CHECK_EQ(g_usbDevice[0].media[kFirst], 0xA7);
+    CHECK(g_usbDevice[0].syncCalls > syncsBefore);
+
+    // Device refuses the data: the flush reports it and the bytes stay pending...
+    CHECK(vs.usbCache.write(0, kSecond, second.data(), second.size()));
+    g_usbDevice[0].refuseWrites = true;
+    CHECK(io_channel_flush(vs.extFs->io) != 0);
+    CHECK_EQ(g_usbDevice[0].media[kSecond], 0);
+    // ...so a retry after the device recovers persists them.
+    g_usbDevice[0].refuseWrites = false;
+    CHECK_EQ(io_channel_flush(vs.extFs->io), 0);
+    CHECK_EQ(g_usbDevice[0].media[kSecond], 0x5C);
+
+    // Data written but the device-level barrier fails: still an error, not success.
+    CHECK(vs.usbCache.write(0, kThird, third.data(), third.size()));
+    g_usbDevice[0].refuseSync = true;
+    CHECK(io_channel_flush(vs.extFs->io) != 0);
+    g_usbDevice[0].refuseSync = false;
+    CHECK_EQ(io_channel_flush(vs.extFs->io), 0);
+    CHECK_EQ(g_usbDevice[0].media[kThird], 0x3E);
+
+    vs.isUsbSource = false;
+    vs.usbCache.clear();
+}
+
 // ---- Runner -------------------------------------------------------------------------
 static void closeAllVolumes() {
     for (int i = 0; i < FF_VOLUMES; ++i) {
@@ -617,6 +664,7 @@ int main() {
         T(test_copy_between_and_within_volumes),
         T(test_streams_read_ranges),
         T(test_read_only_mount_changes_nothing),
+        T(test_usb_io_flush_reaches_the_device),
     };
     return runTests("ext_backend", tests, sizeof(tests) / sizeof(tests[0]), closeAllVolumes);
 }

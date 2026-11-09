@@ -688,8 +688,19 @@ class VaultUnlockHandlers(
         val force = call.argument<Boolean>("force") ?: false
         ioExecutor.execute {
             try {
-                val locked = ContainerLifecycleCore.lockContainer(activity, uriString, force)
-                activity.runOnUiThread { result.success(locked) }
+                val outcome = ContainerLifecycleCore.lockContainerOutcome(activity, uriString, force)
+                activity.runOnUiThread {
+                    when (outcome) {
+                        ContainerLifecycleCore.LockOutcome.LOCKED -> result.success(true)
+                        // Distinct from a plain `false` so the UI can offer retry / lock anyway.
+                        ContainerLifecycleCore.LockOutcome.FLUSH_REFUSED -> result.error(
+                            "LOCK_FLUSH_REFUSED",
+                            "The device did not accept the last changes; the vault was not locked",
+                            null,
+                        )
+                        else -> result.success(false)
+                    }
+                }
             } catch (e: Exception) {
                 activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
             }

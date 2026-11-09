@@ -32,6 +32,12 @@ String libraryArtistLabel(BuildContext context, String name) =>
 String libraryGenreLabel(BuildContext context, String name) =>
     name.isEmpty ? context.l10n.libraryUnknownGenre : name;
 
+/// "Artist", "Various artists" or "Unknown artist" (no year).
+String libraryArtistLabelFor(BuildContext context, AlbumGroup album) =>
+    album.variousArtists
+    ? context.l10n.libraryVariousArtists
+    : libraryArtistLabel(context, album.artist);
+
 /// "Artist · 2004", "Various artists", or "Unknown artist".
 String libraryAlbumSubtitle(BuildContext context, AlbumGroup album) {
   final artist = album.variousArtists
@@ -161,48 +167,95 @@ class LibraryAlbumTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = context.colors;
     final text = context.typography;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Stack(
+    // A soft card with the cover inset, the year as a badge on the cover and
+    // the title and artist underneath.
+    return Material(
+      color: cs.surfaceContainer,
+      elevation: 1,
+      shadowColor: cs.shadow.withValues(alpha: 0.35),
+      borderRadius: BorderRadius.circular(14),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(6),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              LibraryCover(
-                covers: covers,
-                track: album.coverTrack,
-                groupKey: albumCoverKey(album),
-                borderRadius: 12,
-                placeholderIcon: Icons.album_rounded,
-              ),
-              if (onPlay != null)
-                Positioned(
-                  right: 6,
-                  bottom: 6,
-                  child: IconButton.filled(
-                    visualDensity: VisualDensity.compact,
-                    tooltip: context.l10n.libraryPlayAll,
-                    icon: const Icon(Icons.play_arrow_rounded),
-                    onPressed: onPlay,
+              Stack(
+                children: [
+                  LibraryCover(
+                    covers: covers,
+                    track: album.coverTrack,
+                    groupKey: albumCoverKey(album),
+                    borderRadius: 10,
+                    placeholderIcon: Icons.album_rounded,
                   ),
+                  if (album.year != 0)
+                    Positioned(
+                      top: 6,
+                      left: 6,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.55),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          child: Text(
+                            '${album.year}',
+                            style: text.labelSmall?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (onPlay != null)
+                    Positioned(
+                      right: 4,
+                      bottom: 4,
+                      child: IconButton.filled(
+                        visualDensity: VisualDensity.compact,
+                        tooltip: context.l10n.libraryPlayAll,
+                        icon: const Icon(Icons.play_arrow_rounded),
+                        onPressed: onPlay,
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      libraryAlbumTitle(context, album),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: text.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      libraryArtistLabelFor(context, album),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: text.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                 ),
+              ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            libraryAlbumTitle(context, album),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: text.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-          ),
-          Text(
-            libraryAlbumSubtitle(context, album),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -308,19 +361,43 @@ class LibraryTrackTile extends StatelessWidget {
               ? SizedBox(
                   width: 44,
                   child: Center(
-                    child: Text(
-                      leadingLabel!,
-                      style: context.typography.bodyMedium?.copyWith(
-                        color: cs.onSurfaceVariant,
-                      ),
-                    ),
+                    child: isPlaying
+                        ? Icon(
+                            Icons.graphic_eq_rounded,
+                            size: 22,
+                            color: cs.primary,
+                          )
+                        : Text(
+                            leadingLabel!,
+                            style: context.typography.bodyMedium?.copyWith(
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ),
                   ),
                 )
-              : LibraryCover(
-                  covers: covers,
-                  track: coverTrack ?? track,
-                  groupKey: coverGroupKey,
-                  size: 44,
+              : Stack(
+                  children: [
+                    LibraryCover(
+                      covers: covers,
+                      track: coverTrack ?? track,
+                      groupKey: coverGroupKey,
+                      size: 44,
+                    ),
+                    if (isPlaying)
+                      Positioned.fill(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.graphic_eq_rounded,
+                            size: 22,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
           title: AnimatedDefaultTextStyle(
             duration: const Duration(milliseconds: 280),

@@ -284,15 +284,28 @@ class _MiniBarState extends State<_MiniBar> with TickerProviderStateMixin {
     final info = NowPlayingInfo.resolve(widget.hub, session, widget.path);
     final drawerScope = FullScreenDragDrawerScope.maybeOf(context);
 
-    final bar = Listener(
+    // A floating rounded card. The player grows out of the
+    // Material below, whose rectangle is measured, so the margin stays outside
+    // it and the card's corners and shadow match the panel's exactly.
+    final radius = BorderRadius.circular(kMiniPlayerRadius);
+    final bar = Padding(
+      padding: kMiniPlayerMargin,
+      child: Listener(
       behavior: HitTestBehavior.translucent,
       onPointerDown: (_) => drawerScope?.setDrawerDragBlocked(true),
       onPointerUp: (_) => drawerScope?.setDrawerDragBlocked(false),
       onPointerCancel: (_) => drawerScope?.setDrawerDragBlocked(false),
-      child: Material(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: radius,
+          boxShadow: miniPlayerShadows(1),
+        ),
+        child: Material(
         key: _barKey,
         color: cs.surfaceContainerHigh,
-        elevation: 2,
+        borderRadius: radius,
+        clipBehavior: Clip.antiAlias,
+        elevation: 0,
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onVerticalDragStart: (_) => _onDragStart(),
@@ -491,6 +504,8 @@ class _MiniBarState extends State<_MiniBar> with TickerProviderStateMixin {
               ],
             ),
           ),
+        ),
+      ),
         ),
       ),
     );

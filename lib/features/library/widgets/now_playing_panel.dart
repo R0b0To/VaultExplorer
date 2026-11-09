@@ -34,6 +34,29 @@ Rect _lerpRect(Rect a, Rect b, double t) => Rect.fromLTRB(
 double _seg(double p, double a, double b) =>
     ((p - a) / (b - a)).clamp(0.0, 1.0);
 
+/// The mini player is a floating rounded card. The player grows
+/// out of it, so the card and the panel draw the same corners and shadow.
+const double kMiniPlayerRadius = 16;
+const EdgeInsets kMiniPlayerMargin = EdgeInsets.fromLTRB(8, 4, 8, 6);
+
+/// The card's shadow, faded out with [strength] (1 at rest, 0 once the player
+/// is half open) as the panel stops looking like a card.
+List<BoxShadow> miniPlayerShadows(double strength) => [
+  if (strength > 0)
+    BoxShadow(
+      blurRadius: 10 * strength,
+      offset: Offset(0, 2 * strength),
+      color: Colors.black.withValues(alpha: 0.22 * strength),
+    ),
+];
+
+/// How far (in pixels) the card dips below its resting place when it bounces
+/// into the minimized state.
+const double _kMinimizeDip = 120;
+
+/// bouncing curve: overshoots its target a little, then settles.
+const Curve _kBounce = Cubic(0.175, 0.885, 0.32, 1.125);
+
 /// Lets the mini bar steer the player while its finger is still down: the
 /// drag starts on the bar, the player opens underneath it, and the rest of the
 /// drag (and its release) is forwarded here.
@@ -244,7 +267,8 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
   final BackgroundPlaybackHost _host = BackgroundPlaybackHost.instance;
   late final AnimationController _c = AnimationController(
     vsync: this,
-    lowerBound: 0,
+    // A little below 0 is the minimize bounce; geometry reads it clamped.
+    lowerBound: -0.2,
     upperBound: 1,
     value: widget.initialP,
   );
@@ -266,7 +290,6 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
   ModalRoute<dynamic>? _route;
   bool _removalRequested = false;
   bool _removed = false;
-  bool _closing = false;
   bool _ready = false;
   String? _lastTrackPath;
   double _trackSlide = 1;
@@ -274,12 +297,27 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
   bool _dragActive = false;
   int _dragDirection = 0;
 
+  /// The queue: a sheet that rises from the bottom of the full player, dragged
+  /// up from anywhere on it (see [_dragBy]) or from its own handle. Sizes are
+  /// fractions of the screen height, refreshed on every build.
+  final DraggableScrollableController _sheet = DraggableScrollableController();
+  ScrollController? _queueScroll;
+  double _screenHeight = 800;
+  double _padBottom = 0;
+  double _sheetMin = 0.08;
+  double _sheetMax = 0.9;
+  bool _sheetClosed = true;
+
+  /// This drag moved the queue sheet (so its release settles the sheet).
+  bool _sheetDragged = false;
+
   double get _travel => math.max(widget.handle.miniRect.top, 1.0);
 
   @override
   void initState() {
     super.initState();
     _host.activeSession.addListener(_syncSession);
+    _sheet.addListener(_onSheetChanged);
     _syncSession();
     _ready = true;
     widget.handle._attach(this);
@@ -295,6 +333,8 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
   @override
   void dispose() {
     widget.handle._detach(this);
+    _sheet.removeListener(_onSheetChanged);
+    _sheet.dispose();
     _host.activeSession.removeListener(_syncSession);
     _unbindSession();
     _c.dispose();
@@ -435,8 +475,8 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
 
   void _beginDrag() {
     _dragActive = true;
-    _closing = false;
     _dragDirection = 0;
+    _sheetDragged = false;
     _c.stop();
   }
 
@@ -452,19 +492,61 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
     _release(0);
   }
 
+  bool get _sheetReady => _sheet.isAttached;
+  bool get _queueOpen => _sheetReady && _sheet.size > _sheetMin + 0.01;
+
+  /// One continuous drag through three places: minimized, the
+  /// full player, and the queue above it. Going up from the full player raises
+  /// the queue; going down lowers the queue first and only then the player.
   void _dragBy(double dy) {
+    if (_removed) return;
     if (dy != 0) _dragDirection = dy > 0 ? 1 : -1;
-    _closing = false;
     _c.stop();
-    _c.value = (_c.value - dy / _travel).clamp(0.0, 1.0);
+    var rest = dy; // pixels left over for the player itself
+    if (_sheetReady && _screenHeight > 0) {
+      final s = _sheet.size;
+      if (rest < 0 && _c.value >= 0.999 && s < _sheetMax) {
+        _sheet.jumpTo((s - rest / _screenHeight).clamp(_sheetMin, _sheetMax));
+        _sheetDragged = true;
+        rest = 0;
+      } else if (rest > 0 && s > _sheetMin + 0.0005) {
+        final room = (s - _sheetMin) * _screenHeight;
+        final used = math.min(rest, room);
+        _sheet.jumpTo((s - used / _screenHeight).clamp(_sheetMin, _sheetMax));
+        _sheetDragged = true;
+        rest -= used;
+      }
+    }
+    if (rest != 0) {
+      _c.value = (_c.value - rest / _travel).clamp(0.0, 1.0);
+    }
   }
 
   void _release(double velocityY) {
-    if (_closing) return;
+    if (_removed) return;
+    final upwards = _dragDirection < 0;
+
+    // The queue was being dragged: settle it open or closed.
+    if (_sheetDragged && _sheetReady && _c.value >= 0.999) {
+      _sheetDragged = false;
+      final span = math.max(_sheetMax - _sheetMin, 0.001);
+      final progress = (_sheet.size - _sheetMin) / span;
+      final bool open;
+      if (velocityY.abs() > 350) {
+        open = velocityY < 0;
+      } else {
+        open = upwards ? progress >= 0.2 : progress > 0.8;
+      }
+      _sheetTo(open ? _sheetMax : _sheetMin);
+      return;
+    }
+    _sheetDragged = false;
+    if (_sheetReady && _sheet.size > _sheetMin + 0.0005) _sheetTo(_sheetMin);
+
     final double target;
     if (velocityY.abs() > 350) {
       target = velocityY < 0 ? 1.0 : 0.0;
-    } else if (_dragDirection < 0) {
+    } else if (upwards) {
       // Let a deliberate slow upward drag open without needing half the
       // screen's travel.
       target = _c.value >= 0.2 ? 1.0 : 0.0;
@@ -484,17 +566,81 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
   void _settleTo(double target) {
     if (_removed) return;
     final distance = (target - _c.value).abs();
-    final duration = Duration(milliseconds: (140 + 260 * distance).round());
-    if (target == 0.0) _closing = true;
-    if (target == 1.0) {
-      _closing = false;
+    // snaps: opening eases fast into a slow finish, minimizing
+    // springs past the bar and settles back.
+    final duration = Duration(
+      milliseconds: (distance < 0.02 ? 120 : 220 + 140 * distance).round(),
+    );
+    if (distance > 0.2) HapticFeedback.selectionClick();
+    _c
+        .animateTo(
+          target,
+          duration: duration,
+          curve: target == 1.0 ? Curves.fastEaseInToSlowEaseOut : _kBounce,
+        )
+        .then((_) {
+          if (target == 0.0 && mounted && _c.value <= 0.001) _finishCollapse();
+        });
+  }
+
+  /// Safety net for a lost gesture end: whenever a finger lifts and the
+  /// player is neither being dragged nor moving, it must be at rest. If it
+  /// is anywhere else it is settled, so it can never stay stuck mid-page.
+  void _onPointerEnd(Object? _) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _removed || _dragActive || _c.isAnimating) return;
+      final v = _c.value;
+      if (v > 0.001 && v < 0.999) {
+        _dragDirection = 0;
+        _release(0);
+      } else if (v <= 0.001) {
+        _finishCollapse();
+      }
+    });
+  }
+
+  // ── The queue ────────────────────────────────────────────────────────────
+
+  void _sheetTo(double target) {
+    if (!_sheetReady) return;
+    if (((target - _sheet.size) * _screenHeight).abs() > 60) {
       HapticFeedback.selectionClick();
     }
-    _c.animateTo(target, duration: duration, curve: Curves.easeOutCubic).then((
-      _,
-    ) {
-      if (target == 0.0 && mounted) _finishCollapse();
-    });
+    unawaited(
+      _sheet.animateTo(
+        target,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.fastEaseInToSlowEaseOut,
+      ),
+    );
+  }
+
+  void _toggleQueue() => _sheetTo(_queueOpen ? _sheetMin : _sheetMax);
+
+  /// Opening the queue brings the playing track into view.
+  void _onSheetChanged() {
+    if (!_sheetReady) return;
+    final open = _sheet.size > _sheetMin + 0.01;
+    if (open && _sheetClosed) {
+      _sheetClosed = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _queueToCurrent());
+    } else if (!open) {
+      _sheetClosed = true;
+    }
+  }
+
+  void _queueToCurrent() {
+    final controller = _queueScroll;
+    final session = _session;
+    if (!mounted || controller == null || !controller.hasClients) return;
+    if (session == null) return;
+    final current = session.playlist.currentIndex;
+    if (current <= 1) return;
+    final header = kMusicQueuePeekHeight + _padBottom;
+    final target = header + (current - 1) * kMusicQueueRowHeight;
+    controller.jumpTo(
+      math.min(target, controller.position.maxScrollExtent),
+    );
   }
 
   void _collapse() => _settleTo(0.0);
@@ -528,16 +674,6 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
     HapticFeedback.selectionClick();
   }
 
-  void _openQueue() {
-    final session = _session;
-    if (session == null) return;
-    showMusicQueueSheet(
-      context,
-      hub: widget.handle.hub,
-      covers: widget.handle.covers,
-    );
-  }
-
   Future<void> _onMenu(_PanelMenu item) async {
     switch (item) {
       case _PanelMenu.openViewer:
@@ -561,16 +697,44 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
         ? null
         : NowPlayingInfo.resolve(widget.handle.hub, session, path);
 
-    final content = Material(
-      type: MaterialType.transparency,
-      child: SizedBox.expand(
-        child: info == null
-            ? const SizedBox.shrink()
-            : AnimatedBuilder(
-                animation: _c,
-                builder: (context, _) =>
-                    _layers(context, media.size, media.padding, info, session!),
-              ),
+    final size = media.size;
+    _screenHeight = size.height;
+    _padBottom = media.padding.bottom;
+    _sheetMin = ((kMusicQueuePeekHeight + media.padding.bottom) / size.height)
+        .clamp(0.04, 0.3)
+        .toDouble();
+    _sheetMax =
+        ((size.height - media.padding.top - _topBar - 8) / size.height)
+            .clamp(_sheetMin + 0.2, 0.95)
+            .toDouble();
+
+    final content = Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerUp: _onPointerEnd,
+      onPointerCancel: _onPointerEnd,
+      child: Material(
+        type: MaterialType.transparency,
+        child: SizedBox.expand(
+          child: info == null
+              ? const SizedBox.shrink()
+              : Stack(
+                  children: [
+                    Positioned.fill(
+                      child: AnimatedBuilder(
+                        animation: _c,
+                        builder: (context, _) => _layers(
+                          context,
+                          media.size,
+                          media.padding,
+                          info,
+                          session!,
+                        ),
+                      ),
+                    ),
+                    Positioned.fill(child: _queueLayer()),
+                  ],
+                ),
+        ),
       ),
     );
     // The overlay copy lives only while a finger is down: Back has nothing to
@@ -579,9 +743,51 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _collapse();
+        if (didPop) return;
+        if (_queueOpen) {
+          _sheetTo(_sheetMin);
+        } else {
+          _collapse();
+        }
       },
       child: content,
+    );
+  }
+
+  /// The queue sheet, built once (not on every animation frame) and shown only
+  /// when the player is fully open. Taking it out of the tree otherwise also
+  /// closes it, so the player always opens with the queue down.
+  Widget _queueLayer() {
+    return AnimatedBuilder(
+      animation: _c,
+      child: DraggableScrollableSheet(
+        controller: _sheet,
+        initialChildSize: _sheetMin,
+        minChildSize: _sheetMin,
+        maxChildSize: _sheetMax,
+        snap: true,
+        builder: (context, scroll) {
+          _queueScroll = scroll;
+          return MusicInlineQueue(
+            hub: widget.handle.hub,
+            covers: widget.handle.covers,
+            scrollController: scroll,
+            bottomInset: _padBottom,
+            onHeaderTap: _toggleQueue,
+          );
+        },
+      ),
+      builder: (context, child) {
+        final opacity = _seg(_c.value.clamp(0.0, 1.0), 0.55, 1.0);
+        if (opacity <= 0.001) {
+          _sheetClosed = true; // the sheet is gone, so it opens fresh next time
+          return const SizedBox.shrink();
+        }
+        return IgnorePointer(
+          ignoring: opacity < 0.95,
+          child: Opacity(opacity: opacity, child: child),
+        );
+      },
     );
   }
 
@@ -595,7 +801,8 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
     final cs = context.colors;
     final text = context.typography;
     final l10n = context.l10n;
-    final p = _c.value;
+    final p = _c.value.clamp(0.0, 1.0).toDouble();
+    final dip = (-_c.value).clamp(0.0, 0.2).toDouble();
     final mini = widget.handle.miniRect;
     final screen = Offset.zero & size;
     final panel = _lerpRect(mini, screen, p);
@@ -618,7 +825,15 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
     // Expanded geometry.
     const titleHeight = 84.0;
     final below =
-        24 + titleHeight + 8 + 52 + 12 + _expandedPlay + 24 + pad.bottom;
+        24 +
+        titleHeight +
+        8 +
+        52 +
+        12 +
+        _expandedPlay +
+        12 +
+        kMusicQueuePeekHeight +
+        pad.bottom;
     final coverSize = math
         .min(size.width - 64, size.height - pad.top - _topBar - 8 - below)
         .clamp(96.0, 440.0)
@@ -675,6 +890,10 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
     final miniOpacity = 1 - _seg(p, 0.0, 0.35);
     final fullOpacity = _seg(p, 0.55, 1.0);
     final shadow = 1 - _seg(p, 0.0, 0.5);
+    // Rounded like the card at the start, square once it fills the screen.
+    final panelRadius = BorderRadius.circular(
+      _lerp(kMiniPlayerRadius, 0, _seg(p, 0.0, 0.85)),
+    );
 
     Widget fade(double opacity, Widget child) {
       if (opacity <= 0.001) return const SizedBox.shrink();
@@ -707,7 +926,9 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
       e,
     )!;
 
-    return Stack(
+    return Transform.translate(
+      offset: Offset(0, dip * _kMinimizeDip),
+      child: Stack(
       clipBehavior: Clip.none,
       children: [
         // The panel itself: the bar's colour on its way to the page colour.
@@ -716,34 +937,38 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
           child: DecoratedBox(
             decoration: BoxDecoration(
               color: Color.lerp(cs.surfaceContainerHigh, cs.surface, e),
-              boxShadow: [
-                if (shadow > 0)
-                  BoxShadow(
-                    blurRadius: 6 * shadow,
-                    offset: Offset(0, -1 * shadow),
-                    color: Colors.black.withValues(alpha: 0.18 * shadow),
-                  ),
-              ],
+              borderRadius: panelRadius,
+              boxShadow: miniPlayerShadows(shadow),
             ),
           ),
         ),
 
         // Thin progress line of the bar.
         if (miniOpacity > 0.001)
-          Positioned(
-            left: panel.left,
-            top: panel.top,
-            width: panel.width,
-            height: 2,
-            child: Opacity(
-              opacity: miniOpacity,
-              child: ValueListenableBuilder<VideoPlaybackProgress>(
-                valueListenable: _progress,
-                builder: (context, progress, _) => LinearProgressIndicator(
-                  minHeight: 2,
-                  value: progress.duration.inMilliseconds > 0
-                      ? progress.sliderValue
-                      : 0,
+          Positioned.fromRect(
+            rect: panel,
+            child: IgnorePointer(
+              // Clipped to the card's corners, like the bar's own line.
+              child: ClipRRect(
+                borderRadius: panelRadius,
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: Opacity(
+                    opacity: miniOpacity,
+                    child: SizedBox(
+                      height: 2,
+                      child: ValueListenableBuilder<VideoPlaybackProgress>(
+                        valueListenable: _progress,
+                        builder: (context, progress, _) =>
+                            LinearProgressIndicator(
+                              minHeight: 2,
+                              value: progress.duration.inMilliseconds > 0
+                                  ? progress.sliderValue
+                                  : 0,
+                            ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -851,7 +1076,7 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
                 IconButton(
                   tooltip: l10n.nowPlayingQueue,
                   icon: const Icon(Icons.queue_music_rounded),
-                  onPressed: _openQueue,
+                  onPressed: _toggleQueue,
                 ),
                 PopupMenuButton<_PanelMenu>(
                   onSelected: _onMenu,
@@ -1088,6 +1313,7 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
           ),
         ),
       ],
+    ),
     );
   }
 }

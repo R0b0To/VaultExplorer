@@ -133,13 +133,25 @@ class LibraryDetailScreen extends StatelessWidget {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      LibraryCover(
-                        covers: covers,
-                        track: coverTrack,
-                        groupKey: coverKey,
-                        size: 120,
-                        borderRadius: 12,
-                        placeholderIcon: placeholderIcon,
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: cs.shadow.withValues(alpha: 0.3),
+                              blurRadius: 12,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: LibraryCover(
+                          covers: covers,
+                          track: coverTrack,
+                          groupKey: coverKey,
+                          size: 132,
+                          borderRadius: 12,
+                          placeholderIcon: placeholderIcon,
+                        ),
                       ),
                       const SizedBox(width: AppSpacing.md),
                       Expanded(
@@ -196,7 +208,7 @@ class LibraryDetailScreen extends StatelessWidget {
                       ),
                       const SizedBox(width: AppSpacing.sm),
                       Expanded(
-                        child: OutlinedButton.icon(
+                        child: FilledButton.tonalIcon(
                           onPressed: tracks.isEmpty
                               ? null
                               : () => playLibraryTracks(
@@ -267,7 +279,9 @@ class LibraryDetailScreen extends StatelessWidget {
               ),
             ),
           ],
-          SliverList.builder(
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+            sliver: SliverList.builder(
             itemCount: tracks.length,
             itemBuilder: (context, i) {
               final t = tracks[i];
@@ -291,6 +305,7 @@ class LibraryDetailScreen extends StatelessWidget {
                 ),
               );
             },
+            ),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xl)),
         ],

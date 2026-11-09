@@ -182,7 +182,7 @@ class MusicModeBar extends StatelessWidget {
           child: ListenableBuilder(
             listenable: Listenable.merge([entry, hub]),
             builder: (context, _) => SizedBox(
-              height: 72,
+              height: 64,
               child: Row(
                 children: [
                   for (final category in const [
@@ -212,46 +212,75 @@ class MusicModeBar extends StatelessWidget {
     );
   }
 
+  /// One view of the library. Only the view in use shows its name (under a
+  /// pill that animates in); the others are icon-only
+  ///The name stays available as a tooltip and to screen readers.
   Widget _buildDestination(BuildContext context, MusicCategory category) {
     final selected = entry.category == category;
     final cs = Theme.of(context).colorScheme;
-    final textStyle = context.typography.labelSmall?.copyWith(
-      color: selected ? cs.onSurface : cs.onSurfaceVariant,
+    final label = _label(context, category);
+    final pill = Color.alphaBlend(
+      cs.primary.withValues(alpha: 0.08),
+      cs.secondaryContainer,
     );
+    const animation = Duration(milliseconds: 220);
     return Expanded(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: () => (onSelectCategory ?? entry.setCategory)(category),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                curve: Curves.easeOutCubic,
-                width: 52,
-                height: 30,
-                decoration: BoxDecoration(
-                  color: selected ? cs.secondaryContainer : Colors.transparent,
-                  borderRadius: BorderRadius.circular(16),
+      child: Semantics(
+        button: true,
+        selected: selected,
+        label: label,
+        excludeSemantics: true,
+        child: Tooltip(
+          message: label,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: () => (onSelectCategory ?? entry.setCategory)(category),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                AnimatedContainer(
+                  duration: animation,
+                  curve: Curves.easeOutCubic,
+                  width: 52,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: selected ? pill : Colors.transparent,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(
+                    _icon(category),
+                    size: 22,
+                    color: selected
+                        ? cs.onSecondaryContainer
+                        : cs.onSurfaceVariant,
+                  ),
                 ),
-                child: Icon(
-                  _icon(category),
-                  size: 20,
-                  color: selected
-                      ? cs.onSecondaryContainer
-                      : cs.onSurfaceVariant,
+                TweenAnimationBuilder<double>(
+                  tween: Tween<double>(end: selected ? 1 : 0),
+                  duration: animation,
+                  curve: Curves.easeOutCubic,
+                  builder: (context, t, child) => ClipRect(
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      heightFactor: t,
+                      child: Opacity(opacity: t, child: child),
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 3),
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.typography.labelSmall?.copyWith(
+                        color: cs.onSurface,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                _label(context, category),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: textStyle,
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

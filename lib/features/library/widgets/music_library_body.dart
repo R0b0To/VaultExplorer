@@ -23,6 +23,12 @@ import 'package:vaultexplorer/features/library/widgets/library_widgets.dart';
 import 'package:vaultexplorer/features/library/widgets/music_mode_actions.dart';
 import 'package:vaultexplorer/features/library/widgets/music_mode_bar.dart';
 
+/// Rounded rows for the artist, genre and folder lists.
+const _rowShape = RoundedRectangleBorder(
+  borderRadius: BorderRadius.all(Radius.circular(12)),
+);
+const _listPadding = EdgeInsets.symmetric(horizontal: AppSpacing.sm);
+
 /// One entry of the sort menu: a criterion index, or null for "reverse order".
 class _SortChoice {
   final int? criterion;
@@ -325,13 +331,13 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
               onEditFolders: () =>
                   unawaited(editMusicFolders(context, ref, widget.container)),
             ),
-            IconButton(
+            IconButton.filledTonal(
               visualDensity: VisualDensity.compact,
               tooltip: l10n.libraryPlayAll,
               icon: const Icon(Icons.play_arrow_rounded),
               onPressed: canPlay ? () => _playShown(view) : null,
             ),
-            IconButton(
+            IconButton.filledTonal(
               visualDensity: VisualDensity.compact,
               tooltip: l10n.libraryShuffleAll,
               icon: const Icon(Icons.shuffle_rounded, size: 20),
@@ -663,15 +669,14 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
               child: ListView.builder(
                 key: const PageStorageKey('music-artists'),
                 controller: _artistsScroll,
+                padding: _listPadding,
                 itemCount: artists.length,
                 itemBuilder: (context, i) {
                   final a = artists[i];
                   final albumCount = index.albumsOfArtist(a).length;
                   return ListTile(
-                    contentPadding: const EdgeInsets.only(
-                      left: AppSpacing.md,
-                      right: AppSpacing.xs,
-                    ),
+                    shape: _rowShape,
+                    contentPadding: const EdgeInsets.only(left: AppSpacing.sm),
                     leading: LibraryCover(
                       covers: covers,
                       track: a.coverTrack,
@@ -710,16 +715,17 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
               child: ListView.builder(
                 key: const PageStorageKey('music-genres'),
                 controller: _genresScroll,
+                padding: _listPadding,
                 itemCount: genres.length,
                 itemBuilder: (context, i) {
                   final g = genres[i];
                   return ListTile(
-                    contentPadding: const EdgeInsets.only(
-                      left: AppSpacing.md,
-                      right: AppSpacing.xs,
-                    ),
-                    leading: const CircleAvatar(
-                      child: Icon(Icons.piano_rounded),
+                    shape: _rowShape,
+                    contentPadding: const EdgeInsets.only(left: AppSpacing.sm),
+                    leading: CircleAvatar(
+                      backgroundColor: context.colors.secondaryContainer,
+                      foregroundColor: context.colors.onSecondaryContainer,
+                      child: const Icon(Icons.piano_rounded),
                     ),
                     title: Text(
                       libraryGenreLabel(context, g.name),
@@ -794,6 +800,7 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
               child: ListView.builder(
                 key: const PageStorageKey('music-folders'),
                 controller: _foldersScroll,
+                padding: _listPadding,
                 itemCount: folders.length,
                 itemBuilder: (context, i) {
                   final f = folders[i];
@@ -809,10 +816,8 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
                     if (source != null) source,
                   ].join(' · ');
                   return ListTile(
-                    contentPadding: const EdgeInsets.only(
-                      left: AppSpacing.md,
-                      right: AppSpacing.xs,
-                    ),
+                    shape: _rowShape,
+                    contentPadding: const EdgeInsets.only(left: AppSpacing.sm),
                     leading: LibraryCover(
                       covers: covers,
                       track: album?.coverTrack ?? f.coverTrack,
@@ -873,6 +878,7 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
               child: ListView.builder(
                 key: const PageStorageKey('music-tracks'),
                 controller: _tracksScroll,
+                padding: _listPadding,
                 itemExtent: 72,
                 itemCount: tracks.length,
                 itemBuilder: (context, i) {

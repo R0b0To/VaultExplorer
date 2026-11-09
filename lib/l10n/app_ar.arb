@@ -3896,5 +3896,8 @@
   "useBackupHeaderToggleSubtitle": "الفتح باستخدام نسخة الرأس الاحتياطية المخزنة في نهاية وحدة التخزين. استخدم هذا الخيار إذا كان الرأس الرئيسي تالفاً.",
   "keepCurrentOption": "الاحتفاظ بالحالي",
   "optionsAction": "خيارات",
-  "optionsActionTooltip": "خيارات"
+  "optionsActionTooltip": "خيارات",
+  "lockFlushRefusedTitle": "تعذّرت الكتابة على الجهاز",
+  "lockFlushRefusedMessage": "لم يتم قفل {name} لأن الجهاز لم يقبل آخر التغييرات. لا تزال بانتظار الحفظ في التطبيق. تحقق من الاتصال وأعد المحاولة، أو اقفل على أي حال وتجاهل التغييرات.",
+  "lockAnywayButton": "اقفل على أي حال"
 }

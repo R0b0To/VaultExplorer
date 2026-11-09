@@ -14247,4 +14247,15 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get categoryIndexCleared => 'Index de catégories effacés';
+
+  @override
+  String get lockFlushRefusedTitle => 'Impossible d\'écrire sur l\'appareil';
+
+  @override
+  String lockFlushRefusedMessage(String name) {
+    return '$name n\'a pas été verrouillé car l\'appareil n\'a pas accepté les dernières modifications. Elles attendent toujours dans l\'application. Vérifiez la connexion et réessayez, ou verrouillez quand même et abandonnez-les.';
+  }
+
+  @override
+  String get lockAnywayButton => 'Verrouiller quand même';
 }

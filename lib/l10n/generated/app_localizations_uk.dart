@@ -14230,4 +14230,15 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get categoryIndexCleared => 'Індекси категорій очищено';
+
+  @override
+  String get lockFlushRefusedTitle => 'Не вдалося записати на пристрій';
+
+  @override
+  String lockFlushRefusedMessage(String name) {
+    return 'Контейнер $name не заблоковано, бо пристрій не прийняв останні зміни. Вони й досі очікують у застосунку. Перевірте з’єднання й повторіть спробу або заблокуйте все одно та відкиньте зміни.';
+  }
+
+  @override
+  String get lockAnywayButton => 'Усе одно заблокувати';
 }

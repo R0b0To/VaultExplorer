@@ -14168,4 +14168,15 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get categoryIndexCleared => 'Índices de categorías borrados';
+
+  @override
+  String get lockFlushRefusedTitle => 'No se pudo escribir en el dispositivo';
+
+  @override
+  String lockFlushRefusedMessage(String name) {
+    return '$name no se bloqueó porque el dispositivo no aceptó los últimos cambios. Siguen esperando en la app. Comprueba la conexión y reintenta, o bloquea de todos modos y descártalos.';
+  }
+
+  @override
+  String get lockAnywayButton => 'Bloquear de todos modos';
 }

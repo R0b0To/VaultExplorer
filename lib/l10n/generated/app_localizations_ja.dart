@@ -13353,4 +13353,15 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get categoryIndexCleared => 'カテゴリのインデックスを消去しました';
+
+  @override
+  String get lockFlushRefusedTitle => 'デバイスに書き込めませんでした';
+
+  @override
+  String lockFlushRefusedMessage(String name) {
+    return 'デバイスが最新の変更を受け付けなかったため、$name はロックされませんでした。変更はまだアプリ内に保持されています。接続を確認して再試行するか、そのままロックして変更を破棄してください。';
+  }
+
+  @override
+  String get lockAnywayButton => 'このままロック';
 }

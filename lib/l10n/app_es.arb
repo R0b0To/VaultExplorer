@@ -3896,5 +3896,8 @@
   "useBackupHeaderToggleSubtitle": "Abrir con la copia de seguridad del encabezado almacenada al final del volumen. Úselo si el encabezado principal está dañado.",
   "keepCurrentOption": "Mantener actual",
   "optionsAction": "Opciones",
-  "optionsActionTooltip": "Opciones"
+  "optionsActionTooltip": "Opciones",
+  "lockFlushRefusedTitle": "No se pudo escribir en el dispositivo",
+  "lockFlushRefusedMessage": "{name} no se bloqueó porque el dispositivo no aceptó los últimos cambios. Siguen esperando en la app. Comprueba la conexión y reintenta, o bloquea de todos modos y descártalos.",
+  "lockAnywayButton": "Bloquear de todos modos"
 }

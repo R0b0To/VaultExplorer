@@ -3896,5 +3896,8 @@
   "useBackupHeaderToggleSubtitle": "Ouvrir avec la copie de sauvegarde de l'en-tête stockée à la fin du volume. À utiliser si l'en-tête principal est endommagé.",
   "keepCurrentOption": "Conserver l'actuel",
   "optionsAction": "Options",
-  "optionsActionTooltip": "Options"
+  "optionsActionTooltip": "Options",
+  "lockFlushRefusedTitle": "Impossible d'écrire sur l'appareil",
+  "lockFlushRefusedMessage": "{name} n'a pas été verrouillé car l'appareil n'a pas accepté les dernières modifications. Elles attendent toujours dans l'application. Vérifiez la connexion et réessayez, ou verrouillez quand même et abandonnez-les.",
+  "lockAnywayButton": "Verrouiller quand même"
 }

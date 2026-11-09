@@ -14141,4 +14141,15 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get categoryIndexCleared => 'Indici delle categorie cancellati';
+
+  @override
+  String get lockFlushRefusedTitle => 'Impossibile scrivere sul dispositivo';
+
+  @override
+  String lockFlushRefusedMessage(String name) {
+    return '$name non è stato bloccato perché il dispositivo non ha accettato le ultime modifiche. Sono ancora in attesa nell\'app. Controlla la connessione e riprova, oppure blocca comunque e scartale.';
+  }
+
+  @override
+  String get lockAnywayButton => 'Blocca comunque';
 }

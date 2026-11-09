@@ -14130,4 +14130,15 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get categoryIndexCleared => 'Índices de categoria limpos';
+
+  @override
+  String get lockFlushRefusedTitle => 'Não foi possível gravar no dispositivo';
+
+  @override
+  String lockFlushRefusedMessage(String name) {
+    return '$name não foi bloqueado porque o dispositivo não aceitou as últimas alterações. Elas ainda estão aguardando no app. Verifique a conexão e tente novamente, ou bloqueie mesmo assim e descarte-as.';
+  }
+
+  @override
+  String get lockAnywayButton => 'Bloquear mesmo assim';
 }

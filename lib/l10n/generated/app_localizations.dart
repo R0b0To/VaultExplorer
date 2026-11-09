@@ -23542,6 +23542,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Category indexes cleared'**
   String get categoryIndexCleared;
+
+  /// Dialog title shown when locking a container is refused because a USB device did not accept the last buffered changes
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t write to the device'**
+  String get lockFlushRefusedTitle;
+
+  /// Dialog body explaining that the container was left open; offers retry or lock anyway (which discards the unwritten changes)
+  ///
+  /// In en, this message translates to:
+  /// **'{name} wasn\'t locked because the device didn\'t accept the latest changes. They\'re still waiting in the app. Check the connection and retry, or lock anyway and discard them.'**
+  String lockFlushRefusedMessage(String name);
+
+  /// Destructive dialog button that locks a container even though the device refused the last changes, discarding them
+  ///
+  /// In en, this message translates to:
+  /// **'Lock anyway'**
+  String get lockAnywayButton;
 }
 
 class _AppLocalizationsDelegate

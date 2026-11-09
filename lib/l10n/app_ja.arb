@@ -3896,5 +3896,8 @@
   "useBackupHeaderToggleSubtitle": "ボリュームの末尾に保存されているヘッダーのバックアップコピーを使用して開きます。メインヘッダーが破損している場合に使用してください。",
   "keepCurrentOption": "現在の設定を維持",
   "optionsAction": "オプション",
-  "optionsActionTooltip": "オプション"
+  "optionsActionTooltip": "オプション",
+  "lockFlushRefusedTitle": "デバイスに書き込めませんでした",
+  "lockFlushRefusedMessage": "デバイスが最新の変更を受け付けなかったため、{name} はロックされませんでした。変更はまだアプリ内に保持されています。接続を確認して再試行するか、そのままロックして変更を破棄してください。",
+  "lockAnywayButton": "このままロック"
 }

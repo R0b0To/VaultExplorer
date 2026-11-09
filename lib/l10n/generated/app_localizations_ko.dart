@@ -13354,4 +13354,15 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get categoryIndexCleared => '카테고리 색인이 삭제되었습니다';
+
+  @override
+  String get lockFlushRefusedTitle => '기기에 쓸 수 없습니다';
+
+  @override
+  String lockFlushRefusedMessage(String name) {
+    return '기기가 최근 변경 사항을 받아들이지 않아 $name을(를) 잠글 수 없었습니다. 변경 사항은 아직 앱에 남아 있습니다. 연결을 확인하고 다시 시도하거나, 그대로 잠그고 변경 사항을 버리세요.';
+  }
+
+  @override
+  String get lockAnywayButton => '그래도 잠그기';
 }

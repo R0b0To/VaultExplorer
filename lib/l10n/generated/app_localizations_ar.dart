@@ -14161,4 +14161,15 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get categoryIndexCleared => 'تم مسح فهارس التصنيفات';
+
+  @override
+  String get lockFlushRefusedTitle => 'تعذّرت الكتابة على الجهاز';
+
+  @override
+  String lockFlushRefusedMessage(String name) {
+    return 'لم يتم قفل $name لأن الجهاز لم يقبل آخر التغييرات. لا تزال بانتظار الحفظ في التطبيق. تحقق من الاتصال وأعد المحاولة، أو اقفل على أي حال وتجاهل التغييرات.';
+  }
+
+  @override
+  String get lockAnywayButton => 'اقفل على أي حال';
 }

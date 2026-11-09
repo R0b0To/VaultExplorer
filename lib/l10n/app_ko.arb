@@ -3896,5 +3896,8 @@
   "useBackupHeaderToggleSubtitle": "볼륨 끝에 저장된 헤더의 백업 복사본으로 엽니다. 메인 헤더가 손상된 경우 사용하세요.",
   "keepCurrentOption": "현재 설정 유지",
   "optionsAction": "옵션",
-  "optionsActionTooltip": "옵션"
+  "optionsActionTooltip": "옵션",
+  "lockFlushRefusedTitle": "기기에 쓸 수 없습니다",
+  "lockFlushRefusedMessage": "기기가 최근 변경 사항을 받아들이지 않아 {name}을(를) 잠글 수 없었습니다. 변경 사항은 아직 앱에 남아 있습니다. 연결을 확인하고 다시 시도하거나, 그대로 잠그고 변경 사항을 버리세요.",
+  "lockAnywayButton": "그래도 잠그기"
 }

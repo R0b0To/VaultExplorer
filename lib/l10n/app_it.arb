@@ -3896,5 +3896,8 @@
   "useBackupHeaderToggleSubtitle": "Apri con la copia di backup dell'intestazione memorizzata alla fine del volume. Usala se l'intestazione principale è danneggiata.",
   "keepCurrentOption": "Mantieni attuale",
   "optionsAction": "Opzioni",
-  "optionsActionTooltip": "Opzioni"
+  "optionsActionTooltip": "Opzioni",
+  "lockFlushRefusedTitle": "Impossibile scrivere sul dispositivo",
+  "lockFlushRefusedMessage": "{name} non è stato bloccato perché il dispositivo non ha accettato le ultime modifiche. Sono ancora in attesa nell'app. Controlla la connessione e riprova, oppure blocca comunque e scartale.",
+  "lockAnywayButton": "Blocca comunque"
 }

@@ -3896,5 +3896,8 @@
   "useBackupHeaderToggleSubtitle": "Mit der am Ende des Volumes gespeicherten Sicherungskopie des Headers öffnen. Verwenden, wenn der Haupt-Header beschädigt ist.",
   "keepCurrentOption": "Aktuelle beibehalten",
   "optionsAction": "Optionen",
-  "optionsActionTooltip": "Optionen"
+  "optionsActionTooltip": "Optionen",
+  "lockFlushRefusedTitle": "Schreiben auf das Gerät nicht möglich",
+  "lockFlushRefusedMessage": "{name} wurde nicht gesperrt, weil das Gerät die letzten Änderungen nicht angenommen hat. Sie warten noch in der App. Prüfen Sie die Verbindung und versuchen Sie es erneut, oder sperren Sie trotzdem und verwerfen Sie die Änderungen.",
+  "lockAnywayButton": "Trotzdem sperren"
 }

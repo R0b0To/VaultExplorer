@@ -3896,5 +3896,8 @@
   "useBackupHeaderToggleSubtitle": "使用存储在卷末尾的备份卷头打开。若主卷头损坏时请使用此选项。",
   "keepCurrentOption": "保持当前",
   "optionsAction": "选项",
-  "optionsActionTooltip": "选项"
+  "optionsActionTooltip": "选项",
+  "lockFlushRefusedTitle": "无法写入设备",
+  "lockFlushRefusedMessage": "由于设备未接受最新更改，{name} 未被锁定。这些更改仍保留在应用中。请检查连接后重试，或仍然锁定并放弃这些更改。",
+  "lockAnywayButton": "仍然锁定"
 }

@@ -13915,4 +13915,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get categoryIndexCleared => 'Category indexes cleared';
+
+  @override
+  String get lockFlushRefusedTitle => 'Couldn\'t write to the device';
+
+  @override
+  String lockFlushRefusedMessage(String name) {
+    return '$name wasn\'t locked because the device didn\'t accept the latest changes. They\'re still waiting in the app. Check the connection and retry, or lock anyway and discard them.';
+  }
+
+  @override
+  String get lockAnywayButton => 'Lock anyway';
 }

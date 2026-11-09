@@ -12911,4 +12911,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get categoryIndexCleared => '已清除分类索引';
+
+  @override
+  String get lockFlushRefusedTitle => '无法写入设备';
+
+  @override
+  String lockFlushRefusedMessage(String name) {
+    return '由于设备未接受最新更改，$name 未被锁定。这些更改仍保留在应用中。请检查连接后重试，或仍然锁定并放弃这些更改。';
+  }
+
+  @override
+  String get lockAnywayButton => '仍然锁定';
 }

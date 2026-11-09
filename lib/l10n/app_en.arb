@@ -15773,5 +15773,22 @@
   "categoryIndexCleared": "Category indexes cleared",
   "@categoryIndexCleared": {
     "description": "Snackbar shown after the category indexes were cleared"
+  },
+  "lockFlushRefusedTitle": "Couldn't write to the device",
+  "@lockFlushRefusedTitle": {
+    "description": "Dialog title shown when locking a container is refused because a USB device did not accept the last buffered changes"
+  },
+  "lockFlushRefusedMessage": "{name} wasn't locked because the device didn't accept the latest changes. They're still waiting in the app. Check the connection and retry, or lock anyway and discard them.",
+  "@lockFlushRefusedMessage": {
+    "description": "Dialog body explaining that the container was left open; offers retry or lock anyway (which discards the unwritten changes)",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "lockAnywayButton": "Lock anyway",
+  "@lockAnywayButton": {
+    "description": "Destructive dialog button that locks a container even though the device refused the last changes, discarding them"
   }
 }

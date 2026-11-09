@@ -3896,5 +3896,8 @@
   "useBackupHeaderToggleSubtitle": "Abrir com a cópia de backup do cabeçalho armazenada no final do volume. Use se o cabeçalho principal estiver danificado.",
   "keepCurrentOption": "Manter atual",
   "optionsAction": "Opções",
-  "optionsActionTooltip": "Opções"
+  "optionsActionTooltip": "Opções",
+  "lockFlushRefusedTitle": "Não foi possível gravar no dispositivo",
+  "lockFlushRefusedMessage": "{name} não foi bloqueado porque o dispositivo não aceitou as últimas alterações. Elas ainda estão aguardando no app. Verifique a conexão e tente novamente, ou bloqueie mesmo assim e descarte-as.",
+  "lockAnywayButton": "Bloquear mesmo assim"
 }

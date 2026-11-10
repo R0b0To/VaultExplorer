@@ -3899,5 +3899,14 @@
   "optionsActionTooltip": "Optionen",
   "lockFlushRefusedTitle": "Schreiben auf das Gerät nicht möglich",
   "lockFlushRefusedMessage": "{name} wurde nicht gesperrt, weil das Gerät die letzten Änderungen nicht angenommen hat. Sie warten noch in der App. Prüfen Sie die Verbindung und versuchen Sie es erneut, oder sperren Sie trotzdem und verwerfen Sie die Änderungen.",
-  "lockAnywayButton": "Trotzdem sperren"
+  "lockAnywayButton": "Trotzdem sperren",
+  "vaultListingSymbolicLinkCount": "{count, plural, =0 {0 symbolische Links} one {1 symbolischer Link} other {{count} symbolische Links}}",
+  "vaultListingHiddenEntryCount": "{count, plural, =0 {0 Einträge werden nicht angezeigt} one {1 Eintrag wird nicht angezeigt} other {{count} Einträge werden nicht angezeigt}}",
+  "vaultListingDetails": "Details",
+  "vaultListingSymbolicLinksTitle": "Symbolische Links",
+  "vaultListingSymbolicLinksNote": "Ein symbolischer Link verweist auf einen anderen Ort. Er wird hier weder geöffnet noch verfolgt. Tippe darauf, um das Ziel zu kopieren.",
+  "vaultListingHiddenEntriesTitle": "Nicht angezeigte Einträge",
+  "vaultListingHiddenEntriesBody": "Diese Einträge sind im Tresor vorhanden, konnten aber nicht aufgelistet werden. Häufig erstellt eine Synchronisierungs-App Konfliktkopien (zum Beispiel „name (1)“) oder ein Upload ist noch nicht abgeschlossen. Konfliktkopien lassen sich mit Cryptomator auf einem Computer beheben. Hier wurde nichts geändert oder gelöscht.",
+  "vaultListingTargetUnreadable": "(Ziel nicht lesbar)",
+  "vaultListingLinkTargetCopied": "Linkziel kopiert"
 }

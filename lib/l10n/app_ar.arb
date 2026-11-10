@@ -3899,5 +3899,14 @@
   "optionsActionTooltip": "خيارات",
   "lockFlushRefusedTitle": "تعذّرت الكتابة على الجهاز",
   "lockFlushRefusedMessage": "لم يتم قفل {name} لأن الجهاز لم يقبل آخر التغييرات. لا تزال بانتظار الحفظ في التطبيق. تحقق من الاتصال وأعد المحاولة، أو اقفل على أي حال وتجاهل التغييرات.",
-  "lockAnywayButton": "اقفل على أي حال"
+  "lockAnywayButton": "اقفل على أي حال",
+  "vaultListingSymbolicLinkCount": "{count, plural, =0 {لا توجد روابط رمزية} one {رابط رمزي واحد} two {رابطان رمزيان} few {# روابط رمزية} many {# رابطًا رمزيًا} other {# رابط رمزي}}",
+  "vaultListingHiddenEntryCount": "{count, plural, =0 {لا توجد إدخالات مخفية} one {إدخال واحد غير معروض} two {إدخالان غير معروضين} few {# إدخالات غير معروضة} many {# إدخالًا غير معروض} other {# إدخال غير معروض}}",
+  "vaultListingDetails": "التفاصيل",
+  "vaultListingSymbolicLinksTitle": "الروابط الرمزية",
+  "vaultListingSymbolicLinksNote": "يشير الرابط الرمزي إلى موقع آخر. لا نفتحه ولا نتبعه هنا؛ اضغط عليه لنسخ وجهته.",
+  "vaultListingHiddenEntriesTitle": "إدخالات غير معروضة",
+  "vaultListingHiddenEntriesBody": "هذه الإدخالات موجودة في الخزنة لكن تعذّر عرضها. يحدث هذا غالبًا عندما ينشئ تطبيق المزامنة نسخًا متعارضة (مثل \"name (1)\") أو عندما لا يكتمل الرفع. يمكن حل النسخ المتعارضة باستخدام Cryptomator على الكمبيوتر. لم يتم تغيير أي شيء هنا أو حذفه.",
+  "vaultListingTargetUnreadable": "(تعذّرت قراءة الوجهة)",
+  "vaultListingLinkTargetCopied": "تم نسخ وجهة الرابط"
 }

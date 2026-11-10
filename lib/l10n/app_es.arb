@@ -3899,5 +3899,14 @@
   "optionsActionTooltip": "Opciones",
   "lockFlushRefusedTitle": "No se pudo escribir en el dispositivo",
   "lockFlushRefusedMessage": "{name} no se bloqueó porque el dispositivo no aceptó los últimos cambios. Siguen esperando en la app. Comprueba la conexión y reintenta, o bloquea de todos modos y descártalos.",
-  "lockAnywayButton": "Bloquear de todos modos"
+  "lockAnywayButton": "Bloquear de todos modos",
+  "vaultListingSymbolicLinkCount": "{count, plural, =0 {No hay enlaces simbólicos} one {1 enlace simbólico} other {{count} enlaces simbólicos}}",
+  "vaultListingHiddenEntryCount": "{count, plural, =0 {No se muestra ningún elemento} one {1 elemento no se muestra} other {{count} elementos no se muestran}}",
+  "vaultListingDetails": "Detalles",
+  "vaultListingSymbolicLinksTitle": "Enlaces simbólicos",
+  "vaultListingSymbolicLinksNote": "Un enlace simbólico apunta a otro lugar. Aquí nunca se abre ni se sigue; tócalo para copiar su destino.",
+  "vaultListingHiddenEntriesTitle": "Elementos no mostrados",
+  "vaultListingHiddenEntriesBody": "Estos elementos existen en la bóveda, pero no se pudieron enumerar. Lo más habitual es que una aplicación de sincronización haya creado copias en conflicto (por ejemplo, «name (1)») o que una carga aún no haya terminado. Puedes resolver las copias en conflicto con Cryptomator en un ordenador. Aquí no se ha cambiado ni eliminado nada.",
+  "vaultListingTargetUnreadable": "(no se puede leer el destino)",
+  "vaultListingLinkTargetCopied": "Destino del enlace copiado"
 }

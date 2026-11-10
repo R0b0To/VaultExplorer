@@ -3899,5 +3899,14 @@
   "optionsActionTooltip": "选项",
   "lockFlushRefusedTitle": "无法写入设备",
   "lockFlushRefusedMessage": "由于设备未接受最新更改，{name} 未被锁定。这些更改仍保留在应用中。请检查连接后重试，或仍然锁定并放弃这些更改。",
-  "lockAnywayButton": "仍然锁定"
+  "lockAnywayButton": "仍然锁定",
+  "vaultListingSymbolicLinkCount": "{count, plural, =0 {没有符号链接} other {# 个符号链接}}",
+  "vaultListingHiddenEntryCount": "{count, plural, =0 {没有未显示的条目} other {有 # 个条目未显示}}",
+  "vaultListingDetails": "详情",
+  "vaultListingSymbolicLinksTitle": "符号链接",
+  "vaultListingSymbolicLinksNote": "符号链接指向其他位置。此处不会打开或跟随链接；点按可复制其目标位置。",
+  "vaultListingHiddenEntriesTitle": "未显示的条目",
+  "vaultListingHiddenEntriesBody": "这些条目存在于保险库中，但无法列出。通常是同步应用创建了冲突副本（例如“name (1)”），或上传尚未完成。可以在电脑上的 Cryptomator 中解决冲突副本。此处没有任何内容被更改或删除。",
+  "vaultListingTargetUnreadable": "（无法读取目标）",
+  "vaultListingLinkTargetCopied": "已复制链接目标"
 }

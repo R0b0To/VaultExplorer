@@ -14241,4 +14241,55 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get lockAnywayButton => 'Усе одно заблокувати';
+
+  @override
+  String vaultListingSymbolicLinkCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '# символічного посилання',
+      many: '# символічних посилань',
+      few: '# символічні посилання',
+      one: '# символічне посилання',
+      zero: 'Символічних посилань немає',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String vaultListingHiddenEntryCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '# запису не показано',
+      many: '# записів не показано',
+      few: '# записи не показано',
+      one: '# запис не показано',
+      zero: 'Немає прихованих записів',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get vaultListingDetails => 'Деталі';
+
+  @override
+  String get vaultListingSymbolicLinksTitle => 'Символічні посилання';
+
+  @override
+  String get vaultListingSymbolicLinksNote =>
+      'Символічне посилання вказує на інше місце. Тут його не відкривають і не переходять за ним; натисніть, щоб скопіювати ціль.';
+
+  @override
+  String get vaultListingHiddenEntriesTitle => 'Записи, які не показано';
+
+  @override
+  String get vaultListingHiddenEntriesBody =>
+      'Ці записи є у сховищі, але їх не вдалося показати у списку. Найчастіше це стається, коли застосунок синхронізації створює конфліктні копії (наприклад, \"name (1)\") або передавання ще не завершилося. Конфліктні копії можна вирішити за допомогою Cryptomator на комп’ютері. Тут нічого не змінено й не видалено.';
+
+  @override
+  String get vaultListingTargetUnreadable => '(не вдалося прочитати ціль)';
+
+  @override
+  String get vaultListingLinkTargetCopied => 'Ціль посилання скопійовано';
 }

@@ -3899,5 +3899,14 @@
   "optionsActionTooltip": "Opções",
   "lockFlushRefusedTitle": "Não foi possível gravar no dispositivo",
   "lockFlushRefusedMessage": "{name} não foi bloqueado porque o dispositivo não aceitou as últimas alterações. Elas ainda estão aguardando no app. Verifique a conexão e tente novamente, ou bloqueie mesmo assim e descarte-as.",
-  "lockAnywayButton": "Bloquear mesmo assim"
+  "lockAnywayButton": "Bloquear mesmo assim",
+  "vaultListingSymbolicLinkCount": "{count, plural, =0 {Nenhum link simbólico} one {1 link simbólico} other {{count} links simbólicos}}",
+  "vaultListingHiddenEntryCount": "{count, plural, =0 {Nenhuma entrada é exibida} one {1 entrada não é exibida} other {{count} entradas não são exibidas}}",
+  "vaultListingDetails": "Detalhes",
+  "vaultListingSymbolicLinksTitle": "Links simbólicos",
+  "vaultListingSymbolicLinksNote": "Um link simbólico aponta para outro lugar. Ele nunca é aberto nem seguido aqui; toque nele para copiar o destino.",
+  "vaultListingHiddenEntriesTitle": "Entradas não exibidas",
+  "vaultListingHiddenEntriesBody": "Estas entradas existem no cofre, mas não puderam ser listadas. Isso costuma acontecer quando um app de sincronização cria cópias em conflito (por exemplo, \"name (1)\") ou quando um envio ainda não terminou. O Cryptomator em um computador pode resolver cópias em conflito. Nada foi alterado nem excluído aqui.",
+  "vaultListingTargetUnreadable": "(destino ilegível)",
+  "vaultListingLinkTargetCopied": "Destino do link copiado"
 }

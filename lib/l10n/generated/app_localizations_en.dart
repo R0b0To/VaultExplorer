@@ -13926,4 +13926,51 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get lockAnywayButton => 'Lock anyway';
+
+  @override
+  String vaultListingSymbolicLinkCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count symbolic links',
+      one: '1 symbolic link',
+      zero: '0 symbolic links',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String vaultListingHiddenEntryCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count entries are not shown',
+      one: '1 entry is not shown',
+      zero: '0 entries are not shown',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get vaultListingDetails => 'Details';
+
+  @override
+  String get vaultListingSymbolicLinksTitle => 'Symbolic links';
+
+  @override
+  String get vaultListingSymbolicLinksNote =>
+      'A symbolic link points somewhere else. It is never opened or followed here; tap one to copy where it points.';
+
+  @override
+  String get vaultListingHiddenEntriesTitle => 'Entries that are not shown';
+
+  @override
+  String get vaultListingHiddenEntriesBody =>
+      'These entries exist in the vault but could not be listed. This most often happens when a sync app creates conflict copies (for example, \"name (1)\") or an upload has not finished. Cryptomator on a computer can resolve conflict copies. Nothing here has been changed or deleted.';
+
+  @override
+  String get vaultListingTargetUnreadable => '(target unreadable)';
+
+  @override
+  String get vaultListingLinkTargetCopied => 'Link target copied';
 }

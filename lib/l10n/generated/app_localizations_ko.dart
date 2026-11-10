@@ -13365,4 +13365,49 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get lockAnywayButton => '그래도 잠그기';
+
+  @override
+  String vaultListingSymbolicLinkCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '기호 링크 #개',
+      zero: '기호 링크 없음',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String vaultListingHiddenEntryCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '표시되지 않는 항목 #개',
+      zero: '표시되지 않는 항목 없음',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get vaultListingDetails => '세부정보';
+
+  @override
+  String get vaultListingSymbolicLinksTitle => '기호 링크';
+
+  @override
+  String get vaultListingSymbolicLinksNote =>
+      '기호 링크는 다른 위치를 가리킵니다. 여기서는 열거나 따라가지 않습니다. 탭하면 대상 경로를 복사할 수 있습니다.';
+
+  @override
+  String get vaultListingHiddenEntriesTitle => '표시되지 않는 항목';
+
+  @override
+  String get vaultListingHiddenEntriesBody =>
+      '이 항목은 보관함에 있지만 목록에 표시할 수 없습니다. 동기화 앱이 충돌 복사본(예: \"name (1)\")을 만들었거나 업로드가 아직 완료되지 않은 경우가 대부분입니다. 컴퓨터의 Cryptomator에서 충돌 복사본을 해결할 수 있습니다. 여기서는 아무것도 변경되거나 삭제되지 않았습니다.';
+
+  @override
+  String get vaultListingTargetUnreadable => '(대상을 읽을 수 없음)';
+
+  @override
+  String get vaultListingLinkTargetCopied => '링크 대상을 복사했습니다';
 }

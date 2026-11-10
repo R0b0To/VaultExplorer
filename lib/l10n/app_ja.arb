@@ -3899,5 +3899,14 @@
   "optionsActionTooltip": "オプション",
   "lockFlushRefusedTitle": "デバイスに書き込めませんでした",
   "lockFlushRefusedMessage": "デバイスが最新の変更を受け付けなかったため、{name} はロックされませんでした。変更はまだアプリ内に保持されています。接続を確認して再試行するか、そのままロックして変更を破棄してください。",
-  "lockAnywayButton": "このままロック"
+  "lockAnywayButton": "このままロック",
+  "vaultListingSymbolicLinkCount": "{count, plural, =0 {シンボリックリンクはありません} other {シンボリックリンクが{count}個あります}}",
+  "vaultListingHiddenEntryCount": "{count, plural, =0 {表示されていない項目はありません} other {{count}件の項目が表示されていません}}",
+  "vaultListingDetails": "詳細",
+  "vaultListingSymbolicLinksTitle": "シンボリックリンク",
+  "vaultListingSymbolicLinksNote": "シンボリックリンクは別の場所を指します。ここでは開いたりたどったりしません。タップするとリンク先をコピーできます。",
+  "vaultListingHiddenEntriesTitle": "表示されていない項目",
+  "vaultListingHiddenEntriesBody": "これらの項目は保管庫内にありますが、一覧に表示できませんでした。同期アプリが競合コピー（例: \"name (1)\"）を作成した場合や、アップロードが完了していない場合によく発生します。競合コピーはパソコン版 Cryptomator で解決できます。ここでは何も変更または削除されていません。",
+  "vaultListingTargetUnreadable": "(リンク先を読み取れません)",
+  "vaultListingLinkTargetCopied": "リンク先をコピーしました"
 }

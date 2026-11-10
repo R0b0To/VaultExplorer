@@ -3899,5 +3899,14 @@
   "optionsActionTooltip": "Options",
   "lockFlushRefusedTitle": "Impossible d'écrire sur l'appareil",
   "lockFlushRefusedMessage": "{name} n'a pas été verrouillé car l'appareil n'a pas accepté les dernières modifications. Elles attendent toujours dans l'application. Vérifiez la connexion et réessayez, ou verrouillez quand même et abandonnez-les.",
-  "lockAnywayButton": "Verrouiller quand même"
+  "lockAnywayButton": "Verrouiller quand même",
+  "vaultListingSymbolicLinkCount": "{count, plural, =0 {Aucun lien symbolique} one {1 lien symbolique} other {{count} liens symboliques}}",
+  "vaultListingHiddenEntryCount": "{count, plural, =0 {Aucune entrée n’est affichée} one {1 entrée n’est pas affichée} other {{count} entrées ne sont pas affichées}}",
+  "vaultListingDetails": "Détails",
+  "vaultListingSymbolicLinksTitle": "Liens symboliques",
+  "vaultListingSymbolicLinksNote": "Un lien symbolique pointe vers un autre emplacement. Il n’est jamais ouvert ni suivi ici ; touchez-le pour copier sa cible.",
+  "vaultListingHiddenEntriesTitle": "Entrées non affichées",
+  "vaultListingHiddenEntriesBody": "Ces entrées existent dans le coffre, mais n’ont pas pu être répertoriées. Cela arrive le plus souvent lorsqu’une application de synchronisation crée des copies en conflit (par exemple « name (1) ») ou qu’un envoi n’est pas terminé. Cryptomator sur un ordinateur permet de résoudre les copies en conflit. Rien n’a été modifié ni supprimé ici.",
+  "vaultListingTargetUnreadable": "(cible illisible)",
+  "vaultListingLinkTargetCopied": "Cible du lien copiée"
 }

@@ -14152,4 +14152,52 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get lockAnywayButton => 'Blocca comunque';
+
+  @override
+  String vaultListingSymbolicLinkCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count collegamenti simbolici',
+      one: '1 collegamento simbolico',
+      zero: 'Nessun collegamento simbolico',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String vaultListingHiddenEntryCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count elementi non sono mostrati',
+      one: '1 elemento non è mostrato',
+      zero: 'Nessun elemento è mostrato',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get vaultListingDetails => 'Dettagli';
+
+  @override
+  String get vaultListingSymbolicLinksTitle => 'Collegamenti simbolici';
+
+  @override
+  String get vaultListingSymbolicLinksNote =>
+      'Un collegamento simbolico punta a un altro percorso. Qui non viene mai aperto né seguito; toccalo per copiare la destinazione.';
+
+  @override
+  String get vaultListingHiddenEntriesTitle => 'Elementi non mostrati';
+
+  @override
+  String get vaultListingHiddenEntriesBody =>
+      'Questi elementi esistono nel vault, ma non è stato possibile elencarli. Spesso un’app di sincronizzazione crea copie in conflitto (ad esempio \"name (1)\") oppure un caricamento non è terminato. Puoi risolvere le copie in conflitto con Cryptomator su un computer. Qui non è stato modificato né eliminato nulla.';
+
+  @override
+  String get vaultListingTargetUnreadable => '(destinazione non leggibile)';
+
+  @override
+  String get vaultListingLinkTargetCopied =>
+      'Destinazione del collegamento copiata';
 }

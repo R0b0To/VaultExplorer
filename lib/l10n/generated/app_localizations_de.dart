@@ -14140,4 +14140,51 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get lockAnywayButton => 'Trotzdem sperren';
+
+  @override
+  String vaultListingSymbolicLinkCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count symbolische Links',
+      one: '1 symbolischer Link',
+      zero: '0 symbolische Links',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String vaultListingHiddenEntryCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Einträge werden nicht angezeigt',
+      one: '1 Eintrag wird nicht angezeigt',
+      zero: '0 Einträge werden nicht angezeigt',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get vaultListingDetails => 'Details';
+
+  @override
+  String get vaultListingSymbolicLinksTitle => 'Symbolische Links';
+
+  @override
+  String get vaultListingSymbolicLinksNote =>
+      'Ein symbolischer Link verweist auf einen anderen Ort. Er wird hier weder geöffnet noch verfolgt. Tippe darauf, um das Ziel zu kopieren.';
+
+  @override
+  String get vaultListingHiddenEntriesTitle => 'Nicht angezeigte Einträge';
+
+  @override
+  String get vaultListingHiddenEntriesBody =>
+      'Diese Einträge sind im Tresor vorhanden, konnten aber nicht aufgelistet werden. Häufig erstellt eine Synchronisierungs-App Konfliktkopien (zum Beispiel „name (1)“) oder ein Upload ist noch nicht abgeschlossen. Konfliktkopien lassen sich mit Cryptomator auf einem Computer beheben. Hier wurde nichts geändert oder gelöscht.';
+
+  @override
+  String get vaultListingTargetUnreadable => '(Ziel nicht lesbar)';
+
+  @override
+  String get vaultListingLinkTargetCopied => 'Linkziel kopiert';
 }

@@ -13364,4 +13364,49 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get lockAnywayButton => 'このままロック';
+
+  @override
+  String vaultListingSymbolicLinkCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'シンボリックリンクが$count個あります',
+      zero: 'シンボリックリンクはありません',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String vaultListingHiddenEntryCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count件の項目が表示されていません',
+      zero: '表示されていない項目はありません',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get vaultListingDetails => '詳細';
+
+  @override
+  String get vaultListingSymbolicLinksTitle => 'シンボリックリンク';
+
+  @override
+  String get vaultListingSymbolicLinksNote =>
+      'シンボリックリンクは別の場所を指します。ここでは開いたりたどったりしません。タップするとリンク先をコピーできます。';
+
+  @override
+  String get vaultListingHiddenEntriesTitle => '表示されていない項目';
+
+  @override
+  String get vaultListingHiddenEntriesBody =>
+      'これらの項目は保管庫内にありますが、一覧に表示できませんでした。同期アプリが競合コピー（例: \"name (1)\"）を作成した場合や、アップロードが完了していない場合によく発生します。競合コピーはパソコン版 Cryptomator で解決できます。ここでは何も変更または削除されていません。';
+
+  @override
+  String get vaultListingTargetUnreadable => '(リンク先を読み取れません)';
+
+  @override
+  String get vaultListingLinkTargetCopied => 'リンク先をコピーしました';
 }

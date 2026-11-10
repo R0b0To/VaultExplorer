@@ -15790,5 +15790,51 @@
   "lockAnywayButton": "Lock anyway",
   "@lockAnywayButton": {
     "description": "Destructive dialog button that locks a container even though the device refused the last changes, discarding them"
+  },
+  "vaultListingSymbolicLinkCount": "{count, plural, =0 {0 symbolic links} one {1 symbolic link} other {{count} symbolic links}}",
+  "@vaultListingSymbolicLinkCount": {
+    "description": "Count of symbolic links found in the current vault folder",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "vaultListingHiddenEntryCount": "{count, plural, =0 {0 entries are not shown} one {1 entry is not shown} other {{count} entries are not shown}}",
+  "@vaultListingHiddenEntryCount": {
+    "description": "Count of vault entries that could not be listed in the current folder",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "vaultListingDetails": "Details",
+  "@vaultListingDetails": {
+    "description": "Action label that opens details about symbolic links and hidden entries"
+  },
+  "vaultListingSymbolicLinksTitle": "Symbolic links",
+  "@vaultListingSymbolicLinksTitle": {
+    "description": "Heading for the symbolic links section in vault listing details"
+  },
+  "vaultListingSymbolicLinksNote": "A symbolic link points somewhere else. It is never opened or followed here; tap one to copy where it points.",
+  "@vaultListingSymbolicLinksNote": {
+    "description": "Explains that symbolic links are not followed and can be tapped to copy their target"
+  },
+  "vaultListingHiddenEntriesTitle": "Entries that are not shown",
+  "@vaultListingHiddenEntriesTitle": {
+    "description": "Heading for vault entries that could not be listed in the current folder"
+  },
+  "vaultListingHiddenEntriesBody": "These entries exist in the vault but could not be listed. This most often happens when a sync app creates conflict copies (for example, \"name (1)\") or an upload has not finished. Cryptomator on a computer can resolve conflict copies. Nothing here has been changed or deleted.",
+  "@vaultListingHiddenEntriesBody": {
+    "description": "Explains common reasons entries are not listed and how conflict copies can be resolved"
+  },
+  "vaultListingTargetUnreadable": "(target unreadable)",
+  "@vaultListingTargetUnreadable": {
+    "description": "Placeholder shown when a symbolic link target cannot be read"
+  },
+  "vaultListingLinkTargetCopied": "Link target copied",
+  "@vaultListingLinkTargetCopied": {
+    "description": "Confirmation shown after copying a symbolic link target"
   }
 }

@@ -23560,6 +23560,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Lock anyway'**
   String get lockAnywayButton;
+
+  /// Count of symbolic links found in the current vault folder
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0 {0 symbolic links} one {1 symbolic link} other {{count} symbolic links}}'**
+  String vaultListingSymbolicLinkCount(int count);
+
+  /// Count of vault entries that could not be listed in the current folder
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0 {0 entries are not shown} one {1 entry is not shown} other {{count} entries are not shown}}'**
+  String vaultListingHiddenEntryCount(int count);
+
+  /// Action label that opens details about symbolic links and hidden entries
+  ///
+  /// In en, this message translates to:
+  /// **'Details'**
+  String get vaultListingDetails;
+
+  /// Heading for the symbolic links section in vault listing details
+  ///
+  /// In en, this message translates to:
+  /// **'Symbolic links'**
+  String get vaultListingSymbolicLinksTitle;
+
+  /// Explains that symbolic links are not followed and can be tapped to copy their target
+  ///
+  /// In en, this message translates to:
+  /// **'A symbolic link points somewhere else. It is never opened or followed here; tap one to copy where it points.'**
+  String get vaultListingSymbolicLinksNote;
+
+  /// Heading for vault entries that could not be listed in the current folder
+  ///
+  /// In en, this message translates to:
+  /// **'Entries that are not shown'**
+  String get vaultListingHiddenEntriesTitle;
+
+  /// Explains common reasons entries are not listed and how conflict copies can be resolved
+  ///
+  /// In en, this message translates to:
+  /// **'These entries exist in the vault but could not be listed. This most often happens when a sync app creates conflict copies (for example, \"name (1)\") or an upload has not finished. Cryptomator on a computer can resolve conflict copies. Nothing here has been changed or deleted.'**
+  String get vaultListingHiddenEntriesBody;
+
+  /// Placeholder shown when a symbolic link target cannot be read
+  ///
+  /// In en, this message translates to:
+  /// **'(target unreadable)'**
+  String get vaultListingTargetUnreadable;
+
+  /// Confirmation shown after copying a symbolic link target
+  ///
+  /// In en, this message translates to:
+  /// **'Link target copied'**
+  String get vaultListingLinkTargetCopied;
 }
 
 class _AppLocalizationsDelegate

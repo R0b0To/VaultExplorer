@@ -13158,4 +13158,49 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get lockAnywayButton => '仍然锁定';
+
+  @override
+  String vaultListingSymbolicLinkCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '# 个符号链接',
+      zero: '没有符号链接',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String vaultListingHiddenEntryCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '有 # 个条目未显示',
+      zero: '没有未显示的条目',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get vaultListingDetails => '详情';
+
+  @override
+  String get vaultListingSymbolicLinksTitle => '符号链接';
+
+  @override
+  String get vaultListingSymbolicLinksNote =>
+      '符号链接指向其他位置。此处不会打开或跟随链接；点按可复制其目标位置。';
+
+  @override
+  String get vaultListingHiddenEntriesTitle => '未显示的条目';
+
+  @override
+  String get vaultListingHiddenEntriesBody =>
+      '这些条目存在于保险库中，但无法列出。通常是同步应用创建了冲突副本（例如“name (1)”），或上传尚未完成。可以在电脑上的 Cryptomator 中解决冲突副本。此处没有任何内容被更改或删除。';
+
+  @override
+  String get vaultListingTargetUnreadable => '（无法读取目标）';
+
+  @override
+  String get vaultListingLinkTargetCopied => '已复制链接目标';
 }

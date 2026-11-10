@@ -14172,4 +14172,57 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get lockAnywayButton => 'اقفل على أي حال';
+
+  @override
+  String vaultListingSymbolicLinkCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '# رابط رمزي',
+      many: '# رابطًا رمزيًا',
+      few: '# روابط رمزية',
+      two: 'رابطان رمزيان',
+      one: 'رابط رمزي واحد',
+      zero: 'لا توجد روابط رمزية',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String vaultListingHiddenEntryCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '# إدخال غير معروض',
+      many: '# إدخالًا غير معروض',
+      few: '# إدخالات غير معروضة',
+      two: 'إدخالان غير معروضين',
+      one: 'إدخال واحد غير معروض',
+      zero: 'لا توجد إدخالات مخفية',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get vaultListingDetails => 'التفاصيل';
+
+  @override
+  String get vaultListingSymbolicLinksTitle => 'الروابط الرمزية';
+
+  @override
+  String get vaultListingSymbolicLinksNote =>
+      'يشير الرابط الرمزي إلى موقع آخر. لا نفتحه ولا نتبعه هنا؛ اضغط عليه لنسخ وجهته.';
+
+  @override
+  String get vaultListingHiddenEntriesTitle => 'إدخالات غير معروضة';
+
+  @override
+  String get vaultListingHiddenEntriesBody =>
+      'هذه الإدخالات موجودة في الخزنة لكن تعذّر عرضها. يحدث هذا غالبًا عندما ينشئ تطبيق المزامنة نسخًا متعارضة (مثل \"name (1)\") أو عندما لا يكتمل الرفع. يمكن حل النسخ المتعارضة باستخدام Cryptomator على الكمبيوتر. لم يتم تغيير أي شيء هنا أو حذفه.';
+
+  @override
+  String get vaultListingTargetUnreadable => '(تعذّرت قراءة الوجهة)';
+
+  @override
+  String get vaultListingLinkTargetCopied => 'تم نسخ وجهة الرابط';
 }

@@ -14179,4 +14179,48 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get lockAnywayButton => 'Bloquear de todos modos';
+  @override
+  String vaultListingSymbolicLinkCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count enlaces simbólicos',
+      one: '1 enlace simbólico',
+      zero: 'No hay enlaces simbólicos',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String vaultListingHiddenEntryCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count elementos no se muestran',
+      one: '1 elemento no se muestra',
+      zero: 'No se muestra ningún elemento',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get vaultListingDetails => 'Detalles';
+
+  @override
+  String get vaultListingSymbolicLinksTitle => 'Enlaces simbólicos';
+
+  @override
+  String get vaultListingSymbolicLinksNote => 'Un enlace simbólico apunta a otro lugar. Aquí nunca se abre ni se sigue; tócalo para copiar su destino.';
+
+  @override
+  String get vaultListingHiddenEntriesTitle => 'Elementos no mostrados';
+
+  @override
+  String get vaultListingHiddenEntriesBody => 'Estos elementos existen en la bóveda, pero no se pudieron enumerar. Lo más habitual es que una aplicación de sincronización haya creado copias en conflicto (por ejemplo, «name (1)») o que una carga aún no haya terminado. Puedes resolver las copias en conflicto con Cryptomator en un ordenador. Aquí no se ha cambiado ni eliminado nada.';
+
+  @override
+  String get vaultListingTargetUnreadable => '(no se puede leer el destino)';
+
+  @override
+  String get vaultListingLinkTargetCopied => 'Destino del enlace copiado';
 }

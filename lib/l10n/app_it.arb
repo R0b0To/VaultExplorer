@@ -3899,5 +3899,14 @@
   "optionsActionTooltip": "Opzioni",
   "lockFlushRefusedTitle": "Impossibile scrivere sul dispositivo",
   "lockFlushRefusedMessage": "{name} non è stato bloccato perché il dispositivo non ha accettato le ultime modifiche. Sono ancora in attesa nell'app. Controlla la connessione e riprova, oppure blocca comunque e scartale.",
-  "lockAnywayButton": "Blocca comunque"
+  "lockAnywayButton": "Blocca comunque",
+  "vaultListingSymbolicLinkCount": "{count, plural, =0 {Nessun collegamento simbolico} one {1 collegamento simbolico} other {{count} collegamenti simbolici}}",
+  "vaultListingHiddenEntryCount": "{count, plural, =0 {Nessun elemento è mostrato} one {1 elemento non è mostrato} other {{count} elementi non sono mostrati}}",
+  "vaultListingDetails": "Dettagli",
+  "vaultListingSymbolicLinksTitle": "Collegamenti simbolici",
+  "vaultListingSymbolicLinksNote": "Un collegamento simbolico punta a un altro percorso. Qui non viene mai aperto né seguito; toccalo per copiare la destinazione.",
+  "vaultListingHiddenEntriesTitle": "Elementi non mostrati",
+  "vaultListingHiddenEntriesBody": "Questi elementi esistono nel vault, ma non è stato possibile elencarli. Spesso un’app di sincronizzazione crea copie in conflitto (ad esempio \"name (1)\") oppure un caricamento non è terminato. Puoi risolvere le copie in conflitto con Cryptomator su un computer. Qui non è stato modificato né eliminato nulla.",
+  "vaultListingTargetUnreadable": "(destinazione non leggibile)",
+  "vaultListingLinkTargetCopied": "Destinazione del collegamento copiata"
 }

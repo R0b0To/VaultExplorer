@@ -31,9 +31,11 @@ String _inl(List<MdInline> nodes) {
       case MdInlineCode c:
         b.write('<code>${_esc(c.code)}</code>');
       case MdLink l:
-        b.write('<a ${l.url}>${_inl(l.children)}</a>');
+        b.write('<a ${l.url}${l.title == null ? '' : ' "${l.title}"'}>${_inl(l.children)}</a>');
       case MdInlineImage i:
-        b.write('<img ${i.path} "${i.alt}">');
+        b.write('<img ${i.path} "${i.alt}"${i.title == null ? '' : ' "${i.title}"'}>');
+      case MdHtmlInline h:
+        b.write('{${h.html}}');
     }
   }
   return b.toString();
@@ -59,7 +61,9 @@ String _blk(List<MdBlock> blocks) {
       case MdHorizontalRule _:
         b.write('<hr>');
       case MdImageBlock i:
-        b.write('<imgblock ${i.path} "${i.alt}">');
+        b.write('<imgblock ${i.path} "${i.alt}"${i.title == null ? '' : ' "${i.title}"'}>');
+      case MdHtmlBlock h:
+        b.write('<html>${h.html}</html>');
       case MdList l:
         final tag = l.ordered ? 'ol${l.startNumber == 1 ? '' : ' ${l.startNumber}'}' : 'ul';
         b.write('<$tag${l.tight ? '' : ' loose'}>');
@@ -81,6 +85,10 @@ String _blk(List<MdBlock> blocks) {
 }
 
 String md(String source) => _blk(parseMarkdownDocument(source));
+
+/// The strict CommonMark profile (what the spec conformance run uses).
+String mdStrict(String source) =>
+    _blk(parseMarkdownDocument(source, options: MdParseOptions.commonMark));
 
 void main() {
   group('emphasis follows the flanking rules', () {
@@ -218,7 +226,7 @@ void main() {
 
   group('links', () {
     test('reference links, images, collapsed and shortcut forms', () {
-      expect(md('[a][x] [x][] [x]\n\n[x]: /u "T"'), '<p><a /u>a</a> <a /u>x</a> <a /u>x</a></p>');
+      expect(md('[a][x] [x][] [x]\n\n[x]: /u "T"'), '<p><a /u "T">a</a> <a /u "T">x</a> <a /u "T">x</a></p>');
       expect(md('![alt][x]\n\n[x]: /p.png'), '<imgblock /p.png "alt">');
     });
 
@@ -330,6 +338,69 @@ void main() {
       expect(blocks.map((b) => b.sourceLine).toList(), [0, 2, 4, 7]);
       final list = blocks[2] as MdList;
       expect(list.items.map((i) => i.sourceLine).toList(), [4, 5]);
+    });
+  });
+
+  group('titles', () {
+    test('inline links and images keep their title', () {
+      expect(md('[a](/u "T") ![i](/p.png \'P\')'), '<p><a /u "T">a</a> <img /p.png "i" "P"></p>');
+    });
+
+    test('a reference definition supplies the title', () {
+      expect(md('[a]\n\n[a]: /u (T)'), '<p><a /u "T">a</a></p>');
+      expect(md('![a]\n\n[a]: /p.png "P"'), '<imgblock /p.png "a" "P">');
+    });
+
+    test('a title not alone on its line is dropped, the definition survives', () {
+      expect(md('[a]\n\n[a]: /u "T" junk'), '<p>[a]</p><p>[a]: /u "T" junk</p>');
+      expect(md('[a]\n\n[a]: /u\n"T" junk'), '<p><a /u>a</a></p><p>"T" junk</p>');
+    });
+  });
+
+  group('the strict CommonMark profile', () {
+    test('raw HTML is kept as written, not interpreted', () {
+      expect(mdStrict('<div>\n*x*\n</div>'), '<html><div>\n*x*\n</div></html>');
+      expect(mdStrict('a <b>x</b> <!-- c -->'), '<p>a {<b>}x{</b>} {<!-- c -->}</p>');
+      expect(mdStrict('<img src="my_img_v2.png">'), '<html><img src="my_img_v2.png"></html>');
+    });
+
+    test('the app profile interprets the same input', () {
+      expect(md('a <b>x</b> <!-- c -->'), '<p>a <b>x</b> </p>');
+    });
+
+    test('plain URLs are not linked', () {
+      expect(mdStrict('see https://a.b/c'), '<p>see https://a.b/c</p>');
+      expect(md('see https://a.b/c'), '<p>see <a https://a.b/c>https://a.b/c</a></p>');
+    });
+
+    test('soft breaks are newlines, not spaces', () {
+      expect(mdStrict('a\nb'), '<p>a\nb</p>');
+      expect(md('a\nb'), '<p>a b</p>');
+    });
+
+    test('spaces in an image destination are not accepted', () {
+      expect(mdStrict('![a](my file.png)'), '<p>![a](my file.png)</p>');
+      expect(md('![a](my file.png)'), '<imgblock my file.png "a">');
+    });
+  });
+
+  group('character references', () {
+    test('the full HTML5 table, including two-code-point names', () {
+      expect(md('&ngE; &HilbertSpace; &ClockwiseContourIntegral; &AElig;'), '<p>\u2267\u0338 \u210B \u2232 \u00C6</p>');
+      expect(md('&#35; &#x1F600; &#0; &nope; &amp;'), '<p># \u{1F600} \uFFFD &amp;nope; &amp;</p>');
+    });
+  });
+
+  group('reference label matching uses Unicode case folding', () {
+    test('sharp s, final sigma, and newer Unicode', () {
+      expect(md('[\u1E9E]\n\n[SS]: /u'), '<p><a /u>\u1E9E</a></p>');
+      expect(md('[\u00DF]\n\n[ss]: /u'), '<p><a /u>\u00DF</a></p>');
+      expect(md('[\u03A3\u0391\u03A3]\n\n[\u03C3\u03B1\u03C2]: /u'), '<p><a /u>\u03A3\u0391\u03A3</a></p>');
+      expect(md('[\u10D0]\n\n[\u1C90]: /u'), '<p><a /u>\u10D0</a></p>'); // Georgian
+    });
+
+    test('distinct letters stay distinct (Turkish dotless i)', () {
+      expect(md('[\u0131]\n\n[I]: /u'), '<p>[\u0131]</p>');
     });
   });
 

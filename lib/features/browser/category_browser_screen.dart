@@ -11,6 +11,7 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/external_storage_locations_provider.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/cancellation_token.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_feedback.dart';
@@ -132,6 +133,8 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
   bool _searchActive = false;
   String _query = '';
   final ScrollController _scrollController = ScrollController();
+  final GlobalKey<FileGridViewState> _gridKey = GlobalKey<FileGridViewState>();
+  final GlobalKey<FileListViewState> _listKey = GlobalKey<FileListViewState>();
   Set<RawEntry> _selected = {};
 
   // The listing is rebuilt (filtered and sorted) only when one of its inputs
@@ -828,6 +831,12 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
     final index = playlist.indexOf(entry.path);
     final settings = _thumbs[entry.sourceVolId];
     final deleted = <String>{};
+
+    final initialOffset = _scrollController.hasClients
+        ? _scrollController.offset
+        : null;
+    String lastViewedFile = entry.path;
+
     await Navigator.push<bool>(
       context,
       PageRouteBuilder<bool>(
@@ -846,18 +855,172 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
               settings?.cacheMode ?? ThumbnailCacheMode.disabled,
           sortBy: _sortBy,
           sortAscending: _sortAscending,
+          onCurrentFileChanged: (newFile) {
+            lastViewedFile = newFile;
+          },
           onFileDeleted: deleted.add,
         ),
-        transitionsBuilder: (_, animation, _, child) =>
-            FadeTransition(opacity: animation, child: child),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(
+            opacity: CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+              reverseCurve: Curves.easeInCubic,
+            ),
+            child: child,
+          );
+        },
       ),
     );
-    if (!mounted || deleted.isEmpty) return;
+    if (!mounted) return;
+
+    if (lastViewedFile == entry.path &&
+        initialOffset != null &&
+        _scrollController.hasClients) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scrollController.hasClients) return;
+        if (ModalRoute.of(context)?.isCurrent == false) return;
+
+        final position = _scrollController.position;
+        if (!position.hasContentDimensions) return;
+        final restoredOffset = initialOffset
+            .clamp(position.minScrollExtent, position.maxScrollExtent)
+            .toDouble();
+        if ((position.pixels - restoredOffset).abs() > 0.5) {
+          _scrollController.jumpTo(restoredOffset);
+        }
+      });
+    } else if (lastViewedFile != entry.path &&
+        _scrollController.hasClients) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scrollController.hasClients) return;
+        if (ModalRoute.of(context)?.isCurrent == false) return;
+        _scrollToItem(lastViewedFile, entry.sourceVolId);
+      });
+    }
+
+    if (deleted.isEmpty) return;
     setState(() {
       _snapshot = _snapshot.withoutPaths({
         for (final path in deleted) (entry.sourceVolId, path),
       });
     });
+  }
+
+  Map<int, ({double top, double height})> _tileGeometries(
+    List<CategoryEntry> items,
+    Set<int> targets,
+    double viewportWidth,
+  ) {
+    final result = <int, ({double top, double height})>{};
+    if (targets.isEmpty) return result;
+
+    if (_layout == BrowserLayoutMode.grid) {
+      final live =
+          _gridKey.currentState?.geometriesForGlobalIndices(targets);
+      if (live != null && live.isNotEmpty) {
+        result.addAll(live);
+      }
+    } else {
+      final live =
+          _listKey.currentState?.geometriesForGlobalIndices(targets);
+      if (live != null && live.isNotEmpty) {
+        result.addAll(live);
+      }
+    }
+    return result;
+  }
+
+  void _ensureTilesVisible(
+    List<CategoryEntry> items,
+    Set<int> indices, {
+    required bool animate,
+    required bool center,
+    bool clearOfToolbar = true,
+  }) {
+    final controller = _scrollController;
+    if (!controller.hasClients) return;
+    final position = controller.position;
+
+    final viewportWidth =
+        position.context.notificationContext?.size?.width ??
+        MediaQuery.sizeOf(context).width;
+    final geometry = _tileGeometries(items, indices, viewportWidth);
+    if (geometry.isEmpty) return;
+
+    final maxScroll = position.maxScrollExtent;
+    final viewportHeight = position.viewportDimension;
+    final currentOffset = position.pixels;
+    final topMargin = clearOfToolbar ? 16.0 : 8.0;
+
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final bottomMargin = clearOfToolbar
+        ? AppSpacing.floatingStackClearance + bottomInset + 16.0
+        : 8.0;
+    final visibleTop = currentOffset + topMargin;
+    final visibleBottom = currentOffset + viewportHeight - bottomMargin;
+    final bandHeight = viewportHeight - bottomMargin - topMargin;
+
+    double? bestOffset;
+    var bestDistance = double.infinity;
+    for (final tile in geometry.values) {
+      if (tile.top >= visibleTop && (tile.top + tile.height) <= visibleBottom) {
+        return;
+      }
+      final double target;
+      if (center) {
+        target =
+            tile.top -
+            topMargin -
+            math.max(0.0, (bandHeight - tile.height) / 2);
+      } else if (tile.top < visibleTop) {
+        target = tile.top - topMargin;
+      } else {
+        target = (tile.top + tile.height) - viewportHeight + bottomMargin;
+      }
+      final clamped = target.clamp(0.0, maxScroll).toDouble();
+      final distance = (clamped - currentOffset).abs();
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestOffset = clamped;
+      }
+    }
+
+    if (bestOffset == null || bestDistance < 1.0) return;
+    if (animate) {
+      unawaited(
+        controller.animateTo(
+          bestOffset,
+          duration: const Duration(milliseconds: 320),
+          curve: Curves.easeOutCubic,
+        ),
+      );
+    } else {
+      controller.jumpTo(bestOffset);
+    }
+  }
+
+  void _scrollToItem(String fullPath, [int? sourceVolId]) {
+    if (!_scrollController.hasClients) return;
+
+    final items = _items;
+    final targetName = fullPath.contains('/')
+        ? fullPath.substring(fullPath.lastIndexOf('/') + 1)
+        : fullPath;
+
+    final targetIndex = items.indexWhere((e) {
+      if (sourceVolId != null && e.sourceVolId != sourceVolId) return false;
+      return e.path == fullPath || e.baseName == targetName;
+    });
+
+    if (targetIndex == -1) return;
+
+    _ensureTilesVisible(
+      items,
+      {targetIndex},
+      animate: false,
+      center: false,
+    );
   }
 
   Future<void> _openWithApp(
@@ -1533,6 +1696,7 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
         : 0.0;
     final Widget content = isGrid
         ? FileGridView(
+            key: _gridKey,
             scrollController: _scrollController,
             container: anyContainer,
             containerFor: (e) => _containerOfEntry(e) ?? anyContainer,
@@ -1565,6 +1729,7 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
             bottomClearance: searchClearance,
           )
         : FileListView(
+            key: _listKey,
             scrollController: _scrollController,
             container: anyContainer,
             containerFor: (e) => _containerOfEntry(e) ?? anyContainer,

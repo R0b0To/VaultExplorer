@@ -20,6 +20,7 @@ import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
+import 'package:vaultexplorer/features/browser/services/category_aggregate_scan.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/widgets/apk_icon_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/archive_thumbnail_support.dart';
@@ -146,9 +147,12 @@ class FileTile extends StatelessWidget {
     // launcher icon, which is shown as-is rather than filled into (and
     // clipped by) the row's tinted squircle the way a photo/video frame is.
     bool customLeadingIsIcon = false;
-    final fullPath = currentDirPath.isEmpty
-        ? entry.name
-        : '$currentDirPath/${entry.name}';
+    final itemEntry = entry;
+    final fullPath = itemEntry is CategoryEntry
+        ? itemEntry.path
+        : (currentDirPath.isEmpty
+            ? entry.name
+            : '$currentDirPath/${entry.name}');
     final isImg = MediaViewerConstants.isImage(entry.name);
     final isVid = MediaViewerConstants.isVideo(entry.name);
     final isApk = isApkFile(entry.name);
@@ -160,6 +164,8 @@ class FileTile extends StatelessWidget {
       if (isImg) {
         customLeading = Hero(
           tag: 'media_hero_${container!.volId}_$fullPath',
+          createRectTween: (begin, end) =>
+              MaterialRectArcTween(begin: begin, end: end),
           child: Material(
             type: MaterialType.transparency,
             child: _ListImageThumb(
@@ -178,6 +184,8 @@ class FileTile extends StatelessWidget {
       } else if (isVid) {
         customLeading = Hero(
           tag: 'media_hero_${container!.volId}_$fullPath',
+          createRectTween: (begin, end) =>
+              MaterialRectArcTween(begin: begin, end: end),
           child: Material(
             type: MaterialType.transparency,
             child: _ListVideoThumb(

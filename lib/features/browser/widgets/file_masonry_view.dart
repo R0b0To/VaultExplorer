@@ -30,6 +30,7 @@ import 'package:vaultexplorer/data/services/media_index/media_index_service.dart
 import 'package:vaultexplorer/data/services/media_index/media_path_hash.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
+import 'package:vaultexplorer/features/browser/services/category_aggregate_scan.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/gallery/gallery_layout.dart';
 import 'package:vaultexplorer/features/browser/gallery/gallery_ratio_prefetcher.dart';
@@ -434,9 +435,12 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
 
   // ── Layout inputs ──────────────────────────────────────────────────────────
 
-  String _fullPathOf(RawEntry entry) => widget.currentDirPath.isEmpty
-      ? entry.name
-      : '${widget.currentDirPath}/${entry.name}';
+  String _fullPathOf(RawEntry entry) {
+    if (entry is CategoryEntry) return entry.path;
+    return widget.currentDirPath.isEmpty
+        ? entry.name
+        : '${widget.currentDirPath}/${entry.name}';
+  }
 
   int _globalIndexOf(int displayIndex) =>
       _displayGlobal == null ? displayIndex : _displayGlobal![displayIndex];
@@ -1343,6 +1347,8 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
     } else if (isImg) {
       previewWidget = Hero(
         tag: 'media_hero_${container.volId}_$fullPath',
+        createRectTween: (begin, end) =>
+            MaterialRectArcTween(begin: begin, end: end),
         child: Material(
           type: MaterialType.transparency,
           child: _EncryptedImageMasonryThumb(
@@ -1366,6 +1372,8 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
     } else if (isVid) {
       previewWidget = Hero(
         tag: 'media_hero_${container.volId}_$fullPath',
+        createRectTween: (begin, end) =>
+            MaterialRectArcTween(begin: begin, end: end),
         child: Material(
           type: MaterialType.transparency,
           child: _VideoMasonryThumb(

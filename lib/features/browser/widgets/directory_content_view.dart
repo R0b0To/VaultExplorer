@@ -82,6 +82,8 @@ import 'package:vaultexplorer/features/browser/widgets/browser_pane_scope.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_manager_more_menu_button.dart';
 import 'package:vaultexplorer/features/browser/gallery/gallery_layout.dart';
 import 'package:vaultexplorer/features/browser/widgets/book_cover_support.dart';
+import 'package:vaultexplorer/features/browser/widgets/file_grid_view.dart';
+import 'package:vaultexplorer/features/browser/widgets/file_list_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_masonry_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/bookmark_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/bottom_search_bar.dart';
@@ -426,6 +428,10 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   ScrollController _browserScrollController = ScrollController();
   final GlobalKey<FileMasonryViewState> _masonryKey =
       GlobalKey<FileMasonryViewState>();
+  final GlobalKey<FileGridViewState> _gridKey =
+      GlobalKey<FileGridViewState>();
+  final GlobalKey<FileListViewState> _listKey =
+      GlobalKey<FileListViewState>();
   ScrollController _backGesturePreviewScrollController = ScrollController();
 
   void _resetBrowserScrollController({double initialOffset = 0.0}) {
@@ -946,6 +952,13 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       case BrowserLayoutMode.list:
       case BrowserLayoutMode.compact:
       case BrowserLayoutMode.detailed:
+        final liveList =
+            _listKey.currentState?.geometriesForGlobalIndices(targets);
+        if (liveList != null && liveList.isNotEmpty) {
+          result.addAll(liveList);
+          break;
+        }
+
         final isCompact = _layoutMode == BrowserLayoutMode.compact;
         final isDetailed = _layoutMode == BrowserLayoutMode.detailed;
         final zoom = _toolbarConfig.listZoomLevel;
@@ -967,6 +980,13 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         break;
 
       case BrowserLayoutMode.grid:
+        final liveGrid =
+            _gridKey.currentState?.geometriesForGlobalIndices(targets);
+        if (liveGrid != null && liveGrid.isNotEmpty) {
+          result.addAll(liveGrid);
+          break;
+        }
+
         const minCols = 1;
         final maxCols = isLandscape ? 7 : 4;
         final columns =
@@ -6754,6 +6774,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                                   _archiveRootPathForSearch,
                                               sortBy: sortBy,
                                               masonryKey: _masonryKey,
+                                              gridKey: _gridKey,
+                                              listKey: _listKey,
                                             ),
                                           ),
                                           ),

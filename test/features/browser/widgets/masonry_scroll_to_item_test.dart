@@ -1,9 +1,11 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
+import 'package:vaultexplorer/features/browser/widgets/file_grid_view.dart';
+import 'package:vaultexplorer/features/browser/widgets/file_list_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_masonry_view.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -85,7 +87,7 @@ void main() {
     scrollController.dispose();
   });
 
-  testWidgets('FileMasonryViewState.geometriesForGlobalIndices works with groupByDate',
+  testWidgets('FileGridViewState.geometriesForGlobalIndices returns exact item positions',
       (tester) async {
     final container = MountedContainer(
       volId: 1,
@@ -103,11 +105,11 @@ void main() {
         name: 'file_${i.toString().padLeft(4, '0')}.txt',
         isDir: false,
         sizeBytes: 1024,
-        modifiedSecs: 1700000000 + (i ~/ 10) * 86400 * 30, // 3 different date buckets
+        modifiedSecs: 1700000000 + (i ~/ 10) * 86400 * 30,
       ),
     );
 
-    final masonryKey = GlobalKey<FileMasonryViewState>();
+    final gridKey = GlobalKey<FileGridViewState>();
     final scrollController = ScrollController();
 
     await tester.pumpWidget(
@@ -117,8 +119,8 @@ void main() {
             body: SizedBox(
               width: 400,
               height: 800,
-              child: FileMasonryView(
-                key: masonryKey,
+              child: FileGridView(
+                key: gridKey,
                 container: container,
                 items: entries,
                 isSelectionMode: false,
@@ -138,10 +140,9 @@ void main() {
       ),
     );
 
-    await tester.pump(const Duration(milliseconds: 500));
     await tester.pumpAndSettle();
 
-    final state = masonryKey.currentState;
+    final state = gridKey.currentState;
     expect(state, isNotNull);
 
     final targets = {0, 15, 29};
@@ -152,8 +153,80 @@ void main() {
     expect(geometries.containsKey(29), isTrue);
 
     expect(geometries[0]!.height, greaterThan(0));
-    // In date grouping, newest items (higher modifiedSecs, e.g. item 29)
-    // appear first, while older items (e.g. item 0) appear lower.
+    expect(geometries[29]!.top, lessThan(geometries[15]!.top));
+    expect(geometries[15]!.top, lessThan(geometries[0]!.top));
+
+    scrollController.dispose();
+  });
+
+  testWidgets('FileListViewState.geometriesForGlobalIndices returns exact item positions',
+      (tester) async {
+    final container = MountedContainer(
+      volId: 1,
+      displayName: 'test_vault',
+      uri: 'content://test',
+      rootFiles: const [],
+      mountedAt: DateTime.now(),
+      totalSpace: 1024,
+      freeSpace: 512,
+    );
+
+    final entries = List<RawEntry>.generate(
+      30,
+      (i) => RawEntry(
+        name: 'file_${i.toString().padLeft(4, '0')}.txt',
+        isDir: false,
+        sizeBytes: 1024,
+        modifiedSecs: 1700000000 + (i ~/ 10) * 86400 * 30,
+      ),
+    );
+
+    final listKey = GlobalKey<FileListViewState>();
+    final scrollController = ScrollController();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 400,
+              height: 800,
+              child: Material(
+                child: FileListView(
+                  key: listKey,
+                  container: container,
+                  items: entries,
+                  isSelectionMode: false,
+                  selectedItems: const {},
+                  currentDirPath: 'photos',
+                  thumbnailCacheMode: ThumbnailCacheMode.disabled,
+                  thumbnailQuality: ThumbnailQuality.defaultQuality,
+                  scrollController: scrollController,
+                  groupByDate: true,
+                  onDirTap: (_) {},
+                  onFileTap: (_) {},
+                  onItemLongPress: (_) {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    final state = listKey.currentState;
+    expect(state, isNotNull);
+
+    final targets = {0, 15, 29};
+    final geometries = state!.geometriesForGlobalIndices(targets);
+
+    expect(geometries.containsKey(0), isTrue);
+    expect(geometries.containsKey(15), isTrue);
+    expect(geometries.containsKey(29), isTrue);
+
+    expect(geometries[0]!.height, greaterThan(0));
     expect(geometries[29]!.top, lessThan(geometries[15]!.top));
     expect(geometries[15]!.top, lessThan(geometries[0]!.top));
 

@@ -56,6 +56,8 @@ Widget buildBrowserBody(
   String? archiveRootPath,
   SortBy? sortBy,
   GlobalKey<FileMasonryViewState>? masonryKey,
+  GlobalKey<FileGridViewState>? gridKey,
+  GlobalKey<FileListViewState>? listKey,
 }) {
   if (isLoading && currentItems.isEmpty) {
     return const Center(child: CircularProgressIndicator(strokeWidth: 2.5));
@@ -97,6 +99,7 @@ Widget buildBrowserBody(
       MediaQuery.of(context).orientation == Orientation.landscape;
   final content = switch (layoutMode) {
     BrowserLayoutMode.grid => FileGridView(
+      key: gridKey,
       scrollController: scrollController,
       bottomClearance: bottomClearance,
       container: container,
@@ -176,6 +179,7 @@ Widget buildBrowserBody(
     BrowserLayoutMode.list ||
     BrowserLayoutMode.detailed ||
     BrowserLayoutMode.compact => FileListView(
+      key: listKey,
       scrollController: scrollController,
       bottomClearance: bottomClearance,
       container: container,

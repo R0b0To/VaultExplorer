@@ -115,11 +115,11 @@ class MusicInlineQueue extends StatelessWidget {
               child: CustomScrollView(
                 controller: scrollController,
                 slivers: [
-                  SliverToBoxAdapter(
+                    SliverToBoxAdapter(
                     child: InkWell(
                       onTap: onHeaderTap,
                       child: SizedBox(
-                        height: kMusicQueuePeekHeight + bottomInset,
+                        height: kMusicQueuePeekHeight,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [

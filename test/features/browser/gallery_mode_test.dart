@@ -155,6 +155,7 @@ void main() {
           ),
         ),
       );
+      await tester.pump(const Duration(milliseconds: 500));
       await tester.pumpAndSettle();
 
       final initialMax = controller.position.maxScrollExtent;
@@ -162,15 +163,18 @@ void main() {
 
       // Scroll down by 500
       controller.jumpTo(500);
+      await tester.pump(const Duration(milliseconds: 500));
       await tester.pumpAndSettle();
       expect(controller.offset, equals(500));
 
       // Scroll all the way down
       final maxScroll = controller.position.maxScrollExtent;
       controller.jumpTo(maxScroll);
+      await tester.pump(const Duration(milliseconds: 500));
       await tester.pumpAndSettle();
       expect(controller.offset, equals(controller.position.maxScrollExtent));
       expect(controller.offset, greaterThan(500));
+      await tester.pump(const Duration(seconds: 50));
     });
 
     testWidgets('GalleryDateHeader text color in dark and light themes', (tester) async {

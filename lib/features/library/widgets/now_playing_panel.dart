@@ -53,7 +53,7 @@ List<BoxShadow> miniPlayerShadows(double strength) => [
 /// into the minimized state.
 const double _kMinimizeDip = 120;
 
-///bouncing curve: overshoots its target a little, then settles.
+/// bouncing curve: overshoots its target a little, then settles.
 const Curve _kBounce = Cubic(0.175, 0.885, 0.32, 1.125);
 
 /// Lets the mini bar steer the player while its finger is still down: the
@@ -126,12 +126,6 @@ class NowPlayingHandle {
 }
 
 /// Entry point of the music player that grows out of the mini bar.
-///
-/// One animation value drives the whole thing: the cover grows
-/// from the bar's thumbnail to the big cover, the play, previous and next
-/// buttons travel to their places, the title and the waveform fade in, and the
-/// panel itself rises from the bar to the full screen, tracking the finger
-/// while it is dragged. Dragging it back down (or Back) returns it to the bar.
 class NowPlayingPanel {
   NowPlayingPanel._();
 
@@ -266,7 +260,6 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
   final BackgroundPlaybackHost _host = BackgroundPlaybackHost.instance;
   late final AnimationController _c = AnimationController(
     vsync: this,
-    // A little below 0 is the minimize bounce; geometry reads it clamped.
     lowerBound: -0.2,
     upperBound: 1,
     value: widget.initialP,
@@ -297,13 +290,12 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
   int _dragDirection = 0;
 
   /// The queue: a sheet that rises from the bottom of the full player, dragged
-  /// up from anywhere on it (see [_dragBy]) or from its own handle. Sizes are
-  /// fractions of the screen height, refreshed on every build.
+  /// up from anywhere on it (see [_dragBy]) or from its own handle.
   final DraggableScrollableController _sheet = DraggableScrollableController();
   ScrollController? _queueScroll;
   double _screenHeight = 800;
   double _padBottom = 0;
-  double _sheetMin = 0.08;
+  double _sheetMin = 0.0;
   double _sheetMax = 0.9;
   bool _sheetClosed = true;
 
@@ -348,7 +340,6 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
     _progress.dispose();
     _noLoop.dispose();
     _smooth.dispose();
-    // Handing over from the overlay copy to the route is not a closing.
     if (!(widget.inOverlay && widget.handle._handedOff)) {
       NowPlayingPanel._closed(widget.handle);
     }
@@ -442,22 +433,17 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
     _smooth.report(controller.value, speed: _session?.playbackSpeed ?? 1.0);
   }
 
-  /// Called every frame while playing (and on each report): the position as
-  /// it is estimated now, so the seek bar glides.
   void _onSmoothFrame(Duration position, Duration duration) {
     final current = _progress.value;
     if (current.isDragging) return;
     _progress.value = current.copyWith(position: position, duration: duration);
   }
 
-  /// Takes this page off the stack wherever it is in it, so a viewer pushed
-  /// on top of it (see "Open in media player") is left alone.
   void _removeSelf() {
     _removalRequested = true;
     _tryRemove();
   }
 
-  /// Does the removal once the route is known (it is not yet in `initState`).
   void _tryRemove() {
     if (!_removalRequested || _removed) return;
     if (widget.inOverlay) {
@@ -472,7 +458,6 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
     final navigator = route?.navigator;
     if (route == null || navigator == null) return;
     _removed = true;
-    // A removal while the tree is being built or torn down is not allowed.
     scheduleMicrotask(() {
       if (route.isActive) navigator.removeRoute(route);
     });
@@ -502,14 +487,11 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
   bool get _sheetReady => _sheet.isAttached;
   bool get _queueOpen => _sheetReady && _sheet.size > _sheetMin + 0.01;
 
-  /// One continuous drag through three places: minimized, the
-  /// full player, and the queue above it. Going up from the full player raises
-  /// the queue; going down lowers the queue first and only then the player.
   void _dragBy(double dy) {
     if (_removed) return;
     if (dy != 0) _dragDirection = dy > 0 ? 1 : -1;
     _c.stop();
-    var rest = dy; // pixels left over for the player itself
+    var rest = dy;
     if (_sheetReady && _screenHeight > 0) {
       final s = _sheet.size;
       if (rest < 0 && _c.value >= 0.999 && s < _sheetMax) {
@@ -533,7 +515,6 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
     if (_removed) return;
     final upwards = _dragDirection < 0;
 
-    // The queue was being dragged: settle it open or closed.
     if (_sheetDragged && _sheetReady && _c.value >= 0.999) {
       _sheetDragged = false;
       final span = math.max(_sheetMax - _sheetMin, 0.001);
@@ -554,11 +535,8 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
     if (velocityY.abs() > 350) {
       target = velocityY < 0 ? 1.0 : 0.0;
     } else if (upwards) {
-      // Let a deliberate slow upward drag open without needing half the
-      // screen's travel.
       target = _c.value >= 0.2 ? 1.0 : 0.0;
     } else if (_dragDirection > 0) {
-      // Use a matching threshold when dragging the full player down.
       target = _c.value <= 0.8 ? 0.0 : 1.0;
     } else {
       target = _c.value > 0.5 ? 1.0 : 0.0;
@@ -573,8 +551,6 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
   void _settleTo(double target) {
     if (_removed) return;
     final distance = (target - _c.value).abs();
-    // snaps: opening eases fast into a slow finish, minimizing
-    // springs past the bar and settles back.
     final duration = Duration(
       milliseconds: (distance < 0.02 ? 120 : 220 + 140 * distance).round(),
     );
@@ -590,14 +566,10 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
         });
   }
 
-  /// Safety net for a lost gesture end: whenever a finger lifts and the
-  /// player is neither being dragged nor moving, it must be at rest. If it
-  /// is anywhere else it is settled, so it can never stay stuck mid-page.
   void _onPointerEnd(Object? _) {
     if (_pointersDown > 0) _pointersDown--;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _removed || _pointersDown > 0 || _c.isAnimating) return;
-      // The drag detector never reported the end of the drag: end it here.
       if (_dragActive) {
         _dragActive = false;
         _release(0);
@@ -615,8 +587,6 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
 
   // ── The queue ────────────────────────────────────────────────────────────
 
-  /// The list must be at its top whenever the queue is down: otherwise a drag
-  /// on the little that shows would scroll it instead of raising the sheet.
   void _resetQueueScroll() {
     final c = _queueScroll;
     if (c != null && c.hasClients && c.position.pixels > 0.5) c.jumpTo(0);
@@ -624,8 +594,6 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
 
   void _setQueueProgress(double v) {
     if (v == _queueP.value) return;
-    // Notified while the tree is being built or laid out, the update waits for
-    // the frame to end.
     if (WidgetsBinding.instance.schedulerPhase ==
         SchedulerPhase.persistentCallbacks) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -653,7 +621,6 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
 
   void _toggleQueue() => _sheetTo(_queueOpen ? _sheetMin : _sheetMax);
 
-  /// Opening the queue brings the playing track into view.
   void _onSheetChanged() {
     if (!_sheetReady) return;
     final span = math.max(_sheetMax - _sheetMin, 0.001);
@@ -675,7 +642,7 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
     if (session == null) return;
     final current = session.playlist.currentIndex;
     if (current <= 1) return;
-    final header = kMusicQueuePeekHeight + _padBottom;
+    final header = kMusicQueuePeekHeight;
     final target = header + (current - 1) * kMusicQueueRowHeight;
     controller.jumpTo(
       math.min(target, controller.position.maxScrollExtent),
@@ -721,8 +688,6 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
   Future<void> _onMenu(_PanelMenu item) async {
     switch (item) {
       case _PanelMenu.openViewer:
-        // The viewer takes the running player back on its own. Open it first,
-        // then step aside, so it does not end up under this page.
         _host.expand();
         _removeSelf();
       case _PanelMenu.stop:
@@ -744,9 +709,7 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
     final size = media.size;
     _screenHeight = size.height;
     _padBottom = media.padding.bottom;
-    _sheetMin = ((kMusicQueuePeekHeight + media.padding.bottom) / size.height)
-        .clamp(0.04, 0.3)
-        .toDouble();
+    _sheetMin = 0.0;
     _sheetMax =
         ((size.height -
                     media.padding.top -
@@ -754,7 +717,7 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
                     widget.handle.miniRect.height -
                     8) /
                 size.height)
-            .clamp(_sheetMin + 0.2, 0.95)
+            .clamp(0.4, 0.95)
             .toDouble();
 
     final content = Listener(
@@ -787,8 +750,7 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
         ),
       ),
     );
-    // The overlay copy lives only while a finger is down: Back has nothing to
-    // do there. The route copy turns Back into "minimize".
+
     if (widget.inOverlay) return content;
     return PopScope(
       canPop: false,
@@ -804,19 +766,17 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
     );
   }
 
-  /// The queue sheet, built once (not on every animation frame) and kept in
-  /// the tree via [Offstage] when the full player is minimized or opening.
-  /// Keeping it mounted prevents [DraggableScrollableController] assertion
-  /// failures from re-attaching a controller during animation frames.
   Widget _queueLayer() {
     return AnimatedBuilder(
-      animation: _c,
+      animation: Listenable.merge([_c, _queueP]),
       child: DraggableScrollableSheet(
         controller: _sheet,
         initialChildSize: _sheetMin,
         minChildSize: _sheetMin,
         maxChildSize: _sheetMax,
         snap: true,
+        shouldCloseOnMinExtent: false,
+        snapSizes: [_sheetMin, _sheetMax],
         builder: (context, scroll) {
           _queueScroll = scroll;
           return MusicInlineQueue(
@@ -847,10 +807,11 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
             });
           }
         }
+        final isSheetOpen = _sheetReady && _sheet.size > _sheetMin + 0.001;
         return Offstage(
           offstage: isOffstage,
           child: IgnorePointer(
-            ignoring: opacity < 0.95,
+            ignoring: opacity < 0.95 || !isSheetOpen,
             child: Opacity(opacity: opacity.clamp(0.0, 1.0), child: child),
           ),
         );
@@ -874,8 +835,6 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
     final screen = Offset.zero & size;
     final panel = _lerpRect(mini, screen, p);
 
-    // The mini bar's own content sits at the same offsets inside the panel as
-    // it did inside the bar, and rises with the panel's top edge.
     final miniDy = panel.top - mini.top;
     final miniCoverTop = mini.top + (mini.height - _miniCover) / 2 + 1;
     final miniCoverRect = Rect.fromLTWH(
@@ -890,39 +849,49 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
     );
 
     // Expanded geometry.
-    const titleHeight = 84.0;
-    final below =
-        24 +
+    const titleHeight = 68.0;
+    const bottomBarHeight = 48.0;
+    const gapCoverToTitle = 20.0;
+    const gapTitleToSeek = 16.0;
+    const gapSeekToControls = 20.0;
+    const gapControlsToBottom = 16.0;
+
+    final fixedBelow = gapCoverToTitle +
         titleHeight +
-        8 +
-        52 +
-        12 +
+        gapTitleToSeek +
+        52.0 +
+        gapSeekToControls +
         _expandedPlay +
-        12 +
-        kMusicQueuePeekHeight +
-        pad.bottom;
+        gapControlsToBottom +
+        bottomBarHeight +
+        pad.bottom +
+        8.0;
+
+    final topBarBottom = pad.top + _topBar;
+    final availForCover = math.max(0.0, size.height - topBarBottom - fixedBelow);
     final coverSize = math
-        .min(size.width - 64, size.height - pad.top - _topBar - 8 - below)
-        .clamp(96.0, 440.0)
+        .min(size.width - 64, availForCover - 28)
+        .clamp(96.0, 380.0)
         .toDouble();
-    final coverTop = pad.top + _topBar + 8;
+
+    final topGap = math.max(24.0, (availForCover - coverSize) * 0.45);
+    final coverTop = topBarBottom + topGap;
     final expCoverRect = Rect.fromLTWH(
       (size.width - coverSize) / 2,
       coverTop,
       coverSize,
       coverSize,
     );
-    final titleTop = coverTop + coverSize + 24;
-    final seekTop = titleTop + titleHeight + 8;
-    final controlsTop = seekTop + 52 + 12;
+    final titleTop = coverTop + coverSize + gapCoverToTitle;
+    final seekTop = titleTop + titleHeight + gapTitleToSeek;
+    final controlsTop = seekTop + 52 + gapSeekToControls;
+    final bottomBarTop = controlsTop + _expandedPlay + gapControlsToBottom;
     final expPlayCenter = Offset(
       size.width / 2,
       controlsTop + _expandedPlay / 2,
     );
 
-    // The queue state: the bar's layout again, but at the top of the screen,
-    // above the queue. It is laid out like the bar, so the cover,
-    // title and buttons make the same journey as when the bar opens.
+    // The queue state layout at the top.
     final q = p >= 0.999 ? _queueP.value : 0.0;
     final qBar = Rect.fromLTWH(0, pad.top + 8, size.width, mini.height);
     final qCoverRect = Rect.fromLTWH(
@@ -939,11 +908,7 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
     final qTextRight =
         qBar.right - AppSpacing.xs - _miniButton * 3 - AppSpacing.sm;
 
-    // Shared elements. They move linearly with the panel, so they follow the
-    // finger going up exactly as they do going down.
     final e = p;
-    // The cover follows the panel's rising edge; the controls take the direct
-    // path from their mini-player positions to their full-player positions.
     final coverRect = _lerpRect(
       _lerpRect(miniCoverRect.shift(Offset(0, miniDy)), expCoverRect, e),
       qCoverRect,
@@ -957,9 +922,7 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
       _lerp(_lerp(miniPlayCenter.dy, expPlayCenter.dy, e), qPlayCenter.dy, q),
     );
 
-    // Previous and next are shared too: they sit either side of the play
-    // button in the bar and in the full player, and travel between the two.
-    final step = ((size.width - 48) / 5).clamp(64.0, 84.0).toDouble();
+    final step = (size.width * 0.22).clamp(72.0, 96.0).toDouble();
     Offset sideCenter(int direction) => Offset(
       _lerp(
         _lerp(
@@ -979,10 +942,8 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
 
     final miniOpacity = 1 - _seg(p, 0.0, 0.35);
     final fullOpacity = _seg(p, 0.55, 1.0);
-    // What the queue state takes away: top bar, waveform, shuffle and repeat.
     final fullFade = fullOpacity * (1 - q);
     final shadow = 1 - _seg(p, 0.0, 0.5);
-    // Rounded like the card at the start, square once it fills the screen.
     final panelRadius = BorderRadius.circular(
       _lerp(kMiniPlayerRadius, 0, _seg(p, 0.0, 0.85)),
     );
@@ -998,7 +959,6 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
     final miniTextLeft = miniCoverRect.right + AppSpacing.md - 4;
     final miniTextRight =
         mini.right - AppSpacing.xs - _miniButton * 3 - AppSpacing.sm;
-    // Title and artist: bar -> full player -> (queue) bar-like row on top.
     final eT = e * (1 - q);
     final titleStyle = TextStyle.lerp(
       text.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
@@ -1035,397 +995,450 @@ class _NowPlayingPageState extends State<_NowPlayingPage>
     return Transform.translate(
       offset: Offset(0, dip * _kMinimizeDip),
       child: Stack(
-      clipBehavior: Clip.none,
-      children: [
-        // The panel itself: the bar's colour on its way to the page colour.
-        Positioned.fromRect(
-          rect: panel,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: Color.lerp(cs.surfaceContainerHigh, cs.surface, e),
-              borderRadius: panelRadius,
-              boxShadow: miniPlayerShadows(shadow),
+        clipBehavior: Clip.none,
+        children: [
+          // Background panel.
+          Positioned.fromRect(
+            rect: panel,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: Color.lerp(cs.surfaceContainerHigh, cs.surface, e),
+                borderRadius: panelRadius,
+                boxShadow: miniPlayerShadows(shadow),
+              ),
             ),
           ),
-        ),
 
-        // Thin progress line of the bar.
-        // Always present (never `if`): a child that comes and goes shifts the
-        // ones after it, and the drag detector at the end of this list would be
-        // rebuilt in the middle of a drag, losing the finger's release.
-        Positioned.fromRect(
-          key: const ValueKey<String>('mini-progress'),
-          rect: panel,
-          child: miniOpacity > 0.001
-              ? IgnorePointer(
-              // Clipped to the card's corners, like the bar's own line.
-              child: ClipRRect(
-                borderRadius: panelRadius,
-                child: Align(
-                  alignment: Alignment.topCenter,
-                  child: Opacity(
-                    opacity: miniOpacity,
-                    child: SizedBox(
-                      height: 2,
-                      child: ValueListenableBuilder<VideoPlaybackProgress>(
-                        valueListenable: _progress,
-                        builder: (context, progress, _) =>
-                            LinearProgressIndicator(
-                              minHeight: 2,
-                              value: progress.duration.inMilliseconds > 0
-                                  ? progress.sliderValue
-                                  : 0,
-                            ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            )
-              : const SizedBox.shrink(),
-        ),
-
-        // The title and artist travel between the bar and full-player layouts.
-        Positioned(
-          left: titleLeft,
-          width: math.max(0.0, titleRight - titleLeft),
-          top: titleAreaTop,
-          height: titleAreaHeight,
-          child: Align(
-            alignment: titleAlignment,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: math.max(0.0, titleRight - titleLeft),
-              ),
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 260),
-                switchInCurve: Curves.easeOutCubic,
-                switchOutCurve: Curves.easeInCubic,
-                layoutBuilder: (currentChild, previousChildren) => Stack(
-                  alignment: titleAlignment,
-                  clipBehavior: Clip.none,
-                  children: [
-                    ...previousChildren,
-                    ?currentChild,
-                  ],
-                ),
-                transitionBuilder: (child, animation) => FadeTransition(
-                  opacity: animation,
-                  child: SlideTransition(
-                    position: Tween<Offset>(
-                      begin: Offset(_trackSlide * 0.16, 0),
-                      end: Offset.zero,
-                    ).animate(animation),
-                    child: child,
-                  ),
-                ),
-                child: Column(
-                  key: ValueKey<String>('t${info.path}'),
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      info.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: titleStyle,
-                    ),
-                    if (info.artist.isNotEmpty)
-                      Padding(
-                        padding: EdgeInsets.only(top: 2 * eT),
-                        child: Text(
-                          info.artist,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: artistStyle,
-                        ),
-                      ),
-                    if (info.album.isNotEmpty)
-                      ClipRect(
-                        child: Align(
-                          alignment: Alignment.topCenter,
-                          heightFactor: fullFade,
-                          child: Opacity(
-                            opacity: fullFade,
-                            child: Text(
-                              info.album,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: text.bodyMedium?.copyWith(
-                                color: cs.onSurfaceVariant.withValues(
-                                  alpha: 0.8,
-                                ),
+          // Thin mini progress indicator.
+          Positioned.fromRect(
+            key: const ValueKey<String>('mini-progress'),
+            rect: panel,
+            child: miniOpacity > 0.001
+                ? IgnorePointer(
+                    child: ClipRRect(
+                      borderRadius: panelRadius,
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        child: Opacity(
+                          opacity: miniOpacity,
+                          child: SizedBox(
+                            height: 2,
+                            child:
+                                ValueListenableBuilder<VideoPlaybackProgress>(
+                              valueListenable: _progress,
+                              builder: (context, progress, _) =>
+                                  LinearProgressIndicator(
+                                minHeight: 2,
+                                value: progress.duration.inMilliseconds > 0
+                                    ? progress.sliderValue
+                                    : 0,
                               ),
                             ),
                           ),
                         ),
                       ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-
-        // Top bar of the full player.
-        Positioned(
-          left: 0,
-          right: 0,
-          top: pad.top,
-          height: _topBar,
-          child: fade(
-            fullFade,
-            Row(
-              children: [
-                const SizedBox(width: AppSpacing.xs),
-                IconButton(
-                  tooltip: l10n.nowPlayingCollapse,
-                  icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 32),
-                  onPressed: _collapse,
-                ),
-                const Spacer(),
-                IconButton(
-                  tooltip: l10n.nowPlayingQueue,
-                  icon: const Icon(Icons.queue_music_rounded),
-                  onPressed: _toggleQueue,
-                ),
-                PopupMenuButton<_PanelMenu>(
-                  onSelected: _onMenu,
-                  itemBuilder: (context) => [
-                    PopupMenuItem<_PanelMenu>(
-                      value: _PanelMenu.openViewer,
-                      child: Text(l10n.nowPlayingOpenViewer),
                     ),
-                    PopupMenuItem<_PanelMenu>(
-                      value: _PanelMenu.stop,
-                      child: Text(l10n.musicMiniStop),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: AppSpacing.xs),
-              ],
-            ),
+                  )
+                : const SizedBox.shrink(),
           ),
-        ),
 
-        // The big cover: the bar's thumbnail, scaled up. Swiping it skips.
-        // No width or height on the Positioned: the cover is laid out at its
-        // full size and scaled, and tight constraints would shrink it first.
-        Positioned(
-          left: coverRect.left,
-          top: coverRect.top,
-          child: GestureDetector(
-            onHorizontalDragEnd: (details) {
-              final v = details.primaryVelocity ?? 0;
-              if (v < -300) {
-                _step(1);
-              } else if (v > 300) {
-                _step(-1);
-              }
-            },
-            child: Transform.scale(
-              scale: coverScale,
-              alignment: Alignment.topLeft,
-              child: SizedBox(
-                width: coverSize,
-                height: coverSize,
+          // Title and artist.
+          Positioned(
+            left: titleLeft,
+            width: math.max(0.0, titleRight - titleLeft),
+            top: titleAreaTop,
+            height: titleAreaHeight,
+            child: Align(
+              alignment: titleAlignment,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: math.max(0.0, titleRight - titleLeft),
+                ),
                 child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 260),
                   switchInCurve: Curves.easeOutCubic,
                   switchOutCurve: Curves.easeInCubic,
+                  layoutBuilder: (currentChild, previousChildren) => Stack(
+                    alignment: titleAlignment,
+                    clipBehavior: Clip.none,
+                    children: [
+                      ...previousChildren,
+                      ?currentChild,
+                    ],
+                  ),
                   transitionBuilder: (child, animation) => FadeTransition(
                     opacity: animation,
                     child: SlideTransition(
                       position: Tween<Offset>(
-                        begin: Offset(_trackSlide * 0.12, 0),
+                        begin: Offset(_trackSlide * 0.16, 0),
                         end: Offset.zero,
                       ).animate(animation),
-                      child: ScaleTransition(
-                        scale: Tween<double>(
-                          begin: 0.94,
-                          end: 1,
-                        ).animate(animation),
-                        child: child,
-                      ),
+                      child: child,
                     ),
                   ),
-                  child: KeyedSubtree(
-                    key: ValueKey<String>(info.path),
-                    child: LibraryCover(
-                      covers: widget.handle.covers,
-                      track: info.coverTrack,
-                      groupKey: info.coverKey,
-                      size: coverSize,
-                      borderRadius: coverRadius / math.max(coverScale, 0.01),
-                    ),
+                  child: Column(
+                    key: ValueKey<String>('t${info.path}'),
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        info.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: titleStyle,
+                      ),
+                      if (info.artist.isNotEmpty)
+                        Padding(
+                          padding: EdgeInsets.only(top: 2 * eT),
+                          child: Text(
+                            info.artist,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: artistStyle,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ),
             ),
           ),
-        ),
 
-        // The waveform seek bar of the full player.
-        Positioned(
-          left: AppSpacing.lg,
-          right: AppSpacing.lg,
-          top: seekTop,
-          height: 52,
-          child: fade(
-            fullFade,
-            AudioWaveformSeekBar(
-              playbackManager: session.playbackManager,
-              videoProgressNotifier: _progress,
-              abLoopNotifier: _noLoop,
-              onShowUIChanged: (_) {},
-              onStartHideTimer: () {},
-              timeColor: cs.onSurface,
-              restColor: cs.onSurface.withValues(alpha: 0.2),
-              fallback: _PlainSeek(
-                progress: _progress,
-                controller: () => _controller,
-              ),
-            ),
-          ),
-        ),
-
-        // Shuffle and repeat of the full player, either side of the transport
-        // buttons. They only exist in the full player, so they fade in.
-        Positioned(
-          left: 0,
-          right: 0,
-          top: controlsTop,
-          height: _expandedPlay,
-          child: fade(
-            fullFade,
-            ListenableBuilder(
-              listenable: Listenable.merge([
-                _host.repeat,
-                _host.libraryShuffled,
-              ]),
-              builder: (context, _) {
-                final repeat = _host.repeat.value;
-                final shuffled = _host.libraryShuffled.value;
-                return Stack(
-                  children: [
-                    Positioned(
-                      left: size.width / 2 - 2 * step - 24,
-                      top: (_expandedPlay - 48) / 2,
-                      child: IconButton(
-                        tooltip: l10n.nowPlayingShuffle,
-                        icon: Icon(
-                          Icons.shuffle_rounded,
-                          color: shuffled ? cs.primary : cs.onSurfaceVariant,
-                        ),
-                        onPressed: _host.toggleLibraryShuffle,
-                      ),
-                    ),
-                    Positioned(
-                      left: size.width / 2 + 2 * step - 24,
-                      top: (_expandedPlay - 48) / 2,
-                      child: IconButton(
-                        tooltip: switch (repeat) {
-                          PlaybackRepeat.off => l10n.nowPlayingRepeatOff,
-                          PlaybackRepeat.all => l10n.nowPlayingRepeatAll,
-                          PlaybackRepeat.one => l10n.nowPlayingRepeatOne,
-                        },
-                        icon: Icon(
-                          repeat == PlaybackRepeat.one
-                              ? Icons.repeat_one_rounded
-                              : Icons.repeat_rounded,
-                          color: repeat == PlaybackRepeat.off
-                              ? cs.onSurfaceVariant
-                              : cs.primary,
-                        ),
-                        onPressed: _cycleRepeat,
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-        ),
-
-        // Previous and next: the same two buttons in the bar and in the full
-        // player, moving from one to the other with the panel.
-        for (final side in const [-1, 1])
+          // Subtle lower container card behind controls.
           Positioned(
-            left: (side < 0 ? prevCenter.dx : nextCenter.dx) - sideBox / 2,
-            top: (side < 0 ? prevCenter.dy : nextCenter.dy) - sideBox / 2,
-            width: sideBox,
-            height: sideBox,
-            child: ListenableBuilder(
-              listenable: Listenable.merge([session.playlist, _host.repeat]),
-              builder: (context, _) {
-                final can = side < 0
-                    ? _host.canStepPrevious
-                    : _host.canStepNext;
-                return IconButton(
-                  tooltip: side < 0
-                      ? l10n.musicMiniPrevious
-                      : l10n.musicMiniNext,
-                  iconSize: sideIcon,
-                  padding: EdgeInsets.zero,
-                  constraints: BoxConstraints.tightFor(
-                    width: sideBox,
-                    height: sideBox,
-                  ),
-                  icon: Icon(
-                    side < 0
-                        ? Icons.skip_previous_rounded
-                        : Icons.skip_next_rounded,
-                  ),
-                  onPressed: can ? () => _step(side) : null,
-                );
-              },
-            ),
-          ),
-
-        // The play button: one widget that travels from the bar to the middle
-        // of the full player's controls.
-        Positioned(
-          left: playCenter.dx - playSize / 2,
-          top: playCenter.dy - playSize / 2,
-          width: playSize,
-          height: playSize,
-          child: ValueListenableBuilder<bool>(
-            valueListenable: _host.playing,
-            builder: (context, playing, _) => Material(
-              color: cs.primary,
-              shape: const CircleBorder(),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                onTap: _togglePlay,
-                child: Tooltip(
-                  message: playing ? l10n.musicMiniPause : l10n.musicMiniPlay,
-                  child: Icon(
-                    playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                    size: playSize * 0.6,
-                    color: cs.onPrimary,
+            left: 0,
+            right: 0,
+            top: titleTop - 20,
+            bottom: 0,
+            child: fade(
+              fullFade,
+              IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: cs.surfaceContainer.withValues(alpha: 0.45),
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(28),
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-        ),
 
-        // Dragging anywhere on the panel moves it. Laid over everything but
-        // the controls it must not swallow, so it is an opaque strip over the
-        // cover-free background only.
-        Positioned.fromRect(
-          key: const ValueKey<String>('panel-drag'),
-          rect: panel,
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onVerticalDragStart: (_) => _beginDrag(),
-            onVerticalDragUpdate: (d) => _dragBy(d.delta.dy),
-            onVerticalDragEnd: (d) => _endDrag(d.primaryVelocity ?? 0),
-            onVerticalDragCancel: _cancelDrag,
+          // Top bar: collapse, queue position & album name, menu.
+          Positioned(
+            left: 0,
+            right: 0,
+            top: pad.top,
+            height: _topBar,
+            child: fade(
+              fullFade,
+              Row(
+                children: [
+                  const SizedBox(width: AppSpacing.xs),
+                  IconButton(
+                    tooltip: l10n.nowPlayingCollapse,
+                    icon: const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      size: 28,
+                    ),
+                    onPressed: _collapse,
+                  ),
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (session.playlist.playlist.isNotEmpty)
+                          Text(
+                            '${session.playlist.currentIndex + 1}/${session.playlist.playlist.length}',
+                            style: text.labelSmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                              letterSpacing: 0.5,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        if (info.album.isNotEmpty)
+                          Text(
+                            info.album,
+                            style: text.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                      ],
+                    ),
+                  ),
+                  PopupMenuButton<_PanelMenu>(
+                    icon: const Icon(Icons.more_horiz_rounded),
+                    onSelected: _onMenu,
+                    itemBuilder: (context) => [
+                      PopupMenuItem<_PanelMenu>(
+                        value: _PanelMenu.openViewer,
+                        child: Text(l10n.nowPlayingOpenViewer),
+                      ),
+                      PopupMenuItem<_PanelMenu>(
+                        value: _PanelMenu.stop,
+                        child: Text(l10n.musicMiniStop),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                ],
+              ),
+            ),
           ),
-        ),
-      ],
-    ),
+
+          // Big cover.
+          Positioned(
+            left: coverRect.left,
+            top: coverRect.top,
+            child: GestureDetector(
+              onHorizontalDragEnd: (details) {
+                final v = details.primaryVelocity ?? 0;
+                if (v < -300) {
+                  _step(1);
+                } else if (v > 300) {
+                  _step(-1);
+                }
+              },
+              child: Transform.scale(
+                scale: coverScale,
+                alignment: Alignment.topLeft,
+                child: SizedBox(
+                  width: coverSize,
+                  height: coverSize,
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 260),
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeInCubic,
+                    transitionBuilder: (child, animation) => FadeTransition(
+                      opacity: animation,
+                      child: SlideTransition(
+                        position: Tween<Offset>(
+                          begin: Offset(_trackSlide * 0.12, 0),
+                          end: Offset.zero,
+                        ).animate(animation),
+                        child: ScaleTransition(
+                          scale: Tween<double>(
+                            begin: 0.94,
+                            end: 1,
+                          ).animate(animation),
+                          child: child,
+                        ),
+                      ),
+                    ),
+                    child: KeyedSubtree(
+                      key: ValueKey<String>(info.path),
+                      child: LibraryCover(
+                        covers: widget.handle.covers,
+                        track: info.coverTrack,
+                        groupKey: info.coverKey,
+                        size: coverSize,
+                        borderRadius: coverRadius / math.max(coverScale, 0.01),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Waveform seek bar.
+          Positioned(
+            left: AppSpacing.lg,
+            right: AppSpacing.lg,
+            top: seekTop,
+            height: 52,
+            child: fade(
+              fullFade,
+              AudioWaveformSeekBar(
+                playbackManager: session.playbackManager,
+                videoProgressNotifier: _progress,
+                abLoopNotifier: _noLoop,
+                onShowUIChanged: (_) {},
+                onStartHideTimer: () {},
+                timeColor: cs.onSurface,
+                restColor: cs.onSurface.withValues(alpha: 0.2),
+                fallback: _PlainSeek(
+                  progress: _progress,
+                  controller: () => _controller,
+                ),
+              ),
+            ),
+          ),
+
+          // Bottom bar: audio device/viewer, shuffle, repeat, queue toggle.
+          Positioned(
+            left: AppSpacing.lg,
+            right: AppSpacing.lg,
+            top: bottomBarTop,
+            height: bottomBarHeight,
+            child: fade(
+              fullFade,
+              Row(
+                children: [
+                  InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: () => _onMenu(_PanelMenu.openViewer),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 6,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.headphones_rounded,
+                            size: 20,
+                            color: cs.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Audio',
+                            style: text.labelMedium?.copyWith(
+                              color: cs.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  ListenableBuilder(
+                    listenable: Listenable.merge([
+                      _host.repeat,
+                      _host.libraryShuffled,
+                    ]),
+                    builder: (context, _) {
+                      final repeat = _host.repeat.value;
+                      final shuffled = _host.libraryShuffled.value;
+                      return Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            tooltip: l10n.nowPlayingShuffle,
+                            icon: Icon(
+                              Icons.shuffle_rounded,
+                              color: shuffled
+                                  ? cs.primary
+                                  : cs.onSurfaceVariant,
+                            ),
+                            onPressed: _host.toggleLibraryShuffle,
+                          ),
+                          IconButton(
+                            tooltip: switch (repeat) {
+                              PlaybackRepeat.off => l10n.nowPlayingRepeatOff,
+                              PlaybackRepeat.all => l10n.nowPlayingRepeatAll,
+                              PlaybackRepeat.one => l10n.nowPlayingRepeatOne,
+                            },
+                            icon: Icon(
+                              repeat == PlaybackRepeat.one
+                                  ? Icons.repeat_one_rounded
+                                  : Icons.repeat_rounded,
+                              color: repeat == PlaybackRepeat.off
+                                  ? cs.onSurfaceVariant
+                                  : cs.primary,
+                            ),
+                            onPressed: _cycleRepeat,
+                          ),
+                          IconButton(
+                            tooltip: l10n.nowPlayingQueue,
+                            icon: Icon(
+                              Icons.queue_music_rounded,
+                              color: cs.onSurfaceVariant,
+                            ),
+                            onPressed: _toggleQueue,
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Previous and next buttons.
+          for (final side in const [-1, 1])
+            Positioned(
+              left: (side < 0 ? prevCenter.dx : nextCenter.dx) - sideBox / 2,
+              top: (side < 0 ? prevCenter.dy : nextCenter.dy) - sideBox / 2,
+              width: sideBox,
+              height: sideBox,
+              child: ListenableBuilder(
+                listenable: Listenable.merge([session.playlist, _host.repeat]),
+                builder: (context, _) {
+                  final can = side < 0
+                      ? _host.canStepPrevious
+                      : _host.canStepNext;
+                  return IconButton(
+                    tooltip: side < 0
+                        ? l10n.musicMiniPrevious
+                        : l10n.musicMiniNext,
+                    iconSize: sideIcon,
+                    padding: EdgeInsets.zero,
+                    constraints: BoxConstraints.tightFor(
+                      width: sideBox,
+                      height: sideBox,
+                    ),
+                    icon: Icon(
+                      side < 0
+                          ? Icons.skip_previous_rounded
+                          : Icons.skip_next_rounded,
+                    ),
+                    onPressed: can ? () => _step(side) : null,
+                  );
+                },
+              ),
+            ),
+
+          // Play/pause button.
+          Positioned(
+            left: playCenter.dx - playSize / 2,
+            top: playCenter.dy - playSize / 2,
+            width: playSize,
+            height: playSize,
+            child: ValueListenableBuilder<bool>(
+              valueListenable: _host.playing,
+              builder: (context, playing, _) => Material(
+                color: cs.primary,
+                shape: const CircleBorder(),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: _togglePlay,
+                  child: Tooltip(
+                    message:
+                        playing ? l10n.musicMiniPause : l10n.musicMiniPlay,
+                    child: Icon(
+                      playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                      size: playSize * 0.6,
+                      color: cs.onPrimary,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Panel vertical drag detector.
+          Positioned.fromRect(
+            key: const ValueKey<String>('panel-drag'),
+            rect: panel,
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onVerticalDragStart: (_) => _beginDrag(),
+              onVerticalDragUpdate: (d) => _dragBy(d.delta.dy),
+              onVerticalDragEnd: (d) => _endDrag(d.primaryVelocity ?? 0),
+              onVerticalDragCancel: _cancelDrag,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -23,6 +22,7 @@ import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
+import 'package:vaultexplorer/features/browser/services/category_aggregate_scan.dart';
 import 'package:vaultexplorer/features/browser/gallery/gallery_layout.dart';
 import 'package:vaultexplorer/features/browser/gallery/gallery_sliver.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
@@ -141,11 +141,60 @@ class FileGridView extends StatefulWidget {
   });
 
   @override
-  State<FileGridView> createState() => _FileGridViewState();
+  State<FileGridView> createState() => FileGridViewState();
 }
 
-class _FileGridViewState extends State<FileGridView>
+class FileGridViewState extends State<FileGridView>
     with SingleTickerProviderStateMixin {
+  /// Returns the geometries (top offset and height) in scroll-content coordinates
+  /// for the items at [globalIndices] in `widget.items`.
+  Map<int, ({double top, double height})> geometriesForGlobalIndices(
+    Set<int> globalIndices,
+  ) {
+    final result = <int, ({double top, double height})>{};
+    if (globalIndices.isEmpty) return result;
+
+    if (widget.groupByDate) {
+      final groups = _groupsFor(widget.items);
+      final aspect = _getAspectRatio(_crossAxisCount);
+      final headerExtent = galleryDateHeaderExtent(context);
+      _syncGroupHost(
+        groups,
+        aspect.isFinite && aspect > 0 ? aspect : 1.0,
+        headerExtent,
+      );
+      final width = _getViewportWidth(context) - 20.0;
+      final model = _groupHost.current ?? _groupHost.buildCandidate(width);
+      if (model.childCount > 0) {
+        for (var c = 0; c < model.childCount; c++) {
+          final local = groups.childLocal[c];
+          if (local >= 0) {
+            final g = groups.childGroup[c];
+            final gIdx = groups.groups[g].globalIndices[local];
+            if (globalIndices.contains(gIdx)) {
+              result[gIdx] = (
+                top: model.tops[c],
+                height: model.heights[c],
+              );
+            }
+          }
+        }
+      }
+      return result;
+    }
+
+    final tileHeight = _getTileHeight(_crossAxisCount);
+    final rowHeight = tileHeight + widget.spacing;
+    for (final index in globalIndices) {
+      if (index < 0 || index >= widget.items.length) continue;
+      final row = index ~/ _crossAxisCount;
+      result[index] = (
+        top: 12.0 + (row * rowHeight),
+        height: tileHeight,
+      );
+    }
+    return result;
+  }
   MountedContainer _containerOf(RawEntry entry) =>
       widget.containerFor?.call(entry) ?? widget.container;
 
@@ -583,9 +632,11 @@ class _FileGridViewState extends State<FileGridView>
   Widget _buildDirCell(BuildContext context, RawEntry entry) {
     final isSelected = widget.selectedItems.contains(entry);
     final cs = Theme.of(context).colorScheme;
-    final fullPath = widget.currentDirPath.isEmpty
-        ? entry.name
-        : '${widget.currentDirPath}/${entry.name}';
+    final fullPath = entry is CategoryEntry
+        ? entry.path
+        : (widget.currentDirPath.isEmpty
+            ? entry.name
+            : '${widget.currentDirPath}/${entry.name}');
     final isMounted = widget.mountedFolderPaths.contains(fullPath);
 
     final iconSize = GridCardUtils.calculateIconSize(
@@ -645,9 +696,11 @@ class _FileGridViewState extends State<FileGridView>
   Widget _buildFileCell(BuildContext context, RawEntry entry) {
     final cs = Theme.of(context).colorScheme;
     final cleanName = entry.name;
-    final fullPath = widget.currentDirPath.isEmpty
-        ? cleanName
-        : '${widget.currentDirPath}/$cleanName';
+    final fullPath = entry is CategoryEntry
+        ? entry.path
+        : (widget.currentDirPath.isEmpty
+            ? cleanName
+            : '${widget.currentDirPath}/$cleanName');
     final isSelected = widget.selectedItems.contains(entry);
     String displayName = cleanName;
     final ext = cleanName.split('.').last;
@@ -695,6 +748,8 @@ class _FileGridViewState extends State<FileGridView>
     } else if (isImg) {
       previewWidget = Hero(
         tag: 'media_hero_${_containerOf(entry).volId}_$fullPath',
+        createRectTween: (begin, end) =>
+            MaterialRectArcTween(begin: begin, end: end),
         child: Material(
           type: MaterialType.transparency,
           child: _EncryptedImageGridThumb(
@@ -710,6 +765,8 @@ class _FileGridViewState extends State<FileGridView>
     } else if (isVid) {
       previewWidget = Hero(
         tag: 'media_hero_${_containerOf(entry).volId}_$fullPath',
+        createRectTween: (begin, end) =>
+            MaterialRectArcTween(begin: begin, end: end),
         child: Material(
           type: MaterialType.transparency,
           child: _VideoThumb(

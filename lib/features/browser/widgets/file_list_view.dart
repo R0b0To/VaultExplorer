@@ -154,10 +154,49 @@ class FileListView extends StatefulWidget {
   });
 
   @override
-  State<FileListView> createState() => _FileListViewState();
+  State<FileListView> createState() => FileListViewState();
 }
 
-class _FileListViewState extends State<FileListView> {
+class FileListViewState extends State<FileListView> {
+  /// Returns the geometries (top offset and height) in scroll-content coordinates
+  /// for the items at [globalIndices] in `widget.items`.
+  Map<int, ({double top, double height})> geometriesForGlobalIndices(
+    Set<int> globalIndices,
+  ) {
+    final result = <int, ({double top, double height})>{};
+    if (globalIndices.isEmpty) return result;
+
+    final itemExtent = _computeItemExtent(_zoomLevel);
+
+    if (widget.groupByDate) {
+      final groups = computeDateGroups(widget.items);
+      final headerH = galleryDateHeaderExtent(context);
+      var runningTop = 0.0;
+      for (final group in groups) {
+        runningTop += headerH;
+        for (var j = 0; j < group.items.length; j++) {
+          final gIdx = group.globalIndices[j];
+          if (globalIndices.contains(gIdx)) {
+            result[gIdx] = (
+              top: runningTop,
+              height: itemExtent,
+            );
+          }
+          runningTop += itemExtent;
+        }
+      }
+      return result;
+    }
+
+    for (final index in globalIndices) {
+      if (index < 0 || index >= widget.items.length) continue;
+      result[index] = (
+        top: index * itemExtent,
+        height: itemExtent,
+      );
+    }
+    return result;
+  }
   ThumbnailCacheMode _cacheModeOf(RawEntry entry) =>
       widget.cacheModeFor?.call(entry) ?? widget.thumbnailCacheMode;
 

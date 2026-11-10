@@ -13409,4 +13409,151 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get vaultListingLinkTargetCopied => 'リンク先をコピーしました';
+
+  @override
+  String get galleryFilterTooltip => 'フィルター';
+
+  @override
+  String get galleryFilterMenuOpen => 'フィルター…';
+
+  @override
+  String get galleryFilterClearAll => 'フィルターを解除';
+
+  @override
+  String get galleryFilterClear => 'クリア';
+
+  @override
+  String galleryFilterShownOfTotal(int shown, int total) {
+    return '$total件中$shown件を表示';
+  }
+
+  @override
+  String galleryFilterTotal(int count) {
+    return '合計: $count件';
+  }
+
+  @override
+  String galleryFilterIndexing(int done, int total) {
+    return '写真の詳細を読み込み中: $done/$total。タグ、場所、カメラは読み込みが進むにつれて表示されます。';
+  }
+
+  @override
+  String get galleryFilterSearchHint => 'タグ、場所、カメラ、フォルダーを検索…';
+
+  @override
+  String get galleryFilterTapHint => 'タップでそれだけを表示、長押しで除外します。';
+
+  @override
+  String get galleryFilterGroupBy => 'グループ化';
+
+  @override
+  String galleryFilterShowAll(int count) {
+    return 'すべて（$count）';
+  }
+
+  @override
+  String get galleryFilterShowFewer => '少なく表示';
+
+  @override
+  String get galleryGroupNone => 'なし';
+
+  @override
+  String get galleryGroupDay => '日';
+
+  @override
+  String get galleryGroupMonth => '月';
+
+  @override
+  String get galleryGroupYear => '年';
+
+  @override
+  String get galleryGroupFolder => 'フォルダー';
+
+  @override
+  String get galleryGroupType => '種類';
+
+  @override
+  String get galleryGroupPlace => '場所';
+
+  @override
+  String get galleryGroupCamera => 'カメラ';
+
+  @override
+  String get galleryFilterSectionType => '種類';
+
+  @override
+  String get galleryFilterSectionDate => '日付';
+
+  @override
+  String get galleryFilterSectionTags => 'タグ';
+
+  @override
+  String get galleryFilterSectionPlaces => '場所';
+
+  @override
+  String get galleryFilterSectionCameras => 'カメラ';
+
+  @override
+  String get galleryFilterSectionOrientation => '向き';
+
+  @override
+  String get galleryFilterSectionRating => '評価';
+
+  @override
+  String get galleryFilterSectionSize => 'ファイルサイズ';
+
+  @override
+  String get galleryFilterSectionFolders => 'フォルダー';
+
+  @override
+  String get galleryFilterSectionMissing => '未設定';
+
+  @override
+  String get galleryTypePhotos => '写真';
+
+  @override
+  String get galleryTypeVideos => '動画';
+
+  @override
+  String get galleryTypeAnimated => 'アニメーション';
+
+  @override
+  String get galleryOrientationLandscape => '横向き';
+
+  @override
+  String get galleryOrientationPortrait => '縦向き';
+
+  @override
+  String get galleryOrientationSquare => '正方形';
+
+  @override
+  String get gallerySizeSmall => '1 MB 未満';
+
+  @override
+  String get gallerySizeMedium => '1 – 10 MB';
+
+  @override
+  String get gallerySizeLarge => '10 MB 超';
+
+  @override
+  String get galleryMissingLocation => '位置情報なし';
+
+  @override
+  String get galleryMissingTags => 'タグなし';
+
+  @override
+  String get galleryMissingCamera => 'カメラ情報なし';
+
+  @override
+  String get galleryMissingDateTaken => '撮影日なし';
+
+  @override
+  String galleryPlaceHintCity(int km) {
+    return '最寄りの都市（$km km 以内）';
+  }
+
+  @override
+  String galleryPlaceHintCoordinates(int km) {
+    return '$km km 以内に都市なし: 座標でグループ化';
+  }
 }

@@ -14187,4 +14187,152 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get vaultListingLinkTargetCopied => 'Linkziel kopiert';
+
+  @override
+  String get galleryFilterTooltip => 'Filter';
+
+  @override
+  String get galleryFilterMenuOpen => 'Filtern…';
+
+  @override
+  String get galleryFilterClearAll => 'Filter zurücksetzen';
+
+  @override
+  String get galleryFilterClear => 'Zurücksetzen';
+
+  @override
+  String galleryFilterShownOfTotal(int shown, int total) {
+    return '$shown von $total angezeigt';
+  }
+
+  @override
+  String galleryFilterTotal(int count) {
+    return 'Gesamt: $count';
+  }
+
+  @override
+  String galleryFilterIndexing(int done, int total) {
+    return 'Fotodetails werden gelesen: $done von $total. Tags, Orte und Kameras erscheinen nach und nach.';
+  }
+
+  @override
+  String get galleryFilterSearchHint => 'Tags, Orte, Kameras, Ordner suchen…';
+
+  @override
+  String get galleryFilterTapHint =>
+      'Tippen: nur diese anzeigen. Lange drücken: ausblenden.';
+
+  @override
+  String get galleryFilterGroupBy => 'Gruppieren nach';
+
+  @override
+  String galleryFilterShowAll(int count) {
+    return 'Alle $count';
+  }
+
+  @override
+  String get galleryFilterShowFewer => 'Weniger';
+
+  @override
+  String get galleryGroupNone => 'Keine';
+
+  @override
+  String get galleryGroupDay => 'Tag';
+
+  @override
+  String get galleryGroupMonth => 'Monat';
+
+  @override
+  String get galleryGroupYear => 'Jahr';
+
+  @override
+  String get galleryGroupFolder => 'Ordner';
+
+  @override
+  String get galleryGroupType => 'Typ';
+
+  @override
+  String get galleryGroupPlace => 'Ort';
+
+  @override
+  String get galleryGroupCamera => 'Kamera';
+
+  @override
+  String get galleryFilterSectionType => 'Typ';
+
+  @override
+  String get galleryFilterSectionDate => 'Datum';
+
+  @override
+  String get galleryFilterSectionTags => 'Tags';
+
+  @override
+  String get galleryFilterSectionPlaces => 'Orte';
+
+  @override
+  String get galleryFilterSectionCameras => 'Kameras';
+
+  @override
+  String get galleryFilterSectionOrientation => 'Ausrichtung';
+
+  @override
+  String get galleryFilterSectionRating => 'Bewertung';
+
+  @override
+  String get galleryFilterSectionSize => 'Dateigröße';
+
+  @override
+  String get galleryFilterSectionFolders => 'Ordner';
+
+  @override
+  String get galleryFilterSectionMissing => 'Fehlend';
+
+  @override
+  String get galleryTypePhotos => 'Fotos';
+
+  @override
+  String get galleryTypeVideos => 'Videos';
+
+  @override
+  String get galleryTypeAnimated => 'Animiert';
+
+  @override
+  String get galleryOrientationLandscape => 'Querformat';
+
+  @override
+  String get galleryOrientationPortrait => 'Hochformat';
+
+  @override
+  String get galleryOrientationSquare => 'Quadratisch';
+
+  @override
+  String get gallerySizeSmall => 'Unter 1 MB';
+
+  @override
+  String get gallerySizeMedium => '1 – 10 MB';
+
+  @override
+  String get gallerySizeLarge => 'Über 10 MB';
+
+  @override
+  String get galleryMissingLocation => 'Kein Ort';
+
+  @override
+  String get galleryMissingTags => 'Keine Tags';
+
+  @override
+  String get galleryMissingCamera => 'Keine Kamerainfo';
+
+  @override
+  String get galleryMissingDateTaken => 'Kein Aufnahmedatum';
+
+  @override
+  String galleryPlaceHintCity(int km) {
+    return 'Nächste Stadt im Umkreis von $km km';
+  }
+
+  @override
+  String galleryPlaceHintCoordinates(int km) {
+    return 'Keine Stadt im Umkreis von $km km: nach Koordinaten gruppiert';
+  }
 }

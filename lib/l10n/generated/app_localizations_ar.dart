@@ -14225,4 +14225,152 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get vaultListingLinkTargetCopied => 'تم نسخ وجهة الرابط';
+
+  @override
+  String get galleryFilterTooltip => 'تصفية';
+
+  @override
+  String get galleryFilterMenuOpen => 'تصفية…';
+
+  @override
+  String get galleryFilterClearAll => 'مسح عوامل التصفية';
+
+  @override
+  String get galleryFilterClear => 'مسح';
+
+  @override
+  String galleryFilterShownOfTotal(int shown, int total) {
+    return 'عرض $shown من $total';
+  }
+
+  @override
+  String galleryFilterTotal(int count) {
+    return 'الإجمالي: $count';
+  }
+
+  @override
+  String galleryFilterIndexing(int done, int total) {
+    return 'جارٍ قراءة تفاصيل الصور: $done من $total. تظهر الوسوم والأماكن والكاميرات تدريجيًا.';
+  }
+
+  @override
+  String get galleryFilterSearchHint =>
+      'ابحث في الوسوم والأماكن والكاميرات والمجلدات…';
+
+  @override
+  String get galleryFilterTapHint => 'انقر للعرض فقط، واضغط مطولًا للإخفاء.';
+
+  @override
+  String get galleryFilterGroupBy => 'تجميع حسب';
+
+  @override
+  String galleryFilterShowAll(int count) {
+    return 'الكل ($count)';
+  }
+
+  @override
+  String get galleryFilterShowFewer => 'أقل';
+
+  @override
+  String get galleryGroupNone => 'بلا';
+
+  @override
+  String get galleryGroupDay => 'يوم';
+
+  @override
+  String get galleryGroupMonth => 'شهر';
+
+  @override
+  String get galleryGroupYear => 'سنة';
+
+  @override
+  String get galleryGroupFolder => 'مجلد';
+
+  @override
+  String get galleryGroupType => 'نوع';
+
+  @override
+  String get galleryGroupPlace => 'مكان';
+
+  @override
+  String get galleryGroupCamera => 'كاميرا';
+
+  @override
+  String get galleryFilterSectionType => 'النوع';
+
+  @override
+  String get galleryFilterSectionDate => 'التاريخ';
+
+  @override
+  String get galleryFilterSectionTags => 'الوسوم';
+
+  @override
+  String get galleryFilterSectionPlaces => 'الأماكن';
+
+  @override
+  String get galleryFilterSectionCameras => 'الكاميرات';
+
+  @override
+  String get galleryFilterSectionOrientation => 'الاتجاه';
+
+  @override
+  String get galleryFilterSectionRating => 'التقييم';
+
+  @override
+  String get galleryFilterSectionSize => 'حجم الملف';
+
+  @override
+  String get galleryFilterSectionFolders => 'المجلدات';
+
+  @override
+  String get galleryFilterSectionMissing => 'المفقودة';
+
+  @override
+  String get galleryTypePhotos => 'صور';
+
+  @override
+  String get galleryTypeVideos => 'فيديوهات';
+
+  @override
+  String get galleryTypeAnimated => 'متحركة';
+
+  @override
+  String get galleryOrientationLandscape => 'أفقي';
+
+  @override
+  String get galleryOrientationPortrait => 'عمودي';
+
+  @override
+  String get galleryOrientationSquare => 'مربع';
+
+  @override
+  String get gallerySizeSmall => 'أقل من 1 ميغابايت';
+
+  @override
+  String get gallerySizeMedium => '1 – 10 ميغابايت';
+
+  @override
+  String get gallerySizeLarge => 'أكثر من 10 ميغابايت';
+
+  @override
+  String get galleryMissingLocation => 'بدون موقع';
+
+  @override
+  String get galleryMissingTags => 'بدون وسوم';
+
+  @override
+  String get galleryMissingCamera => 'بدون معلومات الكاميرا';
+
+  @override
+  String get galleryMissingDateTaken => 'بدون تاريخ التقاط';
+
+  @override
+  String galleryPlaceHintCity(int km) {
+    return 'أقرب مدينة ضمن $km كم';
+  }
+
+  @override
+  String galleryPlaceHintCoordinates(int km) {
+    return 'لا توجد مدينة ضمن $km كم: مجمّعة حسب الإحداثيات';
+  }
 }

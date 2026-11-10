@@ -23614,6 +23614,276 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Link target copied'**
   String get vaultListingLinkTargetCopied;
+
+  /// Tooltip of the gallery filter button in the app bar
+  ///
+  /// In en, this message translates to:
+  /// **'Filter'**
+  String get galleryFilterTooltip;
+
+  /// Menu entry that opens the gallery filter sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Filter…'**
+  String get galleryFilterMenuOpen;
+
+  /// Menu entry that removes every gallery filter
+  ///
+  /// In en, this message translates to:
+  /// **'Clear filters'**
+  String get galleryFilterClearAll;
+
+  /// Button that removes every gallery filter (filter sheet and filter bar)
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get galleryFilterClear;
+
+  /// Header of the gallery filter sheet when filters are applied: how many items are left out of the total
+  ///
+  /// In en, this message translates to:
+  /// **'{shown} of {total} shown'**
+  String galleryFilterShownOfTotal(int shown, int total);
+
+  /// Header of the gallery filter sheet when no filter is applied: number of items
+  ///
+  /// In en, this message translates to:
+  /// **'Total: {count}'**
+  String galleryFilterTotal(int count);
+
+  /// Progress note in the gallery filter sheet while photo metadata (EXIF, tags, GPS) is read in the background
+  ///
+  /// In en, this message translates to:
+  /// **'Reading photo details: {done} of {total}. Tags, places and cameras appear as it goes.'**
+  String galleryFilterIndexing(int done, int total);
+
+  /// Hint of the search field in the gallery filter sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Search tags, places, cameras, folders…'**
+  String get galleryFilterSearchHint;
+
+  /// Usage hint in the gallery filter sheet: tapping a chip shows only matching items, long-pressing excludes them
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to show only, long-press to hide.'**
+  String get galleryFilterTapHint;
+
+  /// Title of the section choosing how the gallery is divided into sections
+  ///
+  /// In en, this message translates to:
+  /// **'Group by'**
+  String get galleryFilterGroupBy;
+
+  /// Chip that expands a long list of filter chips; count is the total number of chips
+  ///
+  /// In en, this message translates to:
+  /// **'All {count}'**
+  String galleryFilterShowAll(int count);
+
+  /// Chip that collapses an expanded list of filter chips
+  ///
+  /// In en, this message translates to:
+  /// **'Fewer'**
+  String get galleryFilterShowFewer;
+
+  /// Gallery grouping option: no sections
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get galleryGroupNone;
+
+  /// Gallery grouping option: one section per day
+  ///
+  /// In en, this message translates to:
+  /// **'Day'**
+  String get galleryGroupDay;
+
+  /// Gallery grouping option: one section per month
+  ///
+  /// In en, this message translates to:
+  /// **'Month'**
+  String get galleryGroupMonth;
+
+  /// Gallery grouping option: one section per year
+  ///
+  /// In en, this message translates to:
+  /// **'Year'**
+  String get galleryGroupYear;
+
+  /// Gallery grouping option: one section per folder
+  ///
+  /// In en, this message translates to:
+  /// **'Folder'**
+  String get galleryGroupFolder;
+
+  /// Gallery grouping option: one section per media type (photos, videos...)
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get galleryGroupType;
+
+  /// Gallery grouping option: one section per place (city)
+  ///
+  /// In en, this message translates to:
+  /// **'Place'**
+  String get galleryGroupPlace;
+
+  /// Gallery grouping option: one section per camera model
+  ///
+  /// In en, this message translates to:
+  /// **'Camera'**
+  String get galleryGroupCamera;
+
+  /// Gallery filter sheet section title: media type
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get galleryFilterSectionType;
+
+  /// Gallery filter sheet section title: year and month
+  ///
+  /// In en, this message translates to:
+  /// **'Date'**
+  String get galleryFilterSectionDate;
+
+  /// Gallery filter sheet section title: photo tags (keywords)
+  ///
+  /// In en, this message translates to:
+  /// **'Tags'**
+  String get galleryFilterSectionTags;
+
+  /// Gallery filter sheet section title: places (cities) photos were taken in
+  ///
+  /// In en, this message translates to:
+  /// **'Places'**
+  String get galleryFilterSectionPlaces;
+
+  /// Gallery filter sheet section title: camera models
+  ///
+  /// In en, this message translates to:
+  /// **'Cameras'**
+  String get galleryFilterSectionCameras;
+
+  /// Gallery filter sheet section title: landscape, portrait, square
+  ///
+  /// In en, this message translates to:
+  /// **'Orientation'**
+  String get galleryFilterSectionOrientation;
+
+  /// Gallery filter sheet section title: star rating
+  ///
+  /// In en, this message translates to:
+  /// **'Rating'**
+  String get galleryFilterSectionRating;
+
+  /// Gallery filter sheet section title: file size ranges
+  ///
+  /// In en, this message translates to:
+  /// **'File size'**
+  String get galleryFilterSectionSize;
+
+  /// Gallery filter sheet section title: folders
+  ///
+  /// In en, this message translates to:
+  /// **'Folders'**
+  String get galleryFilterSectionFolders;
+
+  /// Gallery filter sheet section title: items that lack some information (no location, no tags...)
+  ///
+  /// In en, this message translates to:
+  /// **'Missing'**
+  String get galleryFilterSectionMissing;
+
+  /// Gallery filter: still images
+  ///
+  /// In en, this message translates to:
+  /// **'Photos'**
+  String get galleryTypePhotos;
+
+  /// Gallery filter: videos
+  ///
+  /// In en, this message translates to:
+  /// **'Videos'**
+  String get galleryTypeVideos;
+
+  /// Gallery filter: animated images such as GIF
+  ///
+  /// In en, this message translates to:
+  /// **'Animated'**
+  String get galleryTypeAnimated;
+
+  /// Gallery filter: images wider than tall
+  ///
+  /// In en, this message translates to:
+  /// **'Landscape'**
+  String get galleryOrientationLandscape;
+
+  /// Gallery filter: images taller than wide
+  ///
+  /// In en, this message translates to:
+  /// **'Portrait'**
+  String get galleryOrientationPortrait;
+
+  /// Gallery filter: images as wide as tall
+  ///
+  /// In en, this message translates to:
+  /// **'Square'**
+  String get galleryOrientationSquare;
+
+  /// Gallery filter: files smaller than one megabyte
+  ///
+  /// In en, this message translates to:
+  /// **'Under 1 MB'**
+  String get gallerySizeSmall;
+
+  /// Gallery filter: files between one and ten megabytes
+  ///
+  /// In en, this message translates to:
+  /// **'1 – 10 MB'**
+  String get gallerySizeMedium;
+
+  /// Gallery filter: files larger than ten megabytes
+  ///
+  /// In en, this message translates to:
+  /// **'Over 10 MB'**
+  String get gallerySizeLarge;
+
+  /// Gallery filter and group name: photos without a GPS position
+  ///
+  /// In en, this message translates to:
+  /// **'No location'**
+  String get galleryMissingLocation;
+
+  /// Gallery filter: photos without tags
+  ///
+  /// In en, this message translates to:
+  /// **'No tags'**
+  String get galleryMissingTags;
+
+  /// Gallery filter and group name: photos without camera information
+  ///
+  /// In en, this message translates to:
+  /// **'No camera info'**
+  String get galleryMissingCamera;
+
+  /// Gallery filter: photos without a capture date in their metadata
+  ///
+  /// In en, this message translates to:
+  /// **'No date taken'**
+  String get galleryMissingDateTaken;
+
+  /// Tooltip of a place chip that is a city; km is the search radius
+  ///
+  /// In en, this message translates to:
+  /// **'Nearest city, within {km} km'**
+  String galleryPlaceHintCity(int km);
+
+  /// Tooltip of a place chip that is raw coordinates because no city is close; km is the search radius
+  ///
+  /// In en, this message translates to:
+  /// **'No city within {km} km: grouped by coordinates'**
+  String galleryPlaceHintCoordinates(int km);
 }
 
 class _AppLocalizationsDelegate

@@ -13203,4 +13203,151 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get vaultListingLinkTargetCopied => '已复制链接目标';
+
+  @override
+  String get galleryFilterTooltip => '筛选';
+
+  @override
+  String get galleryFilterMenuOpen => '筛选…';
+
+  @override
+  String get galleryFilterClearAll => '清除筛选';
+
+  @override
+  String get galleryFilterClear => '清除';
+
+  @override
+  String galleryFilterShownOfTotal(int shown, int total) {
+    return '已显示 $shown / $total';
+  }
+
+  @override
+  String galleryFilterTotal(int count) {
+    return '共 $count 项';
+  }
+
+  @override
+  String galleryFilterIndexing(int done, int total) {
+    return '正在读取照片详情：$done / $total。标签、地点和相机会随读取进度逐步出现。';
+  }
+
+  @override
+  String get galleryFilterSearchHint => '搜索标签、地点、相机、文件夹…';
+
+  @override
+  String get galleryFilterTapHint => '点按仅显示，长按排除。';
+
+  @override
+  String get galleryFilterGroupBy => '分组方式';
+
+  @override
+  String galleryFilterShowAll(int count) {
+    return '全部（$count）';
+  }
+
+  @override
+  String get galleryFilterShowFewer => '收起';
+
+  @override
+  String get galleryGroupNone => '无';
+
+  @override
+  String get galleryGroupDay => '日';
+
+  @override
+  String get galleryGroupMonth => '月';
+
+  @override
+  String get galleryGroupYear => '年';
+
+  @override
+  String get galleryGroupFolder => '文件夹';
+
+  @override
+  String get galleryGroupType => '类型';
+
+  @override
+  String get galleryGroupPlace => '地点';
+
+  @override
+  String get galleryGroupCamera => '相机';
+
+  @override
+  String get galleryFilterSectionType => '类型';
+
+  @override
+  String get galleryFilterSectionDate => '日期';
+
+  @override
+  String get galleryFilterSectionTags => '标签';
+
+  @override
+  String get galleryFilterSectionPlaces => '地点';
+
+  @override
+  String get galleryFilterSectionCameras => '相机';
+
+  @override
+  String get galleryFilterSectionOrientation => '方向';
+
+  @override
+  String get galleryFilterSectionRating => '评分';
+
+  @override
+  String get galleryFilterSectionSize => '文件大小';
+
+  @override
+  String get galleryFilterSectionFolders => '文件夹';
+
+  @override
+  String get galleryFilterSectionMissing => '缺失';
+
+  @override
+  String get galleryTypePhotos => '照片';
+
+  @override
+  String get galleryTypeVideos => '视频';
+
+  @override
+  String get galleryTypeAnimated => '动图';
+
+  @override
+  String get galleryOrientationLandscape => '横向';
+
+  @override
+  String get galleryOrientationPortrait => '纵向';
+
+  @override
+  String get galleryOrientationSquare => '方形';
+
+  @override
+  String get gallerySizeSmall => '小于 1 MB';
+
+  @override
+  String get gallerySizeMedium => '1 – 10 MB';
+
+  @override
+  String get gallerySizeLarge => '大于 10 MB';
+
+  @override
+  String get galleryMissingLocation => '无位置信息';
+
+  @override
+  String get galleryMissingTags => '无标签';
+
+  @override
+  String get galleryMissingCamera => '无相机信息';
+
+  @override
+  String get galleryMissingDateTaken => '无拍摄日期';
+
+  @override
+  String galleryPlaceHintCity(int km) {
+    return '最近的城市（$km 公里内）';
+  }
+
+  @override
+  String galleryPlaceHintCoordinates(int km) {
+    return '$km 公里内没有城市：按坐标分组';
+  }
 }

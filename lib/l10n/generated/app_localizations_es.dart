@@ -14179,6 +14179,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get lockAnywayButton => 'Bloquear de todos modos';
+
   @override
   String vaultListingSymbolicLinkCount(int count) {
     String _temp0 = intl.Intl.pluralLogic(
@@ -14210,17 +14211,168 @@ class AppLocalizationsEs extends AppLocalizations {
   String get vaultListingSymbolicLinksTitle => 'Enlaces simbólicos';
 
   @override
-  String get vaultListingSymbolicLinksNote => 'Un enlace simbólico apunta a otro lugar. Aquí nunca se abre ni se sigue; tócalo para copiar su destino.';
+  String get vaultListingSymbolicLinksNote =>
+      'Un enlace simbólico apunta a otro lugar. Aquí nunca se abre ni se sigue; tócalo para copiar su destino.';
 
   @override
   String get vaultListingHiddenEntriesTitle => 'Elementos no mostrados';
 
   @override
-  String get vaultListingHiddenEntriesBody => 'Estos elementos existen en la bóveda, pero no se pudieron enumerar. Lo más habitual es que una aplicación de sincronización haya creado copias en conflicto (por ejemplo, «name (1)») o que una carga aún no haya terminado. Puedes resolver las copias en conflicto con Cryptomator en un ordenador. Aquí no se ha cambiado ni eliminado nada.';
+  String get vaultListingHiddenEntriesBody =>
+      'Estos elementos existen en la bóveda, pero no se pudieron enumerar. Lo más habitual es que una aplicación de sincronización haya creado copias en conflicto (por ejemplo, «name (1)») o que una carga aún no haya terminado. Puedes resolver las copias en conflicto con Cryptomator en un ordenador. Aquí no se ha cambiado ni eliminado nada.';
 
   @override
   String get vaultListingTargetUnreadable => '(no se puede leer el destino)';
 
   @override
   String get vaultListingLinkTargetCopied => 'Destino del enlace copiado';
+
+  @override
+  String get galleryFilterTooltip => 'Filtrar';
+
+  @override
+  String get galleryFilterMenuOpen => 'Filtrar…';
+
+  @override
+  String get galleryFilterClearAll => 'Quitar filtros';
+
+  @override
+  String get galleryFilterClear => 'Borrar';
+
+  @override
+  String galleryFilterShownOfTotal(int shown, int total) {
+    return '$shown de $total mostrados';
+  }
+
+  @override
+  String galleryFilterTotal(int count) {
+    return 'Total: $count';
+  }
+
+  @override
+  String galleryFilterIndexing(int done, int total) {
+    return 'Leyendo detalles de las fotos: $done de $total. Las etiquetas, los lugares y las cámaras aparecen a medida que avanza.';
+  }
+
+  @override
+  String get galleryFilterSearchHint =>
+      'Buscar etiquetas, lugares, cámaras, carpetas…';
+
+  @override
+  String get galleryFilterTapHint =>
+      'Toca para mostrar solo esto; mantén pulsado para ocultar.';
+
+  @override
+  String get galleryFilterGroupBy => 'Agrupar por';
+
+  @override
+  String galleryFilterShowAll(int count) {
+    return 'Todos ($count)';
+  }
+
+  @override
+  String get galleryFilterShowFewer => 'Menos';
+
+  @override
+  String get galleryGroupNone => 'Ninguno';
+
+  @override
+  String get galleryGroupDay => 'Día';
+
+  @override
+  String get galleryGroupMonth => 'Mes';
+
+  @override
+  String get galleryGroupYear => 'Año';
+
+  @override
+  String get galleryGroupFolder => 'Carpeta';
+
+  @override
+  String get galleryGroupType => 'Tipo';
+
+  @override
+  String get galleryGroupPlace => 'Lugar';
+
+  @override
+  String get galleryGroupCamera => 'Cámara';
+
+  @override
+  String get galleryFilterSectionType => 'Tipo';
+
+  @override
+  String get galleryFilterSectionDate => 'Fecha';
+
+  @override
+  String get galleryFilterSectionTags => 'Etiquetas';
+
+  @override
+  String get galleryFilterSectionPlaces => 'Lugares';
+
+  @override
+  String get galleryFilterSectionCameras => 'Cámaras';
+
+  @override
+  String get galleryFilterSectionOrientation => 'Orientación';
+
+  @override
+  String get galleryFilterSectionRating => 'Valoración';
+
+  @override
+  String get galleryFilterSectionSize => 'Tamaño de archivo';
+
+  @override
+  String get galleryFilterSectionFolders => 'Carpetas';
+
+  @override
+  String get galleryFilterSectionMissing => 'Faltantes';
+
+  @override
+  String get galleryTypePhotos => 'Fotos';
+
+  @override
+  String get galleryTypeVideos => 'Vídeos';
+
+  @override
+  String get galleryTypeAnimated => 'Animados';
+
+  @override
+  String get galleryOrientationLandscape => 'Horizontal';
+
+  @override
+  String get galleryOrientationPortrait => 'Vertical';
+
+  @override
+  String get galleryOrientationSquare => 'Cuadrada';
+
+  @override
+  String get gallerySizeSmall => 'Menos de 1 MB';
+
+  @override
+  String get gallerySizeMedium => '1 – 10 MB';
+
+  @override
+  String get gallerySizeLarge => 'Más de 10 MB';
+
+  @override
+  String get galleryMissingLocation => 'Sin ubicación';
+
+  @override
+  String get galleryMissingTags => 'Sin etiquetas';
+
+  @override
+  String get galleryMissingCamera => 'Sin datos de cámara';
+
+  @override
+  String get galleryMissingDateTaken => 'Sin fecha de captura';
+
+  @override
+  String galleryPlaceHintCity(int km) {
+    return 'Ciudad más cercana, a menos de $km km';
+  }
+
+  @override
+  String galleryPlaceHintCoordinates(int km) {
+    return 'Ninguna ciudad a menos de $km km: agrupado por coordenadas';
+  }
 }

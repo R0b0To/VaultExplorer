@@ -13410,4 +13410,151 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get vaultListingLinkTargetCopied => '링크 대상을 복사했습니다';
+
+  @override
+  String get galleryFilterTooltip => '필터';
+
+  @override
+  String get galleryFilterMenuOpen => '필터…';
+
+  @override
+  String get galleryFilterClearAll => '필터 지우기';
+
+  @override
+  String get galleryFilterClear => '지우기';
+
+  @override
+  String galleryFilterShownOfTotal(int shown, int total) {
+    return '$total개 중 $shown개 표시';
+  }
+
+  @override
+  String galleryFilterTotal(int count) {
+    return '전체: $count개';
+  }
+
+  @override
+  String galleryFilterIndexing(int done, int total) {
+    return '사진 정보 읽는 중: $total개 중 $done개. 태그, 장소, 카메라는 읽는 대로 표시됩니다.';
+  }
+
+  @override
+  String get galleryFilterSearchHint => '태그, 장소, 카메라, 폴더 검색…';
+
+  @override
+  String get galleryFilterTapHint => '탭하면 해당 항목만 표시하고, 길게 누르면 숨깁니다.';
+
+  @override
+  String get galleryFilterGroupBy => '그룹 기준';
+
+  @override
+  String galleryFilterShowAll(int count) {
+    return '전체 ($count)';
+  }
+
+  @override
+  String get galleryFilterShowFewer => '간단히';
+
+  @override
+  String get galleryGroupNone => '없음';
+
+  @override
+  String get galleryGroupDay => '일';
+
+  @override
+  String get galleryGroupMonth => '월';
+
+  @override
+  String get galleryGroupYear => '년';
+
+  @override
+  String get galleryGroupFolder => '폴더';
+
+  @override
+  String get galleryGroupType => '유형';
+
+  @override
+  String get galleryGroupPlace => '장소';
+
+  @override
+  String get galleryGroupCamera => '카메라';
+
+  @override
+  String get galleryFilterSectionType => '유형';
+
+  @override
+  String get galleryFilterSectionDate => '날짜';
+
+  @override
+  String get galleryFilterSectionTags => '태그';
+
+  @override
+  String get galleryFilterSectionPlaces => '장소';
+
+  @override
+  String get galleryFilterSectionCameras => '카메라';
+
+  @override
+  String get galleryFilterSectionOrientation => '방향';
+
+  @override
+  String get galleryFilterSectionRating => '평점';
+
+  @override
+  String get galleryFilterSectionSize => '파일 크기';
+
+  @override
+  String get galleryFilterSectionFolders => '폴더';
+
+  @override
+  String get galleryFilterSectionMissing => '누락';
+
+  @override
+  String get galleryTypePhotos => '사진';
+
+  @override
+  String get galleryTypeVideos => '동영상';
+
+  @override
+  String get galleryTypeAnimated => '애니메이션';
+
+  @override
+  String get galleryOrientationLandscape => '가로';
+
+  @override
+  String get galleryOrientationPortrait => '세로';
+
+  @override
+  String get galleryOrientationSquare => '정사각형';
+
+  @override
+  String get gallerySizeSmall => '1 MB 미만';
+
+  @override
+  String get gallerySizeMedium => '1 – 10 MB';
+
+  @override
+  String get gallerySizeLarge => '10 MB 초과';
+
+  @override
+  String get galleryMissingLocation => '위치 없음';
+
+  @override
+  String get galleryMissingTags => '태그 없음';
+
+  @override
+  String get galleryMissingCamera => '카메라 정보 없음';
+
+  @override
+  String get galleryMissingDateTaken => '촬영 날짜 없음';
+
+  @override
+  String galleryPlaceHintCity(int km) {
+    return '가장 가까운 도시 ($km km 이내)';
+  }
+
+  @override
+  String galleryPlaceHintCoordinates(int km) {
+    return '$km km 이내에 도시 없음: 좌표로 그룹화';
+  }
 }

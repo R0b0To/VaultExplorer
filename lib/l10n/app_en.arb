@@ -15836,5 +15836,221 @@
   "vaultListingLinkTargetCopied": "Link target copied",
   "@vaultListingLinkTargetCopied": {
     "description": "Confirmation shown after copying a symbolic link target"
+  },
+  "galleryFilterTooltip": "Filter",
+  "@galleryFilterTooltip": {
+    "description": "Tooltip of the gallery filter button in the app bar"
+  },
+  "galleryFilterMenuOpen": "Filter…",
+  "@galleryFilterMenuOpen": {
+    "description": "Menu entry that opens the gallery filter sheet"
+  },
+  "galleryFilterClearAll": "Clear filters",
+  "@galleryFilterClearAll": {
+    "description": "Menu entry that removes every gallery filter"
+  },
+  "galleryFilterClear": "Clear",
+  "@galleryFilterClear": {
+    "description": "Button that removes every gallery filter (filter sheet and filter bar)"
+  },
+  "galleryFilterShownOfTotal": "{shown} of {total} shown",
+  "@galleryFilterShownOfTotal": {
+    "description": "Header of the gallery filter sheet when filters are applied: how many items are left out of the total",
+    "placeholders": {
+      "shown": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "galleryFilterTotal": "Total: {count}",
+  "@galleryFilterTotal": {
+    "description": "Header of the gallery filter sheet when no filter is applied: number of items",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "galleryFilterIndexing": "Reading photo details: {done} of {total}. Tags, places and cameras appear as it goes.",
+  "@galleryFilterIndexing": {
+    "description": "Progress note in the gallery filter sheet while photo metadata (EXIF, tags, GPS) is read in the background",
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "galleryFilterSearchHint": "Search tags, places, cameras, folders…",
+  "@galleryFilterSearchHint": {
+    "description": "Hint of the search field in the gallery filter sheet"
+  },
+  "galleryFilterTapHint": "Tap to show only, long-press to hide.",
+  "@galleryFilterTapHint": {
+    "description": "Usage hint in the gallery filter sheet: tapping a chip shows only matching items, long-pressing excludes them"
+  },
+  "galleryFilterGroupBy": "Group by",
+  "@galleryFilterGroupBy": {
+    "description": "Title of the section choosing how the gallery is divided into sections"
+  },
+  "galleryFilterShowAll": "All {count}",
+  "@galleryFilterShowAll": {
+    "description": "Chip that expands a long list of filter chips; count is the total number of chips",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "galleryFilterShowFewer": "Fewer",
+  "@galleryFilterShowFewer": {
+    "description": "Chip that collapses an expanded list of filter chips"
+  },
+  "galleryGroupNone": "None",
+  "@galleryGroupNone": {
+    "description": "Gallery grouping option: no sections"
+  },
+  "galleryGroupDay": "Day",
+  "@galleryGroupDay": {
+    "description": "Gallery grouping option: one section per day"
+  },
+  "galleryGroupMonth": "Month",
+  "@galleryGroupMonth": {
+    "description": "Gallery grouping option: one section per month"
+  },
+  "galleryGroupYear": "Year",
+  "@galleryGroupYear": {
+    "description": "Gallery grouping option: one section per year"
+  },
+  "galleryGroupFolder": "Folder",
+  "@galleryGroupFolder": {
+    "description": "Gallery grouping option: one section per folder"
+  },
+  "galleryGroupType": "Type",
+  "@galleryGroupType": {
+    "description": "Gallery grouping option: one section per media type (photos, videos...)"
+  },
+  "galleryGroupPlace": "Place",
+  "@galleryGroupPlace": {
+    "description": "Gallery grouping option: one section per place (city)"
+  },
+  "galleryGroupCamera": "Camera",
+  "@galleryGroupCamera": {
+    "description": "Gallery grouping option: one section per camera model"
+  },
+  "galleryFilterSectionType": "Type",
+  "@galleryFilterSectionType": {
+    "description": "Gallery filter sheet section title: media type"
+  },
+  "galleryFilterSectionDate": "Date",
+  "@galleryFilterSectionDate": {
+    "description": "Gallery filter sheet section title: year and month"
+  },
+  "galleryFilterSectionTags": "Tags",
+  "@galleryFilterSectionTags": {
+    "description": "Gallery filter sheet section title: photo tags (keywords)"
+  },
+  "galleryFilterSectionPlaces": "Places",
+  "@galleryFilterSectionPlaces": {
+    "description": "Gallery filter sheet section title: places (cities) photos were taken in"
+  },
+  "galleryFilterSectionCameras": "Cameras",
+  "@galleryFilterSectionCameras": {
+    "description": "Gallery filter sheet section title: camera models"
+  },
+  "galleryFilterSectionOrientation": "Orientation",
+  "@galleryFilterSectionOrientation": {
+    "description": "Gallery filter sheet section title: landscape, portrait, square"
+  },
+  "galleryFilterSectionRating": "Rating",
+  "@galleryFilterSectionRating": {
+    "description": "Gallery filter sheet section title: star rating"
+  },
+  "galleryFilterSectionSize": "File size",
+  "@galleryFilterSectionSize": {
+    "description": "Gallery filter sheet section title: file size ranges"
+  },
+  "galleryFilterSectionFolders": "Folders",
+  "@galleryFilterSectionFolders": {
+    "description": "Gallery filter sheet section title: folders"
+  },
+  "galleryFilterSectionMissing": "Missing",
+  "@galleryFilterSectionMissing": {
+    "description": "Gallery filter sheet section title: items that lack some information (no location, no tags...)"
+  },
+  "galleryTypePhotos": "Photos",
+  "@galleryTypePhotos": {
+    "description": "Gallery filter: still images"
+  },
+  "galleryTypeVideos": "Videos",
+  "@galleryTypeVideos": {
+    "description": "Gallery filter: videos"
+  },
+  "galleryTypeAnimated": "Animated",
+  "@galleryTypeAnimated": {
+    "description": "Gallery filter: animated images such as GIF"
+  },
+  "galleryOrientationLandscape": "Landscape",
+  "@galleryOrientationLandscape": {
+    "description": "Gallery filter: images wider than tall"
+  },
+  "galleryOrientationPortrait": "Portrait",
+  "@galleryOrientationPortrait": {
+    "description": "Gallery filter: images taller than wide"
+  },
+  "galleryOrientationSquare": "Square",
+  "@galleryOrientationSquare": {
+    "description": "Gallery filter: images as wide as tall"
+  },
+  "gallerySizeSmall": "Under 1 MB",
+  "@gallerySizeSmall": {
+    "description": "Gallery filter: files smaller than one megabyte"
+  },
+  "gallerySizeMedium": "1 – 10 MB",
+  "@gallerySizeMedium": {
+    "description": "Gallery filter: files between one and ten megabytes"
+  },
+  "gallerySizeLarge": "Over 10 MB",
+  "@gallerySizeLarge": {
+    "description": "Gallery filter: files larger than ten megabytes"
+  },
+  "galleryMissingLocation": "No location",
+  "@galleryMissingLocation": {
+    "description": "Gallery filter and group name: photos without a GPS position"
+  },
+  "galleryMissingTags": "No tags",
+  "@galleryMissingTags": {
+    "description": "Gallery filter: photos without tags"
+  },
+  "galleryMissingCamera": "No camera info",
+  "@galleryMissingCamera": {
+    "description": "Gallery filter and group name: photos without camera information"
+  },
+  "galleryMissingDateTaken": "No date taken",
+  "@galleryMissingDateTaken": {
+    "description": "Gallery filter: photos without a capture date in their metadata"
+  },
+  "galleryPlaceHintCity": "Nearest city, within {km} km",
+  "@galleryPlaceHintCity": {
+    "description": "Tooltip of a place chip that is a city; km is the search radius",
+    "placeholders": {
+      "km": {
+        "type": "int"
+      }
+    }
+  },
+  "galleryPlaceHintCoordinates": "No city within {km} km: grouped by coordinates",
+  "@galleryPlaceHintCoordinates": {
+    "description": "Tooltip of a place chip that is raw coordinates because no city is close; km is the search radius",
+    "placeholders": {
+      "km": {
+        "type": "int"
+      }
+    }
   }
 }

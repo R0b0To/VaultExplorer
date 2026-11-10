@@ -13973,4 +13973,152 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get vaultListingLinkTargetCopied => 'Link target copied';
+
+  @override
+  String get galleryFilterTooltip => 'Filter';
+
+  @override
+  String get galleryFilterMenuOpen => 'Filter…';
+
+  @override
+  String get galleryFilterClearAll => 'Clear filters';
+
+  @override
+  String get galleryFilterClear => 'Clear';
+
+  @override
+  String galleryFilterShownOfTotal(int shown, int total) {
+    return '$shown of $total shown';
+  }
+
+  @override
+  String galleryFilterTotal(int count) {
+    return 'Total: $count';
+  }
+
+  @override
+  String galleryFilterIndexing(int done, int total) {
+    return 'Reading photo details: $done of $total. Tags, places and cameras appear as it goes.';
+  }
+
+  @override
+  String get galleryFilterSearchHint =>
+      'Search tags, places, cameras, folders…';
+
+  @override
+  String get galleryFilterTapHint => 'Tap to show only, long-press to hide.';
+
+  @override
+  String get galleryFilterGroupBy => 'Group by';
+
+  @override
+  String galleryFilterShowAll(int count) {
+    return 'All $count';
+  }
+
+  @override
+  String get galleryFilterShowFewer => 'Fewer';
+
+  @override
+  String get galleryGroupNone => 'None';
+
+  @override
+  String get galleryGroupDay => 'Day';
+
+  @override
+  String get galleryGroupMonth => 'Month';
+
+  @override
+  String get galleryGroupYear => 'Year';
+
+  @override
+  String get galleryGroupFolder => 'Folder';
+
+  @override
+  String get galleryGroupType => 'Type';
+
+  @override
+  String get galleryGroupPlace => 'Place';
+
+  @override
+  String get galleryGroupCamera => 'Camera';
+
+  @override
+  String get galleryFilterSectionType => 'Type';
+
+  @override
+  String get galleryFilterSectionDate => 'Date';
+
+  @override
+  String get galleryFilterSectionTags => 'Tags';
+
+  @override
+  String get galleryFilterSectionPlaces => 'Places';
+
+  @override
+  String get galleryFilterSectionCameras => 'Cameras';
+
+  @override
+  String get galleryFilterSectionOrientation => 'Orientation';
+
+  @override
+  String get galleryFilterSectionRating => 'Rating';
+
+  @override
+  String get galleryFilterSectionSize => 'File size';
+
+  @override
+  String get galleryFilterSectionFolders => 'Folders';
+
+  @override
+  String get galleryFilterSectionMissing => 'Missing';
+
+  @override
+  String get galleryTypePhotos => 'Photos';
+
+  @override
+  String get galleryTypeVideos => 'Videos';
+
+  @override
+  String get galleryTypeAnimated => 'Animated';
+
+  @override
+  String get galleryOrientationLandscape => 'Landscape';
+
+  @override
+  String get galleryOrientationPortrait => 'Portrait';
+
+  @override
+  String get galleryOrientationSquare => 'Square';
+
+  @override
+  String get gallerySizeSmall => 'Under 1 MB';
+
+  @override
+  String get gallerySizeMedium => '1 – 10 MB';
+
+  @override
+  String get gallerySizeLarge => 'Over 10 MB';
+
+  @override
+  String get galleryMissingLocation => 'No location';
+
+  @override
+  String get galleryMissingTags => 'No tags';
+
+  @override
+  String get galleryMissingCamera => 'No camera info';
+
+  @override
+  String get galleryMissingDateTaken => 'No date taken';
+
+  @override
+  String galleryPlaceHintCity(int km) {
+    return 'Nearest city, within $km km';
+  }
+
+  @override
+  String galleryPlaceHintCoordinates(int km) {
+    return 'No city within $km km: grouped by coordinates';
+  }
 }

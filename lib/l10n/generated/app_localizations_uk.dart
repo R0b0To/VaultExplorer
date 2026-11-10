@@ -14292,4 +14292,152 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get vaultListingLinkTargetCopied => 'Ціль посилання скопійовано';
+
+  @override
+  String get galleryFilterTooltip => 'Фільтр';
+
+  @override
+  String get galleryFilterMenuOpen => 'Фільтр…';
+
+  @override
+  String get galleryFilterClearAll => 'Скинути фільтри';
+
+  @override
+  String get galleryFilterClear => 'Скинути';
+
+  @override
+  String galleryFilterShownOfTotal(int shown, int total) {
+    return 'Показано $shown із $total';
+  }
+
+  @override
+  String galleryFilterTotal(int count) {
+    return 'Усього: $count';
+  }
+
+  @override
+  String galleryFilterIndexing(int done, int total) {
+    return 'Читання відомостей про фото: $done із $total. Теги, місця й камери з’являються поступово.';
+  }
+
+  @override
+  String get galleryFilterSearchHint => 'Шукати теги, місця, камери, теки…';
+
+  @override
+  String get galleryFilterTapHint =>
+      'Торкніться, щоб показати лише це; утримуйте, щоб приховати.';
+
+  @override
+  String get galleryFilterGroupBy => 'Групувати за';
+
+  @override
+  String galleryFilterShowAll(int count) {
+    return 'Усі ($count)';
+  }
+
+  @override
+  String get galleryFilterShowFewer => 'Менше';
+
+  @override
+  String get galleryGroupNone => 'Немає';
+
+  @override
+  String get galleryGroupDay => 'День';
+
+  @override
+  String get galleryGroupMonth => 'Місяць';
+
+  @override
+  String get galleryGroupYear => 'Рік';
+
+  @override
+  String get galleryGroupFolder => 'Тека';
+
+  @override
+  String get galleryGroupType => 'Тип';
+
+  @override
+  String get galleryGroupPlace => 'Місце';
+
+  @override
+  String get galleryGroupCamera => 'Камера';
+
+  @override
+  String get galleryFilterSectionType => 'Тип';
+
+  @override
+  String get galleryFilterSectionDate => 'Дата';
+
+  @override
+  String get galleryFilterSectionTags => 'Теги';
+
+  @override
+  String get galleryFilterSectionPlaces => 'Місця';
+
+  @override
+  String get galleryFilterSectionCameras => 'Камери';
+
+  @override
+  String get galleryFilterSectionOrientation => 'Орієнтація';
+
+  @override
+  String get galleryFilterSectionRating => 'Оцінка';
+
+  @override
+  String get galleryFilterSectionSize => 'Розмір файлу';
+
+  @override
+  String get galleryFilterSectionFolders => 'Теки';
+
+  @override
+  String get galleryFilterSectionMissing => 'Відсутнє';
+
+  @override
+  String get galleryTypePhotos => 'Фото';
+
+  @override
+  String get galleryTypeVideos => 'Відео';
+
+  @override
+  String get galleryTypeAnimated => 'Анімовані';
+
+  @override
+  String get galleryOrientationLandscape => 'Альбомна';
+
+  @override
+  String get galleryOrientationPortrait => 'Портретна';
+
+  @override
+  String get galleryOrientationSquare => 'Квадратна';
+
+  @override
+  String get gallerySizeSmall => 'Менше ніж 1 МБ';
+
+  @override
+  String get gallerySizeMedium => '1 – 10 МБ';
+
+  @override
+  String get gallerySizeLarge => 'Понад 10 МБ';
+
+  @override
+  String get galleryMissingLocation => 'Без місця';
+
+  @override
+  String get galleryMissingTags => 'Без тегів';
+
+  @override
+  String get galleryMissingCamera => 'Без даних про камеру';
+
+  @override
+  String get galleryMissingDateTaken => 'Без дати зйомки';
+
+  @override
+  String galleryPlaceHintCity(int km) {
+    return 'Найближче місто в межах $km км';
+  }
+
+  @override
+  String galleryPlaceHintCoordinates(int km) {
+    return 'Немає міст у межах $km км: згруповано за координатами';
+  }
 }

@@ -50,6 +50,30 @@ String libraryAlbumSubtitle(BuildContext context, AlbumGroup album) {
 String libraryDurationLabel(int durationMs) =>
     durationMs <= 0 ? '' : formatClockDuration(Duration(milliseconds: durationMs));
 
+/// Formats duration for album cards (e.g. "29s", "3m 45s", "1h 12m").
+String formatAlbumDuration(int durationMs) {
+  if (durationMs <= 0) return '';
+  final d = Duration(milliseconds: durationMs);
+  if (d.inHours > 0) {
+    final m = d.inMinutes.remainder(60);
+    return m > 0 ? '${d.inHours}h ${m}m' : '${d.inHours}h';
+  }
+  if (d.inMinutes > 0) {
+    final s = d.inSeconds.remainder(60);
+    return s > 0 ? '${d.inMinutes}m ${s}s' : '${d.inMinutes}m';
+  }
+  return '${d.inSeconds}s';
+}
+
+/// "1 Track • 29s", "12 Tracks • 42m", etc.
+String libraryAlbumDetails(AlbumGroup album) {
+  final count = album.tracks.length;
+  final trackLabel = count == 1 ? '1 Track' : '$count Tracks';
+  final duration = formatAlbumDuration(album.durationMs);
+  if (duration.isEmpty) return trackLabel;
+  return '$trackLabel • $duration';
+}
+
 /// "Artist — Album" for a track row; whichever part exists when one is missing.
 String libraryTrackSubtitle(BuildContext context, LibraryTrack t) {
   final artist = t.artists.isEmpty ? '' : t.artists.join(', ');
@@ -167,94 +191,116 @@ class LibraryAlbumTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = context.colors;
     final text = context.typography;
-    // A soft card with the cover inset, the year as a badge on the cover and
-    // the title and artist underneath.
     return Material(
       color: cs.surfaceContainer,
       elevation: 1,
       shadowColor: cs.shadow.withValues(alpha: 0.35),
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(16),
       clipBehavior: Clip.antiAlias,
-      child: InkWell(
+    child: InkWell(
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(6),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Stack(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final textContent = Padding(
+              padding: const EdgeInsets.fromLTRB(8, 4, 8, 6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  LibraryCover(
-                    covers: covers,
-                    track: album.coverTrack,
-                    groupKey: albumCoverKey(album),
-                    borderRadius: 10,
-                    placeholderIcon: Icons.album_rounded,
+                  Text(
+                    libraryAlbumTitle(context, album),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: text.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                  if (album.year != 0)
-                    Positioned(
-                      top: 6,
-                      left: 6,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.55),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          child: Text(
-                            '${album.year}',
-                            style: text.labelSmall?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ),
+                  const SizedBox(height: 1),
+                  Text(
+                    libraryArtistLabelFor(context, album),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: text.bodySmall?.copyWith(
+                      color: cs.onSurfaceVariant,
                     ),
-                  if (onPlay != null)
-                    Positioned(
-                      right: 4,
-                      bottom: 4,
-                      child: IconButton.filled(
-                        visualDensity: VisualDensity.compact,
-                        tooltip: context.l10n.libraryPlayAll,
-                        icon: const Icon(Icons.play_arrow_rounded),
-                        onPressed: onPlay,
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+                  ),
+                  if (album.tracks.isNotEmpty) ...[
+                    const SizedBox(height: 1),
                     Text(
-                      libraryAlbumTitle(context, album),
+                      libraryAlbumDetails(album),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: text.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      libraryArtistLabelFor(context, album),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: text.bodySmall?.copyWith(
-                        color: cs.onSurfaceVariant,
+                      style: text.labelSmall?.copyWith(
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.75),
                       ),
                     ),
                   ],
-                ),
+                ],
               ),
-            ],
-          ),
+            );
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Stack(
+                  children: [
+                    LibraryCover(
+                      covers: covers,
+                      track: album.coverTrack,
+                      groupKey: albumCoverKey(album),
+                      borderRadius: 0,
+                      placeholderIcon: Icons.music_note_outlined,
+                      placeholderColor: Colors.transparent,
+                    ),
+                    if (album.year != 0)
+                      Positioned(
+                        top: 8,
+                        right: 10,
+                        child: Text(
+                          '${album.year}',
+                          style: text.labelSmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                            shadows: [
+                              Shadow(
+                                color: Colors.black.withValues(alpha: 0.7),
+                                blurRadius: 4,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    if (onPlay != null)
+                      Positioned(
+                        right: 2,
+                        bottom: 2,
+                        child: IconButton(
+                          visualDensity: VisualDensity.compact,
+                          tooltip: context.l10n.libraryPlayAll,
+                          icon: Icon(
+                            Icons.play_arrow_outlined,
+                            color: cs.onSurface.withValues(alpha: 0.85),
+                            size: 26,
+                            shadows: [
+                              Shadow(
+                                color: Colors.black.withValues(alpha: 0.7),
+                                blurRadius: 4,
+                              ),
+                            ],
+                          ),
+                          onPressed: onPlay,
+                        ),
+                      ),
+                  ],
+                ),
+                if (constraints.hasBoundedHeight)
+                  Expanded(child: textContent)
+                else
+                  textContent,
+              ],
+            );
+          },
         ),
       ),
     );

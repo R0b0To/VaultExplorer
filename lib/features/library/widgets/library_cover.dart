@@ -79,6 +79,7 @@ class LibraryCover extends StatefulWidget {
   final double? size;
   final double borderRadius;
   final IconData placeholderIcon;
+  final Color? placeholderColor;
 
   const LibraryCover({
     super.key,
@@ -88,6 +89,7 @@ class LibraryCover extends StatefulWidget {
     this.size,
     this.borderRadius = 8,
     this.placeholderIcon = Icons.music_note_rounded,
+    this.placeholderColor,
   });
 
   @override
@@ -171,13 +173,13 @@ class _LibraryCoverState extends State<LibraryCover> {
     final cs = Theme.of(context).colorScheme;
     final radius = BorderRadius.circular(widget.borderRadius);
 
-    Widget placeholder() => ColoredBox(
-          color: cs.surfaceContainerHighest,
+   Widget placeholder() => ColoredBox(
+          color: widget.placeholderColor ?? cs.surfaceContainerHighest,
           child: Center(
             child: Icon(
               widget.placeholderIcon,
               color: cs.onSurfaceVariant.withValues(alpha: 0.7),
-              size: widget.size == null ? 32 : widget.size! * 0.5,
+              size: widget.size == null ? 48 : widget.size! * 0.5,
             ),
           ),
         );

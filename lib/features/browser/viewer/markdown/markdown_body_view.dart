@@ -746,6 +746,9 @@ class MarkdownBodyViewState extends ConsumerState<MarkdownBodyView> {
       );
     }
     if (block is MdList) {
+      final markerWidth = block.ordered
+          ? _orderedMarkerWidth(context, block, _orderedMarkerStyle(textTheme, cs))
+          : 0.0;
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Column(
@@ -760,6 +763,7 @@ class MarkdownBodyViewState extends ConsumerState<MarkdownBodyView> {
                 textTheme,
                 cs,
                 depth: depth,
+                orderedMarkerWidth: markerWidth,
               ),
           ],
         ),
@@ -774,6 +778,31 @@ class MarkdownBodyViewState extends ConsumerState<MarkdownBodyView> {
     return const SizedBox.shrink();
   }
 
+  static const double _orderedMarkerGap = 6;
+
+  TextStyle? _orderedMarkerStyle(TextTheme textTheme, ColorScheme cs) =>
+      textTheme.bodyMedium?.copyWith(
+        color: cs.onSurfaceVariant,
+        fontWeight: FontWeight.w600,
+      );
+
+  /// Width of the "N." marker column. Sized for the list's largest number so
+  /// numbers of any length (e.g. a list starting at 100) are never clipped,
+  /// and every item's text stays aligned. Never narrower than the old 24.
+  double _orderedMarkerWidth(BuildContext context, MdList list, TextStyle? style) {
+    final last = list.startNumber + list.items.length - 1;
+    final digits = last.toString().length;
+    final painter = TextPainter(
+      text: TextSpan(text: '${'8' * digits}.', style: style),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      maxLines: 1,
+    )..layout();
+    final width = painter.width + _orderedMarkerGap;
+    painter.dispose();
+    return width < 24 ? 24 : width;
+  }
+
   Widget _buildListItem(
     BuildContext context,
     MdList list,
@@ -782,6 +811,7 @@ class MarkdownBodyViewState extends ConsumerState<MarkdownBodyView> {
     TextTheme textTheme,
     ColorScheme cs, {
     required int depth,
+    required double orderedMarkerWidth,
   }) {
     Widget markerWidget;
 
@@ -807,16 +837,15 @@ class MarkdownBodyViewState extends ConsumerState<MarkdownBodyView> {
       );
     } else if (list.ordered) {
       markerWidget = Container(
-        width: 24,
+        width: orderedMarkerWidth,
         height: 22,
         alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 6),
+        padding: const EdgeInsets.only(right: _orderedMarkerGap),
         child: Text(
           '${list.startNumber + index}.',
-          style: textTheme.bodyMedium?.copyWith(
-            color: cs.onSurfaceVariant,
-            fontWeight: FontWeight.w600,
-          ),
+          maxLines: 1,
+          softWrap: false,
+          style: _orderedMarkerStyle(textTheme, cs),
         ),
       );
     } else {

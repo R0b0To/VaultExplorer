@@ -53,4 +53,50 @@ void main() {
       expect(withInset - without, closeTo(40, 0.01));
     });
   });
+
+  group('MarkdownBodyView ordered lists', () {
+    Future<void> pump(WidgetTester tester, String source) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: MarkdownBodyView(
+                source: source,
+                container: _container(),
+                currentFilePath: '/note.md',
+                onLinkTap: (_) {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+    }
+
+    testWidgets('numbers of three or more digits are not clipped or wrapped',
+        (tester) async {
+      await pump(tester, '100. Grapes\n101. Carrot\n102. ter');
+
+      for (final label in ['100.', '101.', '102.']) {
+        // One line of body text. A clipped marker wraps onto several lines.
+        expect(tester.getSize(find.text(label)).height, lessThan(24),
+            reason: label);
+      }
+
+      // The item text still lines up across the list.
+      final left = {
+        for (final t in ['Grapes', 'Carrot', 'ter'])
+          tester.getTopLeft(find.text(t, findRichText: true)).dx,
+      };
+      expect(left, hasLength(1));
+    });
+
+    testWidgets('a long list sizes the marker for its largest number',
+        (tester) async {
+      await pump(tester, '98. a\n99. b\n100. c');
+
+      expect(tester.getSize(find.text('98.')).height, lessThan(24));
+      expect(tester.getSize(find.text('100.')).height, lessThan(24));
+    });
+  });
 }

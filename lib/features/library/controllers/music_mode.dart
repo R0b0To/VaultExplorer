@@ -13,8 +13,9 @@ enum MusicCategory { files, albums, artists, genres, tracks, folders }
 /// and which view is showing.
 ///
 /// The on/off switch and the folders are saved with the container (see
-/// [LibraryIndexStore]); the visible category is for this session and resumes
-/// on Tracks whenever saved music mode is reopened.
+/// [LibraryIndexStore]); the visible category is for this session. Enabling
+/// music mode opens Albums, while a saved enabled mode starts each new session
+/// on the file listing until the user chooses a library view.
 class MusicModeEntry extends ChangeNotifier {
   final MountedContainer container;
   final LibraryIndexStore _store;
@@ -43,16 +44,16 @@ class MusicModeEntry extends ChangeNotifier {
     final saved = await _store.loadConfig(container);
     if (_disposed) return;
     _config = saved;
-    _category = saved.enabled ? MusicCategory.tracks : MusicCategory.files;
+    _category = MusicCategory.files;
     _loaded = true;
     _notify();
   }
 
   /// Turns music mode on for [folders] (empty: the whole container) and opens
-  /// the Tracks view.
+  /// the Albums view.
   Future<void> enable({List<String> folders = const []}) async {
     _config = MusicConfig(enabled: true, folders: MusicConfig.normalizeFolders(folders));
-    _category = MusicCategory.tracks;
+    _category = MusicCategory.albums;
     _notify();
     await _store.saveConfig(container, _config);
   }

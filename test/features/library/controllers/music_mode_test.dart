@@ -116,9 +116,10 @@ void main() {
       await second.load();
       expect(second.config.enabled, isTrue);
       expect(second.config.folders, ['Music']);
-      // The visible view is per session: it opens on the files.
-      expect(second.category, MusicCategory.files);
-      expect(second.libraryVisible, isFalse);
+      // Music mode never reopens as the file listing with only the toolbar:
+      // a saved enabled mode opens on the library.
+      expect(second.category, MusicCategory.albums);
+      expect(second.libraryVisible, isTrue);
       second.dispose();
     });
 
@@ -174,6 +175,46 @@ void main() {
       await e.load();
       e.setCategory(MusicCategory.albums);
       expect(e.libraryVisible, isFalse);
+      e.dispose();
+    });
+
+    test('a hint that music mode is on opens on the library before the load', () {
+      final e = MusicModeEntry(_vault('/a'), store);
+      expect(e.pendingView, isTrue);
+      expect(e.expectedEnabled, isFalse);
+
+      e.applyHint(true);
+
+      expect(e.hint, isTrue);
+      expect(e.expectedEnabled, isTrue);
+      expect(e.category, MusicCategory.albums);
+      expect(e.pendingView, isTrue); // the view waits for the real setting
+      e.dispose();
+    });
+
+    test('a hint that music mode is off settles the view at once', () {
+      final e = MusicModeEntry(_vault('/a'), store);
+      e.applyHint(false);
+
+      expect(e.pendingView, isFalse);
+      expect(e.expectedEnabled, isFalse);
+      expect(e.category, MusicCategory.files);
+      e.dispose();
+    });
+
+    test('the saved setting replaces a wrong hint once it is read', () async {
+      final e = MusicModeEntry(_vault('/a'), store);
+      e.applyHint(true); // this device thinks it is on; the vault says off
+      await e.load();
+
+      expect(e.config.enabled, isFalse);
+      expect(e.expectedEnabled, isFalse);
+      expect(e.hint, isNull);
+      expect(e.category, MusicCategory.files);
+      expect(e.pendingView, isFalse);
+
+      e.applyHint(true); // too late: ignored
+      expect(e.expectedEnabled, isFalse);
       e.dispose();
     });
 

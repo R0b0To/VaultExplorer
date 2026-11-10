@@ -68,6 +68,30 @@ void main() {
       expect(toggledOff.isGalleryModeForStorage(vaultUri), isFalse);
     });
 
+    test('FileManagerToolbarConfig musicModeStorageUris hint persistence', () {
+      var config = FileManagerToolbarConfig.defaults();
+      const vaultUri = 'vault://test-vault-id';
+
+      expect(config.isMusicModeHintedForStorage(vaultUri), isFalse);
+
+      config = config.withMusicModeHintForStorage(vaultUri, true);
+      expect(config.isMusicModeHintedForStorage(vaultUri), isTrue);
+      expect(config.toJson()['musicModeStorageUris'], contains(vaultUri));
+
+      final restored = FileManagerToolbarConfig.fromJson(config.toJson());
+      expect(restored.isMusicModeHintedForStorage(vaultUri), isTrue);
+
+      // Kept on this device: never part of either export.
+      expect(restored.interfaceToJson().containsKey('musicModeStorageUris'),
+          isFalse);
+      expect(restored.behaviorToJson().containsKey('musicModeStorageUris'),
+          isFalse);
+
+      final cleared = restored.withMusicModeHintForStorage(vaultUri, false);
+      expect(cleared.isMusicModeHintedForStorage(vaultUri), isFalse);
+      expect(cleared.toJson()['musicModeStorageUris'], isEmpty);
+    });
+
     test('computeDateGroups groups items by day in descending order', () {
       final nowSecs = DateTime(2026, 11, 4, 14, 30).millisecondsSinceEpoch ~/ 1000;
       final yesterdaySecs = DateTime(2026, 11, 3, 10, 0).millisecondsSinceEpoch ~/ 1000;

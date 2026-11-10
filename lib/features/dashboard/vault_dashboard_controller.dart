@@ -14,6 +14,7 @@ import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/services/cross_container_clipboard.dart';
+import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
 import 'package:vaultexplorer/data/services/full_res_image_cache.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/data/services/media_index/media_index_service.dart';
@@ -1010,6 +1011,7 @@ class VaultDashboardController extends _$VaultDashboardController {
 
     Future.delayed(const Duration(milliseconds: 300), () async {
       await ref.read(containerRepositoryProvider).remove(uri);
+      await ref.read(fileManagerToolbarServiceProvider).forgetMusicModeHint(uri);
       if (!ref.mounted) return;
 
       final newOut = Set<String>.from(state.animatingOutUris)..remove(uri);

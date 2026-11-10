@@ -144,6 +144,7 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
         folderLayoutModes: currentServiceConfig.folderLayoutModes,
         folderGridAspectRatios: currentServiceConfig.folderGridAspectRatios,
         folderSortModes: currentServiceConfig.folderSortModes,
+        musicModeStorageUris: currentServiceConfig.musicModeStorageUris,
       );
       await service.save(preservedConfig);
 

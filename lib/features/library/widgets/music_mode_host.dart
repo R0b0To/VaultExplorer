@@ -91,6 +91,12 @@ class _MusicModeHostState extends ConsumerState<MusicModeHost> {
   Widget build(BuildContext context) {
     final enabled = _entry.config.enabled;
     final showLibrary = _entry.libraryVisible && _attached;
+    // Whether music mode is on is only known once its saved setting has been
+    // read from the container, or this device remembers it was off. Until
+    // then the file listing stays mounted (so it keeps loading) but is
+    // covered, so a vault that opens in music mode never flashes the file
+    // manager first.
+    final awaitingConfig = _entry.pendingView;
 
     // The music mode toolbar is supplied through the file manager's bottom
     // toolbar slot, so it takes layout space instead of covering this content.
@@ -111,6 +117,12 @@ class _MusicModeHostState extends ConsumerState<MusicModeHost> {
                   ),
                 ),
               ),
+              if (awaitingConfig)
+                Positioned.fill(
+                  child: ColoredBox(
+                    color: Theme.of(context).colorScheme.surface,
+                  ),
+                ),
               if (showLibrary)
                 Positioned.fill(
                   child: MusicLibraryBody(

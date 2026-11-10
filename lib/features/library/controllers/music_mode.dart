@@ -5,17 +5,19 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/library/data/library_index_store.dart';
 import 'package:vaultexplorer/features/library/models/music_config.dart';
 
-/// What the library shows while music mode is on. Files is retained as the
-/// inactive-mode state; it is not a selectable library tab.
+/// What the library shows while music mode is on. Files is the inactive-mode
+/// state; it is not a selectable library tab, so with the mode on the entry
+/// always rests on one of the library views.
 enum MusicCategory { files, albums, artists, genres, tracks, folders }
 
 /// Music mode for one container: whether it is on, which folders it covers,
 /// and which view is showing.
 ///
 /// The on/off switch and the folders are saved with the container (see
-/// [LibraryIndexStore]); the visible category is for this session. Enabling
-/// music mode opens Albums, while a saved enabled mode starts each new session
-/// on the file listing until the user chooses a library view.
+/// [LibraryIndexStore]); the visible category is for this session. Music mode
+/// always opens on the library (Albums): enabling it does, and so does loading
+/// a saved enabled mode, so a vault never opens on the file listing with just
+/// the music toolbar underneath it.
 class MusicModeEntry extends ChangeNotifier {
   final MountedContainer container;
   final LibraryIndexStore _store;
@@ -25,6 +27,7 @@ class MusicModeEntry extends ChangeNotifier {
   MusicConfig _config = MusicConfig.off;
   MusicCategory _category = MusicCategory.files;
   bool _loaded = false;
+  bool? _hint;
   bool _disposed = false;
   Future<void>? _loading;
 
@@ -33,6 +36,30 @@ class MusicModeEntry extends ChangeNotifier {
 
   /// Whether the saved config has been read yet.
   bool get loaded => _loaded;
+
+  /// What this device remembers about whether music mode was on, before the
+  /// saved setting has been read: null when nothing is known. Only a hint --
+  /// see [applyHint]; ignored once [loaded].
+  bool? get hint => _loaded ? null : _hint;
+
+  /// Whether music mode is on, or is expected to be: the saved setting once
+  /// read, the hint until then. Lets the chrome (the music toolbar) match
+  /// from the first frame.
+  bool get expectedEnabled => _loaded ? _config.enabled : _hint == true;
+
+  /// True while the screen cannot yet tell which view to show: the saved
+  /// setting has not been read and the hint does not say music mode is off.
+  bool get pendingView => !_loaded && _hint != false;
+
+  /// Gives the entry the on-device hint (kept in the toolbar config) so the
+  /// first frame can match before the vault's own setting is read. The saved
+  /// setting stays the source of truth and replaces the hint when it loads.
+  void applyHint(bool enabled) {
+    if (_loaded || _hint == enabled) return;
+    _hint = enabled;
+    if (enabled) _category = MusicCategory.albums;
+    _notify();
+  }
 
   /// True when a library view (not the file listing) is on screen.
   bool get libraryVisible => _config.enabled && _category != MusicCategory.files;
@@ -44,7 +71,7 @@ class MusicModeEntry extends ChangeNotifier {
     final saved = await _store.loadConfig(container);
     if (_disposed) return;
     _config = saved;
-    _category = MusicCategory.files;
+    _category = saved.enabled ? MusicCategory.albums : MusicCategory.files;
     _loaded = true;
     _notify();
   }

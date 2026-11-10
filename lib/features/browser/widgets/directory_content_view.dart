@@ -541,12 +541,45 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   /// [_shownToolbarConfig]).
   late final MusicModeEntry _music = musicModeEntryFor(ref, widget.container);
 
-  FileManagerToolbarConfig get _shownToolbarConfig => _music.libraryVisible
+  /// The toolbar is also held back until the saved music mode setting has been
+  /// read: a vault that opens in music mode must not show the file toolbar for
+  /// a moment first (see `MusicModeHost`).
+  bool get _musicOwnsToolbar => _music.libraryVisible || _music.pendingView;
+
+  FileManagerToolbarConfig get _shownToolbarConfig => _musicOwnsToolbar
       ? _toolbarConfig.copyWith(hidden: FileManagerAction.values.toSet())
       : _toolbarConfig;
 
   void _onMusicChanged() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    setState(() {});
+    _syncMusicModeHint();
+  }
+
+  /// Keeps the on-device music mode hint equal to the real saved setting, so
+  /// the next cold open of this storage can show the right view at once. Runs
+  /// only after the real setting has been read.
+  void _syncMusicModeHint() {
+    if (!_music.loaded || !_toolbarConfigReady) return;
+    final uri = widget.container.uri;
+    final enabled = _music.config.enabled;
+    if (_toolbarConfig.isMusicModeHintedForStorage(uri) == enabled) return;
+    unawaited(
+      _updateToolbarConfigField(
+        (c) => c.withMusicModeHintForStorage(uri, enabled),
+      ),
+    );
+  }
+
+  /// Hands the on-device hint to the music entry (a no-op once the saved
+  /// setting has loaded), and re-checks the hint against a loaded setting.
+  void _applyMusicModeHint() {
+    if (!_music.loaded) {
+      _music.applyHint(
+        _toolbarConfig.isMusicModeHintedForStorage(widget.container.uri),
+      );
+    }
+    _syncMusicModeHint();
   }
 
   bool _toolbarConfigReady = false;
@@ -1623,6 +1656,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
           _containerRecord = record;
           _applyResolvedThumbnails(toolbarConfig);
         });
+        _applyMusicModeHint();
         _navNotifier.setLayoutMode(
           _getLayoutModeForFolder(_currentDirPath, appSettings: appSettings),
         );
@@ -5925,7 +5959,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       );
     }
     final useFab = _toolbarConfig.useFabForToolbar;
-    final showActionBar = !_searchActive && !useFab && !_music.libraryVisible;
+    final showActionBar = !_searchActive && !useFab && !_musicOwnsToolbar;
     final workspace = widget.workspaceConfig;
     final appBarNavigation = _nav;
     final appBarSearch = _search;
@@ -6447,7 +6481,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             ),
           )
         : null;
-    final Widget? musicModeBottomBar = _music.config.enabled
+    final Widget? musicModeBottomBar = _music.expectedEnabled
         ? MusicModeBar(
             entry: _music,
             hub: ref.read(musicLibraryProvider).hub,

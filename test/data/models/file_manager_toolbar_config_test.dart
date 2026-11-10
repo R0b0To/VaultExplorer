@@ -19,7 +19,62 @@ void main() {
       expect(defaults.order, contains(FileManagerAction.playMedia));
       expect(defaults.hidden, contains(FileManagerAction.playMedia));
       expect(defaults.visible, isNot(contains(FileManagerAction.playMedia)));
-      expect(defaults.visible.last, FileManagerAction.musicMode);
+      expect(defaults.visible.last, FileManagerAction.options);
+    });
+
+    test('the mode switches sit together and the options menu is last', () {
+      final order = FileManagerToolbarConfig.defaultActionOrder;
+
+      expect(order.last, FileManagerAction.options);
+      expect(
+        order.indexOf(FileManagerAction.musicMode) -
+            order.indexOf(FileManagerAction.gallery),
+        1,
+      );
+      expect(
+        order.indexOf(FileManagerAction.viewToggle),
+        lessThan(order.indexOf(FileManagerAction.gallery)),
+      );
+    });
+
+    test('an order that is a previous default moves to the new default', () {
+      final previous = FileManagerToolbarConfig.defaults().toJson()
+        ..['order'] = [
+          FileManagerAction.search.name,
+          FileManagerAction.add.name,
+          FileManagerAction.gallery.name,
+          FileManagerAction.viewToggle.name,
+          FileManagerAction.sort.name,
+          FileManagerAction.filter.name,
+          FileManagerAction.options.name,
+          FileManagerAction.playMedia.name,
+          FileManagerAction.musicMode.name,
+        ];
+      final restored = FileManagerToolbarConfig.fromJson(previous);
+
+      expect(restored.order, FileManagerToolbarConfig.defaultActionOrder);
+    });
+
+    test('an order the user rearranged is kept', () {
+      final custom = FileManagerToolbarConfig.defaults().toJson()
+        ..['order'] = [
+          FileManagerAction.add.name,
+          FileManagerAction.search.name,
+          FileManagerAction.gallery.name,
+          FileManagerAction.viewToggle.name,
+          FileManagerAction.sort.name,
+          FileManagerAction.filter.name,
+          FileManagerAction.options.name,
+          FileManagerAction.playMedia.name,
+          FileManagerAction.musicMode.name,
+        ];
+      final restored = FileManagerToolbarConfig.fromJson(custom);
+
+      expect(restored.order.take(3), [
+        FileManagerAction.add,
+        FileManagerAction.search,
+        FileManagerAction.gallery,
+      ]);
     });
 
     test('legacy orders gain the mode action and hide newly added play media', () {
@@ -36,22 +91,9 @@ void main() {
         ..['hidden'] = <String>[];
       final restored = FileManagerToolbarConfig.fromJson(legacy);
 
-      expect(
-        restored.order,
-        [
-          FileManagerAction.search,
-          FileManagerAction.add,
-          FileManagerAction.gallery,
-          FileManagerAction.viewToggle,
-          FileManagerAction.sort,
-          FileManagerAction.filter,
-          FileManagerAction.options,
-          FileManagerAction.playMedia,
-          FileManagerAction.musicMode,
-        ],
-      );
+      expect(restored.order, FileManagerToolbarConfig.defaultActionOrder);
       expect(restored.hidden, contains(FileManagerAction.playMedia));
-      expect(restored.visible.last, FileManagerAction.musicMode);
+      expect(restored.visible.last, FileManagerAction.options);
     });
   });
 

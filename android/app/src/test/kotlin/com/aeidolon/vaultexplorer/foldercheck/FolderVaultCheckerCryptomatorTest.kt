@@ -51,7 +51,10 @@ class FolderVaultCheckerCryptomatorTest {
      *  size; nothing here is ever unwrapped on the no-password path this test covers. */
     private fun writeValidMasterkeyFile(dir: File) {
         val json = JSONObject().apply {
-            put("version", 999)
+            // This fixture covers the config-less format-7 path. Modern
+            // masterkey files use the legacy version value 999 and require
+            // vault.cryptomator to identify their actual vault format.
+            put("version", 7)
             put("scryptSalt", Base64.getEncoder().encodeToString(ByteArray(8)))
             put("scryptCostParam", 32768)
             put("scryptBlockSize", 8)

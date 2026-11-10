@@ -51,6 +51,10 @@ struct DirEntry {
     bool isDir = false;
     int64_t size = 0;      // cleartext size for virtual entries, 0 for dirs
     int64_t mtimeMs = 0;   // milliseconds since the epoch
+    // Cryptomator only, and only ever set by Vault::listSymlinks: the entry is a symbolic link, not a
+    // file or a folder. [size] is then the byte length of the link target. Plain listDirectory() never
+    // returns such entries, so a consumer that does not know about symlinks cannot trip over one.
+    bool isSymlink = false;
 };
 
 // ---- small helpers shared by every format -----------------------------

@@ -9,6 +9,7 @@ import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart'
 import 'package:vaultexplorer/core/utils/image_preview_exception.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
+import 'package:vaultexplorer/core/utils/vault_symlink.dart';
 import 'package:vaultexplorer/data/models/clipboard_item.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_with_size.dart';
@@ -738,6 +739,60 @@ class VaultFileIoApi {
       {'filePath': container.uri, 'dirPath': dirPath, 'refresh': refresh},
     );
     return result?.cast<String>();
+  }
+
+  /// The symbolic links of one folder of a mounted Cryptomator vault. Deliberately separate from
+  /// [listDirectory]: a link is neither a file nor a folder, so nothing that walks listings (sync, export,
+  /// scanners) ever sees one. Empty for everything that is not a vault, and on any error.
+  Future<List<VaultSymlink>> listVaultSymlinks(
+    MountedContainer container,
+    String dirPath,
+  ) async {
+    if (_isSaf(container) || container.isLocalStorage) return const [];
+    try {
+      final result = await _channel.invokeMethod<List<Object?>>(
+        ChannelMethods.listVaultSymlinks,
+        {'filePath': container.uri, 'dirPath': dirPath},
+      );
+      return (result ?? const <Object?>[])
+          .whereType<String>()
+          .map(VaultSymlink.tryParse)
+          .whereType<VaultSymlink>()
+          .toList(growable: false);
+    } catch (e) {
+      logSwallowed('listVaultSymlinks', e, expected: true);
+      return const [];
+    }
+  }
+
+  /// Where the link at [path] points (never resolved or followed), or null if it is not a readable link.
+  Future<String?> readVaultSymlink(MountedContainer container, String path) async {
+    if (_isSaf(container) || container.isLocalStorage) return null;
+    try {
+      return await _channel.invokeMethod<String>(
+        ChannelMethods.readVaultSymlink,
+        {'filePath': container.uri, 'path': path},
+      );
+    } catch (e) {
+      logSwallowed('readVaultSymlink', e, expected: true);
+      return null;
+    }
+  }
+
+  /// How many entries of [dirPath] exist on disk but are not listed (sync-conflict copies, names that no
+  /// longer decrypt). -1 when unknown (not a Cryptomator vault, or the call failed).
+  Future<int> hiddenEntryCount(MountedContainer container, String dirPath) async {
+    if (_isSaf(container) || container.isLocalStorage) return -1;
+    try {
+      return await _channel.invokeMethod<int>(
+            ChannelMethods.getHiddenEntryCount,
+            {'filePath': container.uri, 'dirPath': dirPath},
+          ) ??
+          -1;
+    } catch (e) {
+      logSwallowed('getHiddenEntryCount', e, expected: true);
+      return -1;
+    }
   }
 
   /// Strict readability probe used by scheduled sync before an empty

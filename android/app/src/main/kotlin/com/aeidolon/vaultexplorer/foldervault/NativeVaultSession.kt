@@ -43,6 +43,18 @@ open class NativeVaultSession internal constructor(
     override fun listDirectory(virtualPath: String): Array<String>? =
         withHandle(null) { NativeFolderVault.nativeListDirectory(it, virtualPath) }
 
+    override fun listSymlinks(virtualPath: String): Array<String>? =
+        withHandle(null) { NativeFolderVault.nativeListSymlinks(it, virtualPath) }
+
+    override fun readSymlink(virtualPath: String): String? =
+        withHandle(null) { NativeFolderVault.nativeReadSymlink(it, virtualPath) }
+
+    override fun createSymlink(virtualPath: String, target: String): Boolean =
+        withHandle(false) { NativeFolderVault.nativeCreateSymlink(it, virtualPath, target) }
+
+    override fun hiddenEntryCount(virtualPath: String): Int =
+        withHandle(-1) { NativeFolderVault.nativeHiddenEntryCount(it, virtualPath) }
+
     override fun createDirectory(virtualPath: String): Boolean =
         withHandle(false) { NativeFolderVault.nativeCreateDirectory(it, virtualPath) }
 

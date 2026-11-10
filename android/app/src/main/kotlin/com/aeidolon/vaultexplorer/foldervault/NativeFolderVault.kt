@@ -62,8 +62,20 @@ internal object NativeFolderVault {
         oldPassword: ByteArray, newPassword: ByteArray, out: Array<Any?>,
     ): Int
 
+    /** Cryptomator format 7 -> 8, one way. Result codes as [nativeChangePassword]. */
+    @JvmStatic external fun nativeMigrateCryptomator(
+        rawRoot: String?, storage: FolderVaultStorage?, password: ByteArray, out: Array<Any?>,
+    ): Int
+
     @JvmStatic external fun nativeClose(handle: Long)
     @JvmStatic external fun nativeListDirectory(handle: Long, path: String): Array<String>?
+    // Symlinks (Cryptomator). Deliberately not part of nativeListDirectory: the entries come back in the same
+    // wire shape with kind "L" and only callers that know how to present one ask for them.
+    @JvmStatic external fun nativeListSymlinks(handle: Long, path: String): Array<String>?
+    @JvmStatic external fun nativeReadSymlink(handle: Long, path: String): String?
+    @JvmStatic external fun nativeCreateSymlink(handle: Long, path: String, target: String): Boolean
+    /** Entries that exist on disk but are not listed (sync-conflict copies, undecryptable names). -1 = unknown. */
+    @JvmStatic external fun nativeHiddenEntryCount(handle: Long, path: String): Int
     @JvmStatic external fun nativeCreateDirectory(handle: Long, path: String): Boolean
     @JvmStatic external fun nativeDeleteFile(handle: Long, path: String): Boolean
     @JvmStatic external fun nativeFinishWrite(handle: Long, path: String): Boolean

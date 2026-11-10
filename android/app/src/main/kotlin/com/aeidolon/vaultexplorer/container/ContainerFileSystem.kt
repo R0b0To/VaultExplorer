@@ -196,6 +196,15 @@ fun endBatchDelete(volId: Int) {
     fun listDirectory(volId: Int, dirPath: String): Array<String>? =
         withReadLock(volId) { ContainerEngine.listDirectory(dirPath, volId) }
 
+    fun listSymlinks(volId: Int, dirPath: String): Array<String> =
+        withReadLock(volId) { ContainerEngine.listSymlinks(dirPath, volId) }
+
+    fun readSymlink(volId: Int, path: String): String? =
+        withReadLock(volId) { ContainerEngine.readSymlink(path, volId) }
+
+    fun hiddenEntryCount(volId: Int, dirPath: String): Int =
+        withReadLock(volId) { ContainerEngine.hiddenEntryCount(dirPath, volId) }
+
     fun invalidateCache(volId: Int, dirPath: String = "") {
         withWriteLock(volId) { ContainerEngine.invalidateCache(dirPath, volId) }
     }

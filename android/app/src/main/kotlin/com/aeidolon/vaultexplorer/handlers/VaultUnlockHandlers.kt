@@ -480,6 +480,34 @@ class VaultUnlockHandlers(
         }
     }
 
+    fun handleMigrateCryptomatorVault(call: MethodCall, result: MethodChannel.Result) {
+        val uriString = call.argument<String>("filePath")
+        val password = call.argument<String>("password")
+        if (uriString == null || password == null) {
+            result.error("INVALID_ARGS", "filePath and password required", null)
+            return
+        }
+        ioExecutor.execute {
+            try {
+                val chars = password.toCharArray()
+                val migrateResult = try {
+                    com.aeidolon.vaultexplorer.cryptomator.CryptomatorVault.migrate(activity, Uri.parse(uriString), chars)
+                } finally {
+                    chars.fill('\u0000')
+                }
+                activity.runOnUiThread {
+                    when (migrateResult) {
+                        is com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success -> result.success(true)
+                        is com.aeidolon.vaultexplorer.engine.VaultOpenResult.WrongPassword -> result.error("AUTH_FAIL", "Incorrect password", null)
+                        is com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault -> result.error("INVALID_VAULT", migrateResult.reason, null)
+                    }
+                }
+            } catch (e: Exception) {
+                activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
+            }
+        }
+    }
+
     fun handleChangeGocryptfsVaultPassword(call: MethodCall, result: MethodChannel.Result) {
         handleFolderVaultPasswordChange(call, result) { uri, oldPassword, newPassword ->
             com.aeidolon.vaultexplorer.gocryptfs.GocryptfsVault.changePassword(activity, uri, oldPassword, newPassword)

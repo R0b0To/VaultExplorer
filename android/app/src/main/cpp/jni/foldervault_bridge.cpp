@@ -114,8 +114,9 @@ bool clearException(JNIEnv* env) {
 }
 
 std::string wireEntry(const fv::DirEntry& e) {
-    // Same shape as DirEntryWire.encode(): kind|size|mtimeSeconds|name
-    return std::string(e.isDir ? "D|" : "F|") + std::to_string(e.isDir ? 0 : e.size) + "|" +
+    // Same shape as DirEntryWire.encode(): kind|size|mtimeSeconds|name   (kind: F file, D folder, L symlink --
+    // an L entry only ever comes out of nativeListSymlinks, never out of nativeListDirectory)
+    return std::string(e.isSymlink ? "L|" : e.isDir ? "D|" : "F|") + std::to_string(e.isDir ? 0 : e.size) + "|" +
            std::to_string(e.mtimeMs / 1000) + "|" + e.name;
 }
 
@@ -127,6 +128,7 @@ bool parseWire(const std::string& raw, fv::DirEntry& e) {
     size_t c = raw.find('|', b + 1);
     if (c == std::string::npos) return false;
     e.isDir = raw.compare(0, a, "D") == 0;
+    e.isSymlink = raw.compare(0, a, "L") == 0;
     e.size = std::strtoll(raw.substr(a + 1, b - a - 1).c_str(), nullptr, 10);
     e.mtimeMs = std::strtoll(raw.substr(b + 1, c - b - 1).c_str(), nullptr, 10) * 1000;
     e.name = raw.substr(c + 1);
@@ -569,6 +571,19 @@ FV_JNI(jint, nativeChangePassword)(JNIEnv* env, jclass, jint format, jstring raw
     return r.status == fv::OpenStatus::Ok ? 0 : (r.status == fv::OpenStatus::WrongPassword ? 1 : 2);
 }
 
+// Cryptomator format 7 -> 8 (one way). Same result codes as nativeChangePassword: 0 ok, 1 wrong password, 2 other
+// failure (message in out[0]).
+FV_JNI(jint, nativeMigrateCryptomator)(JNIEnv* env, jclass, jstring rawRoot, jobject storageCb, jbyteArray pw,
+                                       jobjectArray out) {
+    PwGuard p{toBytes(env, pw)};
+    auto st = makeStorage(env, rawRoot, storageCb);
+    if (!st) { setOut(env, out, 0, fromUtf8(env, "No storage available")); return 2; }
+    fv::PlainResult r = fv::migrateCryptomator7To8(*st, p.b.data(), p.b.size());
+    st->close();
+    if (r.status != fv::OpenStatus::Ok) setOut(env, out, 0, fromUtf8(env, r.message));
+    return r.status == fv::OpenStatus::Ok ? 0 : (r.status == fv::OpenStatus::WrongPassword ? 1 : 2);
+}
+
 FV_JNI(void, nativeClose)(JNIEnv*, jclass, jlong h) {
     std::shared_ptr<Holder> holder;
     {
@@ -595,6 +610,41 @@ FV_JNI(jobjectArray, nativeListDirectory)(JNIEnv* env, jclass, jlong h, jstring 
     }
     env->DeleteLocalRef(sc);
     return arr;
+}
+
+// Symlinks live outside nativeListDirectory on purpose (see Vault::listSymlinks): only callers that know how to
+// show one ask for them. Same wire shape as the directory listing, kind "L", size = target length in bytes.
+FV_JNI(jobjectArray, nativeListSymlinks)(JNIEnv* env, jclass, jlong h, jstring path) {
+    auto v = lookup(h);
+    if (!v) return nullptr;
+    std::vector<fv::DirEntry> es;
+    if (!v->vault->listSymlinks(toUtf8(env, path), es)) return nullptr;
+    jclass sc = env->FindClass("java/lang/String");
+    jobjectArray arr = env->NewObjectArray((jsize)es.size(), sc, nullptr);
+    for (size_t i = 0; i < es.size(); i++) {
+        jstring s = fromUtf8(env, wireEntry(es[i]));
+        env->SetObjectArrayElement(arr, (jsize)i, s);
+        env->DeleteLocalRef(s);
+    }
+    env->DeleteLocalRef(sc);
+    return arr;
+}
+
+FV_JNI(jstring, nativeReadSymlink)(JNIEnv* env, jclass, jlong h, jstring path) {
+    auto v = lookup(h);
+    if (!v) return nullptr;
+    auto t = v->vault->readSymlink(toUtf8(env, path));
+    return t ? fromUtf8(env, *t) : nullptr;
+}
+
+FV_JNI(jboolean, nativeCreateSymlink)(JNIEnv* env, jclass, jlong h, jstring path, jstring target) {
+    auto v = lookup(h);
+    return v && v->vault->createSymlink(toUtf8(env, path), toUtf8(env, target));
+}
+
+FV_JNI(jint, nativeHiddenEntryCount)(JNIEnv* env, jclass, jlong h, jstring path) {
+    auto v = lookup(h);
+    return v ? (jint)v->vault->hiddenEntryCount(toUtf8(env, path)) : -1;
 }
 
 #define FV_BOOL1(name, call) \

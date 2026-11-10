@@ -215,7 +215,10 @@ List<RawEntry> _listDirectorySync(String path) {
           try {
             final stat = item.statSync();
             modifiedSecs = stat.modified.millisecondsSinceEpoch ~/ 1000;
-          } catch (_) {}
+          } catch (_) {
+            // Folder metadata is optional; keep the entry with modifiedSecs 0
+            // if stat fails because of permissions or a concurrent filesystem change.
+          }
           final name = p.basename(item.path);
           final lower = name.toLowerCase();
           entries.add(RawEntry(

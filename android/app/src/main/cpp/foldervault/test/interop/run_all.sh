@@ -13,4 +13,10 @@ run_one() {
 run_one gocryptfs_interop.sh "gocryptfs" which gocryptfs
 run_one cryfs_interop.sh "cryfs" which cryfs
 [ -n "${CRYPTOMATOR_CLI:-}" ] && run_one cryptomator_interop.sh "cryptomator-cli" test -x "$CRYPTOMATOR_CLI" || echo "SKIP cryptomator_interop.sh (set CRYPTOMATOR_CLI)"
+# These drive the OFFICIAL cryptofs through a small Java program (needs a JDK 21 and `oracle/fetch_oracle.sh` once).
+if [ -n "${FVCLI:-}" ] && [ -d "$here/oracle/lib" ] && command -v java >/dev/null; then
+  for n in symlink backup migrate; do run_one cryptomator_${n}_interop.sh "oracle" test -d "$here/oracle/lib"; done
+else
+  echo "SKIP cryptomator_{symlink,backup,migrate}_interop.sh (set FVCLI, install a JDK 21 and run oracle/fetch_oracle.sh)"
+fi
 exit $rc

@@ -87,6 +87,22 @@ public:
     virtual void endBatchDelete() = 0;
     virtual void invalidateCache(const std::string& path) = 0;
 
+    // ---- symlinks & hidden entries (Cryptomator; the other engines keep these defaults) ------------
+    // Symbolic links are deliberately NOT part of listDirectory(): they are neither files nor folders, and
+    // every existing consumer (export, sync, scanners, ...) would otherwise have to learn to skip them.
+    // A link is never followed: readFileChunk/extractFile/createDirectory/... on a link path fail, and
+    // deleteFile/renameFile act on the link node itself.
+    // Lists only the symbolic links of [path] (isSymlink = true, size = target length in bytes).
+    virtual bool listSymlinks(const std::string& /*path*/, std::vector<DirEntry>& out) { out.clear(); return true; }
+    // The link target (UTF-8, at most 32767 bytes), or nullopt if [path] is not a readable symlink.
+    virtual std::optional<std::string> readSymlink(const std::string& /*path*/) { return std::nullopt; }
+    // Creates a symlink node. Fails if [path] exists, the vault is read-only, or [target] is empty, not
+    // valid UTF-8, contains NUL or is longer than 32767 bytes (the size official can read back).
+    virtual bool createSymlink(const std::string& /*path*/, const std::string& /*target*/) { return false; }
+    // Number of entries in [path] that exist on disk but are not listed: sync-conflict copies, names that
+    // fail authentication and half-synced nodes. Never counts internal files or dot-files. -1 = unknown.
+    virtual int hiddenEntryCount(const std::string& /*path*/) { return -1; }
+
     virtual bool spaceInfo(int64_t& total, int64_t& free) = 0;
     virtual std::vector<InfoItem> info() = 0;
     virtual KeyExport exportKeys() = 0;
@@ -127,6 +143,12 @@ struct HostEnv {
     std::string cryfsLocalStateDir;
     // Where incremental-write scratch files go (default: system temp).
     std::string tempDir;
+    // Cryptomator, read-write opens only: keep a copy of vault.cryptomator and masterkey.cryptomator next to
+    // the originals as "<file>.<first 4 bytes of its SHA-256, upper-case hex>.bkup" -- what the official
+    // desktop app (masterkey file) and cryptofs (vault config) do on every unlock. Create-new and best
+    // effort: an existing backup is verified, never overwritten, and a failure never blocks the unlock.
+    // One file per distinct content, so this only ever adds a file when the original changed.
+    bool backupKeyFilesOnOpen = true;
 };
 
 enum class GocryptfsCipher { Aes256Gcm, XChaCha20Poly1305, AesSiv };
@@ -155,6 +177,12 @@ PlainResult changeGocryptfsPassword(Storage& s, const uint8_t* oldPw, size_t old
 OpenResult openCryptomator(std::shared_ptr<Storage> s, const uint8_t* pw, size_t pwLen, bool readOnly, const HostEnv& env, const StorageFactory& sessionStorage = {});
 PlainResult createCryptomator(Storage& s, const uint8_t* pw, size_t pwLen);
 PlainResult changeCryptomatorPassword(Storage& s, const uint8_t* oldPw, size_t oldLen, const uint8_t* newPw, size_t newLen);
+// Official Version8Migrator (format 7 -> 8): backs up masterkey.cryptomator, writes a signed vault.cryptomator
+// (cipherCombo SIV_CTRMAC, threshold 220 -- the file contents are not touched) and re-saves the key file as
+// version 999. One-way: Cryptomator older than 1.6 cannot open the result. Refuses anything that is not a
+// genuine format 7 vault (no vault.cryptomator yet, masterkey version 7) and aborts without changing a
+// byte if the masterkey backup cannot be written.
+PlainResult migrateCryptomator7To8(Storage& s, const uint8_t* pw, size_t pwLen);
 
 OpenResult openCryfs(std::shared_ptr<Storage> s, const uint8_t* pw, size_t pwLen, bool readOnly, const HostEnv& env, const StorageFactory& sessionStorage = {});
 OpenResult openCryfsWithCombinedKey(std::shared_ptr<Storage> s, const uint8_t* key, size_t keyLen, bool readOnly, const HostEnv& env, const StorageFactory& sessionStorage = {});

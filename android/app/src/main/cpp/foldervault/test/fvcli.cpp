@@ -6,7 +6,8 @@
 //
 // commands: create [opts] | ls P | cat P | get P LOCAL | put P LOCAL |
 //           putchunks P LOCAL | mkdir P | mv A B | rm P | size P | du P |
-//           passwd NEWPW | info | touch P EPOCH
+//           passwd NEWPW | migrate7to8 | info | touch P EPOCH |
+//           lsl P (symlinks of folder P) | lslt P (same, with mtime) | readlink P | symlink P TARGET | hidden P (entries not shown)
 // env: FV_LOCALSTATE (cryfs integrity state dir), FV_CIPHER, FV_PLAINNAMES
 #include <cstdio>
 #include <cstdlib>
@@ -75,6 +76,14 @@ int main(int argc, char** argv) {
         return 0;
     }
 
+    if (cmd == "migrate7to8") {
+        if (fmt != "cryptomator") { std::fprintf(stderr, "only cryptomator\n"); return 2; }
+        PlainResult r = migrateCryptomator7To8(*st, p, pw.size());
+        if (r.status != OpenStatus::Ok) { std::fprintf(stderr, "migrate failed (%d): %s\n", (int)r.status, r.message.c_str()); return r.status == OpenStatus::WrongPassword ? 3 : 1; }
+        std::puts("migrated");
+        return 0;
+    }
+
     OpenResult r;
     if (fmt == "gocryptfs") r = openGocryptfs(st, p, pw.size(), false, env);
     else if (fmt == "cryptomator") r = openCryptomator(st, p, pw.size(), false, env);
@@ -133,6 +142,24 @@ int main(int argc, char** argv) {
         std::printf("%lld\n", (long long)v.getFolderSize(arg(5)));
     } else if (cmd == "touch") {
         if (!v.setLastModifiedTime(arg(5), std::atoll(arg(6).c_str()))) return 1;
+    } else if (cmd == "lsl") {
+        std::vector<DirEntry> es;
+        if (!v.listSymlinks(arg(5), es)) { std::fprintf(stderr, "lsl failed\n"); return 1; }
+        std::sort(es.begin(), es.end(), [](const DirEntry& a, const DirEntry& b) { return a.name < b.name; });
+        for (auto& e : es) std::printf("L %lld %s\n", (long long)e.size, e.name.c_str());
+    } else if (cmd == "lslt") {   // like lsl, plus the mtime in whole seconds: "L <size> <mtime> <name>"
+        std::vector<DirEntry> es;
+        if (!v.listSymlinks(arg(5), es)) { std::fprintf(stderr, "lslt failed\n"); return 1; }
+        std::sort(es.begin(), es.end(), [](const DirEntry& a, const DirEntry& b) { return a.name < b.name; });
+        for (auto& e : es) std::printf("L %lld %lld %s\n", (long long)e.size, (long long)(e.mtimeMs / 1000), e.name.c_str());
+    } else if (cmd == "readlink") {
+        auto t = v.readSymlink(arg(5));
+        if (!t) { std::fprintf(stderr, "readlink failed\n"); return 1; }
+        std::printf("%s\n", t->c_str());
+    } else if (cmd == "symlink") {
+        if (!v.createSymlink(arg(5), arg(6))) { std::fprintf(stderr, "symlink failed\n"); return 1; }
+    } else if (cmd == "hidden") {
+        std::printf("%d\n", v.hiddenEntryCount(arg(5)));
     } else if (cmd == "info") {
         for (auto& i : v.info()) std::printf("%s=%s\n", i.key.c_str(), i.value.c_str());
     } else { std::fprintf(stderr, "unknown command\n"); return 2; }

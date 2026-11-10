@@ -22,6 +22,11 @@ constexpr const char* kDirFile = "dir.c9r";
 constexpr const char* kDirIdBackup = "dirid.c9r";
 constexpr const char* kNameFile = "name.c9s";
 constexpr const char* kContentsFile = "contents.c9r";
+constexpr const char* kSymlinkFile = "symlink.c9r";
+// cryptofs Constants.MAX_SYMLINK_LENGTH. Official checks it in characters when creating a link but in BYTES when
+// reading one back, and a byte is never worth less than a UTF-16 unit -- so the byte count is the binding limit,
+// and it is the one we enforce: a link we create is always one official (and we) can read.
+constexpr size_t kMaxSymlinkLength = 32767;
 
 struct Node {
     bool isDir = false;
@@ -30,7 +35,9 @@ struct Node {
     std::string nodePath;      // the .c9r file/folder or the .c9s wrapper folder
     std::string contentsPath;  // file: where the encrypted bytes are; dir: == nodePath
     std::string dirIdFile;     // dir: path of its dir.c9r pointer
-    int64_t size = 0;          // file: physical size of the contents
+    bool isSymlink = false;    // a node folder holding symlink.c9r instead of dir.c9r / contents.c9r
+    std::string symlinkFile;   // symlink: path of its symlink.c9r (target, encrypted like file content)
+    int64_t size = 0;          // file: physical size of the contents; symlink: physical size of symlink.c9r
     int64_t mtimeMs = 0;       // file: contents mtime; dir: node folder mtime
     int64_t wrapperMtimeMs = 0;
 };
@@ -54,15 +61,64 @@ bool hasNonAscii(const std::string& s) {
     return false;
 }
 
+// A small cleartext (at most one chunk) encrypted like regular file content: header + one chunk.
+static bool writeSmallEncryptedFile(Storage& st, const ContentFormat& fmt, const std::string& path,
+                                    const std::string& plain) {
+    Bytes file;
+    auto key = fmt.newHeader(file);
+    Bytes enc(fmt.encryptedSize(plain.size()));
+    fmt.encrypt(*key, 0, (const uint8_t*)plain.data(), plain.size(), enc.data());
+    file.insert(file.end(), enc.begin(), enc.end());
+    return st.writeWhole(path, file.data(), file.size());
+}
+
 // dirid.c9r = the directory's OWN id encrypted like a regular file (cryptolib DirectoryIdBackup).
 static bool writeDirIdBackupFile(Storage& st, const ContentFormat& fmt, const std::string& physFolder,
                                  const std::string& ownDirId) {
-    Bytes file;
-    auto key = fmt.newHeader(file);
-    Bytes enc(fmt.encryptedSize(ownDirId.size()));
-    fmt.encrypt(*key, 0, (const uint8_t*)ownDirId.data(), ownDirId.size(), enc.data());
-    file.insert(file.end(), enc.begin(), enc.end());
-    return st.writeWhole(joinPath(physFolder, kDirIdBackup), file.data(), file.size());
+    return writeSmallEncryptedFile(st, fmt, joinPath(physFolder, kDirIdBackup), ownDirId);
+}
+
+// Inverse of writeSmallEncryptedFile. [maxPlain] bounds the cleartext (the official symlink reader refuses
+// anything longer); false on a short/foreign header, an authentication failure or an oversized cleartext.
+static bool readSmallEncryptedFile(Storage& st, const ContentFormat& fmt, const std::string& path,
+                                   size_t maxPlain, std::string& out) {
+    const size_t hdr = fmt.headerSize();
+    DirEntry probe;
+    if (st.stat(path, probe) && probe.size > (int64_t)(hdr + fmt.encryptedSize(maxPlain))) return false;   // never slurp a huge file
+    Bytes enc;
+    if (!st.readWhole(path, enc)) return false;
+    if (enc.size() < hdr) return false;
+    const size_t bodyLen = enc.size() - hdr;
+    try {
+        const size_t plainLen = fmt.decryptedSize(bodyLen);   // throws on a torn trailing chunk
+        if (plainLen > maxPlain) return false;
+        auto key = fmt.decodeHeader(enc.data(), enc.size());  // throws unless the header authenticates
+        if (!key) return false;
+        Bytes plain(plainLen);
+        if (plainLen > 0) fmt.decrypt(*key, 0, enc.data() + hdr, bodyLen, plain.data());   // throws on any bad tag
+        out.assign(plain.begin(), plain.end());
+        return true;
+    } catch (const Error&) { return false; }
+}
+
+// True if [s] is well-formed UTF-8 (no overlongs, no surrogates, nothing above U+10FFFF).
+static bool validUtf8(const std::string& s) {
+    size_t i = 0, n = s.size();
+    while (i < n) {
+        unsigned char c = (unsigned char)s[i];
+        size_t len = c < 0x80 ? 1 : (c >= 0xC2 && c <= 0xDF) ? 2 : (c >= 0xE0 && c <= 0xEF) ? 3 : (c >= 0xF0 && c <= 0xF4) ? 4 : 0;
+        if (len == 0 || i + len > n) return false;
+        for (size_t k = 1; k < len; k++) if (((unsigned char)s[i + k] & 0xC0) != 0x80) return false;
+        if (len == 3) {
+            unsigned char c1 = (unsigned char)s[i + 1];
+            if ((c == 0xE0 && c1 < 0xA0) || (c == 0xED && c1 > 0x9F)) return false;
+        } else if (len == 4) {
+            unsigned char c1 = (unsigned char)s[i + 1];
+            if ((c == 0xF0 && c1 < 0x90) || (c == 0xF4 && c1 > 0x8F)) return false;
+        }
+        i += len;
+    }
+    return true;
 }
 
 class Tree {
@@ -119,74 +175,27 @@ public:
         return id;
     }
 
-    std::vector<Node> listByDirId(const std::string& dirId) {
-        std::string folder;
-        try { folder = physicalFolderForDirId(dirId); } catch (const Error& e) {
-            logMsg(LogLevel::Warn, TAG, std::string("listByDirId: backing folder unavailable: ") + e.what());
-            return {};
+    // Everything in the directory that decodes to a node -- files, folders AND symlinks (callers filter).
+    // [hidden], when given, receives the number of physical entries that exist but did not become a node:
+    // sync-conflict copies, names that fail authentication, half-synced or broken nodes. Dot-files, the
+    // internal dir.c9r/dirid.c9r and foreign files (no .c9r/.c9s suffix) are not counted -- the official
+    // client ignores those silently as well.
+    std::vector<Node> listByDirId(const std::string& dirId, int* hidden = nullptr) {
+        int hid = 0;
+        std::vector<Node> out = listByDirIdImpl(dirId, hid);
+        {
+            std::lock_guard<std::mutex> g(mu_);
+            hiddenByDir_[dirId] = hid;
         }
-        std::vector<DirEntry> children;
-        if (!st_.list(folder, children)) return {};
-        std::vector<Node> out;
-        for (const DirEntry& c : children) {
-            const std::string& name = c.name;
-            try {
-                if (name == kDirFile || name == kDirIdBackup) continue;
-                if (endsWith(name, kC9s)) {
-                    if (!c.isDir) continue;
-                    std::string wrapper = joinPath(folder, name);
-                    Bytes ln;
-                    if (!st_.readWhole(joinPath(wrapper, kNameFile), ln) || ln.empty()) {
-                        st_.invalidate(wrapper);
-                        if (!st_.readWhole(joinPath(wrapper, kNameFile), ln) || ln.empty()) continue;
-                    }
-                    std::string raw(ln.begin(), ln.end());
-                    size_t e2 = raw.find_last_not_of(std::string(" \r\n\0", 4));
-                    raw = e2 == std::string::npos ? "" : raw.substr(0, e2 + 1);
-                    size_t s2 = raw.find_first_not_of(' ');
-                    raw = s2 == std::string::npos ? "" : raw.substr(s2);
-                    std::string cipher = endsWith(raw, kC9r) ? raw.substr(0, raw.size() - 4) : raw;
-                    std::string clear = nc_.decryptFilename(cipher, dirId);
-                    if (!usableName(clear)) continue;
-                    DirEntry ptr;
-                    Node n;
-                    n.shortened = true; n.name = clear; n.nodePath = wrapper; n.wrapperMtimeMs = c.mtimeMs;
-                    if (st_.stat(joinPath(wrapper, kDirFile), ptr)) {
-                        n.isDir = true; n.contentsPath = wrapper; n.dirIdFile = joinPath(wrapper, kDirFile); n.mtimeMs = c.mtimeMs;
-                    } else {
-                        DirEntry contents;
-                        if (!st_.stat(joinPath(wrapper, kContentsFile), contents)) {
-                            st_.invalidate(wrapper);
-                            if (!st_.stat(joinPath(wrapper, kContentsFile), contents)) {
-                                logMsg(LogLevel::Warn, TAG, "Shortened node '" + name + "' has neither dir.c9r nor contents.c9r -- skipping");
-                                continue;
-                            }
-                        }
-                        n.contentsPath = joinPath(wrapper, kContentsFile);
-                        n.size = contents.size; n.mtimeMs = contents.mtimeMs;
-                    }
-                    out.push_back(std::move(n));
-                } else if (endsWith(name, kC9r)) {
-                    std::string clear = nc_.decryptFilename(name.substr(0, name.size() - 4), dirId);
-                    if (!usableName(clear)) continue;
-                    Node n;
-                    n.name = clear; n.nodePath = joinPath(folder, name); n.contentsPath = n.nodePath;
-                    n.size = c.size; n.mtimeMs = c.mtimeMs;
-                    if (c.isDir) {
-                        DirEntry ptr;
-                        if (!st_.stat(joinPath(n.nodePath, kDirFile), ptr)) {
-                            logMsg(LogLevel::Warn, TAG, "Directory node '" + name + "' is missing dir.c9r -- skipping");
-                            continue;
-                        }
-                        n.isDir = true; n.size = 0; n.dirIdFile = joinPath(n.nodePath, kDirFile);
-                    }
-                    out.push_back(std::move(n));
-                }
-            } catch (const Error& e) {
-                logMsg(LogLevel::Debug, TAG, "Skipping unreadable child '" + name + "': " + e.what());
-            }
-        }
+        if (hidden) *hidden = hid;
         return out;
+    }
+
+    // Hidden-entry count of the most recent listing of [dirId] (-1 if it was never listed).
+    int lastHiddenCount(const std::string& dirId) {
+        std::lock_guard<std::mutex> g(mu_);
+        auto it = hiddenByDir_.find(dirId);
+        return it == hiddenByDir_.end() ? -1 : it->second;
     }
 
     // Direct lookup of one child by cleartext name (O(1) instead of
@@ -207,11 +216,12 @@ public:
             if (isShort) {
                 n.wrapperMtimeMs = de.mtimeMs;
                 if (!de.isDir) return std::nullopt;
-                DirEntry ptr, contents;
+                DirEntry ptr, contents, link;
                 if (st_.stat(joinPath(nodePath, kDirFile), ptr)) {
                     n.isDir = true; n.dirIdFile = joinPath(nodePath, kDirFile); n.size = 0;
                     return n;
                 }
+                if (st_.stat(joinPath(nodePath, kSymlinkFile), link)) { markSymlink(n, nodePath, link); return n; }   // official order: dir, symlink, contents
                 if (st_.stat(joinPath(nodePath, kContentsFile), contents)) {
                     n.contentsPath = joinPath(nodePath, kContentsFile);
                     n.size = contents.size; n.mtimeMs = contents.mtimeMs;
@@ -220,9 +230,14 @@ public:
                 return std::nullopt;
             }
             if (de.isDir) {
-                DirEntry ptr;
-                if (!st_.stat(joinPath(nodePath, kDirFile), ptr)) return std::nullopt;
-                n.isDir = true; n.size = 0; n.dirIdFile = joinPath(nodePath, kDirFile);
+                DirEntry ptr, link;
+                if (st_.stat(joinPath(nodePath, kDirFile), ptr)) {
+                    n.isDir = true; n.size = 0; n.dirIdFile = joinPath(nodePath, kDirFile);
+                } else if (st_.stat(joinPath(nodePath, kSymlinkFile), link)) {
+                    markSymlink(n, nodePath, link);
+                } else {
+                    return std::nullopt;
+                }
             }
             return n;
         }
@@ -294,6 +309,97 @@ public:
     int shortening() const { return shortening_; }
 
 private:
+    // A node folder that holds symlink.c9r: not a file (nothing to read), not a folder (nothing to enter).
+    static void markSymlink(Node& n, const std::string& nodePath, const DirEntry& link) {
+        n.isDir = false; n.isSymlink = true;
+        n.contentsPath = nodePath;
+        n.symlinkFile = joinPath(nodePath, kSymlinkFile);
+        n.size = link.size; n.mtimeMs = link.mtimeMs;
+    }
+
+    std::vector<Node> listByDirIdImpl(const std::string& dirId, int& hidden) {
+        std::string folder;
+        try { folder = physicalFolderForDirId(dirId); } catch (const Error& e) {
+            logMsg(LogLevel::Warn, TAG, std::string("listByDirId: backing folder unavailable: ") + e.what());
+            return {};
+        }
+        std::vector<DirEntry> children;
+        if (!st_.list(folder, children)) return {};
+        std::vector<Node> out;
+        for (const DirEntry& c : children) {
+            const std::string& name = c.name;
+            if (name.empty() || name == kDirFile || name == kDirIdBackup) continue;
+            if (name[0] == '.') continue;   // hidden files (.DS_Store, sync temp files, ...) -- ignored like the official client
+            const bool isC9s = endsWith(name, kC9s), isC9r = endsWith(name, kC9r);
+            if (!isC9s && !isC9r) continue;   // foreign file: not ours, not "hidden"
+            try {
+                if (isC9s) {
+                    if (!c.isDir) { hidden++; continue; }
+                    std::string wrapper = joinPath(folder, name);
+                    Bytes ln;
+                    if (!st_.readWhole(joinPath(wrapper, kNameFile), ln) || ln.empty()) {
+                        st_.invalidate(wrapper);
+                        if (!st_.readWhole(joinPath(wrapper, kNameFile), ln) || ln.empty()) { hidden++; continue; }
+                    }
+                    std::string raw(ln.begin(), ln.end());
+                    size_t e2 = raw.find_last_not_of(std::string(" \r\n\0", 4));
+                    raw = e2 == std::string::npos ? "" : raw.substr(0, e2 + 1);
+                    size_t s2 = raw.find_first_not_of(' ');
+                    raw = s2 == std::string::npos ? "" : raw.substr(s2);
+                    std::string cipher = endsWith(raw, kC9r) ? raw.substr(0, raw.size() - 4) : raw;
+                    std::string clear = nc_.decryptFilename(cipher, dirId);
+                    if (!usableName(clear)) { hidden++; continue; }
+                    DirEntry ptr, link;
+                    Node n;
+                    n.shortened = true; n.name = clear; n.nodePath = wrapper; n.wrapperMtimeMs = c.mtimeMs;
+                    if (st_.stat(joinPath(wrapper, kDirFile), ptr)) {
+                        n.isDir = true; n.contentsPath = wrapper; n.dirIdFile = joinPath(wrapper, kDirFile); n.mtimeMs = c.mtimeMs;
+                    } else if (st_.stat(joinPath(wrapper, kSymlinkFile), link)) {
+                        markSymlink(n, wrapper, link);
+                    } else {
+                        DirEntry contents;
+                        if (!st_.stat(joinPath(wrapper, kContentsFile), contents)) {
+                            st_.invalidate(wrapper);
+                            if (!st_.stat(joinPath(wrapper, kContentsFile), contents)) {
+                                logMsg(LogLevel::Warn, TAG, "Shortened node '" + name + "' has neither dir.c9r, symlink.c9r nor contents.c9r -- skipping");
+                                hidden++;
+                                continue;
+                            }
+                        }
+                        n.contentsPath = joinPath(wrapper, kContentsFile);
+                        n.size = contents.size; n.mtimeMs = contents.mtimeMs;
+                    }
+                    out.push_back(std::move(n));
+                } else {
+                    std::string clear = nc_.decryptFilename(name.substr(0, name.size() - 4), dirId);
+                    if (!usableName(clear)) { hidden++; continue; }
+                    Node n;
+                    n.name = clear; n.nodePath = joinPath(folder, name); n.contentsPath = n.nodePath;
+                    n.size = c.size; n.mtimeMs = c.mtimeMs;
+                    if (c.isDir) {
+                        DirEntry ptr, link;
+                        if (st_.stat(joinPath(n.nodePath, kDirFile), ptr)) {
+                            n.isDir = true; n.size = 0; n.dirIdFile = joinPath(n.nodePath, kDirFile);
+                        } else if (st_.stat(joinPath(n.nodePath, kSymlinkFile), link)) {
+                            markSymlink(n, n.nodePath, link);
+                        } else {
+                            logMsg(LogLevel::Warn, TAG, "Directory node '" + name + "' has neither dir.c9r nor symlink.c9r -- skipping");
+                            hidden++;
+                            continue;
+                        }
+                    }
+                    out.push_back(std::move(n));
+                }
+            } catch (const Error& e) {
+                // Most often a sync-conflict copy ("<name> (1).c9r", "<name>.sync-conflict-....c9r"): its base64
+                // part no longer authenticates. Counted so the UI can say "N entries are not shown".
+                hidden++;
+                logMsg(LogLevel::Debug, TAG, "Skipping unreadable child '" + name + "': " + e.what());
+            }
+        }
+        return out;
+    }
+
     static bool usableName(const std::string& n) {
         return !n.empty() && n != "." && n != ".." && n.find('/') == std::string::npos && n.find('\0') == std::string::npos;
     }
@@ -312,6 +418,7 @@ private:
     std::mutex mu_;
     std::unordered_map<std::string, std::string> dirIds_;     // cleartext dir path -> dirId
     std::unordered_map<std::string, std::string> dataDirs_;   // dirId -> d/xx/yyyy
+    std::unordered_map<std::string, int> hiddenByDir_;        // dirId -> hidden entries seen by the last listing
     const bool readOnly_;
 };
 
@@ -336,6 +443,7 @@ public:
             if (!tree_.resolveDirId(normalizePath(path), dirId)) return false;
             out.clear();
             for (Node& n : tree_.listByDirId(dirId)) {
+                if (n.isSymlink) continue;   // see listSymlinks(): links are neither files nor folders
                 DirEntry e;
                 e.name = n.name; e.isDir = n.isDir;
                 e.size = n.isDir ? 0 : fmt_.cleartextSize(n.size);
@@ -347,6 +455,97 @@ public:
             logMsg(LogLevel::Debug, TAG, std::string("listDirectory failed: ") + e.what());
             return false;
         }
+    }
+
+    // ---- symlinks (cryptofs Symlinks / CiphertextFilePath.getSymlinkFilePath) -----------------------------
+    // A symlink is a node folder "<encrypted name>.c9r/" (or the .c9s wrapper for long names) that holds
+    // symlink.c9r: the link target, UTF-8, encrypted exactly like file content. We never resolve a target --
+    // a link inside a vault could point anywhere -- we only list, read, create, move and delete the node.
+    bool listSymlinks(const std::string& path, std::vector<DirEntry>& out) override {
+        try {
+            Lifecycle::Op op(life_);
+            std::shared_lock<std::shared_mutex> ns(ns_);
+            std::string dirId;
+            if (!tree_.resolveDirId(normalizePath(path), dirId)) return false;
+            out.clear();
+            for (Node& n : tree_.listByDirId(dirId)) {
+                if (!n.isSymlink) continue;
+                DirEntry e;
+                e.name = n.name; e.isDir = false; e.isSymlink = true;
+                e.size = fmt_.cleartextSize(n.size);   // == length of the target in bytes
+                e.mtimeMs = n.mtimeMs;
+                out.push_back(std::move(e));
+            }
+            return true;
+        } catch (const std::exception& e) {
+            logMsg(LogLevel::Debug, TAG, std::string("listSymlinks failed: ") + e.what());
+            return false;
+        }
+    }
+
+    std::optional<std::string> readSymlink(const std::string& path) override {
+        try {
+            Lifecycle::Op op(life_);
+            std::shared_lock<std::shared_mutex> ns(ns_);
+            auto node = tree_.resolve(normalizePath(path));
+            if (!node || !node->isSymlink) return std::nullopt;
+            st_->ensureContentReady(node->symlinkFile);
+            std::string target;
+            if (!readSmallEncryptedFile(*st_, fmt_, node->symlinkFile, kMaxSymlinkLength, target)) return std::nullopt;
+            if (!validUtf8(target)) return std::nullopt;   // would not survive the JNI boundary; never hand it out
+            return target;
+        } catch (const std::exception& e) {
+            logMsg(LogLevel::Debug, TAG, std::string("readSymlink failed: ") + e.what());
+            return std::nullopt;
+        }
+    }
+
+    bool createSymlink(const std::string& path, const std::string& target) override {
+        if (readOnly_) return false;
+        // 1..32767 bytes of valid UTF-8 without NUL. (Official would also store an empty or malformed string, or
+        // one that is short in characters but over 32767 bytes, but nothing could read or show it afterwards.)
+        if (target.empty() || target.size() > kMaxSymlinkLength || !validUtf8(target) || target.find('\0') != std::string::npos) return false;
+        try {
+            Lifecycle::Op op(life_);
+            std::string n = normalizePath(path);
+            if (n.empty()) return false;
+            std::unique_lock<std::shared_mutex> ns(ns_);
+            if (tree_.resolve(n)) return false;   // official assertNonExisting: never overwrite anything
+            std::string parentPath = parentOf(n), name = nameOf(n);
+            std::string parentId;
+            if (!tree_.resolveDirId(parentPath, parentId)) return false;
+            std::string parentPhys = tree_.physicalFolderForDirId(parentId);
+            ensureDirIdBackup(parentPhys, parentId);
+            // Official order: node folder, then symlink.c9r, and only then name.c9s -- until the last step the
+            // node is invisible (no type file / no name), so an interrupted sync never shows a half link.
+            std::string full = nc_.encryptFilename(name, parentId) + kC9r;
+            const bool isShort = (int)full.size() > tree_.shortening();
+            std::string nodePath = joinPath(parentPhys, isShort ? shortNameFor(full) : full);
+            if (!st_->mkdir(nodePath)) return false;
+            if (!writeSmallEncryptedFile(*st_, fmt_, joinPath(nodePath, kSymlinkFile), target) ||
+                (isShort && !st_->writeWhole(joinPath(nodePath, kNameFile), (const uint8_t*)full.data(), full.size()))) {
+                st_->remove(nodePath);
+                tree_.invalidate(parentPath);
+                return false;
+            }
+            tree_.invalidate(parentPath);
+            return true;
+        } catch (const std::exception& e) {
+            logMsg(LogLevel::Warn, TAG, std::string("createSymlink failed: ") + e.what());
+            return false;
+        }
+    }
+
+    int hiddenEntryCount(const std::string& path) override {
+        try {
+            Lifecycle::Op op(life_);
+            std::shared_lock<std::shared_mutex> ns(ns_);
+            std::string dirId;
+            if (!tree_.resolveDirId(normalizePath(path), dirId)) return -1;
+            int h = tree_.lastHiddenCount(dirId);
+            if (h < 0) { tree_.listByDirId(dirId, &h); }
+            return h;
+        } catch (const std::exception&) { return -1; }
     }
 
     bool createDirectory(const std::string& path) override {
@@ -400,7 +599,7 @@ public:
 
             if (!node->shortened && !newShort) {
                 if (oldNodePath != newNodePath && !st_->rename(oldNodePath, newNodePath)) return false;
-            } else if (node->isDir) {
+            } else if (node->isDir || node->isSymlink) {   // a symlink node is a folder too: move it as a whole
                 if (node->shortened && !newShort) st_->remove(joinPath(oldNodePath, kNameFile));
                 if (oldNodePath != newNodePath && !st_->rename(oldNodePath, newNodePath)) return false;
                 if (newShort && !st_->writeWhole(joinPath(newNodePath, kNameFile), (const uint8_t*)full.data(), full.size())) return false;
@@ -417,7 +616,7 @@ public:
                 if (oldNodePath != newNodePath && !st_->rename(oldNodePath, newNodePath)) return false;
                 newContents = joinPath(newNodePath, kContentsFile);
             }
-            remapPending(oldN, newN, oldNodePath, newNodePath, node->isDir ? std::string() : newContents);
+            remapPending(oldN, newN, oldNodePath, newNodePath, (node->isDir || node->isSymlink) ? std::string() : newContents);
             tree_.invalidate(oldParent);
             tree_.invalidate(newParent);
             if (node->isDir) tree_.invalidate(oldN);
@@ -444,6 +643,8 @@ public:
                     logMsg(LogLevel::Warn, TAG, std::string("deleteFile: backing directory already missing or unreadable: ") + e.what());
                 }
                 st_->remove(node->nodePath);
+            } else if (node->isSymlink) {
+                st_->remove(node->nodePath);   // the node folder incl. symlink.c9r (and name.c9s); the target is never touched
             } else {
                 st_->remove(node->shortened ? node->nodePath : node->contentsPath);
             }
@@ -464,6 +665,7 @@ public:
             if (!node) return false;
             bool ok;
             if (node->isDir) ok = st_->setMtime(node->nodePath, epochSeconds);
+            else if (node->isSymlink) ok = st_->setMtime(node->symlinkFile, epochSeconds);   // official reads a link's mtime from symlink.c9r
             else {
                 ok = st_->setMtime(node->contentsPath, epochSeconds);
                 if (node->shortened) st_->setMtime(node->nodePath, epochSeconds);
@@ -478,7 +680,7 @@ public:
             Lifecycle::Op op(life_);
             std::shared_lock<std::shared_mutex> ns(ns_);
             auto node = tree_.resolve(normalizePath(path));
-            if (!node || node->isDir) return -1;
+            if (!node || node->isDir || node->isSymlink) return -1;
             st_->ensureContentReady(node->contentsPath);
             DirEntry de;
             int64_t phys = st_->stat(node->contentsPath, de) ? de.size : node->size;
@@ -592,7 +794,7 @@ private:
     bool resolveForRead(const std::string& vpath, std::string& physical) override {
         std::shared_lock<std::shared_mutex> ns(ns_);
         auto n = tree_.resolve(vpath);
-        if (!n || n->isDir) return false;
+        if (!n || n->isDir || n->isSymlink) return false;   // a link is never read as if it were a file
         physical = n->contentsPath;
         return true;
     }
@@ -608,6 +810,7 @@ private:
         std::string phys;
         if (auto existing = tree_.resolve(n)) {
             if (existing->isDir) throw Error(Err::Exists, "a folder with that name already exists");
+            if (existing->isSymlink) throw Error(Err::Exists, "a symlink with that name already exists");
             phys = existing->contentsPath;
         } else {
             phys = createNewFileNode(parentPhys, nc_.encryptFilename(name, parentId));
@@ -708,6 +911,7 @@ private:
         if (depth > 256) return 0;
         int64_t total = 0;
         for (Node& n : tree_.listByDirId(dirId)) {
+            if (n.isSymlink) continue;
             if (n.isDir) {
                 try { total += folderSizeById(tree_.readDirId(n.dirIdFile), depth + 1); } catch (const Error&) {}
             } else total += fmt_.cleartextSize(n.size);
@@ -769,8 +973,31 @@ bool looksLikeCryptomator(Storage& s) {
     return s.stat(cryptomator::kMasterkeyFile, de) && !de.isDir;
 }
 
+// cryptofs BackupHelper.attemptBackup: "<name>.<first 4 bytes of SHA-256(content), upper-case hex>.bkup".
+// Create-new: an existing backup is compared with [content] (and only logged if they differ), never replaced.
+// Best effort -- returns false on a write failure, which callers must treat as non-fatal.
+static bool attemptBackup(Storage& s, const std::string& name, const Bytes& content) {
+    using namespace cryptomator;
+    Bytes digest = crypto::hash(crypto::Md::Sha256, content.data(), content.size());
+    std::string hex = toHex(digest.data(), 4);
+    for (char& c : hex) c = (char)std::toupper((unsigned char)c);   // Guava base16 is upper-case
+    const std::string bkup = name + "." + hex + ".bkup";
+    DirEntry be;
+    if (s.stat(bkup, be)) {
+        Bytes existing;
+        if (!s.readWhole(bkup, existing) || existing != content)
+            logMsg(LogLevel::Warn, TAG, "backup " + bkup + " differs from " + name + "; replace it manually");
+        return true;
+    }
+    if (!s.writeWhole(bkup, content.data(), content.size())) {
+        logMsg(LogLevel::Warn, TAG, "could not write " + bkup);
+        return false;
+    }
+    return true;
+}
+
 OpenResult openCryptomator(std::shared_ptr<Storage> s, const uint8_t* pw, size_t pwLen, bool readOnly,
-                           const HostEnv&, const StorageFactory& factory) {
+                           const HostEnv& env, const StorageFactory& factory) {
     using namespace cryptomator;
     OpenResult res;
     auto fail = [&](OpenStatus st, std::string msg) { res.status = st; res.message = std::move(msg); return std::move(res); };
@@ -821,6 +1048,16 @@ OpenResult openCryptomator(std::shared_ptr<Storage> s, const uint8_t* pw, size_t
                         "Vault format " + std::to_string(parsed.version) + " is not supported (only 7 and 8 are). "
                         "Open it once in Cryptomator to migrate it.");
         }
+    }
+
+    // Desktop parity: the key files are backed up on every successful read-write unlock. Never in a read-only
+    // session (which must not write at all) and never fatal.
+    if (!readOnly && env.backupKeyFilesOnOpen) {
+        try {
+            attemptBackup(*s, kMasterkeyFile, raw);
+            Bytes cfgBytes;
+            if (s->stat(kVaultFile, de) && s->readWhole(kVaultFile, cfgBytes)) attemptBackup(*s, kVaultFile, cfgBytes);
+        } catch (const std::exception& e) { logMsg(LogLevel::Warn, TAG, std::string("key file backup failed: ") + e.what()); }
     }
 
     std::shared_ptr<Storage> sessionStorage = s;
@@ -883,15 +1120,7 @@ PlainResult changeCryptomatorPassword(Storage& s, const uint8_t* oldPw, size_t o
         std::string json = lockMasterkey(mk, npw.data(), npw.size(), parsed.version,
                                          (uint32_t)parsed.scryptCostParam, (uint32_t)parsed.scryptBlockSize);
         // Official keeps the previous key file as masterkey.cryptomator.<first 4 bytes of its SHA-256, hex>.bkup
-        {
-            Bytes digest = crypto::hash(crypto::Md::Sha256, raw.data(), raw.size());
-            std::string hex = toHex(digest.data(), 4);
-            for (char& c : hex) c = (char)std::toupper((unsigned char)c);   // Guava base16 is upper-case
-            std::string bkup = std::string(kMasterkeyFile) + "." + hex + ".bkup";
-            DirEntry be;
-            if (!s.stat(bkup, be) && !s.writeWhole(bkup, raw.data(), raw.size()))
-                logMsg(LogLevel::Warn, TAG, "could not write " + bkup);
-        }
+        attemptBackup(s, kMasterkeyFile, raw);
         if (!s.writeWholeAtomic(kMasterkeyFile, (const uint8_t*)json.data(), json.size()))
             return plainFail(OpenStatus::InvalidVault, "Could not write masterkey.cryptomator");
         PlainResult ok;
@@ -903,5 +1132,49 @@ PlainResult changeCryptomatorPassword(Storage& s, const uint8_t* oldPw, size_t o
         return plainFail(OpenStatus::InvalidVault, e.what());
     }
 }
+
+PlainResult migrateCryptomator7To8(Storage& s, const uint8_t* pw, size_t pwLen) {
+    using namespace cryptomator;
+    DirEntry de;
+    if (!s.stat(kMasterkeyFile, de) || de.isDir)
+        return plainFail(OpenStatus::InvalidVault, "No masterkey.cryptomator found \xE2\x80\x94 this doesn't look like a Cryptomator vault.");
+    if (s.stat(kVaultFile, de))
+        return plainFail(OpenStatus::InvalidVault, "This vault already has a vault.cryptomator, so there is nothing to migrate.");
+    Bytes raw;
+    if (!s.readWhole(kMasterkeyFile, raw)) return plainFail(OpenStatus::InvalidVault, "Could not read masterkey.cryptomator");
+    try {
+        MasterkeyFile parsed = MasterkeyFile::parse(std::string(raw.begin(), raw.end()));
+        if (parsed.version != 7) {
+            if (parsed.version >= 8)
+                return plainFail(OpenStatus::InvalidVault,
+                                 "vault.cryptomator is missing from this format 8 vault. If it is stored with a cloud provider, "
+                                 "wait for it to finish syncing; do not migrate.");
+            return plainFail(OpenStatus::InvalidVault,
+                             "Vault format " + std::to_string(parsed.version) + " cannot be migrated here (only 7 can). Open it once in Cryptomator to migrate it.");
+        }
+        Masterkey mk = unlockMasterkeyCompat(parsed, pw, pwLen);   // proves the password before anything is written
+        Secret npw = normalizedPassphrase(pw, pwLen);              // the key file is re-saved with the normalised passphrase
+        // 1. back up the old key file -- here a hard requirement, since the upgrade cannot be undone
+        if (!attemptBackup(s, kMasterkeyFile, raw))
+            return plainFail(OpenStatus::InvalidVault, "Could not back up masterkey.cryptomator; the vault was not changed.");
+        // 2. the signed vault config. Written first: with it in place the vault already opens as format 8, so an
+        //    interruption before step 3 leaves a perfectly usable vault.
+        std::string jwt = createVaultConfig(8, "SIV_CTRMAC", kDefaultShortening, mk, newUuid());
+        if (!s.writeWholeAtomic(kVaultFile, (const uint8_t*)jwt.data(), jwt.size()))
+            return plainFail(OpenStatus::InvalidVault, "Could not write vault.cryptomator; the vault was not changed.");
+        // 3. re-save the key file as version 999 with the library defaults (what official's persist() does)
+        std::string json = lockMasterkey(mk, npw.data(), npw.size(), 999);
+        if (!s.writeWholeAtomic(kMasterkeyFile, (const uint8_t*)json.data(), json.size()))
+            return plainFail(OpenStatus::InvalidVault, "vault.cryptomator was written but masterkey.cryptomator could not be updated; the vault still opens.");
+        PlainResult ok;
+        ok.status = OpenStatus::Ok;
+        return ok;
+    } catch (const Error& e) {
+        return plainFail(e.code() == Err::WrongPassword ? OpenStatus::WrongPassword : OpenStatus::InvalidVault, e.what());
+    } catch (const std::exception& e) {
+        return plainFail(OpenStatus::InvalidVault, e.what());
+    }
+}
+
 
 }  // namespace fv

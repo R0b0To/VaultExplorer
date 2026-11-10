@@ -747,6 +747,19 @@ class VaultLifecycleApi {
     return success ?? false;
   }
 
+  /// Upgrades a Cryptomator format 7 vault to format 8 (what Cryptomator itself does when it offers to
+  /// "migrate"). ONE WAY: Cryptomator older than 1.6 cannot open the result. The old key file is kept as
+  /// `masterkey.cryptomator.<id>.bkup`. The vault must be locked. Like [changeCryptomatorVaultPassword],
+  /// failures are not swallowed: a wrong [password] surfaces as a `PlatformException` with code `AUTH_FAIL`,
+  /// anything else (not a format 7 vault, already migrated, ...) as `INVALID_VAULT` with a display message.
+  Future<bool> migrateCryptomatorVault(String folderUri, String password) async {
+    final success = await _channel.invokeMethod<bool>(
+      ChannelMethods.migrateCryptomatorVault,
+      {'filePath': folderUri, 'password': password},
+    );
+    return success ?? false;
+  }
+
   Future<
     ({String uri, String displayName, bool looksLikeVault, String? format})?
   >

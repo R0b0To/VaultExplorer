@@ -176,6 +176,40 @@ internal object FolderVaultOpener {
         return open(context, vaultRootUri, format, sentinel, password, null, false, makeSession)
     }
 
+    /**
+     * Cryptomator format 7 -> 8 (one way; Cryptomator older than 1.6 cannot open the result). The vault must not be
+     * unlocked in this app while it runs -- same rule as [changePassword].
+     */
+    fun migrateCryptomator(
+        context: Context,
+        vaultRootUri: Uri,
+        sentinel: String,
+        password: CharArray,
+    ): VaultOpenResult<Unit> {
+        if (!NativeFolderVault.isAvailable) return VaultOpenResult.InvalidVault(UNAVAILABLE)
+        val root = DocumentFile.fromTreeUri(context, vaultRootUri) ?: return VaultOpenResult.InvalidVault("Cannot access the selected folder.")
+        val rawRoot = RawFileResolver.getVerifiedRawVaultRoot(context, vaultRootUri, sentinel, probeWrite = true)
+        val storage = if (rawRoot == null) safBootstrap(context, root, vaultRootUri) else null
+        val pwBytes = utf8(password)
+        val out = arrayOfNulls<Any?>(2)
+        try {
+            val status = try {
+                NativeFolderVault.nativeMigrateCryptomator(rawRoot?.absolutePath, storage, pwBytes, out)
+            } catch (e: Throwable) {
+                VeLog.e(TAG, e) { "native migrateCryptomator crashed" }
+                return VaultOpenResult.InvalidVault("Failed to migrate the vault: ${e.message}")
+            }
+            return when (status) {
+                NativeFolderVault.STATUS_OK -> VaultOpenResult.Success(Unit, root.name ?: "Vault")
+                NativeFolderVault.STATUS_WRONG_PASSWORD -> VaultOpenResult.WrongPassword
+                else -> VaultOpenResult.InvalidVault(message(out, "Failed to migrate the vault."))
+            }
+        } finally {
+            pwBytes.fill(0)
+            storage?.close()
+        }
+    }
+
     fun changePassword(
         context: Context,
         vaultRootUri: Uri,

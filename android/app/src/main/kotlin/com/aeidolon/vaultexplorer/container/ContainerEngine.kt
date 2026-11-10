@@ -180,6 +180,16 @@ object ContainerEngine {
         VaultBackendRegistry.get(volId)?.invalidateCache(path)
     }
 
+    // Symlinks and hidden entries exist only on folder-vault backends; everything else reports "none" / unknown.
+    fun listSymlinks(path: String, volId: Int): Array<String> =
+        VaultBackendRegistry.get(volId)?.listSymlinks(path) ?: emptyArray()
+
+    fun readSymlink(path: String, volId: Int): String? =
+        VaultBackendRegistry.get(volId)?.readSymlink(path)
+
+    fun hiddenEntryCount(path: String, volId: Int): Int =
+        VaultBackendRegistry.get(volId)?.hiddenEntryCount(path) ?: -1
+
     fun createDirectory(path: String, volId: Int): Boolean {
         VaultBackendRegistry.get(volId)?.let { return it.createDirectory(path) }
         return NativeEngine.createDirectory(path, volId)

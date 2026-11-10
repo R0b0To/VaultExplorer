@@ -76,6 +76,7 @@ import 'package:vaultexplorer/features/browser/viewer/media_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/pdf_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_screen.dart';
 import 'package:vaultexplorer/features/browser/widgets/add_item_menu_button.dart';
+import 'package:vaultexplorer/features/browser/widgets/vault_listing_notices.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_drag_session.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_item_drag.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_pane_scope.dart';
@@ -6559,6 +6560,15 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
               children: [
                 Column(
                   children: [
+                    // Symbolic links and entries a Cryptomator folder cannot list (e.g. sync-conflict copies).
+                    // Shows nothing unless there is something to report; no-op for every other kind of storage.
+                    if (!widget.container.isLocalStorage &&
+                        _archiveContext == null)
+                      VaultListingNotices(
+                        container: widget.container,
+                        dirPath: _currentDirPath,
+                        listingToken: _currentItems,
+                      ),
                     Expanded(
                       child: Stack(
                         children: [

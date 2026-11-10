@@ -41,6 +41,10 @@ object CryptomatorVault {
             IntArray(2), null, userEntropy,
         ) { handle, volRef -> CryptomatorSession(context, vaultRootUri, handle, false, volRef) }
 
+    /** Format 7 -> 8, one way. See [FolderVaultOpener.migrateCryptomator]. */
+    fun migrate(context: Context, vaultRootUri: Uri, passphrase: CharArray): VaultOpenResult<Unit> =
+        FolderVaultOpener.migrateCryptomator(context, vaultRootUri, MASTERKEY_FILE_NAME, passphrase)
+
     fun changePassword(
         context: Context,
         vaultRootUri: Uri,

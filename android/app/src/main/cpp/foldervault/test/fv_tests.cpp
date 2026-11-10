@@ -544,6 +544,402 @@ static void testCryptomatorCompat() {
     }
 }
 
+// ---- Symlinks and the hidden-entry counter. Layout, limits and precedence mirror cryptofs 2.8.0 / 2.11.1
+// ---- (Symlinks.java, CiphertextFilePath, CryptoPathMapper); the same behaviours are cross-checked against the
+// ---- real implementation in test/interop/cryptomator_symlink_interop.sh.
+static std::string physicalNodeOf(const std::string& root, const std::string& file) {   // folder holding [file]
+    std::string found;
+    walkFiles(root, [&](const std::string& p, off_t) { if (p.size() > file.size() && p.substr(p.size() - file.size()) == file) found = p.substr(0, p.size() - file.size() - 1); });
+    return found;
+}
+static int countFiles(const std::string& root, const std::string& file) {
+    int n = 0;
+    walkFiles(root, [&](const std::string& p, off_t) { if (p.size() >= file.size() && p.substr(p.size() - file.size()) == file) n++; });
+    return n;
+}
+
+static void testCryptomatorSymlinks() {
+    std::printf("cryptomator symlinks + hidden entries\n");
+    const uint8_t pw[] = "secret";
+    namespace cm = cryptomator;
+    const std::string longName = std::string(170, 'L') + ".lnk";                  // > shortening threshold -> .c9s wrapper
+    const std::string uni = "caf\xC3\xA9 \xE6\x97\xA5\xE6\x9C\xAC.lnk";           // "café 日本.lnk"
+    const std::string utarget = "\xE7\x9B\xAE\xE6\xA8\x99/\xF0\x9F\x98\x80";      // "目標/😀" = 3+3+1+4 bytes
+    auto symlinksOf = [](Vault& v, const std::string& dir) { std::vector<DirEntry> es; v.listSymlinks(dir, es); return es; };
+    auto findLink = [](const std::vector<DirEntry>& es, const std::string& n) -> const DirEntry* { for (auto& e : es) if (e.name == n) return &e; return nullptr; };
+
+    for (bool v7 : {false, true}) {
+        std::printf("  scenario: %s\n", v7 ? "format 7 (SIV_CTRMAC)" : "format 8 (SIV_GCM)");
+        TmpDir t; std::string root = t.sub("v"); auto st = std::make_shared<PosixStorage>(root);
+        CHECK(createCryptomator(*st, pw, 6).status == OpenStatus::Ok);
+        if (v7) {
+            Bytes mkRaw; CHECK(st->readWhole("masterkey.cryptomator", mkRaw));
+            auto mk = cm::unlockMasterkey(cm::MasterkeyFile::parse(std::string(mkRaw.begin(), mkRaw.end())), pw, 6);
+            std::string j = cm::lockMasterkey(mk, pw, 6, 7);
+            CHECK(st->writeWhole("masterkey.cryptomator", (const uint8_t*)j.data(), j.size()));
+            CHECK(st->remove("vault.cryptomator"));
+        }
+        auto r = openCryptomator(st, pw, 6, false, {});
+        CHECK(r.status == OpenStatus::Ok);
+        if (!r.vault) return;
+        Vault& v = *r.vault;
+        CHECK(v.createDirectory("docs"));
+        const Bytes fileData = rnd(10, 5);
+        CHECK(put(v, "docs/file.txt", fileData));
+
+        // --- create + list + read ---------------------------------------------------------------------
+        CHECK(v.createSymlink("link", "docs/file.txt"));
+        CHECK(v.createSymlink("docs/" + longName, "/abs/target"));                  // shortened name
+        CHECK(v.createSymlink(uni, utarget));
+        CHECK_EQ(names(v, "").size(), (size_t)1);                                   // listDirectory never shows links
+        CHECK(has(v, "", "D:docs"));
+        CHECK_EQ(names(v, "docs").size(), (size_t)1);
+        CHECK(has(v, "docs", "F:file.txt"));
+        auto root1 = symlinksOf(v, "");
+        CHECK_EQ(root1.size(), (size_t)2);
+        const DirEntry* l1 = findLink(root1, "link");
+        CHECK(l1 && l1->isSymlink && !l1->isDir && l1->size == 13);                  // size = bytes of the target
+        const DirEntry* l2 = findLink(root1, uni);
+        CHECK(l2 && l2->isSymlink && l2->size == 11);
+        auto docs1 = symlinksOf(v, "docs");
+        CHECK_EQ(docs1.size(), (size_t)1);
+        CHECK(findLink(docs1, longName) != nullptr);
+        CHECK(v.readSymlink("link").value_or("?") == "docs/file.txt");
+        CHECK(v.readSymlink("docs/" + longName).value_or("?") == "/abs/target");
+        CHECK(v.readSymlink(uni).value_or("?") == utarget);
+        CHECK(!v.readSymlink("docs/file.txt"));                                      // a file is not a link
+        CHECK(!v.readSymlink("docs"));                                               // neither is a folder
+        CHECK(!v.readSymlink("missing"));
+        std::vector<DirEntry> none; CHECK(!v.listSymlinks("nodir", none));
+        CHECK(countFiles(root, "symlink.c9r") == 3);
+
+        // --- a link is never a file or a folder ---------------------------------------------------------
+        CHECK(!get(v, "link"));
+        CHECK_EQ(v.getFileSize("link"), (int64_t)-1);
+        CHECK(!v.createDirectory("link"));
+        CHECK(!put(v, "link", rnd(20, 6)));                                          // writing over a link is refused...
+        CHECK(v.readSymlink("link").value_or("?") == "docs/file.txt");              // ...and leaves it intact
+        CHECK(!put(v, "link/inside.txt", rnd(5)));                                   // a link is not a folder to put things into
+        std::vector<DirEntry> inside; CHECK(!v.listDirectory("link", inside));       // nor to list
+        CHECK(!v.createSymlink("link", "x"));
+        CHECK(!v.createSymlink("docs", "x"));
+        CHECK(!v.createSymlink("docs/file.txt", "x"));
+        CHECK(!v.createSymlink("nodir/x", "x"));
+        CHECK(!v.createSymlink("", "x"));
+        CHECK(*get(v, "docs/file.txt") == fileData);
+        CHECK_EQ(v.getFolderSize(""), (int64_t)10);                                  // links add nothing to the size of a folder
+        CHECK_EQ(v.getFolderSize("docs"), (int64_t)10);
+
+        // --- target validation and limits -------------------------------------------------------------
+        CHECK(!v.createSymlink("t1", ""));
+        CHECK(!v.createSymlink("t2", std::string("a\0b", 3)));                       // NUL
+        CHECK(!v.createSymlink("t3", "\xC3\x28"));                                   // malformed UTF-8
+        CHECK(!v.createSymlink("t4", "\xC0\xAF"));                                   // overlong
+        CHECK(!v.createSymlink("t5", "\xED\xA0\x80"));                               // UTF-16 surrogate
+        CHECK(!v.createSymlink("t6", "\xF4\x90\x80\x80"));                           // > U+10FFFF
+        CHECK(!v.createSymlink("t7", std::string(32768, 'a')));                      // one over the limit
+        CHECK(v.createSymlink("t8", std::string(32767, 'a')));                       // exactly the limit
+        CHECK(v.readSymlink("t8").value_or("") == std::string(32767, 'a'));
+        std::string euro; for (int i = 0; i < 10923; i++) euro += "\xE2\x82\xAC";    // 10923 chars but 32769 bytes
+        CHECK(!v.createSymlink("t9", euro));                                         // fewer than 32767 chars, yet unreadable: refused
+        euro.resize(10922 * 3);
+        CHECK(v.createSymlink("t10", euro));
+        CHECK(v.readSymlink("t10").value_or("") == euro);
+        for (const char* n : {"t1", "t2", "t3", "t4", "t5", "t6", "t7", "t9"}) CHECK(!v.readSymlink(n));   // nothing half-created
+        CHECK_EQ(countFiles(root, "symlink.c9r"), 5);                                // link, longName, uni, t8, t10
+        CHECK(v.deleteFile("t8")); CHECK(v.deleteFile("t10"));
+
+        // --- move / delete / mtime -----------------------------------------------------------------------
+        CHECK(v.renameFile("link", "docs/moved"));                                   // plain -> plain, other folder
+        CHECK(v.readSymlink("docs/moved").value_or("?") == "docs/file.txt");
+        CHECK(!v.readSymlink("link"));
+        CHECK(v.renameFile("docs/moved", "docs/" + longName + ".2"));                // plain -> shortened
+        CHECK(v.readSymlink("docs/" + longName + ".2").value_or("?") == "docs/file.txt");
+        CHECK(v.renameFile("docs/" + longName + ".2", "docs/short"));                // shortened -> plain
+        CHECK(v.readSymlink("docs/short").value_or("?") == "docs/file.txt");
+        CHECK(v.renameFile("docs/" + longName, "docs/" + longName + ".3"));          // shortened -> shortened
+        CHECK(v.readSymlink("docs/" + longName + ".3").value_or("?") == "/abs/target");
+        CHECK(!v.readSymlink("docs/" + longName));
+        CHECK_EQ(countFiles(root, "symlink.c9r"), 3);                                // moving never duplicates or loses a node (short, long.3, uni)
+        CHECK_EQ(countFiles(root, "name.c9s"), 1);                                   // only the one shortened link keeps its name file
+        CHECK(!v.renameFile("docs/short", "docs/file.txt"));                         // a link never replaces a file...
+        CHECK(*get(v, "docs/file.txt") == fileData);                                 // ...which stays untouched...
+        CHECK(v.readSymlink("docs/short").value_or("?") == "docs/file.txt");         // ...and the link stays where it was
+        CHECK(!v.renameFile("docs/short", "docs/" + longName + ".3"));               // nor another link
+        CHECK(v.readSymlink("docs/short").value_or("?") == "docs/file.txt");
+        CHECK(v.readSymlink("docs/" + longName + ".3").value_or("?") == "/abs/target");
+        CHECK_EQ(countFiles(root, "symlink.c9r"), 3);
+        CHECK(v.setLastModifiedTime("docs/short", 1700000000));
+        { auto d = symlinksOf(v, "docs"); const DirEntry* e = findLink(d, "short"); CHECK(e && e->mtimeMs == 1700000000000LL); }
+        CHECK(v.setLastModifiedTime("docs/" + longName + ".3", 1600000000));
+        { auto d = symlinksOf(v, "docs"); const DirEntry* e = findLink(d, longName + ".3"); CHECK(e && e->mtimeMs == 1600000000000LL); }
+        CHECK(v.deleteFile("docs/short"));
+        CHECK(!v.readSymlink("docs/short"));
+        CHECK_EQ(countFiles(root, "symlink.c9r"), 2);                                // long.3 and uni are left
+        CHECK(*get(v, "docs/file.txt") == fileData);                                 // deleting a link leaves what it pointed at alone
+        CHECK(v.deleteFile("docs"));                                                 // a folder holding links: nothing is followed, nothing is left
+        CHECK_EQ(countFiles(root, "symlink.c9r"), 1);                                // only the root-level "uni" link remains
+        CHECK(v.deleteFile(uni));
+        CHECK_EQ(countFiles(root, "symlink.c9r"), 0);
+        v.close();
+    }
+
+    {   // --- precedence + hostile content (official order: dir.c9r, symlink.c9r, contents.c9r) -------------------
+        TmpDir t; std::string root = t.sub("v"); auto st = std::make_shared<PosixStorage>(root);
+        CHECK(createCryptomator(*st, pw, 6).status == OpenStatus::Ok);
+        auto r = openCryptomator(st, pw, 6, false, {}); CHECK(r.status == OpenStatus::Ok); if (!r.vault) return;
+        auto linkFiles = [&]() { std::vector<std::string> f; walkFiles(root, [&](const std::string& p, off_t) { if (p.size() > 11 && p.substr(p.size() - 11) == "symlink.c9r") f.push_back(p); }); std::sort(f.begin(), f.end()); return f; };
+        std::map<std::string, std::string> fileOf;                                   // link name -> its symlink.c9r on disk
+        for (const char* n : {"a", "b", "c"}) {
+            auto before = linkFiles();
+            CHECK(r.vault->createSymlink(n, std::string("target-") + n));
+            for (auto& f : linkFiles()) if (std::find(before.begin(), before.end(), f) == before.end()) fileOf[n] = f;
+        }
+        CHECK_EQ(fileOf.size(), (size_t)3);
+        // a: flip a ciphertext byte -> the link stays listed, but its target is refused (never returned garbled)
+        flipByte(fileOf["a"], 100);
+        CHECK(!r.vault->readSymlink("a")); CHECK(r.vault->readSymlink("b").value_or("?") == "target-b");
+        CHECK_EQ(symlinksOf(*r.vault, "").size(), (size_t)3);
+        flipByte(fileOf["a"], 100);                                                   // undo (xor is its own inverse)
+        CHECK(r.vault->readSymlink("a").value_or("?") == "target-a");
+        // b: an oversized symlink.c9r (hostile vault) is refused without being slurped into memory
+        { std::string big(2 * 1024 * 1024, 'x'); std::ofstream f(fileOf["b"], std::ios::binary | std::ios::trunc); f.write(big.data(), (std::streamsize)big.size()); }
+        CHECK(!r.vault->readSymlink("b")); CHECK(r.vault->readSymlink("c").value_or("?") == "target-c");
+        // b again: zero-length symlink.c9r (created but its content has not synced yet) -> listed, no target
+        { std::ofstream f(fileOf["b"], std::ios::binary | std::ios::trunc); }
+        r.vault->invalidateCache("");
+        CHECK(!r.vault->readSymlink("b"));
+        CHECK_EQ(symlinksOf(*r.vault, "").size(), (size_t)3);
+        // c: dir.c9r wins over symlink.c9r -- the node then is a folder, not a link
+        std::string folderC = fileOf["c"].substr(0, fileOf["c"].rfind('/'));
+        CHECK(st->writeWhole(folderC.substr(root.size() + 1) + "/dir.c9r", (const uint8_t*)"11111111-2222-3333-4444-555555555555", 36));
+        r.vault->invalidateCache("");
+        CHECK_EQ(symlinksOf(*r.vault, "").size(), (size_t)2);
+        CHECK_EQ(names(*r.vault, "").size(), (size_t)1);
+        CHECK(has(*r.vault, "", "D:c"));
+        r.vault->close();
+    }
+
+    {   // --- read-only sessions can read links but never create one -----------------------------------------
+        TmpDir t; auto st = std::make_shared<PosixStorage>(t.sub("v"));
+        CHECK(createCryptomator(*st, pw, 6).status == OpenStatus::Ok);
+        auto rw = openCryptomator(st, pw, 6, false, {}); CHECK(rw.status == OpenStatus::Ok); if (!rw.vault) return;
+        CHECK(rw.vault->createSymlink("l", "t")); rw.vault->close();
+        auto ro = openCryptomator(st, pw, 6, true, {}); CHECK(ro.status == OpenStatus::Ok); if (!ro.vault) return;
+        CHECK(ro.vault->readSymlink("l").value_or("?") == "t");
+        CHECK_EQ(symlinksOf(*ro.vault, "").size(), (size_t)1);
+        CHECK(!ro.vault->createSymlink("l2", "t"));
+        CHECK(!ro.vault->deleteFile("l"));
+        CHECK(!ro.vault->renameFile("l", "m"));
+        CHECK(ro.vault->readSymlink("l").value_or("?") == "t");
+        ro.vault->close();
+    }
+
+    {   // --- gocryptfs / cryfs engines keep the defaults ---------------------------------------------------------
+        TmpDir t; auto st = std::make_shared<PosixStorage>(t.sub("v"));
+        CHECK(createGocryptfs(*st, pw, 6, {}).status == OpenStatus::Ok);
+        auto g = openGocryptfs(st, pw, 6, false, {}); CHECK(g.status == OpenStatus::Ok); if (!g.vault) return;
+        std::vector<DirEntry> es; CHECK(g.vault->listSymlinks("", es)); CHECK(es.empty());
+        CHECK(!g.vault->createSymlink("l", "t")); CHECK(!g.vault->readSymlink("l")); CHECK_EQ(g.vault->hiddenEntryCount(""), -1);
+        g.vault->close();
+    }
+
+    {   // --- hidden entries: what exists on disk but is not shown -------------------------------------------------
+        TmpDir t; std::string root = t.sub("v"); auto st = std::make_shared<PosixStorage>(root);
+        CHECK(createCryptomator(*st, pw, 6).status == OpenStatus::Ok);
+        auto r = openCryptomator(st, pw, 6, false, {}); CHECK(r.status == OpenStatus::Ok); if (!r.vault) return;
+        Vault& v = *r.vault;
+        CHECK(put(v, "a.txt", rnd(100, 9))); CHECK(v.createDirectory("sub")); CHECK(v.createSymlink("ln", "t"));
+        CHECK_EQ(v.hiddenEntryCount(""), 0);                                         // internal files and links are not "hidden"
+        CHECK_EQ(v.hiddenEntryCount("nodir"), -1);
+        Bytes mkRaw; CHECK(st->readWhole("masterkey.cryptomator", mkRaw));
+        auto mk = cm::unlockMasterkey(cm::MasterkeyFile::parse(std::string(mkRaw.begin(), mkRaw.end())), pw, 6);
+        cm::NameCryptor nc(mk); std::string rh = nc.hashDirectoryId("");
+        const std::string phys = root + "/d/" + rh.substr(0, 2) + "/" + rh.substr(2);   // physical folder of the root
+        std::string nodeFile;                                                        // a.txt's ciphertext file
+        { DIR* d = opendir(phys.c_str()); while (auto* e = readdir(d)) { std::string n = e->d_name; struct stat sb; if (n.size() > 4 && n.substr(n.size() - 4) == ".c9r" && n != "dir.c9r" && n != "dirid.c9r" && stat((phys + "/" + n).c_str(), &sb) == 0 && S_ISREG(sb.st_mode)) nodeFile = n; } closedir(d); }
+        CHECK(!nodeFile.empty());
+        auto cp = [&](const std::string& to) { std::ifstream in(phys + "/" + nodeFile, std::ios::binary); std::ofstream out(phys + "/" + to, std::ios::binary); out << in.rdbuf(); };
+        const std::string base = nodeFile.substr(0, nodeFile.size() - 4);
+        cp(base + " (1).c9r");                                                        // Dropbox/Drive style conflict copy
+        r.vault->close();
+        r = openCryptomator(st, pw, 6, false, {}); if (!r.vault) return;
+        CHECK_EQ(r.vault->hiddenEntryCount(""), 1);
+        CHECK_EQ(names(*r.vault, "").size(), (size_t)2);                              // a.txt + sub, once each
+        cp(base + ".sync-conflict-20200101-000000-ABC.c9r");                           // Syncthing style
+        cp("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.c9r");                            // garbage that is not a name
+        { std::ofstream f(phys + "/.DS_Store"); f << "x"; }                            // ignored like official (dot-file)
+        { std::ofstream f(phys + "/.hidden.c9r"); f << "x"; }
+        { std::ofstream f(phys + "/notes.txt"); f << "x"; }                            // foreign file
+        { std::ofstream f(phys + "/x.c9u"); f << "x"; }                                // in-use marker
+        ::mkdir((phys + "/BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.c9s").c_str(), 0755);      // wrapper without name.c9s (half synced)
+        ::mkdir((phys + "/CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC.c9r").c_str(), 0755); // folder node without any type file
+        r.vault->invalidateCache("");
+        std::vector<DirEntry> es; CHECK(r.vault->listDirectory("", es));
+        CHECK_EQ(es.size(), (size_t)2);
+        CHECK_EQ(r.vault->hiddenEntryCount(""), 5);
+        r.vault->close();
+    }
+}
+
+// ---- Key file backups on open (official: cryptofs backs up vault.cryptomator, the desktop app masterkey.cryptomator).
+static std::vector<std::string> bkupsOf(Storage& st, const std::string& prefix) {
+    std::vector<DirEntry> es; st.list("", es);
+    std::vector<std::string> out;
+    for (auto& e : es) if (e.name.rfind(prefix + ".", 0) == 0 && e.name.size() > 5 && e.name.substr(e.name.size() - 5) == ".bkup") out.push_back(e.name);
+    std::sort(out.begin(), out.end());
+    return out;
+}
+
+static void testCryptomatorBackups() {
+    std::printf("cryptomator key file backups on open\n");
+    const uint8_t pw[] = "secret";
+    auto goodName = [](const std::string& n, const std::string& prefix) {   // <prefix>.XXXXXXXX.bkup with upper-case hex
+        if (n.size() != prefix.size() + 1 + 8 + 5) return false;
+        for (size_t i = prefix.size() + 1; i < prefix.size() + 9; i++) if (!std::isxdigit((unsigned char)n[i]) || std::islower((unsigned char)n[i])) return false;
+        return true;
+    };
+    {   // (1) a read-write open backs up both files, once
+        TmpDir t; auto st = std::make_shared<PosixStorage>(t.sub("v"));
+        CHECK(createCryptomator(*st, pw, 6).status == OpenStatus::Ok);
+        CHECK(bkupsOf(*st, "vault.cryptomator").empty() && bkupsOf(*st, "masterkey.cryptomator").empty());
+        auto r = openCryptomator(st, pw, 6, false, {}); CHECK(r.status == OpenStatus::Ok); if (!r.vault) return;
+        r.vault->close();
+        auto vb = bkupsOf(*st, "vault.cryptomator"), mb = bkupsOf(*st, "masterkey.cryptomator");
+        CHECK_EQ(vb.size(), (size_t)1); CHECK_EQ(mb.size(), (size_t)1);
+        if (vb.size() == 1 && mb.size() == 1) {
+            CHECK(goodName(vb[0], "vault.cryptomator")); CHECK(goodName(mb[0], "masterkey.cryptomator"));
+            Bytes a, b, c, d;
+            CHECK(st->readWhole("vault.cryptomator", a) && st->readWhole(vb[0], b) && a == b);
+            CHECK(st->readWhole("masterkey.cryptomator", c) && st->readWhole(mb[0], d) && c == d);
+            Bytes dg = crypto::hash(crypto::Md::Sha256, a.data(), a.size());
+            std::string hex = toHex(dg.data(), 4); for (char& ch : hex) ch = (char)std::toupper((unsigned char)ch);
+            CHECK_EQ(vb[0], "vault.cryptomator." + hex + ".bkup");               // name = first 4 bytes of SHA-256 of the content
+        }
+        // (2) opening again changes nothing
+        r = openCryptomator(st, pw, 6, false, {}); CHECK(r.status == OpenStatus::Ok); if (r.vault) r.vault->close();
+        CHECK_EQ(bkupsOf(*st, "vault.cryptomator").size(), (size_t)1); CHECK_EQ(bkupsOf(*st, "masterkey.cryptomator").size(), (size_t)1);
+        // (3) a wrong password backs up nothing new
+        CHECK(openCryptomator(st, (const uint8_t*)"bad", 3, false, {}).status == OpenStatus::WrongPassword);
+        CHECK_EQ(bkupsOf(*st, "masterkey.cryptomator").size(), (size_t)1);
+        // (4) a changed key file gets its own backup; the old one stays
+        const uint8_t np[] = "other";
+        CHECK(changeCryptomatorPassword(*st, pw, 6, np, 5).status == OpenStatus::Ok);   // itself backs up the OLD key file (already there)
+        CHECK_EQ(bkupsOf(*st, "masterkey.cryptomator").size(), (size_t)1);
+        r = openCryptomator(st, np, 5, false, {}); CHECK(r.status == OpenStatus::Ok); if (r.vault) r.vault->close();
+        CHECK_EQ(bkupsOf(*st, "masterkey.cryptomator").size(), (size_t)2);          // + the new one
+        CHECK_EQ(bkupsOf(*st, "vault.cryptomator").size(), (size_t)1);               // the config did not change
+        // (5) an existing backup is verified, never overwritten
+        auto mb2 = bkupsOf(*st, "masterkey.cryptomator");
+        const std::string junk = "not the real content";
+        CHECK(st->writeWhole(mb2[1], (const uint8_t*)junk.data(), junk.size()));
+        r = openCryptomator(st, np, 5, false, {}); CHECK(r.status == OpenStatus::Ok); if (r.vault) r.vault->close();
+        CHECK_EQ(readText(*st, mb2[1].c_str()), junk);
+        CHECK_EQ(bkupsOf(*st, "masterkey.cryptomator").size(), (size_t)2);
+    }
+    {   // (6) read-only sessions never write; the HostEnv switch turns the feature off
+        TmpDir t; auto st = std::make_shared<PosixStorage>(t.sub("v"));
+        CHECK(createCryptomator(*st, pw, 6).status == OpenStatus::Ok);
+        auto ro = openCryptomator(st, pw, 6, true, {}); CHECK(ro.status == OpenStatus::Ok); if (ro.vault) ro.vault->close();
+        CHECK(bkupsOf(*st, "vault.cryptomator").empty() && bkupsOf(*st, "masterkey.cryptomator").empty());
+        HostEnv off; off.backupKeyFilesOnOpen = false;
+        auto rw = openCryptomator(st, pw, 6, false, off); CHECK(rw.status == OpenStatus::Ok); if (rw.vault) rw.vault->close();
+        CHECK(bkupsOf(*st, "vault.cryptomator").empty() && bkupsOf(*st, "masterkey.cryptomator").empty());
+    }
+    {   // (7) a format 7 vault has no vault.cryptomator: only its masterkey is backed up
+        TmpDir t; auto st = std::make_shared<PosixStorage>(t.sub("v"));
+        CHECK(createCryptomator(*st, pw, 6).status == OpenStatus::Ok);
+        auto mk = cryptomator::unlockMasterkey(cryptomator::MasterkeyFile::parse(readText(*st, "masterkey.cryptomator")), pw, 6);
+        std::string j = cryptomator::lockMasterkey(mk, pw, 6, 7);
+        CHECK(st->writeWhole("masterkey.cryptomator", (const uint8_t*)j.data(), j.size())); CHECK(st->remove("vault.cryptomator"));
+        auto r = openCryptomator(st, pw, 6, false, {}); CHECK(r.status == OpenStatus::Ok); if (r.vault) r.vault->close();
+        CHECK_EQ(bkupsOf(*st, "masterkey.cryptomator").size(), (size_t)1);
+        CHECK(bkupsOf(*st, "vault.cryptomator").empty());
+        CHECK(!st->stat("vault.cryptomator", *std::make_unique<DirEntry>()));        // and opening did not conjure a config
+    }
+}
+
+// ---- Format 7 -> 8 migration (official Version8Migrator); cross-checked for real in cryptomator_migrate_interop.sh.
+static void testCryptomatorMigration() {
+    std::printf("cryptomator 7 -> 8 migration\n");
+    namespace cm = cryptomator;
+    const uint8_t pw[] = "secret";
+    auto makeV7 = [&](Storage& st) {   // a genuine format 7 vault: version-7 key file, no vault.cryptomator
+        CHECK(createCryptomator(st, pw, 6).status == OpenStatus::Ok);
+        auto mk = cm::unlockMasterkey(cm::MasterkeyFile::parse(readText(st, "masterkey.cryptomator")), pw, 6);
+        std::string j = cm::lockMasterkey(mk, pw, 6, 7);
+        CHECK(st.writeWhole("masterkey.cryptomator", (const uint8_t*)j.data(), j.size()));
+        CHECK(st.remove("vault.cryptomator"));
+    };
+    auto snapshot = [&](const std::string& root) {   // every file outside d/ with its content
+        std::map<std::string, std::string> m;
+        walkFiles(root, [&](const std::string& p, off_t) {
+            if (p.find("/d/") != std::string::npos) return;
+            std::ifstream f(p, std::ios::binary); std::stringstream ss; ss << f.rdbuf(); m[p] = ss.str();
+        });
+        return m;
+    };
+    {   // (1) the happy path: data written as format 7 is intact afterwards, the config says what official's says
+        TmpDir t; std::string root = t.sub("v"); auto st = std::make_shared<PosixStorage>(root);
+        makeV7(*st);
+        auto r = openCryptomator(st, pw, 6, false, {}); CHECK(r.status == OpenStatus::Ok); if (!r.vault) return;
+        const Bytes a = rnd(100000, 21), b = rnd(10, 22);
+        CHECK(r.vault->createDirectory("docs")); CHECK(put(*r.vault, "docs/a.bin", a)); CHECK(put(*r.vault, std::string(170, 'N') + ".txt", b));
+        r.vault->close();
+        Bytes oldKey; CHECK(st->readWhole("masterkey.cryptomator", oldKey));
+        CHECK(migrateCryptomator7To8(*st, pw, 6).status == OpenStatus::Ok);
+        // config: signed, format 8, SIV_CTRMAC, 220
+        Bytes jwt; CHECK(st->readWhole("vault.cryptomator", jwt));
+        auto mk = cm::unlockMasterkey(cm::MasterkeyFile::parse(readText(*st, "masterkey.cryptomator")), pw, 6);
+        auto cfg = cm::verifyVaultConfig(std::string(jwt.begin(), jwt.end()), mk);   // throws unless the HMAC verifies
+        CHECK_EQ(cfg.vaultFormat, 8); CHECK_EQ(cfg.cipherCombo, std::string("SIV_CTRMAC")); CHECK_EQ(cfg.shorteningThreshold, 220);
+        CHECK_EQ(cm::MasterkeyFile::parse(readText(*st, "masterkey.cryptomator")).version, 999);
+        // the old key file is kept under official's name, byte for byte
+        auto bk = bkupsOf(*st, "masterkey.cryptomator");
+        CHECK_EQ(bk.size(), (size_t)1);
+        if (bk.size() == 1) { Bytes x; CHECK(st->readWhole(bk[0], x)); CHECK(x == oldKey); }
+        // the data are untouched and readable
+        r = openCryptomator(st, pw, 6, false, {}); CHECK(r.status == OpenStatus::Ok); if (!r.vault) return;
+        CHECK(*get(*r.vault, "docs/a.bin") == a); CHECK(*get(*r.vault, std::string(170, 'N') + ".txt") == b);
+        CHECK(put(*r.vault, "docs/after.txt", b)); CHECK(*get(*r.vault, "docs/after.txt") == b);
+        r.vault->close();
+        // (2) a second run is refused
+        auto before = snapshot(root);
+        CHECK(migrateCryptomator7To8(*st, pw, 6).status == OpenStatus::InvalidVault);
+        CHECK(snapshot(root) == before);
+    }
+    {   // (3) refusals change nothing at all
+        TmpDir t; std::string root = t.sub("v"); auto st = std::make_shared<PosixStorage>(root);
+        makeV7(*st);
+        auto before = snapshot(root);
+        CHECK(migrateCryptomator7To8(*st, (const uint8_t*)"bad", 3).status == OpenStatus::WrongPassword);
+        CHECK(snapshot(root) == before);
+        CHECK(!st->stat("vault.cryptomator", *std::make_unique<DirEntry>()));
+        // a format 8 key file without its vault.cryptomator (e.g. not synced yet) must never be "migrated"
+        TmpDir t2; std::string root2 = t2.sub("v"); auto st2 = std::make_shared<PosixStorage>(root2);
+        CHECK(createCryptomator(*st2, pw, 6).status == OpenStatus::Ok); CHECK(st2->remove("vault.cryptomator"));
+        auto before2 = snapshot(root2);
+        CHECK(migrateCryptomator7To8(*st2, pw, 6).status == OpenStatus::InvalidVault);
+        CHECK(snapshot(root2) == before2);
+        // a genuine format 8 vault
+        TmpDir t3; auto st3 = std::make_shared<PosixStorage>(t3.sub("v"));
+        CHECK(createCryptomator(*st3, pw, 6).status == OpenStatus::Ok);
+        CHECK(migrateCryptomator7To8(*st3, pw, 6).status == OpenStatus::InvalidVault);
+        // not a vault at all
+        TmpDir t4; auto st4 = std::make_shared<PosixStorage>(t4.sub("v"));
+        CHECK(migrateCryptomator7To8(*st4, pw, 6).status == OpenStatus::InvalidVault);
+        // an old (version 6) key file is not ours to migrate
+        TmpDir t5; auto st5 = std::make_shared<PosixStorage>(t5.sub("v"));
+        makeV7(*st5);
+        auto mk = cm::unlockMasterkey(cm::MasterkeyFile::parse(readText(*st5, "masterkey.cryptomator")), pw, 6);
+        std::string j6 = cm::lockMasterkey(mk, pw, 6, 6);
+        CHECK(st5->writeWhole("masterkey.cryptomator", (const uint8_t*)j6.data(), j6.size()));
+        auto before5 = snapshot(t5.sub("v"));
+        CHECK(migrateCryptomator7To8(*st5, pw, 6).status == OpenStatus::InvalidVault);
+        CHECK(snapshot(t5.sub("v")) == before5);
+    }
+}
+
 static void testCryfs(const char* cipher, int bsz) {
     std::printf("cryfs %s @%d\n", cipher, bsz);
     TmpDir t; std::string root = t.sub("v"); HostEnv env; env.cryfsLocalStateDir = t.sub("state"); env.tempDir = t.path;
@@ -638,6 +1034,7 @@ static void testConcurrency(const char* fmt) {
     constexpr int kThreads = 6, kFiles = 12;
     for (int i = 0; i < kThreads; i++) v.createDirectory("t" + std::to_string(i));
     std::atomic<int> bad{0};
+    const bool cm = std::string(fmt) == "cryptomator";   // only Cryptomator has symlinks; the others keep the no-op defaults
     std::vector<std::thread> ts;
     for (int i = 0; i < kThreads; i++) ts.emplace_back([&, i] {
         for (int j = 0; j < kFiles; j++) {
@@ -648,17 +1045,33 @@ static void testConcurrency(const char* fmt) {
             if (!g || *g != d) bad++;
             std::vector<DirEntry> es; v.listDirectory("t" + std::to_string(i), es);
             if (j % 3 == 2 && !v.renameFile(p, p + "r")) bad++;
+            // symlinks and the hidden-entry count race with the writes above (and with the other threads' folders)
+            std::vector<DirEntry> ls; v.listSymlinks("t" + std::to_string(i), ls); (void)v.hiddenEntryCount("t" + std::to_string(i));
+            if (cm) {
+                std::string lp = "t" + std::to_string(i) + "/l" + std::to_string(j), want = "target-" + std::to_string(j);
+                if (!v.createSymlink(lp, want)) bad++;
+                auto rl = v.readSymlink(lp);
+                if (!rl || *rl != want) bad++;
+                if (j % 2 == 0 && !v.deleteFile(lp)) bad++;
+            }
         }
     });
     // a shared file hammered by readers while writers replace it
     Bytes shared = rnd(50000, 99);
     put(v, "shared.bin", shared);
     std::atomic<bool> stop{false};
-    std::thread reader([&] { while (!stop) { auto g = v.readFileChunk("shared.bin", 0, 60000); (void)g; } });
+    std::thread reader([&] { while (!stop) {
+        auto g = v.readFileChunk("shared.bin", 0, 60000); (void)g;
+        std::vector<DirEntry> ls; v.listSymlinks("t1", ls); v.listSymlinks("", ls); (void)v.hiddenEntryCount("t2"); (void)v.hiddenEntryCount("");
+    } });
     for (auto& th : ts) th.join();
     stop = true; reader.join();
     CHECK_EQ(bad.load(), 0);
-    for (int i = 0; i < kThreads; i++) { std::vector<DirEntry> es; CHECK(v.listDirectory("t" + std::to_string(i), es)); CHECK_EQ(es.size(), (size_t)kFiles); }
+    for (int i = 0; i < kThreads; i++) {
+        std::vector<DirEntry> es; CHECK(v.listDirectory("t" + std::to_string(i), es)); CHECK_EQ(es.size(), (size_t)kFiles);   // links never show up here
+        std::vector<DirEntry> ls; CHECK(v.listSymlinks("t" + std::to_string(i), ls)); CHECK_EQ(ls.size(), cm ? (size_t)(kFiles / 2) : (size_t)0);   // odd j survive
+        CHECK_EQ(v.hiddenEntryCount("t" + std::to_string(i)), cm ? 0 : -1);
+    }
     v.close();
     // operations after close fail cleanly instead of crashing
     CHECK(!put(v, "late", shared));
@@ -674,7 +1087,7 @@ int main(int argc, char** argv) {
         testGocryptfs(GocryptfsCipher::AesSiv, false, "AES-SIV");
         testGocryptfs(GocryptfsCipher::Aes256Gcm, true, "plaintext names");
     }
-    if (want("cryptomator")) { testCryptomator(false); testCryptomator(true); testCryptomatorCompat(); }
+    if (want("cryptomator")) { testCryptomator(false); testCryptomator(true); testCryptomatorCompat(); testCryptomatorSymlinks(); testCryptomatorBackups(); testCryptomatorMigration(); }
     if (want("cryfs")) { testCryfs("xchacha20-poly1305", 32768); testCryfs("aes-256-gcm", 4096); testCryfs("aes-256-cfb", 8192); }
     if (want("concurrency")) { testConcurrency("gocryptfs"); testConcurrency("cryptomator"); testConcurrency("cryfs"); }
     std::printf("\n%d checks, %d failed\n", g_checks, g_failed);

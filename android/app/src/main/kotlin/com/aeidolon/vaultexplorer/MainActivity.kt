@@ -141,6 +141,9 @@ private object ChannelMethods {
     const val GET_SPACE_INFO            = "getSpaceInfo"
     const val GET_VAULT_INFO            = "getVaultInfo"
     const val LIST_DIRECTORY            = "listDirectory"
+    const val LIST_VAULT_SYMLINKS       = "listVaultSymlinks"
+    const val READ_VAULT_SYMLINK        = "readVaultSymlink"
+    const val GET_HIDDEN_ENTRY_COUNT    = "getHiddenEntryCount"
     const val CREATE_DIRECTORY          = "createDirectory"
     const val RENAME_FILE               = "renameFile"
     const val COPY_FILE                 = "copyFile"
@@ -221,6 +224,7 @@ private object ChannelMethods {
     const val UNLOCK_CRYPTOMATOR_VAULT  = "unlockCryptomatorVault"
     const val CREATE_CRYPTOMATOR_VAULT  = "createCryptomatorVault"
     const val CHANGE_CRYPTOMATOR_VAULT_PASSWORD = "changeCryptomatorVaultPassword"
+    const val MIGRATE_CRYPTOMATOR_VAULT = "migrateCryptomatorVault"
     const val PICK_GOCRYPTFS_VAULT      = "pickGocryptfsVault"
     const val UNLOCK_GOCRYPTFS_VAULT    = "unlockGocryptfsVault"
     const val CREATE_GOCRYPTFS_VAULT    = "createGocryptfsVault"
@@ -1152,6 +1156,7 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.UNLOCK_CRYFS_VAULT -> vaultUnlockHandlers.handleUnlockCryfsVault(call, result)
                 ChannelMethods.CREATE_CRYPTOMATOR_VAULT -> vaultCreationHandlers.handleCreateCryptomatorVault(call, result)
                 ChannelMethods.CHANGE_CRYPTOMATOR_VAULT_PASSWORD -> vaultUnlockHandlers.handleChangeCryptomatorVaultPassword(call, result)
+                ChannelMethods.MIGRATE_CRYPTOMATOR_VAULT -> vaultUnlockHandlers.handleMigrateCryptomatorVault(call, result)
                 ChannelMethods.CREATE_GOCRYPTFS_VAULT -> vaultCreationHandlers.handleCreateGocryptfsVault(call, result)
                 ChannelMethods.CHANGE_GOCRYPTFS_VAULT_PASSWORD -> vaultUnlockHandlers.handleChangeGocryptfsVaultPassword(call, result)
                 ChannelMethods.IS_GOCRYPTFS_VAULT -> vaultUnlockHandlers.handleIsGocryptfsVault(call, result)
@@ -1250,6 +1255,9 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.GET_MEDIA_FILE_SIZE -> fileOperationHandlers.handleGetMediaFileSize(call, result)
                 ChannelMethods.READ_MEDIA_FILE_CHUNK -> fileOperationHandlers.handleReadMediaFileChunk(call, result)
                 ChannelMethods.LIST_DIRECTORY -> fileOperationHandlers.handleListDirectory(call, result)
+                ChannelMethods.LIST_VAULT_SYMLINKS -> fileOperationHandlers.handleListVaultSymlinks(call, result)
+                ChannelMethods.READ_VAULT_SYMLINK -> fileOperationHandlers.handleReadVaultSymlink(call, result)
+                ChannelMethods.GET_HIDDEN_ENTRY_COUNT -> fileOperationHandlers.handleGetHiddenEntryCount(call, result)
                 ChannelMethods.CREATE_DIRECTORY -> fileOperationHandlers.handleCreateDirectory(call, result)
                 ChannelMethods.RENAME_FILE -> fileOperationHandlers.handleRenameFile(call, result)
                 ChannelMethods.COPY_FILE -> fileOperationHandlers.handleCopyFile(call, result)

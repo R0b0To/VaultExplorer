@@ -46,6 +46,7 @@ abstract final class ChannelMethods {
   static const createCryptomatorVault = 'createCryptomatorVault';
   static const changeCryptomatorVaultPassword =
       'changeCryptomatorVaultPassword';
+  static const migrateCryptomatorVault = 'migrateCryptomatorVault';
   static const pickGocryptfsVault = 'pickGocryptfsVault';
   static const unlockGocryptfsVault = 'unlockGocryptfsVault';
   static const createGocryptfsVault = 'createGocryptfsVault';
@@ -113,6 +114,9 @@ abstract final class ChannelMethods {
   static const finishHashSession = 'finishHashSession';
   static const discardHashSession = 'discardHashSession';
   static const listDirectory = 'listDirectory';
+  static const listVaultSymlinks = 'listVaultSymlinks';
+  static const readVaultSymlink = 'readVaultSymlink';
+  static const getHiddenEntryCount = 'getHiddenEntryCount';
   static const createDirectory = 'createDirectory';
   static const renameFile = 'renameFile';
   static const copyFile = 'copyFile';

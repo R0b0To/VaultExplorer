@@ -61,8 +61,10 @@ non-ASCII names that arrive in decomposed form are affected) and, optionally,
 
 ```
 cmake --build <build> --target foldervault_test fvcli   # host build, no Android toolchain
-ctest -R foldervault_test                               # 1291 checks, ~1 min
+ctest -R foldervault_test                               # 1741 checks, ~1 min
 FVCLI=<build>/fvcli CRYPTOMATOR_CLI=<cryptomator-cli> test/interop/run_all.sh   # real implementations over FUSE
+test/interop/oracle/fetch_oracle.sh                     # once: the official cryptofs jars (needs a JDK 21)
+FVCLI=<build>/fvcli test/interop/run_all.sh             # ...then also runs the cryptomator_{symlink,backup,migrate} cross-checks
 ```
 
 `foldervault_test` has known-answer vectors from an independent implementation (Python
@@ -74,7 +76,10 @@ rollback protection and legacy block names, password change, and multi-threaded 
 It is clean under ASan/UBSan/LSan and TSan. The `interop/` scripts check the other
 direction against the official software: gocryptfs 2.4 (all three ciphers + plaintext
 names, `gocryptfs -fsck`), Cryptomator CLI 0.6.2 (format 8) and CryFS 0.11.4 (XChaCha20 and
-AES-GCM, shallow and deep block trees).
+AES-GCM, shallow and deep block trees). The `cryptomator_{symlink,backup,migrate}_interop.sh` scripts
+drive the official `cryptofs` library directly (no FUSE) through `interop/oracle/Official.java` and
+check both directions: symlinks (plain, shortened, unicode, 10k-character targets, move/delete/mtime),
+key-file backup names, and the format 7 -> 8 migration against official's own `Version8Migrator`.
 
 ## Where this differs from the Kotlin it replaced
 
@@ -101,6 +106,26 @@ Deliberate, each one verified against the real client where one exists:
   parallel, scratch files for incremental writes are unlinked immediately.
 * gocryptfs: the scrypt `P` comes from the config; the all-zero "hole" shortcut also applies on the bulk path.
 * `crypto/siv.cpp`: one `memcpy(…, nullptr, 0)` guarded (found by UBSan; the old Kotlin hit it too).
+
+* **Cryptomator symlinks** (`isSymlink`, `listSymlinks`, `readSymlink`, `createSymlink`): a link is a node
+  folder holding `symlink.c9r` (target, UTF-8, encrypted like file content), found with official's precedence
+  (`dir.c9r`, then `symlink.c9r`, then `contents.c9r`). Links are **never part of `listDirectory`** (they are neither
+  files nor folders, so nothing that walks listings can trip over one) and **never followed**: reading, writing or
+  entering a link path fails, while delete / rename / mtime act on the link node itself. We are stricter than
+  official in one place: a target is limited to 32767 *bytes* (official checks 32767 characters when creating but
+  refuses more than 32767 bytes when reading, so it can create a link it cannot read back), and an empty,
+  NUL-containing or malformed-UTF-8 target is refused.
+* **Cryptomator `hiddenEntryCount`**: number of entries that exist on disk but are not listed (sync-conflict copies
+  such as `name (1).c9r`, names that no longer authenticate, half-synced nodes). Dot-files, the internal
+  `dir.c9r`/`dirid.c9r` and foreign files are not counted, like official ignores them. Counted during the normal
+  listing pass, so asking for it is free. These entries are still not shown or resolved -- that is future work.
+* **Cryptomator key-file backups on open** (`HostEnv::backupKeyFilesOnOpen`, default on, read-write opens only):
+  `vault.cryptomator` and `masterkey.cryptomator` are copied to `<file>.<8 hex>.bkup` exactly as official does;
+  an existing backup is verified, never overwritten, and a failed backup never blocks the unlock.
+* **Cryptomator 7 -> 8 migration** (`migrateCryptomator7To8`): backs up the key file, writes a signed
+  `vault.cryptomator`, re-saves the key file as version 999. One way. It refuses anything that is not a genuine
+  format 7 vault (including a format 8 key file whose `vault.cryptomator` has not synced yet) and, unlike
+  official, aborts before changing anything if the backup cannot be written.
 
 Not migrated: `foldercheck/` (Check & Repair) keeps running on the Kotlin primitives and gets a live
 session's keys from `NativeVaultSession.keyMaterial()`; `looksLikeVault` probes stay in Kotlin.

@@ -33,6 +33,18 @@ void main() {
       expect(applicable(isImage: true, isAudio: false), isFalse);
     });
 
+    test('the playback mode button is for video and audio, not images', () {
+      bool applicable({required bool isImage, required bool isAudio}) =>
+          MediaViewerAction.playbackMode.isApplicable(
+            isImage: isImage,
+            isAudio: isAudio,
+            isPlaylistMode: true,
+          );
+      expect(applicable(isImage: false, isAudio: false), isTrue);
+      expect(applicable(isImage: false, isAudio: true), isTrue);
+      expect(applicable(isImage: true, isAudio: false), isFalse);
+    });
+
     test('round-trips through JSON', () {
       expect(
         MediaViewerAction.fromJson(MediaViewerAction.abLoop.toJson()),

@@ -115,6 +115,9 @@ enum MediaViewerAction {
           this == MediaViewerAction.editVideo ||
           this == MediaViewerAction.editAudio ||
           this == MediaViewerAction.abLoop ||
+          // Repeat / play-and-advance is a video and audio playback setting;
+          // images advance through the slideshow (play button and delay).
+          this == MediaViewerAction.playbackMode ||
           this == MediaViewerAction.decoder ||
           this == MediaViewerAction.diagnostics ||
           this == MediaViewerAction.pictureInPicture) {

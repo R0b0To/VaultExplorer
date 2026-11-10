@@ -8,7 +8,8 @@ import 'package:vaultexplorer/features/library/data/library_index_store.dart';
 enum _BarMenu { rescan, rebuild, folders, deleteSaved }
 
 /// A persistent mode switch action with the same icon-only hit target as the
-/// file manager toolbar.
+/// file manager toolbar. Like the gallery mode button it keeps one icon in
+/// both states: outlined when the mode is off, filled and tinted when on.
 class MusicModeSwitchButton extends StatelessWidget {
   final bool musicMode;
   final VoidCallback onPressed;
@@ -27,7 +28,7 @@ class MusicModeSwitchButton extends StatelessWidget {
           ? context.l10n.musicModeMenuTurnOff
           : context.l10n.musicModeAction,
       icon: Icon(
-        musicMode ? Icons.folder_outlined : Icons.library_music_outlined,
+        musicMode ? Icons.library_music_rounded : Icons.library_music_outlined,
         size: 24,
       ),
       color: musicMode ? cs.primary : cs.onSurfaceVariant,

@@ -40,8 +40,69 @@ void main() {
       );
     });
 
-    test('is in the default top bar', () {
+    test('is in the default More menu, above rename and delete', () {
       const config = MediaViewerToolbarConfig();
+      expect(
+        config.topBarActions,
+        isNot(contains(MediaViewerAction.lockControls)),
+      );
+      final more = config.moreMenuActions;
+      expect(more, contains(MediaViewerAction.lockControls));
+      expect(
+        more.indexOf(MediaViewerAction.lockControls),
+        lessThan(more.indexOf(MediaViewerAction.rename)),
+      );
+      expect(more.last, MediaViewerAction.delete);
+    });
+
+    test('a layout that is the previous default moves it to the More menu', () {
+      final config = MediaViewerToolbarConfig.fromJson({
+        'topBarActions': [
+          'bookmark',
+          'playlistMenu',
+          'pictureInPicture',
+          'lockControls',
+        ],
+        'bottomBarActions': [
+          'mute',
+          'playbackMode',
+          'previous',
+          'playPause',
+          'next',
+          'thumbnailCarousel',
+          'advancedSettings',
+        ],
+        'moreMenuActions': [
+          'fileInfo',
+          'openWithApp',
+          'editImage',
+          'editVideo',
+          'editAudio',
+          'abLoop',
+          'rename',
+          'delete',
+        ],
+        'advancedSettingsActions': const MediaViewerToolbarConfig()
+            .advancedSettingsActions
+            .map((a) => a.toJson())
+            .toList(),
+      });
+
+      expect(config.topBarActions, const MediaViewerToolbarConfig().topBarActions);
+      expect(
+        config.moreMenuActions,
+        const MediaViewerToolbarConfig().moreMenuActions,
+      );
+    });
+
+    test('a customised layout keeps the lock button in the top bar', () {
+      final config = MediaViewerToolbarConfig.fromJson({
+        'topBarActions': ['bookmark', 'lockControls'],
+        'bottomBarActions': ['playPause'],
+        'moreMenuActions': ['fileInfo'],
+        'advancedSettingsActions': ['rotate90'],
+      });
+
       expect(config.topBarActions, contains(MediaViewerAction.lockControls));
       expect(
         config.moreMenuActions,

@@ -89,7 +89,6 @@ class MediaViewerToolbarConfig {
       MediaViewerAction.bookmark,
       MediaViewerAction.playlistMenu,
       MediaViewerAction.pictureInPicture,
-      MediaViewerAction.lockControls,
     ],
     this.bottomBarActions = const [
       MediaViewerAction.mute,
@@ -107,6 +106,7 @@ class MediaViewerToolbarConfig {
       MediaViewerAction.editVideo,
       MediaViewerAction.editAudio,
       MediaViewerAction.abLoop,
+      MediaViewerAction.lockControls,
       MediaViewerAction.rename,
       MediaViewerAction.delete,
     ],
@@ -163,6 +163,38 @@ class MediaViewerToolbarConfig {
     this.audioDecoderMode = MediaDecoderMode.auto,
     this.equalizer = AudioEqualizerSettings.defaults,
   });
+
+  /// The top bar and More menu as shipped before the lock button moved from
+  /// the top bar into the More menu. A saved layout whose four sections all
+  /// still match the previous defaults was never rearranged, so it follows the
+  /// new defaults; any other layout is kept as saved.
+  static const List<MediaViewerAction> _previousDefaultTopBar = [
+    MediaViewerAction.bookmark,
+    MediaViewerAction.playlistMenu,
+    MediaViewerAction.pictureInPicture,
+    MediaViewerAction.lockControls,
+  ];
+  static const List<MediaViewerAction> _previousDefaultMoreMenu = [
+    MediaViewerAction.fileInfo,
+    MediaViewerAction.openWithApp,
+    MediaViewerAction.editImage,
+    MediaViewerAction.editVideo,
+    MediaViewerAction.editAudio,
+    MediaViewerAction.abLoop,
+    MediaViewerAction.rename,
+    MediaViewerAction.delete,
+  ];
+
+  static bool _sameActions(
+    List<MediaViewerAction> a,
+    List<MediaViewerAction> b,
+  ) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
 
   factory MediaViewerToolbarConfig.defaults() =>
       const MediaViewerToolbarConfig();
@@ -487,10 +519,16 @@ class MediaViewerToolbarConfig {
         ? moreWithPip
         : [...moreWithPip, MediaViewerAction.lockControls];
 
+    final neverRearranged =
+        _sameActions(top, _previousDefaultTopBar) &&
+        _sameActions(bottom, def.bottomBarActions) &&
+        _sameActions(moreWithLock, _previousDefaultMoreMenu) &&
+        _sameActions(advancedWithEqualizer, def.advancedSettingsActions);
+
     return MediaViewerToolbarConfig(
-      topBarActions: top,
+      topBarActions: neverRearranged ? def.topBarActions : top,
       bottomBarActions: bottom,
-      moreMenuActions: moreWithLock,
+      moreMenuActions: neverRearranged ? def.moreMenuActions : moreWithLock,
       advancedSettingsActions: advancedWithEqualizer,
       hiddenActions: hidden,
       showProgressBar: j['showProgressBar'] as bool? ?? true,

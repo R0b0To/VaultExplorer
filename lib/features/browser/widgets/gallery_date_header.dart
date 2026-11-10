@@ -5,11 +5,17 @@ import 'package:vaultexplorer/core/utils/raw_entry.dart';
 
 class DateGroup<T> {
   final DateTime? date;
+
+  /// Header text of a group that is not a plain day (a month, a folder, a
+  /// camera...). Null for the day groups [computeDateGroups] makes, whose
+  /// header is built from [date] by [formatDateGroupHeader].
+  final String? label;
   final List<T> items;
   final List<int> globalIndices;
 
   DateGroup({
     required this.date,
+    this.label,
     required this.items,
     required this.globalIndices,
   });

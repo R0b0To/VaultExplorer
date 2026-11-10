@@ -84,6 +84,14 @@ class FileGridView extends StatefulWidget {
   final SortBy? sortBy;
   final bool groupByDate;
 
+  /// Builds the sections when [groupByDate] is on. Null keeps the day
+  /// sections ([computeDateGroups]); the gallery filter passes its own to
+  /// group by month, folder, place, camera...
+  ///
+  /// The list handed over is already arranged so that each section is one run
+  /// of it, and a new builder only takes effect with a new [items] list.
+  final List<DateGroup<RawEntry>> Function(List<RawEntry> items)? groupBuilder;
+
   /// Resolves the container an entry lives in, for a listing that gathers
   /// files from several containers (the category browser). When null every
   /// entry belongs to [container], as in any ordinary folder listing.
@@ -135,6 +143,7 @@ class FileGridView extends StatefulWidget {
     this.archiveRootPath,
     this.sortBy,
     this.groupByDate = false,
+    this.groupBuilder,
     this.containerFor,
     this.cacheModeFor,
     this.qualityFor,
@@ -491,7 +500,7 @@ class FileGridViewState extends State<FileGridView>
   _GridGroups _groupsFor(List<RawEntry> items) {
     final cached = _groups;
     if (cached != null && identical(cached.source, items)) return cached;
-    return _groups = _GridGroups(items, computeDateGroups(items));
+    return _groups = _GridGroups(items, (widget.groupBuilder ?? computeDateGroups)(items));
   }
 
   void _syncGroupHost(_GridGroups groups, double aspect, double headerExtent) {
@@ -557,7 +566,7 @@ class FileGridViewState extends State<FileGridView>
                       child: Padding(
                         padding: const EdgeInsets.only(top: 4),
                         child: GalleryDateHeader(
-                          title: formatDateGroupHeader(group.date, context),
+                          title: group.label ?? formatDateGroupHeader(group.date, context),
                           count: group.items.length,
                           horizontalPadding: 6,
                         ),

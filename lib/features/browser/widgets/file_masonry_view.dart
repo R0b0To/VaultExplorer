@@ -88,6 +88,14 @@ class FileMasonryView extends ConsumerStatefulWidget {
   final double bottomClearance;
   final bool groupByDate;
 
+  /// Builds the sections when [groupByDate] is on. Null keeps the day
+  /// sections ([computeDateGroups]); the gallery filter passes its own to
+  /// group by month, folder, place, camera...
+  ///
+  /// The list handed over is already arranged so that each section is one run
+  /// of it, and a new builder only takes effect with a new [items] list.
+  final List<DateGroup<RawEntry>> Function(List<RawEntry> items)? groupBuilder;
+
   final ArchiveContext? archiveContext;
   final String? archiveRootPath;
   final SortBy? sortBy;
@@ -139,6 +147,7 @@ class FileMasonryView extends ConsumerStatefulWidget {
     this.scrollController,
     this.bottomClearance = 0.0,
     this.groupByDate = false,
+    this.groupBuilder,
     this.archiveContext,
     this.archiveRootPath,
     this.sortBy,
@@ -513,7 +522,7 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
     Int32List? global;
     List<DateGroup<RawEntry>>? groups;
     if (widget.groupByDate) {
-      groups = computeDateGroups(items);
+      groups = (widget.groupBuilder ?? computeDateGroups)(items);
       display = <RawEntry>[];
       global = Int32List(items.length);
       var k = 0;
@@ -1124,7 +1133,7 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
       child: Padding(
         padding: const EdgeInsets.only(top: 4),
         child: GalleryDateHeader(
-          title: formatDateGroupHeader(group.date, context),
+          title: group.label ?? formatDateGroupHeader(group.date, context),
           count: group.items.length,
           horizontalPadding: 16.0 - _kSideInset,
         ),

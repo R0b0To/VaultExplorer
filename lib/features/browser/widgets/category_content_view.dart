@@ -51,6 +51,15 @@ import 'package:vaultexplorer/features/browser/controllers/file_browser_operatio
 import 'package:vaultexplorer/features/browser/controllers/file_browser_selection_controller.dart';
 import 'package:vaultexplorer/features/browser/file_browser_predicates.dart';
 import 'package:vaultexplorer/features/browser/file_open_dispatch.dart';
+import 'package:vaultexplorer/features/browser/gallery/filter/gallery_filter_controller.dart';
+import 'package:vaultexplorer/features/browser/gallery/filter/gallery_filter_l10n.dart';
+import 'package:vaultexplorer/features/browser/gallery/filter/gallery_filter_labels.dart';
+import 'package:vaultexplorer/features/browser/gallery/filter/gallery_filter_sheet.dart';
+import 'package:vaultexplorer/features/browser/gallery/filter/gallery_filters.dart';
+import 'package:vaultexplorer/features/browser/gallery/filter/gallery_grouping.dart';
+import 'package:vaultexplorer/features/browser/gallery/filter/gallery_meta.dart';
+import 'package:vaultexplorer/features/browser/gallery/filter/gallery_meta_index.dart';
+import 'package:vaultexplorer/features/browser/gallery/filter/gallery_places.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/models/browser_back_policy.dart';
 import 'package:vaultexplorer/features/browser/models/category_index.dart';
@@ -193,6 +202,22 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
   SortBy? _itemsSortBy;
   bool? _itemsSortAscending;
 
+  // Gallery filter: what is applied, what is known about each photo (date
+  // taken, place, tags...), and the cache keys of the filtered listing.
+  final GalleryFilterController _galleryFilter = GalleryFilterController();
+  GalleryMetaIndex? _metaIndex;
+  GalleryFilterSet? _itemsFilters;
+  GalleryGroupBy? _itemsGroupBy;
+  int _itemsMetaRevision = -1;
+  int _itemsQueryHash = 0;
+  int _itemsUnfilteredCount = 0;
+  bool _metaWanted = false;
+  GalleryPlaceResolver? _places;
+  bool _placesLoading = false;
+  bool _itemsPlacesLoaded = false;
+  Timer? _metaTimer;
+  GalleryFilterLabels _galleryLabels = const GalleryFilterLabels();
+
   late final BrowserChromeHub _chrome = ref.read(
     browserChromeProvider(widget.workspaceConfig),
   );
@@ -211,6 +236,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
   @override
   void initState() {
     super.initState();
+    _galleryFilter.addListener(_onGalleryFilterChanged);
     if (widget.scopedContainer != null) {
       _containers = {widget.scopedContainer!.volId: widget.scopedContainer!};
       final initialDir = widget.initialDirPath ?? '';
@@ -264,6 +290,16 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     _token?.cancel();
     _exitArmTimer?.cancel();
     _events?.removeContainerLockedListener(_onVaultLocked);
+    _galleryFilter.removeListener(_onGalleryFilterChanged);
+    _galleryFilter.dispose();
+    _metaTimer?.cancel();
+    final meta = _metaIndex;
+    if (meta != null) {
+      meta.removeListener(_onMetaIndexChanged);
+      meta.cancel();
+      unawaited(meta.flush());
+      meta.dispose();
+    }
     _scrollController.dispose();
     super.dispose();
   }
@@ -586,6 +622,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       _forwardStack = const [];
       _forwardLocations = const [];
     });
+    _metaIndex?.forget(volId);
   }
 
   void _onMountedVaultsChanged(
@@ -605,16 +642,29 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
 
   List<CategoryEntry> _currentItems() {
     final location = _effectiveLocation;
+    final gallery = _isGallery && !_folderMode;
+    final filters = gallery ? _galleryFilter.filters : GalleryFilterSet.empty;
+    final groupBy = gallery ? _galleryFilter.groupBy : GalleryGroupBy.none;
+    final metaRevision = gallery ? (_metaIndex?.revision ?? 0) : 0;
+    final queryHash = gallery ? _query.trim().hashCode : 0;
+    final placesLoaded = gallery && _places != null;
     final unchanged =
         identical(_itemsSnapshot, _snapshot) &&
         _itemsFolderMode == _folderMode &&
         _itemsLocation == location &&
         _itemsQuery == _query &&
         _itemsSortBy == _sortBy &&
-        _itemsSortAscending == _sortAscending;
+        _itemsSortAscending == _sortAscending &&
+        _itemsFilters == filters &&
+        _itemsGroupBy == groupBy &&
+        _itemsMetaRevision == metaRevision &&
+        _itemsQueryHash == queryHash &&
+        _itemsPlacesLoaded == placesLoaded;
     if (unchanged) return _items;
 
-    final list = _folderMode
+    // In gallery mode the search box also looks at tags, camera and place,
+    // so the name-only match of the plain listing is left out here.
+    var list = _folderMode
         ? folderCategoryListing(
             _snapshot,
             location: location,
@@ -624,8 +674,20 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
         : flatCategoryListing(
             _snapshot,
             location: location,
-            query: _query,
+            query: gallery ? '' : _query,
           );
+    _itemsUnfilteredCount = list.length;
+
+    if (gallery) {
+      final text = _query.trim();
+      final queryFilter = text.isEmpty ? null : GalleryQueryFilter(text);
+      if (queryFilter != null || filters.isNotEmpty) {
+        list = [
+          for (final e in list)
+            if (_matchesGallery(e, queryFilter, filters)) e,
+        ];
+      }
+    }
 
     list.sort((a, b) {
       if (_folderMode && a.isDir != b.isDir) return a.isDir ? -1 : 1;
@@ -637,6 +699,21 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       );
     });
 
+    // Sections other than "none" need each section to be one run of the list.
+    if (gallery) list = _galleryGrouper(groupBy).arrange<CategoryEntry>(list);
+
+    if (gallery && !identical(_itemsSnapshot, _snapshot)) {
+      _scheduleMetaIndexing();
+    }
+    if (gallery && (filters.isNotEmpty || _query.trim().isNotEmpty)) {
+      _scheduleMetaWanted();
+    }
+
+    _itemsFilters = filters;
+    _itemsGroupBy = groupBy;
+    _itemsMetaRevision = metaRevision;
+    _itemsQueryHash = queryHash;
+    _itemsPlacesLoaded = placesLoaded;
     _itemsSnapshot = _snapshot;
     _itemsFolderMode = _folderMode;
     _itemsLocation = location;
@@ -645,6 +722,185 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     _itemsSortAscending = _sortAscending;
     return _items = list;
   }
+
+  // ── Gallery filter ───────────────────────────────────────────────────────
+
+  GalleryMetaIndex get _meta => _metaIndex ??= _createMetaIndex();
+
+  GalleryMetaIndex _createMetaIndex() {
+    final io = ref.read(vaultFileIoApiProvider);
+    final index = GalleryMetaIndex(
+      readHeader: (volId, path, length) async {
+        final container = _containers[volId];
+        if (container == null) return null;
+        return io.readFileChunk(container, path, 0, length);
+      },
+      storage: VaultGalleryMetaStorage(
+        io,
+        (volId) => _containers[volId],
+        allowWrite: (volId) =>
+            (_thumbs[volId]?.cacheMode ?? ThumbnailCacheMode.appCache) !=
+            ThumbnailCacheMode.disabled,
+      ),
+      notifyEvery: const Duration(seconds: 1),
+    );
+    index.addListener(_onMetaIndexChanged);
+    return index;
+  }
+
+  void _onMetaIndexChanged() {
+    if (mounted && !_disposed) setState(() {});
+  }
+
+  void _onGalleryFilterChanged() {
+    if (!mounted || _disposed) return;
+    final g = _galleryFilter.groupBy;
+    if (_galleryFilter.hasFilters ||
+        g == GalleryGroupBy.place ||
+        g == GalleryGroupBy.camera) {
+      _markMetaWanted();
+    }
+    setState(() {});
+  }
+
+  /// Reading the details of every photo costs a read per file, so it only
+  /// starts once something needs them: the filter was opened, a filter or a
+  /// grouping by place or camera is on, or a search is typed.
+  void _markMetaWanted() {
+    if (_metaWanted) return;
+    _metaWanted = true;
+    _scheduleMetaIndexing();
+    unawaited(_loadPlaces());
+  }
+
+  /// The bundled city list, loaded once when places are first needed. Until it
+  /// is there (a fraction of a second) places show as coordinates.
+  Future<void> _loadPlaces() async {
+    if (_places != null || _placesLoading) return;
+    _placesLoading = true;
+    try {
+      final data = await rootBundle.load('assets/geo/cities.bin');
+      final resolver = GalleryPlaceResolver.fromBytes(
+        data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
+      );
+      if (!mounted || _disposed) return;
+      setState(() => _places = resolver);
+    } catch (_) {
+      // No city list: places stay coordinates.
+    } finally {
+      _placesLoading = false;
+    }
+  }
+
+  void _scheduleMetaWanted() {
+    if (_metaWanted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_disposed) _markMetaWanted();
+    });
+  }
+
+  void _scheduleMetaIndexing() {
+    _metaTimer?.cancel();
+    _metaTimer = Timer(const Duration(milliseconds: 400), _startMetaIndexing);
+  }
+
+  void _startMetaIndexing() {
+    if (_disposed || !_isGallery) return;
+    final meta = _meta;
+    final entries = _snapshot.entries;
+    unawaited(meta.loadStored({for (final e in entries) e.sourceVolId}));
+    if (!_metaWanted) return;
+    final requests = <GalleryIndexRequest>[
+      for (final e in entries)
+        if (!e.isDir)
+          GalleryIndexRequest(e.sourceVolId, e.path, e.sizeBytes, e.modifiedSecs),
+    ]..sort((a, b) => b.mtime.compareTo(a.mtime)); // newest first
+    unawaited(meta.ensure(requests));
+  }
+
+  GalleryFilterSubject _subjectOf(RawEntry e) {
+    final ce = e as CategoryEntry;
+    final meta =
+        _metaIndex?.lookup(
+          ce.sourceVolId,
+          ce.path,
+          ce.sizeBytes,
+          ce.modifiedSecs,
+        ) ??
+        GalleryMeta.empty;
+    return GalleryFilterSubject(
+      sourceVolId: ce.sourceVolId,
+      name: ce.baseName,
+      parentPath: ce.parentPath,
+      extension: ce.extension,
+      sizeBytes: ce.sizeBytes,
+      modifiedSecs: ce.modifiedSecs,
+      meta: meta,
+      place: galleryPlaceOf(meta, _places),
+    );
+  }
+
+  bool _matchesGallery(
+    CategoryEntry e,
+    GalleryQueryFilter? query,
+    GalleryFilterSet filters,
+  ) {
+    final subject = _subjectOf(e);
+    if (query != null && !query.positive(subject)) return false;
+    return filters.matches(subject);
+  }
+
+  GalleryGrouper _galleryGrouper(GalleryGroupBy by) => GalleryGrouper(
+    by: by,
+    subjectOf: _subjectOf,
+    ascending: _sortBy == SortBy.date && _sortAscending,
+    labels: _galleryLabels,
+  );
+
+  List<GalleryFilterSubject> _gallerySubjects() => [
+    for (final e in flatCategoryListing(_snapshot, location: _effectiveLocation))
+      _subjectOf(e),
+  ];
+
+  void _openGalleryFilter() {
+    _markMetaWanted();
+    unawaited(
+      showGalleryFilterSheet(
+        context,
+        controller: _galleryFilter,
+        index: _meta,
+        subjects: _gallerySubjects,
+        visibleCount: () => _currentItems().length,
+      ),
+    );
+  }
+
+  Widget _galleryFilterButton(BuildContext context) {
+    final active = _galleryFilter.hasFilters;
+    final cs = Theme.of(context).colorScheme;
+    return IconButton(
+      icon: Icon(
+        active ? Icons.filter_alt_rounded : Icons.filter_alt_outlined,
+        color: active ? cs.primary : null,
+      ),
+      tooltip: context.l10n.galleryFilterTooltip,
+      onPressed: _openGalleryFilter,
+    );
+  }
+
+  List<Widget> _galleryFilterMenuItems(BuildContext menuContext) => [
+    MenuItemButton(
+      leadingIcon: const Icon(Icons.tune_rounded, size: 18),
+      onPressed: _openGalleryFilter,
+      child: Text(menuContext.l10n.galleryFilterMenuOpen),
+    ),
+    if (_galleryFilter.hasFilters)
+      MenuItemButton(
+        leadingIcon: const Icon(Icons.clear_all_rounded, size: 18),
+        onPressed: _galleryFilter.clear,
+        child: Text(menuContext.l10n.galleryFilterClearAll),
+      ),
+  ];
 
   bool get _canGoUp {
     if (_scoped && _isGallery) {
@@ -1990,6 +2246,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
 
   @override
   Widget build(BuildContext context) {
+    _galleryLabels = context.galleryFilterLabels;
     final l10n = context.l10n;
     final toolbarConfig = ref
         .watch(fileManagerToolbarSettingsProvider(null))
@@ -2079,7 +2336,9 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           });
         },
       ),
-      FileManagerAction.filter: (context) => _scoped
+      FileManagerAction.filter: (context) => _isGallery
+          ? _galleryFilterButton(context)
+          : _scoped
           ? FilterMenuButton(
               currentFilter: widget.category.filterKey,
               onFilterChanged: (filter) =>
@@ -2183,7 +2442,6 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     }
 
     final visibleActions = toolbarConfig.visible.where((a) {
-      if (_isGallery && a == FileManagerAction.filter) return false;
       // Gallery mode is a view of one storage's files; the categories
       // shortcut screen spans storages, so toggling it there did nothing.
       if (!_scoped && a == FileManagerAction.gallery) return false;
@@ -2588,10 +2846,18 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
                   : (_) {},
               hideVaultOnlyActions:
                   !_scoped || widget.scopedContainer!.isLocalStorage,
-              customFilterMenuBuilder: _scoped ? null : buildSourceMenuItems,
-              customFilterActive: _source != CategorySourceFilter.all,
-              customFilterIcon: Icons.storage_rounded,
-              customFilterTooltip: l10n.categorySourceTooltip,
+              customFilterMenuBuilder: _isGallery
+                  ? _galleryFilterMenuItems
+                  : (_scoped ? null : buildSourceMenuItems),
+              customFilterActive: _isGallery
+                  ? _galleryFilter.hasFilters
+                  : _source != CategorySourceFilter.all,
+              customFilterIcon: _isGallery
+                  ? Icons.filter_alt_outlined
+                  : Icons.storage_rounded,
+              customFilterTooltip: _isGallery
+                  ? l10n.galleryFilterTooltip
+                  : l10n.categorySourceTooltip,
               layoutMode: _layout,
               onLayoutModeChanged: _setLayout,
               gridAspectRatio: toolbarConfig.gridAspectRatio,
@@ -2667,6 +2933,14 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
               onTap: _onJumpTo,
               forwardStack: _forwardStack,
               onForwardTap: _onForwardTo,
+            ),
+          if (_isGallery && !_folderMode)
+            GalleryFilterBar(
+              controller: _galleryFilter,
+              index: _meta,
+              shown: items.length,
+              total: _itemsUnfilteredCount,
+              onOpen: _openGalleryFilter,
             ),
           Expanded(child: _buildBody(items, toolbarConfig, mountedVaults)),
         ],
@@ -2908,7 +3182,12 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           searchQuery: query,
           bottomClearance: searchClearance,
           sortBy: _sortBy,
-          groupByDate: _isGallery && !_folderMode,
+          groupByDate: _isGallery &&
+              !_folderMode &&
+              _galleryFilter.groupBy != GalleryGroupBy.none,
+          groupBuilder: _isGallery && !_folderMode
+              ? _galleryGrouper(_galleryFilter.groupBy).call
+              : null,
         );
       case BrowserLayoutMode.masonry:
         content = FileMasonryView(
@@ -2950,7 +3229,12 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           searchQuery: query,
           bottomClearance: searchClearance,
           sortBy: _sortBy,
-          groupByDate: _isGallery && !_folderMode,
+          groupByDate: _isGallery &&
+              !_folderMode &&
+              _galleryFilter.groupBy != GalleryGroupBy.none,
+          groupBuilder: _isGallery && !_folderMode
+              ? _galleryGrouper(_galleryFilter.groupBy).call
+              : null,
         );
       case BrowserLayoutMode.list:
       case BrowserLayoutMode.detailed:
@@ -2989,7 +3273,12 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           searchQuery: query,
           bottomClearance: searchClearance,
           sortBy: _sortBy,
-          groupByDate: _isGallery && !_folderMode,
+          groupByDate: _isGallery &&
+              !_folderMode &&
+              _galleryFilter.groupBy != GalleryGroupBy.none,
+          groupBuilder: _isGallery && !_folderMode
+              ? _galleryGrouper(_galleryFilter.groupBy).call
+              : null,
           largeThumbnail: _isGallery,
         );
     }

@@ -95,6 +95,14 @@ class FileListView extends StatefulWidget {
   final bool largeThumbnail;
   final bool groupByDate;
 
+  /// Builds the sections when [groupByDate] is on. Null keeps the day
+  /// sections ([computeDateGroups]); the gallery filter passes its own to
+  /// group by month, folder, place, camera...
+  ///
+  /// The list handed over is already arranged so that each section is one run
+  /// of it, and a new builder only takes effect with a new [items] list.
+  final List<DateGroup<RawEntry>> Function(List<RawEntry> items)? groupBuilder;
+
   /// Resolves the container an entry lives in, for a listing that gathers
   /// files from several containers (the category browser). When null every
   /// entry belongs to [container], as in any ordinary folder listing.
@@ -118,6 +126,7 @@ class FileListView extends StatefulWidget {
     this.isDetailed = false,
     this.largeThumbnail = false,
     this.groupByDate = false,
+    this.groupBuilder,
     required this.selectedItems,
     this.detailColumns = const [FileDetailColumn.date, FileDetailColumn.size],
     this.longFileNameMode = LongFileNameDisplayMode.ellipsizeEnd,
@@ -169,7 +178,7 @@ class FileListViewState extends State<FileListView> {
     final itemExtent = _computeItemExtent(_zoomLevel);
 
     if (widget.groupByDate) {
-      final groups = computeDateGroups(widget.items);
+      final groups = (widget.groupBuilder ?? computeDateGroups)(widget.items);
       final headerH = galleryDateHeaderExtent(context);
       var runningTop = 0.0;
       for (final group in groups) {
@@ -437,13 +446,13 @@ class FileListViewState extends State<FileListView> {
   }
 
   Widget _buildDateGroupedListView(ScrollController? controller) {
-    final groups = computeDateGroups(widget.items);
+    final groups = (widget.groupBuilder ?? computeDateGroups)(widget.items);
     final slivers = <Widget>[];
     for (final group in groups) {
       slivers.add(
         SliverToBoxAdapter(
           child: GalleryDateHeader(
-            title: formatDateGroupHeader(group.date, context),
+            title: group.label ?? formatDateGroupHeader(group.date, context),
             count: group.items.length,
           ),
         ),

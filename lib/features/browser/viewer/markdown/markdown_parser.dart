@@ -12,10 +12,13 @@ import 'markdown_inline_parser.dart';
 // `- [x]` task items, and a viewer-friendly treatment of raw HTML blocks
 // (comments are hidden, `<hr>` is a rule, everything else renders as text).
 
-List<MdBlock> parseMarkdownDocument(String source) {
+List<MdBlock> parseMarkdownDocument(
+  String source, {
+  MdParseOptions options = MdParseOptions.app,
+}) {
   final parser = _BlockParser();
   final doc = parser.parse(source);
-  return _Converter(parser.refs).blocks(doc);
+  return _Converter(parser.refs, options).blocks(doc);
 }
 
 // ── Tree ─────────────────────────────────────────────────────────────────
@@ -798,10 +801,12 @@ final RegExp _taskPattern = RegExp(r'^\[([ xX])\](?:[ \t]|\n|$)');
 final RegExp _hrTagPattern = RegExp(r'^<hr\s*/?>$', caseSensitive: false);
 
 class _Converter {
-  _Converter(this.refs);
+  _Converter(this.refs, this.options);
   final MdReferenceMap refs;
+  final MdParseOptions options;
 
-  List<MdInline> _inline(String text) => parseInline(text, references: refs);
+  List<MdInline> _inline(String text) =>
+      parseInline(text, references: refs, options: options);
 
   List<MdBlock> blocks(_B parent) {
     final out = <MdBlock>[];
@@ -826,7 +831,12 @@ class _Converter {
       final images = inl.whereType<MdInlineImage>().toList();
       return [
         for (var i = 0; i < images.length; i++)
-          MdImageBlock(images[i].alt, images[i].path, sourceLine: c.startLine + i),
+          MdImageBlock(
+            images[i].alt,
+            images[i].path,
+            title: images[i].title,
+            sourceLine: c.startLine + i,
+          ),
       ];
     }
     return [MdParagraph(inl, sourceLine: c.startLine)];
@@ -873,6 +883,7 @@ class _Converter {
   }
 
   MdBlock? _htmlBlock(_B c) {
+    if (!options.interpretHtml) return MdHtmlBlock(c.literal, sourceLine: c.startLine);
     var raw = c.literal.trim();
     if (c.htmlType == 2) {
       // Comments are invisible, but text sharing their line is not.

@@ -1,4 +1,5 @@
 import 'markdown_ast.dart';
+import 'markdown_case_fold.dart';
 import 'markdown_entities.dart';
 import 'markdown_link_syntax.dart';
 
@@ -10,23 +11,26 @@ import 'markdown_link_syntax.dart';
 // <b>/<i>/<u>/<s>/<mark>/<sub>/<sup>/<code>/<a> tags, <br>, hidden HTML
 // comments and bare http(s) URLs.
 
-/// Link reference definitions: normalised label -> destination.
-typedef MdReferenceMap = Map<String, String>;
+/// The target of a link reference definition.
+typedef MdLinkReference = ({String destination, String? title});
 
-List<MdInline> parseInline(String text, {MdReferenceMap? references}) {
-  return _autoLinkify(
-    _InlineParser(text, references ?? const <String, String>{}).parse(),
-  );
+/// Link reference definitions by normalised label.
+typedef MdReferenceMap = Map<String, MdLinkReference>;
+
+List<MdInline> parseInline(
+  String text, {
+  MdReferenceMap? references,
+  MdParseOptions options = MdParseOptions.app,
+}) {
+  final nodes = _InlineParser(text, references ?? const <String, MdLinkReference>{}, options).parse();
+  return options.bareUrls ? _autoLinkify(nodes) : nodes;
 }
 
 /// Case-folds and collapses whitespace in a `[label]` (brackets included).
 String normalizeReferenceLabel(String bracketed) {
-  return bracketed
-      .substring(1, bracketed.length - 1)
-      .trim()
-      .replaceAll(RegExp(r'[ \t\r\n]+'), ' ')
-      .toLowerCase()
-      .toUpperCase();
+  return caseFoldForMatching(
+    bracketed.substring(1, bracketed.length - 1).trim().replaceAll(RegExp(r'[ \t\r\n]+'), ' '),
+  );
 }
 
 /// Length of a link label `[...]` starting at [pos], or 0 when there is none.
@@ -77,38 +81,41 @@ int parseLinkReferenceDefinition(String s, MdReferenceMap refs) {
   pos = dest.end;
   final beforeTitle = pos;
   pos = skipLinkWhitespaceAt(s, pos);
-  var hasTitle = false;
+  String? title;
   if (pos != beforeTitle) {
-    final titleEnd = skipLinkTitleAt(s, pos);
-    if (titleEnd != null) {
-      hasTitle = true;
-      pos = titleEnd;
+    final parsed = parseLinkTitleAt(s, pos);
+    if (parsed != null) {
+      title = parsed.value;
+      pos = parsed.end;
     }
   }
-  if (!hasTitle) pos = beforeTitle;
+  if (title == null) pos = beforeTitle;
 
   var end = _endOfLine(s, pos);
   if (end == null) {
-    if (!hasTitle) return 0;
+    if (title == null) return 0;
     // The title is not alone on its line: drop it and retry with just the URL.
+    title = null;
     end = _endOfLine(s, beforeTitle);
     if (end == null) return 0;
   }
 
   final label = normalizeReferenceLabel(rawLabel);
   if (label.isEmpty) return 0;
-  refs.putIfAbsent(label, () => dest.value);
+  final reference = (destination: dest.value, title: title);
+  refs.putIfAbsent(label, () => reference);
   return end;
 }
 
 // ── Node list ────────────────────────────────────────────────────────────
 
-enum _K { root, text, softbreak, hardbreak, code, emph, strong, strike, mark, link, image, ready }
+enum _K { root, text, softbreak, hardbreak, code, emph, strong, strike, mark, link, image, ready, html }
 
 class _N {
   final _K kind;
   String text;
   String dest = '';
+  String? title;
   MdInline? ready;
   _N? parent, prev, next, first, last;
   _N(this.kind, [this.text = '']);
@@ -191,9 +198,10 @@ const String _htmlAttribute = '(?:\\s+$_htmlAttrName(?:\\s*=\\s*$_htmlAttrValue)
 const String mdHtmlOpenTag = '<$mdHtmlTagName$_htmlAttribute*\\s*/?>';
 const String mdHtmlCloseTag = '</$mdHtmlTagName\\s*>';
 
-final RegExp _reRawHtml = RegExp(
-  '$mdHtmlOpenTag|$mdHtmlCloseTag|<\\?[\\s\\S]*?\\?>|<![A-Za-z]+\\s+[^>]*>|<!\\[CDATA\\[[\\s\\S]*?\\]\\]>',
-);
+const String _htmlOtherTokens =
+    '$mdHtmlOpenTag|$mdHtmlCloseTag|<\\?[\\s\\S]*?\\?>|<![A-Za-z]+\\s+[^>]*>|<!\\[CDATA\\[[\\s\\S]*?\\]\\]>';
+final RegExp _reRawHtml = RegExp(_htmlOtherTokens);
+final RegExp _reRawHtmlOrComment = RegExp('<!--(?:>|->|[\\s\\S]*?-->)|$_htmlOtherTokens');
 final RegExp _reBr = RegExp(r'<br\s*/?>', caseSensitive: false);
 final RegExp _reHtmlComment = RegExp(r'<!--(?:>|->|[\s\S]*?-->)');
 final RegExp _reOpenTag = RegExp(r'<([a-zA-Z]+)(?:\s+([^>]*))?>', caseSensitive: false);
@@ -209,10 +217,11 @@ bool _isSpecialInline(int c) =>
     c == 0x7E || c == 0x3D;
 
 class _InlineParser {
-  _InlineParser(this.s, this.refs);
+  _InlineParser(this.s, this.refs, this.options);
 
   final String s;
   final MdReferenceMap refs;
+  final MdParseOptions options;
   int pos = 0;
   _Delim? delimiters;
   _Bracket? brackets;
@@ -533,12 +542,18 @@ class _InlineParser {
 
     final isImage = opener.image;
     String? dest;
+    String? title;
     var matched = false;
 
     if (pos < s.length && s.codeUnitAt(pos) == 0x28) {
-      final tail = matchInlineLinkTail(s, pos + 1);
+      final tail = matchInlineLinkTail(
+        s,
+        pos + 1,
+        legacySpaces: isImage && options.spacedImageDestinations,
+      );
       if (tail != null) {
         dest = tail.destination;
+        title = tail.title;
         pos = tail.end;
         matched = true;
       }
@@ -561,7 +576,8 @@ class _InlineParser {
         final key = normalizeReferenceLabel(refLabel);
         final target = key.isEmpty ? null : refs[key];
         if (target != null) {
-          dest = target;
+          dest = target.destination;
+          title = target.title;
           matched = true;
         }
       }
@@ -574,7 +590,9 @@ class _InlineParser {
       return true;
     }
 
-    final node = _N(isImage ? _K.image : _K.link)..dest = dest ?? '';
+    final node = _N(isImage ? _K.image : _K.link)
+      ..dest = dest ?? ''
+      ..title = title;
     var tmp = opener.node.next;
     while (tmp != null) {
       final nx = tmp.next;
@@ -623,6 +641,15 @@ class _InlineParser {
   }
 
   bool _htmlLike() {
+    if (!options.interpretHtml) {
+      // CommonMark profile: every HTML construct is an opaque raw token.
+      final raw = _reRawHtmlOrComment.matchAsPrefix(s, pos);
+      if (raw == null) return false;
+      root.append(_N(_K.html, raw.group(0)!));
+      pos = raw.end;
+      return true;
+    }
+
     final br = _reBr.matchAsPrefix(s, pos);
     if (br != null) {
       root.append(_N(_K.hardbreak));
@@ -665,7 +692,7 @@ class _InlineParser {
 
   MdInline _formattingNode(String tag, String attrs, String inner) {
     if (tag == 'code') return MdInlineCode(inner);
-    final children = _InlineParser(inner, refs).parse();
+    final children = _InlineParser(inner, refs, options).parse();
     switch (tag) {
       case 'a':
         final href = RegExp(r'''href=["']([^"']*)["']''', caseSensitive: false)
@@ -723,7 +750,7 @@ class _InlineParser {
         case _K.text:
           text.write(n.text);
         case _K.softbreak:
-          text.write(' ');
+          text.write(options.softBreaksAsNewlines ? '\n' : ' ');
         case _K.hardbreak:
           flush();
           out.add(const MdLineBreak());
@@ -744,13 +771,16 @@ class _InlineParser {
           out.add(MdHighlight(_convert(n)));
         case _K.link:
           flush();
-          out.add(MdLink(_convert(n), n.dest));
+          out.add(MdLink(_convert(n), n.dest, title: n.title));
         case _K.image:
           flush();
-          out.add(MdInlineImage(_plainText(n), n.dest));
+          out.add(MdInlineImage(_plainText(n), n.dest, title: n.title));
         case _K.ready:
           flush();
           out.add(n.ready!);
+        case _K.html:
+          flush();
+          out.add(MdHtmlInline(n.text));
       }
     }
     flush();
@@ -768,6 +798,7 @@ class _InlineParser {
         case _K.hardbreak:
           b.write(' ');
         case _K.ready:
+        case _K.html:
         case _K.root:
           break;
         default:

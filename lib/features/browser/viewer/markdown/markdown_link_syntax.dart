@@ -17,11 +17,6 @@ import 'markdown_entities.dart';
 // Percent-encoding is what gets WRITTEN (it is the most portable form, and is
 // what Obsidian / GitHub / Pandoc emit); both forms are READ.
 
-/// The app used to write `![a](my file.png)`, which is not a link in
-/// CommonMark (spec example 488). Notes created that way still render while
-/// this is true. Set it to false to become strictly spec-conformant on input.
-const bool kAcceptLegacySpacedDestinations = true;
-
 /// ASCII punctuation per the spec: ``!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~``.
 bool isAsciiPunctuation(int c) =>
     (c >= 0x21 && c <= 0x2F) ||
@@ -32,14 +27,21 @@ bool isAsciiPunctuation(int c) =>
 /// Parses what follows the `(` of an inline link: `destination "title" )`.
 ///
 /// [from] is the index just after the `(`. Returns the destination (enclosing
-/// `<>` removed, backslash escapes resolved, NOT percent-decoded) and the index
-/// just past the closing `)`, or null when it is not a valid inline link tail.
-({String destination, int end})? matchInlineLinkTail(String text, int from) {
+/// `<>` removed, escapes and entities resolved, NOT percent-decoded), the title
+/// if there is one, and the index just past the closing `)`; null when it is not
+/// a valid inline link tail.
+///
+/// With [legacySpaces], a destination containing raw spaces is accepted too
+/// (`![a](my file.png)`, as the old editor wrote). Not CommonMark; callers use
+/// it for images only.
+({String destination, String? title, int end})? matchInlineLinkTail(
+  String text,
+  int from, {
+  bool legacySpaces = false,
+}) {
   final strict = _parseDestinationAndTitle(text, from);
   if (strict != null) return strict;
-  if (kAcceptLegacySpacedDestinations) {
-    return _parseLegacySpacedDestination(text, from);
-  }
+  if (legacySpaces) return _parseLegacySpacedDestination(text, from);
   return null;
 }
 
@@ -48,8 +50,9 @@ bool isAsciiPunctuation(int c) =>
 ({String value, int end})? parseLinkDestinationAt(String text, int i) =>
     _parseDestination(text, i);
 
-/// Returns the index just past a link title starting at [i], or null.
-int? skipLinkTitleAt(String text, int i) => _skipTitle(text, i);
+/// Parses a link title (`"..."`, `'...'` or `(...)`) at [i]: its text with
+/// escapes and entities resolved, and the index just past it; or null.
+({String value, int end})? parseLinkTitleAt(String text, int i) => _parseTitle(text, i);
 
 /// Spaces / tabs and at most one line ending, starting at [i].
 int skipLinkWhitespaceAt(String text, int i) => _skipLinkWhitespace(text, i);
@@ -72,7 +75,7 @@ int _skipLinkWhitespace(String text, int i) {
   return i;
 }
 
-({String destination, int end})? _parseDestinationAndTitle(
+({String destination, String? title, int end})? _parseDestinationAndTitle(
   String text,
   int from,
 ) {
@@ -83,16 +86,16 @@ int _skipLinkWhitespace(String text, int i) {
   var k = _skipLinkWhitespace(text, dest.end);
   final separated = k > dest.end;
   if (k < text.length && text[k] == ')') {
-    return (destination: dest.value, end: k + 1);
+    return (destination: dest.value, title: null, end: k + 1);
   }
 
   // Anything but ')' must be a title, and a title needs whitespace before it.
   if (!separated) return null;
-  final titleEnd = _skipTitle(text, k);
-  if (titleEnd == null) return null;
-  k = _skipLinkWhitespace(text, titleEnd);
+  final title = _parseTitle(text, k);
+  if (title == null) return null;
+  k = _skipLinkWhitespace(text, title.end);
   if (k < text.length && text[k] == ')') {
-    return (destination: dest.value, end: k + 1);
+    return (destination: dest.value, title: title.value, end: k + 1);
   }
   return null;
 }
@@ -142,8 +145,7 @@ int _skipLinkWhitespace(String text, int i) {
   return (value: resolveEscapesAndEntities(text.substring(i, j)), end: j);
 }
 
-/// Returns the index just past a title starting at [i], or null.
-int? _skipTitle(String text, int i) {
+({String value, int end})? _parseTitle(String text, int i) {
   if (i >= text.length) return null;
   final open = text[i];
   final String close;
@@ -166,7 +168,9 @@ int? _skipTitle(String text, int i) {
       j += 2;
       continue;
     }
-    if (ch == close) return j + 1;
+    if (ch == close) {
+      return (value: resolveEscapesAndEntities(text.substring(i + 1, j)), end: j + 1);
+    }
     if (open == '(' && ch == '(') return null;
     if (ch == '\n') {
       // A title may span lines but may not contain a blank line.
@@ -183,8 +187,8 @@ int? _skipTitle(String text, int i) {
 
 /// Pre-spec behaviour: everything up to the matching ')' is the destination,
 /// spaces included. Only used when the strict parse failed AND the content
-/// really contains a space, so it never loosens any other spec rule.
-({String destination, int end})? _parseLegacySpacedDestination(
+/// really contains a space, so it never loosens any other rule.
+({String destination, String? title, int end})? _parseLegacySpacedDestination(
   String text,
   int from,
 ) {
@@ -205,7 +209,7 @@ int? _skipTitle(String text, int i) {
   if (raw.isEmpty || raw.startsWith('<')) return null;
   if (raw.contains('\n') || raw.contains('\r')) return null;
   if (!raw.contains(' ') && !raw.contains('\t')) return null;
-  return (destination: raw, end: j + 1);
+  return (destination: raw, title: null, end: j + 1);
 }
 
 /// Resolves backslash escapes (`\[` -> `[`), for image alt text.

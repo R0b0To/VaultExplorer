@@ -22,6 +22,7 @@ String inl(List<MdInline> ns) {
       case MdInlineCode c: b.write('<code>${esc(c.code)}</code>');
       case MdLink l: b.write('<a href="${esc(normalizeLinkUri(l.url))}">${inl(l.children)}</a>');
       case MdInlineImage i: b.write('<img src="${esc(normalizeLinkUri(i.path))}" alt="${esc(i.alt)}" />');
+      default: break;
     }
   }
   return b.toString();
@@ -47,6 +48,8 @@ String blk(List<MdBlock> bs) {
         for (final it in l.items) { b.write('<li>${blk(it.children)}</li>\n'); }
         b.write('</$tag>\n');
       case MdTable _: b.write('<table></table>\n');
+      default:
+        break;
     }
   }
   return b.toString();

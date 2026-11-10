@@ -56,27 +56,38 @@ void main() {
     });
 
     test('example 488: a bare destination with a space is not a link', () {
-      // Only true while the legacy fallback (kAcceptLegacySpacedDestinations)
-      // is switched off; with it on, old notes keep rendering.
-      if (kAcceptLegacySpacedDestinations) {
-        expect(_dest('[link](/my uri)'), '/my uri');
-      } else {
-        expect(_dest('[link](/my uri)'), isNull);
-      }
+      expect(_dest('[link](/my uri)'), isNull);
+      expect(_dest('[a](b (t(x)))'), isNull);
     });
 
-    test('a title with an unescaped ( is not a title', () {
-      // Strictly this is not a link; the legacy fallback reads it the way the
-      // old parser did (the whole text up to the last ")" is the path).
-      expect(
-        _dest('[a](b (t(x)))'),
-        kAcceptLegacySpacedDestinations ? 'b (t(x))' : isNull,
-      );
+    test('titles are returned, with escapes and entities resolved', () {
+      MdLink link(String s) => parseInline(s).whereType<MdLink>().single;
+      expect(link('[a](/u "T")').title, 'T');
+      expect(link("[a](/u 'T')").title, 'T');
+      expect(link('[a](/u (T))').title, 'T');
+      expect(link(r'[a](/u "a\"b")').title, 'a"b');
+      expect(link('[a](/u "f&ouml;&ouml;")').title, 'föö');
+      expect(link('[a](/u)').title, isNull);
+    });
+  });
+
+  group('old notes: images may keep raw spaces', () {
+    // The old editor wrote ![alt](my file.png). Only images get this
+    // compatibility; a link with a space is not a link (spec example 488).
+    test('an image with spaces still parses in the app profile', () {
+      final nodes = parseInline('![a](my file.png)');
+      expect(nodes.single, isA<MdInlineImage>());
+      expect((nodes.single as MdInlineImage).path, 'my file.png');
     });
 
-    test('the legacy fallback never loosens any other rule', () {
+    test('the strict profile is spec-only', () {
+      final nodes = parseInline('![a](my file.png)', options: MdParseOptions.commonMark);
+      expect(nodes.whereType<MdInlineImage>(), isEmpty);
+    });
+
+    test('it never loosens any other rule', () {
       expect(_dest('[a](<b c)'), isNull);
-      expect(_dest('[a](foo(and(bar))'), isNull);
+      expect(parseInline('![a](foo(and(bar))').whereType<MdInlineImage>(), isEmpty);
     });
   });
 

@@ -2507,6 +2507,99 @@ class AppLocalizationsFr extends AppLocalizations {
   String get keepCurrentOption => 'Conserver l\'actuel';
 
   @override
+  String get toolExpandVolumeTitle => 'Agrandir le volume VeraCrypt';
+
+  @override
+  String get toolExpandVolumeSubtitle =>
+      'Agrandir un volume standard, comme l’outil d’extension de volume pour ordinateur';
+
+  @override
+  String get toolHiddenInExistingTitle => 'Ajouter un volume caché';
+
+  @override
+  String get toolHiddenInExistingSubtitle =>
+      'Créer un volume caché dans un volume standard existant';
+
+  @override
+  String get vcToolsPickContainer => 'Choisir le conteneur';
+
+  @override
+  String get vcToolsNoContainer => 'Aucun conteneur sélectionné';
+
+  @override
+  String get vcToolsPasswordLabel => 'Mot de passe du volume';
+
+  @override
+  String get vcToolsPimLabel => 'PIM (facultatif)';
+
+  @override
+  String get vcToolsNewSizeLabel => 'Nouvelle taille du conteneur (Mio)';
+
+  @override
+  String get vcToolsInitFreeSpace => 'Initialiser le nouvel espace';
+
+  @override
+  String get vcToolsInitFreeSpaceHint =>
+      'Remplit l’espace ajouté avec des données chiffrées avec la clé du volume afin de ne pas pouvoir le distinguer du reste. Désactivez pour un agrandissement rapide.';
+
+  @override
+  String get vcToolsExpandAction => 'Agrandir le volume';
+
+  @override
+  String get vcToolsExpandNote =>
+      'Seul le conteneur est agrandi. La taille du système de fichiers interne n’est pas modifiée, l’espace ajouté reste donc non alloué tant que le système de fichiers n’est pas étendu. Sauvegardez d’abord le volume.';
+
+  @override
+  String get vcToolsExpandDone => 'Volume agrandi';
+
+  @override
+  String get vcToolsAnalyzeAction => 'Vérifier l’espace libre';
+
+  @override
+  String get vcToolsMaxHidden => 'Plus grand volume caché possible';
+
+  @override
+  String get vcToolsNoRoom =>
+      'Il n’y a pas de place pour un volume caché : la fin du volume externe est occupée.';
+
+  @override
+  String get vcToolsHiddenSizeLabel => 'Taille du volume caché (Mio)';
+
+  @override
+  String get vcToolsHiddenPasswordLabel => 'Mot de passe du volume caché';
+
+  @override
+  String get vcToolsHiddenConfirmLabel =>
+      'Confirmer le mot de passe du volume caché';
+
+  @override
+  String get vcToolsHiddenFsLabel => 'Système de fichiers du volume caché';
+
+  @override
+  String get vcToolsQuickFormat => 'Formatage rapide';
+
+  @override
+  String get vcToolsCreateHiddenAction => 'Créer le volume caché';
+
+  @override
+  String get vcToolsHiddenDone => 'Volume caché créé';
+
+  @override
+  String get vcToolsHiddenNote =>
+      'Le volume caché utilise l’espace libre à la fin du volume externe. Ensuite, montez toujours le volume externe avec la protection du volume caché lorsque vous y écrivez, sinon le volume caché risque d’être écrasé.';
+
+  @override
+  String get vcToolsPasswordsDiffer =>
+      'Les mots de passe ne correspondent pas.';
+
+  @override
+  String get vcToolsInvalidSize => 'Entrez une taille valide.';
+
+  @override
+  String get vcToolsCredentialsRequired =>
+      'Entrez le mot de passe du volume ou ajoutez un fichier clé.';
+
+  @override
   String get readOnlyModeLabel => 'Mode lecture seule';
 
   @override

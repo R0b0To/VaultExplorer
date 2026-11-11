@@ -4092,6 +4092,174 @@ abstract class AppLocalizations {
   /// **'Keep current'**
   String get keepCurrentOption;
 
+  /// Tools row: enlarge a standard VeraCrypt volume
+  ///
+  /// In en, this message translates to:
+  /// **'Expand VeraCrypt volume'**
+  String get toolExpandVolumeTitle;
+
+  /// Tools row subtitle for volume expansion
+  ///
+  /// In en, this message translates to:
+  /// **'Make a standard volume larger, like the desktop Volume Expander'**
+  String get toolExpandVolumeSubtitle;
+
+  /// Tools row: create a hidden volume inside an existing volume
+  ///
+  /// In en, this message translates to:
+  /// **'Add hidden volume'**
+  String get toolHiddenInExistingTitle;
+
+  /// Tools row subtitle for direct-mode hidden volume creation
+  ///
+  /// In en, this message translates to:
+  /// **'Create a hidden volume inside an existing standard volume'**
+  String get toolHiddenInExistingSubtitle;
+
+  /// Button: pick the container file
+  ///
+  /// In en, this message translates to:
+  /// **'Choose container'**
+  String get vcToolsPickContainer;
+
+  /// Shown before a container is picked
+  ///
+  /// In en, this message translates to:
+  /// **'No container selected'**
+  String get vcToolsNoContainer;
+
+  /// Password field of the existing volume
+  ///
+  /// In en, this message translates to:
+  /// **'Volume password'**
+  String get vcToolsPasswordLabel;
+
+  /// PIM field
+  ///
+  /// In en, this message translates to:
+  /// **'PIM (optional)'**
+  String get vcToolsPimLabel;
+
+  /// Target size of the container after expansion, in MiB
+  ///
+  /// In en, this message translates to:
+  /// **'New container size (MiB)'**
+  String get vcToolsNewSizeLabel;
+
+  /// Switch: fill the added space with encrypted data
+  ///
+  /// In en, this message translates to:
+  /// **'Initialize new space'**
+  String get vcToolsInitFreeSpace;
+
+  /// Explains the initialize new space switch
+  ///
+  /// In en, this message translates to:
+  /// **'Fills the added space with data encrypted under the volume key so it cannot be told apart from the rest. Turn off for a quick expand.'**
+  String get vcToolsInitFreeSpaceHint;
+
+  /// Button: run the expansion
+  ///
+  /// In en, this message translates to:
+  /// **'Expand volume'**
+  String get vcToolsExpandAction;
+
+  /// Note about volume expansion
+  ///
+  /// In en, this message translates to:
+  /// **'Only the container is enlarged. The file system inside is not resized, so the added space stays unallocated until the file system is grown. Back up the volume first.'**
+  String get vcToolsExpandNote;
+
+  /// Success message after expansion
+  ///
+  /// In en, this message translates to:
+  /// **'Volume expanded'**
+  String get vcToolsExpandDone;
+
+  /// Button: analyze the outer volume for hidden volume space
+  ///
+  /// In en, this message translates to:
+  /// **'Check free space'**
+  String get vcToolsAnalyzeAction;
+
+  /// Label before the maximum hidden volume size
+  ///
+  /// In en, this message translates to:
+  /// **'Largest possible hidden volume'**
+  String get vcToolsMaxHidden;
+
+  /// Shown when the outer volume has no free space at its end
+  ///
+  /// In en, this message translates to:
+  /// **'There is no room for a hidden volume: the end of the outer volume is in use.'**
+  String get vcToolsNoRoom;
+
+  /// Size of the hidden volume in MiB
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden volume size (MiB)'**
+  String get vcToolsHiddenSizeLabel;
+
+  /// Password for the new hidden volume
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden volume password'**
+  String get vcToolsHiddenPasswordLabel;
+
+  /// Confirmation of the hidden volume password
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm hidden volume password'**
+  String get vcToolsHiddenConfirmLabel;
+
+  /// File system of the hidden volume
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden volume file system'**
+  String get vcToolsHiddenFsLabel;
+
+  /// Switch: skip wiping the hidden volume area
+  ///
+  /// In en, this message translates to:
+  /// **'Quick format'**
+  String get vcToolsQuickFormat;
+
+  /// Button: create the hidden volume
+  ///
+  /// In en, this message translates to:
+  /// **'Create hidden volume'**
+  String get vcToolsCreateHiddenAction;
+
+  /// Success message after creating the hidden volume
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden volume created'**
+  String get vcToolsHiddenDone;
+
+  /// Warning about hidden volumes
+  ///
+  /// In en, this message translates to:
+  /// **'The hidden volume takes the free space at the end of the outer volume. Afterwards, mount the outer volume with hidden volume protection whenever you write to it, or the hidden volume can be overwritten.'**
+  String get vcToolsHiddenNote;
+
+  /// Hidden volume password confirmation mismatch
+  ///
+  /// In en, this message translates to:
+  /// **'The passwords do not match.'**
+  String get vcToolsPasswordsDiffer;
+
+  /// Invalid size input
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid size.'**
+  String get vcToolsInvalidSize;
+
+  /// No credentials given
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the volume password or add a keyfile.'**
+  String get vcToolsCredentialsRequired;
+
   /// Checkbox label for mounting in read-only mode
   ///
   /// In en, this message translates to:

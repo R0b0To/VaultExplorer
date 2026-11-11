@@ -2492,6 +2492,97 @@ class AppLocalizationsIt extends AppLocalizations {
   String get keepCurrentOption => 'Mantieni attuale';
 
   @override
+  String get toolExpandVolumeTitle => 'Espandi volume VeraCrypt';
+
+  @override
+  String get toolExpandVolumeSubtitle =>
+      'Ingrandisci un volume standard, come il Volume Expander desktop';
+
+  @override
+  String get toolHiddenInExistingTitle => 'Aggiungi volume nascosto';
+
+  @override
+  String get toolHiddenInExistingSubtitle =>
+      'Crea un volume nascosto all’interno di un volume standard esistente';
+
+  @override
+  String get vcToolsPickContainer => 'Scegli contenitore';
+
+  @override
+  String get vcToolsNoContainer => 'Nessun contenitore selezionato';
+
+  @override
+  String get vcToolsPasswordLabel => 'Password del volume';
+
+  @override
+  String get vcToolsPimLabel => 'PIM (facoltativo)';
+
+  @override
+  String get vcToolsNewSizeLabel => 'Nuova dimensione contenitore (MiB)';
+
+  @override
+  String get vcToolsInitFreeSpace => 'Inizializza nuovo spazio';
+
+  @override
+  String get vcToolsInitFreeSpaceHint =>
+      'Riempie lo spazio aggiunto con dati cifrati con la chiave del volume in modo da non distinguerlo dal resto. Disattiva per un’espansione rapida.';
+
+  @override
+  String get vcToolsExpandAction => 'Espandi volume';
+
+  @override
+  String get vcToolsExpandNote =>
+      'Viene ingrandito solo il contenitore. Il file system interno non viene ridimensionato, quindi lo spazio aggiunto rimane non allocato finché il file system non viene esteso. Esegui prima un backup del volume.';
+
+  @override
+  String get vcToolsExpandDone => 'Volume espanso';
+
+  @override
+  String get vcToolsAnalyzeAction => 'Controlla spazio libero';
+
+  @override
+  String get vcToolsMaxHidden => 'Volume nascosto più grande possibile';
+
+  @override
+  String get vcToolsNoRoom =>
+      'Non c’è spazio per un volume nascosto: la fine del volume esterno è occupata.';
+
+  @override
+  String get vcToolsHiddenSizeLabel => 'Dimensione volume nascosto (MiB)';
+
+  @override
+  String get vcToolsHiddenPasswordLabel => 'Password volume nascosto';
+
+  @override
+  String get vcToolsHiddenConfirmLabel => 'Conferma password volume nascosto';
+
+  @override
+  String get vcToolsHiddenFsLabel => 'File system del volume nascosto';
+
+  @override
+  String get vcToolsQuickFormat => 'Formattazione rapida';
+
+  @override
+  String get vcToolsCreateHiddenAction => 'Crea volume nascosto';
+
+  @override
+  String get vcToolsHiddenDone => 'Volume nascosto creato';
+
+  @override
+  String get vcToolsHiddenNote =>
+      'Il volume nascosto occupa lo spazio libero alla fine del volume esterno. In seguito, monta il volume esterno con la protezione del volume nascosto ogni volta che ci scrivi, altrimenti il volume nascosto potrebbe essere sovrascritto.';
+
+  @override
+  String get vcToolsPasswordsDiffer => 'Le password non corrispondono.';
+
+  @override
+  String get vcToolsInvalidSize => 'Inserisci una dimensione valida.';
+
+  @override
+  String get vcToolsCredentialsRequired =>
+      'Inserisci la password del volume o aggiungi un file chiave.';
+
+  @override
   String get readOnlyModeLabel => 'Modalità sola lettura';
 
   @override

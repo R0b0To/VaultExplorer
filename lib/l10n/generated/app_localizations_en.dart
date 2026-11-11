@@ -2455,6 +2455,97 @@ class AppLocalizationsEn extends AppLocalizations {
   String get keepCurrentOption => 'Keep current';
 
   @override
+  String get toolExpandVolumeTitle => 'Expand VeraCrypt volume';
+
+  @override
+  String get toolExpandVolumeSubtitle =>
+      'Make a standard volume larger, like the desktop Volume Expander';
+
+  @override
+  String get toolHiddenInExistingTitle => 'Add hidden volume';
+
+  @override
+  String get toolHiddenInExistingSubtitle =>
+      'Create a hidden volume inside an existing standard volume';
+
+  @override
+  String get vcToolsPickContainer => 'Choose container';
+
+  @override
+  String get vcToolsNoContainer => 'No container selected';
+
+  @override
+  String get vcToolsPasswordLabel => 'Volume password';
+
+  @override
+  String get vcToolsPimLabel => 'PIM (optional)';
+
+  @override
+  String get vcToolsNewSizeLabel => 'New container size (MiB)';
+
+  @override
+  String get vcToolsInitFreeSpace => 'Initialize new space';
+
+  @override
+  String get vcToolsInitFreeSpaceHint =>
+      'Fills the added space with data encrypted under the volume key so it cannot be told apart from the rest. Turn off for a quick expand.';
+
+  @override
+  String get vcToolsExpandAction => 'Expand volume';
+
+  @override
+  String get vcToolsExpandNote =>
+      'Only the container is enlarged. The file system inside is not resized, so the added space stays unallocated until the file system is grown. Back up the volume first.';
+
+  @override
+  String get vcToolsExpandDone => 'Volume expanded';
+
+  @override
+  String get vcToolsAnalyzeAction => 'Check free space';
+
+  @override
+  String get vcToolsMaxHidden => 'Largest possible hidden volume';
+
+  @override
+  String get vcToolsNoRoom =>
+      'There is no room for a hidden volume: the end of the outer volume is in use.';
+
+  @override
+  String get vcToolsHiddenSizeLabel => 'Hidden volume size (MiB)';
+
+  @override
+  String get vcToolsHiddenPasswordLabel => 'Hidden volume password';
+
+  @override
+  String get vcToolsHiddenConfirmLabel => 'Confirm hidden volume password';
+
+  @override
+  String get vcToolsHiddenFsLabel => 'Hidden volume file system';
+
+  @override
+  String get vcToolsQuickFormat => 'Quick format';
+
+  @override
+  String get vcToolsCreateHiddenAction => 'Create hidden volume';
+
+  @override
+  String get vcToolsHiddenDone => 'Hidden volume created';
+
+  @override
+  String get vcToolsHiddenNote =>
+      'The hidden volume takes the free space at the end of the outer volume. Afterwards, mount the outer volume with hidden volume protection whenever you write to it, or the hidden volume can be overwritten.';
+
+  @override
+  String get vcToolsPasswordsDiffer => 'The passwords do not match.';
+
+  @override
+  String get vcToolsInvalidSize => 'Enter a valid size.';
+
+  @override
+  String get vcToolsCredentialsRequired =>
+      'Enter the volume password or add a keyfile.';
+
+  @override
   String get readOnlyModeLabel => 'Read-only mode';
 
   @override

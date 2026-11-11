@@ -2361,6 +2361,94 @@ class AppLocalizationsJa extends AppLocalizations {
   String get keepCurrentOption => '現在の設定を維持';
 
   @override
+  String get toolExpandVolumeTitle => 'VeraCryptボリュームを拡張';
+
+  @override
+  String get toolExpandVolumeSubtitle =>
+      'デスクトップ版のボリュームエクスパンダーのように、標準ボリュームを拡大します';
+
+  @override
+  String get toolHiddenInExistingTitle => '隠しボリュームを追加';
+
+  @override
+  String get toolHiddenInExistingSubtitle => '既存の標準ボリューム内に隠しボリュームを作成します';
+
+  @override
+  String get vcToolsPickContainer => 'コンテナを選択';
+
+  @override
+  String get vcToolsNoContainer => 'コンテナが選択されていません';
+
+  @override
+  String get vcToolsPasswordLabel => 'ボリュームのパスワード';
+
+  @override
+  String get vcToolsPimLabel => 'PIM（省略可能）';
+
+  @override
+  String get vcToolsNewSizeLabel => 'コンテナの新しいサイズ (MiB)';
+
+  @override
+  String get vcToolsInitFreeSpace => '新しい領域を初期化';
+
+  @override
+  String get vcToolsInitFreeSpaceHint =>
+      '他の領域と区別がつかないよう、追加領域をボリュームキーで暗号化されたデータで埋めます。高速拡張を行うにはオフにしてください。';
+
+  @override
+  String get vcToolsExpandAction => 'ボリュームを拡張';
+
+  @override
+  String get vcToolsExpandNote =>
+      'コンテナのみが拡大されます。内部のファイルシステムはサイズ変更されないため、ファイルシステムを拡張するまで追加された領域は未割り当てのままになります。事前にボリュームのバックアップを作成してください。';
+
+  @override
+  String get vcToolsExpandDone => 'ボリュームを拡張しました';
+
+  @override
+  String get vcToolsAnalyzeAction => '空き領域を確認';
+
+  @override
+  String get vcToolsMaxHidden => '作成可能な最大の隠しボリューム';
+
+  @override
+  String get vcToolsNoRoom => '隠しボリューム用の空きがありません。外側ボリュームの末尾が使用されています。';
+
+  @override
+  String get vcToolsHiddenSizeLabel => '隠しボリュームのサイズ (MiB)';
+
+  @override
+  String get vcToolsHiddenPasswordLabel => '隠しボリュームのパスワード';
+
+  @override
+  String get vcToolsHiddenConfirmLabel => '隠しボリュームのパスワードを確認';
+
+  @override
+  String get vcToolsHiddenFsLabel => '隠しボリュームのファイルシステム';
+
+  @override
+  String get vcToolsQuickFormat => 'クイックフォーマット';
+
+  @override
+  String get vcToolsCreateHiddenAction => '隠しボリュームを作成';
+
+  @override
+  String get vcToolsHiddenDone => '隠しボリュームを作成しました';
+
+  @override
+  String get vcToolsHiddenNote =>
+      '隠しボリュームは外側ボリュームの末尾の空き領域を使用します。作成後、外側ボリュームへの書き込みを行う際は必ず隠しボリューム保護を有効にしてマウントしてください。保護しないと隠しボリュームが上書きされる可能性があります。';
+
+  @override
+  String get vcToolsPasswordsDiffer => 'パスワードが一致しません。';
+
+  @override
+  String get vcToolsInvalidSize => '有効なサイズを入力してください。';
+
+  @override
+  String get vcToolsCredentialsRequired => 'ボリュームのパスワードを入力するか、キーファイルを追加してください。';
+
+  @override
   String get readOnlyModeLabel => '読み取り専用モード';
 
   @override

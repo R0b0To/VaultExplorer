@@ -2499,6 +2499,98 @@ class AppLocalizationsDe extends AppLocalizations {
   String get keepCurrentOption => 'Aktuelle beibehalten';
 
   @override
+  String get toolExpandVolumeTitle => 'VeraCrypt-Volume vergrößern';
+
+  @override
+  String get toolExpandVolumeSubtitle =>
+      'Ein Standard-Volume vergrößern, wie mit dem Desktop-Volume-Expander';
+
+  @override
+  String get toolHiddenInExistingTitle => 'Verstecktes Volume hinzufügen';
+
+  @override
+  String get toolHiddenInExistingSubtitle =>
+      'Ein verstecktes Volume in einem bestehenden Standard-Volume erstellen';
+
+  @override
+  String get vcToolsPickContainer => 'Container auswählen';
+
+  @override
+  String get vcToolsNoContainer => 'Kein Container ausgewählt';
+
+  @override
+  String get vcToolsPasswordLabel => 'Volume-Passwort';
+
+  @override
+  String get vcToolsPimLabel => 'PIM (optional)';
+
+  @override
+  String get vcToolsNewSizeLabel => 'Neue Containergröße (MiB)';
+
+  @override
+  String get vcToolsInitFreeSpace => 'Neuen Speicherbereich initialisieren';
+
+  @override
+  String get vcToolsInitFreeSpaceHint =>
+      'Füllt den hinzugefügten Speicher mit unter dem Volume-Schlüssel verschlüsselten Daten, damit er vom Rest nicht unterscheidbar ist. Deaktivieren für schnelles Vergrößern.';
+
+  @override
+  String get vcToolsExpandAction => 'Volume vergrößern';
+
+  @override
+  String get vcToolsExpandNote =>
+      'Nur der Container wird vergrößert. Das darin enthaltene Dateisystem wird nicht angepasst, sodass der hinzugefügte Speicher nicht zugewiesen bleibt, bis das Dateisystem vergrößert wird. Sichern Sie das Volume vorher.';
+
+  @override
+  String get vcToolsExpandDone => 'Volume vergrößert';
+
+  @override
+  String get vcToolsAnalyzeAction => 'Freien Speicher prüfen';
+
+  @override
+  String get vcToolsMaxHidden => 'Größtmögliches verstecktes Volume';
+
+  @override
+  String get vcToolsNoRoom =>
+      'Kein Platz für ein verstecktes Volume: Das Ende des äußeren Volumes wird verwendet.';
+
+  @override
+  String get vcToolsHiddenSizeLabel => 'Größe des versteckten Volumes (MiB)';
+
+  @override
+  String get vcToolsHiddenPasswordLabel => 'Passwort für verstecktes Volume';
+
+  @override
+  String get vcToolsHiddenConfirmLabel =>
+      'Passwort für verstecktes Volume bestätigen';
+
+  @override
+  String get vcToolsHiddenFsLabel => 'Dateisystem des versteckten Volumes';
+
+  @override
+  String get vcToolsQuickFormat => 'Schnellformatierung';
+
+  @override
+  String get vcToolsCreateHiddenAction => 'Verstecktes Volume erstellen';
+
+  @override
+  String get vcToolsHiddenDone => 'Verstecktes Volume erstellt';
+
+  @override
+  String get vcToolsHiddenNote =>
+      'Das versteckte Volume belegt den freien Speicher am Ende des äußeren Volumes. Binden Sie das äußere Volume danach stets mit Schutz für versteckte Volumes ein, wenn Sie darauf schreiben, sonst kann das versteckte Volume überschrieben werden.';
+
+  @override
+  String get vcToolsPasswordsDiffer => 'Die Passwörter stimmen nicht überein.';
+
+  @override
+  String get vcToolsInvalidSize => 'Geben Sie eine gültige Größe ein.';
+
+  @override
+  String get vcToolsCredentialsRequired =>
+      'Geben Sie das Volume-Passwort ein oder fügen Sie eine Schlüsseldatei hinzu.';
+
+  @override
   String get readOnlyModeLabel => 'Schreibgeschützter Modus';
 
   @override

@@ -2361,6 +2361,93 @@ class AppLocalizationsKo extends AppLocalizations {
   String get keepCurrentOption => '현재 설정 유지';
 
   @override
+  String get toolExpandVolumeTitle => 'VeraCrypt 볼륨 확장';
+
+  @override
+  String get toolExpandVolumeSubtitle => '데스크톱 볼륨 확장기처럼 표준 볼륨의 크기를 늘립니다';
+
+  @override
+  String get toolHiddenInExistingTitle => '숨김 볼륨 추가';
+
+  @override
+  String get toolHiddenInExistingSubtitle => '기존 표준 볼륨 내에 숨김 볼륨 생성';
+
+  @override
+  String get vcToolsPickContainer => '컨테이너 선택';
+
+  @override
+  String get vcToolsNoContainer => '선택된 컨테이너 없음';
+
+  @override
+  String get vcToolsPasswordLabel => '볼륨 비밀번호';
+
+  @override
+  String get vcToolsPimLabel => 'PIM(선택 사항)';
+
+  @override
+  String get vcToolsNewSizeLabel => '새 컨테이너 크기(MiB)';
+
+  @override
+  String get vcToolsInitFreeSpace => '새 공간 초기화';
+
+  @override
+  String get vcToolsInitFreeSpaceHint =>
+      '추가된 공간을 볼륨 키로 암호화된 데이터로 채워 나머지 영역과 구별할 수 없게 만듭니다. 빠른 확장을 원하면 끄십시오.';
+
+  @override
+  String get vcToolsExpandAction => '볼륨 확장';
+
+  @override
+  String get vcToolsExpandNote =>
+      '컨테이너 크기만 확장됩니다. 내부 파일 시스템 크기는 변경되지 않으므로, 파일 시스템을 확장하기 전까지 추가된 공간은 할당되지 않은 상태로 유지됩니다. 먼저 볼륨을 백업하십시오.';
+
+  @override
+  String get vcToolsExpandDone => '볼륨이 확장되었습니다';
+
+  @override
+  String get vcToolsAnalyzeAction => '여유 공간 확인';
+
+  @override
+  String get vcToolsMaxHidden => '생성 가능한 최대 숨김 볼륨 크기';
+
+  @override
+  String get vcToolsNoRoom => '숨김 볼륨을 위한 공간이 없습니다. 외부 볼륨의 끝부분이 사용 중입니다.';
+
+  @override
+  String get vcToolsHiddenSizeLabel => '숨김 볼륨 크기(MiB)';
+
+  @override
+  String get vcToolsHiddenPasswordLabel => '숨김 볼륨 비밀번호';
+
+  @override
+  String get vcToolsHiddenConfirmLabel => '숨김 볼륨 비밀번호 확인';
+
+  @override
+  String get vcToolsHiddenFsLabel => '숨김 볼륨 파일 시스템';
+
+  @override
+  String get vcToolsQuickFormat => '빠른 포맷';
+
+  @override
+  String get vcToolsCreateHiddenAction => '숨김 볼륨 생성';
+
+  @override
+  String get vcToolsHiddenDone => '숨김 볼륨이 생성되었습니다';
+
+  @override
+  String get vcToolsHiddenNote =>
+      '숨김 볼륨은 외부 볼륨 끝부분의 여유 공간을 차지합니다. 이후 외부 볼륨에 쓸 때는 숨김 볼륨 보호 기능을 켜고 마운트하십시오. 그렇지 않으면 숨김 볼륨이 덮어씌워질 수 있습니다.';
+
+  @override
+  String get vcToolsPasswordsDiffer => '비밀번호가 일치하지 않습니다.';
+
+  @override
+  String get vcToolsInvalidSize => '유효한 크기를 입력하십시오.';
+
+  @override
+  String get vcToolsCredentialsRequired => '볼륨 비밀번호를 입력하거나 키파일을 추가하십시오.';
+
+  @override
   String get readOnlyModeLabel => '읽기 전용 모드';
 
   @override

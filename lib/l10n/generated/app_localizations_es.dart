@@ -2494,6 +2494,98 @@ class AppLocalizationsEs extends AppLocalizations {
   String get keepCurrentOption => 'Mantener actual';
 
   @override
+  String get toolExpandVolumeTitle => 'Expandir volumen de VeraCrypt';
+
+  @override
+  String get toolExpandVolumeSubtitle =>
+      'Aumentar el tamaño de un volumen estándar, como el expansor de volúmenes de escritorio';
+
+  @override
+  String get toolHiddenInExistingTitle => 'Añadir volumen oculto';
+
+  @override
+  String get toolHiddenInExistingSubtitle =>
+      'Crear un volumen oculto dentro de un volumen estándar existente';
+
+  @override
+  String get vcToolsPickContainer => 'Elegir contenedor';
+
+  @override
+  String get vcToolsNoContainer => 'Ningún contenedor seleccionado';
+
+  @override
+  String get vcToolsPasswordLabel => 'Contraseña del volumen';
+
+  @override
+  String get vcToolsPimLabel => 'PIM (opcional)';
+
+  @override
+  String get vcToolsNewSizeLabel => 'Nuevo tamaño del contenedor (MiB)';
+
+  @override
+  String get vcToolsInitFreeSpace => 'Inicializar nuevo espacio';
+
+  @override
+  String get vcToolsInitFreeSpaceHint =>
+      'Rellena el espacio añadido con datos cifrados con la clave del volumen para que no se pueda distinguir del resto. Desactívalo para una expansión rápida.';
+
+  @override
+  String get vcToolsExpandAction => 'Expandir volumen';
+
+  @override
+  String get vcToolsExpandNote =>
+      'Solo se agranda el contenedor. No se cambia el tamaño del sistema de archivos interno, por lo que el espacio añadido queda sin asignar hasta que se expanda el sistema de archivos. Haz una copia de seguridad del volumen primero.';
+
+  @override
+  String get vcToolsExpandDone => 'Volumen expandido';
+
+  @override
+  String get vcToolsAnalyzeAction => 'Comprobar espacio libre';
+
+  @override
+  String get vcToolsMaxHidden => 'Tamaño máximo de volumen oculto posible';
+
+  @override
+  String get vcToolsNoRoom =>
+      'No hay espacio para un volumen oculto: el final del volumen externo está en uso.';
+
+  @override
+  String get vcToolsHiddenSizeLabel => 'Tamaño del volumen oculto (MiB)';
+
+  @override
+  String get vcToolsHiddenPasswordLabel => 'Contraseña del volumen oculto';
+
+  @override
+  String get vcToolsHiddenConfirmLabel =>
+      'Confirmar contraseña del volumen oculto';
+
+  @override
+  String get vcToolsHiddenFsLabel => 'Sistema de archivos del volumen oculto';
+
+  @override
+  String get vcToolsQuickFormat => 'Formato rápido';
+
+  @override
+  String get vcToolsCreateHiddenAction => 'Crear volumen oculto';
+
+  @override
+  String get vcToolsHiddenDone => 'Volumen oculto creado';
+
+  @override
+  String get vcToolsHiddenNote =>
+      'El volumen oculto ocupa el espacio libre al final del volumen externo. Después, monta el volumen externo con protección de volumen oculto cada vez que escribas en él, o el volumen oculto podría ser sobrescrito.';
+
+  @override
+  String get vcToolsPasswordsDiffer => 'Las contraseñas no coinciden.';
+
+  @override
+  String get vcToolsInvalidSize => 'Introduce un tamaño válido.';
+
+  @override
+  String get vcToolsCredentialsRequired =>
+      'Introduce la contraseña del volumen o añade un archivo de claves.';
+
+  @override
   String get readOnlyModeLabel => 'Modo de solo lectura';
 
   @override

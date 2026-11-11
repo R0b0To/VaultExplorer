@@ -2520,6 +2520,97 @@ class AppLocalizationsUk extends AppLocalizations {
   String get keepCurrentOption => 'Зберегти поточний';
 
   @override
+  String get toolExpandVolumeTitle => 'Розширити том VeraCrypt';
+
+  @override
+  String get toolExpandVolumeSubtitle =>
+      'Збільшити стандартний том, як у десктопній утиліті розширення томів';
+
+  @override
+  String get toolHiddenInExistingTitle => 'Додати прихований том';
+
+  @override
+  String get toolHiddenInExistingSubtitle =>
+      'Створити прихований том усередині наявного стандартного тому';
+
+  @override
+  String get vcToolsPickContainer => 'Вибрати контейнер';
+
+  @override
+  String get vcToolsNoContainer => 'Контейнер не вибрано';
+
+  @override
+  String get vcToolsPasswordLabel => 'Пароль тому';
+
+  @override
+  String get vcToolsPimLabel => 'PIM (необов’язково)';
+
+  @override
+  String get vcToolsNewSizeLabel => 'Новий розмір контейнера (МіБ)';
+
+  @override
+  String get vcToolsInitFreeSpace => 'Ініціалізувати новий простір';
+
+  @override
+  String get vcToolsInitFreeSpaceHint =>
+      'Заповнює доданий простір даними, зашифрованими ключем тому, щоб його не можна було відрізнити від решти. Вимкніть для швидкого розширення.';
+
+  @override
+  String get vcToolsExpandAction => 'Розширити том';
+
+  @override
+  String get vcToolsExpandNote =>
+      'Збільшується лише контейнер. Розмір файлової системи всередині не змінюється, тому доданий простір залишається нерозподіленим, доки файлову систему не буде розширено. Спочатку створіть резервну копію тому.';
+
+  @override
+  String get vcToolsExpandDone => 'Том розширено';
+
+  @override
+  String get vcToolsAnalyzeAction => 'Перевірити вільне місце';
+
+  @override
+  String get vcToolsMaxHidden => 'Максимально можливий прихований том';
+
+  @override
+  String get vcToolsNoRoom =>
+      'Немає місця для прихованого тому: кінець зовнішнього тому використовується.';
+
+  @override
+  String get vcToolsHiddenSizeLabel => 'Розмір прихованого тому (МіБ)';
+
+  @override
+  String get vcToolsHiddenPasswordLabel => 'Пароль прихованого тому';
+
+  @override
+  String get vcToolsHiddenConfirmLabel => 'Підтвердьте пароль прихованого тому';
+
+  @override
+  String get vcToolsHiddenFsLabel => 'Файлова система прихованого тому';
+
+  @override
+  String get vcToolsQuickFormat => 'Швидке форматування';
+
+  @override
+  String get vcToolsCreateHiddenAction => 'Створити прихований том';
+
+  @override
+  String get vcToolsHiddenDone => 'Прихований том створено';
+
+  @override
+  String get vcToolsHiddenNote =>
+      'Прихований том займає вільне місце в кінці зовнішнього тому. Надалі монтуйте зовнішній том із захистом прихованого тому щоразу, коли записуєте на нього, інакше прихований том може бути перезаписано.';
+
+  @override
+  String get vcToolsPasswordsDiffer => 'Паролі не збігаються.';
+
+  @override
+  String get vcToolsInvalidSize => 'Введіть коректний розмір.';
+
+  @override
+  String get vcToolsCredentialsRequired =>
+      'Введіть пароль тому або додайте файл ключа.';
+
+  @override
   String get readOnlyModeLabel => 'Режим лише для читання';
 
   @override

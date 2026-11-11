@@ -2528,6 +2528,98 @@ class AppLocalizationsAr extends AppLocalizations {
   String get keepCurrentOption => 'الاحتفاظ بالحالي';
 
   @override
+  String get toolExpandVolumeTitle => 'توسيع وحدة تخزين VeraCrypt';
+
+  @override
+  String get toolExpandVolumeSubtitle =>
+      'تكبير حجم وحدة تخزين قياسية، مثل أداة توسيع وحدات التخزين على سطح المكتب';
+
+  @override
+  String get toolHiddenInExistingTitle => 'إضافة وحدة تخزين مخفية';
+
+  @override
+  String get toolHiddenInExistingSubtitle =>
+      'إنشاء وحدة تخزين مخفية داخل وحدة تخزين قياسية موجودة';
+
+  @override
+  String get vcToolsPickContainer => 'اختيار الحاوية';
+
+  @override
+  String get vcToolsNoContainer => 'لم يتم تحديد أي حاوية';
+
+  @override
+  String get vcToolsPasswordLabel => 'كلمة مرور وحدة التخزين';
+
+  @override
+  String get vcToolsPimLabel => 'PIM (اختياري)';
+
+  @override
+  String get vcToolsNewSizeLabel => 'حجم الحاوية الجديد (ميغابايت)';
+
+  @override
+  String get vcToolsInitFreeSpace => 'تهيئة المساحة الجديدة';
+
+  @override
+  String get vcToolsInitFreeSpaceHint =>
+      'ملء المساحة المضافة ببيانات مشفرة بمفتاح وحدة التخزين حتى لا يمكن تمييزها عن البقية. أوقف التفعيل للتوسيع السريع.';
+
+  @override
+  String get vcToolsExpandAction => 'توسيع وحدة التخزين';
+
+  @override
+  String get vcToolsExpandNote =>
+      'يتم تكبير الحاوية فقط. لا يتم تغيير حجم نظام الملفات بداخلها، لذلك تظل المساحة المضافة غير مخصصة حتى يتم توسيع نظام الملفات. قم بعمل نسخة احتياطية أولاً.';
+
+  @override
+  String get vcToolsExpandDone => 'تم توسيع وحدة التخزين';
+
+  @override
+  String get vcToolsAnalyzeAction => 'التحقق من المساحة الفارغة';
+
+  @override
+  String get vcToolsMaxHidden => 'أكبر وحدة تخزين مخفية ممكنة';
+
+  @override
+  String get vcToolsNoRoom =>
+      'لا توجد مساحة لوحدة تخزين مخفية: نهاية وحدة التخزين الخارجية قيد الاستخدام.';
+
+  @override
+  String get vcToolsHiddenSizeLabel => 'حجم وحدة التخزين المخفية (ميغابايت)';
+
+  @override
+  String get vcToolsHiddenPasswordLabel => 'كلمة مرور وحدة التخزين المخفية';
+
+  @override
+  String get vcToolsHiddenConfirmLabel =>
+      'تأكيد كلمة مرور وحدة التخزين المخفية';
+
+  @override
+  String get vcToolsHiddenFsLabel => 'نظام ملفات وحدة التخزين المخفية';
+
+  @override
+  String get vcToolsQuickFormat => 'تهيئة سريعة';
+
+  @override
+  String get vcToolsCreateHiddenAction => 'إنشاء وحدة تخزين مخفية';
+
+  @override
+  String get vcToolsHiddenDone => 'تم إنشاء وحدة التخزين المخفية';
+
+  @override
+  String get vcToolsHiddenNote =>
+      'تأخذ وحدة التخزين المخفية المساحة الحرة في نهاية وحدة التخزين الخارجية. بعد ذلك، قم بتركيب وحدة التخزين الخارجية مع تمكين حماية وحدة التخزين المخفية عند الكتابة إليها، وإلا فقد يتم الكتابة فوقها.';
+
+  @override
+  String get vcToolsPasswordsDiffer => 'كلمتا المرور غير متطابقتين.';
+
+  @override
+  String get vcToolsInvalidSize => 'أدخل حجمًا صالحًا.';
+
+  @override
+  String get vcToolsCredentialsRequired =>
+      'أدخل كلمة مرور وحدة التخزين أو أضف ملف مفتاح.';
+
+  @override
   String get readOnlyModeLabel => 'وضع القراءة فقط';
 
   @override

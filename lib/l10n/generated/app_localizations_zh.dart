@@ -2322,6 +2322,93 @@ class AppLocalizationsZh extends AppLocalizations {
   String get keepCurrentOption => '保持当前';
 
   @override
+  String get toolExpandVolumeTitle => '扩展 VeraCrypt 卷';
+
+  @override
+  String get toolExpandVolumeSubtitle => '增大标准卷的容量，类似于桌面版卷扩展器';
+
+  @override
+  String get toolHiddenInExistingTitle => '添加隐藏卷';
+
+  @override
+  String get toolHiddenInExistingSubtitle => '在现有标准卷内创建隐藏卷';
+
+  @override
+  String get vcToolsPickContainer => '选择容器';
+
+  @override
+  String get vcToolsNoContainer => '未选择容器';
+
+  @override
+  String get vcToolsPasswordLabel => '卷密码';
+
+  @override
+  String get vcToolsPimLabel => 'PIM（可选）';
+
+  @override
+  String get vcToolsNewSizeLabel => '新容器大小 (MiB)';
+
+  @override
+  String get vcToolsInitFreeSpace => '初始化新空间';
+
+  @override
+  String get vcToolsInitFreeSpaceHint =>
+      '使用卷密钥加密的数据填充新增空间，使其与其余部分无法区分。如需快速扩展请关闭。';
+
+  @override
+  String get vcToolsExpandAction => '扩展卷';
+
+  @override
+  String get vcToolsExpandNote =>
+      '仅扩大容器大小。内部文件系统不会被调整，因此新增空间在扩展文件系统之前将保持未分配状态。请先备份卷。';
+
+  @override
+  String get vcToolsExpandDone => '卷已扩展';
+
+  @override
+  String get vcToolsAnalyzeAction => '检查可用空间';
+
+  @override
+  String get vcToolsMaxHidden => '最大可能隐藏卷';
+
+  @override
+  String get vcToolsNoRoom => '没有空间容纳隐藏卷：外层卷末尾已被使用。';
+
+  @override
+  String get vcToolsHiddenSizeLabel => '隐藏卷大小 (MiB)';
+
+  @override
+  String get vcToolsHiddenPasswordLabel => '隐藏卷密码';
+
+  @override
+  String get vcToolsHiddenConfirmLabel => '确认隐藏卷密码';
+
+  @override
+  String get vcToolsHiddenFsLabel => '隐藏卷文件系统';
+
+  @override
+  String get vcToolsQuickFormat => '快速格式化';
+
+  @override
+  String get vcToolsCreateHiddenAction => '创建隐藏卷';
+
+  @override
+  String get vcToolsHiddenDone => '隐藏卷已创建';
+
+  @override
+  String get vcToolsHiddenNote =>
+      '隐藏卷占用外层卷末尾的可用空间。之后，每当向外层卷写入数据时，请务必启用隐藏卷保护进行挂载，否则隐藏卷可能会被覆盖。';
+
+  @override
+  String get vcToolsPasswordsDiffer => '密码不匹配。';
+
+  @override
+  String get vcToolsInvalidSize => '请输入有效的大小。';
+
+  @override
+  String get vcToolsCredentialsRequired => '请输入卷密码或添加密钥文件。';
+
+  @override
   String get readOnlyModeLabel => '只读模式';
 
   @override

@@ -3236,6 +3236,118 @@
   "@keepCurrentOption": {
     "description": "Picker choice that leaves a setting unchanged (e.g. keep the header PRF when changing a password)"
   },
+  "toolExpandVolumeTitle": "Expand VeraCrypt volume",
+  "@toolExpandVolumeTitle": {
+    "description": "Tools row: enlarge a standard VeraCrypt volume"
+  },
+  "toolExpandVolumeSubtitle": "Make a standard volume larger, like the desktop Volume Expander",
+  "@toolExpandVolumeSubtitle": {
+    "description": "Tools row subtitle for volume expansion"
+  },
+  "toolHiddenInExistingTitle": "Add hidden volume",
+  "@toolHiddenInExistingTitle": {
+    "description": "Tools row: create a hidden volume inside an existing volume"
+  },
+  "toolHiddenInExistingSubtitle": "Create a hidden volume inside an existing standard volume",
+  "@toolHiddenInExistingSubtitle": {
+    "description": "Tools row subtitle for direct-mode hidden volume creation"
+  },
+  "vcToolsPickContainer": "Choose container",
+  "@vcToolsPickContainer": {
+    "description": "Button: pick the container file"
+  },
+  "vcToolsNoContainer": "No container selected",
+  "@vcToolsNoContainer": {
+    "description": "Shown before a container is picked"
+  },
+  "vcToolsPasswordLabel": "Volume password",
+  "@vcToolsPasswordLabel": {
+    "description": "Password field of the existing volume"
+  },
+  "vcToolsPimLabel": "PIM (optional)",
+  "@vcToolsPimLabel": {
+    "description": "PIM field"
+  },
+  "vcToolsNewSizeLabel": "New container size (MiB)",
+  "@vcToolsNewSizeLabel": {
+    "description": "Target size of the container after expansion, in MiB"
+  },
+  "vcToolsInitFreeSpace": "Initialize new space",
+  "@vcToolsInitFreeSpace": {
+    "description": "Switch: fill the added space with encrypted data"
+  },
+  "vcToolsInitFreeSpaceHint": "Fills the added space with data encrypted under the volume key so it cannot be told apart from the rest. Turn off for a quick expand.",
+  "@vcToolsInitFreeSpaceHint": {
+    "description": "Explains the initialize new space switch"
+  },
+  "vcToolsExpandAction": "Expand volume",
+  "@vcToolsExpandAction": {
+    "description": "Button: run the expansion"
+  },
+  "vcToolsExpandNote": "Only the container is enlarged. The file system inside is not resized, so the added space stays unallocated until the file system is grown. Back up the volume first.",
+  "@vcToolsExpandNote": {
+    "description": "Note about volume expansion"
+  },
+  "vcToolsExpandDone": "Volume expanded",
+  "@vcToolsExpandDone": {
+    "description": "Success message after expansion"
+  },
+  "vcToolsAnalyzeAction": "Check free space",
+  "@vcToolsAnalyzeAction": {
+    "description": "Button: analyze the outer volume for hidden volume space"
+  },
+  "vcToolsMaxHidden": "Largest possible hidden volume",
+  "@vcToolsMaxHidden": {
+    "description": "Label before the maximum hidden volume size"
+  },
+  "vcToolsNoRoom": "There is no room for a hidden volume: the end of the outer volume is in use.",
+  "@vcToolsNoRoom": {
+    "description": "Shown when the outer volume has no free space at its end"
+  },
+  "vcToolsHiddenSizeLabel": "Hidden volume size (MiB)",
+  "@vcToolsHiddenSizeLabel": {
+    "description": "Size of the hidden volume in MiB"
+  },
+  "vcToolsHiddenPasswordLabel": "Hidden volume password",
+  "@vcToolsHiddenPasswordLabel": {
+    "description": "Password for the new hidden volume"
+  },
+  "vcToolsHiddenConfirmLabel": "Confirm hidden volume password",
+  "@vcToolsHiddenConfirmLabel": {
+    "description": "Confirmation of the hidden volume password"
+  },
+  "vcToolsHiddenFsLabel": "Hidden volume file system",
+  "@vcToolsHiddenFsLabel": {
+    "description": "File system of the hidden volume"
+  },
+  "vcToolsQuickFormat": "Quick format",
+  "@vcToolsQuickFormat": {
+    "description": "Switch: skip wiping the hidden volume area"
+  },
+  "vcToolsCreateHiddenAction": "Create hidden volume",
+  "@vcToolsCreateHiddenAction": {
+    "description": "Button: create the hidden volume"
+  },
+  "vcToolsHiddenDone": "Hidden volume created",
+  "@vcToolsHiddenDone": {
+    "description": "Success message after creating the hidden volume"
+  },
+  "vcToolsHiddenNote": "The hidden volume takes the free space at the end of the outer volume. Afterwards, mount the outer volume with hidden volume protection whenever you write to it, or the hidden volume can be overwritten.",
+  "@vcToolsHiddenNote": {
+    "description": "Warning about hidden volumes"
+  },
+  "vcToolsPasswordsDiffer": "The passwords do not match.",
+  "@vcToolsPasswordsDiffer": {
+    "description": "Hidden volume password confirmation mismatch"
+  },
+  "vcToolsInvalidSize": "Enter a valid size.",
+  "@vcToolsInvalidSize": {
+    "description": "Invalid size input"
+  },
+  "vcToolsCredentialsRequired": "Enter the volume password or add a keyfile.",
+  "@vcToolsCredentialsRequired": {
+    "description": "No credentials given"
+  },
   "readOnlyModeLabel": "Read-only mode",
   "@readOnlyModeLabel": {
     "description": "Checkbox label for mounting in read-only mode"

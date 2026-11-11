@@ -13485,11 +13485,11 @@ class AppLocalizationsKo extends AppLocalizations {
   String get vaultListingDetails => '세부정보';
 
   @override
-  String get vaultListingSymbolicLinksTitle => '기호 링크';
+  String get vaultListingSymbolicLinksTitle => '바로가기';
 
   @override
   String get vaultListingSymbolicLinksNote =>
-      '기호 링크는 다른 위치를 가리킵니다. 여기서는 열거나 따라가지 않습니다. 탭하면 대상 경로를 복사할 수 있습니다.';
+      '바로가기를 탭하면 대상이 열립니다. 상대 경로는 이 볼트 내부로 제한되며, 절대 경로나 끊어진 링크는 열 수 없습니다.';
 
   @override
   String get vaultListingHiddenEntriesTitle => '표시되지 않는 항목';
@@ -13701,7 +13701,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get symbolicLinkTargetHelper =>
-      '입력한 그대로 저장됩니다. 여기서는 대상을 따라가거나 열지 않으며, 주로 컴퓨터의 Cryptomator에서 유용합니다.';
+      '입력한 그대로 저장됩니다. 열 때 상대 경로는 이 볼트 내부에서 확인하며, 절대 경로는 따라가지 않습니다.';
 
   @override
   String get symbolicLinkTargetTooLong => '대상이 너무 깁니다(최대 32,767바이트)';
@@ -13722,4 +13722,22 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get symbolicLinkRenameTitle => '기호 링크 이름 바꾸기';
+
+  @override
+  String get symbolicLinkBrowseTarget => '볼트 찾아보기';
+
+  @override
+  String get symbolicLinkSelectTargetTitle => '바로가기 대상 선택';
+
+  @override
+  String get symbolicLinkSelectThisFolder => '이 폴더 선택';
+
+  @override
+  String get symbolicLinkPickerLoadError => '이 폴더를 불러올 수 없습니다';
+
+  @override
+  String get shortcutBadge => '바로가기';
+
+  @override
+  String get emptyFolder => '이 폴더는 비어 있습니다';
 }

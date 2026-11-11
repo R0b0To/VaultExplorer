@@ -10,8 +10,10 @@ import 'package:flutter/foundation.dart';
 ///
 ///   "F|sizeBytes|unixSecs|name"   (file)
 ///   "D|0|unixSecs|name"           (directory)
+///   "L|targetBytes|unixSecs|name" (symbolic link to a file / broken link)
+///   "LD|0|unixSecs|name"          (symbolic link to a directory)
 ///
-/// The type is a real field (`F`/`D`), never inferred from the name — and
+/// The type is a real field (`F`, `D`, `L` or `LD`), never inferred from the name — and
 /// the name is *everything after the third `|`*, not "up to the next `|`",
 /// so a name that itself contains `|` (legal on ext2/3/4) round-trips
 /// exactly instead of corrupting the fields after it. Previously this used
@@ -31,6 +33,10 @@ class RawEntry {
   final String name;
   final bool isDir;
 
+  /// True when this entry is a Cryptomator symbolic link. The entry keeps
+  /// its link path for rename/delete, while content access follows its target.
+  final bool isSymlink;
+
   /// Byte size of the file.  Always 0 for directories; call [getFolderSize]
   /// for the real recursive total.
   final int sizeBytes;
@@ -47,6 +53,7 @@ class RawEntry {
   const RawEntry({
     required this.name,
     required this.isDir,
+    this.isSymlink = false,
     required this.sizeBytes,
     required this.modifiedSecs,
     this.isPlaceholder = false,
@@ -88,7 +95,8 @@ class RawEntry {
 
     return RawEntry(
       name: name,
-      isDir: typeTag == 'D',
+      isDir: typeTag == 'D' || typeTag == 'LD',
+      isSymlink: typeTag == 'L' || typeTag == 'LD',
       sizeBytes: int.tryParse(sizeStr) ?? 0,
       modifiedSecs: int.tryParse(mtimeStr) ?? 0,
       lowercaseName: lower,
@@ -116,7 +124,8 @@ class RawEntry {
   /// that still expects the wire format. Most in-app state (like
   /// [FileBrowserSelectionState.items]) holds [RawEntry] values directly and
   /// has no need to round-trip through this.
-  String get raw => '${isDir ? 'D' : 'F'}|$sizeBytes|$modifiedSecs|$name';
+  String get raw =>
+      '${isSymlink ? (isDir ? 'LD' : 'L') : isDir ? 'D' : 'F'}|$sizeBytes|$modifiedSecs|$name';
 
   /// This entry under a different [newName] (deep-search results, whose name
   /// is the path relative to the folder searched from).
@@ -130,6 +139,7 @@ class RawEntry {
   RawEntry withName(String newName) => RawEntry(
     name: newName,
     isDir: isDir,
+    isSymlink: isSymlink,
     sizeBytes: sizeBytes,
     modifiedSecs: modifiedSecs,
     isPlaceholder: isPlaceholder,
@@ -157,12 +167,13 @@ class RawEntry {
       other is RawEntry &&
           other.name == name &&
           other.isDir == isDir &&
+          other.isSymlink == isSymlink &&
           other.sizeBytes == sizeBytes &&
           other.modifiedSecs == modifiedSecs &&
           other.isPlaceholder == isPlaceholder;
 
   @override
-  int get hashCode => Object.hash(name, isDir, sizeBytes, modifiedSecs, isPlaceholder);
+  int get hashCode => Object.hash(name, isDir, isSymlink, sizeBytes, modifiedSecs, isPlaceholder);
 
   @override
   String toString() =>

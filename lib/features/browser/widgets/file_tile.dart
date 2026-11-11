@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/api/vault_book_api.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
@@ -25,6 +26,7 @@ import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dar
 import 'package:vaultexplorer/features/browser/widgets/apk_icon_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/archive_thumbnail_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/book_cover_support.dart';
+import 'package:vaultexplorer/features/browser/widgets/shortcut_target_preview.dart';
 import 'package:vaultexplorer/features/browser/widgets/thumbnail_raw_fallback.dart';
 import 'package:vaultexplorer/features/browser/widgets/tile_selection_style.dart';
 
@@ -108,7 +110,7 @@ class FileTile extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     String displayName = entry.name;
     final ext = displayName.split('.').last;
-    final vaultIcon = vaultIconForExt(ext);
+    final vaultIcon = entry.isSymlink ? null : vaultIconForExt(ext);
     if (vaultIcon != null) {
       final parts = displayName.split('.');
       if (parts.length > 1) {
@@ -157,11 +159,34 @@ class FileTile extends StatelessWidget {
     final isVid = MediaViewerConstants.isVideo(entry.name);
     final isApk = isApkFile(entry.name);
     final isBook = isBookWithCover(entry.name);
-    if (showThumbnail &&
-        container != null &&
-        vaultIcon == null &&
-        !entry.isPlaceholder) {
-      if (isImg) {
+    if (container != null && vaultIcon == null && !entry.isPlaceholder) {
+      if (entry.isSymlink &&
+          !entry.isDir &&
+          container!.format.isCryptomator &&
+          archiveContext == null) {
+        // A shortcut's displayed name is arbitrary and may have no extension
+        // (or a misleading one). Resolve its in-vault target before deciding
+        // which thumbnail pipeline to use. The thumbnail is fetched from the
+        // final target path, while the row and its badge remain the shortcut.
+        customLeading = Hero(
+          tag: 'media_hero_${container!.volId}_$fullPath',
+          createRectTween: (begin, end) =>
+              MaterialRectArcTween(begin: begin, end: end),
+          child: Material(
+            type: MaterialType.transparency,
+            child: _ShortcutMediaThumb(
+              container: container!,
+              linkPath: fullPath,
+              cacheMode: thumbnailCacheMode,
+              quality: thumbnailQuality,
+              fallbackIcon: displayIcon,
+              fallbackColor: iconColor,
+              zoomLevel: zoomLevel,
+              showMediaThumbnail: showThumbnail,
+            ),
+          ),
+        );
+      } else if (showThumbnail && isImg) {
         customLeading = Hero(
           tag: 'media_hero_${container!.volId}_$fullPath',
           createRectTween: (begin, end) =>
@@ -181,7 +206,7 @@ class FileTile extends StatelessWidget {
             ),
           ),
         );
-      } else if (isVid) {
+      } else if (showThumbnail && isVid) {
         customLeading = Hero(
           tag: 'media_hero_${container!.volId}_$fullPath',
           createRectTween: (begin, end) =>
@@ -201,7 +226,7 @@ class FileTile extends StatelessWidget {
             ),
           ),
         );
-      } else if (isApk && archiveContext == null) {
+      } else if (showThumbnail && isApk && archiveContext == null) {
         // Same restriction as video above, and for the same underlying
         // reason: an APK nested inside an already-open archive has no
         // real container/local path for fetchApkIconForThumbnail to open
@@ -219,7 +244,7 @@ class FileTile extends StatelessWidget {
             zoomLevel: zoomLevel,
           ),
         );
-      } else if (isBook && archiveContext == null) {
+      } else if (showThumbnail && isBook && archiveContext == null) {
         // Same restriction as the APK above. Unlike an app icon a cover is
         // shown filled into the row's squircle, like a photo or video frame,
         // so customLeadingIsIcon stays false.
@@ -239,22 +264,31 @@ class FileTile extends StatelessWidget {
     }
 
     Widget? badge;
-    if ((isPinned || isBookmark) && !isSelected) {
+    if (!isSelected && (entry.isSymlink || isPinned || isBookmark)) {
       badge = Container(
         padding: const EdgeInsets.all(2),
         decoration: BoxDecoration(
-          color: cs.surfaceContainerHigh.withValues(alpha: 0.85),
+          color: cs.surfaceContainerHigh.withValues(alpha: 0.92),
           shape: BoxShape.circle,
         ),
         child: Row(
           mainAxisSize: dynamicSize(mainAxis: true),
           children: [
+            if (entry.isSymlink)
+              Icon(
+                Icons.shortcut_rounded,
+                size: 11 * zoomLevel,
+                color: cs.primary,
+              ),
+            if (entry.isSymlink && (isPinned || isBookmark))
+              const SizedBox(width: 1),
             if (isPinned)
               Icon(
                 Icons.push_pin_rounded,
                 size: 10 * zoomLevel,
                 color: cs.onPrimaryContainer,
               ),
+            if (isBookmark && isPinned) const SizedBox(width: 1),
             if (isBookmark)
               Icon(
                 Icons.star_rounded,
@@ -294,6 +328,119 @@ class FileTile extends StatelessWidget {
 
   MainAxisSize dynamicSize({required bool mainAxis}) =>
       mainAxis ? MainAxisSize.min : MainAxisSize.max;
+}
+
+/// Resolves a Cryptomator shortcut before choosing the image/video thumbnail
+/// pipeline. The final target path is used for thumbnail generation and cache
+/// lookup, so extensionless or misleadingly named shortcuts still show the
+/// target's real preview. Resolution is confined to this vault and bounded to
+/// the same 40-hop limit used by file opening.
+class _ShortcutMediaThumb extends ConsumerStatefulWidget {
+  final MountedContainer container;
+  final String linkPath;
+  final ThumbnailCacheMode cacheMode;
+  final ThumbnailQuality quality;
+  final IconData fallbackIcon;
+  final Color fallbackColor;
+  final double zoomLevel;
+  final bool showMediaThumbnail;
+
+  const _ShortcutMediaThumb({
+    required this.container,
+    required this.linkPath,
+    required this.cacheMode,
+    required this.quality,
+    required this.fallbackIcon,
+    required this.fallbackColor,
+    this.zoomLevel = 1.0,
+    this.showMediaThumbnail = true,
+  });
+
+  @override
+  ConsumerState<_ShortcutMediaThumb> createState() =>
+      _ShortcutMediaThumbState();
+}
+
+class _ShortcutMediaThumbState extends ConsumerState<_ShortcutMediaThumb> {
+  late Future<String?> _targetPath;
+
+  @override
+  void initState() {
+    super.initState();
+    _targetPath = _resolveTargetPath();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ShortcutMediaThumb oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.linkPath != widget.linkPath ||
+        oldWidget.container.volId != widget.container.volId) {
+      _targetPath = _resolveTargetPath();
+    }
+  }
+
+  Future<String?> _resolveTargetPath() => resolveShortcutTargetPath(
+    fileIoApi: ref.read(vaultFileIoApiProvider),
+    container: widget.container,
+    linkPath: widget.linkPath,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<String?>(
+      future: _targetPath,
+      builder: (context, snapshot) {
+        final targetPath = snapshot.data;
+        if (targetPath == null) return _fallbackWidget();
+        final targetName = p.posix.basename(targetPath);
+        final skin = FileManagerSkinScope.of(context);
+        final targetIcon = skin.fileIcon(targetName);
+        final targetColor = skin.fileIconColor(
+          Theme.of(context).colorScheme,
+          targetName,
+        );
+        if (widget.showMediaThumbnail &&
+            MediaViewerConstants.isImage(targetName)) {
+          return _ListImageThumb(
+            container: widget.container,
+            filePath: targetPath,
+            cacheMode: widget.cacheMode,
+            quality: widget.quality,
+            fallbackIcon: targetIcon,
+            fallbackColor: targetColor,
+            zoomLevel: widget.zoomLevel,
+          );
+        }
+        if (widget.showMediaThumbnail &&
+            MediaViewerConstants.isVideo(targetName)) {
+          return _ListVideoThumb(
+            container: widget.container,
+            filePath: targetPath,
+            cacheMode: widget.cacheMode,
+            quality: widget.quality,
+            fallbackIcon: targetIcon,
+            fallbackColor: targetColor,
+            zoomLevel: widget.zoomLevel,
+          );
+        }
+        return Center(
+          child: Icon(
+            targetIcon,
+            size: AppIconSize.action * widget.zoomLevel,
+            color: targetColor,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _fallbackWidget() => Center(
+    child: Icon(
+      widget.fallbackIcon,
+      size: AppIconSize.action * widget.zoomLevel,
+      color: widget.fallbackColor,
+    ),
+  );
 }
 
 class _ListImageThumb extends ConsumerWidget {

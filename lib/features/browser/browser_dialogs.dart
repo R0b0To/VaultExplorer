@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
+import 'package:path/path.dart' as p;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -19,6 +20,7 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/advanced_rename_screen.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_pins_bookmarks_controller.dart';
 import 'package:vaultexplorer/features/browser/symlink_target_validation.dart';
+import 'package:vaultexplorer/features/browser/widgets/vault_target_picker_dialog.dart';
 import 'package:vaultexplorer/features/browser/widgets/create_archive_bottom_sheet.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
@@ -55,8 +57,8 @@ abstract class BrowserDialogs {
     );
   }
 
-  /// Cryptomator vaults only (the caller gates it). Creates a symbolic link; its target is stored as written
-  /// and never followed or opened by this app.
+  /// Cryptomator vaults only (the caller gates it). Creates a symbolic link; its target text is stored as
+  /// written and resolved within the vault when the shortcut is accessed.
   static void showCreateSymlink(
     BuildContext context, {
     required MountedContainer container,
@@ -566,6 +568,22 @@ class _CreateSymlinkDialogState extends ConsumerState<_CreateSymlinkDialog>
       !_nameTakenByLink &&
       _targetIssue == null;
 
+  Future<void> _pickTarget() async {
+    final selectedPath = await showVaultTargetPicker(
+      context: context,
+      container: widget.container,
+    );
+    if (!mounted || selectedPath == null) return;
+
+    // Cryptomator stores a symlink target relative to the directory containing
+    // the link. Keep it relative so the native resolver can enforce the
+    // same-vault boundary without ever accepting a host/absolute path.
+    final from = widget.currentDirPath.isEmpty ? '.' : widget.currentDirPath;
+    final relativeTarget = p.posix.relative(selectedPath, from: from);
+    _targetCtrl.text = relativeTarget;
+    setState(() {});
+  }
+
   void _onNameChanged(String text) => revalidate(
     text: text,
     fsType: _fsType,
@@ -653,6 +671,11 @@ class _CreateSymlinkDialogState extends ConsumerState<_CreateSymlinkDialog>
                 helperMaxLines: 4,
                 errorText: _targetErrorText(context),
                 errorMaxLines: 2,
+                suffixIcon: IconButton(
+                  tooltip: context.l10n.symbolicLinkBrowseTarget,
+                  onPressed: _pickTarget,
+                  icon: const Icon(Icons.folder_open_outlined),
+                ),
               ),
               autocorrect: false,
               enableSuggestions: false,

@@ -115,8 +115,8 @@ bool clearException(JNIEnv* env) {
 
 std::string wireEntry(const fv::DirEntry& e) {
     // Same shape as DirEntryWire.encode(): kind|size|mtimeSeconds|name   (kind: F file, D folder, L symlink --
-    // an L entry only ever comes out of nativeListSymlinks, never out of nativeListDirectory)
-    return std::string(e.isSymlink ? "L|" : e.isDir ? "D|" : "F|") + std::to_string(e.isDir ? 0 : e.size) + "|" +
+    // an L/LD entry only ever comes out of nativeListSymlinks, never out of nativeListDirectory)
+    return std::string(e.isSymlink ? (e.isDir ? "LD|" : "L|") : e.isDir ? "D|" : "F|") + std::to_string(e.isDir ? 0 : e.size) + "|" +
            std::to_string(e.mtimeMs / 1000) + "|" + e.name;
 }
 
@@ -127,8 +127,9 @@ bool parseWire(const std::string& raw, fv::DirEntry& e) {
     if (b == std::string::npos) return false;
     size_t c = raw.find('|', b + 1);
     if (c == std::string::npos) return false;
-    e.isDir = raw.compare(0, a, "D") == 0;
-    e.isSymlink = raw.compare(0, a, "L") == 0;
+    const std::string kind = raw.substr(0, a);
+    e.isDir = kind == "D" || kind == "LD";
+    e.isSymlink = kind == "L" || kind == "LD";
     e.size = std::strtoll(raw.substr(a + 1, b - a - 1).c_str(), nullptr, 10);
     e.mtimeMs = std::strtoll(raw.substr(b + 1, c - b - 1).c_str(), nullptr, 10) * 1000;
     e.name = raw.substr(c + 1);

@@ -90,9 +90,11 @@ public:
     // ---- symlinks & hidden entries (Cryptomator; the other engines keep these defaults) ------------
     // Symbolic links are deliberately NOT part of listDirectory(): they are neither files nor folders, and
     // every existing consumer (export, sync, scanners, ...) would otherwise have to learn to skip them.
-    // A link is never followed: readFileChunk/extractFile/createDirectory/... on a link path fail, and
-    // deleteFile/renameFile act on the link node itself.
-    // Lists only the symbolic links of [path] (isSymlink = true, size = target length in bytes).
+    // Cryptomator resolves relative link targets within the same vault for reads, writes and directory
+    // traversal (with a 40-link hop limit, so cycles fail closed); absolute targets are refused. deleteFile/renameFile unlink or
+    // rename the link node itself, as POSIX does.
+    // Lists only the symbolic links of [path] (isSymlink = true; isDir reflects a directory target; size is
+    // target length in bytes for file/broken links and 0 for directory links).
     virtual bool listSymlinks(const std::string& /*path*/, std::vector<DirEntry>& out) { out.clear(); return true; }
     // The link target (UTF-8, at most 32767 bytes), or nullopt if [path] is not a readable symlink.
     virtual std::optional<std::string> readSymlink(const std::string& /*path*/) { return std::nullopt; }

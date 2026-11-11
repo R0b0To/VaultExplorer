@@ -66,12 +66,12 @@ void main() {
   bool createEnabled(WidgetTester tester) => tester.widget<TextButton>(createButton()).onPressed != null;
 
   group('New symbolic link dialog', () {
-    testWidgets('shows the title, both fields and the "never followed" helper text', (tester) async {
+    testWidgets('shows the title, both fields and the in-vault resolution helper text', (tester) async {
       await openDialog(tester);
       expect(find.text('New symbolic link'), findsOneWidget);
       expect(find.text('Link name'), findsOneWidget);
       expect(find.text('Points to'), findsOneWidget);
-      expect(find.textContaining('never followed or opened here'), findsOneWidget);
+      expect(find.textContaining('Relative targets are resolved inside this vault'), findsOneWidget);
       expect(createEnabled(tester), isFalse);
     });
 

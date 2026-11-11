@@ -14053,11 +14053,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get vaultListingDetails => 'Details';
 
   @override
-  String get vaultListingSymbolicLinksTitle => 'Symbolic links';
+  String get vaultListingSymbolicLinksTitle => 'Shortcuts';
 
   @override
   String get vaultListingSymbolicLinksNote =>
-      'A symbolic link points somewhere else. It is never opened or followed here; tap one to copy where it points.';
+      'Shortcuts open their targets when tapped. Relative targets stay inside this vault; absolute or broken targets cannot be opened.';
 
   @override
   String get vaultListingHiddenEntriesTitle => 'Entries that are not shown';
@@ -14272,7 +14272,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get symbolicLinkTargetHelper =>
-      'Stored exactly as written. It is never followed or opened here; the link is mainly useful with Cryptomator on a computer.';
+      'Stored exactly as written. Relative targets are resolved inside this vault when opened; absolute targets are not followed.';
 
   @override
   String get symbolicLinkTargetTooLong =>
@@ -14296,4 +14296,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get symbolicLinkRenameTitle => 'Rename symbolic link';
+
+  @override
+  String get symbolicLinkBrowseTarget => 'Browse vault';
+
+  @override
+  String get symbolicLinkSelectTargetTitle => 'Choose shortcut target';
+
+  @override
+  String get symbolicLinkSelectThisFolder => 'Select this folder';
+
+  @override
+  String get symbolicLinkPickerLoadError => 'Couldn\'t load this folder';
+
+  @override
+  String get shortcutBadge => 'Shortcut';
+
+  @override
+  String get emptyFolder => 'This folder is empty';
 }

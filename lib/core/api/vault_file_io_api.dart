@@ -741,6 +741,29 @@ class VaultFileIoApi {
     return result?.cast<String>();
   }
 
+  /// Directory entries for the interactive file browser. Unlike [listDirectory],
+  /// this merges Cryptomator symbolic links into the visible listing. It is
+  /// intentionally not used by scanners, sync or export code: those consumers
+  /// must continue to treat links as separate nodes and never recurse through them.
+  Future<List<String>?> listDirectoryForBrowser(
+    MountedContainer container,
+    String dirPath, {
+    bool refresh = false,
+  }) async {
+    final entries = await listDirectory(container, dirPath, refresh: refresh);
+    if (entries == null || !container.format.isCryptomator) return entries;
+    final links = await listVaultSymlinks(container, dirPath);
+    if (links.isEmpty) return entries;
+    final merged = List<String>.of(entries);
+    for (final link in links) {
+      final isDirectory = link.isDir;
+      merged.add(
+        '${isDirectory ? 'LD' : 'L'}|${isDirectory ? 0 : link.targetBytes}|${link.modifiedSecs}|${link.name}',
+      );
+    }
+    return merged;
+  }
+
   /// The symbolic links of one folder of a mounted Cryptomator vault. Deliberately separate from
   /// [listDirectory]: a link is neither a file nor a folder, so nothing that walks listings (sync, export,
   /// scanners) ever sees one. Empty for everything that is not a vault, and on any error.
@@ -765,9 +788,10 @@ class VaultFileIoApi {
     }
   }
 
-  /// Creates a symbolic link at [path] pointing to [target] in a mounted Cryptomator vault. The target is
-  /// stored exactly as given and is never resolved, followed or checked. False when the engine refuses (name
-  /// taken, read-only session, not a Cryptomator vault) and, without asking the platform at all, for SAF and
+  /// Creates a symbolic link at [path] pointing to [target] in a mounted Cryptomator vault. The target text
+  /// is stored exactly as given; when accessed, relative targets are resolved within the same vault. False
+  /// when the engine refuses (name taken, read-only session, not a Cryptomator vault) and, without asking the
+  /// platform at all, for SAF and
   /// local-storage containers. Like [createDirectory], channel failures are not swallowed.
   Future<bool> createVaultSymlink(
     MountedContainer container,

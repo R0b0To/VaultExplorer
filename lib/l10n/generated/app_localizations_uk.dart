@@ -14373,11 +14373,11 @@ class AppLocalizationsUk extends AppLocalizations {
   String get vaultListingDetails => 'Деталі';
 
   @override
-  String get vaultListingSymbolicLinksTitle => 'Символічні посилання';
+  String get vaultListingSymbolicLinksTitle => 'Ярлики';
 
   @override
   String get vaultListingSymbolicLinksNote =>
-      'Символічне посилання вказує на інше місце. Тут його не відкривають і не переходять за ним; натисніть, щоб скопіювати ціль.';
+      'Торкніться ярлика, щоб відкрити його ціль. Відносні цілі залишаються в межах цього сховища; абсолютні або пошкоджені посилання відкрити неможливо.';
 
   @override
   String get vaultListingHiddenEntriesTitle => 'Записи, які не показано';
@@ -14593,7 +14593,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get symbolicLinkTargetHelper =>
-      'Ціль зберігається точно так, як ви її ввели. Тут її не відкривають і не переходять за нею; посилання корисне переважно з Cryptomator на комп’ютері.';
+      'Зберігається точно так, як введено. Під час відкриття відносні цілі визначаються в межах цього сховища; абсолютні цілі не переходять за посиланням.';
 
   @override
   String get symbolicLinkTargetTooLong =>
@@ -14617,4 +14617,22 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get symbolicLinkRenameTitle => 'Перейменувати символічне посилання';
+
+  @override
+  String get symbolicLinkBrowseTarget => 'Переглянути сховище';
+
+  @override
+  String get symbolicLinkSelectTargetTitle => 'Вибрати ціль ярлика';
+
+  @override
+  String get symbolicLinkSelectThisFolder => 'Вибрати цю папку';
+
+  @override
+  String get symbolicLinkPickerLoadError => 'Не вдалося завантажити цю папку';
+
+  @override
+  String get shortcutBadge => 'Ярлик';
+
+  @override
+  String get emptyFolder => 'Ця папка порожня';
 }

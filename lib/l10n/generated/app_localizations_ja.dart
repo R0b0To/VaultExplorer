@@ -13485,11 +13485,11 @@ class AppLocalizationsJa extends AppLocalizations {
   String get vaultListingDetails => '詳細';
 
   @override
-  String get vaultListingSymbolicLinksTitle => 'シンボリックリンク';
+  String get vaultListingSymbolicLinksTitle => 'ショートカット';
 
   @override
   String get vaultListingSymbolicLinksNote =>
-      'シンボリックリンクは別の場所を指します。ここでは開いたりたどったりしません。タップするとリンク先をコピーできます。';
+      'ショートカットをタップするとリンク先が開きます。相対パスはこの保管庫内に限定され、絶対パスやリンク切れのリンクは開けません。';
 
   @override
   String get vaultListingHiddenEntriesTitle => '表示されていない項目';
@@ -13701,7 +13701,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get symbolicLinkTargetHelper =>
-      '入力したとおりに保存されます。リンク先をここでたどったり開いたりすることはありません。主にパソコンの Cryptomator で使う場合に役立ちます。';
+      '入力したとおりに保存されます。開くとき、相対パスはこの保管庫内で解決され、絶対パスはたどりません。';
 
   @override
   String get symbolicLinkTargetTooLong => 'リンク先が長すぎます（最大 32,767 バイト）';
@@ -13722,4 +13722,22 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get symbolicLinkRenameTitle => 'シンボリックリンクの名前を変更';
+
+  @override
+  String get symbolicLinkBrowseTarget => '保管庫を参照';
+
+  @override
+  String get symbolicLinkSelectTargetTitle => 'ショートカットのリンク先を選択';
+
+  @override
+  String get symbolicLinkSelectThisFolder => 'このフォルダーを選択';
+
+  @override
+  String get symbolicLinkPickerLoadError => 'このフォルダーを読み込めませんでした';
+
+  @override
+  String get shortcutBadge => 'ショートカット';
+
+  @override
+  String get emptyFolder => 'このフォルダーは空です';
 }

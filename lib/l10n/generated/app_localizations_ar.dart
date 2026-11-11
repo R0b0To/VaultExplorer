@@ -14305,11 +14305,11 @@ class AppLocalizationsAr extends AppLocalizations {
   String get vaultListingDetails => 'التفاصيل';
 
   @override
-  String get vaultListingSymbolicLinksTitle => 'الروابط الرمزية';
+  String get vaultListingSymbolicLinksTitle => 'الاختصارات';
 
   @override
   String get vaultListingSymbolicLinksNote =>
-      'يشير الرابط الرمزي إلى موقع آخر. لا نفتحه ولا نتبعه هنا؛ اضغط عليه لنسخ وجهته.';
+      'اضغط على الاختصار لفتح وجهته. تبقى الأهداف النسبية داخل هذه الخزنة؛ ولا يمكن فتح الأهداف المطلقة أو المعطّلة.';
 
   @override
   String get vaultListingHiddenEntriesTitle => 'إدخالات غير معروضة';
@@ -14524,7 +14524,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get symbolicLinkTargetHelper =>
-      'يُخزَّن كما كُتب تمامًا. لا يتم اتباعه أو فتحه هنا؛ والرابط مفيد غالبًا مع Cryptomator على الكمبيوتر.';
+      'يُخزَّن كما كُتب تمامًا. عند الفتح، تُحلّ الأهداف النسبية داخل هذه الخزنة؛ ولا يتم اتباع الأهداف المطلقة.';
 
   @override
   String get symbolicLinkTargetTooLong =>
@@ -14548,4 +14548,22 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get symbolicLinkRenameTitle => 'إعادة تسمية الرابط الرمزي';
+
+  @override
+  String get symbolicLinkBrowseTarget => 'استعراض الخزنة';
+
+  @override
+  String get symbolicLinkSelectTargetTitle => 'اختيار وجهة الاختصار';
+
+  @override
+  String get symbolicLinkSelectThisFolder => 'اختيار هذا المجلد';
+
+  @override
+  String get symbolicLinkPickerLoadError => 'تعذر تحميل هذا المجلد';
+
+  @override
+  String get shortcutBadge => 'اختصار';
+
+  @override
+  String get emptyFolder => 'هذا المجلد فارغ';
 }

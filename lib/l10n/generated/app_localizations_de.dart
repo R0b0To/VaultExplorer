@@ -14268,11 +14268,11 @@ class AppLocalizationsDe extends AppLocalizations {
   String get vaultListingDetails => 'Details';
 
   @override
-  String get vaultListingSymbolicLinksTitle => 'Symbolische Links';
+  String get vaultListingSymbolicLinksTitle => 'Verknüpfungen';
 
   @override
   String get vaultListingSymbolicLinksNote =>
-      'Ein symbolischer Link verweist auf einen anderen Ort. Er wird hier weder geöffnet noch verfolgt. Tippe darauf, um das Ziel zu kopieren.';
+      'Beim Antippen wird das Ziel einer Verknüpfung geöffnet. Relative Ziele bleiben in diesem Tresor; absolute oder ungültige Ziele können nicht geöffnet werden.';
 
   @override
   String get vaultListingHiddenEntriesTitle => 'Nicht angezeigte Einträge';
@@ -14489,7 +14489,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get symbolicLinkTargetHelper =>
-      'Wird genau so gespeichert, wie es eingegeben wurde. Das Ziel wird hier nie verfolgt oder geöffnet; nützlich ist der Link vor allem mit Cryptomator am Computer.';
+      'Wird genau so gespeichert, wie es eingegeben wurde. Relative Ziele werden beim Öffnen innerhalb dieses Tresors aufgelöst; absolute Ziele werden nicht verfolgt.';
 
   @override
   String get symbolicLinkTargetTooLong =>
@@ -14513,4 +14513,23 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get symbolicLinkRenameTitle => 'Symbolischen Link umbenennen';
+
+  @override
+  String get symbolicLinkBrowseTarget => 'Tresor durchsuchen';
+
+  @override
+  String get symbolicLinkSelectTargetTitle => 'Ziel für Verknüpfung auswählen';
+
+  @override
+  String get symbolicLinkSelectThisFolder => 'Diesen Ordner auswählen';
+
+  @override
+  String get symbolicLinkPickerLoadError =>
+      'Dieser Ordner konnte nicht geladen werden';
+
+  @override
+  String get shortcutBadge => 'Verknüpfung';
+
+  @override
+  String get emptyFolder => 'Dieser Ordner ist leer';
 }

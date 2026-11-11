@@ -14388,11 +14388,11 @@ class AppLocalizationsFr extends AppLocalizations {
   String get vaultListingDetails => 'Détails';
 
   @override
-  String get vaultListingSymbolicLinksTitle => 'Liens symboliques';
+  String get vaultListingSymbolicLinksTitle => 'Raccourcis';
 
   @override
   String get vaultListingSymbolicLinksNote =>
-      'Un lien symbolique pointe vers un autre emplacement. Il n’est jamais ouvert ni suivi ici ; touchez-le pour copier sa cible.';
+      'Touchez un raccourci pour ouvrir sa cible. Les cibles relatives restent dans ce coffre ; les cibles absolues ou rompues ne peuvent pas être ouvertes.';
 
   @override
   String get vaultListingHiddenEntriesTitle => 'Entrées non affichées';
@@ -14610,7 +14610,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get symbolicLinkTargetHelper =>
-      'La cible est enregistrée exactement telle que saisie. Elle n’est jamais suivie ni ouverte ici ; le lien sert surtout avec Cryptomator sur ordinateur.';
+      'La cible est enregistrée exactement telle que saisie. À l’ouverture, les cibles relatives sont résolues dans ce coffre ; les cibles absolues ne sont pas suivies.';
 
   @override
   String get symbolicLinkTargetTooLong =>
@@ -14634,4 +14634,22 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get symbolicLinkRenameTitle => 'Renommer le lien symbolique';
+
+  @override
+  String get symbolicLinkBrowseTarget => 'Parcourir le coffre';
+
+  @override
+  String get symbolicLinkSelectTargetTitle => 'Choisir la cible du raccourci';
+
+  @override
+  String get symbolicLinkSelectThisFolder => 'Sélectionner ce dossier';
+
+  @override
+  String get symbolicLinkPickerLoadError => 'Impossible de charger ce dossier';
+
+  @override
+  String get shortcutBadge => 'Raccourci';
+
+  @override
+  String get emptyFolder => 'Ce dossier est vide';
 }

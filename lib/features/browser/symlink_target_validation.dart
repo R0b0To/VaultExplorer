@@ -7,9 +7,9 @@ const int kMaxSymlinkTargetBytes = 32767;
 /// exactly these (and malformed UTF-8, which a Dart string cannot produce).
 enum SymlinkTargetIssue { empty, tooLong, containsNul }
 
-/// Checks [target] the way the engine will, without resolving, normalising or testing it in any way: a target
-/// is stored exactly as written and never followed, so "does it exist" is not a question this app asks.
-/// Null when the target is fine.
+/// Checks whether [target] can be stored. The text is preserved exactly; at access time the native engine
+/// resolves relative targets within the same vault and refuses absolute paths. Existence is checked when used.
+/// Null when the target can be stored.
 SymlinkTargetIssue? validateSymlinkTarget(String target) {
   if (target.isEmpty) return SymlinkTargetIssue.empty;
   if (target.contains('\u0000')) return SymlinkTargetIssue.containsNul;

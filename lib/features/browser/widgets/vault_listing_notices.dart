@@ -16,8 +16,6 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 
 /// What a Cryptomator folder contains that a normal listing cannot show:
 ///
-///  * **Symbolic links.** A link is neither a file nor a folder here. It is never followed (its target could
-///    point anywhere), so the sheet only *shows* where it points.
 ///  * **Hidden entries.** Things that exist on disk inside the vault but are not listed -- most often
 ///    sync-conflict copies such as "name (1)" made by a cloud sync app, or a node whose upload has not
 ///    finished. Without this notice they are simply invisible.
@@ -117,14 +115,13 @@ class _VaultListingNoticesState extends ConsumerState<VaultListingNotices> {
 
   @override
   Widget build(BuildContext context) {
-    if (_links.isEmpty && _hidden == 0) return const SizedBox.shrink();
+    // Symbolic links are first-class listing entries now; this notice is only
+    // for hidden/unreadable vault nodes.
+    if (_hidden == 0) return const SizedBox.shrink();
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
-    final parts = <String>[
-      if (_links.isNotEmpty) l10n.vaultListingSymbolicLinkCount(_links.length),
-      if (_hidden > 0) l10n.vaultListingHiddenEntryCount(_hidden),
-    ];
-    final warn = _hidden > 0;
+    final parts = <String>[l10n.vaultListingHiddenEntryCount(_hidden)];
+    const warn = true;
     return Material(
       color: warn ? scheme.tertiaryContainer : scheme.surfaceContainerHighest,
       child: InkWell(
@@ -345,7 +342,7 @@ class _DetailsSheetState extends ConsumerState<_DetailsSheet> {
               for (final link in _links)
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.link),
+                  leading: const Icon(Icons.shortcut_rounded),
                   trailing: !_canEdit
                       ? null
                       : Row(

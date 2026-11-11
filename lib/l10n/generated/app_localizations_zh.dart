@@ -13278,11 +13278,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vaultListingDetails => '详情';
 
   @override
-  String get vaultListingSymbolicLinksTitle => '符号链接';
+  String get vaultListingSymbolicLinksTitle => '快捷方式';
 
   @override
   String get vaultListingSymbolicLinksNote =>
-      '符号链接指向其他位置。此处不会打开或跟随链接；点按可复制其目标位置。';
+      '点按快捷方式即可打开目标。相对目标仅在此保险库内解析；绝对路径或失效的链接无法打开。';
 
   @override
   String get vaultListingHiddenEntriesTitle => '未显示的条目';
@@ -13494,7 +13494,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get symbolicLinkTargetHelper =>
-      '目标会按输入的原样保存。此处不会跟随或打开目标；该链接主要在电脑上的 Cryptomator 中有用。';
+      '目标会按输入的原样保存。打开时，相对目标会在此保险库内解析；不会跟随绝对目标。';
 
   @override
   String get symbolicLinkTargetTooLong => '目标过长（最多 32,767 字节）';
@@ -13515,4 +13515,22 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get symbolicLinkRenameTitle => '重命名符号链接';
+
+  @override
+  String get symbolicLinkBrowseTarget => '浏览保险库';
+
+  @override
+  String get symbolicLinkSelectTargetTitle => '选择快捷方式目标';
+
+  @override
+  String get symbolicLinkSelectThisFolder => '选择此文件夹';
+
+  @override
+  String get symbolicLinkPickerLoadError => '无法加载此文件夹';
+
+  @override
+  String get shortcutBadge => '快捷方式';
+
+  @override
+  String get emptyFolder => '此文件夹为空';
 }

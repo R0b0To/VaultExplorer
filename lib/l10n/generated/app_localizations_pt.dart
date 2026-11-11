@@ -14268,11 +14268,11 @@ class AppLocalizationsPt extends AppLocalizations {
   String get vaultListingDetails => 'Detalhes';
 
   @override
-  String get vaultListingSymbolicLinksTitle => 'Links simbólicos';
+  String get vaultListingSymbolicLinksTitle => 'Atalhos';
 
   @override
   String get vaultListingSymbolicLinksNote =>
-      'Um link simbólico aponta para outro lugar. Ele nunca é aberto nem seguido aqui; toque nele para copiar o destino.';
+      'Toque um atalho para abrir o destino. Destinos relativos permanecem dentro deste cofre; destinos absolutos ou inválidos não podem ser abertos.';
 
   @override
   String get vaultListingHiddenEntriesTitle => 'Entradas não exibidas';
@@ -14489,7 +14489,7 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get symbolicLinkTargetHelper =>
-      'O destino é salvo exatamente como digitado. Ele nunca é seguido nem aberto aqui; o link é útil principalmente com o Cryptomator em um computador.';
+      'O destino é salvo exatamente como digitado. Ao abrir, destinos relativos são resolvidos dentro deste cofre; destinos absolutos não são seguidos.';
 
   @override
   String get symbolicLinkTargetTooLong =>
@@ -14513,4 +14513,23 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get symbolicLinkRenameTitle => 'Renomear link simbólico';
+
+  @override
+  String get symbolicLinkBrowseTarget => 'Explorar cofre';
+
+  @override
+  String get symbolicLinkSelectTargetTitle => 'Escolher destino do atalho';
+
+  @override
+  String get symbolicLinkSelectThisFolder => 'Selecionar esta pasta';
+
+  @override
+  String get symbolicLinkPickerLoadError =>
+      'Não foi possível carregar esta pasta';
+
+  @override
+  String get shortcutBadge => 'Atalho';
+
+  @override
+  String get emptyFolder => 'Esta pasta está vazia';
 }

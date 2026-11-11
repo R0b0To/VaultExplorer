@@ -14280,11 +14280,11 @@ class AppLocalizationsIt extends AppLocalizations {
   String get vaultListingDetails => 'Dettagli';
 
   @override
-  String get vaultListingSymbolicLinksTitle => 'Collegamenti simbolici';
+  String get vaultListingSymbolicLinksTitle => 'Scorciatoie';
 
   @override
   String get vaultListingSymbolicLinksNote =>
-      'Un collegamento simbolico punta a un altro percorso. Qui non viene mai aperto né seguito; toccalo per copiare la destinazione.';
+      'Toccando una scorciatoia si apre la destinazione. I percorsi relativi restano all\'interno di questo vault; le destinazioni assolute o non valide non possono essere aperte.';
 
   @override
   String get vaultListingHiddenEntriesTitle => 'Elementi non mostrati';
@@ -14503,7 +14503,7 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get symbolicLinkTargetHelper =>
-      'La destinazione viene salvata esattamente come la scrivi. Qui non viene mai seguita né aperta; il collegamento è utile soprattutto con Cryptomator su un computer.';
+      'Salvata esattamente come inserita. Quando viene aperta, una destinazione relativa viene risolta all\'interno di questo vault; le destinazioni assolute non vengono seguite.';
 
   @override
   String get symbolicLinkTargetTooLong =>
@@ -14527,4 +14527,24 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get symbolicLinkRenameTitle => 'Rinomina collegamento simbolico';
+
+  @override
+  String get symbolicLinkBrowseTarget => 'Sfoglia vault';
+
+  @override
+  String get symbolicLinkSelectTargetTitle =>
+      'Scegli la destinazione del collegamento';
+
+  @override
+  String get symbolicLinkSelectThisFolder => 'Seleziona questa cartella';
+
+  @override
+  String get symbolicLinkPickerLoadError =>
+      'Impossibile caricare questa cartella';
+
+  @override
+  String get shortcutBadge => 'Collegamento';
+
+  @override
+  String get emptyFolder => 'Questa cartella è vuota';
 }

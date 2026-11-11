@@ -132,6 +132,16 @@ void main() {
       }
     });
 
+    test("'txt' opens the text editor by default", () {
+      final action = decideFileOpenAction(
+        ext: 'txt',
+        extensionPreference: null,
+        needsSystemAppForLocal: false,
+        isSupportedMedia: false,
+      );
+      expect(action, isA<OpenInEditor>());
+    });
+
      test("'md' and 'markdown' both open the editor", () {
       for (final ext in ['md', 'markdown']) {
         final action = decideFileOpenAction(

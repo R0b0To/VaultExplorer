@@ -615,22 +615,43 @@ static void testCryptomatorSymlinks() {
         std::vector<DirEntry> none; CHECK(!v.listSymlinks("nodir", none));
         CHECK(countFiles(root, "symlink.c9r") == 3);
 
-        // --- a link is never a file or a folder ---------------------------------------------------------
-        CHECK(!get(v, "link"));
-        CHECK_EQ(v.getFileSize("link"), (int64_t)-1);
-        CHECK(!v.createDirectory("link"));
-        CHECK(!put(v, "link", rnd(20, 6)));                                          // writing over a link is refused...
-        CHECK(v.readSymlink("link").value_or("?") == "docs/file.txt");              // ...and leaves it intact
-        CHECK(!put(v, "link/inside.txt", rnd(5)));                                   // a link is not a folder to put things into
-        std::vector<DirEntry> inside; CHECK(!v.listDirectory("link", inside));       // nor to list
+        // --- links behave like POSIX shortcuts for access, but remain separate directory entries ---------
+        CHECK(get(v, "link").has_value());
+        CHECK_EQ(v.getFileSize("link"), (int64_t)10);
+        CHECK(!v.createDirectory("link"));                                           // target is a file
+        Bytes replacement = rnd(20, 6);
+        CHECK(put(v, "link", replacement));                                          // writing through the link updates its target
+        CHECK(*get(v, "docs/file.txt") == replacement);
+        CHECK(v.readSymlink("link").value_or("?") == "docs/file.txt");              // link text itself is unchanged
+        CHECK(!put(v, "link/inside.txt", rnd(5)));                                   // a file target cannot have children
+        std::vector<DirEntry> inside; CHECK(!v.listDirectory("link", inside));       // nor can it be listed as a folder
+        CHECK(v.createSymlink("docs-link", "docs"));
+        CHECK_EQ(symlinksOf(v, "").size(), (size_t)3);
+        auto folderLink = symlinksOf(v, "");
+        const DirEntry* folderLinkEntry = findLink(folderLink, "docs-link");
+        CHECK(folderLinkEntry && folderLinkEntry->isSymlink && folderLinkEntry->isDir);
+        std::vector<DirEntry> throughLink;
+        CHECK(v.listDirectory("docs-link", throughLink) && throughLink.size() == (size_t)1);
+        Bytes throughData = rnd(7, 12);
+        CHECK(put(v, "docs-link/through.txt", throughData));
+        CHECK(*get(v, "docs/through.txt") == throughData);
+        CHECK(v.deleteFile("docs-link/through.txt"));
+        CHECK(!get(v, "docs/through.txt"));
+        CHECK(v.deleteFile("docs-link"));                                          // unlink removes only the shortcut
+        CHECK(v.listDirectory("docs", throughLink));                               // target folder remains
+        CHECK(v.createSymlink("cycle-a", "cycle-b"));
+        CHECK(v.createSymlink("cycle-b", "cycle-a"));
+        CHECK(!get(v, "cycle-a"));                                                 // loops fail closed
+        CHECK(v.deleteFile("cycle-a"));
+        CHECK(v.deleteFile("cycle-b"));
         CHECK(!v.createSymlink("link", "x"));
         CHECK(!v.createSymlink("docs", "x"));
         CHECK(!v.createSymlink("docs/file.txt", "x"));
         CHECK(!v.createSymlink("nodir/x", "x"));
         CHECK(!v.createSymlink("", "x"));
-        CHECK(*get(v, "docs/file.txt") == fileData);
-        CHECK_EQ(v.getFolderSize(""), (int64_t)10);                                  // links add nothing to the size of a folder
-        CHECK_EQ(v.getFolderSize("docs"), (int64_t)10);
+        CHECK(*get(v, "docs/file.txt") == replacement);
+        CHECK_EQ(v.getFolderSize(""), (int64_t)20);                                  // links add nothing; target data is counted once
+        CHECK_EQ(v.getFolderSize("docs"), (int64_t)20);
 
         // --- target validation and limits -------------------------------------------------------------
         CHECK(!v.createSymlink("t1", ""));

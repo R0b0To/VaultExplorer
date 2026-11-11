@@ -36,6 +36,7 @@ import 'package:vaultexplorer/features/browser/widgets/folder_thumbnail_preview.
 import 'package:vaultexplorer/features/browser/widgets/gallery_date_header.dart';
 import 'package:vaultexplorer/features/browser/widgets/grid_card_shell.dart';
 import 'package:vaultexplorer/features/browser/widgets/hold_range_select_container.dart';
+import 'package:vaultexplorer/features/browser/widgets/shortcut_target_preview.dart';
 import 'package:vaultexplorer/features/browser/widgets/thumbnail_raw_fallback.dart';
 
 class FileGridView extends StatefulWidget {
@@ -671,6 +672,7 @@ class FileGridViewState extends State<FileGridView>
       longFileNameMode: widget.longFileNameMode,
       isPinned: widget.isPinned?.call(entry) ?? false,
       isBookmark: widget.isBookmark?.call(entry) ?? false,
+      isShortcut: entry.isSymlink,
       isDocumentProviderMounted: isMounted,
       isSynced: widget.isFolderSynced?.call(entry) ?? false,
       isPlaceholder: entry.isPlaceholder,
@@ -714,7 +716,7 @@ class FileGridViewState extends State<FileGridView>
     String displayName = cleanName;
     final ext = cleanName.split('.').last;
     final skin = FileManagerSkinScope.of(context);
-    final vaultIcon = vaultIconForExt(ext);
+    final vaultIcon = entry.isSymlink ? null : vaultIconForExt(ext);
     if (vaultIcon != null) {
       final nameParts = cleanName.split('.');
       if (nameParts.length > 1) {
@@ -746,7 +748,89 @@ class FileGridViewState extends State<FileGridView>
       viewportWidth: _getViewportWidth(context),
     );
 
-    if (vaultIcon != null) {
+    if (entry.isSymlink &&
+        _containerOf(entry).format.isCryptomator &&
+        widget.archiveContext == null) {
+      final targetContainer = _containerOf(entry);
+      previewWidget = ShortcutTargetPreview(
+        container: targetContainer,
+        linkPath: fullPath,
+        fallback: Center(
+          child: Icon(
+            skin.fileIcon(cleanName),
+            size: iconSize,
+            color: skin.fileIconColor(cs, cleanName),
+          ),
+        ),
+        builder: (context, targetPath, targetName) {
+          final targetIcon = skin.fileIcon(targetName);
+          final targetColor = skin.fileIconColor(cs, targetName);
+          if (MediaViewerConstants.isImage(targetName)) {
+            return Hero(
+              tag: 'media_hero_${targetContainer.volId}_$fullPath',
+              createRectTween: (begin, end) =>
+                  MaterialRectArcTween(begin: begin, end: end),
+              child: Material(
+                type: MaterialType.transparency,
+                child: _EncryptedImageGridThumb(
+                  container: targetContainer,
+                  filePath: targetPath,
+                  cacheMode: _cacheModeOf(entry),
+                  quality: _effectiveQualityOf(entry),
+                ),
+              ),
+            );
+          }
+          if (MediaViewerConstants.isVideo(targetName)) {
+            return Hero(
+              tag: 'media_hero_${targetContainer.volId}_$fullPath',
+              createRectTween: (begin, end) =>
+                  MaterialRectArcTween(begin: begin, end: end),
+              child: Material(
+                type: MaterialType.transparency,
+                child: _VideoThumb(
+                  container: targetContainer,
+                  filePath: targetPath,
+                  cacheMode: _cacheModeOf(entry),
+                  quality: _effectiveQualityOf(entry),
+                ),
+              ),
+            );
+          }
+          if (isApkFile(targetName)) {
+            return Center(
+              child: SizedBox(
+                width: iconSize,
+                height: iconSize,
+                child: _ApkIconGridThumb(
+                  container: targetContainer,
+                  filePath: targetPath,
+                  cacheMode: _cacheModeOf(entry),
+                  quality: _effectiveQualityOf(entry),
+                  fallbackIcon: targetIcon,
+                  fallbackColor: targetColor,
+                  fallbackIconSize: iconSize,
+                ),
+              ),
+            );
+          }
+          if (isBookWithCover(targetName)) {
+            return _BookCoverGridThumb(
+              container: targetContainer,
+              filePath: targetPath,
+              cacheMode: _cacheModeOf(entry),
+              quality: _effectiveQualityOf(entry),
+              fallbackIcon: targetIcon,
+              fallbackColor: targetColor,
+              fallbackIconSize: iconSize,
+            );
+          }
+          return Center(
+            child: Icon(targetIcon, size: iconSize, color: targetColor),
+          );
+        },
+      );
+    } else if (vaultIcon != null) {
       previewWidget = Center(
         child: Icon(
           skin.fileIcon(cleanName),
@@ -835,6 +919,7 @@ class FileGridViewState extends State<FileGridView>
       longFileNameMode: widget.longFileNameMode,
       isPinned: widget.isPinned?.call(entry) ?? false,
       isBookmark: widget.isBookmark?.call(entry) ?? false,
+      isShortcut: entry.isSymlink,
       isPlaceholder: entry.isPlaceholder,
       onTap: entry.isPlaceholder ? () {} : () => widget.onFileTap(entry),
       // Selection is owned by HoldRangeSelectContainer's hold recognizer

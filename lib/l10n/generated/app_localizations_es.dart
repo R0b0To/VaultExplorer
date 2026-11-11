@@ -14308,11 +14308,11 @@ class AppLocalizationsEs extends AppLocalizations {
   String get vaultListingDetails => 'Detalles';
 
   @override
-  String get vaultListingSymbolicLinksTitle => 'Enlaces simbólicos';
+  String get vaultListingSymbolicLinksTitle => 'Accesos directos';
 
   @override
   String get vaultListingSymbolicLinksNote =>
-      'Un enlace simbólico apunta a otro lugar. Aquí nunca se abre ni se sigue; tócalo para copiar su destino.';
+      'Al tocar un acceso directo se abre su destino. Los destinos relativos permanecen dentro de esta bóveda; los destinos absolutos o rotos no se pueden abrir.';
 
   @override
   String get vaultListingHiddenEntriesTitle => 'Elementos no mostrados';
@@ -14530,7 +14530,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get symbolicLinkTargetHelper =>
-      'Se guarda exactamente como lo escribes. Aquí nunca se sigue ni se abre el destino; el enlace resulta útil sobre todo con Cryptomator en un ordenador.';
+      'Se guarda exactamente como lo escribes. Al abrirlo, los destinos relativos se resuelven dentro de esta bóveda; los destinos absolutos no se siguen.';
 
   @override
   String get symbolicLinkTargetTooLong =>
@@ -14554,4 +14554,23 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get symbolicLinkRenameTitle => 'Renombrar enlace simbólico';
+
+  @override
+  String get symbolicLinkBrowseTarget => 'Explorar bóveda';
+
+  @override
+  String get symbolicLinkSelectTargetTitle =>
+      'Elegir destino del acceso directo';
+
+  @override
+  String get symbolicLinkSelectThisFolder => 'Seleccionar esta carpeta';
+
+  @override
+  String get symbolicLinkPickerLoadError => 'No se pudo cargar esta carpeta';
+
+  @override
+  String get shortcutBadge => 'Acceso directo';
+
+  @override
+  String get emptyFolder => 'Esta carpeta está vacía';
 }

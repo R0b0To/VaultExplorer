@@ -203,8 +203,10 @@ Deliberate, each one verified against the real client where one exists:
 * **Cryptomator symlinks** (`isSymlink`, `listSymlinks`, `readSymlink`, `createSymlink`): a link is a node
   folder holding `symlink.c9r` (target, UTF-8, encrypted like file content), found with official's precedence
   (`dir.c9r`, then `symlink.c9r`, then `contents.c9r`). Links are **never part of `listDirectory`** (they are neither
-  files nor folders, so nothing that walks listings can trip over one) and **never followed**: reading, writing or
-  entering a link path fails, while delete / rename / mtime act on the link node itself. We are stricter than
+  files nor folders, so sync/export/scanners cannot accidentally recurse through one). The interactive browser
+  merges them as shortcut entries. Relative targets are resolved inside the same vault for reads, writes and
+  directory traversal, with a 40-link hop limit (so cycles fail closed); absolute targets are refused. Delete and
+  rename operate on the link node itself, while mtime follows the target. We are stricter than
   official in one place: a target is limited to 32767 *bytes* (official checks 32767 characters when creating but
   refuses more than 32767 bytes when reading, so it can create a link it cannot read back), and an empty,
   NUL-containing or malformed-UTF-8 target is refused.

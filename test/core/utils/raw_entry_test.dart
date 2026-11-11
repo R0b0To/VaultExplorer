@@ -13,10 +13,25 @@ void main() {
 
     test('an unrecognized type tag is treated as not-a-directory (file)',
         () {
-      // Only 'D' means directory; anything else is a file, per isDir:
-      // typeTag == 'D'.
+      // Ordinary directory entries use 'D'; shortcut directories use 'LD'.
       final entry = RawEntry.parse('X|1|1|weird.tag');
       expect(entry.isDir, isFalse);
+    });
+  });
+
+  group('RawEntry.parse — symbolic links', () {
+    test('parses a file shortcut and preserves its link type in raw form', () {
+      final entry = RawEntry.parse('L|14|1690000000|notes-link');
+      expect(entry.isSymlink, isTrue);
+      expect(entry.isDir, isFalse);
+      expect(entry.raw, 'L|14|1690000000|notes-link');
+    });
+
+    test('parses a directory shortcut as a directory and preserves its type', () {
+      final entry = RawEntry.parse('LD|0|1690000000|docs-link');
+      expect(entry.isSymlink, isTrue);
+      expect(entry.isDir, isTrue);
+      expect(entry.raw, 'LD|0|1690000000|docs-link');
     });
   });
 

@@ -23762,13 +23762,13 @@ abstract class AppLocalizations {
   /// Heading for the symbolic links section in vault listing details
   ///
   /// In en, this message translates to:
-  /// **'Symbolic links'**
+  /// **'Shortcuts'**
   String get vaultListingSymbolicLinksTitle;
 
-  /// Explains that symbolic links are not followed and can be tapped to copy their target
+  /// Explains that shortcut entries open relative targets within the vault and reject absolute or broken targets
   ///
   /// In en, this message translates to:
-  /// **'A symbolic link points somewhere else. It is never opened or followed here; tap one to copy where it points.'**
+  /// **'Shortcuts open their targets when tapped. Relative targets stay inside this vault; absolute or broken targets cannot be opened.'**
   String get vaultListingSymbolicLinksNote;
 
   /// Heading for vault entries that could not be listed in the current folder
@@ -24155,10 +24155,10 @@ abstract class AppLocalizations {
   /// **'Points to'**
   String get symbolicLinkTargetHint;
 
-  /// Helper text under the symbolic link target field: stored as written, never followed or opened by the app
+  /// Helper text under the symbolic link target field: relative targets are resolved within the vault; absolute targets are not followed
   ///
   /// In en, this message translates to:
-  /// **'Stored exactly as written. It is never followed or opened here; the link is mainly useful with Cryptomator on a computer.'**
+  /// **'Stored exactly as written. Relative targets are resolved inside this vault when opened; absolute targets are not followed.'**
   String get symbolicLinkTargetHelper;
 
   /// Error under the symbolic link target field when it exceeds the 32,767-byte limit
@@ -24196,6 +24196,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Rename symbolic link'**
   String get symbolicLinkRenameTitle;
+
+  /// Tooltip for the button that opens the vault target picker when creating a symbolic link
+  ///
+  /// In en, this message translates to:
+  /// **'Browse vault'**
+  String get symbolicLinkBrowseTarget;
+
+  /// Title of the in-vault file and folder picker for a symbolic link target
+  ///
+  /// In en, this message translates to:
+  /// **'Choose shortcut target'**
+  String get symbolicLinkSelectTargetTitle;
+
+  /// Button to choose the currently displayed folder as a symbolic link target
+  ///
+  /// In en, this message translates to:
+  /// **'Select this folder'**
+  String get symbolicLinkSelectThisFolder;
+
+  /// Message shown when the symbolic-link target picker cannot load a folder
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load this folder'**
+  String get symbolicLinkPickerLoadError;
+
+  /// Label identifying a symbolic link as a shortcut in the target picker
+  ///
+  /// In en, this message translates to:
+  /// **'Shortcut'**
+  String get shortcutBadge;
+
+  /// Message shown when the current folder has no entries
+  ///
+  /// In en, this message translates to:
+  /// **'This folder is empty'**
+  String get emptyFolder;
 }
 
 class _AppLocalizationsDelegate

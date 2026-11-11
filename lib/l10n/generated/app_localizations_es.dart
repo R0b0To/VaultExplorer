@@ -8756,7 +8756,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get statusBadgeSubtitle =>
-      'Muestra el temporizador de presentación o indicador de foto estática';
+      'Muestra la cuenta atrás de la presentación mientras se reproduce';
 
   @override
   String get topBarActionsHeader => 'Acciones de la barra superior';

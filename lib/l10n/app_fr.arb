@@ -2210,7 +2210,7 @@
   "showTransportControlsOnPhotosTitle": "Afficher les commandes de lecture sur les photos",
   "showTransportControlsOnPhotosSubtitle": "Activer les commandes de diaporama sur les images (désactiver pour une vue épurée)",
   "statusBadgeTitle": "Badge d’état",
-  "statusBadgeSubtitle": "Affiche le minuteur de diaporama ou l’indicateur de photo statique",
+  "statusBadgeSubtitle": "Affiche le compte à rebours du diaporama pendant sa lecture",
   "topBarActionsHeader": "Actions de la barre supérieure",
   "topBarActionsEmptyHint": "Glissez des actions ici pour les épingler à la barre supérieure",
   "bottomDockActionsHeader": "Actions du dock inférieur",

@@ -2221,7 +2221,7 @@
   "showTransportControlsOnPhotosTitle": "Показувати кнопки відтворення для фотографій",
   "showTransportControlsOnPhotosSubtitle": "Керування слайд-шоу під час перегляду зображень (вимкніть для мінімалістичного вигляду)",
   "statusBadgeTitle": "Значок стану",
-  "statusBadgeSubtitle": "Показує таймер слайд-шоу або індикатор статичного фото",
+  "statusBadgeSubtitle": "Показує зворотний відлік слайд-шоу під час його відтворення",
   "topBarActionsHeader": "Дії верхньої панелі",
   "topBarActionsEmptyHint": "Перетягніть дії сюди, щоб закріпити на верхній панелі",
   "bottomDockActionsHeader": "Дії нижньої панелі",

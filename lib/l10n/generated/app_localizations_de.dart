@@ -8739,7 +8739,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get statusBadgeSubtitle =>
-      'Zeigt Diashow-Timer oder Indikator für statische Fotos an';
+      'Zeigt den Diashow-Countdown, solange eine Diashow läuft';
 
   @override
   String get topBarActionsHeader => 'Aktionen der oberen Leiste';

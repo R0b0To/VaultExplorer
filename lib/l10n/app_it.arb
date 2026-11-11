@@ -2210,7 +2210,7 @@
   "showTransportControlsOnPhotosTitle": "Mostra controlli di riproduzione sulle foto",
   "showTransportControlsOnPhotosSubtitle": "Abilita controlli presentazione sulle immagini (disattiva per vista minimalista)",
   "statusBadgeTitle": "Badge di stato",
-  "statusBadgeSubtitle": "Mostra timer presentazione o indicatore foto statica",
+  "statusBadgeSubtitle": "Mostra il conto alla rovescia della presentazione mentre è in riproduzione",
   "topBarActionsHeader": "Azioni barra superiore",
   "topBarActionsEmptyHint": "Trascina qui le azioni per fissarle nella barra superiore",
   "bottomDockActionsHeader": "Azioni barra inferiore (Dock)",

@@ -8739,7 +8739,7 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get statusBadgeSubtitle =>
-      'Mostra timer presentazione o indicatore foto statica';
+      'Mostra il conto alla rovescia della presentazione mentre è in riproduzione';
 
   @override
   String get topBarActionsHeader => 'Azioni barra superiore';

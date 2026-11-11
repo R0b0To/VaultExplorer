@@ -2210,7 +2210,7 @@
   "showTransportControlsOnPhotosTitle": "Wiedergabesteuerung bei Fotos anzeigen",
   "showTransportControlsOnPhotosSubtitle": "Diashow-Steuerung für Bilder aktivieren (aus für minimalistische Ansicht)",
   "statusBadgeTitle": "Status-Badge",
-  "statusBadgeSubtitle": "Zeigt Diashow-Timer oder Indikator für statische Fotos an",
+  "statusBadgeSubtitle": "Zeigt den Diashow-Countdown, solange eine Diashow läuft",
   "topBarActionsHeader": "Aktionen der oberen Leiste",
   "topBarActionsEmptyHint": "Aktionen hierher ziehen, um sie an der oberen Leiste anzupinnen",
   "bottomDockActionsHeader": "Aktionen des unteren Docks",

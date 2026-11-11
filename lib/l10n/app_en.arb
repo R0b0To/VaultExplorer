@@ -10926,7 +10926,7 @@
   "@statusBadgeTitle": {
     "description": "Switch title for status badge visibility"
   },
-  "statusBadgeSubtitle": "Shows slideshow timer or static photo indicator",
+  "statusBadgeSubtitle": "Shows the slideshow countdown while a slideshow is playing",
   "@statusBadgeSubtitle": {
     "description": "Subtitle explaining status badge details"
   },

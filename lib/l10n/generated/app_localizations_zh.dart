@@ -8172,7 +8172,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get statusBadgeTitle => '状态徽章';
 
   @override
-  String get statusBadgeSubtitle => '显示幻灯片计时器或静态照片指示器';
+  String get statusBadgeSubtitle => '幻灯片播放时显示倒计时';
 
   @override
   String get topBarActionsHeader => '顶部栏操作';

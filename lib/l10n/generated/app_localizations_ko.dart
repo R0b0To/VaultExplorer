@@ -8280,7 +8280,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get statusBadgeTitle => '상태 배지';
 
   @override
-  String get statusBadgeSubtitle => '슬라이드쇼 타이머 또는 정적 사진 표시기 표시';
+  String get statusBadgeSubtitle => '슬라이드쇼가 재생되는 동안 카운트다운 표시';
 
   @override
   String get topBarActionsHeader => '상단 표시줄 작업';

@@ -8604,7 +8604,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get statusBadgeSubtitle =>
-      'Shows slideshow timer or static photo indicator';
+      'Shows the slideshow countdown while a slideshow is playing';
 
   @override
   String get topBarActionsHeader => 'Top Bar Actions';

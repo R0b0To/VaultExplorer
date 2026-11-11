@@ -105,6 +105,11 @@ enum MediaViewerAction {
       };
 
   bool isApplicable({required bool isImage, required bool isAudio, required bool isPlaylistMode}) {
+    // The thumbnail carousel browses the playlist; with a single file there is
+    // nothing to browse and the button would do nothing.
+    if (this == MediaViewerAction.thumbnailCarousel && !isPlaylistMode) {
+      return false;
+    }
     if (isImage) {
       if (this == MediaViewerAction.mute ||
           this == MediaViewerAction.playbackSpeed ||
@@ -115,9 +120,6 @@ enum MediaViewerAction {
           this == MediaViewerAction.editVideo ||
           this == MediaViewerAction.editAudio ||
           this == MediaViewerAction.abLoop ||
-          // Repeat / play-and-advance is a video and audio playback setting;
-          // images advance through the slideshow (play button and delay).
-          this == MediaViewerAction.playbackMode ||
           this == MediaViewerAction.decoder ||
           this == MediaViewerAction.diagnostics ||
           this == MediaViewerAction.pictureInPicture) {

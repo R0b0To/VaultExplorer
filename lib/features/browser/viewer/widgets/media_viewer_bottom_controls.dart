@@ -257,7 +257,7 @@ class MediaViewerBottomControls extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.xs),
           ],
-          if (pinned.isNotEmpty || (isImage && toolbarConfig.showStatusBadge))
+          if (pinned.isNotEmpty || _showSlideshowChip(pinned))
             _buildTransparentDock(context, cs, pinned),
         ],
       ),
@@ -274,6 +274,16 @@ class MediaViewerBottomControls extends StatelessWidget {
         previewHost: scrubPreviewHost,
       );
 
+  /// The slideshow countdown pill is shown only while a slideshow is running:
+  /// a static photo needs no indicator (the play state is already visible) and
+  /// the delay is still reachable from Advanced settings.
+  bool _showSlideshowChip(List<MediaViewerAction> pinned) =>
+      isImage &&
+      isPlaylistMode &&
+      autoAdvance &&
+      toolbarConfig.showStatusBadge &&
+      !pinned.contains(MediaViewerAction.slideshowDelay);
+
   Widget _buildTransparentDock(
     BuildContext context,
     ColorScheme cs,
@@ -288,10 +298,7 @@ class MediaViewerBottomControls extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (isImage &&
-                isPlaylistMode &&
-                toolbarConfig.showStatusBadge &&
-                !pinned.contains(MediaViewerAction.slideshowDelay)) ...[
+            if (_showSlideshowChip(pinned)) ...[
               _SlideshowStatusChip(
                 autoAdvance: autoAdvance,
                 slideshowDelaySeconds: slideshowDelaySeconds,

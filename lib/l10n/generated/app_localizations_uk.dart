@@ -8798,7 +8798,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get statusBadgeSubtitle =>
-      'Показує таймер слайд-шоу або індикатор статичного фото';
+      'Показує зворотний відлік слайд-шоу під час його відтворення';
 
   @override
   String get topBarActionsHeader => 'Дії верхньої панелі';

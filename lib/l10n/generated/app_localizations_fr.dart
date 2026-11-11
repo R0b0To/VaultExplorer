@@ -8811,7 +8811,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get statusBadgeSubtitle =>
-      'Affiche le minuteur de diaporama ou l’indicateur de photo statique';
+      'Affiche le compte à rebours du diaporama pendant sa lecture';
 
   @override
   String get topBarActionsHeader => 'Actions de la barre supérieure';

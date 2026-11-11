@@ -33,16 +33,19 @@ void main() {
       expect(applicable(isImage: true, isAudio: false), isFalse);
     });
 
-    test('the playback mode button is for video and audio, not images', () {
-      bool applicable({required bool isImage, required bool isAudio}) =>
+    test('the playback mode button stays on images: it starts the slideshow', () {
+      // The play button is hidden for photos by default, so this is the
+      // default way to start a slideshow (play-and-advance).
+      for (final isImage in [true, false]) {
+        expect(
           MediaViewerAction.playbackMode.isApplicable(
             isImage: isImage,
-            isAudio: isAudio,
+            isAudio: false,
             isPlaylistMode: true,
-          );
-      expect(applicable(isImage: false, isAudio: false), isTrue);
-      expect(applicable(isImage: false, isAudio: true), isTrue);
-      expect(applicable(isImage: true, isAudio: false), isFalse);
+          ),
+          isTrue,
+        );
+      }
     });
 
     test('round-trips through JSON', () {

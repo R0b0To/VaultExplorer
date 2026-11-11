@@ -2210,7 +2210,7 @@
   "showTransportControlsOnPhotosTitle": "사진에 탐색 컨트롤 표시",
   "showTransportControlsOnPhotosSubtitle": "이미지 슬라이드쇼 컨트롤 활성화(미니멀 뷰는 해제)",
   "statusBadgeTitle": "상태 배지",
-  "statusBadgeSubtitle": "슬라이드쇼 타이머 또는 정적 사진 표시기 표시",
+  "statusBadgeSubtitle": "슬라이드쇼가 재생되는 동안 카운트다운 표시",
   "topBarActionsHeader": "상단 표시줄 작업",
   "topBarActionsEmptyHint": "상단 표시줄에 고정하려면 작업을 여기로 드래그하세요",
   "bottomDockActionsHeader": "하단 도크 작업",

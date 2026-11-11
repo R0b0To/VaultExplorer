@@ -2210,7 +2210,7 @@
   "showTransportControlsOnPhotosTitle": "Mostrar controles de transporte en fotos",
   "showTransportControlsOnPhotosSubtitle": "Habilitar controles de diapositivas en imágenes (desactivar para vista minimalista)",
   "statusBadgeTitle": "Insignia de estado",
-  "statusBadgeSubtitle": "Muestra el temporizador de presentación o indicador de foto estática",
+  "statusBadgeSubtitle": "Muestra la cuenta atrás de la presentación mientras se reproduce",
   "topBarActionsHeader": "Acciones de la barra superior",
   "topBarActionsEmptyHint": "Arrastra acciones aquí para fijarlas en la barra superior",
   "bottomDockActionsHeader": "Acciones del dock inferior",

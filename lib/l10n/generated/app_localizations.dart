@@ -14408,7 +14408,7 @@ abstract class AppLocalizations {
   /// Subtitle explaining status badge details
   ///
   /// In en, this message translates to:
-  /// **'Shows slideshow timer or static photo indicator'**
+  /// **'Shows the slideshow countdown while a slideshow is playing'**
   String get statusBadgeSubtitle;
 
   /// Section header for top bar actions

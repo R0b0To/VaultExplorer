@@ -8794,7 +8794,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get statusBadgeSubtitle =>
-      'عرض مؤقت عرض الشرائح أو مؤشر الصورة الثابتة';
+      'يعرض العد التنازلي لعرض الشرائح أثناء تشغيله';
 
   @override
   String get topBarActionsHeader => 'إجراءات الشريط العلوي';

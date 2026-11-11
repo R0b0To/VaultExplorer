@@ -2210,7 +2210,7 @@
   "showTransportControlsOnPhotosTitle": "写真に再生コントロールを表示",
   "showTransportControlsOnPhotosSubtitle": "画像のスライドショー操作を有効化（オフでシンプル表示）",
   "statusBadgeTitle": "ステータスバッジ",
-  "statusBadgeSubtitle": "スライドショーのタイマーまたは静止画インジケーターを表示",
+  "statusBadgeSubtitle": "スライドショーの再生中にカウントダウンを表示",
   "topBarActionsHeader": "トップバーのアクション",
   "topBarActionsEmptyHint": "アクションをここにドラッグしてトップバーに固定",
   "bottomDockActionsHeader": "ボトムドックのアクション",

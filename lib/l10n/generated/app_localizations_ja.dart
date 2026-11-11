@@ -8283,7 +8283,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get statusBadgeTitle => 'ステータスバッジ';
 
   @override
-  String get statusBadgeSubtitle => 'スライドショーのタイマーまたは静止画インジケーターを表示';
+  String get statusBadgeSubtitle => 'スライドショーの再生中にカウントダウンを表示';
 
   @override
   String get topBarActionsHeader => 'トップバーのアクション';

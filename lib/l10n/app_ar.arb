@@ -2210,7 +2210,7 @@
   "showTransportControlsOnPhotosTitle": "إظهار عناصر التحكم في العرض على الصور",
   "showTransportControlsOnPhotosSubtitle": "تمكين عناصر تحكم عرض الشرائح على الصور (عطله لمظهر بسيط)",
   "statusBadgeTitle": "شارة الحالة",
-  "statusBadgeSubtitle": "عرض مؤقت عرض الشرائح أو مؤشر الصورة الثابتة",
+  "statusBadgeSubtitle": "يعرض العد التنازلي لعرض الشرائح أثناء تشغيله",
   "topBarActionsHeader": "إجراءات الشريط العلوي",
   "topBarActionsEmptyHint": "اسحب الإجراءات إلى هنا لتثبيتها في الشريط العلوي",
   "bottomDockActionsHeader": "إجراءات الشريط السفلي",

@@ -13650,4 +13650,43 @@ class AppLocalizationsJa extends AppLocalizations {
   String galleryPlaceHintCoordinates(int km) {
     return '$km km 以内に都市なし: 座標でグループ化';
   }
+
+  @override
+  String get cryptomatorBackupKeyFilesTitle => 'ロック解除時にキーファイルをバックアップ';
+
+  @override
+  String get cryptomatorBackupKeyFilesSubtitle =>
+      'デスクトップ版 Cryptomator と同様に、masterkey.cryptomator と vault.cryptomator のコピーを元のファイルの隣に保存します。次回のロック解除から有効です。読み取り専用のセッションでは書き込みません。';
+
+  @override
+  String get cryptomatorUpgradeTitle => '保管庫の形式をアップグレード';
+
+  @override
+  String get cryptomatorUpgradeSubtitle => 'この保管庫は古い形式 7 を使用しています。';
+
+  @override
+  String get cryptomatorUpgradeLockFirst => 'アップグレードするには保管庫をロックしてください';
+
+  @override
+  String get cryptomatorUpgradeWarning =>
+      'アップグレードすると、この保管庫は形式 8 に変更されます。元に戻すことはできず、その後は 1.6 より前のバージョンの Cryptomator ではこの保管庫を開けなくなります。\n\n現在のキーファイルのコピーは masterkey.cryptomator.<id>.bkup として保持されます。別のアプリがこの保管庫を同期している場合は、先に同期が完了するまで待ってください。';
+
+  @override
+  String get cryptomatorUpgradeConfirm => '元に戻せないことを理解しました';
+
+  @override
+  String get cryptomatorUpgradeAction => 'アップグレード';
+
+  @override
+  String get cryptomatorUpgradedMessage => '保管庫を形式 8 にアップグレードしました';
+
+  @override
+  String get cryptomatorUpgradeUnlockedError => '先に保管庫をロックしてください';
+
+  @override
+  String get cryptomatorConfigMissingWarning =>
+      'vault.cryptomator が見つかりません。別のアプリがこの保管庫を同期している場合は、同期が完了するまで待ってから、もう一度お試しください。アップグレードしないでください。';
+
+  @override
+  String get cryptomatorUpgradeFailedMessage => '保管庫をアップグレードできませんでした';
 }

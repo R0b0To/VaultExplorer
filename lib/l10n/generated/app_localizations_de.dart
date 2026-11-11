@@ -14434,4 +14434,47 @@ class AppLocalizationsDe extends AppLocalizations {
   String galleryPlaceHintCoordinates(int km) {
     return 'Keine Stadt im Umkreis von $km km: nach Koordinaten gruppiert';
   }
+
+  @override
+  String get cryptomatorBackupKeyFilesTitle =>
+      'Schlüsseldateien beim Entsperren sichern';
+
+  @override
+  String get cryptomatorBackupKeyFilesSubtitle =>
+      'Legt neben den Originalen eine Kopie von masterkey.cryptomator und vault.cryptomator ab, wie Cryptomator am Computer. Gilt ab dem nächsten Entsperren. Schreibgeschützte Sitzungen schreiben nie.';
+
+  @override
+  String get cryptomatorUpgradeTitle => 'Tresorformat aktualisieren';
+
+  @override
+  String get cryptomatorUpgradeSubtitle =>
+      'Dieser Tresor verwendet das ältere Format 7.';
+
+  @override
+  String get cryptomatorUpgradeLockFirst => 'Tresor zum Aktualisieren sperren';
+
+  @override
+  String get cryptomatorUpgradeWarning =>
+      'Beim Aktualisieren wird dieser Tresor auf Format 8 umgestellt. Das lässt sich nicht rückgängig machen, und Cryptomator-Versionen vor 1.6 können den Tresor danach nicht mehr öffnen.\n\nEine Kopie der aktuellen Schlüsseldatei bleibt als masterkey.cryptomator.<id>.bkup erhalten. Wenn eine andere App diesen Tresor synchronisiert, lassen Sie die Synchronisierung zuerst abschließen.';
+
+  @override
+  String get cryptomatorUpgradeConfirm =>
+      'Mir ist klar, dass sich das nicht rückgängig machen lässt';
+
+  @override
+  String get cryptomatorUpgradeAction => 'Aktualisieren';
+
+  @override
+  String get cryptomatorUpgradedMessage => 'Tresor auf Format 8 aktualisiert';
+
+  @override
+  String get cryptomatorUpgradeUnlockedError => 'Sperren Sie zuerst den Tresor';
+
+  @override
+  String get cryptomatorConfigMissingWarning =>
+      'vault.cryptomator fehlt. Wenn eine andere App diesen Tresor synchronisiert, warten Sie, bis sie fertig ist, und versuchen Sie es dann erneut. Nicht aktualisieren.';
+
+  @override
+  String get cryptomatorUpgradeFailedMessage =>
+      'Tresor konnte nicht aktualisiert werden';
 }

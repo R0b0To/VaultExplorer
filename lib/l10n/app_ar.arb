@@ -3983,5 +3983,17 @@
   "vcToolsHiddenNote": "تأخذ وحدة التخزين المخفية المساحة الحرة في نهاية وحدة التخزين الخارجية. بعد ذلك، قم بتركيب وحدة التخزين الخارجية مع تمكين حماية وحدة التخزين المخفية عند الكتابة إليها، وإلا فقد يتم الكتابة فوقها.",
   "vcToolsPasswordsDiffer": "كلمتا المرور غير متطابقتين.",
   "vcToolsInvalidSize": "أدخل حجمًا صالحًا.",
-  "vcToolsCredentialsRequired": "أدخل كلمة مرور وحدة التخزين أو أضف ملف مفتاح."
+  "vcToolsCredentialsRequired": "أدخل كلمة مرور وحدة التخزين أو أضف ملف مفتاح.",
+  "cryptomatorBackupKeyFilesTitle": "نسخ احتياطي لملفات المفاتيح عند فتح القفل",
+  "cryptomatorBackupKeyFilesSubtitle": "يحتفظ بنسخة من masterkey.cryptomator وvault.cryptomator بجوار الملفات الأصلية، كما يفعل Cryptomator على سطح المكتب. يسري من عملية الفتح التالية. جلسات القراءة فقط لا تكتب أي شيء أبدًا.",
+  "cryptomatorUpgradeTitle": "ترقية تنسيق الخزنة",
+  "cryptomatorUpgradeSubtitle": "تستخدم هذه الخزنة التنسيق 7 الأقدم.",
+  "cryptomatorUpgradeLockFirst": "اقفل الخزنة لترقيتها",
+  "cryptomatorUpgradeWarning": "تؤدي الترقية إلى تحويل هذه الخزنة إلى التنسيق 8. لا يمكن التراجع عنها، ولن تتمكن إصدارات Cryptomator الأقدم من 1.6 من فتح الخزنة بعد ذلك.\n\nيُحتفظ بنسخة من ملف المفتاح الحالي باسم masterkey.cryptomator.<id>.bkup. إذا كان تطبيق آخر يزامن هذه الخزنة، فدعه ينهي المزامنة أولًا.",
+  "cryptomatorUpgradeConfirm": "أفهم أنه لا يمكن التراجع عن هذا",
+  "cryptomatorUpgradeAction": "ترقية",
+  "cryptomatorUpgradedMessage": "تمت ترقية الخزنة إلى التنسيق 8",
+  "cryptomatorUpgradeUnlockedError": "اقفل الخزنة أولًا",
+  "cryptomatorConfigMissingWarning": "الملف vault.cryptomator مفقود. إذا كان تطبيق آخر يزامن هذه الخزنة، فانتظر حتى تنتهي المزامنة ثم حاول مرة أخرى. لا تقم بالترقية.",
+  "cryptomatorUpgradeFailedMessage": "تعذرت ترقية الخزنة"
 }

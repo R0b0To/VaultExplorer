@@ -13443,4 +13443,43 @@ class AppLocalizationsZh extends AppLocalizations {
   String galleryPlaceHintCoordinates(int km) {
     return '$km 公里内没有城市：按坐标分组';
   }
+
+  @override
+  String get cryptomatorBackupKeyFilesTitle => '解锁时备份密钥文件';
+
+  @override
+  String get cryptomatorBackupKeyFilesSubtitle =>
+      '与桌面版 Cryptomator 一样，在原文件旁保留 masterkey.cryptomator 和 vault.cryptomator 的副本。从下次解锁起生效。只读会话不会写入。';
+
+  @override
+  String get cryptomatorUpgradeTitle => '升级保险库格式';
+
+  @override
+  String get cryptomatorUpgradeSubtitle => '此保险库使用较旧的格式 7。';
+
+  @override
+  String get cryptomatorUpgradeLockFirst => '请先锁定保险库再升级';
+
+  @override
+  String get cryptomatorUpgradeWarning =>
+      '升级会将此保险库更改为格式 8。此操作无法撤销，之后低于 1.6 的 Cryptomator 版本将无法再打开该保险库。\n\n当前密钥文件的副本会以 masterkey.cryptomator.<id>.bkup 的名称保留。如果有其他应用正在同步此保险库，请先等待同步完成。';
+
+  @override
+  String get cryptomatorUpgradeConfirm => '我了解此操作无法撤销';
+
+  @override
+  String get cryptomatorUpgradeAction => '升级';
+
+  @override
+  String get cryptomatorUpgradedMessage => '保险库已升级到格式 8';
+
+  @override
+  String get cryptomatorUpgradeUnlockedError => '请先锁定保险库';
+
+  @override
+  String get cryptomatorConfigMissingWarning =>
+      '缺少 vault.cryptomator。如果有其他应用正在同步此保险库，请等待同步完成后再试。请勿升级。';
+
+  @override
+  String get cryptomatorUpgradeFailedMessage => '无法升级保险库';
 }

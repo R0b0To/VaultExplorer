@@ -3983,5 +3983,17 @@
   "vcToolsHiddenNote": "Das versteckte Volume belegt den freien Speicher am Ende des äußeren Volumes. Binden Sie das äußere Volume danach stets mit Schutz für versteckte Volumes ein, wenn Sie darauf schreiben, sonst kann das versteckte Volume überschrieben werden.",
   "vcToolsPasswordsDiffer": "Die Passwörter stimmen nicht überein.",
   "vcToolsInvalidSize": "Geben Sie eine gültige Größe ein.",
-  "vcToolsCredentialsRequired": "Geben Sie das Volume-Passwort ein oder fügen Sie eine Schlüsseldatei hinzu."
+  "vcToolsCredentialsRequired": "Geben Sie das Volume-Passwort ein oder fügen Sie eine Schlüsseldatei hinzu.",
+  "cryptomatorBackupKeyFilesTitle": "Schlüsseldateien beim Entsperren sichern",
+  "cryptomatorBackupKeyFilesSubtitle": "Legt neben den Originalen eine Kopie von masterkey.cryptomator und vault.cryptomator ab, wie Cryptomator am Computer. Gilt ab dem nächsten Entsperren. Schreibgeschützte Sitzungen schreiben nie.",
+  "cryptomatorUpgradeTitle": "Tresorformat aktualisieren",
+  "cryptomatorUpgradeSubtitle": "Dieser Tresor verwendet das ältere Format 7.",
+  "cryptomatorUpgradeLockFirst": "Tresor zum Aktualisieren sperren",
+  "cryptomatorUpgradeWarning": "Beim Aktualisieren wird dieser Tresor auf Format 8 umgestellt. Das lässt sich nicht rückgängig machen, und Cryptomator-Versionen vor 1.6 können den Tresor danach nicht mehr öffnen.\n\nEine Kopie der aktuellen Schlüsseldatei bleibt als masterkey.cryptomator.<id>.bkup erhalten. Wenn eine andere App diesen Tresor synchronisiert, lassen Sie die Synchronisierung zuerst abschließen.",
+  "cryptomatorUpgradeConfirm": "Mir ist klar, dass sich das nicht rückgängig machen lässt",
+  "cryptomatorUpgradeAction": "Aktualisieren",
+  "cryptomatorUpgradedMessage": "Tresor auf Format 8 aktualisiert",
+  "cryptomatorUpgradeUnlockedError": "Sperren Sie zuerst den Tresor",
+  "cryptomatorConfigMissingWarning": "vault.cryptomator fehlt. Wenn eine andere App diesen Tresor synchronisiert, warten Sie, bis sie fertig ist, und versuchen Sie es dann erneut. Nicht aktualisieren.",
+  "cryptomatorUpgradeFailedMessage": "Tresor konnte nicht aktualisiert werden"
 }

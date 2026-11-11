@@ -3983,5 +3983,17 @@
   "vcToolsHiddenNote": "숨김 볼륨은 외부 볼륨 끝부분의 여유 공간을 차지합니다. 이후 외부 볼륨에 쓸 때는 숨김 볼륨 보호 기능을 켜고 마운트하십시오. 그렇지 않으면 숨김 볼륨이 덮어씌워질 수 있습니다.",
   "vcToolsPasswordsDiffer": "비밀번호가 일치하지 않습니다.",
   "vcToolsInvalidSize": "유효한 크기를 입력하십시오.",
-  "vcToolsCredentialsRequired": "볼륨 비밀번호를 입력하거나 키파일을 추가하십시오."
+  "vcToolsCredentialsRequired": "볼륨 비밀번호를 입력하거나 키파일을 추가하십시오.",
+  "cryptomatorBackupKeyFilesTitle": "잠금 해제 시 키 파일 백업",
+  "cryptomatorBackupKeyFilesSubtitle": "데스크톱 Cryptomator처럼 masterkey.cryptomator와 vault.cryptomator의 사본을 원본 옆에 보관합니다. 다음 잠금 해제부터 적용됩니다. 읽기 전용 세션에서는 아무것도 쓰지 않습니다.",
+  "cryptomatorUpgradeTitle": "보관함 형식 업그레이드",
+  "cryptomatorUpgradeSubtitle": "이 보관함은 이전 형식인 7을 사용합니다.",
+  "cryptomatorUpgradeLockFirst": "업그레이드하려면 보관함을 잠그세요",
+  "cryptomatorUpgradeWarning": "업그레이드하면 이 보관함이 형식 8로 변경됩니다. 되돌릴 수 없으며, 이후에는 1.6 이전 버전의 Cryptomator로 이 보관함을 열 수 없습니다.\n\n현재 키 파일의 사본은 masterkey.cryptomator.<id>.bkup로 보관됩니다. 다른 앱이 이 보관함을 동기화하고 있다면 먼저 동기화가 끝날 때까지 기다리세요.",
+  "cryptomatorUpgradeConfirm": "되돌릴 수 없음을 이해합니다",
+  "cryptomatorUpgradeAction": "업그레이드",
+  "cryptomatorUpgradedMessage": "보관함을 형식 8로 업그레이드했습니다",
+  "cryptomatorUpgradeUnlockedError": "먼저 보관함을 잠그세요",
+  "cryptomatorConfigMissingWarning": "vault.cryptomator가 없습니다. 다른 앱이 이 보관함을 동기화하고 있다면 동기화가 끝날 때까지 기다린 후 다시 시도하세요. 업그레이드하지 마세요.",
+  "cryptomatorUpgradeFailedMessage": "보관함을 업그레이드하지 못했습니다"
 }

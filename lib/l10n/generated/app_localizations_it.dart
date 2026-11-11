@@ -14448,4 +14448,47 @@ class AppLocalizationsIt extends AppLocalizations {
   String galleryPlaceHintCoordinates(int km) {
     return 'Nessuna città entro $km km: raggruppato per coordinate';
   }
+
+  @override
+  String get cryptomatorBackupKeyFilesTitle =>
+      'Esegui il backup dei file chiave allo sblocco';
+
+  @override
+  String get cryptomatorBackupKeyFilesSubtitle =>
+      'Conserva una copia di masterkey.cryptomator e vault.cryptomator accanto agli originali, come Cryptomator sul computer. Vale dal prossimo sblocco. Le sessioni in sola lettura non scrivono mai.';
+
+  @override
+  String get cryptomatorUpgradeTitle => 'Aggiorna il formato della cassaforte';
+
+  @override
+  String get cryptomatorUpgradeSubtitle =>
+      'Questa cassaforte usa il vecchio formato 7.';
+
+  @override
+  String get cryptomatorUpgradeLockFirst =>
+      'Blocca la cassaforte per aggiornarla';
+
+  @override
+  String get cryptomatorUpgradeWarning =>
+      'L’aggiornamento converte questa cassaforte al formato 8. Non si può annullare e le versioni di Cryptomator precedenti alla 1.6 non potranno più aprirla.\n\nUna copia del file chiave attuale viene conservata come masterkey.cryptomator.<id>.bkup. Se un’altra app sincronizza questa cassaforte, lascia prima che finisca la sincronizzazione.';
+
+  @override
+  String get cryptomatorUpgradeConfirm => 'Capisco che non si può annullare';
+
+  @override
+  String get cryptomatorUpgradeAction => 'Aggiorna';
+
+  @override
+  String get cryptomatorUpgradedMessage => 'Cassaforte aggiornata al formato 8';
+
+  @override
+  String get cryptomatorUpgradeUnlockedError => 'Blocca prima la cassaforte';
+
+  @override
+  String get cryptomatorConfigMissingWarning =>
+      'Manca vault.cryptomator. Se un’altra app sincronizza questa cassaforte, attendi che finisca e riprova. Non aggiornare.';
+
+  @override
+  String get cryptomatorUpgradeFailedMessage =>
+      'Impossibile aggiornare la cassaforte';
 }

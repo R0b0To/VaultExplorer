@@ -3983,5 +3983,17 @@
   "vcToolsHiddenNote": "O volume oculto utiliza o espaço livre no final do volume externo. Depois disso, monte o volume externo com a proteção de volume oculto sempre que gravar nele, caso contrário o volume oculto poderá ser sobrescrito.",
   "vcToolsPasswordsDiffer": "As senhas não coincidem.",
   "vcToolsInvalidSize": "Insira um tamanho válido.",
-  "vcToolsCredentialsRequired": "Insira a senha do volume ou adicione um arquivo de chave."
+  "vcToolsCredentialsRequired": "Insira a senha do volume ou adicione um arquivo de chave.",
+  "cryptomatorBackupKeyFilesTitle": "Fazer backup dos arquivos de chave ao desbloquear",
+  "cryptomatorBackupKeyFilesSubtitle": "Mantém uma cópia de masterkey.cryptomator e vault.cryptomator ao lado dos originais, como o Cryptomator no computador. Vale a partir do próximo desbloqueio. Sessões somente leitura nunca gravam.",
+  "cryptomatorUpgradeTitle": "Atualizar o formato do cofre",
+  "cryptomatorUpgradeSubtitle": "Este cofre usa o formato 7, mais antigo.",
+  "cryptomatorUpgradeLockFirst": "Bloqueie o cofre para atualizá-lo",
+  "cryptomatorUpgradeWarning": "A atualização converte este cofre para o formato 8. Não é possível desfazê-la, e versões do Cryptomator anteriores à 1.6 não conseguirão mais abrir o cofre.\n\nUma cópia do arquivo de chave atual é mantida como masterkey.cryptomator.<id>.bkup. Se outro aplicativo sincroniza este cofre, deixe-o terminar a sincronização antes.",
+  "cryptomatorUpgradeConfirm": "Entendo que não é possível desfazer",
+  "cryptomatorUpgradeAction": "Atualizar",
+  "cryptomatorUpgradedMessage": "Cofre atualizado para o formato 8",
+  "cryptomatorUpgradeUnlockedError": "Bloqueie o cofre primeiro",
+  "cryptomatorConfigMissingWarning": "vault.cryptomator está ausente. Se outro aplicativo sincroniza este cofre, aguarde o término e tente novamente. Não atualize.",
+  "cryptomatorUpgradeFailedMessage": "Não foi possível atualizar o cofre"
 }

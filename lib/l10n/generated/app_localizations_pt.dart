@@ -14435,4 +14435,46 @@ class AppLocalizationsPt extends AppLocalizations {
   String galleryPlaceHintCoordinates(int km) {
     return 'Nenhuma cidade em até $km km: agrupado por coordenadas';
   }
+
+  @override
+  String get cryptomatorBackupKeyFilesTitle =>
+      'Fazer backup dos arquivos de chave ao desbloquear';
+
+  @override
+  String get cryptomatorBackupKeyFilesSubtitle =>
+      'Mantém uma cópia de masterkey.cryptomator e vault.cryptomator ao lado dos originais, como o Cryptomator no computador. Vale a partir do próximo desbloqueio. Sessões somente leitura nunca gravam.';
+
+  @override
+  String get cryptomatorUpgradeTitle => 'Atualizar o formato do cofre';
+
+  @override
+  String get cryptomatorUpgradeSubtitle =>
+      'Este cofre usa o formato 7, mais antigo.';
+
+  @override
+  String get cryptomatorUpgradeLockFirst => 'Bloqueie o cofre para atualizá-lo';
+
+  @override
+  String get cryptomatorUpgradeWarning =>
+      'A atualização converte este cofre para o formato 8. Não é possível desfazê-la, e versões do Cryptomator anteriores à 1.6 não conseguirão mais abrir o cofre.\n\nUma cópia do arquivo de chave atual é mantida como masterkey.cryptomator.<id>.bkup. Se outro aplicativo sincroniza este cofre, deixe-o terminar a sincronização antes.';
+
+  @override
+  String get cryptomatorUpgradeConfirm => 'Entendo que não é possível desfazer';
+
+  @override
+  String get cryptomatorUpgradeAction => 'Atualizar';
+
+  @override
+  String get cryptomatorUpgradedMessage => 'Cofre atualizado para o formato 8';
+
+  @override
+  String get cryptomatorUpgradeUnlockedError => 'Bloqueie o cofre primeiro';
+
+  @override
+  String get cryptomatorConfigMissingWarning =>
+      'vault.cryptomator está ausente. Se outro aplicativo sincroniza este cofre, aguarde o término e tente novamente. Não atualize.';
+
+  @override
+  String get cryptomatorUpgradeFailedMessage =>
+      'Não foi possível atualizar o cofre';
 }

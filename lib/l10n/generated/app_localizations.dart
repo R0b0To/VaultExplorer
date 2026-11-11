@@ -24064,6 +24064,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No city within {km} km: grouped by coordinates'**
   String galleryPlaceHintCoordinates(int km);
+
+  /// Title of the switch in a Cryptomator vault's settings that controls whether key-file backups are written when the vault is unlocked
+  ///
+  /// In en, this message translates to:
+  /// **'Back up key files when unlocking'**
+  String get cryptomatorBackupKeyFilesTitle;
+
+  /// Subtitle of the Cryptomator key-file backup switch: what is copied, that it applies from the next unlock, and that read-only sessions never write
+  ///
+  /// In en, this message translates to:
+  /// **'Keeps a copy of masterkey.cryptomator and vault.cryptomator next to the originals, like Cryptomator on desktop. Applies from the next unlock. Read-only sessions never write.'**
+  String get cryptomatorBackupKeyFilesSubtitle;
+
+  /// Title of the settings row (and screen) that upgrades a Cryptomator vault from the older format 7 to format 8
+  ///
+  /// In en, this message translates to:
+  /// **'Upgrade vault format'**
+  String get cryptomatorUpgradeTitle;
+
+  /// Subtitle of the upgrade row for a vault that is still Cryptomator format 7
+  ///
+  /// In en, this message translates to:
+  /// **'This vault uses the older format 7.'**
+  String get cryptomatorUpgradeSubtitle;
+
+  /// Subtitle of the disabled upgrade row while the vault is unlocked
+  ///
+  /// In en, this message translates to:
+  /// **'Lock the vault to upgrade it'**
+  String get cryptomatorUpgradeLockFirst;
+
+  /// Warning on the Cryptomator format upgrade screen: what changes, that it is one-way, that older Cryptomator cannot open the vault, where the key-file copy goes, and that sync must finish first
+  ///
+  /// In en, this message translates to:
+  /// **'Upgrading changes this vault to format 8. It cannot be undone, and Cryptomator versions older than 1.6 will no longer be able to open the vault afterwards.\n\nA copy of the current key file is kept as masterkey.cryptomator.<id>.bkup. If another app syncs this vault, let it finish syncing first.'**
+  String get cryptomatorUpgradeWarning;
+
+  /// Checkbox on the Cryptomator upgrade screen the user must tick before the upgrade button works
+  ///
+  /// In en, this message translates to:
+  /// **'I understand this can\'t be undone'**
+  String get cryptomatorUpgradeConfirm;
+
+  /// Button that runs the Cryptomator vault format upgrade
+  ///
+  /// In en, this message translates to:
+  /// **'Upgrade'**
+  String get cryptomatorUpgradeAction;
+
+  /// Snackbar shown after a Cryptomator vault was upgraded to format 8
+  ///
+  /// In en, this message translates to:
+  /// **'Vault upgraded to format 8'**
+  String get cryptomatorUpgradedMessage;
+
+  /// Error shown when the format upgrade is refused because the vault is unlocked
+  ///
+  /// In en, this message translates to:
+  /// **'Lock the vault first'**
+  String get cryptomatorUpgradeUnlockedError;
+
+  /// Warning row for a Cryptomator vault whose vault.cryptomator is missing (usually not synced yet); the user must wait and must not upgrade
+  ///
+  /// In en, this message translates to:
+  /// **'vault.cryptomator is missing. If another app syncs this vault, wait for it to finish, then try again. Do not upgrade.'**
+  String get cryptomatorConfigMissingWarning;
+
+  /// Generic error when the Cryptomator format upgrade fails without a more specific message
+  ///
+  /// In en, this message translates to:
+  /// **'Could not upgrade the vault'**
+  String get cryptomatorUpgradeFailedMessage;
 }
 
 class _AppLocalizationsDelegate

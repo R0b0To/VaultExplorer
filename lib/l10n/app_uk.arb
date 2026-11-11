@@ -3983,5 +3983,17 @@
   "vcToolsHiddenNote": "Прихований том займає вільне місце в кінці зовнішнього тому. Надалі монтуйте зовнішній том із захистом прихованого тому щоразу, коли записуєте на нього, інакше прихований том може бути перезаписано.",
   "vcToolsPasswordsDiffer": "Паролі не збігаються.",
   "vcToolsInvalidSize": "Введіть коректний розмір.",
-  "vcToolsCredentialsRequired": "Введіть пароль тому або додайте файл ключа."
+  "vcToolsCredentialsRequired": "Введіть пароль тому або додайте файл ключа.",
+  "cryptomatorBackupKeyFilesTitle": "Резервне копіювання файлів ключів під час розблокування",
+  "cryptomatorBackupKeyFilesSubtitle": "Зберігає копію masterkey.cryptomator і vault.cryptomator поруч з оригіналами, як Cryptomator на комп’ютері. Діє з наступного розблокування. Сеанси лише для читання нічого не записують.",
+  "cryptomatorUpgradeTitle": "Оновити формат сховища",
+  "cryptomatorUpgradeSubtitle": "Це сховище використовує старіший формат 7.",
+  "cryptomatorUpgradeLockFirst": "Заблокуйте сховище, щоб оновити його",
+  "cryptomatorUpgradeWarning": "Оновлення змінює формат цього сховища на 8. Це не можна скасувати, і версії Cryptomator, старіші за 1.6, більше не зможуть відкрити це сховище.\n\nКопія поточного файлу ключа зберігається як masterkey.cryptomator.<id>.bkup. Якщо інший застосунок синхронізує це сховище, спершу дочекайтеся завершення синхронізації.",
+  "cryptomatorUpgradeConfirm": "Я розумію, що це не можна скасувати",
+  "cryptomatorUpgradeAction": "Оновити",
+  "cryptomatorUpgradedMessage": "Сховище оновлено до формату 8",
+  "cryptomatorUpgradeUnlockedError": "Спершу заблокуйте сховище",
+  "cryptomatorConfigMissingWarning": "Файл vault.cryptomator відсутній. Якщо інший застосунок синхронізує це сховище, дочекайтеся завершення й спробуйте ще раз. Не оновлюйте.",
+  "cryptomatorUpgradeFailedMessage": "Не вдалося оновити сховище"
 }

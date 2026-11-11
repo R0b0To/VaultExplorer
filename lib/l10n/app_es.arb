@@ -3983,5 +3983,17 @@
   "vcToolsHiddenNote": "El volumen oculto ocupa el espacio libre al final del volumen externo. Después, monta el volumen externo con protección de volumen oculto cada vez que escribas en él, o el volumen oculto podría ser sobrescrito.",
   "vcToolsPasswordsDiffer": "Las contraseñas no coinciden.",
   "vcToolsInvalidSize": "Introduce un tamaño válido.",
-  "vcToolsCredentialsRequired": "Introduce la contraseña del volumen o añade un archivo de claves."
+  "vcToolsCredentialsRequired": "Introduce la contraseña del volumen o añade un archivo de claves.",
+  "cryptomatorBackupKeyFilesTitle": "Copia de seguridad de los archivos de clave al desbloquear",
+  "cryptomatorBackupKeyFilesSubtitle": "Guarda una copia de masterkey.cryptomator y vault.cryptomator junto a los originales, como Cryptomator en el ordenador. Se aplica desde el próximo desbloqueo. Las sesiones de solo lectura nunca escriben.",
+  "cryptomatorUpgradeTitle": "Actualizar el formato de la bóveda",
+  "cryptomatorUpgradeSubtitle": "Esta bóveda usa el formato 7, más antiguo.",
+  "cryptomatorUpgradeLockFirst": "Bloquea la bóveda para actualizarla",
+  "cryptomatorUpgradeWarning": "Al actualizar, esta bóveda pasa al formato 8. No se puede deshacer, y las versiones de Cryptomator anteriores a la 1.6 ya no podrán abrir la bóveda.\n\nSe conserva una copia del archivo de clave actual como masterkey.cryptomator.<id>.bkup. Si otra aplicación sincroniza esta bóveda, deja que termine de sincronizar antes.",
+  "cryptomatorUpgradeConfirm": "Entiendo que no se puede deshacer",
+  "cryptomatorUpgradeAction": "Actualizar",
+  "cryptomatorUpgradedMessage": "Bóveda actualizada al formato 8",
+  "cryptomatorUpgradeUnlockedError": "Bloquea primero la bóveda",
+  "cryptomatorConfigMissingWarning": "Falta vault.cryptomator. Si otra aplicación sincroniza esta bóveda, espera a que termine y vuelve a intentarlo. No actualices.",
+  "cryptomatorUpgradeFailedMessage": "No se pudo actualizar la bóveda"
 }

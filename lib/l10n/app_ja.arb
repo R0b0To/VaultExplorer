@@ -3983,5 +3983,17 @@
   "vcToolsHiddenNote": "隠しボリュームは外側ボリュームの末尾の空き領域を使用します。作成後、外側ボリュームへの書き込みを行う際は必ず隠しボリューム保護を有効にしてマウントしてください。保護しないと隠しボリュームが上書きされる可能性があります。",
   "vcToolsPasswordsDiffer": "パスワードが一致しません。",
   "vcToolsInvalidSize": "有効なサイズを入力してください。",
-  "vcToolsCredentialsRequired": "ボリュームのパスワードを入力するか、キーファイルを追加してください。"
+  "vcToolsCredentialsRequired": "ボリュームのパスワードを入力するか、キーファイルを追加してください。",
+  "cryptomatorBackupKeyFilesTitle": "ロック解除時にキーファイルをバックアップ",
+  "cryptomatorBackupKeyFilesSubtitle": "デスクトップ版 Cryptomator と同様に、masterkey.cryptomator と vault.cryptomator のコピーを元のファイルの隣に保存します。次回のロック解除から有効です。読み取り専用のセッションでは書き込みません。",
+  "cryptomatorUpgradeTitle": "保管庫の形式をアップグレード",
+  "cryptomatorUpgradeSubtitle": "この保管庫は古い形式 7 を使用しています。",
+  "cryptomatorUpgradeLockFirst": "アップグレードするには保管庫をロックしてください",
+  "cryptomatorUpgradeWarning": "アップグレードすると、この保管庫は形式 8 に変更されます。元に戻すことはできず、その後は 1.6 より前のバージョンの Cryptomator ではこの保管庫を開けなくなります。\n\n現在のキーファイルのコピーは masterkey.cryptomator.<id>.bkup として保持されます。別のアプリがこの保管庫を同期している場合は、先に同期が完了するまで待ってください。",
+  "cryptomatorUpgradeConfirm": "元に戻せないことを理解しました",
+  "cryptomatorUpgradeAction": "アップグレード",
+  "cryptomatorUpgradedMessage": "保管庫を形式 8 にアップグレードしました",
+  "cryptomatorUpgradeUnlockedError": "先に保管庫をロックしてください",
+  "cryptomatorConfigMissingWarning": "vault.cryptomator が見つかりません。別のアプリがこの保管庫を同期している場合は、同期が完了するまで待ってから、もう一度お試しください。アップグレードしないでください。",
+  "cryptomatorUpgradeFailedMessage": "保管庫をアップグレードできませんでした"
 }

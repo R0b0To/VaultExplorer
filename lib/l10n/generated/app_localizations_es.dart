@@ -14475,4 +14475,47 @@ class AppLocalizationsEs extends AppLocalizations {
   String galleryPlaceHintCoordinates(int km) {
     return 'Ninguna ciudad a menos de $km km: agrupado por coordenadas';
   }
+
+  @override
+  String get cryptomatorBackupKeyFilesTitle =>
+      'Copia de seguridad de los archivos de clave al desbloquear';
+
+  @override
+  String get cryptomatorBackupKeyFilesSubtitle =>
+      'Guarda una copia de masterkey.cryptomator y vault.cryptomator junto a los originales, como Cryptomator en el ordenador. Se aplica desde el próximo desbloqueo. Las sesiones de solo lectura nunca escriben.';
+
+  @override
+  String get cryptomatorUpgradeTitle => 'Actualizar el formato de la bóveda';
+
+  @override
+  String get cryptomatorUpgradeSubtitle =>
+      'Esta bóveda usa el formato 7, más antiguo.';
+
+  @override
+  String get cryptomatorUpgradeLockFirst =>
+      'Bloquea la bóveda para actualizarla';
+
+  @override
+  String get cryptomatorUpgradeWarning =>
+      'Al actualizar, esta bóveda pasa al formato 8. No se puede deshacer, y las versiones de Cryptomator anteriores a la 1.6 ya no podrán abrir la bóveda.\n\nSe conserva una copia del archivo de clave actual como masterkey.cryptomator.<id>.bkup. Si otra aplicación sincroniza esta bóveda, deja que termine de sincronizar antes.';
+
+  @override
+  String get cryptomatorUpgradeConfirm => 'Entiendo que no se puede deshacer';
+
+  @override
+  String get cryptomatorUpgradeAction => 'Actualizar';
+
+  @override
+  String get cryptomatorUpgradedMessage => 'Bóveda actualizada al formato 8';
+
+  @override
+  String get cryptomatorUpgradeUnlockedError => 'Bloquea primero la bóveda';
+
+  @override
+  String get cryptomatorConfigMissingWarning =>
+      'Falta vault.cryptomator. Si otra aplicación sincroniza esta bóveda, espera a que termine y vuelve a intentarlo. No actualices.';
+
+  @override
+  String get cryptomatorUpgradeFailedMessage =>
+      'No se pudo actualizar la bóveda';
 }

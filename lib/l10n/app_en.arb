@@ -16172,5 +16172,53 @@
         "type": "int"
       }
     }
+  },
+  "cryptomatorBackupKeyFilesTitle": "Back up key files when unlocking",
+  "@cryptomatorBackupKeyFilesTitle": {
+    "description": "Title of the switch in a Cryptomator vault's settings that controls whether key-file backups are written when the vault is unlocked"
+  },
+  "cryptomatorBackupKeyFilesSubtitle": "Keeps a copy of masterkey.cryptomator and vault.cryptomator next to the originals, like Cryptomator on desktop. Applies from the next unlock. Read-only sessions never write.",
+  "@cryptomatorBackupKeyFilesSubtitle": {
+    "description": "Subtitle of the Cryptomator key-file backup switch: what is copied, that it applies from the next unlock, and that read-only sessions never write"
+  },
+  "cryptomatorUpgradeTitle": "Upgrade vault format",
+  "@cryptomatorUpgradeTitle": {
+    "description": "Title of the settings row (and screen) that upgrades a Cryptomator vault from the older format 7 to format 8"
+  },
+  "cryptomatorUpgradeSubtitle": "This vault uses the older format 7.",
+  "@cryptomatorUpgradeSubtitle": {
+    "description": "Subtitle of the upgrade row for a vault that is still Cryptomator format 7"
+  },
+  "cryptomatorUpgradeLockFirst": "Lock the vault to upgrade it",
+  "@cryptomatorUpgradeLockFirst": {
+    "description": "Subtitle of the disabled upgrade row while the vault is unlocked"
+  },
+  "cryptomatorUpgradeWarning": "Upgrading changes this vault to format 8. It cannot be undone, and Cryptomator versions older than 1.6 will no longer be able to open the vault afterwards.\n\nA copy of the current key file is kept as masterkey.cryptomator.<id>.bkup. If another app syncs this vault, let it finish syncing first.",
+  "@cryptomatorUpgradeWarning": {
+    "description": "Warning on the Cryptomator format upgrade screen: what changes, that it is one-way, that older Cryptomator cannot open the vault, where the key-file copy goes, and that sync must finish first"
+  },
+  "cryptomatorUpgradeConfirm": "I understand this can't be undone",
+  "@cryptomatorUpgradeConfirm": {
+    "description": "Checkbox on the Cryptomator upgrade screen the user must tick before the upgrade button works"
+  },
+  "cryptomatorUpgradeAction": "Upgrade",
+  "@cryptomatorUpgradeAction": {
+    "description": "Button that runs the Cryptomator vault format upgrade"
+  },
+  "cryptomatorUpgradedMessage": "Vault upgraded to format 8",
+  "@cryptomatorUpgradedMessage": {
+    "description": "Snackbar shown after a Cryptomator vault was upgraded to format 8"
+  },
+  "cryptomatorUpgradeUnlockedError": "Lock the vault first",
+  "@cryptomatorUpgradeUnlockedError": {
+    "description": "Error shown when the format upgrade is refused because the vault is unlocked"
+  },
+  "cryptomatorConfigMissingWarning": "vault.cryptomator is missing. If another app syncs this vault, wait for it to finish, then try again. Do not upgrade.",
+  "@cryptomatorConfigMissingWarning": {
+    "description": "Warning row for a Cryptomator vault whose vault.cryptomator is missing (usually not synced yet); the user must wait and must not upgrade"
+  },
+  "cryptomatorUpgradeFailedMessage": "Could not upgrade the vault",
+  "@cryptomatorUpgradeFailedMessage": {
+    "description": "Generic error when the Cryptomator format upgrade fails without a more specific message"
   }
 }

@@ -13650,4 +13650,43 @@ class AppLocalizationsKo extends AppLocalizations {
   String galleryPlaceHintCoordinates(int km) {
     return '$km km 이내에 도시 없음: 좌표로 그룹화';
   }
+
+  @override
+  String get cryptomatorBackupKeyFilesTitle => '잠금 해제 시 키 파일 백업';
+
+  @override
+  String get cryptomatorBackupKeyFilesSubtitle =>
+      '데스크톱 Cryptomator처럼 masterkey.cryptomator와 vault.cryptomator의 사본을 원본 옆에 보관합니다. 다음 잠금 해제부터 적용됩니다. 읽기 전용 세션에서는 아무것도 쓰지 않습니다.';
+
+  @override
+  String get cryptomatorUpgradeTitle => '보관함 형식 업그레이드';
+
+  @override
+  String get cryptomatorUpgradeSubtitle => '이 보관함은 이전 형식인 7을 사용합니다.';
+
+  @override
+  String get cryptomatorUpgradeLockFirst => '업그레이드하려면 보관함을 잠그세요';
+
+  @override
+  String get cryptomatorUpgradeWarning =>
+      '업그레이드하면 이 보관함이 형식 8로 변경됩니다. 되돌릴 수 없으며, 이후에는 1.6 이전 버전의 Cryptomator로 이 보관함을 열 수 없습니다.\n\n현재 키 파일의 사본은 masterkey.cryptomator.<id>.bkup로 보관됩니다. 다른 앱이 이 보관함을 동기화하고 있다면 먼저 동기화가 끝날 때까지 기다리세요.';
+
+  @override
+  String get cryptomatorUpgradeConfirm => '되돌릴 수 없음을 이해합니다';
+
+  @override
+  String get cryptomatorUpgradeAction => '업그레이드';
+
+  @override
+  String get cryptomatorUpgradedMessage => '보관함을 형식 8로 업그레이드했습니다';
+
+  @override
+  String get cryptomatorUpgradeUnlockedError => '먼저 보관함을 잠그세요';
+
+  @override
+  String get cryptomatorConfigMissingWarning =>
+      'vault.cryptomator가 없습니다. 다른 앱이 이 보관함을 동기화하고 있다면 동기화가 끝날 때까지 기다린 후 다시 시도하세요. 업그레이드하지 마세요.';
+
+  @override
+  String get cryptomatorUpgradeFailedMessage => '보관함을 업그레이드하지 못했습니다';
 }

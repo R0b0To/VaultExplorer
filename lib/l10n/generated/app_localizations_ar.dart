@@ -14471,4 +14471,45 @@ class AppLocalizationsAr extends AppLocalizations {
   String galleryPlaceHintCoordinates(int km) {
     return 'لا توجد مدينة ضمن $km كم: مجمّعة حسب الإحداثيات';
   }
+
+  @override
+  String get cryptomatorBackupKeyFilesTitle =>
+      'نسخ احتياطي لملفات المفاتيح عند فتح القفل';
+
+  @override
+  String get cryptomatorBackupKeyFilesSubtitle =>
+      'يحتفظ بنسخة من masterkey.cryptomator وvault.cryptomator بجوار الملفات الأصلية، كما يفعل Cryptomator على سطح المكتب. يسري من عملية الفتح التالية. جلسات القراءة فقط لا تكتب أي شيء أبدًا.';
+
+  @override
+  String get cryptomatorUpgradeTitle => 'ترقية تنسيق الخزنة';
+
+  @override
+  String get cryptomatorUpgradeSubtitle =>
+      'تستخدم هذه الخزنة التنسيق 7 الأقدم.';
+
+  @override
+  String get cryptomatorUpgradeLockFirst => 'اقفل الخزنة لترقيتها';
+
+  @override
+  String get cryptomatorUpgradeWarning =>
+      'تؤدي الترقية إلى تحويل هذه الخزنة إلى التنسيق 8. لا يمكن التراجع عنها، ولن تتمكن إصدارات Cryptomator الأقدم من 1.6 من فتح الخزنة بعد ذلك.\n\nيُحتفظ بنسخة من ملف المفتاح الحالي باسم masterkey.cryptomator.<id>.bkup. إذا كان تطبيق آخر يزامن هذه الخزنة، فدعه ينهي المزامنة أولًا.';
+
+  @override
+  String get cryptomatorUpgradeConfirm => 'أفهم أنه لا يمكن التراجع عن هذا';
+
+  @override
+  String get cryptomatorUpgradeAction => 'ترقية';
+
+  @override
+  String get cryptomatorUpgradedMessage => 'تمت ترقية الخزنة إلى التنسيق 8';
+
+  @override
+  String get cryptomatorUpgradeUnlockedError => 'اقفل الخزنة أولًا';
+
+  @override
+  String get cryptomatorConfigMissingWarning =>
+      'الملف vault.cryptomator مفقود. إذا كان تطبيق آخر يزامن هذه الخزنة، فانتظر حتى تنتهي المزامنة ثم حاول مرة أخرى. لا تقم بالترقية.';
+
+  @override
+  String get cryptomatorUpgradeFailedMessage => 'تعذرت ترقية الخزنة';
 }

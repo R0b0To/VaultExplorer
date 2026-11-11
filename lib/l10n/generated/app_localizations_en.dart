@@ -14219,4 +14219,45 @@ class AppLocalizationsEn extends AppLocalizations {
   String galleryPlaceHintCoordinates(int km) {
     return 'No city within $km km: grouped by coordinates';
   }
+
+  @override
+  String get cryptomatorBackupKeyFilesTitle =>
+      'Back up key files when unlocking';
+
+  @override
+  String get cryptomatorBackupKeyFilesSubtitle =>
+      'Keeps a copy of masterkey.cryptomator and vault.cryptomator next to the originals, like Cryptomator on desktop. Applies from the next unlock. Read-only sessions never write.';
+
+  @override
+  String get cryptomatorUpgradeTitle => 'Upgrade vault format';
+
+  @override
+  String get cryptomatorUpgradeSubtitle =>
+      'This vault uses the older format 7.';
+
+  @override
+  String get cryptomatorUpgradeLockFirst => 'Lock the vault to upgrade it';
+
+  @override
+  String get cryptomatorUpgradeWarning =>
+      'Upgrading changes this vault to format 8. It cannot be undone, and Cryptomator versions older than 1.6 will no longer be able to open the vault afterwards.\n\nA copy of the current key file is kept as masterkey.cryptomator.<id>.bkup. If another app syncs this vault, let it finish syncing first.';
+
+  @override
+  String get cryptomatorUpgradeConfirm => 'I understand this can\'t be undone';
+
+  @override
+  String get cryptomatorUpgradeAction => 'Upgrade';
+
+  @override
+  String get cryptomatorUpgradedMessage => 'Vault upgraded to format 8';
+
+  @override
+  String get cryptomatorUpgradeUnlockedError => 'Lock the vault first';
+
+  @override
+  String get cryptomatorConfigMissingWarning =>
+      'vault.cryptomator is missing. If another app syncs this vault, wait for it to finish, then try again. Do not upgrade.';
+
+  @override
+  String get cryptomatorUpgradeFailedMessage => 'Could not upgrade the vault';
 }

@@ -3983,5 +3983,17 @@
   "vcToolsHiddenNote": "Le volume caché utilise l’espace libre à la fin du volume externe. Ensuite, montez toujours le volume externe avec la protection du volume caché lorsque vous y écrivez, sinon le volume caché risque d’être écrasé.",
   "vcToolsPasswordsDiffer": "Les mots de passe ne correspondent pas.",
   "vcToolsInvalidSize": "Entrez une taille valide.",
-  "vcToolsCredentialsRequired": "Entrez le mot de passe du volume ou ajoutez un fichier clé."
+  "vcToolsCredentialsRequired": "Entrez le mot de passe du volume ou ajoutez un fichier clé.",
+  "cryptomatorBackupKeyFilesTitle": "Sauvegarder les fichiers de clé au déverrouillage",
+  "cryptomatorBackupKeyFilesSubtitle": "Conserve une copie de masterkey.cryptomator et de vault.cryptomator à côté des originaux, comme Cryptomator sur ordinateur. S’applique dès le prochain déverrouillage. Les sessions en lecture seule n’écrivent jamais.",
+  "cryptomatorUpgradeTitle": "Mettre à niveau le format du coffre",
+  "cryptomatorUpgradeSubtitle": "Ce coffre utilise l’ancien format 7.",
+  "cryptomatorUpgradeLockFirst": "Verrouillez le coffre pour le mettre à niveau",
+  "cryptomatorUpgradeWarning": "La mise à niveau convertit ce coffre au format 8. Elle est irréversible, et les versions de Cryptomator antérieures à la 1.6 ne pourront plus ouvrir le coffre ensuite.\n\nUne copie du fichier de clé actuel est conservée sous le nom masterkey.cryptomator.<id>.bkup. Si une autre application synchronise ce coffre, laissez-la d’abord terminer la synchronisation.",
+  "cryptomatorUpgradeConfirm": "Je comprends que c’est irréversible",
+  "cryptomatorUpgradeAction": "Mettre à niveau",
+  "cryptomatorUpgradedMessage": "Coffre mis à niveau au format 8",
+  "cryptomatorUpgradeUnlockedError": "Verrouillez d’abord le coffre",
+  "cryptomatorConfigMissingWarning": "vault.cryptomator est manquant. Si une autre application synchronise ce coffre, attendez la fin de la synchronisation, puis réessayez. Ne lancez pas la mise à niveau.",
+  "cryptomatorUpgradeFailedMessage": "Impossible de mettre à niveau le coffre"
 }

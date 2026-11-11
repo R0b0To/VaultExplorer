@@ -14555,4 +14555,47 @@ class AppLocalizationsFr extends AppLocalizations {
   String galleryPlaceHintCoordinates(int km) {
     return 'Aucune ville à moins de $km km : regroupé par coordonnées';
   }
+
+  @override
+  String get cryptomatorBackupKeyFilesTitle =>
+      'Sauvegarder les fichiers de clé au déverrouillage';
+
+  @override
+  String get cryptomatorBackupKeyFilesSubtitle =>
+      'Conserve une copie de masterkey.cryptomator et de vault.cryptomator à côté des originaux, comme Cryptomator sur ordinateur. S’applique dès le prochain déverrouillage. Les sessions en lecture seule n’écrivent jamais.';
+
+  @override
+  String get cryptomatorUpgradeTitle => 'Mettre à niveau le format du coffre';
+
+  @override
+  String get cryptomatorUpgradeSubtitle =>
+      'Ce coffre utilise l’ancien format 7.';
+
+  @override
+  String get cryptomatorUpgradeLockFirst =>
+      'Verrouillez le coffre pour le mettre à niveau';
+
+  @override
+  String get cryptomatorUpgradeWarning =>
+      'La mise à niveau convertit ce coffre au format 8. Elle est irréversible, et les versions de Cryptomator antérieures à la 1.6 ne pourront plus ouvrir le coffre ensuite.\n\nUne copie du fichier de clé actuel est conservée sous le nom masterkey.cryptomator.<id>.bkup. Si une autre application synchronise ce coffre, laissez-la d’abord terminer la synchronisation.';
+
+  @override
+  String get cryptomatorUpgradeConfirm => 'Je comprends que c’est irréversible';
+
+  @override
+  String get cryptomatorUpgradeAction => 'Mettre à niveau';
+
+  @override
+  String get cryptomatorUpgradedMessage => 'Coffre mis à niveau au format 8';
+
+  @override
+  String get cryptomatorUpgradeUnlockedError => 'Verrouillez d’abord le coffre';
+
+  @override
+  String get cryptomatorConfigMissingWarning =>
+      'vault.cryptomator est manquant. Si une autre application synchronise ce coffre, attendez la fin de la synchronisation, puis réessayez. Ne lancez pas la mise à niveau.';
+
+  @override
+  String get cryptomatorUpgradeFailedMessage =>
+      'Impossible de mettre à niveau le coffre';
 }

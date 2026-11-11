@@ -3983,5 +3983,17 @@
   "vcToolsHiddenNote": "隐藏卷占用外层卷末尾的可用空间。之后，每当向外层卷写入数据时，请务必启用隐藏卷保护进行挂载，否则隐藏卷可能会被覆盖。",
   "vcToolsPasswordsDiffer": "密码不匹配。",
   "vcToolsInvalidSize": "请输入有效的大小。",
-  "vcToolsCredentialsRequired": "请输入卷密码或添加密钥文件。"
+  "vcToolsCredentialsRequired": "请输入卷密码或添加密钥文件。",
+  "cryptomatorBackupKeyFilesTitle": "解锁时备份密钥文件",
+  "cryptomatorBackupKeyFilesSubtitle": "与桌面版 Cryptomator 一样，在原文件旁保留 masterkey.cryptomator 和 vault.cryptomator 的副本。从下次解锁起生效。只读会话不会写入。",
+  "cryptomatorUpgradeTitle": "升级保险库格式",
+  "cryptomatorUpgradeSubtitle": "此保险库使用较旧的格式 7。",
+  "cryptomatorUpgradeLockFirst": "请先锁定保险库再升级",
+  "cryptomatorUpgradeWarning": "升级会将此保险库更改为格式 8。此操作无法撤销，之后低于 1.6 的 Cryptomator 版本将无法再打开该保险库。\n\n当前密钥文件的副本会以 masterkey.cryptomator.<id>.bkup 的名称保留。如果有其他应用正在同步此保险库，请先等待同步完成。",
+  "cryptomatorUpgradeConfirm": "我了解此操作无法撤销",
+  "cryptomatorUpgradeAction": "升级",
+  "cryptomatorUpgradedMessage": "保险库已升级到格式 8",
+  "cryptomatorUpgradeUnlockedError": "请先锁定保险库",
+  "cryptomatorConfigMissingWarning": "缺少 vault.cryptomator。如果有其他应用正在同步此保险库，请等待同步完成后再试。请勿升级。",
+  "cryptomatorUpgradeFailedMessage": "无法升级保险库"
 }

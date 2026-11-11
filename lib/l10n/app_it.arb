@@ -3983,5 +3983,17 @@
   "vcToolsHiddenNote": "Il volume nascosto occupa lo spazio libero alla fine del volume esterno. In seguito, monta il volume esterno con la protezione del volume nascosto ogni volta che ci scrivi, altrimenti il volume nascosto potrebbe essere sovrascritto.",
   "vcToolsPasswordsDiffer": "Le password non corrispondono.",
   "vcToolsInvalidSize": "Inserisci una dimensione valida.",
-  "vcToolsCredentialsRequired": "Inserisci la password del volume o aggiungi un file chiave."
+  "vcToolsCredentialsRequired": "Inserisci la password del volume o aggiungi un file chiave.",
+  "cryptomatorBackupKeyFilesTitle": "Esegui il backup dei file chiave allo sblocco",
+  "cryptomatorBackupKeyFilesSubtitle": "Conserva una copia di masterkey.cryptomator e vault.cryptomator accanto agli originali, come Cryptomator sul computer. Vale dal prossimo sblocco. Le sessioni in sola lettura non scrivono mai.",
+  "cryptomatorUpgradeTitle": "Aggiorna il formato della cassaforte",
+  "cryptomatorUpgradeSubtitle": "Questa cassaforte usa il vecchio formato 7.",
+  "cryptomatorUpgradeLockFirst": "Blocca la cassaforte per aggiornarla",
+  "cryptomatorUpgradeWarning": "L’aggiornamento converte questa cassaforte al formato 8. Non si può annullare e le versioni di Cryptomator precedenti alla 1.6 non potranno più aprirla.\n\nUna copia del file chiave attuale viene conservata come masterkey.cryptomator.<id>.bkup. Se un’altra app sincronizza questa cassaforte, lascia prima che finisca la sincronizzazione.",
+  "cryptomatorUpgradeConfirm": "Capisco che non si può annullare",
+  "cryptomatorUpgradeAction": "Aggiorna",
+  "cryptomatorUpgradedMessage": "Cassaforte aggiornata al formato 8",
+  "cryptomatorUpgradeUnlockedError": "Blocca prima la cassaforte",
+  "cryptomatorConfigMissingWarning": "Manca vault.cryptomator. Se un’altra app sincronizza questa cassaforte, attendi che finisca e riprova. Non aggiornare.",
+  "cryptomatorUpgradeFailedMessage": "Impossibile aggiornare la cassaforte"
 }

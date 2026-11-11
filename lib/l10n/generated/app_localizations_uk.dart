@@ -14539,4 +14539,46 @@ class AppLocalizationsUk extends AppLocalizations {
   String galleryPlaceHintCoordinates(int km) {
     return 'Немає міст у межах $km км: згруповано за координатами';
   }
+
+  @override
+  String get cryptomatorBackupKeyFilesTitle =>
+      'Резервне копіювання файлів ключів під час розблокування';
+
+  @override
+  String get cryptomatorBackupKeyFilesSubtitle =>
+      'Зберігає копію masterkey.cryptomator і vault.cryptomator поруч з оригіналами, як Cryptomator на комп’ютері. Діє з наступного розблокування. Сеанси лише для читання нічого не записують.';
+
+  @override
+  String get cryptomatorUpgradeTitle => 'Оновити формат сховища';
+
+  @override
+  String get cryptomatorUpgradeSubtitle =>
+      'Це сховище використовує старіший формат 7.';
+
+  @override
+  String get cryptomatorUpgradeLockFirst =>
+      'Заблокуйте сховище, щоб оновити його';
+
+  @override
+  String get cryptomatorUpgradeWarning =>
+      'Оновлення змінює формат цього сховища на 8. Це не можна скасувати, і версії Cryptomator, старіші за 1.6, більше не зможуть відкрити це сховище.\n\nКопія поточного файлу ключа зберігається як masterkey.cryptomator.<id>.bkup. Якщо інший застосунок синхронізує це сховище, спершу дочекайтеся завершення синхронізації.';
+
+  @override
+  String get cryptomatorUpgradeConfirm => 'Я розумію, що це не можна скасувати';
+
+  @override
+  String get cryptomatorUpgradeAction => 'Оновити';
+
+  @override
+  String get cryptomatorUpgradedMessage => 'Сховище оновлено до формату 8';
+
+  @override
+  String get cryptomatorUpgradeUnlockedError => 'Спершу заблокуйте сховище';
+
+  @override
+  String get cryptomatorConfigMissingWarning =>
+      'Файл vault.cryptomator відсутній. Якщо інший застосунок синхронізує це сховище, дочекайтеся завершення й спробуйте ще раз. Не оновлюйте.';
+
+  @override
+  String get cryptomatorUpgradeFailedMessage => 'Не вдалося оновити сховище';
 }

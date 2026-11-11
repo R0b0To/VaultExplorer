@@ -22,6 +22,7 @@
 #include "filesystems/filesystem_paths.h"
 #include "containers/container_utils.h"
 #include "containers/vc_header_build.h"
+#include "containers/vc_header_backup.h"
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
 
@@ -567,21 +568,20 @@ HeaderRestoreResult restoreContainerHeaderRegionImpl(
             };
             bool verified = false;
             bool verifiedAsHidden = false;
+            unsigned char keyMaterial[192];
+            unsigned char decryptedHeader[VC_HEADER_BODY_SIZE];
+            CascadeId matchedCipher{};
+            HashId matchedHash{};
+            ParsedHeaderFields fields;
             for (uint64_t slotOffset : candidateOffsets) {
                 if (slotOffset != 0 && payloadLen < slotOffset + VC_FULL_HEADER_SIZE) {
                     rlog(opId, "Backup doesn't include a hidden-volume header slot -- skipping it.");
                     continue;
                 }
-                unsigned char keyMaterial[192];
-                unsigned char decryptedHeader[VC_HEADER_BODY_SIZE];
-                CascadeId matchedCipher;
-                HashId matchedHash;
-                ParsedHeaderFields fields;
                 const bool slotVerified = deriveAndValidateHeader(
                     payload + slotOffset, password, passwordLen, pim, cipherId, hashId,
                     keyMaterial, decryptedHeader, matchedCipher, matchedHash, fields);
                 mbedtls_platform_zeroize(keyMaterial, sizeof(keyMaterial));
-                mbedtls_platform_zeroize(decryptedHeader, sizeof(decryptedHeader));
                 if (slotVerified) {
                     verified = true;
                     verifiedAsHidden = fields.isHiddenVolume();
@@ -593,6 +593,7 @@ HeaderRestoreResult restoreContainerHeaderRegionImpl(
                                : "Hidden-volume header slot didn't decrypt/verify under this password either.");
             }
             if (!verified) {
+                mbedtls_platform_zeroize(decryptedHeader, sizeof(decryptedHeader));
                 rlog(opId, "Backup header didn't decrypt/verify under this password.");
                 return HeaderRestoreResult::kPasswordIncorrect;
             }
@@ -600,7 +601,27 @@ HeaderRestoreResult restoreContainerHeaderRegionImpl(
                            ? "Backup header decrypted and CRC-validated as a genuine hidden volume header."
                            : "Backup header decrypted and CRC-validated as a genuine standard volume header.");
             if (outWasHiddenVolume) *outWasHiddenVolume = verifiedAsHidden;
-            break;
+            // Desktop VeraCrypt semantics (see containers/vc_header_backup.h): write back ONLY the header
+            // that decrypted -- the standard-volume slot or the hidden-volume slot, never both, so a
+            // restore cannot clobber the other volume's header -- each under its own fresh salt, plus
+            // the embedded backup copy of that header at the end of the container.
+            rlog(opId, "Re-encrypting the header under fresh salts and writing it plus its embedded backup copy...");
+            const VcRestoreApplyResult applied = vcApplyRestoredHeader(
+                decryptedHeader, matchedCipher, matchedHash, password, passwordLen, pim,
+                verifiedAsHidden, static_cast<uint64_t>(st.st_size),
+                [fd](uint64_t off, const unsigned char* data, size_t len) { return pwriteFully(fd, off, data, len); });
+            mbedtls_platform_zeroize(decryptedHeader, sizeof(decryptedHeader));
+            if (applied == VcRestoreApplyResult::kOk) {
+                fsync(fd);
+                rlog(opId, "Header restored from the backup file.");
+                return HeaderRestoreResult::kSuccess;
+            }
+            rlog(opId, applied == VcRestoreApplyResult::kVulnerableKey
+                           ? "The backup's master key is vulnerable (identical XTS keys) -- refusing to restore it."
+                           : "Writing the restored header failed.");
+            return applied == VcRestoreApplyResult::kVulnerableKey ? HeaderRestoreResult::kBackupInvalid
+                 : applied == VcRestoreApplyResult::kContainerTooSmall ? HeaderRestoreResult::kSizeMismatch
+                 : HeaderRestoreResult::kIoError;
         }
         default:
             rlog(opId, "This container format doesn't support header restore.");

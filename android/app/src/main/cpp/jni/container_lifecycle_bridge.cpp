@@ -162,7 +162,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_createUsbContainerNative(
         JNIEnv* env, jobject,
         jint volId, jstring partitionScheme, jstring password, jint pim, jlong sizeBytes, jstring fileSystem,
         jint containerFormat, jint cipherId, jint hashId, jintArray keyfileFds, jboolean quickFormat,
-        jlong deviceSectorCount, jstring operationId, jbyteArray userEntropy) {
+        jlong deviceSectorCount, jstring operationId, jbyteArray userEntropy, jint deviceSectorSize) {
     JNI_TRY
     ScopedJniUserEntropy entropyScope(env, userEntropy);
 
@@ -176,14 +176,21 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_createUsbContainerNative(
     const char* nativeFS   = env->GetStringUTFChars(fileSystem, nullptr);
     const char* nativeOpId = operationId ? env->GetStringUTFChars(operationId, nullptr) : nullptr;
 
-    static constexpr uint64_t kUsbPartitionStartSector = 2048;
-    const uint64_t numSectors = static_cast<uint64_t>(sizeBytes) / 512;
+    static constexpr uint64_t kUsbPartitionStartSector = 2048;   // 1 MiB, in the 512-byte units the native layer addresses
+    // A drive with larger logical sectors (4Kn: 4096) counts them in its partition table, and the volume must be
+    // a whole number of them: like desktop, the header and the file system use that sector size.
+    const uint32_t sectorSize = (deviceSectorSize >= 512 && deviceSectorSize <= 4096 && deviceSectorSize % 512 == 0)
+                                    ? static_cast<uint32_t>(deviceSectorSize) : 512u;
+    int64_t usbSizeBytes = static_cast<int64_t>(sizeBytes);
+    if (sectorSize > 512) usbSizeBytes -= usbSizeBytes % 4096;
+    const uint64_t mbrStartSector = kUsbPartitionStartSector * 512 / sectorSize;
+    const uint64_t numSectors = static_cast<uint64_t>(usbSizeBytes) / sectorSize;
 
     LOGI("[%s] createUsbContainerNative: volId=%d sizeBytes=%lld fs=%s format=%d numSectors=%llu deviceSectorCount=%lld",
          nativeOpId ? nativeOpId : "-", volId, (long long)sizeBytes, nativeFS, containerFormat,
          (unsigned long long)numSectors, (long long)deviceSectorCount);
 
-    UsbCreateResult mbrResult = writeMbrPartitionTable(volId, kUsbPartitionStartSector, numSectors,
+    UsbCreateResult mbrResult = writeMbrPartitionTable(volId, mbrStartSector, numSectors,
                                                         static_cast<uint64_t>(deviceSectorCount));
     LOGI("[%s] createUsbContainerNative: writeMbrPartitionTable success=%d errorCode=%s",
          nativeOpId ? nativeOpId : "-", mbrResult.success ? 1 : 0, mbrResult.errorCode.c_str());
@@ -192,15 +199,15 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_createUsbContainerNative(
     if (mbrResult.success) {
         createResult = (containerFormat == 1 || containerFormat == 2)
             ? createUsbLuksContainer(volId, kUsbPartitionStartSector, nativePass, pim,
-                                     static_cast<int64_t>(sizeBytes), nativeFS,
+                                     usbSizeBytes, nativeFS,
                                      containerFormat, cipherId, hashId,
                                      kfFds.empty() ? nullptr : kfFds.data(), static_cast<int>(kfFds.size()), quickFormat,
                                      nativeOpId)
             : createUsbContainer(volId, kUsbPartitionStartSector, nativePass, pim,
-                                 static_cast<int64_t>(sizeBytes), nativeFS,
+                                 usbSizeBytes, nativeFS,
                                  cipherId, hashId,
                                  kfFds.empty() ? nullptr : kfFds.data(), static_cast<int>(kfFds.size()), quickFormat,
-                                 nativeOpId);
+                                 nativeOpId, sectorSize);
     } else {
         closeUnusedKeyfileFds(kfFds.empty() ? nullptr : kfFds.data(), static_cast<int>(kfFds.size()));
         createResult = mbrResult;
@@ -225,7 +232,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_createUsbContainerWithHiddenNative(
         jstring outerFileSystem, jstring hiddenFileSystem, jlong hiddenSizeBytes,
         jint outerCipherId, jint outerHashId, jint hiddenCipherId, jint hiddenHashId,
         jintArray outerKeyfileFds, jintArray hiddenKeyfileFds, jboolean quickFormat,
-        jlong deviceSectorCount, jstring operationId, jbyteArray userEntropy) {
+        jlong deviceSectorCount, jstring operationId, jbyteArray userEntropy, jint deviceSectorSize) {
     JNI_TRY
     ScopedJniUserEntropy entropyScope(env, userEntropy);
 
@@ -243,22 +250,29 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_createUsbContainerWithHiddenNative(
     const char* nativeHiddenFS   = env->GetStringUTFChars(hiddenFileSystem, nullptr);
     const char* nativeOpId = operationId ? env->GetStringUTFChars(operationId, nullptr) : nullptr;
 
-    static constexpr uint64_t kUsbPartitionStartSector = 2048;
-    const uint64_t numSectors = static_cast<uint64_t>(sizeBytes) / 512;
+    static constexpr uint64_t kUsbPartitionStartSector = 2048;   // 1 MiB, in the 512-byte units the native layer addresses
+    // A drive with larger logical sectors (4Kn: 4096) counts them in its partition table, and the volume must be
+    // a whole number of them: like desktop, the header and the file system use that sector size.
+    const uint32_t sectorSize = (deviceSectorSize >= 512 && deviceSectorSize <= 4096 && deviceSectorSize % 512 == 0)
+                                    ? static_cast<uint32_t>(deviceSectorSize) : 512u;
+    int64_t usbSizeBytes = static_cast<int64_t>(sizeBytes);
+    if (sectorSize > 512) usbSizeBytes -= usbSizeBytes % 4096;
+    const uint64_t mbrStartSector = kUsbPartitionStartSector * 512 / sectorSize;
+    const uint64_t numSectors = static_cast<uint64_t>(usbSizeBytes) / sectorSize;
 
-    UsbCreateResult mbrResult = writeMbrPartitionTable(volId, kUsbPartitionStartSector, numSectors,
+    UsbCreateResult mbrResult = writeMbrPartitionTable(volId, mbrStartSector, numSectors,
                                                         static_cast<uint64_t>(deviceSectorCount));
 
     UsbCreateResult createResult;
     if (mbrResult.success) {
         createResult = createUsbContainerWithHidden(
             volId, kUsbPartitionStartSector,
-            nativeOuterPass, nativeHiddenPass, outerPim, hiddenPim, static_cast<int64_t>(sizeBytes),
+            nativeOuterPass, nativeHiddenPass, outerPim, hiddenPim, usbSizeBytes,
             nativeOuterFS, nativeHiddenFS, static_cast<int64_t>(hiddenSizeBytes),
             outerCipherId, outerHashId, hiddenCipherId, hiddenHashId,
             outerKfFds.empty() ? nullptr : outerKfFds.data(), static_cast<int>(outerKfFds.size()),
             hiddenKfFds.empty() ? nullptr : hiddenKfFds.data(), static_cast<int>(hiddenKfFds.size()),
-            quickFormat, nativeOpId
+            quickFormat, nativeOpId, sectorSize
         );
     } else {
         closeUnusedKeyfileFds(outerKfFds.empty() ? nullptr : outerKfFds.data(), static_cast<int>(outerKfFds.size()));
@@ -335,4 +349,81 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_changeLuksContainerPasswordNative(
     return result;
 
     JNI_CATCH_RETURN(2)
+}
+
+// 0 = expanded, 1 = wrong password/keyfile, 2 = not expandable (hidden-volume header / not a plain full-size
+// standard volume), 3 = requested size not larger, 4 = I/O error, 5 = unreadable keyfile.
+extern "C" JNIEXPORT jint JNICALL
+Java_com_aeidolon_vaultexplorer_NativeEngine_expandVeraCryptContainerNative(
+        JNIEnv* env, jobject,
+        jint fd, jstring password, jint pim, jint cipherId, jint hashId, jintArray keyfileFds,
+        jlong newSizeBytes, jboolean initFreeSpace) {
+    JNI_TRY
+
+    std::vector<int> kfFds = extractKeyfileFds(env, keyfileFds);
+    const char* nativePass = vcGetPasswordUtf8(env, password);
+    const ExpandOutcome outcome = expandVeraCryptContainer(
+        fd, nativePass != nullptr ? nativePass : "", pim, cipherId, hashId,
+        kfFds.empty() ? nullptr : kfFds.data(), static_cast<int>(kfFds.size()),
+        static_cast<int64_t>(newSizeBytes), initFreeSpace == JNI_TRUE);
+    vcReleasePasswordUtf8(nativePass);
+    return static_cast<jint>(outcome);
+
+    JNI_CATCH_RETURN(static_cast<jint>(ExpandOutcome::kIoError))
+}
+
+// Result: [outcome, fsKind, clusterSize, maxHiddenBytes]; outcome 0 = ok, 1 wrong password, 2 unsupported file system,
+// 4 I/O error, 5 unreadable keyfile, 6 not a plain full-size standard volume.
+extern "C" JNIEXPORT jlongArray JNICALL
+Java_com_aeidolon_vaultexplorer_NativeEngine_analyzeHiddenVolumeHostNative(
+        JNIEnv* env, jobject,
+        jint fd, jstring password, jint pim, jint cipherId, jint hashId, jintArray keyfileFds) {
+    JNI_TRY
+
+    std::vector<int> kfFds = extractKeyfileFds(env, keyfileFds);
+    const char* nativePass = vcGetPasswordUtf8(env, password);
+    HiddenHostAnalysis analysis;
+    const HiddenHostOutcome outcome = analyzeHiddenVolumeHost(
+        fd, nativePass != nullptr ? nativePass : "", pim, cipherId, hashId,
+        kfFds.empty() ? nullptr : kfFds.data(), static_cast<int>(kfFds.size()), &analysis);
+    vcReleasePasswordUtf8(nativePass);
+    jlong values[4] = {static_cast<jlong>(outcome), static_cast<jlong>(analysis.fsKind),
+                       static_cast<jlong>(analysis.clusterSize), static_cast<jlong>(analysis.maxHiddenBytes)};
+    jlongArray result = env->NewLongArray(4);
+    if (result != nullptr) env->SetLongArrayRegion(result, 0, 4, values);
+    return result;
+
+    JNI_CATCH_RETURN(nullptr)
+}
+
+// 0 = created, 1 wrong outer password, 2 unsupported file system, 3 no room / size too large, 4 I/O error,
+// 5 unreadable keyfile, 6 invalid (not a plain full-size standard volume, hidden password too long or equal to the outer one).
+extern "C" JNIEXPORT jint JNICALL
+Java_com_aeidolon_vaultexplorer_NativeEngine_createHiddenVolumeInExistingNative(
+        JNIEnv* env, jobject,
+        jint fd, jstring outerPassword, jint outerPim, jint outerCipherId, jint outerHashId, jintArray outerKeyfileFds,
+        jstring hiddenPassword, jint hiddenPim, jstring hiddenFileSystem, jlong hiddenSizeBytes,
+        jint hiddenCipherId, jint hiddenHashId, jintArray hiddenKeyfileFds, jboolean quickFormat,
+        jbyteArray userEntropy) {
+    JNI_TRY
+    ScopedJniUserEntropy entropyScope(env, userEntropy);
+
+    std::vector<int> outerKfFds = extractKeyfileFds(env, outerKeyfileFds);
+    std::vector<int> hiddenKfFds = extractKeyfileFds(env, hiddenKeyfileFds);
+    const char* nativeOuterPass = vcGetPasswordUtf8(env, outerPassword);
+    const char* nativeHiddenPass = vcGetPasswordUtf8(env, hiddenPassword);
+    const char* nativeHiddenFS = env->GetStringUTFChars(hiddenFileSystem, nullptr);
+    const HiddenHostOutcome outcome = createHiddenVolumeInExisting(
+        fd, nativeOuterPass != nullptr ? nativeOuterPass : "", outerPim, outerCipherId, outerHashId,
+        outerKfFds.empty() ? nullptr : outerKfFds.data(), static_cast<int>(outerKfFds.size()),
+        nativeHiddenPass != nullptr ? nativeHiddenPass : "", hiddenPim,
+        nativeHiddenFS, static_cast<int64_t>(hiddenSizeBytes), hiddenCipherId, hiddenHashId,
+        hiddenKfFds.empty() ? nullptr : hiddenKfFds.data(), static_cast<int>(hiddenKfFds.size()),
+        quickFormat == JNI_TRUE);
+    env->ReleaseStringUTFChars(hiddenFileSystem, nativeHiddenFS);
+    vcReleasePasswordUtf8(nativeOuterPass);
+    vcReleasePasswordUtf8(nativeHiddenPass);
+    return static_cast<jint>(outcome);
+
+    JNI_CATCH_RETURN(static_cast<jint>(HiddenHostOutcome::kIoError))
 }

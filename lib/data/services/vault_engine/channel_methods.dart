@@ -240,6 +240,9 @@ abstract final class ChannelMethods {
   // Header Backup tool.
   static const exportContainerHeader = 'exportContainerHeader';
   static const restoreContainerHeaderRegion = 'restoreContainerHeaderRegion';
+  static const expandVeraCryptContainer = 'expandVeraCryptContainer';
+  static const analyzeHiddenVolumeHost = 'analyzeHiddenVolumeHost';
+  static const createHiddenVolumeInExisting = 'createHiddenVolumeInExisting';
   static const resolveFolderVaultConfigFile = 'resolveFolderVaultConfigFile';
   static const restoreFolderVaultConfig = 'restoreFolderVaultConfig';
 

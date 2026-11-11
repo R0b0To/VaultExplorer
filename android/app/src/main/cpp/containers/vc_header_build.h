@@ -41,6 +41,21 @@ bool deriveHeaderKey(HashId hash,
                      unsigned char* out, size_t outLen,
                      std::function<bool()> cancelCheck);
 
+// Standard CRC-32 (zlib), as used for the header and key-area checksums.
+inline uint32_t vcCrc32(const unsigned char* d, size_t n) {
+    uint32_t c = 0xFFFFFFFFu;
+    for (size_t i = 0; i < n; i++) {
+        c ^= d[i];
+        for (int k = 0; k < 8; k++) c = (c >> 1) ^ (0xEDB88320u & (0u - (c & 1u)));
+    }
+    return ~c;
+}
+
+inline void vcPutBE32(unsigned char* p, uint32_t v) {
+    p[0] = static_cast<unsigned char>(v >> 24); p[1] = static_cast<unsigned char>(v >> 16);
+    p[2] = static_cast<unsigned char>(v >> 8);  p[3] = static_cast<unsigned char>(v);
+}
+
 // "VERA" + header format version + minimum program version, at the start of
 // the decrypted 448-byte header body.
 inline void vcStampHeaderPreamble(unsigned char* body) {

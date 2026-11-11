@@ -85,7 +85,8 @@ bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeByte
 UsbCreateResult createUsbContainer(int volId, uint64_t startSector, const char* password, int pim, int64_t sizeBytes,
                         const char* fileSystem, int cipherId, int hashId,
                         const int* keyfileFds = nullptr, int keyfileCount = 0, bool quickFormat = false,
-                        const char* operationId = "");
+                        const char* operationId = "",
+                        uint32_t sectorSize = 512);   // the drive's logical sector size (512..4096): header field + file system sector size
 
 UsbCreateResult createUsbLuksContainer(int volId, uint64_t startSector, const char* password, int pim, int64_t sizeBytes,
                             const char* fileSystem, int luksVersion, int cipherId, int hashId,
@@ -102,7 +103,8 @@ UsbCreateResult createUsbContainerWithHidden(
     int hiddenCipherId, int hiddenHashId,
     const int* outerKeyfileFds = nullptr, int outerKeyfileCount = 0,
     const int* hiddenKeyfileFds = nullptr, int hiddenKeyfileCount = 0,
-    bool quickFormat = false, const char* operationId = "");                           
+    bool quickFormat = false, const char* operationId = "",
+    uint32_t sectorSize = 512);
 // Creates a VeraCrypt container with an embedded hidden volume.
 // The outer volume is created and formatted first, then a hidden volume
 // header is written at VC_HIDDEN_HEADER_OFFSET (65536) with its own
@@ -171,3 +173,40 @@ int changeLuksContainerPassword(int fd,
                                 const char* oldPassword, const char* newPassword,
                                 const int* oldKeyfileFds = nullptr, int oldKeyfileCount = 0,
                                 const int* newKeyfileFds = nullptr, int newKeyfileCount = 0);
+
+// ---- Volume expansion (VeraCrypt Volume Expander; containers/vc_expand.h) --------------------
+enum class ExpandOutcome : int {
+    kOk = 0, kWrongPassword = 1, kNotExpandable = 2, kNotLarger = 3, kIoError = 4, kBadKeyfile = 5,
+};
+// Grows a standard VeraCrypt file container to [newSizeBytes] (rounded down to 4096): extends the file,
+// initialises the new space under the volume key (or, [initFreeSpace] false, just wipes the old embedded
+// backup header), rewrites the volume header with the new size and moves the embedded backup header to
+// the new end. The file system inside is NOT grown. Always takes ownership of [fd] and the keyfile fds.
+ExpandOutcome expandVeraCryptContainer(int fd, const char* password, int pim, int cipherId, int hashId,
+                                       const int* keyfileFds, int keyfileCount,
+                                       int64_t newSizeBytes, bool initFreeSpace);
+
+// ---- Hidden volume inside an EXISTING volume (VeraCrypt "direct mode") -------------------------------
+enum class HiddenHostOutcome : int {
+    kOk = 0, kWrongPassword = 1, kUnsupportedFs = 2, kNoSpace = 3, kIoError = 4, kBadKeyfile = 5, kInvalid = 6,
+};
+struct HiddenHostAnalysis {
+    int fsKind = 0;                 // VcFsKind: 1 FAT12, 2 FAT16, 3 FAT32, 4 exFAT, 5 NTFS
+    uint64_t clusterSize = 0;
+    uint64_t maxHiddenBytes = 0;    // upstream's maximum hidden volume size for this outer volume (0 = no room)
+};
+// Opens the standard volume (read-only), reads its FAT/exFAT/NTFS cluster map and reports how large a hidden
+// volume could be placed at its end. Takes ownership of [fd] and the keyfile fds.
+HiddenHostOutcome analyzeHiddenVolumeHost(int fd, const char* password, int pim, int cipherId, int hashId,
+                                          const int* keyfileFds, int keyfileCount, HiddenHostAnalysis* out);
+// Creates a hidden volume of [hiddenSizeBytes] at the end of the existing standard volume: hidden header (and
+// backup) under its own salt/keys, optional wipe, file system. The outer volume's own header and files are not
+// touched. Takes ownership of [fd] and of both keyfile fd sets.
+HiddenHostOutcome createHiddenVolumeInExisting(int fd,
+                                               const char* outerPassword, int outerPim, int outerCipherId, int outerHashId,
+                                               const int* outerKeyfileFds, int outerKeyfileCount,
+                                               const char* hiddenPassword, int hiddenPim,
+                                               const char* hiddenFileSystem, int64_t hiddenSizeBytes,
+                                               int hiddenCipherId, int hiddenHashId,
+                                               const int* hiddenKeyfileFds, int hiddenKeyfileCount,
+                                               bool quickFormat);

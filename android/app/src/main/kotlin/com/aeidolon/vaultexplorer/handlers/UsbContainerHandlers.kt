@@ -436,7 +436,7 @@ class UsbContainerHandlers(
                         call.argument<Number>("hashId")?.toInt() ?: 255,
                         hiddenCipherId, hiddenHashId,
                         keyfileFds, hiddenKeyfileFds, quickFormat,
-                        deviceSectorCount = msd.sectorCount, operationId = operationId,
+                        deviceSectorCount = msd.sectorCount, deviceSectorSize = msd.sectorSize, operationId = operationId,
                         userEntropy = userEntropy,
                     )
                 } else {
@@ -449,7 +449,7 @@ class UsbContainerHandlers(
                         call.argument<Number>("cipherId")?.toInt() ?: 255,
                         call.argument<Number>("hashId")?.toInt() ?: 255,
                         keyfileFds, quickFormat,
-                        deviceSectorCount = msd.sectorCount, operationId = operationId,
+                        deviceSectorCount = msd.sectorCount, deviceSectorSize = msd.sectorSize, operationId = operationId,
                         userEntropy = userEntropy,
                     )
                 }

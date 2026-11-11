@@ -38,8 +38,9 @@ static constexpr int MKFS_WORK_BUF_SIZE = 1048576;
 UsbCreateResult createUsbContainer(int volId, uint64_t startSector, const char* password, int pim, int64_t sizeBytes,
                         const char* fileSystem, int cipherId, int hashId,
                         const int* keyfileFds, int keyfileCount, bool quickFormat,
-                        const char* operationId) {
+                        const char* operationId, uint32_t sectorSize) {
     const char* opId = (operationId && operationId[0]) ? operationId : "-";
+    if (sectorSize < VC_MIN_SECTOR_SIZE || sectorSize > VC_MAX_SECTOR_SIZE || sectorSize % VC_ENCRYPTION_DATA_UNIT_SIZE != 0) sectorSize = 512;
     LOGI("[%s] createUsbContainer: ENTER volId=%d startSector=%llu sizeBytes=%lld fs=%s",
          opId, volId, (unsigned long long)startSector, (long long)sizeBytes, fileSystem);
 
@@ -133,10 +134,7 @@ UsbCreateResult createUsbContainer(int volId, uint64_t startSector, const char* 
         for (int i = 7; i >= 0; --i) body[VC_HDR_OFF_KEY_SCOPE_START + (7 - i)] = (VC_DATA_AREA_OFFSET >> (i * 8)) & 0xFF;
         for (int i = 7; i >= 0; --i) body[VC_HDR_OFF_KEY_SCOPE_SIZE + (7 - i)] = (DATA_SIZE >> (i * 8)) & 0xFF;
 
-        body[VC_HDR_OFF_SECTOR_SIZE]     = 0x00;
-        body[VC_HDR_OFF_SECTOR_SIZE + 1] = 0x00;
-        body[VC_HDR_OFF_SECTOR_SIZE + 2] = 0x02;
-        body[VC_HDR_OFF_SECTOR_SIZE + 3] = 0x00;
+        vcPutBE32(body + VC_HDR_OFF_SECTOR_SIZE, sectorSize);   // the drive's logical sector size, like desktop
 
         memcpy(&body[VC_KEY_OFFSET_MASTER], combinedMasterKey, masterKeyLen);
         uint32_t keyCrc = container_crc32(&body[VC_KEY_OFFSET_MASTER], VC_HDR_KEY_CRC_COVERAGE_LEN);
@@ -237,6 +235,7 @@ UsbCreateResult createUsbContainer(int volId, uint64_t startSector, const char* 
             cascadeSetKeys(v.cascade, createCipher, combinedMasterKey, masterKeyLen);
 
             v.dataOffset = baseOffset + VC_DATA_AREA_OFFSET;
+            v.luksSectorSize = sectorSize;   // file systems are formatted with the volume's sector size
             v.dataAreaLengthBytes = DATA_SIZE;
             v.fileSize = VOLUME_SIZE;
             v.dataCtxInitialized = true;
@@ -248,10 +247,11 @@ UsbCreateResult createUsbContainer(int volId, uint64_t startSector, const char* 
             } else if (useNtfs) {
                 char deviceName[16];
                 std::snprintf(deviceName, sizeof(deviceName), "ve%d", volId);
+                const std::string sectorSizeStr = std::to_string(sectorSize);
                 char* args[] = {
                     const_cast<char*>("mkntfs"), const_cast<char*>("-F"),
                     const_cast<char*>("-Q"), const_cast<char*>("-s"),
-                    const_cast<char*>("512"), const_cast<char*>("-p"),
+                    const_cast<char*>(sectorSizeStr.c_str()), const_cast<char*>("-p"),
                     const_cast<char*>("0"), deviceName, nullptr
                 };
                 const int mkntfsRet = vaultexplorer_mkntfs_main(8, args);
@@ -262,7 +262,7 @@ UsbCreateResult createUsbContainer(int volId, uint64_t startSector, const char* 
                 mp.fmt = (useExFat ? FM_EXFAT : (FM_FAT | FM_FAT32)) | FM_SFD;
                 mp.n_fat  = useExFat ? 1 : 2;
                 mp.n_root = 512;
-                mp.au_size = useExFat ? 0 : vc_fat_cluster_size(DATA_SIZE);
+                mp.au_size = useExFat ? 0 : std::max<uint32_t>(vc_fat_cluster_size(DATA_SIZE), sectorSize);
                 mp.align   = 0;
 
                 std::unique_ptr<unsigned char[]> mkfsBuf(new unsigned char[MKFS_WORK_BUF_SIZE]);
@@ -547,9 +547,11 @@ UsbCreateResult createUsbContainerWithHidden(
     int hiddenCipherId, int hiddenHashId,
     const int* outerKeyfileFds, int outerKeyfileCount,
     const int* hiddenKeyfileFds, int hiddenKeyfileCount,
-    bool quickFormat, const char* operationId
+    bool quickFormat, const char* operationId,
+    uint32_t sectorSize
 ) {
     const char* opId = (operationId && operationId[0]) ? operationId : "-";
+    if (sectorSize < VC_MIN_SECTOR_SIZE || sectorSize > VC_MAX_SECTOR_SIZE || sectorSize % VC_ENCRYPTION_DATA_UNIT_SIZE != 0) sectorSize = 512;
     LOGI("[%s] createUsbContainerWithHidden: ENTER volId=%d", opId, volId);
 
     unsigned char mixedOuterPass[MAX_PASSWORD_LEN] = {0};
@@ -652,7 +654,7 @@ UsbCreateResult createUsbContainerWithHidden(
         for (int i = 7; i >= 0; --i) oBody[VC_HDR_OFF_VOLUME_SIZE + (7 - i)] = (OUTER_DATA_SIZE >> (i * 8)) & 0xFF;
         for (int i = 7; i >= 0; --i) oBody[VC_HDR_OFF_KEY_SCOPE_START + (7 - i)] = (VC_DATA_AREA_OFFSET >> (i * 8)) & 0xFF;
         for (int i = 7; i >= 0; --i) oBody[VC_HDR_OFF_KEY_SCOPE_SIZE + (7 - i)] = (OUTER_DATA_SIZE >> (i * 8)) & 0xFF;
-        oBody[VC_HDR_OFF_SECTOR_SIZE] = 0x00; oBody[VC_HDR_OFF_SECTOR_SIZE + 1] = 0x00; oBody[VC_HDR_OFF_SECTOR_SIZE + 2] = 0x02; oBody[VC_HDR_OFF_SECTOR_SIZE + 3] = 0x00;
+        vcPutBE32(oBody + VC_HDR_OFF_SECTOR_SIZE, sectorSize);
         memcpy(&oBody[VC_KEY_OFFSET_MASTER], oMasterKey, oMasterKeyLen);
         uint32_t oKeyCrc = container_crc32(&oBody[VC_KEY_OFFSET_MASTER], VC_HDR_KEY_CRC_COVERAGE_LEN);
         oBody[VC_HDR_OFF_KEY_CRC] = (oKeyCrc >> 24) & 0xFF; oBody[VC_HDR_OFF_KEY_CRC + 1] = (oKeyCrc >> 16) & 0xFF;
@@ -687,7 +689,7 @@ UsbCreateResult createUsbContainerWithHidden(
         for (int i = 7; i >= 0; --i) hBody[VC_HDR_OFF_VOLUME_SIZE + (7 - i)] = (HIDDEN_DATA_SIZE >> (i * 8)) & 0xFF;
         for (int i = 7; i >= 0; --i) hBody[VC_HDR_OFF_KEY_SCOPE_START + (7 - i)] = (HIDDEN_AREA_START >> (i * 8)) & 0xFF;
         for (int i = 7; i >= 0; --i) hBody[VC_HDR_OFF_KEY_SCOPE_SIZE + (7 - i)] = (HIDDEN_DATA_SIZE >> (i * 8)) & 0xFF;
-        hBody[VC_HDR_OFF_SECTOR_SIZE] = 0x00; hBody[VC_HDR_OFF_SECTOR_SIZE + 1] = 0x00; hBody[VC_HDR_OFF_SECTOR_SIZE + 2] = 0x02; hBody[VC_HDR_OFF_SECTOR_SIZE + 3] = 0x00;
+        vcPutBE32(hBody + VC_HDR_OFF_SECTOR_SIZE, sectorSize);
         memcpy(&hBody[VC_KEY_OFFSET_MASTER], hMasterKey, hMasterKeyLen);
         uint32_t hKeyCrc = container_crc32(&hBody[VC_KEY_OFFSET_MASTER], VC_HDR_KEY_CRC_COVERAGE_LEN);
         hBody[VC_HDR_OFF_KEY_CRC] = (hKeyCrc >> 24) & 0xFF; hBody[VC_HDR_OFF_KEY_CRC + 1] = (hKeyCrc >> 16) & 0xFF;
@@ -817,6 +819,7 @@ UsbCreateResult createUsbContainerWithHidden(
             std::unique_lock<std::shared_mutex> vlock(v.mutex);
             cascadeSetKeys(v.cascade, cId, mKey, mkLen);
             v.dataOffset = baseOffset + dOffset;
+            v.luksSectorSize = sectorSize;
             v.dataAreaLengthBytes = dLen;
             v.fileSize = VOLUME_SIZE;
             v.dataCtxInitialized = true;
@@ -825,7 +828,8 @@ UsbCreateResult createUsbContainerWithHidden(
             if (strncasecmp(fs, "ext", 3) == 0) ok = formatExtVolume(volId, fs);
             else if (strncasecmp(fs, "ntfs", 4) == 0) {
                 char devName[16]; std::snprintf(devName, sizeof(devName), "ve%d", volId);
-                char* args[] = { (char*)"mkntfs", (char*)"-F", (char*)"-Q", (char*)"-s", (char*)"512", (char*)"-p", (char*)"0", devName, nullptr };
+                const std::string sectorSizeStr = std::to_string(sectorSize);
+                char* args[] = { (char*)"mkntfs", (char*)"-F", (char*)"-Q", (char*)"-s", (char*)sectorSizeStr.c_str(), (char*)"-p", (char*)"0", devName, nullptr };
                 ok = (vaultexplorer_mkntfs_main(8, args) == 0);
             } else {
                 MKFS_PARM mp; memset(&mp, 0, sizeof(mp));
@@ -833,7 +837,7 @@ UsbCreateResult createUsbContainerWithHidden(
                 mp.fmt = (isExFat ? FM_EXFAT : (FM_FAT | FM_FAT32)) | FM_SFD;
                 mp.n_fat = isExFat ? 1 : 2;
                 mp.n_root = 512;
-                mp.au_size = isExFat ? 0 : vc_fat_cluster_size(dLen);
+                mp.au_size = isExFat ? 0 : std::max<uint32_t>(vc_fat_cluster_size(dLen), sectorSize);
                 mp.align = 0;
                 std::unique_ptr<unsigned char[]> mkfsBuf(new unsigned char[MKFS_WORK_BUF_SIZE]);
                 ok = (f_mkfs(drivePaths[volId], &mp, mkfsBuf.get(), MKFS_WORK_BUF_SIZE) == FR_OK);

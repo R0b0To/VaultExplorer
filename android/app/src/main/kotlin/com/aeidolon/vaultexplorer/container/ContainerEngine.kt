@@ -85,9 +85,10 @@ object ContainerEngine {
         keyfileFds: IntArray? = null, quickFormat: Boolean = false,
         deviceSectorCount: Long = 0L, operationId: String = "",
         userEntropy: ByteArray? = null,
+        deviceSectorSize: Int = 512,
     ): Map<String, Any?>? = NativeEngine.createUsbContainerNative(
         volId, partitionScheme, password, pim, sizeBytes, fileSystem, containerFormat, cipherId, hashId,
-        keyfileFds, quickFormat, deviceSectorCount, operationId, userEntropy,
+        keyfileFds, quickFormat, deviceSectorCount, operationId, userEntropy, deviceSectorSize,
     )
 
     fun createWithHidden(
@@ -120,11 +121,12 @@ object ContainerEngine {
         quickFormat: Boolean = false,
         deviceSectorCount: Long = 0L, operationId: String = "",
         userEntropy: ByteArray? = null,
+        deviceSectorSize: Int = 512,
     ): Map<String, Any?>? = NativeEngine.createUsbContainerWithHiddenNative(
         volId, partitionScheme, outerPassword, hiddenPassword, outerPim, hiddenPim, sizeBytes,
         outerFileSystem, hiddenFileSystem, hiddenSizeBytes, outerCipherId, outerHashId,
         hiddenCipherId, hiddenHashId, outerKeyfileFds, hiddenKeyfileFds, quickFormat,
-        deviceSectorCount, operationId, userEntropy,
+        deviceSectorCount, operationId, userEntropy, deviceSectorSize,
     )
 
     fun changePassword(

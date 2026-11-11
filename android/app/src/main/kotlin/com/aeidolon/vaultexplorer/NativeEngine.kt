@@ -85,6 +85,29 @@ internal object NativeEngine {
         newHashId: Int = 255
     ): Boolean
 
+    /** Grows a standard VeraCrypt file container (see ExpandOutcome in container_create.h for the result codes). */
+    @JvmStatic
+    external fun expandVeraCryptContainerNative(
+        fd: Int, password: String, pim: Int, cipherId: Int, hashId: Int,
+        keyfileFds: IntArray?, newSizeBytes: Long, initFreeSpace: Boolean
+    ): Int
+
+    /** [outcome, fsKind, clusterSize, maxHiddenBytes]; outcome codes as in HiddenHostOutcome (container_create.h). */
+    @JvmStatic
+    external fun analyzeHiddenVolumeHostNative(
+        fd: Int, password: String, pim: Int, cipherId: Int, hashId: Int, keyfileFds: IntArray?
+    ): LongArray?
+
+    /** Adds a hidden volume to an existing standard volume (desktop VeraCrypt "direct mode"); outcome codes as above. */
+    @JvmStatic
+    external fun createHiddenVolumeInExistingNative(
+        fd: Int,
+        outerPassword: String, outerPim: Int, outerCipherId: Int, outerHashId: Int, outerKeyfileFds: IntArray?,
+        hiddenPassword: String, hiddenPim: Int, hiddenFileSystem: String, hiddenSizeBytes: Long,
+        hiddenCipherId: Int, hiddenHashId: Int, hiddenKeyfileFds: IntArray?, quickFormat: Boolean,
+        userEntropy: ByteArray?
+    ): Int
+
     @JvmStatic
     external fun changeLuksContainerPasswordNative(
         fd: Int, oldPassword: String, newPassword: String,
@@ -203,6 +226,7 @@ internal object NativeEngine {
         keyfileFds: IntArray? = null, quickFormat: Boolean = false,
         deviceSectorCount: Long = 0L, operationId: String = "",
         userEntropy: ByteArray? = null,
+        deviceSectorSize: Int = 512,
     ): Map<String, Any?>?
 
     /** PBKDF2-HMAC over raw password bytes. [hashKind]: 1 = SHA-1, 2 = SHA-256. */
@@ -261,6 +285,7 @@ internal object NativeEngine {
         quickFormat: Boolean = false,
         deviceSectorCount: Long = 0L, operationId: String = "",
         userEntropy: ByteArray? = null,
+        deviceSectorSize: Int = 512,
     ): Map<String, Any?>?
 
     @JvmStatic external fun openStream(targetFileName: String, volId: Int): Long

@@ -55,6 +55,7 @@ import com.aeidolon.vaultexplorer.handlers.ImportExportHandlers
 import com.aeidolon.vaultexplorer.handlers.LogExportHandlers
 import com.aeidolon.vaultexplorer.handlers.RepairHandlers
 import com.aeidolon.vaultexplorer.handlers.HeaderBackupHandlers
+import com.aeidolon.vaultexplorer.handlers.VeraCryptToolsHandlers
 import com.aeidolon.vaultexplorer.handlers.SecureStorageHandlers
 import com.aeidolon.vaultexplorer.handlers.SingleFileCryptoHandlers
 import com.aeidolon.vaultexplorer.handlers.SplitContainerMountHandlers
@@ -287,6 +288,9 @@ private object ChannelMethods {
     const val REPAIR_FOLDER_VAULT = "repairFolderVault"
     const val EXPORT_CONTAINER_HEADER = "exportContainerHeader"
     const val RESTORE_CONTAINER_HEADER_REGION = "restoreContainerHeaderRegion"
+    const val EXPAND_VERACRYPT_CONTAINER = "expandVeraCryptContainer"
+    const val ANALYZE_HIDDEN_VOLUME_HOST = "analyzeHiddenVolumeHost"
+    const val CREATE_HIDDEN_VOLUME_IN_EXISTING = "createHiddenVolumeInExisting"
     const val RESOLVE_FOLDER_VAULT_CONFIG_FILE = "resolveFolderVaultConfigFile"
     const val RESTORE_FOLDER_VAULT_CONFIG = "restoreFolderVaultConfig"
     const val OPEN_LOCAL_FILE_WITH_APP = "openLocalFileWithApp"
@@ -421,6 +425,7 @@ open class MainActivity : FlutterFragmentActivity() {
     private val automationSettingsHandlers = AutomationSettingsHandlers(this)
     private val repairHandlers = RepairHandlers(this, ioExecutor)
     private val headerBackupHandlers = HeaderBackupHandlers(this, ioExecutor, nativeOps)
+    private val veraCryptToolsHandlers = VeraCryptToolsHandlers(this, ioExecutor, nativeOps)
     private val pdfViewerHandlers = com.aeidolon.vaultexplorer.pdf.PdfViewerHandlers(this, pdfExecutor)
     private val archiveHandlers = com.aeidolon.vaultexplorer.handlers.ArchiveHandlers(this, ioExecutor, nativeOps)
     private val bookReaderHandlers = com.aeidolon.vaultexplorer.handlers.BookReaderHandlers(
@@ -1517,6 +1522,9 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.BOOK_COVER -> bookReaderHandlers.handleBookCover(call, result)
                 ChannelMethods.BOOK_CLOSE -> bookReaderHandlers.handleBookClose(call, result)
                 ChannelMethods.EXPORT_CONTAINER_HEADER -> headerBackupHandlers.handleExportContainerHeader(call, result)
+                ChannelMethods.EXPAND_VERACRYPT_CONTAINER -> veraCryptToolsHandlers.handleExpandContainer(call, result)
+                ChannelMethods.ANALYZE_HIDDEN_VOLUME_HOST -> veraCryptToolsHandlers.handleAnalyzeHiddenHost(call, result)
+                ChannelMethods.CREATE_HIDDEN_VOLUME_IN_EXISTING -> veraCryptToolsHandlers.handleCreateHiddenInExisting(call, result)
                 ChannelMethods.RESTORE_CONTAINER_HEADER_REGION ->
                     headerBackupHandlers.handleRestoreContainerHeaderRegion(call, result)
                 ChannelMethods.RESOLVE_FOLDER_VAULT_CONFIG_FILE ->

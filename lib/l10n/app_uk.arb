@@ -3953,5 +3953,7 @@
   "galleryMissingCamera": "Без даних про камеру",
   "galleryMissingDateTaken": "Без дати зйомки",
   "galleryPlaceHintCity": "Найближче місто в межах {km} км",
-  "galleryPlaceHintCoordinates": "Немає міст у межах {km} км: згруповано за координатами"
+  "galleryPlaceHintCoordinates": "Немає міст у межах {km} км: згруповано за координатами",
+  "gocryptfsNamesRandomIvOption": "Випадковий для кожної папки (за замовчуванням)",
+  "gocryptfsNamesDeterministicOption": "Детермінований (для синхронізованих папок)"
 }

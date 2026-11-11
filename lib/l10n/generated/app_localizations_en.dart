@@ -2274,6 +2274,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get gocryptfsCipherLabel => 'Content Cipher';
 
   @override
+  String get gocryptfsNamesRandomIvOption => 'Random per folder (default)';
+
+  @override
+  String get gocryptfsNamesDeterministicOption =>
+      'Deterministic (for synced folders)';
+
+  @override
   String get cryfsCipherLabel => 'Content Cipher';
 
   @override

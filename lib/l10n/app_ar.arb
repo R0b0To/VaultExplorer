@@ -3953,5 +3953,7 @@
   "galleryMissingCamera": "بدون معلومات الكاميرا",
   "galleryMissingDateTaken": "بدون تاريخ التقاط",
   "galleryPlaceHintCity": "أقرب مدينة ضمن {km} كم",
-  "galleryPlaceHintCoordinates": "لا توجد مدينة ضمن {km} كم: مجمّعة حسب الإحداثيات"
+  "galleryPlaceHintCoordinates": "لا توجد مدينة ضمن {km} كم: مجمّعة حسب الإحداثيات",
+  "gocryptfsNamesRandomIvOption": "عشوائي لكل مجلد (افتراضي)",
+  "gocryptfsNamesDeterministicOption": "حتمي (للمجلدات المتزامنة)"
 }

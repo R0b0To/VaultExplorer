@@ -2322,6 +2322,14 @@ class AppLocalizationsFr extends AppLocalizations {
   String get gocryptfsCipherLabel => 'Chiffrement du contenu';
 
   @override
+  String get gocryptfsNamesRandomIvOption =>
+      'Aléatoire par dossier (par défaut)';
+
+  @override
+  String get gocryptfsNamesDeterministicOption =>
+      'Déterministe (pour les dossiers synchronisés)';
+
+  @override
   String get cryfsCipherLabel => 'Chiffrement du contenu';
 
   @override

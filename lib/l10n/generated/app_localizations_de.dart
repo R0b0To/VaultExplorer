@@ -2316,6 +2316,13 @@ class AppLocalizationsDe extends AppLocalizations {
   String get gocryptfsCipherLabel => 'Inhaltsverschlüsselung';
 
   @override
+  String get gocryptfsNamesRandomIvOption => 'Zufällig pro Ordner (Standard)';
+
+  @override
+  String get gocryptfsNamesDeterministicOption =>
+      'Deterministisch (für synchronisierte Ordner)';
+
+  @override
   String get cryfsCipherLabel => 'Inhaltsverschlüsselung';
 
   @override

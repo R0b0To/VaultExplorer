@@ -3953,5 +3953,7 @@
   "galleryMissingCamera": "カメラ情報なし",
   "galleryMissingDateTaken": "撮影日なし",
   "galleryPlaceHintCity": "最寄りの都市（{km} km 以内）",
-  "galleryPlaceHintCoordinates": "{km} km 以内に都市なし: 座標でグループ化"
+  "galleryPlaceHintCoordinates": "{km} km 以内に都市なし: 座標でグループ化",
+  "gocryptfsNamesRandomIvOption": "フォルダーごとにランダム（デフォルト）",
+  "gocryptfsNamesDeterministicOption": "決定論的（同期フォルダー用）"
 }

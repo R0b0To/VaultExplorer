@@ -3953,5 +3953,7 @@
   "galleryMissingCamera": "Sin datos de cámara",
   "galleryMissingDateTaken": "Sin fecha de captura",
   "galleryPlaceHintCity": "Ciudad más cercana, a menos de {km} km",
-  "galleryPlaceHintCoordinates": "Ninguna ciudad a menos de {km} km: agrupado por coordenadas"
+  "galleryPlaceHintCoordinates": "Ninguna ciudad a menos de {km} km: agrupado por coordenadas",
+  "gocryptfsNamesRandomIvOption": "Aleatorio por carpeta (predeterminado)",
+  "gocryptfsNamesDeterministicOption": "Determinista (para carpetas sincronizadas)"
 }

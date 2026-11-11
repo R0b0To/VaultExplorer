@@ -2188,6 +2188,12 @@ class AppLocalizationsJa extends AppLocalizations {
   String get gocryptfsCipherLabel => 'コンテンツ暗号方式';
 
   @override
+  String get gocryptfsNamesRandomIvOption => 'フォルダーごとにランダム（デフォルト）';
+
+  @override
+  String get gocryptfsNamesDeterministicOption => '決定論的（同期フォルダー用）';
+
+  @override
   String get cryfsCipherLabel => 'コンテンツ暗号方式';
 
   @override

@@ -2155,6 +2155,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get gocryptfsCipherLabel => '内容加密算法';
 
   @override
+  String get gocryptfsNamesRandomIvOption => '按文件夹随机（默认）';
+
+  @override
+  String get gocryptfsNamesDeterministicOption => '确定性（适用于同步文件夹）';
+
+  @override
   String get cryfsCipherLabel => '内容加密算法';
 
   @override

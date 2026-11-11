@@ -3953,5 +3953,7 @@
   "galleryMissingCamera": "카메라 정보 없음",
   "galleryMissingDateTaken": "촬영 날짜 없음",
   "galleryPlaceHintCity": "가장 가까운 도시 ({km} km 이내)",
-  "galleryPlaceHintCoordinates": "{km} km 이내에 도시 없음: 좌표로 그룹화"
+  "galleryPlaceHintCoordinates": "{km} km 이내에 도시 없음: 좌표로 그룹화",
+  "gocryptfsNamesRandomIvOption": "폴더별 무작위(기본값)",
+  "gocryptfsNamesDeterministicOption": "결정론적(동기화 폴더용)"
 }

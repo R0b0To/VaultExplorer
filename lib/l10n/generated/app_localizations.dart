@@ -3768,6 +3768,18 @@ abstract class AppLocalizations {
   /// **'Content Cipher'**
   String get gocryptfsCipherLabel;
 
+  /// Option in the gocryptfs filename picker when creating a vault: every folder gets its own random gocryptfs.diriv (the gocryptfs default)
+  ///
+  /// In en, this message translates to:
+  /// **'Random per folder (default)'**
+  String get gocryptfsNamesRandomIvOption;
+
+  /// Option in the gocryptfs filename picker when creating a vault: gocryptfs -deterministic-names. No gocryptfs.diriv files, so devices that create the same folder offline produce identical ciphertext
+  ///
+  /// In en, this message translates to:
+  /// **'Deterministic (for synced folders)'**
+  String get gocryptfsNamesDeterministicOption;
+
   /// Label above the XChaCha20-Poly1305/AES-256-GCM cipher picker shown when creating a new CryFS vault
   ///
   /// In en, this message translates to:

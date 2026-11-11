@@ -2187,6 +2187,12 @@ class AppLocalizationsKo extends AppLocalizations {
   String get gocryptfsCipherLabel => '콘텐츠 암호화 방식';
 
   @override
+  String get gocryptfsNamesRandomIvOption => '폴더별 무작위(기본값)';
+
+  @override
+  String get gocryptfsNamesDeterministicOption => '결정론적(동기화 폴더용)';
+
+  @override
   String get cryfsCipherLabel => '콘텐츠 암호화 방식';
 
   @override

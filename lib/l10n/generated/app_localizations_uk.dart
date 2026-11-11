@@ -2337,6 +2337,14 @@ class AppLocalizationsUk extends AppLocalizations {
   String get gocryptfsCipherLabel => 'Шифр вмісту';
 
   @override
+  String get gocryptfsNamesRandomIvOption =>
+      'Випадковий для кожної папки (за замовчуванням)';
+
+  @override
+  String get gocryptfsNamesDeterministicOption =>
+      'Детермінований (для синхронізованих папок)';
+
+  @override
   String get cryfsCipherLabel => 'Шифр вмісту';
 
   @override

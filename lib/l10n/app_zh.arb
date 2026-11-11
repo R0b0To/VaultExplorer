@@ -3953,5 +3953,7 @@
   "galleryMissingCamera": "无相机信息",
   "galleryMissingDateTaken": "无拍摄日期",
   "galleryPlaceHintCity": "最近的城市（{km} 公里内）",
-  "galleryPlaceHintCoordinates": "{km} 公里内没有城市：按坐标分组"
+  "galleryPlaceHintCoordinates": "{km} 公里内没有城市：按坐标分组",
+  "gocryptfsNamesRandomIvOption": "按文件夹随机（默认）",
+  "gocryptfsNamesDeterministicOption": "确定性（适用于同步文件夹）"
 }

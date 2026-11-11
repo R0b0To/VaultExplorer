@@ -2352,6 +2352,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get gocryptfsCipherLabel => 'شيفرة المحتوى';
 
   @override
+  String get gocryptfsNamesRandomIvOption => 'عشوائي لكل مجلد (افتراضي)';
+
+  @override
+  String get gocryptfsNamesDeterministicOption => 'حتمي (للمجلدات المتزامنة)';
+
+  @override
   String get cryfsCipherLabel => 'شيفرة المحتوى';
 
   @override

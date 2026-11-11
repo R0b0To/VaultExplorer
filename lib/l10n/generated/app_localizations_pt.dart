@@ -2311,6 +2311,13 @@ class AppLocalizationsPt extends AppLocalizations {
   String get gocryptfsCipherLabel => 'Cifra de Conteúdo';
 
   @override
+  String get gocryptfsNamesRandomIvOption => 'Aleatório por pasta (padrão)';
+
+  @override
+  String get gocryptfsNamesDeterministicOption =>
+      'Determinístico (para pastas sincronizadas)';
+
+  @override
   String get cryfsCipherLabel => 'Cifra de Conteúdo';
 
   @override

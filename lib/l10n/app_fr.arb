@@ -3953,5 +3953,7 @@
   "galleryMissingCamera": "Sans infos d’appareil",
   "galleryMissingDateTaken": "Sans date de prise de vue",
   "galleryPlaceHintCity": "Ville la plus proche, à moins de {km} km",
-  "galleryPlaceHintCoordinates": "Aucune ville à moins de {km} km : regroupé par coordonnées"
+  "galleryPlaceHintCoordinates": "Aucune ville à moins de {km} km : regroupé par coordonnées",
+  "gocryptfsNamesRandomIvOption": "Aléatoire par dossier (par défaut)",
+  "gocryptfsNamesDeterministicOption": "Déterministe (pour les dossiers synchronisés)"
 }

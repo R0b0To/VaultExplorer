@@ -3010,6 +3010,14 @@
   "@gocryptfsCipherLabel": {
     "description": "Label above the AES-256-GCM/XChaCha20-Poly1305 cipher picker shown when creating a new gocryptfs vault"
   },
+  "gocryptfsNamesRandomIvOption": "Random per folder (default)",
+  "@gocryptfsNamesRandomIvOption": {
+    "description": "Option in the gocryptfs filename picker when creating a vault: every folder gets its own random gocryptfs.diriv (the gocryptfs default)"
+  },
+  "gocryptfsNamesDeterministicOption": "Deterministic (for synced folders)",
+  "@gocryptfsNamesDeterministicOption": {
+    "description": "Option in the gocryptfs filename picker when creating a vault: gocryptfs -deterministic-names. No gocryptfs.diriv files, so devices that create the same folder offline produce identical ciphertext"
+  },
   "cryfsCipherLabel": "Content Cipher",
   "@cryfsCipherLabel": {
     "description": "Label above the XChaCha20-Poly1305/AES-256-GCM cipher picker shown when creating a new CryFS vault"

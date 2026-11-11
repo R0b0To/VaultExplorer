@@ -34,6 +34,7 @@ extern "C" {
 #include "containers/vhd_image.h"
 #include "containers/vhdx_image.h"
 #include "filesystems/stream_handles.h"
+#include "io/host_file.h"
 
 namespace {
 constexpr int kMaxVolumes = FF_VOLUMES;
@@ -833,7 +834,7 @@ int openNtfsHostSource(const std::string& sourceHostPath) {
             return duplicated;
         }
     }
-    return open(sourceHostPath.c_str(), O_RDONLY | O_CLOEXEC);
+    return hostOpen(sourceHostPath.c_str(), O_RDONLY | O_CLOEXEC);
 }
 
 int openNtfsHostDest(const std::string& destHostPath) {
@@ -845,7 +846,7 @@ int openNtfsHostDest(const std::string& destHostPath) {
             return duplicated;
         }
     }
-    return open(destHostPath.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
+    return hostOpen(destHostPath.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
 }
 } // namespace
 

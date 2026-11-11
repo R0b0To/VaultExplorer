@@ -12,9 +12,9 @@
 //   } else {
 //     WidgetsFlutterBinding.ensureInitialized();
 //   }
-import 'dart:io' show Platform;
+import 'dart:io';
 import 'dart:typed_data';
-import 'dart:ui' show PlatformMessageResponseCallback;
+import 'dart:ui' show PlatformMessageResponseCallback, AppExitResponse;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -38,10 +38,21 @@ class DesktopEngineRuntime {
   DesktopEngineRuntime._();
   static final DesktopEngineRuntime instance = DesktopEngineRuntime._();
 
-  late final DesktopEngineHost host = DesktopEngineHost(
-    pool: EngineWorkerPool(),
-    emit: _emitToDart,
-  );
+  DesktopEngineHost? _host;
+
+  /// Created on first use, so an app that never touches the engine never spawns its workers.
+  DesktopEngineHost get host => _host ??= DesktopEngineHost(
+        pool: EngineWorkerPool(),
+        emit: _emitToDart,
+      );
+
+  /// App exit: lock every unlocked vault (wipes its key material in the engine), delete any decrypted
+  /// "open with" copies, stop the workers. Safe to call when the engine was never used.
+  Future<void> shutdown() async {
+    final h = _host;
+    _host = null;
+    if (h != null) await h.dispose();
+  }
 
   MessageHandler? _dartHandler;
 
@@ -105,6 +116,7 @@ class DesktopEngineBinding extends WidgetsFlutterBinding {
   BinaryMessenger createBinaryMessenger() => _EngineInterceptingMessenger(super.createBinaryMessenger());
 
   static DesktopEngineBinding? _instance;
+  static AppLifecycleListener? _exitListener;
 
   static WidgetsBinding ensureInitialized() {
     if (_instance == null) {
@@ -112,6 +124,18 @@ class DesktopEngineBinding extends WidgetsFlutterBinding {
       // before anything else initialises a binding.
       DesktopEngineBinding();
     }
+    // Closing the window must not leave vaults unlocked, or decrypted "open with" copies on disk, until
+    // the next start: tidy up first, then let the exit proceed.
+    _exitListener ??= AppLifecycleListener(
+      onExitRequested: () async {
+        try {
+          await DesktopEngineRuntime.instance.shutdown();
+        } on Object catch (e) {
+          debugPrint('[desktop-engine] shutdown failed: $e');
+        }
+        return AppExitResponse.exit;
+      },
+    );
     return WidgetsBinding.instance;
   }
 

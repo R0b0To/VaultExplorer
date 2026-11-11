@@ -1,5 +1,6 @@
 #include "carrier_fd_cache.h"
 #include <algorithm>
+#include "io/host_file.h"
 
 #undef min
 #undef max
@@ -60,9 +61,9 @@ int CarrierFdCache::openTargetLocked(uint32_t fileIndex) {
 #ifdef O_LARGEFILE
         flags |= O_LARGEFILE;
 #endif
-        int fd = ::open(target.path.c_str(), flags);
+        int fd = hostOpen(target.path.c_str(), flags);
         if (fd < 0 && !target.readOnly) {
-            fd = ::open(target.path.c_str(), O_RDONLY);
+            fd = hostOpen(target.path.c_str(), O_RDONLY);
         }
         return fd;
     }

@@ -135,6 +135,32 @@ endif()
 # archive_deps.cmake's file-level comment for what's vendored vs. reused
 # from the NDK/BoringSSL, and for a caveat on what could/couldn't be
 # verified without an actual Android build.
+if(VAULTEXPLORER_DESKTOP AND WIN32)
+    # The NDK and a Linux host provide libz; a MinGW toolchain has none, so vendor it. libarchive's own
+    # find_package(ZLIB) is pre-seeded below so it uses this copy instead of searching.
+    FetchContent_Declare(
+            zlib_upstream
+            GIT_REPOSITORY https://github.com/madler/zlib.git
+            GIT_TAG        v1.3.1
+            GIT_SHALLOW    TRUE
+    )
+    set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(SKIP_INSTALL_ALL ON CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(zlib_upstream)
+    set(VE_ZLIB_LIB zlibstatic)
+    set(VE_ZLIB_INCLUDE_DIRS ${zlib_upstream_SOURCE_DIR} ${zlib_upstream_BINARY_DIR})
+    set(ZLIB_FOUND TRUE CACHE BOOL "" FORCE)
+    set(ZLIB_INCLUDE_DIR ${zlib_upstream_SOURCE_DIR} CACHE PATH "" FORCE)
+    set(ZLIB_INCLUDE_DIRS "${VE_ZLIB_INCLUDE_DIRS}" CACHE STRING "" FORCE)
+    set(ZLIB_LIBRARY zlibstatic CACHE STRING "" FORCE)
+    set(ZLIB_LIBRARIES zlibstatic CACHE STRING "" FORCE)
+    set(HAVE_LIBZ 1 CACHE BOOL "" FORCE)
+    set(HAVE_ZLIB_H 1 CACHE BOOL "" FORCE)
+else()
+    set(VE_ZLIB_LIB z)
+    set(VE_ZLIB_INCLUDE_DIRS "")
+endif()
+
 include(${CMAKE_CURRENT_SOURCE_DIR}/archive_deps.cmake)
 
 # 2. Download ChaN's FatFs (Filesystem Engine)
@@ -255,13 +281,22 @@ foreach(E2FS_TARGET e2fs_com_err e2fs_uuid e2fs_ext2fs)
             ${CMAKE_CURRENT_BINARY_DIR} ${E2FS_GENERATED_DIR}
             ${E2FS_SRC_DIR}/lib ${E2FS_SRC_DIR}/lib/et
             ${E2FS_SRC_DIR}/lib/uuid ${E2FS_EXT2FS_DIR})
-    target_compile_definitions(${E2FS_TARGET} PRIVATE
+    set(E2FS_DEFINITIONS
             HAVE_CONFIG_H HAVE_SYS_TYPES_H HAVE_SYS_STAT_H HAVE_UNISTD_H
             HAVE_STDLIB_H HAVE_STRING_H HAVE_ERRNO_H HAVE_INTTYPES_H
             HAVE_SNPRINTF HAVE_STRCASECMP HAVE_STRDUP HAVE_STRNLEN
             HAVE_PREAD HAVE_PWRITE HAVE_PREAD64 HAVE_PWRITE64
             HAVE_LINUX_TYPES_H HAVE_SYS_TIME_H HAVE_GETPAGESIZE
             CRC_LE_BITS=1 CRC_BE_BITS=1 DISABLE_BACKTRACE _GNU_SOURCE)
+    if(WIN32)
+        # No <linux/types.h> and no getpagesize() on a Windows C runtime (e2fsprogs falls back to constants).
+        list(REMOVE_ITEM E2FS_DEFINITIONS HAVE_LINUX_TYPES_H HAVE_GETPAGESIZE)
+        target_include_directories(${E2FS_TARGET} BEFORE PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ffi/compat_win)
+        # getuid() & co. (gen_uuid.c, getenv.c) -- declared, not implicitly guessed (an error from GCC 14 on)
+        target_compile_options(${E2FS_TARGET} PRIVATE
+                "$<$<COMPILE_LANGUAGE:C>:SHELL:-include ${CMAKE_CURRENT_SOURCE_DIR}/ffi/compat/ve_win_types.h>")
+    endif()
+    target_compile_definitions(${E2FS_TARGET} PRIVATE ${E2FS_DEFINITIONS})
 endforeach()
 target_link_libraries(e2fs_ext2fs PRIVATE e2fs_com_err e2fs_uuid)
 
@@ -301,9 +336,9 @@ set(CONFIG_H_CONTENT "
 #define HAVE_SYS_TIME_H 1
 #define HAVE_STDINT_H 1
 #define HAVE_STDDEF_H 1
+#define HAVE_SYS_IOCTL_H 1
 #define HAVE_SYS_STAT_H 1
 #define HAVE_SYS_TYPES_H 1
-#define HAVE_SYS_IOCTL_H 1
 #define HAVE_UNISTD_H 1
 #define HAVE_FCNTL_H 1
 #define HAVE_ERRNO_H 1
@@ -349,6 +384,11 @@ struct hd_geometry {
 
 #endif
 ")
+if(WIN32)
+    # MinGW's C runtime has no <sys/sysmacros.h> (major/minor/makedev are defined just below) and no utimensat.
+    string(REPLACE "#define HAVE_SYS_SYSMACROS_H 1\n" "" CONFIG_H_CONTENT "${CONFIG_H_CONTENT}")
+    string(REPLACE "#define HAVE_UTIMENSAT 1\n" "" CONFIG_H_CONTENT "${CONFIG_H_CONTENT}")
+endif()
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/config.h "${CONFIG_H_CONTENT}")
 
 # 3c. VeraCrypt crypto primitives
@@ -430,6 +470,11 @@ if(VE_X86_TARGET)
 endif()
 
 set(MKNTFS_EMBEDDED_SOURCE ${CMAKE_CURRENT_BINARY_DIR}/mkntfs_embedded.c)
+if(WIN32)
+    # mkntfs.c reads st_blocks only on the path that guesses a volume size from the file when no sector count
+    # was given; the engine always passes the size explicitly, and a Windows stat has no st_blocks.
+    set_source_files_properties(${MKNTFS_EMBEDDED_SOURCE} PROPERTIES COMPILE_DEFINITIONS "st_blocks=st_size")
+endif()
 set(NTFS3G_MKNTFS_SOURCE ${ntfs3g_SOURCE_DIR}/ntfsprogs/mkntfs.c)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/filesystems/mkntfs_embedded.c.in ${MKNTFS_EMBEDDED_SOURCE} @ONLY)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/filesystems/mkntfs_embedded.c.in)
@@ -534,8 +579,15 @@ endif()
 # dependencies (ntfs-3g, e2fsprogs, dislocker) still relies on them. Desktop toolchains are GCC;
 # the Android NDK (clang) build keeps its flags exactly as before.
 if(VAULTEXPLORER_DESKTOP AND NOT MSVC)
-    target_compile_options(vaultexplorer PRIVATE
-        "$<$<COMPILE_LANGUAGE:C>:-Wno-error=implicit-function-declaration>")
+    set(VE_LEGACY_C_FLAGS -Wno-error=implicit-function-declaration -Wno-error=int-conversion
+                          -Wno-error=incompatible-pointer-types)
+    target_compile_options(vaultexplorer PRIVATE "$<$<COMPILE_LANGUAGE:C>:${VE_LEGACY_C_FLAGS}>")
+    # the other vendored legacy-C libraries built in this directory
+    foreach(VE_LEGACY_TARGET e2fs_com_err e2fs_ext2fs e2fs_uuid dislocker_lib)
+        if(TARGET ${VE_LEGACY_TARGET})
+            target_compile_options(${VE_LEGACY_TARGET} PRIVATE "$<$<COMPILE_LANGUAGE:C>:${VE_LEGACY_C_FLAGS}>")
+        endif()
+    endforeach()
 endif()
 
 if(NOT VAULTEXPLORER_DESKTOP)
@@ -564,7 +616,7 @@ if(VAULTEXPLORER_DESKTOP)
     # BEFORE: the stand-in <jni.h> / <android/log.h> must win over any JDK/NDK header.
     target_include_directories(vaultexplorer BEFORE PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/ffi/compat)
-    target_include_directories(vaultexplorer PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ffi)
+    target_include_directories(vaultexplorer PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ffi ${VE_ZLIB_INCLUDE_DIRS})
 else()
     target_include_directories(vaultexplorer PRIVATE ${zxing_cpp_SOURCE_DIR}/core/src)
 endif()
@@ -619,7 +671,7 @@ endif()
 target_link_libraries(
         vaultexplorer
         ${log-lib}
-        z
+        ${VE_ZLIB_LIB}
         mbedcrypto
         crypto
         e2fs_ext2fs
@@ -635,13 +687,19 @@ if(VAULTEXPLORER_DESKTOP)
     find_package(Threads REQUIRED)
     target_link_libraries(vaultexplorer Threads::Threads)
     if(WIN32)
-        target_link_libraries(vaultexplorer bcrypt)  # BCryptGenRandom (ffi/ve_win_platform.cpp)
+        # Self-contained DLL: link the MinGW runtime (libgcc / libstdc++ / winpthread) statically, so it depends
+        # only on system DLLs and a Flutter Windows bundle needs nothing from an MSYS2 install.
+        target_link_options(vaultexplorer PRIVATE -static)
+        target_link_libraries(vaultexplorer bcrypt ws2_32)  # BCryptGenRandom (ffi/ve_win_platform.cpp); htonl & co. (e2fsprogs)
         # POSIX shims (pread/pwrite/...) for every engine C++ file; declarations only, no windows.h.
         target_compile_options(vaultexplorer PRIVATE
                 "$<$<COMPILE_LANGUAGE:CXX>:SHELL:-include ${CMAKE_CURRENT_SOURCE_DIR}/ffi/compat/ve_win_compat.h>")
         # ntfs-3g's ntfstime.h declares its own `struct timespec` unless glibc's marker is set;
         # MinGW already has one (via <time.h>/pthread), so tell it so.
         target_compile_definitions(vaultexplorer PRIVATE __timespec_defined=1)
+        # uid_t/gid_t, S_IFSOCK, flock/fcntl ... for the vendored C code (ntfs-3g); see ffi/compat/ve_win_types.h
+        target_compile_options(vaultexplorer PRIVATE
+                "$<$<COMPILE_LANGUAGE:C>:SHELL:-include ${CMAKE_CURRENT_SOURCE_DIR}/ffi/compat/ve_win_types.h>")
     endif()
     # Export only the ve_* C ABI (VE_API); keep every engine symbol private so the
     # library cannot clash with anything the host process (Flutter) already loads.
@@ -652,6 +710,9 @@ if(VAULTEXPLORER_DESKTOP)
         target_link_options(vaultexplorer PRIVATE "-Wl,--exclude-libs,ALL")
     endif()
     if(WIN32)
+        # POSIX header stand-ins (termios.h, pwd.h, grp.h, sys/ioctl.h, ...). Windows ONLY: on Linux they would
+        # shadow the real system headers.
+        target_include_directories(vaultexplorer BEFORE PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ffi/compat_win)
         # MinGW would name it libvaultexplorer_engine.dll; the Dart loader expects vaultexplorer_engine.dll
         set_target_properties(vaultexplorer PROPERTIES PREFIX "")
     endif()
@@ -665,6 +726,9 @@ if(VAULTEXPLORER_DESKTOP)
     add_executable(ve_smoke_test ffi/test/ve_smoke_test.cpp)
     target_include_directories(ve_smoke_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ffi)
     target_link_libraries(ve_smoke_test vaultexplorer)
+    if(WIN32)
+        target_link_options(ve_smoke_test PRIVATE -static)
+    endif()
 endif()
 
 

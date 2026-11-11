@@ -120,6 +120,14 @@ target_compile_options(dislocker_lib PRIVATE
 )
 
 target_link_libraries(dislocker_lib PRIVATE mbedcrypto)
+if(WIN32)
+    # O_LARGEFILE is a no-op there (file offsets are already 64-bit); termios / ioctl / select headers are
+    # satisfied by the stand-ins in ffi/compat_win (its password-prompt helpers are never called by the engine).
+    target_compile_definitions(dislocker_lib PRIVATE O_LARGEFILE=0 O_NONBLOCK=0)
+    target_compile_options(dislocker_lib PRIVATE
+            "$<$<COMPILE_LANGUAGE:C>:SHELL:-include ${CMAKE_CURRENT_SOURCE_DIR}/ffi/compat/ve_win_types.h>")
+    target_include_directories(dislocker_lib BEFORE PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ffi/compat_win)
+endif()
 
 # Public include path for consumers (bitlocker_backend.cpp)
 set(DISLOCKER_INCLUDE_DIRS

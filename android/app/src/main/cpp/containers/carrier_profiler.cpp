@@ -4,6 +4,7 @@
 #include <vector>
 #include <sys/stat.h>
 #include <openssl/sha.h>
+#include "io/host_file.h"
 #ifdef __ANDROID__
 #include <android/log.h>
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_Composite", __VA_ARGS__)
@@ -195,7 +196,7 @@ CapacityProfile CarrierProfiler::profileForAllocation(
         int fd = carriers[i].fd;
         bool openedHere = false;
         if (fd < 0 && !carriers[i].path.empty()) {
-            fd = ::open(carriers[i].path.c_str(), O_RDONLY);
+            fd = hostOpen(carriers[i].path.c_str(), O_RDONLY);
             openedHere = true;
         }
 
@@ -219,7 +220,7 @@ CapacityProfile CarrierProfiler::profileForRecovery(
         int fd = carriers[i].fd;
         bool openedHere = false;
         if (fd < 0 && !carriers[i].path.empty()) {
-            fd = ::open(carriers[i].path.c_str(), O_RDONLY);
+            fd = hostOpen(carriers[i].path.c_str(), O_RDONLY);
             openedHere = true;
         }
 

@@ -15,6 +15,7 @@
 #include "diskio.h"
 #include "volume_state.h"
 #include "filesystems/stream_handles.h"
+#include "io/host_file.h"
 namespace { constexpr size_t kIoBufferSize = 2097152; }
 #define EXT_LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
 #define EXT_LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "VaultExplorer_C++", __VA_ARGS__)
@@ -136,7 +137,7 @@ int openExtHostSource(const char* sourceHostPath) {
             return duplicated;
         }
     }
-    return open(sourceHostPath, O_RDONLY | O_CLOEXEC);
+    return hostOpen(sourceHostPath, O_RDONLY | O_CLOEXEC);
 }
 
 int openExtHostDest(const char* destHostPath) {
@@ -148,7 +149,7 @@ int openExtHostDest(const char* destHostPath) {
             return duplicated;
         }
     }
-    return open(destHostPath, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
+    return hostOpen(destHostPath, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
 }
 } // namespace
 

@@ -13,6 +13,7 @@
 #include "filesystem_paths.h"
 #include "container_utils.h"
 #include "volume_state.h"
+#include "io/host_file.h"
 
 uint64_t recursiveFatFolderSize(int volumeId, const std::string& path) {
     std::string fullPath = drivePaths[volumeId];
@@ -140,7 +141,7 @@ int openHostSource(const std::string& sourceHostPath) {
             return duplicated;
         }
     }
-    return open(sourceHostPath.c_str(), O_RDONLY | O_CLOEXEC);
+    return hostOpen(sourceHostPath.c_str(), O_RDONLY | O_CLOEXEC);
 }
 
 int openHostDest(const std::string& destHostPath) {
@@ -152,7 +153,7 @@ int openHostDest(const std::string& destHostPath) {
             return duplicated;
         }
     }
-    return open(destHostPath.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
+    return hostOpen(destHostPath.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
 }
 }
 

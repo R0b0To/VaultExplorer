@@ -66,6 +66,56 @@ On first run expect some rough edges: methods the desktop host does not implemen
 and are logged once in debug builds as `[desktop-engine] not implemented yet: <method>`. Paste
 those lines back and they become the to-do list.
 
+## Windows
+
+Status: the engine builds as a self-contained `vaultexplorer_engine.dll` and **passes the full engine smoke
+test (300 checks: FAT / exFAT / NTFS / ext4, creation, hidden volumes, password change, crypto, digests,
+single-file tool) when run under Wine.** That is a strong signal, not a substitute for running it on real
+Windows: please run the test there once (below). The Flutter side (runner, bundling, file dialogs, secret
+store) has not been tried on Windows at all.
+
+Build the engine (either way produces the same DLL):
+
+    scripts/build_desktop_engine_windows.sh                # from Linux, cross-compiling with MinGW-w64
+    # or, natively in an MSYS2 UCRT64 shell:
+    cmake -S android/app/src/main/cpp -B build/desktop-engine-win -G Ninja -DVAULTEXPLORER_DESKTOP=ON -DCMAKE_BUILD_TYPE=Release
+    cmake --build build/desktop-engine-win --target vaultexplorer ve_smoke_test
+
+Check it on a Windows machine: copy `vaultexplorer_engine.dll` and `ve_smoke_test.exe` somewhere and run
+`ve_smoke_test.exe fat exfat ntfs ext4` (takes a few minutes; expect `N checks, 0 failed`).
+
+Run the app on Windows:
+
+1. `flutter create --platforms=windows .`
+2. Bundle the DLL: in `windows/CMakeLists.txt`, next to the other `install()` calls:
+
+       set(VE_ENGINE_DLL "${CMAKE_CURRENT_SOURCE_DIR}/../build/desktop-engine-win/vaultexplorer_engine.dll")
+       install(FILES "${VE_ENGINE_DLL}" DESTINATION "${CMAKE_INSTALL_PREFIX}" COMPONENT Runtime)
+
+   (or set `VE_ENGINE_LIBRARY` to the DLL's full path while developing).
+3. `flutter pub get && flutter run -d windows`
+
+What the Windows port changed, and why (all behind the desktop/Windows switches, so Android is unchanged):
+
+- POSIX stand-ins: `pread` / `pwrite` over CRT descriptors, `getline`, `random()` (backed by the OS CSPRNG),
+  stub `ioctl` / `fcntl` / `getuid` ..., and header stand-ins (`ffi/compat_win/`: termios, pwd, grp,
+  sys/ioctl, sys/select, arpa/inet). They only exist so the vendored C code (ntfs-3g, e2fsprogs,
+  dislocker) compiles and links; the engine does not use those paths on Windows. `ffi/compat_win` is added
+  to the include path on Windows only: on Linux it would shadow real system headers.
+- Host files are opened through `hostOpen()` (`io/host_file.h`): plain `open()` on Android / Linux, but on
+  Windows a UTF-8 path in binary mode. The C runtime's default text mode corrupts any binary file (it
+  translates CR/LF and treats byte 0x1A as end-of-file) and cannot open non-ASCII paths. Caught by the
+  import/export round-trip in the smoke test.
+- `Common/Endian.h` allows little-endian Windows explicitly (it deliberately refuses unknown platforms).
+- zlib is vendored (MinGW has none); libarchive is built without a regex library (MinGW has none).
+- Not applicable on Windows: raw USB mass-storage access, the Android file-descriptor tricks.
+- Newer MinGW compilers (GCC 14+) make several legacy-C constructs hard errors (implicit function
+  declarations, int/pointer conversions). The vendored C libraries still contain a few, so the desktop build
+  declares the POSIX functions they use (`ffi/compat/ve_win_types.h`, force-included into every vendored C
+  target) and keeps `-Wno-error=` for the remaining legacy patterns on those targets only. A strict-mode
+  pass over all 568 vendored C files (compile commands re-run with the implicit-declaration / int-conversion /
+  pointer-type diagnostics forced to errors) is clean apart from what those flags cover.
+
 ## What works (design scope of this cut)
 
 Add a vault (multi-select file picker), probe, unlock (VeraCrypt / LUKS / BitLocker / plain block
@@ -110,6 +160,10 @@ http / https / mailto. The app's secret store (`readSecure` / `writeSecure` / ..
 the OS keyring, so saved vaults and credentials persist; without a keyring service the writes fail soft
 (`false`) and a one-time hint is printed.
 
+Closing the window runs a clean-up first (`AppLifecycleListener.onExitRequested`): every unlocked vault is
+locked (its key material wiped in the engine) and any decrypted "open with" copies are deleted, rather than
+relying on the next start's purge. A crash or kill -9 still falls back to that purge.
+
 ## Not yet
 
 - Folder vaults (Cryptomator / gocryptfs / CryFS) -- still Kotlin, so their add and create flows do
@@ -120,7 +174,5 @@ the OS keyring, so saved vaults and credentials persist; without a keyring servi
   (the engine still rejects an illegal name when it writes it).
 - Share sheet; JPEG/WebP encoding for the image editor (PNG only for now).
 - Pre-flight free-space check on create (Android reports `INSUFFICIENT_SPACE`; desktop just fails).
-- Windows: all 41 engine C++ files pass a MinGW syntax check and the POSIX shims exist
-  (`ffi/compat/`, `ffi/ve_win_platform.cpp`), but 16 C files still need work (Endian.h guard, ntfs-3g
-  POSIX bits, Argon2 threading) and nothing has been linked or run there. Use MSYS2 UCRT64.
+- Windows: the engine is validated under Wine (see "Windows" above); the Flutter app on Windows is untested.
 - macOS / iOS: not started.

@@ -31,12 +31,15 @@
 #endif
 
 // Build with _FILE_OFFSET_BITS=64 (the engine already does) so off_t is 64-bit.
+// C linkage: the vendored C code (dislocker, ntfs-3g) calls the same functions.
+extern "C" {
 ssize_t pread(int fd, void* buf, size_t count, off_t offset);
 ssize_t pwrite(int fd, const void* buf, size_t count, off_t offset);
 ssize_t pread64(int fd, void* buf, size_t count, int64_t offset);
 ssize_t pwrite64(int fd, const void* buf, size_t count, int64_t offset);
 int fsync(int fd);
 int fdatasync(int fd);
+}
 
 #include <stdlib.h>
 #include <time.h>

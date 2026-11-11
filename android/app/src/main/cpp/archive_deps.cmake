@@ -175,6 +175,12 @@ set(ENABLE_EXPAT    OFF CACHE BOOL "" FORCE)
 set(ENABLE_PCREPOSIX OFF CACHE BOOL "" FORCE)
 set(ENABLE_PCRE2POSIX OFF CACHE BOOL "" FORCE)
 set(ENABLE_LIBGCC   OFF CACHE BOOL "" FORCE)
+if(WIN32)
+    # MinGW's C runtime has no POSIX regex (regcomp) and no PCRE is bundled; libarchive then hard-errors
+    # in its "find a regex library" step. The engine does not use archive_match's regex patterns
+    # (pathname globbing is built in), so build without one.
+    set(POSIX_REGEX_LIB NONE CACHE STRING "" FORCE)
+endif()
 set(ENABLE_CNG      OFF CACHE BOOL "" FORCE)
 set(ENABLE_XATTR    OFF CACHE BOOL "" FORCE)
 set(ENABLE_ACL      OFF CACHE BOOL "" FORCE)
@@ -191,6 +197,10 @@ set(ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
 set(ENABLE_WERROR  OFF CACHE BOOL "" FORCE)
 
 FetchContent_MakeAvailable(libarchive_upstream)
+if(WIN32)
+    # libarchive's Windows branch does not use the pre-seeded OPENSSL_INCLUDE_DIR; hand it BoringSSL's headers.
+    target_include_directories(archive_static PRIVATE ${boringssl_SOURCE_DIR}/include)
+endif()
 
 # Re-apply patches whenever apply_patch_once.cmake or the patch changes, even inside an existing .cxx build tree
 execute_process(

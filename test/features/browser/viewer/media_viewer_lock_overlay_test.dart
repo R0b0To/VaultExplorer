@@ -130,7 +130,9 @@ void main() {
     testWidgets('a plain tap on the lock button does not unlock',
         (tester) async {
       await pumpOverlay(tester);
-      await tester.tap(find.byIcon(Icons.lock_rounded));
+      await tester.tapAt(
+        tester.getCenter(find.byIcon(Icons.lock_rounded)),
+      );
       await tester.pump(const Duration(milliseconds: 100));
       expect(unlocks, 0);
     });

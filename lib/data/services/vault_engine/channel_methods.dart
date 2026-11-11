@@ -47,6 +47,10 @@ abstract final class ChannelMethods {
   static const changeCryptomatorVaultPassword =
       'changeCryptomatorVaultPassword';
   static const migrateCryptomatorVault = 'migrateCryptomatorVault';
+  static const probeCryptomatorVault = 'probeCryptomatorVault';
+  static const getCryptomatorKeyFileBackup = 'getCryptomatorKeyFileBackup';
+  static const setCryptomatorKeyFileBackup = 'setCryptomatorKeyFileBackup';
+  static const clearVaultOpenPreferences = 'clearVaultOpenPreferences';
   static const pickGocryptfsVault = 'pickGocryptfsVault';
   static const unlockGocryptfsVault = 'unlockGocryptfsVault';
   static const createGocryptfsVault = 'createGocryptfsVault';

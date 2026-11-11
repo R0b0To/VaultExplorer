@@ -6,7 +6,7 @@
 //
 // commands: create [opts] | ls P | cat P | get P LOCAL | put P LOCAL |
 //           putchunks P LOCAL | mkdir P | mv A B | rm P | size P | du P |
-//           passwd NEWPW | migrate7to8 | info | touch P EPOCH |
+//           passwd NEWPW | migrate7to8 | probe | info | touch P EPOCH |
 //           lsl P (symlinks of folder P) | lslt P (same, with mtime) | readlink P | symlink P TARGET | hidden P (entries not shown) |
 //           tree [P]   (recursive, one "D|F <TAB> size <TAB> sha256 <TAB> path" line per entry, names
 //                       escaped with \\ \n \r \t so any name round-trips; files that cannot be read
@@ -118,6 +118,11 @@ int main(int argc, char** argv) {
         return 0;
     }
 
+    if (cmd == "probe") {   // password-free format check of a Cryptomator folder; prints 0 / 7 / 8 / -8 / 6
+        if (fmt != "cryptomator") { std::fprintf(stderr, "only cryptomator\n"); return 2; }
+        std::printf("%d\n", probeCryptomatorFormat(*st));
+        return 0;
+    }
     if (cmd == "migrate7to8") {
         if (fmt != "cryptomator") { std::fprintf(stderr, "only cryptomator\n"); return 2; }
         PlainResult r = migrateCryptomator7To8(*st, p, pw.size());

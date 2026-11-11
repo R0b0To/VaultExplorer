@@ -16,6 +16,7 @@ import com.aeidolon.vaultexplorer.bridge.UsbBlockBridge
 import com.aeidolon.vaultexplorer.cryfs.CryfsVault
 import com.aeidolon.vaultexplorer.cryptomator.CryptomatorVault
 import com.aeidolon.vaultexplorer.engine.VaultOpenResult
+import com.aeidolon.vaultexplorer.foldervault.VaultOpenPreferences
 import com.aeidolon.vaultexplorer.gocryptfs.GocryptfsVault
 import com.aeidolon.vaultexplorer.handlers.DerivedKeyHandlers
 import com.aeidolon.vaultexplorer.saf.UriToPath
@@ -392,7 +393,10 @@ object ContainerLifecycleCore {
                 DirectoryVaultFormat.CRYPTOMATOR -> {
                     val chars = (password ?: "").toCharArray()
                     try {
-                        CryptomatorVault.open(context, uri, chars, readOnly)
+                        CryptomatorVault.open(
+                            context, uri, chars, readOnly,
+                            backupKeyFiles = VaultOpenPreferences.getBackupKeyFiles(context, uriString),
+                        )
                     } finally {
                         chars.fill('\u0000')
                     }

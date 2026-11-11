@@ -884,12 +884,14 @@ static void testCryptomatorMigration() {
     {   // (1) the happy path: data written as format 7 is intact afterwards, the config says what official's says
         TmpDir t; std::string root = t.sub("v"); auto st = std::make_shared<PosixStorage>(root);
         makeV7(*st);
+        CHECK_EQ(probeCryptomatorFormat(*st), 7);   // password-free, from the files alone
         auto r = openCryptomator(st, pw, 6, false, {}); CHECK(r.status == OpenStatus::Ok); if (!r.vault) return;
         const Bytes a = rnd(100000, 21), b = rnd(10, 22);
         CHECK(r.vault->createDirectory("docs")); CHECK(put(*r.vault, "docs/a.bin", a)); CHECK(put(*r.vault, std::string(170, 'N') + ".txt", b));
         r.vault->close();
         Bytes oldKey; CHECK(st->readWhole("masterkey.cryptomator", oldKey));
         CHECK(migrateCryptomator7To8(*st, pw, 6).status == OpenStatus::Ok);
+        CHECK_EQ(probeCryptomatorFormat(*st), 8);   // vault.cryptomator now exists
         // config: signed, format 8, SIV_CTRMAC, 220
         Bytes jwt; CHECK(st->readWhole("vault.cryptomator", jwt));
         auto mk = cm::unlockMasterkey(cm::MasterkeyFile::parse(readText(*st, "masterkey.cryptomator")), pw, 6);
@@ -909,11 +911,15 @@ static void testCryptomatorMigration() {
         auto before = snapshot(root);
         CHECK(migrateCryptomator7To8(*st, pw, 6).status == OpenStatus::InvalidVault);
         CHECK(snapshot(root) == before);
+        CHECK_EQ(probeCryptomatorFormat(*st), 8);
+        CHECK(snapshot(root) == before);            // probing never writes
     }
     {   // (3) refusals change nothing at all
         TmpDir t; std::string root = t.sub("v"); auto st = std::make_shared<PosixStorage>(root);
         makeV7(*st);
         auto before = snapshot(root);
+        CHECK_EQ(probeCryptomatorFormat(*st), 7);
+        CHECK(snapshot(root) == before);
         CHECK(migrateCryptomator7To8(*st, (const uint8_t*)"bad", 3).status == OpenStatus::WrongPassword);
         CHECK(snapshot(root) == before);
         CHECK(!st->stat("vault.cryptomator", *std::make_unique<DirEntry>()));
@@ -921,15 +927,26 @@ static void testCryptomatorMigration() {
         TmpDir t2; std::string root2 = t2.sub("v"); auto st2 = std::make_shared<PosixStorage>(root2);
         CHECK(createCryptomator(*st2, pw, 6).status == OpenStatus::Ok); CHECK(st2->remove("vault.cryptomator"));
         auto before2 = snapshot(root2);
+        CHECK_EQ(probeCryptomatorFormat(*st2), -8);   // the signal the UI uses to say "wait for sync", never "upgrade"
         CHECK(migrateCryptomator7To8(*st2, pw, 6).status == OpenStatus::InvalidVault);
         CHECK(snapshot(root2) == before2);
         // a genuine format 8 vault
         TmpDir t3; auto st3 = std::make_shared<PosixStorage>(t3.sub("v"));
         CHECK(createCryptomator(*st3, pw, 6).status == OpenStatus::Ok);
+        CHECK_EQ(probeCryptomatorFormat(*st3), 8);
         CHECK(migrateCryptomator7To8(*st3, pw, 6).status == OpenStatus::InvalidVault);
         // not a vault at all
         TmpDir t4; auto st4 = std::make_shared<PosixStorage>(t4.sub("v"));
+        CHECK_EQ(probeCryptomatorFormat(*st4), 0);
         CHECK(migrateCryptomator7To8(*st4, pw, 6).status == OpenStatus::InvalidVault);
+        // a key file that is not parseable, and a *directory* named masterkey.cryptomator, are "cannot tell" too
+        TmpDir t4b; auto st4b = std::make_shared<PosixStorage>(t4b.sub("v"));
+        CHECK(st4b->writeWhole("masterkey.cryptomator", (const uint8_t*)"{ not json", 10));
+        CHECK_EQ(probeCryptomatorFormat(*st4b), 0);
+        CHECK(migrateCryptomator7To8(*st4b, pw, 6).status == OpenStatus::InvalidVault);
+        TmpDir t4c; auto st4c = std::make_shared<PosixStorage>(t4c.sub("v"));
+        CHECK(st4c->mkdir("masterkey.cryptomator"));
+        CHECK_EQ(probeCryptomatorFormat(*st4c), 0);
         // an old (version 6) key file is not ours to migrate
         TmpDir t5; auto st5 = std::make_shared<PosixStorage>(t5.sub("v"));
         makeV7(*st5);
@@ -937,6 +954,7 @@ static void testCryptomatorMigration() {
         std::string j6 = cm::lockMasterkey(mk, pw, 6, 6);
         CHECK(st5->writeWhole("masterkey.cryptomator", (const uint8_t*)j6.data(), j6.size()));
         auto before5 = snapshot(t5.sub("v"));
+        CHECK_EQ(probeCryptomatorFormat(*st5), 6);
         CHECK(migrateCryptomator7To8(*st5, pw, 6).status == OpenStatus::InvalidVault);
         CHECK(snapshot(t5.sub("v")) == before5);
     }

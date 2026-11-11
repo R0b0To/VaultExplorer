@@ -236,6 +236,7 @@ class _GalleryFilterSheetState extends State<GalleryFilterSheet> {
         children: [
           for (final g in GalleryGroupBy.values)
             ChoiceChip(
+              showCheckmark: false,
               label: Text(labels[g]!),
               selected: controller.groupBy == g,
               onSelected: (_) => controller.groupBy = g,
@@ -334,7 +335,7 @@ class _GalleryFilterSheetState extends State<GalleryFilterSheet> {
                   ),
                   selected: on || off,
                   selectedColor: off ? scheme.errorContainer : null,
-                  showCheckmark: !off,
+                  showCheckmark: false,
                   avatar: off ? Icon(Icons.block_rounded, size: 16, color: scheme.error) : null,
                   onSelected: (_) {
                     if (id == 'year') {

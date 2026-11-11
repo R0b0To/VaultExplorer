@@ -28,11 +28,13 @@ BEFORE=$($O dump $V0 pw)
 $O downgrade $V0 pw >/dev/null
 eq "precondition: masterkey version 7" "$(mkver $V0)" "7"
 [ ! -e $V0/vault.cryptomator ] && echo "  ok   precondition: no vault.cryptomator" || { echo "  FAIL precondition"; fail=1; }
+eq "probe (password-free) says format 7 on the genuine v7 vault" "$($FV cryptomator $V0 - probe)" "7"
 cp -r $V0 $T/ours; cp -r $V0 $T/off
 
 echo "== both implementations migrate their own copy"
 $FV cryptomator $T/ours pw migrate7to8 >/dev/null; eq "our migration exit code" "$?" "0"
 $O migrate $T/off pw >/dev/null;                    eq "official migration exit code" "$?" "0"
+eq "probe says 8 after our migration / after official's" "$($FV cryptomator $T/ours - probe)/$($FV cryptomator $T/off - probe)" "8/8"
 eq "vault.cryptomator header+claims identical in shape" "$(jwt $T/ours/vault.cryptomator)" "$(jwt $T/off/vault.cryptomator)"
 eq "claims are what the spec says" "$(jwt $T/ours/vault.cryptomator)" "HS256 masterkeyfile:masterkey.cryptomator JWT 8 SIV_CTRMAC 220 True"
 eq "masterkey version after (ours / official)" "$(mkver $T/ours)/$(mkver $T/off)" "999/999"
@@ -64,5 +66,8 @@ cp -r $T/off $T/nocfg; rm $T/nocfg/vault.cryptomator; S2=$(snap $T/nocfg)
 $FV cryptomator $T/nocfg pw migrate7to8 >/dev/null 2>&1; eq "format 8 key file without vault.cryptomator -> refused (never 'migrate' a half-synced v8)" "$?" "1"
 eq "...and nothing changed" "$(snap $T/nocfg)" "$S2"
 $FV cryptomator $T/nocfg pw ls '' >/dev/null 2>&1; eq "...and open still refuses it (unchanged behaviour)" "$?" "1"
+eq "probe says -8 for that half-synced format 8 vault (the UI must say wait, never upgrade)" "$($FV cryptomator $T/nocfg - probe)" "-8"
+eq "probe says 8 for a genuine format 8 vault" "$($FV cryptomator $T/v8 - probe)" "8"
+eq "probe says 0 for something that is not a vault" "$($FV cryptomator $T/nonexist - probe)" "0"
 $FV cryptomator $T/nonexist pw migrate7to8 >/dev/null 2>&1; eq "not a vault -> refused" "$?" "1"
 echo "RESULT fail=$fail"; exit $fail

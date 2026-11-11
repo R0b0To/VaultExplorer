@@ -226,6 +226,10 @@ private object ChannelMethods {
     const val CREATE_CRYPTOMATOR_VAULT  = "createCryptomatorVault"
     const val CHANGE_CRYPTOMATOR_VAULT_PASSWORD = "changeCryptomatorVaultPassword"
     const val MIGRATE_CRYPTOMATOR_VAULT = "migrateCryptomatorVault"
+    const val PROBE_CRYPTOMATOR_VAULT = "probeCryptomatorVault"
+    const val GET_CRYPTOMATOR_KEY_FILE_BACKUP = "getCryptomatorKeyFileBackup"
+    const val SET_CRYPTOMATOR_KEY_FILE_BACKUP = "setCryptomatorKeyFileBackup"
+    const val CLEAR_VAULT_OPEN_PREFERENCES = "clearVaultOpenPreferences"
     const val PICK_GOCRYPTFS_VAULT      = "pickGocryptfsVault"
     const val UNLOCK_GOCRYPTFS_VAULT    = "unlockGocryptfsVault"
     const val CREATE_GOCRYPTFS_VAULT    = "createGocryptfsVault"
@@ -1162,6 +1166,10 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.CREATE_CRYPTOMATOR_VAULT -> vaultCreationHandlers.handleCreateCryptomatorVault(call, result)
                 ChannelMethods.CHANGE_CRYPTOMATOR_VAULT_PASSWORD -> vaultUnlockHandlers.handleChangeCryptomatorVaultPassword(call, result)
                 ChannelMethods.MIGRATE_CRYPTOMATOR_VAULT -> vaultUnlockHandlers.handleMigrateCryptomatorVault(call, result)
+                ChannelMethods.PROBE_CRYPTOMATOR_VAULT -> vaultUnlockHandlers.handleProbeCryptomatorVault(call, result)
+                ChannelMethods.GET_CRYPTOMATOR_KEY_FILE_BACKUP -> vaultUnlockHandlers.handleGetCryptomatorKeyFileBackup(call, result)
+                ChannelMethods.SET_CRYPTOMATOR_KEY_FILE_BACKUP -> vaultUnlockHandlers.handleSetCryptomatorKeyFileBackup(call, result)
+                ChannelMethods.CLEAR_VAULT_OPEN_PREFERENCES -> vaultUnlockHandlers.handleClearVaultOpenPreferences(call, result)
                 ChannelMethods.CREATE_GOCRYPTFS_VAULT -> vaultCreationHandlers.handleCreateGocryptfsVault(call, result)
                 ChannelMethods.CHANGE_GOCRYPTFS_VAULT_PASSWORD -> vaultUnlockHandlers.handleChangeGocryptfsVaultPassword(call, result)
                 ChannelMethods.IS_GOCRYPTFS_VAULT -> vaultUnlockHandlers.handleIsGocryptfsVault(call, result)

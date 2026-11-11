@@ -466,13 +466,15 @@ FV_JNI(void, nativeInit)(JNIEnv* env, jclass) {
 // 0 = invalid vault, -1 = wrong password; out[0] = message, out[1] = CryFS
 // derived key bytes.
 FV_JNI(jlong, nativeOpen)(JNIEnv* env, jclass, jint format, jstring rawRoot, jobject bootstrap, jobject sessionProvider,
-                          jbyteArray password, jboolean readOnly, jstring localState, jstring tempDir,
-                          jbyteArray combinedKey, jobjectArray out) {
+                          jbyteArray password, jboolean readOnly, jboolean backupKeyFiles, jstring localState,
+                          jstring tempDir, jbyteArray combinedKey, jobjectArray out) {
     PwGuard pw{toBytes(env, password)};
     PwGuard ck{toBytes(env, combinedKey)};
     auto st = makeStorage(env, rawRoot, bootstrap);
     if (!st) { setOut(env, out, 0, fromUtf8(env, "No storage available")); return 0; }
     fv::HostEnv henv = makeEnv(env, localState, tempDir);
+    // Only Cryptomator reads this; the other formats ignore it.
+    henv.backupKeyFilesOnOpen = backupKeyFiles == JNI_TRUE;
 
     fv::StorageFactory factory;
     jobject provider = sessionProvider ? env->NewGlobalRef(sessionProvider) : nullptr;
@@ -588,6 +590,21 @@ FV_JNI(jint, nativeMigrateCryptomator)(JNIEnv* env, jclass, jstring rawRoot, job
     st->close();
     if (r.status != fv::OpenStatus::Ok) setOut(env, out, 0, fromUtf8(env, r.message));
     return r.status == fv::OpenStatus::Ok ? 0 : (r.status == fv::OpenStatus::WrongPassword ? 1 : 2);
+}
+
+// Password-free format check of a Cryptomator folder (fv::probeCryptomatorFormat): 0 unknown, 7 migratable,
+// 8 current, -8 config missing (never migrate), 6 too old. Reads two small files, writes nothing.
+FV_JNI(jint, nativeProbeCryptomator)(JNIEnv* env, jclass, jstring rawRoot, jobject storageCb) {
+    auto st = makeStorage(env, rawRoot, storageCb);
+    if (!st) return 0;
+    int code = 0;
+    try {
+        code = fv::probeCryptomatorFormat(*st);
+    } catch (...) {
+        code = 0;
+    }
+    st->close();
+    return code;
 }
 
 FV_JNI(void, nativeClose)(JNIEnv*, jclass, jlong h) {

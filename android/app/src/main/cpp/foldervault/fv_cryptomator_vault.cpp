@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <map>
 #include <mutex>
+#include <optional>
 #include <shared_mutex>
 #include <unordered_map>
 
@@ -1133,25 +1134,78 @@ PlainResult changeCryptomatorPassword(Storage& s, const uint8_t* oldPw, size_t o
     }
 }
 
+namespace {
+
+// What a vault folder looks like from its files alone (no password, no scrypt). Shared by
+// probeCryptomatorFormat and migrateCryptomator7To8 so the two can never disagree about whether a vault is
+// migratable. [code] is the probe result (see fv_vault.h); [message] is the reason shown when migration is
+// refused; [raw]/[parsed] are filled when the key file was read and parsed (codes 7, -8 and 6).
+struct CryptomatorLayout {
+    int code = 0;
+    std::string message;
+    Bytes raw;
+    std::optional<cryptomator::MasterkeyFile> parsed;
+};
+
+CryptomatorLayout classifyCryptomatorLayout(Storage& s) {
+    using namespace cryptomator;
+    CryptomatorLayout out;
+    DirEntry de;
+    if (!s.stat(kMasterkeyFile, de) || de.isDir) {
+        out.code = 0;
+        out.message = "No masterkey.cryptomator found \xE2\x80\x94 this doesn't look like a Cryptomator vault.";
+        return out;
+    }
+    if (s.stat(kVaultFile, de)) {
+        out.code = 8;
+        out.message = "This vault already has a vault.cryptomator, so there is nothing to migrate.";
+        return out;
+    }
+    if (!s.readWhole(kMasterkeyFile, out.raw)) {
+        out.code = 0;
+        out.message = "Could not read masterkey.cryptomator";
+        return out;
+    }
+    try {
+        out.parsed = MasterkeyFile::parse(std::string(out.raw.begin(), out.raw.end()));
+    } catch (const std::exception& e) {
+        out.code = 0;
+        out.message = e.what();
+        out.parsed.reset();
+        return out;
+    }
+    const int version = out.parsed->version;
+    if (version == 7) {
+        out.code = 7;
+    } else if (version >= 8) {
+        out.code = -8;
+        out.message = "vault.cryptomator is missing from this format 8 vault. If it is stored with a cloud provider, "
+                      "wait for it to finish syncing; do not migrate.";
+    } else {
+        out.code = 6;
+        out.message = "Vault format " + std::to_string(version) +
+                      " cannot be migrated here (only 7 can). Open it once in Cryptomator to migrate it.";
+    }
+    return out;
+}
+
+}  // namespace
+
+int probeCryptomatorFormat(Storage& s) {
+    try {
+        return classifyCryptomatorLayout(s).code;
+    } catch (...) {
+        return 0;   // a storage that throws is "cannot tell", never a reason to offer the upgrade
+    }
+}
+
 PlainResult migrateCryptomator7To8(Storage& s, const uint8_t* pw, size_t pwLen) {
     using namespace cryptomator;
-    DirEntry de;
-    if (!s.stat(kMasterkeyFile, de) || de.isDir)
-        return plainFail(OpenStatus::InvalidVault, "No masterkey.cryptomator found \xE2\x80\x94 this doesn't look like a Cryptomator vault.");
-    if (s.stat(kVaultFile, de))
-        return plainFail(OpenStatus::InvalidVault, "This vault already has a vault.cryptomator, so there is nothing to migrate.");
-    Bytes raw;
-    if (!s.readWhole(kMasterkeyFile, raw)) return plainFail(OpenStatus::InvalidVault, "Could not read masterkey.cryptomator");
+    CryptomatorLayout layout = classifyCryptomatorLayout(s);
+    if (layout.code != 7 || !layout.parsed) return plainFail(OpenStatus::InvalidVault, layout.message);
+    const Bytes& raw = layout.raw;
     try {
-        MasterkeyFile parsed = MasterkeyFile::parse(std::string(raw.begin(), raw.end()));
-        if (parsed.version != 7) {
-            if (parsed.version >= 8)
-                return plainFail(OpenStatus::InvalidVault,
-                                 "vault.cryptomator is missing from this format 8 vault. If it is stored with a cloud provider, "
-                                 "wait for it to finish syncing; do not migrate.");
-            return plainFail(OpenStatus::InvalidVault,
-                             "Vault format " + std::to_string(parsed.version) + " cannot be migrated here (only 7 can). Open it once in Cryptomator to migrate it.");
-        }
+        const MasterkeyFile& parsed = *layout.parsed;
         Masterkey mk = unlockMasterkeyCompat(parsed, pw, pwLen);   // proves the password before anything is written
         Secret npw = normalizedPassphrase(pw, pwLen);              // the key file is re-saved with the normalised passphrase
         // 1. back up the old key file -- here a hard requirement, since the upgrade cannot be undone

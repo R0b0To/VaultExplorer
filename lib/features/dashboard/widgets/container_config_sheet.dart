@@ -18,6 +18,7 @@ import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/automation_settings_screen.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/change_password_screen.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_config_controller.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/cryptomator_upgrade_tile.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/pattern_pin_verify_controller.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/real_password_gate_controller.dart';
@@ -1094,6 +1095,15 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                   }
                 },
               ),
+              if (_isCryptomator)
+                CryptomatorUpgradeTile(
+                  uri: widget.uri,
+                  format: state.cryptomatorFormat,
+                  vaultIsUnlocked: widget.mountedContainer != null,
+                  onUpgraded: () => ref
+                      .read(containerConfigControllerProvider(_params).notifier)
+                      .refreshCryptomatorFormat(),
+                ),
             ],
           ],
         ),
@@ -1217,6 +1227,27 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                   .setAlwaysOpenReadOnly(value),
               secondary: const Icon(Icons.visibility_outlined),
             ),
+            if (_isCryptomator)
+              SwitchListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                title: Text(
+                  context.l10n.cryptomatorBackupKeyFilesTitle,
+                  style: textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: Text(
+                  context.l10n.cryptomatorBackupKeyFilesSubtitle,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+                value: state.backupKeyFiles,
+                onChanged: (value) => ref
+                    .read(containerConfigControllerProvider(_params).notifier)
+                    .setBackupKeyFiles(value),
+                secondary: const Icon(Icons.history_rounded),
+              ),
             SwitchListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 16),
               title: Text(

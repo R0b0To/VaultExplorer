@@ -751,6 +751,7 @@ class VaultLifecycleApi {
   /// "migrate"). ONE WAY: Cryptomator older than 1.6 cannot open the result. The old key file is kept as
   /// `masterkey.cryptomator.<id>.bkup`. The vault must be locked. Like [changeCryptomatorVaultPassword],
   /// failures are not swallowed: a wrong [password] surfaces as a `PlatformException` with code `AUTH_FAIL`,
+  /// `VAULT_UNLOCKED` if the vault is unlocked in this app (the native side refuses, whatever the UI showed),
   /// anything else (not a format 7 vault, already migrated, ...) as `INVALID_VAULT` with a display message.
   Future<bool> migrateCryptomatorVault(String folderUri, String password) async {
     final success = await _channel.invokeMethod<bool>(
@@ -758,6 +759,64 @@ class VaultLifecycleApi {
       {'filePath': folderUri, 'password': password},
     );
     return success ?? false;
+  }
+
+  /// Password-free look at a Cryptomator vault folder's format, usable whether the vault is locked or not.
+  /// Never throws: anything that goes wrong is [CryptomatorVaultFormat.unknown], which offers no upgrade.
+  Future<CryptomatorVaultFormat> probeCryptomatorVault(String folderUri) async {
+    try {
+      final code = await _channel.invokeMethod<int>(
+        ChannelMethods.probeCryptomatorVault,
+        {'filePath': folderUri},
+      );
+      return CryptomatorVaultFormat.fromProbeCode(code);
+    } catch (e) {
+      logSwallowed('probeCryptomatorVault', e);
+      return CryptomatorVaultFormat.unknown;
+    }
+  }
+
+  /// Whether read-write unlocks of this Cryptomator vault keep `.bkup` copies of `masterkey.cryptomator` and
+  /// `vault.cryptomator` next to the originals. The flag lives on the Kotlin side (it must also apply to
+  /// automation unlocks, which never touch Dart). Defaults to true, including when the call fails.
+  Future<bool> getCryptomatorKeyFileBackup(String uri) async {
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        ChannelMethods.getCryptomatorKeyFileBackup,
+        {'uri': uri},
+      );
+      return result ?? true;
+    } catch (e) {
+      logSwallowed('getCryptomatorKeyFileBackup', e);
+      return true;
+    }
+  }
+
+  /// Applies from the next unlock; an open session keeps the behavior it was opened with.
+  Future<bool> setCryptomatorKeyFileBackup(String uri, bool enabled) async {
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        ChannelMethods.setCryptomatorKeyFileBackup,
+        {'uri': uri, 'enabled': enabled},
+      );
+      return result ?? false;
+    } catch (e) {
+      logSwallowed('setCryptomatorKeyFileBackup', e);
+      return false;
+    }
+  }
+
+  /// Best effort: asks the Kotlin side to forget per-vault open options (see
+  /// [setCryptomatorKeyFileBackup]) once a vault has been removed from the app.
+  Future<void> clearVaultOpenPreferences(String uri) async {
+    try {
+      await _channel.invokeMethod<bool>(
+        ChannelMethods.clearVaultOpenPreferences,
+        {'uri': uri},
+      );
+    } catch (e) {
+      logSwallowed('clearVaultOpenPreferences', e);
+    }
   }
 
   Future<

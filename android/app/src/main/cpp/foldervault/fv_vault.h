@@ -194,6 +194,15 @@ PlainResult changeCryptomatorPassword(Storage& s, const uint8_t* oldPw, size_t o
 // genuine format 7 vault (no vault.cryptomator yet, masterkey version 7) and aborts without changing a
 // byte if the masterkey backup cannot be written.
 PlainResult migrateCryptomator7To8(Storage& s, const uint8_t* pw, size_t pwLen);
+// Password-free look at a Cryptomator vault folder's format, from its files alone (nothing is decrypted or
+// written). Shares its classification with migrateCryptomator7To8, so "7" here means exactly "the migration
+// would accept this vault if the password is right":
+//    0  no readable masterkey.cryptomator (not a Cryptomator vault, or it cannot be read right now)
+//    7  no vault.cryptomator and the key file is version 7 -- migratable
+//    8  vault.cryptomator exists (a current vault; nothing to migrate)
+//   -8  no vault.cryptomator but the key file is version 8 or newer -- the config has not synced yet; NEVER migrate
+//    6  no vault.cryptomator and the key file is older than 7 -- cannot be migrated here
+int probeCryptomatorFormat(Storage& s);
 
 OpenResult openCryfs(std::shared_ptr<Storage> s, const uint8_t* pw, size_t pwLen, bool readOnly, const HostEnv& env, const StorageFactory& sessionStorage = {});
 OpenResult openCryfsWithCombinedKey(std::shared_ptr<Storage> s, const uint8_t* key, size_t keyLen, bool readOnly, const HostEnv& env, const StorageFactory& sessionStorage = {});

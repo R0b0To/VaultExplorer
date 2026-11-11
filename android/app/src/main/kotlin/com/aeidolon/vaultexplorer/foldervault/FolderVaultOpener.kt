@@ -87,6 +87,7 @@ internal object FolderVaultOpener {
         password: CharArray?,
         combinedKey: ByteArray?,
         readOnly: Boolean,
+        backupKeyFiles: Boolean = true,
         makeSession: (handle: Long, volRef: AtomicInteger) -> S,
     ): VaultOpenResult<S> {
         if (!NativeFolderVault.isAvailable) return VaultOpenResult.InvalidVault(UNAVAILABLE)
@@ -107,7 +108,7 @@ internal object FolderVaultOpener {
         try {
             val handle = try {
                 NativeFolderVault.nativeOpen(
-                    format, rawRoot?.absolutePath, bootstrap, provider, pw, readOnly,
+                    format, rawRoot?.absolutePath, bootstrap, provider, pw, readOnly, backupKeyFiles,
                     localStateDir(context), tempDir(context), combinedKey, out,
                 )
             } catch (e: Throwable) {
@@ -173,7 +174,7 @@ internal object FolderVaultOpener {
             VeLog.e(TAG) { "create failed: $msg" }
             return VaultOpenResult.InvalidVault(msg)
         }
-        return open(context, vaultRootUri, format, sentinel, password, null, false, makeSession)
+        return open(context, vaultRootUri, format, sentinel, password, null, false, makeSession = makeSession)
     }
 
     /**
@@ -206,6 +207,42 @@ internal object FolderVaultOpener {
             }
         } finally {
             pwBytes.fill(0)
+            storage?.close()
+        }
+    }
+
+    /**
+     * Password-free, read-only look at a Cryptomator vault's format (see [NativeFolderVault.nativeProbeCryptomator]
+     * for the codes). Safe on a vault that is unlocked here. Returns 0 ("cannot tell") whenever the folder is
+     * unreachable, never throws, so a caller can always fall back to showing no upgrade offer.
+     */
+    fun probeCryptomator(context: Context, vaultRootUri: Uri, sentinel: String): Int {
+        if (!NativeFolderVault.isAvailable) return 0
+        val root = try {
+            DocumentFile.fromTreeUri(context, vaultRootUri)
+        } catch (_: Exception) {
+            null
+        } ?: return 0
+        val rawRoot = try {
+            RawFileResolver.getVerifiedRawVaultRoot(context, vaultRootUri, sentinel, probeWrite = false)
+        } catch (_: Exception) {
+            null
+        }
+        val storage = if (rawRoot == null) {
+            try {
+                safBootstrap(context, root, vaultRootUri)
+            } catch (_: Exception) {
+                return 0
+            }
+        } else {
+            null
+        }
+        return try {
+            NativeFolderVault.nativeProbeCryptomator(rawRoot?.absolutePath, storage)
+        } catch (e: Throwable) {
+            VeLog.e(TAG, e) { "native probeCryptomator crashed" }
+            0
+        } finally {
             storage?.close()
         }
     }

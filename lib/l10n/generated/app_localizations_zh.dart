@@ -13482,4 +13482,37 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get cryptomatorUpgradeFailedMessage => '无法升级保险库';
+
+  @override
+  String get newSymbolicLinkTitle => '新建符号链接';
+
+  @override
+  String get symbolicLinkNameHint => '链接名称';
+
+  @override
+  String get symbolicLinkTargetHint => '指向';
+
+  @override
+  String get symbolicLinkTargetHelper =>
+      '目标会按输入的原样保存。此处不会跟随或打开目标；该链接主要在电脑上的 Cryptomator 中有用。';
+
+  @override
+  String get symbolicLinkTargetTooLong => '目标过长（最多 32,767 字节）';
+
+  @override
+  String get symbolicLinkTargetInvalid => '目标不能包含空字符';
+
+  @override
+  String get symbolicLinkNameTaken => '已存在同名的文件、文件夹或链接';
+
+  @override
+  String get deleteSymbolicLinkTitle => '删除符号链接？';
+
+  @override
+  String deleteSymbolicLinkMessage(String name) {
+    return '删除链接“$name”？只会删除链接本身，不会影响它所指向的内容。';
+  }
+
+  @override
+  String get symbolicLinkRenameTitle => '重命名符号链接';
 }

@@ -3995,5 +3995,15 @@
   "cryptomatorUpgradedMessage": "Coffre mis à niveau au format 8",
   "cryptomatorUpgradeUnlockedError": "Verrouillez d’abord le coffre",
   "cryptomatorConfigMissingWarning": "vault.cryptomator est manquant. Si une autre application synchronise ce coffre, attendez la fin de la synchronisation, puis réessayez. Ne lancez pas la mise à niveau.",
-  "cryptomatorUpgradeFailedMessage": "Impossible de mettre à niveau le coffre"
+  "cryptomatorUpgradeFailedMessage": "Impossible de mettre à niveau le coffre",
+  "newSymbolicLinkTitle": "Nouveau lien symbolique",
+  "symbolicLinkNameHint": "Nom du lien",
+  "symbolicLinkTargetHint": "Pointe vers",
+  "symbolicLinkTargetHelper": "La cible est enregistrée exactement telle que saisie. Elle n’est jamais suivie ni ouverte ici ; le lien sert surtout avec Cryptomator sur ordinateur.",
+  "symbolicLinkTargetTooLong": "La cible est trop longue (32 767 octets maximum)",
+  "symbolicLinkTargetInvalid": "La cible ne peut pas contenir de caractère nul",
+  "symbolicLinkNameTaken": "Un fichier, un dossier ou un lien portant ce nom existe déjà",
+  "deleteSymbolicLinkTitle": "Supprimer le lien symbolique ?",
+  "deleteSymbolicLinkMessage": "Supprimer le lien « {name} » ? Seul le lien est supprimé ; ce vers quoi il pointe n’est pas touché.",
+  "symbolicLinkRenameTitle": "Renommer le lien symbolique"
 }

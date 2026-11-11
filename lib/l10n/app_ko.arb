@@ -3995,5 +3995,15 @@
   "cryptomatorUpgradedMessage": "보관함을 형식 8로 업그레이드했습니다",
   "cryptomatorUpgradeUnlockedError": "먼저 보관함을 잠그세요",
   "cryptomatorConfigMissingWarning": "vault.cryptomator가 없습니다. 다른 앱이 이 보관함을 동기화하고 있다면 동기화가 끝날 때까지 기다린 후 다시 시도하세요. 업그레이드하지 마세요.",
-  "cryptomatorUpgradeFailedMessage": "보관함을 업그레이드하지 못했습니다"
+  "cryptomatorUpgradeFailedMessage": "보관함을 업그레이드하지 못했습니다",
+  "newSymbolicLinkTitle": "새 기호 링크",
+  "symbolicLinkNameHint": "링크 이름",
+  "symbolicLinkTargetHint": "가리키는 대상",
+  "symbolicLinkTargetHelper": "입력한 그대로 저장됩니다. 여기서는 대상을 따라가거나 열지 않으며, 주로 컴퓨터의 Cryptomator에서 유용합니다.",
+  "symbolicLinkTargetTooLong": "대상이 너무 깁니다(최대 32,767바이트)",
+  "symbolicLinkTargetInvalid": "대상에는 null 문자를 사용할 수 없습니다",
+  "symbolicLinkNameTaken": "이 이름의 파일, 폴더 또는 링크가 이미 있습니다",
+  "deleteSymbolicLinkTitle": "기호 링크를 삭제할까요?",
+  "deleteSymbolicLinkMessage": "링크 \"{name}\"을(를) 삭제할까요? 링크만 삭제되며 가리키는 대상은 변경되지 않습니다.",
+  "symbolicLinkRenameTitle": "기호 링크 이름 바꾸기"
 }

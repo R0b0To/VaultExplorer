@@ -3995,5 +3995,15 @@
   "cryptomatorUpgradedMessage": "Cassaforte aggiornata al formato 8",
   "cryptomatorUpgradeUnlockedError": "Blocca prima la cassaforte",
   "cryptomatorConfigMissingWarning": "Manca vault.cryptomator. Se un’altra app sincronizza questa cassaforte, attendi che finisca e riprova. Non aggiornare.",
-  "cryptomatorUpgradeFailedMessage": "Impossibile aggiornare la cassaforte"
+  "cryptomatorUpgradeFailedMessage": "Impossibile aggiornare la cassaforte",
+  "newSymbolicLinkTitle": "Nuovo collegamento simbolico",
+  "symbolicLinkNameHint": "Nome del collegamento",
+  "symbolicLinkTargetHint": "Punta a",
+  "symbolicLinkTargetHelper": "La destinazione viene salvata esattamente come la scrivi. Qui non viene mai seguita né aperta; il collegamento è utile soprattutto con Cryptomator su un computer.",
+  "symbolicLinkTargetTooLong": "La destinazione è troppo lunga (massimo 32.767 byte)",
+  "symbolicLinkTargetInvalid": "La destinazione non può contenere un carattere nullo",
+  "symbolicLinkNameTaken": "Esiste già un file, una cartella o un collegamento con questo nome",
+  "deleteSymbolicLinkTitle": "Eliminare il collegamento simbolico?",
+  "deleteSymbolicLinkMessage": "Eliminare il collegamento \"{name}\"? Viene rimosso solo il collegamento; ciò a cui punta non viene toccato.",
+  "symbolicLinkRenameTitle": "Rinomina collegamento simbolico"
 }

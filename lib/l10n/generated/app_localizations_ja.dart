@@ -13689,4 +13689,37 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get cryptomatorUpgradeFailedMessage => '保管庫をアップグレードできませんでした';
+
+  @override
+  String get newSymbolicLinkTitle => '新規シンボリックリンク';
+
+  @override
+  String get symbolicLinkNameHint => 'リンク名';
+
+  @override
+  String get symbolicLinkTargetHint => 'リンク先';
+
+  @override
+  String get symbolicLinkTargetHelper =>
+      '入力したとおりに保存されます。リンク先をここでたどったり開いたりすることはありません。主にパソコンの Cryptomator で使う場合に役立ちます。';
+
+  @override
+  String get symbolicLinkTargetTooLong => 'リンク先が長すぎます（最大 32,767 バイト）';
+
+  @override
+  String get symbolicLinkTargetInvalid => 'リンク先に null 文字は使えません';
+
+  @override
+  String get symbolicLinkNameTaken => 'この名前のファイル、フォルダ、またはリンクはすでに存在します';
+
+  @override
+  String get deleteSymbolicLinkTitle => 'シンボリックリンクを削除しますか？';
+
+  @override
+  String deleteSymbolicLinkMessage(String name) {
+    return 'リンク「$name」を削除しますか？削除されるのはリンクだけで、リンク先には影響しません。';
+  }
+
+  @override
+  String get symbolicLinkRenameTitle => 'シンボリックリンクの名前を変更';
 }

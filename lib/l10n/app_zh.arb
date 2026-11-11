@@ -3995,5 +3995,15 @@
   "cryptomatorUpgradedMessage": "保险库已升级到格式 8",
   "cryptomatorUpgradeUnlockedError": "请先锁定保险库",
   "cryptomatorConfigMissingWarning": "缺少 vault.cryptomator。如果有其他应用正在同步此保险库，请等待同步完成后再试。请勿升级。",
-  "cryptomatorUpgradeFailedMessage": "无法升级保险库"
+  "cryptomatorUpgradeFailedMessage": "无法升级保险库",
+  "newSymbolicLinkTitle": "新建符号链接",
+  "symbolicLinkNameHint": "链接名称",
+  "symbolicLinkTargetHint": "指向",
+  "symbolicLinkTargetHelper": "目标会按输入的原样保存。此处不会跟随或打开目标；该链接主要在电脑上的 Cryptomator 中有用。",
+  "symbolicLinkTargetTooLong": "目标过长（最多 32,767 字节）",
+  "symbolicLinkTargetInvalid": "目标不能包含空字符",
+  "symbolicLinkNameTaken": "已存在同名的文件、文件夹或链接",
+  "deleteSymbolicLinkTitle": "删除符号链接？",
+  "deleteSymbolicLinkMessage": "删除链接“{name}”？只会删除链接本身，不会影响它所指向的内容。",
+  "symbolicLinkRenameTitle": "重命名符号链接"
 }

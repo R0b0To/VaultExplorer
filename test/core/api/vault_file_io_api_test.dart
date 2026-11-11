@@ -571,4 +571,54 @@ void main() {
       expect(calls.single.method, 'listDirectory');
     });
   });
+
+  group('createVaultSymlink', () {
+    MountedContainer containerWith({required int volId, required String uri}) =>
+        MountedContainer(
+          uri: uri,
+          displayName: 'Vault',
+          volId: volId,
+          rootFiles: const [],
+          mountedAt: DateTime(2026, 1, 1),
+          totalSpace: 1,
+          freeSpace: 1,
+          containerFormat: 'cryptomator',
+        );
+
+    test('sends filePath, path and target exactly as given', () async {
+      nextResult = true;
+      final ok = await api.createVaultSymlink(container, 'docs/ünï link', '../Ziel ☃/x');
+      expect(ok, isTrue);
+      expect(calls.single.method, 'createVaultSymlink');
+      expect(calls.single.arguments, {
+        'filePath': 'content://test-container',
+        'path': 'docs/ünï link',
+        'target': '../Ziel ☃/x',
+      });
+    });
+
+    test('an engine refusal (false or null) is false', () async {
+      nextResult = false;
+      expect(await api.createVaultSymlink(container, 'ln', 't'), isFalse);
+      nextResult = null;
+      expect(await api.createVaultSymlink(container, 'ln', 't'), isFalse);
+    });
+
+    test('channel failures are not swallowed (like createDirectory)', () async {
+      nextError = PlatformException(code: 'ERR');
+      await expectLater(
+        api.createVaultSymlink(container, 'ln', 't'),
+        throwsA(isA<PlatformException>()),
+      );
+    });
+
+    test('SAF and local-storage containers answer false without asking the platform', () async {
+      nextResult = true;
+      final saf = containerWith(volId: -3, uri: 'content://tree/x');
+      final local = containerWith(volId: -4, uri: 'file:///storage/x');
+      expect(await api.createVaultSymlink(saf, 'ln', 't'), isFalse);
+      expect(await api.createVaultSymlink(local, 'ln', 't'), isFalse);
+      expect(calls, isEmpty);
+    });
+  });
 }

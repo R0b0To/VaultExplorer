@@ -18,6 +18,7 @@ import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/advanced_rename_screen.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_pins_bookmarks_controller.dart';
+import 'package:vaultexplorer/features/browser/symlink_target_validation.dart';
 import 'package:vaultexplorer/features/browser/widgets/create_archive_bottom_sheet.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
@@ -46,6 +47,31 @@ abstract class BrowserDialogs {
     showDialog(
       context: context,
       builder: (dialogContext) => _CreateFolderDialog(
+        container: container,
+        currentDirPath: currentDirPath,
+        existingEntries: existingEntries,
+        onSuccess: onSuccess,
+      ),
+    );
+  }
+
+  /// Cryptomator vaults only (the caller gates it). Creates a symbolic link; its target is stored as written
+  /// and never followed or opened by this app.
+  static void showCreateSymlink(
+    BuildContext context, {
+    required MountedContainer container,
+    required String currentDirPath,
+    required List<RawEntry> existingEntries,
+    required VoidCallback onSuccess,
+    bool readOnly = false,
+  }) {
+    if (readOnly) {
+      _blockedReadOnly(context);
+      return;
+    }
+    showDialog(
+      context: context,
+      builder: (dialogContext) => _CreateSymlinkDialog(
         container: container,
         currentDirPath: currentDirPath,
         existingEntries: existingEntries,
@@ -454,6 +480,195 @@ class _CreateFolderDialogState extends ConsumerState<_CreateFolderDialog>
         ),
         TextButton(
           onPressed: name.isNotEmpty && isValid ? _onCreate : null,
+          child: Text(context.l10n.create),
+        ),
+      ],
+    );
+  }
+}
+
+class _CreateSymlinkDialog extends ConsumerStatefulWidget {
+  final MountedContainer container;
+  final String currentDirPath;
+  final List<RawEntry> existingEntries;
+  final VoidCallback onSuccess;
+  const _CreateSymlinkDialog({
+    required this.container,
+    required this.currentDirPath,
+    required this.existingEntries,
+    required this.onSuccess,
+  });
+
+  @override
+  ConsumerState<_CreateSymlinkDialog> createState() =>
+      _CreateSymlinkDialogState();
+}
+
+class _CreateSymlinkDialogState extends ConsumerState<_CreateSymlinkDialog>
+    with _LiveNameValidation<_CreateSymlinkDialog> {
+  VaultFileIoApi get _fileIoApi => ref.read(vaultFileIoApiProvider);
+  late final TextEditingController _nameCtrl;
+  late final TextEditingController _targetCtrl;
+  late final FilesystemType _fsType;
+
+  /// Names of the links already in this folder. [widget.existingEntries] holds no links (they are not part of
+  /// a directory listing), so they are loaded separately; the engine refuses an existing name anyway, this
+  /// only lets the dialog say so before the user taps Create.
+  Set<String> _linkNames = const {};
+
+  @override
+  void initState() {
+    super.initState();
+    _nameCtrl = TextEditingController();
+    _targetCtrl = TextEditingController();
+    _fsType = resolveFilesystemType(widget.container);
+    unawaited(_loadLinkNames());
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _targetCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadLinkNames() async {
+    final links = await _fileIoApi.listVaultSymlinks(
+      widget.container,
+      widget.currentDirPath,
+    );
+    if (!mounted) return;
+    setState(() => _linkNames = links.map((l) => l.name).toSet());
+  }
+
+  bool get _nameTakenByLink {
+    final name = _nameCtrl.text;
+    if (name.isEmpty) return false;
+    if (FilesystemRules.of(_fsType).caseSensitive) {
+      return _linkNames.contains(name);
+    }
+    final lower = name.toLowerCase();
+    return _linkNames.any((n) => n.toLowerCase() == lower);
+  }
+
+  SymlinkTargetIssue? get _targetIssue => validateSymlinkTarget(_targetCtrl.text);
+
+  /// An empty target just keeps Create disabled; only a real problem is worth an error line.
+  String? _targetErrorText(BuildContext context) => switch (_targetIssue) {
+    SymlinkTargetIssue.tooLong => context.l10n.symbolicLinkTargetTooLong,
+    SymlinkTargetIssue.containsNul => context.l10n.symbolicLinkTargetInvalid,
+    SymlinkTargetIssue.empty || null => null,
+  };
+
+  bool get _canCreate =>
+      _nameCtrl.text.isNotEmpty &&
+      isValid &&
+      !_nameTakenByLink &&
+      _targetIssue == null;
+
+  void _onNameChanged(String text) => revalidate(
+    text: text,
+    fsType: _fsType,
+    entryType: EntryType.file,
+    existingEntries: widget.existingEntries,
+  );
+
+  Future<void> _onCreate() async {
+    if (!_canCreate) return;
+    final name = _nameCtrl.text;
+    final target = _targetCtrl.text;
+    final l10n = context.l10n;
+    final parentSegments = widget.currentDirPath.isEmpty
+        ? <String>[]
+        : widget.currentDirPath.split('/');
+    final built = PathComponents(
+      parentSegments: parentSegments,
+      name: name,
+      type: EntryType.file,
+      fsType: _fsType,
+    ).validateAndBuild(l10n);
+    if (built is! PathBuildSuccess) return;
+    final parentContext = context;
+    final opService = ref.read(fileOperationServiceProvider);
+    Navigator.pop(context);
+    var ok = false;
+    try {
+      ok = await _fileIoApi.createVaultSymlink(
+        widget.container,
+        built.path,
+        target,
+      );
+    } catch (_) {
+      ok = false; // shown below like any other refusal
+    }
+    if (ok) {
+      opService.notifyVolumeContentChanged(widget.container.volId);
+      widget.onSuccess();
+    } else if (parentContext.mounted) {
+      showAppSnackBar(
+        parentContext,
+        message: l10n.couldntCreateItem(name),
+        tone: AppBannerTone.error,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final name = _nameCtrl.text;
+    final errorColor = Theme.of(context).colorScheme.error;
+    return _buildNamePromptDialog(
+      context,
+      title: Text(context.l10n.newSymbolicLinkTitle),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _nameCtrl,
+              decoration: InputDecoration(
+                hintText: context.l10n.symbolicLinkNameHint,
+              ),
+              autofocus: true,
+              inputFormatters: [IllegalCharacterInputFormatter(_fsType)],
+              onChanged: _onNameChanged,
+            ),
+            buildIssuesList(name),
+            if (_nameTakenByLink)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  context.l10n.symbolicLinkNameTaken,
+                  style: TextStyle(color: errorColor, fontSize: 12),
+                ),
+              ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _targetCtrl,
+              decoration: InputDecoration(
+                hintText: context.l10n.symbolicLinkTargetHint,
+                helperText: context.l10n.symbolicLinkTargetHelper,
+                helperMaxLines: 4,
+                errorText: _targetErrorText(context),
+                errorMaxLines: 2,
+              ),
+              autocorrect: false,
+              enableSuggestions: false,
+              onChanged: (_) => setState(() {}),
+              onSubmitted: (_) => _onCreate(),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(context.l10n.cancel),
+        ),
+        TextButton(
+          onPressed: _canCreate ? _onCreate : null,
           child: Text(context.l10n.create),
         ),
       ],

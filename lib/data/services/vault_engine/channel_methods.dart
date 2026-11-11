@@ -120,6 +120,7 @@ abstract final class ChannelMethods {
   static const listDirectory = 'listDirectory';
   static const listVaultSymlinks = 'listVaultSymlinks';
   static const readVaultSymlink = 'readVaultSymlink';
+  static const createVaultSymlink = 'createVaultSymlink';
   static const getHiddenEntryCount = 'getHiddenEntryCount';
   static const createDirectory = 'createDirectory';
   static const renameFile = 'renameFile';

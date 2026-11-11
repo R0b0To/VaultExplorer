@@ -3995,5 +3995,15 @@
   "cryptomatorUpgradedMessage": "Сховище оновлено до формату 8",
   "cryptomatorUpgradeUnlockedError": "Спершу заблокуйте сховище",
   "cryptomatorConfigMissingWarning": "Файл vault.cryptomator відсутній. Якщо інший застосунок синхронізує це сховище, дочекайтеся завершення й спробуйте ще раз. Не оновлюйте.",
-  "cryptomatorUpgradeFailedMessage": "Не вдалося оновити сховище"
+  "cryptomatorUpgradeFailedMessage": "Не вдалося оновити сховище",
+  "newSymbolicLinkTitle": "Нове символічне посилання",
+  "symbolicLinkNameHint": "Назва посилання",
+  "symbolicLinkTargetHint": "Вказує на",
+  "symbolicLinkTargetHelper": "Ціль зберігається точно так, як ви її ввели. Тут її не відкривають і не переходять за нею; посилання корисне переважно з Cryptomator на комп’ютері.",
+  "symbolicLinkTargetTooLong": "Ціль задовга (максимум 32 767 байтів)",
+  "symbolicLinkTargetInvalid": "Ціль не може містити нульовий символ",
+  "symbolicLinkNameTaken": "Файл, папка або посилання з такою назвою вже існує",
+  "deleteSymbolicLinkTitle": "Видалити символічне посилання?",
+  "deleteSymbolicLinkMessage": "Видалити посилання «{name}»? Видаляється лише посилання; те, на що воно вказує, не чіпається.",
+  "symbolicLinkRenameTitle": "Перейменувати символічне посилання"
 }

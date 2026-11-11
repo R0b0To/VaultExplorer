@@ -4,6 +4,7 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/vault_item.dart';
 import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
@@ -186,6 +187,23 @@ class _AddItemMenuButtonState extends ConsumerState<AddItemMenuButton> {
             );
           },
         ),
+        // Symbolic links exist only in Cryptomator vaults, and need a registered vault session.
+        if (!widget.hideImportAndSecureItemActions &&
+            ContainerFormat.isCryptomatorWire(widget.container.containerFormat))
+          MenuItemButton(
+            leadingIcon: Icon(Icons.add_link, color: cs.primary),
+            child: Text(context.l10n.newSymbolicLinkTitle),
+            onPressed: () {
+              BrowserDialogs.showCreateSymlink(
+                context,
+                container: widget.container,
+                currentDirPath: widget.currentDirPath,
+                existingEntries: widget.currentItems,
+                onSuccess: () {},
+                readOnly: widget.isReadOnly,
+              );
+            },
+          ),
         MenuItemButton(
           leadingIcon: Icon(Icons.photo_camera_outlined, color: cs.primary),
           // The callback awaits the camera route. Holding lock suppression

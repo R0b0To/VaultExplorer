@@ -14518,4 +14518,40 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get cryptomatorUpgradeFailedMessage =>
       'No se pudo actualizar la bóveda';
+
+  @override
+  String get newSymbolicLinkTitle => 'Nuevo enlace simbólico';
+
+  @override
+  String get symbolicLinkNameHint => 'Nombre del enlace';
+
+  @override
+  String get symbolicLinkTargetHint => 'Apunta a';
+
+  @override
+  String get symbolicLinkTargetHelper =>
+      'Se guarda exactamente como lo escribes. Aquí nunca se sigue ni se abre el destino; el enlace resulta útil sobre todo con Cryptomator en un ordenador.';
+
+  @override
+  String get symbolicLinkTargetTooLong =>
+      'El destino es demasiado largo (máximo 32 767 bytes)';
+
+  @override
+  String get symbolicLinkTargetInvalid =>
+      'El destino no puede contener un carácter nulo';
+
+  @override
+  String get symbolicLinkNameTaken =>
+      'Ya existe un archivo, una carpeta o un enlace con este nombre';
+
+  @override
+  String get deleteSymbolicLinkTitle => '¿Eliminar el enlace simbólico?';
+
+  @override
+  String deleteSymbolicLinkMessage(String name) {
+    return '¿Eliminar el enlace \"$name\"? Solo se elimina el enlace; aquello a lo que apunta no se toca.';
+  }
+
+  @override
+  String get symbolicLinkRenameTitle => 'Renombrar enlace simbólico';
 }

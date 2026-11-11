@@ -14598,4 +14598,40 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get cryptomatorUpgradeFailedMessage =>
       'Impossible de mettre à niveau le coffre';
+
+  @override
+  String get newSymbolicLinkTitle => 'Nouveau lien symbolique';
+
+  @override
+  String get symbolicLinkNameHint => 'Nom du lien';
+
+  @override
+  String get symbolicLinkTargetHint => 'Pointe vers';
+
+  @override
+  String get symbolicLinkTargetHelper =>
+      'La cible est enregistrée exactement telle que saisie. Elle n’est jamais suivie ni ouverte ici ; le lien sert surtout avec Cryptomator sur ordinateur.';
+
+  @override
+  String get symbolicLinkTargetTooLong =>
+      'La cible est trop longue (32 767 octets maximum)';
+
+  @override
+  String get symbolicLinkTargetInvalid =>
+      'La cible ne peut pas contenir de caractère nul';
+
+  @override
+  String get symbolicLinkNameTaken =>
+      'Un fichier, un dossier ou un lien portant ce nom existe déjà';
+
+  @override
+  String get deleteSymbolicLinkTitle => 'Supprimer le lien symbolique ?';
+
+  @override
+  String deleteSymbolicLinkMessage(String name) {
+    return 'Supprimer le lien « $name » ? Seul le lien est supprimé ; ce vers quoi il pointe n’est pas touché.';
+  }
+
+  @override
+  String get symbolicLinkRenameTitle => 'Renommer le lien symbolique';
 }

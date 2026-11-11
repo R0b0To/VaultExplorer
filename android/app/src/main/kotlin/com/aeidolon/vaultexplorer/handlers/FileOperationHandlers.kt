@@ -159,6 +159,19 @@ class FileOperationHandlers(
         }
     }
 
+    /** Creates a symbolic link inside a Cryptomator vault. [target] is stored exactly as given. */
+    fun handleCreateVaultSymlink(call: MethodCall, result: MethodChannel.Result) {
+        val path = call.argument<String>("path")
+        val target = call.argument<String>("target")
+        if (path == null || target == null) {
+            result.error("INVALID_ARGS", "path and target required", null)
+            return
+        }
+        nativeOps.runNativeOp(call.argument<String>("filePath"), result) { volId ->
+            ContainerFileSystem.createSymlink(volId, path, target)
+        }
+    }
+
     fun handleRenameFile(call: MethodCall, result: MethodChannel.Result) {
         val oldPath = call.argument<String>("oldPath")
         val newPath = call.argument<String>("newPath")

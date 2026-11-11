@@ -13689,4 +13689,37 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get cryptomatorUpgradeFailedMessage => '보관함을 업그레이드하지 못했습니다';
+
+  @override
+  String get newSymbolicLinkTitle => '새 기호 링크';
+
+  @override
+  String get symbolicLinkNameHint => '링크 이름';
+
+  @override
+  String get symbolicLinkTargetHint => '가리키는 대상';
+
+  @override
+  String get symbolicLinkTargetHelper =>
+      '입력한 그대로 저장됩니다. 여기서는 대상을 따라가거나 열지 않으며, 주로 컴퓨터의 Cryptomator에서 유용합니다.';
+
+  @override
+  String get symbolicLinkTargetTooLong => '대상이 너무 깁니다(최대 32,767바이트)';
+
+  @override
+  String get symbolicLinkTargetInvalid => '대상에는 null 문자를 사용할 수 없습니다';
+
+  @override
+  String get symbolicLinkNameTaken => '이 이름의 파일, 폴더 또는 링크가 이미 있습니다';
+
+  @override
+  String get deleteSymbolicLinkTitle => '기호 링크를 삭제할까요?';
+
+  @override
+  String deleteSymbolicLinkMessage(String name) {
+    return '링크 \"$name\"을(를) 삭제할까요? 링크만 삭제되며 가리키는 대상은 변경되지 않습니다.';
+  }
+
+  @override
+  String get symbolicLinkRenameTitle => '기호 링크 이름 바꾸기';
 }

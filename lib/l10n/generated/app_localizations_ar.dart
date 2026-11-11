@@ -14512,4 +14512,40 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get cryptomatorUpgradeFailedMessage => 'تعذرت ترقية الخزنة';
+
+  @override
+  String get newSymbolicLinkTitle => 'رابط رمزي جديد';
+
+  @override
+  String get symbolicLinkNameHint => 'اسم الرابط';
+
+  @override
+  String get symbolicLinkTargetHint => 'يشير إلى';
+
+  @override
+  String get symbolicLinkTargetHelper =>
+      'يُخزَّن كما كُتب تمامًا. لا يتم اتباعه أو فتحه هنا؛ والرابط مفيد غالبًا مع Cryptomator على الكمبيوتر.';
+
+  @override
+  String get symbolicLinkTargetTooLong =>
+      'الهدف طويل جدًا (الحد الأقصى 32,767 بايت)';
+
+  @override
+  String get symbolicLinkTargetInvalid =>
+      'لا يمكن أن يحتوي الهدف على محرف فارغ (null)';
+
+  @override
+  String get symbolicLinkNameTaken =>
+      'يوجد ملف أو مجلد أو رابط بهذا الاسم بالفعل';
+
+  @override
+  String get deleteSymbolicLinkTitle => 'حذف الرابط الرمزي؟';
+
+  @override
+  String deleteSymbolicLinkMessage(String name) {
+    return 'حذف الرابط \"$name\"؟ يُحذف الرابط فقط، ولا يتم المساس بما يشير إليه.';
+  }
+
+  @override
+  String get symbolicLinkRenameTitle => 'إعادة تسمية الرابط الرمزي';
 }

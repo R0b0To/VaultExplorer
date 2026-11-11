@@ -24136,6 +24136,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not upgrade the vault'**
   String get cryptomatorUpgradeFailedMessage;
+
+  /// Menu entry and dialog title for creating a symbolic link in a Cryptomator vault
+  ///
+  /// In en, this message translates to:
+  /// **'New symbolic link'**
+  String get newSymbolicLinkTitle;
+
+  /// Hint of the name field when creating or renaming a symbolic link
+  ///
+  /// In en, this message translates to:
+  /// **'Link name'**
+  String get symbolicLinkNameHint;
+
+  /// Hint of the field where the user types what a new symbolic link points to
+  ///
+  /// In en, this message translates to:
+  /// **'Points to'**
+  String get symbolicLinkTargetHint;
+
+  /// Helper text under the symbolic link target field: stored as written, never followed or opened by the app
+  ///
+  /// In en, this message translates to:
+  /// **'Stored exactly as written. It is never followed or opened here; the link is mainly useful with Cryptomator on a computer.'**
+  String get symbolicLinkTargetHelper;
+
+  /// Error under the symbolic link target field when it exceeds the 32,767-byte limit
+  ///
+  /// In en, this message translates to:
+  /// **'Target is too long (maximum 32,767 bytes)'**
+  String get symbolicLinkTargetTooLong;
+
+  /// Error under the symbolic link target field when it contains a null character
+  ///
+  /// In en, this message translates to:
+  /// **'Target can\'t contain a null character'**
+  String get symbolicLinkTargetInvalid;
+
+  /// Error when the chosen symbolic link name is already used by a file, folder or another link
+  ///
+  /// In en, this message translates to:
+  /// **'A file, folder or link with this name already exists'**
+  String get symbolicLinkNameTaken;
+
+  /// Title of the confirmation dialog for deleting a symbolic link
+  ///
+  /// In en, this message translates to:
+  /// **'Delete symbolic link?'**
+  String get deleteSymbolicLinkTitle;
+
+  /// Body of the confirmation dialog for deleting a symbolic link; says only the link is removed, not what it points to
+  ///
+  /// In en, this message translates to:
+  /// **'Delete the link \"{name}\"? Only the link is removed; what it points to is not touched.'**
+  String deleteSymbolicLinkMessage(String name);
+
+  /// Title of the dialog for renaming a symbolic link
+  ///
+  /// In en, this message translates to:
+  /// **'Rename symbolic link'**
+  String get symbolicLinkRenameTitle;
 }
 
 class _AppLocalizationsDelegate

@@ -146,6 +146,7 @@ private object ChannelMethods {
     const val READ_VAULT_SYMLINK        = "readVaultSymlink"
     const val GET_HIDDEN_ENTRY_COUNT    = "getHiddenEntryCount"
     const val CREATE_DIRECTORY          = "createDirectory"
+    const val CREATE_VAULT_SYMLINK      = "createVaultSymlink"
     const val RENAME_FILE               = "renameFile"
     const val COPY_FILE                 = "copyFile"
     const val CANCEL_COPY               = "cancelCopy"
@@ -1272,6 +1273,7 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.READ_VAULT_SYMLINK -> fileOperationHandlers.handleReadVaultSymlink(call, result)
                 ChannelMethods.GET_HIDDEN_ENTRY_COUNT -> fileOperationHandlers.handleGetHiddenEntryCount(call, result)
                 ChannelMethods.CREATE_DIRECTORY -> fileOperationHandlers.handleCreateDirectory(call, result)
+                ChannelMethods.CREATE_VAULT_SYMLINK -> fileOperationHandlers.handleCreateVaultSymlink(call, result)
                 ChannelMethods.RENAME_FILE -> fileOperationHandlers.handleRenameFile(call, result)
                 ChannelMethods.COPY_FILE -> fileOperationHandlers.handleCopyFile(call, result)
                 ChannelMethods.CANCEL_COPY -> fileOperationHandlers.handleCancelCopy(call, result)

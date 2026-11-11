@@ -14477,4 +14477,40 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get cryptomatorUpgradeFailedMessage =>
       'Não foi possível atualizar o cofre';
+
+  @override
+  String get newSymbolicLinkTitle => 'Novo link simbólico';
+
+  @override
+  String get symbolicLinkNameHint => 'Nome do link';
+
+  @override
+  String get symbolicLinkTargetHint => 'Aponta para';
+
+  @override
+  String get symbolicLinkTargetHelper =>
+      'O destino é salvo exatamente como digitado. Ele nunca é seguido nem aberto aqui; o link é útil principalmente com o Cryptomator em um computador.';
+
+  @override
+  String get symbolicLinkTargetTooLong =>
+      'O destino é longo demais (máximo de 32.767 bytes)';
+
+  @override
+  String get symbolicLinkTargetInvalid =>
+      'O destino não pode conter um caractere nulo';
+
+  @override
+  String get symbolicLinkNameTaken =>
+      'Já existe um arquivo, uma pasta ou um link com este nome';
+
+  @override
+  String get deleteSymbolicLinkTitle => 'Excluir o link simbólico?';
+
+  @override
+  String deleteSymbolicLinkMessage(String name) {
+    return 'Excluir o link \"$name\"? Apenas o link é removido; o que ele aponta não é alterado.';
+  }
+
+  @override
+  String get symbolicLinkRenameTitle => 'Renomear link simbólico';
 }

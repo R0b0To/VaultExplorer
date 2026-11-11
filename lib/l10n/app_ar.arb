@@ -3995,5 +3995,15 @@
   "cryptomatorUpgradedMessage": "تمت ترقية الخزنة إلى التنسيق 8",
   "cryptomatorUpgradeUnlockedError": "اقفل الخزنة أولًا",
   "cryptomatorConfigMissingWarning": "الملف vault.cryptomator مفقود. إذا كان تطبيق آخر يزامن هذه الخزنة، فانتظر حتى تنتهي المزامنة ثم حاول مرة أخرى. لا تقم بالترقية.",
-  "cryptomatorUpgradeFailedMessage": "تعذرت ترقية الخزنة"
+  "cryptomatorUpgradeFailedMessage": "تعذرت ترقية الخزنة",
+  "newSymbolicLinkTitle": "رابط رمزي جديد",
+  "symbolicLinkNameHint": "اسم الرابط",
+  "symbolicLinkTargetHint": "يشير إلى",
+  "symbolicLinkTargetHelper": "يُخزَّن كما كُتب تمامًا. لا يتم اتباعه أو فتحه هنا؛ والرابط مفيد غالبًا مع Cryptomator على الكمبيوتر.",
+  "symbolicLinkTargetTooLong": "الهدف طويل جدًا (الحد الأقصى 32,767 بايت)",
+  "symbolicLinkTargetInvalid": "لا يمكن أن يحتوي الهدف على محرف فارغ (null)",
+  "symbolicLinkNameTaken": "يوجد ملف أو مجلد أو رابط بهذا الاسم بالفعل",
+  "deleteSymbolicLinkTitle": "حذف الرابط الرمزي؟",
+  "deleteSymbolicLinkMessage": "حذف الرابط \"{name}\"؟ يُحذف الرابط فقط، ولا يتم المساس بما يشير إليه.",
+  "symbolicLinkRenameTitle": "إعادة تسمية الرابط الرمزي"
 }

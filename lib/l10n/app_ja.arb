@@ -3995,5 +3995,15 @@
   "cryptomatorUpgradedMessage": "保管庫を形式 8 にアップグレードしました",
   "cryptomatorUpgradeUnlockedError": "先に保管庫をロックしてください",
   "cryptomatorConfigMissingWarning": "vault.cryptomator が見つかりません。別のアプリがこの保管庫を同期している場合は、同期が完了するまで待ってから、もう一度お試しください。アップグレードしないでください。",
-  "cryptomatorUpgradeFailedMessage": "保管庫をアップグレードできませんでした"
+  "cryptomatorUpgradeFailedMessage": "保管庫をアップグレードできませんでした",
+  "newSymbolicLinkTitle": "新規シンボリックリンク",
+  "symbolicLinkNameHint": "リンク名",
+  "symbolicLinkTargetHint": "リンク先",
+  "symbolicLinkTargetHelper": "入力したとおりに保存されます。リンク先をここでたどったり開いたりすることはありません。主にパソコンの Cryptomator で使う場合に役立ちます。",
+  "symbolicLinkTargetTooLong": "リンク先が長すぎます（最大 32,767 バイト）",
+  "symbolicLinkTargetInvalid": "リンク先に null 文字は使えません",
+  "symbolicLinkNameTaken": "この名前のファイル、フォルダ、またはリンクはすでに存在します",
+  "deleteSymbolicLinkTitle": "シンボリックリンクを削除しますか？",
+  "deleteSymbolicLinkMessage": "リンク「{name}」を削除しますか？削除されるのはリンクだけで、リンク先には影響しません。",
+  "symbolicLinkRenameTitle": "シンボリックリンクの名前を変更"
 }

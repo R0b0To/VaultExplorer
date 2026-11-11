@@ -765,6 +765,23 @@ class VaultFileIoApi {
     }
   }
 
+  /// Creates a symbolic link at [path] pointing to [target] in a mounted Cryptomator vault. The target is
+  /// stored exactly as given and is never resolved, followed or checked. False when the engine refuses (name
+  /// taken, read-only session, not a Cryptomator vault) and, without asking the platform at all, for SAF and
+  /// local-storage containers. Like [createDirectory], channel failures are not swallowed.
+  Future<bool> createVaultSymlink(
+    MountedContainer container,
+    String path,
+    String target,
+  ) async {
+    if (_isSaf(container) || container.isLocalStorage) return false;
+    final result = await _channel.invokeMethod<bool>(
+      ChannelMethods.createVaultSymlink,
+      {'filePath': container.uri, 'path': path, 'target': target},
+    );
+    return result ?? false;
+  }
+
   /// Where the link at [path] points (never resolved or followed), or null if it is not a readable link.
   Future<String?> readVaultSymlink(MountedContainer container, String path) async {
     if (_isSaf(container) || container.isLocalStorage) return null;

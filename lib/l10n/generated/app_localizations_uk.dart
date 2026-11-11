@@ -14581,4 +14581,40 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get cryptomatorUpgradeFailedMessage => 'Не вдалося оновити сховище';
+
+  @override
+  String get newSymbolicLinkTitle => 'Нове символічне посилання';
+
+  @override
+  String get symbolicLinkNameHint => 'Назва посилання';
+
+  @override
+  String get symbolicLinkTargetHint => 'Вказує на';
+
+  @override
+  String get symbolicLinkTargetHelper =>
+      'Ціль зберігається точно так, як ви її ввели. Тут її не відкривають і не переходять за нею; посилання корисне переважно з Cryptomator на комп’ютері.';
+
+  @override
+  String get symbolicLinkTargetTooLong =>
+      'Ціль задовга (максимум 32 767 байтів)';
+
+  @override
+  String get symbolicLinkTargetInvalid =>
+      'Ціль не може містити нульовий символ';
+
+  @override
+  String get symbolicLinkNameTaken =>
+      'Файл, папка або посилання з такою назвою вже існує';
+
+  @override
+  String get deleteSymbolicLinkTitle => 'Видалити символічне посилання?';
+
+  @override
+  String deleteSymbolicLinkMessage(String name) {
+    return 'Видалити посилання «$name»? Видаляється лише посилання; те, на що воно вказує, не чіпається.';
+  }
+
+  @override
+  String get symbolicLinkRenameTitle => 'Перейменувати символічне посилання';
 }

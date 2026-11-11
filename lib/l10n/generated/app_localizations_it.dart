@@ -14491,4 +14491,40 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get cryptomatorUpgradeFailedMessage =>
       'Impossibile aggiornare la cassaforte';
+
+  @override
+  String get newSymbolicLinkTitle => 'Nuovo collegamento simbolico';
+
+  @override
+  String get symbolicLinkNameHint => 'Nome del collegamento';
+
+  @override
+  String get symbolicLinkTargetHint => 'Punta a';
+
+  @override
+  String get symbolicLinkTargetHelper =>
+      'La destinazione viene salvata esattamente come la scrivi. Qui non viene mai seguita né aperta; il collegamento è utile soprattutto con Cryptomator su un computer.';
+
+  @override
+  String get symbolicLinkTargetTooLong =>
+      'La destinazione è troppo lunga (massimo 32.767 byte)';
+
+  @override
+  String get symbolicLinkTargetInvalid =>
+      'La destinazione non può contenere un carattere nullo';
+
+  @override
+  String get symbolicLinkNameTaken =>
+      'Esiste già un file, una cartella o un collegamento con questo nome';
+
+  @override
+  String get deleteSymbolicLinkTitle => 'Eliminare il collegamento simbolico?';
+
+  @override
+  String deleteSymbolicLinkMessage(String name) {
+    return 'Eliminare il collegamento \"$name\"? Viene rimosso solo il collegamento; ciò a cui punta non viene toccato.';
+  }
+
+  @override
+  String get symbolicLinkRenameTitle => 'Rinomina collegamento simbolico';
 }

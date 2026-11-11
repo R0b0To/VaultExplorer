@@ -3995,5 +3995,15 @@
   "cryptomatorUpgradedMessage": "Tresor auf Format 8 aktualisiert",
   "cryptomatorUpgradeUnlockedError": "Sperren Sie zuerst den Tresor",
   "cryptomatorConfigMissingWarning": "vault.cryptomator fehlt. Wenn eine andere App diesen Tresor synchronisiert, warten Sie, bis sie fertig ist, und versuchen Sie es dann erneut. Nicht aktualisieren.",
-  "cryptomatorUpgradeFailedMessage": "Tresor konnte nicht aktualisiert werden"
+  "cryptomatorUpgradeFailedMessage": "Tresor konnte nicht aktualisiert werden",
+  "newSymbolicLinkTitle": "Neuer symbolischer Link",
+  "symbolicLinkNameHint": "Name des Links",
+  "symbolicLinkTargetHint": "Verweist auf",
+  "symbolicLinkTargetHelper": "Wird genau so gespeichert, wie es eingegeben wurde. Das Ziel wird hier nie verfolgt oder geöffnet; nützlich ist der Link vor allem mit Cryptomator am Computer.",
+  "symbolicLinkTargetTooLong": "Ziel ist zu lang (maximal 32.767 Byte)",
+  "symbolicLinkTargetInvalid": "Das Ziel darf kein Nullzeichen enthalten",
+  "symbolicLinkNameTaken": "Eine Datei, ein Ordner oder ein Link mit diesem Namen existiert bereits",
+  "deleteSymbolicLinkTitle": "Symbolischen Link löschen?",
+  "deleteSymbolicLinkMessage": "Link „{name}“ löschen? Nur der Link wird entfernt; das Ziel bleibt unberührt.",
+  "symbolicLinkRenameTitle": "Symbolischen Link umbenennen"
 }

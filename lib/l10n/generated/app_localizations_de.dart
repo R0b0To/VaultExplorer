@@ -14477,4 +14477,40 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get cryptomatorUpgradeFailedMessage =>
       'Tresor konnte nicht aktualisiert werden';
+
+  @override
+  String get newSymbolicLinkTitle => 'Neuer symbolischer Link';
+
+  @override
+  String get symbolicLinkNameHint => 'Name des Links';
+
+  @override
+  String get symbolicLinkTargetHint => 'Verweist auf';
+
+  @override
+  String get symbolicLinkTargetHelper =>
+      'Wird genau so gespeichert, wie es eingegeben wurde. Das Ziel wird hier nie verfolgt oder geöffnet; nützlich ist der Link vor allem mit Cryptomator am Computer.';
+
+  @override
+  String get symbolicLinkTargetTooLong =>
+      'Ziel ist zu lang (maximal 32.767 Byte)';
+
+  @override
+  String get symbolicLinkTargetInvalid =>
+      'Das Ziel darf kein Nullzeichen enthalten';
+
+  @override
+  String get symbolicLinkNameTaken =>
+      'Eine Datei, ein Ordner oder ein Link mit diesem Namen existiert bereits';
+
+  @override
+  String get deleteSymbolicLinkTitle => 'Symbolischen Link löschen?';
+
+  @override
+  String deleteSymbolicLinkMessage(String name) {
+    return 'Link „$name“ löschen? Nur der Link wird entfernt; das Ziel bleibt unberührt.';
+  }
+
+  @override
+  String get symbolicLinkRenameTitle => 'Symbolischen Link umbenennen';
 }

@@ -14260,4 +14260,40 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cryptomatorUpgradeFailedMessage => 'Could not upgrade the vault';
+
+  @override
+  String get newSymbolicLinkTitle => 'New symbolic link';
+
+  @override
+  String get symbolicLinkNameHint => 'Link name';
+
+  @override
+  String get symbolicLinkTargetHint => 'Points to';
+
+  @override
+  String get symbolicLinkTargetHelper =>
+      'Stored exactly as written. It is never followed or opened here; the link is mainly useful with Cryptomator on a computer.';
+
+  @override
+  String get symbolicLinkTargetTooLong =>
+      'Target is too long (maximum 32,767 bytes)';
+
+  @override
+  String get symbolicLinkTargetInvalid =>
+      'Target can\'t contain a null character';
+
+  @override
+  String get symbolicLinkNameTaken =>
+      'A file, folder or link with this name already exists';
+
+  @override
+  String get deleteSymbolicLinkTitle => 'Delete symbolic link?';
+
+  @override
+  String deleteSymbolicLinkMessage(String name) {
+    return 'Delete the link \"$name\"? Only the link is removed; what it points to is not touched.';
+  }
+
+  @override
+  String get symbolicLinkRenameTitle => 'Rename symbolic link';
 }

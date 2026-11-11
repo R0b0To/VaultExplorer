@@ -186,6 +186,10 @@ object ContainerEngine {
     fun listSymlinks(path: String, volId: Int): Array<String> =
         VaultBackendRegistry.get(volId)?.listSymlinks(path) ?: emptyArray()
 
+    /** Cryptomator only; every other backend (and a missing session) answers false. The target is stored as written. */
+    fun createSymlink(path: String, target: String, volId: Int): Boolean =
+        VaultBackendRegistry.get(volId)?.createSymlink(path, target) ?: false
+
     fun readSymlink(path: String, volId: Int): String? =
         VaultBackendRegistry.get(volId)?.readSymlink(path)
 

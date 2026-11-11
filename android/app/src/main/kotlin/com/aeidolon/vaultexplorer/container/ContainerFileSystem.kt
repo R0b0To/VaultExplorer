@@ -216,6 +216,12 @@ fun endBatchDelete(volId: Int) {
         return withWriteLock(volId) { ContainerEngine.createDirectory(dirPath, volId) }
     }
 
+    /** Creates a symbolic link (Cryptomator vaults). Never follows or reads [target]; see ContainerEngine.createSymlink. */
+    fun createSymlink(volId: Int, path: String, target: String): Boolean {
+        requireSession(volId)
+        return withWriteLock(volId) { ContainerEngine.createSymlink(path, target, volId) }
+    }
+
     fun renameFile(volId: Int, oldPath: String, newPath: String): Boolean {
         requireSession(volId)
         return withWriteLock(volId) { ContainerEngine.renameFile(oldPath, newPath, volId) }

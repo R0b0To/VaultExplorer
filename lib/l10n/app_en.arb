@@ -16220,5 +16220,50 @@
   "cryptomatorUpgradeFailedMessage": "Could not upgrade the vault",
   "@cryptomatorUpgradeFailedMessage": {
     "description": "Generic error when the Cryptomator format upgrade fails without a more specific message"
+  },
+  "newSymbolicLinkTitle": "New symbolic link",
+  "@newSymbolicLinkTitle": {
+    "description": "Menu entry and dialog title for creating a symbolic link in a Cryptomator vault"
+  },
+  "symbolicLinkNameHint": "Link name",
+  "@symbolicLinkNameHint": {
+    "description": "Hint of the name field when creating or renaming a symbolic link"
+  },
+  "symbolicLinkTargetHint": "Points to",
+  "@symbolicLinkTargetHint": {
+    "description": "Hint of the field where the user types what a new symbolic link points to"
+  },
+  "symbolicLinkTargetHelper": "Stored exactly as written. It is never followed or opened here; the link is mainly useful with Cryptomator on a computer.",
+  "@symbolicLinkTargetHelper": {
+    "description": "Helper text under the symbolic link target field: stored as written, never followed or opened by the app"
+  },
+  "symbolicLinkTargetTooLong": "Target is too long (maximum 32,767 bytes)",
+  "@symbolicLinkTargetTooLong": {
+    "description": "Error under the symbolic link target field when it exceeds the 32,767-byte limit"
+  },
+  "symbolicLinkTargetInvalid": "Target can't contain a null character",
+  "@symbolicLinkTargetInvalid": {
+    "description": "Error under the symbolic link target field when it contains a null character"
+  },
+  "symbolicLinkNameTaken": "A file, folder or link with this name already exists",
+  "@symbolicLinkNameTaken": {
+    "description": "Error when the chosen symbolic link name is already used by a file, folder or another link"
+  },
+  "deleteSymbolicLinkTitle": "Delete symbolic link?",
+  "@deleteSymbolicLinkTitle": {
+    "description": "Title of the confirmation dialog for deleting a symbolic link"
+  },
+  "deleteSymbolicLinkMessage": "Delete the link \"{name}\"? Only the link is removed; what it points to is not touched.",
+  "@deleteSymbolicLinkMessage": {
+    "description": "Body of the confirmation dialog for deleting a symbolic link; says only the link is removed, not what it points to",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "symbolicLinkRenameTitle": "Rename symbolic link",
+  "@symbolicLinkRenameTitle": {
+    "description": "Title of the dialog for renaming a symbolic link"
   }
 }

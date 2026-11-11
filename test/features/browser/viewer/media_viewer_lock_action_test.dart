@@ -170,8 +170,12 @@ void main() {
         MediaViewerToolbarConfig.defaults().toJson(),
       );
       expect(
-        restored.topBarActions,
+        restored.moreMenuActions,
         contains(MediaViewerAction.lockControls),
+      );
+      expect(
+        restored.topBarActions,
+        isNot(contains(MediaViewerAction.lockControls)),
       );
     });
   });

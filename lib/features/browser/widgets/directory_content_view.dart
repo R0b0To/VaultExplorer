@@ -431,8 +431,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       GlobalKey<FileMasonryViewState>();
   final GlobalKey<FileGridViewState> _gridKey =
       GlobalKey<FileGridViewState>();
-  final GlobalKey<FileListViewState> _listKey =
-      GlobalKey<FileListViewState>();
+  // Not final: replaced on every folder change, see
+  // [_resetBrowserScrollController].
+  GlobalKey<FileListViewState> _listKey = GlobalKey<FileListViewState>();
   ScrollController _backGesturePreviewScrollController = ScrollController();
 
   void _resetBrowserScrollController({double initialOffset = 0.0}) {
@@ -446,6 +447,14 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     _browserScrollController = ScrollController(
       initialScrollOffset: initialOffset,
     );
+    // The list is keyed by a GlobalKey (so reveals can ask it where a tile
+    // sits), and a GlobalKey lets its state, and the scroll position inside
+    // it, move into the next folder's subtree. A kept position ignores the new
+    // controller's `initialScrollOffset`, so going back would not land where
+    // the folder was left. A new key gives the next folder a fresh list that
+    // starts at the saved offset on its first frame, which is what the
+    // predictive back preview already shows.
+    _listKey = GlobalKey<FileListViewState>();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       old.dispose();
     });
@@ -5922,6 +5931,12 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         (previewDirPath == previewArchiveRootPath ||
             previewDirPath.startsWith('$previewArchiveRootPath/'));
     final previewArchiveContext = previewInsideArchive ? _archiveContext : null;
+    // The folder being swiped back to is shown in the sort it will be landed in
+    // (see [_navigateUp]), not the sort of the folder being left, which may
+    // have been changed since.
+    final previewSort = _backGesturePreviewDirPath != null
+        ? _getSortStateForFolder(previewDirPath)
+        : (sortBy: sortBy, sortAscending: sortAscending);
     final sortedPreviewItems =
         (_backGestureProgress != null && _backGesturePreviewItems != null)
         ? (List<RawEntry>.of(
@@ -5938,8 +5953,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
               eb,
               currentDirPath: previewDirPath,
               pinnedPaths: _pinnedPaths,
-              sortBy: sortBy,
-              sortAscending: sortAscending,
+              sortBy: previewSort.sortBy,
+              sortAscending: previewSort.sortAscending,
             ),
           ))
         : null;
@@ -6909,7 +6924,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                                             previewArchiveContext,
                                                         archiveRootPath:
                                                             previewArchiveRootPath,
-                                                        sortBy: sortBy,
+                                                        sortBy: previewSort.sortBy,
                                                       ),
                                                     ],
                                                     Opacity(

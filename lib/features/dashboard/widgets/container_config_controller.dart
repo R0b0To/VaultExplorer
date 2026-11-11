@@ -392,6 +392,7 @@ class ContainerConfigController extends _$ContainerConfigController {
       settingsLocked: false,
       isMounted: false,
       initialLabel: initialLabel,
+      initialCacheDerivedKey: false,
       initialUnlockMethod: ContainerUnlockMethod.password,
       initialAutoCloseMins: kInheritAutoLockDuration,
       initialDocumentProvider: false,

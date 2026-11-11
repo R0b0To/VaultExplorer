@@ -228,7 +228,7 @@ void main() {
         await tester.pumpWidget(const SizedBox()); // fresh state: the previous menu was left open
         await tester.pumpWidget(menu(cryptomatorContainer(format: format)));
         await openMenu(tester);
-        expect(find.text('New folder'), findsOneWidget, reason: 'menu opened for $format');
+        expect(find.text('New Folder'), findsOneWidget, reason: 'menu opened for $format');
         expect(find.text('New symbolic link'), findsNothing, reason: format);
       }
     });
@@ -236,7 +236,7 @@ void main() {
     testWidgets('plain storage (import/secure-item actions hidden) does not', (tester) async {
       await tester.pumpWidget(menu(cryptomatorContainer(), hideImport: true));
       await openMenu(tester);
-      expect(find.text('New folder'), findsOneWidget);
+      expect(find.text('New Folder'), findsOneWidget);
       expect(find.text('New symbolic link'), findsNothing);
     });
 

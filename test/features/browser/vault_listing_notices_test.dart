@@ -40,26 +40,26 @@ void main() {
   );
 
   Future<void> openDetails(WidgetTester tester) async {
-    await tester.tap(find.byIcon(Icons.link).first);
+    await tester.tap(find.byIcon(Icons.visibility_off_outlined).first);
     await tester.pumpAndSettle();
   }
 
   group('refresh', () {
-    testWidgets('shows nothing for a folder without links', (tester) async {
+    testWidgets('shows nothing for a folder without hidden entries', (tester) async {
       await tester.pumpWidget(app(cryptomatorContainer()));
       await tester.pumpAndSettle();
-      expect(find.byIcon(Icons.link), findsNothing);
+      expect(find.byIcon(Icons.visibility_off_outlined), findsNothing);
     });
 
-    testWidgets('a content change in this volume brings a new link into view', (tester) async {
+    testWidgets('a content change in this volume brings newly hidden entries into view', (tester) async {
       await tester.pumpWidget(app(cryptomatorContainer()));
       await tester.pumpAndSettle();
 
-      fileIo.links = [link('fresh')];
+      fileIo.hidden = 2;
       opService.notifyVolumeContentChanged(7);
       await tester.pumpAndSettle();
 
-      expect(find.byIcon(Icons.link), findsOneWidget);
+      expect(find.byIcon(Icons.visibility_off_outlined), findsOneWidget);
     });
 
     testWidgets('a change in another volume does not reload', (tester) async {
@@ -95,6 +95,10 @@ void main() {
   });
 
   group('details sheet management', () {
+    // Links are ordinary listing entries now; the sheet is reached through the hidden-entries banner,
+    // so these tests need at least one hidden entry for the banner to exist.
+    setUp(() => fileIo.hidden = 1);
+
     testWidgets('tap-to-copy stays and there is no open/follow action', (tester) async {
       fileIo.links = [link('ln')];
       await tester.pumpWidget(app(cryptomatorContainer()));
@@ -106,7 +110,7 @@ void main() {
       expect(find.byIcon(Icons.launch), findsNothing);
     });
 
-    testWidgets('Delete asks first, removes only the link, announces the change and closes the sheet', (tester) async {
+    testWidgets('Delete asks first, removes only the link and announces the change', (tester) async {
       fileIo.links = [link('ln')];
       await tester.pumpWidget(app(cryptomatorContainer()));
       await tester.pumpAndSettle();
@@ -123,8 +127,8 @@ void main() {
       expect(fileIo.deleted, ['ln']);
       expect(opService.notified, contains(7));
       expect(find.text('Delete symbolic link?'), findsNothing);
-      expect(find.byIcon(Icons.delete_outline), findsNothing); // sheet closed: nothing left to show
-      expect(find.byIcon(Icons.link), findsNothing); // and the banner is gone
+      expect(find.byIcon(Icons.delete_outline), findsNothing); // the link is gone from the sheet
+      // The sheet itself stays open because a hidden entry is still being reported.
     });
 
     testWidgets('cancelling the confirmation deletes nothing', (tester) async {

@@ -22,6 +22,9 @@ VaultSymlink link(String name) =>
 /// An in-memory stand-in for the symlink-related part of [VaultFileIoApi].
 class FakeSymlinkFileIo implements VaultFileIoApi {
   List<VaultSymlink> links = [];
+
+  /// What [hiddenEntryCount] reports; the notice banner only shows while this is above zero.
+  int hidden = 0;
   int listCalls = 0;
   bool createResult = true;
   bool deleteResult = true;
@@ -37,7 +40,7 @@ class FakeSymlinkFileIo implements VaultFileIoApi {
   }
 
   @override
-  Future<int> hiddenEntryCount(MountedContainer container, String dirPath) async => 0;
+  Future<int> hiddenEntryCount(MountedContainer container, String dirPath) async => hidden;
 
   @override
   Future<String?> readVaultSymlink(MountedContainer container, String path) async => 'target-of-$path';

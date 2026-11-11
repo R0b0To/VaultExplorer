@@ -734,6 +734,12 @@ if(NOT ANDROID)
             crypto/xchacha20poly1305.cpp crypto/cryfs_block_cipher.cpp)
     add_executable(foldervault_test foldervault/test/fv_tests.cpp ${FV_CRYPTO_SOURCES})
     target_link_libraries(foldervault_test foldervault_core mbedcrypto)
+    # The gocryptfs known-answer vectors are located via an absolute path baked in
+    # here, not via __FILE__: the global -ffile-prefix-map above rewrites
+    # CMAKE_SOURCE_DIR to /source_tree inside __FILE__, so deriving the path from it
+    # points at a directory that doesn't exist on the host (FV_VECTORS still overrides).
+    target_compile_definitions(foldervault_test PRIVATE
+            FV_VECTORS_DIR="${CMAKE_CURRENT_LIST_DIR}/foldervault/test/vectors/gocryptfs")
     add_executable(fvcli foldervault/test/fvcli.cpp ${FV_CRYPTO_SOURCES})
     target_link_libraries(fvcli foldervault_core mbedcrypto)
     list(APPEND VAULTEXPLORER_HOST_TESTS foldervault_test)

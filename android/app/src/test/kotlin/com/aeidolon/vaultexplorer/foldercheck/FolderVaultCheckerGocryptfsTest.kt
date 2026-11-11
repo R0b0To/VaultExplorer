@@ -99,8 +99,11 @@ class FolderVaultCheckerGocryptfsTest {
         File(dir, "gocryptfs.conf").writeBytes(json.toString().toByteArray(Charsets.UTF_8))
     }
 
-    private fun writeDiriv(dir: File) {
-        File(dir, "gocryptfs.diriv").writeBytes(ByteArray(16))
+    /** A well-formed diriv: exactly 16 bytes and NOT all zero. gocryptfs rejects
+     *  an all-zero diriv, and GocryptfsVaultCheck flags one as CRITICAL, so a
+     *  zero-filled fixture would make a "healthy" vault look corrupt. */
+    private fun writeDiriv(dir: File, bytes: ByteArray = ByteArray(16) { (it + 1).toByte() }) {
+        File(dir, "gocryptfs.diriv").writeBytes(bytes)
     }
 
     /** One exactly-aligned ciphertext chunk: header + one full chunk body,
@@ -137,6 +140,25 @@ class FolderVaultCheckerGocryptfsTest {
         val root = newFolder("vault")
         writeValidConfig(root)
         // writeDiriv(root) intentionally omitted
+        writeAlignedCiphertextFile(root, "ABCDEFGHIJKLMNOPQRSTUV")
+
+        val outcome = GocryptfsVaultCheck.checkGocryptfs(
+            context, DocumentFile.fromFile(root), password = null, session = null, log = {},
+        )
+
+        val success = outcome as? FolderVaultCheckOutcome.Success
+            ?: throw AssertionError("expected Success, got $outcome")
+        val issue = success.report.issues.singleOrNull()
+            ?: throw AssertionError("expected exactly one issue, got ${success.report.issues}")
+        assertEquals(FolderVaultIssueSeverity.CRITICAL, issue.severity)
+        assertTrue(issue.message.contains("gocryptfs.diriv"))
+    }
+
+    @Test
+    fun `checkGocryptfs flags an all-zero gocryptfs_diriv as critical`() {
+        val root = newFolder("vault")
+        writeValidConfig(root)
+        writeDiriv(root, ByteArray(16))
         writeAlignedCiphertextFile(root, "ABCDEFGHIJKLMNOPQRSTUV")
 
         val outcome = GocryptfsVaultCheck.checkGocryptfs(

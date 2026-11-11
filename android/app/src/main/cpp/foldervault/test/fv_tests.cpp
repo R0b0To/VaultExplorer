@@ -1125,8 +1125,14 @@ static void copyTree(const std::string& from, const std::string& to) {
 }
 static std::string vectorsDir() {
     if (const char* e = std::getenv("FV_VECTORS")) return e;
+#ifdef FV_VECTORS_DIR
+    // Set by CMake (see foldervault_test): __FILE__ is rewritten to /source_tree/...
+    // by -ffile-prefix-map, so it can't be used to find the vectors on disk.
+    return FV_VECTORS_DIR;
+#else
     std::string f = __FILE__;
     return f.substr(0, f.rfind('/')) + "/vectors/gocryptfs";
+#endif
 }
 static OpenResult openAt(const std::string& dir, const char* pw, bool ro = false) {
     auto st = std::make_shared<PosixStorage>(dir);

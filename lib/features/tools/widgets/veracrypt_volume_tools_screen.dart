@@ -1,9 +1,10 @@
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:vaultexplorer/core/api/vault_engine_channel.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/api/veracrypt_tools_api.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/widgets/crypto_forms/keyfiles_picker.dart';
 import 'package:vaultexplorer/core/widgets/inputs/option_picker_tile.dart';
 import 'package:vaultexplorer/core/widgets/inputs/utf8_byte_limit_formatter.dart';
@@ -12,17 +13,17 @@ import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
 /// The desktop-VeraCrypt volume operations that work on an existing container.
 enum VeraCryptVolumeTool { expand, addHidden }
 
-class VeraCryptVolumeToolsScreen extends StatefulWidget {
+class VeraCryptVolumeToolsScreen extends ConsumerStatefulWidget {
   const VeraCryptVolumeToolsScreen({super.key, required this.tool});
 
   final VeraCryptVolumeTool tool;
 
   @override
-  State<VeraCryptVolumeToolsScreen> createState() => _VeraCryptVolumeToolsScreenState();
+  ConsumerState<VeraCryptVolumeToolsScreen> createState() => _VeraCryptVolumeToolsScreenState();
 }
 
-class _VeraCryptVolumeToolsScreenState extends State<VeraCryptVolumeToolsScreen> {
-  static const _api = VeraCryptToolsApi(kVaultEngineChannel);
+class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeToolsScreen> {
+  late final _api = VeraCryptToolsApi(ref.read(vaultEngineChannelProvider));
   static const _hiddenFileSystems = ['exFAT', 'FAT', 'NTFS'];
 
   ({String uri, String displayName})? _target;

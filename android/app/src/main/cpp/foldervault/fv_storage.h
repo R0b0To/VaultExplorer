@@ -77,6 +77,13 @@ public:
     // Deletes a file or a whole directory tree. true if nothing is left.
     virtual bool remove(const std::string& path) = 0;
     virtual bool setMtime(const std::string& path, int64_t epochSec) = 0;
+    // True if anything is at [path], *including a dangling symlink* (stat() follows links and cannot tell).
+    // gocryptfs vaults can contain symlinks this app neither shows nor follows; creating an entry over one
+    // has to fail -- as it does in gocryptfs (EEXIST) -- instead of writing through the link.
+    virtual bool existsNoFollow(const std::string& path) {
+        DirEntry de;
+        return stat(path, de);
+    }
 
     // ---- content ----------------------------------------------------------
     virtual bool readWhole(const std::string& path, Bytes& out) = 0;
@@ -130,6 +137,7 @@ public:
     bool rename(const std::string& from, const std::string& to) override;
     bool remove(const std::string& path) override;
     bool setMtime(const std::string& path, int64_t epochSec) override;
+    bool existsNoFollow(const std::string& path) override;
     bool readWhole(const std::string& path, Bytes& out) override;
     bool writeWhole(const std::string& path, const uint8_t* data, size_t len) override;
     bool writeBlock(const std::string& path, const uint8_t* data, size_t len) override;

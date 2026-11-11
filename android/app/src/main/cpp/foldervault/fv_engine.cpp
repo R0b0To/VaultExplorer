@@ -85,6 +85,19 @@ void ChunkedFileEngine::invalidateRead(const std::string& vpath) {
     std::string path = normalizePath(vpath);
     PathLocks::Guard g(locks_, path);
     dropHandle(path);
+    // The path may be a folder that was refreshed because a sync tool changed what is inside it: the cached
+    // descriptors, file keys and decrypted chunks of everything below it are stale as well. (A thread that is
+    // still reading keeps its own reference; only the cache's is dropped.)
+    std::lock_guard<std::mutex> rg(rmu_);
+    const std::string prefix = path + "/";
+    for (auto it = handles_.begin(); it != handles_.end();) {
+        if (it->first.compare(0, prefix.size(), prefix) == 0) {
+            lru_.erase(it->second.it);
+            it = handles_.erase(it);
+        } else {
+            ++it;
+        }
+    }
 }
 
 void ChunkedFileEngine::invalidateAll() {

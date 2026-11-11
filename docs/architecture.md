@@ -43,7 +43,10 @@ complete command-line front-end). Its seams:
   `VaultDocumentOps` and the mirror; `CryfsMirrorFolderVaultStorage` for CryFS
   blocks), so all SAF/mirror policy stays in Kotlin.
 - Format code: `fv_gocryptfs*` (AES-256-GCM / XChaCha20-Poly1305 / AES-SIV,
-  EME names, long names, plaintext-names mode), `fv_cryptomator*` (format 7
+  EME names, long names incl. `-longnamemax`, plaintext-names mode,
+  `-deterministic-names`, and the pre-HKDF / pre-Raw64 vaults of gocryptfs
+  0.7-1.6; held to the official implementation's rules -- see the foldervault
+  README), `fv_cryptomator*` (format 7
   SIV_CTRMAC and 8 SIV_GCM, `.c9s` shortening), `fv_cryfs*` (block store with
   local integrity state, blob data tree, directory blobs), sharing the
   chunked file engine in `fv_engine*`. scrypt, EME, AES-SIV, XChaCha20 and the

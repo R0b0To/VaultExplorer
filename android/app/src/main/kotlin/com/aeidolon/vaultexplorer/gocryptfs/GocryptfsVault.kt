@@ -37,6 +37,11 @@ object GocryptfsVault {
         cipher: GocryptfsCipher = GocryptfsCipher.AES_256_GCM,
         plaintextNames: Boolean = false,
         userEntropy: ByteArray? = null,
+        // gocryptfs -deterministic-names: no gocryptfs.diriv files, so two devices that create the same
+        // folder offline produce the same ciphertext (the right choice for a synchronised folder).
+        deterministicNames: Boolean = false,
+        // gocryptfs -longnamemax: 0 = default (255), otherwise 62..255.
+        longNameMax: Int = 0,
     ): VaultOpenResult<GocryptfsSession> {
         // Same order as the native enum: 0 = AES-256-GCM, 1 = XChaCha20-Poly1305, 2 = AES-SIV.
         val cipherIndex = when (cipher) {
@@ -46,7 +51,8 @@ object GocryptfsVault {
         }
         return FolderVaultOpener.create(
             context, vaultRootUri, NativeFolderVault.GOCRYPTFS, CONFIG_FILE_NAME, password,
-            intArrayOf(cipherIndex, if (plaintextNames) 1 else 0), null, userEntropy,
+            intArrayOf(cipherIndex, if (plaintextNames) 1 else 0, if (deterministicNames) 1 else 0, longNameMax),
+            null, userEntropy,
         ) { handle, volRef -> GocryptfsSession(context, vaultRootUri, handle, false, volRef) }
     }
 

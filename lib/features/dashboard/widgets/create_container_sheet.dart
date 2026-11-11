@@ -966,6 +966,20 @@ class _CreateContainerSheetState extends ConsumerState<CreateContainerSheet> {
                     ref.read(createContainerProvider.notifier).setGocryptfsCipher(val),
               ),
             ),
+            Padding(
+              padding: const EdgeInsets.all(1),
+              child: OptionPickerTile<bool>(
+                label: l10n.vaultInfoFilenameEncryptionLabel,
+                value: state.gocryptfsDeterministicNames,
+                prefixIcon: Icons.drive_file_rename_outline_rounded,
+                options: [
+                  SelectOption(value: false, label: l10n.gocryptfsNamesRandomIvOption),
+                  SelectOption(value: true, label: l10n.gocryptfsNamesDeterministicOption),
+                ],
+                onChanged: (val) =>
+                    ref.read(createContainerProvider.notifier).setGocryptfsDeterministicNames(val),
+              ),
+            ),
           ],
         );
       }

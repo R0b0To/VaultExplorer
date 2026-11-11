@@ -846,6 +846,12 @@ class VaultLifecycleApi {
     String password, {
     String cipher = 'aes-256-gcm',
     Uint8List? userEntropy,
+    // gocryptfs -deterministic-names: no gocryptfs.diriv files, so a folder
+    // created offline on two devices is the same ciphertext on both -- the
+    // right choice when the vault folder is synchronised.
+    bool deterministicNames = false,
+    // gocryptfs -longnamemax: 0 = default (255), otherwise 62..255.
+    int longNameMax = 0,
   }) async {
     try {
       final success = await _channel.invokeMethod<bool>(
@@ -855,6 +861,8 @@ class VaultLifecycleApi {
           'password': password,
           'cipher': cipher,
           'userEntropy': userEntropy,
+          'deterministicNames': deterministicNames,
+          'longNameMax': longNameMax,
         },
       );
       return success ?? false;

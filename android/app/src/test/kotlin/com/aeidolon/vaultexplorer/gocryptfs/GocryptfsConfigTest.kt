@@ -1,5 +1,6 @@
 package com.aeidolon.vaultexplorer.gocryptfs
 
+import java.security.MessageDigest
 import java.util.Base64
 import org.json.JSONArray
 import org.json.JSONObject
@@ -100,10 +101,12 @@ class GocryptfsConfigTest {
     }
 
     @Test
-    fun `AESSIV is no longer reported as unsupported`() {
-        val message = parseError(listOf("GCMIV128", "AESSIV", "DirIV", "EMENames", "LongNames", "Raw64")) // no HKDF
-        assertFalse(message, message.contains("not yet supported"))
-        assertTrue(message, message.contains("missing HKDF"))
+    fun `AESSIV without HKDF or Raw64 is accepted like gocryptfs does (vaults from gocryptfs 1_1 and 1_2)`() {
+        // gocryptfs' Validate() requires HKDF only for XChaCha20; older vaults keep mounting.
+        val parsed = GocryptfsConfig.parse(configJson(listOf("GCMIV128", "AESSIV", "DirIV", "EMENames", "LongNames")))
+        assertEquals(GocryptfsCipher.AES_SIV, parsed.cipher)
+        assertFalse(parsed.hasHkdf)
+        assertFalse(parsed.raw64)
     }
 
     // ---- real configs written by gocryptfs (tests/example_filesystems in the gocryptfs repo)
@@ -136,10 +139,13 @@ class GocryptfsConfigTest {
         GocryptfsContentCryptor(contentKey, parsed.cipher) // accepted: key length matches the cipher
     }
 
+    private fun hex(s: String): ByteArray = s.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+
     @Test
-    fun `a real legacy v1_1 AES-SIV config without HKDF is still rejected by the existing HKDF rule`() {
-        // v1.1-aessiv/gocryptfs.conf: written before HKDF/Raw64 existed. The app has never accepted
-        // pre-HKDF vaults for any cipher; enabling AES-SIV does not change that.
+    fun `a real legacy v1_1 AES-SIV config without HKDF parses and unlocks to the known masterkey`() {
+        // tests/example_filesystems/v1.1-aessiv/gocryptfs.conf (password "test"): written before HKDF and Raw64
+        // existed. gocryptfs still mounts it, so this must too. The expected key was derived independently
+        // (scrypt, then AES-GCM with a 96-bit nonce on the raw scrypt output) and is the key gocryptfs finds.
         val legacy = """
             {"Creator": "gocryptfs v1.1-beta1-33-gf054353-dirty",
              "EncryptedKey": "y2ldEXg3Ui0jwic99bqvvrvGRPRDB7gYzvOBwZxcmWqRgcp3BLMShhIXwx3Pewmst5TivqSrK2r9wUIL",
@@ -147,7 +153,18 @@ class GocryptfsConfigTest {
              "Version": 2,
              "FeatureFlags": ["GCMIV128", "DirIV", "EMENames", "LongNames", "AESSIV"]}
         """.trimIndent()
-        val e = assertThrows(GocryptfsConfigException::class.java) { GocryptfsConfig.parse(legacy.toByteArray(Charsets.UTF_8)) }
-        assertTrue(e.message!!, e.message!!.contains("missing HKDF"))
+        val parsed = GocryptfsConfig.parse(legacy.toByteArray(Charsets.UTF_8))
+        assertEquals(GocryptfsCipher.AES_SIV, parsed.cipher)
+        assertFalse(parsed.hasHkdf)
+        assertFalse(parsed.raw64)
+
+        val masterkey = GocryptfsMasterkey.unlock(parsed, "test".toCharArray())
+        assertArrayEquals(hex("eaf371c3f9a553368819f22b7bccd7c2a738cf617261c65814c28a039428992b"), masterkey)
+
+        // Without HKDF the keys are the master key itself; AES-SIV needs 64 bytes and takes its SHA-512.
+        val (nameKey, contentKey) = GocryptfsMasterkey.deriveKeys(parsed, masterkey)
+        assertArrayEquals(masterkey, nameKey)
+        assertArrayEquals(MessageDigest.getInstance("SHA-512").digest(masterkey), contentKey)
+        GocryptfsContentCryptor(contentKey, parsed.cipher) // accepted: key length matches the cipher
     }
 }

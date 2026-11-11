@@ -49,7 +49,9 @@ internal object NativeFolderVault {
 
     /**
      * Writes a new vault's skeleton. [options]: gocryptfs = [cipher 0=GCM 1=XChaCha
-     * 2=AES-SIV, plaintextNames 0/1]; cryfs = [blocksizeBytes, 0].
+     * 2=AES-SIV, plaintextNames 0/1, deterministicNames 0/1 (gocryptfs
+     * -deterministic-names), longNameMax 0 or 62..255 (gocryptfs -longnamemax)] --
+     * the last two may be omitted; cryfs = [blocksizeBytes, 0].
      */
     @JvmStatic external fun nativeCreate(
         format: Int, rawRoot: String?, storage: FolderVaultStorage?, password: ByteArray,

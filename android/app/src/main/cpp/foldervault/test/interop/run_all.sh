@@ -11,6 +11,9 @@ run_one() {
   echo "$out" | grep -q "RESULT fail=0" || rc=1
 }
 run_one gocryptfs_interop.sh "gocryptfs" which gocryptfs
+# Differential test against the real gocryptfs: every -init flavour, both directions, -fsck, the official
+# example filesystems, the sync-merge scenario and damaged ciphertext. (GOCRYPTFS=<binary> to choose one.)
+run_one gocryptfs_official_compat.py "gocryptfs + python3" bash -c "which \"${GOCRYPTFS:-gocryptfs}\" && which python3"
 run_one cryfs_interop.sh "cryfs" which cryfs
 [ -n "${CRYPTOMATOR_CLI:-}" ] && run_one cryptomator_interop.sh "cryptomator-cli" test -x "$CRYPTOMATOR_CLI" || echo "SKIP cryptomator_interop.sh (set CRYPTOMATOR_CLI)"
 # These drive the OFFICIAL cryptofs through a small Java program (needs a JDK 21 and `oracle/fetch_oracle.sh` once).

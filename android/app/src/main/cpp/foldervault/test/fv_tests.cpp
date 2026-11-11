@@ -15,8 +15,10 @@
 #include <thread>
 #include <unistd.h>
 #include <dirent.h>
+#include <filesystem>
 #include <sys/stat.h>
 
+#include "../../crypto/eme.h"
 #include "../fv_cryptomator.h"
 #include "../fv_cryfs.h"
 #include "../fv_gocryptfs.h"
@@ -193,7 +195,7 @@ static void testGocryptfsSivVector() {
     // gocryptfs refuses AESSIV without GCMIV128 and combined with XChaCha
     bool a = false, b = false;
     auto cfg = [](const char* flags) {
-        return std::string("{\"EncryptedKey\":\"AAAA\",\"ScryptObject\":{\"Salt\":\"AAAA\",\"N\":1024,\"R\":8,\"P\":1,\"KeyLen\":32},\"Version\":2,\"FeatureFlags\":[") + flags + "]}";
+        return std::string("{\"EncryptedKey\":\"AAAA\",\"ScryptObject\":{\"Salt\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\"N\":1024,\"R\":8,\"P\":1,\"KeyLen\":32},\"Version\":2,\"FeatureFlags\":[") + flags + "]}";
     };
     try { gocryptfs::Config::parse(cfg("\"HKDF\",\"DirIV\",\"EMENames\",\"LongNames\",\"Raw64\",\"AESSIV\"")); } catch (const Error&) { a = true; }
     try { gocryptfs::Config::parse(cfg("\"HKDF\",\"XChaCha20Poly1305\",\"AESSIV\",\"GCMIV128\",\"EMENames\",\"Raw64\"")); } catch (const Error&) { b = true; }
@@ -1064,8 +1066,19 @@ static void testConcurrency(const char* fmt) {
         auto g = v.readFileChunk("shared.bin", 0, 60000); (void)g;
         std::vector<DirEntry> ls; v.listSymlinks("t1", ls); v.listSymlinks("", ls); (void)v.hiddenEntryCount("t2"); (void)v.hiddenEntryCount("");
     } });
+    // pull-to-refresh style invalidation (folder, whole vault, a file) racing all of the above: it must neither
+    // break the traffic nor race with it
+    std::thread refresher([&] {
+        int n = 0;
+        while (!stop) {
+            v.invalidateCache(n % 4 == 0 ? std::string() : "t" + std::to_string(n % kThreads));
+            if (n % 5 == 0) v.invalidateCache("shared.bin");
+            n++;
+            std::this_thread::yield();
+        }
+    });
     for (auto& th : ts) th.join();
-    stop = true; reader.join();
+    stop = true; reader.join(); refresher.join();
     CHECK_EQ(bad.load(), 0);
     for (int i = 0; i < kThreads; i++) {
         std::vector<DirEntry> es; CHECK(v.listDirectory("t" + std::to_string(i), es)); CHECK_EQ(es.size(), (size_t)kFiles);   // links never show up here
@@ -1077,6 +1090,863 @@ static void testConcurrency(const char* fmt) {
     CHECK(!put(v, "late", shared));
 }
 
+// ============================================================================
+// Compatibility with the *official* gocryptfs (github.com/rfjakob/gocryptfs).
+//
+// Every rule asserted below is taken from its source: internal/configfile
+// (validate.go, scrypt.go, config_file.go), internal/nametransform (names.go,
+// valid.go, diriv.go, longnames.go), internal/contentenc, internal/cryptocore
+// and internal/fusefrontend. The real binary is exercised against the same
+// behaviour in test/interop/gocryptfs_official_compat.py.
+// ============================================================================
+
+static std::string slurp(const std::string& p) {
+    std::ifstream f(p, std::ios::binary);
+    std::stringstream ss; ss << f.rdbuf();
+    return ss.str();
+}
+static void spit(const std::string& p, const std::string& d) {
+    std::ofstream f(p, std::ios::binary | std::ios::trunc);
+    f.write(d.data(), (std::streamsize)d.size());
+}
+static std::vector<std::string> physNames(const std::string& dir) {
+    std::vector<std::string> o;
+    for (auto& e : std::filesystem::directory_iterator(dir)) o.push_back(e.path().filename().string());
+    std::sort(o.begin(), o.end());
+    return o;
+}
+static bool hasPhys(const std::string& dir, const std::string& name) {
+    auto n = physNames(dir);
+    return std::find(n.begin(), n.end(), name) != n.end();
+}
+static void copyTree(const std::string& from, const std::string& to) {
+    std::string cmd = "cp -a '" + from + "/.' '" + to + "'";
+    if (system(cmd.c_str())) std::puts("  (cp failed)");
+}
+static std::string vectorsDir() {
+    if (const char* e = std::getenv("FV_VECTORS")) return e;
+    std::string f = __FILE__;
+    return f.substr(0, f.rfind('/')) + "/vectors/gocryptfs";
+}
+static OpenResult openAt(const std::string& dir, const char* pw, bool ro = false) {
+    auto st = std::make_shared<PosixStorage>(dir);
+    return openGocryptfs(st, (const uint8_t*)pw, std::strlen(pw), ro, {});
+}
+static PlainResult createAt(const std::string& dir, const GocryptfsCreateOptions& o, const char* pw = "pw") {
+    PosixStorage st(dir);
+    return createGocryptfs(st, (const uint8_t*)pw, std::strlen(pw), o);
+}
+static GocryptfsCreateOptions fastOpts() { GocryptfsCreateOptions o; o.scryptLogN = 10; return o; }
+static bool infoBool(Vault& v, const std::string& key) {
+    for (auto& i : v.info()) if (i.key == key) return i.value == "true";
+    return false;
+}
+static int64_t infoInt(Vault& v, const std::string& key) {
+    for (auto& i : v.info()) if (i.key == key) return std::atoll(i.value.c_str());
+    return -1;
+}
+static std::string repeatc(char c, size_t n) { return std::string(n, c); }
+static std::vector<std::string> configFlags(const std::string& vaultDir) {
+    auto cfg = gocryptfs::Config::parse(slurp(vaultDir + "/gocryptfs.conf"));
+    return cfg.featureFlags;
+}
+
+// ---- internal/configfile: Validate() + scrypt validateParams() ---------------
+static std::string gcCfg(const std::string& flags, const std::string& extraTop = "", const std::string& scrypt = "",
+                         int version = 2) {
+    std::string defScrypt = "\"Salt\":\"" + repeatc('A', 43) + "=\",\"N\":1024,\"R\":8,\"P\":1,\"KeyLen\":32";
+    return "{\"Creator\":\"gocryptfs 2.x\",\"EncryptedKey\":\"" + repeatc('A', 84) + "\",\"ScryptObject\":{" +
+           (scrypt.empty() ? defScrypt : scrypt) + "},\"Version\":" + std::to_string(version) + "," + extraTop +
+           "\"FeatureFlags\":[" + flags + "]}";
+}
+static bool cfgOk(const std::string& json, gocryptfs::Config* out = nullptr) {
+    try { auto c = gocryptfs::Config::parse(json); if (out) *out = c; return true; }
+    catch (const Error& e) { if (e.code() != Err::InvalidVault) CHECK(false); return false; }
+}
+
+static void testGocryptfsConfigRules() {
+    std::puts("gocryptfs config validation (configfile.Validate)");
+    const std::string GCM = "\"GCMIV128\"", HK = "\"HKDF\"";
+    gocryptfs::Config c;
+
+    // --- accepted by gocryptfs (see tests/example_filesystems) -----------------
+    CHECK(cfgOk(gcCfg(HK + "," + GCM + ",\"DirIV\",\"EMENames\",\"LongNames\",\"Raw64\""), &c));
+    CHECK(c.cipher == GocryptfsCipher::Aes256Gcm && c.hasHkdf() && c.raw64() && c.hasDirIV() && !c.deterministicNames());
+    // v0.7: no HKDF, no Raw64, no LongNames
+    CHECK(cfgOk(gcCfg(GCM + ",\"DirIV\",\"EMENames\""), &c));
+    CHECK(!c.hasHkdf() && !c.raw64() && c.hasDirIV());
+    // v1.1-aessiv: AESSIV without HKDF / Raw64
+    CHECK(cfgOk(gcCfg(GCM + ",\"DirIV\",\"EMENames\",\"LongNames\",\"AESSIV\""), &c));
+    CHECK(c.cipher == GocryptfsCipher::AesSiv && !c.hasHkdf());
+    CHECK(cfgOk(gcCfg(HK + ",\"XChaCha20Poly1305\",\"DirIV\",\"EMENames\",\"LongNames\",\"Raw64\""), &c));
+    CHECK(c.cipher == GocryptfsCipher::XChaCha20Poly1305);
+    // -deterministic-names: simply no DirIV flag
+    CHECK(cfgOk(gcCfg(HK + "," + GCM + ",\"EMENames\",\"LongNames\",\"Raw64\""), &c));
+    CHECK(c.deterministicNames() && !c.hasDirIV());
+    CHECK(cfgOk(gcCfg(HK + "," + GCM + ",\"PlaintextNames\""), &c));
+    CHECK(c.plaintextNames && !c.deterministicNames());
+    // gocryptfs never requires EMENames on its own
+    CHECK(cfgOk(gcCfg(HK + "," + GCM + ",\"DirIV\",\"LongNames\",\"Raw64\"")));
+    // -longnamemax: the flag *and* the field
+    CHECK(cfgOk(gcCfg(HK + "," + GCM + ",\"DirIV\",\"LongNameMax\",\"EMENames\",\"LongNames\",\"Raw64\"", "\"LongNameMax\":100,"), &c));
+    CHECK_EQ(c.longNameMax, 100);
+    // -fido2 parses (it just cannot be unlocked here)
+    CHECK(cfgOk(gcCfg(HK + "," + GCM + ",\"DirIV\",\"EMENames\",\"FIDO2\""), &c));
+    CHECK(c.fido2());
+
+    // --- refused by gocryptfs --------------------------------------------------
+    CHECK(!cfgOk(gcCfg("\"DirIV\",\"EMENames\"")));                                   // AES-GCM requires GCMIV128
+    CHECK(!cfgOk(gcCfg(HK)));
+    CHECK(!cfgOk(gcCfg(HK + ",\"AESSIV\",\"DirIV\"")));                               // AESSIV requires GCMIV128
+    CHECK(!cfgOk(gcCfg(HK + ",\"XChaCha20Poly1305\"," + GCM)));                       // conflicts with GCMIV128
+    CHECK(!cfgOk(gcCfg(HK + ",\"XChaCha20Poly1305\",\"AESSIV\"")));                   // both
+    CHECK(!cfgOk(gcCfg(HK + ",\"XChaCha20Poly1305\",\"AESSIV\"," + GCM)));
+    CHECK(!cfgOk(gcCfg("\"XChaCha20Poly1305\",\"DirIV\",\"EMENames\"")));             // XChaCha requires HKDF
+    CHECK(!cfgOk(gcCfg(HK + "," + GCM + ",\"Bogus\"")));                              // unknown flag
+    for (const char* bad : {"EMENames", "DirIV", "LongNames", "Raw64"})               // PlaintextNames conflicts
+        CHECK(!cfgOk(gcCfg(HK + "," + GCM + ",\"PlaintextNames\",\"" + bad + "\"")));
+    CHECK(!cfgOk(gcCfg(HK + "," + GCM + ",\"PlaintextNames\",\"LongNameMax\"", "\"LongNameMax\":100,")));
+    CHECK(!cfgOk(gcCfg(HK + "," + GCM + ",\"DirIV\",\"EMENames\"", "\"LongNameMax\":100,")));        // value without flag
+    CHECK(!cfgOk(gcCfg(HK + "," + GCM + ",\"DirIV\",\"EMENames\",\"LongNameMax\"")));                // flag without value
+    CHECK(!cfgOk(gcCfg(HK + "," + GCM + ",\"DirIV\",\"EMENames\",\"LongNameMax\"", "\"LongNameMax\":300,")));   // not a uint8
+    CHECK(!cfgOk(gcCfg(HK + "," + GCM + ",\"DirIV\",\"EMENames\",\"LongNameMax\"", "\"LongNameMax\":-1,")));
+    CHECK(!cfgOk(gcCfg(HK + "," + GCM, "", "", 1)));                                  // only format 2
+    CHECK(!cfgOk(gcCfg(HK + "," + GCM, "", "", 3)));
+
+    // --- scrypt parameter validation (scrypt.go validateParams) ----------------
+    auto sc = [](const std::string& salt43, int N, int R, int P, int keyLen) {
+        return "\"Salt\":\"" + salt43 + "\",\"N\":" + std::to_string(N) + ",\"R\":" + std::to_string(R) +
+               ",\"P\":" + std::to_string(P) + ",\"KeyLen\":" + std::to_string(keyLen);
+    };
+    const std::string ok = HK + "," + GCM + ",\"DirIV\",\"EMENames\"";
+    const std::string salt32 = repeatc('A', 43) + "=", salt31 = repeatc('A', 41) + "A=";
+    CHECK(cfgOk(gcCfg(ok, "", sc(salt32, 1024, 8, 1, 32))));
+    CHECK(cfgOk(gcCfg(ok, "", sc(salt32, 65536, 8, 1, 32))));
+    CHECK(!cfgOk(gcCfg(ok, "", sc(salt32, 512, 8, 1, 32))));        // N below 2^10
+    CHECK(!cfgOk(gcCfg(ok, "", sc(salt32, 3000, 8, 1, 32))));       // not a power of two
+    CHECK(!cfgOk(gcCfg(ok, "", sc(salt32, 1024, 7, 1, 32))));       // R below 8
+    CHECK(!cfgOk(gcCfg(ok, "", sc(salt32, 1024, 8, 0, 32))));       // P below 1
+    CHECK(!cfgOk(gcCfg(ok, "", sc(salt31, 1024, 8, 1, 32))));       // salt shorter than 32 bytes
+    CHECK(!cfgOk(gcCfg(ok, "", sc(salt32, 1024, 8, 1, 31))));       // KeyLen below 32
+    CHECK(!cfgOk(gcCfg(ok, "", sc(salt32, 1024, 8, 1, 64))));       // gocryptfs itself panics on that
+    for (const char* hugeN : {"4294967296", "1099511627776", "9223372036854775807"})   // 2^32, 2^40, > 2^62: must not wrap to 0
+        CHECK(!cfgOk(gcCfg(ok, "", "\"Salt\":\"" + salt32 + "\",\"N\":" + hugeN + ",\"R\":8,\"P\":1,\"KeyLen\":32")));
+}
+
+// ---- internal/nametransform ---------------------------------------------------
+static void testGocryptfsNameRules() {
+    std::puts("gocryptfs names (IsValidName, strict base64, long names)");
+    using gocryptfs::NameCryptor;
+    Secret key{Bytes(32, 0x42)};
+    uint8_t iv[16]; std::memset(iv, 0x11, 16);
+    NameCryptor nc(key, 0, false, /*raw64*/ true);
+
+    // everything IsValidName allows must round-trip -- including names this app used to hide
+    const std::vector<std::string> good = {
+        "a", "hello world", repeatc('n', 255), "nl\nname", "cr\rname", "crlf\r\nname", "repl-" "\xEF\xBF\xBD" "-char",
+        "ünï.txt", " lead trail ", "...", ".hidden", "a.b", "tab\tname", "a=b", "gocryptfs.conf", "gocryptfs.diriv",
+        "gocryptfs.longname.abc", "x.name"};
+    for (auto& n : good) {
+        std::string c = nc.encryptName(n, iv);
+        CHECK(NameCryptor::isValidName(n));
+        std::string back;
+        try { back = nc.decryptName(c, iv); } catch (const Error&) {}
+        CHECK(back == n);
+    }
+    auto encFails = [&](const std::string& n) { try { nc.encryptName(n, iv); return false; } catch (const Error&) { return true; } };
+    CHECK(encFails("")); CHECK(encFails(".")); CHECK(encFails("..")); CHECK(encFails("a/b"));
+    CHECK(encFails(std::string("a\0b", 3))); CHECK(encFails(repeatc('n', 256)));
+    CHECK(!NameCryptor::isValidName("") && !NameCryptor::isValidName("..") && !NameCryptor::isValidName(repeatc('n', 256)));
+
+    auto decFails = [&](const NameCryptor& n, const std::string& s) { try { n.decryptName(s, iv); return false; } catch (const Error&) { return true; } };
+    // decrypting what a valid-but-forbidden plaintext would produce: forge ciphertexts for arbitrary padded blocks
+    auto forge = [&](const std::string& plain) {
+        size_t pad = 16 - plain.size() % 16;
+        Bytes p(plain.begin(), plain.end()); p.insert(p.end(), pad, (uint8_t)pad);
+        Bytes o(p.size());
+        eme_transform(key.data(), key.size(), iv, p.data(), o.data(), p.size(), true);
+        return base64Encode(o.data(), o.size(), true, false);
+    };
+    CHECK(!decFails(nc, forge("fine")));
+    CHECK(decFails(nc, forge("")));              // a block of pure padding: empty name
+    CHECK(decFails(nc, forge(".")));
+    CHECK(decFails(nc, forge("..")));
+    CHECK(decFails(nc, forge("a/b")));
+    CHECK(decFails(nc, forge(std::string("a\0b", 3))));
+    CHECK(decFails(nc, forge(repeatc('n', 256))));
+    CHECK(!decFails(nc, forge(repeatc('n', 255))));
+    CHECK(decFails(nc, forge("bad\xFF\xFE")));   // valid for gocryptfs, but not representable as a Java/Dart string
+    // bad PKCS#7 padding
+    {
+        Bytes p(16, 3); p[15] = 5;   // claims 5 bytes of padding, only the last one says so
+        Bytes o(16);
+        eme_transform(key.data(), key.size(), iv, p.data(), o.data(), 16, true);
+        CHECK(decFails(nc, base64Encode(o.data(), o.size(), true, false)));
+    }
+
+    // base64 must be canonical (gocryptfs decodes with base64.Strict())
+    std::string c = nc.encryptName("x", iv);
+    CHECK_EQ(c.size(), (size_t)22);
+    static const std::string alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    size_t idx = alpha.find(c.back());
+    CHECK(idx != std::string::npos && (idx & 0x0F) == 0);          // the last sextet carries 4 zero bits
+    std::string malleable = c; malleable.back() = alpha[idx | 1];
+    Bytes lenient; CHECK(base64Decode(malleable, lenient));        // the app's lenient codec would take it ...
+    CHECK(decFails(nc, malleable));                                // ... but it is not a gocryptfs name
+    CHECK(decFails(nc, c + "="));                                  // Raw64 has no padding
+    CHECK(decFails(nc, c.substr(0, 10) + "\n" + c.substr(10)));    // Go's decoder skips newlines; gocryptfs rejects them
+    CHECK(decFails(nc, c.substr(0, 10) + "\r\n" + c.substr(10)));
+    CHECK(decFails(nc, c + "A"));                                  // 23 chars: not a whole number of blocks
+    CHECK(decFails(nc, ""));
+    CHECK(decFails(nc, "gocryptfs.diriv"));
+    CHECK(decFails(nc, "!!notbase64!!"));
+
+    // legacy vaults (no Raw64): padded base64 for names, and for the long-name hash
+    NameCryptor np(key, 0, false, /*raw64*/ false);
+    std::string cp = np.encryptName("x", iv);
+    CHECK_EQ(cp.size(), (size_t)24);
+    CHECK(cp.substr(22) == "==");
+    CHECK(np.decryptName(cp, iv) == "x");
+    CHECK(decFails(np, cp.substr(0, 22)));                         // padding is mandatory there
+    CHECK(decFails(nc, cp));                                       // and forbidden with Raw64
+    const size_t prefix = std::strlen(gocryptfs::kLongNamePrefix);
+    CHECK_EQ(nc.hashLongName("abc").size(), prefix + 43);
+    CHECK_EQ(np.hashLongName("abc").size(), prefix + 44);
+    CHECK(np.hashLongName("abc").back() == '=');
+
+    // long-name threshold: 255 by default, -longnamemax otherwise
+    NameCryptor n100(key, 100, false, true);
+    CHECK(!nc.isOverLongNameLimit(repeatc('a', 255)));  CHECK(nc.isOverLongNameLimit(repeatc('a', 256)));
+    CHECK(!n100.isOverLongNameLimit(repeatc('a', 100))); CHECK(n100.isOverLongNameLimit(repeatc('a', 101)));
+    NameCryptor npl(Secret(), 0, true, true);
+    CHECK(!npl.isOverLongNameLimit(repeatc('a', 300)));            // plaintext names are never hashed
+    CHECK(npl.encryptName("plain.txt", iv) == "plain.txt");
+
+    // classification of physical names (nametransform.NameType)
+    CHECK(NameCryptor::isLongNameContent("gocryptfs.longname.abc") && !NameCryptor::isLongNameFile("gocryptfs.longname.abc"));
+    CHECK(NameCryptor::isLongNameFile("gocryptfs.longname.abc.name") && !NameCryptor::isLongNameContent("gocryptfs.longname.abc.name"));
+    CHECK(!NameCryptor::isLongNameFile("foo.name") && !NameCryptor::isLongNameContent("foo.name"));
+    CHECK(!NameCryptor::isLongNameFile("gocryptfs.diriv") && !NameCryptor::isLongNameContent("gocryptfs.diriv"));
+}
+
+// ---- the official example filesystems (tests/example_filesystems) ----------------
+struct VectorCase {
+    const char* dir;
+    bool opens;                // false: gocryptfs itself refuses ("too old")
+    bool hkdf, raw64, deterministic, plain;
+    GocryptfsCipher cipher;
+    bool longname;             // has the 255-byte "longname_255_xxx..." file
+};
+
+static void testGocryptfsOfficialVectors() {
+    std::puts("gocryptfs official example filesystems");
+    const GocryptfsCipher GCM = GocryptfsCipher::Aes256Gcm, SIV = GocryptfsCipher::AesSiv, XC = GocryptfsCipher::XChaCha20Poly1305;
+    const VectorCase cases[] = {
+        {"v0.4", false, 0, 0, 0, 0, GCM, false}, {"v0.5", false, 0, 0, 0, 0, GCM, false},
+        {"v0.6", false, 0, 0, 0, 0, GCM, false}, {"v0.6-plaintextnames", false, 0, 0, 0, 1, GCM, false},
+        {"v0.7", true, 0, 0, 0, 0, GCM, false},  {"v0.7-plaintextnames", true, 0, 0, 0, 1, GCM, false},
+        {"v0.9", true, 0, 0, 0, 0, GCM, true},   {"v1.1-aessiv", true, 0, 0, 0, 0, SIV, true},
+        {"v1.3", true, 1, 1, 0, 0, GCM, true},   {"v2.2-deterministic-names", true, 1, 1, 1, 0, GCM, true},
+        {"v2.2-xchacha", true, 1, 1, 0, 0, XC, true}, {"v2.2-xchacha-deterministic-names", true, 1, 1, 1, 0, XC, true},
+    };
+    const std::string longName = "longname_255_" + repeatc('x', 242);
+    const std::string vroot = vectorsDir();
+    for (const VectorCase& vc : cases) {
+        std::printf("  %s\n", vc.dir);
+        if (!std::filesystem::exists(vroot + "/" + vc.dir)) { CHECK(false); continue; }
+        TmpDir t; std::string d = t.sub("v");
+        copyTree(vroot + "/" + vc.dir, d);
+        auto r = openAt(d, "test");
+        if (!vc.opens) { CHECK(r.status == OpenStatus::InvalidVault); continue; }
+        CHECK(r.status == OpenStatus::Ok);
+        if (!r.vault) continue;
+        Vault& v = *r.vault;
+        CHECK(openAt(d, "wrong").status == OpenStatus::WrongPassword);
+        CHECK_EQ(infoBool(v, "hkdf"), (bool)vc.hkdf);
+        CHECK_EQ(infoBool(v, "raw64"), vc.plain ? false : (bool)vc.raw64);
+        CHECK_EQ(infoBool(v, "deterministicNames"), (bool)vc.deterministic);
+        CHECK_EQ(infoBool(v, "plaintextNames"), (bool)vc.plain);
+        auto st = get(v, "status.txt");
+        CHECK(st.has_value() && std::string(st->begin(), st->end()) == "It works!\n");
+        if (vc.longname) {
+            auto ln = get(v, longName);
+            CHECK(ln.has_value() && std::string(ln->begin(), ln->end()) == "It works!\n");
+            CHECK(has(v, "", "F:" + longName));
+        }
+        CHECK(has(v, "", "F:status.txt"));
+
+        // --- write into it the way gocryptfs would ---
+        const std::string payload(5000, 'q');
+        CHECK(v.createDirectory("sub"));
+        CHECK(v.createDirectory("sub/inner"));
+        CHECK(put(v, "sub/new.txt", Bytes(payload.begin(), payload.end())));
+        CHECK(put(v, "sub/" + repeatc('L', 200) + ".txt", Bytes(payload.begin(), payload.end())));   // forces a long name
+        CHECK(v.renameFile("sub/new.txt", "sub/renamed.txt"));
+        CHECK(v.createDirectory("sub/" + repeatc('D', 230)));                                         // long-named folder
+        CHECK(put(v, "sub/" + repeatc('D', 230) + "/f", Bytes(payload.begin(), payload.end())));
+        auto back = get(v, "sub/renamed.txt");
+        CHECK(back.has_value() && std::string(back->begin(), back->end()) == payload);
+        v.close();
+
+        auto r2 = openAt(d, "test");
+        CHECK(r2.status == OpenStatus::Ok);
+        if (r2.vault) {
+            Vault& w = *r2.vault;
+            CHECK(has(w, "sub", "F:renamed.txt") && has(w, "sub", "F:" + repeatc('L', 200) + ".txt") && has(w, "sub", "D:inner"));
+            CHECK(has(w, "sub", "D:" + repeatc('D', 230)));
+            auto lf = get(w, "sub/" + repeatc('L', 200) + ".txt");
+            CHECK(lf.has_value() && std::string(lf->begin(), lf->end()) == payload);
+            CHECK(w.deleteFile("sub/" + repeatc('L', 200) + ".txt"));
+            CHECK(w.deleteFile("sub/" + repeatc('D', 230)));
+            CHECK(get(w, "status.txt").has_value());
+            w.close();
+        }
+
+        // --- password change must keep the vault's own wrap format (nonce size, key expansion) ---
+        PosixStorage st2(d);
+        CHECK(changeGocryptfsPassword(st2, (const uint8_t*)"test", 4, (const uint8_t*)"newpw", 5).status == OpenStatus::Ok);
+        auto cfg = gocryptfs::Config::parse(slurp(d + "/gocryptfs.conf"));
+        CHECK_EQ(cfg.encryptedKey.size(), (size_t)(vc.hkdf ? 16 + 32 + 16 : 12 + 32 + 16));
+        CHECK_EQ(cfg.hasHkdf(), (bool)vc.hkdf);
+        CHECK(openAt(d, "test").status == OpenStatus::WrongPassword);
+        auto r3 = openAt(d, "newpw");
+        CHECK(r3.status == OpenStatus::Ok);
+        if (r3.vault) CHECK(get(*r3.vault, "status.txt").has_value());
+    }
+
+    // known answer: the hash in a legacy (padded-base64) long name is the padded sha256 of the *encrypted* name
+    {
+        TmpDir t; std::string d = t.sub("v");
+        copyTree(vroot + "/v0.9", d);
+        gocryptfs::Config cfg = gocryptfs::Config::parse(slurp(d + "/gocryptfs.conf"));
+        Secret mk = gocryptfs::unlockMasterkey(cfg, (const uint8_t*)"test", 4);
+        auto keys = gocryptfs::deriveSessionKeys(cfg, mk);
+        gocryptfs::NameCryptor nc(keys.nameKey, cfg.longNameMax, false, cfg.raw64());
+        const std::string h = "gocryptfs.longname.y4J-w3LBX165Mn_pGdDRY7Gb6EgHcTrdWjME3WGu-CQ=";
+        std::string sidecar = slurp(d + "/" + h + ".name");
+        CHECK_EQ(nc.hashLongName(sidecar), h);
+        std::string iv = slurp(d + "/gocryptfs.diriv");
+        CHECK_EQ(iv.size(), (size_t)16);
+        CHECK_EQ(nc.decryptName(sidecar, (const uint8_t*)iv.data()), longName);
+        CHECK(nc.isOverLongNameLimit(sidecar));
+    }
+}
+
+// ---- -init options: -deterministic-names, -longnamemax, -scryptn ----------------
+static void testGocryptfsCreateOptions() {
+    std::puts("gocryptfs create options (-deterministic-names, -longnamemax, -scryptn)");
+    using V = std::vector<std::string>;
+    auto flagsOf = [&](const GocryptfsCreateOptions& o, std::string* dirOut = nullptr) {
+        TmpDir t; std::string d = t.sub("v");
+        CHECK(createAt(d, o).status == OpenStatus::Ok);
+        auto f = configFlags(d);
+        auto r = openAt(d, "pw");
+        CHECK(r.status == OpenStatus::Ok);
+        if (dirOut) *dirOut = hasPhys(d, "gocryptfs.diriv") ? "diriv" : "nodiriv";
+        return f;
+    };
+    // the exact flag set and order `gocryptfs -init` writes
+    std::string dv;
+    GocryptfsCreateOptions o = fastOpts();
+    CHECK(flagsOf(o, &dv) == (V{"HKDF", "GCMIV128", "DirIV", "EMENames", "LongNames", "Raw64"})); CHECK_EQ(dv, std::string("diriv"));
+    o.cipher = GocryptfsCipher::AesSiv;
+    CHECK(flagsOf(o) == (V{"HKDF", "GCMIV128", "DirIV", "EMENames", "LongNames", "Raw64", "AESSIV"}));
+    o.cipher = GocryptfsCipher::XChaCha20Poly1305;
+    CHECK(flagsOf(o) == (V{"HKDF", "XChaCha20Poly1305", "DirIV", "EMENames", "LongNames", "Raw64"}));
+    o = fastOpts(); o.deterministicNames = true;
+    CHECK(flagsOf(o, &dv) == (V{"HKDF", "GCMIV128", "EMENames", "LongNames", "Raw64"})); CHECK_EQ(dv, std::string("nodiriv"));
+    o = fastOpts(); o.longNameMax = 100;
+    CHECK(flagsOf(o) == (V{"HKDF", "GCMIV128", "DirIV", "LongNameMax", "EMENames", "LongNames", "Raw64"}));
+    o = fastOpts(); o.longNameMax = 255;                      // the default is not recorded
+    CHECK(flagsOf(o) == (V{"HKDF", "GCMIV128", "DirIV", "EMENames", "LongNames", "Raw64"}));
+    o = fastOpts(); o.plaintextNames = true; o.deterministicNames = true; o.longNameMax = 100;   // ignored, like -init
+    CHECK(flagsOf(o, &dv) == (V{"HKDF", "GCMIV128", "PlaintextNames"})); CHECK_EQ(dv, std::string("nodiriv"));
+
+    // limits enforced by the official CLI
+    for (int bad : {1, 61, 256, 1000, -5}) { o = fastOpts(); o.longNameMax = bad; TmpDir t; CHECK(createAt(t.sub("v"), o).status == OpenStatus::InvalidVault); }
+    for (int bad : {62, 63, 100, 255}) { o = fastOpts(); o.longNameMax = bad; TmpDir t; CHECK(createAt(t.sub("v"), o).status == OpenStatus::Ok); }
+    for (int bad : {0, 9, 29, 100}) { o = fastOpts(); o.scryptLogN = bad; TmpDir t; CHECK(createAt(t.sub("v"), o).status == OpenStatus::InvalidVault); }
+    { o = fastOpts(); TmpDir t; std::string d = t.sub("v"); CHECK(createAt(d, o).status == OpenStatus::Ok);
+      CHECK_EQ(gocryptfs::Config::parse(slurp(d + "/gocryptfs.conf")).scryptN, (uint32_t)1024);
+      CHECK_EQ(gocryptfs::Config::parse(slurp(d + "/gocryptfs.conf")).creator, std::string("VaultExplorer")); }
+
+    // ---- deterministic names: no gocryptfs.diriv anywhere, same name => same ciphertext name ----
+    for (GocryptfsCipher cipher : {GocryptfsCipher::Aes256Gcm, GocryptfsCipher::XChaCha20Poly1305, GocryptfsCipher::AesSiv}) {
+        o = fastOpts(); o.deterministicNames = true; o.cipher = cipher;
+        TmpDir t; std::string d = t.sub("v");
+        CHECK(createAt(d, o).status == OpenStatus::Ok);
+        auto r = openAt(d, "pw");
+        CHECK(r.status == OpenStatus::Ok);
+        if (!r.vault) continue;
+        Vault& v = *r.vault;
+        CHECK(infoBool(v, "deterministicNames"));
+        CHECK(v.createDirectory("a")); CHECK(v.createDirectory("b")); CHECK(v.createDirectory("a/deep"));
+        CHECK(put(v, "a/same.txt", rnd(6000, 1))); CHECK(put(v, "b/same.txt", rnd(6000, 2)));
+        CHECK(put(v, "a/deep/same.txt", rnd(10, 3)));
+        CHECK(put(v, repeatc('L', 240), rnd(100, 4)));            // long name without any diriv
+        CHECK(v.renameFile("a/same.txt", "a/other.txt"));
+        CHECK(v.renameFile("a/other.txt", "a/same.txt"));
+        // physical layout: nothing called gocryptfs.diriv, and "same.txt" has one ciphertext name everywhere
+        int dirivFiles = 0;
+        for (auto& e : std::filesystem::recursive_directory_iterator(d)) if (e.path().filename() == "gocryptfs.diriv") dirivFiles++;
+        CHECK_EQ(dirivFiles, 0);
+        // "a" holds {deep, same.txt}, "b" holds {same.txt}, "a/deep" holds {same.txt}
+        std::string aDir, bDir;
+        for (auto& n : physNames(d)) {
+            if (!std::filesystem::is_directory(d + "/" + n) || gocryptfs::NameCryptor::isLongNameContent(n)) continue;
+            (physNames(d + "/" + n).size() == 2 ? aDir : bDir) = n;
+        }
+        CHECK(!aDir.empty() && !bDir.empty());
+        std::string inA, inDeep;
+        for (auto& n : physNames(d + "/" + aDir)) { if (std::filesystem::is_directory(d + "/" + aDir + "/" + n)) inDeep = n; else inA = n; }
+        auto phB = physNames(d + "/" + bDir);
+        auto phDeep = physNames(d + "/" + aDir + "/" + inDeep);
+        CHECK(phB.size() == 1 && phDeep.size() == 1 && phB[0] == phDeep[0] && phB[0] == inA);
+        // and it survives a re-open and re-listing
+        v.close();
+        auto r2 = openAt(d, "pw");
+        CHECK(r2.status == OpenStatus::Ok);
+        if (r2.vault) { CHECK(get(*r2.vault, "b/same.txt") == rnd(6000, 2)); CHECK(has(*r2.vault, "a", "D:deep")); }
+    }
+
+    // ---- the synchronisation scenario that motivates the flag --------------------------------
+    // Two devices start from the same ciphertext folder, go offline, and both create folder "FD0".
+    for (bool deterministic : {true, false}) {
+        o = fastOpts(); o.deterministicNames = deterministic;
+        TmpDir t; std::string base = t.sub("base"), devA = t.sub("A"), devB = t.sub("B");
+        CHECK(createAt(base, o).status == OpenStatus::Ok);
+        copyTree(base, devA); copyTree(base, devB);
+        { auto a = openAt(devA, "pw"); CHECK(a.status == OpenStatus::Ok); if (!a.vault) continue;
+          CHECK(put(*a.vault, "F0", rnd(100, 1))); CHECK(a.vault->createDirectory("FD0")); CHECK(put(*a.vault, "FD0/FF0", rnd(5000, 2))); }
+        { auto b = openAt(devB, "pw"); CHECK(b.status == OpenStatus::Ok); if (!b.vault) continue;
+          CHECK(b.vault->createDirectory("FD0")); CHECK(put(*b.vault, "FD0/FF1", rnd(7000, 3))); }
+        // the sync tool copies B's new files into A without overwriting anything A has
+        std::string cmd = "cp -an '" + devB + "/.' '" + devA + "/'";
+        if (system(cmd.c_str())) {}
+        auto m = openAt(devA, "pw");
+        CHECK(m.status == OpenStatus::Ok);
+        if (!m.vault) continue;
+        bool f0 = get(*m.vault, "F0") == rnd(100, 1);
+        bool ff0 = get(*m.vault, "FD0/FF0") == rnd(5000, 2);
+        bool ff1 = get(*m.vault, "FD0/FF1") == rnd(7000, 3);
+        CHECK(f0 && ff0);
+        if (deterministic) CHECK(ff1);          // both files are there: the folders were the same folder
+        else CHECK(!ff1);                       // random diriv: B's file was encrypted under a diriv that lost
+    }
+}
+
+// ---- plaintext-names listing rules (fusefrontend Readdirent) -------------------------
+static void testGocryptfsPlaintextNamesRules() {
+    std::puts("gocryptfs plaintext names: only the root config is special");
+    GocryptfsCreateOptions o = fastOpts(); o.plaintextNames = true;
+    TmpDir t; std::string d = t.sub("v");
+    CHECK(createAt(d, o).status == OpenStatus::Ok);
+    auto r = openAt(d, "pw");
+    CHECK(r.status == OpenStatus::Ok);
+    if (!r.vault) return;
+    Vault& v = *r.vault;
+    const Bytes data(10, 'p');
+    // names that mean something to gocryptfs with encrypted names are ordinary names here
+    for (const char* n : {"data.name", "gocryptfs.diriv", "gocryptfs.longname.abc", "gocryptfs.longname.abc.name", "plain.txt"})
+        CHECK(put(v, n, data));
+    CHECK(v.createDirectory("sub"));
+    CHECK(put(v, "sub/gocryptfs.conf", data));
+    CHECK(put(v, "sub/gocryptfs.conf.bak", data));
+    auto root = names(v, "");
+    CHECK(has(v, "", "F:data.name") && has(v, "", "F:gocryptfs.diriv") && has(v, "", "F:gocryptfs.longname.abc") &&
+          has(v, "", "F:gocryptfs.longname.abc.name") && has(v, "", "F:plain.txt") && has(v, "", "D:sub"));
+    CHECK(!has(v, "", "F:gocryptfs.conf"));                                  // the real config stays hidden
+    CHECK(has(v, "sub", "F:gocryptfs.conf") && has(v, "sub", "F:gocryptfs.conf.bak"));   // ... but only in the root
+    auto g = get(v, "gocryptfs.longname.abc");
+    CHECK(g.has_value() && *g == data);
+    // the config cannot be reached, replaced, deleted or shadowed through the plaintext view
+    const std::string before = slurp(d + "/gocryptfs.conf");
+    CHECK(!put(v, "gocryptfs.conf", data));
+    CHECK(!v.createDirectory("gocryptfs.conf"));
+    CHECK(!v.renameFile("plain.txt", "gocryptfs.conf"));
+    CHECK(!v.deleteFile("gocryptfs.conf"));
+    CHECK(!get(v, "gocryptfs.conf").has_value());
+    CHECK_EQ(v.getFileSize("gocryptfs.conf"), (int64_t)-1);
+    CHECK_EQ(slurp(d + "/gocryptfs.conf"), before);
+    // symlinks are neither listed nor addressable (gocryptfs stores them as symlinks; Android has none) -- even one
+    // that resolves, which with plaintext names is the normal case -- but they are cleaned up with their folder
+    std::filesystem::create_symlink("plain.txt", d + "/rel");
+    std::filesystem::create_symlink("/no/such/target", d + "/dangling");
+    std::filesystem::create_directory(d + "/real-dir");
+    std::filesystem::create_symlink("real-dir", d + "/dir-link");
+    spit(d + "/real-dir/inner", "x");
+    std::filesystem::create_symlink("inner", d + "/real-dir/inner-link");
+    CHECK(!has(v, "", "F:rel") && !has(v, "", "F:dangling") && !has(v, "", "D:dir-link") && !has(v, "", "F:dir-link"));
+    CHECK(!get(v, "rel").has_value() && !get(v, "dir-link/inner").has_value());
+    CHECK(has(v, "", "D:real-dir") && has(v, "real-dir", "F:inner") && !has(v, "real-dir", "F:inner-link"));
+    const std::string plainBefore = slurp(d + "/plain.txt");
+    CHECK(!put(v, "rel", Bytes(777, 'z')));              // not writable through the link either ...
+    CHECK(!v.createDirectory("dir-link"));               // ... nor can a folder be made over a link to one
+    CHECK_EQ(slurp(d + "/plain.txt"), plainBefore);      // and the link's target was left alone
+    CHECK(get(v, "plain.txt") == data);
+    CHECK(!hasPhys(d + "/real-dir", "gocryptfs.diriv"));
+    CHECK(v.deleteFile("real-dir"));
+    CHECK(!hasPhys(d, "real-dir"));
+    // deleting an ordinary file whose name looks like a long-name file must not touch a sibling ".name" file
+    CHECK(v.deleteFile("gocryptfs.longname.abc"));
+    CHECK(has(v, "", "F:gocryptfs.longname.abc.name"));
+    CHECK(hasPhys(d, "gocryptfs.longname.abc.name") && !hasPhys(d, "gocryptfs.longname.abc"));
+    v.close();
+}
+
+// ---- diriv handling (nametransform.ReadDirIVAt) ----------------------------------------------
+static void testGocryptfsDirivHandling() {
+    std::puts("gocryptfs diriv: validation, re-read on listing, never invented");
+    TmpDir t; std::string d = t.sub("v");
+    CHECK(createAt(d, fastOpts()).status == OpenStatus::Ok);
+    auto r = openAt(d, "pw");
+    CHECK(r.status == OpenStatus::Ok);
+    if (!r.vault) return;
+    Vault& v = *r.vault;
+    // deleting a cleartext path that does not exist must not touch gocryptfs' own files with the same *physical*
+    // name (an earlier fallback compared physical and cleartext names and deleted the config)
+    CHECK(!v.deleteFile("gocryptfs.conf"));
+    CHECK(!v.deleteFile("gocryptfs.diriv"));
+    CHECK(!v.deleteFile("gocryptfs.conf.bak"));
+    CHECK(hasPhys(d, "gocryptfs.conf") && hasPhys(d, "gocryptfs.diriv"));
+    CHECK(v.createDirectory("dir")); CHECK(put(v, "dir/file", rnd(100, 7)));
+    std::string physDir;
+    for (auto& n : physNames(d)) if (std::filesystem::is_directory(d + "/" + n)) physDir = n;
+    const std::string dirivPath = d + "/" + physDir + "/gocryptfs.diriv";
+    const std::string good = slurp(dirivPath);
+    CHECK_EQ(good.size(), (size_t)16);
+    std::vector<DirEntry> es;
+    CHECK(v.listDirectory("dir", es) && es.size() == 1);
+
+    // official: an all-zero IV is refused (it would silently make the folder deterministic)
+    spit(dirivPath, std::string(16, '\0'));
+    CHECK(!v.listDirectory("dir", es));
+    // wrong length
+    spit(dirivPath, good + "x");
+    CHECK(!v.listDirectory("dir", es));
+    spit(dirivPath, good.substr(0, 15));
+    CHECK(!v.listDirectory("dir", es));
+    // restored: the very next listing sees it again -- no manual invalidation needed
+    spit(dirivPath, good);
+    CHECK(v.listDirectory("dir", es) && es.size() == 1);
+    // a different, valid IV (what a lost sync conflict leaves behind): the folder is readable but its names are not
+    std::string other = good; other[0] ^= 0x55;
+    spit(dirivPath, other);
+    CHECK(v.listDirectory("dir", es) && es.empty());
+    spit(dirivPath, good);
+    CHECK(v.listDirectory("dir", es) && es.size() == 1);
+    CHECK(get(v, "dir/file") == rnd(100, 7));
+
+    // an existing folder without a diriv is reported, never "repaired" with a made-up one
+    std::filesystem::remove(dirivPath);
+    v.invalidateCache("");
+    CHECK(!v.createDirectory("dir"));
+    CHECK(!hasPhys(d + "/" + physDir, "gocryptfs.diriv"));
+    spit(dirivPath, good);
+    CHECK(v.createDirectory("dir"));
+    CHECK_EQ(slurp(dirivPath), good);
+
+    // pull-to-refresh on a sub folder picks up a diriv that changed behind our back -- for listings (which always
+    // re-read it) *and* for lookups such as opening a file, which otherwise go by the cached IV like gocryptfs'
+    // own dircache does until it expires
+    CHECK(get(v, "dir/file") == rnd(100, 7));              // (primes the cached IV)
+    spit(dirivPath, other);
+    v.invalidateCache("dir");
+    CHECK(!get(v, "dir/file").has_value());                // looked up under the new IV: not there (before any listing refreshes the cache)
+    CHECK(v.listDirectory("dir", es) && es.empty());
+    spit(dirivPath, good);
+    v.invalidateCache("dir");
+    CHECK(get(v, "dir/file") == rnd(100, 7));
+    CHECK(v.listDirectory("dir", es) && es.size() == 1);
+
+    // a file replaced from outside (a sync tool renames the new version over the old one) shows its new content
+    // once its folder is refreshed -- the cached read handle of a file below the folder must not survive that
+    CHECK(put(v, "dir/other", rnd(5000, 8)));
+    {
+        std::string physFile, physOther;
+        for (auto& n : physNames(d + "/" + physDir)) {
+            if (n == "gocryptfs.diriv") continue;
+            (std::filesystem::file_size(d + "/" + physDir + "/" + n) < 1000 ? physFile : physOther) = d + "/" + physDir + "/" + n;
+        }
+        CHECK(!physFile.empty() && !physOther.empty());
+        CHECK(get(v, "dir/file") == rnd(100, 7));                  // opens (and caches) a read handle
+        spit(physFile + ".incoming", slurp(physOther));
+        std::filesystem::rename(physFile + ".incoming", physFile);
+        v.invalidateCache("dir");
+        CHECK(get(v, "dir/file") == rnd(5000, 8));
+        CHECK_EQ(v.getFileSize("dir/file"), (int64_t)5000);
+    }
+
+    // every folder the app creates has a valid, non-zero, 16-byte diriv
+    for (int i = 0; i < 20; i++) CHECK(v.createDirectory("n" + std::to_string(i)));
+    for (auto& n : physNames(d)) {
+        if (!std::filesystem::is_directory(d + "/" + n)) continue;
+        std::string iv = slurp(d + "/" + n + "/gocryptfs.diriv");
+        CHECK(iv.size() == 16 && iv != std::string(16, '\0'));
+    }
+    v.close();
+}
+
+// ---- file header (contentenc.ParseHeader) -----------------------------------------------------
+static void testGocryptfsFileHeaderRules() {
+    std::puts("gocryptfs file header: all-zero header / file id are corruption");
+    TmpDir t; std::string d = t.sub("v");
+    CHECK(createAt(d, fastOpts()).status == OpenStatus::Ok);
+    auto r = openAt(d, "pw");
+    if (r.status != OpenStatus::Ok) { CHECK(false); return; }
+    Vault& v = *r.vault;
+    CHECK(put(v, "f", rnd(9000, 5)));
+    std::string phys;
+    for (auto& n : physNames(d)) if (n != "gocryptfs.conf" && n != "gocryptfs.diriv") phys = d + "/" + n;
+    const std::string orig = slurp(phys);
+    CHECK(orig.size() > 18);
+    CHECK(get(v, "f") == rnd(9000, 5));
+    auto patched = [&](size_t off, size_t len) { std::string s = orig; for (size_t i = 0; i < len; i++) s[off + i] = '\0'; return s; };
+    spit(phys, patched(0, 18));        v.invalidateCache("");  CHECK(!get(v, "f").has_value());   // all-zero header
+    spit(phys, patched(2, 16));        v.invalidateCache("");  CHECK(!get(v, "f").has_value());   // all-zero file id
+    std::string badVer = orig; badVer[1] = 3;
+    spit(phys, badVer);                v.invalidateCache("");  CHECK(!get(v, "f").has_value());   // unknown version
+    spit(phys, orig);                  v.invalidateCache("");  CHECK(get(v, "f") == rnd(9000, 5));
+    // a header-only file is an empty file (fusefrontend readFileID)
+    spit(phys, orig.substr(0, 18));    v.invalidateCache("");
+    auto e = get(v, "f"); CHECK(e.has_value() && e->empty());
+
+    // A file that is *validly encrypted under an all-zero file id* is refused as well (ParseHeader): the id is what
+    // ties a block to its file, so a zero one must not be allowed to authenticate. (Zeroing the id of a real file,
+    // as above, fails authentication anyway; this builds a file that would otherwise decrypt.)
+    {
+        Bytes contentKey;
+        for (auto& f : v.exportKeys().fields) if (f.first == "contentKey") contentKey = f.second;
+        gocryptfs::ContentFormat fmt(Secret(contentKey), GocryptfsCipher::Aes256Gcm);
+        const Bytes pt = rnd(100, 9);
+        uint8_t nonce[16]; std::memset(nonce, 0x42, sizeof nonce);
+        auto craft = [&](uint8_t idByte) {
+            uint8_t id[16]; std::memset(id, idByte, sizeof id);
+            Bytes ct(16 + pt.size() + 16);
+            fmt.sealChunk(id, 0, nonce, pt.data(), pt.size(), ct.data());
+            std::string file("\x00\x02", 2);
+            file.append((const char*)id, 16);
+            file.append((const char*)ct.data(), ct.size());
+            return file;
+        };
+        spit(phys, craft(0x07)); v.invalidateCache("");
+        CHECK(get(v, "f") == pt);                                    // control: the construction is right
+        spit(phys, craft(0x00)); v.invalidateCache("");
+        CHECK(!get(v, "f").has_value());                             // the same with an all-zero id is not
+    }
+    v.close();
+}
+
+// A storage whose directory listings do not know file sizes (some document providers report 0): limits that
+// gocryptfs applies to what it *reads* must not depend on the listing.
+struct BlindSizeStorage : PosixStorage {
+    using PosixStorage::PosixStorage;
+    bool list(const std::string& dir, std::vector<DirEntry>& out) override {
+        bool ok = PosixStorage::list(dir, out);
+        for (auto& e : out) e.size = 0;
+        return ok;
+    }
+};
+
+// Fault injection: lets a test make one kind of storage operation fail.
+struct FaultStorage : PosixStorage {
+    using PosixStorage::PosixStorage;
+    bool failDiriv = false, failRename = false, failCreate = false, failMkdir = false;
+    bool writeWhole(const std::string& p, const uint8_t* d, size_t n) override {
+        const std::string tail = "gocryptfs.diriv";
+        if (failDiriv && p.size() >= tail.size() && p.compare(p.size() - tail.size(), tail.size(), tail) == 0) return false;
+        return PosixStorage::writeWhole(p, d, n);
+    }
+    bool rename(const std::string& a, const std::string& b) override { return failRename ? false : PosixStorage::rename(a, b); }
+    bool createFile(const std::string& p) override { return failCreate ? false : PosixStorage::createFile(p); }
+    bool mkdir(const std::string& p) override { return failMkdir ? false : PosixStorage::mkdir(p); }
+};
+
+// gocryptfs undoes the steps of a failed Mkdir / Create / Rename (long-name sidecar, directory, diriv).
+static void testGocryptfsFailureRollback() {
+    std::puts("gocryptfs: a failed mkdir / create / rename leaves nothing behind");
+    TmpDir t; std::string d = t.sub("v");
+    GocryptfsCreateOptions o = fastOpts(); o.longNameMax = 100;      // 100-byte names are hashed
+    CHECK(createAt(d, o).status == OpenStatus::Ok);
+    auto st = std::make_shared<FaultStorage>(d);
+    auto r = openGocryptfs(st, (const uint8_t*)"pw", 2, false, {});
+    if (r.status != OpenStatus::Ok) { CHECK(false); return; }
+    Vault& v = *r.vault;
+    const auto before = physNames(d);
+
+    st->failDiriv = true;                                            // the folder is made but its diriv cannot be
+    CHECK(!v.createDirectory("short"));
+    CHECK(!v.createDirectory(repeatc('D', 100)));                    // ... and for a hashed name the sidecar must go too
+    CHECK(physNames(d) == before);
+    st->failDiriv = false;
+    CHECK(v.createDirectory("short"));                               // nothing stale blocks a retry
+    CHECK(v.deleteFile("short"));
+
+    st->failMkdir = true;                                            // the sidecar is written, the directory cannot be made
+    CHECK(!v.createDirectory(repeatc('D', 100)));
+    CHECK(physNames(d) == before);
+    st->failMkdir = false;
+
+    st->failCreate = true;                                           // the sidecar is written, the file cannot be created
+    CHECK(!put(v, repeatc('F', 100), rnd(10, 1)));
+    CHECK(physNames(d) == before);
+    st->failCreate = false;
+
+    CHECK(put(v, "orig", rnd(10, 2)));
+    const auto mid = physNames(d);
+    st->failRename = true;                                           // the new sidecar is written, the rename fails
+    CHECK(!v.renameFile("orig", repeatc('R', 100)));
+    CHECK(physNames(d) == mid);
+    CHECK(get(v, "orig") == rnd(10, 2));
+    st->failRename = false;
+    CHECK(v.renameFile("orig", repeatc('R', 100)));
+    CHECK(get(v, repeatc('R', 100)) == rnd(10, 2));
+    v.close();
+}
+
+// ---- long-name sidecars (nametransform.ReadLongNameAt) -----------------------------------------
+static void testGocryptfsLongNameFiles() {
+    std::puts("gocryptfs long names: sidecar limits, creation order, cleanup");
+    TmpDir t; std::string d = t.sub("v");
+    GocryptfsCreateOptions o = fastOpts(); o.longNameMax = 100;
+    CHECK(createAt(d, o).status == OpenStatus::Ok);
+    auto r = openAt(d, "pw");
+    if (r.status != OpenStatus::Ok) { CHECK(false); return; }
+    Vault& v = *r.vault;
+    CHECK(infoInt(v, "longNameMax") == 100);
+    auto longCount = [&](const std::string& dir) {
+        int n = 0; for (auto& p : physNames(dir)) if (gocryptfs::NameCryptor::isLongNameContent(p)) n++; return n;
+    };
+    auto sidecarCount = [&](const std::string& dir) {
+        int n = 0; for (auto& p : physNames(dir)) if (gocryptfs::NameCryptor::isLongNameFile(p)) n++; return n;
+    };
+    // 63-byte names encrypt to 86 base64 chars (<= 100); 64 bytes pad to 80 -> 107 chars (> 100): hashed
+    CHECK(put(v, repeatc('s', 63), rnd(10, 1)));
+    CHECK_EQ(longCount(d), 0);
+    CHECK(put(v, repeatc('l', 64), rnd(10, 2)));
+    CHECK_EQ(longCount(d), 1); CHECK_EQ(sidecarCount(d), 1);
+    CHECK(v.createDirectory(repeatc('d', 100)));
+    CHECK_EQ(longCount(d), 2); CHECK_EQ(sidecarCount(d), 2);
+    CHECK(put(v, repeatc('d', 100) + "/inner", rnd(10, 3)));
+    CHECK(get(v, repeatc('l', 64)) == rnd(10, 2) && get(v, repeatc('s', 63)) == rnd(10, 1));
+    // short -> long -> short renames keep exactly one sidecar per long entry
+    CHECK(v.renameFile(repeatc('s', 63), repeatc('S', 80)));
+    CHECK_EQ(longCount(d), 3); CHECK_EQ(sidecarCount(d), 3);
+    CHECK(v.renameFile(repeatc('S', 80), "short"));
+    CHECK_EQ(longCount(d), 2); CHECK_EQ(sidecarCount(d), 2);
+    CHECK(v.renameFile(repeatc('l', 64), repeatc('m', 64)));
+    CHECK_EQ(longCount(d), 2); CHECK_EQ(sidecarCount(d), 2);
+    CHECK(get(v, repeatc('m', 64)) == rnd(10, 2) && !get(v, repeatc('l', 64)).has_value());
+    // sidecar limits: empty or larger than 344 bytes => gocryptfs does not list the entry
+    std::string sc; for (auto& p : physNames(d)) if (gocryptfs::NameCryptor::isLongNameFile(p)) { sc = d + "/" + p; break; }
+    CHECK(!sc.empty());
+    const std::string scOrig = slurp(sc);
+    spit(sc, "");                      size_t visibleEmpty = names(v, "").size();
+    spit(sc, repeatc('A', 345));       size_t visibleBig = names(v, "").size();
+    spit(sc, scOrig);                  size_t visibleOk = names(v, "").size();
+    CHECK(visibleEmpty < visibleOk); CHECK(visibleBig < visibleOk);
+    {   // the same limit, enforced after reading when the listing cannot say how big the file is
+        auto blind = openGocryptfs(std::make_shared<BlindSizeStorage>(d), (const uint8_t*)"pw", 2, false, {});
+        if (blind.status != OpenStatus::Ok) { CHECK(false); }
+        else {
+            CHECK_EQ(names(*blind.vault, "").size(), visibleOk);
+            spit(sc, repeatc('A', 345));
+            CHECK(names(*blind.vault, "").size() < visibleOk);
+            spit(sc, scOrig);
+            CHECK_EQ(names(*blind.vault, "").size(), visibleOk);
+            blind.vault->close();
+        }
+    }
+    // deleting removes sidecars too: nothing is left behind
+    for (auto& n : names(v, "")) CHECK(v.deleteFile(n.substr(2)));
+    CHECK_EQ(longCount(d), 0); CHECK_EQ(sidecarCount(d), 0);
+    v.close();
+}
+
+// ---- names that used to be hidden, and names that must stay out --------------------------------
+static void testGocryptfsUnusualNames() {
+    std::puts("gocryptfs unusual names: newline, CR, U+FFFD, 255 bytes, dots");
+    TmpDir t; std::string d = t.sub("v");
+    CHECK(createAt(d, fastOpts()).status == OpenStatus::Ok);
+    auto r = openAt(d, "pw");
+    if (r.status != OpenStatus::Ok) { CHECK(false); return; }
+    Vault& v = *r.vault;
+    const std::vector<std::string> odd = {"nl\nname", "cr\rname", "repl-" "\xEF\xBF\xBD" "-char", " lead-trail ", repeatc('m', 255),
+                                          "tab\tname", "...", "gocryptfs.conf", "gocryptfs.diriv", "x.name"};
+    int i = 0;
+    for (auto& n : odd) {
+        CHECK(put(v, n, rnd(50 + i, 100 + i)));
+        i++;
+    }
+    v.close();
+    auto r2 = openAt(d, "pw");
+    if (r2.status != OpenStatus::Ok) { CHECK(false); return; }
+    i = 0;
+    for (auto& n : odd) {
+        CHECK(has(*r2.vault, "", "F:" + n));
+        CHECK(get(*r2.vault, n) == rnd(50 + i, 100 + i));
+        i++;
+    }
+    CHECK(!put(*r2.vault, repeatc('x', 256), rnd(10, 1)));      // longer than NameMax: gocryptfs cannot store it
+    CHECK(!r2.vault->createDirectory(repeatc('y', 256)));
+    CHECK(!r2.vault->renameFile("...", repeatc('z', 256)));
+    CHECK(has(*r2.vault, "", "F:..."));
+    r2.vault->close();
+}
+
+// ---- legacy vaults: HKDF-less masterkey and key derivation --------------------------------------
+static void testGocryptfsLegacyKeys() {
+    std::puts("gocryptfs without HKDF: key wrap and key derivation");
+    gocryptfs::Config c = gocryptfs::Config::parse(gcCfg("\"GCMIV128\",\"DirIV\",\"EMENames\""));
+    Secret mk{Bytes(32, 0x07)};
+    auto k = gocryptfs::deriveSessionKeys(c, mk);
+    CHECK(k.nameKey.bytes() == mk.bytes() && k.contentKey.bytes() == mk.bytes());          // used as-is
+    c = gocryptfs::Config::parse(gcCfg("\"GCMIV128\",\"DirIV\",\"EMENames\",\"AESSIV\""));
+    k = gocryptfs::deriveSessionKeys(c, mk);
+    CHECK(k.nameKey.bytes() == mk.bytes());
+    CHECK_EQ(hexs(k.contentKey.bytes()), hexs(crypto::hash(crypto::Md::Sha512, mk.data(), mk.size())));   // SHA-512(masterkey)
+    c = gocryptfs::Config::parse(gcCfg("\"HKDF\",\"GCMIV128\",\"DirIV\",\"EMENames\""));
+    k = gocryptfs::deriveSessionKeys(c, mk);
+    CHECK_EQ(hexs(k.nameKey.bytes()), hexs(crypto::hkdfSha256(mk.data(), 32, "EME filename encryption", 32).bytes()));
+    CHECK_EQ(hexs(k.contentKey.bytes()), hexs(crypto::hkdfSha256(mk.data(), 32, "AES-GCM file content encryption", 32).bytes()));
+    // wrap / unwrap round trips for both nonce sizes; the blob sizes are what gocryptfs expects
+    for (bool hkdf : {true, false}) {
+        Bytes salt(32, 0x33);
+        gocryptfs::Config cc;
+        cc.version = 2; cc.scryptSalt = salt; cc.scryptN = 1024; cc.scryptR = 8; cc.scryptP = 1; cc.scryptKeyLen = 32;
+        cc.featureFlags = hkdf ? std::vector<std::string>{"HKDF", "GCMIV128", "DirIV", "EMENames"} : std::vector<std::string>{"GCMIV128", "DirIV", "EMENames"};
+        cc.encryptedKey = gocryptfs::wrapMasterkey(mk, (const uint8_t*)"pw", 2, salt, 1024, 8, 1, 32, hkdf);
+        CHECK_EQ(cc.encryptedKey.size(), (size_t)(hkdf ? 64 : 60));
+        CHECK(gocryptfs::unlockMasterkey(cc, (const uint8_t*)"pw", 2).bytes() == mk.bytes());
+        bool wrong = false;
+        try { gocryptfs::unlockMasterkey(cc, (const uint8_t*)"px", 2); } catch (const Error& e) { wrong = e.code() == Err::WrongPassword; }
+        CHECK(wrong);
+        // unwrapping with the other scheme must fail, not return garbage
+        gocryptfs::Config other = cc;
+        other.featureFlags = hkdf ? std::vector<std::string>{"GCMIV128", "DirIV", "EMENames"} : std::vector<std::string>{"HKDF", "GCMIV128", "DirIV", "EMENames"};
+        bool failed = false;
+        try { gocryptfs::unlockMasterkey(other, (const uint8_t*)"pw", 2); } catch (const Error&) { failed = true; }
+        CHECK(failed);
+    }
+    // FIDO2 vaults need a hardware token: refuse with a clear error rather than "wrong password"
+    c = gocryptfs::Config::parse(gcCfg("\"HKDF\",\"GCMIV128\",\"DirIV\",\"EMENames\",\"FIDO2\""));
+    bool unsupported = false;
+    try { gocryptfs::unlockMasterkey(c, (const uint8_t*)"pw", 2); } catch (const Error& e) { unsupported = e.code() == Err::Unsupported; }
+    CHECK(unsupported);
+    // a master key that is not 32 bytes is corruption (gocryptfs panics on it)
+    {
+        Bytes salt(32, 0x44);
+        gocryptfs::Config cc;
+        cc.version = 2; cc.scryptSalt = salt; cc.scryptN = 1024; cc.scryptR = 8; cc.scryptP = 1; cc.scryptKeyLen = 32;
+        cc.featureFlags = {"HKDF", "GCMIV128", "DirIV", "EMENames"};
+        cc.encryptedKey = gocryptfs::wrapMasterkey(Secret(Bytes(31, 1)), (const uint8_t*)"pw", 2, salt, 1024, 8, 1, 32, true);
+        bool bad = false;
+        try { gocryptfs::unlockMasterkey(cc, (const uint8_t*)"pw", 2); } catch (const Error& e) { bad = e.code() == Err::InvalidVault; }
+        CHECK(bad);
+    }
+}
+
+
 int main(int argc, char** argv) {
     std::string only = argc > 1 ? argv[1] : "";
     auto want = [&](const char* n) { return only.empty() || only == n; };
@@ -1086,6 +1956,17 @@ int main(int argc, char** argv) {
         testGocryptfs(GocryptfsCipher::XChaCha20Poly1305, false, "XChaCha20-Poly1305");
         testGocryptfs(GocryptfsCipher::AesSiv, false, "AES-SIV");
         testGocryptfs(GocryptfsCipher::Aes256Gcm, true, "plaintext names");
+        testGocryptfsConfigRules();
+        testGocryptfsNameRules();
+        testGocryptfsLegacyKeys();
+        testGocryptfsOfficialVectors();
+        testGocryptfsCreateOptions();
+        testGocryptfsPlaintextNamesRules();
+        testGocryptfsDirivHandling();
+        testGocryptfsFileHeaderRules();
+        testGocryptfsLongNameFiles();
+        testGocryptfsFailureRollback();
+        testGocryptfsUnusualNames();
     }
     if (want("cryptomator")) { testCryptomator(false); testCryptomator(true); testCryptomatorCompat(); testCryptomatorSymlinks(); testCryptomatorBackups(); testCryptomatorMigration(); }
     if (want("cryfs")) { testCryfs("xchacha20-poly1305", 32768); testCryfs("aes-256-gcm", 4096); testCryfs("aes-256-cfb", 8192); }

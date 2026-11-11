@@ -161,6 +161,17 @@ bool looksLikeCryfs(Storage& s);
 struct GocryptfsCreateOptions {
     GocryptfsCipher cipher = GocryptfsCipher::Aes256Gcm;
     bool plaintextNames = false;
+    // gocryptfs -deterministic-names: no gocryptfs.diriv files; every folder uses the all-zero IV, so one
+    // cleartext name always encrypts to the same ciphertext name. Use it when the ciphertext folder is
+    // synchronised between devices: two devices that create the same folder (or file) while offline then
+    // produce the *same* ciphertext entries instead of two conflicting gocryptfs.diriv files. The price is
+    // that equal names in different folders are equal on disk. Ignored with plaintextNames, like gocryptfs.
+    bool deterministicNames = false;
+    // gocryptfs -longnamemax: encrypted names longer than this are stored as gocryptfs.longname.* hashes.
+    // 0 (or 255) = the default; otherwise 62..255. Ignored with plaintextNames.
+    int longNameMax = 0;
+    // gocryptfs -scryptn: scrypt cost parameter logN, 10..28.
+    int scryptLogN = 16;
 };
 struct CryfsCreateOptions {
     std::string cipher = "xchacha20-poly1305";

@@ -21,7 +21,10 @@ class GocryptfsSession internal constructor(
 
     val nameCryptor: GocryptfsFileNameCryptor by lazy {
         val k = keyMaterial()
-        GocryptfsFileNameCryptor(k.bytes("nameKey"), k.string("longNameMax").toInt(), k.string("plaintextNames") == "1")
+        GocryptfsFileNameCryptor(
+            k.bytes("nameKey"), k.string("longNameMax").toInt(), k.string("plaintextNames") == "1",
+            raw64 = k.stringOrNull("raw64") != "0",
+        )
     }
 
     val contentCryptor: GocryptfsContentCryptor by lazy {

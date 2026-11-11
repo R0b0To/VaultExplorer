@@ -27,6 +27,7 @@ class CreateContainerState {
   final int hiddenCipherId;
   final int hiddenHashId;
   final String gocryptfsCipher;
+  final bool gocryptfsDeterministicNames;
   final String cryfsCipher;
   final int cryfsBlockSize;
   final String? folderVaultUri;
@@ -60,6 +61,7 @@ class CreateContainerState {
     this.hiddenCipherId = 0,
     this.hiddenHashId = 0,
     this.gocryptfsCipher = 'aes-256-gcm',
+    this.gocryptfsDeterministicNames = false,
     this.cryfsCipher = 'xchacha20-poly1305',
     this.cryfsBlockSize = 32 * 1024,
     this.folderVaultUri,
@@ -90,6 +92,7 @@ class CreateContainerState {
     int? hiddenCipherId,
     int? hiddenHashId,
     String? gocryptfsCipher,
+    bool? gocryptfsDeterministicNames,
     String? cryfsCipher,
     int? cryfsBlockSize,
     String? folderVaultUri,
@@ -121,6 +124,7 @@ class CreateContainerState {
     hiddenCipherId: hiddenCipherId ?? this.hiddenCipherId,
     hiddenHashId: hiddenHashId ?? this.hiddenHashId,
     gocryptfsCipher: gocryptfsCipher ?? this.gocryptfsCipher,
+    gocryptfsDeterministicNames: gocryptfsDeterministicNames ?? this.gocryptfsDeterministicNames,
     cryfsCipher: cryfsCipher ?? this.cryfsCipher,
     cryfsBlockSize: cryfsBlockSize ?? this.cryfsBlockSize,
     folderVaultUri: clearFolderVaultUri ? null : (folderVaultUri ?? this.folderVaultUri),
@@ -195,6 +199,9 @@ class CreateContainer extends _$CreateContainer {
   void setHiddenHashId(int hashId) => state = state._copy(hiddenHashId: hashId);
 
   void setGocryptfsCipher(String cipher) => state = state._copy(gocryptfsCipher: cipher);
+
+  void setGocryptfsDeterministicNames(bool deterministic) =>
+      state = state._copy(gocryptfsDeterministicNames: deterministic);
 
   void setCryfsCipher(String cipher) => state = state._copy(cryfsCipher: cipher);
 
@@ -311,6 +318,7 @@ class CreateContainer extends _$CreateContainer {
                   password,
                   cipher: state.gocryptfsCipher,
                   userEntropy: userEntropy,
+                  deterministicNames: state.gocryptfsDeterministicNames,
                 )
               : await lifecycle.createCryfsVault(
                   state.folderVaultUri!,

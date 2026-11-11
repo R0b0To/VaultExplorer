@@ -1,6 +1,7 @@
 // gocryptfs vault: directory tree resolution, the session (fv::Vault) and the
 // open / create / change-password entry points.
 #include <algorithm>
+#include <chrono>
 #include <map>
 #include <mutex>
 #include <shared_mutex>
@@ -26,11 +27,26 @@ struct Node {
 
 // Resolves cleartext paths to physical paths. Caches are guarded by mu_ (the
 // engine calls resolve() concurrently, without the namespace lock).
+//
+// Like gocryptfs' own dircache (fusefrontend/dircache.go), the folder and
+// diriv caches are dropped periodically (kCacheTtl) so a ciphertext tree that
+// another gocryptfs client or a sync tool changes under us is picked up, and
+// listing a folder always re-reads that folder's gocryptfs.diriv (gocryptfs does
+// the same on every opendir).
 class Tree {
 public:
-    Tree(Storage& st, const NameCryptor& nc, bool hasDirIv) : st_(st), nc_(nc), hasDirIv_(hasDirIv) {}
+    static constexpr std::chrono::seconds kCacheTtl{60};
+
+    Tree(Storage& st, const NameCryptor& nc, bool hasDirIv)
+        : st_(st), nc_(nc), hasDirIv_(hasDirIv), lastClear_(std::chrono::steady_clock::now()) {}
 
     bool hasDirIV() const { return hasDirIv_; }
+
+    // gocryptfs keeps its config in the root of the cipher directory and hides it from the plaintext view.
+    // (VaultExplorer's Check & Repair backup of it is hidden too.)
+    static bool isConfigFile(const std::string& vdir, const std::string& physName) {
+        return vdir.empty() && (physName == kConfigName || physName == kConfigBakName);
+    }
 
     std::string physicalFolderFor(const std::string& vdirIn) {
         std::string vdir = normalizePath(vdirIn);
@@ -49,18 +65,28 @@ public:
         return physical;
     }
 
-    Bytes dirivFor(const std::string& vdir, const std::string& physicalFolder) {
-        if (!hasDirIv_) return Bytes(16, 0);
-        {
+    // A valid gocryptfs.diriv is exactly 16 bytes and not all zero (nametransform.fdReadDirIV: an all-zero IV
+    // would silently turn the folder into a deterministic one).
+    static bool validDirIv(const Bytes& iv) {
+        if (iv.size() != kDirIvLen) return false;
+        for (uint8_t b : iv) if (b) return true;
+        return false;
+    }
+
+    // [fresh] bypasses the cache and re-reads the file.
+    Bytes dirivFor(const std::string& vdir, const std::string& physicalFolder, bool fresh = false) {
+        if (!hasDirIv_) return Bytes(kDirIvLen, 0);   // -deterministic-names: ReadDirIVAt returns the null IV
+        if (!fresh) {
             std::lock_guard<std::mutex> g(mu_);
+            expireIfDue();
             auto it = diriv_.find(vdir);
             if (it != diriv_.end()) return it->second;
         }
         Bytes iv;
         const std::string p = joinPath(physicalFolder, kDirIvName);
-        if (!st_.readWhole(p, iv) || iv.size() != 16) {
+        if (!st_.readWhole(p, iv) || !validDirIv(iv)) {
             st_.invalidate(physicalFolder);   // a stale listing may have hidden it
-            if (!st_.readWhole(p, iv) || iv.size() != 16)
+            if (!st_.readWhole(p, iv) || !validDirIv(iv))
                 throw Error(Err::Io, "Missing or invalid gocryptfs.diriv in " + (physicalFolder.empty() ? std::string("<root>") : physicalFolder));
         }
         std::lock_guard<std::mutex> g(mu_);
@@ -70,8 +96,8 @@ public:
     Bytes dirivFor(const std::string& vdir) { return dirivFor(vdir, physicalFolderFor(vdir)); }
 
     Bytes createDirIv(const std::string& vdir, const std::string& physicalFolder) {
-        Bytes iv(16);
-        crypto::randomFast(iv.data(), 16);
+        Bytes iv(kDirIvLen);
+        do { crypto::randomFast(iv.data(), iv.size()); } while (!validDirIv(iv));
         if (!st_.writeWhole(joinPath(physicalFolder, kDirIvName), iv.data(), iv.size()))
             throw Error(Err::Io, "Could not write gocryptfs.diriv");
         std::lock_guard<std::mutex> g(mu_);
@@ -79,34 +105,55 @@ public:
         return iv;
     }
 
+    // Turns one physical directory entry into a cleartext Node. False = the entry is not part of the cleartext
+    // view: gocryptfs' own files, long-name sidecars, and names that do not decrypt (gocryptfs skips those too).
+    bool decodeEntry(const std::string& vdir, const std::string& physical, const Bytes& iv, const DirEntry& e,
+                     const std::unordered_map<std::string, const DirEntry*>& byName, Node& out) {
+        const std::string& name = e.name;
+        if (isConfigFile(vdir, name)) return false;
+        // gocryptfs stores a symlink as a symlink (the target encrypted, or in clear with plaintext names).
+        // Android's storage model has none, so they stay in the ciphertext untouched and out of the view.
+        if (e.isSymlink) return false;
+        std::string clear;
+        if (nc_.plaintextNames()) {
+            // Plaintext names: the entry names are the names. None of gocryptfs' special files exist
+            // (no diriv, no long-name files), so a user file may be called anything.
+            if (!NameCryptor::isRepresentableName(name)) return false;
+            clear = name;
+        } else {
+            if (name == kDirIvName || NameCryptor::isLongNameFile(name)) return false;
+            std::string cipherName = name;
+            if (NameCryptor::isLongNameContent(name)) {
+                auto side = byName.find(name + kLongNameSuffix);
+                if (side == byName.end()) return false;
+                if (side->second->size > (int64_t)kLongNameFileMax) return false;
+                Bytes raw;
+                if (!st_.readWhole(joinPath(physical, side->second->name), raw)) return false;
+                if (raw.empty() || raw.size() > kLongNameFileMax) return false;   // ReadLongNameAt's limits
+                cipherName.assign(raw.begin(), raw.end());
+            }
+            try { clear = nc_.decryptName(cipherName, iv.data()); } catch (const Error&) { return false; }
+        }
+        out = Node();
+        out.isDir = e.isDir; out.name = clear; out.physName = name;
+        out.physPath = joinPath(physical, name);
+        out.size = e.size; out.mtimeMs = e.mtimeMs;
+        return true;
+    }
+
     std::vector<Node> list(const std::string& vdirIn) {
         std::string vdir = normalizePath(vdirIn);
         std::string physical = physicalFolderFor(vdir);
-        Bytes iv = dirivFor(vdir, physical);
+        Bytes iv = nc_.plaintextNames() ? Bytes() : dirivFor(vdir, physical, /*fresh*/ true);
         std::vector<DirEntry> ents;
         if (!st_.list(physical, ents)) throw Error(Err::NotFound, "Folder not found: " + vdir);
         std::unordered_map<std::string, const DirEntry*> byName;
-        for (auto& e : ents) byName[e.name] = &e;
+        if (!nc_.plaintextNames()) for (auto& e : ents) byName[e.name] = &e;
         std::vector<Node> out;
         for (auto& e : ents) {
-            const std::string& name = e.name;
-            if (name == kDirIvName || name == kConfigName || name == kConfigBakName) continue;
-            if (endsWith(name, kLongNameSuffix)) continue;
-            std::string cipherName = name;
-            if (startsWith(name, kLongNamePrefix)) {
-                auto side = byName.find(name + kLongNameSuffix);
-                if (side == byName.end()) continue;
-                Bytes raw;
-                if (!st_.readWhole(joinPath(physical, side->second->name), raw)) continue;
-                cipherName.assign(raw.begin(), raw.end());
-            }
-            std::string clear;
-            try { clear = nc_.decryptName(cipherName, iv.data()); } catch (const Error&) { continue; }
             Node n;
-            n.isDir = e.isDir; n.name = clear; n.physName = name;
-            n.physPath = joinPath(physical, name);
-            n.size = e.size; n.mtimeMs = e.mtimeMs;
-            if (n.isDir) cacheFolder(joinPath(vdir, clear), n.physPath);
+            if (!decodeEntry(vdir, physical, iv, e, byName, n)) continue;
+            if (n.isDir) cacheFolder(joinPath(vdir, n.name), n.physPath);
             out.push_back(std::move(n));
         }
         return out;
@@ -132,29 +179,51 @@ public:
             if (it->first == vdir || startsWith(it->first, prefix.c_str())) it = diriv_.erase(it); else ++it;
         }
     }
+    // Housekeeping after our own writes: only the storage listing of [vdir] is stale.
     void invalidate(const std::string& vdir) {
         st_.invalidate(physicalOfCachedFolder(normalizePath(vdir)));
+    }
+    // The user asked for a fresh look at [vdir] (pull to refresh): forget everything cached about the folder
+    // chain too -- a sync tool may have replaced a diriv or renamed a parent -- and re-read the listing.
+    void invalidateFolder(const std::string& vdirIn) {
+        std::string vdir = normalizePath(vdirIn);
+        std::string oldPhys = physicalOfCachedFolder(vdir);
+        {
+            std::lock_guard<std::mutex> g(mu_);
+            folders_.clear();
+            diriv_.clear();
+            lastClear_ = std::chrono::steady_clock::now();
+        }
+        st_.invalidate(oldPhys);
+        std::string fresh = physicalOfCachedFolder(vdir);
+        if (fresh != oldPhys) st_.invalidate(fresh);
     }
     void invalidateAll() {
         {
             std::lock_guard<std::mutex> g(mu_);
             folders_.clear();
             diriv_.clear();
+            lastClear_ = std::chrono::steady_clock::now();
         }
         st_.invalidateAll();
     }
 
     // Physical child lookup by cleartext name: direct stat of the expected
-    // encrypted name first, then (as a fallback for stale/odd listings) a scan.
+    // encrypted name first (what gocryptfs does), then -- as a fallback for
+    // stale/odd listings -- a scan.
     std::optional<Node> findChild(const std::string& vparent, const std::string& physParent,
                                   const std::string& name, bool wantDir) {
         (void)wantDir;
-        Bytes iv = dirivFor(vparent, physParent);
+        // With plaintext names a user file could be called "gocryptfs.conf"; gocryptfs refuses (EPERM) to
+        // touch the config through the plaintext view.
+        if (nc_.plaintextNames() && isConfigFile(vparent, name)) return std::nullopt;
+        Bytes iv = nc_.plaintextNames() ? Bytes() : dirivFor(vparent, physParent);
         std::string cipher;
         try { cipher = nc_.encryptName(name, iv.data()); } catch (const Error&) { return std::nullopt; }
         std::string physName = nc_.isOverLongNameLimit(cipher) ? nc_.hashLongName(cipher) : cipher;
         DirEntry de;
         if (st_.stat(joinPath(physParent, physName), de)) {
+            if (de.isSymlink) return std::nullopt;   // see decodeEntry
             Node n;
             n.isDir = de.isDir; n.name = name; n.physName = physName;
             n.physPath = joinPath(physParent, physName);
@@ -164,33 +233,28 @@ public:
         std::vector<DirEntry> ents;
         if (!st_.list(physParent, ents)) return std::nullopt;
         std::unordered_map<std::string, const DirEntry*> byName;
-        for (auto& e : ents) byName[e.name] = &e;
+        if (!nc_.plaintextNames()) for (auto& e : ents) byName[e.name] = &e;
         for (auto& e : ents) {
-            const std::string& pn = e.name;
-            if (pn == kDirIvName || pn == kConfigName || pn == kConfigBakName || endsWith(pn, kLongNameSuffix)) continue;
-            std::string cn = pn;
-            if (startsWith(pn, kLongNamePrefix)) {
-                auto side = byName.find(pn + kLongNameSuffix);
-                if (side == byName.end()) continue;
-                Bytes raw;
-                if (!st_.readWhole(joinPath(physParent, side->second->name), raw)) continue;
-                cn.assign(raw.begin(), raw.end());
-            }
-            std::string clear;
-            try { clear = nc_.decryptName(cn, iv.data()); } catch (const Error&) { continue; }
-            if (clear != name) continue;
             Node n;
-            n.isDir = e.isDir; n.name = clear; n.physName = pn;
-            n.physPath = joinPath(physParent, pn);
-            n.size = e.size; n.mtimeMs = e.mtimeMs;
+            if (!decodeEntry(vparent, physParent, iv, e, byName, n) || n.name != name) continue;
             return n;
         }
         return std::nullopt;
     }
 
 private:
+    // mu_ held. gocryptfs clears its dircache every 60 s; so do we.
+    void expireIfDue() {
+        auto now = std::chrono::steady_clock::now();
+        if (now - lastClear_ >= kCacheTtl) {
+            folders_.clear();
+            diriv_.clear();
+            lastClear_ = now;
+        }
+    }
     std::optional<std::string> cachedFolder(const std::string& v) {
         std::lock_guard<std::mutex> g(mu_);
+        expireIfDue();
         auto it = folders_.find(v);
         if (it == folders_.end()) return std::nullopt;
         return it->second;
@@ -209,6 +273,7 @@ private:
     const NameCryptor& nc_;
     const bool hasDirIv_;
     std::mutex mu_;
+    std::chrono::steady_clock::time_point lastClear_;
     std::unordered_map<std::string, std::string> folders_;
     std::unordered_map<std::string, Bytes> diriv_;
 };
@@ -217,11 +282,13 @@ class GocryptfsVault final : public Vault, private EngineHost {
 public:
     GocryptfsVault(std::shared_ptr<Storage> st, const Config& cfg, const Secret& masterkey, bool readOnly)
         : st_(std::move(st)), cfg_(cfg), readOnly_(readOnly),
-          nameKey_(cfg.plaintextNames ? Secret() : crypto::hkdfSha256(masterkey.data(), masterkey.size(), "EME filename encryption", 32)),
-          nc_(nameKey_, cfg.longNameMax, cfg.plaintextNames),
-          fmt_(crypto::hkdfSha256(masterkey.data(), masterkey.size(), cipherInfo(cfg.cipher).hkdfInfo, cipherInfo(cfg.cipher).contentKeyLen), cfg.cipher),
+          keys_(deriveSessionKeys(cfg, masterkey)),
+          nc_(keys_.nameKey, cfg.longNameMax, cfg.plaintextNames, cfg.raw64()),
+          fmt_(keys_.contentKey, cfg.cipher),
           tree_(*st_, nc_, cfg.hasDirIV() && !cfg.plaintextNames),
-          engine_(*st_, fmt_, *this, readOnly, batchWrite_) {}
+          engine_(*st_, fmt_, *this, readOnly, batchWrite_) {
+        keys_.contentKey.wipe();   // fmt_ holds the only copy it needs
+    }
 
     ~GocryptfsVault() override { close(); }
 
@@ -263,19 +330,38 @@ public:
             Bytes parentIv = tree_.dirivFor(parentPath, parentPhys);
             if (auto existing = tree_.resolve(normalized)) {
                 if (!existing->isDir) return false;
-                try { tree_.dirivFor(normalized, existing->physPath); }
-                catch (const Error&) { tree_.createDirIv(normalized, existing->physPath); }
+                // The folder is already there. Like gocryptfs we leave it alone: a missing diriv is reported (the
+                // call fails) rather than "repaired" with a fresh random one, because with a synchronised
+                // ciphertext folder the real diriv may simply not have arrived yet -- and inventing a second one
+                // would orphan every name written under the first.
+                tree_.dirivFor(normalized, existing->physPath);
                 return true;
             }
+            checkCreatable(parentPath, name);
             std::string cipher = nc_.encryptName(name, parentIv.data());
-            std::string physName = nc_.isOverLongNameLimit(cipher) ? nc_.hashLongName(cipher) : cipher;
+            const bool over = nc_.isOverLongNameLimit(cipher);
+            std::string physName = over ? nc_.hashLongName(cipher) : cipher;
             std::string phys = joinPath(parentPhys, physName);
-            if (!st_->mkdir(phys)) return false;
-            if (nc_.isOverLongNameLimit(cipher) && !st_->writeWhole(phys + kLongNameSuffix, (const uint8_t*)cipher.data(), cipher.size())) {
-                st_->remove(phys);
+            // Something we do not show may already sit there -- a symlink. gocryptfs says EEXIST; so do we (mkdir
+            // would otherwise "succeed" on a link to a folder and we would then write a diriv into its target).
+            if (st_->existsNoFollow(phys)) throw Error(Err::Exists, "\"" + name + "\" already exists");
+            // Same order as gocryptfs' Mkdir: long-name sidecar, directory, diriv -- and every step undone if a
+            // later one fails, so a failed mkdir never leaves a folder without its gocryptfs.diriv behind.
+            const std::string sidecar = phys + kLongNameSuffix;
+            if (over && !st_->writeWhole(sidecar, (const uint8_t*)cipher.data(), cipher.size())) return false;
+            if (!st_->mkdir(phys)) {
+                if (over) st_->remove(sidecar);
                 return false;
             }
-            if (tree_.hasDirIV()) tree_.createDirIv(normalized, phys);
+            if (tree_.hasDirIV()) {
+                try {
+                    tree_.createDirIv(normalized, phys);
+                } catch (...) {
+                    st_->remove(phys);
+                    if (over) st_->remove(sidecar);
+                    throw;
+                }
+            }
             tree_.invalidate(parentPath);
             return true;
         } catch (const std::exception& e) {
@@ -297,16 +383,30 @@ public:
             std::string oldParent = parentOf(oldN), newParent = parentOf(newN), newName = nameOf(newN);
             std::string oldParentPhys = tree_.physicalFolderFor(oldParent);
             std::string newParentPhys = oldParent == newParent ? oldParentPhys : tree_.physicalFolderFor(newParent);
-            Bytes iv = tree_.dirivFor(newParent, newParentPhys);
+            Bytes iv = nc_.plaintextNames() ? Bytes() : tree_.dirivFor(newParent, newParentPhys);
+            checkCreatable(newParent, newName);
             std::string cipher = nc_.encryptName(newName, iv.data());
             bool over = nc_.isOverLongNameLimit(cipher);
             std::string newPhysName = over ? nc_.hashLongName(cipher) : cipher;
             std::string newPhys = joinPath(newParentPhys, newPhysName);
-            bool wasLong = startsWith(node->physName, kLongNamePrefix) && !endsWith(node->physName, kLongNameSuffix);
+            bool wasLong = hasSidecar(node->physName);
             if (newPhys == node->physPath) return true;   // same name, nothing to do
-            if (!st_->rename(node->physPath, newPhys)) return false;
-            if (over && !st_->writeWhole(newPhys + kLongNameSuffix, (const uint8_t*)cipher.data(), cipher.size()))
-                throw Error(Err::Io, "Could not create .name file");
+            // gocryptfs' Rename order: new long-name sidecar first (an existing one is fine), then the rename, and
+            // the sidecar we wrote is removed again if the rename fails.
+            const std::string newSidecar = newPhys + kLongNameSuffix;
+            bool wroteSidecar = false;
+            if (over) {
+                DirEntry existing;
+                if (!st_->stat(newSidecar, existing)) {
+                    if (!st_->writeWhole(newSidecar, (const uint8_t*)cipher.data(), cipher.size()))
+                        throw Error(Err::Io, "Could not create .name file");
+                    wroteSidecar = true;
+                }
+            }
+            if (!st_->rename(node->physPath, newPhys)) {
+                if (wroteSidecar) st_->remove(newSidecar);
+                return false;
+            }
             if (wasLong) st_->remove(joinPath(oldParentPhys, node->physName + kLongNameSuffix));
             remapPending(oldN, newN, node->physPath, newPhys);
             tree_.invalidate(oldParent);
@@ -346,30 +446,14 @@ public:
                 try { parentPhys = tree_.physicalFolderFor(parentOf(n)); } catch (const Error&) { haveParent = false; }
                 st_->remove(node->physPath);
                 if (node->isDir) tree_.removeFolder(n);
-                if (haveParent && startsWith(node->physName, kLongNamePrefix))
+                if (haveParent && hasSidecar(node->physName))
                     st_->remove(joinPath(parentPhys, node->physName + kLongNameSuffix));
                 tree_.invalidate(parentOf(n));
                 return true;
             }
-            // Fallback: the listing may know a name the direct lookup missed.
-            std::string parentPath = parentOf(n);
-            std::string parentPhys;
-            try { parentPhys = tree_.physicalFolderFor(parentPath); } catch (const Error&) { return false; }
-            std::string target = nameOf(n);
-            Bytes iv;
-            bool haveIv = true;
-            try { iv = tree_.dirivFor(parentPath, parentPhys); } catch (const Error&) { haveIv = false; }
-            std::vector<DirEntry> ents;
-            if (!st_->list(parentPhys, ents)) return false;
-            for (auto& e : ents) {
-                bool match = e.name == target;
-                if (!match && haveIv) { try { match = nc_.decryptName(e.name, iv.data()) == target; } catch (const Error&) {} }
-                if (!match) continue;
-                st_->remove(joinPath(parentPhys, e.name));
-                if (startsWith(e.name, kLongNamePrefix)) st_->remove(joinPath(parentPhys, e.name + kLongNameSuffix));
-                tree_.invalidate(parentPath);
-                return true;
-            }
+            // Nothing to delete. (resolve() already falls back to scanning the listing, so there is no
+            // second lookup here -- an earlier one compared the *physical* name with the cleartext name,
+            // which for an encrypted vault could hit gocryptfs.conf or gocryptfs.diriv.)
             return false;
         } catch (const std::exception& e) {
             logMsg(LogLevel::Warn, TAG, std::string("deleteFile failed: ") + e.what());
@@ -458,7 +542,7 @@ public:
         try {
             Lifecycle::Op op(life_);
             if (path.empty()) { tree_.invalidateAll(); engine_.invalidateAll(); }
-            else { std::string n = normalizePath(path); tree_.invalidate(n); engine_.invalidateRead(n); }
+            else { std::string n = normalizePath(path); tree_.invalidateFolder(n); engine_.invalidateRead(n); }
         } catch (const std::exception&) {}
     }
 
@@ -471,6 +555,11 @@ public:
             {InfoItem::Kind::Int, "formatVersion", "2"},
             {InfoItem::Kind::Str, "cipher", cipher},
             {InfoItem::Kind::Bool, "plaintextNames", cfg_.plaintextNames ? "true" : "false"},
+            {InfoItem::Kind::Bool, "deterministicNames", cfg_.deterministicNames() ? "true" : "false"},
+            {InfoItem::Kind::Int, "longNameMax", std::to_string(cfg_.plaintextNames ? 0 : (cfg_.longNameMax > 0 ? cfg_.longNameMax : (int)kNameMax))},
+            {InfoItem::Kind::Bool, "raw64", cfg_.raw64() ? "true" : "false"},
+            {InfoItem::Kind::Bool, "hkdf", cfg_.hasHkdf() ? "true" : "false"},
+            {InfoItem::Kind::Str, "creator", cfg_.creator},
             {InfoItem::Kind::Bool, "readOnly", readOnly_ ? "true" : "false"},
         };
     }
@@ -478,12 +567,13 @@ public:
     KeyExport exportKeys() override {
         KeyExport k;
         k.format = VaultFormat::Gocryptfs;
-        k.fields.emplace_back("nameKey", nameKey_.bytes());
+        k.fields.emplace_back("nameKey", keys_.nameKey.bytes());
         k.fields.emplace_back("contentKey", fmt_.contentKey().bytes());
         k.strings.emplace_back("cipher", std::to_string((int)cfg_.cipher));
         k.strings.emplace_back("longNameMax", std::to_string(cfg_.longNameMax));
         k.strings.emplace_back("plaintextNames", cfg_.plaintextNames ? "1" : "0");
         k.strings.emplace_back("hasDirIV", tree_.hasDirIV() ? "1" : "0");
+        k.strings.emplace_back("raw64", cfg_.plaintextNames || cfg_.raw64() ? "1" : "0");
         return k;
     }
 
@@ -510,19 +600,26 @@ private:
         std::string n = normalizePath(vpath);
         std::string parentPath = parentOf(n), name = nameOf(n);
         std::string parentPhys = tree_.physicalFolderFor(parentPath);
-        Bytes iv = tree_.dirivFor(parentPath, parentPhys);
+        Bytes iv = nc_.plaintextNames() ? Bytes() : tree_.dirivFor(parentPath, parentPhys);
         std::string phys;
         if (auto existing = tree_.resolve(n)) {
             if (existing->isDir) throw Error(Err::Exists, "a folder with that name already exists");
             phys = existing->physPath;
         } else {
+            checkCreatable(parentPath, name);
             std::string cipher = nc_.encryptName(name, iv.data());
             bool over = nc_.isOverLongNameLimit(cipher);
             phys = joinPath(parentPhys, over ? nc_.hashLongName(cipher) : cipher);
-            if (!st_->createFile(phys)) throw Error(Err::Io, "Could not create file");
-            if (over && !st_->writeWhole(phys + kLongNameSuffix, (const uint8_t*)cipher.data(), cipher.size())) {
-                st_->remove(phys);
+            // A symlink (which we neither show nor follow) may sit at that name: refuse, as gocryptfs does (EEXIST),
+            // instead of creating the file *through* the link.
+            if (st_->existsNoFollow(phys)) throw Error(Err::Exists, "\"" + name + "\" already exists");
+            // gocryptfs' Create order: the long-name sidecar first, then the file; the sidecar goes again if the
+            // file cannot be created.
+            if (over && !st_->writeWhole(phys + kLongNameSuffix, (const uint8_t*)cipher.data(), cipher.size()))
                 throw Error(Err::Io, "Could not create .name file");
+            if (!st_->createFile(phys)) {
+                if (over) st_->remove(phys + kLongNameSuffix);
+                throw Error(Err::Io, "Could not create file");
             }
         }
         if (batchWrite_) { std::lock_guard<std::mutex> g(pmu_); pending_[n] = phys; }
@@ -542,11 +639,22 @@ private:
         { std::lock_guard<std::mutex> g(pmu_); pending_.erase(n); }
         st_->remove(physical);
         std::string base = nameOf(physical);
-        if (startsWith(base, kLongNamePrefix)) st_->remove(physical + kLongNameSuffix);
+        if (hasSidecar(base)) st_->remove(physical + kLongNameSuffix);
         tree_.invalidate(parentOf(n));
     }
 
     // ---- helpers ------------------------------------------------------------
+    // True if the physical entry [physName] has a gocryptfs.longname.*.name sidecar (never with plaintext names).
+    bool hasSidecar(const std::string& physName) const {
+        return !nc_.plaintextNames() && NameCryptor::isLongNameContent(physName);
+    }
+    // Refuses names gocryptfs cannot store: not a valid name, or -- with plaintext names -- the config file.
+    void checkCreatable(const std::string& parentPath, const std::string& name) const {
+        if (!NameCryptor::isValidName(name)) throw Error(Err::Unsupported, "Invalid file name");
+        if (nc_.plaintextNames() && Tree::isConfigFile(parentPath, name))
+            throw Error(Err::Unsupported, "\"" + name + "\" is reserved: gocryptfs keeps its configuration there");
+    }
+
     void publish(const std::string& vpath, const std::string& physical) {
         try { st_->publishWrite(physical, endsWith(vpath, ".tmp") && !batchWrite_); }
         catch (const std::exception& e) { logMsg(LogLevel::Warn, TAG, std::string("publish failed: ") + e.what()); }
@@ -587,7 +695,7 @@ private:
     std::shared_ptr<Storage> st_;
     Config cfg_;
     const bool readOnly_;
-    Secret nameKey_;
+    SessionKeys keys_;
     NameCryptor nc_;
     ContentFormat fmt_;
     Tree tree_;
@@ -683,30 +791,50 @@ OpenResult openGocryptfs(std::shared_ptr<Storage> s, const uint8_t* pw, size_t p
 PlainResult createGocryptfs(Storage& s, const uint8_t* pw, size_t pwLen, const GocryptfsCreateOptions& o) {
     using namespace gocryptfs;
     try {
+        // The same limits `gocryptfs -init` enforces.
+        if (o.longNameMax != 0 && (o.longNameMax < 62 || o.longNameMax > 255))
+            return plainFail(OpenStatus::InvalidVault, "longnamemax: value " + std::to_string(o.longNameMax) + " is outside allowed range 62 ... 255");
+        if (o.scryptLogN < 10 || o.scryptLogN > 28)
+            return plainFail(OpenStatus::InvalidVault, "scryptn: value " + std::to_string(o.scryptLogN) + " is outside allowed range 10 ... 28");
+
         std::vector<DirEntry> existing;
         if (s.list("", existing) && !existing.empty())
             return plainFail(OpenStatus::InvalidVault, "Selected folder is not empty.");
 
         Config cfg;
         cfg.version = 2;
+        cfg.creator = "VaultExplorer";
         cfg.plaintextNames = o.plaintextNames;
         cfg.cipher = o.cipher;
-        cfg.scryptN = 1u << 16; cfg.scryptR = 8; cfg.scryptP = 1; cfg.scryptKeyLen = 32;
-        cfg.featureFlags.push_back(o.cipher == GocryptfsCipher::XChaCha20Poly1305 ? "XChaCha20Poly1305" : "GCMIV128");
-        if (o.cipher == GocryptfsCipher::AesSiv) cfg.featureFlags.push_back("AESSIV");
+        cfg.scryptN = 1u << o.scryptLogN; cfg.scryptR = 8; cfg.scryptP = 1; cfg.scryptKeyLen = 32;
+        // The flag set and order configfile.Create() writes: HKDF, the content cipher, then either
+        // PlaintextNames or [DirIV] [LongNameMax] EMENames LongNames Raw64, and finally AESSIV.
         cfg.featureFlags.push_back("HKDF");
-        if (o.plaintextNames) cfg.featureFlags.push_back("PlaintextNames");
-        else for (const char* f : {"Raw64", "DirIV", "EMENames", "LongNames"}) cfg.featureFlags.push_back(f);
+        cfg.featureFlags.push_back(o.cipher == GocryptfsCipher::XChaCha20Poly1305 ? "XChaCha20Poly1305" : "GCMIV128");
+        const bool deterministic = !o.plaintextNames && o.deterministicNames;
+        if (o.plaintextNames) {
+            cfg.featureFlags.push_back("PlaintextNames");
+        } else {
+            if (!deterministic) cfg.featureFlags.push_back("DirIV");
+            if (o.longNameMax != 0 && o.longNameMax != 255) {   // 255 is the default and is not recorded
+                cfg.featureFlags.push_back("LongNameMax");
+                cfg.longNameMax = o.longNameMax;
+            }
+            for (const char* f : {"EMENames", "LongNames", "Raw64"}) cfg.featureFlags.push_back(f);
+        }
+        if (o.cipher == GocryptfsCipher::AesSiv) cfg.featureFlags.push_back("AESSIV");
 
         Secret masterkey(crypto::randomKeyBytes(32));
         cfg.scryptSalt = crypto::randomKeyBytes(32);
-        cfg.encryptedKey = wrapMasterkey(masterkey, pw, pwLen, cfg.scryptSalt, cfg.scryptN, cfg.scryptR, cfg.scryptP, cfg.scryptKeyLen);
+        cfg.encryptedKey = wrapMasterkey(masterkey, pw, pwLen, cfg.scryptSalt, cfg.scryptN, cfg.scryptR, cfg.scryptP, cfg.scryptKeyLen, /*hkdf*/ true);
 
         std::string json = cfg.toJson();
         if (!s.writeWhole(kConfigName, (const uint8_t*)json.data(), json.size()))
             return plainFail(OpenStatus::InvalidVault, "Could not write gocryptfs.conf");
-        if (!o.plaintextNames) {
-            Bytes iv = crypto::randomKeyBytes(16);
+        // The root needs its gocryptfs.diriv unless names are plaintext or deterministic.
+        if (!o.plaintextNames && !deterministic) {
+            Bytes iv(kDirIvLen);
+            do { crypto::randomKey(iv.data(), iv.size()); } while (!Tree::validDirIv(iv));
             if (!s.writeWhole(kDirIvName, iv.data(), iv.size()))
                 return plainFail(OpenStatus::InvalidVault, "Could not write gocryptfs.diriv");
         }
@@ -726,7 +854,8 @@ PlainResult changeGocryptfsPassword(Storage& s, const uint8_t* oldPw, size_t old
     try {
         Secret masterkey = unlockMasterkey(cfg, oldPw, oldLen);
         cfg.scryptSalt = crypto::randomKeyBytes(32);
-        cfg.encryptedKey = wrapMasterkey(masterkey, newPw, newLen, cfg.scryptSalt, cfg.scryptN, cfg.scryptR, cfg.scryptP, cfg.scryptKeyLen);
+        // Re-wrapped the way the vault's own flags say (a vault without HKDF has a 96-bit nonce and an unexpanded key).
+        cfg.encryptedKey = wrapMasterkey(masterkey, newPw, newLen, cfg.scryptSalt, cfg.scryptN, cfg.scryptR, cfg.scryptP, cfg.scryptKeyLen, cfg.hasHkdf());
         std::string json = cfg.toJson();
         if (!s.writeWholeAtomic(kConfigName, (const uint8_t*)json.data(), json.size()))
             return plainFail(OpenStatus::InvalidVault, "Could not write gocryptfs.conf");

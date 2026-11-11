@@ -118,9 +118,15 @@ bool PosixStorage::list(const std::string& dir, std::vector<DirEntry>& out) {
     while (struct dirent* e = ::readdir(d)) {
         if (!std::strcmp(e->d_name, ".") || !std::strcmp(e->d_name, "..")) continue;
         struct stat st;
-        if (::fstatat(::dirfd(d), e->d_name, &st, 0) != 0) continue;
+        bool link = false;
+        if (::fstatat(::dirfd(d), e->d_name, &st, AT_SYMLINK_NOFOLLOW) != 0) continue;
+        if (S_ISLNK(st.st_mode)) {   // describe the target, as before, but remember it is a link
+            link = true;
+            if (::fstatat(::dirfd(d), e->d_name, &st, 0) != 0) continue;   // dangling: not listed (unchanged)
+        }
         DirEntry de;
         de.name = e->d_name;
+        de.isSymlink = link;
         de.isDir = S_ISDIR(st.st_mode);
         de.size = de.isDir ? 0 : (int64_t)st.st_size;
         de.mtimeMs = mtimeMsOf(st);
@@ -136,6 +142,11 @@ bool PosixStorage::stat(const std::string& path, DirEntry& out) {
     struct stat st;
     if (::stat(p.c_str(), &st) != 0) return false;
     out.name = nameOf(path);
+    out.isSymlink = false;
+    if (!path.empty()) {   // (the root itself may legitimately be reached through a link, e.g. /sdcard)
+        struct stat ls;
+        out.isSymlink = ::lstat(p.c_str(), &ls) == 0 && S_ISLNK(ls.st_mode);
+    }
     out.isDir = S_ISDIR(st.st_mode);
     out.size = out.isDir ? 0 : (int64_t)st.st_size;
     out.mtimeMs = mtimeMsOf(st);
@@ -149,6 +160,14 @@ bool PosixStorage::mkdir(const std::string& path) {
     if (errno != EEXIST) return false;
     struct stat st;
     return ::stat(p.c_str(), &st) == 0 && S_ISDIR(st.st_mode);
+}
+
+bool PosixStorage::existsNoFollow(const std::string& path) {
+    std::string p;
+    if (!abs(path, p)) return false;
+    struct stat st;
+    // (the root itself may legitimately be reached through a link, e.g. /sdcard)
+    return (path.empty() ? ::stat(p.c_str(), &st) : ::lstat(p.c_str(), &st)) == 0;
 }
 
 bool PosixStorage::createFile(const std::string& path) {

@@ -526,7 +526,8 @@ FV_JNI(jlong, nativeOpen)(JNIEnv* env, jclass, jint format, jstring rawRoot, job
     return id;
 }
 
-// options: gocryptfs [cipher 0..2, plaintextNames 0/1]; cryfs [blocksize, 0]; cipherName for cryfs.
+// options: gocryptfs [cipher 0..2, plaintextNames 0/1, deterministicNames 0/1, longNameMax 0|62..255]
+// (the last two are optional, older callers pass two); cryfs [blocksize, 0]; cipherName for cryfs.
 // Returns fv::OpenStatus as int (0 Ok, 1 WrongPassword, 2 InvalidVault); out[0] = message.
 FV_JNI(jint, nativeCreate)(JNIEnv* env, jclass, jint format, jstring rawRoot, jobject storageCb, jbyteArray password,
                            jintArray options, jstring cipherName, jstring localState, jstring tempDir,
@@ -535,13 +536,18 @@ FV_JNI(jint, nativeCreate)(JNIEnv* env, jclass, jint format, jstring rawRoot, jo
     PwGuard pw{toBytes(env, password)};
     auto st = makeStorage(env, rawRoot, storageCb);
     if (!st) { setOut(env, out, 0, fromUtf8(env, "No storage available")); return 2; }
-    jint opt[2] = {0, 0};
-    if (options && env->GetArrayLength(options) >= 2) env->GetIntArrayRegion(options, 0, 2, opt);
+    jint opt[4] = {0, 0, 0, 0};
+    if (options) {
+        jsize n = env->GetArrayLength(options);
+        if (n >= 2) env->GetIntArrayRegion(options, 0, n < 4 ? n : 4, opt);
+    }
     fv::PlainResult r;
     if (format == 0) {
         fv::GocryptfsCreateOptions o;
         o.cipher = opt[0] == 1 ? fv::GocryptfsCipher::XChaCha20Poly1305 : opt[0] == 2 ? fv::GocryptfsCipher::AesSiv : fv::GocryptfsCipher::Aes256Gcm;
         o.plaintextNames = opt[1] != 0;
+        o.deterministicNames = opt[2] != 0;
+        o.longNameMax = opt[3];
         r = fv::createGocryptfs(*st, pw.b.data(), pw.b.size(), o);
     } else if (format == 1) {
         r = fv::createCryptomator(*st, pw.b.data(), pw.b.size());

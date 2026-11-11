@@ -18,7 +18,8 @@ class GocryptfsFileNameCryptorTest {
     fun `encryptName and decryptName round trip across pad16 block-size boundaries`() {
         val cryptor = newCryptor()
         val dirIv = randomDirIv()
-        for (name in listOf("", "a".repeat(15), "a".repeat(16), "a".repeat(17), "üñïçødé.txt")) {
+        // (An empty name is not a name: gocryptfs refuses to encrypt or decrypt one.)
+        for (name in listOf("a".repeat(15), "a".repeat(16), "a".repeat(17), "üñïçødé.txt")) {
             val encrypted = cryptor.encryptName(name, dirIv)
             assertEquals(name, cryptor.decryptName(encrypted, dirIv))
         }
@@ -96,5 +97,65 @@ class GocryptfsFileNameCryptorTest {
         assertEquals("secret.txt", cryptor.decryptName("secret.txt", dirIv))
         // isOverLongNameLimit should always be false when PlaintextNames is set.
         assertFalse(cryptor.isOverLongNameLimit("a".repeat(300)))
+    }
+
+    // ---- compatibility with the official gocryptfs (nametransform.IsValidName / base64.Strict) ----
+
+    @Test
+    fun `every name gocryptfs allows round trips, including ones this app used to hide`() {
+        val cryptor = newCryptor()
+        val dirIv = randomDirIv()
+        for (name in listOf("nl\nname", "cr\rname", "repl-\uFFFD-char", " lead trail ", "...", ".hidden", "a".repeat(255), "gocryptfs.conf")) {
+            assertEquals(name, cryptor.decryptName(cryptor.encryptName(name, dirIv), dirIv))
+        }
+    }
+
+    @Test
+    fun `names gocryptfs refuses are refused`() {
+        val cryptor = newCryptor()
+        val dirIv = randomDirIv()
+        for (name in listOf("", ".", "..", "a/b", "a\u0000b", "a".repeat(256))) {
+            assertThrows(GocryptfsNameException::class.java) { cryptor.encryptName(name, dirIv) }
+        }
+        assertFalse(GocryptfsFileNameCryptor.isValidName(ByteArray(0)))
+        assertTrue(GocryptfsFileNameCryptor.isValidName("\n".toByteArray()))
+    }
+
+    @Test
+    fun `a block of pure padding is not a name`() {
+        val key = ByteArray(32).also { random.nextBytes(it) }
+        val dirIv = randomDirIv()
+        val forged = GocryptfsEme(key).encrypt(dirIv, ByteArray(16) { 16 })
+        val name = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(forged)
+        assertThrows(GocryptfsNameException::class.java) { GocryptfsFileNameCryptor(key, 0).decryptName(name, dirIv) }
+    }
+
+    @Test
+    fun `decryptName insists on the canonical base64 spelling`() {
+        val cryptor = newCryptor()
+        val dirIv = randomDirIv()
+        val c = cryptor.encryptName("x", dirIv)   // 16 bytes -> 22 chars; the last carries 4 zero bits
+        val alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+        val i = alphabet.indexOf(c.last())
+        assertEquals(0, i and 15)
+        // the same bytes spelled with non-zero trailing bits: Java's decoder accepts it, gocryptfs does not
+        assertThrows(GocryptfsNameException::class.java) { cryptor.decryptName(c.dropLast(1) + alphabet[i or 1], dirIv) }
+        assertThrows(GocryptfsNameException::class.java) { cryptor.decryptName(c + "=", dirIv) }
+    }
+
+    @Test
+    fun `padded base64 vaults (no Raw64) pad names and long-name hashes`() {
+        val key = ByteArray(32).also { random.nextBytes(it) }
+        val dirIv = randomDirIv()
+        val padded = GocryptfsFileNameCryptor(key, 0, false, raw64 = false)
+        val raw = GocryptfsFileNameCryptor(key, 0, false, raw64 = true)
+        val c = padded.encryptName("x", dirIv)
+        assertEquals(24, c.length)
+        assertTrue(c.endsWith("=="))
+        assertEquals("x", padded.decryptName(c, dirIv))
+        assertThrows(GocryptfsNameException::class.java) { padded.decryptName(c.dropLast(2), dirIv) }   // padding is mandatory
+        assertThrows(GocryptfsNameException::class.java) { raw.decryptName(c, dirIv) }                   // and forbidden with Raw64
+        assertTrue(padded.hashLongName("abc").endsWith("="))
+        assertFalse(raw.hashLongName("abc").endsWith("="))
     }
 }

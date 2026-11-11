@@ -13740,4 +13740,12 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get emptyFolder => '이 폴더는 비어 있습니다';
+
+  @override
+  String get symbolicLinkTargetHelperRelative =>
+      '이 컨테이너 내부의 상대 경로를 사용하세요. 대상이 아직 없어도 됩니다. 링크를 이름 변경하거나 삭제해도 대상은 변경되지 않습니다.';
+
+  @override
+  String get symbolicLinkTargetOutsideVault =>
+      '대상은 이 컨테이너 내부에 머무르는 상대 경로여야 합니다.';
 }

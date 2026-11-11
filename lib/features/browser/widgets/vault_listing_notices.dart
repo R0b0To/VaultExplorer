@@ -14,14 +14,15 @@ import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 
-/// What a Cryptomator folder contains that a normal listing cannot show:
+/// What a mounted vault/container contains that a normal listing cannot show:
 ///
 ///  * **Hidden entries.** Things that exist on disk inside the vault but are not listed -- most often
 ///    sync-conflict copies such as "name (1)" made by a cloud sync app, or a node whose upload has not
 ///    finished. Without this notice they are simply invisible.
 ///
-/// Renders nothing at all unless there is something to report, and nothing for anything that is not a
-/// Cryptomator vault, so it is safe to place above every folder listing.
+/// Renders nothing unless there is something to report. Link queries are
+/// supported for Cryptomator and native LUKS/VeraCrypt filesystems; hidden
+/// entry counts remain Cryptomator-specific.
 class VaultListingNotices extends ConsumerStatefulWidget {
   const VaultListingNotices({
     super.key,
@@ -65,8 +66,7 @@ class _VaultListingNoticesState extends ConsumerState<VaultListingNotices> {
   }
 
   void _onVolumeContentChanged(VolumeContentChange change) {
-    // Only Cryptomator vaults have links or hidden entries; every other container stays untouched.
-    if (!widget.container.format.isCryptomator) return;
+    if (!mayHaveVaultSymbolicLinks(widget.container)) return;
     if (change.volId != widget.container.volId) return;
     unawaited(_load());
   }

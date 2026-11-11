@@ -57,8 +57,8 @@ abstract class BrowserDialogs {
     );
   }
 
-  /// Cryptomator vaults only (the caller gates it). Creates a symbolic link; its target text is stored as
-  /// written and resolved within the vault when the shortcut is accessed.
+  /// Creates a symbolic link in Cryptomator or a supported native filesystem.
+  /// The caller gates this action using [supportsVaultSymbolicLinks].
   static void showCreateSymlink(
     BuildContext context, {
     required MountedContainer container,
@@ -553,12 +553,21 @@ class _CreateSymlinkDialogState extends ConsumerState<_CreateSymlinkDialog>
     return _linkNames.any((n) => n.toLowerCase() == lower);
   }
 
-  SymlinkTargetIssue? get _targetIssue => validateSymlinkTarget(_targetCtrl.text);
+  bool get _requiresRelativeTarget =>
+      !widget.container.format.isCryptomator;
+
+  SymlinkTargetIssue? get _targetIssue => validateSymlinkTarget(
+    _targetCtrl.text,
+    parentPath: widget.currentDirPath,
+    requireRelativeInsideVault: _requiresRelativeTarget,
+  );
 
   /// An empty target just keeps Create disabled; only a real problem is worth an error line.
   String? _targetErrorText(BuildContext context) => switch (_targetIssue) {
     SymlinkTargetIssue.tooLong => context.l10n.symbolicLinkTargetTooLong,
     SymlinkTargetIssue.containsNul => context.l10n.symbolicLinkTargetInvalid,
+    SymlinkTargetIssue.outsideVault =>
+      context.l10n.symbolicLinkTargetOutsideVault,
     SymlinkTargetIssue.empty || null => null,
   };
 
@@ -667,7 +676,9 @@ class _CreateSymlinkDialogState extends ConsumerState<_CreateSymlinkDialog>
               controller: _targetCtrl,
               decoration: InputDecoration(
                 hintText: context.l10n.symbolicLinkTargetHint,
-                helperText: context.l10n.symbolicLinkTargetHelper,
+                helperText: _requiresRelativeTarget
+                    ? context.l10n.symbolicLinkTargetHelperRelative
+                    : context.l10n.symbolicLinkTargetHelper,
                 helperMaxLines: 4,
                 errorText: _targetErrorText(context),
                 errorMaxLines: 2,

@@ -4011,5 +4011,13 @@
   "symbolicLinkSelectThisFolder": "Sélectionner ce dossier",
   "symbolicLinkPickerLoadError": "Impossible de charger ce dossier",
   "shortcutBadge": "Raccourci",
-  "emptyFolder": "Ce dossier est vide"
+  "emptyFolder": "Ce dossier est vide",
+  "symbolicLinkTargetHelperRelative": "Utilisez un chemin relatif dans ce conteneur. La cible peut ne pas exister ; renommer ou supprimer le lien ne modifie pas la cible.",
+  "@symbolicLinkTargetHelperRelative": {
+    "description": "Helper text under the symbolic link target field for native LUKS/VeraCrypt filesystems"
+  },
+  "symbolicLinkTargetOutsideVault": "La cible doit être un chemin relatif qui reste dans ce conteneur.",
+  "@symbolicLinkTargetOutsideVault": {
+    "description": "Error under the symbolic link target field when a native target is absolute or escapes the container root"
+  }
 }

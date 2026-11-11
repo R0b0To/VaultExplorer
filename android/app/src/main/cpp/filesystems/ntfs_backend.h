@@ -21,6 +21,10 @@ ntfs_inode* createNtfsFile(ntfs_volume* volume, const std::string& path);
 
 bool listNtfsDirectory(int volumeId, const std::string& pathSuffix,
                        std::vector<std::string>& results);
+void ntfsListSymlinks(int volumeId, const std::string& pathSuffix,
+                      std::vector<std::string>& results);
+bool ntfsReadSymlink(int volumeId, const std::string& path, std::string& outTarget);
+bool ntfsCreateSymlink(int volumeId, const std::string& path, const std::string& target);
 
 int64_t ntfsGetFileSize(int volumeId, const std::string& path);
 bool ntfsReadFileChunk(int volumeId, const std::string& path, uint64_t offset, size_t length, std::vector<uint8_t>& outBuffer);

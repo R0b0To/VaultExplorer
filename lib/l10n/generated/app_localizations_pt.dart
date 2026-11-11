@@ -14532,4 +14532,12 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get emptyFolder => 'Esta pasta está vazia';
+
+  @override
+  String get symbolicLinkTargetHelperRelative =>
+      'Use um caminho relativo dentro deste contêiner. O destino pode não existir; renomear ou excluir o link não altera o destino.';
+
+  @override
+  String get symbolicLinkTargetOutsideVault =>
+      'O destino deve ser um caminho relativo que permaneça dentro deste contêiner.';
 }

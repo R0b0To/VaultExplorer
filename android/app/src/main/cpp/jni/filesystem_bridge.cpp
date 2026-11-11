@@ -16,6 +16,72 @@
 
 static constexpr size_t MAX_CHUNK_SIZE = 64 * 1024 * 1024;  // 64 MB per JNI read/write call
 
+// Symlink targets can contain supplementary Unicode characters. Use real
+// UTF-16/UTF-8 conversion here rather than JNI's modified UTF-8 helpers.
+static std::string jniStringToUtf8(JNIEnv* env, jstring value) {
+    if (!value) return {};
+    const jchar* chars = env->GetStringChars(value, nullptr);
+    if (!chars) return {};
+    const jsize length = env->GetStringLength(value);
+    std::string out;
+    out.reserve(static_cast<size_t>(length) * 3);
+    for (jsize i = 0; i < length; ++i) {
+        uint32_t cp = chars[i];
+        if (cp >= 0xD800 && cp <= 0xDBFF && i + 1 < length &&
+            chars[i + 1] >= 0xDC00 && chars[i + 1] <= 0xDFFF) {
+            cp = 0x10000 + ((cp - 0xD800) << 10) + (chars[++i] - 0xDC00);
+        } else if (cp >= 0xD800 && cp <= 0xDFFF) {
+            cp = 0xFFFD;
+        }
+        if (cp < 0x80) out.push_back(static_cast<char>(cp));
+        else if (cp < 0x800) {
+            out.push_back(static_cast<char>(0xC0 | (cp >> 6)));
+            out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+        } else if (cp < 0x10000) {
+            out.push_back(static_cast<char>(0xE0 | (cp >> 12)));
+            out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+            out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+        } else {
+            out.push_back(static_cast<char>(0xF0 | (cp >> 18)));
+            out.push_back(static_cast<char>(0x80 | ((cp >> 12) & 0x3F)));
+            out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+            out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+        }
+    }
+    env->ReleaseStringChars(value, chars);
+    return out;
+}
+
+static jstring jniUtf8ToString(JNIEnv* env, const std::string& value) {
+    std::vector<jchar> chars;
+    chars.reserve(value.size());
+    size_t i = 0;
+    while (i < value.size()) {
+        const uint8_t c = static_cast<uint8_t>(value[i]);
+        uint32_t cp = 0xFFFD;
+        size_t count = 1;
+        if (c < 0x80) cp = c;
+        else if ((c & 0xE0) == 0xC0 && i + 1 < value.size()) {
+            cp = ((c & 0x1F) << 6) | (static_cast<uint8_t>(value[i + 1]) & 0x3F); count = 2;
+        } else if ((c & 0xF0) == 0xE0 && i + 2 < value.size()) {
+            cp = ((c & 0x0F) << 12) | ((static_cast<uint8_t>(value[i + 1]) & 0x3F) << 6) |
+                 (static_cast<uint8_t>(value[i + 2]) & 0x3F); count = 3;
+        } else if ((c & 0xF8) == 0xF0 && i + 3 < value.size()) {
+            cp = ((c & 0x07) << 18) | ((static_cast<uint8_t>(value[i + 1]) & 0x3F) << 12) |
+                 ((static_cast<uint8_t>(value[i + 2]) & 0x3F) << 6) |
+                 (static_cast<uint8_t>(value[i + 3]) & 0x3F); count = 4;
+        }
+        i += count;
+        if (cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF)) cp = 0xFFFD;
+        if (cp >= 0x10000) {
+            cp -= 0x10000;
+            chars.push_back(static_cast<jchar>(0xD800 + (cp >> 10)));
+            chars.push_back(static_cast<jchar>(0xDC00 + (cp & 0x3FF)));
+        } else chars.push_back(static_cast<jchar>(cp));
+    }
+    return env->NewString(chars.data(), static_cast<jsize>(chars.size()));
+}
+
 extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_listDirectory(
         JNIEnv* env, jobject, jstring dirPath, jint volId) {
@@ -50,6 +116,67 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_listDirectory(
     return result;
 
     JNI_CATCH_RETURN(nullptr)
+}
+
+extern "C" JNIEXPORT jobjectArray JNICALL
+Java_com_aeidolon_vaultexplorer_NativeEngine_listSymlinks(
+        JNIEnv* env, jobject, jstring dirPath, jint volId) {
+    JNI_TRY
+    if (!requireActiveSession(volId, "listSymlinks")) {
+        throwNotUnlocked(env, volId, "listSymlinks"); return nullptr;
+    }
+    const std::string path = jniStringToUtf8(env, dirPath);
+    jobjectArray result = nullptr;
+    {
+        std::unique_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
+        if (ensureMounted(volId)) {
+            std::vector<std::string> entries;
+            fsListSymlinks(volId, path, entries);
+            jclass stringClass = env->FindClass("java/lang/String");
+            result = env->NewObjectArray(static_cast<jsize>(entries.size()), stringClass, nullptr);
+            for (size_t i = 0; result && i < entries.size(); ++i) {
+                jstring entry = jniUtf8ToString(env, entries[i]);
+                env->SetObjectArrayElement(result, static_cast<jsize>(i), entry);
+                env->DeleteLocalRef(entry);
+            }
+        }
+    }
+    return result;
+    JNI_CATCH_RETURN(nullptr)
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_aeidolon_vaultexplorer_NativeEngine_readSymlink(
+        JNIEnv* env, jobject, jstring pathValue, jint volId) {
+    JNI_TRY
+    if (!requireActiveSession(volId, "readSymlink")) {
+        throwNotUnlocked(env, volId, "readSymlink"); return nullptr;
+    }
+    const std::string path = jniStringToUtf8(env, pathValue);
+    std::string target;
+    {
+        std::unique_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
+        if (!ensureMounted(volId) || !fsReadSymlink(volId, path, target)) return nullptr;
+    }
+    return jniUtf8ToString(env, target);
+    JNI_CATCH_RETURN(nullptr)
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_aeidolon_vaultexplorer_NativeEngine_createSymlink(
+        JNIEnv* env, jobject, jstring pathValue, jstring targetValue, jint volId) {
+    JNI_TRY
+    if (!requireActiveSession(volId, "createSymlink")) {
+        throwNotUnlocked(env, volId, "createSymlink"); return JNI_FALSE;
+    }
+    if (isVolumeReadOnly(volId)) {
+        throwReadOnly(env, volId, "createSymlink"); return JNI_FALSE;
+    }
+    const std::string path = jniStringToUtf8(env, pathValue);
+    const std::string target = jniStringToUtf8(env, targetValue);
+    std::unique_lock<std::shared_mutex> fsLock(volumes[volId].mutex);
+    return ensureMounted(volId) && fsCreateSymlink(volId, path, target) ? JNI_TRUE : JNI_FALSE;
+    JNI_CATCH_RETURN(JNI_FALSE)
 }
 
 extern "C" JNIEXPORT jlong JNICALL

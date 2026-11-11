@@ -122,7 +122,8 @@ class FileOperationHandlers(
         }
     }
 
-    // Symlinks and the "hidden entries" count (Cryptomator). Read-only queries, same executor as listing.
+    // Symlinks (Cryptomator and ext/NTFS disk images) plus the hidden-entry
+    // count (Cryptomator only). Read-only queries, same executor as listing.
     fun handleListVaultSymlinks(call: MethodCall, result: MethodChannel.Result) {
         val dirPath = call.argument<String>("dirPath") ?: ""
         nativeOps.runNativeOp(call.argument<String>("filePath"), result, executor = queryExecutor) { volId ->

@@ -770,6 +770,12 @@ class VaultDashboardController extends _$VaultDashboardController {
       return;
     }
 
+    // Native volume ids are recycled. Clear any prior filesystem answer
+    // before this container is exposed to the browser, otherwise a newly
+    // mounted exFAT volume can briefly inherit the previous ext/NTFS type
+    // and incorrectly show the symbolic-link action.
+    VolumeFilesystemRegistry.forget(container.volId);
+
     final newMounted = List<MountedContainer>.from(state.mounted)
       ..add(container);
     final newRecords = Map<String, ContainerRecord>.from(state.records);
@@ -952,11 +958,18 @@ class VaultDashboardController extends _$VaultDashboardController {
           .read(vaultFileIoApiProvider)
           .getVaultInfo(container.uri);
       if (!ref.mounted) return;
-      if (!state.mounted.any((c) => c.volId == container.volId)) return;
+      if (!state.mounted.any(
+        (c) => c.volId == container.volId && c.uri == container.uri,
+      )) return;
       final label = info?['fileSystem'];
       final FilesystemType? type =
           filesystemTypeFromLabel(label is String ? label : null);
       VolumeFilesystemRegistry.record(container.volId, type);
+      // The registry is intentionally process-wide, but it is not itself a
+      // Riverpod provider. Publish a state revision so menus that depend on
+      // supportsVaultSymbolicLinks rebuild after the asynchronous filesystem
+      // probe completes (and so exFAT/FAT volumes stay hidden).
+      state = state._copy(mounted: List.unmodifiable(state.mounted));
     } catch (e) {
       VeLog.w(
         _kLogTag,

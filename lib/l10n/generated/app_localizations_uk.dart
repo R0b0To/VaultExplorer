@@ -14635,4 +14635,12 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get emptyFolder => 'Ця папка порожня';
+
+  @override
+  String get symbolicLinkTargetHelperRelative =>
+      'Використовуйте відносний шлях у межах цього контейнера. Ціль може ще не існувати; перейменування або видалення посилання не змінює ціль.';
+
+  @override
+  String get symbolicLinkTargetOutsideVault =>
+      'Ціль має бути відносним шляхом у межах цього контейнера.';
 }

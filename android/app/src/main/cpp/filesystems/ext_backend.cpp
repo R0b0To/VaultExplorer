@@ -14,7 +14,11 @@
 #include "diskio.h"
 #include "volume_state.h"
 #include "filesystems/stream_handles.h"
-namespace { constexpr size_t kIoBufferSize = 2097152; }
+namespace {
+constexpr size_t kIoBufferSize = 2097152;
+bool extIsDirectory(ext2_filsys fs, ext2_ino_t ino);
+bool extEntryExists(ext2_filsys fs, ext2_ino_t dir, const std::string& name);
+}
 #define EXT_LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
 #define EXT_LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "VaultExplorer_C++", __VA_ARGS__)
 bool extResolvePath(ext2_filsys fs, const std::string& path, ext2_ino_t* inode) {
@@ -23,6 +27,42 @@ bool extResolvePath(ext2_filsys fs, const std::string& path, ext2_ino_t* inode) 
     if (relative.empty()) { *inode = EXT2_ROOT_INO; return true; }
     return ext2fs_namei_follow(fs, EXT2_ROOT_INO, EXT2_ROOT_INO, relative.c_str(), inode) == 0;
 }
+
+// Resolve the parent normally but look up the final component without following
+// it. Rename/delete must act on the link inode itself, not on its target.
+static bool extResolvePathNoFollowFinal(ext2_filsys fs, const std::string& path,
+                                        ext2_ino_t* inode) {
+    std::string relative = path;
+    while (!relative.empty() && relative.front() == '/') relative.erase(relative.begin());
+    if (relative.empty()) { *inode = EXT2_ROOT_INO; return true; }
+    const size_t slash = relative.find_last_of('/');
+    const std::string parentPath = slash == std::string::npos ? "" : relative.substr(0, slash);
+    const std::string name = slash == std::string::npos ? relative : relative.substr(slash + 1);
+    ext2_ino_t parent = 0;
+    if (name.empty() || !extResolvePath(fs, parentPath, &parent)) return false;
+    return ext2fs_lookup(fs, parent, name.c_str(), static_cast<int>(name.size()),
+                         nullptr, inode) == 0;
+}
+
+static bool extTargetStaysInside(const std::string& parentPath, const std::string& target) {
+    if (target.empty() || target.front() == '/' || target.find('\0') != std::string::npos) return false;
+    std::vector<std::string> stack;
+    auto consume = [&stack](const std::string& value) {
+        size_t start = 0;
+        while (start < value.size()) {
+            while (start < value.size() && value[start] == '/') ++start;
+            if (start >= value.size()) break;
+            size_t end = value.find('/', start);
+            if (end == std::string::npos) end = value.size();
+            const std::string part = value.substr(start, end - start);
+            if (part == "..") { if (stack.empty()) return false; stack.pop_back(); }
+            else if (!part.empty() && part != ".") stack.push_back(part);
+            start = end;
+        }
+        return true;
+    };
+    return consume(parentPath) && consume(target);
+}
 int extDirectoryEntry(ext2_ino_t, int, struct ext2_dir_entry* entry, int, int, char*, void* data) {
     auto* context = static_cast<ExtDirContext*>(data);
     if (!entry->inode || context->results->size() >= EXT_DIRECTORY_MAX_ENTRIES) return 0;
@@ -30,6 +70,10 @@ int extDirectoryEntry(ext2_ino_t, int, struct ext2_dir_entry* entry, int, int, c
     if (name == "." || name == "..") return 0;
     struct ext2_inode inode{};
     if (ext2fs_read_inode(context->fs, entry->inode, &inode) != 0) return 0;
+    // Symlinks are fetched through fsListSymlinks(), not the ordinary file
+    // listing; otherwise generic scanners could treat their target bytes as
+    // regular file content.
+    if (LINUX_S_ISLNK(inode.i_mode)) return 0;
     const bool isDir = LINUX_S_ISDIR(inode.i_mode);
     const uint64_t size = (static_cast<uint64_t>(inode.i_size_high) << 32) | inode.i_size;
     context->results->push_back(encodeDirEntryWire(name, isDir, size, inode.i_mtime));
@@ -784,6 +828,96 @@ void extListDirectory(int volumeId, const std::string& pathSuffix, std::vector<s
         if (results.size() >= EXT_DIRECTORY_MAX_ENTRIES) results.push_back("System:TRUNCATED");
     }
 }
+
+namespace {
+struct ExtSymlinkListContext {
+    ext2_filsys fs;
+    std::string parentPath;
+    std::vector<std::string>* results;
+};
+int extSymlinkListEntry(ext2_ino_t, int, struct ext2_dir_entry* entry, int, int, char*, void* data) {
+    auto* context = static_cast<ExtSymlinkListContext*>(data);
+    if (!entry->inode || context->results->size() >= EXT_DIRECTORY_MAX_ENTRIES) return 0;
+    const std::string name(entry->name, ext2fs_dirent_name_len(entry));
+    if (name == "." || name == "..") return 0;
+    struct ext2_inode inode{};
+    if (ext2fs_read_inode(context->fs, entry->inode, &inode) != 0 ||
+        !LINUX_S_ISLNK(inode.i_mode)) return 0;
+    const uint64_t size = (static_cast<uint64_t>(inode.i_size_high) << 32) | inode.i_size;
+    const std::string linkPath = context->parentPath.empty()
+        ? name : context->parentPath + "/" + name;
+    ext2_ino_t targetInode = 0;
+    const bool targetIsDirectory = extResolvePath(context->fs, linkPath, &targetInode) &&
+                                   extIsDirectory(context->fs, targetInode);
+    context->results->push_back(
+        encodeSymlinkEntryWire(name, size, inode.i_mtime, targetIsDirectory));
+    return 0;
+}
+}
+
+void extListSymlinks(int volumeId, const std::string& pathSuffix, std::vector<std::string>& results) {
+    if (volumeId < 0 || volumeId >= FF_VOLUMES) return;
+    auto& v = volumes[volumeId];
+    ext2_ino_t dirInode = 0;
+    if (!v.extFs || !extResolvePath(v.extFs, pathSuffix, &dirInode)) return;
+    ExtSymlinkListContext context{v.extFs, pathSuffix, &results};
+    ext2fs_dir_iterate2(v.extFs, dirInode, 0, nullptr, extSymlinkListEntry, &context);
+    if (results.size() >= EXT_DIRECTORY_MAX_ENTRIES) results.push_back("System:TRUNCATED");
+}
+
+bool extReadSymlink(int volumeId, const std::string& path, std::string& outTarget) {
+    if (volumeId < 0 || volumeId >= FF_VOLUMES) return false;
+    auto& v = volumes[volumeId];
+    ext2_ino_t ino = 0;
+    struct ext2_inode inode{};
+    if (!v.extFs || !extResolvePathNoFollowFinal(v.extFs, path, &ino) ||
+        ext2fs_read_inode(v.extFs, ino, &inode) != 0 || !LINUX_S_ISLNK(inode.i_mode)) return false;
+    const uint64_t size = (static_cast<uint64_t>(inode.i_size_high) << 32) | inode.i_size;
+    if (size == 0 || size > 32767) return false;
+    outTarget.assign(static_cast<size_t>(size), '\0');
+    if (ext2fs_is_fast_symlink(&inode)) {
+        std::memcpy(outTarget.data(), inode.i_block, static_cast<size_t>(size));
+        if (outTarget.find('\0') != std::string::npos) { outTarget.clear(); return false; }
+        return true;
+    }
+    ext2_file_t file = nullptr;
+    if (ext2fs_file_open(v.extFs, ino, 0, &file) != 0 || !file) {
+        outTarget.clear();
+        return false;
+    }
+    unsigned int got = 0;
+    const errcode_t err = ext2fs_file_read(file, outTarget.data(), static_cast<unsigned int>(size), &got);
+    ext2fs_file_close(file);
+    if (err != 0 || got != size || outTarget.find('\0') != std::string::npos) {
+        outTarget.clear();
+        return false;
+    }
+    return true;
+}
+
+bool extCreateSymlink(int volumeId, const std::string& path, const std::string& target) {
+    if (volumeId < 0 || volumeId >= FF_VOLUMES || target.empty() || target.size() > 32767 ||
+        target.find('\0') != std::string::npos) return false;
+    auto& v = volumes[volumeId];
+    if (!v.extFs || v.readOnly) return false;
+    const size_t slash = path.find_last_of('/');
+    const std::string parentPath = slash == std::string::npos ? "" : path.substr(0, slash);
+    const std::string name = slash == std::string::npos ? path : path.substr(slash + 1);
+    ext2_ino_t parent = 0;
+    if (name.empty() || name.size() > EXT2_NAME_LEN || !extTargetStaysInside(parentPath, target) ||
+        !extResolvePath(v.extFs, parentPath, &parent) || !extIsDirectory(v.extFs, parent) ||
+        extEntryExists(v.extFs, parent, name)) return false;
+    errcode_t err = ext2fs_symlink(v.extFs, parent, 0, name.c_str(), target.c_str());
+    if (err == EXT2_ET_DIR_NO_SPACE && ext2fs_expand_dir(v.extFs, parent) == 0) {
+        err = ext2fs_symlink(v.extFs, parent, 0, name.c_str(), target.c_str());
+    }
+    if (err != 0) {
+        EXT_LOGE("extCreateSymlink: ext2fs_symlink failed for '%s' err=%lu (%s)",
+                 path.c_str(), (unsigned long)err, error_message(err));
+        return false;
+    }
+    return ext2fs_flush(v.extFs) == 0;
+}
 int64_t extGetFileSize(int volumeId, const std::string& path) {
     auto& v = volumes[volumeId];
     ext2_ino_t ino = 0;
@@ -968,7 +1102,7 @@ bool extDeleteFile(int volumeId, const std::string& path) {
     const std::string name = slash == std::string::npos ? path : path.substr(slash + 1);
     ext2_ino_t parent = 0, ino = 0;
     if (!name.empty() && extResolvePath(v.extFs, parentPath, &parent) &&
-        extResolvePath(v.extFs, path, &ino)) {
+        extResolvePathNoFollowFinal(v.extFs, path, &ino)) {
         struct ext2_inode inode{};
         const bool isDir = ext2fs_read_inode(v.extFs, ino, &inode) == 0 &&
                             LINUX_S_ISDIR(inode.i_mode);
@@ -1033,6 +1167,7 @@ bool extIsSelfOrDescendant(ext2_filsys fs, ext2_ino_t candidate, ext2_ino_t ance
 }
 }  // namespace
 bool extRenameFile(int volumeId, const std::string& oldPath, const std::string& newPath) {
+    if (oldPath == newPath) return true;
     auto& v = volumes[volumeId];
     bool success = false;
     ensureExtBitmapsLoaded(volumeId);
@@ -1046,15 +1181,13 @@ bool extRenameFile(int volumeId, const std::string& oldPath, const std::string& 
     if (!oldName.empty() && !newName.empty() && newName.size() <= EXT2_NAME_LEN &&
         extResolvePath(v.extFs, oldParentPath, &oldParentIno) &&
         extResolvePath(v.extFs, newParentPath, &newParentIno) &&
-        extResolvePath(v.extFs, oldPath, &srcIno)) {
+        extResolvePathNoFollowFinal(v.extFs, oldPath, &srcIno)) {
         struct ext2_inode srcInode{};
-        const bool isDir = ext2fs_read_inode(v.extFs, srcIno, &srcInode) == 0 &&
-                            LINUX_S_ISDIR(srcInode.i_mode);
-        const int fileType = isDir ? EXT2_FT_DIR : EXT2_FT_REG_FILE;
-        ext2_ino_t destIno = 0;
-        if (extResolvePath(v.extFs, newPath, &destIno) && destIno != srcIno) {
-            return false;
-        }
+        if (ext2fs_read_inode(v.extFs, srcIno, &srcInode) != 0) return false;
+        const bool isDir = LINUX_S_ISDIR(srcInode.i_mode);
+        const bool isSymlink = LINUX_S_ISLNK(srcInode.i_mode);
+        const int fileType = isDir ? EXT2_FT_DIR : (isSymlink ? EXT2_FT_SYMLINK : EXT2_FT_REG_FILE);
+        if (extEntryExists(v.extFs, newParentIno, newName)) return false;
         if (isDir && extIsSelfOrDescendant(v.extFs, newParentIno, srcIno)) {
             // Moving a directory into itself would link it under its own
             // subtree and then unlink it from the root, detaching the whole

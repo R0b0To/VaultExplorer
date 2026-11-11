@@ -24232,6 +24232,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This folder is empty'**
   String get emptyFolder;
+
+  /// Helper text under the symbolic link target field for native LUKS/VeraCrypt filesystems
+  ///
+  /// In en, this message translates to:
+  /// **'Use a relative path inside this container. The target may be missing; renaming or deleting the link does not change the target.'**
+  String get symbolicLinkTargetHelperRelative;
+
+  /// Error under the symbolic link target field when a native target is absolute or escapes the container root
+  ///
+  /// In en, this message translates to:
+  /// **'Target must be a relative path that stays inside this container.'**
+  String get symbolicLinkTargetOutsideVault;
 }
 
 class _AppLocalizationsDelegate

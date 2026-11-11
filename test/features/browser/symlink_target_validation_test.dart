@@ -11,6 +11,33 @@ void main() {
       expect(validateSymlinkTarget('.'), isNull);
     });
 
+    test('native container targets must be relative and stay inside the container', () {
+      expect(
+        validateSymlinkTarget('/absolute/path', requireRelativeInsideVault: true),
+        SymlinkTargetIssue.outsideVault,
+      );
+      expect(
+        validateSymlinkTarget('C:\\Users\\me', requireRelativeInsideVault: true),
+        SymlinkTargetIssue.outsideVault,
+      );
+      expect(
+        validateSymlinkTarget('../outside', requireRelativeInsideVault: true),
+        SymlinkTargetIssue.outsideVault,
+      );
+      expect(
+        validateSymlinkTarget('../../outside', parentPath: 'folder', requireRelativeInsideVault: true),
+        SymlinkTargetIssue.outsideVault,
+      );
+      expect(
+        validateSymlinkTarget('../../target', parentPath: 'folder/nested', requireRelativeInsideVault: true),
+        isNull,
+      );
+      expect(
+        validateSymlinkTarget('../target', parentPath: 'folder', requireRelativeInsideVault: true),
+        isNull,
+      );
+    });
+
     test('rejects an empty target', () {
       expect(validateSymlinkTarget(''), SymlinkTargetIssue.empty);
     });

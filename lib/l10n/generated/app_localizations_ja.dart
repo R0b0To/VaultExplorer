@@ -13740,4 +13740,12 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get emptyFolder => 'このフォルダーは空です';
+
+  @override
+  String get symbolicLinkTargetHelperRelative =>
+      'このコンテナー内の相対パスを指定してください。リンク先が存在しなくてもかまいません。リンクの名前を変更または削除してもリンク先は変わりません。';
+
+  @override
+  String get symbolicLinkTargetOutsideVault =>
+      'リンク先はこのコンテナー内に収まる相対パスである必要があります。';
 }

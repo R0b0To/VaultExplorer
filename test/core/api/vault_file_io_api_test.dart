@@ -37,6 +37,7 @@ void main() {
         .setMockMethodCallHandler(channel, (call) async {
           calls.add(call);
           if (nextError != null) throw nextError!;
+          if (call.method == 'readVaultSymlink') return null;
           return nextResult;
         });
   });
@@ -156,6 +157,44 @@ void main() {
     });
   });
 
+  group('symbolic-link path resolution', () {
+    test('follows chained relative links inside the container', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            calls.add(call);
+            if (call.method != 'readVaultSymlink') return null;
+            return switch (call.arguments['path']) {
+              'links/shortcut' => '../nested/next',
+              'nested/next' => '../media/photo.jpg',
+              _ => null,
+            };
+          });
+
+      final resolved = await api.resolveVaultSymlinkTargetPath(
+        container,
+        'links/shortcut',
+      );
+
+      expect(resolved, 'media/photo.jpg');
+    });
+
+    test('refuses links that escape the container root', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            calls.add(call);
+            if (call.method == 'readVaultSymlink') return '../outside.txt';
+            return null;
+          });
+
+      final resolved = await api.resolveVaultSymlinkTargetPath(
+        container,
+        'shortcut',
+      );
+
+      expect(resolved, isNull);
+    });
+  });
+
   group('whole-file writes', () {
     test('createEmptyFile commits through the injected channel', () async {
       nextResult = true;
@@ -186,16 +225,66 @@ void main() {
 
         expect(ok, isTrue);
         expect(calls.map((call) => call.method), [
+          'readVaultSymlink',
           'deleteFile',
           'writeFileChunk',
           'finishWrite',
           'deleteFile',
           'renameFile',
         ]);
-        expect(calls[2].arguments, {
-          'volId': container.volId,
-          'path': 'notes.txt.tmp',
-        });
+        expect(calls[2].arguments['fileName'], 'notes.txt.tmp');
+        expect(calls[2].arguments['offset'], 0);
+      },
+    );
+
+    test('does not replace a link when its no-follow probe fails', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            calls.add(call);
+            throw PlatformException(code: 'IO_ERROR');
+          });
+
+      final ok = await api.writeWholeFile(
+        container,
+        'shortcut.txt',
+        Uint8List(0),
+      );
+
+      expect(ok, isFalse);
+      expect(calls.map((call) => call.method), ['readVaultSymlink']);
+    });
+
+    test(
+      'editing through a symlink preserves the link and replaces its target',
+      () async {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (call) async {
+              calls.add(call);
+              if (call.method == 'readVaultSymlink') {
+                final path = call.arguments['path'] as String;
+                return path == 'shortcut.txt' ? 'docs/original.txt' : null;
+              }
+              return true;
+            });
+
+        final ok = await api.writeWholeFile(
+          container,
+          'shortcut.txt',
+          Uint8List(0),
+        );
+
+        expect(ok, isTrue);
+        final writeCall = calls.singleWhere((c) => c.method == 'writeFileChunk');
+        expect(writeCall.arguments['fileName'], 'docs/original.txt.tmp');
+        final deletePaths = calls
+            .where((c) => c.method == 'deleteFile')
+            .map((c) => c.arguments['fileName'] as String)
+            .toList();
+        expect(deletePaths, ['docs/original.txt.tmp', 'docs/original.txt']);
+        final renameCall = calls.singleWhere((c) => c.method == 'renameFile');
+        expect(renameCall.arguments['oldPath'], 'docs/original.txt.tmp');
+        expect(renameCall.arguments['newPath'], 'docs/original.txt');
+        expect(deletePaths, isNot(contains('shortcut.txt')));
       },
     );
   });

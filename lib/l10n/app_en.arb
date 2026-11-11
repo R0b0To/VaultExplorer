@@ -16289,5 +16289,13 @@
   },
   "@emptyFolder": {
     "description": "Message shown when the current folder has no entries"
+  },
+  "symbolicLinkTargetHelperRelative": "Use a relative path inside this container. The target may be missing; renaming or deleting the link does not change the target.",
+  "@symbolicLinkTargetHelperRelative": {
+    "description": "Helper text under the symbolic link target field for native LUKS/VeraCrypt filesystems"
+  },
+  "symbolicLinkTargetOutsideVault": "Target must be a relative path that stays inside this container.",
+  "@symbolicLinkTargetOutsideVault": {
+    "description": "Error under the symbolic link target field when a native target is absolute or escapes the container root"
   }
 }

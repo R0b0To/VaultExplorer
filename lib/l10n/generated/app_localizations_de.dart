@@ -14532,4 +14532,12 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get emptyFolder => 'Dieser Ordner ist leer';
+
+  @override
+  String get symbolicLinkTargetHelperRelative =>
+      'Verwende einen relativen Pfad innerhalb dieses Containers. Das Ziel darf fehlen; Umbenennen oder Löschen des Links ändert das Ziel nicht.';
+
+  @override
+  String get symbolicLinkTargetOutsideVault =>
+      'Das Ziel muss ein relativer Pfad innerhalb dieses Containers sein.';
 }

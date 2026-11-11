@@ -14547,4 +14547,12 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get emptyFolder => 'Questa cartella è vuota';
+
+  @override
+  String get symbolicLinkTargetHelperRelative =>
+      'Usa un percorso relativo all’interno di questo contenitore. La destinazione può non esistere; rinominare o eliminare il collegamento non la modifica.';
+
+  @override
+  String get symbolicLinkTargetOutsideVault =>
+      'La destinazione deve essere un percorso relativo che rimane all’interno di questo contenitore.';
 }

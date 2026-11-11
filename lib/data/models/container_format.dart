@@ -53,6 +53,7 @@ enum ContainerFormat {
       );
 
   bool get isLuks => this == luks1 || this == luks2;
+  bool get isVeraCrypt => this == veracrypt;
   bool get isBitlocker => this == bitlocker;
   bool get isCryptomator => this == cryptomator;
   bool get isGocryptfs => this == gocryptfs;

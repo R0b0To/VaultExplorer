@@ -4011,5 +4011,13 @@
   "symbolicLinkSelectThisFolder": "Seleccionar esta carpeta",
   "symbolicLinkPickerLoadError": "No se pudo cargar esta carpeta",
   "shortcutBadge": "Acceso directo",
-  "emptyFolder": "Esta carpeta está vacía"
+  "emptyFolder": "Esta carpeta está vacía",
+  "symbolicLinkTargetHelperRelative": "Usa una ruta relativa dentro de este contenedor. El destino puede no existir; cambiar el nombre o eliminar el enlace no modifica el destino.",
+  "@symbolicLinkTargetHelperRelative": {
+    "description": "Helper text under the symbolic link target field for native LUKS/VeraCrypt filesystems"
+  },
+  "symbolicLinkTargetOutsideVault": "El destino debe ser una ruta relativa que permanezca dentro de este contenedor.",
+  "@symbolicLinkTargetOutsideVault": {
+    "description": "Error under the symbolic link target field when a native target is absolute or escapes the container root"
+  }
 }

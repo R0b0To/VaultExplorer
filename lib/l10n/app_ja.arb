@@ -4011,5 +4011,13 @@
   "symbolicLinkSelectThisFolder": "このフォルダーを選択",
   "symbolicLinkPickerLoadError": "このフォルダーを読み込めませんでした",
   "shortcutBadge": "ショートカット",
-  "emptyFolder": "このフォルダーは空です"
+  "emptyFolder": "このフォルダーは空です",
+  "symbolicLinkTargetHelperRelative": "このコンテナー内の相対パスを指定してください。リンク先が存在しなくてもかまいません。リンクの名前を変更または削除してもリンク先は変わりません。",
+  "@symbolicLinkTargetHelperRelative": {
+    "description": "Helper text under the symbolic link target field for native LUKS/VeraCrypt filesystems"
+  },
+  "symbolicLinkTargetOutsideVault": "リンク先はこのコンテナー内に収まる相対パスである必要があります。",
+  "@symbolicLinkTargetOutsideVault": {
+    "description": "Error under the symbolic link target field when a native target is absolute or escapes the container root"
+  }
 }

@@ -4011,5 +4011,13 @@
   "symbolicLinkSelectThisFolder": "이 폴더 선택",
   "symbolicLinkPickerLoadError": "이 폴더를 불러올 수 없습니다",
   "shortcutBadge": "바로가기",
-  "emptyFolder": "이 폴더는 비어 있습니다"
+  "emptyFolder": "이 폴더는 비어 있습니다",
+  "symbolicLinkTargetHelperRelative": "이 컨테이너 내부의 상대 경로를 사용하세요. 대상이 아직 없어도 됩니다. 링크를 이름 변경하거나 삭제해도 대상은 변경되지 않습니다.",
+  "@symbolicLinkTargetHelperRelative": {
+    "description": "Helper text under the symbolic link target field for native LUKS/VeraCrypt filesystems"
+  },
+  "symbolicLinkTargetOutsideVault": "대상은 이 컨테이너 내부에 머무르는 상대 경로여야 합니다.",
+  "@symbolicLinkTargetOutsideVault": {
+    "description": "Error under the symbolic link target field when a native target is absolute or escapes the container root"
+  }
 }

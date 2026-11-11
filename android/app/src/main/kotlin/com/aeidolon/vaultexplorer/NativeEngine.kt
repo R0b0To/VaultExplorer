@@ -179,6 +179,9 @@ internal object NativeEngine {
     @JvmStatic external fun getMatchedHashId(volId: Int): Int
     @JvmStatic external fun getContainerFormat(volId: Int): Int
     @JvmStatic external fun listDirectory(dirPath: String, volId: Int): Array<String>?
+    @JvmStatic external fun listSymlinks(dirPath: String, volId: Int): Array<String>?
+    @JvmStatic external fun readSymlink(path: String, volId: Int): String?
+    @JvmStatic external fun createSymlink(path: String, target: String, volId: Int): Boolean
     @JvmStatic external fun getFileSize(fileName: String, volId: Int): Long
     @JvmStatic external fun getFolderSize(dirPath: String, volId: Int): Long
     @JvmStatic external fun readFileChunk(fileName: String, offset: Long, length: Int, volId: Int): ByteArray?

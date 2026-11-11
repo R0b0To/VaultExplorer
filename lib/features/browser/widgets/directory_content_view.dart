@@ -2746,7 +2746,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   /// shortcut's arbitrary display name. Resolve chained links too, but never
   /// allow a target to escape the vault or loop forever.
   Future<String> _effectiveOpenName(RawEntry entry, String linkPath) async {
-    if (!entry.isSymlink || !widget.container.format.isCryptomator) {
+    if (!entry.isSymlink || !mayHaveVaultSymbolicLinks(widget.container)) {
       return entry.name;
     }
 

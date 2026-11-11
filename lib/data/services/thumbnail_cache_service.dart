@@ -12,6 +12,7 @@ import 'package:vaultexplorer/core/api/vault_crypto_api.dart';
 import 'package:vaultexplorer/core/api/vault_engine_channel.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/api/vault_hash_api.dart';
+import 'package:vaultexplorer/core/services/thumbnail_refresh_signal.dart';
 import 'package:vaultexplorer/core/utils/byte_budget_cache.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
@@ -178,6 +179,11 @@ class ThumbnailCacheService {
   static final _memoryCache = ByteBudgetCache(_memoryMaxBytes);
   static final Map<String, String> _latestKeyByFile = {};
   static final Map<String, (int width, int height)> _sizeCache = {};
+  // Every quality used for a path during this mount. An edit must invalidate
+  // cell-sized grid/masonry variants already loaded in this session too;
+  // removing only the configured/default size can leave an older persisted
+  // variant available to a later tile rebuild.
+  static final Map<String, Set<ThumbnailQuality>> _knownQualitiesByFile = {};
 
   static String _videoThumbnailVariant = 'hybrid-120';
   static final Set<String> _knownVideoThumbnailVariants = {
@@ -244,6 +250,12 @@ class ThumbnailCacheService {
     final variant = _variantForPath(filePath);
     return variant == null ? base : '$base$variant|';
   }
+
+  static String _fileIdentityPrefix(
+    MountedContainer container,
+    String filePath,
+  ) =>
+      '${container.volId}:${container.mountedAt.millisecondsSinceEpoch}:$filePath|';
 
   static String? _findResidentKeyForFile(
     MountedContainer container,
@@ -323,9 +335,24 @@ class ThumbnailCacheService {
     MountedContainer container,
     String filePath,
     ThumbnailQuality quality,
-  ) =>
-      '${container.volId}:${container.mountedAt.millisecondsSinceEpoch}:'
-      '${_qualifiedPath(filePath, quality)}';
+  ) {
+    _rememberQuality(container, filePath, quality);
+    return '${container.volId}:${container.mountedAt.millisecondsSinceEpoch}:'
+        '${_qualifiedPath(filePath, quality)}';
+  }
+
+  static void _rememberQuality(
+    MountedContainer container,
+    String filePath,
+    ThumbnailQuality quality,
+  ) {
+    _knownQualitiesByFile
+        .putIfAbsent(
+          _fileIdentityPrefix(container, filePath),
+          () => <ThumbnailQuality>{},
+        )
+        .add(quality);
+  }
 
   // ── AES-GCM Helpers ────────────────────────────────────────────────────────
 
@@ -719,6 +746,7 @@ class ThumbnailCacheService {
     int? height,
   }) async {
     try {
+      _rememberQuality(container, filePath, quality);
       if (mode == ThumbnailCacheMode.appCache) {
         final dirPath = await _thumbDir(container);
 
@@ -1074,6 +1102,9 @@ class ThumbnailCacheService {
       (prefix, _) => prefix.startsWith('${container.volId}:'),
     );
     _sizeCache.removeWhere((key, _) => key.startsWith('${container.volId}:'));
+    _knownQualitiesByFile.removeWhere(
+      (key, _) => key.startsWith('${container.volId}:'),
+    );
   }
 
   static Future<void> clearAppCacheByUri(String uri) async {
@@ -1141,6 +1172,7 @@ class ThumbnailCacheService {
     _memoryCache.clear();
     _latestKeyByFile.clear();
     _sizeCache.clear();
+    _knownQualitiesByFile.clear();
   }
 
   static Future<void> invalidateFile(
@@ -1150,6 +1182,11 @@ class ThumbnailCacheService {
   }) async {
     final prefix =
         '${container.volId}:${container.mountedAt.millisecondsSinceEpoch}:$filePath|';
+    final knownQualities = _knownQualitiesByFile.remove(prefix);
+    final qualitiesToInvalidate = <ThumbnailQuality>{
+      ...qualities,
+      ...?knownQualities,
+    }.toList(growable: false);
     _memoryCache.removeWhere((key) => key.startsWith(prefix));
     _sizeCache.removeWhere((key, _) => key.startsWith(prefix));
     _latestKeyByFile.removeWhere((key, _) => key.startsWith(prefix));
@@ -1158,7 +1195,7 @@ class ThumbnailCacheService {
     final videoVariants = _variantForPath(filePath) == null
         ? <String?>[null]
         : _knownVideoThumbnailVariants.toList();
-    for (final quality in qualities) {
+    for (final quality in qualitiesToInvalidate) {
       for (final variant in videoVariants) {
         try {
           inContainerKeys.add(
@@ -1175,7 +1212,7 @@ class ThumbnailCacheService {
     // App-cache tier (best effort, like everything here).
     try {
       final dir = await _thumbDir(container);
-      for (final quality in qualities) {
+      for (final quality in qualitiesToInvalidate) {
         for (final variant in videoVariants) {
           try {
             final cacheKey = await _encodeKey(
@@ -1211,6 +1248,12 @@ class ThumbnailCacheService {
     } catch (e) {
       VeLog.w('ThumbnailCacheService', 'in-container invalidate failed', e);
     }
+
+    // A live tile can keep displaying bytes already held by its
+    // AsyncThumbnailLoader even after every cache tier has been cleared.
+    // Notify loaders for this exact container/path so they fetch the updated
+    // image or video instead of continuing to paint their old state.
+    ThumbnailRefreshSignal.invalidate(container, filePath);
   }
 
   // ── Budget Enforcement ─────────────────────────────────────────────────────

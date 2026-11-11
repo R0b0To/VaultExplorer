@@ -14314,4 +14314,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get emptyFolder => 'This folder is empty';
+
+  @override
+  String get symbolicLinkTargetHelperRelative =>
+      'Use a relative path inside this container. The target may be missing; renaming or deleting the link does not change the target.';
+
+  @override
+  String get symbolicLinkTargetOutsideVault =>
+      'Target must be a relative path that stays inside this container.';
 }

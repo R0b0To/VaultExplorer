@@ -559,6 +559,73 @@ static void test_streams_read_ranges() {
     v.fsckClean("streams");
 }
 
+static void test_native_symlinks_follow_and_manage_link_identity() {
+    Vol v;
+    CHECK(v.format("ext4", 16));
+    const Bytes payload = pseudoRandom(4096, 177);
+    CHECK(putFile(0, "/target.bin", payload));
+    CHECK(extCreateSymlink(0, "/file-link", "target.bin"));
+    std::string target;
+    CHECK(extReadSymlink(0, "/file-link", target));
+    CHECK_EQ(target, "target.bin");
+    std::vector<std::string> links;
+    extListSymlinks(0, "/", links);
+    CHECK_EQ(links.size(), 1u);
+    CHECK(links[0].rfind("L|", 0) == 0);
+    CHECK(links[0].find("|file-link") != std::string::npos);
+    CHECK(!has(0, "", "file-link")); // symlinks stay out of normal file scans
+    CHECK(getFile(0, "/file-link") == payload); // ordinary reads follow the target
+    CHECK_EQ(extGetFileSize(0, "/file-link"), static_cast<int64_t>(payload.size()));
+
+    // Rename and delete operate on the link inode, never the target.
+    CHECK(extRenameFile(0, "/file-link", "/renamed-link"));
+    CHECK(extReadSymlink(0, "/renamed-link", target));
+    CHECK_EQ(target, "target.bin");
+    CHECK(extDeleteFile(0, "/renamed-link"));
+    CHECK(getFile(0, "/target.bin") == payload);
+
+    CHECK(extCreateDirectory(0, "/subdir"));
+    CHECK(putFile(0, "/subdir/inside.txt", Bytes{'o','k'}));
+    CHECK(extCreateSymlink(0, "/dir-link", "subdir"));
+    links.clear();
+    extListSymlinks(0, "/", links);
+    CHECK(std::any_of(links.begin(), links.end(), [](const std::string& s) {
+        return s.rfind("LD|", 0) == 0 && s.find("|dir-link") != std::string::npos;
+    }));
+    std::vector<std::string> throughLink;
+    extListDirectory(0, "/dir-link", throughLink);
+    CHECK_EQ(throughLink.size(), 1u);
+    CHECK(throughLink[0].find("inside.txt") != std::string::npos);
+    CHECK(extDeleteFile(0, "/dir-link"));
+    CHECK(getFile(0, "/subdir/inside.txt") == Bytes({'o','k'}));
+
+    // Broken links remain visible and are not mistaken for regular files.
+    const std::string longTarget = std::string(90, 'x') + "/missing-long-target";
+    CHECK(extCreateSymlink(0, "/long-link", longTarget));
+    CHECK(extReadSymlink(0, "/long-link", target));
+    CHECK_EQ(target, longTarget); // exercises the non-inline symlink data blocks
+
+    CHECK(extCreateSymlink(0, "/broken", "missing-target"));
+    links.clear();
+    extListSymlinks(0, "/", links);
+    CHECK(std::any_of(links.begin(), links.end(), [](const std::string& s) {
+        return s.find("|broken") != std::string::npos;
+    }));
+    CHECK_EQ(extGetFileSize(0, "/broken"), -1);
+
+    // Relative targets are confined to the volume root.
+    CHECK(!extCreateSymlink(0, "/escape", "../../outside"));
+    CHECK(extCreateDirectory(0, "/subdir/nested"));
+    CHECK(extCreateSymlink(0, "/subdir/nested/up", "../../target.bin"));
+    CHECK(getFile(0, "/subdir/nested/up") == payload);
+
+    // A cycle is refused by the filesystem path resolver instead of hanging.
+    CHECK(extCreateSymlink(0, "/loop-a", "loop-b"));
+    CHECK(extCreateSymlink(0, "/loop-b", "loop-a"));
+    CHECK_EQ(extGetFileSize(0, "/loop-a"), -1);
+    v.fsckClean("native symlinks");
+}
+
 static void test_read_only_mount_changes_nothing() {
     Vol v;
     CHECK(v.format("ext4", 16));
@@ -664,6 +731,7 @@ int main() {
         T(test_copy_between_and_within_volumes),
         T(test_streams_read_ranges),
         T(test_read_only_mount_changes_nothing),
+        T(test_native_symlinks_follow_and_manage_link_identity),
         T(test_usb_io_flush_reaches_the_device),
     };
     return runTests("ext_backend", tests, sizeof(tests) / sizeof(tests[0]), closeAllVolumes);

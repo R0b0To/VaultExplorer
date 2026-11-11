@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/api/vault_book_api.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
+import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/theme/file_manager_skin_scope.dart';
@@ -162,7 +163,7 @@ class FileTile extends StatelessWidget {
     if (container != null && vaultIcon == null && !entry.isPlaceholder) {
       if (entry.isSymlink &&
           !entry.isDir &&
-          container!.format.isCryptomator &&
+          mayHaveVaultSymbolicLinks(container!) &&
           archiveContext == null) {
         // A shortcut's displayed name is arbitrary and may have no extension
         // (or a misleading one). Resolve its in-vault target before deciding
@@ -374,7 +375,8 @@ class _ShortcutMediaThumbState extends ConsumerState<_ShortcutMediaThumb> {
   void didUpdateWidget(covariant _ShortcutMediaThumb oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.linkPath != widget.linkPath ||
-        oldWidget.container.volId != widget.container.volId) {
+        oldWidget.container.volId != widget.container.volId ||
+        oldWidget.container.uri != widget.container.uri) {
       _targetPath = _resolveTargetPath();
     }
   }
@@ -414,6 +416,28 @@ class _ShortcutMediaThumbState extends ConsumerState<_ShortcutMediaThumb> {
         if (widget.showMediaThumbnail &&
             MediaViewerConstants.isVideo(targetName)) {
           return _ListVideoThumb(
+            container: widget.container,
+            filePath: targetPath,
+            cacheMode: widget.cacheMode,
+            quality: widget.quality,
+            fallbackIcon: targetIcon,
+            fallbackColor: targetColor,
+            zoomLevel: widget.zoomLevel,
+          );
+        }
+        if (widget.showMediaThumbnail && isApkFile(targetName)) {
+          return _ListApkIconThumb(
+            container: widget.container,
+            filePath: targetPath,
+            cacheMode: widget.cacheMode,
+            quality: widget.quality,
+            fallbackIcon: targetIcon,
+            fallbackColor: targetColor,
+            zoomLevel: widget.zoomLevel,
+          );
+        }
+        if (widget.showMediaThumbnail && isBookWithCover(targetName)) {
+          return _ListBookCoverThumb(
             container: widget.container,
             filePath: targetPath,
             cacheMode: widget.cacheMode,

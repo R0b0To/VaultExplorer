@@ -14,6 +14,32 @@ bool fsListDirectory(int volId, const std::string& pathSuffix, std::vector<std::
     }
 }
 
+void fsListSymlinks(int volId, const std::string& pathSuffix,
+                    std::vector<std::string>& outResults) {
+    switch (volumes[volId].fsType) {
+        case VolumeState::FS_NTFS: ntfsListSymlinks(volId, pathSuffix, outResults); break;
+        case VolumeState::FS_EXT:  extListSymlinks(volId, pathSuffix, outResults); break;
+        // FAT12/16/32 and exFAT have no native symbolic-link entry type.
+        case VolumeState::FS_FATFS: default: break;
+    }
+}
+
+bool fsReadSymlink(int volId, const std::string& path, std::string& outTarget) {
+    switch (volumes[volId].fsType) {
+        case VolumeState::FS_NTFS: return ntfsReadSymlink(volId, path, outTarget);
+        case VolumeState::FS_EXT:  return extReadSymlink(volId, path, outTarget);
+        case VolumeState::FS_FATFS: default: return false;
+    }
+}
+
+bool fsCreateSymlink(int volId, const std::string& path, const std::string& target) {
+    switch (volumes[volId].fsType) {
+        case VolumeState::FS_NTFS: return ntfsCreateSymlink(volId, path, target);
+        case VolumeState::FS_EXT:  return extCreateSymlink(volId, path, target);
+        case VolumeState::FS_FATFS: default: return false;
+    }
+}
+
 int64_t fsGetFileSize(int volId, const std::string& path) {
     switch (volumes[volId].fsType) {
         case VolumeState::FS_FATFS: return fatGetFileSize(volId, path);

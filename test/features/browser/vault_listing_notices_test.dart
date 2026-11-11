@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/filesystem/filesystem_type.dart';
+import 'package:vaultexplorer/core/filesystem/volume_filesystem_registry.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -14,6 +16,7 @@ void main() {
   late FakeOperationService opService;
 
   setUp(() {
+    VolumeFilesystemRegistry.clearForTesting();
     fileIo = FakeSymlinkFileIo();
     opService = FakeOperationService();
   });
@@ -73,8 +76,8 @@ void main() {
       expect(fileIo.listCalls, before);
     });
 
-    testWidgets('a non-Cryptomator container is not reloaded by changes', (tester) async {
-      await tester.pumpWidget(app(cryptomatorContainer(format: 'veracrypt')));
+    testWidgets('an unrelated folder-vault format is not reloaded by changes', (tester) async {
+      await tester.pumpWidget(app(cryptomatorContainer(format: 'cryfs')));
       await tester.pumpAndSettle();
       final before = fileIo.listCalls;
 
@@ -82,6 +85,17 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(fileIo.listCalls, before);
+    });
+
+    testWidgets('a native LUKS/ext container refreshes its symlink query', (tester) async {
+      VolumeFilesystemRegistry.record(7, FilesystemType.ext);
+      await tester.pumpWidget(app(cryptomatorContainer(format: 'luks2')));
+      await tester.pumpAndSettle();
+      final before = fileIo.listCalls;
+
+      opService.notifyVolumeContentChanged(7);
+      await tester.pumpAndSettle();
+      expect(fileIo.listCalls, before + 1);
     });
 
     testWidgets('the listener is removed when the notice goes away', (tester) async {

@@ -4011,5 +4011,13 @@
   "symbolicLinkSelectThisFolder": "Вибрати цю папку",
   "symbolicLinkPickerLoadError": "Не вдалося завантажити цю папку",
   "shortcutBadge": "Ярлик",
-  "emptyFolder": "Ця папка порожня"
+  "emptyFolder": "Ця папка порожня",
+  "symbolicLinkTargetHelperRelative": "Використовуйте відносний шлях у межах цього контейнера. Ціль може ще не існувати; перейменування або видалення посилання не змінює ціль.",
+  "@symbolicLinkTargetHelperRelative": {
+    "description": "Helper text under the symbolic link target field for native LUKS/VeraCrypt filesystems"
+  },
+  "symbolicLinkTargetOutsideVault": "Ціль має бути відносним шляхом у межах цього контейнера.",
+  "@symbolicLinkTargetOutsideVault": {
+    "description": "Error under the symbolic link target field when a native target is absolute or escapes the container root"
+  }
 }

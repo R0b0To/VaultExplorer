@@ -5,39 +5,13 @@ import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 
-/// Resolves a Cryptomator symbolic link (and any links it points to) without
-/// ever allowing the result to escape the current vault.
+/// Resolves a symbolic link (and any links it points to) without
+/// ever allowing the result to escape the current container.
 Future<String?> resolveShortcutTargetPath({
   required VaultFileIoApi fileIoApi,
   required MountedContainer container,
   required String linkPath,
-}) async {
-  var currentPath = p.posix.normalize(linkPath);
-  final visited = <String>{};
-  var followedLink = false;
-
-  for (var hop = 0; hop < 40; hop++) {
-    if (!visited.add(currentPath)) return null;
-    final target = await fileIoApi.readVaultSymlink(container, currentPath);
-    if (target == null || target.isEmpty) {
-      return followedLink ? currentPath : null;
-    }
-    followedLink = true;
-    // Absolute targets are deliberately rejected. Relative targets are
-    // resolved from the link's containing directory and confined to the vault.
-    if (p.posix.isAbsolute(target)) return null;
-    final resolved = p.posix.normalize(
-      p.posix.join(p.posix.dirname(currentPath), target),
-    );
-    if (resolved == '..' ||
-        resolved.startsWith('../') ||
-        p.posix.isAbsolute(resolved)) {
-      return null;
-    }
-    currentPath = resolved;
-  }
-  return null;
-}
+}) => fileIoApi.resolveVaultSymlinkTargetPath(container, linkPath);
 
 typedef ShortcutTargetPreviewBuilder = Widget Function(
   BuildContext context,
@@ -80,7 +54,8 @@ class _ShortcutTargetPreviewState
   void didUpdateWidget(covariant ShortcutTargetPreview oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.linkPath != widget.linkPath ||
-        oldWidget.container.volId != widget.container.volId) {
+        oldWidget.container.volId != widget.container.volId ||
+        oldWidget.container.uri != widget.container.uri) {
       _targetPath = _resolve();
     }
   }

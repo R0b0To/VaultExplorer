@@ -4011,5 +4011,13 @@
   "symbolicLinkSelectThisFolder": "选择此文件夹",
   "symbolicLinkPickerLoadError": "无法加载此文件夹",
   "shortcutBadge": "快捷方式",
-  "emptyFolder": "此文件夹为空"
+  "emptyFolder": "此文件夹为空",
+  "symbolicLinkTargetHelperRelative": "请使用此容器内的相对路径。目标可以暂时不存在；重命名或删除链接不会更改目标。",
+  "@symbolicLinkTargetHelperRelative": {
+    "description": "Helper text under the symbolic link target field for native LUKS/VeraCrypt filesystems"
+  },
+  "symbolicLinkTargetOutsideVault": "目标必须是保留在此容器内的相对路径。",
+  "@symbolicLinkTargetOutsideVault": {
+    "description": "Error under the symbolic link target field when a native target is absolute or escapes the container root"
+  }
 }

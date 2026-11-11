@@ -35,6 +35,12 @@
 // reports failures today; NTFS/ext always return true.
 bool fsListDirectory(int volId, const std::string& pathSuffix,
                       std::vector<std::string>& outResults);
+// Symlinks are kept out of ordinary listings and surfaced through a separate
+// list, so generic scanners never mistake a link target for file content.
+void fsListSymlinks(int volId, const std::string& pathSuffix,
+                    std::vector<std::string>& outResults);
+bool fsReadSymlink(int volId, const std::string& path, std::string& outTarget);
+bool fsCreateSymlink(int volId, const std::string& path, const std::string& target);
 
 // ── Size queries ───────────────────────────────────────────────────────
 // fsGetFileSize returns the size in bytes, or -1 on any failure (e.g. path not found).

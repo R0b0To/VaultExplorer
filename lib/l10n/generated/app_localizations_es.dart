@@ -14573,4 +14573,12 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get emptyFolder => 'Esta carpeta está vacía';
+
+  @override
+  String get symbolicLinkTargetHelperRelative =>
+      'Usa una ruta relativa dentro de este contenedor. El destino puede no existir; cambiar el nombre o eliminar el enlace no modifica el destino.';
+
+  @override
+  String get symbolicLinkTargetOutsideVault =>
+      'El destino debe ser una ruta relativa que permanezca dentro de este contenedor.';
 }

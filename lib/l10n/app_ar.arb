@@ -4011,5 +4011,13 @@
   "symbolicLinkSelectThisFolder": "اختيار هذا المجلد",
   "symbolicLinkPickerLoadError": "تعذر تحميل هذا المجلد",
   "shortcutBadge": "اختصار",
-  "emptyFolder": "هذا المجلد فارغ"
+  "emptyFolder": "هذا المجلد فارغ",
+  "symbolicLinkTargetHelperRelative": "استخدم مسارًا نسبيًا داخل هذا الحاوي. يمكن ألا يكون الهدف موجودًا بعد؛ إعادة تسمية الرابط أو حذفه لا تغيّر الهدف.",
+  "@symbolicLinkTargetHelperRelative": {
+    "description": "Helper text under the symbolic link target field for native LUKS/VeraCrypt filesystems"
+  },
+  "symbolicLinkTargetOutsideVault": "يجب أن يكون الهدف مسارًا نسبيًا يبقى داخل هذا الحاوي.",
+  "@symbolicLinkTargetOutsideVault": {
+    "description": "Error under the symbolic link target field when a native target is absolute or escapes the container root"
+  }
 }

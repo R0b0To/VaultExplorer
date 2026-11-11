@@ -11,6 +11,8 @@
 #include <memory>
 #include <sys/stat.h>
 #include <unordered_set>
+#include <utility>
+#include <vector>
 #include <unistd.h>
 extern "C" {
 #include "device.h"
@@ -19,6 +21,8 @@ extern "C" {
 #include "attrib.h"
 #include "index.h"
 #include "layout.h"
+#include "volume.h"
+#include "reparse.h"
 }
 #include "block_io.h"
 #include "crypto/cascade.h"
@@ -29,7 +33,10 @@ extern "C" {
 #include "containers/vhdx_image.h"
 #include "filesystems/stream_handles.h"
 
+static bool ntfsIsDirectoryInode(const ntfs_inode* ni);
+
 namespace {
+bool ntfsIsSymlinkInode(const ntfs_inode* inode);
 constexpr int kMaxVolumes = FF_VOLUMES;
 std::atomic<int64_t> ntfsDevicePositions[kMaxVolumes];
 const bool kNtfsDevicePositionsInitialized = []() {
@@ -420,6 +427,7 @@ int recursiveSizeEntry(void* directory, const ntfschar* name, const int nameLeng
         entryName == "$Extend" || entryName == "$RECYCLE.BIN") return 0;
     ntfs_inode* inode = ntfs_inode_open(context->volume, reference);
     if (!inode) return 0;
+    if (ntfsIsSymlinkInode(inode)) { ntfs_inode_close(inode); return 0; }
     if (inode->mrec->flags & MFT_RECORD_IS_DIRECTORY) {
         s64 position = 0;
         ntfs_readdir(inode, &position, context, recursiveSizeEntry);
@@ -459,6 +467,7 @@ int ntfsFilldir(void* dirent, const ntfschar* name, const int nameLength,
     }
     ntfs_inode* ni = ntfs_inode_open(context->vol, reference);
     if (!ni) return 0;
+    if (ntfsIsSymlinkInode(ni)) { ntfs_inode_close(ni); return 0; }
     uint64_t size = 0;
     uint64_t ts = 0;
     const bool isDir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) != 0;
@@ -520,7 +529,8 @@ int ntfsRepairDirectoryEntry(void* data, const ntfschar* name, const int nameLen
     bool corrupt = nameInvalid || !inode;
     bool isDirectory = false;
     if (inode) {
-        isDirectory = (inode->mrec->flags & MFT_RECORD_IS_DIRECTORY) != 0;
+        isDirectory = !ntfsIsSymlinkInode(inode) &&
+                      (inode->mrec->flags & MFT_RECORD_IS_DIRECTORY) != 0;
         const uint64_t ntfsTime = inode->last_data_change_time;
         constexpr uint64_t kNtfsEpochOffset = 116444736000000000ULL;
         constexpr uint64_t kOneYearSeconds = 366ULL * 24 * 3600;
@@ -616,12 +626,231 @@ bool ntfsRemoveCorruptDirectoryEntries(int volumeId) {
     return ntfsScanCorruptDirectoryEntries(volumeId, true);
 }
 
+namespace {
+// NTFS-3G supports Windows reparse-point symlinks, WSL LX symlinks and
+// Interix INTX_SYMBOLIC_LINK data attributes. New links use the WSL LX reparse
+// representation; existing Windows and legacy Interix links are also read.
+struct NtfsWslLinkReparseData {
+    le32 type;
+    char link[1];
+};
+
+static bool ntfsReadWslSymlinkTarget(ntfs_inode* inode, std::string& outTarget) {
+    if (!inode || !(inode->flags & FILE_ATTR_REPARSE_POINT)) return false;
+    s64 attrSize = 0;
+    auto* reparse = reinterpret_cast<REPARSE_POINT*>(
+        ntfs_attr_readall(inode, AT_REPARSE_POINT, nullptr, 0, &attrSize));
+    if (!reparse) return false;
+    bool success = false;
+    const size_t dataOffset = offsetof(REPARSE_POINT, reparse_data);
+    const uint16_t dataLength = le16_to_cpu(reparse->reparse_data_length);
+    if (reparse->reparse_tag == IO_REPARSE_TAG_LX_SYMLINK &&
+        dataLength > sizeof(le32) &&
+        attrSize >= static_cast<s64>(dataOffset + dataLength)) {
+        const auto* link = reinterpret_cast<const NtfsWslLinkReparseData*>(reparse->reparse_data);
+        if (link->type == const_cpu_to_le32(2)) {
+            const size_t targetLength = dataLength - sizeof(le32);
+            if (targetLength > 0 && targetLength <= 32767) {
+                outTarget.assign(link->link, targetLength);
+                success = outTarget.find('\0') == std::string::npos;
+            }
+        }
+    }
+    free(reparse);
+    return success;
+}
+
+static bool ntfsReadInterixSymlinkTarget(ntfs_inode* inode, std::string& outTarget) {
+    if (!inode || !(inode->flags & FILE_ATTR_SYSTEM)) return false;
+    ntfs_attr* attr = ntfs_attr_open(inode, AT_DATA, nullptr, 0);
+    if (!attr) return false;
+    const s64 size = attr->data_size;
+    if (size <= static_cast<s64>(offsetof(INTX_FILE, target)) || size > 65536) {
+        ntfs_attr_close(attr);
+        return false;
+    }
+    std::vector<uint8_t> data(static_cast<size_t>(size));
+    const s64 bytesRead = ntfs_attr_pread(attr, 0, size, data.data());
+    ntfs_attr_close(attr);
+    if (bytesRead != size) return false;
+    const auto* intx = reinterpret_cast<const INTX_FILE*>(data.data());
+    if (intx->magic != INTX_SYMBOLIC_LINK) return false;
+    const int targetUnits = static_cast<int>((size - offsetof(INTX_FILE, target)) / sizeof(ntfschar));
+    char* utf8 = nullptr;
+    const int utf8Length = ntfs_ucstombs(intx->target, targetUnits, &utf8, 0);
+    if (utf8Length <= 0 || !utf8) { if (utf8) free(utf8); return false; }
+    outTarget.assign(utf8, static_cast<size_t>(utf8Length));
+    free(utf8);
+    return outTarget.size() <= 32767 && outTarget.find('\0') == std::string::npos;
+}
+
+bool ntfsIsSymlinkInode(const ntfs_inode* inode) {
+    if (!inode) return false;
+    if (inode->flags & FILE_ATTR_REPARSE_POINT) {
+        if (ntfs_possible_symlink(const_cast<ntfs_inode*>(inode))) return true;
+        std::string ignored;
+        return ntfsReadWslSymlinkTarget(const_cast<ntfs_inode*>(inode), ignored);
+    }
+    std::string ignored;
+    return ntfsReadInterixSymlinkTarget(const_cast<ntfs_inode*>(inode), ignored);
+}
+
+static bool ntfsReadSymlinkTarget(ntfs_inode* inode, std::string& outTarget) {
+    if (!ntfsIsSymlinkInode(inode)) return false;
+    if (inode->flags & FILE_ATTR_REPARSE_POINT) {
+        if (ntfs_possible_symlink(inode)) {
+            char* rawTarget = ntfs_make_symlink(inode, "/");
+            if (rawTarget) {
+                outTarget.assign(rawTarget);
+                free(rawTarget);
+                return !outTarget.empty() && outTarget.size() <= 32767 &&
+                       outTarget.find('\0') == std::string::npos;
+            }
+        }
+        return ntfsReadWslSymlinkTarget(inode, outTarget);
+    }
+    return ntfsReadInterixSymlinkTarget(inode, outTarget);
+}
+
+bool ntfsNormalizeInsideRoot(const std::vector<std::string>& input,
+                             std::vector<std::string>& output) {
+    output.clear();
+    for (const std::string& part : input) {
+        if (part.empty() || part == ".") continue;
+        if (part == "..") {
+            if (output.empty()) return false;
+            output.pop_back();
+        } else {
+            if (part.find('\0') != std::string::npos) return false;
+            output.push_back(part);
+        }
+    }
+    return true;
+}
+
+std::vector<std::string> ntfsSplitPath(const std::string& path) {
+    std::vector<std::string> parts;
+    size_t start = 0;
+    while (start < path.size()) {
+        while (start < path.size() && (path[start] == '/' || path[start] == '\\')) ++start;
+        if (start >= path.size()) break;
+        size_t end = path.find_first_of("/\\", start);
+        if (end == std::string::npos) end = path.size();
+        parts.emplace_back(path.substr(start, end - start));
+        start = end;
+    }
+    return parts;
+}
+
+std::string ntfsJoinPath(const std::vector<std::string>& parts) {
+    std::string out;
+    for (const auto& part : parts) {
+        if (!out.empty()) out.push_back('/');
+        out += part;
+    }
+    return out;
+}
+
+bool ntfsTargetStaysInside(const std::string& parentPath, const std::string& target) {
+    if (target.empty() || target.front() == '/' || target.front() == '\\' ||
+        target.find('\0') != std::string::npos) return false;
+    std::vector<std::string> combined = ntfsSplitPath(parentPath);
+    const auto targetParts = ntfsSplitPath(target);
+    combined.insert(combined.end(), targetParts.begin(), targetParts.end());
+    std::vector<std::string> normalized;
+    return ntfsNormalizeInsideRoot(combined, normalized);
+}
+
+ntfs_inode* ntfsResolvePath(ntfs_volume* volume, const std::string& inputPath,
+                            bool followFinal = true) {
+    if (!volume) return nullptr;
+    std::vector<std::string> initial = ntfsSplitPath(inputPath);
+    std::vector<std::string> parts;
+    if (!ntfsNormalizeInsideRoot(initial, parts)) return nullptr;
+    if (parts.empty()) return ntfs_inode_open(volume, FILE_root);
+
+    std::unordered_set<std::string> followed;
+    for (int hop = 0; hop <= 40; ++hop) {
+        std::string prefix;
+        bool restarted = false;
+        for (size_t i = 0; i < parts.size(); ++i) {
+            if (!prefix.empty()) prefix.push_back('/');
+            prefix += parts[i];
+            const std::string absolutePrefix = "/" + prefix;
+            ntfs_inode* inode = ntfs_pathname_to_inode(volume, nullptr, absolutePrefix.c_str());
+            if (!inode) return nullptr;
+            const bool shouldFollow = ntfsIsSymlinkInode(inode) &&
+                                      (followFinal || i + 1 < parts.size());
+            if (shouldFollow) {
+                if (!followed.insert(prefix).second) {
+                    ntfs_inode_close(inode);
+                    return nullptr;
+                }
+                std::string target;
+                const bool targetReadable = ntfsReadSymlinkTarget(inode, target);
+                ntfs_inode_close(inode);
+                if (!targetReadable || target.empty() || target.front() == '/' || target.front() == '\\') return nullptr;
+
+                std::vector<std::string> expanded(parts.begin(), parts.begin() + i);
+                const auto targetParts = ntfsSplitPath(target);
+                expanded.insert(expanded.end(), targetParts.begin(), targetParts.end());
+                expanded.insert(expanded.end(), parts.begin() + i + 1, parts.end());
+                std::vector<std::string> normalized;
+                if (!ntfsNormalizeInsideRoot(expanded, normalized)) return nullptr;
+                parts = std::move(normalized);
+                if (parts.empty()) return ntfs_inode_open(volume, FILE_root);
+                restarted = true;
+                break;
+            }
+            if (i + 1 == parts.size()) return inode;
+            ntfs_inode_close(inode);
+        }
+        if (!restarted) return nullptr;
+    }
+    return nullptr; // More than 40 link traversals: loop or hostile chain.
+}
+
+struct NtfsSymlinkListContext {
+    std::vector<std::string>* results;
+    ntfs_volume* volume;
+    std::string parentPath;
+};
+
+int ntfsSymlinkFilldir(void* dirent, const ntfschar* name, const int nameLength,
+                       const int nameType, const s64, const MFT_REF reference,
+                       const unsigned) {
+    auto* context = static_cast<NtfsSymlinkListContext*>(dirent);
+    if (nameType == FILE_NAME_DOS || context->results->size() >= NTFS_DIRECTORY_MAX_ENTRIES) return 0;
+    char* utf8Name = nullptr;
+    const int utf8Length = ntfs_ucstombs(name, nameLength, &utf8Name, 0);
+    if (utf8Length < 0 || !utf8Name) { if (utf8Name) free(utf8Name); return 0; }
+    std::string nameStr(utf8Name, utf8Length);
+    free(utf8Name);
+    if (nameStr == "." || nameStr == "..") return 0;
+    ntfs_inode* inode = ntfs_inode_open(context->volume, reference);
+    if (!inode) return 0;
+    if (!ntfsIsSymlinkInode(inode)) { ntfs_inode_close(inode); return 0; }
+    std::string target;
+    const uint64_t targetBytes = ntfsReadSymlinkTarget(inode, target) ? target.size() : 0;
+    const uint64_t ntfsTime = inode->last_data_change_time;
+    const uint64_t mtime = ntfsTime > 116444736000000000ULL
+        ? (ntfsTime - 116444736000000000ULL) / 10000000ULL : 0;
+    ntfs_inode_close(inode);
+    const std::string linkPath = context->parentPath.empty()
+        ? nameStr : context->parentPath + "/" + nameStr;
+    ntfs_inode* targetInode = ntfsResolvePath(context->volume, linkPath, true);
+    const bool targetIsDirectory = ntfsIsDirectoryInode(targetInode);
+    if (targetInode) ntfs_inode_close(targetInode);
+    context->results->push_back(
+        encodeSymlinkEntryWire(nameStr, targetBytes, mtime, targetIsDirectory));
+    return 0;
+}
+} // namespace
+
 uint64_t recursiveNtfsFolderSize(int volumeId, const std::string& path) {
     ntfs_volume* volume = volumes[volumeId].ntfsVol;
     if (!volume) return 0;
-    ntfs_inode* directory = (path.empty() || path == "/")
-        ? ntfs_inode_open(volume, FILE_root)
-        : ntfs_pathname_to_inode(volume, nullptr, ("/" + path).c_str());
+    ntfs_inode* directory = ntfsResolvePath(volume, path, true);
     if (!directory) return 0;
     s64 position = 0;
     NtfsSizeContext context{0, volume};
@@ -635,9 +864,7 @@ bool listNtfsDirectory(int volumeId, const std::string& pathSuffix,
     if (volumeId < 0 || volumeId >= kMaxVolumes) return false;
     ntfs_volume* volume = volumes[volumeId].ntfsVol;
     if (!volume) return false;
-    ntfs_inode* dirInode = (pathSuffix.empty() || pathSuffix == "/")
-        ? ntfs_inode_open(volume, FILE_root)
-        : ntfs_pathname_to_inode(volume, nullptr, ("/" + pathSuffix).c_str());
+    ntfs_inode* dirInode = ntfsResolvePath(volume, pathSuffix, true);
     if (!dirInode) return false;
     s64 position = 0;
     NtfsFilldirContext context{&results, volume};
@@ -645,6 +872,65 @@ bool listNtfsDirectory(int volumeId, const std::string& pathSuffix,
     ntfs_inode_close(dirInode);
     if (results.size() >= NTFS_DIRECTORY_MAX_ENTRIES) results.push_back("System:TRUNCATED");
     return true;
+}
+
+void ntfsListSymlinks(int volumeId, const std::string& pathSuffix,
+                      std::vector<std::string>& results) {
+    if (volumeId < 0 || volumeId >= kMaxVolumes) return;
+    ntfs_volume* volume = volumes[volumeId].ntfsVol;
+    if (!volume) return;
+    ntfs_inode* dirInode = ntfsResolvePath(volume, pathSuffix, true);
+    if (!dirInode) return;
+    s64 position = 0;
+    NtfsSymlinkListContext context{&results, volume, pathSuffix};
+    ntfs_readdir(dirInode, &position, &context, ntfsSymlinkFilldir);
+    ntfs_inode_close(dirInode);
+    if (results.size() >= NTFS_DIRECTORY_MAX_ENTRIES) results.push_back("System:TRUNCATED");
+}
+
+bool ntfsReadSymlink(int volumeId, const std::string& path, std::string& outTarget) {
+    if (volumeId < 0 || volumeId >= kMaxVolumes) return false;
+    ntfs_volume* volume = volumes[volumeId].ntfsVol;
+    ntfs_inode* inode = ntfsResolvePath(volume, path, false);
+    if (!inode) return false;
+    if (!ntfsIsSymlinkInode(inode)) { ntfs_inode_close(inode); return false; }
+    const bool success = ntfsReadSymlinkTarget(inode, outTarget);
+    ntfs_inode_close(inode);
+    return success;
+}
+
+static bool ntfsNameLengthOk(int unicodeLength);
+
+bool ntfsCreateSymlink(int volumeId, const std::string& path, const std::string& target) {
+    if (volumeId < 0 || volumeId >= kMaxVolumes || target.empty() || target.size() > 32767 ||
+        target.find('\0') != std::string::npos) return false;
+    VolumeState& volumeState = volumes[volumeId];
+    ntfs_volume* volume = volumeState.ntfsVol;
+    if (!volume || volumeState.readOnly) return false;
+    const size_t slash = path.find_last_of('/');
+    const std::string parentPath = slash == std::string::npos ? "" : path.substr(0, slash);
+    const std::string name = slash == std::string::npos ? path : path.substr(slash + 1);
+    if (name.empty() || !ntfsTargetStaysInside(parentPath, target)) return false;
+    ntfs_inode* parent = ntfsResolvePath(volume, parentPath, true);
+    if (!parent) return false;
+    ntfschar* unicodeName = nullptr;
+    ntfschar* unicodeTarget = nullptr;
+    const int nameLength = ntfs_mbstoucs(name.c_str(), &unicodeName);
+    const int targetLength = ntfs_mbstoucs(target.c_str(), &unicodeTarget);
+    ntfs_inode* created = nullptr;
+    if (ntfsNameLengthOk(nameLength) && targetLength > 0 && targetLength <= 32767) {
+        const auto previousSpecialFiles = volume->special_files;
+        volume->special_files = NTFS_FILES_WSL;
+        created = ntfs_create_symlink(parent, 0, unicodeName, static_cast<u8>(nameLength),
+                                      unicodeTarget, targetLength);
+        volume->special_files = previousSpecialFiles;
+    }
+    if (unicodeName) free(unicodeName);
+    if (unicodeTarget) free(unicodeTarget);
+    ntfs_inode_close(parent);
+    if (!created) return false;
+    ntfs_inode_close(created);
+    return ntfs_device_sync(volume->dev) == 0;
 }
 
 // NTFS names are at most 255 UTF-16 units, and ntfs_create()/ntfs_link() take the
@@ -655,7 +941,8 @@ static bool ntfsNameLengthOk(int unicodeLength) {
 }
 
 static bool ntfsIsDirectoryInode(const ntfs_inode* ni) {
-    return (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) != 0;
+    return ni && !ntfsIsSymlinkInode(ni) &&
+           (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) != 0;
 }
 
 // True if [dir] is the directory with MFT number [ancestorMftNo] or lies somewhere
@@ -687,7 +974,7 @@ ntfs_inode* createNtfsFile(ntfs_volume* volume, const std::string& path) {
     std::string parentPath = path.substr(0, slash);
     const std::string name = path.substr(slash + 1);
     if (parentPath.empty()) parentPath = "/";
-    ntfs_inode* parent = ntfs_pathname_to_inode(volume, nullptr, parentPath.c_str());
+    ntfs_inode* parent = ntfsResolvePath(volume, parentPath, true);
     if (!parent) return nullptr;
     ntfschar* unicodeName = nullptr;
     const int unicodeLength = ntfs_mbstoucs(name.c_str(), &unicodeName);
@@ -707,8 +994,7 @@ extern "C" const char *ntfs_libntfs_version(void) {
 int64_t ntfsGetFileSize(int volumeId, const std::string& path) {
     auto& v = volumes[volumeId];
     int64_t size = -1;
-    std::string fullPath = "/" + path;
-    ntfs_inode* ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullPath.c_str());
+    ntfs_inode* ni = ntfsResolvePath(v.ntfsVol, path, true);
     if (ni) {
         size = static_cast<int64_t>(ni->data_size);
         ntfs_inode_close(ni);
@@ -719,8 +1005,7 @@ int64_t ntfsGetFileSize(int volumeId, const std::string& path) {
 bool ntfsReadFileChunk(int volumeId, const std::string& path, uint64_t offset, size_t length, std::vector<uint8_t>& outBuffer) {
     auto& v = volumes[volumeId];
     bool success = false;
-    std::string fullPath = "/" + path;
-    ntfs_inode* ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullPath.c_str());
+    ntfs_inode* ni = ntfsResolvePath(v.ntfsVol, path, true);
     if (ni) {
         ntfs_attr* na = ntfs_attr_open(ni, AT_DATA, NULL, 0);
         if (na) {
@@ -745,7 +1030,7 @@ bool ntfsWriteFileChunk(int volumeId, const std::string& path, uint64_t offset, 
     if (v.readOnly) return false;
     bool success = false;
     std::string fullPath = "/" + path;
-    ntfs_inode* ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullPath.c_str());
+    ntfs_inode* ni = ntfsResolvePath(v.ntfsVol, path, true);
     if (!ni) {
         ni = createNtfsFile(v.ntfsVol, fullPath);
     }
@@ -780,9 +1065,9 @@ bool ntfsCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const
     if (destV.readOnly) return false;
     std::string srcFullPath = "/" + srcPath;
     std::string destFullPath = "/" + destPath;
-    ntfs_inode* src_ni = ntfs_pathname_to_inode(srcV.ntfsVol, NULL, srcFullPath.c_str());
+    ntfs_inode* src_ni = ntfsResolvePath(srcV.ntfsVol, srcPath, true);
     if (!src_ni) return false;
-    ntfs_inode* dest_ni = ntfs_pathname_to_inode(destV.ntfsVol, NULL, destFullPath.c_str());
+    ntfs_inode* dest_ni = ntfsResolvePath(destV.ntfsVol, destPath, true);
     if (!dest_ni) {
         dest_ni = createNtfsFile(destV.ntfsVol, destFullPath);
     }
@@ -859,7 +1144,7 @@ bool ntfsWriteBackFile(int volumeId, const std::string& targetPath, const std::s
     if (v.readOnly) return false;
     bool success = false;
     std::string fullPath = "/" + targetPath;
-    ntfs_inode* ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullPath.c_str());
+    ntfs_inode* ni = ntfsResolvePath(v.ntfsVol, targetPath, true);
     if (!ni) {
         ni = createNtfsFile(v.ntfsVol, fullPath);
     }
@@ -909,8 +1194,7 @@ bool ntfsExtractFile(int volumeId, const std::string& targetPath, const std::str
     constexpr size_t kIoBufferSize = 2097152;
     auto& v = volumes[volumeId];
     bool success = false;
-    std::string fullPath = "/" + targetPath;
-    ntfs_inode* ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullPath.c_str());
+    ntfs_inode* ni = ntfsResolvePath(v.ntfsVol, targetPath, true);
     if (ni) {
         ntfs_attr* na = ntfs_attr_open(ni, AT_DATA, NULL, 0);
         if (na) {
@@ -949,12 +1233,12 @@ bool ntfsDeleteFile(int volumeId, const std::string& path) {
     if (v.readOnly) return false;
     bool success = false;
     std::string fullPath = "/" + path;
-    ntfs_inode* ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullPath.c_str());
+    ntfs_inode* ni = ntfsResolvePath(v.ntfsVol, path, false);
     size_t slashPos = fullPath.find_last_of('/');
     std::string parentPath = fullPath.substr(0, slashPos);
     std::string childName = fullPath.substr(slashPos + 1);
     if (parentPath.empty()) parentPath = "/";
-    ntfs_inode* dir_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, parentPath.c_str());
+    ntfs_inode* dir_ni = ntfsResolvePath(v.ntfsVol, parentPath, true);
     if (dir_ni && ni) {
         ntfschar* uname = nullptr;
         int uname_len = ntfs_mbstoucs(childName.c_str(), &uname);
@@ -980,7 +1264,7 @@ bool ntfsCreateDirectory(int volumeId, const std::string& path) {
     std::string parentPath = fullPath.substr(0, slashPos);
     std::string childName = fullPath.substr(slashPos + 1);
     if (parentPath.empty()) parentPath = "/";
-    ntfs_inode* parentNi = ntfs_pathname_to_inode(v.ntfsVol, NULL, parentPath.c_str());
+    ntfs_inode* parentNi = ntfsResolvePath(v.ntfsVol, parentPath, true);
     if (parentNi) {
         ntfschar* uChild = nullptr;
         int uChildLen = ntfs_mbstoucs(childName.c_str(), &uChild);
@@ -1016,16 +1300,16 @@ bool ntfsRenameFile(int volumeId, const std::string& oldPath, const std::string&
     ntfschar* uNew = nullptr;
     int uNewLen = ntfs_mbstoucs(newChildName.c_str(), &uNew);
     if (uOldLen >= 0 && ntfsNameLengthOk(uNewLen)) {
-        ntfs_inode* existing_dest_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, newFullPath.c_str());
+        ntfs_inode* existing_dest_ni = ntfsResolvePath(v.ntfsVol, newPath, false);
         if (existing_dest_ni) {
             ntfs_inode_close(existing_dest_ni);
             if (uOld) free(uOld);
             if (uNew) free(uNew);
             return false;
         }
-        ntfs_inode* old_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, oldFullPath.c_str());
-        ntfs_inode* dir_new_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, parentNewPath.c_str());
-        ntfs_inode* dir_old_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, parentOldPath.c_str());
+        ntfs_inode* old_ni = ntfsResolvePath(v.ntfsVol, oldPath, false);
+        ntfs_inode* dir_new_ni = ntfsResolvePath(v.ntfsVol, parentNewPath, true);
+        ntfs_inode* dir_old_ni = ntfsResolvePath(v.ntfsVol, parentOldPath, true);
         if (old_ni && dir_new_ni && dir_old_ni) {
             // Linking a directory under its own subtree and then removing its old name
             // would detach the whole branch from the root (rename(2) says EINVAL).
@@ -1043,8 +1327,8 @@ bool ntfsRenameFile(int volumeId, const std::string& oldPath, const std::string&
                 if (delRet != 0) {
                     LOGI("ntfsRenameFile: linked '%s' OK but removing old name '%s' failed (errno=%d); retrying cleanup",
                          newFullPath.c_str(), oldFullPath.c_str(), errno);
-                    ntfs_inode* retryOldNi = ntfs_pathname_to_inode(v.ntfsVol, NULL, oldFullPath.c_str());
-                    ntfs_inode* retryDirNi = ntfs_pathname_to_inode(v.ntfsVol, NULL, parentOldPath.c_str());
+                    ntfs_inode* retryOldNi = ntfsResolvePath(v.ntfsVol, oldPath, false);
+                    ntfs_inode* retryDirNi = ntfsResolvePath(v.ntfsVol, parentOldPath, true);
                     if (retryOldNi && retryDirNi) {
                         if (ntfs_delete(v.ntfsVol, oldFullPath.c_str(), retryOldNi, retryDirNi,
                                          uOld, static_cast<u8>(uOldLen)) != 0) {
@@ -1076,8 +1360,7 @@ bool ntfsSetLastModifiedTime(int volumeId, const std::string& path, uint64_t epo
     auto& v = volumes[volumeId];
     if (v.readOnly) return false;
     bool success = false;
-    std::string fullPath = "/" + path;
-    ntfs_inode* ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullPath.c_str());
+    ntfs_inode* ni = ntfsResolvePath(v.ntfsVol, path, true);
     if (ni) {
         uint64_t ntfsTime = (epochSeconds * 10000000ULL) + 116444736000000000ULL;
         ni->last_data_change_time = ntfsTime;
@@ -1100,8 +1383,7 @@ void ntfsGetSpaceInfo(int volumeId, uint64_t& outTotalBytes, uint64_t& outFreeBy
 
 void* ntfsOpenStream(int volumeId, const std::string& path) {
     auto& v = volumes[volumeId];
-    std::string fullPath = "/" + path;
-    ntfs_inode* ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullPath.c_str());
+    ntfs_inode* ni = ntfsResolvePath(v.ntfsVol, path, true);
     if (ni) {
         ntfs_attr* na = ntfs_attr_open(ni, AT_DATA, NULL, 0);
         if (na) {

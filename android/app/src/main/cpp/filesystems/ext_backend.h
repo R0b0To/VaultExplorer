@@ -88,6 +88,9 @@ bool extReclaimOrphanedInodes(int volumeId);
 // from what used to be inline `else if (v.fsType == FS_EXT) { ... }`
 // branches in jni/filesystem_bridge.cpp.
 void extListDirectory(int volumeId, const std::string& pathSuffix, std::vector<std::string>& results);
+void extListSymlinks(int volumeId, const std::string& pathSuffix, std::vector<std::string>& results);
+bool extReadSymlink(int volumeId, const std::string& path, std::string& outTarget);
+bool extCreateSymlink(int volumeId, const std::string& path, const std::string& target);
 int64_t extGetFileSize(int volumeId, const std::string& path);
 bool extReadFileChunk(int volumeId, const std::string& path, uint64_t offset, size_t length, std::vector<uint8_t>& outBuffer);
 bool extWriteFileChunk(int volumeId, const std::string& path, uint64_t offset, const uint8_t* data, size_t length);

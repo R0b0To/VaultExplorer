@@ -4011,5 +4011,13 @@
   "symbolicLinkSelectThisFolder": "Diesen Ordner auswählen",
   "symbolicLinkPickerLoadError": "Dieser Ordner konnte nicht geladen werden",
   "shortcutBadge": "Verknüpfung",
-  "emptyFolder": "Dieser Ordner ist leer"
+  "emptyFolder": "Dieser Ordner ist leer",
+  "symbolicLinkTargetHelperRelative": "Verwende einen relativen Pfad innerhalb dieses Containers. Das Ziel darf fehlen; Umbenennen oder Löschen des Links ändert das Ziel nicht.",
+  "@symbolicLinkTargetHelperRelative": {
+    "description": "Helper text under the symbolic link target field for native LUKS/VeraCrypt filesystems"
+  },
+  "symbolicLinkTargetOutsideVault": "Das Ziel muss ein relativer Pfad innerhalb dieses Containers sein.",
+  "@symbolicLinkTargetOutsideVault": {
+    "description": "Error under the symbolic link target field when a native target is absolute or escapes the container root"
+  }
 }

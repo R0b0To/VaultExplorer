@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/filesystem/filesystem_type.dart';
+import 'package:vaultexplorer/core/filesystem/volume_filesystem_registry.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
@@ -16,6 +18,7 @@ void main() {
   late FakeOperationService opService;
 
   setUp(() {
+    VolumeFilesystemRegistry.clearForTesting();
     fileIo = FakeSymlinkFileIo();
     opService = FakeOperationService();
   });
@@ -39,6 +42,7 @@ void main() {
     WidgetTester tester, {
     String dir = '',
     List<RawEntry> entries = const [],
+    MountedContainer? container,
   }) async {
     await tester.pumpWidget(
       app(
@@ -46,7 +50,7 @@ void main() {
           builder: (context) => ElevatedButton(
             onPressed: () => BrowserDialogs.showCreateSymlink(
               context,
-              container: cryptomatorContainer(),
+              container: container ?? cryptomatorContainer(),
               currentDirPath: dir,
               existingEntries: entries,
               onSuccess: () {},
@@ -73,6 +77,29 @@ void main() {
       expect(find.text('Points to'), findsOneWidget);
       expect(find.textContaining('Relative targets are resolved inside this vault'), findsOneWidget);
       expect(createEnabled(tester), isFalse);
+    });
+
+    testWidgets('native disk-image targets must be relative and stay inside the container', (tester) async {
+      await openDialog(
+        tester,
+        container: cryptomatorContainer(format: 'luks2'),
+        dir: 'folder',
+      );
+      expect(find.textContaining('Use a relative path inside this container'), findsOneWidget);
+      await tester.enterText(nameField(), 'ln');
+
+      await tester.enterText(targetField(), '/absolute');
+      await tester.pump();
+      expect(find.text('Target must be a relative path that stays inside this container.'), findsOneWidget);
+      expect(createEnabled(tester), isFalse);
+
+      await tester.enterText(targetField(), '../../escape');
+      await tester.pump();
+      expect(createEnabled(tester), isFalse);
+
+      await tester.enterText(targetField(), '../inside');
+      await tester.pump();
+      expect(createEnabled(tester), isTrue);
     });
 
     testWidgets('needs both a name and a target', (tester) async {
@@ -223,13 +250,25 @@ void main() {
       expect(find.byIcon(Icons.add_link), findsOneWidget);
     });
 
-    testWidgets('other vault formats do not', (tester) async {
-      for (final format in ['veracrypt', 'gocryptfs', 'cryfs', 'luks']) {
-        await tester.pumpWidget(const SizedBox()); // fresh state: the previous menu was left open
+    testWidgets('unsupported formats and unknown native filesystems do not', (tester) async {
+      for (final format in ['veracrypt', 'gocryptfs', 'cryfs', 'luks1', 'bitlocker', 'plain']) {
+        await tester.pumpWidget(const SizedBox());
         await tester.pumpWidget(menu(cryptomatorContainer(format: format)));
         await openMenu(tester);
         expect(find.text('New Folder'), findsOneWidget, reason: 'menu opened for $format');
         expect(find.text('New symbolic link'), findsNothing, reason: format);
+      }
+    });
+
+    testWidgets('LUKS and VeraCrypt offer links on ext and NTFS', (tester) async {
+      for (final format in ['luks1', 'luks2', 'veracrypt']) {
+        for (final fs in [FilesystemType.ext, FilesystemType.ntfs]) {
+          VolumeFilesystemRegistry.record(7, fs);
+          await tester.pumpWidget(const SizedBox());
+          await tester.pumpWidget(menu(cryptomatorContainer(format: format)));
+          await openMenu(tester);
+          expect(find.text('New symbolic link'), findsOneWidget, reason: '$format / $fs');
+        }
       }
     });
 

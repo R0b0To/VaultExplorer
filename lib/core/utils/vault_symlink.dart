@@ -1,13 +1,14 @@
 import 'package:flutter/foundation.dart';
 
-/// A symbolic link inside a Cryptomator vault.
+/// A symbolic link in a Cryptomator vault or a native ext/NTFS filesystem
+/// inside a LUKS/VeraCrypt container.
 ///
 /// Links are fetched separately from the general filesystem listing so sync,
-/// export and scanners do not recurse through them. The interactive browser
-/// merges them into its visible listing as shortcut entries. Path access follows
-/// relative targets within the same vault; link-node rename/delete remain no-follow.
+/// export and scanners do not treat link targets as regular file content.
+/// Path access follows supported targets within the same container; link-node
+/// rename/delete remain no-follow.
 ///
-/// Wire shape (from `foldervault_bridge.cpp`, only ever produced by the symlink listing):
+/// Wire shape (produced only by the dedicated symlink listing):
 ///   "L|targetBytes|unixSecs|name"   (file target or broken link)
 ///   "LD|0|unixSecs|name"           (directory target)
 @immutable

@@ -13533,4 +13533,11 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get emptyFolder => '此文件夹为空';
+
+  @override
+  String get symbolicLinkTargetHelperRelative =>
+      '请使用此容器内的相对路径。目标可以暂时不存在；重命名或删除链接不会更改目标。';
+
+  @override
+  String get symbolicLinkTargetOutsideVault => '目标必须是保留在此容器内的相对路径。';
 }

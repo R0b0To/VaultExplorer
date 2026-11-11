@@ -14652,4 +14652,12 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get emptyFolder => 'Ce dossier est vide';
+
+  @override
+  String get symbolicLinkTargetHelperRelative =>
+      'Utilisez un chemin relatif dans ce conteneur. La cible peut ne pas exister ; renommer ou supprimer le lien ne modifie pas la cible.';
+
+  @override
+  String get symbolicLinkTargetOutsideVault =>
+      'La cible doit être un chemin relatif qui reste dans ce conteneur.';
 }

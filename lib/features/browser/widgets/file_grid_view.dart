@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/api/vault_book_api.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
+import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/theme/file_manager_skin_scope.dart';
@@ -749,7 +750,7 @@ class FileGridViewState extends State<FileGridView>
     );
 
     if (entry.isSymlink &&
-        _containerOf(entry).format.isCryptomator &&
+        mayHaveVaultSymbolicLinks(_containerOf(entry)) &&
         widget.archiveContext == null) {
       final targetContainer = _containerOf(entry);
       previewWidget = ShortcutTargetPreview(

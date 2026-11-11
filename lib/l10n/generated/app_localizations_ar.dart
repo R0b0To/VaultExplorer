@@ -14566,4 +14566,12 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get emptyFolder => 'هذا المجلد فارغ';
+
+  @override
+  String get symbolicLinkTargetHelperRelative =>
+      'استخدم مسارًا نسبيًا داخل هذا الحاوي. يمكن ألا يكون الهدف موجودًا بعد؛ إعادة تسمية الرابط أو حذفه لا تغيّر الهدف.';
+
+  @override
+  String get symbolicLinkTargetOutsideVault =>
+      'يجب أن يكون الهدف مسارًا نسبيًا يبقى داخل هذا الحاوي.';
 }

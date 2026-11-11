@@ -33,7 +33,7 @@ class RawEntry {
   final String name;
   final bool isDir;
 
-  /// True when this entry is a Cryptomator symbolic link. The entry keeps
+  /// True when this entry is a symbolic link. The entry keeps
   /// its link path for rename/delete, while content access follows its target.
   final bool isSymlink;
 

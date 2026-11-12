@@ -12,11 +12,17 @@ on:
         options:
           - release
           - debug
+          - prerelease
         default: release
       publish_debug:
         description: 'Debug only: publish the APKs to the rolling "debug-latest" pre-release'
         type: boolean
         default: true
+      prerelease_tag:
+        description: 'Pre-release tag (only for prerelease; leave empty to auto-use v<version>-pre)'
+        type: string
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -89,29 +95,41 @@ jobs:
           .flutter/bin/flutter config --no-analytics
           .flutter/bin/flutter pub get --enforce-lockfile
 
-      - name: Build ${{ env.BUILD_TYPE }} APK
+      - name: Build APK(s)
         working-directory: ${{ env.BUILD_DIR }}
         run: |
           export PUB_CACHE="${{ env.BUILD_DIR }}/.pub-cache"
           BASE_VERSION_CODE=$(grep '^version:' pubspec.yaml | sed -n 's/.*+\([0-9]*\)/\1/p')
           VERSION_CODE=$(( BASE_VERSION_CODE * 100 + ${{ matrix.offset }} ))
 
-          .flutter/bin/flutter build apk --${{ env.BUILD_TYPE }} \
-            --target-platform=${{ matrix.target_platform }} \
-            --build-number=$VERSION_CODE
+          if [ "${{ env.BUILD_TYPE }}" = "prerelease" ]; then
+            MODES=("release" "debug")
+          else
+            MODES=("${{ env.BUILD_TYPE }}")
+          fi
 
-      - name: Prepare APK for Release
+          for MODE in "${MODES[@]}"; do
+            echo "Building $MODE APK for ${{ matrix.flavor }}..."
+            .flutter/bin/flutter build apk --$MODE \
+              --target-platform=${{ matrix.target_platform }} \
+              --build-number=$VERSION_CODE
+          done
+
+      - name: Prepare APKs for Release
         working-directory: ${{ env.BUILD_DIR }}
         run: |
           VERSION=$(grep '^version:' pubspec.yaml | sed 's/^version: //' | cut -d'+' -f1)
-          if [ "${{ env.BUILD_TYPE }}" = "debug" ]; then
-            NAME="VaultExplorer-v${VERSION}-debug-${{ matrix.flavor }}.apk"
-          else
-            NAME="VaultExplorer-v${VERSION}-${{ matrix.flavor }}.apk"
-          fi
           mkdir -p release-apk
-          cp "build/app/outputs/flutter-apk/app-${{ env.BUILD_TYPE }}.apk" \
-             "release-apk/${NAME}"
+
+          if [ -f "build/app/outputs/flutter-apk/app-release.apk" ]; then
+            cp "build/app/outputs/flutter-apk/app-release.apk" \
+               "release-apk/VaultExplorer-v${VERSION}-${{ matrix.flavor }}.apk"
+          fi
+
+          if [ -f "build/app/outputs/flutter-apk/app-debug.apk" ]; then
+            cp "build/app/outputs/flutter-apk/app-debug.apk" \
+               "release-apk/VaultExplorer-v${VERSION}-debug-${{ matrix.flavor }}.apk"
+          fi
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -124,22 +142,22 @@ jobs:
     name: Create GitHub Release
     needs: build
     runs-on: ubuntu-latest
-    # Tag pushes publish a normal release. A manual debug run publishes only
-    # the rolling "debug-latest" pre-release (when "publish_debug" is ticked).
     if: >-
       startsWith(github.ref, 'refs/tags/') ||
       (github.event_name == 'workflow_dispatch' &&
        inputs.build_type == 'debug' &&
-       inputs.publish_debug)
+       inputs.publish_debug) ||
+      (github.event_name == 'workflow_dispatch' &&
+       inputs.build_type == 'prerelease')
     permissions:
       contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Extract Build Number & Set Changelog Path
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Extract Metadata & Changelog Path
         run: |
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/^version: //' | cut -d'+' -f1)
           BUILD_NUMBER=$(grep '^version:' pubspec.yaml | sed 's/^version: //' | cut -d'+' -f2)
           CHANGELOG_FILE="fastlane/metadata/android/en-US/changelogs/${BUILD_NUMBER}.txt"
 
@@ -149,6 +167,14 @@ jobs:
             echo "CHANGELOG_PATH=" >> $GITHUB_ENV
           fi
 
+          if [ "${{ inputs.build_type }}" = "prerelease" ]; then
+            TAG="${{ inputs.prerelease_tag }}"
+            if [ -z "$TAG" ]; then
+              TAG="v${VERSION}-pre"
+            fi
+            echo "PRERELEASE_TAG=$TAG" >> $GITHUB_ENV
+          fi
+
       - name: Download all APK artifacts
         uses: actions/download-artifact@v4
         with:
@@ -156,6 +182,7 @@ jobs:
           pattern: VaultExplorer-*-APK
           merge-multiple: true
 
+      # --- 1. Full Production Release (Triggered by git tag push v*) ---
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
@@ -167,19 +194,32 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # One rolling pre-release instead of one per run: delete the previous
-      # one (and its tag) so there is only ever a single "debug-latest" tag.
-      # The tag does not start with "v", so it never triggers this workflow
-      # and does not look like a version to anything that scans tags.
+      # --- 2. Manual Pre-release with BOTH Release and Debug APKs ---
+      - name: Create GitHub Pre-release (Release + Debug)
+        if: github.event_name == 'workflow_dispatch' && inputs.build_type == 'prerelease'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.PRERELEASE_TAG }}
+          target_commitish: ${{ github.sha }}
+          name: VaultExplorer ${{ env.PRERELEASE_TAG }}
+          prerelease: true
+          make_latest: false
+          body_path: ${{ env.CHANGELOG_PATH }}
+          generate_release_notes: true
+          files: release-apk/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # --- 3. Manual Rolling Debug Only Pre-release (debug-latest) ---
       - name: Remove previous debug pre-release
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        if: github.event_name == 'workflow_dispatch' && inputs.build_type == 'debug'
         run: gh release delete debug-latest --cleanup-tag --yes || true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
 
       - name: Create GitHub Debug Pre-release
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        if: github.event_name == 'workflow_dispatch' && inputs.build_type == 'debug'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: debug-latest

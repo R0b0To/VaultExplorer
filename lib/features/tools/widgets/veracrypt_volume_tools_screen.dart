@@ -5,6 +5,9 @@ import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/api/veracrypt_tools_api.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/utils/responsive.dart';
+import 'package:vaultexplorer/core/widgets/layout/section_card.dart';
 import 'package:vaultexplorer/core/widgets/crypto_forms/keyfiles_picker.dart';
 import 'package:vaultexplorer/core/widgets/inputs/option_picker_tile.dart';
 import 'package:vaultexplorer/core/widgets/inputs/utf8_byte_limit_formatter.dart';
@@ -318,10 +321,33 @@ class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeTool
     );
   }
 
+  Widget _feedbackBanner(BuildContext context, {required String message, required bool error}) {
+    final cs = context.colors;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      color: error ? cs.errorContainer : cs.primaryContainer,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(error ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded,
+              color: error ? cs.onErrorContainer : cs.onPrimaryContainer, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(message, style: TextStyle(
+              color: error ? cs.onErrorContainer : cs.onPrimaryContainer,
+            )),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final scheme = Theme.of(context).colorScheme;
+    final cs = context.colors;
+    final isWide = context.screen.useWideLayout;
     final title = _isLuksExpand
         ? l10n.toolExpandLuksVolumeTitle
         : (_isExpand ? l10n.toolExpandVolumeTitle : l10n.toolHiddenInExistingTitle);
@@ -329,159 +355,211 @@ class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeTool
     final hiddenReady = host != null && host.maxHiddenBytes > 0;
 
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
+      appBar: AppBar(
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        elevation: 0,
+        backgroundColor: cs.surfaceContainerHigh,
+      ),
+      body: Column(
         children: [
-          Text(
-            _isLuksExpand
-                ? l10n.luksToolsExpandNote
-                : (_isExpand ? l10n.vcToolsExpandNote : l10n.vcToolsHiddenNote),
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 16),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.folder_open_rounded),
-            title: Text(_target?.displayName ?? l10n.vcToolsNoContainer),
-            trailing: OutlinedButton(
-              onPressed: _busy ? null : _pickContainer,
-              child: Text(l10n.vcToolsPickContainer),
+          if (_busy) const LinearProgressIndicator(minHeight: 3),
+          if (_error != null) _feedbackBanner(context, message: _error!, error: true),
+          if (_status != null) _feedbackBanner(context, message: _status!, error: false),
+          Expanded(
+            child: ListView(
+              padding: isWide
+                  ? const EdgeInsets.symmetric(horizontal: 24, vertical: 16)
+                  : AppSpacing.pagePadding,
+              children: [
+                Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 760),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: cs.surfaceContainerLow,
+                            borderRadius: BorderRadius.circular(AppRadius.lg),
+                            border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.35)),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(Icons.info_outline_rounded, color: cs.primary),
+                              const SizedBox(width: 12),
+                              Expanded(child: Text(
+                                _isLuksExpand
+                                    ? l10n.luksToolsExpandNote
+                                    : (_isExpand ? l10n.vcToolsExpandNote : l10n.vcToolsHiddenNote),
+                                style: context.typography.bodyMedium,
+                              )),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        const SectionHeader('Container'),
+                        SectionCard(children: [
+                          ListTile(
+                            onTap: _busy ? null : _pickContainer,
+                            leading: Icon(Icons.folder_open_rounded, color: cs.primary),
+                            title: Text(_target?.displayName ?? l10n.vcToolsNoContainer,
+                                maxLines: 2, overflow: TextOverflow.ellipsis),
+                            trailing: Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+                          ),
+                        ]),
+                        const SectionHeader('Credentials'),
+                        SectionCard(children: [
+                          Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                            child: _passwordField(controller: _passwordCtrl, label: l10n.vcToolsPasswordLabel)),
+                          if (!_isLuksExpand)
+                            Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                              child: _numberField(controller: _pimCtrl, label: l10n.vcToolsPimLabel)),
+                          Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                            child: KeyfilesPicker(
+                              keyfiles: _keyfiles,
+                              picking: _pickingKeyfiles,
+                              onPick: () => _pickKeyfiles(hidden: false),
+                              onRemove: (k) => setState(() {
+                                _keyfiles = _keyfiles.where((x) => x.uri != k.uri).toList();
+                                _host = null;
+                              }),
+                              enabled: !_busy,
+                              addEnabled: !_isLuksExpand || _keyfiles.isEmpty,
+                            )),
+                        ]),
+                        const SizedBox(height: 8),
+                        if (_isExpand) ...[
+                          const SectionHeader('Volume options'),
+                          SectionCard(children: [
+                            Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                              child: _numberField(controller: _sizeCtrl, label: l10n.vcToolsNewSizeLabel)),
+                            SwitchListTile(
+                              value: _initFree,
+                              onChanged: _busy ? null : (v) => setState(() => _initFree = v),
+                              title: Text(l10n.vcToolsInitFreeSpace),
+                              subtitle: Text(l10n.vcToolsInitFreeSpaceHint),
+                            ),
+                            SwitchListTile(
+                              value: _growFs,
+                              onChanged: _busy ? null : (v) => setState(() => _growFs = v),
+                              title: Text(l10n.vcToolsGrowFsToggle),
+                              subtitle: Text(l10n.vcToolsGrowFsToggleHint),
+                            ),
+                          ]),
+                          const SizedBox(height: 16),
+                          FilledButton.icon(
+                            onPressed: _busy ? null : _expand,
+                            icon: const Icon(Icons.open_in_full_rounded),
+                            label: Text(l10n.vcToolsExpandAction),
+                          ),
+                          const SizedBox(height: 8),
+                          OutlinedButton.icon(
+                            onPressed: _busy ? null : _growFileSystemOnly,
+                            icon: const Icon(Icons.storage_rounded),
+                            label: Text(l10n.vcToolsGrowFsOnlyAction),
+                          ),
+                        ] else ...[
+                          const SizedBox(height: 16),
+                          OutlinedButton.icon(
+                            onPressed: _busy ? null : _analyze,
+                            icon: const Icon(Icons.analytics_outlined),
+                            label: Text(l10n.vcToolsAnalyzeAction),
+                          ),
+                          if (host != null) ...[
+                            const SizedBox(height: 12),
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: cs.surfaceContainerLow,
+                                borderRadius: BorderRadius.circular(AppRadius.lg),
+                              ),
+                              child: Row(children: [
+                                Icon(hiddenReady ? Icons.check_circle_outline : Icons.info_outline,
+                                    color: hiddenReady ? cs.primary : cs.onSurfaceVariant),
+                                const SizedBox(width: 12),
+                                Expanded(child: Text(hiddenReady
+                                    ? '${l10n.vcToolsMaxHidden}: ${_mib(host.maxHiddenBytes)}'
+                                    : l10n.vcToolsNoRoom)),
+                              ]),
+                            ),
+                          ],
+                          if (hiddenReady) ...[
+                            const SectionHeader('Hidden volume'),
+                            SectionCard(children: [
+                              Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                                child: _numberField(controller: _hiddenSizeCtrl, label: l10n.vcToolsHiddenSizeLabel)),
+                              Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                                child: _passwordField(controller: _hiddenPasswordCtrl,
+                                  label: l10n.vcToolsHiddenPasswordLabel, limitBytes: true)),
+                              Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                                child: _passwordField(controller: _hiddenConfirmCtrl,
+                                  label: l10n.vcToolsHiddenConfirmLabel, limitBytes: true)),
+                              Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                                child: _numberField(controller: _hiddenPimCtrl, label: l10n.vcToolsPimLabel)),
+                              Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                                child: KeyfilesPicker(
+                                  keyfiles: _hiddenKeyfiles,
+                                  picking: _pickingHiddenKeyfiles,
+                                  onPick: () => _pickKeyfiles(hidden: true),
+                                  onRemove: (k) => setState(() {
+                                    _hiddenKeyfiles = _hiddenKeyfiles.where((x) => x.uri != k.uri).toList();
+                                  }),
+                                  enabled: !_busy,
+                                )),
+                              OptionPickerTile<int>(
+                                label: l10n.encryptionAlgorithmLabel,
+                                value: _hiddenCipherId,
+                                prefixIcon: Icons.lock_rounded,
+                                options: [for (final c in CipherAlgo.concrete)
+                                  SelectOption<int>(value: c.id, label: c.label)],
+                                onChanged: (v) => setState(() => _hiddenCipherId = v),
+                                enabled: !_busy,
+                              ),
+                              OptionPickerTile<int>(
+                                label: l10n.hashAlgorithmLabel,
+                                value: _hiddenHashId,
+                                prefixIcon: Icons.tag_rounded,
+                                options: [for (final h in HashAlgo.concrete)
+                                  SelectOption<int>(value: h.id, label: h.label)],
+                                onChanged: (v) => setState(() => _hiddenHashId = v),
+                                enabled: !_busy,
+                              ),
+                              OptionPickerTile<String>(
+                                label: l10n.vcToolsHiddenFsLabel,
+                                value: _hiddenFs,
+                                prefixIcon: Icons.dns_rounded,
+                                options: [for (final fs in _hiddenFileSystems)
+                                  SelectOption<String>(value: fs, label: fs)],
+                                onChanged: (v) => setState(() => _hiddenFs = v),
+                                enabled: !_busy,
+                              ),
+                              SwitchListTile(
+                                value: _quick,
+                                onChanged: _busy ? null : (v) => setState(() => _quick = v),
+                                title: Text(l10n.vcToolsQuickFormat),
+                              ),
+                            ]),
+                            const SizedBox(height: 16),
+                            FilledButton.icon(
+                              onPressed: _busy ? null : _createHidden,
+                              icon: const Icon(Icons.add_to_drive_rounded),
+                              label: Text(l10n.vcToolsCreateHiddenAction),
+                            ),
+                          ],
+                        ],
+                        const SizedBox(height: 24),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          _passwordField(controller: _passwordCtrl, label: l10n.vcToolsPasswordLabel),
-          if (!_isLuksExpand) _numberField(controller: _pimCtrl, label: l10n.vcToolsPimLabel),
-          KeyfilesPicker(
-            keyfiles: _keyfiles,
-            picking: _pickingKeyfiles,
-            onPick: () => _pickKeyfiles(hidden: false),
-            onRemove: (k) => setState(() {
-              _keyfiles = _keyfiles.where((x) => x.uri != k.uri).toList();
-              _host = null;
-            }),
-            enabled: !_busy,
-            addEnabled: !_isLuksExpand || _keyfiles.isEmpty,
-          ),
-          const SizedBox(height: 8),
-          if (_isExpand) ...[
-            _numberField(controller: _sizeCtrl, label: l10n.vcToolsNewSizeLabel),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              value: _initFree,
-              onChanged: _busy ? null : (v) => setState(() => _initFree = v),
-              title: Text(l10n.vcToolsInitFreeSpace),
-              subtitle: Text(l10n.vcToolsInitFreeSpaceHint),
-            ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              value: _growFs,
-              onChanged: _busy ? null : (v) => setState(() => _growFs = v),
-              title: Text(l10n.vcToolsGrowFsToggle),
-              subtitle: Text(l10n.vcToolsGrowFsToggleHint),
-            ),
-            const SizedBox(height: 8),
-            FilledButton(
-              onPressed: _busy ? null : _expand,
-              child: Text(l10n.vcToolsExpandAction),
-            ),
-            const SizedBox(height: 8),
-            OutlinedButton(
-              onPressed: _busy ? null : _growFileSystemOnly,
-              child: Text(l10n.vcToolsGrowFsOnlyAction),
-            ),
-          ] else ...[
-            OutlinedButton(
-              onPressed: _busy ? null : _analyze,
-              child: Text(l10n.vcToolsAnalyzeAction),
-            ),
-            if (host != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                hiddenReady
-                    ? '${l10n.vcToolsMaxHidden}: ${_mib(host.maxHiddenBytes)}'
-                    : l10n.vcToolsNoRoom,
-              ),
-            ],
-            if (hiddenReady) ...[
-              const SizedBox(height: 12),
-              _numberField(controller: _hiddenSizeCtrl, label: l10n.vcToolsHiddenSizeLabel),
-              _passwordField(
-                controller: _hiddenPasswordCtrl,
-                label: l10n.vcToolsHiddenPasswordLabel,
-                limitBytes: true,
-              ),
-              _passwordField(
-                controller: _hiddenConfirmCtrl,
-                label: l10n.vcToolsHiddenConfirmLabel,
-                limitBytes: true,
-              ),
-              _numberField(controller: _hiddenPimCtrl, label: l10n.vcToolsPimLabel),
-              KeyfilesPicker(
-                keyfiles: _hiddenKeyfiles,
-                picking: _pickingHiddenKeyfiles,
-                onPick: () => _pickKeyfiles(hidden: true),
-                onRemove: (k) => setState(() {
-                  _hiddenKeyfiles = _hiddenKeyfiles.where((x) => x.uri != k.uri).toList();
-                }),
-                enabled: !_busy,
-              ),
-              OptionPickerTile<int>(
-                label: l10n.encryptionAlgorithmLabel,
-                value: _hiddenCipherId,
-                prefixIcon: Icons.lock_rounded,
-                options: [
-                  for (final c in CipherAlgo.concrete) SelectOption<int>(value: c.id, label: c.label),
-                ],
-                onChanged: (v) => setState(() => _hiddenCipherId = v),
-                enabled: !_busy,
-              ),
-              OptionPickerTile<int>(
-                label: l10n.hashAlgorithmLabel,
-                value: _hiddenHashId,
-                prefixIcon: Icons.tag_rounded,
-                options: [
-                  for (final h in HashAlgo.concrete) SelectOption<int>(value: h.id, label: h.label),
-                ],
-                onChanged: (v) => setState(() => _hiddenHashId = v),
-                enabled: !_busy,
-              ),
-              OptionPickerTile<String>(
-                label: l10n.vcToolsHiddenFsLabel,
-                value: _hiddenFs,
-                prefixIcon: Icons.dns_rounded,
-                options: [
-                  for (final fs in _hiddenFileSystems) SelectOption<String>(value: fs, label: fs),
-                ],
-                onChanged: (v) => setState(() => _hiddenFs = v),
-                enabled: !_busy,
-              ),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                value: _quick,
-                onChanged: _busy ? null : (v) => setState(() => _quick = v),
-                title: Text(l10n.vcToolsQuickFormat),
-              ),
-              const SizedBox(height: 8),
-              FilledButton(
-                onPressed: _busy ? null : _createHidden,
-                child: Text(l10n.vcToolsCreateHiddenAction),
-              ),
-            ],
-          ],
-          if (_busy) ...[
-            const SizedBox(height: 16),
-            const LinearProgressIndicator(),
-          ],
-          if (_error != null) ...[
-            const SizedBox(height: 16),
-            Text(_error!, style: TextStyle(color: scheme.error)),
-          ],
-          if (_status != null) ...[
-            const SizedBox(height: 16),
-            Text(_status!, style: TextStyle(color: scheme.primary)),
-          ],
         ],
       ),
     );
   }
+
 }

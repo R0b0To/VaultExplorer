@@ -28,6 +28,7 @@
 #include <vector>
 
 #include "copy_progress_callback.h"
+#include "fs_grow.h"
 
 // ── Directory listing ──────────────────────────────────────────────────
 // Returns false when the listing failed and outResults can't be trusted (so an
@@ -112,3 +113,11 @@ void* fsOpenStream(int volId, const std::string& path);
 // this volume, or on any I/O error.
 int32_t fsReadStream(int volId, void* handle, uint64_t offset, uint8_t* dest, size_t length);
 void fsCloseStream(int volId, void* handle);
+
+// ── Growing the file system to fill the volume ─────────────────────────
+// After the container itself was expanded (containers/vc_expand.h) the file system inside still ends where it
+// did: grows it into the added space in place -- NTFS (ntfsresize's grow path) and ext2/3/4 (resize2fs's
+// engine). FAT/exFAT can't, and report kUnsupported when there is unallocated space. On kGrown the file
+// system has been unmounted and mounted again; any handle obtained before (streams) is gone, which is why
+// kBusy is returned while streams are open. Same locking precondition as the rest of this header.
+FsGrowStatus fsGrowToFit(int volId);

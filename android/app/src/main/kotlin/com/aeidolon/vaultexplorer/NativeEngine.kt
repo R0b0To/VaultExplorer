@@ -85,12 +85,23 @@ internal object NativeEngine {
         newHashId: Int = 255
     ): Boolean
 
-    /** Grows a standard VeraCrypt file container (see ExpandOutcome in container_create.h for the result codes). */
+    /**
+     * Grows a standard VeraCrypt file container (see ExpandOutcome in container_create.h for the result codes) and,
+     * when [growFileSystem] is set, the file system inside. Returns [container outcome, file-system step, kind]:
+     * step is -1 when not run, otherwise an FsGrowStatus (fs_grow.h); kind 0 unknown, 1 FAT12, 2 FAT16, 3 FAT32,
+     * 4 exFAT, 5 NTFS, 6 ext2, 7 ext3, 8 ext4. Null on a native exception.
+     */
     @JvmStatic
     external fun expandVeraCryptContainerNative(
         fd: Int, password: String, pim: Int, cipherId: Int, hashId: Int,
-        keyfileFds: IntArray?, newSizeBytes: Long, initFreeSpace: Boolean
-    ): Int
+        keyfileFds: IntArray?, newSizeBytes: Long, initFreeSpace: Boolean, growFileSystem: Boolean
+    ): IntArray?
+
+    /** Only the file-system step for a volume expanded earlier; same result array as [expandVeraCryptContainerNative]. */
+    @JvmStatic
+    external fun growVeraCryptFileSystemNative(
+        fd: Int, password: String, pim: Int, cipherId: Int, hashId: Int, keyfileFds: IntArray?
+    ): IntArray?
 
     /** [outcome, fsKind, clusterSize, maxHiddenBytes]; outcome codes as in HiddenHostOutcome (container_create.h). */
     @JvmStatic

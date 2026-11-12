@@ -246,6 +246,7 @@ abstract final class ChannelMethods {
   static const exportContainerHeader = 'exportContainerHeader';
   static const restoreContainerHeaderRegion = 'restoreContainerHeaderRegion';
   static const expandVeraCryptContainer = 'expandVeraCryptContainer';
+  static const growVeraCryptFileSystem = 'growVeraCryptFileSystem';
   static const analyzeHiddenVolumeHost = 'analyzeHiddenVolumeHost';
   static const createHiddenVolumeInExisting = 'createHiddenVolumeInExisting';
   static const resolveFolderVaultConfigFile = 'resolveFolderVaultConfigFile';

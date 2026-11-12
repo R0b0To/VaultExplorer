@@ -256,8 +256,14 @@ add_library(e2fs_uuid STATIC
         ${E2FS_SRC_DIR}/lib/uuid/unpack.c
         ${E2FS_SRC_DIR}/lib/uuid/unparse.c
         ${E2FS_SRC_DIR}/lib/uuid/uuid_time.c)
+# resize2fs's engine (resize_fs): grows an ext2/3/4 file system in place -- see extGrowToFit in
+# filesystems/ext_backend.cpp. Only resize2fs.c and extent.c are used; resource_track.c (sbrk/getrusage
+# statistics) is replaced by the no-op glue, and main.c/online.c/sim_progress.c are CLI-only.
 add_library(e2fs_ext2fs STATIC ${E2FS_EXT2FS_SOURCES}
-        ${E2FS_GENERATED_DIR}/ext2_err.c)
+        ${E2FS_GENERATED_DIR}/ext2_err.c
+        ${E2FS_SRC_DIR}/resize/resize2fs.c
+        ${E2FS_SRC_DIR}/resize/extent.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/filesystems/ext_resize_glue.c)
 foreach(E2FS_TARGET e2fs_com_err e2fs_uuid e2fs_ext2fs)
     target_include_directories(${E2FS_TARGET} PRIVATE
             ${CMAKE_CURRENT_BINARY_DIR} ${E2FS_GENERATED_DIR}
@@ -271,6 +277,7 @@ foreach(E2FS_TARGET e2fs_com_err e2fs_uuid e2fs_ext2fs)
             HAVE_LINUX_TYPES_H HAVE_SYS_TIME_H HAVE_GETPAGESIZE
             CRC_LE_BITS=1 CRC_BE_BITS=1 DISABLE_BACKTRACE _GNU_SOURCE)
 endforeach()
+target_include_directories(e2fs_ext2fs PRIVATE ${E2FS_SRC_DIR}/resize)
 target_link_libraries(e2fs_ext2fs PRIVATE e2fs_com_err e2fs_uuid)
 
 # 3e. cJSON

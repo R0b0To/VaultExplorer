@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "copy_progress_callback.h"
+#include "fs_grow.h"
 
 extern "C" {
 #include <ext2fs/ext2fs.h>
@@ -49,6 +50,9 @@ uint64_t recursiveExtFolderSize(int volumeId, const std::string& path);
 bool mountExtVolume(int volumeId);
 bool formatExtVolume(int volumeId, const char* variant);
 bool ensureExtBitmapsLoaded(int volumeId);
+// Grows the mounted ext2/3/4 file system to fill the volume (volumes[volumeId].dataAreaLengthBytes) using
+// e2fsprogs' resize_fs(), then remounts it. No data is relocated beyond what resize2fs itself does.
+FsGrowStatus extGrowToFit(int volumeId);
 // "ext2"/"ext3"/"ext4" from the mounted superblock's feature flags -- see
 // ext_backend.cpp for the detection heuristic (same one blkid uses).
 // Empty if the volume isn't actually mounted.

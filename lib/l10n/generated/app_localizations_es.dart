@@ -2534,10 +2534,40 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get vcToolsExpandNote =>
-      'Solo se agranda el contenedor. No se cambia el tamaño del sistema de archivos interno, por lo que el espacio añadido queda sin asignar hasta que se expanda el sistema de archivos. Haz una copia de seguridad del volumen primero.';
+      'Primero se agranda el contenedor. Después, el sistema de archivos interior se amplía hasta el espacio añadido cuando es posible sin reformatear (NTFS, ext2/3/4). FAT y exFAT no se pueden ampliar en el sitio; su espacio añadido queda sin asignar. Haz una copia de seguridad del volumen antes.';
 
   @override
   String get vcToolsExpandDone => 'Volumen expandido';
+
+  @override
+  String get vcToolsGrowFsToggle => 'Ampliar también el sistema de archivos';
+
+  @override
+  String get vcToolsGrowFsToggleHint =>
+      'Permite que los volúmenes NTFS y ext2/3/4 usen el espacio añadido de inmediato, sin reformatear.';
+
+  @override
+  String get vcToolsGrowFsOnlyAction => 'Ampliar solo el sistema de archivos';
+
+  @override
+  String get vcToolsFsGrown =>
+      'Sistema de archivos ampliado: el espacio añadido ya se puede usar.';
+
+  @override
+  String get vcToolsFsAlreadyFills =>
+      'El sistema de archivos ya ocupa todo el volumen.';
+
+  @override
+  String get vcToolsFsUnsupported =>
+      'Este sistema de archivos no se puede ampliar en el sitio (FAT y exFAT no). El espacio añadido queda sin asignar hasta que se reformatee el volumen; copia antes sus archivos.';
+
+  @override
+  String get vcToolsFsNeedsCheck =>
+      'El sistema de archivos está marcado como pendiente de comprobación. Ejecuta Comprobar y reparar en el volumen y luego usa «Ampliar solo el sistema de archivos».';
+
+  @override
+  String get vcToolsFsFailed =>
+      'No se pudo ampliar el sistema de archivos. El volumen en sí se ha ampliado; ejecuta Comprobar y reparar antes de usarlo.';
 
   @override
   String get vcToolsAnalyzeAction => 'Comprobar espacio libre';

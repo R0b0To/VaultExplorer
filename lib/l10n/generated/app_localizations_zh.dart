@@ -2360,10 +2360,36 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get vcToolsExpandNote =>
-      '仅扩大容器大小。内部文件系统不会被调整，因此新增空间在扩展文件系统之前将保持未分配状态。请先备份卷。';
+      '首先扩大容器。然后，在无需重新格式化即可实现时（NTFS、ext2/3/4），将内部文件系统扩展到新增空间。FAT 和 exFAT 无法就地扩展，新增空间将保持未分配状态。请先备份该卷。';
 
   @override
   String get vcToolsExpandDone => '卷已扩展';
+
+  @override
+  String get vcToolsGrowFsToggle => '同时扩展文件系统';
+
+  @override
+  String get vcToolsGrowFsToggleHint => '让 NTFS 和 ext2/3/4 卷无需重新格式化即可立即使用新增空间。';
+
+  @override
+  String get vcToolsGrowFsOnlyAction => '仅扩展文件系统';
+
+  @override
+  String get vcToolsFsGrown => '文件系统已扩展：新增空间可以使用了。';
+
+  @override
+  String get vcToolsFsAlreadyFills => '文件系统已占满整个卷。';
+
+  @override
+  String get vcToolsFsUnsupported =>
+      '此文件系统无法就地扩展（FAT 和 exFAT 不支持）。新增空间将保持未分配，直到重新格式化该卷；请先备份其中的文件。';
+
+  @override
+  String get vcToolsFsNeedsCheck =>
+      '文件系统被标记为需要检查。请先对该卷运行“检查与修复”，然后使用“仅扩展文件系统”。';
+
+  @override
+  String get vcToolsFsFailed => '无法扩展文件系统。卷本身已扩大；使用前请运行“检查与修复”。';
 
   @override
   String get vcToolsAnalyzeAction => '检查可用空间';

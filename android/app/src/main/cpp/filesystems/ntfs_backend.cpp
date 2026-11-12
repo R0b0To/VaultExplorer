@@ -21,6 +21,8 @@ extern "C" {
 #include "attrib.h"
 #include "index.h"
 #include "layout.h"
+#include "runlist.h"
+#include "bitmap.h"
 #include "volume.h"
 #include "reparse.h"
 }
@@ -617,6 +619,133 @@ extern "C" ntfs_device_operations vExplorer_ntfs_ops = {
     ntfsStat,
     ntfsIoctl
 };
+
+
+// ---- Growing the file system into unallocated space after the container was expanded ----------------------
+//
+// libntfs-3g has no resize API; this is the grow-only path of ntfsresize (ntfsprogs/ntfsresize.c), minus
+// everything about relocating data, written against the library so it never calls exit():
+//   * $Bitmap gets one bit per new cluster (new clusters free; the padding bits after the last cluster set).
+//     If it no longer fits its allocated clusters it is extended with clusters taken from the NEW space --
+//     the old file system may be completely full, which is the usual reason to expand;
+//   * $BadClus:$Bad, a sparse stream as long as the volume, is extended with a hole;
+//   * the boot sector gets the new size and a copy is written to the last sector (the backup boot sector).
+// Like ntfsresize the new volume is (device size - one sector) / cluster size clusters: the backup boot sector
+// at the end of the device is not part of the volume.
+// Order matters for interruption: the new backup boot sector is written first and the primary boot sector
+// (which is what the next mount reads the size from) last, so a half-finished grow leaves the old size.
+FsGrowStatus ntfsGrowToFit(int volumeId) {
+    if (volumeId < 0 || volumeId >= kMaxVolumes) return FsGrowStatus::kFailed;
+    VolumeState& volume = volumes[volumeId];
+    ntfs_volume* vol = volume.ntfsVol;
+    if (!vol || volume.readOnly) return FsGrowStatus::kFailed;
+    if (!volume.openNtfsStreams.empty()) return FsGrowStatus::kBusy;
+    const s64 sectorSize = vol->sector_size;
+    const s64 clusterSize = vol->cluster_size;
+    const s64 deviceBytes = static_cast<s64>(volume.dataAreaLengthBytes / sectorSize) * sectorSize;
+    if (deviceBytes <= sectorSize) return FsGrowStatus::kFailed;
+    const s64 oldClusters = vol->nr_clusters;
+    const s64 newClusters = (deviceBytes - sectorSize) / clusterSize;
+    if (newClusters <= oldClusters) return FsGrowStatus::kAlreadyFills;
+    if (vol->major_ver < 3) return FsGrowStatus::kUnsupported;   // NTFS 1.x: $BadClus isn't sparse
+    if (vol->flags & VOLUME_IS_DIRTY) return FsGrowStatus::kNeedsCheck;
+    ntfs_attr* bitmapAttr = vol->lcnbmp_na;
+    if (!bitmapAttr || !NAttrNonResident(bitmapAttr)) return FsGrowStatus::kFailed;
+
+    auto bitmapBytesFor = [](s64 clusters) { return ((clusters + 7) / 8 + 7) & ~static_cast<s64>(7); };
+    const s64 oldBitmapBytes = bitmapAttr->data_size;
+    const s64 newBitmapBytes = bitmapBytesFor(newClusters);
+    const s64 oldBitmapClusters = bitmapAttr->allocated_size >> vol->cluster_size_bits;
+    const s64 neededBitmapClusters = (newBitmapBytes + clusterSize - 1) / clusterSize;
+    const s64 extraClusters = std::max<s64>(0, neededBitmapClusters - oldBitmapClusters);
+    if (extraClusters >= newClusters - oldClusters) return FsGrowStatus::kFailed;
+    LOGI("ntfsGrowToFit: volume %d growing %lld -> %lld clusters (bitmap %lld -> %lld bytes, +%lld clusters)",
+         volumeId, static_cast<long long>(oldClusters), static_cast<long long>(newClusters),
+         static_cast<long long>(oldBitmapBytes), static_cast<long long>(newBitmapBytes),
+         static_cast<long long>(extraClusters));
+
+    // The new $Bitmap content.
+    std::vector<u8> bitmap(static_cast<size_t>(newBitmapBytes), 0);
+    if (ntfs_attr_pread(bitmapAttr, 0, std::min(oldBitmapBytes, newBitmapBytes), bitmap.data()) !=
+        std::min(oldBitmapBytes, newBitmapBytes)) {
+        return FsGrowStatus::kFailed;
+    }
+    for (s64 bit = oldClusters; bit < newBitmapBytes * 8; ++bit)
+        ntfs_bit_set(bitmap.data(), static_cast<u64>(bit), bit < newClusters ? 0 : 1);
+    // $Bitmap's own extension lives at the start of the new space.
+    const s64 extensionLcn = oldClusters;
+    for (s64 i = 0; i < extraClusters; ++i) ntfs_bit_set(bitmap.data(), static_cast<u64>(extensionLcn + i), 1);
+
+    // Boot sector with the new size, plus its backup at the last sector of the device.
+    std::vector<u8> boot(static_cast<size_t>(sectorSize));
+    if (ntfs_pread(vol->dev, 0, sectorSize, boot.data()) != sectorSize) return FsGrowStatus::kFailed;
+    auto* bootSector = reinterpret_cast<NTFS_BOOT_SECTOR*>(boot.data());
+    bootSector->number_of_sectors = cpu_to_sle64(newClusters * (clusterSize / sectorSize));
+    if (ntfs_pwrite(vol->dev, deviceBytes - sectorSize, sectorSize, boot.data()) != sectorSize)
+        return FsGrowStatus::kFailed;
+
+    // 1. $Bitmap: new runs, then the data, then the attribute record.
+    if (ntfs_attr_map_whole_runlist(bitmapAttr)) return FsGrowStatus::kFailed;
+    runlist* merged = bitmapAttr->rl;
+    if (extraClusters > 0) {
+        auto* extension = static_cast<runlist*>(std::malloc(2 * sizeof(runlist_element)));
+        if (!extension) return FsGrowStatus::kFailed;
+        extension[0].vcn = oldBitmapClusters;
+        extension[0].lcn = extensionLcn;
+        extension[0].length = extraClusters;
+        extension[1].vcn = oldBitmapClusters + extraClusters;
+        extension[1].lcn = LCN_ENOENT;
+        extension[1].length = 0;
+        merged = ntfs_runlists_merge(bitmapAttr->rl, extension);
+        if (!merged) { std::free(extension); return FsGrowStatus::kFailed; }
+    }
+    if (ntfs_rl_pwrite(vol, merged, 0, 0, newBitmapBytes, bitmap.data()) != newBitmapBytes) {
+        if (extraClusters > 0) bitmapAttr->rl = merged;   // merge already consumed the old list
+        return FsGrowStatus::kFailed;
+    }
+    bitmapAttr->rl = merged;
+    bitmapAttr->allocated_size = neededBitmapClusters << vol->cluster_size_bits;
+    NAttrSetRunlistDirty(bitmapAttr);
+    if (ntfs_attr_update_mapping_pairs(bitmapAttr, 0)) return FsGrowStatus::kFailed;
+    {
+        ntfs_attr_search_ctx* ctx = ntfs_attr_get_search_ctx(vol->lcnbmp_ni, nullptr);
+        if (!ctx) return FsGrowStatus::kFailed;
+        if (ntfs_attr_lookup(AT_DATA, AT_UNNAMED, 0, CASE_SENSITIVE, 0, nullptr, 0, ctx)) {
+            ntfs_attr_put_search_ctx(ctx);
+            return FsGrowStatus::kFailed;
+        }
+        bitmapAttr->data_size = bitmapAttr->initialized_size = newBitmapBytes;
+        ctx->attr->data_size = ctx->attr->initialized_size = cpu_to_sle64(newBitmapBytes);
+        ctx->attr->allocated_size = cpu_to_sle64(bitmapAttr->allocated_size);
+        vol->lcnbmp_ni->data_size = newBitmapBytes;
+        vol->lcnbmp_ni->allocated_size = bitmapAttr->allocated_size;
+        ntfs_inode_mark_dirty(ctx->ntfs_ino);
+        NInoFileNameSetDirty(vol->lcnbmp_ni);
+        ntfs_attr_put_search_ctx(ctx);
+    }
+    if (ntfs_inode_sync(vol->lcnbmp_ni)) return FsGrowStatus::kFailed;
+
+    // 2. $BadClus:$Bad covers the whole volume.
+    {
+        static const ntfschar badName[4] = {cpu_to_le16('$'), cpu_to_le16('B'), cpu_to_le16('a'), cpu_to_le16('d')};
+        ntfs_inode* badInode = ntfs_inode_open(vol, FILE_BadClus);
+        if (!badInode) return FsGrowStatus::kFailed;
+        ntfs_attr* bad = ntfs_attr_open(badInode, AT_DATA, const_cast<ntfschar*>(badName), 4);
+        const bool resized = bad && ntfs_attr_truncate(bad, newClusters << vol->cluster_size_bits) == 0;
+        if (bad) ntfs_attr_close(bad);
+        const bool synced = ntfs_inode_sync(badInode) == 0;
+        ntfs_inode_close(badInode);
+        if (!resized || !synced) return FsGrowStatus::kFailed;
+    }
+
+    // 3. The primary boot sector last: from here on the volume has its new size.
+    if (ntfs_device_sync(vol->dev) != 0) return FsGrowStatus::kFailed;
+    if (ntfs_pwrite(vol->dev, 0, sectorSize, boot.data()) != sectorSize) return FsGrowStatus::kFailed;
+    if (ntfs_device_sync(vol->dev) != 0) return FsGrowStatus::kFailed;
+    vol->nr_clusters = newClusters;
+    vol->free_clusters = -1;
+    return FsGrowStatus::kGrown;   // the caller remounts so every cached length is re-read
+}
 
 bool ntfsHasCorruptDirectoryEntries(int volumeId) {
     return ntfsScanCorruptDirectoryEntries(volumeId, false);

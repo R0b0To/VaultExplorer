@@ -3284,13 +3284,45 @@
   "@vcToolsExpandAction": {
     "description": "Button: run the expansion"
   },
-  "vcToolsExpandNote": "Only the container is enlarged. The file system inside is not resized, so the added space stays unallocated until the file system is grown. Back up the volume first.",
+  "vcToolsExpandNote": "The container is enlarged first. Then the file system inside is grown into the added space where that is possible without reformatting (NTFS, ext2/3/4). FAT and exFAT cannot be grown in place; their added space stays unallocated. Back up the volume first.",
   "@vcToolsExpandNote": {
     "description": "Note about volume expansion"
   },
   "vcToolsExpandDone": "Volume expanded",
   "@vcToolsExpandDone": {
     "description": "Success message after expansion"
+  },
+  "vcToolsGrowFsToggle": "Also grow the file system",
+  "@vcToolsGrowFsToggle": {
+    "description": "Switch: also grow the file system inside the volume after expanding it"
+  },
+  "vcToolsGrowFsToggleHint": "Lets NTFS and ext2/3/4 volumes use the added space right away, without reformatting.",
+  "@vcToolsGrowFsToggleHint": {
+    "description": "Explains the grow file system switch"
+  },
+  "vcToolsGrowFsOnlyAction": "Only grow the file system",
+  "@vcToolsGrowFsOnlyAction": {
+    "description": "Button: grow only the file system of a volume that was expanded earlier"
+  },
+  "vcToolsFsGrown": "File system grown: the added space is ready to use.",
+  "@vcToolsFsGrown": {
+    "description": "Result: the file system was grown into the added space"
+  },
+  "vcToolsFsAlreadyFills": "The file system already fills the volume.",
+  "@vcToolsFsAlreadyFills": {
+    "description": "Result: the file system already fills the volume"
+  },
+  "vcToolsFsUnsupported": "This file system cannot be grown in place (FAT and exFAT cannot). The added space stays unallocated until the volume is reformatted; back up its files first.",
+  "@vcToolsFsUnsupported": {
+    "description": "Result: this file system (FAT/exFAT) cannot be grown in place"
+  },
+  "vcToolsFsNeedsCheck": "The file system is marked as needing a check. Run Check & Repair on the volume, then use “Only grow the file system”.",
+  "@vcToolsFsNeedsCheck": {
+    "description": "Result: the file system is dirty and must be checked before it can be grown"
+  },
+  "vcToolsFsFailed": "The file system could not be grown. The volume itself is expanded; run Check & Repair on it before using it.",
+  "@vcToolsFsFailed": {
+    "description": "Result: growing the file system failed"
   },
   "vcToolsAnalyzeAction": "Check free space",
   "@vcToolsAnalyzeAction": {

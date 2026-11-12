@@ -14,6 +14,10 @@
 #include "diskio.h"
 #include "volume_state.h"
 #include "filesystems/stream_handles.h"
+// resize2fs engine (e2fsprogs resize/resize2fs.c, built into libext2fs -- see CMakeLists.txt). The progress
+// callback type is spelled with void* because ext2_resize_t is an opaque pointer here; we always pass null.
+extern "C" errcode_t resize_fs(ext2_filsys fs, blk64_t* new_size, int flags,
+                               errcode_t (*progress)(void* rfs, int pass, unsigned long cur, unsigned long max_val));
 namespace {
 constexpr size_t kIoBufferSize = 2097152;
 bool extIsDirectory(ext2_filsys fs, ext2_ino_t ino);
@@ -305,6 +309,9 @@ errcode_t extIoOpen(const char* name, int, io_channel* out) {
 }
 errcode_t extIoClose(io_channel channel) {
     if (!channel) return EXT2_ET_INVALID_ARGUMENT;
+    // ext2fs_dup_handle() (used by resize_fs) shares one channel between two filesystem handles
+    // by bumping refcount; every manager must only release it when the last holder closes.
+    if (--channel->refcount > 0) return 0;
     delete static_cast<int*>(channel->private_data);
     std::free(channel->name);
     std::free(channel);
@@ -477,6 +484,47 @@ bool mountExtVolume(int volumeId) {
              static_cast<unsigned long long>(ext2fs_free_blocks_count(superblock)),
              hasJournal ? 1 : 0, needsRecovery ? 1 : 0);
     return true;
+}
+FsGrowStatus extGrowToFit(int volumeId) {
+    if (volumeId < 0 || volumeId >= FF_VOLUMES) return FsGrowStatus::kFailed;
+    VolumeState& volume = volumes[volumeId];
+    ext2_filsys fs = volume.extFs;
+    if (!fs || !fs->super || volume.readOnly) return FsGrowStatus::kFailed;
+    if (!volume.openExtStreams.empty()) return FsGrowStatus::kBusy;
+    ext2_super_block* sb = fs->super;
+    const blk64_t current = ext2fs_blocks_count(sb);
+    blk64_t target = volume.dataAreaLengthBytes / fs->blocksize;
+    if (!ext2fs_has_feature_64bit(sb) && target > 0xFFFFFFFFull) target = 0xFFFFFFFFull;
+    if (target <= current) return FsGrowStatus::kAlreadyFills;
+    // The same preconditions resize2fs's main() enforces before touching anything.
+    if (ext2fs_has_feature_journal_dev(sb)) return FsGrowStatus::kUnsupported;
+    if ((sb->s_state & EXT2_ERROR_FS) || !(sb->s_state & EXT2_VALID_FS) ||
+        EXT2_HAS_INCOMPAT_FEATURE(sb, EXT3_FEATURE_INCOMPAT_RECOVER)) {
+        return FsGrowStatus::kNeedsCheck;
+    }
+    // New inode tables are zeroed up front: resize2fs otherwise defers that to the kernel when
+    // /sys/fs/ext4/features/lazy_itable_init exists, which would leave garbage after a quick expand.
+    setenv("RESIZE2FS_FORCE_ITABLE_INIT", "1", 1);
+    unsetenv("RESIZE2FS_FORCE_LAZY_ITABLE_INIT");
+    fs->default_bitmap_type = EXT2FS_BMAP64_RBTREE;
+    EXT_LOGI("extGrowToFit: volume %d growing %llu -> %llu blocks", volumeId,
+             static_cast<unsigned long long>(current), static_cast<unsigned long long>(target));
+    blk64_t newSize = target;
+    const errcode_t err = resize_fs(fs, &newSize, 0, nullptr);
+    if (err != 0) {
+        // resize_fs frees only its own state on failure; fs stays valid but is flagged in error
+        // on disk, which Check & Repair reports. Drop the dangling resize state pointer.
+        fs->priv_data = nullptr;
+        EXT_LOGE("extGrowToFit: resize_fs failed on volume %d: %s (err=%lu)", volumeId,
+                 error_message(err), static_cast<unsigned long>(err));
+        return FsGrowStatus::kFailed;
+    }
+    // resize_fs closed the new handle and freed the old one: the mount must be redone.
+    volume.extFs = nullptr;
+    volume.extBitmapsLoaded = false;
+    volume.fsMounted = false;
+    volume.fsType = VolumeState::FS_UNKNOWN;
+    return mountExtVolume(volumeId) ? FsGrowStatus::kGrown : FsGrowStatus::kFailed;
 }
 std::string extGetFilesystemLabel(int volumeId) {
     if (volumeId < 0 || volumeId >= FF_VOLUMES) return std::string();

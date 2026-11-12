@@ -5,6 +5,7 @@
 // Kotlin/Dart changes.
 
 #include <jni.h>
+#include <cstring>
 #include <vector>
 
 #include "container_create.h"
@@ -351,25 +352,63 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_changeLuksContainerPasswordNative(
     JNI_CATCH_RETURN(2)
 }
 
-// 0 = expanded, 1 = wrong password/keyfile, 2 = not expandable (hidden-volume header / not a plain full-size
-// standard volume), 3 = requested size not larger, 4 = I/O error, 5 = unreadable keyfile.
-extern "C" JNIEXPORT jint JNICALL
+// File-system code for the result arrays below, from the label fsGetFilesystemLabel reports.
+static jint fsKindCode(const FsGrowReport& report) {
+    static const char* const kNames[] = {"", "FAT12", "FAT16", "FAT32", "exFAT", "NTFS", "ext2", "ext3", "ext4"};
+    for (jint i = 1; i < 9; i++) if (std::strcmp(report.fsLabel, kNames[i]) == 0) return i;
+    return 0;
+}
+
+// Packs {container outcome, file-system step, file-system kind}. Container outcome: 0 = ok, 1 = wrong
+// password/keyfile, 2 = not expandable (hidden-volume header / not a plain full-size standard volume),
+// 3 = requested size not larger, 4 = I/O error, 5 = unreadable keyfile. File-system step: -1 = not run,
+// otherwise an FsGrowStatus (filesystems/fs_grow.h). Kind: 0 unknown, 1 FAT12, 2 FAT16, 3 FAT32, 4 exFAT,
+// 5 NTFS, 6 ext2, 7 ext3, 8 ext4.
+static jintArray packExpandResult(JNIEnv* env, ExpandOutcome outcome, const FsGrowReport& report) {
+    jint packed[3] = {static_cast<jint>(outcome), report.attempted ? static_cast<jint>(report.status) : -1,
+                      fsKindCode(report)};
+    jintArray result = env->NewIntArray(3);
+    if (result != nullptr) env->SetIntArrayRegion(result, 0, 3, packed);
+    return result;
+}
+
+extern "C" JNIEXPORT jintArray JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_expandVeraCryptContainerNative(
         JNIEnv* env, jobject,
         jint fd, jstring password, jint pim, jint cipherId, jint hashId, jintArray keyfileFds,
-        jlong newSizeBytes, jboolean initFreeSpace) {
+        jlong newSizeBytes, jboolean initFreeSpace, jboolean growFileSystem) {
     JNI_TRY
 
     std::vector<int> kfFds = extractKeyfileFds(env, keyfileFds);
     const char* nativePass = vcGetPasswordUtf8(env, password);
+    FsGrowReport report;
     const ExpandOutcome outcome = expandVeraCryptContainer(
         fd, nativePass != nullptr ? nativePass : "", pim, cipherId, hashId,
         kfFds.empty() ? nullptr : kfFds.data(), static_cast<int>(kfFds.size()),
-        static_cast<int64_t>(newSizeBytes), initFreeSpace == JNI_TRUE);
+        static_cast<int64_t>(newSizeBytes), initFreeSpace == JNI_TRUE, growFileSystem == JNI_TRUE, &report);
     vcReleasePasswordUtf8(nativePass);
-    return static_cast<jint>(outcome);
+    return packExpandResult(env, outcome, report);
 
-    JNI_CATCH_RETURN(static_cast<jint>(ExpandOutcome::kIoError))
+    JNI_CATCH_RETURN(nullptr)
+}
+
+// Grows only the file system of a standard volume that was expanded earlier. Same result array as above.
+extern "C" JNIEXPORT jintArray JNICALL
+Java_com_aeidolon_vaultexplorer_NativeEngine_growVeraCryptFileSystemNative(
+        JNIEnv* env, jobject,
+        jint fd, jstring password, jint pim, jint cipherId, jint hashId, jintArray keyfileFds) {
+    JNI_TRY
+
+    std::vector<int> kfFds = extractKeyfileFds(env, keyfileFds);
+    const char* nativePass = vcGetPasswordUtf8(env, password);
+    FsGrowReport report;
+    const ExpandOutcome outcome = growVeraCryptFileSystem(
+        fd, nativePass != nullptr ? nativePass : "", pim, cipherId, hashId,
+        kfFds.empty() ? nullptr : kfFds.data(), static_cast<int>(kfFds.size()), &report);
+    vcReleasePasswordUtf8(nativePass);
+    return packExpandResult(env, outcome, report);
+
+    JNI_CATCH_RETURN(nullptr)
 }
 
 // Result: [outcome, fsKind, clusterSize, maxHiddenBytes]; outcome 0 = ok, 1 wrong password, 2 unsupported file system,

@@ -2532,10 +2532,40 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get vcToolsExpandNote =>
-      'Apenas o contêiner é expandido. O sistema de arquivos interno não é redimensionado, portanto o espaço adicionado permanece não alocado até que o sistema de arquivos seja expandido. Faça backup do volume antes.';
+      'Primeiro o contentor é aumentado. Depois, o sistema de ficheiros no seu interior é alargado ao espaço adicionado quando é possível sem reformatar (NTFS, ext2/3/4). FAT e exFAT não podem ser alargados no local; o seu espaço adicionado fica por atribuir. Faça primeiro uma cópia de segurança do volume.';
 
   @override
   String get vcToolsExpandDone => 'Volume expandido';
+
+  @override
+  String get vcToolsGrowFsToggle => 'Alargar também o sistema de ficheiros';
+
+  @override
+  String get vcToolsGrowFsToggleHint =>
+      'Permite que os volumes NTFS e ext2/3/4 usem logo o espaço adicionado, sem reformatar.';
+
+  @override
+  String get vcToolsGrowFsOnlyAction => 'Alargar apenas o sistema de ficheiros';
+
+  @override
+  String get vcToolsFsGrown =>
+      'Sistema de ficheiros alargado: o espaço adicionado está pronto a usar.';
+
+  @override
+  String get vcToolsFsAlreadyFills =>
+      'O sistema de ficheiros já ocupa todo o volume.';
+
+  @override
+  String get vcToolsFsUnsupported =>
+      'Este sistema de ficheiros não pode ser alargado no local (FAT e exFAT não). O espaço adicionado fica por atribuir até o volume ser reformatado; faça antes uma cópia dos seus ficheiros.';
+
+  @override
+  String get vcToolsFsNeedsCheck =>
+      'O sistema de ficheiros está marcado como necessitando de verificação. Execute Verificar e reparar no volume e depois use «Alargar apenas o sistema de ficheiros».';
+
+  @override
+  String get vcToolsFsFailed =>
+      'Não foi possível alargar o sistema de ficheiros. O volume em si foi aumentado; execute Verificar e reparar antes de o usar.';
 
   @override
   String get vcToolsAnalyzeAction => 'Verificar espaço livre';

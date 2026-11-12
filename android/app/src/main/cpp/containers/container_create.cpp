@@ -28,6 +28,8 @@
 #include "crypto/xts_tweak.h"
 #include "ext_backend.h"
 #include "filesystem_paths.h"
+#include "fs_ops.h"
+#include "virtual_block_device.h"
 #include "session_prepare.h"
 #include "volume_state.h"
 #undef min
@@ -1095,9 +1097,52 @@ int changeLuksContainerPassword(int fd,
     }
 }
 
+
+// Grows the file system inside an UNLOCKED standard volume into the space an expand added, on a temporary
+// volume slot (the same way container creation borrows one to format): no session, no UI, nothing else sees
+// the slot. [masterKeys] is the volume's key material, [fileSize] the (new) host size.
+static void growFileSystemOfStandardVolume(int fd, CascadeId cipher, const unsigned char* masterKeys,
+                                           uint64_t fileSize, uint32_t sectorSize, FsGrowReport* report) {
+    report->attempted = true;
+    report->status = FsGrowStatus::kFailed;
+    int volId = -1;
+    {
+        std::lock_guard<std::mutex> allocLock(slotAllocMutex);
+        for (int i = 0; i < MAX_VOLUMES; i++) {
+            if (!volumes[i].dataCtxInitialized) { volumes[i].dataCtxInitialized = true; volId = i; break; }
+        }
+    }
+    if (volId < 0) { LOGI("growFileSystem: no free slots available"); return; }
+    VolumeState& v = volumes[volId];
+    std::unique_lock<std::shared_mutex> vlock(v.mutex);
+    if (cascadeSetKeys(v.cascade, cipher, masterKeys, cascadeSpecFor(cipher).layerCount * 64)) {
+        v.fd = fd;                                   // not owned by the slot: detached again before reset()
+        v.dataOffset = VC_DATA_AREA_OFFSET;
+        v.dataAreaLengthBytes = fileSize - 2 * VC_DATA_AREA_OFFSET;
+        v.fileSize = fileSize;
+        v.luksSectorSize = sectorSize >= 512 ? sectorSize : 512;
+        v.partitionStartSector = 0;
+        v.matchedCipherId = static_cast<int>(cipher);
+        v.readOnly = false;
+        v.isUsbSource = false;
+        if (ensureMounted(volId)) {
+            const std::string label = fsGetFilesystemLabel(volId);
+            std::snprintf(report->fsLabel, sizeof(report->fsLabel), "%s", label.c_str());
+            report->status = fsGrowToFit(volId);
+            LOGI("growFileSystem: %s -> status %d", report->fsLabel, static_cast<int>(report->status));
+        } else {
+            report->status = FsGrowStatus::kUnsupported;   // no file system we recognise (raw, or unformatted)
+        }
+        unmountVolume(volId);                        // flushes the write buffer and fsyncs the container
+    }
+    v.fd = -1;
+    v.reset();
+}
+
 ExpandOutcome expandVeraCryptContainer(int fd, const char* password, int pim, int cipherId, int hashId,
                                        const int* keyfileFds, int keyfileCount,
-                                       int64_t newSizeBytes, bool initFreeSpace) {
+                                       int64_t newSizeBytes, bool initFreeSpace,
+                                       bool growFileSystem, FsGrowReport* fsReport) {
     ExpandOutcome outcome = ExpandOutcome::kIoError;
     unsigned char mixedPassword[MAX_PASSWORD_LEN];
     size_t mixedLen = std::min(strlen(password), sizeof(mixedPassword));
@@ -1139,7 +1184,17 @@ ExpandOutcome expandVeraCryptContainer(int fd, const char* password, int pim, in
                                                 static_cast<uint64_t>(st.st_size),
                                                 static_cast<uint64_t>(newSizeBytes), initFreeSpace, io);
         switch (r) {
-            case VcExpandResult::kOk:                 fsync(fd); outcome = ExpandOutcome::kOk; break;
+            case VcExpandResult::kOk:
+                fsync(fd);
+                outcome = ExpandOutcome::kOk;
+                // The container is expanded and its header rewritten whatever happens next; the file system
+                // grow is a separate step whose result is reported on its own.
+                if (growFileSystem && fsReport != nullptr) {
+                    growFileSystemOfStandardVolume(fd, matchedCipher, body + VC_KEY_OFFSET_MASTER,
+                                                   (static_cast<uint64_t>(newSizeBytes) / 4096) * 4096,
+                                                   fields.sectorSize, fsReport);
+                }
+                break;
             case VcExpandResult::kHiddenHeader:
             case VcExpandResult::kInconsistentHeader: outcome = ExpandOutcome::kNotExpandable; break;
             case VcExpandResult::kNotLarger:          outcome = ExpandOutcome::kNotLarger; break;
@@ -1202,6 +1257,47 @@ static HiddenHostOutcome inspectOuterVolume(int fd, const unsigned char* passwor
     out->maxHiddenBytes = vcMaxHiddenVolumeSize(tail, fields.volumeSize);
     *containerSize = size;
     return HiddenHostOutcome::kOk;
+}
+
+ExpandOutcome growVeraCryptFileSystem(int fd, const char* password, int pim, int cipherId, int hashId,
+                                      const int* keyfileFds, int keyfileCount, FsGrowReport* fsReport) {
+    ExpandOutcome outcome = ExpandOutcome::kIoError;
+    unsigned char mixedPassword[MAX_PASSWORD_LEN];
+    size_t mixedLen = std::min(strlen(password), sizeof(mixedPassword));
+    memcpy(mixedPassword, password, mixedLen);
+    unsigned char keyMaterial[192];
+    unsigned char body[VC_HEADER_BODY_SIZE];
+    do {
+        if (keyfileCount > 0 && keyfileFds != nullptr &&
+            !applyKeyfilesToPassword(keyfileFds, keyfileCount, mixedPassword, &mixedLen)) {
+            outcome = ExpandOutcome::kBadKeyfile;
+            break;
+        }
+        struct stat st;
+        unsigned char sector[VC_FULL_HEADER_SIZE];
+        if (fstat(fd, &st) != 0 || pread(fd, sector, sizeof(sector), 0) != static_cast<ssize_t>(sizeof(sector))) break;
+        CascadeId matchedCipher{};
+        HashId matchedHash{};
+        ParsedHeaderFields fields;
+        if (!deriveAndValidateHeader(sector, mixedPassword, mixedLen, pim, cipherId, hashId,
+                                     keyMaterial, body, matchedCipher, matchedHash, fields)) {
+            outcome = ExpandOutcome::kWrongPassword;
+            break;
+        }
+        const uint64_t size = static_cast<uint64_t>(st.st_size);
+        if (fields.isHiddenVolume() || size < 2 * VC_DATA_AREA_OFFSET + 4096 || size % 4096 != 0 ||
+            fields.encryptedAreaStart != VC_DATA_AREA_OFFSET || fields.volumeSize != size - 2 * VC_DATA_AREA_OFFSET) {
+            outcome = ExpandOutcome::kNotExpandable;   // not a plain, full-size standard volume
+            break;
+        }
+        growFileSystemOfStandardVolume(fd, matchedCipher, body + VC_KEY_OFFSET_MASTER, size, fields.sectorSize, fsReport);
+        outcome = ExpandOutcome::kOk;
+    } while (false);
+    mbedtls_platform_zeroize(mixedPassword, sizeof(mixedPassword));
+    mbedtls_platform_zeroize(keyMaterial, sizeof(keyMaterial));
+    mbedtls_platform_zeroize(body, sizeof(body));
+    close(fd);
+    return outcome;
 }
 
 HiddenHostOutcome analyzeHiddenVolumeHost(int fd, const char* password, int pim, int cipherId, int hashId,

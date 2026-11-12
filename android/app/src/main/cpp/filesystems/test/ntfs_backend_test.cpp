@@ -776,6 +776,116 @@ static void test_usb_sync_reaches_the_device() {
     vs.usbCache.clear();
 }
 
+
+// ---- Growing the file system after the container was expanded ------------------------
+static const bool g_haveResize = commandExists("ntfsresize");
+
+// ntfsresize --info is a full consistency check ($Bitmap against every MFT record's runs); a second
+// run with no target size must report that the volume already fills the device.
+static bool resizeOracleOk(Vol& v, const char* what) {
+    v.closeFs();
+    bool ok = true;
+    if (g_haveResize) {
+        const std::string info = g_tmp + "/resize_info.log", fill = g_tmp + "/resize_fill.log";
+        const int rc1 = std::system(("ntfsresize -i -f '" + v.path + "' >'" + info + "' 2>&1").c_str());
+        const int rc2 = std::system(("ntfsresize -n -f '" + v.path + "' >'" + fill + "' 2>&1").c_str());
+        const bool fills = std::system(("grep -q 'Nothing to do' '" + fill + "'").c_str()) == 0;
+        ok = rc1 == 0 && rc2 == 0 && fills;
+        if (!ok) {
+            std::printf("    ntfsresize oracle failed after '%s' (info rc=%d, no-action rc=%d, fills=%d):\n", what, rc1, rc2, fills);
+            std::system(("tail -8 '" + info + "' | sed 's/^/        /'; tail -5 '" + fill + "' | sed 's/^/        /'").c_str());
+        }
+    } else {
+        ++g_skips;
+        std::printf("    SKIP ntfsresize oracle '%s' (ntfsresize not on PATH)\n", what);
+    }
+    v.attach();
+    v.mount();
+    ++g_checks;
+    if (!ok) { ++g_failures; std::printf("    FAIL ntfsresize oracle: %s\n", what); }
+    return ok;
+}
+
+static bool extendNtfsImage(Vol& v, uint64_t addMiB, bool garbage) {
+    VolumeState& vs = volumes[v.id];
+    const uint64_t old = vs.dataAreaLengthBytes;
+    if (std::system(("truncate -s " + std::to_string(old + addMiB * 1048576) + " '" + v.path + "'").c_str()) != 0) return false;
+    if (garbage) {
+        const Bytes noise = pseudoRandom(1048576, 77);
+        for (uint64_t i = 0; i < addMiB; ++i) CHECK(pwrite(g_fd[v.id], noise.data(), noise.size(), static_cast<off_t>(old + i * 1048576)) == 1048576);
+    }
+    vs.dataAreaLengthBytes = static_cast<uint64_t>(lseek(g_fd[v.id], 0, SEEK_END));
+    return true;
+}
+
+static void ntfsGrowAndVerify(Vol& v, uint64_t addMiB, bool garbage, bool fillFirst, const char* what) {
+    std::vector<std::pair<std::string, Bytes>> files;
+    for (int i = 0; i < 6; ++i) {
+        files.push_back({"f" + std::to_string(i), pseudoRandom(150000 + i * 40000, 7 + i)});
+        CHECK(putFile(v.id, files.back().first, files.back().second));
+    }
+    CHECK(ntfsCreateDirectory(v.id, "dir"));
+    CHECK(putFile(v.id, "dir/inner", pseudoRandom(70000, 5)));
+    if (fillFirst) {
+        for (int i = 0; i < 4000; ++i) if (!putFile(v.id, "fill" + std::to_string(i), pseudoRandom(262144, 100 + i))) break;
+        CHECK(freeBytes(v.id) < 1048576);
+    }
+    CHECK(v.fsckClean(what));
+    uint64_t totalBefore = 0, freeBefore = 0;
+    ntfsGetSpaceInfo(v.id, totalBefore, freeBefore);
+    CHECK(extendNtfsImage(v, addMiB, garbage));
+    CHECK(ntfsGrowToFit(v.id) == FsGrowStatus::kGrown);
+    v.closeFs(); v.attach(); CHECK(v.mount());               // what fsGrowToFit does after a successful grow
+    uint64_t totalAfter = 0, freeAfter = 0;
+    ntfsGetSpaceInfo(v.id, totalAfter, freeAfter);
+    CHECK(totalAfter >= totalBefore + (addMiB - 2) * 1048576);
+    CHECK(freeAfter >= freeBefore + (addMiB - 2) * 1048576);
+    for (const auto& f : files) CHECK(getFile(v.id, f.first) == f.second);
+    CHECK(getFile(v.id, "dir/inner") == pseudoRandom(70000, 5));
+    CHECK(resizeOracleOk(v, (std::string(what) + " after grow").c_str()));
+    CHECK(v.fsckClean((std::string(what) + " after grow (ntfsfix)").c_str()));
+    // The new space is usable all the way, and what lives there reads back through the system tools too.
+    const size_t big = static_cast<size_t>((addMiB - 6) * 1048576);
+    CHECK(putFile(v.id, "big_after_grow", pseudoRandom(big, 3)));
+    CHECK(getFile(v.id, "big_after_grow") == pseudoRandom(big, 3));
+    CHECK(v.indepCat("big_after_grow") == pseudoRandom(big, 3));
+    CHECK(ntfsGrowToFit(v.id) == FsGrowStatus::kAlreadyFills);
+    CHECK(resizeOracleOk(v, (std::string(what) + " after use").c_str()));
+}
+
+static void test_grow_variants() {
+    struct Case { uint64_t mib; uint64_t add; bool garbage; bool full; };
+    // 400/900 MiB cross the point where $Bitmap needs an extra cluster; "full" fills the old file system first,
+    // so the extension has to come from the new space.
+    const Case cases[] = {{16, 20, false, false}, {16, 40, true, false}, {16, 400, false, false},
+                          {16, 400, true, true},  {16, 900, false, true}, {32, 70, true, true}};
+    for (const auto& c : cases) {
+        Vol v;
+        CHECK(v.format(c.mib));
+        const std::string what = "grow ntfs " + std::to_string(c.mib) + "+" + std::to_string(c.add) +
+                                 (c.full ? " full" : "") + (c.garbage ? " garbage" : "");
+        ntfsGrowAndVerify(v, c.add, c.garbage, c.full, what.c_str());
+    }
+}
+
+static void test_grow_refusals() {
+    Vol v;
+    CHECK(v.format(16));
+    CHECK(ntfsGrowToFit(v.id) == FsGrowStatus::kAlreadyFills);
+    CHECK(putFile(v.id, "a", pseudoRandom(5000, 1)));
+    CHECK(extendNtfsImage(v, 8, false));
+    void* stream = ntfsOpenStream(v.id, "a");
+    CHECK(stream != nullptr);
+    CHECK(ntfsGrowToFit(v.id) == FsGrowStatus::kBusy);
+    ntfsCloseStream(v.id, stream);
+    volumes[v.id].readOnly = true;
+    CHECK(ntfsGrowToFit(v.id) == FsGrowStatus::kFailed);
+    volumes[v.id].readOnly = false;
+    CHECK(ntfsGrowToFit(v.id) == FsGrowStatus::kGrown);
+    v.closeFs(); v.attach(); CHECK(v.mount());
+    CHECK(resizeOracleOk(v, "refusals then grow"));
+}
+
 // ---- Runner -------------------------------------------------------------------------
 static void closeAllVolumes() {
     for (int i = 0; i < FF_VOLUMES; ++i) {
@@ -810,6 +920,8 @@ int main() {
         T(test_native_symlinks_follow_and_manage_link_identity),
         T(test_read_only_mount_changes_nothing),
         T(test_usb_sync_reaches_the_device),
+        T(test_grow_variants),
+        T(test_grow_refusals),
     };
     return runTests("ntfs_backend", tests, sizeof(tests) / sizeof(tests[0]), closeAllVolumes);
 }

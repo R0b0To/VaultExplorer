@@ -294,6 +294,7 @@ private object ChannelMethods {
     const val EXPORT_CONTAINER_HEADER = "exportContainerHeader"
     const val RESTORE_CONTAINER_HEADER_REGION = "restoreContainerHeaderRegion"
     const val EXPAND_VERACRYPT_CONTAINER = "expandVeraCryptContainer"
+    const val GROW_VERACRYPT_FILE_SYSTEM = "growVeraCryptFileSystem"
     const val ANALYZE_HIDDEN_VOLUME_HOST = "analyzeHiddenVolumeHost"
     const val CREATE_HIDDEN_VOLUME_IN_EXISTING = "createHiddenVolumeInExisting"
     const val RESOLVE_FOLDER_VAULT_CONFIG_FILE = "resolveFolderVaultConfigFile"
@@ -1533,6 +1534,7 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.BOOK_CLOSE -> bookReaderHandlers.handleBookClose(call, result)
                 ChannelMethods.EXPORT_CONTAINER_HEADER -> headerBackupHandlers.handleExportContainerHeader(call, result)
                 ChannelMethods.EXPAND_VERACRYPT_CONTAINER -> veraCryptToolsHandlers.handleExpandContainer(call, result)
+                ChannelMethods.GROW_VERACRYPT_FILE_SYSTEM -> veraCryptToolsHandlers.handleGrowFileSystem(call, result)
                 ChannelMethods.ANALYZE_HIDDEN_VOLUME_HOST -> veraCryptToolsHandlers.handleAnalyzeHiddenHost(call, result)
                 ChannelMethods.CREATE_HIDDEN_VOLUME_IN_EXISTING -> veraCryptToolsHandlers.handleCreateHiddenInExisting(call, result)
                 ChannelMethods.RESTORE_CONTAINER_HEADER_REGION ->

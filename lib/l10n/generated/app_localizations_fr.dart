@@ -2547,10 +2547,41 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get vcToolsExpandNote =>
-      'Seul le conteneur est agrandi. La taille du système de fichiers interne n’est pas modifiée, l’espace ajouté reste donc non alloué tant que le système de fichiers n’est pas étendu. Sauvegardez d’abord le volume.';
+      'Le conteneur est d’abord agrandi. Ensuite, le système de fichiers qu’il contient est étendu à l’espace ajouté lorsque c’est possible sans reformater (NTFS, ext2/3/4). FAT et exFAT ne peuvent pas être étendus sur place ; leur espace ajouté reste non alloué. Sauvegardez d’abord le volume.';
 
   @override
   String get vcToolsExpandDone => 'Volume agrandi';
+
+  @override
+  String get vcToolsGrowFsToggle => 'Étendre aussi le système de fichiers';
+
+  @override
+  String get vcToolsGrowFsToggleHint =>
+      'Permet aux volumes NTFS et ext2/3/4 d’utiliser tout de suite l’espace ajouté, sans reformatage.';
+
+  @override
+  String get vcToolsGrowFsOnlyAction =>
+      'Étendre seulement le système de fichiers';
+
+  @override
+  String get vcToolsFsGrown =>
+      'Système de fichiers étendu : l’espace ajouté est utilisable.';
+
+  @override
+  String get vcToolsFsAlreadyFills =>
+      'Le système de fichiers occupe déjà tout le volume.';
+
+  @override
+  String get vcToolsFsUnsupported =>
+      'Ce système de fichiers ne peut pas être étendu sur place (FAT et exFAT non). L’espace ajouté reste non alloué jusqu’au reformatage du volume ; sauvegardez d’abord ses fichiers.';
+
+  @override
+  String get vcToolsFsNeedsCheck =>
+      'Le système de fichiers est marqué comme nécessitant une vérification. Lancez Vérifier et réparer sur le volume, puis utilisez « Étendre seulement le système de fichiers ».';
+
+  @override
+  String get vcToolsFsFailed =>
+      'Le système de fichiers n’a pas pu être étendu. Le volume lui-même est agrandi ; lancez Vérifier et réparer avant de l’utiliser.';
 
   @override
   String get vcToolsAnalyzeAction => 'Vérifier l’espace libre';

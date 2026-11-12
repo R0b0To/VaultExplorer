@@ -36,6 +36,7 @@ class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeTool
   // expand
   final _sizeCtrl = TextEditingController();
   bool _initFree = true;
+  bool _growFs = true;
 
   // hidden volume
   HiddenHostInfo? _host;
@@ -150,6 +151,18 @@ class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeTool
     return true;
   }
 
+  String _fsResultText(FileSystemGrowResult result) {
+    final l10n = context.l10n;
+    return switch (result) {
+      FileSystemGrowResult.grown => l10n.vcToolsFsGrown,
+      FileSystemGrowResult.alreadyFills => l10n.vcToolsFsAlreadyFills,
+      FileSystemGrowResult.unsupported => l10n.vcToolsFsUnsupported,
+      FileSystemGrowResult.needsCheck => l10n.vcToolsFsNeedsCheck,
+      FileSystemGrowResult.failed => l10n.vcToolsFsFailed,
+      FileSystemGrowResult.notRun => '',
+    };
+  }
+
   Future<void> _expand() async {
     if (!_validateCommon()) return;
     final newSize = _bytesFromMiB(_sizeCtrl);
@@ -159,15 +172,31 @@ class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeTool
     }
     final doneText = context.l10n.vcToolsExpandDone;
     await _guard(() async {
-      await _api.expandContainer(
+      final fs = await _api.expandContainer(
         uri: _target!.uri,
         password: _passwordCtrl.text,
         pim: _pimOf(_pimCtrl),
         keyfilePaths: _keyfilePaths,
         newSizeBytes: newSize,
         initFreeSpace: _initFree,
+        growFileSystem: _growFs,
       );
-      if (mounted) setState(() => _status = doneText);
+      if (!mounted) return;
+      final fsText = _fsResultText(fs.result);
+      setState(() => _status = fsText.isEmpty ? doneText : '$doneText\n$fsText');
+    });
+  }
+
+  Future<void> _growFileSystemOnly() async {
+    if (!_validateCommon()) return;
+    await _guard(() async {
+      final fs = await _api.growFileSystem(
+        uri: _target!.uri,
+        password: _passwordCtrl.text,
+        pim: _pimOf(_pimCtrl),
+        keyfilePaths: _keyfilePaths,
+      );
+      if (mounted) setState(() => _status = _fsResultText(fs.result));
     });
   }
 
@@ -316,10 +345,22 @@ class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeTool
               title: Text(l10n.vcToolsInitFreeSpace),
               subtitle: Text(l10n.vcToolsInitFreeSpaceHint),
             ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _growFs,
+              onChanged: _busy ? null : (v) => setState(() => _growFs = v),
+              title: Text(l10n.vcToolsGrowFsToggle),
+              subtitle: Text(l10n.vcToolsGrowFsToggleHint),
+            ),
             const SizedBox(height: 8),
             FilledButton(
               onPressed: _busy ? null : _expand,
               child: Text(l10n.vcToolsExpandAction),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton(
+              onPressed: _busy ? null : _growFileSystemOnly,
+              child: Text(l10n.vcToolsGrowFsOnlyAction),
             ),
           ] else ...[
             OutlinedButton(

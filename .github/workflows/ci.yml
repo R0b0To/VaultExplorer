@@ -121,7 +121,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install build tools and filesystem tools
-        run: sudo apt-get update && sudo apt-get install -y g++ libext2fs-dev e2fsprogs libssl-dev libmbedtls-dev
+        run: sudo apt-get update && sudo apt-get install -y g++ git python3 e2fsprogs libssl-dev libmbedtls-dev
 
       - name: Build and run ext_backend_test
         run: sh android/app/src/main/cpp/filesystems/test/run_ext_backend_test.sh

@@ -2568,10 +2568,39 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get vcToolsExpandNote =>
-      'يتم تكبير الحاوية فقط. لا يتم تغيير حجم نظام الملفات بداخلها، لذلك تظل المساحة المضافة غير مخصصة حتى يتم توسيع نظام الملفات. قم بعمل نسخة احتياطية أولاً.';
+      'يتم تكبير الحاوية أولًا. بعد ذلك يُوسَّع نظام الملفات بداخلها ليشمل المساحة المضافة متى أمكن ذلك دون إعادة تهيئة (NTFS وext2/3/4). لا يمكن توسيع FAT وexFAT في مكانهما، وتبقى المساحة المضافة غير مخصصة. أنشئ نسخة احتياطية من وحدة التخزين أولًا.';
 
   @override
   String get vcToolsExpandDone => 'تم توسيع وحدة التخزين';
+
+  @override
+  String get vcToolsGrowFsToggle => 'توسيع نظام الملفات أيضًا';
+
+  @override
+  String get vcToolsGrowFsToggleHint =>
+      'يتيح لوحدات NTFS وext2/3/4 استخدام المساحة المضافة فورًا دون إعادة تهيئة.';
+
+  @override
+  String get vcToolsGrowFsOnlyAction => 'توسيع نظام الملفات فقط';
+
+  @override
+  String get vcToolsFsGrown =>
+      'تم توسيع نظام الملفات: المساحة المضافة جاهزة للاستخدام.';
+
+  @override
+  String get vcToolsFsAlreadyFills => 'نظام الملفات يملأ وحدة التخزين بالفعل.';
+
+  @override
+  String get vcToolsFsUnsupported =>
+      'لا يمكن توسيع نظام الملفات هذا في مكانه (FAT وexFAT غير مدعومين). ستبقى المساحة المضافة غير مخصصة حتى تتم إعادة تهيئة وحدة التخزين؛ انسخ ملفاتها احتياطيًا أولًا.';
+
+  @override
+  String get vcToolsFsNeedsCheck =>
+      'نظام الملفات مُعلَّم بأنه يحتاج إلى فحص. شغّل «الفحص والإصلاح» على وحدة التخزين ثم استخدم «توسيع نظام الملفات فقط».';
+
+  @override
+  String get vcToolsFsFailed =>
+      'تعذّر توسيع نظام الملفات. تم تكبير وحدة التخزين نفسها؛ شغّل «الفحص والإصلاح» قبل استخدامها.';
 
   @override
   String get vcToolsAnalyzeAction => 'التحقق من المساحة الفارغة';

@@ -2532,10 +2532,40 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get vcToolsExpandNote =>
-      'Viene ingrandito solo il contenitore. Il file system interno non viene ridimensionato, quindi lo spazio aggiunto rimane non allocato finché il file system non viene esteso. Esegui prima un backup del volume.';
+      'Prima viene ingrandito il contenitore. Poi il file system al suo interno viene esteso allo spazio aggiunto, quando è possibile senza riformattare (NTFS, ext2/3/4). FAT ed exFAT non si possono estendere sul posto; il loro spazio aggiunto resta non allocato. Esegui prima un backup del volume.';
 
   @override
   String get vcToolsExpandDone => 'Volume espanso';
+
+  @override
+  String get vcToolsGrowFsToggle => 'Estendi anche il file system';
+
+  @override
+  String get vcToolsGrowFsToggleHint =>
+      'Permette ai volumi NTFS ed ext2/3/4 di usare subito lo spazio aggiunto, senza riformattare.';
+
+  @override
+  String get vcToolsGrowFsOnlyAction => 'Estendi solo il file system';
+
+  @override
+  String get vcToolsFsGrown =>
+      'File system esteso: lo spazio aggiunto è pronto all’uso.';
+
+  @override
+  String get vcToolsFsAlreadyFills =>
+      'Il file system occupa già tutto il volume.';
+
+  @override
+  String get vcToolsFsUnsupported =>
+      'Questo file system non si può estendere sul posto (FAT ed exFAT no). Lo spazio aggiunto resta non allocato finché il volume non viene riformattato; esegui prima un backup dei suoi file.';
+
+  @override
+  String get vcToolsFsNeedsCheck =>
+      'Il file system è contrassegnato come da controllare. Esegui Controlla e ripara sul volume, poi usa «Estendi solo il file system».';
+
+  @override
+  String get vcToolsFsFailed =>
+      'Non è stato possibile estendere il file system. Il volume stesso è stato ingrandito; esegui Controlla e ripara prima di usarlo.';
 
   @override
   String get vcToolsAnalyzeAction => 'Controlla spazio libero';

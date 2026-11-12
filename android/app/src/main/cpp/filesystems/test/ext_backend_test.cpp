@@ -699,6 +699,115 @@ static void test_usb_io_flush_reaches_the_device() {
     vs.usbCache.clear();
 }
 
+
+// ---- Growing the file system after the container was expanded ------------------------
+// Extends the image file by [addMiB] (zeros, or random bytes to mimic a quick expand whose new area
+// decrypts to garbage), re-reads the device size, then runs the production grow.
+static bool extendImage(Vol& v, uint64_t addMiB, bool garbage) {
+    VolumeState& vs = volumes[v.id];
+    if (vs.extFs) { ext2fs_flush(vs.extFs); }
+    fflush(g_images[v.id]);
+    fseeko(g_images[v.id], 0, SEEK_END);
+    const uint64_t old = static_cast<uint64_t>(ftello(g_images[v.id]));
+    const std::string cmd = "truncate -s " + std::to_string(old + addMiB * 1048576) + " '" + v.path + "'";
+    if (std::system(cmd.c_str()) != 0) return false;
+    if (garbage) {
+        const Bytes noise = pseudoRandom(1048576, 99);
+        for (uint64_t i = 0; i < addMiB; ++i) {
+            fseeko(g_images[v.id], static_cast<off_t>(old + i * 1048576), SEEK_SET);
+            fwrite(noise.data(), 1, noise.size(), g_images[v.id]);
+        }
+        fflush(g_images[v.id]);
+    }
+    fseeko(g_images[v.id], 0, SEEK_END);
+    vs.dataAreaLengthBytes = static_cast<uint64_t>(ftello(g_images[v.id]));
+    return true;
+}
+
+static void growAndVerify(Vol& v, uint64_t addMiB, bool garbage, const char* what, bool fillFirst) {
+    std::vector<std::pair<std::string, Bytes>> files;
+    for (int i = 0; i < 6; ++i) {
+        files.push_back({"/f" + std::to_string(i), pseudoRandom(150000 + i * 40000, 7 + i)});
+        CHECK(putFile(v.id, files.back().first, files.back().second));
+    }
+    CHECK(extCreateDirectory(v.id, "/dir"));
+    CHECK(putFile(v.id, "/dir/inner", pseudoRandom(70000, 5)));
+    if (fillFirst) {   // fill the fs until a write fails: the usual reason to expand
+        for (int i = 0; i < 4000; ++i) {
+            if (!putFile(v.id, "/fill" + std::to_string(i), pseudoRandom(262144, 100 + i))) break;
+        }
+        CHECK(freeBytes(v.id) < 1048576);
+    }
+    const uint64_t totalBefore = [&] { uint64_t t = 0, f = 0; extGetSpaceInfo(v.id, t, f); return t; }();
+    CHECK(v.fsckClean(what));
+    CHECK(extendImage(v, addMiB, garbage));
+    CHECK(extGrowToFit(v.id) == FsGrowStatus::kGrown);
+    uint64_t totalAfter = 0, freeAfter = 0;
+    extGetSpaceInfo(v.id, totalAfter, freeAfter);
+    CHECK(totalAfter >= totalBefore + (addMiB - 2) * 1048576);
+    CHECK(freeAfter >= (addMiB - 4) * 1048576 / 2);
+    for (const auto& f : files) CHECK(getFile(v.id, f.first) == f.second);
+    CHECK(getFile(v.id, "/dir/inner") == pseudoRandom(70000, 5));
+    CHECK(v.fsckClean((std::string(what) + " after grow").c_str()));
+    // The new space is really usable, to the last megabyte.
+    CHECK(putFile(v.id, "/big_after_grow", pseudoRandom(static_cast<size_t>((addMiB / 2) * 1048576), 3)));
+    CHECK(getFile(v.id, "/big_after_grow") == pseudoRandom(static_cast<size_t>((addMiB / 2) * 1048576), 3));
+    CHECK(extGrowToFit(v.id) == FsGrowStatus::kAlreadyFills);
+    CHECK(v.fsckClean((std::string(what) + " after use").c_str()));
+}
+
+static void test_grow_variants_pass_fsck() {
+    struct Case { const char* variant; uint64_t mib; uint64_t add; bool garbage; bool full; };
+    const Case cases[] = {{"ext2", 16, 40, false, false}, {"ext3", 64, 100, false, false},
+                          {"ext4", 16, 40, true, false},  {"ext4", 32, 700, false, false},
+                          {"ext4", 16, 64, true, true},   {"ext2", 16, 64, false, true}};
+    for (const auto& c : cases) {
+        Vol v;
+        CHECK(v.format(c.variant, c.mib));
+        const std::string what = std::string("grow ") + c.variant + " " + std::to_string(c.mib) + "+" + std::to_string(c.add);
+        growAndVerify(v, c.add, c.garbage, what.c_str(), c.full);
+    }
+}
+
+static void test_grow_images_made_by_system_mkfs() {
+    if (!g_haveMkfs) { ++g_skips; std::printf("    SKIP (mkfs.ext4 not on PATH)\n"); return; }
+    struct Case { const char* tool; const char* opts; uint64_t mib; uint64_t add; };
+    const Case cases[] = {{"mkfs.ext4", "-b 4096", 32, 200},
+                          {"mkfs.ext4", "-b 1024", 16, 120},
+                          {"mkfs.ext4", "-b 4096 -O ^resize_inode", 32, 300},   // GDT blocks must move
+                          {"mkfs.ext4", "-b 1024 -O ^resize_inode -E lazy_itable_init=1", 8, 300},
+                          {"mkfs.ext4", "-b 4096 -O ^flex_bg,^resize_inode", 32, 400},
+                          {"mkfs.ext4", "-b 4096 -O 64bit,metadata_csum", 32, 200},
+                          {"mkfs.ext3", "-b 4096", 32, 150},
+                          {"mkfs.ext2", "-b 2048", 16, 90}};
+    for (const auto& c : cases) {
+        Vol v;
+        CHECK(v.mkfs(c.tool, c.opts, c.mib));
+        const std::string what = std::string("grow ") + c.tool + " " + c.opts;
+        growAndVerify(v, c.add, true, what.c_str(), false);
+    }
+}
+
+static void test_grow_refusals() {
+    Vol v;
+    CHECK(v.format("ext4", 16));
+    CHECK(extGrowToFit(v.id) == FsGrowStatus::kAlreadyFills);
+    CHECK(putFile(v.id, "/a", pseudoRandom(5000, 1)));
+    void* stream = extOpenStream(v.id, "/a");
+    CHECK(stream != nullptr);
+    CHECK(extendImage(v, 8, false));
+    CHECK(extGrowToFit(v.id) == FsGrowStatus::kBusy);     // an open stream pins the handle
+    extCloseStream(v.id, stream);
+    volumes[v.id].extFs->super->s_state &= ~EXT2_VALID_FS;
+    CHECK(extGrowToFit(v.id) == FsGrowStatus::kNeedsCheck);
+    volumes[v.id].extFs->super->s_state |= EXT2_VALID_FS;
+    volumes[v.id].readOnly = true;
+    CHECK(extGrowToFit(v.id) == FsGrowStatus::kFailed);
+    volumes[v.id].readOnly = false;
+    CHECK(extGrowToFit(v.id) == FsGrowStatus::kGrown);
+    CHECK(v.fsckClean("refusals then grow"));
+}
+
 // ---- Runner -------------------------------------------------------------------------
 static void closeAllVolumes() {
     for (int i = 0; i < FF_VOLUMES; ++i) {
@@ -733,6 +842,9 @@ int main() {
         T(test_read_only_mount_changes_nothing),
         T(test_native_symlinks_follow_and_manage_link_identity),
         T(test_usb_io_flush_reaches_the_device),
+        T(test_grow_variants_pass_fsck),
+        T(test_grow_images_made_by_system_mkfs),
+        T(test_grow_refusals),
     };
     return runTests("ext_backend", tests, sizeof(tests) / sizeof(tests[0]), closeAllVolumes);
 }

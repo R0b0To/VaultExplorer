@@ -2399,10 +2399,38 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get vcToolsExpandNote =>
-      '컨테이너 크기만 확장됩니다. 내부 파일 시스템 크기는 변경되지 않으므로, 파일 시스템을 확장하기 전까지 추가된 공간은 할당되지 않은 상태로 유지됩니다. 먼저 볼륨을 백업하십시오.';
+      '먼저 컨테이너가 확장됩니다. 그런 다음 다시 포맷하지 않고 가능한 경우(NTFS, ext2/3/4) 내부 파일 시스템이 추가된 공간까지 확장됩니다. FAT와 exFAT는 제자리에서 확장할 수 없으며 추가된 공간은 할당되지 않은 상태로 남습니다. 먼저 볼륨을 백업하세요.';
 
   @override
   String get vcToolsExpandDone => '볼륨이 확장되었습니다';
+
+  @override
+  String get vcToolsGrowFsToggle => '파일 시스템도 확장';
+
+  @override
+  String get vcToolsGrowFsToggleHint =>
+      'NTFS 및 ext2/3/4 볼륨이 다시 포맷하지 않고 바로 추가된 공간을 사용할 수 있게 합니다.';
+
+  @override
+  String get vcToolsGrowFsOnlyAction => '파일 시스템만 확장';
+
+  @override
+  String get vcToolsFsGrown => '파일 시스템이 확장되었습니다. 추가된 공간을 사용할 수 있습니다.';
+
+  @override
+  String get vcToolsFsAlreadyFills => '파일 시스템이 이미 볼륨 전체를 사용하고 있습니다.';
+
+  @override
+  String get vcToolsFsUnsupported =>
+      '이 파일 시스템은 제자리에서 확장할 수 없습니다(FAT와 exFAT는 불가). 추가된 공간은 볼륨을 다시 포맷할 때까지 할당되지 않은 상태로 남습니다. 먼저 파일을 백업하세요.';
+
+  @override
+  String get vcToolsFsNeedsCheck =>
+      '파일 시스템에 검사가 필요하다고 표시되어 있습니다. 볼륨에서 \'검사 및 복구\'를 실행한 다음 \'파일 시스템만 확장\'을 사용하세요.';
+
+  @override
+  String get vcToolsFsFailed =>
+      '파일 시스템을 확장하지 못했습니다. 볼륨 자체는 확장되었습니다. 사용하기 전에 \'검사 및 복구\'를 실행하세요.';
 
   @override
   String get vcToolsAnalyzeAction => '여유 공간 확인';

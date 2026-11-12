@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "copy_progress_callback.h"
+#include "fs_grow.h"
 
 struct _ntfs_volume;
 typedef struct _ntfs_volume ntfs_volume;
@@ -48,3 +49,8 @@ bool ntfsIsDirty(int volumeId);
 bool ntfsClearDirtyFlag(int volumeId);
 bool ntfsHasCorruptDirectoryEntries(int volumeId);
 bool ntfsRemoveCorruptDirectoryEntries(int volumeId);
+
+// Grows the mounted NTFS volume into unallocated space at the end of the volume (volumes[volumeId].
+// dataAreaLengthBytes larger than the file system), the way ntfsresize does. The caller must unmount and
+// remount afterwards (filesystems/fs_ops.cpp fsGrowToFit does).
+FsGrowStatus ntfsGrowToFit(int volumeId);

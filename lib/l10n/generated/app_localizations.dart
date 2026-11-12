@@ -4167,7 +4167,7 @@ abstract class AppLocalizations {
   /// Note about volume expansion
   ///
   /// In en, this message translates to:
-  /// **'Only the container is enlarged. The file system inside is not resized, so the added space stays unallocated until the file system is grown. Back up the volume first.'**
+  /// **'The container is enlarged first. Then the file system inside is grown into the added space where that is possible without reformatting (NTFS, ext2/3/4). FAT and exFAT cannot be grown in place; their added space stays unallocated. Back up the volume first.'**
   String get vcToolsExpandNote;
 
   /// Success message after expansion
@@ -4175,6 +4175,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Volume expanded'**
   String get vcToolsExpandDone;
+
+  /// Switch: also grow the file system inside the volume after expanding it
+  ///
+  /// In en, this message translates to:
+  /// **'Also grow the file system'**
+  String get vcToolsGrowFsToggle;
+
+  /// Explains the grow file system switch
+  ///
+  /// In en, this message translates to:
+  /// **'Lets NTFS and ext2/3/4 volumes use the added space right away, without reformatting.'**
+  String get vcToolsGrowFsToggleHint;
+
+  /// Button: grow only the file system of a volume that was expanded earlier
+  ///
+  /// In en, this message translates to:
+  /// **'Only grow the file system'**
+  String get vcToolsGrowFsOnlyAction;
+
+  /// Result: the file system was grown into the added space
+  ///
+  /// In en, this message translates to:
+  /// **'File system grown: the added space is ready to use.'**
+  String get vcToolsFsGrown;
+
+  /// Result: the file system already fills the volume
+  ///
+  /// In en, this message translates to:
+  /// **'The file system already fills the volume.'**
+  String get vcToolsFsAlreadyFills;
+
+  /// Result: this file system (FAT/exFAT) cannot be grown in place
+  ///
+  /// In en, this message translates to:
+  /// **'This file system cannot be grown in place (FAT and exFAT cannot). The added space stays unallocated until the volume is reformatted; back up its files first.'**
+  String get vcToolsFsUnsupported;
+
+  /// Result: the file system is dirty and must be checked before it can be grown
+  ///
+  /// In en, this message translates to:
+  /// **'The file system is marked as needing a check. Run Check & Repair on the volume, then use “Only grow the file system”.'**
+  String get vcToolsFsNeedsCheck;
+
+  /// Result: growing the file system failed
+  ///
+  /// In en, this message translates to:
+  /// **'The file system could not be grown. The volume itself is expanded; run Check & Repair on it before using it.'**
+  String get vcToolsFsFailed;
 
   /// Button: analyze the outer volume for hidden volume space
   ///

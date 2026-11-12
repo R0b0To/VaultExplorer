@@ -2539,10 +2539,40 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get vcToolsExpandNote =>
-      'Nur der Container wird vergrößert. Das darin enthaltene Dateisystem wird nicht angepasst, sodass der hinzugefügte Speicher nicht zugewiesen bleibt, bis das Dateisystem vergrößert wird. Sichern Sie das Volume vorher.';
+      'Zuerst wird der Container vergrößert. Danach wird das Dateisystem darin in den hinzugefügten Platz erweitert, sofern das ohne Neuformatierung möglich ist (NTFS, ext2/3/4). FAT und exFAT lassen sich nicht an Ort und Stelle erweitern; ihr hinzugefügter Platz bleibt unzugeordnet. Sichern Sie das Volume vorher.';
 
   @override
   String get vcToolsExpandDone => 'Volume vergrößert';
+
+  @override
+  String get vcToolsGrowFsToggle => 'Dateisystem ebenfalls erweitern';
+
+  @override
+  String get vcToolsGrowFsToggleHint =>
+      'Ermöglicht NTFS- und ext2/3/4-Volumes, den hinzugefügten Platz sofort ohne Neuformatierung zu nutzen.';
+
+  @override
+  String get vcToolsGrowFsOnlyAction => 'Nur Dateisystem erweitern';
+
+  @override
+  String get vcToolsFsGrown =>
+      'Dateisystem erweitert: Der hinzugefügte Platz ist nutzbar.';
+
+  @override
+  String get vcToolsFsAlreadyFills =>
+      'Das Dateisystem füllt das Volume bereits aus.';
+
+  @override
+  String get vcToolsFsUnsupported =>
+      'Dieses Dateisystem lässt sich nicht an Ort und Stelle erweitern (FAT und exFAT nicht). Der hinzugefügte Platz bleibt unzugeordnet, bis das Volume neu formatiert wird; sichern Sie vorher seine Dateien.';
+
+  @override
+  String get vcToolsFsNeedsCheck =>
+      'Das Dateisystem ist als prüfbedürftig markiert. Führen Sie „Prüfen & Reparieren“ für das Volume aus und verwenden Sie dann „Nur Dateisystem erweitern“.';
+
+  @override
+  String get vcToolsFsFailed =>
+      'Das Dateisystem konnte nicht erweitert werden. Das Volume selbst wurde vergrößert; führen Sie „Prüfen & Reparieren“ aus, bevor Sie es verwenden.';
 
   @override
   String get vcToolsAnalyzeAction => 'Freien Speicher prüfen';

@@ -4,6 +4,7 @@
 #include "fat_backend.h"
 #include "ntfs_backend.h"
 #include "ext_backend.h"
+#include "virtual_block_device.h"
 
 bool fsListDirectory(int volId, const std::string& pathSuffix, std::vector<std::string>& outResults) {
     switch (volumes[volId].fsType) {
@@ -218,5 +219,20 @@ void fsCloseStream(int volId, void* handle) {
         case VolumeState::FS_NTFS:  ntfsCloseStream(volId, handle); break;
         case VolumeState::FS_EXT:   extCloseStream(volId, handle); break;
         default: break;
+    }
+}
+
+FsGrowStatus fsGrowToFit(int volId) {
+    switch (volumes[volId].fsType) {
+        case VolumeState::FS_FATFS: return fatGrowToFit(volId);
+        case VolumeState::FS_EXT:   return extGrowToFit(volId);   // remounts itself: resize_fs frees the handle
+        case VolumeState::FS_NTFS: {
+            const FsGrowStatus status = ntfsGrowToFit(volId);
+            if (status != FsGrowStatus::kGrown) return status;
+            // Unmount flushes everything to the container; mounting again re-reads the new size.
+            unmountVolume(volId);
+            return ensureMounted(volId) ? FsGrowStatus::kGrown : FsGrowStatus::kFailed;
+        }
+        default: return FsGrowStatus::kUnsupported;
     }
 }

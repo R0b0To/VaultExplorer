@@ -2400,10 +2400,38 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get vcToolsExpandNote =>
-      'コンテナのみが拡大されます。内部のファイルシステムはサイズ変更されないため、ファイルシステムを拡張するまで追加された領域は未割り当てのままになります。事前にボリュームのバックアップを作成してください。';
+      'まずコンテナーが拡張されます。その後、再フォーマットせずに可能な場合（NTFS、ext2/3/4）は、内部のファイルシステムも追加された領域まで拡張されます。FAT と exFAT はその場で拡張できず、追加された領域は未割り当てのままです。先にボリュームをバックアップしてください。';
 
   @override
   String get vcToolsExpandDone => 'ボリュームを拡張しました';
+
+  @override
+  String get vcToolsGrowFsToggle => 'ファイルシステムも拡張する';
+
+  @override
+  String get vcToolsGrowFsToggleHint =>
+      'NTFS および ext2/3/4 のボリュームで、再フォーマットなしにすぐ追加領域を使えるようにします。';
+
+  @override
+  String get vcToolsGrowFsOnlyAction => 'ファイルシステムのみ拡張';
+
+  @override
+  String get vcToolsFsGrown => 'ファイルシステムを拡張しました。追加された領域を使用できます。';
+
+  @override
+  String get vcToolsFsAlreadyFills => 'ファイルシステムはすでにボリューム全体を使用しています。';
+
+  @override
+  String get vcToolsFsUnsupported =>
+      'このファイルシステムはその場で拡張できません（FAT と exFAT は不可）。追加された領域は、ボリュームを再フォーマットするまで未割り当てのままです。先にファイルをバックアップしてください。';
+
+  @override
+  String get vcToolsFsNeedsCheck =>
+      'ファイルシステムにチェックが必要とマークされています。ボリュームで「チェックと修復」を実行してから、「ファイルシステムのみ拡張」を使用してください。';
+
+  @override
+  String get vcToolsFsFailed =>
+      'ファイルシステムを拡張できませんでした。ボリューム自体は拡張されています。使用する前に「チェックと修復」を実行してください。';
 
   @override
   String get vcToolsAnalyzeAction => '空き領域を確認';

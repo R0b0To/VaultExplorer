@@ -2495,10 +2495,40 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get vcToolsExpandNote =>
-      'Only the container is enlarged. The file system inside is not resized, so the added space stays unallocated until the file system is grown. Back up the volume first.';
+      'The container is enlarged first. Then the file system inside is grown into the added space where that is possible without reformatting (NTFS, ext2/3/4). FAT and exFAT cannot be grown in place; their added space stays unallocated. Back up the volume first.';
 
   @override
   String get vcToolsExpandDone => 'Volume expanded';
+
+  @override
+  String get vcToolsGrowFsToggle => 'Also grow the file system';
+
+  @override
+  String get vcToolsGrowFsToggleHint =>
+      'Lets NTFS and ext2/3/4 volumes use the added space right away, without reformatting.';
+
+  @override
+  String get vcToolsGrowFsOnlyAction => 'Only grow the file system';
+
+  @override
+  String get vcToolsFsGrown =>
+      'File system grown: the added space is ready to use.';
+
+  @override
+  String get vcToolsFsAlreadyFills =>
+      'The file system already fills the volume.';
+
+  @override
+  String get vcToolsFsUnsupported =>
+      'This file system cannot be grown in place (FAT and exFAT cannot). The added space stays unallocated until the volume is reformatted; back up its files first.';
+
+  @override
+  String get vcToolsFsNeedsCheck =>
+      'The file system is marked as needing a check. Run Check & Repair on the volume, then use “Only grow the file system”.';
+
+  @override
+  String get vcToolsFsFailed =>
+      'The file system could not be grown. The volume itself is expanded; run Check & Repair on it before using it.';
 
   @override
   String get vcToolsAnalyzeAction => 'Check free space';

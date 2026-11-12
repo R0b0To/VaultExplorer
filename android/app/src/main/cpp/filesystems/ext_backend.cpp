@@ -372,11 +372,67 @@ errcode_t extIoOpenBound(const char* name, int flags, io_channel* out) {
     return result;
 }
 }
+namespace {
+// Wipes everything formatExtVolume() relies on being clean: block 0 (boot area, stale
+// signatures) and every inode table.
+//
+// libext2fs only *reserves* these blocks (ext2fs_allocate_tables); writing them is the
+// caller's job, which mke2fs does. The payload underneath is never trustworthy: a
+// container that was not quick-formatted decrypts to noise, and a re-formatted volume still
+// holds the previous filesystem. Stale inode tables are harmful rather than cosmetic: inode 8
+// (the journal) with a leftover nonzero i_blocks makes ext2fs_add_journal_inode3() fail
+// with EEXIST, and a filesystem that claims a journal it does not have is rejected by the
+// kernel.
+errcode_t zeroFormatTargets(ext2_filsys fs) {
+    errcode_t err = ext2fs_zero_blocks2(fs, 0, 1, nullptr, nullptr);
+    if (err) return err;
+    for (dgrp_t group = 0; group < fs->group_desc_count; ++group) {
+        const blk64_t table = ext2fs_inode_table_loc(fs, group);
+        if (table == 0) return EXT2_ET_MISSING_INODE_TABLE;
+        err = ext2fs_zero_blocks2(fs, table, static_cast<int>(fs->inode_blocks_per_group),
+                                  nullptr, nullptr);
+        if (err) return err;
+    }
+    return 0;
+}
+
+// What the root directory looks like to every user of the volume: world-accessible, since
+// the container itself is the access boundary.
+errcode_t openUpRootDirectory(ext2_filsys fs) {
+    ext2_inode root{};
+    errcode_t err = ext2fs_read_inode(fs, EXT2_ROOT_INO, &root);
+    if (err) return err;
+    root.i_mode = LINUX_S_IFDIR | 0777;
+    root.i_uid = root.i_gid = 0;
+    root.i_links_count = 2;
+    root.i_atime = root.i_mtime = root.i_ctime = static_cast<uint32_t>(time(nullptr));
+    return ext2fs_write_inode(fs, EXT2_ROOT_INO, &root);
+}
+
+errcode_t addJournal(ext2_filsys fs, uint64_t totalBlocks) {
+    ext2fs_journal_params journal{};
+    journal.num_journal_blocks = static_cast<blk_t>(std::min<uint64_t>(8192, totalBlocks / 32));
+    if (journal.num_journal_blocks < 1024) journal.num_journal_blocks = 1024;
+    // The device name libext2fs sees is a synthetic volume id ("0", "1", ...), not a host
+    // block device, so the mount-table probe is meaningless here (and can fail outright
+    // where /proc/mounts is unreadable). VaultExplorer owns the volume exclusively.
+    errcode_t err = ext2fs_add_journal_inode3(fs, &journal, 0, EXT2_MKJOURNAL_NO_MNT_CHECK);
+    if (err) return err;
+    // libext2fs sets HAS_JOURNAL itself once the journal inode is real; trust but verify.
+    if (!EXT2_HAS_COMPAT_FEATURE(fs->super, EXT3_FEATURE_COMPAT_HAS_JOURNAL) ||
+        fs->super->s_journal_inum != EXT2_JOURNAL_INO || fs->super->s_journal_dev != 0)
+        return EXT2_ET_BAD_INODE_NUM;
+    return 0;
+}
+}  // namespace
+
 bool formatExtVolume(int volumeId, const char* variant) {
+    if (volumeId < 0 || volumeId >= FF_VOLUMES || !variant) return false;
     const bool ext3 = strncasecmp(variant, "ext3", 4) == 0;
     const bool ext4 = strncasecmp(variant, "ext4", 4) == 0;
     const uint64_t totalBlocks = volumes[volumeId].dataAreaLengthBytes / 4096;
     if (totalBlocks < 1024) return false;
+
     ext2_super_block params{};
     params.s_rev_level = EXT2_DYNAMIC_REV;
     params.s_inode_size = 256;
@@ -385,24 +441,41 @@ bool formatExtVolume(int volumeId, const char* variant) {
     params.s_blocks_per_group = 32768;
     params.s_inodes_per_group = 2048;
     ext2fs_blocks_count_set(&params, totalBlocks);
-    // Do not advertise a journal until libext2fs has actually created it.
-    // Otherwise a failed journal creation leaves HAS_JOURNAL set with
-    // s_journal_inum == 0, which e2fsck correctly rejects.
-    const bool willHaveJournal = (ext3 || ext4) && totalBlocks > 2048;
-    params.s_feature_incompat = 0x0002;
-    params.s_feature_ro_compat = 0x0001;
-    params.s_feature_compat = 0x0020;
-    if (ext4) params.s_feature_incompat |= 0x0040;
+    // HAS_JOURNAL is deliberately NOT requested here: libext2fs sets it when (and only
+    // when) the journal inode has been created. Declaring it up front is what let a failed
+    // journal leave a filesystem that advertised a journal it did not have.
+    params.s_feature_incompat = 0x0002;  // FILETYPE
+    params.s_feature_ro_compat = 0x0001; // SPARSE_SUPER
+    params.s_feature_compat = 0x0020;    // DIR_INDEX
+    if (ext4) params.s_feature_incompat |= 0x0040;  // EXTENTS
+    // Too small for a useful journal: ext3 then reads as ext2, ext4 stays journal-less.
+    const bool wantJournal = (ext3 || ext4) && totalBlocks > 2048;
+
     char deviceName[16];
     std::snprintf(deviceName, sizeof(deviceName), "%d", volumeId);
     ext2_filsys fs = nullptr;
-    if (ext2fs_initialize(deviceName, 0, &params, &encryptedExtIoManager, &fs) != 0) return false;
+    const errcode_t initError = ext2fs_initialize(deviceName, 0, &params, &encryptedExtIoManager, &fs);
+    if (initError != 0) {
+        EXT_LOGE("formatExtVolume: ext2fs_initialize failed: %s (err=%lu)",
+                 error_message(initError), static_cast<unsigned long>(initError));
+        return false;
+    }
+    // Every failure below discards the half-built filesystem (ext2fs_free) rather than
+    // closing it: closing would flush a superblock for a filesystem that is not finished.
+    auto giveUp = [&fs](const char* step, errcode_t err) {
+        EXT_LOGE("formatExtVolume: %s failed: %s (err=%lu)", step, error_message(err),
+                 static_cast<unsigned long>(err));
+        ext2fs_free(fs);
+        return false;
+    };
+
     fs->flags |= EXT2_FLAG_RW;
+    const uint32_t now = static_cast<uint32_t>(time(nullptr));
     fs->super->s_state = 1;
     fs->super->s_max_mnt_count = 20;
-    fs->super->s_lastcheck = static_cast<uint32_t>(time(nullptr));
-    fs->super->s_mtime = static_cast<uint32_t>(time(nullptr));
-    fs->super->s_wtime = static_cast<uint32_t>(time(nullptr));
+    fs->super->s_lastcheck = now;
+    fs->super->s_mtime = now;
+    fs->super->s_wtime = now;
     unsigned char uuid[16];
     if (FILE* random = fopen("/dev/urandom", "rb")) {
         fread(uuid, 1, sizeof(uuid), random);
@@ -413,84 +486,16 @@ bool formatExtVolume(int volumeId, const char* variant) {
     }
     std::strncpy(reinterpret_cast<char*>(fs->super->s_last_mounted), "/", sizeof(fs->super->s_last_mounted));
     fs->super->s_r_blocks_count = 0;
-    if (ext2fs_allocate_tables(fs) != 0) { ext2fs_close(fs); return false; }
 
-    // ext2fs_allocate_tables() reserves inode-table locations, but the
-    // table blocks themselves must be initialized. The encrypted payload
-    // can contain arbitrary old bytes; inode 8 is the reserved journal inode
-    // and libext2fs refuses to reuse it if its stale i_blocks is nonzero.
-    for (dgrp_t group = 0; group < fs->group_desc_count; ++group) {
-        const blk64_t inodeTable = ext2fs_inode_table_loc(fs, group);
-        if (inodeTable == 0) {
-            EXT_LOGE("formatExtVolume: missing inode table for group %u", group);
-            ext2fs_close(fs);
-            return false;
-        }
-        const errcode_t zeroErr = ext2fs_zero_blocks2(
-            fs, inodeTable, static_cast<int>(fs->inode_blocks_per_group), nullptr, nullptr);
-        if (zeroErr != 0) {
-            EXT_LOGE("formatExtVolume: zeroing inode table for group %u failed: %s (err=%lu)",
-                     group, error_message(zeroErr), static_cast<unsigned long>(zeroErr));
-            ext2fs_close(fs);
-            return false;
-        }
-    }
-
-    const errcode_t writeInodeBitmapErr = ext2fs_write_inode_bitmap(fs);
-    if (writeInodeBitmapErr != 0) {
-        EXT_LOGE("formatExtVolume: writing inode bitmap failed: %s (err=%lu)",
-                 error_message(writeInodeBitmapErr), static_cast<unsigned long>(writeInodeBitmapErr));
-        ext2fs_close(fs);
-        return false;
-    }
-    const errcode_t writeBlockBitmapErr = ext2fs_write_block_bitmap(fs);
-    if (writeBlockBitmapErr != 0) {
-        EXT_LOGE("formatExtVolume: writing block bitmap failed: %s (err=%lu)",
-                 error_message(writeBlockBitmapErr), static_cast<unsigned long>(writeBlockBitmapErr));
-        ext2fs_close(fs);
-        return false;
-    }
-    if (ext2fs_mkdir(fs, EXT2_ROOT_INO, EXT2_ROOT_INO, nullptr) != 0) {
-        EXT_LOGE("formatExtVolume: creating root directory failed");
-        ext2fs_close(fs);
-        return false;
-    }
-    ext2_inode root{};
-    if (ext2fs_read_inode(fs, EXT2_ROOT_INO, &root) == 0) {
-        root.i_mode = LINUX_S_IFDIR | 0777;
-        root.i_uid = root.i_gid = 0;
-        root.i_links_count = 2;
-        root.i_atime = root.i_mtime = root.i_ctime = static_cast<uint32_t>(time(nullptr));
-        ext2fs_write_inode(fs, EXT2_ROOT_INO, &root);
-    }
-    if (ext2fs_mkdir(fs, EXT2_ROOT_INO, 0, "lost+found") != 0) {
-        EXT_LOGE("formatExtVolume: creating lost+found failed");
-        ext2fs_close(fs);
-        return false;
-    }
-    if (willHaveJournal) {
-        ext2fs_journal_params journal{};
-        journal.num_journal_blocks = static_cast<blk_t>(std::min<uint64_t>(8192, totalBlocks / 32));
-        if (journal.num_journal_blocks < 1024) journal.num_journal_blocks = 1024;
-
-        // The libext2fs device name is a synthetic volume ID ("0", "1", ...),
-        // not a host block device. Skip the host mount-point probe; volume
-        // lifecycle/exclusivity is enforced by VaultExplorer.
-        const errcode_t journalErr = ext2fs_add_journal_inode3(
-            fs, &journal, 0, EXT2_MKJOURNAL_NO_MNT_CHECK);
-        if (journalErr != 0) {
-            EXT_LOGE("formatExtVolume: journal creation failed: %s (err=%lu)",
-                     error_message(journalErr), static_cast<unsigned long>(journalErr));
-            ext2fs_close(fs);
-            return false;
-        }
-        if (!EXT2_HAS_COMPAT_FEATURE(fs->super, EXT3_FEATURE_COMPAT_HAS_JOURNAL) ||
-            fs->super->s_journal_inum == 0 || fs->super->s_journal_dev != 0) {
-            EXT_LOGE("formatExtVolume: journal metadata invalid after creation (compat=0x%x, journal_inum=%u, journal_dev=%u)",
-                     fs->super->s_feature_compat, fs->super->s_journal_inum, fs->super->s_journal_dev);
-            ext2fs_close(fs);
-            return false;
-        }
+    if (errcode_t err = ext2fs_allocate_tables(fs)) return giveUp("allocating tables", err);
+    if (errcode_t err = zeroFormatTargets(fs)) return giveUp("zeroing block 0 and inode tables", err);
+    if (errcode_t err = ext2fs_mkdir(fs, EXT2_ROOT_INO, EXT2_ROOT_INO, nullptr))
+        return giveUp("creating the root directory", err);
+    if (errcode_t err = openUpRootDirectory(fs)) return giveUp("setting root directory mode", err);
+    if (errcode_t err = ext2fs_mkdir(fs, EXT2_ROOT_INO, 0, "lost+found"))
+        return giveUp("creating lost+found", err);
+    if (wantJournal) {
+        if (errcode_t err = addJournal(fs, totalBlocks)) return giveUp("creating the journal", err);
     }
     for (ext2_ino_t inode = EXT2_BAD_INO; inode < fs->super->s_first_ino; ++inode) {
         if (!ext2fs_test_inode_bitmap2(fs->inode_map, inode))
@@ -499,17 +504,10 @@ bool formatExtVolume(int volumeId, const char* variant) {
     ext2fs_mark_ib_dirty(fs);
     ext2fs_mark_bb_dirty(fs);
     ext2fs_mark_super_dirty(fs);
-    const errcode_t flushErr = ext2fs_flush(fs);
-    if (flushErr != 0) {
-        EXT_LOGE("formatExtVolume: filesystem flush failed: %s (err=%lu)",
-                 error_message(flushErr), static_cast<unsigned long>(flushErr));
-        ext2fs_close(fs);
-        return false;
-    }
-    const errcode_t closeErr = ext2fs_close(fs);
-    if (closeErr != 0) {
-        EXT_LOGE("formatExtVolume: filesystem close failed: %s (err=%lu)",
-                 error_message(closeErr), static_cast<unsigned long>(closeErr));
+    if (errcode_t err = ext2fs_flush(fs)) return giveUp("writing filesystem metadata", err);
+    if (errcode_t err = ext2fs_close(fs)) {
+        EXT_LOGE("formatExtVolume: closing the filesystem failed: %s (err=%lu)",
+                 error_message(err), static_cast<unsigned long>(err));
         return false;
     }
     return true;

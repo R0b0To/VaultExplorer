@@ -93,6 +93,31 @@ struct Vol {
         attach();
         return formatExtVolume(id, variant) && mount();
     }
+    // New image full of noise, formatted by the product's formatExtVolume(). This is what a
+    // container that was not quick-formatted looks like from the filesystem's side: unused
+    // space decrypts to garbage, so nothing may be assumed zero. (format() above starts from
+    // zeros, which hides every "forgot to initialize it" bug.)
+    bool formatOverNoise(const char* variant, uint64_t mib, uint32_t seed) {
+        closeFs();
+        path = g_tmp + "/vol" + std::to_string(id) + ".img";
+        FILE* f = fopen(path.c_str(), "wb");
+        if (!f) return false;
+        const size_t chunk = 1u << 20;
+        for (uint64_t i = 0; i < mib; ++i) {
+            const Bytes noise = pseudoRandom(chunk, seed + static_cast<uint32_t>(i));
+            if (fwrite(noise.data(), 1, noise.size(), f) != noise.size()) { fclose(f); return false; }
+        }
+        fclose(f);
+        attach();
+        return formatExtVolume(id, variant) && mount();
+    }
+    // Format the image that is already attached, in place: a volume that holds an old
+    // filesystem (reformat), as opposed to a fresh one.
+    bool reformat(const char* variant) {
+        closeFs();
+        attach();
+        return formatExtVolume(id, variant) && mount();
+    }
     // New image made by the system mkfs (a different producer than formatExtVolume).
     bool mkfs(const char* tool, const char* opts, uint64_t mib) {
         closeFs();
@@ -205,6 +230,49 @@ static void test_format_variants_pass_fsck() {
         CHECK(list(0, "").size() == 1 && has(0, "", "lost+found"));
         const std::string what = std::string("format ") + c.variant + " " + std::to_string(c.mib) + "MiB";
         v.fsckClean(what.c_str());
+    }
+}
+
+static void test_format_over_stale_payload_passes_fsck() {
+    // Regression: on a container whose free space decrypts to noise, inode 8 had a stale
+    // nonzero i_blocks, ext2fs_add_journal_inode3() failed with EEXIST (unchecked), and the
+    // volume was left advertising a journal that did not exist -> "Superblock has an
+    // invalid journal (inode 0)", unmountable on desktop Linux. ext2 only looked fine: its
+    // inode tables were just as dirty ("bad block inode looks invalid").
+    struct Case { const char* variant; uint64_t mib; const char* expectLabel; };
+    const Case cases[] = {{"ext2", 8, "ext2"},   {"ext2", 64, "ext2"}, {"ext3", 8, "ext2"},
+                          {"ext3", 64, "ext3"},  {"ext4", 8, "ext4"},  {"ext4", 64, "ext4"},
+                          {"ext4", 200, "ext4"}};  // 200 MiB = two block groups
+    uint32_t seed = 1000;
+    for (const auto& c : cases) {
+        Vol v;
+        CHECK(v.formatOverNoise(c.variant, c.mib, seed += 977));
+        CHECK_EQ(extGetFilesystemLabel(0), std::string(c.expectLabel));
+        CHECK(list(0, "").size() == 1 && has(0, "", "lost+found"));
+        CHECK(extCreateDirectory(0, "/after"));
+        CHECK(putFile(0, "/after/f.bin", pseudoRandom(100000, 9)));
+        CHECK(getFile(0, "/after/f.bin") == pseudoRandom(100000, 9));
+        const std::string what = std::string("format over noise ") + c.variant + " " + std::to_string(c.mib) + "MiB";
+        v.fsckClean(what.c_str());
+    }
+}
+
+static void test_reformat_over_existing_filesystem_passes_fsck() {
+    // Re-formatting leaves the previous journal inode (nonzero i_blocks) in place, the same
+    // failure as above reached by a different road (e.g. formatting a used USB partition).
+    const char* variants[] = {"ext4", "ext3", "ext2", "ext4"};
+    Vol v;
+    CHECK(v.format("ext4", 64));
+    CHECK(extCreateDirectory(0, "/old"));
+    CHECK(putFile(0, "/old/data.bin", pseudoRandom(400000, 3)));
+    for (const char* variant : variants) {
+        CHECK(v.reformat(variant));
+        CHECK(list(0, "").size() == 1 && has(0, "", "lost+found"));   // old contents are gone
+        CHECK(!has(0, "", "old"));
+        const std::string what = std::string("reformat as ") + variant;
+        v.fsckClean(what.c_str());
+        CHECK(extCreateDirectory(0, "/old"));
+        CHECK(putFile(0, "/old/data.bin", pseudoRandom(400000, 3)));
     }
 }
 
@@ -823,6 +891,8 @@ int main() {
     if (!g_haveFsck) std::printf("NOTE: e2fsck not found; filesystem-consistency checks will be skipped.\n");
     const TestCase tests[] = {
         T(test_format_variants_pass_fsck),
+        T(test_format_over_stale_payload_passes_fsck),
+        T(test_reformat_over_existing_filesystem_passes_fsck),
         T(test_mounts_images_made_by_system_mkfs),
         T(test_mkdir_rules),
         T(test_names_wire_format_and_limits),

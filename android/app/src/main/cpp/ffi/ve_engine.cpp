@@ -472,6 +472,61 @@ extern "C" VE_API int32_t ve_list_directory(int32_t vol, const char* path, ve_bu
     VE_CATCH(VE_ERR_EXCEPTION)
 }
 
+// Same wire packing as ve_list_directory (u32 count, then u32-length-prefixed UTF-8 entries).
+static int32_t packWireList(std::vector<std::string>& results, ve_buffer* out) {
+    std::vector<uint8_t> packed;
+    putU32(packed, static_cast<uint32_t>(results.size()));
+    for (auto& entry : results) {
+        sanitizeString(entry);
+        putU32(packed, static_cast<uint32_t>(entry.size()));
+        packed.insert(packed.end(), entry.begin(), entry.end());
+    }
+    return emitBuffer(packed.data(), packed.size(), out) ? VE_OK : VE_ERR_FAILED;
+}
+
+extern "C" VE_API int32_t ve_list_symlinks(int32_t vol, const char* path, ve_buffer* out) {
+    if (!out) return VE_ERR_INVALID_ARG;
+    out->data = nullptr;
+    out->len = 0;
+    if (!path || !validVol(vol)) return VE_ERR_INVALID_ARG;
+    VE_TRY
+    if (vefv::isSlot(vol)) return vefv::listSymlinks(vol, path, out);
+    std::vector<std::string> results;
+    const int32_t rc = withMounted(vol, "listSymlinks", false, [&](auto&) {
+        fsListSymlinks(vol, path, results);
+        return VE_OK;
+    });
+    if (rc != VE_OK) return rc;
+    return packWireList(results, out);
+    VE_CATCH(VE_ERR_EXCEPTION)
+}
+
+extern "C" VE_API int32_t ve_read_symlink(int32_t vol, const char* path, ve_buffer* out) {
+    if (!out) return VE_ERR_INVALID_ARG;
+    out->data = nullptr;
+    out->len = 0;
+    if (!path || !validVol(vol)) return VE_ERR_INVALID_ARG;
+    VE_TRY
+    if (vefv::isSlot(vol)) return vefv::readSymlink(vol, path, out);
+    std::string target;
+    const int32_t rc = withMounted(vol, "readSymlink", false, [&](auto&) {
+        return okOrFailed(fsReadSymlink(vol, path, target));
+    });
+    if (rc != VE_OK) return rc;
+    return emitBuffer(reinterpret_cast<const uint8_t*>(target.data()), target.size(), out) ? VE_OK : VE_ERR_FAILED;
+    VE_CATCH(VE_ERR_EXCEPTION)
+}
+
+extern "C" VE_API int32_t ve_create_symlink(int32_t vol, const char* path, const char* target) {
+    if (!path || !target || !validVol(vol)) return VE_ERR_INVALID_ARG;
+    VE_TRY
+    if (vefv::isSlot(vol)) return vefv::createSymlink(vol, path, target);
+    return withMounted(vol, "createSymlink", true, [&](auto&) {
+        return okOrFailed(fsCreateSymlink(vol, path, target));
+    });
+    VE_CATCH(VE_ERR_EXCEPTION)
+}
+
 extern "C" VE_API int64_t ve_get_file_size(int32_t vol, const char* path) {
     if (!path || !validVol(vol)) return -VE_ERR_INVALID_ARG;
     VE_TRY

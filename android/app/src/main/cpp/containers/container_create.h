@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include "usb_create_diagnostics.h"
+#include "fs_grow.h"
 
 // Creates a new VeraCrypt-format container at file descriptor [fd]:
 // generates a salt and master key from /dev/urandom, builds and encrypts
@@ -177,14 +178,50 @@ int changeLuksContainerPassword(int fd,
 // ---- Volume expansion (VeraCrypt Volume Expander; containers/vc_expand.h) --------------------
 enum class ExpandOutcome : int {
     kOk = 0, kWrongPassword = 1, kNotExpandable = 2, kNotLarger = 3, kIoError = 4, kBadKeyfile = 5,
+    kNotLuks = 6, kInvalidHeader = 7, kContainerInUse = 8,
+};
+// Result of the file-system step that can follow an expand (see growFileSystem below).
+struct FsGrowReport {
+    bool attempted = false;                      // false: not asked for, or the container step failed first
+    FsGrowStatus status = FsGrowStatus::kFailed;
+    char fsLabel[16] = {0};                      // "NTFS", "ext4", "exFAT", ... (empty if not recognised)
 };
 // Grows a standard VeraCrypt file container to [newSizeBytes] (rounded down to 4096): extends the file,
 // initialises the new space under the volume key (or, [initFreeSpace] false, just wipes the old embedded
 // backup header), rewrites the volume header with the new size and moves the embedded backup header to
-// the new end. The file system inside is NOT grown. Always takes ownership of [fd] and the keyfile fds.
+// the new end. With [growFileSystem] (and [fsReport]) it then grows the file system inside into the added
+// space where that is possible in place -- NTFS and ext2/3/4; see filesystems/fs_ops.h fsGrowToFit -- and
+// reports what happened in [fsReport]; the container expansion itself stands either way. Always takes
+// ownership of [fd] and the keyfile fds.
 ExpandOutcome expandVeraCryptContainer(int fd, const char* password, int pim, int cipherId, int hashId,
                                        const int* keyfileFds, int keyfileCount,
-                                       int64_t newSizeBytes, bool initFreeSpace);
+                                       int64_t newSizeBytes, bool initFreeSpace,
+                                       bool growFileSystem = false, FsGrowReport* fsReport = nullptr);
+// Only the file-system step, for a standard volume that was expanded earlier (or by another program) and whose
+// file system still ends where it did. Same ownership of [fd] and keyfile fds. kNotExpandable: not a plain
+// full-size standard volume. kOk means the step ran; its result is in [fsReport].
+ExpandOutcome growVeraCryptFileSystem(int fd, const char* password, int pim, int cipherId, int hashId,
+                                      const int* keyfileFds, int keyfileCount, FsGrowReport* fsReport);
+
+// Expands a LUKS1/LUKS2 file container. LUKS1 and LUKS2 dynamic segments
+// grow by extending the file; a fixed-size LUKS2 segment also gets its
+// `size` field updated in both validated metadata copies. Keyfiles follow
+// cryptsetup semantics: the first keyfile replaces (rather than mixes with)
+// the typed password. [initFreeSpace] encrypts plaintext zeroes into the new
+// data range before metadata is committed. File-system growth reuses the
+// NTFS/ext2/3/4 in-place backends; FAT/exFAT report unsupported. Always owns
+// [fd] and all keyfile fds.
+ExpandOutcome expandLuksContainer(int fd, const char* password,
+                                 const int* keyfileFds, int keyfileCount,
+                                 int64_t newSizeBytes, bool initFreeSpace,
+                                 bool growFileSystem = false, FsGrowReport* fsReport = nullptr);
+// Re-runs only the filesystem grow step for a LUKS volume whose data segment
+// already exposes the larger size (for example after a previous filesystem
+// grow returned busy/needs_check/failed). Fixed-size LUKS2 uses its declared
+// segment size, not the physical file tail.
+ExpandOutcome growLuksFileSystem(int fd, const char* password,
+                                 const int* keyfileFds, int keyfileCount,
+                                 FsGrowReport* fsReport);
 
 // ---- Hidden volume inside an EXISTING volume (VeraCrypt "direct mode") -------------------------------
 enum class HiddenHostOutcome : int {

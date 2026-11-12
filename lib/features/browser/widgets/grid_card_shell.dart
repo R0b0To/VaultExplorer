@@ -97,6 +97,7 @@ class GridCardShell extends StatelessWidget {
   final bool showMoreButton;
   final bool isPinned;
   final bool isBookmark;
+  final bool isShortcut;
   final bool isDocumentProviderMounted;
   final bool isSynced;
   final bool isPlaceholder;
@@ -128,6 +129,7 @@ class GridCardShell extends StatelessWidget {
     this.showMoreButton = true,
     this.isPinned = false,
     this.isBookmark = false,
+    this.isShortcut = false,
     this.isDocumentProviderMounted = false,
     this.isSynced = false,
     this.isPlaceholder = false,
@@ -161,7 +163,7 @@ class GridCardShell extends StatelessWidget {
               color: cs.primary.withValues(alpha: 0.12),
             ),
           ),
-        if ((isPinned || isBookmark || isDocumentProviderMounted || isSynced) && !isSelected)
+        if ((isShortcut || isPinned || isBookmark || isDocumentProviderMounted || isSynced) && !isSelected)
           Align(
             alignment: Alignment.topLeft,
             child: Padding(
@@ -175,14 +177,22 @@ class GridCardShell extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (isPinned)
+                    if (isShortcut)
+                      Icon(
+                        Icons.shortcut_rounded,
+                        size: 13,
+                        color: cs.primary,
+                      ),
+                    if (isPinned) ...[
+                      if (isShortcut) const SizedBox(width: 3),
                       Icon(
                         Icons.push_pin_rounded,
                         size: 13,
                         color: cs.primary,
                       ),
+                    ],
                     if (isBookmark) ...[
-                      if (isPinned) const SizedBox(width: 3),
+                      if (isPinned || isShortcut) const SizedBox(width: 3),
                       Icon(
                         Icons.star_rounded,
                         size: 13,
@@ -190,7 +200,7 @@ class GridCardShell extends StatelessWidget {
                       ),
                     ],
                     if (isDocumentProviderMounted) ...[
-                      if (isPinned || isBookmark) const SizedBox(width: 3),
+                      if (isPinned || isBookmark || isShortcut) const SizedBox(width: 3),
                       Icon(
                         Icons.folder_shared_rounded,
                         size: 13,
@@ -198,7 +208,7 @@ class GridCardShell extends StatelessWidget {
                       ),
                     ],
                     if (isSynced) ...[
-                      if (isPinned || isBookmark || isDocumentProviderMounted)
+                      if (isPinned || isBookmark || isShortcut || isDocumentProviderMounted)
                         const SizedBox(width: 3),
                       Icon(
                         Icons.sync_rounded,

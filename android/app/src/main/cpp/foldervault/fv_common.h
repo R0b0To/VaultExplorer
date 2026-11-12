@@ -52,9 +52,9 @@ struct DirEntry {
     int64_t size = 0;      // cleartext size for virtual entries, 0 for dirs
     int64_t mtimeMs = 0;   // milliseconds since the epoch
     // The entry is a symbolic link.
-    //  * Cryptomator, only ever set by Vault::listSymlinks: the link is neither a file nor a folder and [size]
-    //    is the byte length of the link target. Plain listDirectory() never returns such entries, so a
-    //    consumer that does not know about symlinks cannot trip over one.
+    //  * Cryptomator, only ever set by Vault::listSymlinks: [isDir] describes whether the in-vault target
+    //    resolves to a directory; [size] is zero for directories and target byte length otherwise. Plain
+    //    listDirectory() never returns such entries, so unaware consumers cannot recurse through links.
     //  * Physical listings of POSIX storages (PosixStorage::list/stat): set when the entry is a link, in which
     //    case isDir/size describe the link's target. gocryptfs stores symlinks as symlinks (with an encrypted
     //    target); the vault code here neither shows nor follows them, so they never leave listDirectory().

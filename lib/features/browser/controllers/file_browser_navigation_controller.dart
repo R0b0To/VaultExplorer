@@ -257,7 +257,7 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
       try {
         final raw = await ref
             .read(vaultFileIoApiProvider)
-            .listDirectory(container, parentSegment.fatPath);
+            .listDirectoryForBrowser(container, parentSegment.fatPath);
         if (raw != null) {
           parentSegment.items = RawEntry.parseAll(raw);
         }
@@ -317,7 +317,7 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
     try {
       final items = await ref
           .read(vaultFileIoApiProvider)
-          .listDirectory(container, path, refresh: refresh);
+          .listDirectoryForBrowser(container, path, refresh: refresh);
 
       if (!ref.mounted ||
           generation != _loadGeneration ||

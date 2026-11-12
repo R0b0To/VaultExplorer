@@ -13,6 +13,7 @@ class KeyfilesPicker extends ConsumerWidget {
   final FutureOr<void> Function() onPick;
   final ValueChanged<KeyfileRef> onRemove;
   final bool enabled;
+  final bool addEnabled;
 
   const KeyfilesPicker({
     super.key,
@@ -21,6 +22,7 @@ class KeyfilesPicker extends ConsumerWidget {
     required this.onPick,
     required this.onRemove,
     this.enabled = true,
+    this.addEnabled = true,
   });
 
   @override
@@ -54,7 +56,7 @@ class KeyfilesPicker extends ConsumerWidget {
               ),
               const SizedBox(width: 8),
                FilledButton.tonalIcon(
-                onPressed: (enabled && !picking)
+                onPressed: (enabled && addEnabled && !picking)
                     ? () => ref
                         .read(sessionLockControllerProvider)
                         .withLockSuppression(() async => await onPick())

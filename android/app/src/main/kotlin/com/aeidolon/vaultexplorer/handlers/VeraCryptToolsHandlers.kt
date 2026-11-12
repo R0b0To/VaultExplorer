@@ -26,33 +26,131 @@ class VeraCryptToolsHandlers(
         val keyfilePaths = call.argument<List<String>>("keyfilePaths")
         val newSizeBytes = call.argument<Number>("newSizeBytes")?.toLong() ?: 0L
         val initFreeSpace = call.argument<Boolean>("initFreeSpace") ?: true
+        val growFileSystem = call.argument<Boolean>("growFileSystem") ?: true
         if (uri.isNullOrEmpty() || newSizeBytes <= 0L || (password.isEmpty() && keyfilePaths.isNullOrEmpty())) {
             result.error("INVALID_ARGS", "uri, newSizeBytes and a password or keyfile are required", null)
             return
         }
+        runFileSystemTool(result, uri, keyfilePaths) { pfd, keyfileFds ->
+            NativeEngine.expandVeraCryptContainerNative(
+                pfd, password, pim, cipherId, hashId, keyfileFds, newSizeBytes, initFreeSpace, growFileSystem,
+            )
+        }
+    }
+
+    /** Expands a LUKS1/LUKS2 file container. A keyfile replaces the typed password, like cryptsetup. */
+    fun handleExpandLuksContainer(call: MethodCall, result: MethodChannel.Result) {
+        val uri = call.argument<String>("uri")
+        val password = call.argument<String>("password") ?: ""
+        val keyfilePaths = call.argument<List<String>>("keyfilePaths")
+        val newSizeBytes = call.argument<Number>("newSizeBytes")?.toLong() ?: 0L
+        val initFreeSpace = call.argument<Boolean>("initFreeSpace") ?: true
+        val growFileSystem = call.argument<Boolean>("growFileSystem") ?: true
+        if (uri.isNullOrEmpty() || newSizeBytes <= 0L || (password.isEmpty() && keyfilePaths.isNullOrEmpty())) {
+            result.error("INVALID_ARGS", "uri, newSizeBytes and a password or keyfile are required", null)
+            return
+        }
+        runFileSystemTool(result, uri, keyfilePaths, isLuks = true) { pfd, keyfileFds ->
+            NativeEngine.expandLuksContainerNative(
+                pfd, password, keyfileFds, newSizeBytes, initFreeSpace, growFileSystem,
+            )
+        }
+    }
+
+    /** Grows only the file system of a volume that was expanded earlier, into the space it does not use yet. */
+    fun handleGrowFileSystem(call: MethodCall, result: MethodChannel.Result) {
+        val uri = call.argument<String>("uri")
+        val password = call.argument<String>("password") ?: ""
+        val pim = call.argument<Number>("pim")?.toInt() ?: 0
+        val cipherId = call.argument<Number>("cipherId")?.toInt() ?: 255
+        val hashId = call.argument<Number>("hashId")?.toInt() ?: 255
+        val keyfilePaths = call.argument<List<String>>("keyfilePaths")
+        if (uri.isNullOrEmpty() || (password.isEmpty() && keyfilePaths.isNullOrEmpty())) {
+            result.error("INVALID_ARGS", "uri and a password or keyfile are required", null)
+            return
+        }
+        runFileSystemTool(result, uri, keyfilePaths) { pfd, keyfileFds ->
+            NativeEngine.growVeraCryptFileSystemNative(pfd, password, pim, cipherId, hashId, keyfileFds)
+        }
+    }
+
+    /** Retries only the LUKS filesystem grow step without changing the container geometry. */
+    fun handleGrowLuksFileSystem(call: MethodCall, result: MethodChannel.Result) {
+        val uri = call.argument<String>("uri")
+        val password = call.argument<String>("password") ?: ""
+        val keyfilePaths = call.argument<List<String>>("keyfilePaths")
+        if (uri.isNullOrEmpty() || (password.isEmpty() && keyfilePaths.isNullOrEmpty())) {
+            result.error("INVALID_ARGS", "uri and a password or keyfile are required", null)
+            return
+        }
+        runFileSystemTool(result, uri, keyfilePaths, isLuks = true) { pfd, keyfileFds ->
+            NativeEngine.growLuksFileSystemNative(pfd, password, keyfileFds)
+        }
+    }
+
+    /**
+     * Shared plumbing of the expand / grow-file-system calls: keyfile fds first (as in the other handlers, so a keyfile
+     * that fails to open can't strand the detached container fd), then the native call, then the result mapping.
+     * Success is a map {fsStatus, fsName}: fsStatus is "grown", "already_fills", "unsupported", "needs_check",
+     * "busy", "failed" or "not_run" (the container was expanded, the file system step was not asked for).
+     */
+    private fun runFileSystemTool(
+        result: MethodChannel.Result, uri: String, keyfilePaths: List<String>?, isLuks: Boolean = false,
+        nativeCall: (pfd: Int, keyfileFds: IntArray?) -> IntArray?,
+    ) {
         ioExecutor.execute {
             try {
-                // Keyfile fds first, as in the other handlers, so a keyfile that fails to open can't strand the detached container fd.
                 val keyfileFds = nativeOps.openKeyfileFds(keyfilePaths)
                 val pfd = activity.contentResolver.openFileDescriptor(Uri.parse(uri), "rw")
                     ?: throw Exception("Could not open file descriptor")
-                val outcome = NativeEngine.expandVeraCryptContainerNative(
-                    pfd.detachFd(), password, pim, cipherId, hashId, keyfileFds, newSizeBytes, initFreeSpace,
-                )
+                val out = nativeCall(pfd.detachFd(), keyfileFds)
                 activity.runOnUiThread {
+                    val outcome = out?.getOrNull(0) ?: 4
                     when (outcome) {
-                        0 -> result.success(true)
+                        0 -> result.success(mapOf("fsStatus" to fsStatusName(out?.getOrNull(1) ?: -1), "fsName" to fsKindName(out?.getOrNull(2) ?: 0)))
                         1 -> result.error("PASSWORD_INCORRECT", "Incorrect password", null)
-                        2 -> result.error("NOT_EXPANDABLE", "Only a standard volume that fills its container can be expanded.", null)
+                        2 -> result.error(
+                            "NOT_EXPANDABLE",
+                            if (isLuks) "This LUKS container uses an unsupported segment layout or inconsistent metadata."
+                            else "Only a standard volume that fills its container can be expanded.",
+                            null,
+                        )
                         3 -> result.error("NOT_LARGER", "The new size must be larger than the current size.", null)
                         5 -> result.error("KEYFILE_ERROR", "A keyfile could not be read.", null)
-                        else -> result.error("IO_ERROR", "Could not expand the volume (code $outcome)", null)
+                        6 -> result.error("NOT_LUKS", "The selected file is not a LUKS container.", null)
+                        7 -> result.error("INVALID_HEADER", "The LUKS header is damaged or unsupported.", null)
+                        8 -> result.error("CONTAINER_IN_USE", "Close the unlocked volume before expanding or growing its file system.", null)
+                        else -> result.error("IO_ERROR", "Could not complete the volume operation (code $outcome)", null)
                     }
                 }
             } catch (e: Exception) {
                 activity.runOnUiThread { result.error("IO_ERROR", e.message, null) }
             }
         }
+    }
+
+    // Mirrors FsGrowStatus in cpp/filesystems/fs_grow.h.
+    private fun fsStatusName(status: Int): String = when (status) {
+        0 -> "grown"
+        1 -> "already_fills"
+        2 -> "unsupported"
+        3 -> "needs_check"
+        4 -> "busy"
+        5 -> "failed"
+        else -> "not_run"
+    }
+
+    // Mirrors fsKindCode in cpp/jni/container_lifecycle_bridge.cpp.
+    private fun fsKindName(kind: Int): String = when (kind) {
+        1 -> "FAT12"
+        2 -> "FAT16"
+        3 -> "FAT32"
+        4 -> "exFAT"
+        5 -> "NTFS"
+        6 -> "ext2"
+        7 -> "ext3"
+        8 -> "ext4"
+        else -> ""
     }
 
     private fun hiddenHostErrorFor(outcome: Int): Pair<String, String> = when (outcome) {

@@ -108,7 +108,11 @@ enum ContainerUnlockMethod {
 
 @Riverpod(keepAlive: true)
 ContainerRepository containerRepository(Ref ref) =>
-    ContainerRepository.withCryptoApi(ref.watch(vaultCryptoApiProvider));
+    ContainerRepository.withCryptoApi(ref.watch(vaultCryptoApiProvider))
+      // Read lazily: only needed when a vault is removed, and it keeps this provider
+      // independent of the lifecycle API's own dependencies.
+      ..clearVaultOpenPreferences = (uri) =>
+          ref.read(vaultLifecycleApiProvider).clearVaultOpenPreferences(uri);
 
 /// The string the platform layer uses to key a container's cached derived key.
 ///
@@ -155,6 +159,10 @@ class ContainerRepository {
   final Future<bool> Function(String filePath, {bool removeExpiry})
   _clearDerivedKey;
   final Future<bool> Function(String id) _deleteBiometricKey;
+
+  /// Tells the platform layer to forget per-vault open options it keeps itself (today: the Cryptomator
+  /// key-file backup switch) once a vault is removed. Best effort; unset in tests and non-Android contexts.
+  Future<void> Function(String uri)? clearVaultOpenPreferences;
   final AppSecureStorage _secure;
   Map<String, ContainerRecord>? _cache;
 
@@ -394,6 +402,11 @@ class ContainerRepository {
       await _deleteBiometricKey(vaultBiometricKeyId(uri));
     } catch (e) {
       _logSwallowed('remove/deleteBiometricKey', e);
+    }
+    try {
+      await clearVaultOpenPreferences?.call(uri);
+    } catch (e) {
+      _logSwallowed('remove/clearVaultOpenPreferences', e);
     }
     await _persist();
   }

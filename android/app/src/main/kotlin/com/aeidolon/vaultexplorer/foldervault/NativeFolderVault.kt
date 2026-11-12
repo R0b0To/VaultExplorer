@@ -40,11 +40,15 @@ internal object NativeFolderVault {
      *
      * Returns a handle > 0, 0 for "not a valid vault", -1 for "wrong password".
      * out[0] receives the failure message, out[1] the CryFS derived key.
+     *
+     * [backupKeyFiles] only matters for Cryptomator (the `.bkup` copies of the key files on a read-write
+     * unlock); the other formats ignore it.
      */
     @JvmStatic external fun nativeOpen(
         format: Int, rawRoot: String?, bootstrap: FolderVaultStorage?,
         sessionProvider: FolderVaultSessionProvider?, password: ByteArray, readOnly: Boolean,
-        localStateDir: String, tempDir: String, combinedKey: ByteArray?, out: Array<Any?>,
+        backupKeyFiles: Boolean, localStateDir: String, tempDir: String, combinedKey: ByteArray?,
+        out: Array<Any?>,
     ): Long
 
     /**
@@ -68,6 +72,12 @@ internal object NativeFolderVault {
     @JvmStatic external fun nativeMigrateCryptomator(
         rawRoot: String?, storage: FolderVaultStorage?, password: ByteArray, out: Array<Any?>,
     ): Int
+
+    /**
+     * Password-free format check of a Cryptomator folder: 0 unknown, 7 format 7 (migratable), 8 current,
+     * -8 key file says 8+ but vault.cryptomator is missing (not synced yet; never migrate), 6 older than 7.
+     */
+    @JvmStatic external fun nativeProbeCryptomator(rawRoot: String?, storage: FolderVaultStorage?): Int
 
     @JvmStatic external fun nativeClose(handle: Long)
     @JvmStatic external fun nativeListDirectory(handle: Long, path: String): Array<String>?

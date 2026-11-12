@@ -38,7 +38,7 @@ extern "C" {
 #  define VE_API __attribute__((visibility("default")))
 #endif
 
-#define VE_ABI_VERSION 7 /* bump whenever a function/struct is added or changed; the Dart side checks it */
+#define VE_ABI_VERSION 8 /* bump whenever a function/struct is added or changed; the Dart side checks it */
 
 /* ---- result codes ------------------------------------------------------- */
 #define VE_OK 0
@@ -364,6 +364,17 @@ VE_API int32_t ve_poll_event(ve_event* out);
 VE_API void ve_set_wake_callback(void (*cb)(void));
 
 
+/* ---- symbolic links (any unlocked slot: ext/NTFS containers and Cryptomator vaults) ----
+ * Links are kept out of ve_list_directory on purpose (they are neither files nor folders, so scanners,
+ * sync and export never see them). ve_list_symlinks returns ONLY the links of a folder, in the
+ * ve_list_directory wire format: "L|targetBytes|mtimeSeconds|name", or "LD|0|mtimeSeconds|name" when the
+ * target is a directory. ve_read_symlink returns the raw UTF-8 target (never followed); VE_ERR_FAILED if
+ * `path` is not a readable link. ve_create_symlink refuses what the filesystem/vault refuses (absolute or
+ * escaping targets, unsupported filesystems): VE_ERR_FAILED, or VE_ERR_READ_ONLY. */
+VE_API int32_t ve_list_symlinks(int32_t vol_id, const char* path, ve_buffer* out);
+VE_API int32_t ve_read_symlink(int32_t vol_id, const char* path, ve_buffer* out);
+VE_API int32_t ve_create_symlink(int32_t vol_id, const char* path, const char* target);
+
 /* ---- folder vaults (gocryptfs / Cryptomator / CryFS) ---------------------
  * Directory-based vaults live in the platform-neutral foldervault/ core. An unlocked one takes a
  * volume slot exactly like a container does: afterwards EVERY ve_* file call above (list, read,
@@ -393,12 +404,19 @@ VE_API int32_t ve_fv_probe(const char* root, int32_t* format_out);
 /* Opens the vault at `root` into slot `vol_id`. Returns VE_OK, VE_ERR_AUTH_FAILED (wrong password),
  * VE_ERR_FAILED (not a vault / I/O error) or VE_ERR_INVALID_ARG. `combined_key` (CryFS only,
  * may be NULL) is the derived key from an earlier unlock and replaces the password.
+ * `backup_key_files` (Cryptomator, read-write unlocks only) keeps .bkup copies of masterkey.cryptomator
+ * and vault.cryptomator next to the originals; the other formats ignore it.
  * `derived_key` (optional) receives the CryFS derived key so the caller can offer "remember". */
 VE_API int32_t ve_fv_unlock(int32_t vol_id, int32_t format, const char* root,
                             const uint8_t* password, int32_t password_len,
                             const uint8_t* combined_key, int32_t combined_key_len,
-                            int32_t read_only, const char* local_state_dir, const char* temp_dir,
-                            ve_buffer* message, ve_buffer* derived_key);
+                            int32_t read_only, int32_t backup_key_files, const char* local_state_dir,
+                            const char* temp_dir, ve_buffer* message, ve_buffer* derived_key);
+
+/* Password-free look at a Cryptomator vault folder from its files alone (nothing is decrypted or
+ * written): *code_out = 0 not a (readable) vault, 7 format 7 (migratable), 8 current, -8 key file is
+ * version 8+ but vault.cryptomator has not synced yet (NEVER migrate), 6 too old to migrate here. */
+VE_API int32_t ve_fv_probe_cryptomator(const char* root, int32_t* code_out);
 
 /* Creates a new vault in the (empty) directory `root`. gocryptfs: cipher 0 AES-256-GCM,
  * 1 XChaCha20-Poly1305, 2 AES-SIV; plaintext_names / deterministic_names flags; long_name_max
@@ -425,10 +443,6 @@ VE_API int32_t ve_fv_migrate_cryptomator(const char* root, const uint8_t* passwo
 /* Vault properties as triples: u32 count, then per item 3 x (u32 length + UTF-8 bytes):
  * key, kind ("s" string / "i" integer / "b" boolean), value. Little-endian. */
 VE_API int32_t ve_fv_info(int32_t vol_id, ve_buffer* out);
-/* Directory listing in the same wire format as ve_list_directory, but ONLY the symlinks ("L|size|mtime|name"). */
-VE_API int32_t ve_fv_list_symlinks(int32_t vol_id, const char* path, ve_buffer* out);
-/* The raw UTF-8 target of the symlink at `path`. */
-VE_API int32_t ve_fv_read_symlink(int32_t vol_id, const char* path, ve_buffer* out);
 /* Number of entries hidden from listings in `path` (>= 0), or a negative -VE_ERR_* code. */
 VE_API int32_t ve_fv_hidden_entry_count(int32_t vol_id, const char* path);
 /* Flushes pending metadata for a file that was written chunk by chunk. */

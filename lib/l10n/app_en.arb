@@ -3244,6 +3244,18 @@
   "@toolExpandVolumeSubtitle": {
     "description": "Tools row subtitle for volume expansion"
   },
+  "toolExpandLuksVolumeTitle": "Expand LUKS container",
+  "@toolExpandLuksVolumeTitle": {
+    "description": "Tools row: enlarge a LUKS1 or LUKS2 file container"
+  },
+  "toolExpandLuksVolumeSubtitle": "Grow LUKS1 and LUKS2 containers, including fixed-size LUKS2 metadata",
+  "@toolExpandLuksVolumeSubtitle": {
+    "description": "Tools row subtitle for LUKS container expansion"
+  },
+  "luksToolsExpandNote": "Back up the container first. Supports LUKS1 and LUKS2. NTFS and ext2/3/4 filesystems can be expanded in place (FAT and exFAT cannot). The added space can be initialized with encrypted zeros. A keyfile replaces the password if used.",
+  "@luksToolsExpandNote": {
+    "description": "Explains LUKS container expansion behavior and supported in-place filesystem growth"
+  },
   "toolHiddenInExistingTitle": "Add hidden volume",
   "@toolHiddenInExistingTitle": {
     "description": "Tools row: create a hidden volume inside an existing volume"
@@ -3284,13 +3296,49 @@
   "@vcToolsExpandAction": {
     "description": "Button: run the expansion"
   },
-  "vcToolsExpandNote": "Only the container is enlarged. The file system inside is not resized, so the added space stays unallocated until the file system is grown. Back up the volume first.",
+  "vcToolsExpandNote": "The container is enlarged first. Then the file system inside is grown into the added space where that is possible without reformatting (NTFS, ext2/3/4). FAT and exFAT cannot be grown in place; their added space stays unallocated. Back up the volume first.",
   "@vcToolsExpandNote": {
     "description": "Note about volume expansion"
   },
   "vcToolsExpandDone": "Volume expanded",
   "@vcToolsExpandDone": {
     "description": "Success message after expansion"
+  },
+  "vcToolsGrowFsToggle": "Also grow the file system",
+  "@vcToolsGrowFsToggle": {
+    "description": "Switch: also grow the file system inside the volume after expanding it"
+  },
+  "vcToolsGrowFsToggleHint": "Lets NTFS and ext2/3/4 volumes use the added space right away, without reformatting.",
+  "@vcToolsGrowFsToggleHint": {
+    "description": "Explains the grow file system switch"
+  },
+  "vcToolsGrowFsOnlyAction": "Only grow the file system",
+  "@vcToolsGrowFsOnlyAction": {
+    "description": "Button: grow only the file system of a volume that was expanded earlier"
+  },
+  "vcToolsFsGrown": "File system grown: the added space is ready to use.",
+  "@vcToolsFsGrown": {
+    "description": "Result: the file system was grown into the added space"
+  },
+  "vcToolsFsAlreadyFills": "The file system already fills the volume.",
+  "@vcToolsFsAlreadyFills": {
+    "description": "Result: the file system already fills the volume"
+  },
+  "vcToolsFsUnsupported": "This file system cannot be grown in place (FAT and exFAT cannot). The added space stays unallocated until the volume is reformatted; back up its files first.",
+  "@vcToolsFsUnsupported": {
+    "description": "Result: this file system (FAT/exFAT) cannot be grown in place"
+  },
+  "vcToolsFsBusy": "Files are still open in the volume. Close them, lock the volume, then retry “Only grow the file system”.",
+  "@vcToolsFsBusy": {
+    "description": "Result: file system growth could not run because files remain open"
+  },
+  "vcToolsFsNeedsCheck": "The file system is marked as needing a check. Run Check & Repair on the volume, then use “Only grow the file system”.",
+  "@vcToolsFsNeedsCheck": {
+    "description": "Result: the file system is dirty and must be checked before it can be grown"
+  },
+  "vcToolsFsFailed": "The file system could not be grown. The volume itself is expanded; run Check & Repair on it before using it.",
+  "@vcToolsFsFailed": {
+    "description": "Result: growing the file system failed"
   },
   "vcToolsAnalyzeAction": "Check free space",
   "@vcToolsAnalyzeAction": {
@@ -15933,13 +15981,13 @@
   "@vaultListingDetails": {
     "description": "Action label that opens details about symbolic links and hidden entries"
   },
-  "vaultListingSymbolicLinksTitle": "Symbolic links",
+  "vaultListingSymbolicLinksTitle": "Shortcuts",
   "@vaultListingSymbolicLinksTitle": {
     "description": "Heading for the symbolic links section in vault listing details"
   },
-  "vaultListingSymbolicLinksNote": "A symbolic link points somewhere else. It is never opened or followed here; tap one to copy where it points.",
+  "vaultListingSymbolicLinksNote": "Shortcuts open their targets when tapped. Relative targets stay inside this vault; absolute or broken targets cannot be opened.",
   "@vaultListingSymbolicLinksNote": {
-    "description": "Explains that symbolic links are not followed and can be tapped to copy their target"
+    "description": "Explains that shortcut entries open relative targets within the vault and reject absolute or broken targets"
   },
   "vaultListingHiddenEntriesTitle": "Entries that are not shown",
   "@vaultListingHiddenEntriesTitle": {
@@ -16172,5 +16220,130 @@
         "type": "int"
       }
     }
+  },
+  "cryptomatorBackupKeyFilesTitle": "Back up key files when unlocking",
+  "@cryptomatorBackupKeyFilesTitle": {
+    "description": "Title of the switch in a Cryptomator vault's settings that controls whether key-file backups are written when the vault is unlocked"
+  },
+  "cryptomatorBackupKeyFilesSubtitle": "Keeps a copy of masterkey.cryptomator and vault.cryptomator next to the originals, like Cryptomator on desktop. Applies from the next unlock. Read-only sessions never write.",
+  "@cryptomatorBackupKeyFilesSubtitle": {
+    "description": "Subtitle of the Cryptomator key-file backup switch: what is copied, that it applies from the next unlock, and that read-only sessions never write"
+  },
+  "cryptomatorUpgradeTitle": "Upgrade vault format",
+  "@cryptomatorUpgradeTitle": {
+    "description": "Title of the settings row (and screen) that upgrades a Cryptomator vault from the older format 7 to format 8"
+  },
+  "cryptomatorUpgradeSubtitle": "This vault uses the older format 7.",
+  "@cryptomatorUpgradeSubtitle": {
+    "description": "Subtitle of the upgrade row for a vault that is still Cryptomator format 7"
+  },
+  "cryptomatorUpgradeLockFirst": "Lock the vault to upgrade it",
+  "@cryptomatorUpgradeLockFirst": {
+    "description": "Subtitle of the disabled upgrade row while the vault is unlocked"
+  },
+  "cryptomatorUpgradeWarning": "Upgrading changes this vault to format 8. It cannot be undone, and Cryptomator versions older than 1.6 will no longer be able to open the vault afterwards.\n\nA copy of the current key file is kept as masterkey.cryptomator.<id>.bkup. If another app syncs this vault, let it finish syncing first.",
+  "@cryptomatorUpgradeWarning": {
+    "description": "Warning on the Cryptomator format upgrade screen: what changes, that it is one-way, that older Cryptomator cannot open the vault, where the key-file copy goes, and that sync must finish first"
+  },
+  "cryptomatorUpgradeConfirm": "I understand this can't be undone",
+  "@cryptomatorUpgradeConfirm": {
+    "description": "Checkbox on the Cryptomator upgrade screen the user must tick before the upgrade button works"
+  },
+  "cryptomatorUpgradeAction": "Upgrade",
+  "@cryptomatorUpgradeAction": {
+    "description": "Button that runs the Cryptomator vault format upgrade"
+  },
+  "cryptomatorUpgradedMessage": "Vault upgraded to format 8",
+  "@cryptomatorUpgradedMessage": {
+    "description": "Snackbar shown after a Cryptomator vault was upgraded to format 8"
+  },
+  "cryptomatorUpgradeUnlockedError": "Lock the vault first",
+  "@cryptomatorUpgradeUnlockedError": {
+    "description": "Error shown when the format upgrade is refused because the vault is unlocked"
+  },
+  "cryptomatorConfigMissingWarning": "vault.cryptomator is missing. If another app syncs this vault, wait for it to finish, then try again. Do not upgrade.",
+  "@cryptomatorConfigMissingWarning": {
+    "description": "Warning row for a Cryptomator vault whose vault.cryptomator is missing (usually not synced yet); the user must wait and must not upgrade"
+  },
+  "cryptomatorUpgradeFailedMessage": "Could not upgrade the vault",
+  "@cryptomatorUpgradeFailedMessage": {
+    "description": "Generic error when the Cryptomator format upgrade fails without a more specific message"
+  },
+  "newSymbolicLinkTitle": "New symbolic link",
+  "@newSymbolicLinkTitle": {
+    "description": "Menu entry and dialog title for creating a symbolic link in a Cryptomator vault"
+  },
+  "symbolicLinkNameHint": "Link name",
+  "@symbolicLinkNameHint": {
+    "description": "Hint of the name field when creating or renaming a symbolic link"
+  },
+  "symbolicLinkTargetHint": "Points to",
+  "@symbolicLinkTargetHint": {
+    "description": "Hint of the field where the user types what a new symbolic link points to"
+  },
+  "symbolicLinkTargetHelper": "Stored exactly as written. Relative targets are resolved inside this vault when opened; absolute targets are not followed.",
+  "@symbolicLinkTargetHelper": {
+    "description": "Helper text under the symbolic link target field: relative targets are resolved within the vault; absolute targets are not followed"
+  },
+  "symbolicLinkTargetTooLong": "Target is too long (maximum 32,767 bytes)",
+  "@symbolicLinkTargetTooLong": {
+    "description": "Error under the symbolic link target field when it exceeds the 32,767-byte limit"
+  },
+  "symbolicLinkTargetInvalid": "Target can't contain a null character",
+  "@symbolicLinkTargetInvalid": {
+    "description": "Error under the symbolic link target field when it contains a null character"
+  },
+  "symbolicLinkNameTaken": "A file, folder or link with this name already exists",
+  "@symbolicLinkNameTaken": {
+    "description": "Error when the chosen symbolic link name is already used by a file, folder or another link"
+  },
+  "deleteSymbolicLinkTitle": "Delete symbolic link?",
+  "@deleteSymbolicLinkTitle": {
+    "description": "Title of the confirmation dialog for deleting a symbolic link"
+  },
+  "deleteSymbolicLinkMessage": "Delete the link \"{name}\"? Only the link is removed; what it points to is not touched.",
+  "@deleteSymbolicLinkMessage": {
+    "description": "Body of the confirmation dialog for deleting a symbolic link; says only the link is removed, not what it points to",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "symbolicLinkRenameTitle": "Rename symbolic link",
+  "@symbolicLinkRenameTitle": {
+    "description": "Title of the dialog for renaming a symbolic link"
+  },
+  "symbolicLinkBrowseTarget": "Browse vault",
+  "symbolicLinkSelectTargetTitle": "Choose shortcut target",
+  "symbolicLinkSelectThisFolder": "Select this folder",
+  "symbolicLinkPickerLoadError": "Couldn't load this folder",
+  "shortcutBadge": "Shortcut",
+  "emptyFolder": "This folder is empty",
+  "@symbolicLinkBrowseTarget": {
+    "description": "Tooltip for the button that opens the vault target picker when creating a symbolic link"
+  },
+  "@symbolicLinkSelectTargetTitle": {
+    "description": "Title of the in-vault file and folder picker for a symbolic link target"
+  },
+  "@symbolicLinkSelectThisFolder": {
+    "description": "Button to choose the currently displayed folder as a symbolic link target"
+  },
+  "@symbolicLinkPickerLoadError": {
+    "description": "Message shown when the symbolic-link target picker cannot load a folder"
+  },
+  "@shortcutBadge": {
+    "description": "Label identifying a symbolic link as a shortcut in the target picker"
+  },
+  "@emptyFolder": {
+    "description": "Message shown when the current folder has no entries"
+  },
+  "symbolicLinkTargetHelperRelative": "Use a relative path inside this container. The target may be missing; renaming or deleting the link does not change the target.",
+  "@symbolicLinkTargetHelperRelative": {
+    "description": "Helper text under the symbolic link target field for native LUKS/VeraCrypt filesystems"
+  },
+  "symbolicLinkTargetOutsideVault": "Target must be a relative path that stays inside this container.",
+  "@symbolicLinkTargetOutsideVault": {
+    "description": "Error under the symbolic link target field when a native target is absolute or escapes the container root"
   }
 }

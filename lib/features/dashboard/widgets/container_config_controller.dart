@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
@@ -10,6 +12,7 @@ import 'package:vaultexplorer/core/widgets/inputs/auto_lock_duration_options.dar
         kImmediateAutoLockDuration,
         kInheritAutoLockDuration,
         kScreenLockOnlyAutoLockDuration;
+import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
@@ -65,6 +68,15 @@ class ContainerConfigState {
   final int autoCloseMins;
   final bool documentProvider;
   final bool alwaysOpenReadOnly;
+
+  /// Cryptomator only: keep `.bkup` copies of the key files on a read-write unlock. Lives in Kotlin, not in
+  /// the [ContainerRecord] (see [VaultLifecycleApi.getCryptomatorKeyFileBackup]); ignored for other formats.
+  final bool backupKeyFiles;
+
+  /// Cryptomator only: what the vault folder looks like without a password (drives the upgrade row). Not part
+  /// of [isModified]; nothing here is saved.
+  final CryptomatorVaultFormat cryptomatorFormat;
+
   /// This vault's own thumbnail settings -- what the vault uses when
   /// [useGlobalThumbnails] is off. Prefilled with the app-wide default while
   /// the vault follows it, so turning the switch off changes nothing until
@@ -124,6 +136,7 @@ class ContainerConfigState {
   final String? initialPatternHash;
   final String? initialPinHash;
   final List<KeyfileRef> initialKeyfiles;
+  final bool initialBackupKeyFiles;
 
   const ContainerConfigState({
     required this.label,
@@ -131,6 +144,8 @@ class ContainerConfigState {
     required this.autoCloseMins,
     required this.documentProvider,
     this.alwaysOpenReadOnly = false,
+    this.backupKeyFiles = true,
+    this.cryptomatorFormat = CryptomatorVaultFormat.unknown,
     this.thumbnailCacheMode,
     this.thumbnailQuality,
     this.useGlobalThumbnails = true,
@@ -170,6 +185,7 @@ class ContainerConfigState {
     this.initialPatternHash,
     this.initialPinHash,
     this.initialKeyfiles = const [],
+    this.initialBackupKeyFiles = true,
   });
 
   bool get wasPasswordless =>
@@ -206,6 +222,7 @@ class ContainerConfigState {
     if (autoCloseMins != initialAutoCloseMins) return true;
     if (documentProvider != initialDocumentProvider) return true;
     if (alwaysOpenReadOnly != initialAlwaysOpenReadOnly) return true;
+    if (backupKeyFiles != initialBackupKeyFiles) return true;
     if (useGlobalThumbnails != initialUseGlobalThumbnails) return true;
     // While following the global default the vault's own values are not
     // stored, so editing them (or not) is not a change.
@@ -260,6 +277,8 @@ class ContainerConfigState {
     int? autoCloseMins,
     bool? documentProvider,
     bool? alwaysOpenReadOnly,
+    bool? backupKeyFiles,
+    CryptomatorVaultFormat? cryptomatorFormat,
     ThumbnailCacheMode? thumbnailCacheMode,
     ThumbnailQuality? thumbnailQuality,
     bool? useGlobalThumbnails,
@@ -291,6 +310,7 @@ class ContainerConfigState {
     ThumbnailQuality? initialThumbnailQuality,
     bool? initialUseGlobalThumbnails,
     bool? initialAlwaysOpenReadOnly,
+    bool? initialBackupKeyFiles,
     bool? initialCacheDerivedKey,
     VaultDeleteAfterImportMode? initialVaultDeleteAfterImportMode,
     String? initialPatternHash,
@@ -301,6 +321,8 @@ class ContainerConfigState {
     autoCloseMins: autoCloseMins ?? this.autoCloseMins,
     documentProvider: documentProvider ?? this.documentProvider,
     alwaysOpenReadOnly: alwaysOpenReadOnly ?? this.alwaysOpenReadOnly,
+    backupKeyFiles: backupKeyFiles ?? this.backupKeyFiles,
+    cryptomatorFormat: cryptomatorFormat ?? this.cryptomatorFormat,
     thumbnailCacheMode: thumbnailCacheMode ?? this.thumbnailCacheMode,
     thumbnailQuality: thumbnailQuality ?? this.thumbnailQuality,
     useGlobalThumbnails: useGlobalThumbnails ?? this.useGlobalThumbnails,
@@ -351,6 +373,7 @@ class ContainerConfigState {
     initialPatternHash: initialPatternHash ?? this.initialPatternHash,
     initialPinHash: initialPinHash ?? this.initialPinHash,
     initialKeyfiles: initialKeyfiles,
+    initialBackupKeyFiles: initialBackupKeyFiles ?? this.initialBackupKeyFiles,
   );
 }
 
@@ -369,6 +392,7 @@ class ContainerConfigController extends _$ContainerConfigController {
       settingsLocked: false,
       isMounted: false,
       initialLabel: initialLabel,
+      initialCacheDerivedKey: false,
       initialUnlockMethod: ContainerUnlockMethod.password,
       initialAutoCloseMins: kInheritAutoLockDuration,
       initialDocumentProvider: false,
@@ -556,6 +580,18 @@ class ContainerConfigController extends _$ContainerConfigController {
     }
     if (!ref.mounted) return;
 
+    // Cryptomator only. Unreadable counts as the default (on), like the API call itself.
+    bool backupKeyFiles = true;
+    final isCryptomator = ContainerFormat.isCryptomatorWire(
+      params.containerFormat,
+    );
+    if (isCryptomator) {
+      backupKeyFiles = await ref
+          .read(vaultLifecycleApiProvider)
+          .getCryptomatorKeyFileBackup(params.uri);
+    }
+    if (!ref.mounted) return;
+
     String? patternHash;
     String? pinHash;
     if (state.unlockMethod == ContainerUnlockMethod.pattern) {
@@ -591,6 +627,8 @@ class ContainerConfigController extends _$ContainerConfigController {
       initialThumbnailCacheMode: thumbMode,
       initialThumbnailQuality: thumbQuality,
       initialCacheDerivedKey: state.initialCacheDerivedKey ?? derivedKey,
+      backupKeyFiles: isCryptomator ? backupKeyFiles : null,
+      initialBackupKeyFiles: isCryptomator ? backupKeyFiles : null,
       globalDeleteAfterImportMode: globalDeleteAfterImportMode,
       patternHash: patternHash,
       initialPatternHash: patternHash,
@@ -598,6 +636,8 @@ class ContainerConfigController extends _$ContainerConfigController {
       initialPinHash: pinHash,
       loadingPassword: false,
     );
+    // After the sheet is usable: the probe reads vault files (possibly through SAF), so it must not delay it.
+    if (isCryptomator) unawaited(refreshCryptomatorFormat());
   }
 
   void setLabel(String label) => state = state._copy(label: label);
@@ -622,6 +662,19 @@ class ContainerConfigController extends _$ContainerConfigController {
 
   void setAlwaysOpenReadOnly(bool val) =>
       state = state._copy(alwaysOpenReadOnly: val);
+
+  void setBackupKeyFiles(bool val) => state = state._copy(backupKeyFiles: val);
+
+  /// (Re-)reads the Cryptomator vault's format from its files, for the upgrade row. Cheap, read-only and
+  /// safe on an unlocked vault. Never throws; no-op for other formats.
+  Future<void> refreshCryptomatorFormat() async {
+    if (!ContainerFormat.isCryptomatorWire(params.containerFormat)) return;
+    final format = await ref
+        .read(vaultLifecycleApiProvider)
+        .probeCryptomatorVault(params.uri);
+    if (!ref.mounted) return;
+    state = state._copy(cryptomatorFormat: format);
+  }
 
   void setThumbnailCacheMode(ThumbnailCacheMode mode) =>
       state = state._copy(thumbnailCacheMode: mode);
@@ -862,6 +915,19 @@ class ContainerConfigController extends _$ContainerConfigController {
     await ref.read(containerRepositoryProvider).save(record);
     if (wasBiometrics && !isBiometrics) await guard.forgetVault(params.uri);
     await _applyDerivedKeyLifetime();
+    // Cryptomator only, and only when the switch actually moved. Kotlin owns the value (it applies at the
+    // next unlock, whichever caller does it), so it is not part of the record above.
+    final backupChanged =
+        ContainerFormat.isCryptomatorWire(params.containerFormat) &&
+        state.backupKeyFiles != state.initialBackupKeyFiles;
+    if (backupChanged) {
+      final saved = await ref
+          .read(vaultLifecycleApiProvider)
+          .setCryptomatorKeyFileBackup(params.uri, state.backupKeyFiles);
+      if (saved && ref.mounted) {
+        state = state._copy(initialBackupKeyFiles: state.backupKeyFiles);
+      }
+    }
     if (!ref.mounted) return record;
     if (!state.isMounted && !state.cacheDerivedKey) {
       try {

@@ -1731,6 +1731,16 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
     String filePath,
     Uint8List bytes,
   ) async {
+    // Resolve before committing. If link metadata cannot be read safely,
+    // writeWholeFile will also refuse the write; do not save successfully and
+    // only then fail while trying to discover the cache key to invalidate.
+    final targetPath =
+        await _fileIoApi.resolveVaultSymlinkTargetPath(
+          container,
+          filePath,
+          strict: true,
+        ) ??
+        filePath;
     final ok = await _fileIoApi.writeWholeFile(container, filePath, bytes);
     if (!mounted) return;
     if (!ok) {
@@ -1746,16 +1756,30 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
     }
     _overwroteOriginal = true;
     FullResImageCache.invalidate(container, filePath);
-    await ref
-        .read(thumbnailCacheServiceProvider)
-        .invalidate(
-          container,
-          filePath,
-          qualities: {
-            widget.thumbnailQuality,
-            ThumbnailQuality.defaultQuality,
-          }.toList(),
-        );
+    // The editor is opened with the shortcut path so the native file API can
+    // follow it. Thumbnail widgets, however, are keyed by the resolved target
+    // path. Invalidate that path too (and the link path for any older cache
+    // entries) or the tile can keep showing the pre-edit preview.
+    if (targetPath != filePath) {
+      FullResImageCache.invalidate(container, targetPath);
+    }
+    final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
+    final qualities = {
+      widget.thumbnailQuality,
+      ThumbnailQuality.defaultQuality,
+    }.toList();
+    await thumbnailCache.invalidate(
+      container,
+      filePath,
+      qualities: qualities,
+    );
+    if (targetPath != filePath) {
+      await thumbnailCache.invalidate(
+        container,
+        targetPath,
+        qualities: qualities,
+      );
+    }
     if (!mounted) return;
     _documentController.saved();
     showAppSnackBar(

@@ -2328,6 +2328,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get toolExpandVolumeSubtitle => '增大标准卷的容量，类似于桌面版卷扩展器';
 
   @override
+  String get toolExpandLuksVolumeTitle => '扩展 LUKS 容器';
+
+  @override
+  String get toolExpandLuksVolumeSubtitle =>
+      '扩大 LUKS1 和 LUKS2 容器，包括固定大小的 LUKS2 元数据';
+
+  @override
+  String get luksToolsExpandNote =>
+      '请先备份容器。支持 LUKS1 和 LUKS2。NTFS 和 ext2/3/4 文件系统支持就地扩容（FAT 和 exFAT 不支持）。新增空间可使用加密零进行初始化。如果使用密钥文件，它将替代密码。';
+
+  @override
   String get toolHiddenInExistingTitle => '添加隐藏卷';
 
   @override
@@ -2360,10 +2371,39 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get vcToolsExpandNote =>
-      '仅扩大容器大小。内部文件系统不会被调整，因此新增空间在扩展文件系统之前将保持未分配状态。请先备份卷。';
+      '首先扩大容器。然后，在无需重新格式化即可实现时（NTFS、ext2/3/4），将内部文件系统扩展到新增空间。FAT 和 exFAT 无法就地扩展，新增空间将保持未分配状态。请先备份该卷。';
 
   @override
   String get vcToolsExpandDone => '卷已扩展';
+
+  @override
+  String get vcToolsGrowFsToggle => '同时扩展文件系统';
+
+  @override
+  String get vcToolsGrowFsToggleHint => '让 NTFS 和 ext2/3/4 卷无需重新格式化即可立即使用新增空间。';
+
+  @override
+  String get vcToolsGrowFsOnlyAction => '仅扩展文件系统';
+
+  @override
+  String get vcToolsFsGrown => '文件系统已扩展：新增空间可以使用了。';
+
+  @override
+  String get vcToolsFsAlreadyFills => '文件系统已占满整个卷。';
+
+  @override
+  String get vcToolsFsUnsupported =>
+      '此文件系统无法就地扩展（FAT 和 exFAT 不支持）。新增空间将保持未分配，直到重新格式化该卷；请先备份其中的文件。';
+
+  @override
+  String get vcToolsFsBusy => '卷中仍有文件处于打开状态。请将其关闭、锁定卷，然后重试“仅扩展文件系统”。';
+
+  @override
+  String get vcToolsFsNeedsCheck =>
+      '文件系统被标记为需要检查。请先对该卷运行“检查与修复”，然后使用“仅扩展文件系统”。';
+
+  @override
+  String get vcToolsFsFailed => '无法扩展文件系统。卷本身已扩大；使用前请运行“检查与修复”。';
 
   @override
   String get vcToolsAnalyzeAction => '检查可用空间';
@@ -13278,11 +13318,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vaultListingDetails => '详情';
 
   @override
-  String get vaultListingSymbolicLinksTitle => '符号链接';
+  String get vaultListingSymbolicLinksTitle => '快捷方式';
 
   @override
   String get vaultListingSymbolicLinksNote =>
-      '符号链接指向其他位置。此处不会打开或跟随链接；点按可复制其目标位置。';
+      '点按快捷方式即可打开目标。相对目标仅在此保险库内解析；绝对路径或失效的链接无法打开。';
 
   @override
   String get vaultListingHiddenEntriesTitle => '未显示的条目';
@@ -13443,4 +13483,101 @@ class AppLocalizationsZh extends AppLocalizations {
   String galleryPlaceHintCoordinates(int km) {
     return '$km 公里内没有城市：按坐标分组';
   }
+
+  @override
+  String get cryptomatorBackupKeyFilesTitle => '解锁时备份密钥文件';
+
+  @override
+  String get cryptomatorBackupKeyFilesSubtitle =>
+      '与桌面版 Cryptomator 一样，在原文件旁保留 masterkey.cryptomator 和 vault.cryptomator 的副本。从下次解锁起生效。只读会话不会写入。';
+
+  @override
+  String get cryptomatorUpgradeTitle => '升级保险库格式';
+
+  @override
+  String get cryptomatorUpgradeSubtitle => '此保险库使用较旧的格式 7。';
+
+  @override
+  String get cryptomatorUpgradeLockFirst => '请先锁定保险库再升级';
+
+  @override
+  String get cryptomatorUpgradeWarning =>
+      '升级会将此保险库更改为格式 8。此操作无法撤销，之后低于 1.6 的 Cryptomator 版本将无法再打开该保险库。\n\n当前密钥文件的副本会以 masterkey.cryptomator.<id>.bkup 的名称保留。如果有其他应用正在同步此保险库，请先等待同步完成。';
+
+  @override
+  String get cryptomatorUpgradeConfirm => '我了解此操作无法撤销';
+
+  @override
+  String get cryptomatorUpgradeAction => '升级';
+
+  @override
+  String get cryptomatorUpgradedMessage => '保险库已升级到格式 8';
+
+  @override
+  String get cryptomatorUpgradeUnlockedError => '请先锁定保险库';
+
+  @override
+  String get cryptomatorConfigMissingWarning =>
+      '缺少 vault.cryptomator。如果有其他应用正在同步此保险库，请等待同步完成后再试。请勿升级。';
+
+  @override
+  String get cryptomatorUpgradeFailedMessage => '无法升级保险库';
+
+  @override
+  String get newSymbolicLinkTitle => '新建符号链接';
+
+  @override
+  String get symbolicLinkNameHint => '链接名称';
+
+  @override
+  String get symbolicLinkTargetHint => '指向';
+
+  @override
+  String get symbolicLinkTargetHelper =>
+      '目标会按输入的原样保存。打开时，相对目标会在此保险库内解析；不会跟随绝对目标。';
+
+  @override
+  String get symbolicLinkTargetTooLong => '目标过长（最多 32,767 字节）';
+
+  @override
+  String get symbolicLinkTargetInvalid => '目标不能包含空字符';
+
+  @override
+  String get symbolicLinkNameTaken => '已存在同名的文件、文件夹或链接';
+
+  @override
+  String get deleteSymbolicLinkTitle => '删除符号链接？';
+
+  @override
+  String deleteSymbolicLinkMessage(String name) {
+    return '删除链接“$name”？只会删除链接本身，不会影响它所指向的内容。';
+  }
+
+  @override
+  String get symbolicLinkRenameTitle => '重命名符号链接';
+
+  @override
+  String get symbolicLinkBrowseTarget => '浏览保险库';
+
+  @override
+  String get symbolicLinkSelectTargetTitle => '选择快捷方式目标';
+
+  @override
+  String get symbolicLinkSelectThisFolder => '选择此文件夹';
+
+  @override
+  String get symbolicLinkPickerLoadError => '无法加载此文件夹';
+
+  @override
+  String get shortcutBadge => '快捷方式';
+
+  @override
+  String get emptyFolder => '此文件夹为空';
+
+  @override
+  String get symbolicLinkTargetHelperRelative =>
+      '请使用此容器内的相对路径。目标可以暂时不存在；重命名或删除链接不会更改目标。';
+
+  @override
+  String get symbolicLinkTargetOutsideVault => '目标必须是保留在此容器内的相对路径。';
 }

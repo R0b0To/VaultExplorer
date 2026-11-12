@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vaultexplorer/core/api/vault_crypto_api.dart';
+import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/api/vault_lifecycle_api.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/widgets/inputs/auto_lock_duration_options.dart'
@@ -135,6 +136,172 @@ void main() {
         {'uri': 'file:///carrier2.png', 'name': 'carrier2.png'},
       ]);
       expect(saved.alwaysOpenReadOnly, isTrue);
+    });
+  });
+
+  group('Cryptomator key-file backup switch', () {
+    const cryptomatorParams = ContainerConfigParams(
+      uri: 'content://tree/vault',
+      currentLabel: 'My Vault',
+      containerFormat: 'cryptomator',
+    );
+    const veracryptParams = ContainerConfigParams(
+      uri: 'file:///vault.hc',
+      currentLabel: 'My Vault',
+      containerFormat: 'veracrypt',
+    );
+
+    late _BackupFlagLifecycleApi lifecycle;
+    late ProviderContainer localContainer;
+
+    setUp(() {
+      lifecycle = _BackupFlagLifecycleApi();
+      localContainer = ProviderContainer(
+        overrides: [
+          containerRepositoryProvider.overrideWith((ref) => _FakeContainerRepo()),
+          appSecureStorageProvider.overrideWith((ref) => _FakeAppSecureStorage()),
+          vaultLifecycleApiProvider.overrideWith((ref) => lifecycle),
+        ],
+      );
+      addTearDown(localContainer.dispose);
+    });
+
+    Future<void> initFromRecord(ContainerConfigParams params) async {
+      final provider = containerConfigControllerProvider(params);
+      localContainer.listen(provider, (_, __) {});
+      localContainer.read(provider.notifier).initializeFromRecord(
+            rec: ContainerRecord(uri: params.uri, label: 'My Vault', containerFormat: params.containerFormat),
+            appSettings: null,
+            mountedContainer: null,
+          );
+      for (var i = 0; i < 500; i++) {
+        if (!localContainer.read(provider).loadingPassword) return;
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      fail('controller never finished loading');
+    }
+
+    // The probe runs after the sheet is usable (it must not delay it), so give it a moment to land.
+    Future<void> untilFormatIs(CryptomatorVaultFormat expected) async {
+      final provider = containerConfigControllerProvider(cryptomatorParams);
+      for (var i = 0; i < 500; i++) {
+        if (localContainer.read(provider).cryptomatorFormat == expected) return;
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      fail('probe result never arrived');
+    }
+
+    Future<void> save(ContainerConfigParams params) => localContainer
+        .read(containerConfigControllerProvider(params).notifier)
+        .saveContainer(
+          passwordText: '',
+          labelText: 'My Vault',
+          existingRecord: ContainerRecord(uri: params.uri, label: 'My Vault', containerFormat: params.containerFormat),
+        );
+
+    test('defaults to on and is unmodified before any change', () {
+      final state = localContainer.read(containerConfigControllerProvider(cryptomatorParams));
+      expect(state.backupKeyFiles, isTrue);
+      expect(state.initialBackupKeyFiles, isTrue);
+      expect(state.isModified('', 'My Vault'), isFalse);
+    });
+
+    test('loads the stored value for a Cryptomator vault', () async {
+      lifecycle.stored = false;
+      await initFromRecord(cryptomatorParams);
+
+      final state = localContainer.read(containerConfigControllerProvider(cryptomatorParams));
+      expect(state.backupKeyFiles, isFalse);
+      expect(state.initialBackupKeyFiles, isFalse);
+      expect(state.isModified('', 'My Vault'), isFalse);
+      expect(lifecycle.getCalls, ['content://tree/vault']);
+    });
+
+    test('toggling marks the settings as modified', () async {
+      await initFromRecord(cryptomatorParams);
+      final provider = containerConfigControllerProvider(cryptomatorParams);
+
+      localContainer.read(provider.notifier).setBackupKeyFiles(false);
+      expect(localContainer.read(provider).isModified('', 'My Vault'), isTrue);
+
+      localContainer.read(provider.notifier).setBackupKeyFiles(true);
+      expect(localContainer.read(provider).isModified('', 'My Vault'), isFalse);
+    });
+
+    test('save calls the setter once with the new value', () async {
+      await initFromRecord(cryptomatorParams);
+      localContainer
+          .read(containerConfigControllerProvider(cryptomatorParams).notifier)
+          .setBackupKeyFiles(false);
+
+      await save(cryptomatorParams);
+
+      expect(lifecycle.setCalls, [('content://tree/vault', false)]);
+      expect(
+        localContainer.read(containerConfigControllerProvider(cryptomatorParams)).initialBackupKeyFiles,
+        isFalse,
+      );
+    });
+
+    test('save does not call the setter when the switch was not touched', () async {
+      await initFromRecord(cryptomatorParams);
+      await save(cryptomatorParams);
+      expect(lifecycle.setCalls, isEmpty);
+    });
+
+    test('init probes a Cryptomator vault and exposes the format', () async {
+      lifecycle.probeResult = CryptomatorVaultFormat.legacy7;
+      await initFromRecord(cryptomatorParams);
+      await untilFormatIs(CryptomatorVaultFormat.legacy7);
+
+      expect(lifecycle.probeCalls, ['content://tree/vault']);
+      // the probe is information, not a setting: it never makes the sheet "modified"
+      expect(
+        localContainer
+            .read(containerConfigControllerProvider(cryptomatorParams))
+            .isModified('', 'My Vault'),
+        isFalse,
+      );
+    });
+
+    test('refreshCryptomatorFormat re-reads the probe (row disappears after an upgrade)', () async {
+      lifecycle.probeResult = CryptomatorVaultFormat.legacy7;
+      await initFromRecord(cryptomatorParams);
+      await untilFormatIs(CryptomatorVaultFormat.legacy7);
+
+      lifecycle.probeResult = CryptomatorVaultFormat.current;
+      await localContainer
+          .read(containerConfigControllerProvider(cryptomatorParams).notifier)
+          .refreshCryptomatorFormat();
+
+      expect(
+        localContainer.read(containerConfigControllerProvider(cryptomatorParams)).cryptomatorFormat,
+        CryptomatorVaultFormat.current,
+      );
+    });
+
+    test('other formats never probe', () async {
+      await initFromRecord(veracryptParams);
+      await localContainer
+          .read(containerConfigControllerProvider(veracryptParams).notifier)
+          .refreshCryptomatorFormat();
+
+      expect(lifecycle.probeCalls, isEmpty);
+      expect(
+        localContainer.read(containerConfigControllerProvider(veracryptParams)).cryptomatorFormat,
+        CryptomatorVaultFormat.unknown,
+      );
+    });
+
+    test('other formats never read or write the flag', () async {
+      await initFromRecord(veracryptParams);
+      final provider = containerConfigControllerProvider(veracryptParams);
+      localContainer.read(provider.notifier).setBackupKeyFiles(false);
+
+      await save(veracryptParams);
+
+      expect(lifecycle.getCalls, isEmpty);
+      expect(lifecycle.setCalls, isEmpty);
     });
   });
 
@@ -629,6 +796,39 @@ class _FakeVaultLifecycleApi implements VaultLifecycleApi {
     lockedUris.add(filePath);
     return true;
   }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _BackupFlagLifecycleApi implements VaultLifecycleApi {
+  bool stored = true;
+  CryptomatorVaultFormat probeResult = CryptomatorVaultFormat.current;
+  final List<String> getCalls = [];
+  final List<(String, bool)> setCalls = [];
+  final List<String> probeCalls = [];
+
+  @override
+  Future<CryptomatorVaultFormat> probeCryptomatorVault(String folderUri) async {
+    probeCalls.add(folderUri);
+    return probeResult;
+  }
+
+  @override
+  Future<bool> getCryptomatorKeyFileBackup(String uri) async {
+    getCalls.add(uri);
+    return stored;
+  }
+
+  @override
+  Future<bool> setCryptomatorKeyFileBackup(String uri, bool enabled) async {
+    setCalls.add((uri, enabled));
+    stored = enabled;
+    return true;
+  }
+
+  @override
+  Future<bool> lockContainer(String filePath, {bool force = false}) async => true;
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);

@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/api/vault_book_api.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
+import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
@@ -45,6 +46,7 @@ import 'package:vaultexplorer/features/browser/widgets/folder_thumbnail_preview.
 import 'package:vaultexplorer/features/browser/widgets/gallery_date_header.dart';
 import 'package:vaultexplorer/features/browser/widgets/grid_card_shell.dart';
 import 'package:vaultexplorer/features/browser/widgets/hold_range_select_container.dart';
+import 'package:vaultexplorer/features/browser/widgets/shortcut_target_preview.dart';
 import 'package:vaultexplorer/features/browser/widgets/thumbnail_raw_fallback.dart';
 
 class FileMasonryView extends ConsumerStatefulWidget {
@@ -1271,6 +1273,7 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
       longFileNameMode: widget.longFileNameMode,
       isPinned: widget.isPinned?.call(entry) ?? false,
       isBookmark: widget.isBookmark?.call(entry) ?? false,
+      isShortcut: entry.isSymlink,
       isDocumentProviderMounted: isMounted,
       isSynced: widget.isFolderSynced?.call(entry) ?? false,
       isPlaceholder: entry.isPlaceholder,
@@ -1314,7 +1317,7 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
     String displayName = cleanName;
     final ext = cleanName.split('.').last;
     final skin = FileManagerSkinScope.of(context);
-    final vaultIcon = vaultIconForExt(ext);
+    final vaultIcon = entry.isSymlink ? null : vaultIconForExt(ext);
     if (vaultIcon != null) {
       final nameParts = cleanName.split('.');
       if (nameParts.length > 1) {
@@ -1345,7 +1348,112 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
       spacing: widget.spacing,
     );
 
-    if (vaultIcon != null) {
+    if (entry.isSymlink &&
+        mayHaveVaultSymbolicLinks(container) &&
+        widget.archiveContext == null) {
+      previewWidget = ShortcutTargetPreview(
+        container: container,
+        linkPath: fullPath,
+        fallback: Center(
+          child: Icon(
+            skin.fileIcon(cleanName),
+            size: iconSize,
+            color: skin.fileIconColor(cs, cleanName),
+          ),
+        ),
+        builder: (context, targetPath, targetName) {
+          final targetIcon = skin.fileIcon(targetName);
+          final targetColor = skin.fileIconColor(cs, targetName);
+          if (MediaViewerConstants.isImage(targetName)) {
+            return Hero(
+              tag: 'media_hero_${container.volId}_$fullPath',
+              createRectTween: (begin, end) =>
+                  MaterialRectArcTween(begin: begin, end: end),
+              child: Material(
+                type: MaterialType.transparency,
+                child: _EncryptedImageMasonryThumb(
+                  container: container,
+                  filePath: targetPath,
+                  cacheMode: cacheMode,
+                  quality: _effectiveQualityOf(entry),
+                  onSizeKnown: (w, h) => _onSizeKnown(
+                    displayIndex,
+                    entry,
+                    fullPath,
+                    w,
+                    h,
+                    container: container,
+                  ),
+                ),
+              ),
+            );
+          }
+          if (MediaViewerConstants.isVideo(targetName)) {
+            return Hero(
+              tag: 'media_hero_${container.volId}_$fullPath',
+              createRectTween: (begin, end) =>
+                  MaterialRectArcTween(begin: begin, end: end),
+              child: Material(
+                type: MaterialType.transparency,
+                child: _VideoMasonryThumb(
+                  container: container,
+                  filePath: targetPath,
+                  cacheMode: cacheMode,
+                  quality: _effectiveQualityOf(entry),
+                  onSizeKnown: (w, h) => _onSizeKnown(
+                    displayIndex,
+                    entry,
+                    fullPath,
+                    w,
+                    h,
+                    container: container,
+                  ),
+                ),
+              ),
+            );
+          }
+          if (isApkFile(targetName)) {
+            return Center(
+              child: SizedBox(
+                width: iconSize,
+                height: iconSize,
+                child: _ApkIconMasonryThumb(
+                  container: container,
+                  filePath: targetPath,
+                  cacheMode: cacheMode,
+                  quality: _effectiveQualityOf(entry),
+                  fallbackIcon: targetIcon,
+                  fallbackColor: targetColor,
+                  fallbackIconSize: iconSize,
+                ),
+              ),
+            );
+          }
+          if (isBookWithCover(targetName)) {
+            return _BookCoverMasonryThumb(
+              container: container,
+              filePath: targetPath,
+              cacheMode: cacheMode,
+              quality: _effectiveQualityOf(entry),
+              onSizeKnown: (w, h) => _onSizeKnown(
+                displayIndex,
+                entry,
+                fullPath,
+                w,
+                h,
+                container: container,
+              ),
+              fallbackIcon: targetIcon,
+              fallbackColor: targetColor,
+              fallbackIconSize: iconSize,
+            );
+          }
+          return Center(
+            child: Icon(targetIcon, size: iconSize, color: targetColor),
+          );
+        },
+      );
+    } else if (vaultIcon != null) {
       previewWidget = Center(
         child: Icon(
           skin.fileIcon(cleanName),
@@ -1461,6 +1569,7 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
       longFileNameMode: widget.longFileNameMode,
       isPinned: widget.isPinned?.call(entry) ?? false,
       isBookmark: widget.isBookmark?.call(entry) ?? false,
+      isShortcut: entry.isSymlink,
       isPlaceholder: entry.isPlaceholder,
       onTap: entry.isPlaceholder ? () {} : () => widget.onFileTap(entry),
       // Selection is owned by HoldRangeSelectContainer's hold recognizer

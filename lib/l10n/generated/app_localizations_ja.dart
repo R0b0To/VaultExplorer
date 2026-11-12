@@ -2368,6 +2368,17 @@ class AppLocalizationsJa extends AppLocalizations {
       'デスクトップ版のボリュームエクスパンダーのように、標準ボリュームを拡大します';
 
   @override
+  String get toolExpandLuksVolumeTitle => 'LUKSコンテナを拡張';
+
+  @override
+  String get toolExpandLuksVolumeSubtitle =>
+      '固定サイズLUKS2メタデータを含むLUKS1およびLUKS2コンテナの拡張';
+
+  @override
+  String get luksToolsExpandNote =>
+      '事前にコンテナのバックアップを作成してください。LUKS1およびLUKS2に対応しています。NTFSおよびext2/3/4ファイルシステムは直接拡張できます（FATおよびexFATは拡張不可）。追加された領域は暗号化されたゼロで初期化できます。キーファイルを使用する場合はパスワードの代わりになります。';
+
+  @override
   String get toolHiddenInExistingTitle => '隠しボリュームを追加';
 
   @override
@@ -2400,10 +2411,42 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get vcToolsExpandNote =>
-      'コンテナのみが拡大されます。内部のファイルシステムはサイズ変更されないため、ファイルシステムを拡張するまで追加された領域は未割り当てのままになります。事前にボリュームのバックアップを作成してください。';
+      'まずコンテナーが拡張されます。その後、再フォーマットせずに可能な場合（NTFS、ext2/3/4）は、内部のファイルシステムも追加された領域まで拡張されます。FAT と exFAT はその場で拡張できず、追加された領域は未割り当てのままです。先にボリュームをバックアップしてください。';
 
   @override
   String get vcToolsExpandDone => 'ボリュームを拡張しました';
+
+  @override
+  String get vcToolsGrowFsToggle => 'ファイルシステムも拡張する';
+
+  @override
+  String get vcToolsGrowFsToggleHint =>
+      'NTFS および ext2/3/4 のボリュームで、再フォーマットなしにすぐ追加領域を使えるようにします。';
+
+  @override
+  String get vcToolsGrowFsOnlyAction => 'ファイルシステムのみ拡張';
+
+  @override
+  String get vcToolsFsGrown => 'ファイルシステムを拡張しました。追加された領域を使用できます。';
+
+  @override
+  String get vcToolsFsAlreadyFills => 'ファイルシステムはすでにボリューム全体を使用しています。';
+
+  @override
+  String get vcToolsFsUnsupported =>
+      'このファイルシステムはその場で拡張できません（FAT と exFAT は不可）。追加された領域は、ボリュームを再フォーマットするまで未割り当てのままです。先にファイルをバックアップしてください。';
+
+  @override
+  String get vcToolsFsBusy =>
+      'ボリューム内でファイルがまだ開かれています。ファイルを閉じてボリュームをロックし、「ファイルシステムのみを拡張」を再試行してください。';
+
+  @override
+  String get vcToolsFsNeedsCheck =>
+      'ファイルシステムにチェックが必要とマークされています。ボリュームで「チェックと修復」を実行してから、「ファイルシステムのみ拡張」を使用してください。';
+
+  @override
+  String get vcToolsFsFailed =>
+      'ファイルシステムを拡張できませんでした。ボリューム自体は拡張されています。使用する前に「チェックと修復」を実行してください。';
 
   @override
   String get vcToolsAnalyzeAction => '空き領域を確認';
@@ -13485,11 +13528,11 @@ class AppLocalizationsJa extends AppLocalizations {
   String get vaultListingDetails => '詳細';
 
   @override
-  String get vaultListingSymbolicLinksTitle => 'シンボリックリンク';
+  String get vaultListingSymbolicLinksTitle => 'ショートカット';
 
   @override
   String get vaultListingSymbolicLinksNote =>
-      'シンボリックリンクは別の場所を指します。ここでは開いたりたどったりしません。タップするとリンク先をコピーできます。';
+      'ショートカットをタップするとリンク先が開きます。相対パスはこの保管庫内に限定され、絶対パスやリンク切れのリンクは開けません。';
 
   @override
   String get vaultListingHiddenEntriesTitle => '表示されていない項目';
@@ -13650,4 +13693,102 @@ class AppLocalizationsJa extends AppLocalizations {
   String galleryPlaceHintCoordinates(int km) {
     return '$km km 以内に都市なし: 座標でグループ化';
   }
+
+  @override
+  String get cryptomatorBackupKeyFilesTitle => 'ロック解除時にキーファイルをバックアップ';
+
+  @override
+  String get cryptomatorBackupKeyFilesSubtitle =>
+      'デスクトップ版 Cryptomator と同様に、masterkey.cryptomator と vault.cryptomator のコピーを元のファイルの隣に保存します。次回のロック解除から有効です。読み取り専用のセッションでは書き込みません。';
+
+  @override
+  String get cryptomatorUpgradeTitle => '保管庫の形式をアップグレード';
+
+  @override
+  String get cryptomatorUpgradeSubtitle => 'この保管庫は古い形式 7 を使用しています。';
+
+  @override
+  String get cryptomatorUpgradeLockFirst => 'アップグレードするには保管庫をロックしてください';
+
+  @override
+  String get cryptomatorUpgradeWarning =>
+      'アップグレードすると、この保管庫は形式 8 に変更されます。元に戻すことはできず、その後は 1.6 より前のバージョンの Cryptomator ではこの保管庫を開けなくなります。\n\n現在のキーファイルのコピーは masterkey.cryptomator.<id>.bkup として保持されます。別のアプリがこの保管庫を同期している場合は、先に同期が完了するまで待ってください。';
+
+  @override
+  String get cryptomatorUpgradeConfirm => '元に戻せないことを理解しました';
+
+  @override
+  String get cryptomatorUpgradeAction => 'アップグレード';
+
+  @override
+  String get cryptomatorUpgradedMessage => '保管庫を形式 8 にアップグレードしました';
+
+  @override
+  String get cryptomatorUpgradeUnlockedError => '先に保管庫をロックしてください';
+
+  @override
+  String get cryptomatorConfigMissingWarning =>
+      'vault.cryptomator が見つかりません。別のアプリがこの保管庫を同期している場合は、同期が完了するまで待ってから、もう一度お試しください。アップグレードしないでください。';
+
+  @override
+  String get cryptomatorUpgradeFailedMessage => '保管庫をアップグレードできませんでした';
+
+  @override
+  String get newSymbolicLinkTitle => '新規シンボリックリンク';
+
+  @override
+  String get symbolicLinkNameHint => 'リンク名';
+
+  @override
+  String get symbolicLinkTargetHint => 'リンク先';
+
+  @override
+  String get symbolicLinkTargetHelper =>
+      '入力したとおりに保存されます。開くとき、相対パスはこの保管庫内で解決され、絶対パスはたどりません。';
+
+  @override
+  String get symbolicLinkTargetTooLong => 'リンク先が長すぎます（最大 32,767 バイト）';
+
+  @override
+  String get symbolicLinkTargetInvalid => 'リンク先に null 文字は使えません';
+
+  @override
+  String get symbolicLinkNameTaken => 'この名前のファイル、フォルダ、またはリンクはすでに存在します';
+
+  @override
+  String get deleteSymbolicLinkTitle => 'シンボリックリンクを削除しますか？';
+
+  @override
+  String deleteSymbolicLinkMessage(String name) {
+    return 'リンク「$name」を削除しますか？削除されるのはリンクだけで、リンク先には影響しません。';
+  }
+
+  @override
+  String get symbolicLinkRenameTitle => 'シンボリックリンクの名前を変更';
+
+  @override
+  String get symbolicLinkBrowseTarget => '保管庫を参照';
+
+  @override
+  String get symbolicLinkSelectTargetTitle => 'ショートカットのリンク先を選択';
+
+  @override
+  String get symbolicLinkSelectThisFolder => 'このフォルダーを選択';
+
+  @override
+  String get symbolicLinkPickerLoadError => 'このフォルダーを読み込めませんでした';
+
+  @override
+  String get shortcutBadge => 'ショートカット';
+
+  @override
+  String get emptyFolder => 'このフォルダーは空です';
+
+  @override
+  String get symbolicLinkTargetHelperRelative =>
+      'このコンテナー内の相対パスを指定してください。リンク先が存在しなくてもかまいません。リンクの名前を変更または削除してもリンク先は変わりません。';
+
+  @override
+  String get symbolicLinkTargetOutsideVault =>
+      'リンク先はこのコンテナー内に収まる相対パスである必要があります。';
 }

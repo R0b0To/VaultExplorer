@@ -1,20 +1,23 @@
 import 'package:flutter/foundation.dart';
 
-/// A symbolic link inside a Cryptomator vault.
+/// A symbolic link in a Cryptomator vault or a native ext/NTFS filesystem
+/// inside a LUKS/VeraCrypt container.
 ///
-/// A link is neither a file nor a folder as far as this app is concerned: it is never followed (its target could
-/// point anywhere), it is never read, exported or synced as content, and it is not part of a normal directory
-/// listing at all -- [RawEntry] therefore cannot represent one. It is fetched through its own call
-/// (`VaultFileIoApi.listVaultSymlinks`) by the one screen that knows how to show it.
+/// Links are fetched separately from the general filesystem listing so sync,
+/// export and scanners do not treat link targets as regular file content.
+/// Path access follows supported targets within the same container; link-node
+/// rename/delete remain no-follow.
 ///
-/// Wire shape (from `foldervault_bridge.cpp`, only ever produced by the symlink listing):
-///   "L|targetBytes|unixSecs|name"
+/// Wire shape (produced only by the dedicated symlink listing):
+///   "L|targetBytes|unixSecs|name"   (file target or broken link)
+///   "LD|0|unixSecs|name"           (directory target)
 @immutable
 class VaultSymlink {
   const VaultSymlink({
     required this.name,
     required this.targetBytes,
     required this.modifiedSecs,
+    this.isDir = false,
   });
 
   final String name;
@@ -25,10 +28,16 @@ class VaultSymlink {
   /// Last-modified time in Unix seconds (UTC); 0 = unknown.
   final int modifiedSecs;
 
-  /// Parses one `L|...` wire entry; null for anything else (never throws).
+  /// Whether the link currently resolves to a directory inside the vault.
+  final bool isDir;
+
+  /// Parses one `L|...` or `LD|...` wire entry; null for anything else (never throws).
   static VaultSymlink? tryParse(String raw) {
     final a = raw.indexOf('|');
-    if (a < 0 || raw.substring(0, a) != 'L') return null;
+    if (a < 0 ||
+        (raw.substring(0, a) != 'L' && raw.substring(0, a) != 'LD')) {
+      return null;
+    }
     final b = raw.indexOf('|', a + 1);
     if (b < 0) return null;
     final c = raw.indexOf('|', b + 1);
@@ -39,6 +48,7 @@ class VaultSymlink {
       name: name,
       targetBytes: int.tryParse(raw.substring(a + 1, b)) ?? 0,
       modifiedSecs: int.tryParse(raw.substring(b + 1, c)) ?? 0,
+      isDir: raw.substring(0, a) == 'LD',
     );
   }
 
@@ -47,8 +57,9 @@ class VaultSymlink {
       other is VaultSymlink &&
       other.name == name &&
       other.targetBytes == targetBytes &&
-      other.modifiedSecs == modifiedSecs;
+      other.modifiedSecs == modifiedSecs &&
+      other.isDir == isDir;
 
   @override
-  int get hashCode => Object.hash(name, targetBytes, modifiedSecs);
+  int get hashCode => Object.hash(name, targetBytes, modifiedSecs, isDir);
 }

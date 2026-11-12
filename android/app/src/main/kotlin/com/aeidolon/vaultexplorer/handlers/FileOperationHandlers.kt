@@ -122,7 +122,8 @@ class FileOperationHandlers(
         }
     }
 
-    // Symlinks and the "hidden entries" count (Cryptomator). Read-only queries, same executor as listing.
+    // Symlinks (Cryptomator and ext/NTFS disk images) plus the hidden-entry
+    // count (Cryptomator only). Read-only queries, same executor as listing.
     fun handleListVaultSymlinks(call: MethodCall, result: MethodChannel.Result) {
         val dirPath = call.argument<String>("dirPath") ?: ""
         nativeOps.runNativeOp(call.argument<String>("filePath"), result, executor = queryExecutor) { volId ->
@@ -156,6 +157,19 @@ class FileOperationHandlers(
         }
         nativeOps.runNativeOp(call.argument<String>("filePath"), result) { volId ->
             ContainerFileSystem.createDirectory(volId, dirPath)
+        }
+    }
+
+    /** Creates a symbolic link inside a Cryptomator vault. [target] is stored exactly as given. */
+    fun handleCreateVaultSymlink(call: MethodCall, result: MethodChannel.Result) {
+        val path = call.argument<String>("path")
+        val target = call.argument<String>("target")
+        if (path == null || target == null) {
+            result.error("INVALID_ARGS", "path and target required", null)
+            return
+        }
+        nativeOps.runNativeOp(call.argument<String>("filePath"), result) { volId ->
+            ContainerFileSystem.createSymlink(volId, path, target)
         }
     }
 

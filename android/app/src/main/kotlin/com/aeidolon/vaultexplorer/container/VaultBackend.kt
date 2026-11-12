@@ -9,7 +9,7 @@ interface VaultBackend {
         get() = false
 
     fun listDirectory(virtualPath: String): Array<String>?
-    /** Symlinks of one folder, wire kind "L" (see DirEntryWire). Only Cryptomator has any; never part of [listDirectory]. */
+    /** Symlinks of one folder, wire kind "L" (see DirEntryWire); never part of [listDirectory]. */
     fun listSymlinks(virtualPath: String): Array<String>? = emptyArray()
     /** The target of the symlink at [virtualPath], or null if it is not a (readable) symlink. */
     fun readSymlink(virtualPath: String): String? = null

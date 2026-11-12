@@ -1,28 +1,29 @@
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:vaultexplorer/core/api/vault_engine_channel.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/api/veracrypt_tools_api.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/widgets/crypto_forms/keyfiles_picker.dart';
 import 'package:vaultexplorer/core/widgets/inputs/option_picker_tile.dart';
 import 'package:vaultexplorer/core/widgets/inputs/utf8_byte_limit_formatter.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
 
 /// The desktop-VeraCrypt volume operations that work on an existing container.
-enum VeraCryptVolumeTool { expand, addHidden }
+enum VeraCryptVolumeTool { expand, expandLuks, addHidden }
 
-class VeraCryptVolumeToolsScreen extends StatefulWidget {
+class VeraCryptVolumeToolsScreen extends ConsumerStatefulWidget {
   const VeraCryptVolumeToolsScreen({super.key, required this.tool});
 
   final VeraCryptVolumeTool tool;
 
   @override
-  State<VeraCryptVolumeToolsScreen> createState() => _VeraCryptVolumeToolsScreenState();
+  ConsumerState<VeraCryptVolumeToolsScreen> createState() => _VeraCryptVolumeToolsScreenState();
 }
 
-class _VeraCryptVolumeToolsScreenState extends State<VeraCryptVolumeToolsScreen> {
-  static const _api = VeraCryptToolsApi(kVaultEngineChannel);
+class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeToolsScreen> {
+  late final _api = VeraCryptToolsApi(ref.read(vaultEngineChannelProvider));
   static const _hiddenFileSystems = ['exFAT', 'FAT', 'NTFS'];
 
   ({String uri, String displayName})? _target;
@@ -35,6 +36,7 @@ class _VeraCryptVolumeToolsScreenState extends State<VeraCryptVolumeToolsScreen>
   // expand
   final _sizeCtrl = TextEditingController();
   bool _initFree = true;
+  bool _growFs = true;
 
   // hidden volume
   HiddenHostInfo? _host;
@@ -65,7 +67,8 @@ class _VeraCryptVolumeToolsScreenState extends State<VeraCryptVolumeToolsScreen>
     super.dispose();
   }
 
-  bool get _isExpand => widget.tool == VeraCryptVolumeTool.expand;
+  bool get _isExpand => widget.tool != VeraCryptVolumeTool.addHidden;
+  bool get _isLuksExpand => widget.tool == VeraCryptVolumeTool.expandLuks;
 
   int _pimOf(TextEditingController c) => int.tryParse(c.text.trim()) ?? 0;
 
@@ -118,7 +121,12 @@ class _VeraCryptVolumeToolsScreenState extends State<VeraCryptVolumeToolsScreen>
       if (!mounted) return;
       setState(() {
         final current = hidden ? _hiddenKeyfiles : _keyfiles;
-        final merged = [...current, ...picked.where((p) => !current.any((c) => c.uri == p.uri))];
+        final distinct = picked.where((p) => !current.any((c) => c.uri == p.uri));
+        // LUKS follows cryptsetup key-file semantics and this native path
+        // consumes one keyfile (which replaces the typed password).
+        final merged = _isLuksExpand
+            ? (current.isNotEmpty ? current : distinct.take(1).toList())
+            : [...current, ...distinct];
         if (hidden) {
           _hiddenKeyfiles = merged;
         } else {
@@ -149,6 +157,19 @@ class _VeraCryptVolumeToolsScreenState extends State<VeraCryptVolumeToolsScreen>
     return true;
   }
 
+  String _fsResultText(FileSystemGrowResult result) {
+    final l10n = context.l10n;
+    return switch (result) {
+      FileSystemGrowResult.grown => l10n.vcToolsFsGrown,
+      FileSystemGrowResult.alreadyFills => l10n.vcToolsFsAlreadyFills,
+      FileSystemGrowResult.unsupported => l10n.vcToolsFsUnsupported,
+      FileSystemGrowResult.needsCheck => l10n.vcToolsFsNeedsCheck,
+      FileSystemGrowResult.busy => l10n.vcToolsFsBusy,
+      FileSystemGrowResult.failed => l10n.vcToolsFsFailed,
+      FileSystemGrowResult.notRun => '',
+    };
+  }
+
   Future<void> _expand() async {
     if (!_validateCommon()) return;
     final newSize = _bytesFromMiB(_sizeCtrl);
@@ -158,15 +179,46 @@ class _VeraCryptVolumeToolsScreenState extends State<VeraCryptVolumeToolsScreen>
     }
     final doneText = context.l10n.vcToolsExpandDone;
     await _guard(() async {
-      await _api.expandContainer(
-        uri: _target!.uri,
-        password: _passwordCtrl.text,
-        pim: _pimOf(_pimCtrl),
-        keyfilePaths: _keyfilePaths,
-        newSizeBytes: newSize,
-        initFreeSpace: _initFree,
-      );
-      if (mounted) setState(() => _status = doneText);
+      final fs = _isLuksExpand
+          ? await _api.expandLuksContainer(
+              uri: _target!.uri,
+              password: _passwordCtrl.text,
+              keyfilePaths: _keyfilePaths,
+              newSizeBytes: newSize,
+              initFreeSpace: _initFree,
+              growFileSystem: _growFs,
+            )
+          : await _api.expandContainer(
+              uri: _target!.uri,
+              password: _passwordCtrl.text,
+              pim: _pimOf(_pimCtrl),
+              keyfilePaths: _keyfilePaths,
+              newSizeBytes: newSize,
+              initFreeSpace: _initFree,
+              growFileSystem: _growFs,
+            );
+      if (!mounted) return;
+      final fsText = _fsResultText(fs.result);
+      setState(() => _status = fsText.isEmpty ? doneText : '$doneText\n$fsText');
+    });
+  }
+
+  Future<void> _growFileSystemOnly() async {
+    if (!_validateCommon()) return;
+    await _guard(() async {
+      final fs = _isLuksExpand
+          ? await _api.growLuksFileSystem(
+              uri: _target!.uri,
+              password: _passwordCtrl.text,
+              keyfilePaths: _keyfilePaths,
+            )
+          : await _api.growFileSystem(
+              uri: _target!.uri,
+              password: _passwordCtrl.text,
+              pim: _pimOf(_pimCtrl),
+              keyfilePaths: _keyfilePaths,
+            );
+      if (mounted) setState(() => _status = _fsResultText(fs.result));
     });
   }
 
@@ -270,7 +322,9 @@ class _VeraCryptVolumeToolsScreenState extends State<VeraCryptVolumeToolsScreen>
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
-    final title = _isExpand ? l10n.toolExpandVolumeTitle : l10n.toolHiddenInExistingTitle;
+    final title = _isLuksExpand
+        ? l10n.toolExpandLuksVolumeTitle
+        : (_isExpand ? l10n.toolExpandVolumeTitle : l10n.toolHiddenInExistingTitle);
     final host = _host;
     final hiddenReady = host != null && host.maxHiddenBytes > 0;
 
@@ -280,7 +334,9 @@ class _VeraCryptVolumeToolsScreenState extends State<VeraCryptVolumeToolsScreen>
         padding: const EdgeInsets.all(16),
         children: [
           Text(
-            _isExpand ? l10n.vcToolsExpandNote : l10n.vcToolsHiddenNote,
+            _isLuksExpand
+                ? l10n.luksToolsExpandNote
+                : (_isExpand ? l10n.vcToolsExpandNote : l10n.vcToolsHiddenNote),
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 16),
@@ -294,7 +350,7 @@ class _VeraCryptVolumeToolsScreenState extends State<VeraCryptVolumeToolsScreen>
             ),
           ),
           _passwordField(controller: _passwordCtrl, label: l10n.vcToolsPasswordLabel),
-          _numberField(controller: _pimCtrl, label: l10n.vcToolsPimLabel),
+          if (!_isLuksExpand) _numberField(controller: _pimCtrl, label: l10n.vcToolsPimLabel),
           KeyfilesPicker(
             keyfiles: _keyfiles,
             picking: _pickingKeyfiles,
@@ -304,6 +360,7 @@ class _VeraCryptVolumeToolsScreenState extends State<VeraCryptVolumeToolsScreen>
               _host = null;
             }),
             enabled: !_busy,
+            addEnabled: !_isLuksExpand || _keyfiles.isEmpty,
           ),
           const SizedBox(height: 8),
           if (_isExpand) ...[
@@ -315,10 +372,22 @@ class _VeraCryptVolumeToolsScreenState extends State<VeraCryptVolumeToolsScreen>
               title: Text(l10n.vcToolsInitFreeSpace),
               subtitle: Text(l10n.vcToolsInitFreeSpaceHint),
             ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _growFs,
+              onChanged: _busy ? null : (v) => setState(() => _growFs = v),
+              title: Text(l10n.vcToolsGrowFsToggle),
+              subtitle: Text(l10n.vcToolsGrowFsToggleHint),
+            ),
             const SizedBox(height: 8),
             FilledButton(
               onPressed: _busy ? null : _expand,
               child: Text(l10n.vcToolsExpandAction),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton(
+              onPressed: _busy ? null : _growFileSystemOnly,
+              child: Text(l10n.vcToolsGrowFsOnlyAction),
             ),
           ] else ...[
             OutlinedButton(

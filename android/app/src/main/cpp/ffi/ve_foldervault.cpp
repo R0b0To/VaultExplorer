@@ -115,11 +115,12 @@ void sanitizeUtf8(std::string& s) {
     s.swap(out);
 }
 
-// Same shape as DirEntryWire.encode(): kind|size|mtimeSeconds|name
+// Same shape as DirEntryWire.encode(): kind|size|mtimeSeconds|name (kind: F file, D folder, L symlink, LD symlink to a
+// folder -- the link kinds only ever come out of listSymlinks, never out of list)
 std::string wireEntry(const fv::DirEntry& e) {
     std::string name = e.name;
     sanitizeUtf8(name);
-    return std::string(e.isSymlink ? "L|" : e.isDir ? "D|" : "F|") + std::to_string(e.isDir ? 0 : e.size) + "|" +
+    return std::string(e.isSymlink ? (e.isDir ? "LD|" : "L|") : e.isDir ? "D|" : "F|") + std::to_string(e.isDir ? 0 : e.size) + "|" +
            std::to_string(e.mtimeMs / 1000) + "|" + name;
 }
 
@@ -313,6 +314,32 @@ int32_t setLastModified(int32_t vol, const char* path, int64_t epochSeconds) {
     FV_CATCH(VE_ERR_EXCEPTION, nullptr)
 }
 
+int32_t listSymlinks(int32_t vol, const char* path, ve_buffer* out) {
+    FV_VAULT_OR_RETURN(VE_ERR_NOT_UNLOCKED)
+    FV_TRY
+    std::vector<fv::DirEntry> es;
+    if (!v->listSymlinks(path, es)) return VE_ERR_FAILED;
+    return packEntries(es, out);
+    FV_CATCH(VE_ERR_EXCEPTION, nullptr)
+}
+
+int32_t readSymlink(int32_t vol, const char* path, ve_buffer* out) {
+    FV_VAULT_OR_RETURN(VE_ERR_NOT_UNLOCKED)
+    FV_TRY
+    auto t = v->readSymlink(path);
+    if (!t) return VE_ERR_FAILED;
+    return emitBuffer(reinterpret_cast<const uint8_t*>(t->data()), t->size(), out) ? VE_OK : VE_ERR_FAILED;
+    FV_CATCH(VE_ERR_EXCEPTION, nullptr)
+}
+
+int32_t createSymlink(int32_t vol, const char* path, const char* target) {
+    FV_VAULT_OR_RETURN(VE_ERR_NOT_UNLOCKED)
+    if (v->readOnly()) return VE_ERR_READ_ONLY;
+    FV_TRY
+    return v->createSymlink(path, target) ? VE_OK : VE_ERR_FAILED;
+    FV_CATCH(VE_ERR_EXCEPTION, nullptr)
+}
+
 int32_t importFile(int32_t vol, const char* vaultPath, const char* hostSource, int32_t opId) {
     FV_VAULT_OR_RETURN(VE_ERR_NOT_UNLOCKED)
     if (v->readOnly()) return VE_ERR_READ_ONLY;
@@ -427,8 +454,8 @@ extern "C" VE_API int32_t ve_fv_probe(const char* root, int32_t* format_out) {
 
 extern "C" VE_API int32_t ve_fv_unlock(int32_t vol_id, int32_t format, const char* root, const uint8_t* password,
                                        int32_t password_len, const uint8_t* combined_key, int32_t combined_key_len,
-                                       int32_t read_only, const char* local_state_dir, const char* temp_dir,
-                                       ve_buffer* message, ve_buffer* derived_key) {
+                                       int32_t read_only, int32_t backup_key_files, const char* local_state_dir,
+                                       const char* temp_dir, ve_buffer* message, ve_buffer* derived_key) {
     if (message) { message->data = nullptr; message->len = 0; }
     if (derived_key) { derived_key->data = nullptr; derived_key->len = 0; }
     if (!validVol(vol_id) || !root || format < 0 || format > 2 || password_len < 0 || combined_key_len < 0 ||
@@ -445,7 +472,8 @@ extern "C" VE_API int32_t ve_fv_unlock(int32_t vol_id, int32_t format, const cha
         }
     }
     auto st = std::make_shared<fv::PosixStorage>(root);
-    const fv::HostEnv env = makeEnv(local_state_dir, temp_dir);
+    fv::HostEnv env = makeEnv(local_state_dir, temp_dir);
+    env.backupKeyFilesOnOpen = backup_key_files != 0;  // only Cryptomator reads it
     static const uint8_t kNone = 0;
     const uint8_t* pw = password ? password : &kNone;
     const size_t pwLen = static_cast<size_t>(password_len);
@@ -582,31 +610,15 @@ extern "C" VE_API int32_t ve_fv_info(int32_t vol_id, ve_buffer* out) {
     FV_CATCH(VE_ERR_EXCEPTION, nullptr)
 }
 
-extern "C" VE_API int32_t ve_fv_list_symlinks(int32_t vol_id, const char* path, ve_buffer* out) {
-    if (!out) return VE_ERR_INVALID_ARG;
-    out->data = nullptr;
-    out->len = 0;
-    if (!path) return VE_ERR_INVALID_ARG;
-    auto v = vaultOf(vol_id);
-    if (!v) return VE_ERR_NOT_UNLOCKED;
+extern "C" VE_API int32_t ve_fv_probe_cryptomator(const char* root, int32_t* code_out) {
+    if (!root || !code_out) return VE_ERR_INVALID_ARG;
+    *code_out = 0;
     FV_TRY
-    std::vector<fv::DirEntry> es;
-    if (!v->listSymlinks(path, es)) return VE_ERR_FAILED;
-    return packEntries(es, out);
-    FV_CATCH(VE_ERR_EXCEPTION, nullptr)
-}
-
-extern "C" VE_API int32_t ve_fv_read_symlink(int32_t vol_id, const char* path, ve_buffer* out) {
-    if (!out) return VE_ERR_INVALID_ARG;
-    out->data = nullptr;
-    out->len = 0;
-    if (!path) return VE_ERR_INVALID_ARG;
-    auto v = vaultOf(vol_id);
-    if (!v) return VE_ERR_NOT_UNLOCKED;
-    FV_TRY
-    auto t = v->readSymlink(path);
-    if (!t) return VE_ERR_FAILED;
-    return emitBuffer(reinterpret_cast<const uint8_t*>(t->data()), t->size(), out) ? VE_OK : VE_ERR_FAILED;
+    ensureInit();
+    fv::PosixStorage st(root);
+    *code_out = fv::probeCryptomatorFormat(st);
+    st.close();
+    return VE_OK;
     FV_CATCH(VE_ERR_EXCEPTION, nullptr)
 }
 
@@ -654,6 +666,9 @@ int32_t remove(int32_t, const char*) { return VE_ERR_NOT_UNLOCKED; }
 int32_t makeDirectory(int32_t, const char*) { return VE_ERR_NOT_UNLOCKED; }
 int32_t rename(int32_t, const char*, const char*) { return VE_ERR_NOT_UNLOCKED; }
 int32_t setLastModified(int32_t, const char*, int64_t) { return VE_ERR_NOT_UNLOCKED; }
+int32_t listSymlinks(int32_t, const char*, ve_buffer*) { return VE_ERR_NOT_UNLOCKED; }
+int32_t readSymlink(int32_t, const char*, ve_buffer*) { return VE_ERR_NOT_UNLOCKED; }
+int32_t createSymlink(int32_t, const char*, const char*) { return VE_ERR_NOT_UNLOCKED; }
 int32_t importFile(int32_t, const char*, const char*, int32_t) { return VE_ERR_NOT_UNLOCKED; }
 int32_t exportFile(int32_t, const char*, const char*, int32_t) { return VE_ERR_NOT_UNLOCKED; }
 int32_t spaceInfo(int32_t, uint64_t*, uint64_t*) { return VE_ERR_NOT_UNLOCKED; }
@@ -683,7 +698,7 @@ extern "C" VE_API int32_t ve_fv_probe(const char*, int32_t* format_out) {
     return VE_OK;
 }
 extern "C" VE_API int32_t ve_fv_unlock(int32_t, int32_t, const char*, const uint8_t*, int32_t, const uint8_t*,
-                                       int32_t, int32_t, const char*, const char*, ve_buffer* message,
+                                       int32_t, int32_t, int32_t, const char*, const char*, ve_buffer* message,
                                        ve_buffer* derived_key) {
     clearBuf(derived_key);
     unsupported(message);
@@ -705,8 +720,10 @@ extern "C" VE_API int32_t ve_fv_migrate_cryptomator(const char*, const uint8_t*,
     return VE_ERR_FAILED;
 }
 extern "C" VE_API int32_t ve_fv_info(int32_t, ve_buffer* out) { clearBuf(out); return VE_ERR_NOT_UNLOCKED; }
-extern "C" VE_API int32_t ve_fv_list_symlinks(int32_t, const char*, ve_buffer* out) { clearBuf(out); return VE_ERR_NOT_UNLOCKED; }
-extern "C" VE_API int32_t ve_fv_read_symlink(int32_t, const char*, ve_buffer* out) { clearBuf(out); return VE_ERR_NOT_UNLOCKED; }
+extern "C" VE_API int32_t ve_fv_probe_cryptomator(const char*, int32_t* code_out) {
+    if (code_out) *code_out = 0;
+    return VE_OK;
+}
 extern "C" VE_API int32_t ve_fv_hidden_entry_count(int32_t, const char*) { return -VE_ERR_NOT_UNLOCKED; }
 extern "C" VE_API int32_t ve_fv_finish_write(int32_t, const char*) { return VE_ERR_NOT_UNLOCKED; }
 extern "C" VE_API int32_t ve_fv_batch(int32_t, int32_t, int32_t) { return VE_ERR_NOT_UNLOCKED; }

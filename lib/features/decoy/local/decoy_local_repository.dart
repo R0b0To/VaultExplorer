@@ -3,7 +3,6 @@ import 'dart:isolate';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
-import 'package:vaultexplorer/core/utils/ve_log.dart';
 
 /// Real, on-disk file operations for the decoy's local storage explorer.
 ///

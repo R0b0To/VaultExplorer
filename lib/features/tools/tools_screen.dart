@@ -118,6 +118,7 @@ class ToolsScreen extends StatelessWidget {
             _buildContainerRepairRow(context, cs),
             _buildHeaderBackupRow(context, cs),
             _buildExpandVolumeRow(context, cs),
+            _buildExpandLuksVolumeRow(context, cs),
             _buildHiddenInExistingRow(context, cs),
           ],
         ),
@@ -190,6 +191,7 @@ class ToolsScreen extends StatelessWidget {
                     _buildContainerRepairRow(context, cs),
                     _buildHeaderBackupRow(context, cs),
                     _buildExpandVolumeRow(context, cs),
+                    _buildExpandLuksVolumeRow(context, cs),
                     _buildHiddenInExistingRow(context, cs),
                   ],
                 ),
@@ -375,6 +377,23 @@ class ToolsScreen extends StatelessWidget {
           builder: (_) => SkinAreaScope(
             area: SkinArea.tools,
             child: const VeraCryptVolumeToolsScreen(tool: VeraCryptVolumeTool.expand),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExpandLuksVolumeRow(BuildContext context, ColorScheme cs) {
+    return _ToolRow(
+      icon: Icons.unfold_more_rounded,
+      title: context.l10n.toolExpandLuksVolumeTitle,
+      subtitle: context.l10n.toolExpandLuksVolumeSubtitle,
+      iconColor: cs.secondary,
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => SkinAreaScope(
+            area: SkinArea.tools,
+            child: const VeraCryptVolumeToolsScreen(tool: VeraCryptVolumeTool.expandLuks),
           ),
         ),
       ),

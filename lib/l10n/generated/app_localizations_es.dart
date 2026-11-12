@@ -2501,6 +2501,17 @@ class AppLocalizationsEs extends AppLocalizations {
       'Aumentar el tamaño de un volumen estándar, como el expansor de volúmenes de escritorio';
 
   @override
+  String get toolExpandLuksVolumeTitle => 'Expandir contenedor LUKS';
+
+  @override
+  String get toolExpandLuksVolumeSubtitle =>
+      'Aumentar contenedores LUKS1 y LUKS2, incluidos metadatos LUKS2 de tamaño fijo';
+
+  @override
+  String get luksToolsExpandNote =>
+      'Haga una copia de seguridad del contenedor primero. Es compatible con LUKS1 y LUKS2. Los sistemas de archivos NTFS y ext2/3/4 se pueden expandir en el lugar (FAT y exFAT no). El espacio añadido se puede inicializar con ceros cifrados. Si se usa un archivo de clave, este reemplaza a la contraseña.';
+
+  @override
   String get toolHiddenInExistingTitle => 'Añadir volumen oculto';
 
   @override
@@ -2534,10 +2545,44 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get vcToolsExpandNote =>
-      'Solo se agranda el contenedor. No se cambia el tamaño del sistema de archivos interno, por lo que el espacio añadido queda sin asignar hasta que se expanda el sistema de archivos. Haz una copia de seguridad del volumen primero.';
+      'Primero se agranda el contenedor. Después, el sistema de archivos interior se amplía hasta el espacio añadido cuando es posible sin reformatear (NTFS, ext2/3/4). FAT y exFAT no se pueden ampliar en el sitio; su espacio añadido queda sin asignar. Haz una copia de seguridad del volumen antes.';
 
   @override
   String get vcToolsExpandDone => 'Volumen expandido';
+
+  @override
+  String get vcToolsGrowFsToggle => 'Ampliar también el sistema de archivos';
+
+  @override
+  String get vcToolsGrowFsToggleHint =>
+      'Permite que los volúmenes NTFS y ext2/3/4 usen el espacio añadido de inmediato, sin reformatear.';
+
+  @override
+  String get vcToolsGrowFsOnlyAction => 'Ampliar solo el sistema de archivos';
+
+  @override
+  String get vcToolsFsGrown =>
+      'Sistema de archivos ampliado: el espacio añadido ya se puede usar.';
+
+  @override
+  String get vcToolsFsAlreadyFills =>
+      'El sistema de archivos ya ocupa todo el volumen.';
+
+  @override
+  String get vcToolsFsUnsupported =>
+      'Este sistema de archivos no se puede ampliar en el sitio (FAT y exFAT no). El espacio añadido queda sin asignar hasta que se reformatee el volumen; copia antes sus archivos.';
+
+  @override
+  String get vcToolsFsBusy =>
+      'Todavía hay archivos abiertos en el volumen. Ciérrelos, bloquee el volumen y luego reintente «Solo expandir el sistema de archivos».';
+
+  @override
+  String get vcToolsFsNeedsCheck =>
+      'El sistema de archivos está marcado como pendiente de comprobación. Ejecuta Comprobar y reparar en el volumen y luego usa «Ampliar solo el sistema de archivos».';
+
+  @override
+  String get vcToolsFsFailed =>
+      'No se pudo ampliar el sistema de archivos. El volumen en sí se ha ampliado; ejecuta Comprobar y reparar antes de usarlo.';
 
   @override
   String get vcToolsAnalyzeAction => 'Comprobar espacio libre';
@@ -14308,11 +14353,11 @@ class AppLocalizationsEs extends AppLocalizations {
   String get vaultListingDetails => 'Detalles';
 
   @override
-  String get vaultListingSymbolicLinksTitle => 'Enlaces simbólicos';
+  String get vaultListingSymbolicLinksTitle => 'Accesos directos';
 
   @override
   String get vaultListingSymbolicLinksNote =>
-      'Un enlace simbólico apunta a otro lugar. Aquí nunca se abre ni se sigue; tócalo para copiar su destino.';
+      'Al tocar un acceso directo se abre su destino. Los destinos relativos permanecen dentro de esta bóveda; los destinos absolutos o rotos no se pueden abrir.';
 
   @override
   String get vaultListingHiddenEntriesTitle => 'Elementos no mostrados';
@@ -14475,4 +14520,110 @@ class AppLocalizationsEs extends AppLocalizations {
   String galleryPlaceHintCoordinates(int km) {
     return 'Ninguna ciudad a menos de $km km: agrupado por coordenadas';
   }
+
+  @override
+  String get cryptomatorBackupKeyFilesTitle =>
+      'Copia de seguridad de los archivos de clave al desbloquear';
+
+  @override
+  String get cryptomatorBackupKeyFilesSubtitle =>
+      'Guarda una copia de masterkey.cryptomator y vault.cryptomator junto a los originales, como Cryptomator en el ordenador. Se aplica desde el próximo desbloqueo. Las sesiones de solo lectura nunca escriben.';
+
+  @override
+  String get cryptomatorUpgradeTitle => 'Actualizar el formato de la bóveda';
+
+  @override
+  String get cryptomatorUpgradeSubtitle =>
+      'Esta bóveda usa el formato 7, más antiguo.';
+
+  @override
+  String get cryptomatorUpgradeLockFirst =>
+      'Bloquea la bóveda para actualizarla';
+
+  @override
+  String get cryptomatorUpgradeWarning =>
+      'Al actualizar, esta bóveda pasa al formato 8. No se puede deshacer, y las versiones de Cryptomator anteriores a la 1.6 ya no podrán abrir la bóveda.\n\nSe conserva una copia del archivo de clave actual como masterkey.cryptomator.<id>.bkup. Si otra aplicación sincroniza esta bóveda, deja que termine de sincronizar antes.';
+
+  @override
+  String get cryptomatorUpgradeConfirm => 'Entiendo que no se puede deshacer';
+
+  @override
+  String get cryptomatorUpgradeAction => 'Actualizar';
+
+  @override
+  String get cryptomatorUpgradedMessage => 'Bóveda actualizada al formato 8';
+
+  @override
+  String get cryptomatorUpgradeUnlockedError => 'Bloquea primero la bóveda';
+
+  @override
+  String get cryptomatorConfigMissingWarning =>
+      'Falta vault.cryptomator. Si otra aplicación sincroniza esta bóveda, espera a que termine y vuelve a intentarlo. No actualices.';
+
+  @override
+  String get cryptomatorUpgradeFailedMessage =>
+      'No se pudo actualizar la bóveda';
+
+  @override
+  String get newSymbolicLinkTitle => 'Nuevo enlace simbólico';
+
+  @override
+  String get symbolicLinkNameHint => 'Nombre del enlace';
+
+  @override
+  String get symbolicLinkTargetHint => 'Apunta a';
+
+  @override
+  String get symbolicLinkTargetHelper =>
+      'Se guarda exactamente como lo escribes. Al abrirlo, los destinos relativos se resuelven dentro de esta bóveda; los destinos absolutos no se siguen.';
+
+  @override
+  String get symbolicLinkTargetTooLong =>
+      'El destino es demasiado largo (máximo 32 767 bytes)';
+
+  @override
+  String get symbolicLinkTargetInvalid =>
+      'El destino no puede contener un carácter nulo';
+
+  @override
+  String get symbolicLinkNameTaken =>
+      'Ya existe un archivo, una carpeta o un enlace con este nombre';
+
+  @override
+  String get deleteSymbolicLinkTitle => '¿Eliminar el enlace simbólico?';
+
+  @override
+  String deleteSymbolicLinkMessage(String name) {
+    return '¿Eliminar el enlace \"$name\"? Solo se elimina el enlace; aquello a lo que apunta no se toca.';
+  }
+
+  @override
+  String get symbolicLinkRenameTitle => 'Renombrar enlace simbólico';
+
+  @override
+  String get symbolicLinkBrowseTarget => 'Explorar bóveda';
+
+  @override
+  String get symbolicLinkSelectTargetTitle =>
+      'Elegir destino del acceso directo';
+
+  @override
+  String get symbolicLinkSelectThisFolder => 'Seleccionar esta carpeta';
+
+  @override
+  String get symbolicLinkPickerLoadError => 'No se pudo cargar esta carpeta';
+
+  @override
+  String get shortcutBadge => 'Acceso directo';
+
+  @override
+  String get emptyFolder => 'Esta carpeta está vacía';
+
+  @override
+  String get symbolicLinkTargetHelperRelative =>
+      'Usa una ruta relativa dentro de este contenedor. El destino puede no existir; cambiar el nombre o eliminar el enlace no modifica el destino.';
+
+  @override
+  String get symbolicLinkTargetOutsideVault =>
+      'El destino debe ser una ruta relativa que permanezca dentro de este contenedor.';
 }

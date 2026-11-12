@@ -10,8 +10,9 @@
 //   * the volume header gets the new volume size / encrypted-area length and a fresh salt; the
 //     embedded backup header is written at the NEW end (V-128 KiB) BEFORE the primary header, both
 //     under independent salts, and the new tail header group is random filler.
-// The file system INSIDE the volume is not touched (desktop extends NTFS through the OS only):
-// the added space is unallocated until the file system is grown.
+// The file system INSIDE the volume is not touched here: the added space is unallocated until the file
+// system is grown, which container_create.cpp does afterwards through filesystems/fs_ops.h fsGrowToFit
+// (NTFS and ext2/3/4 in place; FAT/exFAT cannot).
 // Header-only; I/O and randomness are callbacks so it can be tested on the host
 // (containers/test/vc_expand_test.cpp).
 #include <cstddef>

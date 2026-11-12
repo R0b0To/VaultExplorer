@@ -14,7 +14,7 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
-const int kVeAbiVersion = 7;
+const int kVeAbiVersion = 8;
 
 // Result codes (ve_engine.h)
 const int veOk = 0;
@@ -344,8 +344,9 @@ class VeNative {
     _fvSupported = _lib.lookupFunction<Int32 Function(), int Function()>('ve_fv_supported');
     _fvProbe = _lib.lookupFunction<Int32 Function(Pointer<Utf8>, Pointer<Int32>), int Function(Pointer<Utf8>, Pointer<Int32>)>('ve_fv_probe');
     _fvUnlock = _lib.lookupFunction<
-        Int32 Function(Int32, Int32, Pointer<Utf8>, Pointer<Uint8>, Int32, Pointer<Uint8>, Int32, Int32, Pointer<Utf8>, Pointer<Utf8>, Pointer<VeBuffer>, Pointer<VeBuffer>),
-        int Function(int, int, Pointer<Utf8>, Pointer<Uint8>, int, Pointer<Uint8>, int, int, Pointer<Utf8>, Pointer<Utf8>, Pointer<VeBuffer>, Pointer<VeBuffer>)>('ve_fv_unlock');
+        Int32 Function(Int32, Int32, Pointer<Utf8>, Pointer<Uint8>, Int32, Pointer<Uint8>, Int32, Int32, Int32, Pointer<Utf8>, Pointer<Utf8>, Pointer<VeBuffer>, Pointer<VeBuffer>),
+        int Function(int, int, Pointer<Utf8>, Pointer<Uint8>, int, Pointer<Uint8>, int, int, int, Pointer<Utf8>, Pointer<Utf8>, Pointer<VeBuffer>, Pointer<VeBuffer>)>('ve_fv_unlock');
+    _fvProbeCryptomator = _lib.lookupFunction<Int32 Function(Pointer<Utf8>, Pointer<Int32>), int Function(Pointer<Utf8>, Pointer<Int32>)>('ve_fv_probe_cryptomator');
     _fvCreate = _lib.lookupFunction<
         Int32 Function(Int32, Pointer<Utf8>, Pointer<Uint8>, Int32, Int32, Int32, Int32, Int32, Int32, Pointer<Utf8>, Pointer<Uint8>, Int32, Pointer<Utf8>, Pointer<Utf8>, Pointer<VeBuffer>),
         int Function(int, Pointer<Utf8>, Pointer<Uint8>, int, int, int, int, int, int, Pointer<Utf8>, Pointer<Uint8>, int, Pointer<Utf8>, Pointer<Utf8>, Pointer<VeBuffer>)>('ve_fv_create');
@@ -354,8 +355,9 @@ class VeNative {
         int Function(int, Pointer<Utf8>, Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<VeBuffer>)>('ve_fv_change_password');
     _fvMigrate = _lib.lookupFunction<Int32 Function(Pointer<Utf8>, Pointer<Uint8>, Int32, Pointer<VeBuffer>), int Function(Pointer<Utf8>, Pointer<Uint8>, int, Pointer<VeBuffer>)>('ve_fv_migrate_cryptomator');
     _fvInfo = _lib.lookupFunction<Int32 Function(Int32, Pointer<VeBuffer>), int Function(int, Pointer<VeBuffer>)>('ve_fv_info');
-    _fvListSymlinks = _lib.lookupFunction<Int32 Function(Int32, Pointer<Utf8>, Pointer<VeBuffer>), int Function(int, Pointer<Utf8>, Pointer<VeBuffer>)>('ve_fv_list_symlinks');
-    _fvReadSymlink = _lib.lookupFunction<Int32 Function(Int32, Pointer<Utf8>, Pointer<VeBuffer>), int Function(int, Pointer<Utf8>, Pointer<VeBuffer>)>('ve_fv_read_symlink');
+    _listSymlinks = _lib.lookupFunction<Int32 Function(Int32, Pointer<Utf8>, Pointer<VeBuffer>), int Function(int, Pointer<Utf8>, Pointer<VeBuffer>)>('ve_list_symlinks');
+    _readSymlink = _lib.lookupFunction<Int32 Function(Int32, Pointer<Utf8>, Pointer<VeBuffer>), int Function(int, Pointer<Utf8>, Pointer<VeBuffer>)>('ve_read_symlink');
+    _createSymlink = _lib.lookupFunction<Int32 Function(Int32, Pointer<Utf8>, Pointer<Utf8>), int Function(int, Pointer<Utf8>, Pointer<Utf8>)>('ve_create_symlink');
     _fvHidden = _lib.lookupFunction<Int32 Function(Int32, Pointer<Utf8>), int Function(int, Pointer<Utf8>)>('ve_fv_hidden_entry_count');
     _fvFinishWrite = _lib.lookupFunction<Int32 Function(Int32, Pointer<Utf8>), int Function(int, Pointer<Utf8>)>('ve_fv_finish_write');
     _fvBatch = _lib.lookupFunction<Int32 Function(Int32, Int32, Int32), int Function(int, int, int)>('ve_fv_batch');
@@ -372,13 +374,15 @@ class VeNative {
   late final Pointer<Utf8> Function(int) _probe;
   late final int Function() _fvSupported;
   late final int Function(Pointer<Utf8>, Pointer<Int32>) _fvProbe;
-  late final int Function(int, int, Pointer<Utf8>, Pointer<Uint8>, int, Pointer<Uint8>, int, int, Pointer<Utf8>, Pointer<Utf8>, Pointer<VeBuffer>, Pointer<VeBuffer>) _fvUnlock;
+  late final int Function(int, int, Pointer<Utf8>, Pointer<Uint8>, int, Pointer<Uint8>, int, int, int, Pointer<Utf8>, Pointer<Utf8>, Pointer<VeBuffer>, Pointer<VeBuffer>) _fvUnlock;
+  late final int Function(Pointer<Utf8>, Pointer<Int32>) _fvProbeCryptomator;
   late final int Function(int, Pointer<Utf8>, Pointer<Uint8>, int, int, int, int, int, int, Pointer<Utf8>, Pointer<Uint8>, int, Pointer<Utf8>, Pointer<Utf8>, Pointer<VeBuffer>) _fvCreate;
   late final int Function(int, Pointer<Utf8>, Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<VeBuffer>) _fvChangePassword;
   late final int Function(Pointer<Utf8>, Pointer<Uint8>, int, Pointer<VeBuffer>) _fvMigrate;
   late final int Function(int, Pointer<VeBuffer>) _fvInfo;
-  late final int Function(int, Pointer<Utf8>, Pointer<VeBuffer>) _fvListSymlinks;
-  late final int Function(int, Pointer<Utf8>, Pointer<VeBuffer>) _fvReadSymlink;
+  late final int Function(int, Pointer<Utf8>, Pointer<VeBuffer>) _listSymlinks;
+  late final int Function(int, Pointer<Utf8>, Pointer<VeBuffer>) _readSymlink;
+  late final int Function(int, Pointer<Utf8>, Pointer<Utf8>) _createSymlink;
   late final int Function(int, Pointer<Utf8>) _fvHidden;
   late final int Function(int, Pointer<Utf8>) _fvFinishWrite;
   late final int Function(int, int, int) _fvBatch;
@@ -1210,6 +1214,7 @@ class VeNative {
     required Uint8List password,
     Uint8List? combinedKey,
     bool readOnly = false,
+    bool backupKeyFiles = true,
     String localStateDir = '',
     String tempDir = '',
   }) {
@@ -1224,7 +1229,7 @@ class VeNative {
           password,
           (pw, pwLen) => _withBytes(
             combinedKey,
-            (ck, ckLen) => _fvUnlock(volId, format, r, pw, pwLen, ck, ckLen, readOnly ? 1 : 0, localP, tempP, msg, key),
+            (ck, ckLen) => _fvUnlock(volId, format, r, pw, pwLen, ck, ckLen, readOnly ? 1 : 0, backupKeyFiles ? 1 : 0, localP, tempP, msg, key),
           ),
         ),
       );
@@ -1341,9 +1346,24 @@ class VeNative {
     return (rc, map);
   }
 
-  /// Symlinks directly inside [path] as directory-entry wire strings ("L|size|mtime|name").
-  (int, List<String>) fvListSymlinks(int volId, String path) {
-    final (rc, bytes) = _withUtf8(path, (p) => _withBuffer((b) => _fvListSymlinks(volId, p, b)));
+  /// Password-free format check of a Cryptomator vault folder: 0 not a readable vault, 7 migratable,
+  /// 8 current, -8 key file is v8+ but vault.cryptomator has not synced yet (never migrate), 6 too old.
+  int fvProbeCryptomator(String root) {
+    final out = calloc<Int32>();
+    try {
+      final rc = _withUtf8(root, (p) => _fvProbeCryptomator(p, out));
+      return rc == veOk ? out.value : 0;
+    } finally {
+      calloc.free(out);
+    }
+  }
+
+  // ── symbolic links (any slot: ext/NTFS containers and Cryptomator vaults) ──
+
+  /// Only the symlinks directly inside [path], as directory-entry wire strings:
+  /// "L|targetBytes|mtime|name", or "LD|0|mtime|name" when the target is a directory.
+  (int, List<String>) listSymlinks(int volId, String path) {
+    final (rc, bytes) = _withUtf8(path, (p) => _withBuffer((b) => _listSymlinks(volId, p, b)));
     if (rc != veOk || bytes == null || bytes.length < 4) return (rc, const []);
     final bd = ByteData.sublistView(bytes);
     final count = bd.getUint32(0, Endian.little);
@@ -1359,10 +1379,14 @@ class VeNative {
     return (rc, out);
   }
 
-  (int, String?) fvReadSymlink(int volId, String path) {
-    final (rc, bytes) = _withUtf8(path, (p) => _withBuffer((b) => _fvReadSymlink(volId, p, b)));
+  /// The raw target of the link at [path] (never followed), or null if it is not a readable link.
+  (int, String?) readSymlink(int volId, String path) {
+    final (rc, bytes) = _withUtf8(path, (p) => _withBuffer((b) => _readSymlink(volId, p, b)));
     return (rc, rc == veOk && bytes != null ? utf8.decode(bytes, allowMalformed: true) : null);
   }
+
+  int createSymlink(int volId, String path, String target) =>
+      _withUtf8(path, (p) => _withUtf8(target, (t) => _createSymlink(volId, p, t)));
 
   /// Entries hidden from listings in [path] (>= 0), or a negative -veErr* code.
   int fvHiddenEntryCount(int volId, String path) => _withUtf8(path, (p) => _fvHidden(volId, p));

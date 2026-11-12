@@ -2343,7 +2343,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     try {
       final raw = await ref
           .read(vaultFileIoApiProvider)
-          .listDirectory(widget.container, bookmark.parentPath, refresh: true);
+          .listDirectoryForBrowser(widget.container, bookmark.parentPath, refresh: true);
       if (raw == null) return false;
       return RawEntry.parseAll(
         raw,
@@ -2738,34 +2738,78 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     toggleSelectItem(entry);
   }
 
+  /// Returns the effective target filename for a Cryptomator shortcut.
+  ///
+  /// Content is still opened through [linkPath] so the native vault layer
+  /// follows the link. We only resolve the name here: dispatch, MIME/type
+  /// detection and viewers need the target extension rather than the
+  /// shortcut's arbitrary display name. Resolve chained links too, but never
+  /// allow a target to escape the vault or loop forever.
+  Future<String> _effectiveOpenName(RawEntry entry, String linkPath) async {
+    if (!entry.isSymlink || !mayHaveVaultSymbolicLinks(widget.container)) {
+      return entry.name;
+    }
+
+    final api = ref.read(vaultFileIoApiProvider);
+    var currentPath = linkPath;
+    final visited = <String>{};
+    for (var hop = 0; hop < 40; hop++) {
+      if (!visited.add(currentPath)) return entry.name;
+      final target = await api.readVaultSymlink(widget.container, currentPath);
+      if (target == null || target.isEmpty) {
+        return p.posix.basename(currentPath);
+      }
+      // Cryptomator shortcuts are deliberately confined to this vault.
+      if (p.posix.isAbsolute(target)) return entry.name;
+      final resolved = p.posix.normalize(
+        p.posix.join(p.posix.dirname(currentPath), target),
+      );
+      if (resolved == '..' || resolved.startsWith('../') ||
+          p.posix.isAbsolute(resolved)) {
+        return entry.name;
+      }
+      currentPath = resolved;
+    }
+    return entry.name;
+  }
+
+  MediaKind? _mediaKindForName(String fileName) {
+    if (MediaViewerConstants.isImage(fileName)) return MediaKind.image;
+    if (MediaViewerConstants.isVideo(fileName)) return MediaKind.video;
+    if (MediaViewerConstants.isAudio(fileName)) return MediaKind.audio;
+    return null;
+  }
+
   Future<void> _handleFileTap(RawEntry entry) async {
     ThumbnailConcurrency.videoLimiter.cancelAll();
-    if (MediaViewerConstants.isVideo(entry.name)) {
-      await PlaybackThrottleController.setActive(true);
-    }
     _signalActivity();
     if (isSelectionMode) {
       toggleSelectItem(entry);
       return;
     }
     final fullPath = _fullPathOf(entry);
-    final parts = entry.name.split('.');
+    final openName = await _effectiveOpenName(entry, fullPath);
+    if (!mounted) return;
+    if (MediaViewerConstants.isVideo(openName)) {
+      await PlaybackThrottleController.setActive(true);
+    }
+    final parts = openName.split('.');
     final ext =
-        ArchiveService.splitPartExtension(entry.name) ??
+        ArchiveService.splitPartExtension(openName) ??
         (parts.length > 1
             ? parts.last.toLowerCase().replaceFirst(RegExp(r'^\.+'), '').trim()
             : '');
     if (ArchiveService.opensOnTap(ext)) {
       if (_archiveContext == null) {
-        await _openArchive(fullPath, entry.name);
+        await _openArchive(fullPath, openName);
         return;
       }
       // Inside an archive the path is virtual, so the file can't be opened
       // like a container file; it is staged and opened on top of this one.
       // (A split archive part has no siblings to be read with, so it falls
       // through to the ordinary in-archive handling below.)
-      if (ArchiveService.canOpenNested(entry.name, ext)) {
-        await _openNestedArchive(fullPath, entry.name);
+      if (ArchiveService.canOpenNested(openName, ext)) {
+        await _openNestedArchive(fullPath, openName);
         return;
       }
     }
@@ -2783,9 +2827,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         if (mounted) {
           final opensInNativeViewer =
               ext == 'pdf' ||
-              MediaViewerConstants.isImage(entry.name) ||
-              MediaViewerConstants.isVideo(entry.name) ||
-              MediaViewerConstants.isAudio(entry.name);
+              MediaViewerConstants.isImage(openName) ||
+              MediaViewerConstants.isVideo(openName) ||
+              MediaViewerConstants.isAudio(openName);
           final opensInTextEditor = const {
             'txt',
             'md',
@@ -2799,9 +2843,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             final previewPath = stageResult?.path;
             if (previewPath != null) {
               if (opensInTextEditor) {
-                await _openArchiveTextPreview(entry.name, previewPath);
+                await _openArchiveTextPreview(openName, previewPath);
               } else {
-                await _openArchivePreview(entry.name, previewPath);
+                await _openArchivePreview(openName, previewPath);
               }
             } else if (mounted) {
               _navNotifier.setLoading(false);
@@ -2826,7 +2870,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                     area: SkinArea.files,
                     child: ArchiveFileViewer(
                       bytes: extractResult!.data!,
-                      fileName: entry.name,
+                      fileName: openName,
                     ),
                   ),
                 ),
@@ -2852,7 +2896,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
           .read(vaultItemsServiceProvider)
           .loadItem(widget.container, fullPath);
       if (item != null) {
-        final baseName = entry.name.substring(0, entry.name.lastIndexOf('.'));
+        final baseName = openName.substring(0, openName.lastIndexOf('.'));
         item.title = baseName;
         if (mounted) {
           await Navigator.push(
@@ -2904,7 +2948,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       ext: ext,
       extensionPreference: pref,
       needsSystemAppForLocal: needsSystemAppForLocal,
-      isSupportedMedia: _isSupportedMedia(entry.name),
+      isSupportedMedia: _isSupportedMedia(openName),
     );
     switch (action) {
       case OpenInEditor():
@@ -2921,29 +2965,54 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         if (!mounted) return;
         _loadDirectoryContents(_currentDirPath);
       case OpenInMediaViewer():
-        await _openMediaViewer(entry.name, fullPath);
+        // The media viewer classifies items by the path it receives. For a
+        // shortcut that path is deliberately the link path (so reads still
+        // go through the vault's link resolver), whose extension may differ
+        // from the target. Pin the target's media kind to the link path for
+        // the lifetime of the viewer so an image shortcut named `movie.mp4`
+        // is still treated as an image, and vice versa.
+        final shortcutMediaKind = entry.isSymlink
+            ? _mediaKindForName(openName)
+            : null;
+        if (shortcutMediaKind == null) {
+          await _openMediaViewer(openName, fullPath);
+        } else {
+          await MediaViewerConstants.withKindOverride(
+            fullPath,
+            shortcutMediaKind,
+            // A folder playlist contains other paths whose shortcut targets
+            // have not been resolved here. Keep this launch focused on the
+            // selected shortcut so no neighbouring link is classified from
+            // its display name.
+            () => _openMediaViewer(
+              openName,
+              fullPath,
+              singleFile: entry.isSymlink,
+            ),
+          );
+        }
       case OpenInPdfViewer():
         await _openPdfViewer(fullPath);
       case OpenInHtmlViewer():
         _openHtmlViewer(fullPath);
       case OpenInComicReader():
-        await _openBook(entry.name, fullPath, BookKind.comic);
+        await _openBook(openName, fullPath, BookKind.comic);
       case OpenInEpubReader():
-        await _openBook(entry.name, fullPath, BookKind.epub);
+        await _openBook(openName, fullPath, BookKind.epub);
       case OpenWithSystemApp(packageName: final packageName):
-        _openFileWithApp(entry.name, fullPath, packageName: packageName);
+        _openFileWithApp(openName, fullPath, packageName: packageName);
       case InstallApk():
-        await _installApk(entry.name, fullPath);
+        await _installApk(openName, fullPath);
       case OpenAsArchive():
         // An APK is a ZIP; the archive browser sniffs the format from the
         // bytes, so the same path a .zip takes works unchanged.
-        await _openArchive(fullPath, entry.name);
+        await _openArchive(fullPath, openName);
       case ShowApkOpenChooser():
         if (!mounted) return;
-        await _showApkOpenChooser(entry.name, fullPath, ext);
+        await _showApkOpenChooser(openName, fullPath, ext);
       case ShowOpenWithDialog():
         if (!mounted) return;
-        await _showOpenWithDialog(entry.name, fullPath, ext, settings);
+        await _showOpenWithDialog(openName, fullPath, ext, settings);
     }
   }
 

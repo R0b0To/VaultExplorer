@@ -146,6 +146,7 @@ private object ChannelMethods {
     const val READ_VAULT_SYMLINK        = "readVaultSymlink"
     const val GET_HIDDEN_ENTRY_COUNT    = "getHiddenEntryCount"
     const val CREATE_DIRECTORY          = "createDirectory"
+    const val CREATE_VAULT_SYMLINK      = "createVaultSymlink"
     const val RENAME_FILE               = "renameFile"
     const val COPY_FILE                 = "copyFile"
     const val CANCEL_COPY               = "cancelCopy"
@@ -226,6 +227,10 @@ private object ChannelMethods {
     const val CREATE_CRYPTOMATOR_VAULT  = "createCryptomatorVault"
     const val CHANGE_CRYPTOMATOR_VAULT_PASSWORD = "changeCryptomatorVaultPassword"
     const val MIGRATE_CRYPTOMATOR_VAULT = "migrateCryptomatorVault"
+    const val PROBE_CRYPTOMATOR_VAULT = "probeCryptomatorVault"
+    const val GET_CRYPTOMATOR_KEY_FILE_BACKUP = "getCryptomatorKeyFileBackup"
+    const val SET_CRYPTOMATOR_KEY_FILE_BACKUP = "setCryptomatorKeyFileBackup"
+    const val CLEAR_VAULT_OPEN_PREFERENCES = "clearVaultOpenPreferences"
     const val PICK_GOCRYPTFS_VAULT      = "pickGocryptfsVault"
     const val UNLOCK_GOCRYPTFS_VAULT    = "unlockGocryptfsVault"
     const val CREATE_GOCRYPTFS_VAULT    = "createGocryptfsVault"
@@ -289,6 +294,9 @@ private object ChannelMethods {
     const val EXPORT_CONTAINER_HEADER = "exportContainerHeader"
     const val RESTORE_CONTAINER_HEADER_REGION = "restoreContainerHeaderRegion"
     const val EXPAND_VERACRYPT_CONTAINER = "expandVeraCryptContainer"
+    const val EXPAND_LUKS_CONTAINER = "expandLuksContainer"
+    const val GROW_VERACRYPT_FILE_SYSTEM = "growVeraCryptFileSystem"
+    const val GROW_LUKS_FILE_SYSTEM = "growLuksFileSystem"
     const val ANALYZE_HIDDEN_VOLUME_HOST = "analyzeHiddenVolumeHost"
     const val CREATE_HIDDEN_VOLUME_IN_EXISTING = "createHiddenVolumeInExisting"
     const val RESOLVE_FOLDER_VAULT_CONFIG_FILE = "resolveFolderVaultConfigFile"
@@ -1162,6 +1170,10 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.CREATE_CRYPTOMATOR_VAULT -> vaultCreationHandlers.handleCreateCryptomatorVault(call, result)
                 ChannelMethods.CHANGE_CRYPTOMATOR_VAULT_PASSWORD -> vaultUnlockHandlers.handleChangeCryptomatorVaultPassword(call, result)
                 ChannelMethods.MIGRATE_CRYPTOMATOR_VAULT -> vaultUnlockHandlers.handleMigrateCryptomatorVault(call, result)
+                ChannelMethods.PROBE_CRYPTOMATOR_VAULT -> vaultUnlockHandlers.handleProbeCryptomatorVault(call, result)
+                ChannelMethods.GET_CRYPTOMATOR_KEY_FILE_BACKUP -> vaultUnlockHandlers.handleGetCryptomatorKeyFileBackup(call, result)
+                ChannelMethods.SET_CRYPTOMATOR_KEY_FILE_BACKUP -> vaultUnlockHandlers.handleSetCryptomatorKeyFileBackup(call, result)
+                ChannelMethods.CLEAR_VAULT_OPEN_PREFERENCES -> vaultUnlockHandlers.handleClearVaultOpenPreferences(call, result)
                 ChannelMethods.CREATE_GOCRYPTFS_VAULT -> vaultCreationHandlers.handleCreateGocryptfsVault(call, result)
                 ChannelMethods.CHANGE_GOCRYPTFS_VAULT_PASSWORD -> vaultUnlockHandlers.handleChangeGocryptfsVaultPassword(call, result)
                 ChannelMethods.IS_GOCRYPTFS_VAULT -> vaultUnlockHandlers.handleIsGocryptfsVault(call, result)
@@ -1264,6 +1276,7 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.READ_VAULT_SYMLINK -> fileOperationHandlers.handleReadVaultSymlink(call, result)
                 ChannelMethods.GET_HIDDEN_ENTRY_COUNT -> fileOperationHandlers.handleGetHiddenEntryCount(call, result)
                 ChannelMethods.CREATE_DIRECTORY -> fileOperationHandlers.handleCreateDirectory(call, result)
+                ChannelMethods.CREATE_VAULT_SYMLINK -> fileOperationHandlers.handleCreateVaultSymlink(call, result)
                 ChannelMethods.RENAME_FILE -> fileOperationHandlers.handleRenameFile(call, result)
                 ChannelMethods.COPY_FILE -> fileOperationHandlers.handleCopyFile(call, result)
                 ChannelMethods.CANCEL_COPY -> fileOperationHandlers.handleCancelCopy(call, result)
@@ -1523,6 +1536,9 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.BOOK_CLOSE -> bookReaderHandlers.handleBookClose(call, result)
                 ChannelMethods.EXPORT_CONTAINER_HEADER -> headerBackupHandlers.handleExportContainerHeader(call, result)
                 ChannelMethods.EXPAND_VERACRYPT_CONTAINER -> veraCryptToolsHandlers.handleExpandContainer(call, result)
+                ChannelMethods.EXPAND_LUKS_CONTAINER -> veraCryptToolsHandlers.handleExpandLuksContainer(call, result)
+                ChannelMethods.GROW_VERACRYPT_FILE_SYSTEM -> veraCryptToolsHandlers.handleGrowFileSystem(call, result)
+                ChannelMethods.GROW_LUKS_FILE_SYSTEM -> veraCryptToolsHandlers.handleGrowLuksFileSystem(call, result)
                 ChannelMethods.ANALYZE_HIDDEN_VOLUME_HOST -> veraCryptToolsHandlers.handleAnalyzeHiddenHost(call, result)
                 ChannelMethods.CREATE_HIDDEN_VOLUME_IN_EXISTING -> veraCryptToolsHandlers.handleCreateHiddenInExisting(call, result)
                 ChannelMethods.RESTORE_CONTAINER_HEADER_REGION ->

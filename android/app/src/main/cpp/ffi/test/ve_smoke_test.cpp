@@ -245,6 +245,25 @@ static void runFilesystem(const char* fs, int64_t sizeBytes) {
         ve_op_unregister(42);
         CHECK(readAll(kVol, "/docs/copy.txt") == payload);
 
+        // native symlinks (ext2/3/4 and NTFS only): a relative link, listed apart from the ordinary listing
+        if (std::strcmp(fs, "ext4") == 0 || std::strcmp(fs, "ntfs") == 0) {
+            CHECK_RC(ve_create_symlink(kVol, "/docs/lnk", "copy.txt"), VE_OK);
+            ve_buffer lb{};
+            CHECK_RC(ve_list_symlinks(kVol, "/docs", &lb), VE_OK);
+            bool saw = false;
+            if (lb.data && lb.len > 4) saw = std::string((const char*)lb.data + 4, lb.len - 4).find("|lnk") != std::string::npos;
+            ve_buffer_free(&lb);
+            CHECK(saw);
+            CHECK(!listContains(listDir(kVol, "/docs"), "lnk"));  // links stay out of ordinary listings
+            ve_buffer tb{};
+            CHECK_RC(ve_read_symlink(kVol, "/docs/lnk", &tb), VE_OK);
+            CHECK(tb.len == 8 && std::memcmp(tb.data, "copy.txt", 8) == 0);
+            ve_buffer_free(&tb);
+            CHECK_RC(ve_delete_file(kVol, "/docs/lnk"), VE_OK);
+        } else {
+            CHECK(ve_create_symlink(kVol, "/docs/lnk", "copy.txt") != VE_OK);  // FAT / exFAT cannot
+        }
+
         // streaming read
         int64_t h = ve_open_stream(kVol, "/docs/big.bin");
         CHECK(h != 0);
@@ -672,7 +691,7 @@ static void runFolderVaults() {
     std::printf("  supported: %d\n", supported);
     if (!supported) {
         ve_buffer msg{};
-        CHECK_RC(ve_fv_unlock(0, VE_FV_GOCRYPTFS, "/nonexistent", (const uint8_t*)"x", 1, nullptr, 0, 0, "", "", &msg, nullptr),
+        CHECK_RC(ve_fv_unlock(0, VE_FV_GOCRYPTFS, "/nonexistent", (const uint8_t*)"x", 1, nullptr, 0, 0, 1, "", "", &msg, nullptr),
                  VE_ERR_FAILED);
         ve_buffer_free(&msg);
         return;
@@ -733,13 +752,13 @@ static void runFolderVaults() {
         CHECK(probed == fmt);
 
         // wrong password -> AUTH_FAILED; right one opens it
-        CHECK_RC(ve_fv_unlock(kFvVol, fmt, root.c_str(), (const uint8_t*)"definitely wrong", 16, nullptr, 0, 0,
+        CHECK_RC(ve_fv_unlock(kFvVol, fmt, root.c_str(), (const uint8_t*)"definitely wrong", 16, nullptr, 0, 0, 1,
                               stateDir.c_str(), tmpDir.c_str(), &msg, nullptr),
                  VE_ERR_AUTH_FAILED);
         ve_buffer_free(&msg);
         ve_buffer derived{};
         CHECK_RC(ve_fv_unlock(kFvVol, fmt, root.c_str(), (const uint8_t*)kPassword, (int32_t)std::strlen(kPassword),
-                              nullptr, 0, 0, stateDir.c_str(), tmpDir.c_str(), &msg, &derived),
+                              nullptr, 0, 0, 1, stateDir.c_str(), tmpDir.c_str(), &msg, &derived),
                  VE_OK);
         ve_buffer_free(&msg);
         ve_buffer_free(&derived);
@@ -747,7 +766,7 @@ static void runFolderVaults() {
               (fmt == 0 ? VE_FORMAT_GOCRYPTFS : fmt == 1 ? VE_FORMAT_CRYPTOMATOR : VE_FORMAT_CRYFS));
         // an occupied slot refuses a second unlock
         CHECK_RC(ve_fv_unlock(kFvVol, fmt, root.c_str(), (const uint8_t*)kPassword, (int32_t)std::strlen(kPassword),
-                              nullptr, 0, 0, stateDir.c_str(), tmpDir.c_str(), &msg, nullptr),
+                              nullptr, 0, 0, 1, stateDir.c_str(), tmpDir.c_str(), &msg, nullptr),
                  VE_ERR_FAILED);
         ve_buffer_free(&msg);
 
@@ -831,8 +850,58 @@ static void runFolderVaults() {
         CHECK(items.len > 4);
         ve_buffer_free(&items);
         ve_buffer links{};
-        CHECK_RC(ve_fv_list_symlinks(kFvVol, "/docs", &links), VE_OK);
+        CHECK_RC(ve_list_symlinks(kFvVol, "/docs", &links), VE_OK);  // nothing linked yet
+        CHECK(links.len == 4);  // just the u32 count (0)
         ve_buffer_free(&links);
+        if (fmt == VE_FV_CRYPTOMATOR) {
+            // Cryptomator vaults support relative, in-vault symlinks (file and folder targets)
+            CHECK_RC(ve_create_symlink(kFvVol, "/docs/link.txt", "renamed.txt"), VE_OK);
+            CHECK_RC(ve_create_directory(kFvVol, "/docs/sub"), VE_OK);
+            CHECK_RC(ve_create_symlink(kFvVol, "/docs/sublink", "sub"), VE_OK);
+            const auto sl = [&] {
+                ve_buffer b{};
+                std::vector<std::string> out;
+                if (ve_list_symlinks(kFvVol, "/docs", &b) == VE_OK && b.len >= 4) {
+                    uint32_t cnt = 0;
+                    std::memcpy(&cnt, b.data, 4);
+                    size_t off = 4;
+                    for (uint32_t i = 0; i < cnt && off + 4 <= b.len; ++i) {
+                        uint32_t len = 0;
+                        std::memcpy(&len, b.data + off, 4);
+                        off += 4;
+                        out.emplace_back((const char*)b.data + off, len);
+                        off += len;
+                    }
+                }
+                ve_buffer_free(&b);
+                return out;
+            }();
+            CHECK(sl.size() == 2);
+            bool sawFile = false, sawDir = false;
+            for (const auto& e : sl) {
+                if (e.rfind("L|", 0) == 0 && e.size() >= 3 && e.find("|link.txt") != std::string::npos) sawFile = true;
+                if (e.rfind("LD|0|", 0) == 0 && e.find("|sublink") != std::string::npos) sawDir = true;
+            }
+            CHECK(sawFile && sawDir);
+            ve_buffer tgt{};
+            CHECK_RC(ve_read_symlink(kFvVol, "/docs/link.txt", &tgt), VE_OK);
+            CHECK(tgt.len == 11 && std::memcmp(tgt.data, "renamed.txt", 11) == 0);
+            ve_buffer_free(&tgt);
+            CHECK(ve_read_symlink(kFvVol, "/docs/renamed.txt", &tgt) != VE_OK);  // a regular file is not a link
+            ve_buffer_free(&tgt);
+            CHECK(readAll(kFvVol, "/docs/link.txt") == payload);  // reads resolve inside the vault
+            CHECK_RC(ve_delete_file(kFvVol, "/docs/link.txt"), VE_OK);  // deleting unlinks the link only
+            CHECK_RC(ve_delete_file(kFvVol, "/docs/sublink"), VE_OK);
+            CHECK(readAll(kFvVol, "/docs/renamed.txt") == payload);
+        } else {
+            CHECK(ve_create_symlink(kFvVol, "/docs/link.txt", "renamed.txt") != VE_OK);  // not supported by these formats
+        }
+        // Cryptomator key-file probe: a current (format 8) vault
+        if (fmt == VE_FV_CRYPTOMATOR) {
+            int32_t code = 99;
+            CHECK_RC(ve_fv_probe_cryptomator(root.c_str(), &code), VE_OK);
+            CHECK(code == 8);
+        }
         CHECK_RC(ve_fv_batch(kFvVol, 0, 1), VE_OK);
         CHECK_RC(ve_fv_batch(kFvVol, 0, 0), VE_OK);
         CHECK_RC(ve_fv_info(kBlockVol, &items), VE_ERR_NOT_UNLOCKED);  // a container slot is not a folder vault
@@ -845,7 +914,7 @@ static void runFolderVaults() {
         ve_lock(kFvVol);
         CHECK_RC(ve_list_directory(kFvVol, "/", &junk), VE_ERR_NOT_UNLOCKED);
         CHECK_RC(ve_fv_unlock(kFvVol, fmt, root.c_str(), (const uint8_t*)kPassword, (int32_t)std::strlen(kPassword),
-                              nullptr, 0, 0, stateDir.c_str(), tmpDir.c_str(), &msg, nullptr),
+                              nullptr, 0, 0, 1, stateDir.c_str(), tmpDir.c_str(), &msg, nullptr),
                  VE_OK);
         ve_buffer_free(&msg);
         CHECK(readAll(kFvVol, "/docs/big.bin") == big);
@@ -853,7 +922,7 @@ static void runFolderVaults() {
 
         // read-only mount rejects writes
         CHECK_RC(ve_fv_unlock(kFvVol, fmt, root.c_str(), (const uint8_t*)kPassword, (int32_t)std::strlen(kPassword),
-                              nullptr, 0, 1, stateDir.c_str(), tmpDir.c_str(), &msg, nullptr),
+                              nullptr, 0, 1, 1, stateDir.c_str(), tmpDir.c_str(), &msg, nullptr),
                  VE_OK);
         ve_buffer_free(&msg);
         CHECK_RC(ve_write_file_chunk(kFvVol, "/docs/nope.txt", 0, (const uint8_t*)"x", 1), VE_ERR_READ_ONLY);
@@ -870,11 +939,11 @@ static void runFolderVaults() {
                  VE_OK);
         ve_buffer_free(&msg);
         CHECK_RC(ve_fv_unlock(kFvVol, fmt, root.c_str(), (const uint8_t*)kPassword, (int32_t)std::strlen(kPassword),
-                              nullptr, 0, 0, stateDir.c_str(), tmpDir.c_str(), &msg, nullptr),
+                              nullptr, 0, 0, 1, stateDir.c_str(), tmpDir.c_str(), &msg, nullptr),
                  VE_ERR_AUTH_FAILED);
         ve_buffer_free(&msg);
         CHECK_RC(ve_fv_unlock(kFvVol, fmt, root.c_str(), (const uint8_t*)kNewPassword, (int32_t)std::strlen(kNewPassword),
-                              nullptr, 0, 0, stateDir.c_str(), tmpDir.c_str(), &msg, nullptr),
+                              nullptr, 0, 0, 1, stateDir.c_str(), tmpDir.c_str(), &msg, nullptr),
                  VE_OK);
         ve_buffer_free(&msg);
         CHECK(readAll(kFvVol, "/docs/big.bin") == big);
@@ -912,14 +981,21 @@ int main(int argc, char** argv) {
         return g_failures == 0 ? 0 : 1;
     }
 
+    // `--fs-only fat ext4 ...`: just the per-filesystem sections (the full run takes a few minutes).
+    const bool fsOnly = argc >= 3 && std::strcmp(argv[1], "--fs-only") == 0;
+
     std::vector<std::string> filesystems;
-    for (int i = 1; i < argc; ++i) filesystems.push_back(argv[i]);
+    for (int i = fsOnly ? 2 : 1; i < argc; ++i) filesystems.push_back(argv[i]);
     if (filesystems.empty()) filesystems.push_back("fat");
 
     for (const auto& fs : filesystems) {
         // ext/ntfs need more room than a tiny FAT volume.
         const int64_t size = (fs == "fat" || fs == "exfat") ? 8ll << 20 : 32ll << 20;
         runFilesystem(fs.c_str(), size);
+    }
+    if (fsOnly) {
+        std::printf("\n%d checks, %d failed\n", g_checks, g_failures);
+        return g_failures == 0 ? 0 : 1;
     }
 
     runHidden();

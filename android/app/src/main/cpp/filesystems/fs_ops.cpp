@@ -4,6 +4,7 @@
 #include "fat_backend.h"
 #include "ntfs_backend.h"
 #include "ext_backend.h"
+#include "virtual_block_device.h"
 
 bool fsListDirectory(int volId, const std::string& pathSuffix, std::vector<std::string>& outResults) {
     switch (volumes[volId].fsType) {
@@ -11,6 +12,32 @@ bool fsListDirectory(int volId, const std::string& pathSuffix, std::vector<std::
         case VolumeState::FS_NTFS:  listNtfsDirectory(volId, pathSuffix, outResults); return true;
         case VolumeState::FS_EXT:   extListDirectory(volId, pathSuffix, outResults); return true;
         default: return true;
+    }
+}
+
+void fsListSymlinks(int volId, const std::string& pathSuffix,
+                    std::vector<std::string>& outResults) {
+    switch (volumes[volId].fsType) {
+        case VolumeState::FS_NTFS: ntfsListSymlinks(volId, pathSuffix, outResults); break;
+        case VolumeState::FS_EXT:  extListSymlinks(volId, pathSuffix, outResults); break;
+        // FAT12/16/32 and exFAT have no native symbolic-link entry type.
+        case VolumeState::FS_FATFS: default: break;
+    }
+}
+
+bool fsReadSymlink(int volId, const std::string& path, std::string& outTarget) {
+    switch (volumes[volId].fsType) {
+        case VolumeState::FS_NTFS: return ntfsReadSymlink(volId, path, outTarget);
+        case VolumeState::FS_EXT:  return extReadSymlink(volId, path, outTarget);
+        case VolumeState::FS_FATFS: default: return false;
+    }
+}
+
+bool fsCreateSymlink(int volId, const std::string& path, const std::string& target) {
+    switch (volumes[volId].fsType) {
+        case VolumeState::FS_NTFS: return ntfsCreateSymlink(volId, path, target);
+        case VolumeState::FS_EXT:  return extCreateSymlink(volId, path, target);
+        case VolumeState::FS_FATFS: default: return false;
     }
 }
 
@@ -192,5 +219,20 @@ void fsCloseStream(int volId, void* handle) {
         case VolumeState::FS_NTFS:  ntfsCloseStream(volId, handle); break;
         case VolumeState::FS_EXT:   extCloseStream(volId, handle); break;
         default: break;
+    }
+}
+
+FsGrowStatus fsGrowToFit(int volId) {
+    switch (volumes[volId].fsType) {
+        case VolumeState::FS_FATFS: return fatGrowToFit(volId);
+        case VolumeState::FS_EXT:   return extGrowToFit(volId);   // remounts itself: resize_fs frees the handle
+        case VolumeState::FS_NTFS: {
+            const FsGrowStatus status = ntfsGrowToFit(volId);
+            if (status != FsGrowStatus::kGrown) return status;
+            // Unmount flushes everything to the container; mounting again re-reads the new size.
+            unmountVolume(volId);
+            return ensureMounted(volId) ? FsGrowStatus::kGrown : FsGrowStatus::kFailed;
+        }
+        default: return FsGrowStatus::kUnsupported;
     }
 }

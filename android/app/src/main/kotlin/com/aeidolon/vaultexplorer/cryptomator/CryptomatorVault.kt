@@ -25,9 +25,20 @@ object CryptomatorVault {
         return root.listFiles().any { it.name == MASTERKEY_FILE_NAME }
     }
 
-    fun open(context: Context, vaultRootUri: Uri, passphrase: CharArray, readOnly: Boolean): VaultOpenResult<CryptomatorSession> =
+    /**
+     * [backupKeyFiles]: write `.bkup` copies of `masterkey.cryptomator` and `vault.cryptomator` on a
+     * read-write unlock (what Cryptomator on desktop does). Read-only sessions never write either way.
+     */
+    fun open(
+        context: Context,
+        vaultRootUri: Uri,
+        passphrase: CharArray,
+        readOnly: Boolean,
+        backupKeyFiles: Boolean = true,
+    ): VaultOpenResult<CryptomatorSession> =
         FolderVaultOpener.open(
             context, vaultRootUri, NativeFolderVault.CRYPTOMATOR, MASTERKEY_FILE_NAME, passphrase, null, readOnly,
+            backupKeyFiles,
         ) { handle, volRef -> CryptomatorSession(context, vaultRootUri, handle, readOnly, volRef) }
 
     fun create(
@@ -40,6 +51,10 @@ object CryptomatorVault {
             context, vaultRootUri, NativeFolderVault.CRYPTOMATOR, MASTERKEY_FILE_NAME, passphrase,
             IntArray(2), null, userEntropy,
         ) { handle, volRef -> CryptomatorSession(context, vaultRootUri, handle, false, volRef) }
+
+    /** Password-free format probe; codes as [FolderVaultOpener.probeCryptomator]. */
+    fun probeFormat(context: Context, vaultRootUri: Uri): Int =
+        FolderVaultOpener.probeCryptomator(context, vaultRootUri, MASTERKEY_FILE_NAME)
 
     /** Format 7 -> 8, one way. See [FolderVaultOpener.migrateCryptomator]. */
     fun migrate(context: Context, vaultRootUri: Uri, passphrase: CharArray): VaultOpenResult<Unit> =

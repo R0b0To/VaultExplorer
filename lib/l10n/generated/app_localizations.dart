@@ -4104,6 +4104,24 @@ abstract class AppLocalizations {
   /// **'Make a standard volume larger, like the desktop Volume Expander'**
   String get toolExpandVolumeSubtitle;
 
+  /// Tools row: enlarge a LUKS1 or LUKS2 file container
+  ///
+  /// In en, this message translates to:
+  /// **'Expand LUKS container'**
+  String get toolExpandLuksVolumeTitle;
+
+  /// Tools row subtitle for LUKS container expansion
+  ///
+  /// In en, this message translates to:
+  /// **'Grow LUKS1 and LUKS2 containers, including fixed-size LUKS2 metadata'**
+  String get toolExpandLuksVolumeSubtitle;
+
+  /// Explains LUKS container expansion behavior and supported in-place filesystem growth
+  ///
+  /// In en, this message translates to:
+  /// **'Back up the container first. Supports LUKS1 and LUKS2. NTFS and ext2/3/4 filesystems can be expanded in place (FAT and exFAT cannot). The added space can be initialized with encrypted zeros. A keyfile replaces the password if used.'**
+  String get luksToolsExpandNote;
+
   /// Tools row: create a hidden volume inside an existing volume
   ///
   /// In en, this message translates to:
@@ -4167,7 +4185,7 @@ abstract class AppLocalizations {
   /// Note about volume expansion
   ///
   /// In en, this message translates to:
-  /// **'Only the container is enlarged. The file system inside is not resized, so the added space stays unallocated until the file system is grown. Back up the volume first.'**
+  /// **'The container is enlarged first. Then the file system inside is grown into the added space where that is possible without reformatting (NTFS, ext2/3/4). FAT and exFAT cannot be grown in place; their added space stays unallocated. Back up the volume first.'**
   String get vcToolsExpandNote;
 
   /// Success message after expansion
@@ -4175,6 +4193,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Volume expanded'**
   String get vcToolsExpandDone;
+
+  /// Switch: also grow the file system inside the volume after expanding it
+  ///
+  /// In en, this message translates to:
+  /// **'Also grow the file system'**
+  String get vcToolsGrowFsToggle;
+
+  /// Explains the grow file system switch
+  ///
+  /// In en, this message translates to:
+  /// **'Lets NTFS and ext2/3/4 volumes use the added space right away, without reformatting.'**
+  String get vcToolsGrowFsToggleHint;
+
+  /// Button: grow only the file system of a volume that was expanded earlier
+  ///
+  /// In en, this message translates to:
+  /// **'Only grow the file system'**
+  String get vcToolsGrowFsOnlyAction;
+
+  /// Result: the file system was grown into the added space
+  ///
+  /// In en, this message translates to:
+  /// **'File system grown: the added space is ready to use.'**
+  String get vcToolsFsGrown;
+
+  /// Result: the file system already fills the volume
+  ///
+  /// In en, this message translates to:
+  /// **'The file system already fills the volume.'**
+  String get vcToolsFsAlreadyFills;
+
+  /// Result: this file system (FAT/exFAT) cannot be grown in place
+  ///
+  /// In en, this message translates to:
+  /// **'This file system cannot be grown in place (FAT and exFAT cannot). The added space stays unallocated until the volume is reformatted; back up its files first.'**
+  String get vcToolsFsUnsupported;
+
+  /// Result: file system growth could not run because files remain open
+  ///
+  /// In en, this message translates to:
+  /// **'Files are still open in the volume. Close them, lock the volume, then retry “Only grow the file system”.'**
+  String get vcToolsFsBusy;
+
+  /// Result: the file system is dirty and must be checked before it can be grown
+  ///
+  /// In en, this message translates to:
+  /// **'The file system is marked as needing a check. Run Check & Repair on the volume, then use “Only grow the file system”.'**
+  String get vcToolsFsNeedsCheck;
+
+  /// Result: growing the file system failed
+  ///
+  /// In en, this message translates to:
+  /// **'The file system could not be grown. The volume itself is expanded; run Check & Repair on it before using it.'**
+  String get vcToolsFsFailed;
 
   /// Button: analyze the outer volume for hidden volume space
   ///
@@ -23762,13 +23834,13 @@ abstract class AppLocalizations {
   /// Heading for the symbolic links section in vault listing details
   ///
   /// In en, this message translates to:
-  /// **'Symbolic links'**
+  /// **'Shortcuts'**
   String get vaultListingSymbolicLinksTitle;
 
-  /// Explains that symbolic links are not followed and can be tapped to copy their target
+  /// Explains that shortcut entries open relative targets within the vault and reject absolute or broken targets
   ///
   /// In en, this message translates to:
-  /// **'A symbolic link points somewhere else. It is never opened or followed here; tap one to copy where it points.'**
+  /// **'Shortcuts open their targets when tapped. Relative targets stay inside this vault; absolute or broken targets cannot be opened.'**
   String get vaultListingSymbolicLinksNote;
 
   /// Heading for vault entries that could not be listed in the current folder
@@ -24064,6 +24136,186 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No city within {km} km: grouped by coordinates'**
   String galleryPlaceHintCoordinates(int km);
+
+  /// Title of the switch in a Cryptomator vault's settings that controls whether key-file backups are written when the vault is unlocked
+  ///
+  /// In en, this message translates to:
+  /// **'Back up key files when unlocking'**
+  String get cryptomatorBackupKeyFilesTitle;
+
+  /// Subtitle of the Cryptomator key-file backup switch: what is copied, that it applies from the next unlock, and that read-only sessions never write
+  ///
+  /// In en, this message translates to:
+  /// **'Keeps a copy of masterkey.cryptomator and vault.cryptomator next to the originals, like Cryptomator on desktop. Applies from the next unlock. Read-only sessions never write.'**
+  String get cryptomatorBackupKeyFilesSubtitle;
+
+  /// Title of the settings row (and screen) that upgrades a Cryptomator vault from the older format 7 to format 8
+  ///
+  /// In en, this message translates to:
+  /// **'Upgrade vault format'**
+  String get cryptomatorUpgradeTitle;
+
+  /// Subtitle of the upgrade row for a vault that is still Cryptomator format 7
+  ///
+  /// In en, this message translates to:
+  /// **'This vault uses the older format 7.'**
+  String get cryptomatorUpgradeSubtitle;
+
+  /// Subtitle of the disabled upgrade row while the vault is unlocked
+  ///
+  /// In en, this message translates to:
+  /// **'Lock the vault to upgrade it'**
+  String get cryptomatorUpgradeLockFirst;
+
+  /// Warning on the Cryptomator format upgrade screen: what changes, that it is one-way, that older Cryptomator cannot open the vault, where the key-file copy goes, and that sync must finish first
+  ///
+  /// In en, this message translates to:
+  /// **'Upgrading changes this vault to format 8. It cannot be undone, and Cryptomator versions older than 1.6 will no longer be able to open the vault afterwards.\n\nA copy of the current key file is kept as masterkey.cryptomator.<id>.bkup. If another app syncs this vault, let it finish syncing first.'**
+  String get cryptomatorUpgradeWarning;
+
+  /// Checkbox on the Cryptomator upgrade screen the user must tick before the upgrade button works
+  ///
+  /// In en, this message translates to:
+  /// **'I understand this can\'t be undone'**
+  String get cryptomatorUpgradeConfirm;
+
+  /// Button that runs the Cryptomator vault format upgrade
+  ///
+  /// In en, this message translates to:
+  /// **'Upgrade'**
+  String get cryptomatorUpgradeAction;
+
+  /// Snackbar shown after a Cryptomator vault was upgraded to format 8
+  ///
+  /// In en, this message translates to:
+  /// **'Vault upgraded to format 8'**
+  String get cryptomatorUpgradedMessage;
+
+  /// Error shown when the format upgrade is refused because the vault is unlocked
+  ///
+  /// In en, this message translates to:
+  /// **'Lock the vault first'**
+  String get cryptomatorUpgradeUnlockedError;
+
+  /// Warning row for a Cryptomator vault whose vault.cryptomator is missing (usually not synced yet); the user must wait and must not upgrade
+  ///
+  /// In en, this message translates to:
+  /// **'vault.cryptomator is missing. If another app syncs this vault, wait for it to finish, then try again. Do not upgrade.'**
+  String get cryptomatorConfigMissingWarning;
+
+  /// Generic error when the Cryptomator format upgrade fails without a more specific message
+  ///
+  /// In en, this message translates to:
+  /// **'Could not upgrade the vault'**
+  String get cryptomatorUpgradeFailedMessage;
+
+  /// Menu entry and dialog title for creating a symbolic link in a Cryptomator vault
+  ///
+  /// In en, this message translates to:
+  /// **'New symbolic link'**
+  String get newSymbolicLinkTitle;
+
+  /// Hint of the name field when creating or renaming a symbolic link
+  ///
+  /// In en, this message translates to:
+  /// **'Link name'**
+  String get symbolicLinkNameHint;
+
+  /// Hint of the field where the user types what a new symbolic link points to
+  ///
+  /// In en, this message translates to:
+  /// **'Points to'**
+  String get symbolicLinkTargetHint;
+
+  /// Helper text under the symbolic link target field: relative targets are resolved within the vault; absolute targets are not followed
+  ///
+  /// In en, this message translates to:
+  /// **'Stored exactly as written. Relative targets are resolved inside this vault when opened; absolute targets are not followed.'**
+  String get symbolicLinkTargetHelper;
+
+  /// Error under the symbolic link target field when it exceeds the 32,767-byte limit
+  ///
+  /// In en, this message translates to:
+  /// **'Target is too long (maximum 32,767 bytes)'**
+  String get symbolicLinkTargetTooLong;
+
+  /// Error under the symbolic link target field when it contains a null character
+  ///
+  /// In en, this message translates to:
+  /// **'Target can\'t contain a null character'**
+  String get symbolicLinkTargetInvalid;
+
+  /// Error when the chosen symbolic link name is already used by a file, folder or another link
+  ///
+  /// In en, this message translates to:
+  /// **'A file, folder or link with this name already exists'**
+  String get symbolicLinkNameTaken;
+
+  /// Title of the confirmation dialog for deleting a symbolic link
+  ///
+  /// In en, this message translates to:
+  /// **'Delete symbolic link?'**
+  String get deleteSymbolicLinkTitle;
+
+  /// Body of the confirmation dialog for deleting a symbolic link; says only the link is removed, not what it points to
+  ///
+  /// In en, this message translates to:
+  /// **'Delete the link \"{name}\"? Only the link is removed; what it points to is not touched.'**
+  String deleteSymbolicLinkMessage(String name);
+
+  /// Title of the dialog for renaming a symbolic link
+  ///
+  /// In en, this message translates to:
+  /// **'Rename symbolic link'**
+  String get symbolicLinkRenameTitle;
+
+  /// Tooltip for the button that opens the vault target picker when creating a symbolic link
+  ///
+  /// In en, this message translates to:
+  /// **'Browse vault'**
+  String get symbolicLinkBrowseTarget;
+
+  /// Title of the in-vault file and folder picker for a symbolic link target
+  ///
+  /// In en, this message translates to:
+  /// **'Choose shortcut target'**
+  String get symbolicLinkSelectTargetTitle;
+
+  /// Button to choose the currently displayed folder as a symbolic link target
+  ///
+  /// In en, this message translates to:
+  /// **'Select this folder'**
+  String get symbolicLinkSelectThisFolder;
+
+  /// Message shown when the symbolic-link target picker cannot load a folder
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load this folder'**
+  String get symbolicLinkPickerLoadError;
+
+  /// Label identifying a symbolic link as a shortcut in the target picker
+  ///
+  /// In en, this message translates to:
+  /// **'Shortcut'**
+  String get shortcutBadge;
+
+  /// Message shown when the current folder has no entries
+  ///
+  /// In en, this message translates to:
+  /// **'This folder is empty'**
+  String get emptyFolder;
+
+  /// Helper text under the symbolic link target field for native LUKS/VeraCrypt filesystems
+  ///
+  /// In en, this message translates to:
+  /// **'Use a relative path inside this container. The target may be missing; renaming or deleting the link does not change the target.'**
+  String get symbolicLinkTargetHelperRelative;
+
+  /// Error under the symbolic link target field when a native target is absolute or escapes the container root
+  ///
+  /// In en, this message translates to:
+  /// **'Target must be a relative path that stays inside this container.'**
+  String get symbolicLinkTargetOutsideVault;
 }
 
 class _AppLocalizationsDelegate

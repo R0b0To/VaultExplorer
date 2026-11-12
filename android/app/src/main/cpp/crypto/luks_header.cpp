@@ -4,6 +4,7 @@
 #include "user_entropy.h"
 #include <cstring>
 #include <algorithm>
+#include <cerrno>
 #include <atomic>
 #include <memory>
 #include <mutex>
@@ -25,6 +26,7 @@
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
 
 const uint8_t LUKS_MAGIC[6] = {'L', 'U', 'K', 'S', 0xBA, 0xBE};
+static constexpr uint8_t LUKS2_SECONDARY_MAGIC[6] = {'S', 'K', 'U', 'L', 0xBA, 0xBE};
 
 // ── Endian Helpers ────────────────────────────────────────────────────────
 
@@ -520,29 +522,112 @@ static bool luks2Unlock(const LuksByteReader& reader,
                         const uint8_t* candidateMasterKey = nullptr,
                         size_t candidateMasterKeyLen = 0) {
     LOGI("LUKS2: Starting unlock...");
-    // Read the binary header area (4096 bytes)
-    uint8_t hdr[4096];
-    if (!reader(0, hdr, 4096)) {
-        LOGI("LUKS2: header read failed");
+
+    // LUKS2 maintains two metadata copies. Prefer the valid copy with the
+    // greatest sequence ID, so an interrupted secondary-first metadata
+    // update remains mountable even when the primary copy is stale or was
+    // interrupted while being rewritten. The application writer currently
+    // emits 16 KiB copies; the primary's hdr_size is used to locate external
+    // secondary copies when it is readable.
+    struct UnlockCopy {
+        uint8_t header[4096]{};
+        std::vector<char> json;
+        cJSON* root = nullptr;
+        uint64_t hdrSize = 0;
+        uint64_t seqid = 0;
+        uint64_t offset = 0;
+        bool checksumValid = false;
+    } primary, secondary;
+
+    auto readUnlockCopy = [&](uint64_t copyOffset, UnlockCopy& copy) -> bool {
+        copy.offset = copyOffset;
+        if (!reader(copyOffset, copy.header, sizeof(copy.header)) ||
+            readBE16(copy.header + 6) != 2) return false;
+        const bool isPrimary = copyOffset == 0;
+        const bool magicOk = isPrimary
+            ? std::memcmp(copy.header, LUKS_MAGIC, 6) == 0
+            : (std::memcmp(copy.header, LUKS2_SECONDARY_MAGIC, 6) == 0 ||
+               std::memcmp(copy.header, LUKS_MAGIC, 6) == 0); // accept legacy VaultExplorer secondary headers
+        if (!magicOk) return false;
+        copy.hdrSize = readBE64(copy.header + 8);
+        copy.seqid = readBE64(copy.header + 16);
+        const uint64_t recordedOffset = readBE64(copy.header + 256);
+        if (copy.hdrSize < 4096 || copy.hdrSize > 8 * 1024 * 1024 ||
+            (copy.hdrSize % 4096) != 0 || recordedOffset != copyOffset) return false;
+        const size_t jsonLen = static_cast<size_t>(copy.hdrSize - 4096);
+        copy.json.assign(jsonLen + 1, 0);
+        if (!reader(copyOffset + 4096, copy.json.data(), jsonLen)) return false;
+        copy.root = cJSON_Parse(copy.json.data());
+        if (!copy.root) return false;
+
+        // sha256 is the standard LUKS2 checksum used by cryptsetup and by
+        // VaultExplorer. Other checksum algorithms remain eligible for
+        // ordinary unlocking (as before), but the resize path refuses them.
+        if (std::strncmp(reinterpret_cast<const char*>(copy.header + 72),
+                         "sha256", 32) == 0) {
+            uint8_t headerForHash[4096];
+            std::memcpy(headerForHash, copy.header, sizeof(headerForHash));
+            // Luks2HdrDisk::csum starts at byte 448 and occupies 64 bytes.
+            std::memset(headerForHash + 448, 0, 64);
+            uint8_t computed[32]{};
+            mbedtls_md_context_t md;
+            mbedtls_md_init(&md);
+            const mbedtls_md_info_t* mdInfo = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
+            const bool hashOk = mdInfo && mbedtls_md_setup(&md, mdInfo, 0) == 0 &&
+                mbedtls_md_starts(&md) == 0 &&
+                mbedtls_md_update(&md, headerForHash, sizeof(headerForHash)) == 0 &&
+                mbedtls_md_update(&md, reinterpret_cast<const uint8_t*>(copy.json.data()), jsonLen) == 0 &&
+                mbedtls_md_finish(&md, computed) == 0;
+            mbedtls_md_free(&md);
+            copy.checksumValid = hashOk &&
+                std::memcmp(copy.header + 448, computed, sizeof(computed)) == 0;
+            mbedtls_platform_zeroize(headerForHash, sizeof(headerForHash));
+            mbedtls_platform_zeroize(computed, sizeof(computed));
+        } else {
+            copy.checksumValid = true; // unknown checksum: preserve legacy unlock behavior
+        }
+        return copy.checksumValid;
+    };
+
+    const bool primaryOk = readUnlockCopy(0, primary);
+    // Only trust the primary header's copy size after its checksum verifies.
+    // If the primary is damaged, the standard 16 KiB location still lets us
+    // recover the secondary copy produced by this app and by common LUKS2
+    // layouts supported by the resize path.
+    const uint64_t secondaryOffset = primaryOk ? primary.hdrSize : 16384;
+    const bool secondaryOk = readUnlockCopy(secondaryOffset, secondary);
+
+    UnlockCopy* selected = nullptr;
+    if (primaryOk && secondaryOk) {
+        if (primary.seqid == secondary.seqid && primary.json != secondary.json) {
+            LOGI("LUKS2: header copies have equal sequence IDs but different metadata");
+            cJSON_Delete(primary.root);
+            cJSON_Delete(secondary.root);
+            return false;
+        }
+        selected = secondary.seqid > primary.seqid ? &secondary : &primary;
+    } else if (primaryOk) {
+        selected = &primary;
+    } else if (secondaryOk) {
+        selected = &secondary;
+    } else {
+        LOGI("LUKS2: neither metadata copy could be read and verified");
+        if (primary.root) cJSON_Delete(primary.root);
+        if (secondary.root) cJSON_Delete(secondary.root);
         return false;
     }
 
-    uint64_t hdrSize = readBE64(hdr + 8);
-    LOGI("LUKS2: hdrSize = %llu", (unsigned long long)hdrSize);
-    if (hdrSize < 4096 || hdrSize > 8 * 1024 * 1024) {
-        LOGI("LUKS2: hdrSize check failed");
-        return false;
-    }
-
-    // Read the JSON metadata. It starts at offset 4096, and has length (hdrSize - 4096).
-    size_t jsonLen = hdrSize - 4096;
-    std::vector<char> jsonBuf(jsonLen + 1, 0);
-    if (!reader(4096, jsonBuf.data(), jsonLen)) {
-        LOGI("LUKS2: JSON read failed");
-        return false;
-    }
-
-    cJSON* root = cJSON_Parse(jsonBuf.data());
+    const uint64_t hdrSize = selected->hdrSize;
+    LOGI("LUKS2: selected header copy at %llu, hdrSize=%llu, seqid=%llu",
+         (unsigned long long)selected->offset,
+         (unsigned long long)hdrSize,
+         (unsigned long long)selected->seqid);
+    std::vector<char> jsonBuf = std::move(selected->json);
+    cJSON* root = selected->root;
+    selected->root = nullptr;
+    if (primary.root) cJSON_Delete(primary.root);
+    if (secondary.root) cJSON_Delete(secondary.root);
+    const size_t jsonLen = static_cast<size_t>(hdrSize - 4096);
     for (size_t i = 0; i < jsonLen; i += 2000) {
         LOGI("LUKS2 JSON chunk: %.*s", (int)std::min((size_t)2000, jsonLen - i), jsonBuf.data() + i);
     }
@@ -561,9 +646,31 @@ static bool luks2Unlock(const LuksByteReader& reader,
         return false;
     }
 
-    // Parse Segments (just use the first segment)
+    // Parse the first segment for ordinary mounting. Expansion separately
+    // requires exactly one supported crypt segment and validates both copies.
+    uint32_t segmentCount = 0;
+    for (cJSON* it = segmentsObj->child; it; it = it->next) ++segmentCount;
     Luks2SegmentInfo segment;
+    bool segmentSizeValid = false;
+    bool segmentOffsetValid = false;
+    bool segmentSectorSizeValid = false;
+    bool segmentIvTweakValid = false;
     cJSON* segmentKey = segmentsObj->child;
+    if (segmentKey) {
+        cJSON* segmentType = cJSON_GetObjectItemCaseSensitive(segmentKey, "type");
+        segment.isCryptSegment = segmentType && segmentType->valuestring &&
+            std::strcmp(segmentType->valuestring, "crypt") == 0;
+        // These fields change how the data area is interpreted or indicate
+        // an operation/layout the app does not implement. Preserve the
+        // information through unlock so expansion can refuse before writing
+        // any encrypted zeroes.
+        segment.hasIntegrity = cJSON_GetObjectItemCaseSensitive(segmentKey, "integrity") != nullptr;
+        segment.hasFlags = cJSON_GetObjectItemCaseSensitive(segmentKey, "flags") != nullptr;
+    }
+    cJSON* configObj = cJSON_GetObjectItemCaseSensitive(root, "config");
+    cJSON* requirementsObj = configObj ? cJSON_GetObjectItemCaseSensitive(configObj, "requirements") : nullptr;
+    cJSON* mandatoryObj = requirementsObj ? cJSON_GetObjectItemCaseSensitive(requirementsObj, "mandatory") : nullptr;
+    segment.hasMandatoryRequirements = mandatoryObj != nullptr;
     if (segmentKey) {
         cJSON* enc = cJSON_GetObjectItemCaseSensitive(segmentKey, "encryption");
         cJSON* off = cJSON_GetObjectItemCaseSensitive(segmentKey, "offset");
@@ -572,18 +679,59 @@ static bool luks2Unlock(const LuksByteReader& reader,
         cJSON* ivt = cJSON_GetObjectItemCaseSensitive(segmentKey, "iv_tweak");
 
         if (enc && enc->valuestring) segment.encryption = enc->valuestring;
-        if (off && off->valuestring) {
-            segment.offset = std::strtoull(off->valuestring, nullptr, 10);
+        if (off && off->valuestring && off->type == cJSON_String) {
+            char* end = nullptr;
+            errno = 0;
+            const unsigned long long parsed = std::strtoull(off->valuestring, &end, 10);
+            if (errno == 0 && end != off->valuestring && *end == '\0') {
+                segment.offset = static_cast<uint64_t>(parsed);
+                segmentOffsetValid = true;
+            }
         }
-        if (ss) segment.sectorSize = ss->valueint;
-        if (ivt && ivt->valuestring) {
-            segment.ivTweak = std::strtoull(ivt->valuestring, nullptr, 10);
+        if (ss && ss->type == cJSON_Number && ss->valuedouble >= 512 && ss->valuedouble <= 4096 &&
+            ss->valuedouble == static_cast<double>(static_cast<uint64_t>(ss->valuedouble))) {
+            const uint64_t parsedSectorSize = static_cast<uint64_t>(ss->valuedouble);
+            if ((parsedSectorSize & (parsedSectorSize - 1)) == 0) {
+                segment.sectorSize = parsedSectorSize;
+                segmentSectorSizeValid = true;
+            }
         }
-        LOGI("LUKS2: Parsed segment: encryption=%s, offset=%llu, sector_size=%u, iv_tweak=%llu",
-             segment.encryption.c_str(), (unsigned long long)segment.offset, segment.sectorSize,
-             (unsigned long long)segment.ivTweak);
+        if (ivt && ivt->valuestring && ivt->type == cJSON_String) {
+            char* end = nullptr;
+            errno = 0;
+            const unsigned long long parsed = std::strtoull(ivt->valuestring, &end, 10);
+            if (errno == 0 && end != ivt->valuestring && *end == '\0') {
+                segment.ivTweak = static_cast<uint64_t>(parsed);
+                segmentIvTweakValid = true;
+            }
+        }
+        if (sz && sz->valuestring) {
+            if (std::strcmp(sz->valuestring, "dynamic") == 0) {
+                segment.dynamicSize = true;
+                segmentSizeValid = true;
+            } else {
+                char* end = nullptr;
+                errno = 0;
+                const unsigned long long parsed = std::strtoull(sz->valuestring, &end, 10);
+                if (errno == 0 && end != sz->valuestring && *end == '\0' && parsed > 0) {
+                    segment.sizeBytes = static_cast<uint64_t>(parsed);
+                    segment.dynamicSize = false;
+                    segmentSizeValid = true;
+                }
+            }
+        }
+        LOGI("LUKS2: Parsed segment: encryption=%s, offset=%llu, sector_size=%llu, iv_tweak=%llu, size=%s%llu, segments=%u",
+             segment.encryption.c_str(), (unsigned long long)segment.offset,
+             (unsigned long long)segment.sectorSize, (unsigned long long)segment.ivTweak,
+             segment.dynamicSize ? "dynamic/" : "", (unsigned long long)segment.sizeBytes, segmentCount);
     } else {
         LOGI("LUKS2: no segments found");
+    }
+    if (!segmentKey || !segmentSizeValid || !segmentOffsetValid ||
+        !segmentSectorSizeValid || !segmentIvTweakValid) {
+        LOGI("LUKS2: missing or invalid segment size/offset/sector_size/iv_tweak metadata");
+        cJSON_Delete(root);
+        return false;
     }
 
     // Parse Digests into list
@@ -650,7 +798,14 @@ static bool luks2Unlock(const LuksByteReader& reader,
                 outInfo.keyBytes = static_cast<uint32_t>(candidateMasterKeyLen);
                 outInfo.dataOffsetBytes = segment.offset;
                 outInfo.dataSectorSize = segment.sectorSize;
+                outInfo.dataSizeBytes = segment.sizeBytes;
+                outInfo.dynamicSize = segment.dynamicSize;
+                outInfo.dataSegmentCount = segmentCount;
+                outInfo.dataIsCryptSegment = segment.isCryptSegment;
                 outInfo.ivTweak = segment.ivTweak;
+                outInfo.dataHasIntegrity = segment.hasIntegrity;
+                outInfo.dataSegmentHasFlags = segment.hasFlags;
+                outInfo.hasMandatoryRequirements = segment.hasMandatoryRequirements;
                 outInfo.masterKey.assign(candidateMasterKey, candidateMasterKey + candidateMasterKeyLen);
                 verified = true;
                 break;
@@ -864,7 +1019,14 @@ static bool luks2Unlock(const LuksByteReader& reader,
                 resultInfo.keyBytes = static_cast<uint32_t>(masterKeySize);
                 resultInfo.dataOffsetBytes = segment.offset;
                 resultInfo.dataSectorSize = segment.sectorSize;
+                resultInfo.dataSizeBytes = segment.sizeBytes;
+                resultInfo.dynamicSize = segment.dynamicSize;
+                resultInfo.dataSegmentCount = segmentCount;
+                resultInfo.dataIsCryptSegment = segment.isCryptSegment;
                 resultInfo.ivTweak = segment.ivTweak;
+                resultInfo.dataHasIntegrity = segment.hasIntegrity;
+                resultInfo.dataSegmentHasFlags = segment.hasFlags;
+                resultInfo.hasMandatoryRequirements = segment.hasMandatoryRequirements;
                 resultInfo.masterKey = candidateKey;
             }
         }
@@ -1422,7 +1584,7 @@ static bool luks2CreateHeader(const LuksByteWriter& writer, const uint8_t* passw
     auto buildBinHdr = [&](uint64_t hdrOffsetField) {
         Luks2HdrDisk hdr;
         std::memset(&hdr, 0, sizeof(hdr));
-        std::memcpy(hdr.magic, LUKS_MAGIC, 6);
+        std::memcpy(hdr.magic, hdrOffsetField == 0 ? LUKS_MAGIC : LUKS2_SECONDARY_MAGIC, 6);
         writeBE16((uint8_t*)&hdr.version, 2);
         writeBE64((uint8_t*)&hdr.hdrSize, kLuks2HdrCopySize);
         writeBE64((uint8_t*)&hdr.seqid, 1);
@@ -1942,6 +2104,7 @@ static LuksChangePasswordResult luks2ChangeKeyslotPassword(
     writeBE64((uint8_t*)&primaryHdr.seqid, seqid);
 
     Luks2HdrDisk secondaryHdr = primaryHdr;
+    std::memcpy(secondaryHdr.magic, LUKS2_SECONDARY_MAGIC, sizeof(secondaryHdr.magic));
     writeBE64((uint8_t*)&secondaryHdr.hdrOffset, kLuks2HdrCopySize);
 
     auto computeChecksum = [&](Luks2HdrDisk& hdr, uint8_t out[32]) {
@@ -2034,7 +2197,12 @@ static bool luks2ReadAndVerifyCopy(const LuksByteReader& reader, uint64_t copyOf
                                     bool& outValid) {
     outValid = false;
     if (!reader(copyOffset, &outHdr, sizeof(Luks2HdrDisk))) return false;
-    if (std::memcmp(outHdr.magic, LUKS_MAGIC, 6) != 0) return false; // not a LUKS2 header at all
+    const bool isPrimary = copyOffset == 0;
+    const bool magicOk = isPrimary
+        ? std::memcmp(outHdr.magic, LUKS_MAGIC, 6) == 0
+        : (std::memcmp(outHdr.magic, LUKS2_SECONDARY_MAGIC, 6) == 0 ||
+           std::memcmp(outHdr.magic, LUKS_MAGIC, 6) == 0); // accept legacy VaultExplorer backup headers
+    if (!magicOk) return false; // not a LUKS2 header at this location
     outJsonArea.assign(kLuks2JsonAreaSize, 0);
     if (!reader(copyOffset + kLuks2BinHdrSize, outJsonArea.data(), outJsonArea.size())) return false;
 
@@ -2065,6 +2233,68 @@ bool luks2CheckHeaderIntegrity(const LuksByteReader& reader, bool& outPrimaryVal
     return primaryReadOk || secondaryReadOk;
 }
 
+LuksHeaderProbeResult luksProbeHeader(const LuksByteReader& reader) {
+    if (!reader) return LuksHeaderProbeResult::kInvalidHeader;
+    uint8_t prefix[8]{};
+    if (!reader(0, prefix, sizeof(prefix))) return LuksHeaderProbeResult::kInvalidHeader;
+    if (std::memcmp(prefix, LUKS_MAGIC, sizeof(LUKS_MAGIC)) != 0) {
+        // A LUKS2 primary header can be damaged while its independently
+        // checksummed secondary copy remains usable. Recognize that case
+        // before classifying the selected file as unrelated.
+        uint8_t secondaryPrefix[8]{};
+        if (reader(kLuks2HdrCopySize, secondaryPrefix, sizeof(secondaryPrefix)) &&
+            std::memcmp(secondaryPrefix, LUKS2_SECONDARY_MAGIC, sizeof(LUKS2_SECONDARY_MAGIC)) == 0 &&
+            readBE16(secondaryPrefix + 6) == 2) {
+            bool primaryValid = false;
+            bool secondaryValid = false;
+            return luks2CheckHeaderIntegrity(reader, primaryValid, secondaryValid) && secondaryValid
+                ? LuksHeaderProbeResult::kValid
+                : LuksHeaderProbeResult::kInvalidHeader;
+        }
+        return LuksHeaderProbeResult::kNotLuks;
+    }
+
+    const uint16_t version = readBE16(prefix + 6);
+    if (version == 1) {
+        Luks1Phdr header{};
+        if (!reader(0, &header, sizeof(header)) ||
+            std::memcmp(header.magic, LUKS_MAGIC, sizeof(LUKS_MAGIC)) != 0 ||
+            readBE16(reinterpret_cast<const uint8_t*>(&header.version)) != 1) {
+            return LuksHeaderProbeResult::kInvalidHeader;
+        }
+        const uint32_t payloadOffset = readBE32(reinterpret_cast<const uint8_t*>(&header.payloadOffset));
+        const uint32_t keyBytes = readBE32(reinterpret_cast<const uint8_t*>(&header.keyBytes));
+        const uint32_t digestIterations = readBE32(reinterpret_cast<const uint8_t*>(&header.mkDigestIter));
+        if (payloadOffset == 0 || keyBytes == 0 || keyBytes > 4096 || digestIterations == 0) {
+            return LuksHeaderProbeResult::kInvalidHeader;
+        }
+        bool hasUsableKeyslot = false;
+        for (const auto& slot : header.keySlots) {
+            const uint32_t active = readBE32(reinterpret_cast<const uint8_t*>(&slot.active));
+            const uint32_t iterations = readBE32(reinterpret_cast<const uint8_t*>(&slot.iterations));
+            const uint32_t materialOffset = readBE32(reinterpret_cast<const uint8_t*>(&slot.keyMaterialOffset));
+            const uint32_t stripes = readBE32(reinterpret_cast<const uint8_t*>(&slot.stripes));
+            if (active == 0x00AC71F3 && iterations > 0 && materialOffset > 0 && stripes > 0) {
+                hasUsableKeyslot = true;
+                break;
+            }
+        }
+        return hasUsableKeyslot ? LuksHeaderProbeResult::kValid
+                                : LuksHeaderProbeResult::kInvalidHeader;
+    }
+
+    if (version == 2) {
+        bool primaryValid = false;
+        bool secondaryValid = false;
+        if (luks2CheckHeaderIntegrity(reader, primaryValid, secondaryValid) &&
+            (primaryValid || secondaryValid)) {
+            return LuksHeaderProbeResult::kValid;
+        }
+        return LuksHeaderProbeResult::kInvalidHeader;
+    }
+    return LuksHeaderProbeResult::kInvalidHeader;
+}
+
 bool luks2RestoreHeaderFromBackup(const LuksByteReader& reader, const LuksByteWriter& writer) {
     if (!reader || !writer) return false;
 
@@ -2089,6 +2319,7 @@ bool luks2RestoreHeaderFromBackup(const LuksByteReader& reader, const LuksByteWr
     // function's doc comment in luks_header.h for why a raw byte copy alone
     // isn't correct here.
     Luks2HdrDisk restoredPrimary = secondaryHdr;
+    std::memcpy(restoredPrimary.magic, LUKS_MAGIC, sizeof(restoredPrimary.magic));
     writeBE64(reinterpret_cast<uint8_t*>(&restoredPrimary.hdrOffset), 0);
     uint8_t newCsum[32];
     luks2ComputeCopyChecksum(restoredPrimary, secondaryJson, newCsum);
@@ -2137,4 +2368,301 @@ bool luks2DataSegmentOffset(const LuksByteReader& reader, uint64_t& outOffset) {
     if (!ok || offset == 0) return false;
     outOffset = offset;
     return true;
+}
+// ── Safe LUKS2 fixed-size segment expansion ──────────────────────────────
+
+namespace {
+struct Luks2ResizeState {
+    Luks2HdrDisk primary{};
+    Luks2HdrDisk secondary{};
+    Luks2HdrDisk baseHeader{};       // newest valid copy; used to repair both copies
+    std::vector<uint8_t> baseJson;
+    bool primaryValid = false;
+    bool secondaryValid = false;
+    uint64_t dataOffset = 0;
+    uint64_t oldDataSize = 0;
+    uint64_t sectorSize = 512;
+    uint64_t ivTweak = 0;
+    uint64_t seqid = 0;
+    bool dynamic = true;
+    bool needsMetadataRepair = false;
+};
+
+static bool parseLuksUnsigned(const cJSON* field, uint64_t& out) {
+    if (!field || !field->valuestring || field->type != cJSON_String) return false;
+    const char* value = field->valuestring;
+    if (*value == '\0' || *value == '-') return false;
+    errno = 0;
+    char* end = nullptr;
+    const unsigned long long parsed = std::strtoull(value, &end, 10);
+    if (errno != 0 || end == value || *end != '\0') return false;
+    out = static_cast<uint64_t>(parsed);
+    return true;
+}
+
+static bool luks2LoadResizeState(const LuksByteReader& reader, uint64_t oldFileSize,
+                                 uint64_t newFileSize, Luks2ResizeState& out) {
+    if (!reader || newFileSize < oldFileSize) return false;
+
+    std::vector<uint8_t> primaryJson, secondaryJson;
+    const bool primaryRead = luks2ReadAndVerifyCopy(reader, 0, out.primary,
+                                                     primaryJson, out.primaryValid);
+    const bool secondaryRead = luks2ReadAndVerifyCopy(reader, kLuks2HdrCopySize,
+                                                       out.secondary, secondaryJson,
+                                                       out.secondaryValid);
+    // One valid metadata copy is sufficient for LUKS2 recovery. This also
+    // accepts an interrupted update where the two copies have split sequence
+    // IDs; a later resize repairs both copies before applying the next change.
+    if ((!primaryRead || !out.primaryValid) &&
+        (!secondaryRead || !out.secondaryValid)) return false;
+
+    auto validateHeaderGeometry = [](const Luks2HdrDisk& hdr, uint64_t expectedOffset) {
+        return readBE16(reinterpret_cast<const uint8_t*>(&hdr.version)) == 2 &&
+               readBE64(reinterpret_cast<const uint8_t*>(&hdr.hdrSize)) == kLuks2HdrCopySize &&
+               readBE64(reinterpret_cast<const uint8_t*>(&hdr.hdrOffset)) == expectedOffset &&
+               std::strncmp(hdr.checksumAlg, "sha256", sizeof(hdr.checksumAlg)) == 0;
+    };
+    if (out.primaryValid && !validateHeaderGeometry(out.primary, 0)) return false;
+    if (out.secondaryValid && !validateHeaderGeometry(out.secondary, kLuks2HdrCopySize)) return false;
+
+    if (out.primaryValid && out.secondaryValid) {
+        const uint64_t primarySeq = readBE64(reinterpret_cast<const uint8_t*>(&out.primary.seqid));
+        const uint64_t secondarySeq = readBE64(reinterpret_cast<const uint8_t*>(&out.secondary.seqid));
+        if (primarySeq == secondarySeq && primaryJson != secondaryJson) return false;
+
+        // Two independently valid copies must belong to the same volume.
+        // Sequence ID, offset, magic, checksum and per-copy salt are expected
+        // to differ; UUID/label/subsystem and all other binary fields are not.
+        Luks2HdrDisk normalizedPrimary = out.primary;
+        Luks2HdrDisk normalizedSecondary = out.secondary;
+        writeBE64(reinterpret_cast<uint8_t*>(&normalizedPrimary.hdrOffset), 0);
+        writeBE64(reinterpret_cast<uint8_t*>(&normalizedSecondary.hdrOffset), 0);
+        writeBE64(reinterpret_cast<uint8_t*>(&normalizedPrimary.seqid), 0);
+        writeBE64(reinterpret_cast<uint8_t*>(&normalizedSecondary.seqid), 0);
+        std::memcpy(normalizedSecondary.magic, normalizedPrimary.magic,
+                    sizeof(normalizedPrimary.magic));
+        std::memset(normalizedPrimary.csum, 0, sizeof(normalizedPrimary.csum));
+        std::memset(normalizedSecondary.csum, 0, sizeof(normalizedSecondary.csum));
+        std::memset(normalizedPrimary.salt, 0, sizeof(normalizedPrimary.salt));
+        std::memset(normalizedSecondary.salt, 0, sizeof(normalizedSecondary.salt));
+        if (std::memcmp(&normalizedPrimary, &normalizedSecondary,
+                        sizeof(normalizedPrimary)) != 0) return false;
+    }
+
+    const uint64_t primarySeq = out.primaryValid
+        ? readBE64(reinterpret_cast<const uint8_t*>(&out.primary.seqid)) : 0;
+    const uint64_t secondarySeq = out.secondaryValid
+        ? readBE64(reinterpret_cast<const uint8_t*>(&out.secondary.seqid)) : 0;
+    if (out.primaryValid && out.secondaryValid && primarySeq == secondarySeq &&
+        primaryJson != secondaryJson) return false;
+
+    if (out.secondaryValid && (!out.primaryValid || secondarySeq > primarySeq)) {
+        out.baseHeader = out.secondary;
+        out.baseJson = std::move(secondaryJson);
+        out.seqid = secondarySeq;
+    } else {
+        out.baseHeader = out.primary;
+        out.baseJson = std::move(primaryJson);
+        out.seqid = primarySeq;
+    }
+    if (out.seqid == 0 || out.seqid == UINT64_MAX) return false;
+
+    // This implementation intentionally refuses non-default metadata
+    // geometries instead of guessing where an external cryptsetup header's
+    // secondary copy or JSON area lives.
+    std::string jsonText(reinterpret_cast<const char*>(out.baseJson.data()), out.baseJson.size());
+    cJSON* root = cJSON_Parse(jsonText.c_str());
+    if (!root) return false;
+    cJSON* segments = cJSON_GetObjectItemCaseSensitive(root, "segments");
+    cJSON* segment = segments ? segments->child : nullptr;
+    uint32_t segmentCount = 0;
+    if (segments) for (cJSON* it = segments->child; it; it = it->next) ++segmentCount;
+    bool ok = segment && segmentCount == 1;
+    cJSON* type = ok ? cJSON_GetObjectItemCaseSensitive(segment, "type") : nullptr;
+    cJSON* offset = ok ? cJSON_GetObjectItemCaseSensitive(segment, "offset") : nullptr;
+    cJSON* size = ok ? cJSON_GetObjectItemCaseSensitive(segment, "size") : nullptr;
+    cJSON* sectorSize = ok ? cJSON_GetObjectItemCaseSensitive(segment, "sector_size") : nullptr;
+    cJSON* encryption = ok ? cJSON_GetObjectItemCaseSensitive(segment, "encryption") : nullptr;
+    cJSON* ivTweakField = ok ? cJSON_GetObjectItemCaseSensitive(segment, "iv_tweak") : nullptr;
+    cJSON* integrity = ok ? cJSON_GetObjectItemCaseSensitive(segment, "integrity") : nullptr;
+    cJSON* segmentFlags = ok ? cJSON_GetObjectItemCaseSensitive(segment, "flags") : nullptr;
+    cJSON* config = cJSON_GetObjectItemCaseSensitive(root, "config");
+    cJSON* requirements = config ? cJSON_GetObjectItemCaseSensitive(config, "requirements") : nullptr;
+    cJSON* mandatory = requirements ? cJSON_GetObjectItemCaseSensitive(requirements, "mandatory") : nullptr;
+    if (ok && (!type || !type->valuestring || std::strcmp(type->valuestring, "crypt") != 0)) ok = false;
+    if (ok && (!encryption || !encryption->valuestring)) ok = false;
+    if (ok && encryption && encryption->valuestring) {
+        const char* dash = std::strchr(encryption->valuestring, '-');
+        if (!dash || std::strncmp(dash + 1, "xts-plain64", 11) != 0) ok = false;
+    }
+    // Integrity tags are interleaved with ciphertext; segment flags and
+    // mandatory requirements may denote reencryption or another data-layout
+    // mode. Never zero-fill or rewrite metadata for these layouts.
+    if (ok && (integrity != nullptr || segmentFlags != nullptr)) ok = false;
+    if (ok && mandatory != nullptr) ok = false;
+    if (ok && (!sectorSize || sectorSize->type != cJSON_Number)) ok = false;
+
+    uint64_t dataOffset = 0;
+    uint64_t declaredSize = 0;
+    uint64_t logicalSectorSize = 512;
+    uint64_t ivTweak = 0;
+    if (ok && !parseLuksUnsigned(offset, dataOffset)) ok = false;
+    if (ok && !parseLuksUnsigned(ivTweakField, ivTweak)) ok = false;
+    if (ok) {
+        if (sectorSize->valuedouble < 512 || sectorSize->valuedouble > 4096 ||
+            sectorSize->valuedouble != static_cast<double>(static_cast<uint64_t>(sectorSize->valuedouble)) ||
+            (static_cast<uint64_t>(sectorSize->valuedouble) &
+             (static_cast<uint64_t>(sectorSize->valuedouble) - 1)) != 0) {
+            ok = false;
+        } else {
+            logicalSectorSize = static_cast<uint64_t>(sectorSize->valuedouble);
+        }
+    }
+    bool isDynamic = false;
+    if (ok && size && size->type == cJSON_String && size->valuestring) {
+        if (std::strcmp(size->valuestring, "dynamic") == 0) {
+            isDynamic = true;
+        } else if (parseLuksUnsigned(size, declaredSize)) {
+            isDynamic = false;
+        } else {
+            ok = false;
+        }
+    } else {
+        ok = false;
+    }
+    cJSON_Delete(root);
+
+    if (!ok || dataOffset < kLuks2HeadersTotal || dataOffset >= oldFileSize ||
+        dataOffset % logicalSectorSize != 0 || newFileSize < oldFileSize ||
+        newFileSize % logicalSectorSize != 0) return false;
+    const uint64_t availableOld = oldFileSize - dataOffset;
+    const uint64_t availableNew = newFileSize - dataOffset;
+    // A dynamic segment exposes complete logical data sectors only. A file
+    // whose physical EOF has a partial sector is still mountable; that tail
+    // is not part of the dm-crypt block device.
+    const uint64_t oldDataSize = isDynamic
+        ? (availableOld / logicalSectorSize) * logicalSectorSize : declaredSize;
+    const uint64_t newDataSize = (availableNew / logicalSectorSize) * logicalSectorSize;
+    if (oldDataSize == 0 || oldDataSize > availableOld || oldDataSize % logicalSectorSize != 0 ||
+        (newDataSize < oldDataSize) || newDataSize % logicalSectorSize != 0) return false;
+    if (!isDynamic && declaredSize > availableNew) return false;
+
+    const uint64_t primarySeqNow = out.primaryValid
+        ? readBE64(reinterpret_cast<const uint8_t*>(&out.primary.seqid)) : 0;
+    const uint64_t secondarySeqNow = out.secondaryValid
+        ? readBE64(reinterpret_cast<const uint8_t*>(&out.secondary.seqid)) : 0;
+    // Equal sequence IDs with different JSON were rejected above, so equal
+    // valid sequence IDs imply a byte-identical metadata state here. A split
+    // sequence ID or one invalid/missing copy needs a repair commit.
+    out.needsMetadataRepair = !(out.primaryValid && out.secondaryValid &&
+        primarySeqNow == secondarySeqNow);
+    out.dataOffset = dataOffset;
+    out.oldDataSize = oldDataSize;
+    out.sectorSize = logicalSectorSize;
+    out.ivTweak = ivTweak;
+    out.dynamic = isDynamic;
+    return true;
+}
+} // namespace
+
+bool luks2ValidateResize(const LuksByteReader& reader, uint64_t oldFileSize,
+                         uint64_t newFileSize, uint64_t& outDataOffset,
+                         uint64_t& outOldDataSize, uint64_t& outIvTweak,
+                         bool& outWasDynamic, bool& outNeedsMetadataRepair) {
+    Luks2ResizeState state;
+    if (!luks2LoadResizeState(reader, oldFileSize, newFileSize, state)) return false;
+    outDataOffset = state.dataOffset;
+    outOldDataSize = state.oldDataSize;
+    outIvTweak = state.ivTweak;
+    outWasDynamic = state.dynamic;
+    outNeedsMetadataRepair = state.needsMetadataRepair;
+    return true;
+}
+
+bool luks2ResizeSegmentMetadata(const LuksByteReader& reader, const LuksByteWriter& writer,
+                                uint64_t oldFileSize, uint64_t newFileSize,
+                                const LuksByteSync& sync) {
+    if (!writer) return false;
+    Luks2ResizeState state;
+    if (!luks2LoadResizeState(reader, oldFileSize, newFileSize, state) || state.dynamic) return false;
+
+    std::string jsonText(reinterpret_cast<const char*>(state.baseJson.data()), state.baseJson.size());
+    cJSON* root = cJSON_Parse(jsonText.c_str());
+    if (!root) return false;
+    cJSON* segments = cJSON_GetObjectItemCaseSensitive(root, "segments");
+    cJSON* segment = segments ? segments->child : nullptr;
+    cJSON* size = segment ? cJSON_GetObjectItemCaseSensitive(segment, "size") : nullptr;
+    const uint64_t newDataSize = newFileSize - state.dataOffset;
+    const std::string newSizeString = std::to_string(newDataSize);
+    const bool changed = size && size->type == cJSON_String &&
+                         cJSON_SetValuestring(size, newSizeString.c_str()) != nullptr;
+    char* printed = changed ? cJSON_PrintUnformatted(root) : nullptr;
+    cJSON_Delete(root);
+    if (!printed) return false;
+
+    const size_t printedLen = std::strlen(printed);
+    if (printedLen + 1 > kLuks2JsonAreaSize) {
+        std::free(printed);
+        return false;
+    }
+    std::vector<uint8_t> newJson(kLuks2JsonAreaSize, 0);
+    std::memcpy(newJson.data(), printed, printedLen);
+    std::free(printed);
+
+    const uint64_t newSeq = state.seqid + 1;
+    Luks2HdrDisk newPrimary = state.baseHeader;
+    Luks2HdrDisk newSecondary = state.baseHeader;
+
+    // Keep each copy's existing anti-deduplication salt on a regular update.
+    // If a copy was unreadable or failed its checksum, generate a fresh salt
+    // while reconstructing it from the newest verified copy.
+    if (state.primaryValid) {
+        std::memcpy(newPrimary.salt, state.primary.salt, sizeof(newPrimary.salt));
+    } else if (!randomBytes(newPrimary.salt, sizeof(newPrimary.salt))) {
+        return false;
+    }
+    if (state.secondaryValid) {
+        std::memcpy(newSecondary.salt, state.secondary.salt, sizeof(newSecondary.salt));
+    } else if (!randomBytes(newSecondary.salt, sizeof(newSecondary.salt))) {
+        return false;
+    }
+
+    writeBE64(reinterpret_cast<uint8_t*>(&newPrimary.seqid), newSeq);
+    writeBE64(reinterpret_cast<uint8_t*>(&newSecondary.seqid), newSeq);
+    std::memcpy(newPrimary.magic, LUKS_MAGIC, sizeof(newPrimary.magic));
+    std::memcpy(newSecondary.magic, LUKS2_SECONDARY_MAGIC, sizeof(newSecondary.magic));
+    writeBE64(reinterpret_cast<uint8_t*>(&newPrimary.hdrOffset), 0);
+    writeBE64(reinterpret_cast<uint8_t*>(&newSecondary.hdrOffset), kLuks2HdrCopySize);
+
+    uint8_t primaryChecksum[32], secondaryChecksum[32];
+    luks2ComputeCopyChecksum(newPrimary, newJson, primaryChecksum);
+    luks2ComputeCopyChecksum(newSecondary, newJson, secondaryChecksum);
+    std::memcpy(newPrimary.csum, primaryChecksum, sizeof(primaryChecksum));
+    std::memcpy(newSecondary.csum, secondaryChecksum, sizeof(secondaryChecksum));
+
+    auto writeCopy = [&](uint64_t copyOffset, const Luks2HdrDisk& header) {
+        return writer(copyOffset + kLuks2BinHdrSize, newJson.data(), newJson.size()) &&
+               writer(copyOffset, &header, sizeof(header));
+    };
+
+    // First replace the stale or invalid copy, leaving the selected source
+    // copy untouched until the new metadata is safely committed elsewhere.
+    // This matters when only the secondary copy verifies: blindly writing it
+    // first would destroy the sole recoverable header if power were lost
+    // mid-write. When both verify, replace the lower-sequence copy first.
+    const uint64_t primarySeq = state.primaryValid
+        ? readBE64(reinterpret_cast<const uint8_t*>(&state.primary.seqid)) : 0;
+    const uint64_t secondarySeq = state.secondaryValid
+        ? readBE64(reinterpret_cast<const uint8_t*>(&state.secondary.seqid)) : 0;
+    const bool primaryFirst = !state.primaryValid ||
+        (state.secondaryValid && secondarySeq > primarySeq);
+
+    if (primaryFirst) {
+        if (!writeCopy(0, newPrimary) || (sync && !sync())) return false;
+        if (!writeCopy(kLuks2HdrCopySize, newSecondary)) return false;
+    } else {
+        if (!writeCopy(kLuks2HdrCopySize, newSecondary) || (sync && !sync())) return false;
+        if (!writeCopy(0, newPrimary)) return false;
+    }
+    return !sync || sync();
 }

@@ -2367,6 +2367,17 @@ class AppLocalizationsKo extends AppLocalizations {
   String get toolExpandVolumeSubtitle => '데스크톱 볼륨 확장기처럼 표준 볼륨의 크기를 늘립니다';
 
   @override
+  String get toolExpandLuksVolumeTitle => 'LUKS 컨테이너 확장';
+
+  @override
+  String get toolExpandLuksVolumeSubtitle =>
+      '고정 크기 LUKS2 메타데이터를 포함한 LUKS1 및 LUKS2 컨테이너 확장';
+
+  @override
+  String get luksToolsExpandNote =>
+      '먼저 컨테이너를 백업하세요. LUKS1 및 LUKS2를 지원합니다. NTFS 및 ext2/3/4 파일 시스템은 제자리 확장이 가능합니다(FAT 및 exFAT은 불가). 추가된 공간은 암호화된 0으로 초기화할 수 있습니다. 키 파일을 사용하는 경우 비밀번호를 대체합니다.';
+
+  @override
   String get toolHiddenInExistingTitle => '숨김 볼륨 추가';
 
   @override
@@ -2399,10 +2410,42 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get vcToolsExpandNote =>
-      '컨테이너 크기만 확장됩니다. 내부 파일 시스템 크기는 변경되지 않으므로, 파일 시스템을 확장하기 전까지 추가된 공간은 할당되지 않은 상태로 유지됩니다. 먼저 볼륨을 백업하십시오.';
+      '먼저 컨테이너가 확장됩니다. 그런 다음 다시 포맷하지 않고 가능한 경우(NTFS, ext2/3/4) 내부 파일 시스템이 추가된 공간까지 확장됩니다. FAT와 exFAT는 제자리에서 확장할 수 없으며 추가된 공간은 할당되지 않은 상태로 남습니다. 먼저 볼륨을 백업하세요.';
 
   @override
   String get vcToolsExpandDone => '볼륨이 확장되었습니다';
+
+  @override
+  String get vcToolsGrowFsToggle => '파일 시스템도 확장';
+
+  @override
+  String get vcToolsGrowFsToggleHint =>
+      'NTFS 및 ext2/3/4 볼륨이 다시 포맷하지 않고 바로 추가된 공간을 사용할 수 있게 합니다.';
+
+  @override
+  String get vcToolsGrowFsOnlyAction => '파일 시스템만 확장';
+
+  @override
+  String get vcToolsFsGrown => '파일 시스템이 확장되었습니다. 추가된 공간을 사용할 수 있습니다.';
+
+  @override
+  String get vcToolsFsAlreadyFills => '파일 시스템이 이미 볼륨 전체를 사용하고 있습니다.';
+
+  @override
+  String get vcToolsFsUnsupported =>
+      '이 파일 시스템은 제자리에서 확장할 수 없습니다(FAT와 exFAT는 불가). 추가된 공간은 볼륨을 다시 포맷할 때까지 할당되지 않은 상태로 남습니다. 먼저 파일을 백업하세요.';
+
+  @override
+  String get vcToolsFsBusy =>
+      '볼륨에 열려 있는 파일이 아직 있습니다. 파일을 닫고 볼륨을 잠근 후 “파일 시스템만 확장”을 다시 시도하세요.';
+
+  @override
+  String get vcToolsFsNeedsCheck =>
+      '파일 시스템에 검사가 필요하다고 표시되어 있습니다. 볼륨에서 \'검사 및 복구\'를 실행한 다음 \'파일 시스템만 확장\'을 사용하세요.';
+
+  @override
+  String get vcToolsFsFailed =>
+      '파일 시스템을 확장하지 못했습니다. 볼륨 자체는 확장되었습니다. 사용하기 전에 \'검사 및 복구\'를 실행하세요.';
 
   @override
   String get vcToolsAnalyzeAction => '여유 공간 확인';
@@ -13485,11 +13528,11 @@ class AppLocalizationsKo extends AppLocalizations {
   String get vaultListingDetails => '세부정보';
 
   @override
-  String get vaultListingSymbolicLinksTitle => '기호 링크';
+  String get vaultListingSymbolicLinksTitle => '바로가기';
 
   @override
   String get vaultListingSymbolicLinksNote =>
-      '기호 링크는 다른 위치를 가리킵니다. 여기서는 열거나 따라가지 않습니다. 탭하면 대상 경로를 복사할 수 있습니다.';
+      '바로가기를 탭하면 대상이 열립니다. 상대 경로는 이 볼트 내부로 제한되며, 절대 경로나 끊어진 링크는 열 수 없습니다.';
 
   @override
   String get vaultListingHiddenEntriesTitle => '표시되지 않는 항목';
@@ -13650,4 +13693,102 @@ class AppLocalizationsKo extends AppLocalizations {
   String galleryPlaceHintCoordinates(int km) {
     return '$km km 이내에 도시 없음: 좌표로 그룹화';
   }
+
+  @override
+  String get cryptomatorBackupKeyFilesTitle => '잠금 해제 시 키 파일 백업';
+
+  @override
+  String get cryptomatorBackupKeyFilesSubtitle =>
+      '데스크톱 Cryptomator처럼 masterkey.cryptomator와 vault.cryptomator의 사본을 원본 옆에 보관합니다. 다음 잠금 해제부터 적용됩니다. 읽기 전용 세션에서는 아무것도 쓰지 않습니다.';
+
+  @override
+  String get cryptomatorUpgradeTitle => '보관함 형식 업그레이드';
+
+  @override
+  String get cryptomatorUpgradeSubtitle => '이 보관함은 이전 형식인 7을 사용합니다.';
+
+  @override
+  String get cryptomatorUpgradeLockFirst => '업그레이드하려면 보관함을 잠그세요';
+
+  @override
+  String get cryptomatorUpgradeWarning =>
+      '업그레이드하면 이 보관함이 형식 8로 변경됩니다. 되돌릴 수 없으며, 이후에는 1.6 이전 버전의 Cryptomator로 이 보관함을 열 수 없습니다.\n\n현재 키 파일의 사본은 masterkey.cryptomator.<id>.bkup로 보관됩니다. 다른 앱이 이 보관함을 동기화하고 있다면 먼저 동기화가 끝날 때까지 기다리세요.';
+
+  @override
+  String get cryptomatorUpgradeConfirm => '되돌릴 수 없음을 이해합니다';
+
+  @override
+  String get cryptomatorUpgradeAction => '업그레이드';
+
+  @override
+  String get cryptomatorUpgradedMessage => '보관함을 형식 8로 업그레이드했습니다';
+
+  @override
+  String get cryptomatorUpgradeUnlockedError => '먼저 보관함을 잠그세요';
+
+  @override
+  String get cryptomatorConfigMissingWarning =>
+      'vault.cryptomator가 없습니다. 다른 앱이 이 보관함을 동기화하고 있다면 동기화가 끝날 때까지 기다린 후 다시 시도하세요. 업그레이드하지 마세요.';
+
+  @override
+  String get cryptomatorUpgradeFailedMessage => '보관함을 업그레이드하지 못했습니다';
+
+  @override
+  String get newSymbolicLinkTitle => '새 기호 링크';
+
+  @override
+  String get symbolicLinkNameHint => '링크 이름';
+
+  @override
+  String get symbolicLinkTargetHint => '가리키는 대상';
+
+  @override
+  String get symbolicLinkTargetHelper =>
+      '입력한 그대로 저장됩니다. 열 때 상대 경로는 이 볼트 내부에서 확인하며, 절대 경로는 따라가지 않습니다.';
+
+  @override
+  String get symbolicLinkTargetTooLong => '대상이 너무 깁니다(최대 32,767바이트)';
+
+  @override
+  String get symbolicLinkTargetInvalid => '대상에는 null 문자를 사용할 수 없습니다';
+
+  @override
+  String get symbolicLinkNameTaken => '이 이름의 파일, 폴더 또는 링크가 이미 있습니다';
+
+  @override
+  String get deleteSymbolicLinkTitle => '기호 링크를 삭제할까요?';
+
+  @override
+  String deleteSymbolicLinkMessage(String name) {
+    return '링크 \"$name\"을(를) 삭제할까요? 링크만 삭제되며 가리키는 대상은 변경되지 않습니다.';
+  }
+
+  @override
+  String get symbolicLinkRenameTitle => '기호 링크 이름 바꾸기';
+
+  @override
+  String get symbolicLinkBrowseTarget => '볼트 찾아보기';
+
+  @override
+  String get symbolicLinkSelectTargetTitle => '바로가기 대상 선택';
+
+  @override
+  String get symbolicLinkSelectThisFolder => '이 폴더 선택';
+
+  @override
+  String get symbolicLinkPickerLoadError => '이 폴더를 불러올 수 없습니다';
+
+  @override
+  String get shortcutBadge => '바로가기';
+
+  @override
+  String get emptyFolder => '이 폴더는 비어 있습니다';
+
+  @override
+  String get symbolicLinkTargetHelperRelative =>
+      '이 컨테이너 내부의 상대 경로를 사용하세요. 대상이 아직 없어도 됩니다. 링크를 이름 변경하거나 삭제해도 대상은 변경되지 않습니다.';
+
+  @override
+  String get symbolicLinkTargetOutsideVault =>
+      '대상은 이 컨테이너 내부에 머무르는 상대 경로여야 합니다.';
 }

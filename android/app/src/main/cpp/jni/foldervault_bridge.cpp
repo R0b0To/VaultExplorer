@@ -115,8 +115,8 @@ bool clearException(JNIEnv* env) {
 
 std::string wireEntry(const fv::DirEntry& e) {
     // Same shape as DirEntryWire.encode(): kind|size|mtimeSeconds|name   (kind: F file, D folder, L symlink --
-    // an L entry only ever comes out of nativeListSymlinks, never out of nativeListDirectory)
-    return std::string(e.isSymlink ? "L|" : e.isDir ? "D|" : "F|") + std::to_string(e.isDir ? 0 : e.size) + "|" +
+    // an L/LD entry only ever comes out of nativeListSymlinks, never out of nativeListDirectory)
+    return std::string(e.isSymlink ? (e.isDir ? "LD|" : "L|") : e.isDir ? "D|" : "F|") + std::to_string(e.isDir ? 0 : e.size) + "|" +
            std::to_string(e.mtimeMs / 1000) + "|" + e.name;
 }
 
@@ -127,8 +127,9 @@ bool parseWire(const std::string& raw, fv::DirEntry& e) {
     if (b == std::string::npos) return false;
     size_t c = raw.find('|', b + 1);
     if (c == std::string::npos) return false;
-    e.isDir = raw.compare(0, a, "D") == 0;
-    e.isSymlink = raw.compare(0, a, "L") == 0;
+    const std::string kind = raw.substr(0, a);
+    e.isDir = kind == "D" || kind == "LD";
+    e.isSymlink = kind == "L" || kind == "LD";
     e.size = std::strtoll(raw.substr(a + 1, b - a - 1).c_str(), nullptr, 10);
     e.mtimeMs = std::strtoll(raw.substr(b + 1, c - b - 1).c_str(), nullptr, 10) * 1000;
     e.name = raw.substr(c + 1);
@@ -466,13 +467,15 @@ FV_JNI(void, nativeInit)(JNIEnv* env, jclass) {
 // 0 = invalid vault, -1 = wrong password; out[0] = message, out[1] = CryFS
 // derived key bytes.
 FV_JNI(jlong, nativeOpen)(JNIEnv* env, jclass, jint format, jstring rawRoot, jobject bootstrap, jobject sessionProvider,
-                          jbyteArray password, jboolean readOnly, jstring localState, jstring tempDir,
-                          jbyteArray combinedKey, jobjectArray out) {
+                          jbyteArray password, jboolean readOnly, jboolean backupKeyFiles, jstring localState,
+                          jstring tempDir, jbyteArray combinedKey, jobjectArray out) {
     PwGuard pw{toBytes(env, password)};
     PwGuard ck{toBytes(env, combinedKey)};
     auto st = makeStorage(env, rawRoot, bootstrap);
     if (!st) { setOut(env, out, 0, fromUtf8(env, "No storage available")); return 0; }
     fv::HostEnv henv = makeEnv(env, localState, tempDir);
+    // Only Cryptomator reads this; the other formats ignore it.
+    henv.backupKeyFilesOnOpen = backupKeyFiles == JNI_TRUE;
 
     fv::StorageFactory factory;
     jobject provider = sessionProvider ? env->NewGlobalRef(sessionProvider) : nullptr;
@@ -588,6 +591,21 @@ FV_JNI(jint, nativeMigrateCryptomator)(JNIEnv* env, jclass, jstring rawRoot, job
     st->close();
     if (r.status != fv::OpenStatus::Ok) setOut(env, out, 0, fromUtf8(env, r.message));
     return r.status == fv::OpenStatus::Ok ? 0 : (r.status == fv::OpenStatus::WrongPassword ? 1 : 2);
+}
+
+// Password-free format check of a Cryptomator folder (fv::probeCryptomatorFormat): 0 unknown, 7 migratable,
+// 8 current, -8 config missing (never migrate), 6 too old. Reads two small files, writes nothing.
+FV_JNI(jint, nativeProbeCryptomator)(JNIEnv* env, jclass, jstring rawRoot, jobject storageCb) {
+    auto st = makeStorage(env, rawRoot, storageCb);
+    if (!st) return 0;
+    int code = 0;
+    try {
+        code = fv::probeCryptomatorFormat(*st);
+    } catch (...) {
+        code = 0;
+    }
+    st->close();
+    return code;
 }
 
 FV_JNI(void, nativeClose)(JNIEnv*, jclass, jlong h) {

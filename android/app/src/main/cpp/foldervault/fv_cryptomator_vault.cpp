@@ -1,10 +1,12 @@
 // Cryptomator vault: directory tree, session (fv::Vault) and the open /
 // create / change-password entry points.
 #include <cctype>
+#include <cstddef>
 #include <cstring>
 #include <algorithm>
 #include <map>
 #include <mutex>
+#include <optional>
 #include <shared_mutex>
 #include <unordered_map>
 
@@ -439,11 +441,13 @@ public:
         try {
             Lifecycle::Op op(life_);
             std::shared_lock<std::shared_mutex> ns(ns_);
+            auto resolvedDir = resolveSymlinkPathLocked(normalizePath(path));
+            if (!resolvedDir) return false;
             std::string dirId;
-            if (!tree_.resolveDirId(normalizePath(path), dirId)) return false;
+            if (!tree_.resolveDirId(*resolvedDir, dirId)) return false;
             out.clear();
             for (Node& n : tree_.listByDirId(dirId)) {
-                if (n.isSymlink) continue;   // see listSymlinks(): links are neither files nor folders
+                if (n.isSymlink) continue; // Browser merges links explicitly; scanners/exporters never see them.
                 DirEntry e;
                 e.name = n.name; e.isDir = n.isDir;
                 e.size = n.isDir ? 0 : fmt_.cleartextSize(n.size);
@@ -459,20 +463,27 @@ public:
 
     // ---- symlinks (cryptofs Symlinks / CiphertextFilePath.getSymlinkFilePath) -----------------------------
     // A symlink is a node folder "<encrypted name>.c9r/" (or the .c9s wrapper for long names) that holds
-    // symlink.c9r: the link target, UTF-8, encrypted exactly like file content. We never resolve a target --
-    // a link inside a vault could point anywhere -- we only list, read, create, move and delete the node.
+    // symlink.c9r: the link target, UTF-8, encrypted exactly like file content. Path access follows relative
+    // targets within this vault; absolute targets are refused and link-node operations remain no-follow.
     bool listSymlinks(const std::string& path, std::vector<DirEntry>& out) override {
         try {
             Lifecycle::Op op(life_);
             std::shared_lock<std::shared_mutex> ns(ns_);
+            auto resolvedDir = resolveSymlinkPathLocked(normalizePath(path));
+            if (!resolvedDir) return false;
             std::string dirId;
-            if (!tree_.resolveDirId(normalizePath(path), dirId)) return false;
+            if (!tree_.resolveDirId(*resolvedDir, dirId)) return false;
             out.clear();
             for (Node& n : tree_.listByDirId(dirId)) {
                 if (!n.isSymlink) continue;
                 DirEntry e;
-                e.name = n.name; e.isDir = false; e.isSymlink = true;
-                e.size = fmt_.cleartextSize(n.size);   // == length of the target in bytes
+                e.name = n.name; e.isSymlink = true;
+                auto targetPath = resolveSymlinkPathLocked(joinPath(*resolvedDir, n.name));
+                if (targetPath) {
+                    std::string targetDirId;
+                    e.isDir = tree_.resolveDirId(*targetPath, targetDirId);
+                }
+                e.size = e.isDir ? 0 : fmt_.cleartextSize(n.size); // link target length for file/broken links
                 e.mtimeMs = n.mtimeMs;
                 out.push_back(std::move(e));
             }
@@ -487,7 +498,10 @@ public:
         try {
             Lifecycle::Op op(life_);
             std::shared_lock<std::shared_mutex> ns(ns_);
-            auto node = tree_.resolve(normalizePath(path));
+            std::string input = normalizePath(path);
+            auto parentResolved = resolveSymlinkPathLocked(parentOf(input));
+            if (!parentResolved) return std::nullopt;
+            auto node = tree_.resolve(joinPath(*parentResolved, nameOf(input)));
             if (!node || !node->isSymlink) return std::nullopt;
             st_->ensureContentReady(node->symlinkFile);
             std::string target;
@@ -507,9 +521,12 @@ public:
         if (target.empty() || target.size() > kMaxSymlinkLength || !validUtf8(target) || target.find('\0') != std::string::npos) return false;
         try {
             Lifecycle::Op op(life_);
-            std::string n = normalizePath(path);
-            if (n.empty()) return false;
+            std::string input = normalizePath(path);
+            if (input.empty()) return false;
             std::unique_lock<std::shared_mutex> ns(ns_);
+            auto parentResolved = resolveSymlinkPathLocked(parentOf(input));
+            if (!parentResolved) return false;
+            std::string n = joinPath(*parentResolved, nameOf(input));
             if (tree_.resolve(n)) return false;   // official assertNonExisting: never overwrite anything
             std::string parentPath = parentOf(n), name = nameOf(n);
             std::string parentId;
@@ -540,8 +557,10 @@ public:
         try {
             Lifecycle::Op op(life_);
             std::shared_lock<std::shared_mutex> ns(ns_);
+            auto resolvedDir = resolveSymlinkPathLocked(normalizePath(path));
+            if (!resolvedDir) return -1;
             std::string dirId;
-            if (!tree_.resolveDirId(normalizePath(path), dirId)) return -1;
+            if (!tree_.resolveDirId(*resolvedDir, dirId)) return -1;
             int h = tree_.lastHiddenCount(dirId);
             if (h < 0) { tree_.listByDirId(dirId, &h); }
             return h;
@@ -554,6 +573,10 @@ public:
             Lifecycle::Op op(life_);
             std::string n = normalizePath(path);
             std::unique_lock<std::shared_mutex> ns(ns_);
+            auto resolved = resolveSymlinkPathLocked(n);
+            if (!resolved) return false;
+            n = *resolved;
+            if (n.empty()) return true; // a shortcut resolving to the vault root
             if (auto existing = tree_.resolve(n)) return existing->isDir;
             std::string parentPath = parentOf(n), name = nameOf(n);
             std::string parentId;
@@ -581,10 +604,15 @@ public:
         if (readOnly_) return false;
         try {
             Lifecycle::Op op(life_);
-            std::string oldN = normalizePath(from), newN = normalizePath(to);
-            engine_.invalidateRead(oldN);
-            engine_.invalidateRead(newN);
+            std::string oldInput = normalizePath(from), newInput = normalizePath(to);
+            // Do not take engine path locks while holding ns_: readers acquire them in the opposite order.
+            engine_.invalidateAll();
             std::unique_lock<std::shared_mutex> ns(ns_);
+            auto oldParentResolved = resolveSymlinkPathLocked(parentOf(oldInput));
+            auto newParentResolved = resolveSymlinkPathLocked(parentOf(newInput));
+            if (!oldParentResolved || !newParentResolved) return false;
+            std::string oldN = joinPath(*oldParentResolved, nameOf(oldInput));
+            std::string newN = joinPath(*newParentResolved, nameOf(newInput));
             auto node = tree_.resolve(oldN);
             if (!node) return false;
             std::string oldParent = parentOf(oldN), newParent = parentOf(newN), newName = nameOf(newN);
@@ -631,9 +659,13 @@ public:
         if (readOnly_) return false;
         try {
             Lifecycle::Op op(life_);
-            std::string n = normalizePath(path);
-            engine_.invalidateRead(n);
+            std::string input = normalizePath(path);
+            // Clear cached reads before taking ns_ to preserve the engine -> namespace lock order.
+            engine_.invalidateAll();
             std::unique_lock<std::shared_mutex> ns(ns_);
+            auto parentResolved = resolveSymlinkPathLocked(parentOf(input));
+            if (!parentResolved) return false;
+            std::string n = joinPath(*parentResolved, nameOf(input));
             auto node = tree_.resolve(n);
             if (!node) return false;
             dropPending(n);
@@ -661,6 +693,11 @@ public:
             Lifecycle::Op op(life_);
             std::string n = normalizePath(path);
             std::shared_lock<std::shared_mutex> ns(ns_);
+            // Follow symlinks in parent components, but not the final component:
+            // the timestamp belongs to the link's symlink.c9r, not its target.
+            auto parentResolved = resolveSymlinkPathLocked(parentOf(n));
+            if (!parentResolved) return false;
+            n = joinPath(*parentResolved, nameOf(n));
             auto node = tree_.resolve(n);
             if (!node) return false;
             bool ok;
@@ -679,7 +716,9 @@ public:
         try {
             Lifecycle::Op op(life_);
             std::shared_lock<std::shared_mutex> ns(ns_);
-            auto node = tree_.resolve(normalizePath(path));
+            auto resolved = resolveSymlinkPathLocked(normalizePath(path));
+            if (!resolved) return -1;
+            auto node = tree_.resolve(*resolved);
             if (!node || node->isDir || node->isSymlink) return -1;
             st_->ensureContentReady(node->contentsPath);
             DirEntry de;
@@ -692,8 +731,10 @@ public:
         try {
             Lifecycle::Op op(life_);
             std::shared_lock<std::shared_mutex> ns(ns_);
+            auto resolved = resolveSymlinkPathLocked(normalizePath(path));
+            if (!resolved) return 0;
             std::string dirId;
-            if (!tree_.resolveDirId(normalizePath(path), dirId)) return 0;
+            if (!tree_.resolveDirId(*resolved, dirId)) return 0;
             return folderSizeById(dirId, 0);
         } catch (const std::exception&) { return 0; }
     }
@@ -755,8 +796,17 @@ public:
     void invalidateCache(const std::string& path) override {
         try {
             Lifecycle::Op op(life_);
-            if (path.empty()) { tree_.invalidateAll(); engine_.invalidateAll(); }
-            else { std::string n = normalizePath(path); tree_.invalidate(n); engine_.invalidateRead(n); }
+            if (path.empty()) {
+                tree_.invalidateAll();
+                engine_.invalidateAll();
+            } else {
+                const std::string n = normalizePath(path);
+                // Clear engine handles before taking the namespace lock (readers take them first).
+                engine_.invalidateAll();
+                std::shared_lock<std::shared_mutex> ns(ns_);
+                tree_.invalidate(n);
+                if (auto resolved = resolveSymlinkPathLocked(n)) tree_.invalidate(*resolved);
+            }
         } catch (const std::exception&) {}
     }
 
@@ -793,15 +843,21 @@ private:
     // ---- EngineHost -------------------------------------------------------
     bool resolveForRead(const std::string& vpath, std::string& physical) override {
         std::shared_lock<std::shared_mutex> ns(ns_);
-        auto n = tree_.resolve(vpath);
-        if (!n || n->isDir || n->isSymlink) return false;   // a link is never read as if it were a file
+        auto resolved = resolveSymlinkPathLocked(vpath);
+        if (!resolved) return false;
+        auto n = tree_.resolve(*resolved);
+        if (!n || n->isDir || n->isSymlink) return false;
         physical = n->contentsPath;
         return true;
     }
 
     std::string prepareForWrite(const std::string& vpath) override {
         std::unique_lock<std::shared_mutex> ns(ns_);
-        std::string n = normalizePath(vpath);
+        std::string original = normalizePath(vpath);
+        auto resolved = resolveSymlinkPathLocked(original);
+        if (!resolved) throw Error(Err::NotFound, "Shortcut target not found: " + original);
+        std::string n = *resolved;
+        if (n.empty()) throw Error(Err::NotFound, "A file shortcut cannot target the vault root");
         std::string parentPath = parentOf(n), name = nameOf(n);
         std::string parentId;
         if (!tree_.resolveDirId(parentPath, parentId)) throw Error(Err::NotFound, "Folder not found: " + parentPath);
@@ -816,7 +872,7 @@ private:
             phys = createNewFileNode(parentPhys, nc_.encryptFilename(name, parentId));
         }
         st_->markWritePending(phys);
-        { std::lock_guard<std::mutex> g(pmu_); pending_[n] = phys; }
+        { std::lock_guard<std::mutex> g(pmu_); pending_[original] = phys; }
         return phys;
     }
 
@@ -825,7 +881,8 @@ private:
         std::string captured = physical;
         { std::lock_guard<std::mutex> g(pmu_); auto it = pending_.find(n); if (it != pending_.end()) { captured = it->second; pending_.erase(it); } }
         publish(n, captured);
-        tree_.invalidate(parentOf(n));
+        tree_.invalidateAll();
+        engine_.invalidateAll();
     }
 
     void abortedWrite(const std::string& vpath, const std::string& physical) override {
@@ -836,6 +893,51 @@ private:
         if (nameOf(physical) == kContentsFile && endsWith(nameOf(parent), kC9s)) st_->remove(parent);
         else st_->remove(physical);
         tree_.invalidate(parentOf(n));
+    }
+
+    // Resolve Cryptomator symlinks like a POSIX path walk, but with the vault root as
+    // the boundary. Absolute targets are rejected; relative targets are interpreted
+    // from the link's parent. A bounded hop count and visited set prevent cycles.
+    // Caller must hold ns_ (shared or exclusive).
+    std::optional<std::string> resolveSymlinkPathLocked(const std::string& input) {
+        if (!input.empty() && input.front() == '/') return std::nullopt;
+        std::vector<std::string> pending = splitSegments(normalizePath(input));
+        std::vector<std::string> resolved;
+        size_t i = 0;
+        int hops = 0;
+        while (i < pending.size()) {
+            const std::string segment = pending[i++];
+            if (segment.empty() || segment == ".") continue;
+            if (segment == "..") {
+                if (!resolved.empty()) resolved.pop_back(); // clamp at vault root
+                continue;
+            }
+            std::string parent;
+            for (const auto& part : resolved) parent = joinPath(parent, part);
+            const std::string candidate = joinPath(parent, segment);
+            auto node = tree_.resolve(candidate);
+            if (!node) {
+                if (i == pending.size()) { resolved.push_back(segment); continue; }
+                return std::nullopt;
+            }
+            if (node->isSymlink) {
+                if (++hops > 40) return std::nullopt;
+                std::string target;
+                st_->ensureContentReady(node->symlinkFile);
+                if (!readSmallEncryptedFile(*st_, fmt_, node->symlinkFile, kMaxSymlinkLength, target) ||
+                    target.empty() || target.front() == '/' || target.find('\0') != std::string::npos || !validUtf8(target)) return std::nullopt;
+                auto targetParts = splitSegments(target);
+                pending.erase(pending.begin() + static_cast<std::ptrdiff_t>(i - 1));
+                pending.insert(pending.begin() + static_cast<std::ptrdiff_t>(i - 1), targetParts.begin(), targetParts.end());
+                i--;
+                continue;
+            }
+            if (i < pending.size() && !node->isDir) return std::nullopt;
+            resolved.push_back(segment);
+        }
+        std::string result;
+        for (const auto& segment : resolved) result = joinPath(result, segment);
+        return result;
     }
 
     // ---- helpers ------------------------------------------------------------
@@ -1133,25 +1235,78 @@ PlainResult changeCryptomatorPassword(Storage& s, const uint8_t* oldPw, size_t o
     }
 }
 
+namespace {
+
+// What a vault folder looks like from its files alone (no password, no scrypt). Shared by
+// probeCryptomatorFormat and migrateCryptomator7To8 so the two can never disagree about whether a vault is
+// migratable. [code] is the probe result (see fv_vault.h); [message] is the reason shown when migration is
+// refused; [raw]/[parsed] are filled when the key file was read and parsed (codes 7, -8 and 6).
+struct CryptomatorLayout {
+    int code = 0;
+    std::string message;
+    Bytes raw;
+    std::optional<cryptomator::MasterkeyFile> parsed;
+};
+
+CryptomatorLayout classifyCryptomatorLayout(Storage& s) {
+    using namespace cryptomator;
+    CryptomatorLayout out;
+    DirEntry de;
+    if (!s.stat(kMasterkeyFile, de) || de.isDir) {
+        out.code = 0;
+        out.message = "No masterkey.cryptomator found \xE2\x80\x94 this doesn't look like a Cryptomator vault.";
+        return out;
+    }
+    if (s.stat(kVaultFile, de)) {
+        out.code = 8;
+        out.message = "This vault already has a vault.cryptomator, so there is nothing to migrate.";
+        return out;
+    }
+    if (!s.readWhole(kMasterkeyFile, out.raw)) {
+        out.code = 0;
+        out.message = "Could not read masterkey.cryptomator";
+        return out;
+    }
+    try {
+        out.parsed = MasterkeyFile::parse(std::string(out.raw.begin(), out.raw.end()));
+    } catch (const std::exception& e) {
+        out.code = 0;
+        out.message = e.what();
+        out.parsed.reset();
+        return out;
+    }
+    const int version = out.parsed->version;
+    if (version == 7) {
+        out.code = 7;
+    } else if (version >= 8) {
+        out.code = -8;
+        out.message = "vault.cryptomator is missing from this format 8 vault. If it is stored with a cloud provider, "
+                      "wait for it to finish syncing; do not migrate.";
+    } else {
+        out.code = 6;
+        out.message = "Vault format " + std::to_string(version) +
+                      " cannot be migrated here (only 7 can). Open it once in Cryptomator to migrate it.";
+    }
+    return out;
+}
+
+}  // namespace
+
+int probeCryptomatorFormat(Storage& s) {
+    try {
+        return classifyCryptomatorLayout(s).code;
+    } catch (...) {
+        return 0;   // a storage that throws is "cannot tell", never a reason to offer the upgrade
+    }
+}
+
 PlainResult migrateCryptomator7To8(Storage& s, const uint8_t* pw, size_t pwLen) {
     using namespace cryptomator;
-    DirEntry de;
-    if (!s.stat(kMasterkeyFile, de) || de.isDir)
-        return plainFail(OpenStatus::InvalidVault, "No masterkey.cryptomator found \xE2\x80\x94 this doesn't look like a Cryptomator vault.");
-    if (s.stat(kVaultFile, de))
-        return plainFail(OpenStatus::InvalidVault, "This vault already has a vault.cryptomator, so there is nothing to migrate.");
-    Bytes raw;
-    if (!s.readWhole(kMasterkeyFile, raw)) return plainFail(OpenStatus::InvalidVault, "Could not read masterkey.cryptomator");
+    CryptomatorLayout layout = classifyCryptomatorLayout(s);
+    if (layout.code != 7 || !layout.parsed) return plainFail(OpenStatus::InvalidVault, layout.message);
+    const Bytes& raw = layout.raw;
     try {
-        MasterkeyFile parsed = MasterkeyFile::parse(std::string(raw.begin(), raw.end()));
-        if (parsed.version != 7) {
-            if (parsed.version >= 8)
-                return plainFail(OpenStatus::InvalidVault,
-                                 "vault.cryptomator is missing from this format 8 vault. If it is stored with a cloud provider, "
-                                 "wait for it to finish syncing; do not migrate.");
-            return plainFail(OpenStatus::InvalidVault,
-                             "Vault format " + std::to_string(parsed.version) + " cannot be migrated here (only 7 can). Open it once in Cryptomator to migrate it.");
-        }
+        const MasterkeyFile& parsed = *layout.parsed;
         Masterkey mk = unlockMasterkeyCompat(parsed, pw, pwLen);   // proves the password before anything is written
         Secret npw = normalizedPassphrase(pw, pwLen);              // the key file is re-saved with the normalised passphrase
         // 1. back up the old key file -- here a hard requirement, since the upgrade cannot be undone

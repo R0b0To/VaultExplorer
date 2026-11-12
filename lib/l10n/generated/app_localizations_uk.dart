@@ -2527,6 +2527,17 @@ class AppLocalizationsUk extends AppLocalizations {
       'Збільшити стандартний том, як у десктопній утиліті розширення томів';
 
   @override
+  String get toolExpandLuksVolumeTitle => 'Розширити контейнер LUKS';
+
+  @override
+  String get toolExpandLuksVolumeSubtitle =>
+      'Збільшення контейнерів LUKS1 та LUKS2, включно з метаданими LUKS2 фіксованого розміру';
+
+  @override
+  String get luksToolsExpandNote =>
+      'Спочатку створіть резервну копію контейнера. Підтримуються LUKS1 та LUKS2. Файлові системи NTFS та ext2/3/4 можна розширювати безпосередньо (FAT та exFAT не підтримуються). Додане місце можна ініціалізувати зашифрованими нулями. Файл ключа замінює пароль, якщо використовується.';
+
+  @override
   String get toolHiddenInExistingTitle => 'Додати прихований том';
 
   @override
@@ -2560,10 +2571,43 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get vcToolsExpandNote =>
-      'Збільшується лише контейнер. Розмір файлової системи всередині не змінюється, тому доданий простір залишається нерозподіленим, доки файлову систему не буде розширено. Спочатку створіть резервну копію тому.';
+      'Спочатку збільшується контейнер. Потім файлову систему всередині розширюють на додатковий простір, якщо це можливо без повторного форматування (NTFS, ext2/3/4). FAT і exFAT не можна розширити на місці; їхній додатковий простір залишається нерозподіленим. Спершу створіть резервну копію тому.';
 
   @override
   String get vcToolsExpandDone => 'Том розширено';
+
+  @override
+  String get vcToolsGrowFsToggle => 'Також розширити файлову систему';
+
+  @override
+  String get vcToolsGrowFsToggleHint =>
+      'Дає томам NTFS і ext2/3/4 змогу одразу використовувати додатковий простір без повторного форматування.';
+
+  @override
+  String get vcToolsGrowFsOnlyAction => 'Лише розширити файлову систему';
+
+  @override
+  String get vcToolsFsGrown =>
+      'Файлову систему розширено: додатковий простір готовий до використання.';
+
+  @override
+  String get vcToolsFsAlreadyFills => 'Файлова система вже займає весь том.';
+
+  @override
+  String get vcToolsFsUnsupported =>
+      'Цю файлову систему не можна розширити на місці (FAT і exFAT не можна). Додатковий простір залишиться нерозподіленим, доки том не буде відформатовано повторно; спершу збережіть його файли.';
+
+  @override
+  String get vcToolsFsBusy =>
+      'У томі все ще відкриті файли. Закрийте їх, заблокуйте том і повторіть спробу «Лише збільшити файлову систему».';
+
+  @override
+  String get vcToolsFsNeedsCheck =>
+      'Файлову систему позначено як таку, що потребує перевірки. Запустіть «Перевірити й виправити» для тому, а потім скористайтеся «Лише розширити файлову систему».';
+
+  @override
+  String get vcToolsFsFailed =>
+      'Не вдалося розширити файлову систему. Сам том збільшено; запустіть «Перевірити й виправити» перед використанням.';
 
   @override
   String get vcToolsAnalyzeAction => 'Перевірити вільне місце';
@@ -14373,11 +14417,11 @@ class AppLocalizationsUk extends AppLocalizations {
   String get vaultListingDetails => 'Деталі';
 
   @override
-  String get vaultListingSymbolicLinksTitle => 'Символічні посилання';
+  String get vaultListingSymbolicLinksTitle => 'Ярлики';
 
   @override
   String get vaultListingSymbolicLinksNote =>
-      'Символічне посилання вказує на інше місце. Тут його не відкривають і не переходять за ним; натисніть, щоб скопіювати ціль.';
+      'Торкніться ярлика, щоб відкрити його ціль. Відносні цілі залишаються в межах цього сховища; абсолютні або пошкоджені посилання відкрити неможливо.';
 
   @override
   String get vaultListingHiddenEntriesTitle => 'Записи, які не показано';
@@ -14539,4 +14583,108 @@ class AppLocalizationsUk extends AppLocalizations {
   String galleryPlaceHintCoordinates(int km) {
     return 'Немає міст у межах $km км: згруповано за координатами';
   }
+
+  @override
+  String get cryptomatorBackupKeyFilesTitle =>
+      'Резервне копіювання файлів ключів під час розблокування';
+
+  @override
+  String get cryptomatorBackupKeyFilesSubtitle =>
+      'Зберігає копію masterkey.cryptomator і vault.cryptomator поруч з оригіналами, як Cryptomator на комп’ютері. Діє з наступного розблокування. Сеанси лише для читання нічого не записують.';
+
+  @override
+  String get cryptomatorUpgradeTitle => 'Оновити формат сховища';
+
+  @override
+  String get cryptomatorUpgradeSubtitle =>
+      'Це сховище використовує старіший формат 7.';
+
+  @override
+  String get cryptomatorUpgradeLockFirst =>
+      'Заблокуйте сховище, щоб оновити його';
+
+  @override
+  String get cryptomatorUpgradeWarning =>
+      'Оновлення змінює формат цього сховища на 8. Це не можна скасувати, і версії Cryptomator, старіші за 1.6, більше не зможуть відкрити це сховище.\n\nКопія поточного файлу ключа зберігається як masterkey.cryptomator.<id>.bkup. Якщо інший застосунок синхронізує це сховище, спершу дочекайтеся завершення синхронізації.';
+
+  @override
+  String get cryptomatorUpgradeConfirm => 'Я розумію, що це не можна скасувати';
+
+  @override
+  String get cryptomatorUpgradeAction => 'Оновити';
+
+  @override
+  String get cryptomatorUpgradedMessage => 'Сховище оновлено до формату 8';
+
+  @override
+  String get cryptomatorUpgradeUnlockedError => 'Спершу заблокуйте сховище';
+
+  @override
+  String get cryptomatorConfigMissingWarning =>
+      'Файл vault.cryptomator відсутній. Якщо інший застосунок синхронізує це сховище, дочекайтеся завершення й спробуйте ще раз. Не оновлюйте.';
+
+  @override
+  String get cryptomatorUpgradeFailedMessage => 'Не вдалося оновити сховище';
+
+  @override
+  String get newSymbolicLinkTitle => 'Нове символічне посилання';
+
+  @override
+  String get symbolicLinkNameHint => 'Назва посилання';
+
+  @override
+  String get symbolicLinkTargetHint => 'Вказує на';
+
+  @override
+  String get symbolicLinkTargetHelper =>
+      'Зберігається точно так, як введено. Під час відкриття відносні цілі визначаються в межах цього сховища; абсолютні цілі не переходять за посиланням.';
+
+  @override
+  String get symbolicLinkTargetTooLong =>
+      'Ціль задовга (максимум 32 767 байтів)';
+
+  @override
+  String get symbolicLinkTargetInvalid =>
+      'Ціль не може містити нульовий символ';
+
+  @override
+  String get symbolicLinkNameTaken =>
+      'Файл, папка або посилання з такою назвою вже існує';
+
+  @override
+  String get deleteSymbolicLinkTitle => 'Видалити символічне посилання?';
+
+  @override
+  String deleteSymbolicLinkMessage(String name) {
+    return 'Видалити посилання «$name»? Видаляється лише посилання; те, на що воно вказує, не чіпається.';
+  }
+
+  @override
+  String get symbolicLinkRenameTitle => 'Перейменувати символічне посилання';
+
+  @override
+  String get symbolicLinkBrowseTarget => 'Переглянути сховище';
+
+  @override
+  String get symbolicLinkSelectTargetTitle => 'Вибрати ціль ярлика';
+
+  @override
+  String get symbolicLinkSelectThisFolder => 'Вибрати цю папку';
+
+  @override
+  String get symbolicLinkPickerLoadError => 'Не вдалося завантажити цю папку';
+
+  @override
+  String get shortcutBadge => 'Ярлик';
+
+  @override
+  String get emptyFolder => 'Ця папка порожня';
+
+  @override
+  String get symbolicLinkTargetHelperRelative =>
+      'Використовуйте відносний шлях у межах цього контейнера. Ціль може ще не існувати; перейменування або видалення посилання не змінює ціль.';
+
+  @override
+  String get symbolicLinkTargetOutsideVault =>
+      'Ціль має бути відносним шляхом у межах цього контейнера.';
 }

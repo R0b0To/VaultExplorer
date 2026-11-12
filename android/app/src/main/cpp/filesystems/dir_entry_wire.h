@@ -33,3 +33,23 @@ inline std::string encodeDirEntryWire(const std::string& name, bool isDir,
     out += name;
     return out;
 }
+
+// Symlinks are deliberately returned by the separate listSymlinks API rather
+// than the ordinary file/folder listing. Their target bytes are metadata, not
+// file content. `LD` marks a link that currently resolves to a directory;
+// broken links and file links use `L` and remain visible as non-directories.
+inline std::string encodeSymlinkEntryWire(const std::string& name,
+                                           uint64_t targetBytes,
+                                           uint64_t mtimeUnixSecs,
+                                           bool targetIsDirectory = false) {
+    std::string out;
+    out.reserve(name.size() + 24);
+    out += targetIsDirectory ? "LD" : "L";
+    out += '|';
+    out += std::to_string(targetIsDirectory ? 0 : targetBytes);
+    out += '|';
+    out += std::to_string(mtimeUnixSecs);
+    out += '|';
+    out += name;
+    return out;
+}

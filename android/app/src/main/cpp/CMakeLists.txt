@@ -172,12 +172,41 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(fatfs)
 
 # 3. Download Tuxera NTFS-3G (NTFS Filesystem Engine)
+#
+# Patched with filesystems/patches/ntfs-3g-lookup-by-mbsname.patch. Without it,
+# anything touching a reparse point fails on volumes mounted via
+# ntfs_device_mount() (no lookup cache): ntfs_create_symlink() returns NULL with
+# EINVAL, i.e. symbolic links cannot be created on NTFS. The full explanation is
+# in filesystems/patches/apply_ntfs3g_patches.cmake. The script is idempotent
+# and fails configure if the patch stops applying (e.g. after a version bump).
+#
+# The patch files are configure dependencies so an incremental build (Ninja, as
+# used by Gradle) notices an edited patch instead of keeping the old tree.
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/filesystems/patches/ntfs-3g-lookup-by-mbsname.patch"
+    "${CMAKE_CURRENT_SOURCE_DIR}/filesystems/patches/apply_ntfs3g_patches.cmake")
 FetchContent_Declare(
         ntfs3g
         GIT_REPOSITORY https://github.com/tuxera/ntfs-3g.git
         GIT_TAG        d327833ec1d5eb1358b6f2c37139f10a3460944d
+        PATCH_COMMAND  ${CMAKE_COMMAND}
+                       -DPATCH_FILE=${CMAKE_CURRENT_SOURCE_DIR}/filesystems/patches/ntfs-3g-lookup-by-mbsname.patch
+                       -P ${CMAKE_CURRENT_SOURCE_DIR}/filesystems/patches/apply_ntfs3g_patches.cmake
 )
 FetchContent_MakeAvailable(ntfs3g)
+
+# Re-apply when the patch changes, even inside an existing .cxx build tree
+# (PATCH_COMMAND only runs when the dependency is first populated).
+execute_process(
+    COMMAND ${CMAKE_COMMAND}
+            -DPATCH_FILE=${CMAKE_CURRENT_SOURCE_DIR}/filesystems/patches/ntfs-3g-lookup-by-mbsname.patch
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/filesystems/patches/apply_ntfs3g_patches.cmake
+    WORKING_DIRECTORY ${ntfs3g_SOURCE_DIR}
+    RESULT_VARIABLE ntfs3g_patch_res
+)
+if(NOT ntfs3g_patch_res EQUAL 0)
+    message(FATAL_ERROR "Failed to patch ntfs-3g sources")
+endif()
 
 # 3a. e2fsprogs/libext2fs
 FetchContent_Declare(
@@ -274,8 +303,14 @@ add_library(e2fs_uuid STATIC
         ${E2FS_SRC_DIR}/lib/uuid/unpack.c
         ${E2FS_SRC_DIR}/lib/uuid/unparse.c
         ${E2FS_SRC_DIR}/lib/uuid/uuid_time.c)
+# resize2fs's engine (resize_fs): grows an ext2/3/4 file system in place -- see extGrowToFit in
+# filesystems/ext_backend.cpp. Only resize2fs.c and extent.c are used; resource_track.c (sbrk/getrusage
+# statistics) is replaced by the no-op glue, and main.c/online.c/sim_progress.c are CLI-only.
 add_library(e2fs_ext2fs STATIC ${E2FS_EXT2FS_SOURCES}
-        ${E2FS_GENERATED_DIR}/ext2_err.c)
+        ${E2FS_GENERATED_DIR}/ext2_err.c
+        ${E2FS_SRC_DIR}/resize/resize2fs.c
+        ${E2FS_SRC_DIR}/resize/extent.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/filesystems/ext_resize_glue.c)
 foreach(E2FS_TARGET e2fs_com_err e2fs_uuid e2fs_ext2fs)
     target_include_directories(${E2FS_TARGET} PRIVATE
             ${CMAKE_CURRENT_BINARY_DIR} ${E2FS_GENERATED_DIR}
@@ -298,6 +333,7 @@ foreach(E2FS_TARGET e2fs_com_err e2fs_uuid e2fs_ext2fs)
     endif()
     target_compile_definitions(${E2FS_TARGET} PRIVATE ${E2FS_DEFINITIONS})
 endforeach()
+target_include_directories(e2fs_ext2fs PRIVATE ${E2FS_SRC_DIR}/resize)
 target_link_libraries(e2fs_ext2fs PRIVATE e2fs_com_err e2fs_uuid)
 
 # 3e. cJSON
@@ -914,6 +950,12 @@ if(NOT ANDROID)
             crypto/xchacha20poly1305.cpp crypto/cryfs_block_cipher.cpp)
     add_executable(foldervault_test foldervault/test/fv_tests.cpp ${FV_CRYPTO_SOURCES})
     target_link_libraries(foldervault_test foldervault_core mbedcrypto)
+    # The gocryptfs known-answer vectors are located via an absolute path baked in
+    # here, not via __FILE__: the global -ffile-prefix-map above rewrites
+    # CMAKE_SOURCE_DIR to /source_tree inside __FILE__, so deriving the path from it
+    # points at a directory that doesn't exist on the host (FV_VECTORS still overrides).
+    target_compile_definitions(foldervault_test PRIVATE
+            FV_VECTORS_DIR="${CMAKE_CURRENT_LIST_DIR}/foldervault/test/vectors/gocryptfs")
     add_executable(fvcli foldervault/test/fvcli.cpp ${FV_CRYPTO_SOURCES})
     target_link_libraries(fvcli foldervault_core mbedcrypto)
     list(APPEND VAULTEXPLORER_HOST_TESTS foldervault_test)

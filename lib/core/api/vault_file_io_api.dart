@@ -741,14 +741,41 @@ class VaultFileIoApi {
     return result?.cast<String>();
   }
 
-  /// The symbolic links of one folder of a mounted Cryptomator vault. Deliberately separate from
-  /// [listDirectory]: a link is neither a file nor a folder, so nothing that walks listings (sync, export,
-  /// scanners) ever sees one. Empty for everything that is not a vault, and on any error.
+  /// Directory entries for the interactive browser. Unlike [listDirectory],
+  /// this merges supported symbolic links into the visible listing. It is not
+  /// used by scanners, sync or export code, which must keep links as separate
+  /// nodes and must not recurse through them.
+  Future<List<String>?> listDirectoryForBrowser(
+    MountedContainer container,
+    String dirPath, {
+    bool refresh = false,
+  }) async {
+    final entries = await listDirectory(container, dirPath, refresh: refresh);
+    if (entries == null || !mayHaveVaultSymbolicLinks(container)) return entries;
+    final links = await listVaultSymlinks(container, dirPath);
+    if (links.isEmpty) return entries;
+    final merged = List<String>.of(entries);
+    for (final link in links) {
+      final isDirectory = link.isDir;
+      merged.add(
+        '${isDirectory ? 'LD' : 'L'}|${isDirectory ? 0 : link.targetBytes}|${link.modifiedSecs}|${link.name}',
+      );
+    }
+    return merged;
+  }
+
+  /// The symbolic links of one folder in a supported vault/container.
+  /// Deliberately separate from [listDirectory] so generic scanners, sync and
+  /// export never mistake link targets for regular file content.
   Future<List<VaultSymlink>> listVaultSymlinks(
     MountedContainer container,
     String dirPath,
   ) async {
-    if (_isSaf(container) || container.isLocalStorage) return const [];
+    if (_isSaf(container) ||
+        container.isLocalStorage ||
+        !mayHaveVaultSymbolicLinks(container)) {
+      return const [];
+    }
     try {
       final result = await _channel.invokeMethod<List<Object?>>(
         ChannelMethods.listVaultSymlinks,
@@ -765,9 +792,35 @@ class VaultFileIoApi {
     }
   }
 
-  /// Where the link at [path] points (never resolved or followed), or null if it is not a readable link.
+  /// Creates a symbolic link at [path] pointing to [target] in a supported
+  /// vault/container. Cryptomator keeps its encrypted target representation;
+  /// native ext/NTFS targets must be relative and remain inside the container.
+  /// Unsupported filesystems, SAF and local storage return false without a
+  /// platform call. Like [createDirectory], channel failures are not swallowed.
+  Future<bool> createVaultSymlink(
+    MountedContainer container,
+    String path,
+    String target,
+  ) async {
+    if (_isSaf(container) ||
+        container.isLocalStorage ||
+        !supportsVaultSymbolicLinks(container)) {
+      return false;
+    }
+    final result = await _channel.invokeMethod<bool>(
+      ChannelMethods.createVaultSymlink,
+      {'filePath': container.uri, 'path': path, 'target': target},
+    );
+    return result ?? false;
+  }
+
+  /// Where the link at [path] points (never followed), or null if it is not a readable link.
   Future<String?> readVaultSymlink(MountedContainer container, String path) async {
-    if (_isSaf(container) || container.isLocalStorage) return null;
+    if (_isSaf(container) ||
+        container.isLocalStorage ||
+        !mayHaveVaultSymbolicLinks(container)) {
+      return null;
+    }
     try {
       return await _channel.invokeMethod<String>(
         ChannelMethods.readVaultSymlink,
@@ -777,6 +830,68 @@ class VaultFileIoApi {
       logSwallowed('readVaultSymlink', e, expected: true);
       return null;
     }
+  }
+
+  /// Same no-follow query as [readVaultSymlink], but preserves channel errors.
+  /// Atomic writes use this form so an unreadable link is never mistaken for
+  /// an ordinary file and accidentally replaced.
+  Future<String?> readVaultSymlinkStrict(
+    MountedContainer container,
+    String path,
+  ) {
+    if (_isSaf(container) ||
+        container.isLocalStorage ||
+        !mayHaveVaultSymbolicLinks(container)) {
+      return Future<String?>.value(null);
+    }
+    return _channel.invokeMethod<String>(
+      ChannelMethods.readVaultSymlink,
+      {'filePath': container.uri, 'path': path},
+    );
+  }
+
+  /// Resolves [path] through any chain of symbolic links and returns the final
+  /// container-relative target path. Returns null when [path] is not a link,
+  /// a link is unreadable, a target is absolute/outside the container, or a
+  /// loop/overlong chain is encountered. A dangling final target is returned
+  /// after at least one link was followed, matching normal open-with-create
+  /// semantics (the caller may create that target if its parent exists).
+  Future<String?> resolveVaultSymlinkTargetPath(
+    MountedContainer container,
+    String path, {
+    String? firstTarget,
+    bool strict = false,
+  }) async {
+    var currentPath = p.posix.normalize(path);
+    final visited = <String>{};
+    var followedLink = false;
+
+    for (var hop = 0; hop < 40; hop++) {
+      if (!visited.add(currentPath)) return null;
+      final String? target;
+      if (hop == 0 && firstTarget != null) {
+        target = firstTarget;
+      } else if (strict) {
+        target = await readVaultSymlinkStrict(container, currentPath);
+      } else {
+        target = await readVaultSymlink(container, currentPath);
+      }
+      if (target == null || target.isEmpty) {
+        return followedLink ? currentPath : null;
+      }
+      followedLink = true;
+      if (p.posix.isAbsolute(target)) return null;
+      final resolved = p.posix.normalize(
+        p.posix.join(p.posix.dirname(currentPath), target),
+      );
+      if (resolved == '..' ||
+          resolved.startsWith('../') ||
+          p.posix.isAbsolute(resolved)) {
+        return null;
+      }
+      currentPath = resolved;
+    }
+    return null;
   }
 
   /// How many entries of [dirPath] exist on disk but are not listed (sync-conflict copies, names that no
@@ -1264,7 +1379,39 @@ class VaultFileIoApi {
     String fileName,
     Uint8List bytes,
   ) async {
-    final tmpPath = '$fileName.tmp';
+    // This method commits atomically by writing a sibling temp file, deleting
+    // the old path, then renaming the temp file into place. That is correct
+    // for an ordinary file, but deleting [fileName] when it is a symlink
+    // destroys the link itself. Resolve the link first and commit against its
+    // final target instead, just as opening a symlink for writing does on a
+    // normal filesystem. This applies to Cryptomator's virtual links and the
+    // native ext/NTFS links inside LUKS/VeraCrypt containers.
+    var writePath = fileName;
+    if (mayHaveVaultSymbolicLinks(container)) {
+      try {
+        final firstTarget = await readVaultSymlinkStrict(container, fileName);
+        if (firstTarget != null) {
+          final resolved = await resolveVaultSymlinkTargetPath(
+            container,
+            fileName,
+            firstTarget: firstTarget,
+            strict: true,
+          );
+          // Never fall back to replacing the link when it is broken in an
+          // unsafe way (absolute target, escape, unreadable chain or loop).
+          if (resolved == null) return false;
+          writePath = resolved;
+        }
+      } catch (e) {
+        // If the no-follow probe itself failed, do not risk deleting a link
+        // that we could not identify. The caller can retry after the I/O
+        // error is resolved.
+        logSwallowed('writeWholeFile.resolveSymlink', e, expected: true);
+        return false;
+      }
+    }
+
+    final tmpPath = '$writePath.tmp';
     await deleteFile(container, tmpPath);
 
     var offset = 0;
@@ -1288,8 +1435,8 @@ class VaultFileIoApi {
       return false;
     }
 
-    await deleteFile(container, fileName);
-    return renameFile(container, tmpPath, fileName);
+    await deleteFile(container, writePath);
+    return renameFile(container, tmpPath, writePath);
   }
 
   /// Returns capacity and available bytes for this storage. Raw local paths

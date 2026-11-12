@@ -18,6 +18,41 @@ class VeraCryptToolsException implements Exception {
 /// Free space at the end of a standard volume, as measured for a hidden volume.
 typedef HiddenHostInfo = ({int fsKind, int clusterSize, int maxHiddenBytes});
 
+/// What happened to the file system inside a volume after an expand / grow request (Kotlin: fsStatusName).
+enum FileSystemGrowResult {
+  grown,
+  alreadyFills,
+  unsupported,
+  needsCheck,
+  busy,
+  failed,
+  notRun;
+
+  static FileSystemGrowResult parse(String? name) => switch (name) {
+        'grown' => grown,
+        'already_fills' => alreadyFills,
+        'unsupported' => unsupported,
+        'needs_check' => needsCheck,
+        'busy' => busy,
+        'not_run' => notRun,
+        _ => failed, // 'failed' and anything unknown
+      };
+}
+
+class FileSystemGrowInfo {
+  const FileSystemGrowInfo(this.result, this.fileSystemName);
+
+  factory FileSystemGrowInfo.fromMap(Map<Object?, Object?>? raw) => FileSystemGrowInfo(
+        FileSystemGrowResult.parse(raw?['fsStatus'] as String?),
+        (raw?['fsName'] as String?) ?? '',
+      );
+
+  final FileSystemGrowResult result;
+
+  /// "NTFS", "ext4", "exFAT", ... or empty when the file system wasn't recognised.
+  final String fileSystemName;
+}
+
 /// Desktop-VeraCrypt volume operations on an existing container: volume expansion and
 /// creating a hidden volume inside an existing standard volume ("direct mode").
 class VeraCryptToolsApi {
@@ -40,8 +75,10 @@ class VeraCryptToolsApi {
         .toList();
   }
 
-  /// Grows a standard VeraCrypt file container to [newSizeBytes]. The file system inside is not resized.
-  Future<void> expandContainer({
+  /// Grows a standard VeraCrypt file container to [newSizeBytes] and, with [growFileSystem], the file system inside
+  /// into the added space (NTFS and ext2/3/4; FAT/exFAT can't be grown in place). The container is expanded even when
+  /// the file system step reports anything but [FileSystemGrowResult.grown].
+  Future<FileSystemGrowInfo> expandContainer({
     required String uri,
     String password = '',
     int pim = 0,
@@ -50,9 +87,10 @@ class VeraCryptToolsApi {
     List<String> keyfilePaths = const [],
     required int newSizeBytes,
     bool initFreeSpace = true,
+    bool growFileSystem = true,
   }) async {
     try {
-      await _channel.invokeMethod<bool>(ChannelMethods.expandVeraCryptContainer, {
+      final raw = await _channel.invokeMethod<Map<Object?, Object?>>(ChannelMethods.expandVeraCryptContainer, {
         'uri': uri,
         'password': password,
         'pim': pim,
@@ -61,7 +99,76 @@ class VeraCryptToolsApi {
         'keyfilePaths': keyfilePaths,
         'newSizeBytes': newSizeBytes,
         'initFreeSpace': initFreeSpace,
+        'growFileSystem': growFileSystem,
       });
+      return FileSystemGrowInfo.fromMap(raw);
+    } on PlatformException catch (e) {
+      throw VeraCryptToolsException(e.code, e.message ?? e.code);
+    }
+  }
+
+  /// Expands a LUKS1/LUKS2 file container. LUKS keyfiles replace the typed password,
+  /// matching cryptsetup semantics. Fixed-size LUKS2 metadata is updated in both copies.
+  Future<FileSystemGrowInfo> expandLuksContainer({
+    required String uri,
+    String password = '',
+    List<String> keyfilePaths = const [],
+    required int newSizeBytes,
+    bool initFreeSpace = true,
+    bool growFileSystem = true,
+  }) async {
+    try {
+      final raw = await _channel.invokeMethod<Map<Object?, Object?>>(ChannelMethods.expandLuksContainer, {
+        'uri': uri,
+        'password': password,
+        'keyfilePaths': keyfilePaths,
+        'newSizeBytes': newSizeBytes,
+        'initFreeSpace': initFreeSpace,
+        'growFileSystem': growFileSystem,
+      });
+      return FileSystemGrowInfo.fromMap(raw);
+    } on PlatformException catch (e) {
+      throw VeraCryptToolsException(e.code, e.message ?? e.code);
+    }
+  }
+
+  /// Grows only the file system of a standard volume that was expanded earlier, into the space it doesn't use yet.
+  Future<FileSystemGrowInfo> growFileSystem({
+    required String uri,
+    String password = '',
+    int pim = 0,
+    int cipherId = 255,
+    int hashId = 255,
+    List<String> keyfilePaths = const [],
+  }) async {
+    try {
+      final raw = await _channel.invokeMethod<Map<Object?, Object?>>(ChannelMethods.growVeraCryptFileSystem, {
+        'uri': uri,
+        'password': password,
+        'pim': pim,
+        'cipherId': cipherId,
+        'hashId': hashId,
+        'keyfilePaths': keyfilePaths,
+      });
+      return FileSystemGrowInfo.fromMap(raw);
+    } on PlatformException catch (e) {
+      throw VeraCryptToolsException(e.code, e.message ?? e.code);
+    }
+  }
+
+  /// Re-runs only the LUKS file-system grow step. Fixed-size LUKS2 uses its declared segment size.
+  Future<FileSystemGrowInfo> growLuksFileSystem({
+    required String uri,
+    String password = '',
+    List<String> keyfilePaths = const [],
+  }) async {
+    try {
+      final raw = await _channel.invokeMethod<Map<Object?, Object?>>(ChannelMethods.growLuksFileSystem, {
+        'uri': uri,
+        'password': password,
+        'keyfilePaths': keyfilePaths,
+      });
+      return FileSystemGrowInfo.fromMap(raw);
     } on PlatformException catch (e) {
       throw VeraCryptToolsException(e.code, e.message ?? e.code);
     }

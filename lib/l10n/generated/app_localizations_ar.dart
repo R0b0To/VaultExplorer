@@ -2535,6 +2535,17 @@ class AppLocalizationsAr extends AppLocalizations {
       'تكبير حجم وحدة تخزين قياسية، مثل أداة توسيع وحدات التخزين على سطح المكتب';
 
   @override
+  String get toolExpandLuksVolumeTitle => 'توسيع حاوية LUKS';
+
+  @override
+  String get toolExpandLuksVolumeSubtitle =>
+      'توسيع حاويات LUKS1 وLUKS2، بما في ذلك البيانات الوصفية ثابتة الحجم لـ LUKS2';
+
+  @override
+  String get luksToolsExpandNote =>
+      'قم بعمل نسخة احتياطية للحاوية أولاً. يدعم LUKS1 وLUKS2. يمكن توسيع أنظمة الملفات NTFS وext2/3/4 في مكانها (لا يمكن توسيع FAT وexFAT). يمكن تهيئة المساحة المضافة بأصفار مشفرة. يحل ملف المفتاح محل كلمة المرور إذا تم استخدامه.';
+
+  @override
   String get toolHiddenInExistingTitle => 'إضافة وحدة تخزين مخفية';
 
   @override
@@ -2568,10 +2579,43 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get vcToolsExpandNote =>
-      'يتم تكبير الحاوية فقط. لا يتم تغيير حجم نظام الملفات بداخلها، لذلك تظل المساحة المضافة غير مخصصة حتى يتم توسيع نظام الملفات. قم بعمل نسخة احتياطية أولاً.';
+      'يتم تكبير الحاوية أولًا. بعد ذلك يُوسَّع نظام الملفات بداخلها ليشمل المساحة المضافة متى أمكن ذلك دون إعادة تهيئة (NTFS وext2/3/4). لا يمكن توسيع FAT وexFAT في مكانهما، وتبقى المساحة المضافة غير مخصصة. أنشئ نسخة احتياطية من وحدة التخزين أولًا.';
 
   @override
   String get vcToolsExpandDone => 'تم توسيع وحدة التخزين';
+
+  @override
+  String get vcToolsGrowFsToggle => 'توسيع نظام الملفات أيضًا';
+
+  @override
+  String get vcToolsGrowFsToggleHint =>
+      'يتيح لوحدات NTFS وext2/3/4 استخدام المساحة المضافة فورًا دون إعادة تهيئة.';
+
+  @override
+  String get vcToolsGrowFsOnlyAction => 'توسيع نظام الملفات فقط';
+
+  @override
+  String get vcToolsFsGrown =>
+      'تم توسيع نظام الملفات: المساحة المضافة جاهزة للاستخدام.';
+
+  @override
+  String get vcToolsFsAlreadyFills => 'نظام الملفات يملأ وحدة التخزين بالفعل.';
+
+  @override
+  String get vcToolsFsUnsupported =>
+      'لا يمكن توسيع نظام الملفات هذا في مكانه (FAT وexFAT غير مدعومين). ستبقى المساحة المضافة غير مخصصة حتى تتم إعادة تهيئة وحدة التخزين؛ انسخ ملفاتها احتياطيًا أولًا.';
+
+  @override
+  String get vcToolsFsBusy =>
+      'لا تزال هناك ملفات مفتوحة في وحدة التخزين. أغلقها، ثم اقفل وحدة التخزين، وأعد المحاولة عبر «توسيع نظام الملفات فقط».';
+
+  @override
+  String get vcToolsFsNeedsCheck =>
+      'نظام الملفات مُعلَّم بأنه يحتاج إلى فحص. شغّل «الفحص والإصلاح» على وحدة التخزين ثم استخدم «توسيع نظام الملفات فقط».';
+
+  @override
+  String get vcToolsFsFailed =>
+      'تعذّر توسيع نظام الملفات. تم تكبير وحدة التخزين نفسها؛ شغّل «الفحص والإصلاح» قبل استخدامها.';
 
   @override
   String get vcToolsAnalyzeAction => 'التحقق من المساحة الفارغة';
@@ -14305,11 +14349,11 @@ class AppLocalizationsAr extends AppLocalizations {
   String get vaultListingDetails => 'التفاصيل';
 
   @override
-  String get vaultListingSymbolicLinksTitle => 'الروابط الرمزية';
+  String get vaultListingSymbolicLinksTitle => 'الاختصارات';
 
   @override
   String get vaultListingSymbolicLinksNote =>
-      'يشير الرابط الرمزي إلى موقع آخر. لا نفتحه ولا نتبعه هنا؛ اضغط عليه لنسخ وجهته.';
+      'اضغط على الاختصار لفتح وجهته. تبقى الأهداف النسبية داخل هذه الخزنة؛ ولا يمكن فتح الأهداف المطلقة أو المعطّلة.';
 
   @override
   String get vaultListingHiddenEntriesTitle => 'إدخالات غير معروضة';
@@ -14471,4 +14515,107 @@ class AppLocalizationsAr extends AppLocalizations {
   String galleryPlaceHintCoordinates(int km) {
     return 'لا توجد مدينة ضمن $km كم: مجمّعة حسب الإحداثيات';
   }
+
+  @override
+  String get cryptomatorBackupKeyFilesTitle =>
+      'نسخ احتياطي لملفات المفاتيح عند فتح القفل';
+
+  @override
+  String get cryptomatorBackupKeyFilesSubtitle =>
+      'يحتفظ بنسخة من masterkey.cryptomator وvault.cryptomator بجوار الملفات الأصلية، كما يفعل Cryptomator على سطح المكتب. يسري من عملية الفتح التالية. جلسات القراءة فقط لا تكتب أي شيء أبدًا.';
+
+  @override
+  String get cryptomatorUpgradeTitle => 'ترقية تنسيق الخزنة';
+
+  @override
+  String get cryptomatorUpgradeSubtitle =>
+      'تستخدم هذه الخزنة التنسيق 7 الأقدم.';
+
+  @override
+  String get cryptomatorUpgradeLockFirst => 'اقفل الخزنة لترقيتها';
+
+  @override
+  String get cryptomatorUpgradeWarning =>
+      'تؤدي الترقية إلى تحويل هذه الخزنة إلى التنسيق 8. لا يمكن التراجع عنها، ولن تتمكن إصدارات Cryptomator الأقدم من 1.6 من فتح الخزنة بعد ذلك.\n\nيُحتفظ بنسخة من ملف المفتاح الحالي باسم masterkey.cryptomator.<id>.bkup. إذا كان تطبيق آخر يزامن هذه الخزنة، فدعه ينهي المزامنة أولًا.';
+
+  @override
+  String get cryptomatorUpgradeConfirm => 'أفهم أنه لا يمكن التراجع عن هذا';
+
+  @override
+  String get cryptomatorUpgradeAction => 'ترقية';
+
+  @override
+  String get cryptomatorUpgradedMessage => 'تمت ترقية الخزنة إلى التنسيق 8';
+
+  @override
+  String get cryptomatorUpgradeUnlockedError => 'اقفل الخزنة أولًا';
+
+  @override
+  String get cryptomatorConfigMissingWarning =>
+      'الملف vault.cryptomator مفقود. إذا كان تطبيق آخر يزامن هذه الخزنة، فانتظر حتى تنتهي المزامنة ثم حاول مرة أخرى. لا تقم بالترقية.';
+
+  @override
+  String get cryptomatorUpgradeFailedMessage => 'تعذرت ترقية الخزنة';
+
+  @override
+  String get newSymbolicLinkTitle => 'رابط رمزي جديد';
+
+  @override
+  String get symbolicLinkNameHint => 'اسم الرابط';
+
+  @override
+  String get symbolicLinkTargetHint => 'يشير إلى';
+
+  @override
+  String get symbolicLinkTargetHelper =>
+      'يُخزَّن كما كُتب تمامًا. عند الفتح، تُحلّ الأهداف النسبية داخل هذه الخزنة؛ ولا يتم اتباع الأهداف المطلقة.';
+
+  @override
+  String get symbolicLinkTargetTooLong =>
+      'الهدف طويل جدًا (الحد الأقصى 32,767 بايت)';
+
+  @override
+  String get symbolicLinkTargetInvalid =>
+      'لا يمكن أن يحتوي الهدف على محرف فارغ (null)';
+
+  @override
+  String get symbolicLinkNameTaken =>
+      'يوجد ملف أو مجلد أو رابط بهذا الاسم بالفعل';
+
+  @override
+  String get deleteSymbolicLinkTitle => 'حذف الرابط الرمزي؟';
+
+  @override
+  String deleteSymbolicLinkMessage(String name) {
+    return 'حذف الرابط \"$name\"؟ يُحذف الرابط فقط، ولا يتم المساس بما يشير إليه.';
+  }
+
+  @override
+  String get symbolicLinkRenameTitle => 'إعادة تسمية الرابط الرمزي';
+
+  @override
+  String get symbolicLinkBrowseTarget => 'استعراض الخزنة';
+
+  @override
+  String get symbolicLinkSelectTargetTitle => 'اختيار وجهة الاختصار';
+
+  @override
+  String get symbolicLinkSelectThisFolder => 'اختيار هذا المجلد';
+
+  @override
+  String get symbolicLinkPickerLoadError => 'تعذر تحميل هذا المجلد';
+
+  @override
+  String get shortcutBadge => 'اختصار';
+
+  @override
+  String get emptyFolder => 'هذا المجلد فارغ';
+
+  @override
+  String get symbolicLinkTargetHelperRelative =>
+      'استخدم مسارًا نسبيًا داخل هذا الحاوي. يمكن ألا يكون الهدف موجودًا بعد؛ إعادة تسمية الرابط أو حذفه لا تغيّر الهدف.';
+
+  @override
+  String get symbolicLinkTargetOutsideVault =>
+      'يجب أن يكون الهدف مسارًا نسبيًا يبقى داخل هذا الحاوي.';
 }

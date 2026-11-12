@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
+import 'package:vaultexplorer/core/services/thumbnail_refresh_signal.dart';
 import 'package:vaultexplorer/core/services/thumbnail_retry_signal.dart';
 import 'package:vaultexplorer/core/utils/lru_cache.dart';
 import 'package:vaultexplorer/core/utils/image_preview_exception.dart';
@@ -76,6 +77,7 @@ class AsyncThumbnailLoader extends _$AsyncThumbnailLoader {
   /// later rebuild (scroll away and back, pull-to-refresh) start clean.
   static const _maxCancellationRetries = 20;
   int _cancellationRetries = 0;
+  int _loadGeneration = 0;
 
   /// Hard ceiling on how long a single tile will sit on its spinner.
   ///
@@ -101,9 +103,11 @@ class AsyncThumbnailLoader extends _$AsyncThumbnailLoader {
   AsyncThumbnailState build(int volId, DateTime mountedAt, String filePath, ThumbnailQuality quality) {
     PlaybackThrottleController.isPlaybackActive.addListener(_onPlaybackActiveChanged);
     ThumbnailRetrySignal.generation.addListener(_onRetrySignal);
+    ThumbnailRefreshSignal.invalidation.addListener(_onRefreshSignal);
     ref.onDispose(() {
       PlaybackThrottleController.isPlaybackActive.removeListener(_onPlaybackActiveChanged);
       ThumbnailRetrySignal.generation.removeListener(_onRetrySignal);
+      ThumbnailRefreshSignal.invalidation.removeListener(_onRefreshSignal);
       _cancel();
     });
     return const AsyncThumbnailState();
@@ -161,6 +165,22 @@ class AsyncThumbnailLoader extends _$AsyncThumbnailLoader {
     _restart();
   }
 
+  /// A file was edited while this tile was still mounted. Unlike the
+  /// foreground retry signal, this deliberately refreshes even a tile that
+  /// already has bytes, and only when the changed path is this loader's path.
+  void _onRefreshSignal() {
+    if (!ref.mounted) return;
+    final change = ThumbnailRefreshSignal.invalidation.value;
+    final container = _container;
+    if (change == null || container == null) return;
+    if (change.volId != container.volId ||
+        change.mountedAtMillis != container.mountedAt.millisecondsSinceEpoch ||
+        change.filePath != filePath) {
+      return;
+    }
+    _restart();
+  }
+
   /// Key of this tile's entry in the shared in-flight map. Auto-sized
   /// requests include their size so a sharper re-request (after a zoom
   /// change) never joins an older, smaller fetch of the same file and ends
@@ -176,6 +196,10 @@ class AsyncThumbnailLoader extends _$AsyncThumbnailLoader {
     if (!_started) return;
     final container = _container;
     if (container == null) return;
+    // Invalidate any older asynchronous completion before starting the new
+    // fetch. Native thumbnail calls themselves cannot be cancelled once
+    // running, but their result must not overwrite the refreshed state.
+    _loadGeneration++;
     _cancel();
     final cacheKey = _inFlightKey(container);
     _cache?.remove(cacheKey);
@@ -208,6 +232,7 @@ class AsyncThumbnailLoader extends _$AsyncThumbnailLoader {
   }
 
   Future<void> _load() async {
+    final generation = _loadGeneration;
     final container = _container;
     final fetchFn = _fetchFn;
     final cache = _cache;
@@ -227,7 +252,7 @@ class AsyncThumbnailLoader extends _$AsyncThumbnailLoader {
         // same frame never reaches the queue.
         await Future<void>.value();
       }
-      if (!ref.mounted) return;
+      if (!ref.mounted || generation != _loadGeneration) return;
 
       final syncBytes = _syncLookup?.call();
       if (syncBytes != null) {
@@ -250,11 +275,11 @@ class AsyncThumbnailLoader extends _$AsyncThumbnailLoader {
 
     try {
       final data = await future.timeout(_watchdogTimeout);
-      if (!ref.mounted) return;
+      if (!ref.mounted || generation != _loadGeneration) return;
       _cancellationRetries = 0;
       state = AsyncThumbnailState(bytes: data, isLoading: false);
     } catch (e) {
-      if (!ref.mounted) return;
+      if (!ref.mounted || generation != _loadGeneration) return;
       final errStr = e.toString();
       final isCancellation = errStr.contains('Cancelled') || errStr.contains('cancelled');
       if (isCancellation && _cancellationRetries < _maxCancellationRetries) {

@@ -2462,6 +2462,17 @@ class AppLocalizationsEn extends AppLocalizations {
       'Make a standard volume larger, like the desktop Volume Expander';
 
   @override
+  String get toolExpandLuksVolumeTitle => 'Expand LUKS container';
+
+  @override
+  String get toolExpandLuksVolumeSubtitle =>
+      'Grow LUKS1 and LUKS2 containers, including fixed-size LUKS2 metadata';
+
+  @override
+  String get luksToolsExpandNote =>
+      'Back up the container first. Supports LUKS1 and LUKS2. NTFS and ext2/3/4 filesystems can be expanded in place (FAT and exFAT cannot). The added space can be initialized with encrypted zeros. A keyfile replaces the password if used.';
+
+  @override
   String get toolHiddenInExistingTitle => 'Add hidden volume';
 
   @override
@@ -2495,10 +2506,44 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get vcToolsExpandNote =>
-      'Only the container is enlarged. The file system inside is not resized, so the added space stays unallocated until the file system is grown. Back up the volume first.';
+      'The container is enlarged first. Then the file system inside is grown into the added space where that is possible without reformatting (NTFS, ext2/3/4). FAT and exFAT cannot be grown in place; their added space stays unallocated. Back up the volume first.';
 
   @override
   String get vcToolsExpandDone => 'Volume expanded';
+
+  @override
+  String get vcToolsGrowFsToggle => 'Also grow the file system';
+
+  @override
+  String get vcToolsGrowFsToggleHint =>
+      'Lets NTFS and ext2/3/4 volumes use the added space right away, without reformatting.';
+
+  @override
+  String get vcToolsGrowFsOnlyAction => 'Only grow the file system';
+
+  @override
+  String get vcToolsFsGrown =>
+      'File system grown: the added space is ready to use.';
+
+  @override
+  String get vcToolsFsAlreadyFills =>
+      'The file system already fills the volume.';
+
+  @override
+  String get vcToolsFsUnsupported =>
+      'This file system cannot be grown in place (FAT and exFAT cannot). The added space stays unallocated until the volume is reformatted; back up its files first.';
+
+  @override
+  String get vcToolsFsBusy =>
+      'Files are still open in the volume. Close them, lock the volume, then retry “Only grow the file system”.';
+
+  @override
+  String get vcToolsFsNeedsCheck =>
+      'The file system is marked as needing a check. Run Check & Repair on the volume, then use “Only grow the file system”.';
+
+  @override
+  String get vcToolsFsFailed =>
+      'The file system could not be grown. The volume itself is expanded; run Check & Repair on it before using it.';
 
   @override
   String get vcToolsAnalyzeAction => 'Check free space';
@@ -14053,11 +14098,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get vaultListingDetails => 'Details';
 
   @override
-  String get vaultListingSymbolicLinksTitle => 'Symbolic links';
+  String get vaultListingSymbolicLinksTitle => 'Shortcuts';
 
   @override
   String get vaultListingSymbolicLinksNote =>
-      'A symbolic link points somewhere else. It is never opened or followed here; tap one to copy where it points.';
+      'Shortcuts open their targets when tapped. Relative targets stay inside this vault; absolute or broken targets cannot be opened.';
 
   @override
   String get vaultListingHiddenEntriesTitle => 'Entries that are not shown';
@@ -14219,4 +14264,107 @@ class AppLocalizationsEn extends AppLocalizations {
   String galleryPlaceHintCoordinates(int km) {
     return 'No city within $km km: grouped by coordinates';
   }
+
+  @override
+  String get cryptomatorBackupKeyFilesTitle =>
+      'Back up key files when unlocking';
+
+  @override
+  String get cryptomatorBackupKeyFilesSubtitle =>
+      'Keeps a copy of masterkey.cryptomator and vault.cryptomator next to the originals, like Cryptomator on desktop. Applies from the next unlock. Read-only sessions never write.';
+
+  @override
+  String get cryptomatorUpgradeTitle => 'Upgrade vault format';
+
+  @override
+  String get cryptomatorUpgradeSubtitle =>
+      'This vault uses the older format 7.';
+
+  @override
+  String get cryptomatorUpgradeLockFirst => 'Lock the vault to upgrade it';
+
+  @override
+  String get cryptomatorUpgradeWarning =>
+      'Upgrading changes this vault to format 8. It cannot be undone, and Cryptomator versions older than 1.6 will no longer be able to open the vault afterwards.\n\nA copy of the current key file is kept as masterkey.cryptomator.<id>.bkup. If another app syncs this vault, let it finish syncing first.';
+
+  @override
+  String get cryptomatorUpgradeConfirm => 'I understand this can\'t be undone';
+
+  @override
+  String get cryptomatorUpgradeAction => 'Upgrade';
+
+  @override
+  String get cryptomatorUpgradedMessage => 'Vault upgraded to format 8';
+
+  @override
+  String get cryptomatorUpgradeUnlockedError => 'Lock the vault first';
+
+  @override
+  String get cryptomatorConfigMissingWarning =>
+      'vault.cryptomator is missing. If another app syncs this vault, wait for it to finish, then try again. Do not upgrade.';
+
+  @override
+  String get cryptomatorUpgradeFailedMessage => 'Could not upgrade the vault';
+
+  @override
+  String get newSymbolicLinkTitle => 'New symbolic link';
+
+  @override
+  String get symbolicLinkNameHint => 'Link name';
+
+  @override
+  String get symbolicLinkTargetHint => 'Points to';
+
+  @override
+  String get symbolicLinkTargetHelper =>
+      'Stored exactly as written. Relative targets are resolved inside this vault when opened; absolute targets are not followed.';
+
+  @override
+  String get symbolicLinkTargetTooLong =>
+      'Target is too long (maximum 32,767 bytes)';
+
+  @override
+  String get symbolicLinkTargetInvalid =>
+      'Target can\'t contain a null character';
+
+  @override
+  String get symbolicLinkNameTaken =>
+      'A file, folder or link with this name already exists';
+
+  @override
+  String get deleteSymbolicLinkTitle => 'Delete symbolic link?';
+
+  @override
+  String deleteSymbolicLinkMessage(String name) {
+    return 'Delete the link \"$name\"? Only the link is removed; what it points to is not touched.';
+  }
+
+  @override
+  String get symbolicLinkRenameTitle => 'Rename symbolic link';
+
+  @override
+  String get symbolicLinkBrowseTarget => 'Browse vault';
+
+  @override
+  String get symbolicLinkSelectTargetTitle => 'Choose shortcut target';
+
+  @override
+  String get symbolicLinkSelectThisFolder => 'Select this folder';
+
+  @override
+  String get symbolicLinkPickerLoadError => 'Couldn\'t load this folder';
+
+  @override
+  String get shortcutBadge => 'Shortcut';
+
+  @override
+  String get emptyFolder => 'This folder is empty';
+
+  @override
+  String get symbolicLinkTargetHelperRelative =>
+      'Use a relative path inside this container. The target may be missing; renaming or deleting the link does not change the target.';
+
+  @override
+  String get symbolicLinkTargetOutsideVault =>
+      'Target must be a relative path that stays inside this container.';
 }

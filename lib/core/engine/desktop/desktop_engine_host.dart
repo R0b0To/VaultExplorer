@@ -428,10 +428,20 @@ class DesktopEngineHost {
         return _changeFolderVaultPassword(args, veFvCryfs);
       case ChannelMethods.migrateCryptomatorVault:
         return _migrateCryptomatorVault(args);
+      case ChannelMethods.probeCryptomatorVault:
+        return _probeCryptomatorVault(args);
+      case ChannelMethods.getCryptomatorKeyFileBackup:
+        return _vaultOpenPrefs.getBackupKeyFiles(args['uri'] as String);
+      case ChannelMethods.setCryptomatorKeyFileBackup:
+        return _vaultOpenPrefs.setBackupKeyFiles(args['uri'] as String, args['enabled'] == true);
+      case ChannelMethods.clearVaultOpenPreferences:
+        return _vaultOpenPrefs.clear(args['uri'] as String);
       case ChannelMethods.listVaultSymlinks:
         return _listVaultSymlinks(args);
       case ChannelMethods.readVaultSymlink:
         return _readVaultSymlink(args);
+      case ChannelMethods.createVaultSymlink:
+        return _createVaultSymlink(args);
       case ChannelMethods.getHiddenEntryCount:
         return _hiddenEntryCount(args);
       // Block-device volumes have nothing to flush or batch; a folder vault does.
@@ -472,6 +482,12 @@ class DesktopEngineHost {
   };
 
   String? _fvStateDir;
+  late final _VaultOpenPrefs _vaultOpenPrefs = _VaultOpenPrefs(_folderVaultPrefsFile);
+
+  Future<File> _folderVaultPrefsFile() async {
+    final support = await getApplicationSupportDirectory();
+    return File(p.join(support.path, 'vault_open_prefs.json'));
+  }
 
   /// CryFS keeps per-vault integrity state outside the vault; it has to survive restarts.
   Future<String> _folderVaultStateDir() async {
@@ -557,6 +573,7 @@ class DesktopEngineHost {
               'password': password,
               'combinedKey': preserved,
               'readOnly': args['readOnly'] == true,
+              'backupKeyFiles': await _vaultOpenPrefs.getBackupKeyFiles(root),
               'localStateDir': await _folderVaultStateDir(),
               'tempDir': Directory.systemTemp.path,
             },
@@ -636,6 +653,10 @@ class DesktopEngineHost {
   }
 
   Future<bool> _migrateCryptomatorVault(Map<Object?, Object?> args) async {
+    // The native side refuses whatever the UI showed: a vault open in this app must not be rewritten under it.
+    if (_volByUri.containsKey(args['filePath'])) {
+      throw PlatformException(code: 'VAULT_UNLOCKED', message: 'The vault is unlocked in this app. Lock it first.');
+    }
     final pw = Uint8List.fromList(utf8.encode((args['password'] as String?) ?? ''));
     try {
       final r = await _withActivity(() async => await pool.call('fvMigrate', [
@@ -649,18 +670,40 @@ class DesktopEngineHost {
     }
   }
 
+  /// Password-free Cryptomator format check (0 unknown, 7 migratable, 8 current, -8 config not synced yet,
+  /// 6 too old); never throws.
+  Future<int> _probeCryptomatorVault(Map<Object?, Object?> args) async {
+    final path = args['filePath'];
+    if (path is! String) return 0;
+    try {
+      return await pool.call('fvProbeCryptomator', [path]) as int;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  /// Symlinks work on any unlocked slot (ext/NTFS containers and Cryptomator vaults), so these look the
+  /// slot up by path rather than requiring a folder vault.
   Future<Object?> _listVaultSymlinks(Map<Object?, Object?> args) async {
     final vol = _volByUri[args['filePath']];
-    if (vol == null || !(_meta[vol]?.isFolderVault ?? false)) return <Object?>[];
-    final r = await pool.call('fvListSymlinks', [vol, (args['dirPath'] as String?) ?? '']) as List<Object?>;
+    if (vol == null) return <Object?>[];
+    final r = await pool.call('listSymlinks', [vol, (args['dirPath'] as String?) ?? '']) as List<Object?>;
     return r[0] == veOk ? r[1] : <Object?>[];
   }
 
   Future<Object?> _readVaultSymlink(Map<Object?, Object?> args) async {
     final vol = _volByUri[args['filePath']];
-    if (vol == null || !(_meta[vol]?.isFolderVault ?? false)) return null;
-    final r = await pool.call('fvReadSymlink', [vol, args['path'] as String]) as List<Object?>;
+    if (vol == null) return null;
+    final r = await pool.call('readSymlink', [vol, args['path'] as String]) as List<Object?>;
     return r[0] == veOk ? r[1] : null;
+  }
+
+  /// False when the filesystem/vault refuses the link; session and read-only problems throw like the other writes.
+  Future<bool> _createVaultSymlink(Map<Object?, Object?> args) async {
+    final vol = _volByUri[args['filePath']];
+    if (vol == null) throw PlatformException(code: 'NOT_UNLOCKED', message: 'NOT_UNLOCKED');
+    final rc = await pool.call('createSymlink', [vol, args['path'] as String, args['target'] as String]) as int;
+    return _ok(rc);
   }
 
   Future<int> _hiddenEntryCount(Map<Object?, Object?> args) async {
@@ -1190,5 +1233,60 @@ class DesktopEngineHost {
     await _external.cleanupAll();
     await _hash.dispose();
     await pool.dispose();
+  }
+}
+
+/// Per-vault open options that must survive restarts (what Android keeps in a Kotlin preference file).
+/// Plain JSON in the app-support folder: nothing in it is secret.
+class _VaultOpenPrefs {
+  _VaultOpenPrefs(this._file);
+
+  final Future<File> Function() _file;
+  Map<String, Map<String, Object?>>? _cache;
+
+  Future<Map<String, Map<String, Object?>>> _load() async {
+    final cached = _cache;
+    if (cached != null) return cached;
+    final loaded = <String, Map<String, Object?>>{};
+    try {
+      final f = await _file();
+      if (await f.exists()) {
+        final decoded = jsonDecode(await f.readAsString());
+        if (decoded is Map) {
+          decoded.forEach((k, v) {
+            if (k is String && v is Map) loaded[k] = Map<String, Object?>.from(v);
+          });
+        }
+      }
+    } catch (_) {
+      // unreadable or corrupt: start from defaults
+    }
+    return _cache = loaded;
+  }
+
+  Future<void> _save() async {
+    try {
+      final f = await _file();
+      await f.parent.create(recursive: true);
+      await f.writeAsString(jsonEncode(_cache ?? const {}));
+    } catch (_) {
+      // best effort: the option just reverts to its default next launch
+    }
+  }
+
+  /// Keep `.bkup` copies of Cryptomator's key files on read-write unlocks. Defaults to true.
+  Future<bool> getBackupKeyFiles(String uri) async => (await _load())[uri]?['backupKeyFiles'] != false;
+
+  Future<bool> setBackupKeyFiles(String uri, bool enabled) async {
+    final all = await _load();
+    all.putIfAbsent(uri, () => <String, Object?>{})['backupKeyFiles'] = enabled;
+    await _save();
+    return true;
+  }
+
+  Future<bool> clear(String uri) async {
+    final all = await _load();
+    if (all.remove(uri) != null) await _save();
+    return true;
   }
 }

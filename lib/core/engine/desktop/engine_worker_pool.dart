@@ -228,6 +228,7 @@ Object? veExecute(VeNative n, String op, List<Object?> a) {
             password: m['password'] as Uint8List,
             combinedKey: m['combinedKey'] as Uint8List?,
             readOnly: m['readOnly'] as bool,
+            backupKeyFiles: m['backupKeyFiles'] as bool,
             localStateDir: m['localStateDir'] as String,
             tempDir: m['tempDir'] as String,
           );
@@ -294,16 +295,21 @@ Object? veExecute(VeNative n, String op, List<Object?> a) {
           _wipe(m['password'] as Uint8List?);
         }
       }
-    case 'fvListSymlinks':
+    case 'fvProbeCryptomator':
+      return n.fvProbeCryptomator(a[0] as String);
+    // symbolic links (ext/NTFS containers and Cryptomator vaults alike)
+    case 'listSymlinks':
       {
-        final (rc, entries) = n.fvListSymlinks(a[0] as int, a[1] as String);
+        final (rc, entries) = n.listSymlinks(a[0] as int, a[1] as String);
         return [rc, entries];
       }
-    case 'fvReadSymlink':
+    case 'readSymlink':
       {
-        final (rc, target) = n.fvReadSymlink(a[0] as int, a[1] as String);
+        final (rc, target) = n.readSymlink(a[0] as int, a[1] as String);
         return [rc, target];
       }
+    case 'createSymlink':
+      return n.createSymlink(a[0] as int, a[1] as String, a[2] as String);
     case 'fvHidden':
       return n.fvHiddenEntryCount(a[0] as int, a[1] as String);
     case 'fvFinishWrite':

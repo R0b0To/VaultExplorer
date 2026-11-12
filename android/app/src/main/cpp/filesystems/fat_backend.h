@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "copy_progress_callback.h"
+#include "fs_grow.h"
 
 uint64_t recursiveFatFolderSize(int volumeId, const std::string& path);
 
@@ -30,3 +31,7 @@ std::string fatGetFilesystemLabel(int volumeId);
 void* fatOpenStream(int volumeId, const std::string& path);
 int32_t fatReadStream(int volumeId, void* handle, uint64_t offset, uint8_t* dest, size_t length);
 void fatCloseStream(int volumeId, void* handle);
+
+// FAT/exFAT can't be grown in place (see fat_backend.cpp): reports kUnsupported when the volume has at least
+// 1 MiB of space beyond the end of the file system, kAlreadyFills otherwise.
+FsGrowStatus fatGrowToFit(int volumeId);

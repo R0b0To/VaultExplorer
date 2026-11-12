@@ -2506,6 +2506,17 @@ class AppLocalizationsDe extends AppLocalizations {
       'Ein Standard-Volume vergrößern, wie mit dem Desktop-Volume-Expander';
 
   @override
+  String get toolExpandLuksVolumeTitle => 'LUKS-Container erweitern';
+
+  @override
+  String get toolExpandLuksVolumeSubtitle =>
+      'LUKS1- und LUKS2-Container vergrößern, einschließlich LUKS2-Metadaten fester Größe';
+
+  @override
+  String get luksToolsExpandNote =>
+      'Sichern Sie den Container zuerst. Unterstützt LUKS1 und LUKS2. NTFS- und ext2/3/4-Dateisysteme können direkt vergrößert werden (FAT und exFAT nicht). Der hinzugefügte Speicherplatz kann mit verschlüsselten Nullen initialisiert werden. Eine Schlüsseldatei ersetzt das Passwort, falls verwendet.';
+
+  @override
   String get toolHiddenInExistingTitle => 'Verstecktes Volume hinzufügen';
 
   @override
@@ -2539,10 +2550,44 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get vcToolsExpandNote =>
-      'Nur der Container wird vergrößert. Das darin enthaltene Dateisystem wird nicht angepasst, sodass der hinzugefügte Speicher nicht zugewiesen bleibt, bis das Dateisystem vergrößert wird. Sichern Sie das Volume vorher.';
+      'Zuerst wird der Container vergrößert. Danach wird das Dateisystem darin in den hinzugefügten Platz erweitert, sofern das ohne Neuformatierung möglich ist (NTFS, ext2/3/4). FAT und exFAT lassen sich nicht an Ort und Stelle erweitern; ihr hinzugefügter Platz bleibt unzugeordnet. Sichern Sie das Volume vorher.';
 
   @override
   String get vcToolsExpandDone => 'Volume vergrößert';
+
+  @override
+  String get vcToolsGrowFsToggle => 'Dateisystem ebenfalls erweitern';
+
+  @override
+  String get vcToolsGrowFsToggleHint =>
+      'Ermöglicht NTFS- und ext2/3/4-Volumes, den hinzugefügten Platz sofort ohne Neuformatierung zu nutzen.';
+
+  @override
+  String get vcToolsGrowFsOnlyAction => 'Nur Dateisystem erweitern';
+
+  @override
+  String get vcToolsFsGrown =>
+      'Dateisystem erweitert: Der hinzugefügte Platz ist nutzbar.';
+
+  @override
+  String get vcToolsFsAlreadyFills =>
+      'Das Dateisystem füllt das Volume bereits aus.';
+
+  @override
+  String get vcToolsFsUnsupported =>
+      'Dieses Dateisystem lässt sich nicht an Ort und Stelle erweitern (FAT und exFAT nicht). Der hinzugefügte Platz bleibt unzugeordnet, bis das Volume neu formatiert wird; sichern Sie vorher seine Dateien.';
+
+  @override
+  String get vcToolsFsBusy =>
+      'Dateien im Volume sind noch geöffnet. Schließen Sie diese, sperren Sie das Volume und versuchen Sie es erneut mit „Nur das Dateisystem vergrößern“.';
+
+  @override
+  String get vcToolsFsNeedsCheck =>
+      'Das Dateisystem ist als prüfbedürftig markiert. Führen Sie „Prüfen & Reparieren“ für das Volume aus und verwenden Sie dann „Nur Dateisystem erweitern“.';
+
+  @override
+  String get vcToolsFsFailed =>
+      'Das Dateisystem konnte nicht erweitert werden. Das Volume selbst wurde vergrößert; führen Sie „Prüfen & Reparieren“ aus, bevor Sie es verwenden.';
 
   @override
   String get vcToolsAnalyzeAction => 'Freien Speicher prüfen';
@@ -14268,11 +14313,11 @@ class AppLocalizationsDe extends AppLocalizations {
   String get vaultListingDetails => 'Details';
 
   @override
-  String get vaultListingSymbolicLinksTitle => 'Symbolische Links';
+  String get vaultListingSymbolicLinksTitle => 'Verknüpfungen';
 
   @override
   String get vaultListingSymbolicLinksNote =>
-      'Ein symbolischer Link verweist auf einen anderen Ort. Er wird hier weder geöffnet noch verfolgt. Tippe darauf, um das Ziel zu kopieren.';
+      'Beim Antippen wird das Ziel einer Verknüpfung geöffnet. Relative Ziele bleiben in diesem Tresor; absolute oder ungültige Ziele können nicht geöffnet werden.';
 
   @override
   String get vaultListingHiddenEntriesTitle => 'Nicht angezeigte Einträge';
@@ -14434,4 +14479,110 @@ class AppLocalizationsDe extends AppLocalizations {
   String galleryPlaceHintCoordinates(int km) {
     return 'Keine Stadt im Umkreis von $km km: nach Koordinaten gruppiert';
   }
+
+  @override
+  String get cryptomatorBackupKeyFilesTitle =>
+      'Schlüsseldateien beim Entsperren sichern';
+
+  @override
+  String get cryptomatorBackupKeyFilesSubtitle =>
+      'Legt neben den Originalen eine Kopie von masterkey.cryptomator und vault.cryptomator ab, wie Cryptomator am Computer. Gilt ab dem nächsten Entsperren. Schreibgeschützte Sitzungen schreiben nie.';
+
+  @override
+  String get cryptomatorUpgradeTitle => 'Tresorformat aktualisieren';
+
+  @override
+  String get cryptomatorUpgradeSubtitle =>
+      'Dieser Tresor verwendet das ältere Format 7.';
+
+  @override
+  String get cryptomatorUpgradeLockFirst => 'Tresor zum Aktualisieren sperren';
+
+  @override
+  String get cryptomatorUpgradeWarning =>
+      'Beim Aktualisieren wird dieser Tresor auf Format 8 umgestellt. Das lässt sich nicht rückgängig machen, und Cryptomator-Versionen vor 1.6 können den Tresor danach nicht mehr öffnen.\n\nEine Kopie der aktuellen Schlüsseldatei bleibt als masterkey.cryptomator.<id>.bkup erhalten. Wenn eine andere App diesen Tresor synchronisiert, lassen Sie die Synchronisierung zuerst abschließen.';
+
+  @override
+  String get cryptomatorUpgradeConfirm =>
+      'Mir ist klar, dass sich das nicht rückgängig machen lässt';
+
+  @override
+  String get cryptomatorUpgradeAction => 'Aktualisieren';
+
+  @override
+  String get cryptomatorUpgradedMessage => 'Tresor auf Format 8 aktualisiert';
+
+  @override
+  String get cryptomatorUpgradeUnlockedError => 'Sperren Sie zuerst den Tresor';
+
+  @override
+  String get cryptomatorConfigMissingWarning =>
+      'vault.cryptomator fehlt. Wenn eine andere App diesen Tresor synchronisiert, warten Sie, bis sie fertig ist, und versuchen Sie es dann erneut. Nicht aktualisieren.';
+
+  @override
+  String get cryptomatorUpgradeFailedMessage =>
+      'Tresor konnte nicht aktualisiert werden';
+
+  @override
+  String get newSymbolicLinkTitle => 'Neuer symbolischer Link';
+
+  @override
+  String get symbolicLinkNameHint => 'Name des Links';
+
+  @override
+  String get symbolicLinkTargetHint => 'Verweist auf';
+
+  @override
+  String get symbolicLinkTargetHelper =>
+      'Wird genau so gespeichert, wie es eingegeben wurde. Relative Ziele werden beim Öffnen innerhalb dieses Tresors aufgelöst; absolute Ziele werden nicht verfolgt.';
+
+  @override
+  String get symbolicLinkTargetTooLong =>
+      'Ziel ist zu lang (maximal 32.767 Byte)';
+
+  @override
+  String get symbolicLinkTargetInvalid =>
+      'Das Ziel darf kein Nullzeichen enthalten';
+
+  @override
+  String get symbolicLinkNameTaken =>
+      'Eine Datei, ein Ordner oder ein Link mit diesem Namen existiert bereits';
+
+  @override
+  String get deleteSymbolicLinkTitle => 'Symbolischen Link löschen?';
+
+  @override
+  String deleteSymbolicLinkMessage(String name) {
+    return 'Link „$name“ löschen? Nur der Link wird entfernt; das Ziel bleibt unberührt.';
+  }
+
+  @override
+  String get symbolicLinkRenameTitle => 'Symbolischen Link umbenennen';
+
+  @override
+  String get symbolicLinkBrowseTarget => 'Tresor durchsuchen';
+
+  @override
+  String get symbolicLinkSelectTargetTitle => 'Ziel für Verknüpfung auswählen';
+
+  @override
+  String get symbolicLinkSelectThisFolder => 'Diesen Ordner auswählen';
+
+  @override
+  String get symbolicLinkPickerLoadError =>
+      'Dieser Ordner konnte nicht geladen werden';
+
+  @override
+  String get shortcutBadge => 'Verknüpfung';
+
+  @override
+  String get emptyFolder => 'Dieser Ordner ist leer';
+
+  @override
+  String get symbolicLinkTargetHelperRelative =>
+      'Verwende einen relativen Pfad innerhalb dieses Containers. Das Ziel darf fehlen; Umbenennen oder Löschen des Links ändert das Ziel nicht.';
+
+  @override
+  String get symbolicLinkTargetOutsideVault =>
+      'Das Ziel muss ein relativer Pfad innerhalb dieses Containers sein.';
 }

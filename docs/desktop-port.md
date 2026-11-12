@@ -3,11 +3,13 @@
 Status: **work in progress.** The native engine builds and passes its smoke test on Linux. The Dart
 host is written but has not yet been run inside Flutter. Windows is partly prepared (see below).
 
-**Rebased onto v1.50.0.** The port was first written against v1.39.0. It now sits on top of v1.50.0:
+**Rebased onto the latest v1.50.0 main** (the second 1.50.0 snapshot, which adds in-place ext/NTFS grow, Cryptomator
+symlinks, the Cryptomator key-file backup option and the format probe). The port was first written against v1.39.0;
+it now sits on top of main:
 main's versions of every shared file are kept (they carry fixes the old snapshot lacks, e.g. the
 container-creation header randomisation and the `-1 = missing` file-size contract) and only the port's
 own edits are re-applied. Re-verified since the rebase: the Linux engine (FAT / exFAT / NTFS / ext4, hidden
-volumes, password change, crypto, digests, single-file tool, folder vaults). **Not** re-verified: the
+volumes, password change, crypto, digests, single-file tool, folder vaults, native ext4/NTFS symlinks). **Not** re-verified: the
 Windows build/Wine run (it predates the rebase), and all Dart (no Flutter SDK was available: run
 `flutter pub get` -- `pubspec.lock` was not regenerated -- then `flutter analyze` first).
 
@@ -178,7 +180,13 @@ list / read / write / rename / delete / mkdir / set-mtime / import / export / st
 on it unchanged. `ve_copy_file` between any mix of container and vault slots streams through memory in 2 MiB
 steps (and finishes the destination vault file). Format-specific calls: `ve_fv_probe / unlock / create /
 change_password / migrate_cryptomator / info / list_symlinks / read_symlink / hidden_entry_count /
-finish_write / batch` (ABI 7, `ve_engine.h`).
+finish_write / batch` (ABI 8, `ve_engine.h`). `ve_fv_unlock` takes `backup_key_files` (Cryptomator `.bkup` copies of
+the key files on read-write unlocks; the per-vault choice lives in `<app support>/vault_open_prefs.json`, default on) and
+`ve_fv_probe_cryptomator` is the password-free format check behind the "upgrade this vault" tile.
+
+**Symbolic links** (`ve_list_symlinks / ve_read_symlink / ve_create_symlink`) are generic: they work on any unlocked slot,
+so Cryptomator vaults and native ext/NTFS containers answer through the same calls. Links stay out of `ve_list_directory`;
+a link to a folder is listed as `LD|0|mtime|name`.
 
 - **A chunk-written file only becomes valid after `finishWrite`**, and chunks must arrive in order from offset 0
   (the core's contract; the Dart layer already calls `finishWrite` on Android). Skipping it left the engine
@@ -198,15 +206,19 @@ finish_write / batch` (ABI 7, `ve_engine.h`).
 
 ## Not yet
 
-- Engine-channel coverage: of the 367 methods the Dart layer calls, the desktop host answers 102 and answers
-  45 Android-only ones with a harmless default; **225 still reply `null`**. Many are Android-only (camera 26,
+- Engine-channel coverage: of the 375 methods the Dart layer calls, the desktop host answers 107 and answers
+  45 Android-only ones with a harmless default; **228 still reply `null`**. Many are Android-only (camera 26,
   Media3 23, audio recorder 12, panic 11, disguise 10, automation 10, PiP 6, quick capture 7). The ones worth
   doing for desktop: repair / check / header tools (`vault_repair_api`, 11, including
   `checkFolderVault` / `repairFolderVault`), archives (`vault_archive_api`, 8 -- the libarchive engine is already
   in the build, it only needs ABI functions), PDF (8), audio editing (4), `mountContainerFolder` /
   `createUsbContainer` / pickers in `vault_lifecycle_api`, and part of `vault_file_io_api` (36, e.g. video
   thumbnails, `getMediaFileSize`).
-- Windows: folder vaults (above) and re-running the engine smoke test after the rebase.
+- In-place growth (new in this main): `expandVeraCryptContainer`, `expandLuksContainer`, `growVeraCryptFileSystem`,
+  `growLuksFileSystem`. The engine already has `fsGrowToFit` (NTFS and ext2/3/4; FAT/exFAT report unsupported); it only needs
+  ABI functions and host handlers, plus the container-file extension step for the two `expand*` calls.
+- Windows: folder vaults (above), the new ext resize sources (`e2fsprogs/resize`, `filesystems/ext_resize_glue.c`) under
+  MinGW, and re-running the engine smoke test after the rebase.
 - Archives, video thumbnails, media playback, PDF, camera, video/audio editing -- need their
   desktop backends (they are platform code on Android).
 - Import: per-filesystem file-name validation and the post-import SHA-256 read-back verification

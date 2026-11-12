@@ -7,6 +7,35 @@ import 'package:vaultexplorer/data/models/clipboard_item.dart';
 
 typedef KeyfileRef = ({String uri, String displayName});
 
+/// What a Cryptomator vault folder looks like from its files alone, without the password (see
+/// `VaultLifecycleApi.probeCryptomatorVault`). Only [legacy7] may be offered the format upgrade;
+/// [configMissing] is the "vault.cryptomator has not synced yet" case and must never be upgraded.
+enum CryptomatorVaultFormat {
+  /// Not a readable Cryptomator vault, or the folder could not be read right now.
+  unknown,
+
+  /// Format 7: a version-7 key file and no vault.cryptomator. Migratable.
+  legacy7,
+
+  /// vault.cryptomator exists: nothing to upgrade.
+  current,
+
+  /// No vault.cryptomator, but the key file says format 8 or newer (config not synced yet).
+  configMissing,
+
+  /// A key file older than format 7; the app cannot upgrade it.
+  tooOld;
+
+  /// Maps the native probe code (0 unknown, 7, 8, -8, 6). Anything unexpected is [unknown], never [legacy7].
+  static CryptomatorVaultFormat fromProbeCode(int? code) => switch (code) {
+    7 => legacy7,
+    8 => current,
+    -8 => configMissing,
+    6 => tooOld,
+    _ => unknown,
+  };
+}
+
 typedef UnlockProgress = ({
   int volId,
   int attempted,

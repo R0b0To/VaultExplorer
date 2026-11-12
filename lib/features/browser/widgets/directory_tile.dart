@@ -89,7 +89,12 @@ class DirectoryTile extends StatelessWidget {
     final folderIconSize = (AppIconSize.action + 4) * zoomLevel;
 
     Widget? badge;
-    if ((isPinned || isBookmark || isDocumentProviderMounted || isSynced) && !isSelected) {
+    if ((entry.isSymlink ||
+            isPinned ||
+            isBookmark ||
+            isDocumentProviderMounted ||
+            isSynced) &&
+        !isSelected) {
       badge = Container(
         padding: EdgeInsets.symmetric(horizontal: 3 * zoomLevel, vertical: 1.5 * zoomLevel),
         decoration: BoxDecoration(
@@ -99,6 +104,14 @@ class DirectoryTile extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (entry.isSymlink)
+              Icon(
+                Icons.shortcut_rounded,
+                size: 11 * zoomLevel,
+                color: cs.primary,
+              ),
+            if (entry.isSymlink && isPinned)
+              SizedBox(width: 2 * zoomLevel),
             if (isPinned)
               Icon(
                 Icons.push_pin_rounded,
@@ -106,7 +119,7 @@ class DirectoryTile extends StatelessWidget {
                 color: cs.primary,
               ),
             if (isBookmark) ...[
-              if (isPinned) SizedBox(width: 2 * zoomLevel),
+              if (isPinned || entry.isSymlink) SizedBox(width: 2 * zoomLevel),
               Icon(
                 Icons.star_rounded,
                 size: 10 * zoomLevel,
@@ -114,7 +127,7 @@ class DirectoryTile extends StatelessWidget {
               ),
             ],
             if (isDocumentProviderMounted) ...[
-              if (isPinned || isBookmark) SizedBox(width: 2 * zoomLevel),
+              if (isPinned || isBookmark || entry.isSymlink) SizedBox(width: 2 * zoomLevel),
               Icon(
                 Icons.folder_shared_rounded,
                 size: 10 * zoomLevel,
@@ -122,7 +135,7 @@ class DirectoryTile extends StatelessWidget {
               ),
             ],
             if (isSynced) ...[
-              if (isPinned || isBookmark || isDocumentProviderMounted) SizedBox(width: 2 * zoomLevel),
+              if (isPinned || isBookmark || isDocumentProviderMounted || entry.isSymlink) SizedBox(width: 2 * zoomLevel),
               Icon(
                 Icons.sync_rounded,
                 size: 10 * zoomLevel,

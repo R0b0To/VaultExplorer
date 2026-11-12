@@ -38,6 +38,25 @@ class VeraCryptToolsHandlers(
         }
     }
 
+    /** Expands a LUKS1/LUKS2 file container. A keyfile replaces the typed password, like cryptsetup. */
+    fun handleExpandLuksContainer(call: MethodCall, result: MethodChannel.Result) {
+        val uri = call.argument<String>("uri")
+        val password = call.argument<String>("password") ?: ""
+        val keyfilePaths = call.argument<List<String>>("keyfilePaths")
+        val newSizeBytes = call.argument<Number>("newSizeBytes")?.toLong() ?: 0L
+        val initFreeSpace = call.argument<Boolean>("initFreeSpace") ?: true
+        val growFileSystem = call.argument<Boolean>("growFileSystem") ?: true
+        if (uri.isNullOrEmpty() || newSizeBytes <= 0L || (password.isEmpty() && keyfilePaths.isNullOrEmpty())) {
+            result.error("INVALID_ARGS", "uri, newSizeBytes and a password or keyfile are required", null)
+            return
+        }
+        runFileSystemTool(result, uri, keyfilePaths, isLuks = true) { pfd, keyfileFds ->
+            NativeEngine.expandLuksContainerNative(
+                pfd, password, keyfileFds, newSizeBytes, initFreeSpace, growFileSystem,
+            )
+        }
+    }
+
     /** Grows only the file system of a volume that was expanded earlier, into the space it does not use yet. */
     fun handleGrowFileSystem(call: MethodCall, result: MethodChannel.Result) {
         val uri = call.argument<String>("uri")
@@ -55,6 +74,20 @@ class VeraCryptToolsHandlers(
         }
     }
 
+    /** Retries only the LUKS filesystem grow step without changing the container geometry. */
+    fun handleGrowLuksFileSystem(call: MethodCall, result: MethodChannel.Result) {
+        val uri = call.argument<String>("uri")
+        val password = call.argument<String>("password") ?: ""
+        val keyfilePaths = call.argument<List<String>>("keyfilePaths")
+        if (uri.isNullOrEmpty() || (password.isEmpty() && keyfilePaths.isNullOrEmpty())) {
+            result.error("INVALID_ARGS", "uri and a password or keyfile are required", null)
+            return
+        }
+        runFileSystemTool(result, uri, keyfilePaths, isLuks = true) { pfd, keyfileFds ->
+            NativeEngine.growLuksFileSystemNative(pfd, password, keyfileFds)
+        }
+    }
+
     /**
      * Shared plumbing of the expand / grow-file-system calls: keyfile fds first (as in the other handlers, so a keyfile
      * that fails to open can't strand the detached container fd), then the native call, then the result mapping.
@@ -62,7 +95,7 @@ class VeraCryptToolsHandlers(
      * "busy", "failed" or "not_run" (the container was expanded, the file system step was not asked for).
      */
     private fun runFileSystemTool(
-        result: MethodChannel.Result, uri: String, keyfilePaths: List<String>?,
+        result: MethodChannel.Result, uri: String, keyfilePaths: List<String>?, isLuks: Boolean = false,
         nativeCall: (pfd: Int, keyfileFds: IntArray?) -> IntArray?,
     ) {
         ioExecutor.execute {
@@ -76,10 +109,18 @@ class VeraCryptToolsHandlers(
                     when (outcome) {
                         0 -> result.success(mapOf("fsStatus" to fsStatusName(out?.getOrNull(1) ?: -1), "fsName" to fsKindName(out?.getOrNull(2) ?: 0)))
                         1 -> result.error("PASSWORD_INCORRECT", "Incorrect password", null)
-                        2 -> result.error("NOT_EXPANDABLE", "Only a standard volume that fills its container can be expanded.", null)
+                        2 -> result.error(
+                            "NOT_EXPANDABLE",
+                            if (isLuks) "This LUKS container uses an unsupported segment layout or inconsistent metadata."
+                            else "Only a standard volume that fills its container can be expanded.",
+                            null,
+                        )
                         3 -> result.error("NOT_LARGER", "The new size must be larger than the current size.", null)
                         5 -> result.error("KEYFILE_ERROR", "A keyfile could not be read.", null)
-                        else -> result.error("IO_ERROR", "Could not expand the volume (code $outcome)", null)
+                        6 -> result.error("NOT_LUKS", "The selected file is not a LUKS container.", null)
+                        7 -> result.error("INVALID_HEADER", "The LUKS header is damaged or unsupported.", null)
+                        8 -> result.error("CONTAINER_IN_USE", "Close the unlocked volume before expanding or growing its file system.", null)
+                        else -> result.error("IO_ERROR", "Could not complete the volume operation (code $outcome)", null)
                     }
                 }
             } catch (e: Exception) {

@@ -178,6 +178,7 @@ int changeLuksContainerPassword(int fd,
 // ---- Volume expansion (VeraCrypt Volume Expander; containers/vc_expand.h) --------------------
 enum class ExpandOutcome : int {
     kOk = 0, kWrongPassword = 1, kNotExpandable = 2, kNotLarger = 3, kIoError = 4, kBadKeyfile = 5,
+    kNotLuks = 6, kInvalidHeader = 7, kContainerInUse = 8,
 };
 // Result of the file-system step that can follow an expand (see growFileSystem below).
 struct FsGrowReport {
@@ -201,6 +202,26 @@ ExpandOutcome expandVeraCryptContainer(int fd, const char* password, int pim, in
 // full-size standard volume. kOk means the step ran; its result is in [fsReport].
 ExpandOutcome growVeraCryptFileSystem(int fd, const char* password, int pim, int cipherId, int hashId,
                                       const int* keyfileFds, int keyfileCount, FsGrowReport* fsReport);
+
+// Expands a LUKS1/LUKS2 file container. LUKS1 and LUKS2 dynamic segments
+// grow by extending the file; a fixed-size LUKS2 segment also gets its
+// `size` field updated in both validated metadata copies. Keyfiles follow
+// cryptsetup semantics: the first keyfile replaces (rather than mixes with)
+// the typed password. [initFreeSpace] encrypts plaintext zeroes into the new
+// data range before metadata is committed. File-system growth reuses the
+// NTFS/ext2/3/4 in-place backends; FAT/exFAT report unsupported. Always owns
+// [fd] and all keyfile fds.
+ExpandOutcome expandLuksContainer(int fd, const char* password,
+                                 const int* keyfileFds, int keyfileCount,
+                                 int64_t newSizeBytes, bool initFreeSpace,
+                                 bool growFileSystem = false, FsGrowReport* fsReport = nullptr);
+// Re-runs only the filesystem grow step for a LUKS volume whose data segment
+// already exposes the larger size (for example after a previous filesystem
+// grow returned busy/needs_check/failed). Fixed-size LUKS2 uses its declared
+// segment size, not the physical file tail.
+ExpandOutcome growLuksFileSystem(int fd, const char* password,
+                                 const int* keyfileFds, int keyfileCount,
+                                 FsGrowReport* fsReport);
 
 // ---- Hidden volume inside an EXISTING volume (VeraCrypt "direct mode") -------------------------------
 enum class HiddenHostOutcome : int {

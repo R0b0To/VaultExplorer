@@ -24,6 +24,7 @@ enum FileSystemGrowResult {
   alreadyFills,
   unsupported,
   needsCheck,
+  busy,
   failed,
   notRun;
 
@@ -32,8 +33,9 @@ enum FileSystemGrowResult {
         'already_fills' => alreadyFills,
         'unsupported' => unsupported,
         'needs_check' => needsCheck,
+        'busy' => busy,
         'not_run' => notRun,
-        _ => failed, // 'failed', 'busy' and anything unknown
+        _ => failed, // 'failed' and anything unknown
       };
 }
 
@@ -105,6 +107,31 @@ class VeraCryptToolsApi {
     }
   }
 
+  /// Expands a LUKS1/LUKS2 file container. LUKS keyfiles replace the typed password,
+  /// matching cryptsetup semantics. Fixed-size LUKS2 metadata is updated in both copies.
+  Future<FileSystemGrowInfo> expandLuksContainer({
+    required String uri,
+    String password = '',
+    List<String> keyfilePaths = const [],
+    required int newSizeBytes,
+    bool initFreeSpace = true,
+    bool growFileSystem = true,
+  }) async {
+    try {
+      final raw = await _channel.invokeMethod<Map<Object?, Object?>>(ChannelMethods.expandLuksContainer, {
+        'uri': uri,
+        'password': password,
+        'keyfilePaths': keyfilePaths,
+        'newSizeBytes': newSizeBytes,
+        'initFreeSpace': initFreeSpace,
+        'growFileSystem': growFileSystem,
+      });
+      return FileSystemGrowInfo.fromMap(raw);
+    } on PlatformException catch (e) {
+      throw VeraCryptToolsException(e.code, e.message ?? e.code);
+    }
+  }
+
   /// Grows only the file system of a standard volume that was expanded earlier, into the space it doesn't use yet.
   Future<FileSystemGrowInfo> growFileSystem({
     required String uri,
@@ -121,6 +148,24 @@ class VeraCryptToolsApi {
         'pim': pim,
         'cipherId': cipherId,
         'hashId': hashId,
+        'keyfilePaths': keyfilePaths,
+      });
+      return FileSystemGrowInfo.fromMap(raw);
+    } on PlatformException catch (e) {
+      throw VeraCryptToolsException(e.code, e.message ?? e.code);
+    }
+  }
+
+  /// Re-runs only the LUKS file-system grow step. Fixed-size LUKS2 uses its declared segment size.
+  Future<FileSystemGrowInfo> growLuksFileSystem({
+    required String uri,
+    String password = '',
+    List<String> keyfilePaths = const [],
+  }) async {
+    try {
+      final raw = await _channel.invokeMethod<Map<Object?, Object?>>(ChannelMethods.growLuksFileSystem, {
+        'uri': uri,
+        'password': password,
         'keyfilePaths': keyfilePaths,
       });
       return FileSystemGrowInfo.fromMap(raw);

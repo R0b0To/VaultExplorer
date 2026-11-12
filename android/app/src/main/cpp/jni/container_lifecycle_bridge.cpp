@@ -394,6 +394,45 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_expandVeraCryptContainerNative(
 
 // Grows only the file system of a standard volume that was expanded earlier. Same result array as above.
 extern "C" JNIEXPORT jintArray JNICALL
+Java_com_aeidolon_vaultexplorer_NativeEngine_expandLuksContainerNative(
+        JNIEnv* env, jobject,
+        jint fd, jstring password, jintArray keyfileFds,
+        jlong newSizeBytes, jboolean initFreeSpace, jboolean growFileSystem) {
+    JNI_TRY
+
+    std::vector<int> kfFds = extractKeyfileFds(env, keyfileFds);
+    const char* nativePass = vcGetPasswordUtf8(env, password);
+    FsGrowReport report;
+    const ExpandOutcome outcome = expandLuksContainer(
+        fd, nativePass != nullptr ? nativePass : "",
+        kfFds.empty() ? nullptr : kfFds.data(), static_cast<int>(kfFds.size()),
+        static_cast<int64_t>(newSizeBytes), initFreeSpace == JNI_TRUE,
+        growFileSystem == JNI_TRUE, &report);
+    vcReleasePasswordUtf8(nativePass);
+    return packExpandResult(env, outcome, report);
+
+    JNI_CATCH_RETURN(nullptr)
+}
+
+extern "C" JNIEXPORT jintArray JNICALL
+Java_com_aeidolon_vaultexplorer_NativeEngine_growLuksFileSystemNative(
+        JNIEnv* env, jobject,
+        jint fd, jstring password, jintArray keyfileFds) {
+    JNI_TRY
+
+    std::vector<int> kfFds = extractKeyfileFds(env, keyfileFds);
+    const char* nativePass = vcGetPasswordUtf8(env, password);
+    FsGrowReport report;
+    const ExpandOutcome outcome = growLuksFileSystem(
+        fd, nativePass != nullptr ? nativePass : "",
+        kfFds.empty() ? nullptr : kfFds.data(), static_cast<int>(kfFds.size()), &report);
+    vcReleasePasswordUtf8(nativePass);
+    return packExpandResult(env, outcome, report);
+
+    JNI_CATCH_RETURN(nullptr)
+}
+
+extern "C" JNIEXPORT jintArray JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_growVeraCryptFileSystemNative(
         JNIEnv* env, jobject,
         jint fd, jstring password, jint pim, jint cipherId, jint hashId, jintArray keyfileFds) {

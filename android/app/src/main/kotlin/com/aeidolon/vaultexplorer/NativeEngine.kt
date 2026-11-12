@@ -97,6 +97,19 @@ internal object NativeEngine {
         keyfileFds: IntArray?, newSizeBytes: Long, initFreeSpace: Boolean, growFileSystem: Boolean
     ): IntArray?
 
+    /** Expands a LUKS1/LUKS2 file container and optionally grows its NTFS/ext filesystem. */
+    @JvmStatic
+    external fun expandLuksContainerNative(
+        fd: Int, password: String, keyfileFds: IntArray?,
+        newSizeBytes: Long, initFreeSpace: Boolean, growFileSystem: Boolean
+    ): IntArray?
+
+    /** Only the file-system step for a LUKS volume expanded earlier. */
+    @JvmStatic
+    external fun growLuksFileSystemNative(
+        fd: Int, password: String, keyfileFds: IntArray?
+    ): IntArray?
+
     /** Only the file-system step for a volume expanded earlier; same result array as [expandVeraCryptContainerNative]. */
     @JvmStatic
     external fun growVeraCryptFileSystemNative(

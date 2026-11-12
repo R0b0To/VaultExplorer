@@ -410,6 +410,29 @@ static bool deriveAndValidateHeaderImpl(
     return true;
 }
 
+static bool validLuksSessionGeometry(const LuksVolumeInfo& info,
+                                     uint64_t backingSizeBytes,
+                                     uint64_t backingStartByte) {
+    if (info.dataSectorSize < 512 || info.dataSectorSize > 4096 ||
+        (info.dataSectorSize & (info.dataSectorSize - 1)) != 0 ||
+        info.dataOffsetBytes == 0 || info.dataOffsetBytes >= backingSizeBytes ||
+        info.dataOffsetBytes % info.dataSectorSize != 0 ||
+        backingStartByte > UINT64_MAX - info.dataOffsetBytes) return false;
+
+    const uint64_t available = backingSizeBytes - info.dataOffsetBytes;
+    const uint64_t logicalLength = info.dynamicSize
+        ? (available / info.dataSectorSize) * info.dataSectorSize
+        : info.dataSizeBytes;
+    if (logicalLength == 0 || logicalLength > available ||
+        logicalLength % info.dataSectorSize != 0) return false;
+
+    // iv_tweak is expressed in 512-byte sectors (dm-crypt iv_offset units),
+    // not in logical data-unit counts.
+    const uint64_t segmentStartSector = (backingStartByte + info.dataOffsetBytes) / 512;
+    if (info.ivTweak > segmentStartSector) return false;
+    return true;
+}
+
 static bool prepareLuksSession(int fd, const unsigned char* password, size_t passwordLen, int volId,
                                 const unsigned char* preservedKey, size_t preservedKeyLen,
                                 const int* keyfileFds, int keyfileCount,
@@ -470,6 +493,19 @@ static bool prepareLuksSession(int fd, const unsigned char* password, size_t pas
         return false;
     }
 
+    if (!validLuksSessionGeometry(luksInfo, fileSize, 0)) {
+        LOGI("prepareLuksSession(vol=%d): invalid segment geometry offset=%llu size=%llu sector=%llu iv_tweak=%llu dynamic=%d file=%llu",
+             volId, (unsigned long long)luksInfo.dataOffsetBytes,
+             (unsigned long long)luksInfo.dataSizeBytes,
+             (unsigned long long)luksInfo.dataSectorSize,
+             (unsigned long long)luksInfo.ivTweak, luksInfo.dynamicSize ? 1 : 0,
+             (unsigned long long)fileSize);
+        mbedtls_platform_zeroize(luksInfo.masterKey.data(), luksInfo.masterKey.size());
+        if (!keyfileBuf.empty()) mbedtls_platform_zeroize(keyfileBuf.data(), keyfileBuf.size());
+        close(fd);
+        return false;
+    }
+
     if (luksInfo.cipherMode.rfind("xts-plain64", 0) != 0) {
         LOGI("prepareLuksSession(vol=%d): unsupported cipher mode '%s'", volId, luksInfo.cipherMode.c_str());
         mbedtls_platform_zeroize(luksInfo.masterKey.data(), luksInfo.masterKey.size());
@@ -514,18 +550,20 @@ CascadeContext luksCascade;
         std::unique_lock<std::shared_mutex> lock(v.mutex);
         v.fd = fd;
         v.dataOffset = luksInfo.dataOffsetBytes;
-        v.dataAreaLengthBytes = fileSize - luksInfo.dataOffsetBytes;
+        v.luksSectorSize = (luksInfo.dataSectorSize >= 512) ? luksInfo.dataSectorSize : 512;
+        const uint64_t availableDataBytes = fileSize - luksInfo.dataOffsetBytes;
+        v.dataAreaLengthBytes = luksInfo.dynamicSize
+            ? (availableDataBytes / v.luksSectorSize) * v.luksSectorSize
+            : luksInfo.dataSizeBytes;
         v.isHiddenVolume = false;
         v.fileSize = fileSize;
         v.matchedCipherId = static_cast<int>(dataCipher);
         v.matchedHashId = mappedHash;
-        v.luksSectorSize = (luksInfo.dataSectorSize >= 512) ? luksInfo.dataSectorSize : 512;
         v.luksGenericCascade = luksCascade;
         v.readOnly = readOnly;
         
         const uint64_t segmentStartSector = luksInfo.dataOffsetBytes / 512;
-        const uint64_t sectorsPerUnit = v.luksSectorSize / 512;
-        v.partitionStartSector = segmentStartSector - (luksInfo.ivTweak * sectorsPerUnit);
+        v.partitionStartSector = segmentStartSector - luksInfo.ivTweak;
         
         v.containerFormat = luksInfo.version == 1
             ? ContainerFormat::kLuks1 : ContainerFormat::kLuks2;
@@ -866,6 +904,7 @@ bool detectsAsPlainDiskImage(int fd) {
 }
 
 bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, int pim, int volId, bool forceDerive, int cipherId, int hashId, const unsigned char* preservedKey, size_t preservedKeyLen, const int* keyfileFds, int keyfileCount, bool readOnly, bool useBackupHeader) {
+    std::lock_guard<std::mutex> lifecycleLock(volumeLifecycleMutex);
     if (volId < 0 || volId >= MAX_VOLUMES) { if (fd >= 0) close(fd); closeUnusedKeyfileFds(keyfileFds, keyfileCount); return false; }
     VolumeState& v = volumes[volId];
 
@@ -1523,6 +1562,13 @@ static bool prepareUsbLuksSession(uint64_t partitionStartSector, uint64_t partit
     }
     int mappedHash = 0; // kSha512, display-only for LUKS
 
+    if (!validLuksSessionGeometry(luksInfo, partitionSizeBytes, baseOffset)) {
+        LOGI("prepareUsbLuksSession(vol=%d): invalid segment geometry", volId);
+        mbedtls_platform_zeroize(luksInfo.masterKey.data(), luksInfo.masterKey.size());
+        if (!keyfileBuf.empty()) mbedtls_platform_zeroize(keyfileBuf.data(), keyfileBuf.size());
+        return false;
+    }
+
     CascadeContext luksCascade;
     CascadeSpec spec = cascadeSpecFor(dataCipher);
     if (spec.layerCount != 1 || luksInfo.masterKey.size() != static_cast<size_t>(spec.layerCount) * 64) {
@@ -1544,17 +1590,19 @@ static bool prepareUsbLuksSession(uint64_t partitionStartSector, uint64_t partit
         v.isUsbSource = true;
         v.fd = -1;
         v.dataOffset = baseOffset + luksInfo.dataOffsetBytes;
-        v.dataAreaLengthBytes = partitionSizeBytes - luksInfo.dataOffsetBytes;
+        v.luksSectorSize = (luksInfo.dataSectorSize >= 512) ? luksInfo.dataSectorSize : 512;
+        const uint64_t availableDataBytes = partitionSizeBytes - luksInfo.dataOffsetBytes;
+        v.dataAreaLengthBytes = luksInfo.dynamicSize
+            ? (availableDataBytes / v.luksSectorSize) * v.luksSectorSize
+            : luksInfo.dataSizeBytes;
         v.isHiddenVolume = false;
         v.matchedCipherId = static_cast<int>(dataCipher);
         v.matchedHashId = mappedHash;
-        v.luksSectorSize = (luksInfo.dataSectorSize >= 512) ? luksInfo.dataSectorSize : 512;
         v.luksGenericCascade = luksCascade;
         v.readOnly = readOnly;
 
         const uint64_t segmentStartSector = (baseOffset + luksInfo.dataOffsetBytes) / 512;
-        const uint64_t sectorsPerUnit = v.luksSectorSize / 512;
-        v.partitionStartSector = segmentStartSector - (luksInfo.ivTweak * sectorsPerUnit);
+        v.partitionStartSector = segmentStartSector - luksInfo.ivTweak;
 
         v.containerFormat = luksInfo.version == 1 ? ContainerFormat::kLuks1 : ContainerFormat::kLuks2;
         v.dataCtxInitialized = true;

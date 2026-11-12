@@ -11,7 +11,7 @@ import 'package:vaultexplorer/core/widgets/inputs/utf8_byte_limit_formatter.dart
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
 
 /// The desktop-VeraCrypt volume operations that work on an existing container.
-enum VeraCryptVolumeTool { expand, addHidden }
+enum VeraCryptVolumeTool { expand, expandLuks, addHidden }
 
 class VeraCryptVolumeToolsScreen extends ConsumerStatefulWidget {
   const VeraCryptVolumeToolsScreen({super.key, required this.tool});
@@ -67,7 +67,8 @@ class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeTool
     super.dispose();
   }
 
-  bool get _isExpand => widget.tool == VeraCryptVolumeTool.expand;
+  bool get _isExpand => widget.tool != VeraCryptVolumeTool.addHidden;
+  bool get _isLuksExpand => widget.tool == VeraCryptVolumeTool.expandLuks;
 
   int _pimOf(TextEditingController c) => int.tryParse(c.text.trim()) ?? 0;
 
@@ -120,7 +121,12 @@ class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeTool
       if (!mounted) return;
       setState(() {
         final current = hidden ? _hiddenKeyfiles : _keyfiles;
-        final merged = [...current, ...picked.where((p) => !current.any((c) => c.uri == p.uri))];
+        final distinct = picked.where((p) => !current.any((c) => c.uri == p.uri));
+        // LUKS follows cryptsetup key-file semantics and this native path
+        // consumes one keyfile (which replaces the typed password).
+        final merged = _isLuksExpand
+            ? (current.isNotEmpty ? current : distinct.take(1).toList())
+            : [...current, ...distinct];
         if (hidden) {
           _hiddenKeyfiles = merged;
         } else {
@@ -158,6 +164,7 @@ class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeTool
       FileSystemGrowResult.alreadyFills => l10n.vcToolsFsAlreadyFills,
       FileSystemGrowResult.unsupported => l10n.vcToolsFsUnsupported,
       FileSystemGrowResult.needsCheck => l10n.vcToolsFsNeedsCheck,
+      FileSystemGrowResult.busy => l10n.vcToolsFsBusy,
       FileSystemGrowResult.failed => l10n.vcToolsFsFailed,
       FileSystemGrowResult.notRun => '',
     };
@@ -172,15 +179,24 @@ class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeTool
     }
     final doneText = context.l10n.vcToolsExpandDone;
     await _guard(() async {
-      final fs = await _api.expandContainer(
-        uri: _target!.uri,
-        password: _passwordCtrl.text,
-        pim: _pimOf(_pimCtrl),
-        keyfilePaths: _keyfilePaths,
-        newSizeBytes: newSize,
-        initFreeSpace: _initFree,
-        growFileSystem: _growFs,
-      );
+      final fs = _isLuksExpand
+          ? await _api.expandLuksContainer(
+              uri: _target!.uri,
+              password: _passwordCtrl.text,
+              keyfilePaths: _keyfilePaths,
+              newSizeBytes: newSize,
+              initFreeSpace: _initFree,
+              growFileSystem: _growFs,
+            )
+          : await _api.expandContainer(
+              uri: _target!.uri,
+              password: _passwordCtrl.text,
+              pim: _pimOf(_pimCtrl),
+              keyfilePaths: _keyfilePaths,
+              newSizeBytes: newSize,
+              initFreeSpace: _initFree,
+              growFileSystem: _growFs,
+            );
       if (!mounted) return;
       final fsText = _fsResultText(fs.result);
       setState(() => _status = fsText.isEmpty ? doneText : '$doneText\n$fsText');
@@ -190,12 +206,18 @@ class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeTool
   Future<void> _growFileSystemOnly() async {
     if (!_validateCommon()) return;
     await _guard(() async {
-      final fs = await _api.growFileSystem(
-        uri: _target!.uri,
-        password: _passwordCtrl.text,
-        pim: _pimOf(_pimCtrl),
-        keyfilePaths: _keyfilePaths,
-      );
+      final fs = _isLuksExpand
+          ? await _api.growLuksFileSystem(
+              uri: _target!.uri,
+              password: _passwordCtrl.text,
+              keyfilePaths: _keyfilePaths,
+            )
+          : await _api.growFileSystem(
+              uri: _target!.uri,
+              password: _passwordCtrl.text,
+              pim: _pimOf(_pimCtrl),
+              keyfilePaths: _keyfilePaths,
+            );
       if (mounted) setState(() => _status = _fsResultText(fs.result));
     });
   }
@@ -300,7 +322,9 @@ class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeTool
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
-    final title = _isExpand ? l10n.toolExpandVolumeTitle : l10n.toolHiddenInExistingTitle;
+    final title = _isLuksExpand
+        ? l10n.toolExpandLuksVolumeTitle
+        : (_isExpand ? l10n.toolExpandVolumeTitle : l10n.toolHiddenInExistingTitle);
     final host = _host;
     final hiddenReady = host != null && host.maxHiddenBytes > 0;
 
@@ -310,7 +334,9 @@ class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeTool
         padding: const EdgeInsets.all(16),
         children: [
           Text(
-            _isExpand ? l10n.vcToolsExpandNote : l10n.vcToolsHiddenNote,
+            _isLuksExpand
+                ? l10n.luksToolsExpandNote
+                : (_isExpand ? l10n.vcToolsExpandNote : l10n.vcToolsHiddenNote),
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 16),
@@ -324,7 +350,7 @@ class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeTool
             ),
           ),
           _passwordField(controller: _passwordCtrl, label: l10n.vcToolsPasswordLabel),
-          _numberField(controller: _pimCtrl, label: l10n.vcToolsPimLabel),
+          if (!_isLuksExpand) _numberField(controller: _pimCtrl, label: l10n.vcToolsPimLabel),
           KeyfilesPicker(
             keyfiles: _keyfiles,
             picking: _pickingKeyfiles,
@@ -334,6 +360,7 @@ class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeTool
               _host = null;
             }),
             enabled: !_busy,
+            addEnabled: !_isLuksExpand || _keyfiles.isEmpty,
           ),
           const SizedBox(height: 8),
           if (_isExpand) ...[

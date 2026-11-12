@@ -1,5 +1,6 @@
 #include "container_create.h"
 #include <cerrno>
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <memory>
@@ -40,6 +41,25 @@
 
 static constexpr int MAX_VOLUMES = FF_VOLUMES;
 extern "C" int vaultexplorer_mkntfs_main(int argc, char* argv[]);
+
+// Caller holds volumeLifecycleMutex, so no new file-backed session can be
+// registered while the identity check and mutation are in progress.
+static bool containerFileIsUnlocked(int fd) {
+    if (fd < 0) return false;
+    struct stat candidate{};
+    if (fstat(fd, &candidate) != 0) return false;
+    for (int i = 0; i < MAX_VOLUMES; ++i) {
+        VolumeState& volume = volumes[i];
+        std::shared_lock<std::shared_mutex> lock(volume.mutex);
+        // Also catch an fd retained by an emergency purge / incomplete reset;
+        // only VolumeState::reset() releases the backing descriptor.
+        if (volume.fd < 0) continue;
+        struct stat active{};
+        if (fstat(volume.fd, &active) == 0 && active.st_dev == candidate.st_dev &&
+            active.st_ino == candidate.st_ino) return true;
+    }
+    return false;
+}
 static constexpr uint64_t CREATE_FILL_BATCH = 4096;
 static constexpr int MKFS_WORK_BUF_SIZE = 1048576;
 
@@ -1143,6 +1163,12 @@ ExpandOutcome expandVeraCryptContainer(int fd, const char* password, int pim, in
                                        const int* keyfileFds, int keyfileCount,
                                        int64_t newSizeBytes, bool initFreeSpace,
                                        bool growFileSystem, FsGrowReport* fsReport) {
+    std::lock_guard<std::mutex> lifecycleLock(volumeLifecycleMutex);
+    if (containerFileIsUnlocked(fd)) {
+        closeUnusedKeyfileFds(keyfileFds, keyfileCount);
+        if (fd >= 0) close(fd);
+        return ExpandOutcome::kContainerInUse;
+    }
     ExpandOutcome outcome = ExpandOutcome::kIoError;
     unsigned char mixedPassword[MAX_PASSWORD_LEN];
     size_t mixedLen = std::min(strlen(password), sizeof(mixedPassword));
@@ -1261,6 +1287,12 @@ static HiddenHostOutcome inspectOuterVolume(int fd, const unsigned char* passwor
 
 ExpandOutcome growVeraCryptFileSystem(int fd, const char* password, int pim, int cipherId, int hashId,
                                       const int* keyfileFds, int keyfileCount, FsGrowReport* fsReport) {
+    std::lock_guard<std::mutex> lifecycleLock(volumeLifecycleMutex);
+    if (containerFileIsUnlocked(fd)) {
+        closeUnusedKeyfileFds(keyfileFds, keyfileCount);
+        if (fd >= 0) close(fd);
+        return ExpandOutcome::kContainerInUse;
+    }
     ExpandOutcome outcome = ExpandOutcome::kIoError;
     unsigned char mixedPassword[MAX_PASSWORD_LEN];
     size_t mixedLen = std::min(strlen(password), sizeof(mixedPassword));
@@ -1351,4 +1383,437 @@ HiddenHostOutcome createHiddenVolumeInExisting(int fd,
                                                  hiddenFileSystem, hiddenSizeBytes, hiddenCipherId, hiddenHashId,
                                                  hiddenKeyfileFds, hiddenKeyfileCount, quickFormat);
     return created ? HiddenHostOutcome::kOk : HiddenHostOutcome::kIoError;
+}
+
+// Encrypt a range of plaintext zeroes as LUKS XTS data units. LUKS
+// iv_tweak is in 512-byte sectors, while each data unit advances by
+// sectorSize/512 sectors. Therefore the tweak is unitIndex * sectorsPerUnit
+// + ivTweak (not (unitIndex + ivTweak) * sectorsPerUnit).
+static bool fillLuksZeroRange(int fd, uint64_t fileOffset, uint64_t length,
+                              CascadeContext& dataCipher, uint64_t sectorSize,
+                              uint64_t firstUnitIndex, uint64_t ivTweak) {
+    if (fd < 0 || !dataCipher.initialized || sectorSize < 512 || sectorSize > 4096 ||
+        (sectorSize & (sectorSize - 1)) != 0 || length == 0 ||
+        length % sectorSize != 0 || fileOffset % sectorSize != 0) return false;
+
+    constexpr uint64_t kBatchBytes = 1024 * 1024;
+    const size_t unitsPerBatch = static_cast<size_t>(std::max<uint64_t>(1, kBatchBytes / sectorSize));
+    const size_t batchBytes = unitsPerBatch * static_cast<size_t>(sectorSize);
+    std::vector<unsigned char> plaintext(batchBytes, 0);
+    std::vector<unsigned char> encrypted(batchBytes, 0);
+    const uint64_t sectorsPerUnit = sectorSize / 512;
+    const uint64_t unitCount = length / sectorSize;
+
+    for (uint64_t unit = 0; unit < unitCount;) {
+        const size_t count = static_cast<size_t>(std::min<uint64_t>(unitsPerBatch, unitCount - unit));
+        const size_t bytes = count * static_cast<size_t>(sectorSize);
+        for (size_t i = 0; i < count; ++i) {
+            if (firstUnitIndex > UINT64_MAX - (unit + i)) return false;
+            const uint64_t logicalUnit = firstUnitIndex + unit + i;
+            if (logicalUnit > (UINT64_MAX - ivTweak) / sectorsPerUnit) return false;
+            const uint64_t tweak = logicalUnit * sectorsPerUnit + ivTweak;
+            if (!cascadeCryptLuksXtsUnit(dataCipher, true, tweak, static_cast<size_t>(sectorSize),
+                                         plaintext.data() + i * sectorSize,
+                                         encrypted.data() + i * sectorSize)) return false;
+        }
+
+        size_t written = 0;
+        const uint64_t offset = fileOffset + unit * sectorSize;
+        while (written < bytes) {
+            const ssize_t n = pwrite(fd, encrypted.data() + written, bytes - written,
+                                     static_cast<off_t>(offset + written));
+            if (n < 0 && errno == EINTR) continue;
+            if (n <= 0) return false;
+            written += static_cast<size_t>(n);
+        }
+        unit += count;
+    }
+    mbedtls_platform_zeroize(plaintext.data(), plaintext.size());
+    mbedtls_platform_zeroize(encrypted.data(), encrypted.size());
+    return true;
+}
+
+static bool luksCipherId(const std::string& name, CascadeId& out) {
+    if (name == "aes") { out = CascadeId::kAes; return true; }
+    if (name == "serpent") { out = CascadeId::kSerpent; return true; }
+    if (name == "twofish") { out = CascadeId::kTwofish; return true; }
+    if (name == "camellia") { out = CascadeId::kCamellia; return true; }
+    if (name == "kuznyechik") { out = CascadeId::kKuznyechik; return true; }
+    return false;
+}
+
+static void growFileSystemOfLuksVolume(int fd, const LuksVolumeInfo& info,
+                                       CascadeContext& dataCipher, uint64_t fileSize,
+                                       uint64_t dataAreaLengthBytes, FsGrowReport* report) {
+    if (!report) return;
+    if (info.dataSectorSize < 512 || info.dataSectorSize % 512 != 0 ||
+        info.dataOffsetBytes % 512 != 0 || dataAreaLengthBytes == 0 ||
+        dataAreaLengthBytes % info.dataSectorSize != 0 ||
+        info.ivTweak > info.dataOffsetBytes / 512) {
+        report->attempted = true;
+        report->status = FsGrowStatus::kUnsupported;
+        return;
+    }
+    report->attempted = true;
+    report->status = FsGrowStatus::kFailed;
+
+    int volId = -1;
+    {
+        std::lock_guard<std::mutex> allocLock(slotAllocMutex);
+        for (int i = 0; i < MAX_VOLUMES; ++i) {
+            if (!volumes[i].dataCtxInitialized) {
+                volumes[i].dataCtxInitialized = true;
+                volId = i;
+                break;
+            }
+        }
+    }
+    if (volId < 0) {
+        LOGI("growFileSystemOfLuksVolume: no free volume slots");
+        return;
+    }
+
+    VolumeState& v = volumes[volId];
+    std::unique_lock<std::shared_mutex> vlock(v.mutex);
+    v.fd = fd; // borrowed; detached before reset() below
+    v.dataOffset = info.dataOffsetBytes;
+    v.dataAreaLengthBytes = dataAreaLengthBytes;
+    v.fileSize = fileSize;
+    v.luksSectorSize = static_cast<uint32_t>(info.dataSectorSize >= 512 ? info.dataSectorSize : 512);
+    v.luksGenericCascade = dataCipher;
+    const uint64_t segmentStartSector = info.dataOffsetBytes / 512;
+    v.partitionStartSector = segmentStartSector - info.ivTweak; // validated before the slot is created
+    v.matchedCipherId = -1;
+    v.readOnly = false;
+    v.isUsbSource = false;
+    v.isCompositeSource = false;
+    v.containerFormat = info.version == 1 ? ContainerFormat::kLuks1 : ContainerFormat::kLuks2;
+    v.dataCtxInitialized = true;
+
+    if (ensureMounted(volId)) {
+        const std::string label = fsGetFilesystemLabel(volId);
+        std::snprintf(report->fsLabel, sizeof(report->fsLabel), "%s", label.c_str());
+        report->status = fsGrowToFit(volId);
+        LOGI("growFileSystemOfLuksVolume: %s -> status %d", report->fsLabel,
+             static_cast<int>(report->status));
+    } else {
+        report->status = FsGrowStatus::kUnsupported;
+    }
+    unmountVolume(volId);
+    v.fd = -1;
+    v.reset();
+}
+
+static LuksByteReader makeLuksFdReader(int fd) {
+    return [fd](uint64_t offset, void* out, size_t len) {
+        size_t done = 0;
+        while (done < len) {
+            const ssize_t n = pread(fd, static_cast<unsigned char*>(out) + done,
+                                    len - done, static_cast<off_t>(offset + done));
+            if (n < 0 && errno == EINTR) continue;
+            if (n <= 0) return false;
+            done += static_cast<size_t>(n);
+        }
+        return true;
+    };
+}
+
+static LuksByteWriter makeLuksFdWriter(int fd) {
+    return [fd](uint64_t offset, const void* data, size_t len) {
+        size_t done = 0;
+        while (done < len) {
+            const ssize_t n = pwrite(fd, static_cast<const unsigned char*>(data) + done,
+                                     len - done, static_cast<off_t>(offset + done));
+            if (n < 0 && errno == EINTR) continue;
+            if (n <= 0) return false;
+            done += static_cast<size_t>(n);
+        }
+        return true;
+    };
+}
+
+static bool readLuksKeyfilePassword(const int* keyfileFds, int keyfileCount,
+                                    std::vector<unsigned char>& keyfileBuf,
+                                    std::unique_ptr<ScopeZeroize>& keyfileWiper,
+                                    const unsigned char*& effectivePassword,
+                                    size_t& effectivePasswordLen) {
+    if (keyfileCount <= 0 || keyfileFds == nullptr || keyfileFds[0] < 0) {
+        closeUnusedKeyfileFds(keyfileFds, keyfileCount);
+        return true;
+    }
+    keyfileBuf.resize(KEYFILE_MAX_READ_LEN);
+    ssize_t total = 0;
+    while (total < static_cast<ssize_t>(keyfileBuf.size())) {
+        const ssize_t n = read(keyfileFds[0], keyfileBuf.data() + total,
+                               keyfileBuf.size() - static_cast<size_t>(total));
+        if (n < 0) {
+            if (errno == EINTR) continue;
+            mbedtls_platform_zeroize(keyfileBuf.data(), keyfileBuf.size());
+            closeUnusedKeyfileFds(keyfileFds, keyfileCount);
+            return false;
+        }
+        if (n == 0) break;
+        total += n;
+    }
+    keyfileBuf.resize(total > 0 ? static_cast<size_t>(total) : 0);
+    closeUnusedKeyfileFds(keyfileFds, keyfileCount);
+    if (keyfileBuf.empty()) return false;
+    keyfileWiper = std::make_unique<ScopeZeroize>(keyfileBuf.data(), keyfileBuf.size());
+    effectivePassword = keyfileBuf.data();
+    effectivePasswordLen = keyfileBuf.size();
+    return true;
+}
+
+static bool luksInfoSupportsDataArea(const LuksVolumeInfo& info, CascadeId& cipherId) {
+    if ((info.version != 1 && info.version != 2) ||
+        (info.version == 2 && !info.dataIsCryptSegment) ||
+        info.dataSegmentCount != 1 || info.dataHasIntegrity ||
+        info.dataSegmentHasFlags || info.hasMandatoryRequirements ||
+        info.cipherMode.rfind("xts-plain64", 0) != 0 ||
+        !luksCipherId(info.cipherName, cipherId) || info.masterKey.size() != 64 ||
+        info.dataOffsetBytes == 0 || info.dataSectorSize < 512 ||
+        info.dataSectorSize > 4096 ||
+        (info.dataSectorSize & (info.dataSectorSize - 1)) != 0 ||
+        info.dataOffsetBytes % info.dataSectorSize != 0 ||
+        info.ivTweak > info.dataOffsetBytes / 512) return false;
+    return true;
+}
+
+ExpandOutcome expandLuksContainer(int fd, const char* password,
+                                 const int* keyfileFds, int keyfileCount,
+                                 int64_t newSizeBytes, bool initFreeSpace,
+                                 bool growFileSystem, FsGrowReport* fsReport) {
+    std::lock_guard<std::mutex> lifecycleLock(volumeLifecycleMutex);
+    if (containerFileIsUnlocked(fd)) {
+        closeUnusedKeyfileFds(keyfileFds, keyfileCount);
+        if (fd >= 0) close(fd);
+        return ExpandOutcome::kContainerInUse;
+    }
+
+    ExpandOutcome outcome = ExpandOutcome::kIoError;
+    std::vector<unsigned char> keyfileBuf;
+    std::unique_ptr<ScopeZeroize> keyfileWiper;
+    const unsigned char* effectivePassword = reinterpret_cast<const unsigned char*>(password ? password : "");
+    size_t effectivePasswordLen = password ? std::strlen(password) : 0;
+
+    do {
+        struct stat st{};
+        if (fd < 0 || fstat(fd, &st) != 0 || st.st_size <= 0 || newSizeBytes <= 0) break;
+        const uint64_t oldFileSize = static_cast<uint64_t>(st.st_size);
+        const uint64_t newFileSize = (static_cast<uint64_t>(newSizeBytes) / 4096) * 4096;
+        if (newFileSize < oldFileSize) {
+            outcome = ExpandOutcome::kNotLarger;
+            break;
+        }
+
+        const LuksByteReader reader = makeLuksFdReader(fd);
+        const LuksHeaderProbeResult probe = luksProbeHeader(reader);
+        if (probe == LuksHeaderProbeResult::kNotLuks) {
+            outcome = ExpandOutcome::kNotLuks;
+            break;
+        }
+        if (probe != LuksHeaderProbeResult::kValid) {
+            outcome = ExpandOutcome::kInvalidHeader;
+            break;
+        }
+        if (!readLuksKeyfilePassword(keyfileFds, keyfileCount, keyfileBuf, keyfileWiper,
+                                     effectivePassword, effectivePasswordLen)) {
+            outcome = ExpandOutcome::kBadKeyfile;
+            break;
+        }
+        if (effectivePasswordLen == 0) {
+            outcome = ExpandOutcome::kWrongPassword;
+            break;
+        }
+
+        LuksVolumeInfo info;
+        if (!luksRecoverMasterKey(fd, effectivePassword, effectivePasswordLen, info)) {
+            outcome = ExpandOutcome::kWrongPassword;
+            break;
+        }
+        ScopeZeroize masterKeyWiper(info.masterKey.data(), info.masterKey.size());
+
+        CascadeId cipherId;
+        if (!luksInfoSupportsDataArea(info, cipherId) || info.dataOffsetBytes >= oldFileSize) {
+            outcome = ExpandOutcome::kNotExpandable;
+            break;
+        }
+
+        const uint64_t dataSectorSize = info.dataSectorSize;
+        const uint64_t availableOld = oldFileSize - info.dataOffsetBytes;
+        const bool wasDynamic = info.version == 1 || info.dynamicSize;
+        uint64_t oldDataSize = wasDynamic
+            ? (availableOld / dataSectorSize) * dataSectorSize
+            : info.dataSizeBytes;
+        bool needsMetadataRepair = false;
+
+        if (info.version == 2 && !info.dynamicSize) {
+            uint64_t metadataOffset = 0, metadataOldSize = 0, metadataIvTweak = 0;
+            bool metadataDynamic = true;
+            if (!luks2ValidateResize(reader, oldFileSize, newFileSize,
+                                     metadataOffset, metadataOldSize, metadataIvTweak,
+                                     metadataDynamic, needsMetadataRepair) ||
+                metadataOffset != info.dataOffsetBytes || metadataIvTweak != info.ivTweak ||
+                metadataDynamic || info.dataSizeBytes != metadataOldSize) {
+                outcome = ExpandOutcome::kNotExpandable;
+                break;
+            }
+            oldDataSize = metadataOldSize;
+        }
+
+        if (oldDataSize == 0 || oldDataSize > availableOld ||
+            oldDataSize % dataSectorSize != 0 || newFileSize < info.dataOffsetBytes) {
+            outcome = ExpandOutcome::kNotExpandable;
+            break;
+        }
+        const uint64_t newDataSize = newFileSize - info.dataOffsetBytes;
+        if (newDataSize % dataSectorSize != 0 || newDataSize < oldDataSize) {
+            outcome = ExpandOutcome::kNotLarger;
+            break;
+        }
+        if (wasDynamic && newDataSize == oldDataSize) {
+            outcome = ExpandOutcome::kNotLarger;
+            break;
+        }
+        if (!wasDynamic && newDataSize == oldDataSize && !needsMetadataRepair) {
+            outcome = ExpandOutcome::kNotLarger;
+            break;
+        }
+
+        CascadeContext dataCipher;
+        if (!cascadeSetKeys(dataCipher, cipherId, info.masterKey.data(), info.masterKey.size())) {
+            outcome = ExpandOutcome::kNotExpandable;
+            break;
+        }
+
+        const bool fileWasExtendedNow = newFileSize > oldFileSize;
+        if (fileWasExtendedNow && ftruncate(fd, static_cast<off_t>(newFileSize)) != 0) {
+            mbedtls_platform_zeroize(&dataCipher, sizeof(dataCipher));
+            break;
+        }
+        const uint64_t oldDataEnd = info.dataOffsetBytes + oldDataSize;
+        if (initFreeSpace && newDataSize > oldDataSize &&
+            !fillLuksZeroRange(fd, oldDataEnd, newDataSize - oldDataSize,
+                               dataCipher, dataSectorSize, oldDataSize / dataSectorSize, info.ivTweak)) {
+            // Only roll back a file extension performed by this invocation.
+            // A retry may be operating on a file already extended by an
+            // earlier interrupted attempt; leave that physical size intact.
+            if (fileWasExtendedNow) {
+                ftruncate(fd, static_cast<off_t>(oldFileSize));
+                fsync(fd);
+            }
+            mbedtls_platform_zeroize(&dataCipher, sizeof(dataCipher));
+            break;
+        }
+        if (fsync(fd) != 0) {
+            if (fileWasExtendedNow) {
+                ftruncate(fd, static_cast<off_t>(oldFileSize));
+                fsync(fd);
+            }
+            mbedtls_platform_zeroize(&dataCipher, sizeof(dataCipher));
+            break;
+        }
+
+        if (info.version == 2 && !wasDynamic &&
+            (newDataSize > oldDataSize || needsMetadataRepair)) {
+            const LuksByteWriter writer = makeLuksFdWriter(fd);
+            if (!luks2ResizeSegmentMetadata(reader, writer, oldFileSize, newFileSize,
+                                             [fd]() { return fsync(fd) == 0; })) {
+                // Never truncate after metadata writes begin: either copy may
+                // now be the newest valid recovery header.
+                mbedtls_platform_zeroize(&dataCipher, sizeof(dataCipher));
+                break;
+            }
+        }
+        if (fsync(fd) != 0) {
+            mbedtls_platform_zeroize(&dataCipher, sizeof(dataCipher));
+            break;
+        }
+
+        outcome = ExpandOutcome::kOk;
+        if (growFileSystem && fsReport != nullptr) {
+            growFileSystemOfLuksVolume(fd, info, dataCipher, newFileSize, newDataSize, fsReport);
+        }
+        mbedtls_platform_zeroize(&dataCipher, sizeof(dataCipher));
+    } while (false);
+
+    close(fd);
+    return outcome;
+}
+
+ExpandOutcome growLuksFileSystem(int fd, const char* password,
+                                 const int* keyfileFds, int keyfileCount,
+                                 FsGrowReport* fsReport) {
+    std::lock_guard<std::mutex> lifecycleLock(volumeLifecycleMutex);
+    if (containerFileIsUnlocked(fd)) {
+        closeUnusedKeyfileFds(keyfileFds, keyfileCount);
+        if (fd >= 0) close(fd);
+        return ExpandOutcome::kContainerInUse;
+    }
+    ExpandOutcome outcome = ExpandOutcome::kIoError;
+    std::vector<unsigned char> keyfileBuf;
+    std::unique_ptr<ScopeZeroize> keyfileWiper;
+    const unsigned char* effectivePassword = reinterpret_cast<const unsigned char*>(password ? password : "");
+    size_t effectivePasswordLen = password ? std::strlen(password) : 0;
+
+    do {
+        struct stat st{};
+        if (fd < 0 || fstat(fd, &st) != 0 || st.st_size <= 0) break;
+        const uint64_t fileSize = static_cast<uint64_t>(st.st_size);
+        const LuksByteReader reader = makeLuksFdReader(fd);
+        const LuksHeaderProbeResult probe = luksProbeHeader(reader);
+        if (probe == LuksHeaderProbeResult::kNotLuks) {
+            outcome = ExpandOutcome::kNotLuks;
+            break;
+        }
+        if (probe != LuksHeaderProbeResult::kValid) {
+            outcome = ExpandOutcome::kInvalidHeader;
+            break;
+        }
+        if (!readLuksKeyfilePassword(keyfileFds, keyfileCount, keyfileBuf, keyfileWiper,
+                                     effectivePassword, effectivePasswordLen)) {
+            outcome = ExpandOutcome::kBadKeyfile;
+            break;
+        }
+        if (effectivePasswordLen == 0) {
+            outcome = ExpandOutcome::kWrongPassword;
+            break;
+        }
+
+        LuksVolumeInfo info;
+        if (!luksRecoverMasterKey(fd, effectivePassword, effectivePasswordLen, info)) {
+            outcome = ExpandOutcome::kWrongPassword;
+            break;
+        }
+        ScopeZeroize masterKeyWiper(info.masterKey.data(), info.masterKey.size());
+        CascadeId cipherId;
+        if (!luksInfoSupportsDataArea(info, cipherId) || info.dataOffsetBytes >= fileSize) {
+            outcome = ExpandOutcome::kNotExpandable;
+            break;
+        }
+        const uint64_t available = fileSize - info.dataOffsetBytes;
+        const uint64_t dataAreaLength = info.dynamicSize
+            ? (available / info.dataSectorSize) * info.dataSectorSize
+            : info.dataSizeBytes;
+        if (dataAreaLength == 0 || dataAreaLength > available ||
+            dataAreaLength % info.dataSectorSize != 0) {
+            outcome = ExpandOutcome::kNotExpandable;
+            break;
+        }
+        CascadeContext dataCipher;
+        if (!cascadeSetKeys(dataCipher, cipherId, info.masterKey.data(), info.masterKey.size())) {
+            outcome = ExpandOutcome::kNotExpandable;
+            break;
+        }
+        if (!fsReport) {
+            mbedtls_platform_zeroize(&dataCipher, sizeof(dataCipher));
+            break;
+        }
+        growFileSystemOfLuksVolume(fd, info, dataCipher, fileSize, dataAreaLength, fsReport);
+        outcome = ExpandOutcome::kOk;
+        mbedtls_platform_zeroize(&dataCipher, sizeof(dataCipher));
+    } while (false);
+
+    close(fd);
+    return outcome;
 }

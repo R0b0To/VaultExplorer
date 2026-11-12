@@ -115,3 +115,6 @@ struct VolumeState {
 
 extern VolumeState volumes[FF_VOLUMES];
 extern std::mutex slotAllocMutex;
+// Serializes file-backed session registration/teardown with container
+// mutations such as expansion. Acquire before any VolumeState::mutex.
+extern std::mutex volumeLifecycleMutex;

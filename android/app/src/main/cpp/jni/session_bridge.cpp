@@ -28,6 +28,7 @@ static void throwUnlockCancelledException(JNIEnv* env) {
 }
 
 static void rollBackUnprotectedSession(int volId) {
+    std::lock_guard<std::mutex> lifecycleLock(volumeLifecycleMutex);
     VolumeState& v = volumes[volId];
     std::unique_lock<std::shared_mutex> lock(v.mutex);
     for (FIL* f : v.openStreams) { f_close(f); delete f; }
@@ -207,6 +208,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_lockNative(JNIEnv* env, jobject, ji
 
     if (volId < 0 || volId >= MAX_VOLUMES) return JNI_TRUE;
 
+    std::lock_guard<std::mutex> lifecycleLock(volumeLifecycleMutex);
     VolumeState& v = volumes[volId];
     std::unique_lock<std::shared_mutex> lock(v.mutex);
     return lockVolumeLocked(volId, force == JNI_TRUE) ? JNI_TRUE : JNI_FALSE;
@@ -221,6 +223,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_emergencyPurgeNative(
     JNI_TRY
 
     if (volId >= 0 && volId < MAX_VOLUMES) {
+        std::lock_guard<std::mutex> lifecycleLock(volumeLifecycleMutex);
         VolumeState& vol = volumes[volId];
         std::unique_lock<std::shared_mutex> lock(vol.mutex);
 

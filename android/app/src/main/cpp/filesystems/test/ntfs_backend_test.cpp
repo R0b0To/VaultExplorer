@@ -80,6 +80,7 @@ extern "C" int vaultexplorer_mkntfs_main(int argc, char* argv[]);
 
 static const bool g_haveFix = commandExists("ntfsfix");
 static const bool g_haveLs = commandExists("ntfsls") && commandExists("ntfscat");
+static const bool g_haveInfo = commandExists("ntfsinfo");
 
 // ---- Volume fixture -----------------------------------------------------------------
 struct Vol {
@@ -168,6 +169,24 @@ struct Vol {
             }
             if (p) pclose(p);
             std::sort(out.begin(), out.end());
+        } else {
+            ++g_skips;
+        }
+        attach();
+        mount();
+        return out;
+    }
+    // Reparse tag and data of a file as the system ntfsinfo reports them ("" if unavailable).
+    std::string indepReparse(const std::string& file) {
+        closeFs();
+        std::string out;
+        if (g_haveInfo) {
+            const std::string cmd = "ntfsinfo -v -F '/" + file + "' '" + path +
+                                    "' 2>/dev/null | grep -A2 'Reparse tag'";
+            FILE* p = popen(cmd.c_str(), "r");
+            char line[4096];
+            while (p && fgets(line, sizeof(line), p)) out += line;
+            if (p) pclose(p);
         } else {
             ++g_skips;
         }
@@ -603,6 +622,83 @@ static void test_streams_read_ranges() {
     v.fsckClean("streams");
 }
 
+static void test_native_symlinks_follow_and_manage_link_identity() {
+    Vol v;
+    CHECK(v.format(32));
+    const Bytes payload = pseudoRandom(4096, 177);
+    CHECK(putFile(0, "target.bin", payload));
+    CHECK(ntfsCreateSymlink(0, "file-link", "target.bin"));
+    std::string target;
+    CHECK(ntfsReadSymlink(0, "file-link", target));
+    CHECK_EQ(target, "target.bin");
+    std::vector<std::string> links;
+    ntfsListSymlinks(0, "", links);
+    CHECK_EQ(links.size(), 1u);
+    CHECK(!links.empty() && links[0].rfind("L|", 0) == 0);
+    CHECK(!links.empty() && links[0].find("|file-link") != std::string::npos);
+    // Independent oracle: stock ntfs-3g must see a WSL symlink (tag 0xa000001d, data = type 2 +
+    // the UTF-8 target), not just our own reader.
+    if (g_haveInfo) {
+        const std::string info = v.indepReparse("file-link");
+        CHECK(info.find("0xa000001d (Linux symlink)") != std::string::npos);
+        CHECK(info.find("0x020000007461726765742e62696e") != std::string::npos);  // 02000000 "target.bin"
+    } else {
+        ++g_skips;
+        std::printf("    SKIP reparse check (ntfsinfo not on PATH)\n");
+    }
+    CHECK(!has(0, "", "file-link"));              // symlinks stay out of normal file scans
+    CHECK(getFile(0, "file-link") == payload);    // ordinary reads follow the target
+    CHECK_EQ(ntfsGetFileSize(0, "file-link"), static_cast<int64_t>(payload.size()));
+
+    // Rename and delete operate on the link inode, never the target.
+    CHECK(ntfsRenameFile(0, "file-link", "renamed-link"));
+    CHECK(ntfsReadSymlink(0, "renamed-link", target));
+    CHECK_EQ(target, "target.bin");
+    CHECK(ntfsDeleteFile(0, "renamed-link"));
+    CHECK(getFile(0, "target.bin") == payload);
+
+    CHECK(ntfsCreateDirectory(0, "subdir"));
+    CHECK(putFile(0, "subdir/inside.txt", Bytes{'o', 'k'}));
+    CHECK(ntfsCreateSymlink(0, "dir-link", "subdir"));
+    links.clear();
+    ntfsListSymlinks(0, "", links);
+    CHECK(std::any_of(links.begin(), links.end(), [](const std::string& s) {
+        return s.rfind("LD|", 0) == 0 && s.find("|dir-link") != std::string::npos;
+    }));
+    std::vector<std::string> throughLink;
+    listNtfsDirectory(0, "dir-link", throughLink);
+    CHECK_EQ(throughLink.size(), 1u);
+    CHECK(!throughLink.empty() && throughLink[0].find("inside.txt") != std::string::npos);
+    CHECK(ntfsDeleteFile(0, "dir-link"));
+    CHECK(getFile(0, "subdir/inside.txt") == Bytes({'o', 'k'}));
+
+    // Long and broken links stay visible and are not mistaken for regular files.
+    const std::string longTarget = std::string(90, 'x') + "/missing-long-target";
+    CHECK(ntfsCreateSymlink(0, "long-link", longTarget));
+    CHECK(ntfsReadSymlink(0, "long-link", target));
+    CHECK_EQ(target, longTarget);
+
+    CHECK(ntfsCreateSymlink(0, "broken", "missing-target"));
+    links.clear();
+    ntfsListSymlinks(0, "", links);
+    CHECK(std::any_of(links.begin(), links.end(), [](const std::string& s) {
+        return s.find("|broken") != std::string::npos;
+    }));
+    CHECK_EQ(ntfsGetFileSize(0, "broken"), -1);
+
+    // Relative targets are confined to the volume root.
+    CHECK(!ntfsCreateSymlink(0, "escape", "../../outside"));
+    CHECK(ntfsCreateDirectory(0, "subdir/nested"));
+    CHECK(ntfsCreateSymlink(0, "subdir/nested/up", "../../target.bin"));
+    CHECK(getFile(0, "subdir/nested/up") == payload);
+
+    // A cycle is refused by the path resolver instead of hanging.
+    CHECK(ntfsCreateSymlink(0, "loop-a", "loop-b"));
+    CHECK(ntfsCreateSymlink(0, "loop-b", "loop-a"));
+    CHECK_EQ(ntfsGetFileSize(0, "loop-a"), -1);
+    v.fsckClean("native symlinks");
+}
+
 static void test_read_only_mount_changes_nothing() {
     Vol v;
     CHECK(v.format(32));
@@ -711,6 +807,7 @@ int main() {
         T(test_set_last_modified_time),
         T(test_copy_between_and_within_volumes),
         T(test_streams_read_ranges),
+        T(test_native_symlinks_follow_and_manage_link_identity),
         T(test_read_only_mount_changes_nothing),
         T(test_usb_sync_reaches_the_device),
     };

@@ -125,12 +125,41 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(fatfs)
 
 # 3. Download Tuxera NTFS-3G (NTFS Filesystem Engine)
+#
+# Patched with filesystems/patches/ntfs-3g-lookup-by-mbsname.patch. Without it,
+# anything touching a reparse point fails on volumes mounted via
+# ntfs_device_mount() (no lookup cache): ntfs_create_symlink() returns NULL with
+# EINVAL, i.e. symbolic links cannot be created on NTFS. The full explanation is
+# in filesystems/patches/apply_ntfs3g_patches.cmake. The script is idempotent
+# and fails configure if the patch stops applying (e.g. after a version bump).
+#
+# The patch files are configure dependencies so an incremental build (Ninja, as
+# used by Gradle) notices an edited patch instead of keeping the old tree.
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/filesystems/patches/ntfs-3g-lookup-by-mbsname.patch"
+    "${CMAKE_CURRENT_SOURCE_DIR}/filesystems/patches/apply_ntfs3g_patches.cmake")
 FetchContent_Declare(
         ntfs3g
         GIT_REPOSITORY https://github.com/tuxera/ntfs-3g.git
         GIT_TAG        d327833ec1d5eb1358b6f2c37139f10a3460944d
+        PATCH_COMMAND  ${CMAKE_COMMAND}
+                       -DPATCH_FILE=${CMAKE_CURRENT_SOURCE_DIR}/filesystems/patches/ntfs-3g-lookup-by-mbsname.patch
+                       -P ${CMAKE_CURRENT_SOURCE_DIR}/filesystems/patches/apply_ntfs3g_patches.cmake
 )
 FetchContent_MakeAvailable(ntfs3g)
+
+# Re-apply when the patch changes, even inside an existing .cxx build tree
+# (PATCH_COMMAND only runs when the dependency is first populated).
+execute_process(
+    COMMAND ${CMAKE_COMMAND}
+            -DPATCH_FILE=${CMAKE_CURRENT_SOURCE_DIR}/filesystems/patches/ntfs-3g-lookup-by-mbsname.patch
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/filesystems/patches/apply_ntfs3g_patches.cmake
+    WORKING_DIRECTORY ${ntfs3g_SOURCE_DIR}
+    RESULT_VARIABLE ntfs3g_patch_res
+)
+if(NOT ntfs3g_patch_res EQUAL 0)
+    message(FATAL_ERROR "Failed to patch ntfs-3g sources")
+endif()
 
 # 3a. e2fsprogs/libext2fs
 FetchContent_Declare(

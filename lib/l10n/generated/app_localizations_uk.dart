@@ -2527,6 +2527,17 @@ class AppLocalizationsUk extends AppLocalizations {
       'Збільшити стандартний том, як у десктопній утиліті розширення томів';
 
   @override
+  String get toolExpandLuksVolumeTitle => 'Розширити контейнер LUKS';
+
+  @override
+  String get toolExpandLuksVolumeSubtitle =>
+      'Збільшення контейнерів LUKS1 та LUKS2, включно з метаданими LUKS2 фіксованого розміру';
+
+  @override
+  String get luksToolsExpandNote =>
+      'Спочатку створіть резервну копію контейнера. Підтримуються LUKS1 та LUKS2. Файлові системи NTFS та ext2/3/4 можна розширювати безпосередньо (FAT та exFAT не підтримуються). Додане місце можна ініціалізувати зашифрованими нулями. Файл ключа замінює пароль, якщо використовується.';
+
+  @override
   String get toolHiddenInExistingTitle => 'Додати прихований том';
 
   @override
@@ -2585,6 +2596,10 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get vcToolsFsUnsupported =>
       'Цю файлову систему не можна розширити на місці (FAT і exFAT не можна). Додатковий простір залишиться нерозподіленим, доки том не буде відформатовано повторно; спершу збережіть його файли.';
+
+  @override
+  String get vcToolsFsBusy =>
+      'У томі все ще відкриті файли. Закрийте їх, заблокуйте том і повторіть спробу «Лише збільшити файлову систему».';
 
   @override
   String get vcToolsFsNeedsCheck =>

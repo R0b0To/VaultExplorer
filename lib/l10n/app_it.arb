@@ -4027,5 +4027,9 @@
   "symbolicLinkTargetOutsideVault": "La destinazione deve essere un percorso relativo che rimane all’interno di questo contenitore.",
   "@symbolicLinkTargetOutsideVault": {
     "description": "Error under the symbolic link target field when a native target is absolute or escapes the container root"
-  }
+  },
+  "toolExpandLuksVolumeTitle": "Espandi contenitore LUKS",
+  "toolExpandLuksVolumeSubtitle": "Ingrandisci contenitori LUKS1 e LUKS2, inclusi i metadati LUKS2 a dimensione fissa",
+  "luksToolsExpandNote": "Esegui prima un backup del contenitore. Supporta LUKS1 e LUKS2. I file system NTFS ed ext2/3/4 possono essere espansi sul posto (FAT ed exFAT non sono supportati). Lo spazio aggiunto può essere inizializzato con zeri crittografati. Se utilizzato, un file chiave sostituisce la password.",
+  "vcToolsFsBusy": "Ci sono ancora file aperti nel volume. Chiudili, blocca il volume e riprova “Ingrandisci solo il file system”."
 }

@@ -4104,6 +4104,24 @@ abstract class AppLocalizations {
   /// **'Make a standard volume larger, like the desktop Volume Expander'**
   String get toolExpandVolumeSubtitle;
 
+  /// Tools row: enlarge a LUKS1 or LUKS2 file container
+  ///
+  /// In en, this message translates to:
+  /// **'Expand LUKS container'**
+  String get toolExpandLuksVolumeTitle;
+
+  /// Tools row subtitle for LUKS container expansion
+  ///
+  /// In en, this message translates to:
+  /// **'Grow LUKS1 and LUKS2 containers, including fixed-size LUKS2 metadata'**
+  String get toolExpandLuksVolumeSubtitle;
+
+  /// Explains LUKS container expansion behavior and supported in-place filesystem growth
+  ///
+  /// In en, this message translates to:
+  /// **'Back up the container first. Supports LUKS1 and LUKS2. NTFS and ext2/3/4 filesystems can be expanded in place (FAT and exFAT cannot). The added space can be initialized with encrypted zeros. A keyfile replaces the password if used.'**
+  String get luksToolsExpandNote;
+
   /// Tools row: create a hidden volume inside an existing volume
   ///
   /// In en, this message translates to:
@@ -4211,6 +4229,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This file system cannot be grown in place (FAT and exFAT cannot). The added space stays unallocated until the volume is reformatted; back up its files first.'**
   String get vcToolsFsUnsupported;
+
+  /// Result: file system growth could not run because files remain open
+  ///
+  /// In en, this message translates to:
+  /// **'Files are still open in the volume. Close them, lock the volume, then retry “Only grow the file system”.'**
+  String get vcToolsFsBusy;
 
   /// Result: the file system is dirty and must be checked before it can be grown
   ///

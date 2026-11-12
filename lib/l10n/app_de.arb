@@ -4027,5 +4027,9 @@
   "symbolicLinkTargetOutsideVault": "Das Ziel muss ein relativer Pfad innerhalb dieses Containers sein.",
   "@symbolicLinkTargetOutsideVault": {
     "description": "Error under the symbolic link target field when a native target is absolute or escapes the container root"
-  }
+  },
+  "toolExpandLuksVolumeTitle": "LUKS-Container erweitern",
+  "toolExpandLuksVolumeSubtitle": "LUKS1- und LUKS2-Container vergrößern, einschließlich LUKS2-Metadaten fester Größe",
+  "luksToolsExpandNote": "Sichern Sie den Container zuerst. Unterstützt LUKS1 und LUKS2. NTFS- und ext2/3/4-Dateisysteme können direkt vergrößert werden (FAT und exFAT nicht). Der hinzugefügte Speicherplatz kann mit verschlüsselten Nullen initialisiert werden. Eine Schlüsseldatei ersetzt das Passwort, falls verwendet.",
+  "vcToolsFsBusy": "Dateien im Volume sind noch geöffnet. Schließen Sie diese, sperren Sie das Volume und versuchen Sie es erneut mit „Nur das Dateisystem vergrößern“."
 }

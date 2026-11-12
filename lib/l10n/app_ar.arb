@@ -4027,5 +4027,9 @@
   "symbolicLinkTargetOutsideVault": "يجب أن يكون الهدف مسارًا نسبيًا يبقى داخل هذا الحاوي.",
   "@symbolicLinkTargetOutsideVault": {
     "description": "Error under the symbolic link target field when a native target is absolute or escapes the container root"
-  }
+  },
+  "toolExpandLuksVolumeTitle": "توسيع حاوية LUKS",
+  "toolExpandLuksVolumeSubtitle": "توسيع حاويات LUKS1 وLUKS2، بما في ذلك البيانات الوصفية ثابتة الحجم لـ LUKS2",
+  "luksToolsExpandNote": "قم بعمل نسخة احتياطية للحاوية أولاً. يدعم LUKS1 وLUKS2. يمكن توسيع أنظمة الملفات NTFS وext2/3/4 في مكانها (لا يمكن توسيع FAT وexFAT). يمكن تهيئة المساحة المضافة بأصفار مشفرة. يحل ملف المفتاح محل كلمة المرور إذا تم استخدامه.",
+  "vcToolsFsBusy": "لا تزال هناك ملفات مفتوحة في وحدة التخزين. أغلقها، ثم اقفل وحدة التخزين، وأعد المحاولة عبر «توسيع نظام الملفات فقط»."
 }

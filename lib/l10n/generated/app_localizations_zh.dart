@@ -2328,6 +2328,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get toolExpandVolumeSubtitle => '增大标准卷的容量，类似于桌面版卷扩展器';
 
   @override
+  String get toolExpandLuksVolumeTitle => '扩展 LUKS 容器';
+
+  @override
+  String get toolExpandLuksVolumeSubtitle =>
+      '扩大 LUKS1 和 LUKS2 容器，包括固定大小的 LUKS2 元数据';
+
+  @override
+  String get luksToolsExpandNote =>
+      '请先备份容器。支持 LUKS1 和 LUKS2。NTFS 和 ext2/3/4 文件系统支持就地扩容（FAT 和 exFAT 不支持）。新增空间可使用加密零进行初始化。如果使用密钥文件，它将替代密码。';
+
+  @override
   String get toolHiddenInExistingTitle => '添加隐藏卷';
 
   @override
@@ -2383,6 +2394,9 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get vcToolsFsUnsupported =>
       '此文件系统无法就地扩展（FAT 和 exFAT 不支持）。新增空间将保持未分配，直到重新格式化该卷；请先备份其中的文件。';
+
+  @override
+  String get vcToolsFsBusy => '卷中仍有文件处于打开状态。请将其关闭、锁定卷，然后重试“仅扩展文件系统”。';
 
   @override
   String get vcToolsFsNeedsCheck =>

@@ -2499,6 +2499,17 @@ class AppLocalizationsPt extends AppLocalizations {
       'Aumente o tamanho de um volume padrão, como no Expansor de Volumes para computador';
 
   @override
+  String get toolExpandLuksVolumeTitle => 'Expandir contêiner LUKS';
+
+  @override
+  String get toolExpandLuksVolumeSubtitle =>
+      'Aumentar contêineres LUKS1 e LUKS2, incluindo metadados LUKS2 de tamanho fixo';
+
+  @override
+  String get luksToolsExpandNote =>
+      'Faça backup do contêiner primeiro. Suporta LUKS1 e LUKS2. Os sistemas de arquivos NTFS e ext2/3/4 podem ser expandidos diretamente (FAT e exFAT não podem). O espaço adicionado pode ser inicializado com zeros criptografados. Se usado, um arquivo de chave substitui a senha.';
+
+  @override
   String get toolHiddenInExistingTitle => 'Adicionar volume oculto';
 
   @override
@@ -2558,6 +2569,10 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get vcToolsFsUnsupported =>
       'Este sistema de ficheiros não pode ser alargado no local (FAT e exFAT não). O espaço adicionado fica por atribuir até o volume ser reformatado; faça antes uma cópia dos seus ficheiros.';
+
+  @override
+  String get vcToolsFsBusy =>
+      'Ainda há arquivos abertos no volume. Feche-os, bloqueie o volume e tente novamente “Apenas expandir o sistema de arquivos”.';
 
   @override
   String get vcToolsFsNeedsCheck =>

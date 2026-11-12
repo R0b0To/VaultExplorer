@@ -2462,6 +2462,17 @@ class AppLocalizationsEn extends AppLocalizations {
       'Make a standard volume larger, like the desktop Volume Expander';
 
   @override
+  String get toolExpandLuksVolumeTitle => 'Expand LUKS container';
+
+  @override
+  String get toolExpandLuksVolumeSubtitle =>
+      'Grow LUKS1 and LUKS2 containers, including fixed-size LUKS2 metadata';
+
+  @override
+  String get luksToolsExpandNote =>
+      'Back up the container first. Supports LUKS1 and LUKS2. NTFS and ext2/3/4 filesystems can be expanded in place (FAT and exFAT cannot). The added space can be initialized with encrypted zeros. A keyfile replaces the password if used.';
+
+  @override
   String get toolHiddenInExistingTitle => 'Add hidden volume';
 
   @override
@@ -2521,6 +2532,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get vcToolsFsUnsupported =>
       'This file system cannot be grown in place (FAT and exFAT cannot). The added space stays unallocated until the volume is reformatted; back up its files first.';
+
+  @override
+  String get vcToolsFsBusy =>
+      'Files are still open in the volume. Close them, lock the volume, then retry “Only grow the file system”.';
 
   @override
   String get vcToolsFsNeedsCheck =>

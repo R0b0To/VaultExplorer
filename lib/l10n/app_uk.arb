@@ -4027,5 +4027,9 @@
   "symbolicLinkTargetOutsideVault": "Ціль має бути відносним шляхом у межах цього контейнера.",
   "@symbolicLinkTargetOutsideVault": {
     "description": "Error under the symbolic link target field when a native target is absolute or escapes the container root"
-  }
+  },
+  "toolExpandLuksVolumeTitle": "Розширити контейнер LUKS",
+  "toolExpandLuksVolumeSubtitle": "Збільшення контейнерів LUKS1 та LUKS2, включно з метаданими LUKS2 фіксованого розміру",
+  "luksToolsExpandNote": "Спочатку створіть резервну копію контейнера. Підтримуються LUKS1 та LUKS2. Файлові системи NTFS та ext2/3/4 можна розширювати безпосередньо (FAT та exFAT не підтримуються). Додане місце можна ініціалізувати зашифрованими нулями. Файл ключа замінює пароль, якщо використовується.",
+  "vcToolsFsBusy": "У томі все ще відкриті файли. Закрийте їх, заблокуйте том і повторіть спробу «Лише збільшити файлову систему»."
 }

@@ -3244,6 +3244,18 @@
   "@toolExpandVolumeSubtitle": {
     "description": "Tools row subtitle for volume expansion"
   },
+  "toolExpandLuksVolumeTitle": "Expand LUKS container",
+  "@toolExpandLuksVolumeTitle": {
+    "description": "Tools row: enlarge a LUKS1 or LUKS2 file container"
+  },
+  "toolExpandLuksVolumeSubtitle": "Grow LUKS1 and LUKS2 containers, including fixed-size LUKS2 metadata",
+  "@toolExpandLuksVolumeSubtitle": {
+    "description": "Tools row subtitle for LUKS container expansion"
+  },
+  "luksToolsExpandNote": "Back up the container first. Supports LUKS1 and LUKS2. NTFS and ext2/3/4 filesystems can be expanded in place (FAT and exFAT cannot). The added space can be initialized with encrypted zeros. A keyfile replaces the password if used.",
+  "@luksToolsExpandNote": {
+    "description": "Explains LUKS container expansion behavior and supported in-place filesystem growth"
+  },
   "toolHiddenInExistingTitle": "Add hidden volume",
   "@toolHiddenInExistingTitle": {
     "description": "Tools row: create a hidden volume inside an existing volume"
@@ -3315,6 +3327,10 @@
   "vcToolsFsUnsupported": "This file system cannot be grown in place (FAT and exFAT cannot). The added space stays unallocated until the volume is reformatted; back up its files first.",
   "@vcToolsFsUnsupported": {
     "description": "Result: this file system (FAT/exFAT) cannot be grown in place"
+  },
+  "vcToolsFsBusy": "Files are still open in the volume. Close them, lock the volume, then retry “Only grow the file system”.",
+  "@vcToolsFsBusy": {
+    "description": "Result: file system growth could not run because files remain open"
   },
   "vcToolsFsNeedsCheck": "The file system is marked as needing a check. Run Check & Repair on the volume, then use “Only grow the file system”.",
   "@vcToolsFsNeedsCheck": {

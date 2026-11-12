@@ -2535,6 +2535,17 @@ class AppLocalizationsAr extends AppLocalizations {
       'تكبير حجم وحدة تخزين قياسية، مثل أداة توسيع وحدات التخزين على سطح المكتب';
 
   @override
+  String get toolExpandLuksVolumeTitle => 'توسيع حاوية LUKS';
+
+  @override
+  String get toolExpandLuksVolumeSubtitle =>
+      'توسيع حاويات LUKS1 وLUKS2، بما في ذلك البيانات الوصفية ثابتة الحجم لـ LUKS2';
+
+  @override
+  String get luksToolsExpandNote =>
+      'قم بعمل نسخة احتياطية للحاوية أولاً. يدعم LUKS1 وLUKS2. يمكن توسيع أنظمة الملفات NTFS وext2/3/4 في مكانها (لا يمكن توسيع FAT وexFAT). يمكن تهيئة المساحة المضافة بأصفار مشفرة. يحل ملف المفتاح محل كلمة المرور إذا تم استخدامه.';
+
+  @override
   String get toolHiddenInExistingTitle => 'إضافة وحدة تخزين مخفية';
 
   @override
@@ -2593,6 +2604,10 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get vcToolsFsUnsupported =>
       'لا يمكن توسيع نظام الملفات هذا في مكانه (FAT وexFAT غير مدعومين). ستبقى المساحة المضافة غير مخصصة حتى تتم إعادة تهيئة وحدة التخزين؛ انسخ ملفاتها احتياطيًا أولًا.';
+
+  @override
+  String get vcToolsFsBusy =>
+      'لا تزال هناك ملفات مفتوحة في وحدة التخزين. أغلقها، ثم اقفل وحدة التخزين، وأعد المحاولة عبر «توسيع نظام الملفات فقط».';
 
   @override
   String get vcToolsFsNeedsCheck =>

@@ -4027,5 +4027,9 @@
   "symbolicLinkTargetOutsideVault": "La cible doit être un chemin relatif qui reste dans ce conteneur.",
   "@symbolicLinkTargetOutsideVault": {
     "description": "Error under the symbolic link target field when a native target is absolute or escapes the container root"
-  }
+  },
+  "toolExpandLuksVolumeTitle": "Agrandir le conteneur LUKS",
+  "toolExpandLuksVolumeSubtitle": "Agrandir les conteneurs LUKS1 et LUKS2, y compris les métadonnées LUKS2 à taille fixe",
+  "luksToolsExpandNote": "Sauvegardez d'abord le conteneur. Prend en charge LUKS1 et LUKS2. Les systèmes de fichiers NTFS et ext2/3/4 peuvent être agrandis sur place (FAT et exFAT ne sont pas pris en charge). L'espace ajouté peut être initialisé avec des zéros chiffrés. Un fichier de clé remplace le mot de passe s'il est utilisé.",
+  "vcToolsFsBusy": "Des fichiers sont encore ouverts dans le volume. Fermez-les, verrouillez le volume, puis réessayez « Agrandir uniquement le système de fichiers »."
 }

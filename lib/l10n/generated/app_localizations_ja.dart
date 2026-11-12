@@ -2368,6 +2368,17 @@ class AppLocalizationsJa extends AppLocalizations {
       'デスクトップ版のボリュームエクスパンダーのように、標準ボリュームを拡大します';
 
   @override
+  String get toolExpandLuksVolumeTitle => 'LUKSコンテナを拡張';
+
+  @override
+  String get toolExpandLuksVolumeSubtitle =>
+      '固定サイズLUKS2メタデータを含むLUKS1およびLUKS2コンテナの拡張';
+
+  @override
+  String get luksToolsExpandNote =>
+      '事前にコンテナのバックアップを作成してください。LUKS1およびLUKS2に対応しています。NTFSおよびext2/3/4ファイルシステムは直接拡張できます（FATおよびexFATは拡張不可）。追加された領域は暗号化されたゼロで初期化できます。キーファイルを使用する場合はパスワードの代わりになります。';
+
+  @override
   String get toolHiddenInExistingTitle => '隠しボリュームを追加';
 
   @override
@@ -2424,6 +2435,10 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get vcToolsFsUnsupported =>
       'このファイルシステムはその場で拡張できません（FAT と exFAT は不可）。追加された領域は、ボリュームを再フォーマットするまで未割り当てのままです。先にファイルをバックアップしてください。';
+
+  @override
+  String get vcToolsFsBusy =>
+      'ボリューム内でファイルがまだ開かれています。ファイルを閉じてボリュームをロックし、「ファイルシステムのみを拡張」を再試行してください。';
 
   @override
   String get vcToolsFsNeedsCheck =>

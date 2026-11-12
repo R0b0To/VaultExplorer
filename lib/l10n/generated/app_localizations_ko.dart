@@ -2367,6 +2367,17 @@ class AppLocalizationsKo extends AppLocalizations {
   String get toolExpandVolumeSubtitle => '데스크톱 볼륨 확장기처럼 표준 볼륨의 크기를 늘립니다';
 
   @override
+  String get toolExpandLuksVolumeTitle => 'LUKS 컨테이너 확장';
+
+  @override
+  String get toolExpandLuksVolumeSubtitle =>
+      '고정 크기 LUKS2 메타데이터를 포함한 LUKS1 및 LUKS2 컨테이너 확장';
+
+  @override
+  String get luksToolsExpandNote =>
+      '먼저 컨테이너를 백업하세요. LUKS1 및 LUKS2를 지원합니다. NTFS 및 ext2/3/4 파일 시스템은 제자리 확장이 가능합니다(FAT 및 exFAT은 불가). 추가된 공간은 암호화된 0으로 초기화할 수 있습니다. 키 파일을 사용하는 경우 비밀번호를 대체합니다.';
+
+  @override
   String get toolHiddenInExistingTitle => '숨김 볼륨 추가';
 
   @override
@@ -2423,6 +2434,10 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get vcToolsFsUnsupported =>
       '이 파일 시스템은 제자리에서 확장할 수 없습니다(FAT와 exFAT는 불가). 추가된 공간은 볼륨을 다시 포맷할 때까지 할당되지 않은 상태로 남습니다. 먼저 파일을 백업하세요.';
+
+  @override
+  String get vcToolsFsBusy =>
+      '볼륨에 열려 있는 파일이 아직 있습니다. 파일을 닫고 볼륨을 잠근 후 “파일 시스템만 확장”을 다시 시도하세요.';
 
   @override
   String get vcToolsFsNeedsCheck =>

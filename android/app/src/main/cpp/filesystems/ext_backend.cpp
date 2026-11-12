@@ -385,15 +385,13 @@ bool formatExtVolume(int volumeId, const char* variant) {
     params.s_blocks_per_group = 32768;
     params.s_inodes_per_group = 2048;
     ext2fs_blocks_count_set(&params, totalBlocks);
-    // A journal is only actually written below when this holds -- the
-    // HAS_JOURNAL compat bit must track that exact condition, or every
-    // reader (blkid, the kernel, extGetFilesystemLabel() below) will see
-    // a plain ext2 volume regardless of what was requested.
+    // Do not advertise a journal until libext2fs has actually created it.
+    // Otherwise a failed journal creation leaves HAS_JOURNAL set with
+    // s_journal_inum == 0, which e2fsck correctly rejects.
     const bool willHaveJournal = (ext3 || ext4) && totalBlocks > 2048;
     params.s_feature_incompat = 0x0002;
     params.s_feature_ro_compat = 0x0001;
     params.s_feature_compat = 0x0020;
-    if (willHaveJournal) params.s_feature_compat |= 0x0004;  // EXT3_FEATURE_COMPAT_HAS_JOURNAL
     if (ext4) params.s_feature_incompat |= 0x0040;
     char deviceName[16];
     std::snprintf(deviceName, sizeof(deviceName), "%d", volumeId);
@@ -416,9 +414,47 @@ bool formatExtVolume(int volumeId, const char* variant) {
     std::strncpy(reinterpret_cast<char*>(fs->super->s_last_mounted), "/", sizeof(fs->super->s_last_mounted));
     fs->super->s_r_blocks_count = 0;
     if (ext2fs_allocate_tables(fs) != 0) { ext2fs_close(fs); return false; }
-    ext2fs_write_inode_bitmap(fs);
-    ext2fs_write_block_bitmap(fs);
-    ext2fs_mkdir(fs, EXT2_ROOT_INO, EXT2_ROOT_INO, nullptr);
+
+    // ext2fs_allocate_tables() reserves inode-table locations, but the
+    // table blocks themselves must be initialized. The encrypted payload
+    // can contain arbitrary old bytes; inode 8 is the reserved journal inode
+    // and libext2fs refuses to reuse it if its stale i_blocks is nonzero.
+    for (dgrp_t group = 0; group < fs->group_desc_count; ++group) {
+        const blk64_t inodeTable = ext2fs_inode_table_loc(fs, group);
+        if (inodeTable == 0) {
+            EXT_LOGE("formatExtVolume: missing inode table for group %u", group);
+            ext2fs_close(fs);
+            return false;
+        }
+        const errcode_t zeroErr = ext2fs_zero_blocks2(
+            fs, inodeTable, static_cast<int>(fs->inode_blocks_per_group), nullptr, nullptr);
+        if (zeroErr != 0) {
+            EXT_LOGE("formatExtVolume: zeroing inode table for group %u failed: %s (err=%lu)",
+                     group, error_message(zeroErr), static_cast<unsigned long>(zeroErr));
+            ext2fs_close(fs);
+            return false;
+        }
+    }
+
+    const errcode_t writeInodeBitmapErr = ext2fs_write_inode_bitmap(fs);
+    if (writeInodeBitmapErr != 0) {
+        EXT_LOGE("formatExtVolume: writing inode bitmap failed: %s (err=%lu)",
+                 error_message(writeInodeBitmapErr), static_cast<unsigned long>(writeInodeBitmapErr));
+        ext2fs_close(fs);
+        return false;
+    }
+    const errcode_t writeBlockBitmapErr = ext2fs_write_block_bitmap(fs);
+    if (writeBlockBitmapErr != 0) {
+        EXT_LOGE("formatExtVolume: writing block bitmap failed: %s (err=%lu)",
+                 error_message(writeBlockBitmapErr), static_cast<unsigned long>(writeBlockBitmapErr));
+        ext2fs_close(fs);
+        return false;
+    }
+    if (ext2fs_mkdir(fs, EXT2_ROOT_INO, EXT2_ROOT_INO, nullptr) != 0) {
+        EXT_LOGE("formatExtVolume: creating root directory failed");
+        ext2fs_close(fs);
+        return false;
+    }
     ext2_inode root{};
     if (ext2fs_read_inode(fs, EXT2_ROOT_INO, &root) == 0) {
         root.i_mode = LINUX_S_IFDIR | 0777;
@@ -427,12 +463,34 @@ bool formatExtVolume(int volumeId, const char* variant) {
         root.i_atime = root.i_mtime = root.i_ctime = static_cast<uint32_t>(time(nullptr));
         ext2fs_write_inode(fs, EXT2_ROOT_INO, &root);
     }
-    ext2fs_mkdir(fs, EXT2_ROOT_INO, 0, "lost+found");
+    if (ext2fs_mkdir(fs, EXT2_ROOT_INO, 0, "lost+found") != 0) {
+        EXT_LOGE("formatExtVolume: creating lost+found failed");
+        ext2fs_close(fs);
+        return false;
+    }
     if (willHaveJournal) {
         ext2fs_journal_params journal{};
         journal.num_journal_blocks = static_cast<blk_t>(std::min<uint64_t>(8192, totalBlocks / 32));
         if (journal.num_journal_blocks < 1024) journal.num_journal_blocks = 1024;
-        ext2fs_add_journal_inode3(fs, &journal, 0, 0);
+
+        // The libext2fs device name is a synthetic volume ID ("0", "1", ...),
+        // not a host block device. Skip the host mount-point probe; volume
+        // lifecycle/exclusivity is enforced by VaultExplorer.
+        const errcode_t journalErr = ext2fs_add_journal_inode3(
+            fs, &journal, 0, EXT2_MKJOURNAL_NO_MNT_CHECK);
+        if (journalErr != 0) {
+            EXT_LOGE("formatExtVolume: journal creation failed: %s (err=%lu)",
+                     error_message(journalErr), static_cast<unsigned long>(journalErr));
+            ext2fs_close(fs);
+            return false;
+        }
+        if (!EXT2_HAS_COMPAT_FEATURE(fs->super, EXT3_FEATURE_COMPAT_HAS_JOURNAL) ||
+            fs->super->s_journal_inum == 0 || fs->super->s_journal_dev != 0) {
+            EXT_LOGE("formatExtVolume: journal metadata invalid after creation (compat=0x%x, journal_inum=%u, journal_dev=%u)",
+                     fs->super->s_feature_compat, fs->super->s_journal_inum, fs->super->s_journal_dev);
+            ext2fs_close(fs);
+            return false;
+        }
     }
     for (ext2_ino_t inode = EXT2_BAD_INO; inode < fs->super->s_first_ino; ++inode) {
         if (!ext2fs_test_inode_bitmap2(fs->inode_map, inode))
@@ -441,8 +499,19 @@ bool formatExtVolume(int volumeId, const char* variant) {
     ext2fs_mark_ib_dirty(fs);
     ext2fs_mark_bb_dirty(fs);
     ext2fs_mark_super_dirty(fs);
-    ext2fs_flush(fs);
-    ext2fs_close(fs);
+    const errcode_t flushErr = ext2fs_flush(fs);
+    if (flushErr != 0) {
+        EXT_LOGE("formatExtVolume: filesystem flush failed: %s (err=%lu)",
+                 error_message(flushErr), static_cast<unsigned long>(flushErr));
+        ext2fs_close(fs);
+        return false;
+    }
+    const errcode_t closeErr = ext2fs_close(fs);
+    if (closeErr != 0) {
+        EXT_LOGE("formatExtVolume: filesystem close failed: %s (err=%lu)",
+                 error_message(closeErr), static_cast<unsigned long>(closeErr));
+        return false;
+    }
     return true;
 }
 bool ensureExtBitmapsLoaded(int volumeId) {

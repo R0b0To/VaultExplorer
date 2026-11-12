@@ -686,7 +686,7 @@ static void testCryptomatorSymlinks() {
         CHECK_EQ(countFiles(root, "symlink.c9r"), 3);                                // moving never duplicates or loses a node (short, long.3, uni)
         CHECK_EQ(countFiles(root, "name.c9s"), 1);                                   // only the one shortened link keeps its name file
         CHECK(!v.renameFile("docs/short", "docs/file.txt"));                         // a link never replaces a file...
-        CHECK(*get(v, "docs/file.txt") == fileData);                                 // ...which stays untouched...
+        CHECK(*get(v, "docs/file.txt") == replacement);                                  // failed link rename leaves the written-through target untouched
         CHECK(v.readSymlink("docs/short").value_or("?") == "docs/file.txt");         // ...and the link stays where it was
         CHECK(!v.renameFile("docs/short", "docs/" + longName + ".3"));               // nor another link
         CHECK(v.readSymlink("docs/short").value_or("?") == "docs/file.txt");
@@ -699,7 +699,7 @@ static void testCryptomatorSymlinks() {
         CHECK(v.deleteFile("docs/short"));
         CHECK(!v.readSymlink("docs/short"));
         CHECK_EQ(countFiles(root, "symlink.c9r"), 2);                                // long.3 and uni are left
-        CHECK(*get(v, "docs/file.txt") == fileData);                                 // deleting a link leaves what it pointed at alone
+        CHECK(*get(v, "docs/file.txt") == replacement);                                  // deleting a link leaves its written-through target alone
         CHECK(v.deleteFile("docs"));                                                 // a folder holding links: nothing is followed, nothing is left
         CHECK_EQ(countFiles(root, "symlink.c9r"), 1);                                // only the root-level "uni" link remains
         CHECK(v.deleteFile(uni));

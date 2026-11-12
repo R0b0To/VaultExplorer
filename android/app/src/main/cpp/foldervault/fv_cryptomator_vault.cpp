@@ -693,9 +693,11 @@ public:
             Lifecycle::Op op(life_);
             std::string n = normalizePath(path);
             std::shared_lock<std::shared_mutex> ns(ns_);
-            auto resolved = resolveSymlinkPathLocked(n);
-            if (!resolved) return false;
-            n = *resolved;
+            // Follow symlinks in parent components, but not the final component:
+            // the timestamp belongs to the link's symlink.c9r, not its target.
+            auto parentResolved = resolveSymlinkPathLocked(parentOf(n));
+            if (!parentResolved) return false;
+            n = joinPath(*parentResolved, nameOf(n));
             auto node = tree_.resolve(n);
             if (!node) return false;
             bool ok;

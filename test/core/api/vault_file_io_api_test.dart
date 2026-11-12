@@ -661,7 +661,7 @@ void main() {
     });
   });
 
-  group('createVaultSymlink', () {
+ group('createVaultSymlink', () {
     MountedContainer containerWith({required int volId, required String uri}) =>
         MountedContainer(
           uri: uri,
@@ -673,6 +673,9 @@ void main() {
           freeSpace: 1,
           containerFormat: 'cryptomator',
         );
+
+    // Add this line to shadow the outer container for this group:
+    final container = containerWith(volId: 1, uri: 'content://test-container');
 
     test('sends filePath, path and target exactly as given', () async {
       nextResult = true;

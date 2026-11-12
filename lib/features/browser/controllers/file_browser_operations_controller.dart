@@ -69,6 +69,19 @@ class FileBrowserOperationsController {
     required Future<ConflictPlan?> Function(List<ConflictEntry> conflicts) resolveConflicts,
     required AppLocalizations l10n,
   }) async {
+    final validItems = <ClipboardItem>[];
+    for (final item in items) {
+      final exists = await _fileIoApi.entryExists(
+        srcContainer,
+        item.path,
+        isDir: item.isDir,
+      );
+      if (exists) {
+        validItems.add(item);
+      }
+    }
+    if (validItems.isEmpty) return null;
+
     final existingRaw = await _fileIoApi.listDirectory(destContainer, destDirPath) ?? [];
     final caseSensitive = namesAreCaseSensitive(destContainer);
     final existingNames = <String>{};
@@ -81,7 +94,7 @@ class FileBrowserOperationsController {
       if (e.isDir) existingDirs.add(key);
     }
     final conflicts = detectPasteConflicts(
-      items: items,
+      items: validItems,
       existingNamesLower: existingNames,
       existingDirsLower: existingDirs,
       isCrossContainer: isCrossContainer,
@@ -107,7 +120,7 @@ class FileBrowserOperationsController {
             source: srcContainer,
             dest: destContainer,
             destDirPath: destDirPath,
-            items: items,
+            items: validItems,
             conflictPlan: conflictPlan,
             l10n: l10n,
           )
@@ -116,7 +129,7 @@ class FileBrowserOperationsController {
             source: srcContainer,
             dest: destContainer,
             destDirPath: destDirPath,
-            items: items,
+            items: validItems,
             conflictPlan: conflictPlan,
             l10n: l10n,
           );

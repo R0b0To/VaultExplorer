@@ -46,7 +46,25 @@ data class GocryptfsConfig(
 ) {
     val hasDirIV: Boolean get() = "DirIV" in featureFlags
 
+    /** Without HKDF (gocryptfs <= 1.2) the master key is used as-is and the config's own key wrap has a 96-bit nonce. */
+    val hasHkdf: Boolean get() = "HKDF" in featureFlags
+
+    /** Without Raw64 (gocryptfs <= 1.6) names and long-name hashes are padded base64. */
+    val raw64: Boolean get() = "Raw64" in featureFlags
+
+    /** `-fido2`: the scrypt input comes from a hardware token instead of a password. */
+    val fido2: Boolean get() = "FIDO2" in featureFlags
+
+    /** `-deterministic-names`: no DirIV flag, hence no gocryptfs.diriv files and an all-zero IV everywhere. */
+    val deterministicNames: Boolean get() = !plaintextNames && !hasDirIV
+
     companion object {
+        // Every flag gocryptfs knows (internal/configfile/feature_flags.go); anything else it refuses.
+        private val KNOWN_FLAGS = setOf(
+            "PlaintextNames", "DirIV", "EMENames", "GCMIV128", "LongNames", "LongNameMax",
+            "AESSIV", "Raw64", "HKDF", "FIDO2", "XChaCha20Poly1305",
+        )
+
         @Throws(GocryptfsConfigException::class)
         fun parse(jsonBytes: ByteArray): GocryptfsConfig {
             val json = try {
@@ -73,16 +91,16 @@ data class GocryptfsConfig(
             val hasAessiv = "AESSIV" in flags
             val hasPlaintextNames = "PlaintextNames" in flags
 
-            val problems = mutableListOf<String>()
-            if (!flags.contains("HKDF")) problems += "missing HKDF"
-            if (!hasPlaintextNames) {
-                if (!flags.contains("EMENames")) problems += "missing EMENames"
-                if (!flags.contains("Raw64")) problems += "missing Raw64"
+            val longNameMax = if (json.has("LongNameMax")) json.optInt("LongNameMax", -1) else 0
+            if (longNameMax < 0 || longNameMax > 255) {
+                throw GocryptfsConfigException("gocryptfs.conf: LongNameMax must be a number between 0 and 255")
             }
 
-            val unsupported = flags - setOf("GCMIV128", "XChaCha20Poly1305", "AESSIV", "DirIV", "EMENames", "LongNames", "Raw64", "HKDF", "PlaintextNames", "FIDO2")
-
-            if (unsupported.isNotEmpty()) problems += "unsupported feature flags $unsupported"
+            // gocryptfs does not require HKDF (except for XChaCha20), EMENames or Raw64: vaults from before those
+            // existed (v0.7 .. v1.2) are still mounted by it, and so are they here.
+            val problems = mutableListOf<String>()
+            val unsupported = flags - KNOWN_FLAGS
+            if (unsupported.isNotEmpty()) problems += "unknown feature flags $unsupported"
 
             // Real gocryptfs content-cipher semantics (internal/configfile/
             // validate.go): AESSIV *requires* GCMIV128 to also be set rather
@@ -94,13 +112,26 @@ data class GocryptfsConfig(
                 hasXChaCha && hasAessiv -> problems += "XChaCha20Poly1305 conflicts with AESSIV"
                 hasXChaCha && hasGcmIv128 -> problems += "XChaCha20Poly1305 conflicts with GCMIV128"
                 hasAessiv && !hasGcmIv128 -> problems += "AESSIV requires GCMIV128"
-                !hasXChaCha && !hasGcmIv128 -> problems += "missing a content cipher feature flag"
+                !hasXChaCha && !hasGcmIv128 -> problems += "AES-GCM requires GCMIV128 feature flag"
+            }
+            if (hasXChaCha && !hasAessiv && !hasGcmIv128 && "HKDF" !in flags) problems += "XChaCha20Poly1305 requires HKDF feature flag"
+
+            if (hasPlaintextNames) {
+                for (f in listOf("EMENames", "DirIV", "LongNames", "Raw64", "LongNameMax")) {
+                    if (f in flags) problems += "PlaintextNames conflicts with $f feature flag"
+                }
+            }
+            if (longNameMax != 0 && "LongNameMax" !in flags) {
+                problems += "LongNameMax=$longNameMax but the LongNameMax feature flag is NOT set"
+            }
+            if (longNameMax == 0 && "LongNameMax" in flags) {
+                problems += "LongNameMax=0 but the LongNameMax feature flag IS set"
             }
 
             if (problems.isNotEmpty()) {
                 throw GocryptfsConfigException(
                     "Unsupported gocryptfs feature flags: ${problems.joinToString("; ")}. " +
-                        "This app supports standard vaults created with AES-256-GCM, XChaCha20-Poly1305 or AES-SIV."
+                        "This app supports gocryptfs vaults (on-disk format 2) with AES-256-GCM, XChaCha20-Poly1305 or AES-SIV."
                 )
             }
 
@@ -123,7 +154,7 @@ data class GocryptfsConfig(
                 scryptKeyLen = scrypt.getInt("KeyLen"),
                 version = version,
                 featureFlags = flags,
-                longNameMax = json.optInt("LongNameMax", 0),
+                longNameMax = longNameMax,
                 cipher = cipher,
                 plaintextNames = hasPlaintextNames,
             )

@@ -210,14 +210,26 @@ class BrowserListing {
 }
 
 BrowserListing buildBrowserListing(BrowserListingInputs inputs) {
-  final visibleCurrent = inputs.items.where(
-    (e) => !inputs.pendingDeletedNames.contains(e.name),
-  );
-  final existingNamesLower = visibleCurrent.map((e) => e.lowercaseName).toSet();
-  final uniquePlaceholders = inputs.placeholders.where(
-    (p) => !existingNamesLower.contains(p.lowercaseName),
-  );
-  final combined = [...visibleCurrent, ...uniquePlaceholders];
+  final hasPlaceholders = inputs.placeholders.isNotEmpty;
+  final hasPendingDeletes = inputs.pendingDeletedNames.isNotEmpty;
+
+  final Iterable<RawEntry> visibleCurrent = hasPendingDeletes
+      ? inputs.items.where((e) => !inputs.pendingDeletedNames.contains(e.name))
+      : inputs.items;
+
+  final List<RawEntry> combined;
+  if (!hasPlaceholders) {
+    combined = visibleCurrent is List<RawEntry>
+        ? visibleCurrent
+        : visibleCurrent.toList();
+  } else {
+    final existingNamesLower =
+        visibleCurrent.map((e) => e.lowercaseName).toSet();
+    final uniquePlaceholders = inputs.placeholders.where(
+      (p) => !existingNamesLower.contains(p.lowercaseName),
+    );
+    combined = [...visibleCurrent, ...uniquePlaceholders];
+  }
 
   final items = searchAwareVisibleItems(
     combined,

@@ -241,3 +241,18 @@ class AutomationPermissionStatus {
 /// Runtime permissions that can be requested one at a time with the system
 /// prompt. The enum [name] is the wire value of the native `kind` argument.
 enum AutomationRuntimePermission { camera, microphone }
+
+/// How an attempt to lock a container ended.
+enum LockResult {
+  /// The container is locked.
+  locked,
+
+  /// It could not be locked and nothing was lost: it is not mounted, another
+  /// lock is already running, or an unexpected error occurred.
+  failed,
+
+  /// A USB device would not accept the final write-back. The container stays
+  /// open with its unwritten data still pending, so the lock can be retried;
+  /// `force: true` locks anyway and discards that data.
+  flushRefused,
+}

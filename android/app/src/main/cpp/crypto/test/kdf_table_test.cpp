@@ -9,9 +9,12 @@
 // kdf_table.cpp first.
 #include "../cipher_shim.h"
 #include <cassert>
+#include <cstdint>
 #include <cstdio>
 
 extern int iterationsForHash(HashId hash, int clampedPim);
+extern int clampPim(int pim);
+extern void argon2ParamsForPim(int pim, uint32_t& memoryKiB, uint32_t& timeCost, uint32_t& parallelism);
 
 static void expectIterations(HashId hash, int pim, int expected) {
     const int got = iterationsForHash(hash, pim);
@@ -34,7 +37,36 @@ int main() {
         expectIterations(h, 1,    16000);
         expectIterations(h, 12,   27000);   // VeraCrypt's own PIM default
         expectIterations(h, 500,  515000);
-        expectIterations(h, 2000, 2015000); // this app's clampPim() ceiling
+        expectIterations(h, 2000, 2015000);
+        // PIMs above 2000 used to be silently clamped to 2000, so such volumes
+        // could neither be unlocked here nor opened elsewhere after creation.
+        expectIterations(h, 2001,    2016000);
+        expectIterations(h, 5000,    5015000);
+        expectIterations(h, 100000,  100015000);
+        // Upstream MAX_PIM_VALUE: the largest PIM whose iteration count is still a positive int.
+        expectIterations(h, 2147468, 2147483000);
+    }
+
+    // clampPim(): only negatives and values above upstream's MAX_PIM_VALUE are touched.
+    assert(clampPim(-7) == 0);
+    assert(clampPim(0) == 0);
+    assert(clampPim(12) == 12);
+    assert(clampPim(2000) == 2000);
+    assert(clampPim(2001) == 2001);
+    assert(clampPim(5000) == 5000);
+    assert(clampPim(2147468) == 2147468);
+    assert(clampPim(2147469) == 2147468);
+    assert(clampPim(2147483647) == 2147468);
+
+    // Argon2id parameters, pinned to upstream get_argon2_params() (parallelism is always 1).
+    struct { int pim; uint32_t t; uint32_t memKiB; } argon[] = {
+        {0, 6, 425984}, {1, 3, 65536}, {12, 6, 425984}, {31, 13, 1048576},
+        {32, 14, 1048576}, {100, 82, 1048576}, {2001, 1983, 1048576}, {5000, 4982, 1048576},
+    };
+    for (const auto& a : argon) {
+        uint32_t mem = 0, t = 0, par = 0;
+        argon2ParamsForPim(clampPim(a.pim), mem, t, par);
+        assert(mem == a.memKiB && t == a.t && par == 1);
     }
 
     printf("kdf_table_test: all assertions passed\n");

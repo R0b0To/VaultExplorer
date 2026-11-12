@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/utils/lru_cache.dart';
+import 'package:vaultexplorer/core/widgets/scroll_speed_scope.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart';
@@ -50,7 +51,7 @@ class AsyncThumbnail extends ConsumerStatefulWidget {
     required this.limiter,
     required this.fetchFn,
     required this.imageBuilder,
-    this.debounce = const Duration(milliseconds: 100),
+    this.debounce = const Duration(milliseconds: 30),
     this.syncLookup,
     this.cacheHeight,
     this.priority = TaskPriority.visible,
@@ -64,6 +65,18 @@ class AsyncThumbnail extends ConsumerStatefulWidget {
 
 class _AsyncThumbnailState extends ConsumerState<AsyncThumbnail> {
   bool _tickerEnabled = true;
+
+  /// The scrollable this tile is in is moving too fast to read (see
+  /// [ScrollSpeedScope]): a tile that has not asked for its thumbnail yet
+  /// waits, which costs nothing, instead of creating a loader that its own
+  /// disposal cancels a few frames later.
+  bool _scrollIsFast = false;
+
+  /// This tile has asked for its thumbnail at least once. From then on it is
+  /// served normally, fast scroll or not.
+  bool _armed = false;
+
+  bool get _mayLoad => _tickerEnabled && (!_scrollIsFast || _armed);
 
   AsyncThumbnailLoaderProvider get _provider => asyncThumbnailLoaderProvider(
     widget.container.volId,
@@ -81,7 +94,8 @@ class _AsyncThumbnailState extends ConsumerState<AsyncThumbnail> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     _tickerEnabled = TickerMode.valuesOf(context).enabled;
-    if (_tickerEnabled) _ensureLoaded();
+    _scrollIsFast = ScrollSpeedScope.isFastOf(context);
+    if (_mayLoad) _ensureLoaded();
   }
 
   @override
@@ -102,12 +116,14 @@ class _AsyncThumbnailState extends ConsumerState<AsyncThumbnail> {
         oldWidget.quality != widget.quality ||
         oldWidget.container.volId != widget.container.volId ||
         oldWidget.container.mountedAt != widget.container.mountedAt) {
-      if (_tickerEnabled) _ensureLoaded();
+      _armed = false;
+      if (_mayLoad) _ensureLoaded();
     }
   }
 
   void _ensureLoaded() {
     if (!_tickerEnabled) return;
+    _armed = true;
     ref
         .read(_provider.notifier)
         .ensureLoaded(
@@ -124,7 +140,18 @@ class _AsyncThumbnailState extends ConsumerState<AsyncThumbnail> {
   @override
   Widget build(BuildContext context) {
     _tickerEnabled = TickerMode.valuesOf(context).enabled;
+    _scrollIsFast = ScrollSpeedScope.isFastOf(context);
     if (!_tickerEnabled) {
+      return widget.loadingBuilder?.call(context) ?? const SizedBox.shrink();
+    }
+    if (_scrollIsFast && !_armed) {
+      // Too fast to read. A thumbnail that is already in memory is still shown
+      // (it is free); anything else waits until the scroll slows down, which
+      // rebuilds this tile (see ScrollSpeedScope).
+      final hit = widget.syncLookup?.call();
+      if (hit != null && hit.isNotEmpty) {
+        return widget.imageBuilder(context, hit, widget.cacheHeight);
+      }
       return widget.loadingBuilder?.call(context) ?? const SizedBox.shrink();
     }
     // Arming on every build, not just on mount. `ensureLoaded` is a no-op
@@ -141,6 +168,14 @@ class _AsyncThumbnailState extends ConsumerState<AsyncThumbnail> {
     _ensureLoaded();
     final state = ref.watch(_provider);
     if (state.isLoading) {
+      // A tile re-entering the viewport gets a fresh provider instance whose
+      // state starts as "loading" until the deferred microtask in
+      // ensureLoaded runs. If the bytes are already in the memory cache,
+      // paint them now instead of flashing a placeholder for a frame.
+      final hit = widget.syncLookup?.call();
+      if (hit != null && hit.isNotEmpty) {
+        return widget.imageBuilder(context, hit, widget.cacheHeight);
+      }
       return widget.loadingBuilder?.call(context) ?? const SizedBox.shrink();
     }
     if (state.hasError || state.bytes == null || state.bytes!.isEmpty) {

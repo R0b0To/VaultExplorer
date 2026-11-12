@@ -13,6 +13,7 @@ import 'package:vaultexplorer/data/models/usb_device_info.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_wizard_shared.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/quick_password_generator_sheet.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/usb_create_container_controller.dart';
+import 'package:vaultexplorer/core/widgets/inputs/utf8_byte_limit_formatter.dart';
 
 enum _WizStep { basics, security, advanced, hiddenVolume, randomness, review }
 
@@ -643,6 +644,7 @@ class _UsbCreateContainerSheetState extends ConsumerState<UsbCreateContainerShee
                 controller: _passwordCtrl,
                 enabled: !state.busy,
                 obscureText: _obscure,
+                inputFormatters: const [Utf8ByteLimitingFormatter(128)],
                 onChanged: (_) => setState(() {}),
                 autofillHints: null,
                 decoration: InputDecoration(
@@ -682,6 +684,7 @@ class _UsbCreateContainerSheetState extends ConsumerState<UsbCreateContainerShee
                 controller: _confirmPasswordCtrl,
                 enabled: !state.busy,
                 obscureText: _confirmObscure,
+                inputFormatters: const [Utf8ByteLimitingFormatter(128)],
                 onChanged: (_) => setState(() {}),
                 autofillHints: null,
                 decoration: InputDecoration(
@@ -924,6 +927,7 @@ class _UsbCreateContainerSheetState extends ConsumerState<UsbCreateContainerShee
                 controller: _hiddenPasswordCtrl,
                 enabled: !state.busy,
                 obscureText: _hiddenObscure,
+                inputFormatters: const [Utf8ByteLimitingFormatter(128)],
                 onChanged: (_) => setState(() {}),
                 autofillHints: null,
                 decoration: InputDecoration(
@@ -964,6 +968,7 @@ class _UsbCreateContainerSheetState extends ConsumerState<UsbCreateContainerShee
                 controller: _hiddenConfirmPasswordCtrl,
                 enabled: !state.busy,
                 obscureText: _hiddenConfirmObscure,
+                inputFormatters: const [Utf8ByteLimitingFormatter(128)],
                 onChanged: (_) => setState(() {}),
                 autofillHints: null,
                 decoration: InputDecoration(

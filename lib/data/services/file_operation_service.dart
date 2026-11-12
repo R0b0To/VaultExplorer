@@ -871,16 +871,30 @@ class FileOperationService extends ChangeNotifier {
       final modifiedSecs = <int>[];
       int totalInputBytes = 0;
 
-      Future<void> collect(String containerPath, String archivePath) async {
+      // Returns how many entries the folder put into the archive. A folder that
+      // ends up with none is an empty folder: it goes in as an entry of its own
+      // (a name with a trailing '/', which the native side reads as "folder"),
+      // otherwise it would vanish from the archive, and archiving only empty
+      // folders would produce nothing at all.
+      Future<int> collect(
+        String containerPath,
+        String archivePath,
+        int folderModifiedSecs,
+      ) async {
         if (op.cancelRequested) throw const _CancelledException();
         final rawList = await _fileIoApi.listDirectory(source, containerPath);
         final children = RawEntry.parseAll(rawList ?? const []);
+        var added = 0;
         for (final child in children) {
           if (child.name.startsWith('System:')) continue;
           final childContainerPath = '$containerPath/${child.name}';
           final childArchivePath = '$archivePath/${child.name}';
           if (child.isDir) {
-            await collect(childContainerPath, childArchivePath);
+            added += await collect(
+              childContainerPath,
+              childArchivePath,
+              child.modifiedSecs,
+            );
           } else {
             srcPaths.add(
               source.isRawLocal
@@ -890,14 +904,24 @@ class FileOperationService extends ChangeNotifier {
             entryNames.add(childArchivePath);
             modifiedSecs.add(child.modifiedSecs);
             totalInputBytes += child.sizeBytes;
+            added++;
           }
         }
+        if (added == 0) {
+          srcPaths.add(
+            source.isRawLocal ? p.join(source.uri, containerPath) : containerPath,
+          );
+          entryNames.add('$archivePath/');
+          modifiedSecs.add(folderModifiedSecs);
+          added++;
+        }
+        return added;
       }
 
       for (final item in items) {
         if (op.cancelRequested) throw const _CancelledException();
         if (item.isDir) {
-          await collect(item.path, item.name);
+          await collect(item.path, item.name, item.modifiedSecs);
         } else {
           srcPaths.add(
             source.isRawLocal ? p.join(source.uri, item.path) : item.path,
@@ -910,8 +934,10 @@ class FileOperationService extends ChangeNotifier {
 
       if (op.cancelRequested) throw const _CancelledException();
 
+      // Never finish silently without an archive: the person pasted one.
       if (srcPaths.isEmpty) {
-        op._setStatus(FileOperationStatus.completed);
+        op._setError(op.l10n.failedToArchiveGeneric('Nothing to archive'));
+        op._setStatus(FileOperationStatus.failed);
         return;
       }
 
@@ -1364,6 +1390,8 @@ class FileOperationService extends ChangeNotifier {
               String destPath,
               bool skip,
               bool mergeOverwrite,
+              bool overwrite,
+              bool destIsDir,
             })
           >[];
 
@@ -1403,6 +1431,8 @@ class FileOperationService extends ChangeNotifier {
             destPath: destPath,
             skip: true,
             mergeOverwrite: false,
+            overwrite: false,
+            destIsDir: false,
           ));
           continue;
         }
@@ -1413,16 +1443,20 @@ class FileOperationService extends ChangeNotifier {
             destPath: destPath,
             skip: true,
             mergeOverwrite: false,
+            overwrite: false,
+            destIsDir: false,
           ));
           continue;
         }
 
         bool mergeOverwrite = false;
+        bool overwrite = false;
+        bool destIsDir = false;
         if (existingNames.contains(fold(fileName))) {
           final resolution =
               conflictPlan[fold(fileName)] ??
               ConflictResolution.keepBoth;
-          final destIsDir = existingDirs.contains(fold(fileName));
+          destIsDir = existingDirs.contains(fold(fileName));
 
           switch (resolution) {
             case ConflictResolution.skip:
@@ -1431,6 +1465,8 @@ class FileOperationService extends ChangeNotifier {
                 destPath: destPath,
                 skip: true,
                 mergeOverwrite: false,
+                overwrite: false,
+                destIsDir: destIsDir,
               ));
               continue;
             case ConflictResolution.overwrite:
@@ -1448,13 +1484,15 @@ class FileOperationService extends ChangeNotifier {
                   destPath: destPath,
                   skip: true,
                   mergeOverwrite: false,
+                  overwrite: false,
+                  destIsDir: destIsDir,
                 ));
                 continue;
               }
               if (op.isCut && item.isDir && destIsDir) {
                 mergeOverwrite = true;
-              } else if (op.isCut) {
-                await _deleteEntryRecursive(dest, destPath, destIsDir);
+              } else {
+                overwrite = true;
               }
             case ConflictResolution.keepBoth:
               final unique = makeUniqueName(
@@ -1497,6 +1535,8 @@ class FileOperationService extends ChangeNotifier {
           destPath: destPath,
           skip: false,
           mergeOverwrite: mergeOverwrite,
+          overwrite: overwrite,
+          destIsDir: destIsDir,
         ));
       }
 
@@ -1524,6 +1564,27 @@ class FileOperationService extends ChangeNotifier {
               if (r.skip) {
                 op._recordItemResult(idx, FileItemResult.skipped);
                 return;
+              }
+
+              final srcExists = await _fileIoApi.entryExists(
+                src,
+                r.item.path,
+                isDir: r.item.isDir,
+              );
+              if (!srcExists) {
+                op._recordItemResult(
+                  idx,
+                  FileItemResult.failed,
+                  errorMessage: op.l10n.bookmarkTargetMissing,
+                );
+                return;
+              }
+
+              if (r.overwrite &&
+                  op.isCut &&
+                  src.volId == dest.volId &&
+                  !r.mergeOverwrite) {
+                await _deleteEntryRecursive(dest, r.destPath, r.destIsDir);
               }
 
               op._setActivity(
@@ -1702,7 +1763,13 @@ class FileOperationService extends ChangeNotifier {
 
       final resolved =
           <
-            ({ClipboardItem item, String srcPath, String destPath, bool skip})
+            ({
+              ClipboardItem item,
+              String srcPath,
+              String destPath,
+              bool skip,
+              bool overwrite,
+            })
           >[];
       for (final item in op.items) {
         final fileName = item.name;
@@ -1719,6 +1786,7 @@ class FileOperationService extends ChangeNotifier {
             srcPath: srcPath,
             destPath: destPath,
             skip: true,
+            overwrite: false,
           ));
           continue;
         }
@@ -1728,10 +1796,12 @@ class FileOperationService extends ChangeNotifier {
             srcPath: srcPath,
             destPath: destPath,
             skip: true,
+            overwrite: false,
           ));
           continue;
         }
 
+        var overwrite = false;
         if (existingNames.contains(fileName.toLowerCase())) {
           final resolution =
               conflictPlan[fileName.toLowerCase()] ??
@@ -1743,6 +1813,7 @@ class FileOperationService extends ChangeNotifier {
                 srcPath: srcPath,
                 destPath: destPath,
                 skip: true,
+                overwrite: false,
               ));
               continue;
             case ConflictResolution.overwrite:
@@ -1756,10 +1827,11 @@ class FileOperationService extends ChangeNotifier {
                   srcPath: srcPath,
                   destPath: destPath,
                   skip: true,
+                  overwrite: false,
                 ));
                 continue;
               }
-              await _deleteLocalRecursive(destPath);
+              overwrite = true;
             case ConflictResolution.keepBoth:
               final unique = makeUniqueName(fileName, existingNames);
               existingNames.add(unique.toLowerCase());
@@ -1771,6 +1843,7 @@ class FileOperationService extends ChangeNotifier {
           srcPath: srcPath,
           destPath: destPath,
           skip: false,
+          overwrite: overwrite,
         ));
       }
 
@@ -1793,6 +1866,24 @@ class FileOperationService extends ChangeNotifier {
           op._recordItemResult(i, FileItemResult.skipped);
           continue;
         }
+
+        // Verify source existence before modifying destination!
+        final srcExists = r.item.isDir
+            ? await Directory(r.srcPath).exists()
+            : await File(r.srcPath).exists();
+        if (!srcExists) {
+          op._recordItemResult(
+            i,
+            FileItemResult.failed,
+            errorMessage: op.l10n.bookmarkTargetMissing,
+          );
+          continue;
+        }
+
+        if (r.overwrite) {
+          await _deleteLocalRecursive(r.destPath);
+        }
+
         op._setActivity(
           op.isCut
               ? op.l10n.fileOpMovingName(r.item.name)
@@ -2090,7 +2181,8 @@ class FileOperationService extends ChangeNotifier {
       );
     }
 
-    final children = await _fileIoApi.listDirectory(src, srcPath) ?? [];
+    final children = await _fileIoApi.listDirectory(src, srcPath);
+    if (children == null) return false;
     await _fileIoApi.createDirectory(dest, destPath);
     createdDestPaths.add(destPath);
     if (modifiedSecs > 0) {
@@ -2202,6 +2294,14 @@ class FileOperationService extends ChangeNotifier {
     try {
       final size = await _fileIoApi.getFileSize(src, srcPath);
       if (size < 0) return false;
+      if (size == 0) {
+        final srcExists = await _fileIoApi.entryExists(
+          src,
+          srcPath,
+          isDir: false,
+        );
+        if (!srcExists) return false;
+      }
 
       // Last line of defence, right in front of the delete below: if the
       // destination is the source (same real file reached through two

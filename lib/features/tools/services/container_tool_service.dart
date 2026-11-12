@@ -779,6 +779,9 @@ class NativeContainerToolService extends DefaultContainerToolService {
       throw const HeaderBackupInvalidException('Could not read this backup file.');
     }
     final parsed = HeaderBackupFile.decode(raw);
+    // A bare desktop-style VeraCrypt backup has no envelope and so no checksum; it is verified
+    // by decrypting it with the volume password when it is restored.
+    if (parsed.sha256Hex.isEmpty) return parsed;
     final actualSha256Hex = await _hashApi.hashBytesSha256(parsed.payload);
     if (actualSha256Hex.toLowerCase() != parsed.sha256Hex.toLowerCase()) {
       throw const HeaderBackupInvalidException('This backup file appears corrupted (checksum mismatch).');

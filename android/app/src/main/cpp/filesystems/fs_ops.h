@@ -37,11 +37,8 @@ bool fsListDirectory(int volId, const std::string& pathSuffix,
                       std::vector<std::string>& outResults);
 
 // ── Size queries ───────────────────────────────────────────────────────
-// Both return 0 on any failure (path not found, wrong type, ...) — same
-// zero-on-failure convention the original inline code used, so callers
-// can't distinguish "empty file" from "not found" here any more than they
-// could before this split.
-uint64_t fsGetFileSize(int volId, const std::string& path);
+// fsGetFileSize returns the size in bytes, or -1 on any failure (e.g. path not found).
+int64_t fsGetFileSize(int volId, const std::string& path);
 uint64_t fsGetFolderSize(int volId, const std::string& path);
 
 // ── Whole/partial file I/O ─────────────────────────────────────────────

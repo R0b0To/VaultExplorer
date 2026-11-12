@@ -122,6 +122,32 @@ class FileOperationHandlers(
         }
     }
 
+    // Symlinks and the "hidden entries" count (Cryptomator). Read-only queries, same executor as listing.
+    fun handleListVaultSymlinks(call: MethodCall, result: MethodChannel.Result) {
+        val dirPath = call.argument<String>("dirPath") ?: ""
+        nativeOps.runNativeOp(call.argument<String>("filePath"), result, executor = queryExecutor) { volId ->
+            ContainerFileSystem.listSymlinks(volId, dirPath).toList()
+        }
+    }
+
+    fun handleReadVaultSymlink(call: MethodCall, result: MethodChannel.Result) {
+        val path = call.argument<String>("path")
+        if (path == null) {
+            result.error("INVALID_ARGS", "path required", null)
+            return
+        }
+        nativeOps.runNativeOp(call.argument<String>("filePath"), result, executor = queryExecutor) { volId ->
+            ContainerFileSystem.readSymlink(volId, path)   // null: not a (readable) symlink
+        }
+    }
+
+    fun handleGetHiddenEntryCount(call: MethodCall, result: MethodChannel.Result) {
+        val dirPath = call.argument<String>("dirPath") ?: ""
+        nativeOps.runNativeOp(call.argument<String>("filePath"), result, executor = queryExecutor) { volId ->
+            ContainerFileSystem.hiddenEntryCount(volId, dirPath)
+        }
+    }
+
     fun handleCreateDirectory(call: MethodCall, result: MethodChannel.Result) {
         val dirPath = call.argument<String>("dirPath")
         if (dirPath == null) {

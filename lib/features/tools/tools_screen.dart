@@ -15,15 +15,28 @@ import 'package:vaultexplorer/features/tools/widgets/keyfile_passphrase_generato
 import 'package:vaultexplorer/features/tools/widgets/password_interchange/password_interchange_screen.dart';
 import 'package:vaultexplorer/features/tools/widgets/single_file_crypto_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/storage_analyzer_screen.dart';
+import 'package:vaultexplorer/features/tools/widgets/veracrypt_volume_tools_screen.dart';
 import 'package:vaultexplorer/features/tools/widgets/vault_sync_screen.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
 class ToolsScreen extends StatelessWidget {
   final ValueListenable<List<MountedContainer>> mountedContainers;
+  final ValueListenable<MountedContainer?>? localStorageContainer;
   final ValueChanged<int>? onNavigateTab;
 
-  const ToolsScreen({super.key, required this.mountedContainers, this.onNavigateTab});
+  /// Opens a vault in the file browser. Lets tools such as the Storage
+  /// Analyzer offer "show in file browser"; tools hide that action when this
+  /// is null (e.g. when ToolsScreen is pushed from the drawer).
+  final ValueChanged<MountedContainer>? onOpenInBrowser;
+
+  const ToolsScreen({
+    super.key,
+    required this.mountedContainers,
+    this.localStorageContainer,
+    this.onNavigateTab,
+    this.onOpenInBrowser,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -104,6 +117,8 @@ class ToolsScreen extends StatelessWidget {
             _buildCompositeContainerRow(context, cs),
             _buildContainerRepairRow(context, cs),
             _buildHeaderBackupRow(context, cs),
+            _buildExpandVolumeRow(context, cs),
+            _buildHiddenInExistingRow(context, cs),
           ],
         ),
         const SizedBox(height: AppSpacing.lg),
@@ -174,6 +189,8 @@ class ToolsScreen extends StatelessWidget {
                     _buildCompositeContainerRow(context, cs),
                     _buildContainerRepairRow(context, cs),
                     _buildHeaderBackupRow(context, cs),
+                    _buildExpandVolumeRow(context, cs),
+                    _buildHiddenInExistingRow(context, cs),
                   ],
                 ),
               ],
@@ -276,6 +293,8 @@ class ToolsScreen extends StatelessWidget {
         MaterialPageRoute(
           builder: (_) => SkinAreaScope(area: SkinArea.tools, child: StorageAnalyzerScreen(
             mountedContainers: mountedContainers,
+            localStorageContainer: localStorageContainer,
+            onOpenInBrowser: onOpenInBrowser,
           )),
         ),
       ),
@@ -340,6 +359,40 @@ class ToolsScreen extends StatelessWidget {
           builder: (_) => SkinAreaScope(area: SkinArea.tools, child: ContainerRepairSheet(
             mountedContainers: mountedContainers,
           )),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExpandVolumeRow(BuildContext context, ColorScheme cs) {
+    return _ToolRow(
+      icon: Icons.unfold_more_rounded,
+      title: context.l10n.toolExpandVolumeTitle,
+      subtitle: context.l10n.toolExpandVolumeSubtitle,
+      iconColor: cs.secondary,
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => SkinAreaScope(
+            area: SkinArea.tools,
+            child: const VeraCryptVolumeToolsScreen(tool: VeraCryptVolumeTool.expand),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHiddenInExistingRow(BuildContext context, ColorScheme cs) {
+    return _ToolRow(
+      icon: Icons.visibility_off_rounded,
+      title: context.l10n.toolHiddenInExistingTitle,
+      subtitle: context.l10n.toolHiddenInExistingSubtitle,
+      iconColor: cs.secondary,
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => SkinAreaScope(
+            area: SkinArea.tools,
+            child: const VeraCryptVolumeToolsScreen(tool: VeraCryptVolumeTool.addHidden),
+          ),
         ),
       ),
     );

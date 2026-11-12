@@ -88,3 +88,22 @@ String formatEntryDate(int secs, [BuildContext? context]) {
       ? '$monthAbbr ${dt.day}'
       : '$monthAbbr ${dt.day}, ${dt.year}';
 }
+
+/// Like [formatEntryDate] but always includes the time of day, for places
+/// that compare two copies of the same file where "Nov 3" alone can't tell
+/// which one is newer: "Nov 3, 14:32" this year, "11/3/2024, 14:32" for
+/// other years (formatted for the active locale and 12/24-hour setting).
+/// Returns "—" when the time is unknown (0).
+String formatEntryDateTime(int secs, BuildContext context) {
+  if (secs <= 0) return '—';
+  final dt = DateTime.fromMillisecondsSinceEpoch(secs * 1000);
+  final localizations = MaterialLocalizations.of(context);
+  final date = dt.year == DateTime.now().year
+      ? localizations.formatShortMonthDay(dt)
+      : localizations.formatShortDate(dt);
+  final time = localizations.formatTimeOfDay(
+    TimeOfDay.fromDateTime(dt),
+    alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context),
+  );
+  return '$date, $time';
+}

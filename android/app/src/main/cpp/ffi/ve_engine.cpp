@@ -12,7 +12,9 @@
 // a JNI-free session_ops.{h,cpp} that both bridges call.
 
 #include "ve_engine.h"
+#include "ve_foldervault.h"
 
+#include <algorithm>
 #include <atomic>
 #include <cstdio>
 #include <cstdlib>
@@ -281,23 +283,29 @@ extern "C" VE_API void ve_request_cancel_unlock(int32_t vol_id) {
 }
 
 extern "C" VE_API void ve_lock(int32_t vol_id) {
-    try { lockSlot(vol_id); } catch (...) {}
+    try {
+        if (vefv::isSlot(vol_id)) { vefv::closeSlot(vol_id); return; }  // folder vault: wipe keys, free the slot
+        lockSlot(vol_id);
+    } catch (...) {}
 }
 
 extern "C" VE_API int32_t ve_get_container_format(int32_t vol_id) {
     if (!validVol(vol_id)) return -1;
+    if (const int32_t fvFormat = vefv::containerFormat(vol_id); fvFormat >= 0) return fvFormat;
     std::shared_lock<std::shared_mutex> lock(volumes[vol_id].mutex);
     return static_cast<int32_t>(volumes[vol_id].containerFormat);
 }
 
 extern "C" VE_API int32_t ve_get_matched_cipher_id(int32_t vol_id) {
     if (!validVol(vol_id)) return -1;
+    if (vefv::isSlot(vol_id)) return 255;  // folder vaults have no cascade to report
     std::shared_lock<std::shared_mutex> lock(volumes[vol_id].mutex);
     return static_cast<int32_t>(volumes[vol_id].matchedCipherId);
 }
 
 extern "C" VE_API int32_t ve_get_matched_hash_id(int32_t vol_id) {
     if (!validVol(vol_id)) return -1;
+    if (vefv::isSlot(vol_id)) return 255;
     std::shared_lock<std::shared_mutex> lock(volumes[vol_id].mutex);
     return static_cast<int32_t>(volumes[vol_id].matchedHashId);
 }
@@ -444,6 +452,7 @@ extern "C" VE_API int32_t ve_list_directory(int32_t vol, const char* path, ve_bu
     out->len = 0;
     if (!path || !validVol(vol)) return VE_ERR_INVALID_ARG;
     VE_TRY
+    if (vefv::isSlot(vol)) return vefv::list(vol, path, out);
     std::vector<std::string> results;
     results.reserve(256);
     const int32_t rc = withMounted(vol, "listDirectory", false, [&](auto&) {
@@ -466,6 +475,7 @@ extern "C" VE_API int32_t ve_list_directory(int32_t vol, const char* path, ve_bu
 extern "C" VE_API int64_t ve_get_file_size(int32_t vol, const char* path) {
     if (!path || !validVol(vol)) return -VE_ERR_INVALID_ARG;
     VE_TRY
+    if (vefv::isSlot(vol)) return vefv::fileSize(vol, path);
     int64_t size = 0;
     const int32_t rc = withMounted(vol, "getFileSize", false, [&](auto&) {
         size = static_cast<int64_t>(fsGetFileSize(vol, path));
@@ -478,6 +488,7 @@ extern "C" VE_API int64_t ve_get_file_size(int32_t vol, const char* path) {
 extern "C" VE_API int64_t ve_get_folder_size(int32_t vol, const char* path) {
     if (!path || !validVol(vol)) return -VE_ERR_INVALID_ARG;
     VE_TRY
+    if (vefv::isSlot(vol)) return vefv::folderSize(vol, path);
     int64_t total = 0;
     const int32_t rc = withMounted(vol, "getFolderSize", false, [&](auto&) {
         total = static_cast<int64_t>(fsGetFolderSize(vol, path));
@@ -498,7 +509,9 @@ extern "C" VE_API int32_t ve_read_file_chunk(int32_t vol, const char* path, int6
     }
     VE_TRY
     std::vector<uint8_t> buffer;
-    const int32_t rc = withMounted(vol, "readFileChunk", false, [&](auto&) {
+    const bool isFv = vefv::isSlot(vol);
+    const int32_t rc = isFv ? vefv::readChunk(vol, path, offset, length, buffer)
+                            : withMounted(vol, "readFileChunk", false, [&](auto&) {
         return okOrFailed(fsReadFileChunk(vol, path, static_cast<uint64_t>(offset),
                                           static_cast<size_t>(length), buffer));
     });
@@ -515,6 +528,7 @@ extern "C" VE_API int32_t ve_write_file_chunk(int32_t vol, const char* path, int
         return VE_ERR_INVALID_ARG;
     }
     VE_TRY
+    if (vefv::isSlot(vol)) return vefv::writeChunk(vol, path, offset, data, len);
     return withMounted(vol, "writeFileChunk", true, [&](auto&) {
         return okOrFailed(fsWriteFileChunk(vol, path, static_cast<uint64_t>(offset), data, len));
     });
@@ -524,6 +538,7 @@ extern "C" VE_API int32_t ve_write_file_chunk(int32_t vol, const char* path, int
 extern "C" VE_API int32_t ve_delete_file(int32_t vol, const char* path) {
     if (!path || !validVol(vol)) return VE_ERR_INVALID_ARG;
     VE_TRY
+    if (vefv::isSlot(vol)) return vefv::remove(vol, path);
     return withMounted(vol, "deleteFile", true, [&](auto&) { return okOrFailed(fsDeleteFile(vol, path)); });
     VE_CATCH(VE_ERR_EXCEPTION)
 }
@@ -531,6 +546,7 @@ extern "C" VE_API int32_t ve_delete_file(int32_t vol, const char* path) {
 extern "C" VE_API int32_t ve_create_directory(int32_t vol, const char* path) {
     if (!path || !validVol(vol)) return VE_ERR_INVALID_ARG;
     VE_TRY
+    if (vefv::isSlot(vol)) return vefv::makeDirectory(vol, path);
     return withMounted(vol, "createDirectory", true, [&](auto&) { return okOrFailed(fsCreateDirectory(vol, path)); });
     VE_CATCH(VE_ERR_EXCEPTION)
 }
@@ -538,6 +554,7 @@ extern "C" VE_API int32_t ve_create_directory(int32_t vol, const char* path) {
 extern "C" VE_API int32_t ve_rename_file(int32_t vol, const char* old_path, const char* new_path) {
     if (!old_path || !new_path || !validVol(vol)) return VE_ERR_INVALID_ARG;
     VE_TRY
+    if (vefv::isSlot(vol)) return vefv::rename(vol, old_path, new_path);
     return withMounted(vol, "renameFile", true, [&](auto&) { return okOrFailed(fsRenameFile(vol, old_path, new_path)); });
     VE_CATCH(VE_ERR_EXCEPTION)
 }
@@ -545,6 +562,7 @@ extern "C" VE_API int32_t ve_rename_file(int32_t vol, const char* old_path, cons
 extern "C" VE_API int32_t ve_set_last_modified(int32_t vol, const char* path, int64_t epoch_seconds) {
     if (!path || !validVol(vol) || epoch_seconds < 0) return VE_ERR_INVALID_ARG;
     VE_TRY
+    if (vefv::isSlot(vol)) return vefv::setLastModified(vol, path, epoch_seconds);
     return withMounted(vol, "setLastModifiedTime", true, [&](auto&) {
         return okOrFailed(fsSetLastModifiedTime(vol, path, static_cast<uint64_t>(epoch_seconds)));
     });
@@ -555,6 +573,7 @@ extern "C" VE_API int32_t ve_import_file(int32_t vol, const char* vault_path,
                                          const char* host_source_path, int32_t op_id) {
     if (!vault_path || !host_source_path || !validVol(vol)) return VE_ERR_INVALID_ARG;
     VE_TRY
+    if (vefv::isSlot(vol)) return vefv::importFile(vol, vault_path, host_source_path, op_id);
     return withMounted(vol, "writeBackFile", true, [&](std::unique_lock<std::shared_mutex>& fsLock) {
         return okOrFailed(fsWriteBackFile(vol, vault_path, host_source_path,
             [op_id, vol, &fsLock](uint64_t bytesWritten) -> bool {
@@ -573,6 +592,7 @@ extern "C" VE_API int32_t ve_export_file(int32_t vol, const char* vault_path,
                                          const char* host_dest_path, int32_t op_id) {
     if (!vault_path || !host_dest_path || !validVol(vol)) return VE_ERR_INVALID_ARG;
     VE_TRY
+    if (vefv::isSlot(vol)) return vefv::exportFile(vol, vault_path, host_dest_path, op_id);
     return withMounted(vol, "extractFile", false, [&](std::unique_lock<std::shared_mutex>& fsLock) {
         return okOrFailed(fsExtractFile(vol, vault_path, host_dest_path,
             [op_id, vol, &fsLock](uint64_t bytesWritten) -> bool {
@@ -587,10 +607,75 @@ extern "C" VE_API int32_t ve_export_file(int32_t vol, const char* vault_path,
     VE_CATCH(VE_ERR_EXCEPTION)
 }
 
+// Copy where at least one side is a folder vault (the block-device-only case keeps its dedicated
+// fsCopyFile fast paths below). Streams through memory in 2 MiB steps like fsCopyFile's cross-filesystem
+// fallback: the block-device side takes its volume lock per chunk, a folder vault is internally
+// thread-safe. A failed or cancelled copy removes the partial destination, as fsCopyFile does.
+static int32_t copyMixed(int32_t srcVol, const char* srcPath, int32_t destVol, const char* destPath, int32_t opId) {
+    const bool srcFv = vefv::isSlot(srcVol);
+    const bool destFv = vefv::isSlot(destVol);
+    if (!srcFv && !requireActiveSession(srcVol, "copyFile (src)")) return VE_ERR_NOT_UNLOCKED;
+    if (!destFv && !requireActiveSession(destVol, "copyFile (dest)")) return VE_ERR_NOT_UNLOCKED;
+    if (destFv ? vefv::isReadOnly(destVol) : isVolumeReadOnly(destVol)) return VE_ERR_READ_ONLY;
+
+    int64_t size = -1;
+    if (srcFv) {
+        size = vefv::fileSize(srcVol, srcPath);
+    } else {
+        const int32_t rc = withMounted(srcVol, "copyFile (size)", false, [&](auto&) {
+            size = fsGetFileSize(srcVol, srcPath);
+            return VE_OK;
+        });
+        if (rc != VE_OK) return rc;
+    }
+    if (size < 0) return VE_ERR_FAILED;
+
+    static const uint8_t kNone = 0;
+    auto writeAt = [&](int64_t off, const uint8_t* d, size_t n) -> int32_t {
+        if (destFv) return vefv::writeChunk(destVol, destPath, off, d, n);
+        return withMounted(destVol, "copyFile (write)", true, [&](auto&) {
+            return okOrFailed(fsWriteFileChunk(destVol, destPath, static_cast<uint64_t>(off), d ? d : &kNone, n));
+        });
+    };
+
+    constexpr size_t kStep = 2u * 1024u * 1024u;
+    std::vector<uint8_t> buf;
+    int64_t offset = 0;
+    int32_t rc = VE_OK;
+    if (size == 0) rc = writeAt(0, nullptr, 0);  // an empty source still has to create the destination
+    while (rc == VE_OK && offset < size) {
+        const size_t want = static_cast<size_t>(std::min<int64_t>(static_cast<int64_t>(kStep), size - offset));
+        buf.clear();
+        if (srcFv) {
+            rc = vefv::readChunk(srcVol, srcPath, offset, static_cast<int32_t>(want), buf);
+        } else {
+            rc = withMounted(srcVol, "copyFile (read)", false, [&](auto&) {
+                return okOrFailed(fsReadFileChunk(srcVol, srcPath, static_cast<uint64_t>(offset), want, buf));
+            });
+        }
+        if (rc != VE_OK) break;
+        if (buf.empty()) { rc = VE_ERR_FAILED; break; }  // source shorter than its reported size
+        rc = writeAt(offset, buf.data(), buf.size());
+        if (rc != VE_OK) break;
+        offset += static_cast<int64_t>(buf.size());
+        reportCopyProgress(opId, buf.size());
+        mbedtls_platform_zeroize(buf.data(), buf.size());
+        if (isCopyCancelled(opId)) { rc = VE_ERR_FAILED; break; }  // same code the block path reports for a cancel
+    }
+    if (!buf.empty()) mbedtls_platform_zeroize(buf.data(), buf.size());
+    if (rc == VE_OK && destFv) rc = vefv::finishWrite(destVol, destPath);  // the file only becomes valid here
+    if (rc != VE_OK) {
+        if (destFv) vefv::remove(destVol, destPath);
+        else withMounted(destVol, "copyFile (cleanup)", true, [&](auto&) { return okOrFailed(fsDeleteFile(destVol, destPath)); });
+    }
+    return rc;
+}
+
 extern "C" VE_API int32_t ve_copy_file(int32_t srcVol, const char* srcPath,
                                        int32_t destVol, const char* destPath, int32_t opId) {
     if (!srcPath || !destPath || !validVol(srcVol) || !validVol(destVol)) return VE_ERR_INVALID_ARG;
     VE_TRY
+    if (vefv::isSlot(srcVol) || vefv::isSlot(destVol)) return copyMixed(srcVol, srcPath, destVol, destPath, opId);
     if (!requireActiveSession(srcVol, "copyFile (src)")) return VE_ERR_NOT_UNLOCKED;
     if (!requireActiveSession(destVol, "copyFile (dest)")) return VE_ERR_NOT_UNLOCKED;
     if (isVolumeReadOnly(destVol)) return VE_ERR_READ_ONLY;
@@ -625,6 +710,11 @@ extern "C" VE_API int32_t ve_get_space_info(int32_t vol, uint64_t* total, uint64
     if (!total || !free_bytes || !validVol(vol)) return VE_ERR_INVALID_ARG;
     VE_TRY
     uint64_t t = 0, f = 0;
+    if (vefv::isSlot(vol)) {
+        const int32_t fvRc = vefv::spaceInfo(vol, &t, &f);
+        if (fvRc == VE_OK) { *total = t; *free_bytes = f; }
+        return fvRc;
+    }
     const int32_t rc = withMounted(vol, "getSpaceInfo", false, [&](auto&) {
         fsGetSpaceInfo(vol, t, f);
         return VE_OK;
@@ -639,6 +729,7 @@ extern "C" VE_API int32_t ve_get_space_info(int32_t vol, uint64_t* total, uint64
 extern "C" VE_API int32_t ve_get_filesystem_label(int32_t vol, char* buf, size_t cap) {
     if (!buf || cap == 0 || !validVol(vol)) return -VE_ERR_INVALID_ARG;
     VE_TRY
+    if (vefv::isSlot(vol)) { buf[0] = '\0'; return 0; }  // folder vaults have no filesystem label
     std::string label;
     const int32_t rc = withMounted(vol, "getFilesystemLabel", false, [&](auto&) {
         label = fsGetFilesystemLabel(vol);
@@ -657,6 +748,7 @@ extern "C" VE_API int32_t ve_get_vault_info(int32_t vol, ve_vault_info* out) {
         return VE_ERR_INVALID_ARG;
     }
     VE_TRY
+    if (vefv::isSlot(vol)) return vefv::vaultInfo(vol, out);
     if (!requireActiveSession(vol, "getVaultInfo")) return VE_ERR_NOT_UNLOCKED;
     const int32_t size = out->struct_size;
     std::memset(out, 0, sizeof(*out));
@@ -709,6 +801,7 @@ extern "C" VE_API int32_t ve_get_vault_info(int32_t vol, ve_vault_info* out) {
 extern "C" VE_API int64_t ve_open_stream(int32_t vol, const char* path) {
     if (!path || !validVol(vol)) return 0;
     VE_TRY
+    if (vefv::isSlot(vol)) return vefv::openStream(vol, path);
     intptr_t handle = 0;
     const int32_t rc = withMounted(vol, "openStream", false, [&](auto&) {
         handle = reinterpret_cast<intptr_t>(fsOpenStream(vol, path));
@@ -722,6 +815,7 @@ extern "C" VE_API int32_t ve_read_stream(int32_t vol, int64_t handle, int64_t of
                                          uint8_t* dest, int32_t length) {
     if (handle == 0 || length <= 0 || !dest || offset < 0 || !validVol(vol)) return -1;
     VE_TRY
+    if (vefv::isSlot(vol)) return vefv::readStream(vol, handle, offset, dest, length);
     std::unique_lock<std::shared_mutex> fsLock(volumes[vol].mutex);
     return fsReadStream(vol, reinterpret_cast<void*>(static_cast<intptr_t>(handle)),
                         static_cast<uint64_t>(offset), dest, static_cast<size_t>(length));
@@ -731,6 +825,7 @@ extern "C" VE_API int32_t ve_read_stream(int32_t vol, int64_t handle, int64_t of
 extern "C" VE_API void ve_close_stream(int32_t vol, int64_t handle) {
     if (handle == 0 || !validVol(vol)) return;
     try {
+        if (vefv::isSlot(vol)) { vefv::closeStream(vol, handle); return; }
         std::unique_lock<std::shared_mutex> fsLock(volumes[vol].mutex);
         fsCloseStream(vol, reinterpret_cast<void*>(static_cast<intptr_t>(handle)));
     } catch (...) {}

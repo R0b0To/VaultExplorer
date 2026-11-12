@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vaultexplorer/core/api/vault_engine_events.dart';
+import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/api/vault_lifecycle_api.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -525,6 +526,55 @@ void main() {
       final localApi = VaultLifecycleApi(channel, events, registry);
       nextResult = null;
       expect(await localApi.lockContainer('content://c'), isFalse);
+    });
+
+    test('lockContainerDetailed maps the native result to locked / failed', () async {
+      final localApi = VaultLifecycleApi(channel, events, ActiveRecordingRegistry());
+
+      nextResult = true;
+      expect(await localApi.lockContainerDetailed('content://c'), LockResult.locked);
+      nextResult = false;
+      expect(await localApi.lockContainerDetailed('content://c'), LockResult.failed);
+      nextResult = null;
+      expect(await localApi.lockContainerDetailed('content://c'), LockResult.failed);
+    });
+
+    test('a device that refuses the final flush is reported, not thrown', () async {
+      final localApi = VaultLifecycleApi(channel, events, ActiveRecordingRegistry());
+      nextError = PlatformException(code: 'LOCK_FLUSH_REFUSED');
+
+      expect(
+        await localApi.lockContainerDetailed('content://c'),
+        LockResult.flushRefused,
+      );
+      // The plain boolean API keeps its contract, so loops that lock several
+      // containers carry on to the next one instead of aborting.
+      expect(await localApi.lockContainer('content://c'), isFalse);
+    });
+
+    test('other native errors still propagate', () async {
+      final localApi = VaultLifecycleApi(channel, events, ActiveRecordingRegistry());
+      nextError = PlatformException(code: 'ERR');
+
+      await expectLater(
+        localApi.lockContainerDetailed('content://c'),
+        throwsA(isA<PlatformException>()),
+      );
+      await expectLater(
+        localApi.lockContainer('content://c'),
+        throwsA(isA<PlatformException>()),
+      );
+    });
+
+    test('force is sent only for the explicit lock-anyway choice', () async {
+      final localApi = VaultLifecycleApi(channel, events, ActiveRecordingRegistry());
+      nextResult = true;
+
+      await localApi.lockContainerDetailed('content://c');
+      expect(calls.last.arguments, {'filePath': 'content://c'});
+
+      await localApi.lockContainerDetailed('content://c', force: true);
+      expect(calls.last.arguments, {'filePath': 'content://c', 'force': true});
     });
   });
 

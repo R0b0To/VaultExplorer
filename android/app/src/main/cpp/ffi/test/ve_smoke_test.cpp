@@ -321,14 +321,14 @@ static void runHidden() {
     ve_lock(0);
 
     CHECK_RC(unlock(path, kHidden, 0), VE_OK);
-    CHECK(ve_get_file_size(0, "outer.txt") == 0);  // the hidden volume is a different filesystem
+    CHECK(ve_get_file_size(0, "outer.txt") < 0);  // the hidden volume is a different filesystem (missing -> -1)
     const std::string hiddenData = "lives in the hidden volume";
     CHECK_RC(ve_write_file_chunk(0, "secret.txt", 0, (const uint8_t*)hiddenData.data(), hiddenData.size()), VE_OK);
     ve_lock(0);
 
     CHECK_RC(unlock(path, kOuter, 0), VE_OK);
     CHECK(readAll(0, "outer.txt") == outerData);
-    CHECK(ve_get_file_size(0, "secret.txt") == 0);
+    CHECK(ve_get_file_size(0, "secret.txt") < 0);  // not visible from the outer volume (missing -> -1)
     ve_lock(0);
     CHECK_RC(unlock(path, "neither", 0), VE_ERR_FAILED);
 
@@ -659,6 +659,234 @@ static void runSingleFile() {
     for (const auto& f : {plain, enc, dec, keyfile}) std::remove(f.c_str());
 }
 
+
+// ---- folder vaults (gocryptfs / Cryptomator / CryFS): create, unlock into a slot, then drive the
+// generic slot-addressed file calls against it, including a copy to and from a real container. ----
+static void sh(const std::string& cmd) {
+    if (std::system(cmd.c_str()) != 0) { /* best-effort setup/cleanup */ }
+}
+
+static void runFolderVaults() {
+    std::printf("== folder vaults ==\n");
+    int32_t supported = ve_fv_supported();
+    std::printf("  supported: %d\n", supported);
+    if (!supported) {
+        ve_buffer msg{};
+        CHECK_RC(ve_fv_unlock(0, VE_FV_GOCRYPTFS, "/nonexistent", (const uint8_t*)"x", 1, nullptr, 0, 0, "", "", &msg, nullptr),
+                 VE_ERR_FAILED);
+        ve_buffer_free(&msg);
+        return;
+    }
+#if !defined(_WIN32)
+    static const char* kNames[] = {"gocryptfs", "cryptomator", "cryfs"};
+    const char* kPassword = "correct horse battery staple";
+    const char* kNewPassword = "another passphrase";
+    const std::string stateDir = tempPath("ve_fv_state");
+    const std::string tmpDir = tempPath("");
+    const int kFvVol = 3;  // not 0, so it cannot be mistaken for the container slot used below
+    const int kBlockVol = 1;
+
+    // A real container for the mixed copy tests (slot 1).
+    const std::string hc = tempPath("ve_fv_block.hc");
+    std::remove(hc.c_str());
+    {
+        int fd = ve_create_file(hc.c_str());
+        CHECK(fd >= 0);
+        ve_create_params cp;
+        std::memset(&cp, 0, sizeof(cp));
+        cp.struct_size = sizeof(cp);
+        cp.fd = fd;
+        cp.password = reinterpret_cast<const uint8_t*>(kPassword);
+        cp.password_len = static_cast<int32_t>(std::strlen(kPassword));
+        cp.size_bytes = 8ll << 20;
+        cp.file_system = "fat";
+        cp.container_format = 0;
+        cp.cipher_id = 255;
+        cp.hash_id = 255;
+        cp.quick_format = 1;
+        CHECK_RC(ve_create_container(&cp), VE_OK);
+    }
+    CHECK_RC(unlock(hc, kPassword, kBlockVol), VE_OK);
+
+    std::string big(300 * 1000 + 17, '\0');  // spans several cipher blocks / chunks
+    for (size_t i = 0; i < big.size(); ++i) big[i] = (char)((i * 131 + (i >> 8)) & 0xFF);
+    const std::string payload = "hello from a folder vault\n";
+
+    for (int fmt = 0; fmt < 3; ++fmt) {
+        std::printf("  -- %s --\n", kNames[fmt]);
+        const std::string root = tempPath((std::string("ve_fv_") + kNames[fmt]).c_str());
+        const std::string rmCmd = "rm -rf '" + root + "' '" + stateDir + "'";
+        sh(rmCmd);
+        sh("mkdir -p '" + root + "' '" + stateDir + "'");
+
+        int32_t probed = 99;
+        CHECK_RC(ve_fv_probe(root.c_str(), &probed), VE_OK);
+        CHECK(probed == -1);  // empty directory
+
+        ve_buffer msg{};
+        CHECK_RC(ve_fv_create(fmt, root.c_str(), (const uint8_t*)kPassword, (int32_t)std::strlen(kPassword),
+                              0, 0, 0, 0, 0, nullptr, nullptr, 0, stateDir.c_str(), tmpDir.c_str(), &msg),
+                 VE_OK);
+        if (msg.data) std::printf("    create message: %.*s\n", (int)msg.len, (const char*)msg.data);
+        ve_buffer_free(&msg);
+        CHECK_RC(ve_fv_probe(root.c_str(), &probed), VE_OK);
+        CHECK(probed == fmt);
+
+        // wrong password -> AUTH_FAILED; right one opens it
+        CHECK_RC(ve_fv_unlock(kFvVol, fmt, root.c_str(), (const uint8_t*)"definitely wrong", 16, nullptr, 0, 0,
+                              stateDir.c_str(), tmpDir.c_str(), &msg, nullptr),
+                 VE_ERR_AUTH_FAILED);
+        ve_buffer_free(&msg);
+        ve_buffer derived{};
+        CHECK_RC(ve_fv_unlock(kFvVol, fmt, root.c_str(), (const uint8_t*)kPassword, (int32_t)std::strlen(kPassword),
+                              nullptr, 0, 0, stateDir.c_str(), tmpDir.c_str(), &msg, &derived),
+                 VE_OK);
+        ve_buffer_free(&msg);
+        ve_buffer_free(&derived);
+        CHECK(ve_get_container_format(kFvVol) ==
+              (fmt == 0 ? VE_FORMAT_GOCRYPTFS : fmt == 1 ? VE_FORMAT_CRYPTOMATOR : VE_FORMAT_CRYFS));
+        // an occupied slot refuses a second unlock
+        CHECK_RC(ve_fv_unlock(kFvVol, fmt, root.c_str(), (const uint8_t*)kPassword, (int32_t)std::strlen(kPassword),
+                              nullptr, 0, 0, stateDir.c_str(), tmpDir.c_str(), &msg, nullptr),
+                 VE_ERR_FAILED);
+        ve_buffer_free(&msg);
+
+        // generic slot-addressed calls
+        CHECK_RC(ve_create_directory(kFvVol, "/docs"), VE_OK);
+        CHECK_RC(ve_write_file_chunk(kFvVol, "/docs/hello.txt", 0, (const uint8_t*)payload.data(), payload.size()), VE_OK);
+        CHECK_RC(ve_fv_finish_write(kFvVol, "/docs/hello.txt"), VE_OK);  // chunked writes become valid here
+        CHECK(ve_get_file_size(kFvVol, "/docs/hello.txt") == (int64_t)payload.size());
+        CHECK(readAll(kFvVol, "/docs/hello.txt") == payload);
+        CHECK(ve_get_file_size(kFvVol, "/docs/missing") < 0);
+        for (size_t off = 0; off < big.size(); off += 64 * 1024) {
+            const size_t n = std::min<size_t>(64 * 1024, big.size() - off);
+            CHECK_RC(ve_write_file_chunk(kFvVol, "/docs/big.bin", (int64_t)off, (const uint8_t*)big.data() + off, n), VE_OK);
+        }
+        CHECK_RC(ve_fv_finish_write(kFvVol, "/docs/big.bin"), VE_OK);
+        CHECK(ve_get_file_size(kFvVol, "/docs/big.bin") == (int64_t)big.size());
+        CHECK(readAll(kFvVol, "/docs/big.bin") == big);
+        CHECK(ve_get_folder_size(kFvVol, "/docs") == (int64_t)(big.size() + payload.size()));
+
+        const auto root1 = listDir(kFvVol, "/");
+        const auto docs = listDir(kFvVol, "/docs");
+        CHECK(listContains(root1, "docs"));
+        CHECK(listContains(docs, "hello.txt") && listContains(docs, "big.bin"));
+
+        CHECK_RC(ve_rename_file(kFvVol, "/docs/hello.txt", "/docs/renamed.txt"), VE_OK);
+        CHECK(readAll(kFvVol, "/docs/renamed.txt") == payload);
+        CHECK_RC(ve_set_last_modified(kFvVol, "/docs/renamed.txt", 1700000000), VE_OK);
+
+        // copy inside the vault, with op tracking
+        ve_op_register(77, VE_OP_COPY);
+        CHECK_RC(ve_copy_file(kFvVol, "/docs/big.bin", kFvVol, "/docs/big_copy.bin", 77), VE_OK);
+        ve_op_unregister(77);
+        CHECK(readAll(kFvVol, "/docs/big_copy.bin") == big);
+        // empty file via copy
+        CHECK_RC(ve_write_file_chunk(kFvVol, "/docs/empty.txt", 0, (const uint8_t*)"", 0), VE_OK);
+        CHECK_RC(ve_fv_finish_write(kFvVol, "/docs/empty.txt"), VE_OK);
+        CHECK_RC(ve_copy_file(kFvVol, "/docs/empty.txt", kFvVol, "/docs/empty_copy.txt", 0), VE_OK);
+        CHECK(ve_get_file_size(kFvVol, "/docs/empty_copy.txt") == 0);
+
+        // vault -> container and container -> vault (mixed copy)
+        CHECK_RC(ve_create_directory(kBlockVol, "/fromvault"), VE_OK);
+        CHECK_RC(ve_copy_file(kFvVol, "/docs/big.bin", kBlockVol, "/fromvault/big.bin", 0), VE_OK);
+        CHECK(readAll(kBlockVol, "/fromvault/big.bin") == big);
+        CHECK_RC(ve_copy_file(kBlockVol, "/fromvault/big.bin", kFvVol, "/docs/from_container.bin", 0), VE_OK);
+        CHECK(readAll(kFvVol, "/docs/from_container.bin") == big);
+        CHECK_RC(ve_delete_file(kBlockVol, "/fromvault/big.bin"), VE_OK);
+        CHECK_RC(ve_delete_file(kBlockVol, "/fromvault"), VE_OK);
+
+        // streaming read
+        int64_t h = ve_open_stream(kFvVol, "/docs/big.bin");
+        CHECK(h != 0);
+        if (h) {
+            std::vector<uint8_t> chunk(4096);
+            const int64_t off = 100000;
+            int32_t n = ve_read_stream(kFvVol, h, off, chunk.data(), (int32_t)chunk.size());
+            CHECK(n == (int32_t)chunk.size());
+            CHECK(n > 0 && std::memcmp(chunk.data(), big.data() + off, (size_t)n) == 0);
+            CHECK(ve_read_stream(kFvVol, h, (int64_t)big.size(), chunk.data(), 16) == 0);  // EOF
+            ve_close_stream(kFvVol, h);
+            CHECK(ve_read_stream(kFvVol, h, 0, chunk.data(), 16) < 0);  // closed handle
+        }
+        CHECK(ve_open_stream(kFvVol, "/docs/nope") == 0);
+
+        // export to the host and import back
+        const std::string hostOut = tempPath("ve_fv_export.bin");
+        CHECK_RC(ve_export_file(kFvVol, "/docs/big.bin", hostOut.c_str(), 0), VE_OK);
+        CHECK_RC(ve_import_file(kFvVol, "/docs/imported.bin", hostOut.c_str(), 0), VE_OK);
+        CHECK(readAll(kFvVol, "/docs/imported.bin") == big);
+        std::remove(hostOut.c_str());
+
+        // info / space / label / symlink + hidden-count queries
+        ve_vault_info info;
+        std::memset(&info, 0, sizeof(info));
+        info.struct_size = sizeof(info);
+        CHECK_RC(ve_get_vault_info(kFvVol, &info), VE_OK);
+        CHECK(info.read_only == 0 && info.container_format == ve_get_container_format(kFvVol));
+        uint64_t total = 0, freeB = 0;
+        CHECK_RC(ve_get_space_info(kFvVol, &total, &freeB), VE_OK);
+        ve_buffer items{};
+        CHECK_RC(ve_fv_info(kFvVol, &items), VE_OK);
+        CHECK(items.len > 4);
+        ve_buffer_free(&items);
+        ve_buffer links{};
+        CHECK_RC(ve_fv_list_symlinks(kFvVol, "/docs", &links), VE_OK);
+        ve_buffer_free(&links);
+        CHECK_RC(ve_fv_batch(kFvVol, 0, 1), VE_OK);
+        CHECK_RC(ve_fv_batch(kFvVol, 0, 0), VE_OK);
+        CHECK_RC(ve_fv_info(kBlockVol, &items), VE_ERR_NOT_UNLOCKED);  // a container slot is not a folder vault
+
+        CHECK_RC(ve_delete_file(kFvVol, "/docs/big_copy.bin"), VE_OK);
+        CHECK(ve_get_file_size(kFvVol, "/docs/big_copy.bin") < 0);
+
+        // lock wipes the slot; the data persists on disk
+        ve_buffer junk{};
+        ve_lock(kFvVol);
+        CHECK_RC(ve_list_directory(kFvVol, "/", &junk), VE_ERR_NOT_UNLOCKED);
+        CHECK_RC(ve_fv_unlock(kFvVol, fmt, root.c_str(), (const uint8_t*)kPassword, (int32_t)std::strlen(kPassword),
+                              nullptr, 0, 0, stateDir.c_str(), tmpDir.c_str(), &msg, nullptr),
+                 VE_OK);
+        ve_buffer_free(&msg);
+        CHECK(readAll(kFvVol, "/docs/big.bin") == big);
+        ve_lock(kFvVol);
+
+        // read-only mount rejects writes
+        CHECK_RC(ve_fv_unlock(kFvVol, fmt, root.c_str(), (const uint8_t*)kPassword, (int32_t)std::strlen(kPassword),
+                              nullptr, 0, 1, stateDir.c_str(), tmpDir.c_str(), &msg, nullptr),
+                 VE_OK);
+        ve_buffer_free(&msg);
+        CHECK_RC(ve_write_file_chunk(kFvVol, "/docs/nope.txt", 0, (const uint8_t*)"x", 1), VE_ERR_READ_ONLY);
+        CHECK(readAll(kFvVol, "/docs/renamed.txt") == payload);
+        ve_lock(kFvVol);
+
+        // password change
+        CHECK_RC(ve_fv_change_password(fmt, root.c_str(), (const uint8_t*)"nope nope", 9,
+                                       (const uint8_t*)kNewPassword, (int32_t)std::strlen(kNewPassword), &msg),
+                 VE_ERR_AUTH_FAILED);
+        ve_buffer_free(&msg);
+        CHECK_RC(ve_fv_change_password(fmt, root.c_str(), (const uint8_t*)kPassword, (int32_t)std::strlen(kPassword),
+                                       (const uint8_t*)kNewPassword, (int32_t)std::strlen(kNewPassword), &msg),
+                 VE_OK);
+        ve_buffer_free(&msg);
+        CHECK_RC(ve_fv_unlock(kFvVol, fmt, root.c_str(), (const uint8_t*)kPassword, (int32_t)std::strlen(kPassword),
+                              nullptr, 0, 0, stateDir.c_str(), tmpDir.c_str(), &msg, nullptr),
+                 VE_ERR_AUTH_FAILED);
+        ve_buffer_free(&msg);
+        CHECK_RC(ve_fv_unlock(kFvVol, fmt, root.c_str(), (const uint8_t*)kNewPassword, (int32_t)std::strlen(kNewPassword),
+                              nullptr, 0, 0, stateDir.c_str(), tmpDir.c_str(), &msg, nullptr),
+                 VE_OK);
+        ve_buffer_free(&msg);
+        CHECK(readAll(kFvVol, "/docs/big.bin") == big);
+        ve_lock(kFvVol);
+
+        sh(rmCmd);
+    }
+    ve_lock(kBlockVol);
+    std::remove(hc.c_str());
+#endif
+}
+
 int main(int argc, char** argv) {
     std::printf("ve abi %d, %d volume slots\n", ve_abi_version(), ve_max_volumes());
     CHECK(ve_abi_version() == VE_ABI_VERSION);
@@ -667,6 +895,12 @@ int main(int argc, char** argv) {
         runCrypto();
         runHashes();
         runSingleFile();
+        std::printf("\n%d checks, %d failed\n", g_checks, g_failures);
+        return g_failures == 0 ? 0 : 1;
+    }
+
+    if (argc == 2 && std::strcmp(argv[1], "fv") == 0) {  // fast path: folder vaults only
+        runFolderVaults();
         std::printf("\n%d checks, %d failed\n", g_checks, g_failures);
         return g_failures == 0 ? 0 : 1;
     }
@@ -691,6 +925,7 @@ int main(int argc, char** argv) {
     runHidden();
     runChangePassword(0, "fat", 8ll << 20);
     runChangePassword(1, "ext4", 16ll << 20);
+    runFolderVaults();
     runCrypto();
     runHashes();
     runSingleFile();

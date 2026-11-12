@@ -9,6 +9,13 @@ interface VaultBackend {
         get() = false
 
     fun listDirectory(virtualPath: String): Array<String>?
+    /** Symlinks of one folder, wire kind "L" (see DirEntryWire). Only Cryptomator has any; never part of [listDirectory]. */
+    fun listSymlinks(virtualPath: String): Array<String>? = emptyArray()
+    /** The target of the symlink at [virtualPath], or null if it is not a (readable) symlink. */
+    fun readSymlink(virtualPath: String): String? = null
+    fun createSymlink(virtualPath: String, target: String): Boolean = false
+    /** Entries present on disk but not listed (conflict copies etc.); -1 when the backend cannot tell. */
+    fun hiddenEntryCount(virtualPath: String): Int = -1
     fun createDirectory(virtualPath: String): Boolean
     fun renameFile(oldVirtualPath: String, newVirtualPath: String): Boolean
     fun setLastModifiedTime(virtualPath: String, epochSeconds: Long): Boolean
@@ -47,14 +54,8 @@ object VaultBackendRegistry {
     private val sessions = java.util.concurrent.ConcurrentHashMap<Int, VaultBackend>()
     fun put(volId: Int, session: VaultBackend) {
         sessions[volId] = session
-        if (session is com.aeidolon.vaultexplorer.cryfs.CryfsSession) {
-            session.volId = volId
-            session.dataTree.volId = volId
-        }
-        if (session is com.aeidolon.vaultexplorer.cryptomator.CryptomatorSession) {
-            session.volId = volId
-        }
-        if (session is com.aeidolon.vaultexplorer.gocryptfs.GocryptfsSession) {
+        // Folder vaults run natively; the session needs its volume id to label mirror-pull progress.
+        if (session is com.aeidolon.vaultexplorer.foldervault.NativeVaultSession) {
             session.volId = volId
         }
     }

@@ -33,6 +33,21 @@ void main() {
       expect(applicable(isImage: true, isAudio: false), isFalse);
     });
 
+    test('the playback mode button stays on images: it starts the slideshow', () {
+      // The play button is hidden for photos by default, so this is the
+      // default way to start a slideshow (play-and-advance).
+      for (final isImage in [true, false]) {
+        expect(
+          MediaViewerAction.playbackMode.isApplicable(
+            isImage: isImage,
+            isAudio: false,
+            isPlaylistMode: true,
+          ),
+          isTrue,
+        );
+      }
+    });
+
     test('round-trips through JSON', () {
       expect(
         MediaViewerAction.fromJson(MediaViewerAction.abLoop.toJson()),

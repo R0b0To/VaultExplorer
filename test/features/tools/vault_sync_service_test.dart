@@ -463,4 +463,234 @@ void main() {
       );
     });
   });
+
+  group('VaultSyncService.defaultAction mirror directions', () {
+    final service = VaultSyncService(_FakeVaultSyncApi({}));
+
+    VaultDiffEntry entry(VaultDiffStatus status, {bool typeMismatch = false}) =>
+        VaultDiffEntry(
+          relativePath: 'a.txt',
+          name: 'a.txt',
+          isDir: false,
+          status: status,
+          typeMismatch: typeMismatch,
+        );
+
+    test('mirrorToRight copies everything left over right and deletes extras '
+        'on the right', () {
+      EntryAction a(VaultDiffStatus s) =>
+          service.defaultAction(entry(s), SyncDirection.mirrorToRight);
+      expect(a(VaultDiffStatus.onlyLeft), EntryAction.copyToRight);
+      expect(a(VaultDiffStatus.onlyRight), EntryAction.deleteRight);
+      expect(a(VaultDiffStatus.leftNewer), EntryAction.copyToRight);
+      // A mirror makes the target identical even when its copy is newer.
+      expect(a(VaultDiffStatus.rightNewer), EntryAction.copyToRight);
+      expect(a(VaultDiffStatus.conflicted), EntryAction.copyToRight);
+    });
+
+    test('mirrorToLeft is the same in the other direction', () {
+      EntryAction a(VaultDiffStatus s) =>
+          service.defaultAction(entry(s), SyncDirection.mirrorToLeft);
+      expect(a(VaultDiffStatus.onlyRight), EntryAction.copyToLeft);
+      expect(a(VaultDiffStatus.onlyLeft), EntryAction.deleteLeft);
+      expect(a(VaultDiffStatus.rightNewer), EntryAction.copyToLeft);
+      expect(a(VaultDiffStatus.leftNewer), EntryAction.copyToLeft);
+      expect(a(VaultDiffStatus.conflicted), EntryAction.copyToLeft);
+    });
+
+    test('only the mirror directions ever delete', () {
+      for (final direction in [
+        SyncDirection.twoWay,
+        SyncDirection.leftToRight,
+        SyncDirection.rightToLeft,
+      ]) {
+        for (final status in VaultDiffStatus.values) {
+          expect(
+            service.defaultAction(entry(status), direction).isDelete,
+            isFalse,
+            reason: '$direction / $status',
+          );
+        }
+      }
+    });
+
+    test('type mismatches and in-sync items are skipped even when mirroring',
+        () {
+      for (final direction in [
+        SyncDirection.mirrorToRight,
+        SyncDirection.mirrorToLeft,
+      ]) {
+        expect(
+          service.defaultAction(
+            entry(VaultDiffStatus.conflicted, typeMismatch: true),
+            direction,
+          ),
+          EntryAction.skip,
+        );
+        expect(
+          service.defaultAction(entry(VaultDiffStatus.identical), direction),
+          EntryAction.skip,
+        );
+        expect(
+          service.defaultAction(entry(VaultDiffStatus.bothFolders), direction),
+          EntryAction.skip,
+        );
+      }
+    });
+  });
+
+  group('VaultSyncService.listFolder', () {
+    test('merges both sides, keeps in-sync items and shared folders, and '
+        'lists folders first', () async {
+      final left = _container('left-vault');
+      final right = _container('right-vault');
+      final service = VaultSyncService(
+        _FakeVaultSyncApi({
+          'left-vault::docs': [
+            'F|100|1000|same.txt',
+            'F|50|1000|onlyLeft.txt',
+            'F|15|5000|newer.txt',
+            'D|0|1000|shared',
+            'D|0|1000|leftOnlyDir',
+          ],
+          'right-vault::docs': [
+            'F|100|1000|same.txt',
+            'F|50|1000|onlyRight.txt',
+            'F|10|1000|newer.txt',
+            'D|0|1000|shared',
+          ],
+        }),
+      );
+
+      final listing = await service.listFolder(
+        left: VaultSyncSide(container: left, relativePath: ''),
+        right: VaultSyncSide(container: right, relativePath: ''),
+        relDir: 'docs',
+      );
+
+      expect(listing.unreadable, isFalse);
+      final byPath = {for (final e in listing.entries) e.relativePath: e};
+      expect(byPath['docs/same.txt']!.status, VaultDiffStatus.identical);
+      expect(byPath['docs/onlyLeft.txt']!.status, VaultDiffStatus.onlyLeft);
+      expect(byPath['docs/onlyRight.txt']!.status, VaultDiffStatus.onlyRight);
+      expect(byPath['docs/newer.txt']!.status, VaultDiffStatus.leftNewer);
+      expect(byPath['docs/shared']!.status, VaultDiffStatus.bothFolders);
+      expect(byPath['docs/leftOnlyDir']!.status, VaultDiffStatus.onlyLeft);
+      expect(byPath['docs/leftOnlyDir']!.isDir, isTrue);
+
+      // Folders first, then files, each alphabetical.
+      expect(listing.entries.map((e) => e.name).toList(), [
+        'leftOnlyDir',
+        'shared',
+        'newer.txt',
+        'onlyLeft.txt',
+        'onlyRight.txt',
+        'same.txt',
+      ]);
+    });
+
+    test('a folder that exists on only one side lists as one-sided', () async {
+      final service = VaultSyncService(
+        _FakeVaultSyncApi({
+          'left-vault::only': ['F|1|1000|a.txt'],
+          'right-vault::only': <String>[],
+        }),
+      );
+      final listing = await service.listFolder(
+        left: VaultSyncSide(container: _container('left-vault'), relativePath: ''),
+        right: VaultSyncSide(container: _container('right-vault'), relativePath: ''),
+        relDir: 'only',
+      );
+      expect(listing.entries.single.status, VaultDiffStatus.onlyLeft);
+    });
+
+    test('an unreadable vault folder is reported, not shown as empty', () async {
+      final service = VaultSyncService(
+        _FakeVaultSyncApi({
+          // No listing at all for the right vault's folder -> null.
+          'left-vault::x': ['F|1|1000|a.txt'],
+        }),
+      );
+      final listing = await service.listFolder(
+        left: VaultSyncSide(container: _container('left-vault'), relativePath: ''),
+        right: VaultSyncSide(container: _container('right-vault'), relativePath: ''),
+        relDir: 'x',
+      );
+      expect(listing.unreadable, isTrue);
+      expect(listing.entries, isEmpty);
+    });
+
+    test('a file-versus-folder mismatch is flagged', () async {
+      final service = VaultSyncService(
+        _FakeVaultSyncApi({
+          'left-vault::': ['F|5|1000|thing'],
+          'right-vault::': ['D|0|1000|thing'],
+        }),
+      );
+      final listing = await service.listFolder(
+        left: VaultSyncSide(container: _container('left-vault'), relativePath: ''),
+        right: VaultSyncSide(container: _container('right-vault'), relativePath: ''),
+        relDir: '',
+      );
+      final e = listing.entries.single;
+      expect(e.typeMismatch, isTrue);
+      expect(e.status, VaultDiffStatus.conflicted);
+    });
+  });
+
+  group('VaultSyncService.deleteItemsFor', () {
+    final service = VaultSyncService(_FakeVaultSyncApi({}));
+    final side = VaultSyncSide(
+      container: _container('left-vault'),
+      relativePath: 'root',
+    );
+
+    VaultDiffEntry e(String path, {bool isDir = false, bool mismatch = false}) =>
+        VaultDiffEntry(
+          relativePath: path,
+          name: path.split('/').last,
+          isDir: isDir,
+          status: mismatch
+              ? VaultDiffStatus.conflicted
+              : VaultDiffStatus.onlyLeft,
+          typeMismatch: mismatch,
+        );
+
+    test('paths are resolved under the side root', () {
+      final items = service.deleteItemsFor(side, [e('a.txt')], sideIsLeft: true);
+      expect(items.single.path, 'root/a.txt');
+      expect(items.single.isDir, isFalse);
+    });
+
+    test('an entry inside another selected folder is dropped', () {
+      final items = service.deleteItemsFor(
+        side,
+        [e('dir/inner.txt'), e('dir', isDir: true), e('dirOther.txt')],
+        sideIsLeft: true,
+      );
+      expect(items.map((i) => i.path).toSet(), {'root/dir', 'root/dirOther.txt'});
+    });
+
+    test('a file next to a folder with a similar name is not dropped', () {
+      final items = service.deleteItemsFor(
+        side,
+        [e('dir', isDir: true), e('dir2/x.txt')],
+        sideIsLeft: true,
+      );
+      expect(items, hasLength(2));
+    });
+
+    test('the right side of a type mismatch has the opposite type', () {
+      // Left is a file, so right is a folder.
+      final fileOnLeft = e('thing', isDir: false, mismatch: true);
+      expect(
+        service.deleteItemsFor(side, [fileOnLeft], sideIsLeft: true).single.isDir,
+        isFalse,
+      );
+      expect(
+        service.deleteItemsFor(side, [fileOnLeft], sideIsLeft: false).single.isDir,
+        isTrue,
+      );
+    });
+  });
 }

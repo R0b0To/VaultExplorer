@@ -20,6 +20,8 @@ enum ClipboardAction {
 typedef ClipboardState = ({
   int? sourceVolId,
   String? sourceDisplayName,
+  int? returnToTabId,
+  String? returnToFilter,
   ClipboardAction action,
   List<ClipboardItem> items,
   String? archiveName,
@@ -40,6 +42,8 @@ typedef ClipboardState = ({
 const _emptyClipboard = (
   sourceVolId: null,
   sourceDisplayName: null,
+  returnToTabId: null,
+  returnToFilter: null,
   action: ClipboardAction.copy,
   items: <ClipboardItem>[],
   archiveName: null,
@@ -81,10 +85,14 @@ class CrossContainerClipboard extends _$CrossContainerClipboard {
     required String displayName,
     required bool cut,
     required List<ClipboardItem> clipItems,
+    int? returnToTabId,
+    String? returnToFilter,
   }) {
     _replace((
       sourceVolId: volId,
       sourceDisplayName: displayName,
+      returnToTabId: returnToTabId,
+      returnToFilter: returnToFilter,
       action: cut ? ClipboardAction.move : ClipboardAction.copy,
       items: List.unmodifiable(clipItems),
       archiveName: null,
@@ -110,10 +118,14 @@ class CrossContainerClipboard extends _$CrossContainerClipboard {
     ArchiveCompressionLevel? compressionLevel,
     ArchiveCompressionMethod compressionMethod = ArchiveCompressionMethod.auto,
     int splitSizeBytes = 0,
+    int? returnToTabId,
+    String? returnToFilter,
   }) {
     _replace((
       sourceVolId: volId,
       sourceDisplayName: displayName,
+      returnToTabId: returnToTabId,
+      returnToFilter: returnToFilter,
       action: ClipboardAction.archiveCreate,
       items: List.unmodifiable(clipItems),
       archiveName: archiveName,
@@ -139,6 +151,8 @@ class CrossContainerClipboard extends _$CrossContainerClipboard {
     _replace((
       sourceVolId: volId,
       sourceDisplayName: displayName,
+      returnToTabId: null,
+      returnToFilter: null,
       action: ClipboardAction.archiveExtract,
       items: List.unmodifiable(stagedItems ?? [archiveItem]),
       archiveName: archiveItem.name,
@@ -157,6 +171,49 @@ class CrossContainerClipboard extends _$CrossContainerClipboard {
 
   void clear() {
     _replace(_emptyClipboard);
+  }
+
+  /// Removes any clipboard items that match [deletedPaths] on volume [volId],
+  /// or are children of deleted directories. If all items were removed, the
+  /// clipboard is cleared entirely.
+  void removeDeletedPaths(int volId, Iterable<String> deletedPaths) {
+    if (!state.hasItems) return;
+    final deletedSet = deletedPaths.toSet();
+    if (deletedSet.isEmpty) return;
+
+    bool matches(ClipboardItem item) {
+      final itemVol = item.volId ?? state.sourceVolId;
+      if (itemVol != volId) return false;
+      for (final dp in deletedSet) {
+        if (item.path == dp || item.path.startsWith('$dp/')) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    final remaining = state.items.where((it) => !matches(it)).toList();
+    if (remaining.isEmpty) {
+      clear();
+    } else if (remaining.length != state.items.length) {
+      _replace((
+        sourceVolId: state.sourceVolId,
+        sourceDisplayName: state.sourceDisplayName,
+        returnToTabId: state.returnToTabId,
+        returnToFilter: state.returnToFilter,
+        action: state.action,
+        items: List.unmodifiable(remaining),
+        archiveName: state.archiveName,
+        archiveFormat: state.archiveFormat,
+        passphrase: state.passphrase,
+        encryptFilenames: state.encryptFilenames,
+        compressionLevel: state.compressionLevel,
+        compressionMethod: state.compressionMethod,
+        splitSizeBytes: state.splitSizeBytes,
+        archiveContext: state.archiveContext,
+        selectedEntryPaths: state.selectedEntryPaths,
+      ));
+    }
   }
 
   /// Swaps in [next], keeping a nested archive's temporary copy alive for

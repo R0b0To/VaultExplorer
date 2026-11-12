@@ -3,11 +3,13 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
+import 'package:path/path.dart' as p;
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
 import 'package:vaultexplorer/core/utils/image_preview_exception.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
+import 'package:vaultexplorer/core/utils/vault_symlink.dart';
 import 'package:vaultexplorer/data/models/clipboard_item.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_with_size.dart';
@@ -202,7 +204,47 @@ class VaultFileIoApi {
       ChannelMethods.getFileSize,
       {'filePath': container.uri, 'fileName': fileName},
     );
-    return result ?? 0;
+    return result ?? -1;
+  }
+
+  /// Returns whether an entry (file or folder) exists at [path] within [container].
+  Future<bool> entryExists(
+    MountedContainer container,
+    String path, {
+    required bool isDir,
+  }) async {
+    if (isDir) {
+      return canListDirectory(container, path);
+    }
+    if (container.isLocalStorage) {
+      return _local.entryExists(container.uri, path, isDir: false);
+    }
+    if (_isSaf(container)) {
+      final size = await getFileSize(container, path);
+      return size >= 0;
+    }
+    final size = await getFileSize(container, path);
+    if (size > 0) return true;
+    if (size < 0) return false;
+    // When size == 0, it might be an actual 0-byte file, or a legacy backend
+    // returning 0 on failure. Disambiguate by checking parent directory listing.
+    final parentDir = p.posix.dirname(path);
+    final dirToQuery = (parentDir == '.' || parentDir == '/') ? '' : parentDir;
+    final rawList = await listDirectory(container, dirToQuery);
+    if (rawList == null) return false;
+    final targetName = p.posix.basename(path);
+    final caseSensitive = namesAreCaseSensitive(container);
+    for (final raw in rawList) {
+      if (raw.startsWith('System:')) continue;
+      final e = RawEntry.parse(raw);
+      if (!e.isDir) {
+        final matches = caseSensitive
+            ? e.name == targetName
+            : e.name.toLowerCase() == targetName.toLowerCase();
+        if (matches) return true;
+      }
+    }
+    return false;
   }
 
   Future<int> getMediaFileSize(
@@ -532,6 +574,48 @@ class VaultFileIoApi {
     }
   }
 
+  /// Upright pixel size of each of [fileNames] (paths inside [container]) from
+  /// the image headers alone -- no thumbnail is decoded or cached. One entry
+  /// per requested name, in order; null where the size could not be read (not
+  /// an image the device can parse, unreadable, SAF-backed browsing).
+  ///
+  /// This is what lets the gallery lay a folder out with the right tile shapes
+  /// before any thumbnail exists. Keep batches modest: the native side runs one
+  /// batch as a single task on the thumbnail executor.
+  Future<List<({int width, int height})?>> probeImageDimensions(
+    MountedContainer container,
+    List<String> fileNames,
+  ) async {
+    if (fileNames.isEmpty) return const [];
+    try {
+      final result = await _channel.invokeMethod<Object?>(
+        ChannelMethods.probeImageDimensions,
+        {
+          'filePath': container.uri,
+          'fileNames': fileNames,
+          'isLocalStorage': container.isLocalStorage,
+        },
+      );
+      if (result is! List || result.length < fileNames.length * 2) {
+        return List.filled(fileNames.length, null);
+      }
+      return [
+        for (var i = 0; i < fileNames.length; i++)
+          () {
+            final w = result[i * 2];
+            final h = result[i * 2 + 1];
+            if (w is int && h is int && w > 0 && h > 0) {
+              return (width: w, height: h);
+            }
+            return null;
+          }(),
+      ];
+    } catch (e) {
+      logSwallowed('probeImageDimensions', e, expected: true);
+      return List.filled(fileNames.length, null);
+    }
+  }
+
   /// Extracts an APK's own launcher icon via `PackageManager` on the
   /// native side -- full adaptive-icon compositing included, since it's
   /// the OS's own icon-resolution code doing the work, not a hand-rolled
@@ -623,7 +707,12 @@ class VaultFileIoApi {
           'safListDirectory response item count: ${rawList?.length}',
         );
         if (rawList == null) return const [];
-        final items = (rawList as List).map((it) {
+        final list = rawList as List;
+        if (list.isEmpty) return const [];
+        if (list.first is String) {
+          return list.cast<String>();
+        }
+        final items = list.map((it) {
           final m = it as Map;
           final name = m['name'] as String? ?? '';
           final isDir = m['isDir'] as bool? ?? false;
@@ -650,6 +739,60 @@ class VaultFileIoApi {
       {'filePath': container.uri, 'dirPath': dirPath, 'refresh': refresh},
     );
     return result?.cast<String>();
+  }
+
+  /// The symbolic links of one folder of a mounted Cryptomator vault. Deliberately separate from
+  /// [listDirectory]: a link is neither a file nor a folder, so nothing that walks listings (sync, export,
+  /// scanners) ever sees one. Empty for everything that is not a vault, and on any error.
+  Future<List<VaultSymlink>> listVaultSymlinks(
+    MountedContainer container,
+    String dirPath,
+  ) async {
+    if (_isSaf(container) || container.isLocalStorage) return const [];
+    try {
+      final result = await _channel.invokeMethod<List<Object?>>(
+        ChannelMethods.listVaultSymlinks,
+        {'filePath': container.uri, 'dirPath': dirPath},
+      );
+      return (result ?? const <Object?>[])
+          .whereType<String>()
+          .map(VaultSymlink.tryParse)
+          .whereType<VaultSymlink>()
+          .toList(growable: false);
+    } catch (e) {
+      logSwallowed('listVaultSymlinks', e, expected: true);
+      return const [];
+    }
+  }
+
+  /// Where the link at [path] points (never resolved or followed), or null if it is not a readable link.
+  Future<String?> readVaultSymlink(MountedContainer container, String path) async {
+    if (_isSaf(container) || container.isLocalStorage) return null;
+    try {
+      return await _channel.invokeMethod<String>(
+        ChannelMethods.readVaultSymlink,
+        {'filePath': container.uri, 'path': path},
+      );
+    } catch (e) {
+      logSwallowed('readVaultSymlink', e, expected: true);
+      return null;
+    }
+  }
+
+  /// How many entries of [dirPath] exist on disk but are not listed (sync-conflict copies, names that no
+  /// longer decrypt). -1 when unknown (not a Cryptomator vault, or the call failed).
+  Future<int> hiddenEntryCount(MountedContainer container, String dirPath) async {
+    if (_isSaf(container) || container.isLocalStorage) return -1;
+    try {
+      return await _channel.invokeMethod<int>(
+            ChannelMethods.getHiddenEntryCount,
+            {'filePath': container.uri, 'dirPath': dirPath},
+          ) ??
+          -1;
+    } catch (e) {
+      logSwallowed('getHiddenEntryCount', e, expected: true);
+      return -1;
+    }
   }
 
   /// Strict readability probe used by scheduled sync before an empty
@@ -1149,11 +1292,9 @@ class VaultFileIoApi {
     return renameFile(container, tmpPath, fileName);
   }
 
-  /// No local-storage branch: `dart:io` has no cross-platform way to read
-  /// a volume's free/total space, so callers get `null` for real device
-  /// storage the same as they would for any other unavailable stat -- the
-  /// stats bar already handles a `null` result by simply not showing a
-  /// free-space figure.
+  /// Returns capacity and available bytes for this storage. Raw local paths
+  /// use the native SAF space query with a file URI so Android can read the
+  /// backing filesystem's StatFs values.
   Future<List<int>?> getSpaceInfo(MountedContainer container) async {
     if (_isSaf(container)) {
       final res = await _channel.invokeMethod<List<Object?>>(
@@ -1162,7 +1303,13 @@ class VaultFileIoApi {
       );
       return res?.cast<int>();
     }
-    if (container.isLocalStorage) return null;
+    if (container.isLocalStorage) {
+      final res = await _channel.invokeMethod<List<Object?>>(
+        ChannelMethods.safGetSpaceInfo,
+        {'treeUri': Uri.file(container.uri).toString()},
+      );
+      return res?.cast<int>();
+    }
     final result = await _channel.invokeMethod<List<Object?>>(
       ChannelMethods.getSpaceInfo,
       {'filePath': container.uri},

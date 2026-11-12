@@ -111,7 +111,6 @@ The app contains two specialized native Kotlin adapters written to bridge Media3
 | Package | License | Notes |
 |---|---|---|
 | `intl`, `path_provider`, `local_auth`, `path`, `meta` | BSD-3-Clause | Official Flutter-team / Dart-team packages. |
-| `flutter_staggered_grid_view` | MIT | Masonry file-explorer view. |
 | `dynamic_color` | Apache-2.0 | Material You theming. |
 | `material_ui` | BSD-3-Clause | Official Flutter-team Material widget library, decoupled from the `flutter` SDK into its own pub.dev package as of Flutter 3.47; replaces `package:flutter/material.dart` imports almost everywhere in this project (one file, `lib/features/share_import/share_import_flow.dart`, still imports `package:flutter/material.dart` directly -- not a licensing concern either way since both come from the Flutter SDK/its own packages, just noted so this table doesn't overstate how complete the migration is). |
 | `flutter_riverpod` | MIT | State management / DI container (Riverpod, by rrousselGit). |

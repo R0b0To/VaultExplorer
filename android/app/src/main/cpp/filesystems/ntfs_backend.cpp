@@ -363,6 +363,15 @@ int ntfsSync(ntfs_device* device) {
     const int volumeId = ntfsVolumeId(device);
     if (volumeId < 0 || volumeId >= kMaxVolumes) return 0;
     auto& v = volumes[volumeId];
+    if (v.isUsbSource) {
+        // USB sessions have no fd (it is -1): without this branch the sync did
+        // nothing and reported success while writes were still in the USB cache.
+        if (!v.usbCache.sync(volumeId)) {
+            errno = EIO;
+            return -1;
+        }
+        return 0;
+    }
     if (v.isCompositeSource && v.composite) {
         v.composite->sync();
     } else if (v.fd >= 0) {
@@ -702,13 +711,13 @@ extern "C" const char *ntfs_libntfs_version(void) {
     return "vaultexplorer-ntfs3g-edge";
 }
 
-uint64_t ntfsGetFileSize(int volumeId, const std::string& path) {
+int64_t ntfsGetFileSize(int volumeId, const std::string& path) {
     auto& v = volumes[volumeId];
-    uint64_t size = 0;
+    int64_t size = -1;
     std::string fullPath = "/" + path;
     ntfs_inode* ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullPath.c_str());
     if (ni) {
-        size = static_cast<uint64_t>(ni->data_size);
+        size = static_cast<int64_t>(ni->data_size);
         ntfs_inode_close(ni);
     }
     return size;

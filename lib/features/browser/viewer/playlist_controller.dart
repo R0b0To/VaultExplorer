@@ -81,6 +81,22 @@ class PlaylistController extends ChangeNotifier {
     }
   }
 
+  /// Replaces the active queue with a music-library selection. This keeps the
+  /// existing player session alive while the library starts a different track.
+  void replaceLibraryQueue(List<String> files, {required int index}) {
+    if (files.isEmpty) return;
+    _generation++;
+    _originalList = List<String>.of(files);
+    _currentPlaylist = List<String>.of(files);
+    _currentIndex = index.clamp(0, files.length - 1).toInt();
+    _isShuffled = false;
+    _allFilesScanned = true;
+    _isScanningSubfolders = false;
+    _isPlaylistMode = files.length > 1;
+    _selectedFolder = 'All';
+    notifyListeners();
+  }
+
   String getBaseDir() {
     if (startingFolder != null) return startingFolder!;
     if (_originalList.isEmpty) return '';
@@ -89,14 +105,18 @@ class PlaylistController extends ChangeNotifier {
     return first.substring(0, first.lastIndexOf('/'));
   }
 
+  static bool _isDirectChild(String file, String baseDir, int baseLen) {
+    if (baseLen == 0) return !file.contains('/');
+    if (!file.startsWith(baseDir)) return false;
+    if (file.length <= baseLen || file.codeUnitAt(baseLen) != 47) return false;
+    return file.indexOf('/', baseLen + 1) == -1;
+  }
+
   void _initializeFolderFilter() {
     final baseDir = getBaseDir();
-    final hasSubfolderItems = _originalList.any((file) {
-      final dir = file.contains('/')
-          ? file.substring(0, file.lastIndexOf('/'))
-          : '';
-      return dir != baseDir;
-    });
+    final baseLen = baseDir.length;
+    final hasSubfolderItems =
+        _originalList.any((file) => !_isDirectChild(file, baseDir, baseLen));
     if (hasSubfolderItems) {
       _selectedFolder = 'All';
       _allFilesScanned = true;
@@ -184,12 +204,10 @@ class PlaylistController extends ChangeNotifier {
     if (folder == 'All') {
       filteredList = List.from(_originalList);
     } else {
-      filteredList = _originalList.where((file) {
-        final dir = file.contains('/')
-            ? file.substring(0, file.lastIndexOf('/'))
-            : '';
-        return dir == baseDir;
-      }).toList();
+      final baseLen = baseDir.length;
+      filteredList = _originalList
+          .where((file) => _isDirectChild(file, baseDir, baseLen))
+          .toList();
     }
 
     int newIndex = filteredList.indexOf(fileAnchor);

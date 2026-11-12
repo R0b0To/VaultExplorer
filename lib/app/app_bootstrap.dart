@@ -14,6 +14,7 @@ import 'package:vaultexplorer/core/services/memory_pressure_observer.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/core/services/resume_paint_signal.dart';
 import 'package:vaultexplorer/core/services/thumbnail_retry_signal.dart';
+import 'package:vaultexplorer/core/theme/predictive_back_preference.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/archive_service.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
@@ -67,6 +68,7 @@ Future<void> runDeferredStartupWork(ProviderContainer container) async {
 
     appThemeModeNotifier.value = settings.themeMode;
     appUseDynamicColorNotifier.value = settings.useDynamicColor;
+    appPredictiveBackNotifier.value = settings.predictiveBackAnimations;
     if (settings.languageCode != null) {
       appLocaleNotifier.value = Locale(settings.languageCode!);
     }

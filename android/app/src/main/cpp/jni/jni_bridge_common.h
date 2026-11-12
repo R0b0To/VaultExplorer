@@ -20,6 +20,8 @@
 
 #include "ff.h" // FF_VOLUMES
 
+#include "jni_password_utf8.h"
+
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
 
 // Debug-level, separately-tagged timing logs — see io/virtual_block_device.cpp

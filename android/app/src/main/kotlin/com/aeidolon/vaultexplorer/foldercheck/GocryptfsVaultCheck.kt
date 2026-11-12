@@ -15,7 +15,6 @@ import com.aeidolon.vaultexplorer.gocryptfs.GocryptfsFileNameCryptor
 import com.aeidolon.vaultexplorer.gocryptfs.GocryptfsMasterkey
 import com.aeidolon.vaultexplorer.gocryptfs.GocryptfsSession
 import com.aeidolon.vaultexplorer.gocryptfs.GocryptfsWrongPasswordException
-import com.aeidolon.vaultexplorer.gocryptfs.Hkdf
 
 /**
  * gocryptfs half of the folder-vault Check & Repair tool. Split out of the
@@ -68,11 +67,12 @@ internal object GocryptfsVaultCheck {
                 GocryptfsMasterkey.unlock(config, password)
             } catch (e: GocryptfsWrongPasswordException) {
                 return FolderVaultCheckOutcome.WrongPassword
+            } catch (e: GocryptfsConfigException) {
+                return FolderVaultCheckOutcome.InvalidVault(e.message ?: "Cannot unlock this vault")
             }
-            val nameKey = if (config.plaintextNames) ByteArray(0) else Hkdf.deriveSha256(masterkey, "EME filename encryption", 32)
-            val contentKey = Hkdf.deriveSha256(masterkey, config.cipher.hkdfInfo, config.cipher.contentKeyLen)
+            val (nameKey, contentKey) = GocryptfsMasterkey.deriveKeys(config, masterkey)
             masterkey.fill(0)
-            nameCryptor = GocryptfsFileNameCryptor(nameKey, config.longNameMax, config.plaintextNames)
+            nameCryptor = GocryptfsFileNameCryptor(nameKey, config.longNameMax, config.plaintextNames, config.raw64)
             contentCryptor = GocryptfsContentCryptor(contentKey, config.cipher)
             log("Password verified — scanning file contents…")
         } else {
@@ -93,7 +93,8 @@ internal object GocryptfsVaultCheck {
                     issues += FolderVaultIssue(CRITICAL, virtualPath.ifEmpty { "/" }, "Missing gocryptfs.diriv.")
                 } else {
                     val bytes = saf.readWhole(dirivDoc)
-                    if (bytes.size != 16) {
+                    // gocryptfs refuses a diriv that is not exactly 16 bytes or that is all zero.
+                    if (bytes.size != 16 || bytes.all { it == 0.toByte() }) {
                         issues += FolderVaultIssue(CRITICAL, "$virtualPath/gocryptfs.diriv", "gocryptfs.diriv size invalid.")
                     } else {
                         diriv = bytes
@@ -106,13 +107,17 @@ internal object GocryptfsVaultCheck {
             val byPhysicalName = children.associateBy { it.name }
             for (child in children) {
                 val physName = child.name ?: continue
-                if (physName == GocryptfsFileNameCryptor.DIRIV_FILENAME ||
-                    physName == "gocryptfs.conf" ||
-                    physName == "gocryptfs.conf.bak") continue
-                if (physName.endsWith(GocryptfsFileNameCryptor.LONGNAME_SUFFIX)) continue
+                // gocryptfs keeps its config in the root only. The diriv and the long-name sidecars exist only with
+                // encrypted names; with plaintext names those are ordinary file names.
+                if (virtualPath.isEmpty() && (physName == "gocryptfs.conf" || physName == "gocryptfs.conf.bak")) continue
+                if (!config.plaintextNames) {
+                    if (physName == GocryptfsFileNameCryptor.DIRIV_FILENAME) continue
+                    if (physName.startsWith(GocryptfsFileNameCryptor.LONGNAME_PREFIX) &&
+                        physName.endsWith(GocryptfsFileNameCryptor.LONGNAME_SUFFIX)) continue
+                }
 
                 var ciphertextName = physName
-                if (physName.startsWith(GocryptfsFileNameCryptor.LONGNAME_PREFIX)) {
+                if (!config.plaintextNames && physName.startsWith(GocryptfsFileNameCryptor.LONGNAME_PREFIX)) {
                     val nameFile = byPhysicalName[physName + GocryptfsFileNameCryptor.LONGNAME_SUFFIX]
                     if (nameFile == null) {
                         issues += FolderVaultIssue(WARNING, "$virtualPath/$physName", "Long-name file missing .name sidecar.")
@@ -218,11 +223,12 @@ internal object GocryptfsVaultCheck {
                 GocryptfsMasterkey.unlock(config, password)
             } catch (e: GocryptfsWrongPasswordException) {
                 return FolderVaultRepairOutcome.WrongPassword
+            } catch (e: GocryptfsConfigException) {
+                return FolderVaultRepairOutcome.InvalidVault(e.message ?: "Cannot unlock this vault")
             }
-            val nameKey = if (config.plaintextNames) ByteArray(0) else Hkdf.deriveSha256(masterkey, "EME filename encryption", 32)
-            val contentKey = Hkdf.deriveSha256(masterkey, config.cipher.hkdfInfo, config.cipher.contentKeyLen)
+            val (nameKey, contentKey) = GocryptfsMasterkey.deriveKeys(config, masterkey)
             masterkey.fill(0)
-            nameCryptor = GocryptfsFileNameCryptor(nameKey, config.longNameMax, config.plaintextNames)
+            nameCryptor = GocryptfsFileNameCryptor(nameKey, config.longNameMax, config.plaintextNames, config.raw64)
             contentCryptor = GocryptfsContentCryptor(contentKey, config.cipher)
         }
 

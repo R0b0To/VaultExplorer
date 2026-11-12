@@ -23,6 +23,7 @@
 // NOT covered: BitLocker/VHD layers, FAT, and Windows' own chkdsk (nothing here
 // can run it). ntfsfix is a much weaker check than e2fsck is for ext.
 #include <fcntl.h>
+#include <cerrno>
 #include <unistd.h>
 
 #include <algorithm>
@@ -46,6 +47,7 @@ extern "C" {
 #include "session/volume_state.h"
 
 #include "fs_test_support.h"
+#include "usb_test_support.h"
 
 // ---- The pieces of the app this test stands in for ----------------------------------
 VolumeState volumes[FF_VOLUMES];
@@ -623,6 +625,61 @@ static void test_read_only_mount_changes_nothing() {
     v.fsckClean("read-only session");
 }
 
+// ---- USB write-back -----------------------------------------------------------------
+// With a USB source, ntfs-3g's writes sit in volumes[].usbCache until flushed. ntfsSync
+// used to handle only the composite and fd paths -- USB sessions have fd == -1 -- so it
+// returned success while the bytes were still pending. These call the production sync
+// callback (the one ntfs-3g invokes through ntfs_device_operations) on a USB-source
+// volume and check what actually reached the device.
+static void test_usb_sync_reaches_the_device() {
+    Vol v;
+    CHECK(v.format(8));
+    VolumeState& vs = volumes[0];
+    g_usbDevice[0].reset(8u << 20);
+    vs.isUsbSource = true;
+
+    struct ntfs_device* dev = ntfs_device_alloc("vaultexplorer", 0, &vExplorer_ntfs_ops, &g_deviceId[0]);
+    CHECK(dev != nullptr);
+    if (dev) {
+        const uint64_t kFirst = 4096 * 5, kSecond = 4096 * 9, kThird = 4096 * 13;
+        const Bytes first(512, 0xA7), second(512, 0x5C), third(512, 0x3E);
+
+        // Healthy device: pending bytes are written and the device barrier is issued.
+        CHECK(vs.usbCache.write(0, kFirst, first.data(), first.size()));
+        CHECK_EQ(g_usbDevice[0].media[kFirst], 0);   // only pending in the cache so far
+        const int syncsBefore = g_usbDevice[0].syncCalls;
+        CHECK_EQ(dev->d_ops->sync(dev), 0);
+        CHECK_EQ(g_usbDevice[0].media[kFirst], 0xA7);
+        CHECK(g_usbDevice[0].syncCalls > syncsBefore);
+
+        // Device refuses the data: reported as EIO, bytes stay pending for a retry.
+        CHECK(vs.usbCache.write(0, kSecond, second.data(), second.size()));
+        g_usbDevice[0].refuseWrites = true;
+        errno = 0;
+        CHECK_EQ(dev->d_ops->sync(dev), -1);
+        CHECK_EQ(errno, EIO);
+        CHECK_EQ(g_usbDevice[0].media[kSecond], 0);
+        g_usbDevice[0].refuseWrites = false;
+        CHECK_EQ(dev->d_ops->sync(dev), 0);
+        CHECK_EQ(g_usbDevice[0].media[kSecond], 0x5C);
+
+        // Data written but the device-level barrier fails: still an error.
+        CHECK(vs.usbCache.write(0, kThird, third.data(), third.size()));
+        g_usbDevice[0].refuseSync = true;
+        errno = 0;
+        CHECK_EQ(dev->d_ops->sync(dev), -1);
+        CHECK_EQ(errno, EIO);
+        g_usbDevice[0].refuseSync = false;
+        CHECK_EQ(dev->d_ops->sync(dev), 0);
+        CHECK_EQ(g_usbDevice[0].media[kThird], 0x3E);
+
+        ntfs_device_free(dev);
+    }
+
+    vs.isUsbSource = false;
+    vs.usbCache.clear();
+}
+
 // ---- Runner -------------------------------------------------------------------------
 static void closeAllVolumes() {
     for (int i = 0; i < FF_VOLUMES; ++i) {
@@ -655,6 +712,7 @@ int main() {
         T(test_copy_between_and_within_volumes),
         T(test_streams_read_ranges),
         T(test_read_only_mount_changes_nothing),
+        T(test_usb_sync_reaches_the_device),
     };
     return runTests("ntfs_backend", tests, sizeof(tests) / sizeof(tests[0]), closeAllVolumes);
 }

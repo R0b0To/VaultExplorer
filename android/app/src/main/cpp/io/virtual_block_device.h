@@ -36,4 +36,14 @@ bool ensureMounted(int volId);
 // exact lock hand-off.
 bool ensureMountedShared(int volId, std::shared_lock<std::shared_mutex>& lock);
 
-void unmountVolume(int volId);
+// Tears the mounted filesystem down and flushes the volume's backing store.
+// Returns false when the flush/sync of a USB device failed: the buffered writes
+// are then STILL pending in volume.usbCache (nothing is discarded here), so the
+// caller can retry or deliberately discard them. Everything else returns true.
+//
+// A false return leaves the filesystem unmounted (fsMounted == false) while the
+// session stays open. That is a consistent, usable state: every filesystem entry
+// point calls ensureMounted() first, which remounts on demand by reading through
+// the same usbCache -- so the still-pending bytes are visible to the remount --
+// and a retried lock simply runs this function again (it is idempotent).
+bool unmountVolume(int volId);

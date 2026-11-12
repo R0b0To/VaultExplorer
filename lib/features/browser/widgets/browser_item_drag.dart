@@ -25,19 +25,60 @@ typedef BrowserItemDropHandler =
       BrowserDropMode mode,
     );
 
+/// The tile being dragged plus the part of the selection that is in this list.
+///
+/// One set lookup per selected item. This used to be `List.contains`, which made
+/// it (selected x listed) comparisons: with 4,700 items selected that is over
+/// twenty million `RawEntry` comparisons, and it ran for every tile on every
+/// rebuild.
+@visibleForTesting
+Set<RawEntry> browserEntriesToDrag(
+  RawEntry entry,
+  Set<RawEntry> selected,
+  List<RawEntry> visible,
+) {
+  if (selected.isEmpty) return {entry};
+  final inList = visible.toSet();
+  return {
+    for (final item in selected)
+      if (inList.contains(item)) item,
+    entry,
+  };
+}
+
 /// Data carried while selected browser items are being dragged.
 class BrowserItemDragData {
   final MountedContainer source;
   final String sourceDirectory;
-  final Set<RawEntry> entries;
   final BrowserItemDropHandler onDrop;
 
-  const BrowserItemDragData({
+  Set<RawEntry>? _entries;
+  final Set<RawEntry> Function()? _resolveEntries;
+
+  BrowserItemDragData({
     required this.source,
     required this.sourceDirectory,
-    required this.entries,
+    required Set<RawEntry> entries,
     required this.onDrop,
-  });
+  }) : _entries = entries,
+       _resolveEntries = null;
+
+  /// Like the default constructor, but the entries are worked out the first
+  /// time they are asked for. Every tile in a list builds one of these on every
+  /// rebuild, and only the one that is actually dragged ever needs its
+  /// entries: with thousands of items selected, computing them for every tile
+  /// (as this used to) turned "select all" into a freeze.
+  BrowserItemDragData.lazy({
+    required this.source,
+    required this.sourceDirectory,
+    required Set<RawEntry> Function() entries,
+    required this.onDrop,
+  }) : _resolveEntries = entries;
+
+  /// Everything the drag carries (the dragged tile plus the rest of the
+  /// selection that is in the list).
+  Set<RawEntry> get entries =>
+      _entries ??= Set.unmodifiable(_resolveEntries!());
 
   String pathFor(RawEntry entry) =>
       sourceDirectory.isEmpty ? entry.name : '$sourceDirectory/${entry.name}';
@@ -527,15 +568,10 @@ class _BrowserItemDragItemState extends State<BrowserItemDragItem> {
       listen: false,
     ).read(browserDragSessionProvider.notifier);
 
-    final dragEntries =
-        selectedItems
-            .where((selected) => visibleItems.contains(selected))
-            .toSet()
-          ..add(entry);
-    final data = BrowserItemDragData(
+    final data = BrowserItemDragData.lazy(
       source: source,
       sourceDirectory: currentDirectory,
-      entries: Set.unmodifiable(dragEntries),
+      entries: () => browserEntriesToDrag(entry, selectedItems, visibleItems),
       onDrop: onDrop,
     );
 
@@ -595,7 +631,7 @@ class _BrowserItemDragItemState extends State<BrowserItemDragItem> {
       // stateful thumbnail and PiP subtrees that must not be laid out twice.
       feedback: _DragFeedback(
         entry: entry,
-        count: data.entries.length,
+        data: data,
         pointer: session.pointer,
       ),
       childWhenDragging: dragChild,
@@ -715,14 +751,18 @@ class _DragFeedback extends StatelessWidget {
   static const double _margin = 8;
 
   final RawEntry entry;
-  final int count;
+  final BrowserItemDragData data;
   final ValueListenable<Offset?> pointer;
 
   const _DragFeedback({
     required this.entry,
-    required this.count,
+    required this.data,
     required this.pointer,
   });
+
+  /// How many items are being dragged. Only worked out once the feedback is
+  /// actually shown (see [BrowserItemDragData.lazy]).
+  int get count => data.entries.length;
 
   Offset _shiftFor(BuildContext context, Offset finger) {
     final media = MediaQuery.of(context);

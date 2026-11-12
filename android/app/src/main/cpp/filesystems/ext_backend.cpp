@@ -295,8 +295,14 @@ errcode_t extIoWriteByte(io_channel c, unsigned long offset, int n, const void* 
 }
 errcode_t extIoFlush(io_channel c) {
     if (!c || !c->private_data) return EXT2_ET_INVALID_ARGUMENT;
-    auto& volume = volumes[*static_cast<int*>(c->private_data)];
-    if (volume.isUsbSource) return 0;
+    const int volumeId = *static_cast<int*>(c->private_data);
+    auto& volume = volumes[volumeId];
+    if (volume.isUsbSource) {
+        // Writes sit in the USB write cache until flushed: returning success here
+        // told libext2fs its metadata was durable while it was still pending. Flush
+        // and issue the device barrier, and report failure like the other backends.
+        return volume.usbCache.sync(volumeId) ? 0 : EXT2_ET_SHORT_WRITE;
+    }
     if (volume.isCompositeSource) {
         return (volume.composite && !volume.composite->sync()) ? EXT2_ET_SHORT_WRITE : 0;
     }
@@ -778,22 +784,21 @@ void extListDirectory(int volumeId, const std::string& pathSuffix, std::vector<s
         if (results.size() >= EXT_DIRECTORY_MAX_ENTRIES) results.push_back("System:TRUNCATED");
     }
 }
-uint64_t extGetFileSize(int volumeId, const std::string& path) {
+int64_t extGetFileSize(int volumeId, const std::string& path) {
     auto& v = volumes[volumeId];
-    uint64_t size = 0;
     ext2_ino_t ino = 0;
     struct ext2_inode inode{};
     if (!extResolvePath(v.extFs, path, &ino)) {
         EXT_LOGE("extGetFileSize: path resolution failed for %s", path.c_str());
-        return 0;
+        return -1;
     }
     const errcode_t readErr = ext2fs_read_inode(v.extFs, ino, &inode);
     if (readErr != 0) {
         EXT_LOGE("extGetFileSize: ext2fs_read_inode failed for '%s' inode=%u err=%lu (%s)",
                  path.c_str(), ino, (unsigned long)readErr, error_message(readErr));
-        return 0;
+        return -1;
     }
-    size = (static_cast<uint64_t>(inode.i_size_high) << 32) | inode.i_size;
+    int64_t size = static_cast<int64_t>((static_cast<uint64_t>(inode.i_size_high) << 32) | inode.i_size);
     return size;
 }
 bool extReadFileChunk(int volumeId, const std::string& path, uint64_t offset, size_t length, std::vector<uint8_t>& outBuffer) {

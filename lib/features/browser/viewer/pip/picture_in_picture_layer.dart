@@ -82,8 +82,8 @@ class _PictureInPictureLayerState extends State<PictureInPictureLayer> {
       PageRouteBuilder<void>(
         opaque: false,
         barrierColor: Colors.transparent,
-        transitionDuration: Duration.zero,
-        reverseTransitionDuration: const Duration(milliseconds: 250),
+        transitionDuration: const Duration(milliseconds: 420),
+        reverseTransitionDuration: const Duration(milliseconds: 360),
         pageBuilder: (context, animation, secondaryAnimation) =>
             MediaViewerScreen(
               container: session.container,
@@ -96,15 +96,24 @@ class _PictureInPictureLayerState extends State<PictureInPictureLayer> {
               sortBy: session.sortBy,
               sortAscending: session.sortAscending,
               pinnedPaths: session.pinnedPaths,
+              keepAudioPlayingOnClose: session.libraryPlayback ? true : null,
+              isLibraryPlayback: session.libraryPlayback,
             ),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          final curved = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+            reverseCurve: Curves.easeInCubic,
+          );
           return FadeTransition(
-            opacity: CurvedAnimation(
-              parent: animation,
-              curve: Curves.easeOutCubic,
-              reverseCurve: Curves.easeInCubic,
+            opacity: curved,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, 0.06),
+                end: Offset.zero,
+              ).animate(curved),
+              child: child,
             ),
-            child: child,
           );
         },
       ),

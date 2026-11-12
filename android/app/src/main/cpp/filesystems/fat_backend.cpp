@@ -202,17 +202,17 @@ bool fatListDirectory(int volumeId, const std::string& pathSuffix, std::vector<s
     return true;
 }
 
-uint64_t fatGetFileSize(int volumeId, const std::string& path) {
+int64_t fatGetFileSize(int volumeId, const std::string& path) {
     ensureFatFsValid(volumeId);
     FIL f;
-    uint64_t size = 0;
+    int64_t size = -1;
     std::string fatPath = std::string(drivePaths[volumeId]) + "/" + path;
     FRESULT fr = f_open(&f, fatPath.c_str(), FA_READ);
     if (fatRemountForRetry(volumeId, fr)) {
         fr = f_open(&f, fatPath.c_str(), FA_READ);
     }
     if (fr == FR_OK) {
-        size = static_cast<uint64_t>(f_size(&f));
+        size = static_cast<int64_t>(f_size(&f));
         f_close(&f);
     } else {
         noteFatError(volumeId, fr);

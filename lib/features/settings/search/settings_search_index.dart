@@ -834,6 +834,24 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
     section: (l) => l.navBarVaultsLabel,
     keywords: ['order', 'sort', 'vault list', 'containers'],
   ),
+  _e(
+    'appearance.predictive_back',
+    SettingsDestination.appearance,
+    (l) => l.predictiveBackAnimationsLabel,
+    section: (l) => l.sectionNavigation,
+    details: [(l) => l.predictiveBackAnimationsDesc],
+    keywords: [
+      'back gesture',
+      'swipe back',
+      'back animation',
+      'predictive back',
+      'preview',
+      'transition',
+      'navigation',
+    ],
+    // Back-gesture progress needs Android 14; the row is hidden below that.
+    minSdk: 34,
+  ),
 
   // ─────────────────────────── Screens reached from Appearance ───────────────
   _e(

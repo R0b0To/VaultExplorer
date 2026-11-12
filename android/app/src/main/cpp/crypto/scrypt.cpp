@@ -155,8 +155,11 @@ bool scrypt_crypto(const uint8_t* passphrase, size_t passphraseLen,
     // parameter set (N=2^20, r=8, p=16 alone is already far beyond typical
     // usage) while still bounding worst-case memory.
     constexpr uint32_t kMaxN = 1u << 20;
-    constexpr uint32_t kMaxR = 8;
+    constexpr uint32_t kMaxR = 64;   // official cryptolib MasterkeyFileValidator.DEFAULT_MAX_SCRYPT_BLOCK_SIZE
     constexpr uint32_t kMaxP = 16;
+    // Deliberately below official's 1 GiB: shipped official desktop builds run with -Xmx256m, so no
+    // vault that needs more than that can be opened by an official client either, and a bigger
+    // native allocation risks the Android low-memory killer.
     constexpr size_t kMaxTotalMemoryBytes = 512u * 1024 * 1024;
     if (N > kMaxN || r > kMaxR || p > kMaxP) return false;
 

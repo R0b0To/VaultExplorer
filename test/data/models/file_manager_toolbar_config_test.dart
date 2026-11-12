@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:ui' show Color;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/data/models/file_item_action.dart';
 import 'package:vaultexplorer/data/models/file_manager_skin.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
@@ -11,6 +12,91 @@ import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/models/thumbnail_settings.dart';
 
 void main() {
+  group('FileManagerToolbarConfig toolbar action order', () {
+    test('play media is available but hidden in the fresh-install defaults', () {
+      final defaults = FileManagerToolbarConfig.defaults();
+
+      expect(defaults.order, contains(FileManagerAction.playMedia));
+      expect(defaults.hidden, contains(FileManagerAction.playMedia));
+      expect(defaults.visible, isNot(contains(FileManagerAction.playMedia)));
+      expect(defaults.visible.last, FileManagerAction.options);
+    });
+
+    test('the mode switches sit together and the options menu is last', () {
+      final order = FileManagerToolbarConfig.defaultActionOrder;
+
+      expect(order.last, FileManagerAction.options);
+      expect(
+        order.indexOf(FileManagerAction.musicMode) -
+            order.indexOf(FileManagerAction.gallery),
+        1,
+      );
+      expect(
+        order.indexOf(FileManagerAction.viewToggle),
+        lessThan(order.indexOf(FileManagerAction.gallery)),
+      );
+    });
+
+    test('an order that is a previous default moves to the new default', () {
+      final previous = FileManagerToolbarConfig.defaults().toJson()
+        ..['order'] = [
+          FileManagerAction.search.name,
+          FileManagerAction.add.name,
+          FileManagerAction.gallery.name,
+          FileManagerAction.viewToggle.name,
+          FileManagerAction.sort.name,
+          FileManagerAction.filter.name,
+          FileManagerAction.options.name,
+          FileManagerAction.playMedia.name,
+          FileManagerAction.musicMode.name,
+        ];
+      final restored = FileManagerToolbarConfig.fromJson(previous);
+
+      expect(restored.order, FileManagerToolbarConfig.defaultActionOrder);
+    });
+
+    test('an order the user rearranged is kept', () {
+      final custom = FileManagerToolbarConfig.defaults().toJson()
+        ..['order'] = [
+          FileManagerAction.add.name,
+          FileManagerAction.search.name,
+          FileManagerAction.gallery.name,
+          FileManagerAction.viewToggle.name,
+          FileManagerAction.sort.name,
+          FileManagerAction.filter.name,
+          FileManagerAction.options.name,
+          FileManagerAction.playMedia.name,
+          FileManagerAction.musicMode.name,
+        ];
+      final restored = FileManagerToolbarConfig.fromJson(custom);
+
+      expect(restored.order.take(3), [
+        FileManagerAction.add,
+        FileManagerAction.search,
+        FileManagerAction.gallery,
+      ]);
+    });
+
+    test('legacy orders gain the mode action and hide newly added play media', () {
+      final legacy = FileManagerToolbarConfig.defaults().toJson()
+        ..['order'] = [
+          FileManagerAction.search.name,
+          FileManagerAction.add.name,
+          FileManagerAction.gallery.name,
+          FileManagerAction.viewToggle.name,
+          FileManagerAction.sort.name,
+          FileManagerAction.filter.name,
+          FileManagerAction.options.name,
+        ]
+        ..['hidden'] = <String>[];
+      final restored = FileManagerToolbarConfig.fromJson(legacy);
+
+      expect(restored.order, FileManagerToolbarConfig.defaultActionOrder);
+      expect(restored.hidden, contains(FileManagerAction.playMedia));
+      expect(restored.visible.last, FileManagerAction.options);
+    });
+  });
+
   group('FileManagerToolbarConfig autoStartPlaylistMode', () {
     test('defaults to false in defaults() factory', () {
       final config = FileManagerToolbarConfig.defaults();

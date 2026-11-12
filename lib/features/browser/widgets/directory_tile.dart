@@ -27,6 +27,7 @@ class DirectoryTile extends StatelessWidget {
 
   /// Two-row layout -- see `FileListView.isDetailed`.
   final bool isDetailed;
+  final bool largeThumbnail;
   final double zoomLevel;
   final List<FileDetailColumn> detailColumns;
   final LongFileNameDisplayMode longFileNameMode;
@@ -62,6 +63,7 @@ class DirectoryTile extends StatelessWidget {
     this.showItemActionsMenu = true,
     this.isCompact = false,
     this.isDetailed = false,
+    this.largeThumbnail = false,
     this.zoomLevel = 1.0,
     this.detailColumns = const [FileDetailColumn.date, FileDetailColumn.size],
     this.longFileNameMode = LongFileNameDisplayMode.ellipsizeEnd,
@@ -189,6 +191,7 @@ class DirectoryTile extends StatelessWidget {
       onIconTap: onIconTap,
       isCompact: isCompact,
       isDetailed: isDetailed,
+      largeThumbnail: largeThumbnail,
       zoomLevel: zoomLevel,
       iconBadge: badge,
     );

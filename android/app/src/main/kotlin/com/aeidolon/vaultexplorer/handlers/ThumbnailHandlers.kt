@@ -245,6 +245,7 @@ class ThumbnailHandlers(
             var player: ExoPlayer? = null
             var surface: Surface? = null
             var surfaceTexture: SurfaceTexture? = null
+            var released = false
 
             try {
                 surfaceTexture = SurfaceTexture(10)
@@ -252,6 +253,15 @@ class ThumbnailHandlers(
                 surface = Surface(surfaceTexture)
 
                 player = ExoPlayer.Builder(activity).build()
+                // A frame grab needs the video track only. Leaving audio and
+                // text enabled spun up audio codecs (and their buffers) for
+                // files whose audio stream is the corrupt part, which is how a
+                // failed thumbnail could take the native decoder down with it.
+                player.trackSelectionParameters = player.trackSelectionParameters
+                    .buildUpon()
+                    .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, true)
+                    .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+                    .build()
                 player.setVideoSurface(surface)
 
                 val dataSourceFactory: DataSource.Factory = if (isLocalStorage) {
@@ -266,20 +276,46 @@ class ThumbnailHandlers(
 
                             override fun addTransferListener(transferListener: TransferListener) {}
 
+                            private var remaining: Long = C.LENGTH_UNSET.toLong()
+
                             override fun open(dataSpec: DataSpec): Long {
                                 openUri = dataSpec.uri
                                 currentPosition = dataSpec.position
                                 val totalSize = mediaDataSource.size
-                                if (totalSize <= 0) return C.LENGTH_UNSET.toLong()
-                                return totalSize - currentPosition
+                                if (totalSize <= 0) {
+                                    remaining = C.LENGTH_UNSET.toLong()
+                                    return C.LENGTH_UNSET.toLong()
+                                }
+                                if (currentPosition > totalSize) {
+                                    throw androidx.media3.datasource.DataSourceException(
+                                        PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE
+                                    )
+                                }
+                                remaining = totalSize - currentPosition
+                                return remaining
                             }
 
                             override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
                                 if (length == 0) return 0
-                                val bytesRead = mediaDataSource.readAt(currentPosition, buffer, offset, length)
-                                if (bytesRead > 0) {
-                                    currentPosition += bytesRead
+                                if (remaining == 0L) return C.RESULT_END_OF_INPUT
+                                val request = if (remaining > 0L) {
+                                    minOf(length.toLong(), remaining).toInt()
+                                } else {
+                                    length
                                 }
+                                val bytesRead = mediaDataSource.readAt(currentPosition, buffer, offset, request)
+                                if (bytesRead <= 0) {
+                                    // Promised bytes that never arrive are a truncated
+                                    // or undecryptable file, not a clean end of input.
+                                    if (remaining > 0L) {
+                                        throw java.io.IOException(
+                                            "Vault stream ended early at $currentPosition: $fileName"
+                                        )
+                                    }
+                                    return C.RESULT_END_OF_INPUT
+                                }
+                                currentPosition += bytesRead
+                                if (remaining > 0L) remaining -= bytesRead
                                 return bytesRead
                             }
 
@@ -327,6 +363,13 @@ class ThumbnailHandlers(
                  * this can retry at most once.
                  */
                 fun capturePixelCopy(allowBlankRetry: Boolean) {
+                    // The 4s budget below releases the player and surface; a
+                    // delayed capture that fires afterwards would hit a dead
+                    // Surface (PixelCopy throws) on the main thread.
+                    if (released || surface?.isValid != true) {
+                        latch.countDown()
+                        return
+                    }
                     val bitmap = Bitmap.createBitmap(dstW, dstH, Bitmap.Config.ARGB_8888)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                         PixelCopy.request(
@@ -420,6 +463,7 @@ class ThumbnailHandlers(
                 Thread {
                     latch.await(4, TimeUnit.SECONDS)
                     activity.runOnUiThread {
+                        released = true
                         runCatching {
                             player?.release()
                             surface?.release()
@@ -1327,6 +1371,103 @@ class ThumbnailHandlers(
                 "width" to outcome.sourceWidth,
                 "height" to outcome.sourceHeight,
             )
+        }
+    }
+
+    /**
+     * Header-only dimension probe for a *batch* of images, so the gallery can
+     * lay a folder out with the right tile shapes before a single thumbnail
+     * has been decoded.
+     *
+     * Reads only what [BitmapFactory]'s bounds pass and [ExifInterface] need
+     * (a few KB per file, decrypted on the fly) -- no pixel decode, no
+     * thumbnail, nothing cached or written anywhere. The result is
+     * `[w0, h0, w1, h1, ...]`, one pair per requested name in the same order,
+     * with `0, 0` for a file whose size could not be read (not an image this
+     * device can parse, unreadable, or SAF-backed browsing, which has no
+     * stream to open from here). Sizes are the *upright* ones: swapped when
+     * the EXIF orientation turns the image sideways, exactly as
+     * [finishThumbnail] reports them, so a tile is never laid out sideways.
+     *
+     * One executor task per batch (the caller sends modest batches and keeps
+     * at most one in flight) so a large folder cannot flood [imageExecutor]
+     * ahead of the thumbnail requests that are actually on screen.
+     */
+    fun handleProbeImageDimensions(call: MethodCall, result: MethodChannel.Result) {
+        val uriString = call.argument<String>("filePath")
+        val fileNames = call.argument<List<String>>("fileNames")
+        val isLocalStorage = call.argument<Boolean>("isLocalStorage") ?: false
+
+        if (uriString == null || fileNames == null) {
+            result.error("INVALID_ARGS", "filePath and fileNames required", null)
+            return
+        }
+
+        imageExecutor.execute {
+            try {
+                val out = IntArray(fileNames.size * 2)
+                val safBacked = isLocalStorage && uriString.startsWith("content://")
+                var volId = -1
+                if (!isLocalStorage) {
+                    volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
+                        ?: run {
+                            activity.runOnUiThread { result.error("NOT_MOUNTED", "Container not mounted", null) }
+                            return@execute
+                        }
+                }
+                if (!safBacked) {
+                    for ((i, fileName) in fileNames.withIndex()) {
+                        var localFile: java.io.File? = null
+                        if (isLocalStorage) {
+                            val file = if (fileName.startsWith("/")) java.io.File(fileName) else java.io.File(uriString, fileName)
+                            if (!file.exists()) continue
+                            localFile = file
+                        }
+                        val dims = probeImageDimensions(uriString, fileName, volId, isLocalStorage, localFile)
+                        if (dims != null) {
+                            out[i * 2] = dims.first
+                            out[i * 2 + 1] = dims.second
+                        }
+                    }
+                }
+                activity.runOnUiThread { result.success(out) }
+            } catch (e: Exception) {
+                activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
+            }
+        }
+    }
+
+    /** Upright (width, height) of one image from its headers, or null. Blocking. */
+    private fun probeImageDimensions(
+        uriString: String,
+        fileName: String,
+        volId: Int,
+        isLocalStorage: Boolean,
+        localFile: java.io.File?,
+    ): Pair<Int, Int>? {
+        return try {
+            val exifOrientation = openImageInputStream(uriString, fileName, volId, isLocalStorage, localFile)
+                .use { stream ->
+                    runCatching {
+                        ExifInterface(stream).getAttributeInt(
+                            ExifInterface.TAG_ORIENTATION,
+                            ExifInterface.ORIENTATION_NORMAL,
+                        )
+                    }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
+                }
+            val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            openImageInputStream(uriString, fileName, volId, isLocalStorage, localFile)
+                .use { stream -> BitmapFactory.decodeStream(stream, null, options) }
+            val rawWidth = options.outWidth
+            val rawHeight = options.outHeight
+            if (rawWidth <= 0 || rawHeight <= 0) return null
+            val isSideways = exifOrientation == ExifInterface.ORIENTATION_ROTATE_90 ||
+                exifOrientation == ExifInterface.ORIENTATION_ROTATE_270 ||
+                exifOrientation == ExifInterface.ORIENTATION_TRANSPOSE ||
+                exifOrientation == ExifInterface.ORIENTATION_TRANSVERSE
+            if (isSideways) Pair(rawHeight, rawWidth) else Pair(rawWidth, rawHeight)
+        } catch (e: Exception) {
+            null
         }
     }
 

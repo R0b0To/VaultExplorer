@@ -22,6 +22,7 @@ import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/services/text_editor_appearance_service.dart';
 import 'package:vaultexplorer/features/browser/viewer/markdown/markdown_body_view.dart';
 import 'package:vaultexplorer/features/browser/viewer/markdown/markdown_image_picker_dialog.dart';
+import 'package:vaultexplorer/features/browser/viewer/markdown/markdown_link_syntax.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_appearance_provider.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_chrome.dart';
 import 'package:vaultexplorer/features/browser/viewer/editor_text_encoding.dart';
@@ -1656,7 +1657,10 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
       currentTab.filePath,
       selectedImagePath,
     );
-    final template = '![$selectedImage]($relativePath)';
+    final template = markdownImageTemplate(
+      alt: selectedImage,
+      path: relativePath,
+    );
     currentTab.codeController.replaceSelection(template);
     _focusNode.requestFocus();
   }
@@ -1830,7 +1834,10 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
                   fullPath,
                 );
                 Navigator.of(ctx).pop();
-                final template = '![$fileName]($relativePath)';
+                final template = markdownImageTemplate(
+                  alt: fileName,
+                  path: relativePath,
+                );
                 currentTab.codeController.replaceSelection(template);
                 _focusNode.requestFocus();
               },

@@ -38,7 +38,9 @@ data class SafEntry(
     val lastModified: Long,
     val docId: String,
     val mimeType: String,
-)
+) {
+    fun toWire(): String = "${if (isDir) "D" else "F"}|$size|$lastModified|$name"
+}
 
 /**
  * High-performance SAF (Storage Access Framework) engine modeled after MaterialFiles'
@@ -316,12 +318,21 @@ class SafStorageManager(private val context: Context) {
       val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentDocId)
         val entries = mutableListOf<SafEntry>()
 
-        // Use null projection first (MaterialFiles / DocumentsUI standard for cloud providers like Google Drive)
+        // Use PROJECTION_CHILDREN for ExternalStorageProvider (device storage) to avoid
+        // querying all table columns across Binder IPC cursor windows for large folders.
+        // For cloud providers (e.g. Google Drive), null projection is standard.
+        val preferredProjection = if (treeUri.authority == EXTERNAL_STORAGE_AUTHORITY) PROJECTION_CHILDREN else null
         var cursor = try {
-            context.contentResolver.query(childrenUri, null, null, null, null)
+            context.contentResolver.query(childrenUri, preferredProjection, null, null, null)
         } catch (_: Exception) {
             try {
-                context.contentResolver.query(childrenUri, PROJECTION_CHILDREN, null, null, null)
+                context.contentResolver.query(
+                    childrenUri,
+                    if (preferredProjection == null) PROJECTION_CHILDREN else null,
+                    null,
+                    null,
+                    null
+                )
             } catch (e: Exception) {
                 VeLog.w(TAG) { "queryChildren failed for $childrenUri: ${e.message}" }
                 null
@@ -346,7 +357,7 @@ class SafStorageManager(private val context: Context) {
             }
             cursor.close()
             cursor = try {
-                context.contentResolver.query(childrenUri, null, null, null, null)
+                context.contentResolver.query(childrenUri, preferredProjection, null, null, null)
             } catch (_: Exception) {
                 null
             } ?: return emptyList()

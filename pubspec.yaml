@@ -1,7 +1,7 @@
 name: vaultexplorer
 description: "Encrypted container explorer: VeraCrypt, LUKS, BitLocker, and more."
 publish_to: 'none'
-version: 1.39.0+58
+version: 1.50.0+60
 environment:
   sdk: ^3.12.0
 dependencies:
@@ -16,7 +16,6 @@ dependencies:
   ffi: ^2.1.4            # dart:ffi helpers (desktop engine bindings)
   file_selector: ^1.0.3  # container picker on Linux/Windows
   flutter_secure_storage: ^9.2.4  # desktop secret store (OS keyring: libsecret on Linux)
-  flutter_staggered_grid_view: ^0.7.0
   dynamic_color: ^2.1.0
   flutter_riverpod: ^3.4.2
   riverpod_annotation: ^4.0.6
@@ -48,6 +47,7 @@ flutter:
   assets:
     - assets/images/app_icon.png
     - assets/data/eff_large_wordlist.txt
+    - assets/geo/cities.bin
   shaders:
     - shaders/viewer_adjust.frag
   fonts:

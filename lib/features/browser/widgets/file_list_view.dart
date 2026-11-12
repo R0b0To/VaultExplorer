@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
-import 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
@@ -13,6 +12,7 @@ import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/widgets/directory_tile.dart';
 import 'package:vaultexplorer/features/browser/widgets/fast_scrollbar.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_tile.dart';
+import 'package:vaultexplorer/features/browser/widgets/gallery_date_header.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_item_drag.dart';
 import 'package:vaultexplorer/features/browser/widgets/hold_range_select_container.dart';
 
@@ -92,6 +92,31 @@ class FileListView extends StatefulWidget {
   final ArchiveContext? archiveContext;
   final String? archiveRootPath;
   final SortBy? sortBy;
+  final bool largeThumbnail;
+  final bool groupByDate;
+
+  /// Builds the sections when [groupByDate] is on. Null keeps the day
+  /// sections ([computeDateGroups]); the gallery filter passes its own to
+  /// group by month, folder, place, camera...
+  ///
+  /// The list handed over is already arranged so that each section is one run
+  /// of it, and a new builder only takes effect with a new [items] list.
+  final List<DateGroup<RawEntry>> Function(List<RawEntry> items)? groupBuilder;
+
+  /// Resolves the container an entry lives in, for a listing that gathers
+  /// files from several containers (the category browser). When null every
+  /// entry belongs to [container], as in any ordinary folder listing.
+  final MountedContainer Function(RawEntry entry)? containerFor;
+
+  /// The thumbnail cache policy that applies to an entry, for a listing that
+  /// mixes containers whose owners chose different policies (the category
+  /// browser). When null every entry follows [thumbnailCacheMode].
+  final ThumbnailCacheMode Function(RawEntry entry)? cacheModeFor;
+
+  /// The thumbnail quality that applies to an entry, for a listing that
+  /// mixes containers whose owners chose different qualities (the category
+  /// browser). When null every entry follows [thumbnailQuality].
+  final ThumbnailQuality Function(RawEntry entry)? qualityFor;
 
   const FileListView({
     super.key,
@@ -99,6 +124,9 @@ class FileListView extends StatefulWidget {
     required this.isSelectionMode,
     this.isCompact = false,
     this.isDetailed = false,
+    this.largeThumbnail = false,
+    this.groupByDate = false,
+    this.groupBuilder,
     required this.selectedItems,
     this.detailColumns = const [FileDetailColumn.date, FileDetailColumn.size],
     this.longFileNameMode = LongFileNameDisplayMode.ellipsizeEnd,
@@ -129,16 +157,64 @@ class FileListView extends StatefulWidget {
     this.archiveContext,
     this.archiveRootPath,
     this.sortBy,
+    this.containerFor,
+    this.cacheModeFor,
+    this.qualityFor,
   });
 
   @override
-  State<FileListView> createState() => _FileListViewState();
+  State<FileListView> createState() => FileListViewState();
 }
 
-class _FileListViewState extends State<FileListView> {
+class FileListViewState extends State<FileListView> {
+  /// Returns the geometries (top offset and height) in scroll-content coordinates
+  /// for the items at [globalIndices] in `widget.items`.
+  Map<int, ({double top, double height})> geometriesForGlobalIndices(
+    Set<int> globalIndices,
+  ) {
+    final result = <int, ({double top, double height})>{};
+    if (globalIndices.isEmpty) return result;
+
+    final itemExtent = _computeItemExtent(_zoomLevel);
+
+    if (widget.groupByDate) {
+      final groups = (widget.groupBuilder ?? computeDateGroups)(widget.items);
+      final headerH = galleryDateHeaderExtent(context);
+      var runningTop = 0.0;
+      for (final group in groups) {
+        runningTop += headerH;
+        for (var j = 0; j < group.items.length; j++) {
+          final gIdx = group.globalIndices[j];
+          if (globalIndices.contains(gIdx)) {
+            result[gIdx] = (
+              top: runningTop,
+              height: itemExtent,
+            );
+          }
+          runningTop += itemExtent;
+        }
+      }
+      return result;
+    }
+
+    for (final index in globalIndices) {
+      if (index < 0 || index >= widget.items.length) continue;
+      result[index] = (
+        top: index * itemExtent,
+        height: itemExtent,
+      );
+    }
+    return result;
+  }
+  ThumbnailCacheMode _cacheModeOf(RawEntry entry) =>
+      widget.cacheModeFor?.call(entry) ?? widget.thumbnailCacheMode;
+
+  ThumbnailQuality _qualityOf(RawEntry entry) =>
+      widget.qualityFor?.call(entry) ?? widget.thumbnailQuality;
+
   double _baselineScale = 1.0;
   late double _zoomLevel;
-  final Map<Key, int> _keyIndexMap = {};
+  final Map<RawEntry, int> _entryIndexMap = {};
   int _lastPointerCount = 0;
   bool _isZooming = false;
   bool _isAtBottomAnchor = false;
@@ -149,14 +225,18 @@ class _FileListViewState extends State<FileListView> {
   void initState() {
     super.initState();
     _zoomLevel = widget.initialZoomLevel;
-    _updateKeyIndexMap();
   }
 
-  void _updateKeyIndexMap() {
-    _keyIndexMap.clear();
-    for (int i = 0; i < widget.items.length; i++) {
-      _keyIndexMap[ValueKey(widget.items[i])] = i;
+  int? _findChildIndex(Key key) {
+    if (key is ValueKey<RawEntry>) {
+      if (_entryIndexMap.isEmpty && widget.items.isNotEmpty) {
+        for (int i = 0; i < widget.items.length; i++) {
+          _entryIndexMap[widget.items[i]] = i;
+        }
+      }
+      return _entryIndexMap[key.value];
     }
+    return null;
   }
 
   @override
@@ -166,19 +246,27 @@ class _FileListViewState extends State<FileListView> {
       _zoomLevel = widget.initialZoomLevel;
     }
     if (oldWidget.items != widget.items) {
-      _updateKeyIndexMap();
+      _entryIndexMap.clear();
     }
   }
 
   double _computeItemExtent(double zoom) {
     final textScaler = MediaQuery.textScalerOf(context);
     final effectiveTextScaler = TextScaler.linear(textScaler.scale(1.0) * zoom);
-    final baseContentHeight = (widget.isCompact ? 32.0 : 44.0) * zoom;
+    final double baseContentHeight;
+    if (widget.largeThumbnail) {
+      baseContentHeight = (widget.isCompact ? 54.0 : 58.0) * zoom;
+    } else {
+      baseContentHeight = (widget.isCompact ? 32.0 : 44.0) * zoom;
+    }
     final scaledTextHeight = effectiveTextScaler.scale(
       widget.isDetailed ? 46.0 : 24.0,
     );
     final contentHeight = math.max(baseContentHeight, scaledTextHeight);
-    return contentHeight + (widget.isCompact ? 8.0 : 20.0) * zoom + 2.0;
+    final verticalPadding = widget.largeThumbnail
+        ? (widget.isCompact ? 12.0 : 16.0) * zoom
+        : (widget.isCompact ? 8.0 : 20.0) * zoom;
+    return (contentHeight + verticalPadding + 2.0).roundToDouble();
   }
 
   double _computeMaxScroll(double itemExtent, double viewport) {
@@ -270,31 +358,154 @@ class _FileListViewState extends State<FileListView> {
   }
 
   bool _onScrollNotification(ScrollNotification notification) {
-    if (notification is ScrollUpdateNotification) {
-      final delta = notification.scrollDelta?.abs() ?? 0.0;
-      if (delta > 25.0) {
-        ThumbnailConcurrency.imageLimiter.cancelTier(TaskPriority.visible);
-        ThumbnailConcurrency.videoLimiter.cancelTier(TaskPriority.visible);
-      }
-    }
+    // Disposed tiles already drop their queued request; cancelling the whole
+    // visible tier also cancelled tiles still on screen (see masonry view).
     return false;
   }
 
+  Widget _buildItemRow(BuildContext context, RawEntry entry, int index) {
+    final isSelected = widget.selectedItems.contains(entry);
+    final isPinned = widget.isPinned?.call(entry) ?? false;
+    final isBookmark = widget.isBookmark?.call(entry) ?? false;
+    final Widget tile;
+    if (entry.isDir) {
+      tile = DirectoryTile(
+        key: ValueKey('dir:${entry.raw}:$isPinned:$isBookmark'),
+        entry: entry,
+        isSelectionMode: widget.isSelectionMode,
+        isSelected: isSelected,
+        isCompact: widget.isCompact,
+        isDetailed: widget.isDetailed,
+        largeThumbnail: widget.largeThumbnail,
+        zoomLevel: _zoomLevel,
+        detailColumns: widget.detailColumns,
+        longFileNameMode: widget.longFileNameMode,
+        searchQuery: widget.searchQuery,
+        isDocumentProviderMounted: widget.isFolderMounted?.call(entry) ?? false,
+        isPinned: isPinned,
+        isBookmark: isBookmark,
+        isSynced: widget.isFolderSynced?.call(entry) ?? false,
+        container: (widget.containerFor?.call(entry) ?? widget.container),
+        currentDirPath: widget.currentDirPath,
+        cacheMode: _cacheModeOf(entry),
+        quality: _qualityOf(entry),
+        showThumbnailPreview: widget.showThumbnails,
+        showItemActionsMenu: widget.showItemActionsMenu,
+        onTap: () => widget.onDirTap(entry),
+        onLongPress: () {},
+        onMoreTap: widget.onFileLongMenu,
+        onIconTap: widget.onIconTap == null ? null : () => widget.onIconTap!(entry),
+      );
+    } else {
+      tile = FileTile(
+        key: ValueKey('file:${entry.raw}:$isPinned:$isBookmark'),
+        entry: entry,
+        isSelectionMode: widget.isSelectionMode,
+        isSelected: isSelected,
+        isCompact: widget.isCompact,
+        isDetailed: widget.isDetailed,
+        largeThumbnail: widget.largeThumbnail,
+        zoomLevel: _zoomLevel,
+        detailColumns: widget.detailColumns,
+        longFileNameMode: widget.longFileNameMode,
+        searchQuery: widget.searchQuery,
+        container: (widget.containerFor?.call(entry) ?? widget.container),
+        currentDirPath: widget.currentDirPath,
+        thumbnailCacheMode: _cacheModeOf(entry),
+        thumbnailQuality: _qualityOf(entry),
+        showThumbnail: widget.showThumbnails,
+        isPinned: isPinned,
+        isBookmark: isBookmark,
+        showItemActionsMenu: widget.showItemActionsMenu,
+        showFileExtensions: widget.showFileExtensions,
+        onTap: () => widget.onFileTap(entry),
+        onLongPress: () {},
+        onLongMenu: widget.onFileLongMenu,
+        onIconTap: widget.onIconTap == null ? null : () => widget.onIconTap!(entry),
+        archiveContext: widget.archiveContext,
+        archiveRootPath: widget.archiveRootPath,
+      );
+    }
+    return HoldSelectableItem(
+      key: ValueKey(entry),
+      index: index,
+      entry: entry,
+      child: BrowserItemDragItem(
+        entry: entry,
+        container: (widget.containerFor?.call(entry) ?? widget.container),
+        currentDirectory: widget.currentDirPath,
+        visibleItems: widget.items,
+        selectedItems: widget.selectedItems,
+        isSelectionMode: widget.isSelectionMode,
+        enabled: widget.enableFileDrag && widget.archiveContext == null,
+        onItemLongPress: widget.onItemLongPress,
+        onDrop: widget.onFileDrop,
+        child: tile,
+      ),
+    );
+  }
+
+  Widget _buildDateGroupedListView(ScrollController? controller) {
+    final groups = (widget.groupBuilder ?? computeDateGroups)(widget.items);
+    final slivers = <Widget>[];
+    for (final group in groups) {
+      slivers.add(
+        SliverToBoxAdapter(
+          child: GalleryDateHeader(
+            title: group.label ?? formatDateGroupHeader(group.date, context),
+            count: group.items.length,
+          ),
+        ),
+      );
+      slivers.add(
+        SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, localIndex) {
+              final entry = group.items[localIndex];
+              final globalIndex = group.globalIndices[localIndex];
+              return _buildItemRow(context, entry, globalIndex);
+            },
+            childCount: group.items.length,
+          ),
+        ),
+      );
+    }
+    if (widget.bottomClearance > 0) {
+      slivers.add(
+        SliverToBoxAdapter(
+          child: SizedBox(height: widget.bottomClearance),
+        ),
+      );
+    }
+    return CustomScrollView(
+      controller: controller,
+      cacheExtent: MediaQuery.sizeOf(context).height * 1.5,
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: slivers,
+    );
+  }
+
+  Widget _buildListView(ScrollController? controller, double itemExtent, ScrollPhysics scrollPhysics, int total) {
+    return ListView.builder(
+      controller: controller,
+      cacheExtent: MediaQuery.sizeOf(context).height * 1.5,
+      physics: scrollPhysics,
+      itemExtent: itemExtent,
+      findChildIndexCallback: _findChildIndex,
+      padding: EdgeInsets.only(
+        top: 0,
+        bottom: widget.bottomClearance,
+      ),
+      itemCount: total,
+      itemBuilder: (_, index) => _buildItemRow(context, widget.items[index], index),
+    );
+  }
   @override
   Widget build(BuildContext context) {
     final total = widget.items.length;
     final itemExtent = _computeItemExtent(_zoomLevel);
     final scrollPhysics = _ZoomScrollPhysics(isZooming: () => _isZooming);
 
-    // Zoom start/update/end are driven entirely by HoldRangeSelectContainer's
-    // onScale* callbacks below (backed by _PinchScaleGestureRecognizer), which
-    // are the single source of truth for "is a real 2-finger pinch active".
-    // This used to *also* track raw pointer down/up/cancel counts here and
-    // force _isZooming back to false as soon as the count dropped below 2 --
-    // but that count was independent of (and could desync from) the gesture
-    // recognizer's own pointer tracking, which could flip _isZooming off
-    // mid-gesture and left the two objects disagreeing about whether a pinch
-    // was still in progress. Trusting the scale callbacks alone avoids that.
     return HoldRangeSelectContainer(
       items: widget.items,
       selectedItems: widget.selectedItems,
@@ -318,113 +529,9 @@ class _FileListViewState extends State<FileListView> {
               child: NotificationListener<ScrollNotification>(
                 onNotification: _onScrollNotification,
                 child: widget.scrollController == null
-                    ? ListView.builder(
-                        controller: widget.scrollController,
-                        physics: scrollPhysics,
-                        itemExtent: itemExtent,
-                        findChildIndexCallback: (Key key) => _keyIndexMap[key],
-                        padding: EdgeInsets.only(
-                          top: 0,
-                          bottom: widget.bottomClearance,
-                        ),
-                        itemCount: total,
-                        itemBuilder: (_, index) {
-                          final entry = widget.items[index];
-                          final isSelected = widget.selectedItems.contains(
-                            entry,
-                          );
-                          final isPinned =
-                              widget.isPinned?.call(entry) ?? false;
-                          final isBookmark =
-                              widget.isBookmark?.call(entry) ?? false;
-                          final Widget tile;
-                          if (entry.isDir) {
-                            tile = DirectoryTile(
-                              key: ValueKey(
-                                'dir:${entry.raw}:$isPinned:$isBookmark',
-                              ),
-                              entry: entry,
-                              isSelectionMode: widget.isSelectionMode,
-                              isSelected: isSelected,
-                              isCompact: widget.isCompact,
-                              isDetailed: widget.isDetailed,
-                              zoomLevel: _zoomLevel,
-                              detailColumns: widget.detailColumns,
-                              longFileNameMode: widget.longFileNameMode,
-                              searchQuery: widget.searchQuery,
-                              isDocumentProviderMounted:
-                                  widget.isFolderMounted?.call(entry) ?? false,
-                              isPinned: isPinned,
-                              isBookmark: isBookmark,
-                              isSynced:
-                                  widget.isFolderSynced?.call(entry) ?? false,
-                              container: widget.container,
-                              currentDirPath: widget.currentDirPath,
-                              cacheMode: widget.thumbnailCacheMode,
-                              quality: widget.thumbnailQuality,
-                              showThumbnailPreview: widget.showThumbnails,
-                              showItemActionsMenu: widget.showItemActionsMenu,
-                              onTap: () => widget.onDirTap(entry),
-                              onLongPress: () {},
-                              onMoreTap: widget.onFileLongMenu,
-                              onIconTap: widget.onIconTap == null
-                                  ? null
-                                  : () => widget.onIconTap!(entry),
-                            );
-                          } else {
-                            tile = FileTile(
-                              key: ValueKey(
-                                'file:${entry.raw}:$isPinned:$isBookmark',
-                              ),
-                              entry: entry,
-                              isSelectionMode: widget.isSelectionMode,
-                              isSelected: isSelected,
-                              isCompact: widget.isCompact,
-                              isDetailed: widget.isDetailed,
-                              zoomLevel: _zoomLevel,
-                              detailColumns: widget.detailColumns,
-                              longFileNameMode: widget.longFileNameMode,
-                              searchQuery: widget.searchQuery,
-                              container: widget.container,
-                              currentDirPath: widget.currentDirPath,
-                              thumbnailCacheMode: widget.thumbnailCacheMode,
-                              thumbnailQuality: widget.thumbnailQuality,
-                              showThumbnail: widget.showThumbnails,
-                              isPinned: isPinned,
-                              isBookmark: isBookmark,
-                              showItemActionsMenu: widget.showItemActionsMenu,
-                              showFileExtensions: widget.showFileExtensions,
-                              onTap: () => widget.onFileTap(entry),
-                              onLongPress: () {},
-                              onLongMenu: widget.onFileLongMenu,
-                              onIconTap: widget.onIconTap == null
-                                  ? null
-                                  : () => widget.onIconTap!(entry),
-                              archiveContext: widget.archiveContext,
-                              archiveRootPath: widget.archiveRootPath,
-                            );
-                          }
-                          return HoldSelectableItem(
-                            key: ValueKey(entry),
-                            index: index,
-                            entry: entry,
-                            child: BrowserItemDragItem(
-                              entry: entry,
-                              container: widget.container,
-                              currentDirectory: widget.currentDirPath,
-                              visibleItems: widget.items,
-                              selectedItems: widget.selectedItems,
-                              isSelectionMode: widget.isSelectionMode,
-                              enabled:
-                                  widget.enableFileDrag &&
-                                  widget.archiveContext == null,
-                              onItemLongPress: widget.onItemLongPress,
-                              onDrop: widget.onFileDrop,
-                              child: tile,
-                            ),
-                          );
-                        },
-                      )
+                    ? (widget.groupByDate
+                        ? _buildDateGroupedListView(null)
+                        : _buildListView(null, itemExtent, scrollPhysics, total))
                     : FastScrollbar(
                         controller: widget.scrollController!,
                         items: widget.items,
@@ -433,115 +540,14 @@ class _FileListViewState extends State<FileListView> {
                           top: 0,
                           bottom: widget.bottomClearance,
                         ),
-                        child: ListView.builder(
-                          controller: widget.scrollController,
-                          physics: scrollPhysics,
-                          itemExtent: itemExtent,
-                          findChildIndexCallback: (Key key) =>
-                              _keyIndexMap[key],
-                          padding: EdgeInsets.only(
-                            top: 0,
-                            bottom: widget.bottomClearance,
-                          ),
-                          itemCount: total,
-                          itemBuilder: (_, index) {
-                            final entry = widget.items[index];
-                            final isSelected = widget.selectedItems.contains(
-                              entry,
-                            );
-                            final isPinned =
-                                widget.isPinned?.call(entry) ?? false;
-                            final isBookmark =
-                                widget.isBookmark?.call(entry) ?? false;
-                            final Widget tile;
-                            if (entry.isDir) {
-                              tile = DirectoryTile(
-                                key: ValueKey(
-                                  'dir:${entry.raw}:$isPinned:$isBookmark',
-                                ),
-                                entry: entry,
-                                isSelectionMode: widget.isSelectionMode,
-                                isSelected: isSelected,
-                                isCompact: widget.isCompact,
-                                isDetailed: widget.isDetailed,
-                                zoomLevel: _zoomLevel,
-                                detailColumns: widget.detailColumns,
-                                longFileNameMode: widget.longFileNameMode,
-                                searchQuery: widget.searchQuery,
-                                isDocumentProviderMounted:
-                                    widget.isFolderMounted?.call(entry) ??
-                                    false,
-                                isPinned: isPinned,
-                                isBookmark: isBookmark,
-                                isSynced:
-                                    widget.isFolderSynced?.call(entry) ?? false,
-                                container: widget.container,
-                                currentDirPath: widget.currentDirPath,
-                                cacheMode: widget.thumbnailCacheMode,
-                                quality: widget.thumbnailQuality,
-                                showThumbnailPreview: widget.showThumbnails,
-                                showItemActionsMenu: widget.showItemActionsMenu,
-                                onTap: () => widget.onDirTap(entry),
-                                onLongPress: () {},
-                                onMoreTap: widget.onFileLongMenu,
-                                onIconTap: widget.onIconTap == null
-                                    ? null
-                                    : () => widget.onIconTap!(entry),
-                              );
-                            } else {
-                              tile = FileTile(
-                                key: ValueKey(
-                                  'file:${entry.raw}:$isPinned:$isBookmark',
-                                ),
-                                entry: entry,
-                                isSelectionMode: widget.isSelectionMode,
-                                isSelected: isSelected,
-                                isCompact: widget.isCompact,
-                                isDetailed: widget.isDetailed,
-                                zoomLevel: _zoomLevel,
-                                detailColumns: widget.detailColumns,
-                                longFileNameMode: widget.longFileNameMode,
-                                searchQuery: widget.searchQuery,
-                                container: widget.container,
-                                currentDirPath: widget.currentDirPath,
-                                thumbnailCacheMode: widget.thumbnailCacheMode,
-                                thumbnailQuality: widget.thumbnailQuality,
-                                showThumbnail: widget.showThumbnails,
-                                isPinned: isPinned,
-                                isBookmark: isBookmark,
-                                showItemActionsMenu: widget.showItemActionsMenu,
-                                showFileExtensions: widget.showFileExtensions,
-                                onTap: () => widget.onFileTap(entry),
-                                onLongPress: () {},
-                                onLongMenu: widget.onFileLongMenu,
-                                onIconTap: widget.onIconTap == null
-                                    ? null
-                                    : () => widget.onIconTap!(entry),
-                                archiveContext: widget.archiveContext,
-                                archiveRootPath: widget.archiveRootPath,
-                              );
-                            }
-                            return HoldSelectableItem(
-                              key: ValueKey(entry),
-                              index: index,
-                              entry: entry,
-                              child: BrowserItemDragItem(
-                                entry: entry,
-                                container: widget.container,
-                                currentDirectory: widget.currentDirPath,
-                                visibleItems: widget.items,
-                                selectedItems: widget.selectedItems,
-                                isSelectionMode: widget.isSelectionMode,
-                                enabled:
-                                    widget.enableFileDrag &&
-                                    widget.archiveContext == null,
-                                onItemLongPress: widget.onItemLongPress,
-                                onDrop: widget.onFileDrop,
-                                child: tile,
+                        child: widget.groupByDate
+                            ? _buildDateGroupedListView(widget.scrollController)
+                            : _buildListView(
+                                widget.scrollController,
+                                itemExtent,
+                                scrollPhysics,
+                                total,
                               ),
-                            );
-                          },
-                        ),
                       ),
               ),
             ),

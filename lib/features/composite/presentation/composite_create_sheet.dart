@@ -19,6 +19,7 @@ import 'package:vaultexplorer/features/tools/widgets/composite_container_control
 import 'package:vaultexplorer/features/unlock/unlock_sheet.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
+import 'package:vaultexplorer/core/widgets/inputs/utf8_byte_limit_formatter.dart';
 
 enum _CompositeWizStep { carriers, security, advanced, randomness, review }
 
@@ -545,6 +546,7 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
               child: TextField(
                 controller: _passwordController,
                 obscureText: _obscurePassword,
+                inputFormatters: const [Utf8ByteLimitingFormatter(128)],
                 onChanged: (_) => setState(() {}),
                 decoration: InputDecoration(
                   labelText: l10n.passwordFieldLabel,
@@ -571,6 +573,7 @@ class _CompositeCreateSheetState extends ConsumerState<CompositeCreateSheet> {
               child: TextField(
                 controller: _confirmPasswordController,
                 obscureText: _obscureConfirmPassword,
+                inputFormatters: const [Utf8ByteLimitingFormatter(128)],
                 onChanged: (_) => setState(() {}),
                 decoration: InputDecoration(
                   labelText: l10n.confirmPasswordFieldLabelTitleCase,

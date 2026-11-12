@@ -6,9 +6,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:vaultexplorer/core/api/vault_book_api.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
+import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
@@ -24,9 +24,17 @@ import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
+import 'package:vaultexplorer/data/services/media_index/media_index.dart';
+import 'package:vaultexplorer/data/services/media_index/media_index_providers.dart';
+import 'package:vaultexplorer/data/services/media_index/media_index_service.dart';
+import 'package:vaultexplorer/data/services/media_index/media_path_hash.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
+import 'package:vaultexplorer/features/browser/services/category_aggregate_scan.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
+import 'package:vaultexplorer/features/browser/gallery/gallery_layout.dart';
+import 'package:vaultexplorer/features/browser/gallery/gallery_ratio_prefetcher.dart';
+import 'package:vaultexplorer/features/browser/gallery/gallery_sliver.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/widgets/apk_icon_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/archive_thumbnail_support.dart';
@@ -34,6 +42,7 @@ import 'package:vaultexplorer/features/browser/widgets/book_cover_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_item_drag.dart';
 import 'package:vaultexplorer/features/browser/widgets/fast_scrollbar.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_thumbnail_preview.dart';
+import 'package:vaultexplorer/features/browser/widgets/gallery_date_header.dart';
 import 'package:vaultexplorer/features/browser/widgets/grid_card_shell.dart';
 import 'package:vaultexplorer/features/browser/widgets/hold_range_select_container.dart';
 import 'package:vaultexplorer/features/browser/widgets/thumbnail_raw_fallback.dart';
@@ -77,10 +86,34 @@ class FileMasonryView extends ConsumerStatefulWidget {
   final bool Function(RawEntry entry)? isFolderSynced;
   final ScrollController? scrollController;
   final double bottomClearance;
+  final bool groupByDate;
+
+  /// Builds the sections when [groupByDate] is on. Null keeps the day
+  /// sections ([computeDateGroups]); the gallery filter passes its own to
+  /// group by month, folder, place, camera...
+  ///
+  /// The list handed over is already arranged so that each section is one run
+  /// of it, and a new builder only takes effect with a new [items] list.
+  final List<DateGroup<RawEntry>> Function(List<RawEntry> items)? groupBuilder;
 
   final ArchiveContext? archiveContext;
   final String? archiveRootPath;
   final SortBy? sortBy;
+
+  /// Resolves the container an entry lives in, for a listing that gathers
+  /// files from several containers (the category browser). When null every
+  /// entry belongs to [container], as in any ordinary folder listing.
+  final MountedContainer Function(RawEntry entry)? containerFor;
+
+  /// The thumbnail cache policy that applies to an entry, for a listing that
+  /// mixes containers whose owners chose different policies (the category
+  /// browser). When null every entry follows [thumbnailCacheMode].
+  final ThumbnailCacheMode Function(RawEntry entry)? cacheModeFor;
+
+  /// The thumbnail quality that applies to an entry, for a listing that
+  /// mixes containers whose owners chose different qualities (the category
+  /// browser). When null every entry follows [thumbnailQuality].
+  final ThumbnailQuality Function(RawEntry entry)? qualityFor;
 
   const FileMasonryView({
     super.key,
@@ -113,25 +146,158 @@ class FileMasonryView extends ConsumerStatefulWidget {
     this.isFolderSynced,
     this.scrollController,
     this.bottomClearance = 0.0,
+    this.groupByDate = false,
+    this.groupBuilder,
     this.archiveContext,
     this.archiveRootPath,
     this.sortBy,
+    this.containerFor,
+    this.cacheModeFor,
+    this.qualityFor,
   });
 
   @override
-  ConsumerState<FileMasonryView> createState() => _FileMasonryViewState();
+  ConsumerState<FileMasonryView> createState() => FileMasonryViewState();
 }
 
-class _FileMasonryViewState extends ConsumerState<FileMasonryView>
+class FileMasonryViewState extends ConsumerState<FileMasonryView>
     with SingleTickerProviderStateMixin {
+  /// Returns the geometries (top offset and height) in scroll-content coordinates
+  /// for the items at [globalIndices] in `widget.items`.
+  Map<int, ({double top, double height})> geometriesForGlobalIndices(
+    Set<int> globalIndices,
+  ) {
+    final result = <int, ({double top, double height})>{};
+    final model = _host.current;
+    if (model == null || model.childCount == 0 || globalIndices.isEmpty) {
+      return result;
+    }
+
+    final topInset = _groups == null ? 12.0 : 0.0;
+    final childOfItem = model.childOfItem;
+
+    if (_groups == null) {
+      for (final index in globalIndices) {
+        if (index < 0 || index >= childOfItem.length) continue;
+        final child = childOfItem[index];
+        if (child >= 0 && child < model.childCount) {
+          result[index] = (
+            top: topInset + model.tops[child],
+            height: model.heights[child],
+          );
+        }
+      }
+    } else {
+      final global = _displayGlobal;
+      if (global != null) {
+        for (var d = 0; d < global.length; d++) {
+          final gIdx = global[d];
+          if (globalIndices.contains(gIdx) && d < childOfItem.length) {
+            final child = childOfItem[d];
+            if (child >= 0 && child < model.childCount) {
+              result[gIdx] = (
+                top: topInset + model.tops[child],
+                height: model.heights[child],
+              );
+            }
+          }
+        }
+      }
+    }
+    return result;
+  }
+  /// How the masonry view lays tiles out. [GalleryFlow.rows] is the justified
+  /// "mosaic" (every row fills the width, each tile keeps its picture's
+  /// proportions); [GalleryFlow.columns] is the original column-based masonry.
+  /// Everything else in this file works for either.
+  static const GalleryFlow _flow = GalleryFlow.rows;
+
+  MountedContainer _containerOf(RawEntry entry) =>
+      widget.containerFor?.call(entry) ?? widget.container;
+
+  ThumbnailCacheMode _cacheModeOf(RawEntry entry) =>
+      widget.cacheModeFor?.call(entry) ?? widget.thumbnailCacheMode;
+
   Orientation? _lastOrientation;
   late int _columnCount;
   double _baselineScale = 1.0;
   late final ThumbnailCacheService _thumbnailCache;
+  late final GalleryRatioPrefetcher _prefetcher;
+  TextScaler _textScaler = TextScaler.noScaling;
 
-  final Map<String, double> _renderedRatios = {};
-  bool _hasPendingRebuild = false;
-  int? _anchorItemIndex;
+  // ── Display model ──────────────────────────────────────────────────────────
+  // Everything the layout needs, as flat arrays indexed by *display* index (the
+  // order tiles appear in: the items themselves, or the date groups'
+  // concatenation). Rebuilt when the items change, never per frame.
+  final GalleryLayoutHost _host = GalleryLayoutHost(flow: _flow);
+  List<RawEntry> _display = const [];
+
+  /// Display index -> index in `widget.items` (null = identical, no grouping).
+  Int32List? _displayGlobal;
+  List<DateGroup<RawEntry>>? _groups;
+
+  /// 0: icon/folder cell (always square, always captioned); 1: an image whose
+  /// size can be probed from its headers; 2: other media (video, book cover,
+  /// an image inside an archive) whose size is learned from its thumbnail.
+  Uint8List _kind = Uint8List(0);
+  Float32List _ratio = Float32List(0);
+
+  /// 1 once [_ratio] is a real measurement rather than a default.
+  Uint8List _known = Uint8List(0);
+  List<GallerySection> _sections = const [];
+
+  /// Child index -> display index (-1 = a date header); null when ungrouped,
+  /// where child index == display index.
+  Int32List? _childItem;
+  Int32List? _childSection;
+  int _childCount = 0;
+  double _headerExtent = 56.0;
+
+  // ── Ratio learning and reflow ──────────────────────────────────────────────
+  bool _ratiosDirty = false;
+  Timer? _flushTimer;
+  Timer? _followTimer;
+  bool _diskPreloadRunning = false;
+
+  /// Only decide how a reflow is applied (see [GalleryLayoutHost.reflow]);
+  /// nothing in this view waits for them to become false.
+  bool _isScrolling = false;
+
+  /// The scroll handle is held. Dragging it moves the list with `jumpTo`,
+  /// whose scroll notifications start and end within the same call, so
+  /// [_isScrolling] alone never sees it.
+  bool _handleDragging = false;
+
+  /// Set by the scrollbar while the list moves too fast to read. A layout
+  /// change that lands mid-sweep would only reshuffle a blur (at a different
+  /// rate than the scroll itself); it is applied as soon as the speed drops,
+  /// which is well before the scroll stops.
+  final ValueNotifier<bool> _scrollSpeed = ValueNotifier<bool>(false);
+
+  bool get _freezeLayout => _isScrolling || _handleDragging;
+
+  // ── The persisted media index ──────────────────────────────────────────────
+  late final MediaIndexService _index;
+
+  /// Display index -> [MediaPathHash] of the file (media items only).
+  Int64List _pathHash = Int64List(0);
+
+  /// 1 once this item's size is stored in the media index (loaded from it, or
+  /// recorded into it), so a tile that is rebuilt does not look it up again.
+  Uint8List _inIndex = Uint8List(0);
+
+  /// Media items whose real size is not known yet.
+  int _unknownVisuals = 0;
+
+  /// The index of every container shown here has been loaded. Until then the
+  /// view shows nothing (a moment, once per unlock) instead of a layout that
+  /// would reshuffle when the stored sizes arrive.
+  bool _indexReady = false;
+  int _indexGeneration = 0;
+  Map<String, (MountedContainer, ThumbnailCacheMode)> _indexTargets = const {};
+
+  /// Kept for the whole pinch so continuous zooming cannot drift.
+  GalleryAnchor? _zoomAnchor;
 
   /// The scroll offset this view was opened at (going back to a folder),
   /// until it has been reached. See [_restoreInitialScrollOffset].
@@ -142,14 +308,27 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
   late final AnimationController _morphController;
   late Animation<double> _scaleAnimation;
 
+  static const double _kSideInset = 10.0;
+  static const double _kGroupGap = 12.0;
+
+  // Rows can show a wide panorama or a tall portrait without cropping it to
+  // death; the column flow always had a tighter range.
+  static double get _minRatio => _flow == GalleryFlow.rows ? 0.4 : 0.5;
+  static double get _maxRatio => _flow == GalleryFlow.rows ? 3.2 : 2.2;
+  static const _iconRatio = 1.0;
+  static const _imageDefaultRatio = 1.0;
+  static const _videoDefaultRatio = 16.0 / 9.0;
+  // Until a book's cover size is known (and for a book with no cover).
+  static const _bookDefaultRatio = 2.0 / 3.0;
+
   @override
   void initState() {
     super.initState();
     _thumbnailCache = ref.read(thumbnailCacheServiceProvider);
+    _index = ref.read(mediaIndexServiceProvider);
     _columnCount = widget.initialColumns;
-    _prewarmMemoryCache();
-    _preloadDiskAspectRatios();
-    _scheduleInitialScrollOffsetRestore();
+    final fileIoApi = ref.read(vaultFileIoApiProvider);
+    _prefetcher = GalleryRatioPrefetcher(probe: fileIoApi.probeImageDimensions);
 
     _morphController = AnimationController(
       vsync: this,
@@ -157,22 +336,27 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
       value: 1.0,
     );
     _scaleAnimation = const AlwaysStoppedAnimation<double>(1.0);
+
+    _rebuildDisplay();
+    _scheduleInitialScrollOffsetRestore();
+    _afterDisplayRebuilt();
   }
 
   @override
   void dispose() {
+    _prefetcher.stop();
+    _indexGeneration++;
+    _flushTimer?.cancel();
+    _followTimer?.cancel();
+    _scrollSpeed.dispose();
     _morphController.dispose();
     super.dispose();
   }
 
-  /// A masonry grid with more than one column cannot start its first layout
-  /// away from the top: `SliverMasonryGrid` (flutter_staggered_grid_view
-  /// 0.7.0) only knows where a child goes once every child before it has been
-  /// placed, so it corrects an initial offset down to its cache extent
-  /// (letsar/flutter_staggered_grid_view#346). Going back to a folder opens
-  /// it with a controller whose `initialScrollOffset` is where the folder was
-  /// left, so that offset is applied again with `jumpTo` once the grid has
-  /// laid out from the top.
+  /// Going back to a folder opens it with a controller whose
+  /// `initialScrollOffset` is where the folder was left. The layout is exact
+  /// from the first frame, so the offset is normally reached at once; this only
+  /// re-applies it with `jumpTo` if the first layout ended up somewhere else.
   void _scheduleInitialScrollOffsetRestore() {
     final controller = widget.scrollController;
     if (controller == null || controller.hasClients) return;
@@ -193,8 +377,6 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
     var reached = false;
     if (controller.hasClients && controller.position.hasContentDimensions) {
       final position = controller.position;
-      // Past the children laid out so far the extent is only an estimate, so
-      // a target beyond it is approached over the next frames.
       final clamped = math.min(target, position.maxScrollExtent);
       if ((position.pixels - clamped).abs() > 0.5) controller.jumpTo(clamped);
       reached = (target - clamped).abs() <= 0.5;
@@ -210,11 +392,27 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    // Runs for *every* MediaQuery change (the keyboard animating, for one), so
+    // only touch the layout when something it depends on really changed.
+    var layoutInputsChanged = false;
+    final textScaler = MediaQuery.textScalerOf(context);
+    if (textScaler != _textScaler) {
+      _textScaler = textScaler;
+      layoutInputsChanged = true;
+    }
     final orientation = MediaQuery.of(context).orientation;
     if (_lastOrientation != orientation) {
       _columnCount = widget.initialColumns.clamp(_minColumns, _maxColumns);
       _lastOrientation = orientation;
+      layoutInputsChanged = true;
     }
+    final headerExtent = _computeHeaderExtent(context);
+    if (headerExtent != _headerExtent) {
+      _headerExtent = headerExtent;
+      _sections = _buildSections();
+      layoutInputsChanged = true;
+    }
+    if (layoutInputsChanged) _syncHost();
   }
 
   @override
@@ -227,24 +425,570 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
       }
     }
     if (oldWidget.currentDirPath != widget.currentDirPath ||
-        oldWidget.items != widget.items) {
-      _renderedRatios.clear();
-      _prewarmMemoryCache();
-      _preloadDiskAspectRatios();
+        oldWidget.items != widget.items ||
+        oldWidget.groupByDate != widget.groupByDate ||
+        oldWidget.archiveContext != widget.archiveContext) {
+      _rebuildDisplay();
+      _afterDisplayRebuilt();
+    } else if (oldWidget.thumbnailCacheMode != widget.thumbnailCacheMode) {
+      // The caching mode decides whether the media index may be saved.
+      _rebuildDisplay();
+      _afterDisplayRebuilt();
+    } else if (oldWidget.showFileNames != widget.showFileNames ||
+        oldWidget.showItemActionsMenu != widget.showItemActionsMenu ||
+        oldWidget.spacing != widget.spacing ||
+        (oldWidget.onFileLongMenu == null) != (widget.onFileLongMenu == null)) {
+      _syncHost();
     }
   }
 
+  // ── Layout inputs ──────────────────────────────────────────────────────────
+
+  String _fullPathOf(RawEntry entry) {
+    if (entry is CategoryEntry) return entry.path;
+    return widget.currentDirPath.isEmpty
+        ? entry.name
+        : '${widget.currentDirPath}/${entry.name}';
+  }
+
+  int _globalIndexOf(int displayIndex) =>
+      _displayGlobal == null ? displayIndex : _displayGlobal![displayIndex];
+
+  double _clampRatio(double ratio) =>
+      ratio.clamp(_minRatio, _maxRatio).toDouble();
+
+  double _defaultRatioFor(String fileName) {
+    if (MediaViewerConstants.isVideo(fileName)) {
+      return _clampRatio(_videoDefaultRatio);
+    }
+    if (isBookWithCover(fileName)) return _clampRatio(_bookDefaultRatio);
+    return _clampRatio(_imageDefaultRatio);
+  }
+
+  /// Height of the `GridCardShell` footer (the file-name row) under a preview.
+  /// Only an estimate: the card is handed a fixed height and the preview takes
+  /// whatever the real footer leaves.
+  double _footerHeight(double tileWidth) {
+    final lineHeight = _textScaler.scale(16.0);
+    final hasMoreSlot =
+        widget.showItemActionsMenu && widget.onFileLongMenu != null;
+    if (hasMoreSlot) {
+      final compact = tileWidth < 100;
+      final slot = compact ? 24.0 + 8.0 : 28.0 + 6.0;
+      return math.max(slot, lineHeight + 6.0);
+    }
+    return 18.0 + lineHeight;
+  }
+
+  double _footerOf(int displayIndex, double tileWidth) {
+    final showName = _kind[displayIndex] == 0 || widget.showFileNames;
+    return showName ? _footerHeight(tileWidth) : 0.0;
+  }
+
+  double _ratioOf(int displayIndex) => _ratio[displayIndex];
+
+  /// Height of a date header: `GalleryDateHeader`'s padding plus one line of
+  /// the title style, plus a little air above the first row of the day.
+  double _computeHeaderExtent(BuildContext context) =>
+      galleryDateHeaderExtent(context);
+
+  List<GallerySection> _buildSections() {
+    final groups = _groups;
+    if (groups == null) return [GallerySection(itemCount: _display.length)];
+    return [
+      for (final g in groups)
+        GallerySection(itemCount: g.items.length, headerExtent: _headerExtent),
+    ];
+  }
+
+  /// Pushes the view's current settings into the layout host and invalidates it.
+  void _syncHost() {
+    _host
+      ..columnCount = _columnCount
+      ..spacing = widget.spacing
+      ..sectionGap = _groups == null ? 0.0 : _kGroupGap
+      ..minTileWidth = 72.0
+      ..sections = _sections
+      ..ratioOf = _ratioOf
+      ..footerOf = _footerOf
+      ..invalidate();
+  }
+
+  /// Rebuilds every per-item array for the current items. O(items); runs when
+  /// the list changes, never while scrolling.
+  void _rebuildDisplay() {
+    final items = widget.items;
+    List<RawEntry> display;
+    Int32List? global;
+    List<DateGroup<RawEntry>>? groups;
+    if (widget.groupByDate) {
+      groups = (widget.groupBuilder ?? computeDateGroups)(items);
+      display = <RawEntry>[];
+      global = Int32List(items.length);
+      var k = 0;
+      for (final g in groups) {
+        for (var j = 0; j < g.items.length; j++) {
+          display.add(g.items[j]);
+          global[k++] = g.globalIndices[j];
+        }
+      }
+    } else {
+      display = items;
+    }
+    _display = display;
+    _displayGlobal = global;
+    _groups = groups;
+
+    final n = display.length;
+    _kind = Uint8List(n);
+    _ratio = Float32List(n);
+    _known = Uint8List(n);
+    _pathHash = Int64List(n);
+    _inIndex = Uint8List(n);
+    _unknownVisuals = 0;
+
+    // Sizes already learned for this directory: from the media index (valid
+    // only for the file as it is now: same size, same modified time), else
+    // from what this session has seen. One lookup per item, no path strings.
+    final dirState = MediaPathHash.stateOfDir(widget.currentDirPath);
+    final targets = <String, (MountedContainer, ThumbnailCacheMode)>{};
+    final memoryLookups = <String, double? Function(String)>{};
+    for (var i = 0; i < n; i++) {
+      final entry = display[i];
+      if (entry.isDir || !_hasVisualPreview(entry.name)) {
+        _ratio[i] = _iconRatio;
+        _known[i] = 1;
+        continue;
+      }
+      final probeable =
+          widget.archiveContext == null &&
+          MediaViewerConstants.isImage(entry.name);
+      _kind[i] = probeable ? 1 : 2;
+      final container = _containerOf(entry);
+      targets.putIfAbsent(container.uri, () => (container, _cacheModeOf(entry)));
+      final hash = MediaPathHash.ofName(dirState, entry.name);
+      _pathHash[i] = hash;
+
+      final packed = _index.lookup(
+        container,
+        hash,
+        entry.sizeBytes,
+        entry.modifiedSecs,
+      );
+      if (packed != 0) {
+        _ratio[i] = _clampRatio(
+          MediaIndex.widthOf(packed) / MediaIndex.heightOf(packed),
+        );
+        _known[i] = 1;
+        _inIndex[i] = 1;
+        continue;
+      }
+      final lookup = memoryLookups.putIfAbsent(
+        container.uri,
+        () => MediaAspectRatioCache.lookupIn(container, widget.currentDirPath),
+      );
+      final learned = lookup(entry.name);
+      if (learned != null) {
+        _ratio[i] = _clampRatio(learned);
+        _known[i] = 1;
+      } else {
+        _ratio[i] = _defaultRatioFor(entry.name);
+        _unknownVisuals++;
+      }
+    }
+    _indexTargets = targets;
+    _indexReady = targets.values.every((t) => _index.isReady(t.$1));
+
+    // Child index space: a header child per group, then its items.
+    _sections = _buildSections();
+    if (groups == null) {
+      _childItem = null;
+      _childSection = null;
+      _childCount = n;
+    } else {
+      _childCount = n + groups.length;
+      final childItem = Int32List(_childCount);
+      final childSection = Int32List(_childCount);
+      var c = 0;
+      var item = 0;
+      for (var s = 0; s < groups.length; s++) {
+        childItem[c] = -1;
+        childSection[c] = s;
+        c++;
+        for (var j = 0; j < groups[s].items.length; j++) {
+          childItem[c] = item++;
+          childSection[c] = s;
+          c++;
+        }
+      }
+      _childItem = childItem;
+      _childSection = childSection;
+    }
+
+    _ratiosDirty = false;
+    _flushTimer?.cancel();
+    _syncHost();
+  }
+
+  // ── The media index ────────────────────────────────────────────────────────
+
+  /// What the media index may do for [container]: nothing for phone storage
+  /// (it must not get a hidden folder dropped into it), read but not write for
+  /// a read-only vault or when thumbnail caching is off, otherwise read and
+  /// save (inside the vault, see [MediaIndexService]).
+  MediaIndexAccess _indexAccessFor(
+    MountedContainer container,
+    ThumbnailCacheMode mode,
+  ) {
+    if (container.isLocalStorage) return MediaIndexAccess.memoryOnly;
+    if (container.readOnly || mode == ThumbnailCacheMode.disabled) {
+      return MediaIndexAccess.readOnly;
+    }
+    return MediaIndexAccess.readWrite;
+  }
+
+  /// Everything that has to happen after [_rebuildDisplay]: make sure the media
+  /// index of every container shown is loaded (instantly after the first time
+  /// per unlock), then start measuring what it does not know.
+  void _afterDisplayRebuilt() {
+    final generation = ++_indexGeneration;
+    final futures = <Future<void>>[];
+    for (final (container, mode) in _indexTargets.values) {
+      futures.add(_index.attach(container, _indexAccessFor(container, mode)));
+    }
+    if (_indexReady) {
+      _startProbing();
+      _ensureFollowTimer();
+      return;
+    }
+    unawaited(() async {
+      final loaded = Future.wait(futures);
+      // Normally this takes a few milliseconds. If the storage is slow, do not
+      // keep the screen empty: show the layout with default shapes and bring in
+      // the stored sizes (an anchored reflow) when they arrive.
+      final slow = Completer<void>();
+      final timer = Timer(const Duration(milliseconds: 400), () {
+        if (!slow.isCompleted) slow.complete();
+      });
+      await Future.any([loaded, slow.future]);
+      timer.cancel();
+      if (!mounted || generation != _indexGeneration) return;
+      final allLoaded = _indexTargets.values.every((t) => _index.isReady(t.$1));
+      if (allLoaded) {
+        _hydrateFromIndex();
+        _syncHost();
+      }
+      _indexReady = true;
+      setState(() {});
+      if (allLoaded) {
+        _startProbing();
+        _ensureFollowTimer();
+        return;
+      }
+      await loaded;
+      if (!mounted || generation != _indexGeneration) return;
+      _hydrateFromIndex();
+      _ratiosDirty = true;
+      _scheduleFlush();
+      _startProbing();
+      _ensureFollowTimer();
+    }());
+  }
+
+  /// Takes the sizes the index has for items that were built before it was
+  /// loaded.
+  void _hydrateFromIndex() {
+    for (var i = 0; i < _display.length; i++) {
+      if (_kind[i] == 0 || _inIndex[i] == 1) continue;
+      final entry = _display[i];
+      final packed = _index.lookup(
+        _containerOf(entry),
+        _pathHash[i],
+        entry.sizeBytes,
+        entry.modifiedSecs,
+      );
+      if (packed == 0) continue;
+      if (_known[i] == 0) _unknownVisuals--;
+      _ratio[i] = _clampRatio(
+        MediaIndex.widthOf(packed) / MediaIndex.heightOf(packed),
+      );
+      _known[i] = 1;
+      _inIndex[i] = 1;
+    }
+  }
+
+  /// Remembers a measured size for later sessions (and the media viewer).
+  void _remember(
+    int displayIndex,
+    RawEntry entry,
+    MountedContainer container,
+    String fullPath,
+    int width,
+    int height,
+  ) {
+    MediaAspectRatioCache.put(container, fullPath, width, height);
+    final sameEntry =
+        displayIndex >= 0 &&
+        displayIndex < _display.length &&
+        identical(_display[displayIndex], entry);
+    if (sameEntry && _inIndex[displayIndex] == 1) return;
+    final hash = sameEntry
+        ? _pathHash[displayIndex]
+        : MediaPathHash.ofPath(fullPath);
+    _index.record(
+      container,
+      hash,
+      entry.sizeBytes,
+      entry.modifiedSecs,
+      width,
+      height,
+    );
+    if (sameEntry) _inIndex[displayIndex] = 1;
+  }
+
+  // ── Learning ratios ────────────────────────────────────────────────────────
+
+  /// Records a measured size for display item [displayIndex]. Cheap and safe to
+  /// call from `build`: it only updates arrays and schedules a flush.
+  void _applyRatio(int displayIndex, double rawRatio) {
+    if (displayIndex < 0 || displayIndex >= _ratio.length) return;
+    final ratio = _clampRatio(rawRatio);
+    if (_known[displayIndex] == 1 &&
+        (_ratio[displayIndex] - ratio).abs() < 0.004) {
+      return;
+    }
+    if (_known[displayIndex] == 0 && _kind[displayIndex] != 0) {
+      _unknownVisuals--;
+    }
+    _known[displayIndex] = 1;
+    _ratio[displayIndex] = ratio;
+    _ratiosDirty = true;
+    _scheduleFlush();
+  }
+
+  /// A thumbnail finished decoding for [entry]: its size is the truth.
+  void _onSizeKnown(
+    int displayIndex,
+    RawEntry entry,
+    String fullPath,
+    int width,
+    int height, {
+    required MountedContainer container,
+  }) {
+    if (width <= 0 || height <= 0) return;
+    final sameEntry =
+        displayIndex >= 0 &&
+        displayIndex < _display.length &&
+        identical(_display[displayIndex], entry);
+    if (sameEntry && _known[displayIndex] == 1) {
+      // Tiles report their size every time they are built: the common case is
+      // that nothing is new.
+      final same =
+          (_ratio[displayIndex] - _clampRatio(width / height)).abs() < 0.004;
+      if (same && _inIndex[displayIndex] == 1) return;
+      if (!same) _inIndex[displayIndex] = 0;
+    }
+    _remember(displayIndex, entry, container, fullPath, width, height);
+    if (sameEntry) _applyRatio(displayIndex, width / height);
+  }
+
+  /// Sizes from the header probe.
+  void _onProbed(int displayIndex, int width, int height) {
+    if (!mounted || displayIndex >= _display.length) return;
+    final entry = _display[displayIndex];
+    _remember(
+      displayIndex,
+      entry,
+      _containerOf(entry),
+      _fullPathOf(entry),
+      width,
+      height,
+    );
+    _applyRatio(displayIndex, width / height);
+  }
+
+  void _learnFromMemoryCache(int displayIndex, RawEntry entry, String path) {
+    final cached = _thumbnailCache.peekMemoryWithSize(
+      _containerOf(entry),
+      path,
+      widget.thumbnailQuality,
+    );
+    if (cached == null) return;
+    final w = cached.$2;
+    final h = cached.$3;
+    if (w == null || h == null || w <= 0 || h <= 0) return;
+    _remember(displayIndex, entry, _containerOf(entry), path, w, h);
+    _applyRatio(displayIndex, w / h);
+  }
+
+  void _scheduleFlush([Duration delay = const Duration(milliseconds: 100)]) {
+    if (_flushTimer?.isActive ?? false) return;
+    _flushTimer = Timer(delay, _flush);
+  }
+
+  /// Applies the sizes learned since the last flush. Never waits for a scroll
+  /// to end: what is on screen is correct as soon as this runs.
+  ///
+  /// While the user scrolls, the layout is recomputed from the top row on
+  /// screen downwards and everything above keeps its exact position (see
+  /// [GalleryLayoutHost.reflow]): tiles on screen get their right shape at
+  /// once, nothing the user can see moves vertically, and no scroll correction
+  /// is needed (a fling would overwrite one). The rows above are refreshed as
+  /// soon as the scroll stops, with an anchor on the tile at the top of the
+  /// screen, so that pass moves nothing visible either.
+  void _flush() {
+    if (!mounted) return;
+    if (!_ratiosDirty && !_host.hasStalePrefix) return;
+    final width = _host.sliverCrossExtent;
+    if (width <= 0) {
+      _scheduleFlush(const Duration(milliseconds: 60));
+      return;
+    }
+    if (_scrollSpeed.value) {
+      _scheduleFlush(const Duration(milliseconds: 120));
+      return;
+    }
+    final result = _host.reflow(
+      crossExtent: width,
+      freezeAboveViewport: _freezeLayout,
+    );
+    _ratiosDirty = false;
+    if (result == GalleryReflowResult.applied) setState(() {});
+    // Keep refreshing the rows above while scrolling goes on (the top row
+    // moves, and so does the part that is up to date).
+    if (_host.hasStalePrefix) _scheduleFlush(const Duration(milliseconds: 120));
+  }
+
+  // ── Following the viewport ─────────────────────────────────────────────────
+  // Sizes are measured continuously around whatever is on screen: the header
+  // probe has its own follow loop, and this timer covers what it cannot read
+  // (videos, book covers) from thumbnails that already exist. None of it waits
+  // for scrolling to stop.
+  static const _windowBefore = 60;
+  static const _windowAfter = 200;
+
+  int _focusIndex() {
+    final model = _host.current;
+    if (model == null || model.childCount == 0) return 0;
+    var c = model.minChildForOffset(_host.sliverScrollOffset);
+    if (model.itemOfChild[c] < 0 && c + 1 < model.childCount) c++;
+    return math.max(0, model.itemOfChild[c]);
+  }
+
+  void _ensureFollowTimer() {
+    if (_unknownVisuals <= 0) {
+      _followTimer?.cancel();
+      _followTimer = null;
+      return;
+    }
+    _followTimer ??= Timer.periodic(
+      const Duration(milliseconds: 200),
+      (_) => _followTick(),
+    );
+  }
+
+  void _followTick() {
+    if (!mounted) return;
+    if (_unknownVisuals <= 0) {
+      _ensureFollowTimer();
+      return;
+    }
+    final first = _focusIndex();
+    final start = math.max(0, first - _windowBefore);
+    final end = math.min(_display.length, first + _windowAfter);
+    _prewarmMemoryCache(start, end);
+    if (!_diskPreloadRunning) unawaited(_preloadDiskAspectRatios(start, end));
+  }
+
+  void _startProbing() {
+    if (!_indexReady || _display.isEmpty) return;
+    _prefetcher.start(
+      follow: true,
+      itemCount: _display.length,
+      wantsProbe: (i) =>
+          _kind[i] == 1 && _known[i] == 0 && !_display[i].isPlaceholder,
+      targetOf: (i) {
+        final entry = _display[i];
+        return GalleryProbeTarget(_containerOf(entry), _fullPathOf(entry));
+      },
+      focusIndex: _focusIndex,
+      onResult: _onProbed,
+      paused: () => PlaybackThrottleController.isPlaybackActive.value,
+    );
+  }
+
+  void _prewarmMemoryCache(int start, int end) {
+    for (var i = start; i < end; i++) {
+      if (_kind[i] == 0 || _known[i] == 1) continue;
+      final entry = _display[i];
+      _learnFromMemoryCache(i, entry, _fullPathOf(entry));
+    }
+  }
+
+  /// Sizes stored next to already-generated thumbnails, for media the header
+  /// probe cannot read (videos, book covers). Reads are sequential and yield
+  /// between them so frames and real thumbnail requests are not starved.
+  Future<void> _preloadDiskAspectRatios(int start, int end) async {
+    _diskPreloadRunning = true;
+    try {
+      final quality = widget.thumbnailQuality;
+      var sinceYield = 0;
+      for (var i = start; i < end && i < _display.length; i++) {
+        if (_kind[i] != 2 || _known[i] == 1) continue;
+        if (!mounted || PlaybackThrottleController.isPlaybackActive.value) {
+          return;
+        }
+        final entry = _display[i];
+        final mode = _cacheModeOf(entry);
+        if (mode == ThumbnailCacheMode.disabled || entry.isPlaceholder) {
+          continue;
+        }
+        final container = _containerOf(entry);
+        final fullPath = _fullPathOf(entry);
+        try {
+          final cached = await _thumbnailCache.fetchWithSize(
+            container: container,
+            filePath: fullPath,
+            mode: mode,
+            quality: quality,
+          );
+          final w = cached?.$2;
+          final h = cached?.$3;
+          if (w != null && h != null && w > 0 && h > 0) {
+            _onSizeKnown(i, entry, fullPath, w, h, container: container);
+          }
+        } catch (e) {
+          VeLog.w(
+            'FileMasonryView',
+            'Size prefetch failed for ${VeLog.censorName(fullPath)}',
+            e,
+          );
+        }
+        if (++sinceYield >= 4) {
+          sinceYield = 0;
+          await Future<void>.delayed(const Duration(milliseconds: 8));
+        }
+      }
+    } finally {
+      _diskPreloadRunning = false;
+    }
+  }
+
+  // ── Zoom ───────────────────────────────────────────────────────────────────
+
   /// Auto-aware quality for cells built in [build]; see the grid view's
-  /// equivalent. A masonry column is as wide as a grid tile, and items keep
-  /// their own aspect ratio, so the same cell-width rule applies.
-  ThumbnailQuality get _effectiveQuality {
-    final q = widget.thumbnailQuality;
+  /// equivalent. A row's tiles are about one cell high and as wide as their
+  /// picture is, so the cell width is stretched by a typical landscape ratio
+  /// before it is turned into a thumbnail size.
+  ThumbnailQuality _effectiveQualityOf(RawEntry entry) {
+    final q = widget.qualityFor?.call(entry) ?? widget.thumbnailQuality;
     if (!q.auto) return q;
     final width = MediaQuery.sizeOf(context).width;
-    final colWidth =
-        (width - 20 - (_columnCount - 1) * widget.spacing) / _columnCount;
+    final cellWidth =
+        (width - 2 * _kSideInset - (_columnCount - 1) * widget.spacing) /
+        _columnCount;
     return q.resolveForCell(
-      logicalWidth: colWidth,
+      logicalWidth: _flow == GalleryFlow.rows ? cellWidth * 1.5 : cellWidth,
       devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
     );
   }
@@ -263,35 +1007,23 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
 
   void _handleScaleStart(ScaleStartDetails details) {
     _baselineScale = 1.0;
-
-    final controller = widget.scrollController;
-    if (controller != null && controller.hasClients) {
-      final width = MediaQuery.sizeOf(context).width;
-      final colWidth =
-          (width - 20 - (_columnCount - 1) * widget.spacing) / _columnCount;
-      final avgRowHeight = colWidth + 44.0;
-      final viewport = controller.position.viewportDimension;
-      final viewportCenter = controller.offset + (viewport / 2.0);
-      final centerRow = math.max(
-        0,
-        ((viewportCenter - 12.0) / avgRowHeight).round(),
-      );
-      // Lock center item index ONCE for the whole gesture so continuous zooming never drifts to 0
-      _anchorItemIndex = (centerRow * _columnCount).clamp(
-        0,
-        widget.items.length - 1,
-      );
-    }
+    // Pin what is under the fingers for the whole gesture, so continuous
+    // zooming keeps it there instead of drifting (or snapping back to the top).
+    _zoomAnchor = _host.captureAnchorAt(details.localFocalPoint.dy);
   }
 
   void _changeColumns(int newColumns, double newBaseline) {
     HapticFeedback.selectionClick();
 
     final oldColumns = _columnCount;
-    setState(() {
-      _columnCount = newColumns;
-      _baselineScale = newBaseline;
-    });
+    final anchor = _zoomAnchor ?? _host.captureTopAnchor();
+    _columnCount = newColumns;
+    _baselineScale = newBaseline;
+    _host.columnCount = newColumns;
+    _host.invalidate();
+    // Consumed by the sliver's next layout pass: the anchored tile stays put.
+    _host.pendingAnchor = anchor;
+    setState(() {});
     widget.onColumnCountChanged?.call(_columnCount);
 
     // Snappy physical pop — NO black fade, 100% solid & bright at all times!
@@ -302,32 +1034,11 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
       CurvedAnimation(parent: _morphController, curve: Curves.easeOutCubic),
     );
     _morphController.forward(from: 0.0);
-
-    final controller = widget.scrollController;
-    final anchor = _anchorItemIndex;
-    if (controller != null && controller.hasClients && anchor != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!controller.hasClients) return;
-        final width = MediaQuery.sizeOf(context).width;
-        final newColWidth =
-            (width - 20 - (newColumns - 1) * widget.spacing) / newColumns;
-        final newAvgRowHeight = newColWidth + 44.0;
-        final targetRow = anchor ~/ newColumns;
-        final targetRowCenter =
-            12.0 + (targetRow * newAvgRowHeight) + (newAvgRowHeight / 2.0);
-        final viewport = controller.position.viewportDimension;
-        final maxScroll = controller.position.maxScrollExtent;
-        final targetOffset = (targetRowCenter - (viewport / 2.0))
-            .clamp(0.0, math.max<double>(0.0, maxScroll))
-            .toDouble();
-        controller.jumpTo(targetOffset);
-      });
-    }
   }
 
   void _handleScaleUpdate(ScaleUpdateDetails details) {
     if (details.pointerCount < 2) return;
-    if (_anchorItemIndex == null) {
+    if (_zoomAnchor == null) {
       _handleScaleStart(
         ScaleStartDetails(
           focalPoint: details.focalPoint,
@@ -349,163 +1060,88 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
   }
 
   void _handleScaleEnd(ScaleEndDetails details) {
-    _anchorItemIndex = null;
+    _zoomAnchor = null;
   }
 
-  static const _minRatio = 0.5;
-  static const _maxRatio = 2.2;
-  static const _iconRatio = 1.0;
-  static const _videoDefaultRatio = 16.0 / 9.0;
-  // Until a book's cover size is known (and for a book with no cover).
-  static const _bookDefaultRatio = 2.0 / 3.0;
-
-  void _prewarmMemoryCache() {
-    for (final item in widget.items) {
-      if (item.isDir) continue;
-      final fullPath = widget.currentDirPath.isEmpty
-          ? item.name
-          : '${widget.currentDirPath}/${item.name}';
-      if (MediaAspectRatioCache.get(widget.container, fullPath) == null) {
-        final syncEntry = _thumbnailCache.peekMemoryWithSize(
-          widget.container,
-          fullPath,
-          widget.thumbnailQuality,
-        );
-        if (syncEntry != null && syncEntry.$2 != null && syncEntry.$3 != null) {
-          final w = syncEntry.$2!;
-          final h = syncEntry.$3!;
-          if (w > 0 && h > 0) {
-            MediaAspectRatioCache.put(widget.container, fullPath, w, h);
-          }
-        }
-      }
+  void _onHandleDragChanged(bool dragging) {
+    _handleDragging = dragging;
+    if (!dragging && (_ratiosDirty || _host.hasStalePrefix)) {
+      // Let go: bring the rows above the screen up to date, anchored.
+      _scheduleFlush(const Duration(milliseconds: 30));
     }
-  }
-
-  Future<void> _preloadDiskAspectRatios() async {
-    if (widget.thumbnailCacheMode == ThumbnailCacheMode.disabled) return;
-
-    final container = widget.container;
-    final dirPath = widget.currentDirPath;
-    final quality = widget.thumbnailQuality;
-    final mode = widget.thumbnailCacheMode;
-
-    final mediaItems = widget.items
-        .where((e) => !e.isDir && _hasVisualPreview(e.name))
-        .toList();
-    if (mediaItems.isEmpty) return;
-
-    for (final entry in mediaItems) {
-      if (!mounted || PlaybackThrottleController.isPlaybackActive.value) {
-        return;
-      }
-      final fullPath = dirPath.isEmpty ? entry.name : '$dirPath/${entry.name}';
-      if (MediaAspectRatioCache.get(container, fullPath) != null) continue;
-
-      try {
-        final cached = await _thumbnailCache.fetchWithSize(
-          container: container,
-          filePath: fullPath,
-          mode: mode,
-          quality: quality,
-        );
-        if (cached != null && cached.$2 != null && cached.$3 != null) {
-          _onSizeKnown(fullPath, cached.$2!, cached.$3!);
-        }
-      } catch (e) {
-        VeLog.w(
-          'FileMasonryView',
-          'Size prefetch failed for ${VeLog.censorName(fullPath)}',
-          e,
-        );
-      }
-    }
-  }
-
-  double _defaultRatioFor(String fileName) {
-    if (MediaViewerConstants.isVideo(fileName)) {
-      return _videoDefaultRatio.clamp(_minRatio, _maxRatio);
-    }
-    if (isBookWithCover(fileName)) {
-      return _bookDefaultRatio.clamp(_minRatio, _maxRatio);
-    }
-    return _iconRatio;
-  }
-
-  double _aspectRatioFor(
-    RawEntry entry,
-    String fullPath, {
-    required bool hasVisualPreview,
-  }) {
-    if (!hasVisualPreview) {
-      _renderedRatios[fullPath] = _iconRatio;
-      return _iconRatio;
-    }
-
-    double? decoded = MediaAspectRatioCache.get(widget.container, fullPath);
-
-    if (decoded == null) {
-      final syncEntry = _thumbnailCache.peekMemoryWithSize(
-        widget.container,
-        fullPath,
-        widget.thumbnailQuality,
-      );
-      if (syncEntry != null && syncEntry.$2 != null && syncEntry.$3 != null) {
-        final w = syncEntry.$2!;
-        final h = syncEntry.$3!;
-        if (w > 0 && h > 0) {
-          MediaAspectRatioCache.put(widget.container, fullPath, w, h);
-          decoded = w / h;
-        }
-      }
-    }
-
-    final ratioToUse = (decoded ?? _defaultRatioFor(entry.name))
-        .clamp(_minRatio, _maxRatio)
-        .toDouble();
-
-    _renderedRatios[fullPath] = ratioToUse;
-    return ratioToUse;
-  }
-
-  void _onSizeKnown(String fullPath, int width, int height) {
-    if (width <= 0 || height <= 0) return;
-
-    final ratio = (width / height).clamp(_minRatio, _maxRatio).toDouble();
-    MediaAspectRatioCache.put(widget.container, fullPath, width, height);
-
-    final renderedRatio = _renderedRatios[fullPath];
-    if (renderedRatio == ratio) return;
-
-    _renderedRatios[fullPath] = ratio;
-    _scheduleRebuild();
-  }
-
-  void _scheduleRebuild() {
-    if (_hasPendingRebuild) return;
-    _hasPendingRebuild = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _hasPendingRebuild = false;
-        setState(() {});
-      } else {
-        _hasPendingRebuild = false;
-      }
-    });
   }
 
   bool _onScrollNotification(ScrollNotification notification) {
-    if (notification is ScrollUpdateNotification) {
-      final delta = notification.scrollDelta?.abs() ?? 0.0;
-      if (delta > 25.0) {
-        ThumbnailConcurrency.imageLimiter.cancelTier(TaskPriority.visible);
-        ThumbnailConcurrency.videoLimiter.cancelTier(TaskPriority.visible);
+    // Tiles that scroll out of the viewport are disposed, which already
+    // drops their *queued* request. (Cancelling the whole visible tier here
+    // also cancelled tiles that were still on screen, which then retried
+    // together and, after enough cancellations, showed the error icon.)
+    if (notification.depth != 0) return false;
+    if (notification is ScrollStartNotification) {
+      _isScrolling = true;
+    } else if (notification is ScrollEndNotification) {
+      _isScrolling = false;
+      // The rows above the screen may be out of date (see _flush): bring them
+      // up to date now that it can be done without anything visible moving.
+      if (_ratiosDirty || _host.hasStalePrefix) {
+        _scheduleFlush(const Duration(milliseconds: 30));
       }
     }
     return false;
   }
 
-  Widget _buildAnimatedMasonryView(ScrollController? controller, int total) {
+  // ── Building ───────────────────────────────────────────────────────────────
+
+  Widget _buildItemCell(BuildContext context, int displayIndex) {
+    final entry = _display[displayIndex];
+    final fullPath = _fullPathOf(entry);
+    if (_kind[displayIndex] != 0 && _known[displayIndex] == 0) {
+      _learnFromMemoryCache(displayIndex, entry, fullPath);
+    }
+
+    final cell = entry.isDir
+        ? _buildDirCell(context, entry, fullPath)
+        : _buildFileCell(context, displayIndex, entry, fullPath);
+
+    return HoldSelectableItem(
+      index: _globalIndexOf(displayIndex),
+      entry: entry,
+      child: BrowserItemDragItem(
+        entry: entry,
+        container: _containerOf(entry),
+        currentDirectory: widget.currentDirPath,
+        visibleItems: widget.items,
+        selectedItems: widget.selectedItems,
+        isSelectionMode: widget.isSelectionMode,
+        enabled: widget.enableFileDrag && widget.archiveContext == null,
+        onItemLongPress: widget.onItemLongPress,
+        onDrop: widget.onFileDrop,
+        child: cell,
+      ),
+    );
+  }
+
+  Widget _buildChild(BuildContext context, int child) {
+    final childItem = _childItem;
+    if (childItem == null) return _buildItemCell(context, child);
+    final displayIndex = childItem[child];
+    if (displayIndex >= 0) return _buildItemCell(context, displayIndex);
+    final group = _groups![_childSection![child]];
+    return Align(
+      key: ValueKey('gallery_header:${_childSection![child]}'),
+      alignment: Alignment.topLeft,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: GalleryDateHeader(
+          title: group.label ?? formatDateGroupHeader(group.date, context),
+          count: group.items.length,
+          horizontalPadding: 16.0 - _kSideInset,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScrollView(ScrollController? controller) {
     return AnimatedBuilder(
       animation: _morphController,
       builder: (context, child) {
@@ -517,52 +1153,33 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
           ),
         );
       },
-      child: MasonryGridView.count(
+      child: CustomScrollView(
         controller: controller,
-        crossAxisCount: _columnCount,
+        cacheExtent: MediaQuery.sizeOf(context).height * 1.5,
         physics:
             const AlwaysScrollableScrollPhysics(), // Native physics that cannot freeze
-        mainAxisSpacing: widget.spacing,
-        crossAxisSpacing: widget.spacing,
-        cacheExtent: 800,
-        padding: EdgeInsets.fromLTRB(10, 12, 10, widget.bottomClearance),
-        itemCount: total,
-        itemBuilder: (context, i) {
-          final entry = widget.items[i];
-          final isDir = entry.isDir;
-          final isPinned = widget.isPinned?.call(entry) ?? false;
-          final isBookmark = widget.isBookmark?.call(entry) ?? false;
-          final fullPath = widget.currentDirPath.isEmpty
-              ? entry.name
-              : '${widget.currentDirPath}/${entry.name}';
-          final hasVisualPreview = !isDir && _hasVisualPreview(entry.name);
-          final ratio = _aspectRatioFor(
-            entry,
-            fullPath,
-            hasVisualPreview: hasVisualPreview,
-          );
-
-          final cell = isDir
-              ? _buildDirCell(context, entry, fullPath, ratio)
-              : _buildFileCell(context, entry, fullPath, ratio);
-
-          return HoldSelectableItem(
-            index: i,
-            entry: entry,
-            child: BrowserItemDragItem(
-              entry: entry,
-              container: widget.container,
-              currentDirectory: widget.currentDirPath,
-              visibleItems: widget.items,
-              selectedItems: widget.selectedItems,
-              isSelectionMode: widget.isSelectionMode,
-              enabled: widget.enableFileDrag && widget.archiveContext == null,
-              onItemLongPress: widget.onItemLongPress,
-              onDrop: widget.onFileDrop,
-              child: cell,
+        slivers: [
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(
+              _kSideInset,
+              // A date header brings its own air above it.
+              _groups == null ? 12 : 0,
+              _kSideInset,
+              // The last group's gap is not part of the sliver's extent.
+              widget.bottomClearance + (_groups == null ? 0 : _kGroupGap),
             ),
-          );
-        },
+            // One sliver for every date group, headers included: see
+            // GallerySliverGrid for why a sliver per group does not scale.
+            sliver: GallerySliverGrid(
+              host: _host,
+              delegate: SliverChildBuilderDelegate(
+                _buildChild,
+                childCount: _childCount,
+                addAutomaticKeepAlives: false,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -571,6 +1188,9 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
   Widget build(BuildContext context) {
     final total = widget.items.length;
     if (total == 0) return const SizedBox.shrink();
+    // The stored sizes of the media index are on their way (a moment, once per
+    // unlock): a layout built without them would only be redone.
+    if (!_indexReady) return const SizedBox.shrink();
 
     return HoldRangeSelectContainer(
       items: widget.items,
@@ -586,19 +1206,18 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
       child: NotificationListener<ScrollNotification>(
         onNotification: _onScrollNotification,
         child: widget.scrollController == null
-            ? _buildAnimatedMasonryView(null, total)
+            ? _buildScrollView(null)
             : FastScrollbar(
                 controller: widget.scrollController!,
+                scrollSpeed: _scrollSpeed,
+                onDragStateChanged: _onHandleDragChanged,
                 items: widget.items,
                 sortBy: widget.sortBy,
                 padding: EdgeInsets.only(
                   top: 12,
                   bottom: widget.bottomClearance,
                 ),
-                child: _buildAnimatedMasonryView(
-                  widget.scrollController,
-                  total,
-                ),
+                child: _buildScrollView(widget.scrollController),
               ),
       ),
     );
@@ -620,12 +1239,7 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
         MediaViewerConstants.isVideo(fileName);
   }
 
-  Widget _buildDirCell(
-    BuildContext context,
-    RawEntry entry,
-    String fullPath,
-    double ratio,
-  ) {
+  Widget _buildDirCell(BuildContext context, RawEntry entry, String fullPath) {
     final isSelected = widget.selectedItems.contains(entry);
     final cs = Theme.of(context).colorScheme;
     final isMounted = widget.mountedFolderPaths.contains(fullPath);
@@ -647,7 +1261,8 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
       key: ValueKey(
         'dir:$fullPath:${widget.isPinned?.call(entry)}:${widget.isBookmark?.call(entry)}:$isMounted',
       ),
-      aspectRatio: ratio,
+      // The gallery layout hands the card a fixed height.
+      aspectRatio: null,
       cardColor: GridCardUtils.folderCardColor(cs, isMounted: false),
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
@@ -672,11 +1287,11 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
       preview: entry.isPlaceholder
           ? Center(child: folderIcon)
           : FolderThumbnailPreview(
-              key: ValueKey('folder_preview:${widget.container.uri}:$fullPath'),
-              container: widget.container,
+              key: ValueKey('folder_preview:${_containerOf(entry).uri}:$fullPath'),
+              container: _containerOf(entry),
               folderPath: fullPath,
-              cacheMode: widget.thumbnailCacheMode,
-              quality: _effectiveQuality,
+              cacheMode: _cacheModeOf(entry),
+              quality: _effectiveQualityOf(entry),
               iconSize: iconSize,
               child: folderIcon,
             ),
@@ -687,11 +1302,13 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
 
   Widget _buildFileCell(
     BuildContext context,
+    int displayIndex,
     RawEntry entry,
     String fullPath,
-    double ratio,
   ) {
     final cs = Theme.of(context).colorScheme;
+    final container = _containerOf(entry);
+    final cacheMode = _cacheModeOf(entry);
     final cleanName = entry.name;
     final isSelected = widget.selectedItems.contains(entry);
     String displayName = cleanName;
@@ -738,15 +1355,24 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
       );
     } else if (isImg) {
       previewWidget = Hero(
-        tag: 'media_hero_${widget.container.volId}_$fullPath',
+        tag: 'media_hero_${container.volId}_$fullPath',
+        createRectTween: (begin, end) =>
+            MaterialRectArcTween(begin: begin, end: end),
         child: Material(
           type: MaterialType.transparency,
           child: _EncryptedImageMasonryThumb(
-            container: widget.container,
+            container: container,
             filePath: fullPath,
-            cacheMode: widget.thumbnailCacheMode,
-            quality: _effectiveQuality,
-            onSizeKnown: (w, h) => _onSizeKnown(fullPath, w, h),
+            cacheMode: cacheMode,
+            quality: _effectiveQualityOf(entry),
+            onSizeKnown: (w, h) => _onSizeKnown(
+              displayIndex,
+              entry,
+              fullPath,
+              w,
+              h,
+              container: container,
+            ),
             archiveContext: widget.archiveContext,
             archiveRootPath: widget.archiveRootPath,
           ),
@@ -754,15 +1380,24 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
       );
     } else if (isVid) {
       previewWidget = Hero(
-        tag: 'media_hero_${widget.container.volId}_$fullPath',
+        tag: 'media_hero_${container.volId}_$fullPath',
+        createRectTween: (begin, end) =>
+            MaterialRectArcTween(begin: begin, end: end),
         child: Material(
           type: MaterialType.transparency,
           child: _VideoMasonryThumb(
-            container: widget.container,
+            container: container,
             filePath: fullPath,
-            cacheMode: widget.thumbnailCacheMode,
-            quality: _effectiveQuality,
-            onSizeKnown: (w, h) => _onSizeKnown(fullPath, w, h),
+            cacheMode: cacheMode,
+            quality: _effectiveQualityOf(entry),
+            onSizeKnown: (w, h) => _onSizeKnown(
+              displayIndex,
+              entry,
+              fullPath,
+              w,
+              h,
+              container: container,
+            ),
             archiveContext: widget.archiveContext,
             archiveRootPath: widget.archiveRootPath,
           ),
@@ -774,10 +1409,10 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
           width: iconSize,
           height: iconSize,
           child: _ApkIconMasonryThumb(
-            container: widget.container,
+            container: container,
             filePath: fullPath,
-            cacheMode: widget.thumbnailCacheMode,
-            quality: _effectiveQuality,
+            cacheMode: cacheMode,
+            quality: _effectiveQualityOf(entry),
             fallbackIcon: skin.fileIcon(cleanName),
             fallbackColor: skin.fileIconColor(cs, cleanName),
             fallbackIconSize: iconSize,
@@ -786,11 +1421,18 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
       );
     } else if (isBook && widget.archiveContext == null) {
       previewWidget = _BookCoverMasonryThumb(
-        container: widget.container,
+        container: container,
         filePath: fullPath,
-        cacheMode: widget.thumbnailCacheMode,
-        quality: _effectiveQuality,
-        onSizeKnown: (w, h) => _onSizeKnown(fullPath, w, h),
+        cacheMode: cacheMode,
+        quality: _effectiveQualityOf(entry),
+        onSizeKnown: (w, h) => _onSizeKnown(
+          displayIndex,
+          entry,
+          fullPath,
+          w,
+          h,
+          container: container,
+        ),
         fallbackIcon: skin.fileIcon(cleanName),
         fallbackColor: skin.fileIconColor(cs, cleanName),
         fallbackIconSize: iconSize,
@@ -810,7 +1452,8 @@ class _FileMasonryViewState extends ConsumerState<FileMasonryView>
       key: ValueKey(
         'file:$fullPath:${widget.isPinned?.call(entry)}:${widget.isBookmark?.call(entry)}',
       ),
-      aspectRatio: ratio,
+      // The gallery layout hands the card a fixed height.
+      aspectRatio: null,
       cardColor: GridCardUtils.folderCardColor(cs, isMounted: false),
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
@@ -846,7 +1489,6 @@ class _EncryptedImageMasonryThumb extends ConsumerWidget {
   final String? archiveRootPath;
 
   const _EncryptedImageMasonryThumb({
-    super.key,
     required this.container,
     required this.filePath,
     required this.cacheMode,
@@ -1002,7 +1644,7 @@ class _EncryptedImageMasonryThumb extends ConsumerWidget {
         archiveContext,
         archiveRootPath,
       ),
-      debounce: const Duration(milliseconds: 100),
+      debounce: const Duration(milliseconds: 30),
       syncLookup: () => syncBytes,
       cacheHeight: quality.scaledSize(180),
       imageBuilder: (context, bytes, cacheHeight) => Image.memory(
@@ -1013,17 +1655,8 @@ class _EncryptedImageMasonryThumb extends ConsumerWidget {
       ),
       loadingBuilder: (context) => Container(
         color: cs.surfaceContainerLow,
-        child: Center(
-          child: SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(
-              strokeWidth: 1.5,
-              color: cs.primary.withValues(alpha: 0.6),
-            ),
-          ),
+        child: const SizedBox.expand(),
         ),
-      ),
       errorBuilder: (context) => _errorPlaceholder(cs),
     );
   }
@@ -1050,7 +1683,6 @@ class _VideoMasonryThumb extends ConsumerWidget {
   final String? archiveRootPath;
 
   const _VideoMasonryThumb({
-    super.key,
     required this.container,
     required this.filePath,
     required this.cacheMode,
@@ -1148,7 +1780,7 @@ class _VideoMasonryThumb extends ConsumerWidget {
             archiveContext,
             archiveRootPath,
           ),
-          debounce: const Duration(milliseconds: 150),
+          debounce: const Duration(milliseconds: 60),
           syncLookup: () => syncBytes,
           cacheHeight: quality.scaledSize(180),
           imageBuilder: (context, bytes, cacheHeight) => Image.memory(
@@ -1159,17 +1791,8 @@ class _VideoMasonryThumb extends ConsumerWidget {
           ),
           loadingBuilder: (context) => Container(
             color: cs.surfaceContainerLow,
-            child: Center(
-              child: SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 1.5,
-                  color: cs.primary.withValues(alpha: 0.6),
-                ),
-              ),
+            child: const SizedBox.expand(),
             ),
-          ),
           errorBuilder: (context) => _errorPlaceholder(cs),
         ),
         Align(
@@ -1270,7 +1893,7 @@ class _ApkIconMasonryThumb extends ConsumerWidget {
       quality: quality,
       fetchFn: (c, p) =>
           _fetch(thumbnailCache, fileIoApi, c, p, cacheMode, quality),
-      debounce: const Duration(milliseconds: 100),
+      debounce: const Duration(milliseconds: 30),
       syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
       cacheHeight: quality.scaledSize(180),
       imageBuilder: (context, bytes, cacheHeight) => Image.memory(
@@ -1279,16 +1902,7 @@ class _ApkIconMasonryThumb extends ConsumerWidget {
         cacheHeight: cacheHeight,
         errorBuilder: (_, _, _) => _fallbackWidget(),
       ),
-      loadingBuilder: (context) => Center(
-        child: SizedBox(
-          width: 18,
-          height: 18,
-          child: CircularProgressIndicator(
-            strokeWidth: 1.5,
-            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.6),
-          ),
-        ),
-      ),
+      loadingBuilder: (context) => const SizedBox.expand(),
       errorBuilder: (context) => _fallbackWidget(),
     );
   }
@@ -1363,7 +1977,7 @@ class _BookCoverMasonryThumb extends ConsumerWidget {
         }
         return thumb.bytes;
       },
-      debounce: const Duration(milliseconds: 100),
+      debounce: const Duration(milliseconds: 30),
       syncLookup: () => syncBytes,
       cacheHeight: quality.scaledSize(180),
       imageBuilder: (context, bytes, cacheHeight) => Image.memory(

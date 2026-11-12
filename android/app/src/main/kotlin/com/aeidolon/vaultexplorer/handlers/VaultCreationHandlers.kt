@@ -296,6 +296,9 @@ class VaultCreationHandlers(
             com.aeidolon.vaultexplorer.gocryptfs.GocryptfsCipher.AES_256_GCM
         }
         val userEntropy = call.argument<ByteArray>("userEntropy")
+        // Both optional: callers from before these options existed omit them.
+        val deterministicNames = call.argument<Boolean>("deterministicNames") ?: false
+        val longNameMax = call.argument<Number>("longNameMax")?.toInt() ?: 0
         if (uriString == null || password.isEmpty()) {
             userEntropy?.fill(0)
             result.error("INVALID_ARGS", "filePath and password required", null)
@@ -307,7 +310,8 @@ class VaultCreationHandlers(
                 val passwordChars = password.toCharArray()
                 val createResult = try {
                     com.aeidolon.vaultexplorer.gocryptfs.GocryptfsVault.create(
-                        activity, uri, passwordChars, cipher, userEntropy = userEntropy
+                        activity, uri, passwordChars, cipher, userEntropy = userEntropy,
+                        deterministicNames = deterministicNames, longNameMax = longNameMax,
                     )
                 } finally {
                     passwordChars.fill('\u0000')

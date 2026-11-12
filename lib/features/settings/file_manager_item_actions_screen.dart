@@ -6,7 +6,7 @@ import 'package:vaultexplorer/data/models/file_item_action.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 
 /// Lets the user choose which item actions are shown, and in what order, in
-/// the item actions sheet and the selection bar's overflow menu.
+/// the item actions sheet and the selection bar.
 ///
 /// The quick actions (the sheet's horizontal row) and the menu list are
 /// ordered separately, mirroring how the sheet lays them out, and an action can

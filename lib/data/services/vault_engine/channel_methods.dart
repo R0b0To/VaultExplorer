@@ -46,6 +46,7 @@ abstract final class ChannelMethods {
   static const createCryptomatorVault = 'createCryptomatorVault';
   static const changeCryptomatorVaultPassword =
       'changeCryptomatorVaultPassword';
+  static const migrateCryptomatorVault = 'migrateCryptomatorVault';
   static const pickGocryptfsVault = 'pickGocryptfsVault';
   static const unlockGocryptfsVault = 'unlockGocryptfsVault';
   static const createGocryptfsVault = 'createGocryptfsVault';
@@ -113,6 +114,9 @@ abstract final class ChannelMethods {
   static const finishHashSession = 'finishHashSession';
   static const discardHashSession = 'discardHashSession';
   static const listDirectory = 'listDirectory';
+  static const listVaultSymlinks = 'listVaultSymlinks';
+  static const readVaultSymlink = 'readVaultSymlink';
+  static const getHiddenEntryCount = 'getHiddenEntryCount';
   static const createDirectory = 'createDirectory';
   static const renameFile = 'renameFile';
   static const copyFile = 'copyFile';
@@ -126,9 +130,11 @@ abstract final class ChannelMethods {
   static const openLocalFileWithApp = 'openLocalFileWithApp';
   static const getLocalFileUri = 'getLocalFileUri';
   static const shareLocalFile = 'shareLocalFile';
+  static const queryCategoryIndex = 'queryCategoryIndex';
   static const getVideoThumbnail = 'getVideoThumbnail';
   static const getImageThumbnail = 'getImageThumbnail';
   static const getImageThumbnailWithSize = 'getImageThumbnailWithSize';
+  static const probeImageDimensions = 'probeImageDimensions';
   static const getVideoThumbnailWithSize = 'getVideoThumbnailWithSize';
   static const getApkIcon = 'getApkIcon';
   static const encodeImage = 'encodeImage';
@@ -234,6 +240,9 @@ abstract final class ChannelMethods {
   // Header Backup tool.
   static const exportContainerHeader = 'exportContainerHeader';
   static const restoreContainerHeaderRegion = 'restoreContainerHeaderRegion';
+  static const expandVeraCryptContainer = 'expandVeraCryptContainer';
+  static const analyzeHiddenVolumeHost = 'analyzeHiddenVolumeHost';
+  static const createHiddenVolumeInExisting = 'createHiddenVolumeInExisting';
   static const resolveFolderVaultConfigFile = 'resolveFolderVaultConfigFile';
   static const restoreFolderVaultConfig = 'restoreFolderVaultConfig';
 

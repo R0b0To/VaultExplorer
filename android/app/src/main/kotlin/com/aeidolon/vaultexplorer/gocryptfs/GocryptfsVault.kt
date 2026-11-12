@@ -2,27 +2,22 @@ package com.aeidolon.vaultexplorer.gocryptfs
 
 import android.content.Context
 import android.net.Uri
-import android.util.Base64
 import androidx.documentfile.provider.DocumentFile
-import com.aeidolon.vaultexplorer.RawFileResolver
-import com.aeidolon.vaultexplorer.VeLog
+import com.aeidolon.vaultexplorer.engine.VaultOpenResult
+import com.aeidolon.vaultexplorer.foldervault.FolderVaultOpener
+import com.aeidolon.vaultexplorer.foldervault.NativeFolderVault
 import com.aeidolon.vaultexplorer.saf.SafDocumentOps
-import com.aeidolon.vaultexplorer.saf.SafIOException
-import com.aeidolon.vaultexplorer.util.UserEntropy
-import org.json.JSONArray
-import org.json.JSONObject
-import java.security.SecureRandom
 
+/**
+ * Entry points for gocryptfs vaults: probe, open, create, change password.
+ *
+ * The format itself (config + scrypt/HKDF, EME file names, AES-256-GCM /
+ * XChaCha20-Poly1305 / AES-SIV content, long names) lives in the native core
+ * (cpp/foldervault/fv_gocryptfs*.cpp); [FolderVaultOpener] decides where the
+ * vault's files are read from.
+ */
 object GocryptfsVault {
-    private const val TAG = "GocryptfsVault"
     private const val CONFIG_FILE_NAME = "gocryptfs.conf"
-    private const val MASTERKEY_LEN = 32
-    private const val SCRYPT_SALT_LEN = 32
-    private const val DEFAULT_SCRYPT_LOG_N = 16
-    private const val DEFAULT_SCRYPT_N = 1 shl DEFAULT_SCRYPT_LOG_N
-    private const val DEFAULT_SCRYPT_R = 8
-    private const val DEFAULT_SCRYPT_P = 1
-    private const val CONFIG_VERSION = 2
 
     fun looksLikeVault(context: Context, treeUri: Uri): Boolean {
         val root = DocumentFile.fromTreeUri(context, treeUri) ?: return false
@@ -30,159 +25,11 @@ object GocryptfsVault {
         return saf.childOf(root, CONFIG_FILE_NAME) != null
     }
 
-    private fun readConfigBytes(context: Context, root: DocumentFile): ByteArray? {
-        val saf = SafDocumentOps(context)
-        val configDoc = saf.childOf(root, CONFIG_FILE_NAME) ?: return null
-        return context.contentResolver.openInputStream(configDoc.uri)?.use { it.readBytes() }
-    }
+    fun open(context: Context, vaultRootUri: Uri, password: CharArray, readOnly: Boolean): VaultOpenResult<GocryptfsSession> =
+        FolderVaultOpener.open(
+            context, vaultRootUri, NativeFolderVault.GOCRYPTFS, CONFIG_FILE_NAME, password, null, readOnly,
+        ) { handle, volRef -> GocryptfsSession(context, vaultRootUri, handle, readOnly, volRef) }
 
-    /**
-     * Whether this vault's folder can really be read through a raw
-     * `java.io.File` path -- not merely whether the storage-permission
-     * heuristics in [RawFileResolver.getRawFileFromUri] say so. See
-     * [RawFileResolver.getVerifiedRawVaultRoot]: when the heuristics are
-     * wrong the first raw open of gocryptfs.conf fails with EACCES, and
-     * everything for this vault must then go through SAF / the mirror.
-     *
-     * [probeWrite] also checks that a file can be staged in the folder;
-     * a read-only open passes false so it never touches the vault folder.
-     */
-    private fun rawAccessVerified(context: Context, vaultRootUri: Uri, probeWrite: Boolean = true): Boolean =
-        RawFileResolver.getVerifiedRawVaultRoot(context, vaultRootUri, CONFIG_FILE_NAME, probeWrite) != null
-
-    private fun buildVaultDocOps(
-        context: Context,
-        vaultRootUri: Uri,
-        useRaw: Boolean,
-    ): Pair<com.aeidolon.vaultexplorer.saf.MirrorSyncCoordinator?, com.aeidolon.vaultexplorer.saf.VaultDocumentOps> {
-        val mirrorSync = if (!useRaw) {
-            // The mirror's view of the REAL tree must stay on SAF too:
-            // if raw access was refused (or failed its probe) it must not
-            // sneak back in through the pull/push of the real documents.
-            val realOps = SafDocumentOps(context, allowRaw = false)
-            com.aeidolon.vaultexplorer.saf.MirrorSyncCoordinator(
-                context = context,
-                sessionTag = java.util.UUID.randomUUID().toString(),
-                realOps = realOps,
-            ).also { coordinator ->
-                try {
-                    val realRoot = DocumentFile.fromTreeUri(context, vaultRootUri)
-                        ?: run {
-                            val msg = "Cannot open vault root: $vaultRootUri"
-                            VeLog.e(TAG) { msg }
-                            throw com.aeidolon.vaultexplorer.engine.VaultIOException(msg)
-                        }
-                    coordinator.reset(realRoot)
-                } catch (e: Exception) {
-                    // The coordinator only escapes this function through the
-                    // return value below, so if setup throws nobody else
-                    // holds a reference to tear it down -- and reset() may
-                    // already have created the mirror folder. Clean it up
-                    // here rather than leaving it for the next launch's
-                    // orphan sweep, then let the caller handle the failure.
-                    runCatching { coordinator.teardown() }
-                    throw e
-                }
-            }
-        } else null
-        val vaultDocOps: com.aeidolon.vaultexplorer.saf.VaultDocumentOps =
-            mirrorSync?.let { com.aeidolon.vaultexplorer.saf.MirroredSafDocumentOps(context, it) }
-                ?: SafDocumentOps(context)
-        return mirrorSync to vaultDocOps
-    }
-
-    fun open(context: Context, vaultRootUri: Uri, password: CharArray, readOnly: Boolean): com.aeidolon.vaultexplorer.engine.VaultOpenResult<GocryptfsSession> {
-        val root = DocumentFile.fromTreeUri(context, vaultRootUri)
-            ?: run {
-                VeLog.e(TAG) { "open failed: Cannot access folder URI $vaultRootUri" }
-                return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Cannot access the selected folder.")
-            }
-        val useRaw = rawAccessVerified(context, vaultRootUri, probeWrite = !readOnly)
-        val saf = SafDocumentOps(context, allowRaw = useRaw)
-        val configDoc = saf.childOf(root, CONFIG_FILE_NAME)
-            ?: run {
-                VeLog.e(TAG) { "open failed: Missing gocryptfs.conf in $vaultRootUri" }
-                return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("No gocryptfs.conf found — this doesn't look like a gocryptfs vault.")
-            }
-        
-        val configBytes = try {
-            context.contentResolver.openInputStream(configDoc.uri)?.use { it.readBytes() }
-        } catch (e: Exception) {
-            // A file-backed document is opened with a plain java.io open
-            // under the hood, so a permission problem surfaces here as an
-            // exception rather than a null stream.
-            VeLog.e(TAG, e) { "open failed: Exception reading gocryptfs.conf at ${configDoc.uri}: ${e.message}" }
-            return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Could not read gocryptfs.conf: ${e.message}")
-        } ?: run {
-            VeLog.e(TAG) { "open failed: Could not read gocryptfs.conf at ${configDoc.uri}" }
-            return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Could not read gocryptfs.conf")
-        }
-        
-        val config = try {
-            GocryptfsConfig.parse(configBytes)
-        } catch (e: GocryptfsConfigException) {
-            VeLog.e(TAG, e) { "open failed: Malformed gocryptfs.conf: ${e.message}" }
-            return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault(e.message ?: "Malformed gocryptfs.conf")
-        }
-
-        val masterkey = try {
-            GocryptfsMasterkey.unlock(config, password)
-        } catch (e: GocryptfsWrongPasswordException) {
-            VeLog.e(TAG, e) { "open failed: Incorrect password for gocryptfs vault" }
-            return com.aeidolon.vaultexplorer.engine.VaultOpenResult.WrongPassword
-        } catch (e: Exception) {
-            VeLog.e(TAG, e) { "open failed: Unexpected error during masterkey unlock: ${e.message}" }
-            return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Failed to unlock masterkey: ${e.message}")
-        }
-
-        val nameKey = if (config.plaintextNames) ByteArray(0) else Hkdf.deriveSha256(masterkey, "EME filename encryption", 32)
-        val contentKey = Hkdf.deriveSha256(masterkey, config.cipher.hkdfInfo, config.cipher.contentKeyLen)
-        masterkey.fill(0)
-
-        val nameCryptor = GocryptfsFileNameCryptor(nameKey, config.longNameMax, config.plaintextNames)
-        val contentCryptor = GocryptfsContentCryptor(contentKey, config.cipher)
-        // Same guard Cryptomator gets by building its mirror inside the
-        // session constructor's try/catch: a storage failure while setting
-        // up the mirror (e.g. EACCES) becomes a normal InvalidVault result
-        // with a logged stack trace, not a bare exception that escapes
-        // open() and reaches the user as an unexplained platform error.
-        val (mirrorSync, vaultDocOps) = try {
-            buildVaultDocOps(context, vaultRootUri, useRaw)
-        } catch (e: Exception) {
-            VeLog.e(TAG, e) { "open failed: Could not set up vault storage: ${e.message}" }
-            return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Could not open vault: ${e.message}")
-        }
-        val tree = GocryptfsVaultTree(context, vaultRootUri, nameCryptor, hasDirIV = config.hasDirIV, safOps = vaultDocOps)
-        if (config.hasDirIV) {
-            try {
-                tree.dirivFor("")
-            } catch (e: Exception) {
-                VeLog.e(TAG, e) { "open failed: Root gocryptfs.diriv missing or corrupt: ${e.message}" }
-                mirrorSync?.teardown()
-                return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Missing or corrupt gocryptfs.diriv: ${e.message}")
-            }
-        }
-        
-        val session = GocryptfsSession(
-            context = context,
-            vaultRootUri = vaultRootUri,
-            nameCryptor = nameCryptor,
-            contentCryptor = contentCryptor,
-            tree = tree,
-            readOnly = readOnly,
-            cipher = config.cipher,
-            plaintextNames = config.plaintextNames,
-            mirrorSync = mirrorSync,
-        )
-
-        return com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success(session, root.name ?: "Vault")
-    }
-
-    /**
-     * [userEntropy]: touch-movement bytes collected by the creation wizard, mixed into the
-     * masterkey and scrypt salt (see [UserEntropy]); null/empty = system RNG only. The caller
-     * keeps ownership of the array.
-     */
     fun create(
         context: Context,
         vaultRootUri: Uri,
@@ -190,184 +37,27 @@ object GocryptfsVault {
         cipher: GocryptfsCipher = GocryptfsCipher.AES_256_GCM,
         plaintextNames: Boolean = false,
         userEntropy: ByteArray? = null,
-    ): com.aeidolon.vaultexplorer.engine.VaultOpenResult<GocryptfsSession> {
-        val root = DocumentFile.fromTreeUri(context, vaultRootUri)
-            ?: return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Cannot access the selected folder.")
-        val saf = SafDocumentOps(context)
-        if (saf.listChildren(root).isNotEmpty()) {
-            return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Selected folder is not empty.")
+        // gocryptfs -deterministic-names: no gocryptfs.diriv files, so two devices that create the same
+        // folder offline produce the same ciphertext (the right choice for a synchronised folder).
+        deterministicNames: Boolean = false,
+        // gocryptfs -longnamemax: 0 = default (255), otherwise 62..255.
+        longNameMax: Int = 0,
+    ): VaultOpenResult<GocryptfsSession> {
+        // Same order as the native enum: 0 = AES-256-GCM, 1 = XChaCha20-Poly1305, 2 = AES-SIV.
+        val cipherIndex = when (cipher) {
+            GocryptfsCipher.AES_256_GCM -> 0
+            GocryptfsCipher.XCHACHA20_POLY1305 -> 1
+            GocryptfsCipher.AES_SIV -> 2
         }
-        val random = UserEntropy.secureRandomFor(userEntropy)
-        val masterkey = ByteArray(MASTERKEY_LEN).also { random.nextBytes(it) }
-        var mirrorSync: com.aeidolon.vaultexplorer.saf.MirrorSyncCoordinator? = null
-
-        return try {
-            val scryptSalt = ByteArray(SCRYPT_SALT_LEN).also { random.nextBytes(it) }
-            val encryptedKey = GocryptfsMasterkey.wrap(
-                masterkey = masterkey,
-                password = password,
-                scryptSalt = scryptSalt,
-                scryptN = DEFAULT_SCRYPT_N,
-                scryptR = DEFAULT_SCRYPT_R,
-                scryptKeyLen = MASTERKEY_LEN,
-                random = random,
-            )
-
-            val configJson = buildConfigJson(
-                encryptedKey = encryptedKey,
-                scryptSalt = scryptSalt,
-                scryptN = DEFAULT_SCRYPT_N,
-                scryptR = DEFAULT_SCRYPT_R,
-                scryptP = DEFAULT_SCRYPT_P,
-                longNameMax = 0,
-                featureFlags = featureFlagsFor(cipher, plaintextNames),
-            )
-
-            val configDoc = root.createFile("application/octet-stream", CONFIG_FILE_NAME)
-                ?: return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Could not create gocryptfs.conf")
-            
-            context.contentResolver.openOutputStream(configDoc.uri, "wt")?.use {
-                it.write(configJson.toByteArray(Charsets.UTF_8))
-            } ?: return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Could not write gocryptfs.conf")
-
-            if (!plaintextNames) {
-                val rootDiriv = ByteArray(16).also { random.nextBytes(it) }
-                val dirivDoc = root.createFile("application/octet-stream", GocryptfsFileNameCryptor.DIRIV_FILENAME)
-                    ?: return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Could not create gocryptfs.diriv")
-                context.contentResolver.openOutputStream(dirivDoc.uri, "wt")?.use { it.write(rootDiriv) }
-                    ?: return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Could not write gocryptfs.diriv")
-            }
-
-            val nameKey = if (plaintextNames) ByteArray(0) else Hkdf.deriveSha256(masterkey, "EME filename encryption", 32)
-            val contentKey = Hkdf.deriveSha256(masterkey, cipher.hkdfInfo, cipher.contentKeyLen)
-
-            val nameCryptor = GocryptfsFileNameCryptor(nameKey, 0, plaintextNames)
-            val contentCryptor = GocryptfsContentCryptor(contentKey, cipher)
-            val (coordinator, vaultDocOps) = buildVaultDocOps(context, vaultRootUri, rawAccessVerified(context, vaultRootUri))
-            mirrorSync = coordinator
-            val tree = GocryptfsVaultTree(context, vaultRootUri, nameCryptor, hasDirIV = !plaintextNames, safOps = vaultDocOps)
-
-            val session = GocryptfsSession(
-                context = context,
-                vaultRootUri = vaultRootUri,
-                nameCryptor = nameCryptor,
-                contentCryptor = contentCryptor,
-                tree = tree,
-                mirrorSync = mirrorSync,
-                readOnly = false,
-                cipher = cipher,
-                plaintextNames = plaintextNames,
-            )
-
-            com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success(session, root.name ?: "Vault")
-        } catch (e: Exception) {
-            VeLog.e(TAG, e) { "create failed: ${e.message}" }
-            mirrorSync?.teardown()
-            com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Vault creation failed: ${e.message}")
-        } finally {
-            masterkey.fill(0)
-        }
-    }
-
-    private fun buildConfigJson(
-        encryptedKey: ByteArray,
-        scryptSalt: ByteArray,
-        scryptN: Int,
-        scryptR: Int,
-        scryptP: Int,
-        longNameMax: Int,
-        featureFlags: List<String>,
-    ): String {
-        val scryptObject = JSONObject().apply {
-            put("Salt", Base64.encodeToString(scryptSalt, Base64.NO_WRAP))
-            put("N", scryptN)
-            put("R", scryptR)
-            put("P", scryptP)
-            put("KeyLen", MASTERKEY_LEN)
-        }
-
-        val json = JSONObject().apply {
-            put("Creator", "VaultExplorer")
-            put("EncryptedKey", Base64.encodeToString(encryptedKey, Base64.NO_WRAP))
-            put("ScryptObject", scryptObject)
-            put("Version", CONFIG_VERSION)
-            put("FeatureFlags", JSONArray(featureFlags))
-            if (longNameMax > 0) put("LongNameMax", longNameMax)
-        }
-        return json.toString(2)
-    }
-
-    private fun featureFlagsFor(cipher: GocryptfsCipher, plaintextNames: Boolean): List<String> {
-        val base = mutableListOf("HKDF")
-        if (plaintextNames) {
-            base.add("PlaintextNames")
-        } else {
-            base.addAll(listOf("Raw64", "DirIV", "EMENames", "LongNames"))
-        }
-        return when (cipher) {
-            GocryptfsCipher.AES_256_GCM -> listOf("GCMIV128") + base
-            GocryptfsCipher.XCHACHA20_POLY1305 -> listOf("XChaCha20Poly1305") + base
-            // gocryptfs validate.go: AESSIV is only valid together with GCMIV128.
-            GocryptfsCipher.AES_SIV -> listOf("GCMIV128") + base + "AESSIV"
-        }
+        return FolderVaultOpener.create(
+            context, vaultRootUri, NativeFolderVault.GOCRYPTFS, CONFIG_FILE_NAME, password,
+            intArrayOf(cipherIndex, if (plaintextNames) 1 else 0, if (deterministicNames) 1 else 0, longNameMax),
+            null, userEntropy,
+        ) { handle, volRef -> GocryptfsSession(context, vaultRootUri, handle, false, volRef) }
     }
 
     fun changePassword(
         context: Context, vaultRootUri: Uri, oldPassword: CharArray, newPassword: CharArray,
-    ): com.aeidolon.vaultexplorer.engine.VaultOpenResult<Unit> {
-        val root = DocumentFile.fromTreeUri(context, vaultRootUri)
-            ?: return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Cannot access the selected folder.")
-        val saf = SafDocumentOps(context, allowRaw = rawAccessVerified(context, vaultRootUri))
-        val configDoc = saf.childOf(root, CONFIG_FILE_NAME)
-            ?: return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("No gocryptfs.conf found — this doesn't look like a gocryptfs vault.")
-        
-        val configBytes = context.contentResolver.openInputStream(configDoc.uri)?.use { it.readBytes() }
-            ?: return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Could not read gocryptfs.conf")
-        val config = try {
-            GocryptfsConfig.parse(configBytes)
-        } catch (e: GocryptfsConfigException) {
-            return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault(e.message ?: "Malformed gocryptfs.conf")
-        }
-
-        val masterkey = try {
-            GocryptfsMasterkey.unlock(config, oldPassword)
-        } catch (e: GocryptfsWrongPasswordException) {
-            return com.aeidolon.vaultexplorer.engine.VaultOpenResult.WrongPassword
-        }
-
-        return try {
-            val random = SecureRandom()
-            val newScryptSalt = ByteArray(SCRYPT_SALT_LEN).also { random.nextBytes(it) }
-            val newEncryptedKey = GocryptfsMasterkey.wrap(
-                masterkey = masterkey,
-                password = newPassword,
-                scryptSalt = newScryptSalt,
-                scryptN = config.scryptN,
-                scryptR = config.scryptR,
-                scryptKeyLen = config.scryptKeyLen,
-                random = random,
-            )
-
-            val newConfigJson = buildConfigJson(
-                encryptedKey = newEncryptedKey,
-                scryptSalt = newScryptSalt,
-                scryptN = config.scryptN,
-                scryptR = config.scryptR,
-                scryptP = config.scryptP,
-                longNameMax = config.longNameMax,
-                featureFlags = config.featureFlags.toList(),
-            )
-
-            try {
-                saf.writeWhole(configDoc, newConfigJson.toByteArray(Charsets.UTF_8))
-            } catch (e: SafIOException) {
-                VeLog.e(TAG, e) { "changePassword failed to write gocryptfs.conf: ${e.message}" }
-                return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault(e.message ?: "Could not write gocryptfs.conf")
-            }
-
-            com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success(Unit, root.name ?: "Vault")
-        } finally {
-            masterkey.fill(0)
-        }
-    }
+    ): VaultOpenResult<Unit> =
+        FolderVaultOpener.changePassword(context, vaultRootUri, NativeFolderVault.GOCRYPTFS, CONFIG_FILE_NAME, oldPassword, newPassword)
 }

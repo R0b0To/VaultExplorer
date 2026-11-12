@@ -48,6 +48,7 @@ data class UnlockArgs(
     val hiddenCipherId: Int,
     val hiddenHashId: Int,
     val hiddenKeyfilePaths: List<String>?,
+    val useBackupHeader: Boolean = false,
 )
 
 fun parseUnlockArgs(
@@ -73,6 +74,7 @@ fun parseUnlockArgs(
     val cacheDerivedKey = call.argument<Boolean>("cacheDerivedKey") ?: false
     val keyfilePaths = call.argument<List<String>>("keyfilePaths")
     val readOnly = call.argument<Boolean>("readOnly") ?: false
+    val useBackupHeader = call.argument<Boolean>("useBackupHeader") ?: false
     val protectHiddenVolume = call.argument<Boolean>("protectHiddenVolume") ?: false
     val hiddenPassword = call.argument<String>("hiddenVolumePassword")
     val hiddenPim = call.argument<Number>("hiddenVolumePim")?.toInt() ?: 0
@@ -120,6 +122,7 @@ fun parseUnlockArgs(
         hiddenCipherId = hiddenCipherId,
         hiddenHashId = hiddenHashId,
         hiddenKeyfilePaths = hiddenKeyfilePaths,
+        useBackupHeader = useBackupHeader,
     )
 }
 
@@ -304,6 +307,7 @@ class VaultUnlockHandlers(
                 hiddenCipherId = args.hiddenCipherId,
                 hiddenHashId = args.hiddenHashId,
                 hiddenKeyfileFds = hiddenKeyfileFds,
+                useBackupHeader = args.useBackupHeader,
                 cacheDerivedKey = args.cacheDerivedKey,
                 derivedKeyHandlers = derivedKeyHandlers,
                 fuseHandler = fuseHandler,
@@ -476,6 +480,34 @@ class VaultUnlockHandlers(
         }
     }
 
+    fun handleMigrateCryptomatorVault(call: MethodCall, result: MethodChannel.Result) {
+        val uriString = call.argument<String>("filePath")
+        val password = call.argument<String>("password")
+        if (uriString == null || password == null) {
+            result.error("INVALID_ARGS", "filePath and password required", null)
+            return
+        }
+        ioExecutor.execute {
+            try {
+                val chars = password.toCharArray()
+                val migrateResult = try {
+                    com.aeidolon.vaultexplorer.cryptomator.CryptomatorVault.migrate(activity, Uri.parse(uriString), chars)
+                } finally {
+                    chars.fill('\u0000')
+                }
+                activity.runOnUiThread {
+                    when (migrateResult) {
+                        is com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success -> result.success(true)
+                        is com.aeidolon.vaultexplorer.engine.VaultOpenResult.WrongPassword -> result.error("AUTH_FAIL", "Incorrect password", null)
+                        is com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault -> result.error("INVALID_VAULT", migrateResult.reason, null)
+                    }
+                }
+            } catch (e: Exception) {
+                activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
+            }
+        }
+    }
+
     fun handleChangeGocryptfsVaultPassword(call: MethodCall, result: MethodChannel.Result) {
         handleFolderVaultPasswordChange(call, result) { uri, oldPassword, newPassword ->
             com.aeidolon.vaultexplorer.gocryptfs.GocryptfsVault.changePassword(activity, uri, oldPassword, newPassword)
@@ -563,6 +595,7 @@ class VaultUnlockHandlers(
         val newPim = call.argument<Number>("newPim")?.toInt() ?: 0
         val cipherId = call.argument<Number>("cipherId")?.toInt() ?: 255
         val hashId = call.argument<Number>("hashId")?.toInt() ?: 255
+        val newHashId = call.argument<Number>("newHashId")?.toInt() ?: 255
         val oldKeyfilePaths = call.argument<List<String>>("oldKeyfilePaths")
         val newKeyfilePaths = call.argument<List<String>>("newKeyfilePaths")
 
@@ -581,7 +614,7 @@ class VaultUnlockHandlers(
                 val success = ContainerEngine.changePassword(
                     pfd.detachFd(), oldPassword, newPassword,
                     oldPim, newPim, cipherId, hashId,
-                    oldKfFds, newKfFds
+                    oldKfFds, newKfFds, newHashId
                 )
                 activity.runOnUiThread { result.success(success) }
             } catch (e: Exception) {
@@ -678,10 +711,24 @@ class VaultUnlockHandlers(
             result.error("INVALID_ARGS", "filePath is required", null)
             return
         }
+        // Optional: the explicit "lock anyway" choice after a normal lock was refused because a
+        // USB device would not accept the final flush. Absent/false = the safe default.
+        val force = call.argument<Boolean>("force") ?: false
         ioExecutor.execute {
             try {
-                val locked = ContainerLifecycleCore.lockContainer(activity, uriString)
-                activity.runOnUiThread { result.success(locked) }
+                val outcome = ContainerLifecycleCore.lockContainerOutcome(activity, uriString, force)
+                activity.runOnUiThread {
+                    when (outcome) {
+                        ContainerLifecycleCore.LockOutcome.LOCKED -> result.success(true)
+                        // Distinct from a plain `false` so the UI can offer retry / lock anyway.
+                        ContainerLifecycleCore.LockOutcome.FLUSH_REFUSED -> result.error(
+                            "LOCK_FLUSH_REFUSED",
+                            "The device did not accept the last changes; the vault was not locked",
+                            null,
+                        )
+                        else -> result.success(false)
+                    }
+                }
             } catch (e: Exception) {
                 activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
             }

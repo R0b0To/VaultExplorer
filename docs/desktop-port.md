@@ -3,6 +3,14 @@
 Status: **work in progress.** The native engine builds and passes its smoke test on Linux. The Dart
 host is written but has not yet been run inside Flutter. Windows is partly prepared (see below).
 
+**Rebased onto v1.50.0.** The port was first written against v1.39.0. It now sits on top of v1.50.0:
+main's versions of every shared file are kept (they carry fixes the old snapshot lacks, e.g. the
+container-creation header randomisation and the `-1 = missing` file-size contract) and only the port's
+own edits are re-applied. Re-verified since the rebase: the Linux engine (FAT / exFAT / NTFS / ext4, hidden
+volumes, password change, crypto, digests, single-file tool, folder vaults). **Not** re-verified: the
+Windows build/Wine run (it predates the rebase), and all Dart (no Flutter SDK was available: run
+`flutter pub get` -- `pubspec.lock` was not regenerated -- then `flutter analyze` first).
+
 ## How it fits together
 
 ```
@@ -39,18 +47,12 @@ Android is untouched: the JNI bridges and Kotlin are not involved on desktop, an
        sudo apt install libsecret-1-dev libjsoncpp-dev      # build time
        # runtime: a keyring service must be running (gnome-keyring, or KWallet on KDE)
 
-1. One-time: generate the runner (it does not exist yet, the repo only has `android/`):
+1. The runner already exists (`linux/`) and `linux/CMakeLists.txt` bundles
+   `build/desktop-engine/libvaultexplorer_engine.so` next to the app, so build the engine first
+   (`scripts/build_desktop_engine.sh`). Point `VE_ENGINE_LIBRARY` at the .so instead while developing.
 
-       flutter create --platforms=linux .
-
-2. Bundle the engine library: add to `linux/CMakeLists.txt`, next to the other `install()` calls:
-
-       set(VE_ENGINE_LIB "${CMAKE_CURRENT_SOURCE_DIR}/../build/desktop-engine/libvaultexplorer_engine.so")
-       install(FILES "${VE_ENGINE_LIB}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}" COMPONENT Runtime)
-
-   (or point `VE_ENGINE_LIBRARY` at the .so while developing).
-
-3. `flutter pub get && flutter run -d linux`
+2. `flutter pub get && flutter run -d linux`  (regenerates `linux/flutter/generated_plugin*` for the
+   plugins this version of the app uses)
 
 **Dev loop.** The engine is a separate build. After changing anything under
 `android/app/src/main/cpp/`, re-run `scripts/build_desktop_engine.sh`, then either rebuild the app
@@ -164,15 +166,53 @@ Closing the window runs a clean-up first (`AppLifecycleListener.onExitRequested`
 locked (its key material wiped in the engine) and any decrypted "open with" copies are deleted, rather than
 relying on the next start's purge. A crash or kill -9 still falls back to that purge.
 
+## Folder vaults (gocryptfs / Cryptomator / CryFS) -- Linux
+
+Main (v1.50) moved the three formats into a platform-neutral C++ core (`foldervault/`, linked as
+`foldervault_core`); the desktop engine reaches it through `ffi/ve_foldervault.cpp`, the desktop twin of
+`jni/foldervault_bridge.cpp` (same open/create semantics; `fv::PosixStorage` over an ordinary directory).
+
+An unlocked vault is parked in a **volume slot** (the same slot ids containers use; Dart allocates them).
+`ve_engine.cpp` asks `vefv::isSlot(vol)` at the top of every file-level call and forwards to the vault, so
+list / read / write / rename / delete / mkdir / set-mtime / import / export / streams / space info / lock work
+on it unchanged. `ve_copy_file` between any mix of container and vault slots streams through memory in 2 MiB
+steps (and finishes the destination vault file). Format-specific calls: `ve_fv_probe / unlock / create /
+change_password / migrate_cryptomator / info / list_symlinks / read_symlink / hidden_entry_count /
+finish_write / batch` (ABI 7, `ve_engine.h`).
+
+- **A chunk-written file only becomes valid after `finishWrite`**, and chunks must arrive in order from offset 0
+  (the core's contract; the Dart layer already calls `finishWrite` on Android). Skipping it left the engine
+  smoke test hanging until timeout -- why was not investigated.
+- Dart: `pick*Vault` uses `file_selector.getDirectoryPath`; CryFS keeps its per-vault integrity state in
+  `<app support>/cryfs-state` (it must survive restarts). A wrong password surfaces as `AUTH_FAIL` /
+  `INCORRECT_PASSWORD`, anything else as `INVALID_VAULT`.
+- The CryFS derived key (Android's "remember" fast path) is not surfaced: there is no keystore on desktop.
+- The NFC filename normaliser hook (`fv::setNfcNormalizer`) is not installed, so only non-ASCII names that
+  arrive in decomposed form are affected (see `foldervault/README.md`).
+- **Windows:** not available yet. `foldervault/fv_storage.cpp` is POSIX-only (`opendir`, `fstatat`, `statvfs`,
+  `utimensat`), so the core is not built there and `ve_fv_*` answer "not available" (`ve_fv_supported()==0`,
+  `VE_NO_FOLDERVAULT`). It needs a Win32 storage backend.
+- Tested: `ve_smoke_test fv` (also part of the default run) creates, unlocks, writes, lists, renames, copies
+  (inside the vault and to/from a real VeraCrypt container), streams, exports/imports, mounts read-only, locks
+  and re-unlocks, and changes the password, for all three formats.
+
 ## Not yet
 
-- Folder vaults (Cryptomator / gocryptfs / CryFS) -- still Kotlin, so their add and create flows do
-  nothing on desktop; they need porting to C++.
-- Split/join, archives, video thumbnails, media playback, PDF, camera, video/audio editing -- need their
+- Engine-channel coverage: of the 367 methods the Dart layer calls, the desktop host answers 102 and answers
+  45 Android-only ones with a harmless default; **225 still reply `null`**. Many are Android-only (camera 26,
+  Media3 23, audio recorder 12, panic 11, disguise 10, automation 10, PiP 6, quick capture 7). The ones worth
+  doing for desktop: repair / check / header tools (`vault_repair_api`, 11, including
+  `checkFolderVault` / `repairFolderVault`), archives (`vault_archive_api`, 8 -- the libarchive engine is already
+  in the build, it only needs ABI functions), PDF (8), audio editing (4), `mountContainerFolder` /
+  `createUsbContainer` / pickers in `vault_lifecycle_api`, and part of `vault_file_io_api` (36, e.g. video
+  thumbnails, `getMediaFileSize`).
+- Windows: folder vaults (above) and re-running the engine smoke test after the rebase.
+- Archives, video thumbnails, media playback, PDF, camera, video/audio editing -- need their
   desktop backends (they are platform code on Android).
 - Import: per-filesystem file-name validation and the post-import SHA-256 read-back verification
   (the engine still rejects an illegal name when it writes it).
 - Share sheet; JPEG/WebP encoding for the image editor (PNG only for now).
 - Pre-flight free-space check on create (Android reports `INSUFFICIENT_SPACE`; desktop just fails).
-- Windows: the engine is validated under Wine (see "Windows" above); the Flutter app on Windows is untested.
+- Windows: the engine was validated under Wine on v1.39 (see "Windows" above; re-run it after the rebase); the
+  Flutter app on Windows is untested.
 - macOS / iOS: not started.

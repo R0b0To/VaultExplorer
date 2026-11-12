@@ -21,6 +21,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';
 
 import 'desktop_crypto.dart';
@@ -39,6 +40,9 @@ class _SessionMeta {
   String displayName;
   final String format;
   final bool readOnly;
+
+  /// gocryptfs / Cryptomator / CryFS (a directory vault, not a container file).
+  bool get isFolderVault => format == 'gocryptfs' || format == 'cryptomator' || format == 'cryfs';
 }
 
 class DesktopEngineHost {
@@ -392,6 +396,55 @@ class DesktopEngineHost {
           if (r[0] != veOk) return null;
           return (r[1] as List<Object?>).cast<int>();
         }
+
+      // ── folder vaults (gocryptfs / Cryptomator / CryFS) ──
+      case ChannelMethods.pickCryptomatorVault:
+        return _pickFolderVault(veFvCryptomator);
+      case ChannelMethods.pickGocryptfsVault:
+        return _pickFolderVault(veFvGocryptfs);
+      case ChannelMethods.pickCryfsVault:
+        return _pickFolderVault(veFvCryfs);
+      case ChannelMethods.isGocryptfsVault:
+        return _isFolderVault(args['uri'], veFvGocryptfs);
+      case ChannelMethods.isCryfsVault:
+        return _isFolderVault(args['uri'], veFvCryfs);
+      case ChannelMethods.unlockCryptomatorVault:
+        return _unlockFolderVault(args, veFvCryptomator);
+      case ChannelMethods.unlockGocryptfsVault:
+        return _unlockFolderVault(args, veFvGocryptfs);
+      case ChannelMethods.unlockCryfsVault:
+        return _unlockFolderVault(args, veFvCryfs);
+      case ChannelMethods.createCryptomatorVault:
+        return _createFolderVault(args, veFvCryptomator);
+      case ChannelMethods.createGocryptfsVault:
+        return _createFolderVault(args, veFvGocryptfs);
+      case ChannelMethods.createCryfsVault:
+        return _createFolderVault(args, veFvCryfs);
+      case ChannelMethods.changeCryptomatorVaultPassword:
+        return _changeFolderVaultPassword(args, veFvCryptomator);
+      case ChannelMethods.changeGocryptfsVaultPassword:
+        return _changeFolderVaultPassword(args, veFvGocryptfs);
+      case ChannelMethods.changeCryfsVaultPassword:
+        return _changeFolderVaultPassword(args, veFvCryfs);
+      case ChannelMethods.migrateCryptomatorVault:
+        return _migrateCryptomatorVault(args);
+      case ChannelMethods.listVaultSymlinks:
+        return _listVaultSymlinks(args);
+      case ChannelMethods.readVaultSymlink:
+        return _readVaultSymlink(args);
+      case ChannelMethods.getHiddenEntryCount:
+        return _hiddenEntryCount(args);
+      // Block-device volumes have nothing to flush or batch; a folder vault does.
+      case ChannelMethods.finishWrite:
+        return _folderVaultFinishWrite(args);
+      case ChannelMethods.beginBatchWrite:
+        return _folderVaultBatch(args, kind: 0, begin: true);
+      case ChannelMethods.endBatchWrite:
+        return _folderVaultBatch(args, kind: 0, begin: false);
+      case ChannelMethods.beginBatchDelete:
+        return _folderVaultBatch(args, kind: 1, begin: true);
+      case ChannelMethods.endBatchDelete:
+        return _folderVaultBatch(args, kind: 1, begin: false);
     }
 
     final (handledByCrypto, cryptoResult) = await _crypto.handle(call.method, args);
@@ -403,6 +456,240 @@ class DesktopEngineHost {
       debugPrint('[desktop-engine] not implemented yet: ${call.method} (replying null)');
     }
     return null;
+  }
+
+  // ── folder vaults (gocryptfs / Cryptomator / CryFS) ────────────────────
+  //
+  // A vault is an ordinary directory. Unlocking parks it in a volume slot (same allocator as
+  // containers), after which every file call (list, read, write, copy, import, export, ...) goes
+  // through the usual slot-addressed path -- the engine routes it to the vault. Only the
+  // format-specific entry points live here.
+
+  static const Map<int, String> _fvWireNames = {
+    veFvGocryptfs: 'gocryptfs',
+    veFvCryptomator: 'cryptomator',
+    veFvCryfs: 'cryfs',
+  };
+
+  String? _fvStateDir;
+
+  /// CryFS keeps per-vault integrity state outside the vault; it has to survive restarts.
+  Future<String> _folderVaultStateDir() async {
+    final cached = _fvStateDir;
+    if (cached != null) return cached;
+    final support = await getApplicationSupportDirectory();
+    final dir = Directory(p.join(support.path, 'cryfs-state'));
+    await dir.create(recursive: true);
+    return _fvStateDir = dir.path;
+  }
+
+  /// Folder picker. `looksLikeVault` says whether the chosen directory is a vault of the format the
+  /// caller asked for; `format` is whatever format it actually looks like (null = none).
+  Future<Object?> _pickFolderVault(int expected) async {
+    final dir = await getDirectoryPath();
+    if (dir == null) return null;
+    final detected = await pool.call('fvProbe', [dir]) as int;
+    return {
+      'uri': dir,
+      'displayName': p.basename(dir),
+      'looksLikeVault': detected == expected,
+      'format': _fvWireNames[detected],
+    };
+  }
+
+  Future<bool> _isFolderVault(Object? uri, int format) async {
+    if (uri is! String) return false;
+    return (await pool.call('fvProbe', [uri]) as int) == format;
+  }
+
+  /// Slot for [uri]: the one it already holds, else the first free one.
+  Future<int> _claimSlot(String uri) async {
+    final existing = _volByUri[uri];
+    if (existing != null) return existing;
+    final slots = await _slotCount();
+    for (var i = 0; i < slots; i++) {
+      if (!_uriByVol.containsKey(i)) return i;
+    }
+    throw PlatformException(code: 'MAX_CONTAINERS', message: 'Maximum $slots containers already mounted');
+  }
+
+  Never _fvFail(int rc, String? message, {String wrongPassword = 'Incorrect password'}) {
+    if (rc == veErrAuthFailed) {
+      throw PlatformException(code: 'AUTH_FAIL', message: wrongPassword, details: 'INCORRECT_PASSWORD');
+    }
+    if (rc == veErrInvalidArg) {
+      throw PlatformException(code: 'C++_ERROR', message: 'Invalid arguments');
+    }
+    throw PlatformException(code: 'INVALID_VAULT', message: message ?? 'Not a valid vault (code $rc)');
+  }
+
+  Future<Object?> _unlockFolderVault(Map<Object?, Object?> args, int format) async {
+    final root = args['filePath'] as String;
+
+    // Already unlocked: hand back the live session rather than failing on the occupied slot.
+    final live = _volByUri[root];
+    if (live != null && (_meta[live]?.isFolderVault ?? false)) {
+      final r = await pool.call('list', [live, '']) as List<Object?>;
+      if (r[0] == veOk) {
+        return {
+          'volId': live,
+          'files': (r[1] as List<Object?>).cast<String>(),
+          'matchedCipherId': 255,
+          'matchedHashId': 255,
+          'containerFormat': _meta[live]!.format,
+        };
+      }
+      _forget(live); // the engine no longer has it; unlock afresh
+    }
+
+    final vol = await _claimSlot(root);
+    emit('onUnlockStarted', {'volId': vol});
+
+    final password = Uint8List.fromList(utf8.encode((args['password'] as String?) ?? ''));
+    final preserved = args['preservedKey'] is String ? base64Decode(args['preservedKey'] as String) : null;
+    final Map<Object?, Object?> result;
+    try {
+      result = await _withActivity(() async => await pool.call('fvUnlock', [
+            {
+              'path': root,
+              'volId': vol,
+              'format': format,
+              'password': password,
+              'combinedKey': preserved,
+              'readOnly': args['readOnly'] == true,
+              'localStateDir': await _folderVaultStateDir(),
+              'tempDir': Directory.systemTemp.path,
+            },
+          ])) as Map<Object?, Object?>;
+    } finally {
+      password.fillRange(0, password.length, 0);
+    }
+
+    final rc = result['rc'] as int;
+    if (rc != veOk) _fvFail(rc, result['message'] as String?);
+
+    final wire = result['format'] as String;
+    _volByUri[root] = vol;
+    _uriByVol[vol] = root;
+    _meta[vol] = _SessionMeta(
+      displayName: (args['displayName'] as String?) ?? p.basename(root),
+      format: wire,
+      readOnly: args['readOnly'] == true,
+    );
+    // CryFS hands back a derived key for the Android "remember" fast path; desktop has no keystore
+    // to hold it, so it is not surfaced.
+    final derived = result['derivedKey'];
+    if (derived is Uint8List) derived.fillRange(0, derived.length, 0);
+    return {
+      'volId': vol,
+      'files': (result['files'] as List<Object?>).cast<String>(),
+      'matchedCipherId': 255,
+      'matchedHashId': 255,
+      'containerFormat': wire,
+    };
+  }
+
+  Future<bool> _createFolderVault(Map<Object?, Object?> args, int format) async {
+    final root = args['filePath'] as String;
+    await Directory(root).create(recursive: true);
+    final password = Uint8List.fromList(utf8.encode((args['password'] as String?) ?? ''));
+    final cipherName = (args['cipher'] as String?) ?? '';
+    try {
+      final r = await _withActivity(() async => await pool.call('fvCreate', [
+            {
+              'path': root,
+              'format': format,
+              'password': password,
+              // gocryptfs: AES-256-GCM / XChaCha20-Poly1305 / AES-SIV; CryFS takes the name as is.
+              'cipher': switch (cipherName) { 'xchacha20-poly1305' => 1, 'aes-siv' => 2, _ => 0 },
+              'plaintextNames': false,
+              'deterministicNames': args['deterministicNames'] == true,
+              'longNameMax': (args['longNameMax'] as num?)?.toInt() ?? 0,
+              'blockSize': (args['blockSize'] as num?)?.toInt() ?? 0,
+              'cipherName': format == veFvCryfs ? cipherName : '',
+              'userEntropy': args['userEntropy'] as Uint8List?,
+              'localStateDir': await _folderVaultStateDir(),
+              'tempDir': Directory.systemTemp.path,
+            },
+          ])) as Map<Object?, Object?>;
+      if (r['rc'] != veOk && kDebugMode) debugPrint('[desktop-engine] folder vault create failed: ${r['message']}');
+      return r['rc'] == veOk;
+    } finally {
+      password.fillRange(0, password.length, 0);
+    }
+  }
+
+  Future<bool> _changeFolderVaultPassword(Map<Object?, Object?> args, int format) async {
+    final oldPw = Uint8List.fromList(utf8.encode((args['oldPassword'] as String?) ?? ''));
+    final newPw = Uint8List.fromList(utf8.encode((args['newPassword'] as String?) ?? ''));
+    try {
+      final r = await _withActivity(() async => await pool.call('fvChangePassword', [
+            {'path': args['filePath'], 'format': format, 'oldPassword': oldPw, 'newPassword': newPw},
+          ])) as Map<Object?, Object?>;
+      final rc = r['rc'] as int;
+      if (rc != veOk) _fvFail(rc, r['message'] as String?);
+      return true;
+    } finally {
+      oldPw.fillRange(0, oldPw.length, 0);
+      newPw.fillRange(0, newPw.length, 0);
+    }
+  }
+
+  Future<bool> _migrateCryptomatorVault(Map<Object?, Object?> args) async {
+    final pw = Uint8List.fromList(utf8.encode((args['password'] as String?) ?? ''));
+    try {
+      final r = await _withActivity(() async => await pool.call('fvMigrate', [
+            {'path': args['filePath'], 'password': pw},
+          ])) as Map<Object?, Object?>;
+      final rc = r['rc'] as int;
+      if (rc != veOk) _fvFail(rc, r['message'] as String?);
+      return true;
+    } finally {
+      pw.fillRange(0, pw.length, 0);
+    }
+  }
+
+  Future<Object?> _listVaultSymlinks(Map<Object?, Object?> args) async {
+    final vol = _volByUri[args['filePath']];
+    if (vol == null || !(_meta[vol]?.isFolderVault ?? false)) return <Object?>[];
+    final r = await pool.call('fvListSymlinks', [vol, (args['dirPath'] as String?) ?? '']) as List<Object?>;
+    return r[0] == veOk ? r[1] : <Object?>[];
+  }
+
+  Future<Object?> _readVaultSymlink(Map<Object?, Object?> args) async {
+    final vol = _volByUri[args['filePath']];
+    if (vol == null || !(_meta[vol]?.isFolderVault ?? false)) return null;
+    final r = await pool.call('fvReadSymlink', [vol, args['path'] as String]) as List<Object?>;
+    return r[0] == veOk ? r[1] : null;
+  }
+
+  Future<int> _hiddenEntryCount(Map<Object?, Object?> args) async {
+    final vol = _volByUri[args['filePath']];
+    if (vol == null || !(_meta[vol]?.isFolderVault ?? false)) return -1;
+    final n = await pool.call('fvHidden', [vol, (args['dirPath'] as String?) ?? '']) as int;
+    return n < 0 ? -1 : n;
+  }
+
+  /// The slot a call names, but only if it is a folder vault (finishWrite carries a volId, the batch
+  /// calls a vault path).
+  int? _folderVaultSlot(Map<Object?, Object?> args) {
+    final vol = args['volId'] is num ? (args['volId'] as num).toInt() : _volByUri[args['filePath']];
+    if (vol == null) return null;
+    return (_meta[vol]?.isFolderVault ?? false) ? vol : null;
+  }
+
+  Future<bool> _folderVaultFinishWrite(Map<Object?, Object?> args) async {
+    final vol = _folderVaultSlot(args);
+    if (vol == null) return true; // containers have nothing to finish
+    final path = (args['path'] ?? args['fileName']) as String?;
+    if (path == null) return true;
+    return await pool.call('fvFinishWrite', [vol, path]) == veOk;
+  }
+
+  Future<bool> _folderVaultBatch(Map<Object?, Object?> args, {required int kind, required bool begin}) async {
+    final vol = _folderVaultSlot(args);
+    if (vol == null) return true;
+    return await pool.call('fvBatch', [vol, kind, begin]) == veOk;
   }
 
   // ── picking ────────────────────────────────────────────────────────────
@@ -848,10 +1135,13 @@ class DesktopEngineHost {
     return rc == veOk;
   }
 
+  /// Engine sizes are >= 0, -1 for a path that does not exist (what the Dart layer already treats as
+  /// "missing", as on Android), or -veErr* for a session problem.
   int _size(int v) {
     if (v >= 0) return v;
+    if (v == -veErrFailed) return -1;
     _throwFor(-v);
-    return 0;
+    return -1;
   }
 
   Future<T> _withActivity<T>(Future<T> Function() body) async {

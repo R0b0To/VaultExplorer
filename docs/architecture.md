@@ -13,7 +13,7 @@ structurally different families of encrypted volume:
 | Family | Formats | Session lives in |
 |---|---|---|
 | **Block-device containers** | VeraCrypt, LUKS1, LUKS2, BitLocker (+ VHD/VHDX wrapping), Composite | C++ `VolumeState` slot array, driven through the `NativeEngine` JNI shim |
-| **Directory-based vaults** | Cryptomator, gocryptfs, CryFS | Pure-Kotlin `VaultBackend` session objects in `VaultBackendRegistry` |
+| **Directory-based vaults** | Cryptomator, gocryptfs, CryFS | C++ `foldervault` core (`cpp/foldervault/`) reached through `jni/foldervault_bridge.cpp`; thin Kotlin `NativeVaultSession` objects (`VaultBackend`) in `VaultBackendRegistry` |
 
 **Composite** (`containers/container_create_composite.*`, `containers/composite_block_device.*`,
 `jni/composite_bridge.cpp`) is not a third family -- it is a VeraCrypt-format
@@ -27,6 +27,35 @@ trailer" (`carrier_profiler.cpp`'s `probeBlindTrailer`), not a distinct
 header signature, so a composite carrier is not identifiable as such by
 format inspection alone -- every carrier must be supplied together to
 reassemble and unlock the volume.
+
+**Folder-vault core** (`cpp/foldervault/`). The three directory formats share one
+platform-neutral C++ library with no JNI, Android or Flutter dependency (the
+same sources build into a desktop binary -- `foldervault/test/fvcli.cpp` is a
+complete command-line front-end). Its seams:
+
+- `fv::Vault` (`fv_vault.h`) -- the `VaultBackend` method set, one object per
+  unlocked vault, produced by `open*/create*/change*Password`.
+- `fv::Storage` (`fv_storage.h`) -- where the *encrypted* files live, addressed
+  by path relative to the vault root. `PosixStorage` is a plain directory (desktop,
+  and Android whenever `RawFileResolver` verifies a raw path -- the core then does
+  all file I/O itself). Otherwise `jni/foldervault_bridge.cpp`'s `JniStorage`
+  forwards each call to Kotlin's `FolderVaultStorage` (`SafFolderVaultStorage` over
+  `VaultDocumentOps` and the mirror; `CryfsMirrorFolderVaultStorage` for CryFS
+  blocks), so all SAF/mirror policy stays in Kotlin.
+- Format code: `fv_gocryptfs*` (AES-256-GCM / XChaCha20-Poly1305 / AES-SIV,
+  EME names, long names incl. `-longnamemax`, plaintext-names mode,
+  `-deterministic-names`, and the pre-HKDF / pre-Raw64 vaults of gocryptfs
+  0.7-1.6; held to the official implementation's rules -- see the foldervault
+  README), `fv_cryptomator*` (format 7
+  SIV_CTRMAC and 8 SIV_GCM, `.c9s` shortening), `fv_cryfs*` (block store with
+  local integrity state, blob data tree, directory blobs), sharing the
+  chunked file engine in `fv_engine*`. scrypt, EME, AES-SIV, XChaCha20 and the
+  CryFS block cipher are the existing `crypto/` sources, not copies.
+- Concurrency lives in the core: each session serialises namespace changes with
+  its own `shared_mutex` and drains in-flight calls on `close()`, so the Kotlin
+  `NativeVaultSession` declares `skipsPerVolumeLock` (no second lock on top).
+- Check & Repair (`foldercheck/`) still runs on the Kotlin primitives; it gets
+  the key material of a live session through `NativeVaultSession.keyMaterial()`.
 
 Both families are unified above the crypto layer by **`volId`** (an `Int`,
 `0..7`): every caller — Dart, `ContainerFileSystem`, the SAF
@@ -67,7 +96,8 @@ Flutter/Dart UI  ──MethodChannel──▶  MainActivity + *Handlers (Kotlin)
                                ▼                        ▼
                     VaultBackendRegistry        NativeEngine (JNI shim)
                     (Cryptomator/gocryptfs/            │
-                     CryFS — pure Kotlin)               ▼
+                     CryFS — Kotlin shim over           ▼
+                     the C++ foldervault core)
                                               VolumeState[8] (C++)
                                               FatFs / NTFS-3G / libext2fs /
                                               dislocker / mbedTLS
@@ -372,6 +402,91 @@ decoy's local explorer); native side builds `ACTION_SEND` /
   `StorageFolderShareProvider` is a plain read-only provider with
   `exported=false`; a URI grant matches the exact URI, so a receiver can't
   retarget one.
+
+### 1.6 Category browser (Images / Videos / Audio / Documents)
+
+The drawer's CATEGORIES section opens `CategoryBrowserScreen`, a virtual view
+that gathers one kind of file from every storage the person can reach: phone
+storage, configured storage locations and **unlocked** vaults. Nothing is
+copied or moved; it is a listing over the real files.
+
+- **Scanning.** `CategoryScanner` walks one source through an injected
+  `listDirectory`; `CategoryAggregateScanner` runs one per source under a shared
+  bound on listings in flight, publishes the merged result incrementally, and
+  reports a file reachable from two raw-path sources once. All of it is plain
+  Dart (no vault, SAF or widget types), so it is unit-tested with a map standing
+  in for a disk. What counts as an image or a document is the file manager's
+  type filter (`matchesFilter`), not a second classification.
+- **Source identity.** Results are `CategoryEntry`s: `RawEntry`s that also carry
+  `sourceVolId` and the full `path` in that source. Every action (open, share,
+  rename, delete, copy/cut) goes by those two, never by `name` or by "the folder
+  being shown", because `name` is only what the list/grid view needs (a path from
+  the source root in the flat view, a bare name in the folder view). Copy and
+  cut use the cross-container clipboard, which already carries a source per item.
+  The grid and list views take an optional `containerFor` / `cacheModeFor` so one
+  list can hold entries of several containers, each thumbnailed under its own
+  container's cache policy (disabled until that container's settings load).
+- **Views.** Flat (default) is one list of every match. "Original folder
+  structure" shows only folders that lead to a match, with a source level on top
+  when more than one source has matches; folders are never selectable (a folder
+  stands for files outside the category). The source selector (all / device /
+  vaults / one vault) and the structure toggle are remembered per category in
+  `AppSettings` (`categorySources`, `categoryFolderStructure`).
+- **Vault security.** Only vaults in the dashboard's `mounted` list are scanned.
+  When one locks (the container-locked event or the mounted list shrinking) its
+  entries and selection are removed immediately, and a scan still in flight is
+  filtered against the mounted list before it is shown.
+- **Drawer.** `DrawerCategoriesSection` (between storage and Tools) shows the
+  shortcuts chosen in `CategoryShortcutsEditor` (Settings, and the drawer's
+  manage sheet). Hiding one only removes the shortcut.
+- **Inside one storage.** The file manager's toolbar type filter (Images,
+  Videos, Audio, Documents) opens the same screen with `scopedContainer` set:
+  one source, no selector, same flat/folder views, scanning the whole storage
+  it was used in. "All files", the vault-item filter and any filter inside an
+  archive remain filters on the folder being shown.
+- **Decoy.** The decoy drawer shows the same shortcuts with `includeVaults:
+  false`: the screen then never reads the vault list, listens for vault events
+  or touches the index, ignores a remembered "vaults" source, and the editor
+  leaves out the vault options.
+- **Index inside vaults.** After a category scan finishes, each writable vault
+  it read gets `.vaultexplorer/category_index.json` (the vault's configuration
+  folder, which sync never touches; same idea as `marks.json`): per category,
+  the files found. The next visit seeds that vault's list from it at once
+  (`CategoryScanTarget.seed`) and swaps in the fresh scan when it finishes, so
+  the list neither starts empty nor shrinks while the scan catches up. It is
+  written only when a category was actually opened, never for a scan that hit a
+  limit, never into a read-only vault, and never into phone storage or storage
+  locations (they are the person's own folders). Setting:
+  `AppSettings.categoryIndexInVaults` (configuration group); "Clear category
+  indexes" removes it from the unlocked vaults.
+- **Phone storage is remembered, not walked from scratch.** Opening a category
+  or gallery mode of phone storage (or a raw-path storage location) used to
+  start from nothing: an empty screen, then a walk over up to thousands of
+  folders. `DeviceCategoryIndex` (one instance, `deviceCategoryIndexProvider`)
+  now puts three things in front of the walk, cheapest first:
+  1. *What the last scan found* (`seed`): in memory for the life of the app and,
+     encrypted, on disk (`DeviceCategoryIndexStore`, under the app's private
+     support folder, AES-GCM with the thumbnail cache's key, so wiping that key
+     makes it unreadable). Shown at once; the fresh answer replaces it. Nothing
+     is written into the person's folders, so the vault rule above still holds.
+  2. *The platform's file index* (`lookup`, Android 11+): one `queryCategoryIndex`
+     call asks MediaStore for every match under the root and visits no folder.
+     MediaStore only supplies candidate paths; the native side confirms each with
+     one `stat` and reports the file's real size and date, so a stale row never
+     shows up. The same hidden / skip rules a walk applies are applied to the
+     result (`filterCategoryIndexRows`), so both agree. It answers null, which
+     means "walk", when the index finds nothing, when hidden files are shown, or
+     before Android 11 (where file writes do not keep the index current).
+  3. *The walk*, only when 2 cannot answer or the person asks for it (pull to
+     refresh, and a rescan after an operation that wrote files, both `deep`).
+     It is cheaper per folder: `rawLocalCategoryLister` `stat`s only files that
+     match instead of every entry, `skipDeviceCategoryFolder` never enters
+     `Android/data`, `Android/obb`, `node_modules`, `cache` and similar
+     (`kCategoryPrunedFolderNames`), and `CategoryScanner.respectNoMedia` skips a
+     folder holding `.nomedia` with everything under it (media categories only,
+     never the scan root, never while hidden files are shown).
+  A finished, uncut scan is remembered per (root, category, show-hidden);
+  "Clear category indexes" also clears it.
 
 ---
 
@@ -893,7 +1008,7 @@ not every constant is spelled out by name.
 | Panic & quick capture | `getPanicSettings`, `setPanicTier`, `setQuickTileEnabled`, `triggerPanic`, the `*PanicKit*` and `*PanicBootTrigger*` settings calls, `getQuickCaptureSettings`, `setQuickCaptureTileEnabled`, `checkPendingQuickCaptureRequest`, `requestPinQuickCaptureShortcut` |
 | Security | `setSecureScreen`, `setDebugLogging`, `setRecentsSnapshotBlocked`, `notifyResumedFramePainted`, `set/clearSensitiveClipboardText` |
 | Background service & camera | `syncBackgroundService`, `updateBackgroundServiceProgress`, `start/stopBackgroundRecording` |
-| Local/decoy file ops (plain device storage, no vault involved) | `getLocalFileUri`, `openLocalFileWithApp`, `shareLocalFile` |
+| Local/decoy file ops (plain device storage, no vault involved) | `getLocalFileUri`, `openLocalFileWithApp`, `shareLocalFile`, `queryCategoryIndex` (MediaStore candidate paths for the category views) |
 | USB | `listUsbDevices`, `requestUsbPermission`, `unlockUsbContainer`, `createUsbContainer`, `getUsbDeviceCapacity`, `set/isUsbAttachPromptEnabled` |
 | System | `documentExists`, `warmContainer`, `getDeviceCapabilityProfile`, `probeContainerFormat`, `getAppVersion`, `getAndroidSdkInt`, `launchUrl`, `installApk`, `getApkIcon`, `hasOverlayPermission`/`requestOverlayPermission`, `setNotificationLocale`, `exportLogFile` (in-app log viewer), `setKeepScreenOn`, `requestNotificationPermission`, `exportAppSettingsFile`/`importAppSettingsFile` |
 
@@ -1144,7 +1259,11 @@ than take this summary on faith:
 - **The native crypto/filesystem engine's automated regression tests are
   plain host-side C++ binaries** — `g++`-buildable, `assert`-based, zero
   Android toolchain required, registered with CTest and gated behind
-  `if(NOT ANDROID)` (`CMakeLists.txt`). Eleven tests are registered today —
+  `if(NOT ANDROID)` (`CMakeLists.txt`). Twelve tests are registered today —
+  `foldervault_test` (the folder-vault core: known-answer vectors, per-format
+  scenarios, tamper/rollback/legacy-name handling, thread stress; the
+  `foldervault/test/interop/` scripts additionally drive `fvcli` against the real
+  gocryptfs, Cryptomator and CryFS and are not part of CTest),
   `composite_block_device_test`, `sector_batching_test`, `fs_scan_test`,
   `kdf_table_test`, `decrypted_block_cache_test`, `cryfs_block_cipher_test`,
   `utf16le_password_test`, `container_header_test`,

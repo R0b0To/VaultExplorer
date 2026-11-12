@@ -513,4 +513,62 @@ void main() {
       expect(calls, hasLength(3));
     });
   });
+
+  group('entryExists', () {
+    test('reports true for existing file when getFileSize > 0', () async {
+      nextResult = 1024;
+      final exists = await api.entryExists(container, 'file.txt', isDir: false);
+      expect(exists, isTrue);
+      expect(calls.single.method, 'getFileSize');
+    });
+
+    test('reports false for missing file when getFileSize < 0', () async {
+      nextResult = -1;
+      final exists = await api.entryExists(container, 'file.txt', isDir: false);
+      expect(exists, isFalse);
+      expect(calls.single.method, 'getFileSize');
+    });
+
+    test('disambiguates 0-byte file against directory listing', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            if (call.method == 'getFileSize') return 0;
+            if (call.method == 'listDirectory') {
+              return ['F|0|0|file.txt'];
+            }
+            return null;
+          });
+
+      final exists = await api.entryExists(container, 'file.txt', isDir: false);
+      expect(exists, isTrue);
+    });
+
+    test('reports false for 0-size file not found in directory listing', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            if (call.method == 'getFileSize') return 0;
+            if (call.method == 'listDirectory') {
+              return ['F|100|0|other.txt'];
+            }
+            return null;
+          });
+
+      final exists = await api.entryExists(container, 'file.txt', isDir: false);
+      expect(exists, isFalse);
+    });
+
+    test('reports true for existing directory via listDirectory', () async {
+      nextResult = <String>[];
+      final exists = await api.entryExists(container, 'my_folder', isDir: true);
+      expect(exists, isTrue);
+      expect(calls.single.method, 'listDirectory');
+    });
+
+    test('reports false for missing directory when listDirectory returns null', () async {
+      nextResult = null;
+      final exists = await api.entryExists(container, 'my_folder', isDir: true);
+      expect(exists, isFalse);
+      expect(calls.single.method, 'listDirectory');
+    });
+  });
 }

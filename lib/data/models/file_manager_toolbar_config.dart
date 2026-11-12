@@ -46,6 +46,56 @@ enum FileDetailColumn {
 }
 
 class FileManagerToolbarConfig {
+  /// Grouped by what the buttons do: find / create, shape the current list
+  /// (view mode, sort, filter), switch what the screen is showing (gallery,
+  /// music, play media -- the mode switches sit side by side), and the
+  /// overflow menu last, as on every Android toolbar.
+  static const List<FileManagerAction> defaultActionOrder = [
+    FileManagerAction.search,
+    FileManagerAction.add,
+    FileManagerAction.viewToggle,
+    FileManagerAction.sort,
+    FileManagerAction.filter,
+    FileManagerAction.gallery,
+    FileManagerAction.musicMode,
+    FileManagerAction.playMedia,
+    FileManagerAction.options,
+  ];
+
+  /// Default orders shipped before [defaultActionOrder] was regrouped. A saved
+  /// order that is exactly one of these was never rearranged by the user, so
+  /// it moves to the current default; any other saved order is kept as is.
+  static const List<List<FileManagerAction>> _previousDefaultOrders = [
+    [
+      FileManagerAction.search,
+      FileManagerAction.add,
+      FileManagerAction.gallery,
+      FileManagerAction.viewToggle,
+      FileManagerAction.sort,
+      FileManagerAction.filter,
+      FileManagerAction.options,
+    ],
+    [
+      FileManagerAction.search,
+      FileManagerAction.add,
+      FileManagerAction.gallery,
+      FileManagerAction.viewToggle,
+      FileManagerAction.sort,
+      FileManagerAction.filter,
+      FileManagerAction.options,
+      FileManagerAction.playMedia,
+      FileManagerAction.musicMode,
+    ],
+  ];
+
+  static bool _sameOrder(List<FileManagerAction> a, List<FileManagerAction> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
   final List<FileManagerAction> order;
   final Set<FileManagerAction> hidden;
   final bool showBreadcrumbBar;
@@ -68,6 +118,17 @@ class FileManagerToolbarConfig {
   final Map<String, String> folderGridAspectRatios;
   final Map<String, String> folderSortModes;
 
+  /// URIs of storages (vaults, local storage, external drives) that currently
+  /// have gallery mode active.
+  final Set<String> galleryModeStorageUris;
+
+  /// URIs of storages whose music mode was on the last time it was read from
+  /// the storage itself. Only a hint kept on this device so a vault can open
+  /// straight into the right view before its own saved setting (the source of
+  /// truth, stored inside the vault) has been read; it holds no folders or
+  /// other content, and is corrected as soon as the real setting is known.
+  final Set<String> musicModeStorageUris;
+
   /// URIs of vaults or storage locations whose bookmark groups are collapsed
   /// in the navigation drawer. This is device-local UI state; bookmark data
   /// stays with its existing store.
@@ -77,8 +138,8 @@ class FileManagerToolbarConfig {
   final Set<FileDetailColumn> hiddenDetailColumns;
 
   /// Order and visibility of the actions in the item actions sheet and the
-  /// selection bar's overflow menu. Always holds every [FileItemAction]
-  /// exactly once (see [fromJson]).
+  /// selection bar. Always holds every [FileItemAction] exactly once (see
+  /// [fromJson]).
   final List<FileItemAction> itemActionsOrder;
   final Set<FileItemAction> hiddenItemActions;
 
@@ -151,6 +212,8 @@ class FileManagerToolbarConfig {
     this.folderLayoutModes = const {},
     this.folderGridAspectRatios = const {},
     this.folderSortModes = const {},
+    this.galleryModeStorageUris = const {},
+    this.musicModeStorageUris = const {},
     this.collapsedBookmarkGroupUris = const {},
     this.detailColumnsOrder = const [
       FileDetailColumn.date,
@@ -185,15 +248,8 @@ class FileManagerToolbarConfig {
   });
 
   factory FileManagerToolbarConfig.defaults() => const FileManagerToolbarConfig(
-        order: [
-          FileManagerAction.search,
-          FileManagerAction.add,
-          FileManagerAction.viewToggle,
-          FileManagerAction.sort,
-          FileManagerAction.filter,
-          FileManagerAction.playMedia,
-        ],
-        hidden: {},
+        order: defaultActionOrder,
+        hidden: {FileManagerAction.playMedia},
         showBreadcrumbBar: true,
         showStatsBar: true,
         showBookmarkBar: false,
@@ -209,6 +265,8 @@ class FileManagerToolbarConfig {
         folderLayoutModes: {},
         folderGridAspectRatios: {},
         folderSortModes: {},
+        galleryModeStorageUris: {},
+        musicModeStorageUris: {},
         detailColumnsOrder: [
           FileDetailColumn.date,
           FileDetailColumn.size,
@@ -237,7 +295,7 @@ class FileManagerToolbarConfig {
         defaultThumbnailQuality: ThumbnailQuality.defaultAutoQuality,
         localStorageThumbnailCacheMode: ThumbnailCacheMode.disabled,
         localStorageThumbnailQuality: ThumbnailQuality.defaultAutoQuality,
-        mediaViewerToolbarConfig: const MediaViewerToolbarConfig(),
+        mediaViewerToolbarConfig: MediaViewerToolbarConfig(),
         skin: FileManagerSkin.classic,
       );
 
@@ -311,6 +369,40 @@ class FileManagerToolbarConfig {
     return folderSortModes[folderKey(containerUri, dirPath)];
   }
 
+  bool isGalleryModeForStorage(String containerUri) =>
+      galleryModeStorageUris.contains(containerUri);
+
+  FileManagerToolbarConfig withGalleryModeForStorage(
+    String containerUri,
+    bool enabled,
+  ) {
+    final next = Set<String>.from(galleryModeStorageUris);
+    if (enabled) {
+      next.add(containerUri);
+    } else {
+      next.remove(containerUri);
+    }
+    return copyWith(galleryModeStorageUris: next);
+  }
+
+  /// Whether the music mode hint says it is on for [containerUri].
+  bool isMusicModeHintedForStorage(String containerUri) =>
+      musicModeStorageUris.contains(containerUri);
+
+  FileManagerToolbarConfig withMusicModeHintForStorage(
+    String containerUri,
+    bool enabled,
+  ) {
+    if (enabled == musicModeStorageUris.contains(containerUri)) return this;
+    final next = Set<String>.from(musicModeStorageUris);
+    if (enabled) {
+      next.add(containerUri);
+    } else {
+      next.remove(containerUri);
+    }
+    return copyWith(musicModeStorageUris: next);
+  }
+
   FileManagerToolbarConfig copyWith({
     List<FileManagerAction>? order,
     Set<FileManagerAction>? hidden,
@@ -329,6 +421,8 @@ class FileManagerToolbarConfig {
     Map<String, String>? folderLayoutModes,
     Map<String, String>? folderGridAspectRatios,
     Map<String, String>? folderSortModes,
+    Set<String>? galleryModeStorageUris,
+    Set<String>? musicModeStorageUris,
     Set<String>? collapsedBookmarkGroupUris,
     List<FileDetailColumn>? detailColumnsOrder,
     Set<FileDetailColumn>? hiddenDetailColumns,
@@ -379,6 +473,10 @@ class FileManagerToolbarConfig {
         folderGridAspectRatios:
             folderGridAspectRatios ?? this.folderGridAspectRatios,
         folderSortModes: folderSortModes ?? this.folderSortModes,
+        galleryModeStorageUris:
+            galleryModeStorageUris ?? this.galleryModeStorageUris,
+        musicModeStorageUris:
+            musicModeStorageUris ?? this.musicModeStorageUris,
         collapsedBookmarkGroupUris:
             collapsedBookmarkGroupUris ?? this.collapsedBookmarkGroupUris,
         detailColumnsOrder: detailColumnsOrder ?? this.detailColumnsOrder,
@@ -484,6 +582,8 @@ class FileManagerToolbarConfig {
     'folderLayoutModes',
     'folderGridAspectRatios',
     'folderSortModes',
+    'galleryModeStorageUris',
+    'musicModeStorageUris',
     'collapsedBookmarkGroupUris',
   };
 
@@ -547,6 +647,8 @@ class FileManagerToolbarConfig {
         'folderLayoutModes': folderLayoutModes,
         'folderGridAspectRatios': folderGridAspectRatios,
         'folderSortModes': folderSortModes,
+        'galleryModeStorageUris': galleryModeStorageUris.toList()..sort(),
+        'musicModeStorageUris': musicModeStorageUris.toList()..sort(),
         'collapsedBookmarkGroupUris': collapsedBookmarkGroupUris.toList()
           ..sort(),
         'detailColumnsOrder':
@@ -586,13 +688,27 @@ class FileManagerToolbarConfig {
         .map((v) => FileManagerAction.fromJson(v as String?))
         .whereType<FileManagerAction>()
         .toList();
-    for (final a in FileManagerAction.values) {
+    final actionsInSavedOrder = rawOrder.toSet();
+    final neverRearranged =
+        _previousDefaultOrders.any((old) => _sameOrder(old, rawOrder));
+    if (neverRearranged) {
+      rawOrder
+        ..clear()
+        ..addAll(defaultActionOrder);
+    }
+    for (final a in defaultActionOrder) {
       if (!rawOrder.contains(a)) rawOrder.add(a);
     }
     final hidden = (j['hidden'] as List<dynamic>? ?? [])
         .map((v) => FileManagerAction.fromJson(v as String?))
         .whereType<FileManagerAction>()
         .toSet();
+    // Older configs predate the media-play action. Keep it available in the
+    // toolbar settings, but don't crowd the default bar with a newly appended
+    // button unless it was already part of the saved order.
+    if (!actionsInSavedOrder.contains(FileManagerAction.playMedia)) {
+      hidden.add(FileManagerAction.playMedia);
+    }
     final rawDetailColumns = (j['detailColumnsOrder'] as List<dynamic>? ?? [])
         .map((v) => FileDetailColumn.fromJson(v as String?))
         .whereType<FileDetailColumn>()
@@ -653,6 +769,16 @@ class FileManagerToolbarConfig {
             .whereType<String>()
             .where((uri) => uri.isNotEmpty)
             .toSet();
+    final galleryModeStorageUris =
+        (j['galleryModeStorageUris'] as List<dynamic>? ?? const [])
+            .whereType<String>()
+            .where((uri) => uri.isNotEmpty)
+            .toSet();
+    final musicModeStorageUris =
+        (j['musicModeStorageUris'] as List<dynamic>? ?? const [])
+            .whereType<String>()
+            .where((uri) => uri.isNotEmpty)
+            .toSet();
     final defaultThumbnailCacheMode = ThumbnailCacheMode.fromJson(
           j['defaultThumbnailCacheMode'] as String?,
         ) ??
@@ -704,6 +830,8 @@ class FileManagerToolbarConfig {
       folderLayoutModes: rawFolderLayoutModes,
       folderGridAspectRatios: rawFolderGridAspectRatios,
       folderSortModes: rawFolderSortModes,
+      galleryModeStorageUris: galleryModeStorageUris,
+      musicModeStorageUris: musicModeStorageUris,
       collapsedBookmarkGroupUris: collapsedBookmarkGroupUris,
       detailColumnsOrder: rawDetailColumns.isEmpty
           ? const [

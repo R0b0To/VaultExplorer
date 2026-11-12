@@ -21,6 +21,9 @@
 #include "vhd_image.h"
 #include "container_header.h"
 #include "container_utils.h"
+#include "vc_header_validate.h"
+#include "crypto/password_encoding.h"
+#include "vc_geometry.h"
 #include "crypto/cascade.h"
 #include "crypto/cipher_shim.h"
 #include "crypto/keyfile_mixing.h"
@@ -213,47 +216,9 @@ static bool tryDecryptHeader(
         }
     }
 
-    if (decH[0] != 'V' || decH[1] != 'E' || decH[2] != 'R' || decH[3] != 'A') {
-        return false;
-    }
-
-    const uint32_t computedHdrCrc = container_crc32(decH, VC_HDR_CRC_COVERAGE_LEN);
-    const uint32_t storedHdrCrc   = readHeaderBE32(decH, VC_HDR_OFF_HEADER_CRC);
-    if (computedHdrCrc != storedHdrCrc) {
-        return false;
-    }
-
-    const uint32_t computedKeyCrc = container_crc32(&decH[VC_KEY_OFFSET_MASTER], VC_HDR_KEY_CRC_COVERAGE_LEN);
-    const uint32_t storedKeyCrc = readHeaderBE32(decH, VC_HDR_OFF_KEY_CRC);
-    if (computedKeyCrc != storedKeyCrc) {
-        return false;
-    }
-
-    if (outFields) {
-        outFields->volumeSize          = readHeaderBE64(decH, VC_HDR_OFF_VOLUME_SIZE);
-        outFields->hiddenVolumeSize    = readHeaderBE64(decH, VC_HDR_OFF_HIDDEN_VOL_SIZE);
-        outFields->encryptedAreaStart  = readHeaderBE64(decH, VC_HDR_OFF_KEY_SCOPE_START);
-        outFields->encryptedAreaLength = readHeaderBE64(decH, VC_HDR_OFF_KEY_SCOPE_SIZE);
-        outFields->sectorSize          = readHeaderBE32(decH, VC_HDR_OFF_SECTOR_SIZE);
-
-        if (cipherId == CascadeId::kAes) {
-            constexpr size_t kBenchBytes = 64 * 1024 * 1024;
-            constexpr size_t kSectors = kBenchBytes / 512;
-            std::vector<unsigned char> plain(512, 0), cipher(512);
-            auto start = std::chrono::steady_clock::now();
-            for (size_t i = 0; i < kSectors; i++) {
-                cascadeEncryptSector(tempCtx, i, plain.data(), cipher.data());
-            }
-            auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::steady_clock::now() - start).count();
-            double mbPerSec = (kBenchBytes / (1024.0 * 1024.0)) / (ms > 0 ? (ms / 1000.0) : 0.001);
-            __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_Bench",
-                "BORINGSSL_AES_XTS_BENCH bytes=%zu ms=%lld throughputMBs=%.1f",
-                kBenchBytes, (long long)ms, mbPerSec);
-        }
-    }
-
-    return true;
+    // Apply the same format/version/CRC/sector-size acceptance rules as
+    // upstream VolumeHeader::Deserialize() via the shared validator.
+    return vcAcceptDecryptedHeader(decH, outFields);
 }
 
 bool deriveHeaderKey(HashId hash,
@@ -277,7 +242,7 @@ bool deriveHeaderKey(HashId hash,
 
 std::mutex derivationMutexes[MAX_VOLUMES];
 
-bool deriveAndValidateHeader(
+static bool deriveAndValidateHeaderImpl(
     const unsigned char headerSector[VC_FULL_HEADER_SIZE],
     const unsigned char* password, size_t passwordLen, int pim,
     int cipherIdParam, int hashIdParam,
@@ -900,7 +865,7 @@ bool detectsAsPlainDiskImage(int fd) {
     return std::strcmp(probeContainerFormat(fd), "plain") == 0;
 }
 
-bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, int pim, int volId, bool forceDerive, int cipherId, int hashId, const unsigned char* preservedKey, size_t preservedKeyLen, const int* keyfileFds, int keyfileCount, bool readOnly) {
+bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, int pim, int volId, bool forceDerive, int cipherId, int hashId, const unsigned char* preservedKey, size_t preservedKeyLen, const int* keyfileFds, int keyfileCount, bool readOnly, bool useBackupHeader) {
     if (volId < 0 || volId >= MAX_VOLUMES) { if (fd >= 0) close(fd); closeUnusedKeyfileFds(keyfileFds, keyfileCount); return false; }
     VolumeState& v = volumes[volId];
 
@@ -1197,7 +1162,22 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
     }
 
     struct HeaderSlot { uint64_t fileOffset; };
-    static constexpr HeaderSlot kHeaderSlots[] = { { 0 }, { VC_HIDDEN_HEADER_OFFSET } };
+    HeaderSlot kHeaderSlots[2] = { { 0 }, { VC_HIDDEN_HEADER_OFFSET } };
+    if (useBackupHeader) {
+        // VeraCrypt's "Use backup header embedded in volume" mount option: read the
+        // copies at the END of the container instead of the primary ones; same
+        // normal-then-hidden order. Everything else (password, PIM, keyfiles) as usual.
+        uint64_t normalBackup = 0, hiddenBackup = 0;
+        if (!vcgeom::backupHeaderOffset(fileSize, false, &normalBackup) ||
+            !vcgeom::backupHeaderOffset(fileSize, true, &hiddenBackup)) {
+            LOGI("prepareSession(vol=%d): container too small to hold backup headers", volId);
+            closeUnusedKeyfileFds(keyfileFds, keyfileCount);
+            close(fd);
+            return false;
+        }
+        kHeaderSlots[0].fileOffset = normalBackup;
+        kHeaderSlots[1].fileOffset = hiddenBackup;
+    }
 
     unsigned char dKey[192];           // PBKDF2 result (Key to Header)
     unsigned char decH[VC_HEADER_BODY_SIZE]; // Decrypted Header Body
@@ -1310,6 +1290,7 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
         v.fd = fd;
         v.dataOffset = fields.encryptedAreaStart;
         v.dataAreaLengthBytes = fields.encryptedAreaLength;
+        v.luksSectorSize = fields.sectorSize;   // the volume's logical sector size (512..4096); drives FatFs/ext/NTFS I/O units
         v.isHiddenVolume = fields.isHiddenVolume();
         v.fileSize = fileSize;
         v.matchedCipherId = (int)matchedCipher;
@@ -1324,7 +1305,8 @@ bool enableHiddenVolumeProtection(
     int volId,
     const unsigned char* hiddenPassword, size_t hiddenPasswordLen,
     int hiddenPim, int hiddenCipherId, int hiddenHashId,
-    const int* hiddenKeyfileFds, int hiddenKeyfileCount) {
+    const int* hiddenKeyfileFds, int hiddenKeyfileCount,
+    bool useBackupHeader) {
     if (volId < 0 || volId >= MAX_VOLUMES) {
         closeUnusedKeyfileFds(hiddenKeyfileFds, hiddenKeyfileCount);
         return false;
@@ -1367,8 +1349,26 @@ bool enableHiddenVolumeProtection(
     // header, always equals VC_DATA_AREA_OFFSET past the container's own
     // byte 0 -- so this recovers that byte 0 in the same absolute
     // coordinate space physicalWrite() operates in, for either transport.
+    if (dataOffset < VC_DATA_AREA_OFFSET) {
+        LOGI("enableHiddenVolumeProtection(vol=%d): outer data offset %llu precedes the header group",
+             volId, (unsigned long long)dataOffset);
+        return false;
+    }
     const uint64_t containerBase = dataOffset - VC_DATA_AREA_OFFSET;
-    const uint64_t hiddenHeaderOffset = containerBase + TC_HIDDEN_VOLUME_HEADER_OFFSET;
+    uint64_t hiddenHeaderOffset = containerBase + TC_HIDDEN_VOLUME_HEADER_OFFSET;
+    if (useBackupHeader) {
+        // The outer volume was opened through its backup header, so the protected hidden
+        // volume is read through ITS backup header too (upstream passes the same
+        // useBackupHeaders flag when it opens the hidden volume to protect). The outer
+        // data area spans everything between the two header groups, which gives the
+        // container size.
+        uint64_t hiddenBackup = 0;
+        if (!vcgeom::backupHeaderOffset(dataAreaLengthBytes + 2 * VC_DATA_AREA_OFFSET, true, &hiddenBackup)) {
+            LOGI("enableHiddenVolumeProtection(vol=%d): container too small for a backup header", volId);
+            return false;
+        }
+        hiddenHeaderOffset = containerBase + hiddenBackup;
+    }
 
     unsigned char headerSector[VC_FULL_HEADER_SIZE];
     if (!physicalRead(volId, hiddenHeaderOffset, headerSector, VC_FULL_HEADER_SIZE)) {
@@ -1391,40 +1391,45 @@ bool enableHiddenVolumeProtection(
         LOGI("enableHiddenVolumeProtection(vol=%d): hidden password/keyfiles did not match", volId);
         return false;
     }
-    // Mirrors createContainerWithHidden's own validity check (see
-    // container_create.cpp): a hidden volume can occupy at most everything
-    // past the outer volume's reserved header area.
-    if (!fields.isHiddenVolume() || fields.hiddenVolumeSize == 0 ||
-        fields.hiddenVolumeSize >= dataAreaLengthBytes + VC_DATA_AREA_OFFSET) {
+    if (!fields.isHiddenVolume() || fields.hiddenVolumeSize == 0) {
         LOGI("enableHiddenVolumeProtection(vol=%d): decrypted header is not a valid hidden volume", volId);
         return false;
     }
 
-    // See container_create.cpp's createContainerWithHidden: the hidden
-    // volume's data area always occupies the last hiddenVolumeSize bytes
-    // of the outer container, and the outer container's own total size is
-    // dataOffset + dataAreaLengthBytes + VC_DATA_AREA_OFFSET (the trailing
-    // header-group-sized area reserved, but never used for data, by every
-    // outer volume this app creates).
-    const uint64_t outerContainerEnd = dataOffset + dataAreaLengthBytes + VC_DATA_AREA_OFFSET;
+    // Protect exactly the interval the hidden header says its data occupies.
+    // For hidden volumes this app creates, that is [V-A-H, V-A): the data ends
+    // at the outer volume's trailing backup-header group, NOT at the end of the
+    // container. (Arming [V-H, V) instead left the first A bytes of the hidden
+    // volume -- where its boot sector and allocation tables are -- writable.)
+    // The helper also rejects a header whose area does not fit inside the
+    // container the outer volume implies, and returns coordinates in the same
+    // absolute space physicalWrite() compares against, for either transport.
+    uint64_t protectedStart = 0, protectedEnd = 0;
+    const uint64_t hiddenAreaLength =
+        fields.encryptedAreaLength != 0 ? fields.encryptedAreaLength : fields.hiddenVolumeSize;
+    if (!vcgeom::hiddenProtectedRange(dataOffset, dataAreaLengthBytes,
+                                      fields.encryptedAreaStart, hiddenAreaLength,
+                                      &protectedStart, &protectedEnd)) {
+        LOGI("enableHiddenVolumeProtection(vol=%d): hidden header geometry does not fit the container "
+             "(start=%llu length=%llu)", volId,
+             (unsigned long long)fields.encryptedAreaStart, (unsigned long long)hiddenAreaLength);
+        return false;
+    }
 
     {
         std::unique_lock<std::shared_mutex> lock(v.mutex);
         v.hiddenVolumeProtectionEnabled = true;
-        v.hiddenProtectedStart = outerContainerEnd - fields.hiddenVolumeSize;
-        v.hiddenProtectedEnd = outerContainerEnd;
+        v.hiddenProtectedStart = protectedStart;
+        v.hiddenProtectedEnd = protectedEnd;
         v.hiddenVolumeProtectionTriggered = false;
     }
-    LOGI("enableHiddenVolumeProtection(vol=%d): armed -- outerEnd=%llu hiddenSize=%llu "
+    LOGI("enableHiddenVolumeProtection(vol=%d): armed -- hiddenSize=%llu "
          "protected=[%llu,%llu) outerDataOffset=%llu outerDataAreaLen=%llu writableBytes=%llu",
          volId,
-         (unsigned long long)outerContainerEnd, (unsigned long long)fields.hiddenVolumeSize,
-         (unsigned long long)(outerContainerEnd - fields.hiddenVolumeSize),
-         (unsigned long long)outerContainerEnd,
+         (unsigned long long)hiddenAreaLength,
+         (unsigned long long)protectedStart, (unsigned long long)protectedEnd,
          (unsigned long long)dataOffset, (unsigned long long)dataAreaLengthBytes,
-         (unsigned long long)((outerContainerEnd - fields.hiddenVolumeSize) > dataOffset
-                                   ? (outerContainerEnd - fields.hiddenVolumeSize) - dataOffset
-                                   : 0));
+         (unsigned long long)(protectedStart > dataOffset ? protectedStart - dataOffset : 0));
     return true;
 }
 
@@ -1572,7 +1577,7 @@ static bool prepareUsbLuksSession(uint64_t partitionStartSector, uint64_t partit
     return true;
 }
 
-bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pim, int volId, int cipherId, int hashId, const unsigned char* preservedKey, size_t preservedKeyLen, int64_t partitionOffsetHint, const int* keyfileFds, int keyfileCount, bool readOnly) {
+bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pim, int volId, int cipherId, int hashId, const unsigned char* preservedKey, size_t preservedKeyLen, int64_t partitionOffsetHint, const int* keyfileFds, int keyfileCount, bool readOnly, bool useBackupHeader, int64_t deviceSizeBytes) {
     if (volId < 0 || volId >= MAX_VOLUMES) { closeUnusedKeyfileFds(keyfileFds, keyfileCount); return false; }
     VolumeState& v = volumes[volId];
     std::lock_guard<std::mutex> derivationLock(derivationMutexes[volId]);
@@ -1668,6 +1673,7 @@ bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pi
     bool fsFound = false;
     uint64_t foundDataOffset = 0;
     uint64_t foundDataLength = 0;
+    uint32_t foundSectorSize = 512;
     bool foundIsHidden = false;
     CascadeContext candidateCascade;
     uint64_t matchedPartitionStart = 0;
@@ -1677,7 +1683,21 @@ bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pi
 
     for (const auto& part : partitions) {
         for (const auto& slot : kHeaderSlots) {
-            const uint64_t headerSector = part.startSector + slot.sectorOffset;
+            uint64_t headerSector = part.startSector + slot.sectorOffset;
+            if (useBackupHeader) {
+                // "Use backup header embedded in volume": read the copies at the end of the partition.
+                uint64_t partSectors = part.sectorCount;
+                if (partSectors == 0 && deviceSizeBytes > 0 &&
+                    static_cast<uint64_t>(deviceSizeBytes) / 512 > part.startSector) {
+                    partSectors = static_cast<uint64_t>(deviceSizeBytes) / 512 - part.startSector;
+                }
+                uint64_t backupByteOffset = 0;
+                if (partSectors == 0 ||
+                    !vcgeom::backupHeaderOffset(partSectors * 512ULL, slot.sectorOffset > 0, &backupByteOffset)) {
+                    continue;
+                }
+                headerSector = part.startSector + backupByteOffset / 512;
+            }
 
             unsigned char dKey[192]{};
             unsigned char decH[VC_HEADER_BODY_SIZE];
@@ -1723,6 +1743,7 @@ bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pi
             fsFound = true;
             foundDataOffset = part.startSector * 512 + fields.encryptedAreaStart;
             foundDataLength = fields.encryptedAreaLength;
+            foundSectorSize = fields.sectorSize;
             foundIsHidden   = fields.isHiddenVolume();
             matchedPartitionStart = part.startSector;
             matchedCipherFound = matchedCipher;
@@ -1755,6 +1776,7 @@ bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pi
         v.fd                   = -1;
         v.dataOffset           = foundDataOffset;
         v.dataAreaLengthBytes  = foundDataLength;
+        v.luksSectorSize       = foundSectorSize;   // logical sector size from the header
         v.isHiddenVolume       = foundIsHidden;
         v.partitionStartSector = matchedPartitionStart;
         v.matchedCipherId      = static_cast<int>(matchedCipherFound);
@@ -1762,4 +1784,40 @@ bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pi
         v.readOnly             = readOnly;
     }
     return true;
+}
+
+// Public entry point. Tries the password as given (standard UTF-8, what VeraCrypt
+// hashes) and, only if that fails and the password contains a supplementary-plane
+// character, once more with the bytes older builds of this app used (JNI modified
+// UTF-8) so volumes created by those builds keep opening. Passwords without such
+// characters never take the second attempt. (Not applied when keyfiles were mixed
+// in first -- the mixed bytes are no longer a text password.)
+bool deriveAndValidateHeader(
+    const unsigned char headerSector[VC_FULL_HEADER_SIZE],
+    const unsigned char* password, size_t passwordLen, int pim,
+    int cipherIdParam, int hashIdParam,
+    unsigned char outKeyMaterial[192],
+    unsigned char outDecryptedHeader[VC_HEADER_BODY_SIZE],
+    CascadeId& outMatchedCipher,
+    HashId& outMatchedHash,
+    ParsedHeaderFields& outFields,
+    int volId,
+    std::atomic<bool>* externalAbort,
+    int slotId
+) {
+    if (deriveAndValidateHeaderImpl(headerSector, password, passwordLen, pim, cipherIdParam, hashIdParam,
+                                    outKeyMaterial, outDecryptedHeader, outMatchedCipher, outMatchedHash,
+                                    outFields, volId, externalAbort, slotId)) {
+        return true;
+    }
+    if (externalAbort != nullptr && externalAbort->load()) return false;
+    if (volId >= 0 && isUnlockCancelled(volId)) return false;
+    unsigned char legacy[MAX_PASSWORD_LEN];
+    const size_t legacyLen = vcLegacyPasswordBytes(password, passwordLen, legacy, sizeof(legacy));
+    if (legacyLen == 0) return false;
+    const bool ok = deriveAndValidateHeaderImpl(headerSector, legacy, legacyLen, pim, cipherIdParam, hashIdParam,
+                                                outKeyMaterial, outDecryptedHeader, outMatchedCipher,
+                                                outMatchedHash, outFields, volId, externalAbort, slotId);
+    mbedtls_platform_zeroize(legacy, sizeof(legacy));
+    return ok;
 }

@@ -2,8 +2,10 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
+import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/grid_aspect_ratio.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
+import 'package:vaultexplorer/features/browser/widgets/file_manager_options_menu_button.dart';
 import 'package:vaultexplorer/features/browser/widgets/filter_menu_button.dart';
 import 'package:vaultexplorer/features/browser/widgets/layout_mode_menu_button.dart';
 import 'package:vaultexplorer/features/browser/widgets/sort_menu_button.dart';
@@ -46,6 +48,19 @@ class FileManagerMoreMenuButton extends StatelessWidget {
   final ValueChanged<String?> onFilterChanged;
   final bool hideVaultOnlyActions;
 
+  /// Replaces the file-type filter menu behind the Filter action. The
+  /// categories shortcut screen has no type filter (the category is the
+  /// filter); its Filter action picks which storages are listed instead, and
+  /// supplies that picker here so the floating toolbar offers it as well.
+  final List<Widget> Function(BuildContext context)? customFilterMenuBuilder;
+
+  /// Whether the custom filter is narrowing the listing (highlights the icon).
+  final bool customFilterActive;
+
+  /// Icon and tooltip for the custom filter menu.
+  final IconData? customFilterIcon;
+  final String? customFilterTooltip;
+
   final BrowserLayoutMode layoutMode;
   final ValueChanged<BrowserLayoutMode> onLayoutModeChanged;
   final GridAspectRatio gridAspectRatio;
@@ -53,6 +68,20 @@ class FileManagerMoreMenuButton extends StatelessWidget {
 
   final bool canPlayMedia;
   final VoidCallback onPlayMedia;
+
+  /// Whether music mode is on for this location, and the switch for it.
+  final bool musicModeActive;
+  final VoidCallback? onToggleMusicMode;
+
+  final bool isGalleryMode;
+  final VoidCallback onToggleGallery;
+
+  final FileManagerToolbarConfig? toolbarConfig;
+  final ValueChanged<bool>? onToggleShowHiddenFiles;
+  final ValueChanged<bool>? onToggleShowGridFileNames;
+  final ValueChanged<bool>? onToggleShowFileExtensions;
+  final ValueChanged<bool>? onToggleShowListThumbnails;
+  final VoidCallback? onOpenSettings;
 
   const FileManagerMoreMenuButton({
     super.key,
@@ -65,12 +94,26 @@ class FileManagerMoreMenuButton extends StatelessWidget {
     required this.currentFilter,
     required this.onFilterChanged,
     required this.hideVaultOnlyActions,
+    this.customFilterMenuBuilder,
+    this.customFilterActive = false,
+    this.customFilterIcon,
+    this.customFilterTooltip,
     required this.layoutMode,
     required this.onLayoutModeChanged,
     required this.gridAspectRatio,
     this.onGridAspectRatioChanged,
     required this.canPlayMedia,
     required this.onPlayMedia,
+    this.musicModeActive = false,
+    this.onToggleMusicMode,
+    this.isGalleryMode = false,
+    required this.onToggleGallery,
+    this.toolbarConfig,
+    this.onToggleShowHiddenFiles,
+    this.onToggleShowGridFileNames,
+    this.onToggleShowFileExtensions,
+    this.onToggleShowListThumbnails,
+    this.onOpenSettings,
   });
 
   @override
@@ -119,6 +162,17 @@ class FileManagerMoreMenuButton extends StatelessWidget {
             child: Text(l10n.sortAction),
           );
         case FileManagerAction.filter:
+          final customFilter = customFilterMenuBuilder;
+          if (customFilter != null) {
+            return SubmenuButton(
+              leadingIcon: Icon(
+                customFilterIcon ?? Icons.storage_rounded,
+                color: cs.primary,
+              ),
+              menuChildren: customFilter(context),
+              child: Text(customFilterTooltip ?? l10n.filterAction),
+            );
+          }
           final isFilterActive = currentFilter != null;
           return SubmenuButton(
             leadingIcon: Icon(
@@ -142,6 +196,40 @@ class FileManagerMoreMenuButton extends StatelessWidget {
             ),
             onPressed: canPlayMedia ? onPlayMedia : null,
             child: Text(l10n.playMediaAction),
+          );
+        case FileManagerAction.musicMode:
+          return MenuItemButton(
+            leadingIcon: Icon(
+              musicModeActive ? Icons.library_music_rounded : Icons.library_music_outlined,
+              color: musicModeActive ? cs.primary : cs.onSurface,
+            ),
+            onPressed: onToggleMusicMode,
+            child: Text(l10n.musicModeAction),
+          );
+        case FileManagerAction.gallery:
+          return MenuItemButton(
+            leadingIcon: Icon(
+              isGalleryMode ? Icons.photo_library_rounded : Icons.photo_library_outlined,
+              color: cs.primary,
+            ),
+            onPressed: onToggleGallery,
+            child: Text(l10n.galleryModeAction),
+          );
+        case FileManagerAction.options:
+          if (toolbarConfig == null) return null;
+          return SubmenuButton(
+            leadingIcon: Icon(Icons.more_vert_rounded, color: cs.primary),
+            menuChildren: buildOptionsMenuItems(
+              context: context,
+              cs: cs,
+              toolbarConfig: toolbarConfig!,
+              onToggleShowHiddenFiles: onToggleShowHiddenFiles ?? (_) {},
+              onToggleShowGridFileNames: onToggleShowGridFileNames ?? (_) {},
+              onToggleShowFileExtensions: onToggleShowFileExtensions ?? (_) {},
+              onToggleShowListThumbnails: onToggleShowListThumbnails ?? (_) {},
+              onOpenSettings: onOpenSettings ?? () {},
+            ),
+            child: Text(l10n.optionsAction),
           );
       }
     }
@@ -243,6 +331,17 @@ class FileManagerMoreMenuButton extends StatelessWidget {
           onTap: canPlayMedia ? onPlayMedia : null,
         );
 
+      case FileManagerAction.musicMode:
+        return _fabShell(
+          cs: cs,
+          icon: Icon(
+            musicModeActive ? Icons.library_music_rounded : Icons.library_music_outlined,
+            color: musicModeActive ? cs.primary : cs.onSurface,
+          ),
+          tooltip: l10n.musicModeAction,
+          onTap: onToggleMusicMode,
+        );
+
       case FileManagerAction.viewToggle:
         final currentIcon = switch (layoutMode) {
           BrowserLayoutMode.list => Icons.view_list_rounded,
@@ -278,6 +377,17 @@ class FileManagerMoreMenuButton extends StatelessWidget {
         );
 
       case FileManagerAction.filter:
+        final customFilter = customFilterMenuBuilder;
+        if (customFilter != null) {
+          return menuFab(
+            icon: Icon(
+              customFilterIcon ?? Icons.storage_rounded,
+              color: customFilterActive ? cs.primary : cs.onSurface,
+            ),
+            tooltip: customFilterTooltip ?? l10n.filtersMenuItem,
+            menuChildren: customFilter(context),
+          );
+        }
         final isFilterActive = currentFilter != null;
         return menuFab(
           icon: Icon(
@@ -291,6 +401,34 @@ class FileManagerMoreMenuButton extends StatelessWidget {
             currentFilter: currentFilter,
             onFilterChanged: onFilterChanged,
             hideVaultOnlyActions: hideVaultOnlyActions,
+          ),
+        );
+
+      case FileManagerAction.gallery:
+        return _fabShell(
+          cs: cs,
+          icon: Icon(
+            isGalleryMode ? Icons.photo_library_rounded : Icons.photo_library_outlined,
+            color: isGalleryMode ? cs.primary : cs.onSurface,
+          ),
+          tooltip: l10n.galleryModeTooltip,
+          onTap: onToggleGallery,
+        );
+
+      case FileManagerAction.options:
+        if (toolbarConfig == null) return const SizedBox.shrink();
+        return menuFab(
+          icon: Icon(Icons.more_vert_rounded, color: cs.onSurface),
+          tooltip: l10n.optionsActionTooltip,
+          menuChildren: buildOptionsMenuItems(
+            context: context,
+            cs: cs,
+            toolbarConfig: toolbarConfig!,
+            onToggleShowHiddenFiles: onToggleShowHiddenFiles ?? (_) {},
+            onToggleShowGridFileNames: onToggleShowGridFileNames ?? (_) {},
+            onToggleShowFileExtensions: onToggleShowFileExtensions ?? (_) {},
+            onToggleShowListThumbnails: onToggleShowListThumbnails ?? (_) {},
+            onOpenSettings: onOpenSettings ?? () {},
           ),
         );
     }

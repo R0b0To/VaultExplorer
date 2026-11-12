@@ -43,9 +43,9 @@ object DeviceCapabilityProfiler {
     fun tierFor(context: Context): Tier = classify(context)
 
     fun executorSizesFor(tier: Tier): ExecutorSizes = when (tier) {
-        Tier.LOW -> ExecutorSizes(io = 2, imageThumbnail = 1, videoThumbnail = 1, fullRes = 1)
-        Tier.MEDIUM -> ExecutorSizes(io = 4, imageThumbnail = 2, videoThumbnail = 1, fullRes = 2)
-        Tier.HIGH -> ExecutorSizes(io = 6, imageThumbnail = 3, videoThumbnail = 2, fullRes = 3)
+        Tier.LOW -> ExecutorSizes(io = 2, imageThumbnail = 2, videoThumbnail = 1, fullRes = 1)
+        Tier.MEDIUM -> ExecutorSizes(io = 5, imageThumbnail = 4, videoThumbnail = 1, fullRes = 2)
+        Tier.HIGH -> ExecutorSizes(io = 7, imageThumbnail = 6, videoThumbnail = 2, fullRes = 3)
     }
 
     fun handleGetDeviceCapabilityProfile(

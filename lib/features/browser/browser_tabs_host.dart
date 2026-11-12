@@ -18,21 +18,26 @@ import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
 import 'package:vaultexplorer/data/models/tab_swipe_gestures.dart';
 import 'package:vaultexplorer/data/models/external_storage_location.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/models/vault_marks.dart';
+import 'package:vaultexplorer/features/browser/controllers/bookmark_navigation_request.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_search_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_chrome_hub.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_drag_session.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
 import 'package:vaultexplorer/features/browser/models/browser_viewport_options.dart';
+import 'package:vaultexplorer/features/browser/models/file_category_presentation.dart';
 import 'package:vaultexplorer/features/browser/models/tab_id.dart';
 import 'package:vaultexplorer/features/browser/widgets/adaptive_browser_app_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_app_bar_factory.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_new_tab_sheet.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_tab_strip.dart';
+import 'package:vaultexplorer/features/browser/widgets/category_content_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/directory_content_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/fast_scrollbar.dart';
 import 'package:vaultexplorer/features/browser/widgets/gated_page_scroll_physics.dart';
 import 'package:vaultexplorer/features/browser/widgets/settle_touch_page_controller.dart';
+import 'package:vaultexplorer/features/library/widgets/music_mode_host.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 
@@ -130,6 +135,16 @@ class BrowserTabsShell extends ConsumerStatefulWidget {
   /// [primaryLocalContainer] and back at the root leaves the app.
   final bool appRoot;
 
+  /// A workspace that already exists and should be shown again instead of
+  /// starting an empty one -- the tabs the person left open when this shell
+  /// was last torn down (see `BrowserSessionStore`). The tab list and every
+  /// tab's own location and sort are still held by their providers, so this
+  /// shell simply picks them up where they were; search and selection start
+  /// empty again.
+  /// When the workspace's state is gone by the time it is read, the provider
+  /// rebuilds it from the config's initial data, i.e. a fresh session.
+  final BrowserTabsConfig? restoredWorkspace;
+
   const BrowserTabsShell({
     super.key,
     this.initialContainer,
@@ -147,6 +162,7 @@ class BrowserTabsShell extends ConsumerStatefulWidget {
     this.onDuplicate,
     this.viewportOptions = const BrowserViewportOptions(),
     this.appRoot = false,
+    this.restoredWorkspace,
   });
 
   @override
@@ -196,6 +212,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     end: 1.0,
   ).animate(_loopTransitionController);
   final Map<TabId, GlobalKey> _directoryViewKeys = {};
+  final Map<TabId, GlobalKey> _categoryViewKeys = {};
   final Map<TabId, GlobalKey> _dashboardViewKeys = {};
   bool _popScheduled = false;
   bool _drawerOpenOrDragging = false;
@@ -296,11 +313,13 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   @override
   void initState() {
     super.initState();
-    _workspace = BrowserTabsConfig.create(
-      initialContainer: widget.initialContainer,
-      includeDashboardTab: widget.includeDashboardTab,
-      appRoot: widget.appRoot,
-    );
+    _workspace =
+        widget.restoredWorkspace ??
+        BrowserTabsConfig.create(
+          initialContainer: widget.initialContainer,
+          includeDashboardTab: widget.includeDashboardTab,
+          appRoot: widget.appRoot,
+        );
     final initialState = ref.read(browserTabsProvider(_workspace));
     // Pages keep taking touches while a swipe is still settling, so a vertical
     // scroll can start right after changing tabs instead of waiting for the
@@ -400,6 +419,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
 
     final liveTabIds = next.tabs.map((tab) => tab.tabId).toSet();
     _directoryViewKeys.removeWhere((id, _) => !liveTabIds.contains(id));
+    _categoryViewKeys.removeWhere((id, _) => !liveTabIds.contains(id));
     _dashboardViewKeys.removeWhere((id, _) => !liveTabIds.contains(id));
     if (next.tabs.isEmpty && !_popScheduled) {
       _popScheduled = true;
@@ -518,9 +538,67 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
             const SizedBox.expand(),
       );
     }
+    if (tab.isCategory) {
+      return SkinAreaScope(
+        area: SkinArea.files,
+        child: CategoryContentView(
+          key: _categoryViewKeys.putIfAbsent(tab.tabId, GlobalKey.new),
+          tabId: tab.tabId,
+          category: tab.category!,
+          workspaceConfig: _workspace,
+          primaryLocalContainer:
+              tab.primaryLocalContainer ?? widget.primaryLocalContainer(),
+          includeVaults: tab.includeVaults,
+          resolveContainer: widget.resolveContainer,
+          onShowInFolder: (container, path) {
+            final slash = path.lastIndexOf('/');
+            final dir = path.contains('/')
+                ? path.substring(0, slash)
+                : '';
+            final revealName = slash < 0 ? path : path.substring(slash + 1);
+            final currentTabs =
+                ref.read(browserTabsProvider(_workspace)).tabs;
+            final existingTab = currentTabs
+                .where(
+                  (t) =>
+                      !t.isCategory &&
+                      !t.isDashboard &&
+                      t.volId == container.volId,
+                )
+                .firstOrNull;
+            if (existingTab != null) {
+              _workspaceActions.activate(existingTab.tabId);
+              ref
+                  .read(bookmarkNavigationRequestsProvider.notifier)
+                  .request(
+                  container.volId,
+                  VaultBookmark(dir, isDir: true),
+                  revealName: revealName,
+                );
+            } else {
+              final tabId = _workspaceActions.openTab(
+                container,
+                initialPath: dir.isEmpty ? null : dir,
+              );
+              if (tabId == null) {
+                _showLimitReached();
+              } else {
+                ref
+                    .read(bookmarkNavigationRequestsProvider.notifier)
+                    .request(
+                      container.volId,
+                      VaultBookmark(dir, isDir: true),
+                      revealName: revealName,
+                    );
+              }
+            }
+          },
+        ),
+      );
+    }
     return SkinAreaScope(
       area: SkinArea.files,
-      child: DirectoryContentView(
+      child: MusicModeHost(container: tab.container!, child: DirectoryContentView(
         key: _directoryViewKeys.putIfAbsent(tab.tabId, GlobalKey.new),
         container: tab.container!,
         tabId: tab.tabId,
@@ -535,7 +613,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
         onUserActivity: isActive
             ? widget.userActivityFor?.call(tab.volId!)
             : null,
-      ),
+      )),
     );
   }
 
@@ -1140,6 +1218,11 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     }
     final active = _workspaceState.activeTab;
     if (active == null) return;
+    // Don't offer a picker whose every choice would fail.
+    if (_workspaceState.atLimit) {
+      _showLimitReached();
+      return;
+    }
     // Respect this shell's workspace boundary. In decoy mode this callback
     // intentionally returns no vaults, even if the engine still has sessions
     // left over from an earlier normal-mode run.
@@ -1335,7 +1418,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
         : tabs.where((tab) => tab.pane == TabPane.primary).toList();
     final drawerPaneShownId = !dualPaneForTabStrip
         ? activeTabId
-        : paneTabIds!.$1;
+        : paneTabIds.$1;
     final isFirstTab =
         drawerPaneTabs.isNotEmpty &&
         drawerPaneTabs.first.tabId == drawerPaneShownId;
@@ -1436,7 +1519,9 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       workspaceConfig: _workspace,
       appBarListenable: _chrome.appBar,
       fallback: BrowserAppBarFallback(
-        title: activeTab?.container?.displayName ?? '',
+        title: activeTab?.isCategory == true
+            ? activeTab!.category!.label(context.l10n)
+            : activeTab?.container?.displayName ?? '',
         showBackButton: widget.viewportOptions.showBackButton,
         preferBackButton: !tabsEnabled,
         onBackPressed: tabsEnabled ? null : _handleBackToDashboard,
@@ -1508,7 +1593,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                         }
 
                         if (dualPane) {
-                          final ids = paneTabIds!;
+                          final ids = paneTabIds;
                           final firstId = ids.$1!;
                           final secondId = ids.$2!;
                           final firstTab = tabs.firstWhere(

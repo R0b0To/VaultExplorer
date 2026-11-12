@@ -60,7 +60,7 @@ class AsyncThumbnailLoader extends _$AsyncThumbnailLoader {
   ThumbnailSyncLookup? _syncLookup;
   LruCache<String, Future<Uint8List>>? _cache;
   PriorityTaskQueue? _limiter;
-  Duration _debounce = const Duration(milliseconds: 100);
+  Duration _debounce = const Duration(milliseconds: 30);
   TaskPriority _priority = TaskPriority.visible;
   bool _started = false;
   Completer<void>? _limiterCompleter;
@@ -74,7 +74,7 @@ class AsyncThumbnailLoader extends _$AsyncThumbnailLoader {
   /// or the file-type fallback. Past this many attempts the error state
   /// wins, which at least shows the correct fallback icon and lets a
   /// later rebuild (scroll away and back, pull-to-refresh) start clean.
-  static const _maxCancellationRetries = 5;
+  static const _maxCancellationRetries = 20;
   int _cancellationRetries = 0;
 
   /// Hard ceiling on how long a single tile will sit on its spinner.
@@ -115,7 +115,7 @@ class AsyncThumbnailLoader extends _$AsyncThumbnailLoader {
     required LruCache<String, Future<Uint8List>> cache,
     required PriorityTaskQueue limiter,
     ThumbnailSyncLookup? syncLookup,
-    Duration debounce = const Duration(milliseconds: 100),
+    Duration debounce = const Duration(milliseconds: 30),
     TaskPriority priority = TaskPriority.visible,
   }) {
     if (_started) return;
@@ -220,7 +220,13 @@ class AsyncThumbnailLoader extends _$AsyncThumbnailLoader {
     if (future == null) {
       if (ref.mounted) state = state._copy(isLoading: true, hasError: false);
 
-      await Future.delayed(_debounce);
+      if (_debounce > Duration.zero) {
+        await Future.delayed(_debounce);
+      } else {
+        // Still yield once so a tile that is built and disposed within the
+        // same frame never reaches the queue.
+        await Future<void>.value();
+      }
       if (!ref.mounted) return;
 
       final syncBytes = _syncLookup?.call();
@@ -256,7 +262,9 @@ class AsyncThumbnailLoader extends _$AsyncThumbnailLoader {
         // corrupt file. Retry after a brief delay if this instance is
         // still live -- bounded by [_maxCancellationRetries], see there.
         _cancellationRetries++;
-        Future.delayed(const Duration(milliseconds: 150), () {
+        // Back off so a burst of cancellations doesn't retry in lockstep.
+        final delayMs = (150 * _cancellationRetries).clamp(150, 1200);
+        Future.delayed(Duration(milliseconds: delayMs), () {
           if (ref.mounted) _load();
         });
       } else {

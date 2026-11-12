@@ -3768,6 +3768,18 @@ abstract class AppLocalizations {
   /// **'Content Cipher'**
   String get gocryptfsCipherLabel;
 
+  /// Option in the gocryptfs filename picker when creating a vault: every folder gets its own random gocryptfs.diriv (the gocryptfs default)
+  ///
+  /// In en, this message translates to:
+  /// **'Random per folder (default)'**
+  String get gocryptfsNamesRandomIvOption;
+
+  /// Option in the gocryptfs filename picker when creating a vault: gocryptfs -deterministic-names. No gocryptfs.diriv files, so devices that create the same folder offline produce identical ciphertext
+  ///
+  /// In en, this message translates to:
+  /// **'Deterministic (for synced folders)'**
+  String get gocryptfsNamesDeterministicOption;
+
   /// Label above the XChaCha20-Poly1305/AES-256-GCM cipher picker shown when creating a new CryFS vault
   ///
   /// In en, this message translates to:
@@ -4061,6 +4073,192 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Select File or Folder'**
   String get selectContainerFileOrFolder;
+
+  /// Unlock option: open the volume using the backup header embedded at its end
+  ///
+  /// In en, this message translates to:
+  /// **'Use backup header'**
+  String get useBackupHeaderToggleTitle;
+
+  /// Explains the Use backup header unlock option
+  ///
+  /// In en, this message translates to:
+  /// **'Open with the backup copy of the header stored at the end of the volume. Use it if the main header is damaged.'**
+  String get useBackupHeaderToggleSubtitle;
+
+  /// Picker choice that leaves a setting unchanged (e.g. keep the header PRF when changing a password)
+  ///
+  /// In en, this message translates to:
+  /// **'Keep current'**
+  String get keepCurrentOption;
+
+  /// Tools row: enlarge a standard VeraCrypt volume
+  ///
+  /// In en, this message translates to:
+  /// **'Expand VeraCrypt volume'**
+  String get toolExpandVolumeTitle;
+
+  /// Tools row subtitle for volume expansion
+  ///
+  /// In en, this message translates to:
+  /// **'Make a standard volume larger, like the desktop Volume Expander'**
+  String get toolExpandVolumeSubtitle;
+
+  /// Tools row: create a hidden volume inside an existing volume
+  ///
+  /// In en, this message translates to:
+  /// **'Add hidden volume'**
+  String get toolHiddenInExistingTitle;
+
+  /// Tools row subtitle for direct-mode hidden volume creation
+  ///
+  /// In en, this message translates to:
+  /// **'Create a hidden volume inside an existing standard volume'**
+  String get toolHiddenInExistingSubtitle;
+
+  /// Button: pick the container file
+  ///
+  /// In en, this message translates to:
+  /// **'Choose container'**
+  String get vcToolsPickContainer;
+
+  /// Shown before a container is picked
+  ///
+  /// In en, this message translates to:
+  /// **'No container selected'**
+  String get vcToolsNoContainer;
+
+  /// Password field of the existing volume
+  ///
+  /// In en, this message translates to:
+  /// **'Volume password'**
+  String get vcToolsPasswordLabel;
+
+  /// PIM field
+  ///
+  /// In en, this message translates to:
+  /// **'PIM (optional)'**
+  String get vcToolsPimLabel;
+
+  /// Target size of the container after expansion, in MiB
+  ///
+  /// In en, this message translates to:
+  /// **'New container size (MiB)'**
+  String get vcToolsNewSizeLabel;
+
+  /// Switch: fill the added space with encrypted data
+  ///
+  /// In en, this message translates to:
+  /// **'Initialize new space'**
+  String get vcToolsInitFreeSpace;
+
+  /// Explains the initialize new space switch
+  ///
+  /// In en, this message translates to:
+  /// **'Fills the added space with data encrypted under the volume key so it cannot be told apart from the rest. Turn off for a quick expand.'**
+  String get vcToolsInitFreeSpaceHint;
+
+  /// Button: run the expansion
+  ///
+  /// In en, this message translates to:
+  /// **'Expand volume'**
+  String get vcToolsExpandAction;
+
+  /// Note about volume expansion
+  ///
+  /// In en, this message translates to:
+  /// **'Only the container is enlarged. The file system inside is not resized, so the added space stays unallocated until the file system is grown. Back up the volume first.'**
+  String get vcToolsExpandNote;
+
+  /// Success message after expansion
+  ///
+  /// In en, this message translates to:
+  /// **'Volume expanded'**
+  String get vcToolsExpandDone;
+
+  /// Button: analyze the outer volume for hidden volume space
+  ///
+  /// In en, this message translates to:
+  /// **'Check free space'**
+  String get vcToolsAnalyzeAction;
+
+  /// Label before the maximum hidden volume size
+  ///
+  /// In en, this message translates to:
+  /// **'Largest possible hidden volume'**
+  String get vcToolsMaxHidden;
+
+  /// Shown when the outer volume has no free space at its end
+  ///
+  /// In en, this message translates to:
+  /// **'There is no room for a hidden volume: the end of the outer volume is in use.'**
+  String get vcToolsNoRoom;
+
+  /// Size of the hidden volume in MiB
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden volume size (MiB)'**
+  String get vcToolsHiddenSizeLabel;
+
+  /// Password for the new hidden volume
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden volume password'**
+  String get vcToolsHiddenPasswordLabel;
+
+  /// Confirmation of the hidden volume password
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm hidden volume password'**
+  String get vcToolsHiddenConfirmLabel;
+
+  /// File system of the hidden volume
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden volume file system'**
+  String get vcToolsHiddenFsLabel;
+
+  /// Switch: skip wiping the hidden volume area
+  ///
+  /// In en, this message translates to:
+  /// **'Quick format'**
+  String get vcToolsQuickFormat;
+
+  /// Button: create the hidden volume
+  ///
+  /// In en, this message translates to:
+  /// **'Create hidden volume'**
+  String get vcToolsCreateHiddenAction;
+
+  /// Success message after creating the hidden volume
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden volume created'**
+  String get vcToolsHiddenDone;
+
+  /// Warning about hidden volumes
+  ///
+  /// In en, this message translates to:
+  /// **'The hidden volume takes the free space at the end of the outer volume. Afterwards, mount the outer volume with hidden volume protection whenever you write to it, or the hidden volume can be overwritten.'**
+  String get vcToolsHiddenNote;
+
+  /// Hidden volume password confirmation mismatch
+  ///
+  /// In en, this message translates to:
+  /// **'The passwords do not match.'**
+  String get vcToolsPasswordsDiffer;
+
+  /// Invalid size input
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid size.'**
+  String get vcToolsInvalidSize;
+
+  /// No credentials given
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the volume password or add a keyfile.'**
+  String get vcToolsCredentialsRequired;
 
   /// Checkbox label for mounting in read-only mode
   ///
@@ -6288,6 +6486,48 @@ abstract class AppLocalizations {
   /// **'Gallery Grid'**
   String get layoutModeGalleryGrid;
 
+  /// Label for gallery mode toolbar action
+  ///
+  /// In en, this message translates to:
+  /// **'Gallery'**
+  String get galleryModeAction;
+
+  /// Tooltip for gallery mode toolbar action
+  ///
+  /// In en, this message translates to:
+  /// **'Gallery mode'**
+  String get galleryModeTooltip;
+
+  /// Label for options overflow toolbar action
+  ///
+  /// In en, this message translates to:
+  /// **'Options'**
+  String get optionsAction;
+
+  /// Tooltip for options overflow toolbar action
+  ///
+  /// In en, this message translates to:
+  /// **'Options'**
+  String get optionsActionTooltip;
+
+  /// Section header for files modified today
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get dateToday;
+
+  /// Section header for files modified yesterday
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday'**
+  String get dateYesterday;
+
+  /// Section header for files modified earlier or with unknown date
+  ///
+  /// In en, this message translates to:
+  /// **'Earlier'**
+  String get dateEarlier;
+
   /// Tooltip for the delete action when the container is read-only
   ///
   /// In en, this message translates to:
@@ -7410,6 +7650,456 @@ abstract class AppLocalizations {
   /// **'Play media'**
   String get playMediaAction;
 
+  /// Music library tab label
+  ///
+  /// In en, this message translates to:
+  /// **'Albums'**
+  String get libraryTabAlbums;
+
+  /// Music library tab label
+  ///
+  /// In en, this message translates to:
+  /// **'Artists'**
+  String get libraryTabArtists;
+
+  /// Music library tab label
+  ///
+  /// In en, this message translates to:
+  /// **'Genres'**
+  String get libraryTabGenres;
+
+  /// Music library tab label
+  ///
+  /// In en, this message translates to:
+  /// **'Tracks'**
+  String get libraryTabTracks;
+
+  /// Music library tab label
+  ///
+  /// In en, this message translates to:
+  /// **'Folders'**
+  String get libraryTabFolders;
+
+  /// Tooltip and title of the music player's play queue
+  ///
+  /// In en, this message translates to:
+  /// **'Queue'**
+  String get nowPlayingQueue;
+
+  /// Tooltip of the shuffle toggle in the music player
+  ///
+  /// In en, this message translates to:
+  /// **'Shuffle'**
+  String get nowPlayingShuffle;
+
+  /// Tooltip of the repeat button when repeat is off
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat off'**
+  String get nowPlayingRepeatOff;
+
+  /// Tooltip of the repeat button when the whole queue repeats
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat all'**
+  String get nowPlayingRepeatAll;
+
+  /// Tooltip of the repeat button when the current track repeats
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat this track'**
+  String get nowPlayingRepeatOne;
+
+  /// Menu entry of the music player that opens the full media player (equalizer, A-B loop, more)
+  ///
+  /// In en, this message translates to:
+  /// **'Open in media player'**
+  String get nowPlayingOpenViewer;
+
+  /// Tooltip of the button that collapses the music player to the mini player
+  ///
+  /// In en, this message translates to:
+  /// **'Minimize player'**
+  String get nowPlayingCollapse;
+
+  /// Number of folders that contain music
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 folder} other{{count} folders}}'**
+  String libraryFolderCount(num count);
+
+  /// Hint text of the music library search field
+  ///
+  /// In en, this message translates to:
+  /// **'Search music'**
+  String get librarySearchHint;
+
+  /// Progress text while the music library walks the vault folders; count is audio files found so far
+  ///
+  /// In en, this message translates to:
+  /// **'Looking through folders... {count, plural, =1{1 audio file so far} other{{count} audio files so far}}'**
+  String libraryScanListing(num count);
+
+  /// Progress text while the music library reads audio tags; read and total are file counts
+  ///
+  /// In en, this message translates to:
+  /// **'Reading tags... {read} of {total}'**
+  String libraryScanReading(int read, int total);
+
+  /// Button that stops the music library scan
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get libraryScanStop;
+
+  /// Music library empty state title when the vault has no audio files
+  ///
+  /// In en, this message translates to:
+  /// **'No music found'**
+  String get libraryEmptyTitle;
+
+  /// Music library empty state message when the vault has no audio files
+  ///
+  /// In en, this message translates to:
+  /// **'This vault has no audio files, or they are in folders that could not be read.'**
+  String get libraryEmptyMessage;
+
+  /// Music library message when a search has no matches
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing matches your search'**
+  String get libraryNoResults;
+
+  /// Label for tracks with no artist tag
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown artist'**
+  String get libraryUnknownArtist;
+
+  /// Label for tracks with no album tag or folder name
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown album'**
+  String get libraryUnknownAlbum;
+
+  /// Label for tracks with no genre tag
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown genre'**
+  String get libraryUnknownGenre;
+
+  /// Label for an album whose tracks are by different artists
+  ///
+  /// In en, this message translates to:
+  /// **'Various artists'**
+  String get libraryVariousArtists;
+
+  /// Number of tracks
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 track} other{{count} tracks}}'**
+  String libraryTrackCount(num count);
+
+  /// Number of albums
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 album} other{{count} albums}}'**
+  String libraryAlbumCount(num count);
+
+  /// Music library button that plays a list from the start
+  ///
+  /// In en, this message translates to:
+  /// **'Play'**
+  String get libraryPlayAll;
+
+  /// Music library button that plays a list in random order
+  ///
+  /// In en, this message translates to:
+  /// **'Shuffle'**
+  String get libraryShuffleAll;
+
+  /// Music library menu item that looks for new, changed and deleted files
+  ///
+  /// In en, this message translates to:
+  /// **'Scan for changes'**
+  String get libraryMenuRescan;
+
+  /// Music library menu item that re-reads the tags of every file
+  ///
+  /// In en, this message translates to:
+  /// **'Re-read all tags'**
+  String get libraryMenuRebuild;
+
+  /// Music library menu item that deletes the saved index
+  ///
+  /// In en, this message translates to:
+  /// **'Delete saved index'**
+  String get libraryMenuDeleteSaved;
+
+  /// Snackbar after the saved music library index was deleted
+  ///
+  /// In en, this message translates to:
+  /// **'Saved index deleted'**
+  String get libraryMenuDeleteSavedDone;
+
+  /// Music library note shown when the last scan could not read every folder
+  ///
+  /// In en, this message translates to:
+  /// **'Some folders could not be read, so files that may have been removed are still listed.'**
+  String get libraryIncompleteNote;
+
+  /// Music library note: number of files whose tags could not be read
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 file could not be read} other{{count} files could not be read}}'**
+  String libraryReadFailuresNote(num count);
+
+  /// Heading above an artist's albums
+  ///
+  /// In en, this message translates to:
+  /// **'Albums'**
+  String get libraryArtistAlbumsHeader;
+
+  /// Heading above a list of tracks
+  ///
+  /// In en, this message translates to:
+  /// **'Tracks'**
+  String get libraryArtistTracksHeader;
+
+  /// Tooltip of the music library sort button
+  ///
+  /// In en, this message translates to:
+  /// **'Sort'**
+  String get librarySortTooltip;
+
+  /// Music library sort option
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get librarySortTitle;
+
+  /// Music library sort option
+  ///
+  /// In en, this message translates to:
+  /// **'Artist'**
+  String get librarySortArtist;
+
+  /// Music library sort option
+  ///
+  /// In en, this message translates to:
+  /// **'Album'**
+  String get librarySortAlbum;
+
+  /// Music library sort option
+  ///
+  /// In en, this message translates to:
+  /// **'Year'**
+  String get librarySortYear;
+
+  /// Music library sort option: newest files first
+  ///
+  /// In en, this message translates to:
+  /// **'Recently added'**
+  String get librarySortRecentlyAdded;
+
+  /// Music library sort option for artists
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get librarySortName;
+
+  /// Music library sort option for artists
+  ///
+  /// In en, this message translates to:
+  /// **'Number of tracks'**
+  String get librarySortTrackCount;
+
+  /// Music library sort option: track duration
+  ///
+  /// In en, this message translates to:
+  /// **'Length'**
+  String get librarySortLength;
+
+  /// Music library sort option that reverses the current order
+  ///
+  /// In en, this message translates to:
+  /// **'Reverse order'**
+  String get librarySortReverse;
+
+  /// File manager toolbar action that turns music mode on or off for this location
+  ///
+  /// In en, this message translates to:
+  /// **'Music mode'**
+  String get musicModeAction;
+
+  /// Music mode bar: the normal file listing
+  ///
+  /// In en, this message translates to:
+  /// **'Files'**
+  String get musicModeFiles;
+
+  /// Music mode menu item that changes which folders are included
+  ///
+  /// In en, this message translates to:
+  /// **'Music folders'**
+  String get musicModeMenuFolders;
+
+  /// Music mode menu item that turns the mode off
+  ///
+  /// In en, this message translates to:
+  /// **'Turn off music mode'**
+  String get musicModeMenuTurnOff;
+
+  /// Music mode note: the index is stored in the vault itself
+  ///
+  /// In en, this message translates to:
+  /// **'Index saved inside this vault'**
+  String get libraryStorageInVault;
+
+  /// Music mode note: the index is stored encrypted in app storage
+  ///
+  /// In en, this message translates to:
+  /// **'Index saved encrypted on this device'**
+  String get libraryStorageThisDevice;
+
+  /// Title of the sheet where music mode folders are chosen
+  ///
+  /// In en, this message translates to:
+  /// **'Music mode'**
+  String get musicScopeTitle;
+
+  /// Message in the music mode folders sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Choose what music mode should include.'**
+  String get musicScopeMessage;
+
+  /// Option: index the whole location
+  ///
+  /// In en, this message translates to:
+  /// **'Everything in this location'**
+  String get musicScopeAll;
+
+  /// Hint under the whole-location option
+  ///
+  /// In en, this message translates to:
+  /// **'Looks through every folder. Slower on large locations.'**
+  String get musicScopeAllHint;
+
+  /// Option: index only chosen folders
+  ///
+  /// In en, this message translates to:
+  /// **'Only some folders'**
+  String get musicScopeChoose;
+
+  /// Button that opens the folder picker
+  ///
+  /// In en, this message translates to:
+  /// **'Add a folder'**
+  String get musicScopeAddFolder;
+
+  /// Shown when only-some-folders is selected but none are chosen
+  ///
+  /// In en, this message translates to:
+  /// **'No folders chosen yet'**
+  String get musicScopeNoFolders;
+
+  /// Button that turns music mode on with the chosen folders
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get musicScopeStart;
+
+  /// Button that adds the folder being viewed
+  ///
+  /// In en, this message translates to:
+  /// **'Add this folder'**
+  String get musicScopePickerAdd;
+
+  /// Folder picker empty state
+  ///
+  /// In en, this message translates to:
+  /// **'No subfolders here'**
+  String get musicScopePickerEmpty;
+
+  /// Folder picker name for the root of a location
+  ///
+  /// In en, this message translates to:
+  /// **'Top level'**
+  String get musicScopePickerRoot;
+
+  /// Tooltip of the button that removes a chosen folder
+  ///
+  /// In en, this message translates to:
+  /// **'Remove folder'**
+  String get musicScopeRemoveFolder;
+
+  /// Number of artists
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 artist} other{{count} artists}}'**
+  String libraryArtistCount(num count);
+
+  /// Number of genres
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 genre} other{{count} genres}}'**
+  String libraryGenreCount(num count);
+
+  /// Shown when a mixed list is played: only the tracks in one location can play together
+  ///
+  /// In en, this message translates to:
+  /// **'Playing {count, plural, =1{1 track} other{{count} tracks}} from {source}. The rest of this list is in other locations.'**
+  String musicPlayPartialNote(num count, String source);
+
+  /// Menu item that picks an image from the location's files as an album or artist cover
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a cover image'**
+  String get musicCoverChoose;
+
+  /// Menu item that removes a cover chosen by hand
+  ///
+  /// In en, this message translates to:
+  /// **'Remove custom cover'**
+  String get musicCoverRemove;
+
+  /// Snackbar when the chosen image could not be read or decoded
+  ///
+  /// In en, this message translates to:
+  /// **'That image could not be used as a cover'**
+  String get musicCoverFailed;
+
+  /// Tooltip of the mini player previous-track button
+  ///
+  /// In en, this message translates to:
+  /// **'Previous'**
+  String get musicMiniPrevious;
+
+  /// Tooltip of the mini player next-track button
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get musicMiniNext;
+
+  /// Tooltip of the mini player play button
+  ///
+  /// In en, this message translates to:
+  /// **'Play'**
+  String get musicMiniPlay;
+
+  /// Tooltip of the mini player pause button
+  ///
+  /// In en, this message translates to:
+  /// **'Pause'**
+  String get musicMiniPause;
+
+  /// Tooltip of the mini player button that stops the music
+  ///
+  /// In en, this message translates to:
+  /// **'Stop playback'**
+  String get musicMiniStop;
+
   /// Storage space summary shown on mounted container card
   ///
   /// In en, this message translates to:
@@ -7953,7 +8643,7 @@ abstract class AppLocalizations {
   /// Tool card subtitle for the Storage Analyzer
   ///
   /// In en, this message translates to:
-  /// **'See what\'s taking up space in a mounted vault'**
+  /// **'See what\'s taking up space in Local Storage or a mounted vault'**
   String get toolStorageAnalyzerSubtitle;
 
   /// Tool card title for Duplicate File Finder
@@ -8809,7 +9499,7 @@ abstract class AppLocalizations {
   /// Empty state message when no volumes are mounted
   ///
   /// In en, this message translates to:
-  /// **'Mount a vault first, then come back here to see its storage breakdown.'**
+  /// **'Open Local Storage or mount a vault first, then come back here to see its storage breakdown.'**
   String get storageAnalyzerNoTargetsMessage;
 
   /// Capacity gauge caption
@@ -8883,6 +9573,244 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Other'**
   String get storageCategoryOther;
+
+  /// Storage Analyzer tab: treemap of the current folder
+  ///
+  /// In en, this message translates to:
+  /// **'Map'**
+  String get storageAnalyzerTabMap;
+
+  /// Storage Analyzer tab: sortable list of the current folder
+  ///
+  /// In en, this message translates to:
+  /// **'Folders'**
+  String get storageAnalyzerTabFolders;
+
+  /// Storage Analyzer tab: usage grouped by file type
+  ///
+  /// In en, this message translates to:
+  /// **'Types'**
+  String get storageAnalyzerTabTypes;
+
+  /// Storage Analyzer tab: suggestions for freeing space
+  ///
+  /// In en, this message translates to:
+  /// **'Cleanup'**
+  String get storageAnalyzerTabCleanup;
+
+  /// Free space on the volume, shown beside the capacity gauge
+  ///
+  /// In en, this message translates to:
+  /// **'{free} free'**
+  String storageAnalyzerFreeSpace(String free);
+
+  /// Number of files in a folder or selection
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 file} other{{count} files}}'**
+  String storageAnalyzerFileCount(num count);
+
+  /// Number of items in a cleanup suggestion
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 item} other{{count} items}}'**
+  String storageAnalyzerItemCount(num count);
+
+  /// Total size of the files found, shown when the volume capacity is unknown
+  ///
+  /// In en, this message translates to:
+  /// **'Vault content: {size}'**
+  String storageAnalyzerContentSize(String size);
+
+  /// Live tally while the volume is being scanned
+  ///
+  /// In en, this message translates to:
+  /// **'{files} files · {size} so far'**
+  String storageAnalyzerScanProgress(String files, String size);
+
+  /// Banner shown when some folders could not be listed completely during a scan
+  ///
+  /// In en, this message translates to:
+  /// **'Some folders couldn\'t be fully read, so totals may be lower than the real figures.'**
+  String get storageAnalyzerPartialNotice;
+
+  /// Banner shown when the volume was modified elsewhere after the scan
+  ///
+  /// In en, this message translates to:
+  /// **'This volume has changed since it was scanned.'**
+  String get storageAnalyzerStaleNotice;
+
+  /// Tooltip for the button that goes to the parent folder
+  ///
+  /// In en, this message translates to:
+  /// **'Up one level'**
+  String get storageAnalyzerUpOneLevel;
+
+  /// Shown when the folder being viewed has no content
+  ///
+  /// In en, this message translates to:
+  /// **'This folder is empty.'**
+  String get storageAnalyzerEmptyFolder;
+
+  /// Label of the treemap tile that groups many items too small to draw
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 smaller item} other{{count} smaller items}}'**
+  String storageAnalyzerSmallerItems(num count);
+
+  /// Hint below the storage treemap
+  ///
+  /// In en, this message translates to:
+  /// **'Tap a folder to open it. Press and hold to select.'**
+  String get storageAnalyzerMapHint;
+
+  /// Sort option: folders with the most files first
+  ///
+  /// In en, this message translates to:
+  /// **'File count'**
+  String get storageAnalyzerSortFiles;
+
+  /// Button that clears the file-type filter
+  ///
+  /// In en, this message translates to:
+  /// **'All types'**
+  String get storageAnalyzerAllTypes;
+
+  /// Header above the biggest files of one file type
+  ///
+  /// In en, this message translates to:
+  /// **'Largest files · {type}'**
+  String storageAnalyzerLargestOfType(String type);
+
+  /// Section header for cleanup suggestions
+  ///
+  /// In en, this message translates to:
+  /// **'Suggestions'**
+  String get storageAnalyzerCleanupHeader;
+
+  /// Cleanup suggestion title: the biggest files
+  ///
+  /// In en, this message translates to:
+  /// **'Large files'**
+  String get storageAnalyzerCleanupLarge;
+
+  /// Cleanup suggestion title: files nobody has touched for a year
+  ///
+  /// In en, this message translates to:
+  /// **'Not modified in over a year'**
+  String get storageAnalyzerCleanupStale;
+
+  /// Cleanup suggestion title: leftover download, backup and cache files
+  ///
+  /// In en, this message translates to:
+  /// **'Temporary and junk files'**
+  String get storageAnalyzerCleanupTemp;
+
+  /// Cleanup suggestion title: folders with nothing in them
+  ///
+  /// In en, this message translates to:
+  /// **'Empty folders'**
+  String get storageAnalyzerCleanupEmpty;
+
+  /// Button that opens a cleanup suggestion for review
+  ///
+  /// In en, this message translates to:
+  /// **'Review'**
+  String get storageAnalyzerCleanupReview;
+
+  /// Shown when there are no cleanup suggestions
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing obvious to clean up. This volume looks tidy.'**
+  String get storageAnalyzerCleanupNothing;
+
+  /// Card title that opens a list of the largest files
+  ///
+  /// In en, this message translates to:
+  /// **'Biggest files'**
+  String get storageAnalyzerBiggestFiles;
+
+  /// Card subtitle for the biggest-files list
+  ///
+  /// In en, this message translates to:
+  /// **'Browse the largest files on this volume'**
+  String get storageAnalyzerBiggestFilesSubtitle;
+
+  /// Button that returns from a reviewed suggestion to the list of suggestions
+  ///
+  /// In en, this message translates to:
+  /// **'All suggestions'**
+  String get storageAnalyzerAllSuggestions;
+
+  /// Selection bar: how many items are selected and how much space they use
+  ///
+  /// In en, this message translates to:
+  /// **'{count} selected · {size}'**
+  String storageAnalyzerSelectedSummary(int count, String size);
+
+  /// Confirmation text for deleting files from the Storage Analyzer
+  ///
+  /// In en, this message translates to:
+  /// **'This permanently deletes the selected items from this storage and frees {size}. It can\'t be undone.'**
+  String storageAnalyzerDeleteFilesMessage(String size);
+
+  /// Confirmation text for deleting a selection that includes folders
+  ///
+  /// In en, this message translates to:
+  /// **'This permanently deletes the selected items ({files} files, including everything inside selected folders) and frees {size}. It can\'t be undone.'**
+  String storageAnalyzerDeleteFoldersMessage(String files, String size);
+
+  /// Snackbar after a successful delete from the Storage Analyzer
+  ///
+  /// In en, this message translates to:
+  /// **'Freed {size}'**
+  String storageAnalyzerDeleteDone(String size);
+
+  /// Snackbar when only some of the selected items could be deleted
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted {deleted}, but {failed} couldn\'t be deleted. Freed {size}.'**
+  String storageAnalyzerDeletePartial(
+    String deleted,
+    String failed,
+    String size,
+  );
+
+  /// Snackbar when none of the selected items could be deleted
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing was deleted.'**
+  String get storageAnalyzerDeleteNone;
+
+  /// Snackbar when a delete from the Storage Analyzer failed unexpectedly
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t delete the selected items.'**
+  String get storageAnalyzerDeleteError;
+
+  /// Action: rescan only the folder being acted on
+  ///
+  /// In en, this message translates to:
+  /// **'Rescan this folder'**
+  String get storageAnalyzerRescanFolder;
+
+  /// Action that starts selecting items in the Storage Analyzer
+  ///
+  /// In en, this message translates to:
+  /// **'Select'**
+  String get storageAnalyzerSelectAction;
+
+  /// Action: tick every item in the folder being viewed
+  ///
+  /// In en, this message translates to:
+  /// **'Select all in this folder'**
+  String get storageAnalyzerSelectAllHere;
+
+  /// Action: drill into a folder in the Storage Analyzer
+  ///
+  /// In en, this message translates to:
+  /// **'Open folder'**
+  String get storageAnalyzerOpenFolder;
 
   /// Title for Keyfile & Passphrase Generator tool
   ///
@@ -9624,16 +10552,16 @@ abstract class AppLocalizations {
   /// **'Tap to select a storage & folder'**
   String get vaultSyncTapToSelect;
 
-  /// Tooltip for the button that swaps the Left and Right sides in Vault Sync
+  /// Tooltip of the swap button in Vault Sync
   ///
   /// In en, this message translates to:
-  /// **'Swap Left and Right'**
+  /// **'Swap the two storages'**
   String get vaultSyncSwapTooltip;
 
-  /// Warning shown when Left and Right are set to the exact same vault and folder
+  /// Warning in Vault Sync when both storages point at the same folder
   ///
   /// In en, this message translates to:
-  /// **'Left and Right must be different folders.'**
+  /// **'The two folders must be different.'**
   String get vaultSyncSameLocationWarning;
 
   /// Title of the idle-state intro card in Vault Sync before a comparison has run
@@ -9642,10 +10570,10 @@ abstract class AppLocalizations {
   /// **'Compare Two Folders'**
   String get vaultSyncIntroTitle;
 
-  /// Subtitle of the idle-state intro card in Vault Sync before a comparison has run
+  /// Intro text on the Vault Sync tool
   ///
   /// In en, this message translates to:
-  /// **'Pick a Left and Right folder — in a vault, on device storage or on a document provider such as an SD card or cloud drive — to see what\'s missing, modified, or newer on each side.'**
+  /// **'Pick two folders — in a vault, on device storage or on a document provider such as an SD card or cloud drive — to see what\'s missing, modified, or newer in each.'**
   String get vaultSyncIntroSubtitle;
 
   /// Button label to start comparing the two selected vault locations
@@ -9753,13 +10681,13 @@ abstract class AppLocalizations {
   /// Sync direction option: copy newer/missing files in both directions
   ///
   /// In en, this message translates to:
-  /// **'Two-way (recommended)'**
+  /// **'Two-way'**
   String get vaultSyncDirectionTwoWay;
 
   /// Explanation of the two-way sync direction option
   ///
   /// In en, this message translates to:
-  /// **'Copies each file to whichever side is missing it or has an older copy'**
+  /// **'Copies missing files and newer versions to the other side.'**
   String get vaultSyncDirectionTwoWaySubtitle;
 
   /// Sync direction option: only push Left's changes to Right
@@ -9917,10 +10845,10 @@ abstract class AppLocalizations {
   /// **'Select {side} Folder'**
   String vaultSyncPickLocationTitle(Object side);
 
-  /// Shown on the Vault Sync screen when the two chosen folders are identical or one contains the other
+  /// Warning in Vault Sync when the two folders overlap
   ///
   /// In en, this message translates to:
-  /// **'Left and Right must not be the same folder or nested inside each other.'**
+  /// **'The two folders must not be the same or nested inside each other.'**
   String get vaultSyncOverlapWarning;
 
   /// Extra line in the Vault Sync confirmation when files will flow from an encrypted vault to plain device storage or a document provider. {targets} is a comma-separated list of destination names
@@ -13480,7 +14408,7 @@ abstract class AppLocalizations {
   /// Subtitle explaining status badge details
   ///
   /// In en, this message translates to:
-  /// **'Shows slideshow timer or static photo indicator'**
+  /// **'Shows the slideshow countdown while a slideshow is playing'**
   String get statusBadgeSubtitle;
 
   /// Section header for top bar actions
@@ -20803,6 +21731,24 @@ abstract class AppLocalizations {
   /// **'Move the app bar from the top of the screen to the bottom, where your thumb can reach it more easily.'**
   String get appBarAtBottomDesc;
 
+  /// Settings section header on the Appearance & Interface page that groups navigation-related options.
+  ///
+  /// In en, this message translates to:
+  /// **'Navigation'**
+  String get sectionNavigation;
+
+  /// Setting title for the switch that turns the in-app predictive back animations on or off.
+  ///
+  /// In en, this message translates to:
+  /// **'Predictive back animations'**
+  String get predictiveBackAnimationsLabel;
+
+  /// Explains the predictive back animations setting. It only affects the in-app transitions, not the Android system back animations.
+  ///
+  /// In en, this message translates to:
+  /// **'Show interactive previews and animations when navigating backwards.'**
+  String get predictiveBackAnimationsDesc;
+
   /// Setting title for selecting files and folders by tapping their icon in list view.
   ///
   /// In en, this message translates to:
@@ -22248,6 +23194,876 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Show page thumbnails above the scrubber'**
   String get comicReaderCarouselScrubberSubtitle;
+
+  /// Button in Vault Sync that opens the folder explorer showing every item in both storages
+  ///
+  /// In en, this message translates to:
+  /// **'Browse all items'**
+  String get vaultSyncBrowseAllButton;
+
+  /// Title of the Vault Sync folder explorer screen
+  ///
+  /// In en, this message translates to:
+  /// **'Browse both storages'**
+  String get vaultSyncExplorerTitle;
+
+  /// Empty state title in the Vault Sync folder explorer
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to show'**
+  String get vaultSyncExplorerEmptyTitle;
+
+  /// Empty state message in the Vault Sync folder explorer
+  ///
+  /// In en, this message translates to:
+  /// **'No items match this filter in this folder.'**
+  String get vaultSyncExplorerEmptyMessage;
+
+  /// Error title when the Vault Sync folder explorer cannot list a folder
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t read this folder'**
+  String get vaultSyncExplorerLoadFailedTitle;
+
+  /// Error message when the Vault Sync folder explorer cannot list a folder
+  ///
+  /// In en, this message translates to:
+  /// **'One of the two storages couldn\'t be listed. Try again, and make sure both are still unlocked and connected.'**
+  String get vaultSyncExplorerLoadFailedMessage;
+
+  /// Vault Sync filter chip: show every difference
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get vaultSyncFilterAll;
+
+  /// Vault Sync folder explorer filter chip: hide items that are already in sync
+  ///
+  /// In en, this message translates to:
+  /// **'Differences'**
+  String get vaultSyncFilterDifferences;
+
+  /// Vault Sync filter chip: files present in both storages where one copy is newer
+  ///
+  /// In en, this message translates to:
+  /// **'Newer copy'**
+  String get vaultSyncFilterNewer;
+
+  /// Vault Sync filter chip: conflicting items that need a decision
+  ///
+  /// In en, this message translates to:
+  /// **'Needs review'**
+  String get vaultSyncFilterConflicts;
+
+  /// Vault Sync filter chip: items the current plan will delete
+  ///
+  /// In en, this message translates to:
+  /// **'Deletions'**
+  String get vaultSyncFilterDeletions;
+
+  /// Empty state message when a Vault Sync filter hides every result
+  ///
+  /// In en, this message translates to:
+  /// **'No items match this filter.'**
+  String get vaultSyncFilterNoMatchesMessage;
+
+  /// Tooltip of the Vault Sync sort button
+  ///
+  /// In en, this message translates to:
+  /// **'Sort'**
+  String get vaultSyncSortTooltip;
+
+  /// Vault Sync sort option: by path
+  ///
+  /// In en, this message translates to:
+  /// **'Path'**
+  String get vaultSyncSortPath;
+
+  /// Vault Sync sort option: by size, largest first
+  ///
+  /// In en, this message translates to:
+  /// **'Largest first'**
+  String get vaultSyncSortSize;
+
+  /// Vault Sync sort option: by modified time, newest first
+  ///
+  /// In en, this message translates to:
+  /// **'Newest first'**
+  String get vaultSyncSortModified;
+
+  /// Vault Sync sort option: grouped by status
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get vaultSyncSortStatus;
+
+  /// Badge for a file that is identical in both storages in the Vault Sync folder explorer
+  ///
+  /// In en, this message translates to:
+  /// **'In sync'**
+  String get vaultSyncStatusInSync;
+
+  /// Badge for a folder present in both storages in the Vault Sync folder explorer
+  ///
+  /// In en, this message translates to:
+  /// **'Folder'**
+  String get vaultSyncStatusFolder;
+
+  /// Bottom bar line in Vault Sync showing how many items the sync will delete
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 deletion} other{{count} deletions}}'**
+  String vaultSyncDeletionsQueuedLabel(num count);
+
+  /// Extra paragraph in the Vault Sync confirmation dialog when the sync deletes items
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 item will be permanently deleted. This can\'t be undone.} other{{count} items will be permanently deleted. This can\'t be undone.}}'**
+  String vaultSyncConfirmDeletionsMessage(num count);
+
+  /// Banner in Vault Sync shown after a delete that the comparison cannot account for
+  ///
+  /// In en, this message translates to:
+  /// **'Results may be out of date after deleting. Compare again to refresh the counts.'**
+  String get vaultSyncResultsStaleMessage;
+
+  /// App bar title in Vault Sync selection mode
+  ///
+  /// In en, this message translates to:
+  /// **'{count} selected'**
+  String vaultSyncSelectedCount(num count);
+
+  /// Entry sheet action in Vault Sync: open the file
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get vaultSyncOpenAction;
+
+  /// Entry sheet action in Vault Sync: open the copy that lives in one storage. {side} is the storage name
+  ///
+  /// In en, this message translates to:
+  /// **'Open copy in {side}'**
+  String vaultSyncOpenCopyAction(String side);
+
+  /// Entry sheet action in Vault Sync: browse inside the folder
+  ///
+  /// In en, this message translates to:
+  /// **'Open folder'**
+  String get vaultSyncOpenFolderAction;
+
+  /// Subtitle of the open-folder action in the Vault Sync entry sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Browse what\'s inside, in both storages'**
+  String get vaultSyncOpenFolderSubtitle;
+
+  /// Entry sheet action in Vault Sync: open the folder that contains the item
+  ///
+  /// In en, this message translates to:
+  /// **'Show in folder'**
+  String get vaultSyncShowInFolderAction;
+
+  /// Subtitle of the show-in-folder action in the Vault Sync entry sheet
+  ///
+  /// In en, this message translates to:
+  /// **'See it next to its neighbours in both storages'**
+  String get vaultSyncShowInFolderSubtitle;
+
+  /// Delete the item from both compared storages immediately
+  ///
+  /// In en, this message translates to:
+  /// **'Delete from both storages'**
+  String get vaultSyncDeleteFromBothAction;
+
+  /// Names both compared storages in the Vault Sync delete confirmation
+  ///
+  /// In en, this message translates to:
+  /// **'{left} and {right}'**
+  String vaultSyncDeleteBothSidesLabel(String left, String right);
+
+  /// Body of the Vault Sync delete confirmation dialog. {where} is one or two storage names
+  ///
+  /// In en, this message translates to:
+  /// **'These items will be permanently deleted from {where}, including everything inside any folder. This can\'t be undone.'**
+  String vaultSyncDeleteConfirmMessage(String where);
+
+  /// Snackbar after a successful delete in Vault Sync
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Deleted 1 item} other{Deleted {count} items}}'**
+  String vaultSyncDeleteDoneMessage(num count);
+
+  /// Snackbar after a delete in Vault Sync where some items failed
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted {deleted}, but {failed} couldn\'t be deleted'**
+  String vaultSyncDeletePartialMessage(int deleted, int failed);
+
+  /// Snackbar after an immediate copy in Vault Sync succeeded
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get vaultSyncCopyDoneMessage;
+
+  /// Snackbar after an immediate copy in Vault Sync failed
+  ///
+  /// In en, this message translates to:
+  /// **'Some items couldn\'t be copied. Check the transfer list for details.'**
+  String get vaultSyncCopyFailedMessage;
+
+  /// Snackbar when a file cannot be opened from Vault Sync
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open {name}'**
+  String vaultSyncOpenFailedMessage(String name);
+
+  /// Entry sheet detail in Vault Sync for a storage that does not hold the item
+  ///
+  /// In en, this message translates to:
+  /// **'Not in this storage'**
+  String get vaultSyncDetailsNotOnThisSide;
+
+  /// Entry sheet detail in Vault Sync for a folder (no size)
+  ///
+  /// In en, this message translates to:
+  /// **'Folder'**
+  String get vaultSyncDetailsFolder;
+
+  /// Status badge: the item exists only in the named storage
+  ///
+  /// In en, this message translates to:
+  /// **'Only in {storage}'**
+  String vaultSyncStatusOnlyIn(String storage);
+
+  /// Status badge: the copy in the named storage is newer
+  ///
+  /// In en, this message translates to:
+  /// **'Newer in {storage}'**
+  String vaultSyncStatusNewerIn(String storage);
+
+  /// Summary badge: how many items exist only in the named storage
+  ///
+  /// In en, this message translates to:
+  /// **'{count} only in {storage}'**
+  String vaultSyncBadgeOnlyIn(int count, String storage);
+
+  /// Summary badge: how many items are newer in the named storage
+  ///
+  /// In en, this message translates to:
+  /// **'{count} newer in {storage}'**
+  String vaultSyncBadgeNewerIn(int count, String storage);
+
+  /// Detail line for a folder that exists only in the named storage
+  ///
+  /// In en, this message translates to:
+  /// **'Folder — only in {storage}'**
+  String vaultSyncFolderOnlyInDetail(String storage);
+
+  /// One-way copy mode label; the user chooses the source and destination separately.
+  ///
+  /// In en, this message translates to:
+  /// **'One-way copy'**
+  String get vaultSyncDirectionOneWay;
+
+  /// Concise explanation of one-way sync; the option title names both storages.
+  ///
+  /// In en, this message translates to:
+  /// **'Copies new and updated files in the direction shown; the source is unchanged.'**
+  String get vaultSyncDirectionOneWaySubtitle;
+
+  /// Mirror sync mode label; the user chooses the source and destination separately.
+  ///
+  /// In en, this message translates to:
+  /// **'Mirror sync'**
+  String get vaultSyncDirectionMirror;
+
+  /// Concise explanation of mirror sync and its deletion behavior; the option title names both storages.
+  ///
+  /// In en, this message translates to:
+  /// **'Replaces the destination with an exact copy; destination-only items are deleted.'**
+  String get vaultSyncDirectionMirrorSubtitle;
+
+  /// Plan menu item and button: copy the item into the named storage
+  ///
+  /// In en, this message translates to:
+  /// **'Copy → {storage}'**
+  String vaultSyncActionCopyTo(String storage);
+
+  /// Entry sheet action in Vault Sync: copy the item into the named storage immediately
+  ///
+  /// In en, this message translates to:
+  /// **'Copy to {storage} now'**
+  String vaultSyncCopyNowToAction(String storage);
+
+  /// Delete the item from the named storage immediately
+  ///
+  /// In en, this message translates to:
+  /// **'Delete from {storage}'**
+  String vaultSyncDeleteFromAction(String storage);
+
+  /// Plan menu item: delete the item from the named storage during the next sync
+  ///
+  /// In en, this message translates to:
+  /// **'Delete from {storage} when syncing'**
+  String vaultSyncPlanDeleteFrom(String storage);
+
+  /// Vault Sync filter chip: items present only in the named storage
+  ///
+  /// In en, this message translates to:
+  /// **'Only in {storage}'**
+  String vaultSyncFilterOnlyIn(String storage);
+
+  /// Title of the first storage card before a storage has been picked
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the first storage'**
+  String get vaultSyncChooseFirstStorage;
+
+  /// Title of the second storage card before a storage has been picked
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the second storage'**
+  String get vaultSyncChooseSecondStorage;
+
+  /// Button on a storage card in Vault Sync that changes the chosen storage
+  ///
+  /// In en, this message translates to:
+  /// **'Change'**
+  String get vaultSyncChangeButton;
+
+  /// Button on an empty storage card in Vault Sync that picks a storage
+  ///
+  /// In en, this message translates to:
+  /// **'Choose'**
+  String get vaultSyncChooseButton;
+
+  /// Title of the screen listing the storages that can be compared
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a storage'**
+  String get vaultSyncChooseStorageTitle;
+
+  /// Hint above the list of storages in the Vault Sync storage chooser
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a storage first, then the folder inside it to compare.'**
+  String get vaultSyncChooseStorageHint;
+
+  /// Badge marking the storage that is already in use in the Vault Sync storage chooser
+  ///
+  /// In en, this message translates to:
+  /// **'Current'**
+  String get vaultSyncCurrentStorageBadge;
+
+  /// Tooltip of the button that returns from the folder picker to the storage list
+  ///
+  /// In en, this message translates to:
+  /// **'Change storage'**
+  String get vaultSyncChangeStorageTooltip;
+
+  /// Title of the Vault Sync folder picker. {storage} is the storage name
+  ///
+  /// In en, this message translates to:
+  /// **'Folder in {storage}'**
+  String vaultSyncPickFolderTitle(String storage);
+
+  /// Heading above the source and destination choices in the sync direction dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Direction'**
+  String get vaultSyncDirectionSectionTitle;
+
+  /// Warning badge on mirror mode because extra destination files are deleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Deletes files'**
+  String get vaultSyncDirectionMirrorWarning;
+
+  /// Label for the storage that is copied from in one-way or mirror sync.
+  ///
+  /// In en, this message translates to:
+  /// **'Source'**
+  String get vaultSyncDirectionSourceLabel;
+
+  /// Label for the storage that receives changes in one-way or mirror sync.
+  ///
+  /// In en, this message translates to:
+  /// **'Target'**
+  String get vaultSyncDirectionTargetLabel;
+
+  /// Button label for reversing source and target in the direction selector.
+  ///
+  /// In en, this message translates to:
+  /// **'Swap'**
+  String get vaultSyncDirectionSwapButton;
+
+  /// Badge that marks two-way sync as the recommended mode.
+  ///
+  /// In en, this message translates to:
+  /// **'Recommended'**
+  String get vaultSyncDirectionRecommendedLabel;
+
+  /// Navigation drawer section title for the Images / Videos / Audio / Documents shortcuts
+  ///
+  /// In en, this message translates to:
+  /// **'Categories'**
+  String get categoriesSectionTitle;
+
+  /// Tooltip of the drawer button that opens the category shortcut settings
+  ///
+  /// In en, this message translates to:
+  /// **'Manage categories'**
+  String get manageCategoriesTooltip;
+
+  /// Settings section title and sheet title for choosing which category shortcuts the drawer shows
+  ///
+  /// In en, this message translates to:
+  /// **'Category shortcuts'**
+  String get categoryShortcutsTitle;
+
+  /// Settings switch: show the category shortcuts in the navigation drawer
+  ///
+  /// In en, this message translates to:
+  /// **'Show category shortcuts'**
+  String get categoryShortcutsEnable;
+
+  /// Subtitle of the switch that shows the category shortcuts in the drawer
+  ///
+  /// In en, this message translates to:
+  /// **'Images, videos, audio and documents from all your storage, in the drawer'**
+  String get categoryShortcutsEnableSubtitle;
+
+  /// Settings action: show all four category shortcuts again in their default order
+  ///
+  /// In en, this message translates to:
+  /// **'Restore default shortcuts'**
+  String get categoryShortcutsRestore;
+
+  /// Category browser source choice: local storage, storage locations and unlocked vaults together
+  ///
+  /// In en, this message translates to:
+  /// **'All storage'**
+  String get categorySourceAll;
+
+  /// Tooltip of the category browser's source selector button
+  ///
+  /// In en, this message translates to:
+  /// **'Choose source'**
+  String get categorySourceTooltip;
+
+  /// Category browser menu switch: browse the matching files grouped in their original folders instead of one flat list
+  ///
+  /// In en, this message translates to:
+  /// **'Display original folder structure'**
+  String get categoryFolderStructure;
+
+  /// Category browser progress line while it looks through folders for matching files
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Scanning… 1 folder checked} other{Scanning… {count} folders checked}}'**
+  String categoryScanning(int count);
+
+  /// Category browser empty state when no matching file was found
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing found in this category'**
+  String get categoryEmpty;
+
+  /// Category browser empty state when only vaults are selected but none is unlocked
+  ///
+  /// In en, this message translates to:
+  /// **'No vault is unlocked'**
+  String get categoryNoVaultsUnlocked;
+
+  /// Notice in the category browser when the scan stopped at its folder or file limit
+  ///
+  /// In en, this message translates to:
+  /// **'Results may be incomplete — the scan stopped at its limit.'**
+  String get categoryScanLimitReached;
+
+  /// Message when sharing selected category files that live in more than one storage
+  ///
+  /// In en, this message translates to:
+  /// **'Choose files from one storage at a time to share them.'**
+  String get categoryShareOneSource;
+
+  /// Message after copying or cutting files in the category browser
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 file ready to paste} other{{count} files ready to paste}} — open a folder to paste'**
+  String categoryClipboardReady(int count);
+
+  /// Settings switch: keep an index of category files inside each vault
+  ///
+  /// In en, this message translates to:
+  /// **'Keep category index in vaults'**
+  String get categoryIndexInVaultsTitle;
+
+  /// Subtitle of the switch that keeps the category index inside vaults
+  ///
+  /// In en, this message translates to:
+  /// **'Saved encrypted inside each vault, in its configuration folder, when you open a category, so its files appear instantly next time. Nothing is saved on your phone.'**
+  String get categoryIndexInVaultsSubtitle;
+
+  /// Settings action that removes the category index from the unlocked vaults
+  ///
+  /// In en, this message translates to:
+  /// **'Clear category indexes'**
+  String get categoryIndexClear;
+
+  /// Subtitle of the action that clears the category indexes
+  ///
+  /// In en, this message translates to:
+  /// **'Removes the index from every unlocked vault'**
+  String get categoryIndexClearSubtitle;
+
+  /// Snackbar shown after the category indexes were cleared
+  ///
+  /// In en, this message translates to:
+  /// **'Category indexes cleared'**
+  String get categoryIndexCleared;
+
+  /// Dialog title shown when locking a container is refused because a USB device did not accept the last buffered changes
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t write to the device'**
+  String get lockFlushRefusedTitle;
+
+  /// Dialog body explaining that the container was left open; offers retry or lock anyway (which discards the unwritten changes)
+  ///
+  /// In en, this message translates to:
+  /// **'{name} wasn\'t locked because the device didn\'t accept the latest changes. They\'re still waiting in the app. Check the connection and retry, or lock anyway and discard them.'**
+  String lockFlushRefusedMessage(String name);
+
+  /// Destructive dialog button that locks a container even though the device refused the last changes, discarding them
+  ///
+  /// In en, this message translates to:
+  /// **'Lock anyway'**
+  String get lockAnywayButton;
+
+  /// Count of symbolic links found in the current vault folder
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0 {0 symbolic links} one {1 symbolic link} other {{count} symbolic links}}'**
+  String vaultListingSymbolicLinkCount(int count);
+
+  /// Count of vault entries that could not be listed in the current folder
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0 {0 entries are not shown} one {1 entry is not shown} other {{count} entries are not shown}}'**
+  String vaultListingHiddenEntryCount(int count);
+
+  /// Action label that opens details about symbolic links and hidden entries
+  ///
+  /// In en, this message translates to:
+  /// **'Details'**
+  String get vaultListingDetails;
+
+  /// Heading for the symbolic links section in vault listing details
+  ///
+  /// In en, this message translates to:
+  /// **'Symbolic links'**
+  String get vaultListingSymbolicLinksTitle;
+
+  /// Explains that symbolic links are not followed and can be tapped to copy their target
+  ///
+  /// In en, this message translates to:
+  /// **'A symbolic link points somewhere else. It is never opened or followed here; tap one to copy where it points.'**
+  String get vaultListingSymbolicLinksNote;
+
+  /// Heading for vault entries that could not be listed in the current folder
+  ///
+  /// In en, this message translates to:
+  /// **'Entries that are not shown'**
+  String get vaultListingHiddenEntriesTitle;
+
+  /// Explains common reasons entries are not listed and how conflict copies can be resolved
+  ///
+  /// In en, this message translates to:
+  /// **'These entries exist in the vault but could not be listed. This most often happens when a sync app creates conflict copies (for example, \"name (1)\") or an upload has not finished. Cryptomator on a computer can resolve conflict copies. Nothing here has been changed or deleted.'**
+  String get vaultListingHiddenEntriesBody;
+
+  /// Placeholder shown when a symbolic link target cannot be read
+  ///
+  /// In en, this message translates to:
+  /// **'(target unreadable)'**
+  String get vaultListingTargetUnreadable;
+
+  /// Confirmation shown after copying a symbolic link target
+  ///
+  /// In en, this message translates to:
+  /// **'Link target copied'**
+  String get vaultListingLinkTargetCopied;
+
+  /// Tooltip of the gallery filter button in the app bar
+  ///
+  /// In en, this message translates to:
+  /// **'Filter'**
+  String get galleryFilterTooltip;
+
+  /// Menu entry that opens the gallery filter sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Filter…'**
+  String get galleryFilterMenuOpen;
+
+  /// Menu entry that removes every gallery filter
+  ///
+  /// In en, this message translates to:
+  /// **'Clear filters'**
+  String get galleryFilterClearAll;
+
+  /// Button that removes every gallery filter (filter sheet and filter bar)
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get galleryFilterClear;
+
+  /// Header of the gallery filter sheet when filters are applied: how many items are left out of the total
+  ///
+  /// In en, this message translates to:
+  /// **'{shown} of {total} shown'**
+  String galleryFilterShownOfTotal(int shown, int total);
+
+  /// Header of the gallery filter sheet when no filter is applied: number of items
+  ///
+  /// In en, this message translates to:
+  /// **'Total: {count}'**
+  String galleryFilterTotal(int count);
+
+  /// Progress note in the gallery filter sheet while photo metadata (EXIF, tags, GPS) is read in the background
+  ///
+  /// In en, this message translates to:
+  /// **'Reading photo details: {done} of {total}. Tags, places and cameras appear as it goes.'**
+  String galleryFilterIndexing(int done, int total);
+
+  /// Hint of the search field in the gallery filter sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Search tags, places, cameras, folders…'**
+  String get galleryFilterSearchHint;
+
+  /// Usage hint in the gallery filter sheet: tapping a chip shows only matching items, long-pressing excludes them
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to show only, long-press to hide.'**
+  String get galleryFilterTapHint;
+
+  /// Title of the section choosing how the gallery is divided into sections
+  ///
+  /// In en, this message translates to:
+  /// **'Group by'**
+  String get galleryFilterGroupBy;
+
+  /// Chip that expands a long list of filter chips; count is the total number of chips
+  ///
+  /// In en, this message translates to:
+  /// **'All {count}'**
+  String galleryFilterShowAll(int count);
+
+  /// Chip that collapses an expanded list of filter chips
+  ///
+  /// In en, this message translates to:
+  /// **'Fewer'**
+  String get galleryFilterShowFewer;
+
+  /// Gallery grouping option: no sections
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get galleryGroupNone;
+
+  /// Gallery grouping option: one section per day
+  ///
+  /// In en, this message translates to:
+  /// **'Day'**
+  String get galleryGroupDay;
+
+  /// Gallery grouping option: one section per month
+  ///
+  /// In en, this message translates to:
+  /// **'Month'**
+  String get galleryGroupMonth;
+
+  /// Gallery grouping option: one section per year
+  ///
+  /// In en, this message translates to:
+  /// **'Year'**
+  String get galleryGroupYear;
+
+  /// Gallery grouping option: one section per folder
+  ///
+  /// In en, this message translates to:
+  /// **'Folder'**
+  String get galleryGroupFolder;
+
+  /// Gallery grouping option: one section per media type (photos, videos...)
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get galleryGroupType;
+
+  /// Gallery grouping option: one section per place (city)
+  ///
+  /// In en, this message translates to:
+  /// **'Place'**
+  String get galleryGroupPlace;
+
+  /// Gallery grouping option: one section per camera model
+  ///
+  /// In en, this message translates to:
+  /// **'Camera'**
+  String get galleryGroupCamera;
+
+  /// Gallery filter sheet section title: media type
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get galleryFilterSectionType;
+
+  /// Gallery filter sheet section title: year and month
+  ///
+  /// In en, this message translates to:
+  /// **'Date'**
+  String get galleryFilterSectionDate;
+
+  /// Gallery filter sheet section title: photo tags (keywords)
+  ///
+  /// In en, this message translates to:
+  /// **'Tags'**
+  String get galleryFilterSectionTags;
+
+  /// Gallery filter sheet section title: places (cities) photos were taken in
+  ///
+  /// In en, this message translates to:
+  /// **'Places'**
+  String get galleryFilterSectionPlaces;
+
+  /// Gallery filter sheet section title: camera models
+  ///
+  /// In en, this message translates to:
+  /// **'Cameras'**
+  String get galleryFilterSectionCameras;
+
+  /// Gallery filter sheet section title: landscape, portrait, square
+  ///
+  /// In en, this message translates to:
+  /// **'Orientation'**
+  String get galleryFilterSectionOrientation;
+
+  /// Gallery filter sheet section title: star rating
+  ///
+  /// In en, this message translates to:
+  /// **'Rating'**
+  String get galleryFilterSectionRating;
+
+  /// Gallery filter sheet section title: file size ranges
+  ///
+  /// In en, this message translates to:
+  /// **'File size'**
+  String get galleryFilterSectionSize;
+
+  /// Gallery filter sheet section title: folders
+  ///
+  /// In en, this message translates to:
+  /// **'Folders'**
+  String get galleryFilterSectionFolders;
+
+  /// Gallery filter sheet section title: items that lack some information (no location, no tags...)
+  ///
+  /// In en, this message translates to:
+  /// **'Missing'**
+  String get galleryFilterSectionMissing;
+
+  /// Gallery filter: still images
+  ///
+  /// In en, this message translates to:
+  /// **'Photos'**
+  String get galleryTypePhotos;
+
+  /// Gallery filter: videos
+  ///
+  /// In en, this message translates to:
+  /// **'Videos'**
+  String get galleryTypeVideos;
+
+  /// Gallery filter: animated images such as GIF
+  ///
+  /// In en, this message translates to:
+  /// **'Animated'**
+  String get galleryTypeAnimated;
+
+  /// Gallery filter: images wider than tall
+  ///
+  /// In en, this message translates to:
+  /// **'Landscape'**
+  String get galleryOrientationLandscape;
+
+  /// Gallery filter: images taller than wide
+  ///
+  /// In en, this message translates to:
+  /// **'Portrait'**
+  String get galleryOrientationPortrait;
+
+  /// Gallery filter: images as wide as tall
+  ///
+  /// In en, this message translates to:
+  /// **'Square'**
+  String get galleryOrientationSquare;
+
+  /// Gallery filter: files smaller than one megabyte
+  ///
+  /// In en, this message translates to:
+  /// **'Under 1 MB'**
+  String get gallerySizeSmall;
+
+  /// Gallery filter: files between one and ten megabytes
+  ///
+  /// In en, this message translates to:
+  /// **'1 – 10 MB'**
+  String get gallerySizeMedium;
+
+  /// Gallery filter: files larger than ten megabytes
+  ///
+  /// In en, this message translates to:
+  /// **'Over 10 MB'**
+  String get gallerySizeLarge;
+
+  /// Gallery filter and group name: photos without a GPS position
+  ///
+  /// In en, this message translates to:
+  /// **'No location'**
+  String get galleryMissingLocation;
+
+  /// Gallery filter: photos without tags
+  ///
+  /// In en, this message translates to:
+  /// **'No tags'**
+  String get galleryMissingTags;
+
+  /// Gallery filter and group name: photos without camera information
+  ///
+  /// In en, this message translates to:
+  /// **'No camera info'**
+  String get galleryMissingCamera;
+
+  /// Gallery filter: photos without a capture date in their metadata
+  ///
+  /// In en, this message translates to:
+  /// **'No date taken'**
+  String get galleryMissingDateTaken;
+
+  /// Tooltip of a place chip that is a city; km is the search radius
+  ///
+  /// In en, this message translates to:
+  /// **'Nearest city, within {km} km'**
+  String galleryPlaceHintCity(int km);
+
+  /// Tooltip of a place chip that is raw coordinates because no city is close; km is the search radius
+  ///
+  /// In en, this message translates to:
+  /// **'No city within {km} km: grouped by coordinates'**
+  String galleryPlaceHintCoordinates(int km);
 }
 
 class _AppLocalizationsDelegate

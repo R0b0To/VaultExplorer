@@ -677,6 +677,17 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
           if (supportsHiddenVolumeProtection) ...[
             SwitchListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+              value: state.useBackupHeader,
+              onChanged: canConfigure ? notifier.setUseBackupHeader : null,
+              title: Text(context.l10n.useBackupHeaderToggleTitle),
+              subtitle: Text(
+                context.l10n.useBackupHeaderToggleSubtitle,
+                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              ),
+              secondary: Icon(Icons.history_rounded, color: cs.primary, size: 22),
+            ),
+            SwitchListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
               value: state.protectHiddenVolume && !state.readOnly,
               onChanged: canConfigure && !state.readOnly ? notifier.setProtectHiddenVolume : null,
               title: Text(context.l10n.protectHiddenVolumeToggleTitle),
@@ -792,6 +803,21 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
         secondary: Icon(Icons.visibility_outlined, color: cs.primary, size: 22),
       ),
       if (!isKnownLuks && !isKnownBitlocker) ...[
+        SwitchListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+          value: state.useBackupHeader,
+          onChanged: canConfigure
+              ? (val) {
+                  ref.read(usbUnlockControllerProvider(_params).notifier).setUseBackupHeader(val);
+                }
+              : null,
+          title: Text(context.l10n.useBackupHeaderToggleTitle),
+          subtitle: Text(
+            context.l10n.useBackupHeaderToggleSubtitle,
+            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+          secondary: Icon(Icons.history_rounded, color: cs.primary, size: 22),
+        ),
         SwitchListTile(
           contentPadding: const EdgeInsets.symmetric(horizontal: 12),
           value: state.protectHiddenVolume && !state.readOnly,

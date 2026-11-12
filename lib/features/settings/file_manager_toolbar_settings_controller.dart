@@ -144,6 +144,7 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
         folderLayoutModes: currentServiceConfig.folderLayoutModes,
         folderGridAspectRatios: currentServiceConfig.folderGridAspectRatios,
         folderSortModes: currentServiceConfig.folderSortModes,
+        musicModeStorageUris: currentServiceConfig.musicModeStorageUris,
       );
       await service.save(preservedConfig);
 
@@ -284,6 +285,15 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
       }
     }
     return changed;
+  }
+
+  Future<void> setGalleryModeForStorage(
+    String containerUri,
+    bool enabled,
+  ) async {
+    final newConfig =
+        state.config.withGalleryModeForStorage(containerUri, enabled);
+    await _updateConfig(newConfig);
   }
 
   Future<void> reorderActions(int oldIndex, int newIndex) async {

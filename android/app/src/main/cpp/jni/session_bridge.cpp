@@ -14,6 +14,7 @@
 
 #include "session_prepare.h"
 #include "session_guard.h"
+#include "lock_policy.h"
 #include "volume_state.h"
 #include "container_format.h"
 #include "filesystems/stream_handles.h"
@@ -43,16 +44,17 @@ static void rollBackUnprotectedSession(int volId) {
 
 static bool applyHiddenVolumeProtectionOrRollBack(
         JNIEnv* env, int volId, jstring hiddenPassword, jint hiddenPim,
-        jint hiddenCipherId, jint hiddenHashId, jintArray hiddenKeyfileFds) {
+        jint hiddenCipherId, jint hiddenHashId, jintArray hiddenKeyfileFds, bool useBackupHeader) {
     if (hiddenPassword == nullptr) return true;
 
-    const char* nativeHiddenPass = env->GetStringUTFChars(hiddenPassword, nullptr);
+    const char* nativeHiddenPass = vcGetPasswordUtf8(env, hiddenPassword);
     std::vector<int> hiddenKfFds = extractKeyfileFds(env, hiddenKeyfileFds);
     const bool ok = enableHiddenVolumeProtection(
         volId, reinterpret_cast<const unsigned char*>(nativeHiddenPass), strlen(nativeHiddenPass),
         hiddenPim, hiddenCipherId, hiddenHashId,
-        hiddenKfFds.empty() ? nullptr : hiddenKfFds.data(), static_cast<int>(hiddenKfFds.size()));
-    env->ReleaseStringUTFChars(hiddenPassword, nativeHiddenPass);
+        hiddenKfFds.empty() ? nullptr : hiddenKfFds.data(), static_cast<int>(hiddenKfFds.size()),
+        useBackupHeader);
+    vcReleasePasswordUtf8(nativeHiddenPass);
 
     if (!ok) {
         rollBackUnprotectedSession(volId);
@@ -64,7 +66,8 @@ static bool applyHiddenVolumeProtectionOrRollBack(
 extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_unlockAndListNative(
         JNIEnv* env, jobject, jint fd, jstring password, jint pim, jint volId, jint cipherId, jint hashId, jbyteArray preservedKey, jintArray keyfileFds, jboolean readOnly,
-        jstring hiddenPassword, jint hiddenPim, jint hiddenCipherId, jint hiddenHashId, jintArray hiddenKeyfileFds) {
+        jstring hiddenPassword, jint hiddenPim, jint hiddenCipherId, jint hiddenHashId, jintArray hiddenKeyfileFds,
+        jboolean useBackupHeader) {
     JNI_TRY
 
     clearUnlockCancellation(volId);
@@ -77,15 +80,15 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_unlockAndListNative(
     }
 
     std::vector<int> kfFds = extractKeyfileFds(env, keyfileFds);
-    const char* nativePass = env->GetStringUTFChars(password, nullptr);
+    const char* nativePass = vcGetPasswordUtf8(env, password);
     
     if (!prepareSession(fd, reinterpret_cast<const unsigned char*>(nativePass), strlen(nativePass), pim, volId, true, cipherId, hashId, preservedBytes, preservedLen,
                              kfFds.empty() ? nullptr : kfFds.data(), static_cast<int>(kfFds.size()),
-                             readOnly == JNI_TRUE)) {
+                             readOnly == JNI_TRUE, useBackupHeader == JNI_TRUE)) {
         if (preservedKey != nullptr) {
             env->ReleaseByteArrayElements(preservedKey, reinterpret_cast<jbyte*>(const_cast<unsigned char*>(preservedBytes)), JNI_ABORT);
         }
-        env->ReleaseStringUTFChars(password, nativePass);
+        vcReleasePasswordUtf8(nativePass);
         if (isUnlockCancelled(volId)) throwUnlockCancelledException(env);
         return nullptr;
     }
@@ -99,7 +102,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_unlockAndListNative(
     if (preservedKey != nullptr) {
         env->ReleaseByteArrayElements(preservedKey, reinterpret_cast<jbyte*>(const_cast<unsigned char*>(preservedBytes)), JNI_ABORT);
     }
-    env->ReleaseStringUTFChars(password, nativePass);
+    vcReleasePasswordUtf8(nativePass);
 
     if (!mountOk) {
         LOGI("FATFS/NTFS Mount failed on volume %d", volId);
@@ -107,7 +110,8 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_unlockAndListNative(
     }
 
     if (!applyHiddenVolumeProtectionOrRollBack(env, volId, hiddenPassword, hiddenPim,
-                                               hiddenCipherId, hiddenHashId, hiddenKeyfileFds)) {
+                                               hiddenCipherId, hiddenHashId, hiddenKeyfileFds,
+                                               useBackupHeader == JNI_TRUE)) {
         return nullptr;
     }
 
@@ -148,34 +152,66 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_probeContainerFormatNative(
     JNI_CATCH_RETURN(nullptr)
 }
 
-extern "C" JNIEXPORT void JNICALL
-Java_com_aeidolon_vaultexplorer_NativeEngine_lockNative(JNIEnv* env, jobject, jint volId) {
+// Locks one volume; the caller holds volumes[volId].mutex exclusively. The ordering is
+// session/lock_policy.h: a normal lock of a USB volume never throws away data it has
+// already acknowledged. If the device refuses the flush it returns false and keeps the
+// pending write cache and the volume state, so locking can simply be retried (the
+// keep-alive service and the Lock button do). `force` is the explicit "give up on the
+// unwritten data" path -- a removed device, or the user choosing to lock anyway.
+static bool lockVolumeLocked(int volId, bool force) {
+    VolumeState& v = volumes[volId];
+    bool discarded = false;
+    const bool locked = lockpolicy::lockVolume(
+        v.isUsbSource, force,
+        // Flush while the filesystem is still mounted: if the device is already failing,
+        // nothing has been torn down and the vault stays fully usable.
+        [&] {
+            const bool ok = v.usbCache.sync(volId);
+            if (!ok) LOGI("lockNative(vol=%d): USB flush failed, volume left open for retry", volId);
+            return ok;
+        },
+        [&] {
+            // Close FAT streams
+            for (FIL* f : v.openStreams) {
+                f_close(f);
+                delete f;
+            }
+            v.openStreams.clear();
+
+            // Close NTFS streams
+            for (NtfsStream* ns : v.openNtfsStreams) {
+                ntfs_attr_close(ns->attr);
+                ntfs_inode_close(ns->inode);
+                delete ns;
+            }
+            v.openNtfsStreams.clear();
+
+            const bool durable = unmountVolume(volId);
+            if (!durable) LOGI("lockNative(vol=%d): final USB flush failed", volId);
+            return durable;
+        },
+        // reset() clears the USB write cache, so it only runs once that is intended.
+        [&] { v.reset(); },
+        &discarded);
+    if (!locked) {
+        LOGI("lockNative(vol=%d): not locked, pending writes kept for retry", volId);
+    } else if (discarded) {
+        LOGI("lockNative(vol=%d): forced lock discarded buffered USB writes", volId);
+    }
+    return locked;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_aeidolon_vaultexplorer_NativeEngine_lockNative(JNIEnv* env, jobject, jint volId, jboolean force) {
     JNI_TRY
 
-    if (volId < 0 || volId >= MAX_VOLUMES) return;
+    if (volId < 0 || volId >= MAX_VOLUMES) return JNI_TRUE;
 
     VolumeState& v = volumes[volId];
     std::unique_lock<std::shared_mutex> lock(v.mutex);
+    return lockVolumeLocked(volId, force == JNI_TRUE) ? JNI_TRUE : JNI_FALSE;
 
-    // Close FAT streams
-    for (FIL* f : v.openStreams) {
-        f_close(f);
-        delete f;
-    }
-    v.openStreams.clear();
-
-    // Close NTFS streams
-    for (NtfsStream* ns : v.openNtfsStreams) {
-        ntfs_attr_close(ns->attr);
-        ntfs_inode_close(ns->inode);
-        delete ns;
-    }
-    v.openNtfsStreams.clear();
-
-    unmountVolume(volId);
-    v.reset();
-
-    JNI_CATCH_VOID
+    JNI_CATCH_RETURN(JNI_FALSE)
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -263,7 +299,8 @@ extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_unlockUsbAndListNative(
         JNIEnv* env, jobject, jstring password, jint pim, jint volId, jlong deviceSizeBytes, jint cipherId, jint hashId, jbyteArray preservedKey,
         jlong partitionOffsetHint, jintArray keyfileFds, jboolean readOnly,
-        jstring hiddenPassword, jint hiddenPim, jint hiddenCipherId, jint hiddenHashId, jintArray hiddenKeyfileFds) {
+        jstring hiddenPassword, jint hiddenPim, jint hiddenCipherId, jint hiddenHashId, jintArray hiddenKeyfileFds,
+        jboolean useBackupHeader) {
     JNI_TRY
 
     clearUnlockCancellation(volId);
@@ -276,17 +313,18 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_unlockUsbAndListNative(
     }
 
     std::vector<int> kfFds = extractKeyfileFds(env, keyfileFds);
-    const char* nativePass = env->GetStringUTFChars(password, nullptr);
+    const char* nativePass = vcGetPasswordUtf8(env, password);
     
     const bool ok = prepareUsbSession(reinterpret_cast<const unsigned char*>(nativePass), strlen(nativePass), pim, volId, cipherId, hashId, preservedBytes, preservedLen,
                                        static_cast<int64_t>(partitionOffsetHint),
                                        kfFds.empty() ? nullptr : kfFds.data(), static_cast<int>(kfFds.size()),
-                                       readOnly == JNI_TRUE);
+                                       readOnly == JNI_TRUE, useBackupHeader == JNI_TRUE,
+                                       static_cast<int64_t>(deviceSizeBytes));
     
     if (preservedKey != nullptr) {
         env->ReleaseByteArrayElements(preservedKey, reinterpret_cast<jbyte*>(const_cast<unsigned char*>(preservedBytes)), JNI_ABORT);
     }
-    env->ReleaseStringUTFChars(password, nativePass);
+    vcReleasePasswordUtf8(nativePass);
     if (!ok) {
         if (isUnlockCancelled(volId)) throwUnlockCancelledException(env);
         return nullptr;
@@ -308,7 +346,8 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_unlockUsbAndListNative(
     }
 
     if (!applyHiddenVolumeProtectionOrRollBack(env, volId, hiddenPassword, hiddenPim,
-                                               hiddenCipherId, hiddenHashId, hiddenKeyfileFds)) {
+                                               hiddenCipherId, hiddenHashId, hiddenKeyfileFds,
+                                               useBackupHeader == JNI_TRUE)) {
         return nullptr;
     }
 

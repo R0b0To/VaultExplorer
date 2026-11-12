@@ -309,7 +309,17 @@ class HeaderBackupFile {
     required this.sourceName,
   });
 
+  /// A VeraCrypt container header backup is saved as the bare 131072-byte file desktop VeraCrypt
+  /// writes and reads (standard-volume header slot + hidden-volume header slot), without this
+  /// app's envelope, so the file can be restored with desktop VeraCrypt's "Restore Volume Header"
+  /// -- and a file made there can be restored here (see [decode]).
+  static const int _veraCryptBackupFileSize = 131072;
+
+  bool get _isDesktopCompatibleVeraCrypt =>
+      kind == HeaderBackupKind.containerHeader && format == 'veracrypt' && payload.length == _veraCryptBackupFileSize;
+
   Uint8List encode() {
+    if (_isDesktopCompatibleVeraCrypt) return payload;
     final metaLine = jsonEncode({
       'kind': kind.wireName,
       'format': format,
@@ -333,6 +343,23 @@ class HeaderBackupFile {
   /// which checks both. Throws [HeaderBackupInvalidException] if the
   /// envelope itself doesn't parse.
   static HeaderBackupFile decode(Uint8List raw) {
+    // A bare 131072-byte file without this app's envelope is a desktop VeraCrypt header backup.
+    final magicBytes = utf8.encode(_magic);
+    var hasEnvelope = raw.length >= magicBytes.length;
+    for (var i = 0; hasEnvelope && i < magicBytes.length; i++) {
+      if (raw[i] != magicBytes[i]) hasEnvelope = false;
+    }
+    if (!hasEnvelope && raw.length == _veraCryptBackupFileSize) {
+      return HeaderBackupFile(
+        kind: HeaderBackupKind.containerHeader,
+        format: 'veracrypt',
+        payload: raw,
+        sha256Hex: '',
+        containerSizeBytes: null,
+        exportedAtMs: 0,
+        sourceName: 'VeraCrypt header backup',
+      );
+    }
     final firstNewline = raw.indexOf(0x0A);
     if (firstNewline < 0) {
       throw const HeaderBackupInvalidException('Not a Header Backup file.');

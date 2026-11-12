@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/usb_device_info.dart';
+import 'package:vaultexplorer/data/services/media_index/media_index_service.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';
 import 'package:vaultexplorer/features/camera/active_recording_registry.dart';
@@ -481,10 +482,12 @@ class VaultLifecycleApi {
     int hashId = 255,
     List<String>? oldKeyfilePaths,
     List<String>? newKeyfilePaths,
+    int newHashId = 255,
   }) async {
     try {
       final success = await _channel
           .invokeMethod<bool>(ChannelMethods.changeContainerPassword, {
+            'newHashId': newHashId,
             'uri': uri,
             'oldPassword': oldPassword,
             'newPassword': newPassword,
@@ -744,6 +747,19 @@ class VaultLifecycleApi {
     return success ?? false;
   }
 
+  /// Upgrades a Cryptomator format 7 vault to format 8 (what Cryptomator itself does when it offers to
+  /// "migrate"). ONE WAY: Cryptomator older than 1.6 cannot open the result. The old key file is kept as
+  /// `masterkey.cryptomator.<id>.bkup`. The vault must be locked. Like [changeCryptomatorVaultPassword],
+  /// failures are not swallowed: a wrong [password] surfaces as a `PlatformException` with code `AUTH_FAIL`,
+  /// anything else (not a format 7 vault, already migrated, ...) as `INVALID_VAULT` with a display message.
+  Future<bool> migrateCryptomatorVault(String folderUri, String password) async {
+    final success = await _channel.invokeMethod<bool>(
+      ChannelMethods.migrateCryptomatorVault,
+      {'filePath': folderUri, 'password': password},
+    );
+    return success ?? false;
+  }
+
   Future<
     ({String uri, String displayName, bool looksLikeVault, String? format})?
   >
@@ -830,6 +846,12 @@ class VaultLifecycleApi {
     String password, {
     String cipher = 'aes-256-gcm',
     Uint8List? userEntropy,
+    // gocryptfs -deterministic-names: no gocryptfs.diriv files, so a folder
+    // created offline on two devices is the same ciphertext on both -- the
+    // right choice when the vault folder is synchronised.
+    bool deterministicNames = false,
+    // gocryptfs -longnamemax: 0 = default (255), otherwise 62..255.
+    int longNameMax = 0,
   }) async {
     try {
       final success = await _channel.invokeMethod<bool>(
@@ -839,6 +861,8 @@ class VaultLifecycleApi {
           'password': password,
           'cipher': cipher,
           'userEntropy': userEntropy,
+          'deterministicNames': deterministicNames,
+          'longNameMax': longNameMax,
         },
       );
       return success ?? false;
@@ -1084,6 +1108,7 @@ class VaultLifecycleApi {
     int? hiddenVolumeCipherId,
     int? hiddenVolumeHashId,
     List<String>? hiddenVolumeKeyfilePaths,
+    bool useBackupHeader = false,
   }) async {
     final raw = await _channel.invokeMethod<Map<Object?, Object?>>(
       ChannelMethods.unlockContainer,
@@ -1101,6 +1126,7 @@ class VaultLifecycleApi {
         if (keyfilePaths != null && keyfilePaths.isNotEmpty)
           'keyfilePaths': keyfilePaths,
         'readOnly': readOnly,
+        'useBackupHeader': useBackupHeader,
         'protectHiddenVolume': protectHiddenVolume,
         if (protectHiddenVolume) ...{
           'hiddenVolumePassword': hiddenVolumePassword ?? '',
@@ -1288,6 +1314,7 @@ class VaultLifecycleApi {
     int? hiddenVolumeCipherId,
     int? hiddenVolumeHashId,
     List<String>? hiddenVolumeKeyfilePaths,
+    bool useBackupHeader = false,
   }) async {
     final raw = await _channel.invokeMethod<Map<Object?, Object?>>(
       ChannelMethods.unlockUsbContainer,
@@ -1305,6 +1332,7 @@ class VaultLifecycleApi {
         if (keyfilePaths != null && keyfilePaths.isNotEmpty)
           'keyfilePaths': keyfilePaths,
         'readOnly': readOnly,
+        'useBackupHeader': useBackupHeader,
         'protectHiddenVolume': protectHiddenVolume,
         if (protectHiddenVolume) ...{
           'hiddenVolumePassword': hiddenVolumePassword ?? '',
@@ -1332,7 +1360,22 @@ class VaultLifecycleApi {
     );
   }
 
-  Future<bool> lockContainer(String filePath) async {
+  /// Locks the container at [filePath]. Resolves `false` when it could not be locked --
+  /// including when a USB device refused the final flush, in which case the container
+  /// stays open with its unwritten data pending and locking can simply be retried.
+  /// [force] is the explicit "lock anyway" choice that discards that data.
+  ///
+  /// Never throws for a refused flush, so loops that lock several containers keep going.
+  /// Use [lockContainerDetailed] where the person should be able to retry or force.
+  Future<bool> lockContainer(String filePath, {bool force = false}) async =>
+      (await lockContainerDetailed(filePath, force: force)) == LockResult.locked;
+
+  /// Like [lockContainer], but tells a refused flush ([LockResult.flushRefused]) apart
+  /// from every other failure so the UI can offer "Retry" and "Lock anyway".
+  Future<LockResult> lockContainerDetailed(
+    String filePath, {
+    bool force = false,
+  }) async {
     // If a video is currently being recorded into this container (whether
     // the camera screen is in the foreground or the recording is
     // continuing in the background via VaultCameraRecordingService),
@@ -1360,11 +1403,27 @@ class VaultLifecycleApi {
     } catch (e) {
       logSwallowed('lockContainer/flushThumbnailCache', e, expected: true);
     }
-    final result = await _channel.invokeMethod<bool>(
-      ChannelMethods.lockContainer,
-      {'filePath': filePath},
-    );
-    return result ?? false;
+    // Same for the media index: its last measurements are only buffered for a
+    // few seconds before they are written into the vault.
+    try {
+      await MediaIndexService.flushForUri(
+        filePath,
+      ).timeout(const Duration(seconds: 3));
+    } catch (e) {
+      logSwallowed('lockContainer/flushMediaIndex', e, expected: true);
+    }
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        ChannelMethods.lockContainer,
+        {'filePath': filePath, if (force) 'force': true},
+      );
+      return result == true ? LockResult.locked : LockResult.failed;
+    } on PlatformException catch (e) {
+      // Native reports a device that refused the final flush under its own code;
+      // anything else keeps propagating exactly as before.
+      if (e.code == 'LOCK_FLUSH_REFUSED') return LockResult.flushRefused;
+      rethrow;
+    }
   }
 
   /// Starts or stops the "keep vaults running in background" foreground

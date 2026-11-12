@@ -14,6 +14,12 @@
 #include "mbedtls/platform_util.h"
 #include "container_format.h"
 #include "container_utils.h"
+#include "vc_geometry.h"
+#include "vc_header_areas.h"
+#include "vc_header_build.h"
+#include "vc_expand.h"
+#include "vc_outer_reader.h"
+#include "vc_free_space_fill.h"
 #include "crypto/cascade.h"
 #include "crypto/keyfile_mixing.h"
 #include "crypto/luks_header.h"
@@ -43,7 +49,14 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
     bool success = false;
     unsigned char mixedPassword[MAX_PASSWORD_LEN] = {0};
     ScopeZeroize mixedPasswordGuard(mixedPassword, sizeof(mixedPassword));
-    size_t mixedPasswordLen = std::min(strlen(password), sizeof(mixedPassword));
+    if (strlen(password) > VC_MAX_PASSWORD_BYTES) {
+        // Upstream refuses passwords over 128 UTF-8 bytes (VolumePassword::MaxSize) instead of cutting them.
+        LOGI("createContainer: password longer than %zu bytes (UTF-8)", VC_MAX_PASSWORD_BYTES);
+        close(fd);
+        if (keyfileFds != nullptr) for (int i = 0; i < keyfileCount; i++) if (keyfileFds[i] >= 0) close(keyfileFds[i]);
+        return false;
+    }
+    size_t mixedPasswordLen = strlen(password);
     memcpy(mixedPassword, password, mixedPasswordLen);
     if (keyfileCount > 0 && keyfileFds != nullptr) {
         if (!applyKeyfilesToPassword(keyfileFds, keyfileCount, mixedPassword, &mixedPasswordLen)) {
@@ -107,11 +120,24 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
 
         const uint64_t DATA_SIZE = VOLUME_SIZE - (2 * VC_DATA_AREA_OFFSET);
 
+        // Fill both 128 KiB header groups with random bytes before the real
+        // headers go in, as VeraCrypt does. Otherwise the hidden-header slot
+        // (and the rest of the reserved areas) of a fresh zero-extended file is
+        // all zeros exactly when no hidden volume exists, which tells an
+        // observer whether a hidden volume is there without any secret. The
+        // last piece also ends at VOLUME_SIZE - 1, so this extends the file
+        // even where ftruncate() above is not honoured.
+        if (!vcgeom::randomizeHeaderGroups(
+                0, VOLUME_SIZE,
+                [fd](uint64_t off, const unsigned char* p, size_t n) { return vcgeom::pwriteFully(fd, off, p, n); },
+                [](void* out, size_t n) { return userentropy::fillRandom(static_cast<uint8_t*>(out), n); })) {
+            LOGI("createContainer: failed to initialise the reserved header areas");
+            break;
+        }
+
         unsigned char body[VC_HEADER_BODY_SIZE];
         memset(body, 0, sizeof(body));
-        body[0] = 'V'; body[1] = 'E'; body[2] = 'R'; body[3] = 'A';
-        body[4] = 0x00; body[5] = 0x02;
-        body[6] = 0x01; body[7] = 0x0b;
+        vcStampHeaderPreamble(body);
 
         for (int i = 7; i >= 0; --i)
             body[VC_HDR_OFF_VOLUME_SIZE + (7 - i)] = (DATA_SIZE >> (i * 8)) & 0xFF;
@@ -162,7 +188,15 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
         }
 
         mbedtls_platform_zeroize(headerKey, sizeof(headerKey));
+
+        // The backup header is its own encryption of the same header: fresh
+        // salt, fresh KDF run (what VeraCrypt does). A byte-identical copy would
+        // fingerprint the container -- see vc_header_build.h.
+        unsigned char backupSector[VC_FULL_HEADER_SIZE];
+        const bool backupBuilt = vcBuildFreshlySaltedHeaderSector(
+            body, createCipher, createHash, mixedPassword, mixedPasswordLen, safePim, backupSector);
         mbedtls_platform_zeroize(body, sizeof(body));
+        if (!backupBuilt) { LOGI("createContainer: backup header generation failed"); break; }
 
         unsigned char hdrSector[VC_FULL_HEADER_SIZE];
         memcpy(hdrSector,                  salt,    VC_SALT_SIZE);
@@ -172,42 +206,24 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
             LOGI("createContainer: primary header write failed"); break;
         }
 
-        if (pwrite(fd, hdrSector, VC_FULL_HEADER_SIZE,
+        if (pwrite(fd, backupSector, VC_FULL_HEADER_SIZE,
                    static_cast<off_t>(VOLUME_SIZE - VC_DATA_AREA_OFFSET)) != VC_FULL_HEADER_SIZE) {
             LOGI("createContainer: backup header write failed"); break;
         }
 
-        unsigned char eofByte = 0;
-        pwrite(fd, &eofByte, 1, static_cast<off_t>(VOLUME_SIZE - 1));
+        // (No trailing marker byte: the last byte of the container belongs to the
+        // random-filled hidden-volume backup header slot and must stay random.)
 
         if (!quickFormat) {
-            CascadeContext dataCtx;
-            if (!cascadeSetKeys(dataCtx, createCipher, combinedMasterKey, masterKeyLen)) {
-                LOGI("createContainer: cascadeSetKeys failed for data");
+            // Free space gets encrypted zeros under a TEMPORARY random key, not the
+            // real data key (see vc_free_space_fill.h): otherwise untouched space
+            // decrypts to zeros under the outer key and a hidden volume stands out.
+            if (!vcfill::fillWithRandomizedKey(
+                    createCipher, masterKeyLen, VC_DATA_AREA_OFFSET / 512, DATA_SIZE / 512, CREATE_FILL_BATCH,
+                    [fd](uint64_t off, const unsigned char* p, size_t n) { return vcgeom::pwriteFully(fd, off, p, n); })) {
+                LOGI("createContainer: data fill failed");
                 break;
             }
-
-            const uint64_t START_SECTOR  = VC_DATA_AREA_OFFSET / 512;
-            const uint64_t TOTAL_SECTORS = (VOLUME_SIZE - VC_DATA_AREA_OFFSET) / 512;
-            const unsigned char ZERO_SECTOR[512] = {0};
-            const size_t batchBufBytes = CREATE_FILL_BATCH * 512;
-            std::unique_ptr<unsigned char[]> batch(new unsigned char[batchBufBytes]);
-            bool writeOk = true;
-
-            for (uint64_t s = START_SECTOR; s < TOTAL_SECTORS && writeOk; ) {
-                const uint64_t rem   = TOTAL_SECTORS - s;
-                const uint64_t count = (rem < CREATE_FILL_BATCH) ? rem : CREATE_FILL_BATCH;
-                for (uint64_t i = 0; i < count; ++i) {
-                    cascadeEncryptSector(dataCtx, s + i, ZERO_SECTOR, batch.get() + i * 512);
-                }
-                const ssize_t want = static_cast<ssize_t>(count * 512);
-                if (pwrite(fd, batch.get(), want, static_cast<off_t>(s * 512)) != want) {
-                    LOGI("createContainer: data fill write failed at sector %llu", (unsigned long long)s);
-                    writeOk = false;
-                }
-                s += count;
-            }
-            if (!writeOk) break;
         }
 
         fsync(fd);
@@ -536,39 +552,27 @@ bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeByte
     return success;
 }
 
-bool createContainerWithHidden(int fd,
-                               const char* outerPassword, const char* hiddenPassword,
-                               int outerPim, int hiddenPim,
-                               int64_t sizeBytes,
-                               const char* outerFileSystem, const char* hiddenFileSystem,
-                               int64_t hiddenSizeBytes,
-                               int outerCipherId, int outerHashId,
-                               int hiddenCipherId, int hiddenHashId,
-                               const int* outerKeyfileFds, int outerKeyfileCount,
-                               const int* hiddenKeyfileFds, int hiddenKeyfileCount,
-                               bool quickFormat) {
-    int fdOuter = dup(fd);
-    if (fdOuter < 0) {
-        close(fd);
-        if (outerKeyfileFds) for (int i = 0; i < outerKeyfileCount; i++) if (outerKeyfileFds[i] >= 0) close(outerKeyfileFds[i]);
-        if (hiddenKeyfileFds) for (int i = 0; i < hiddenKeyfileCount; i++) if (hiddenKeyfileFds[i] >= 0) close(hiddenKeyfileFds[i]);
-        return false;
-    }
-
-    bool outerSuccess = createContainer(fdOuter, outerPassword, outerPim, sizeBytes, outerFileSystem,
-                                        outerCipherId, outerHashId, outerKeyfileFds, outerKeyfileCount,
-                                        quickFormat);
-    if (!outerSuccess) {
-        close(fd);
-        if (hiddenKeyfileFds) for (int i = 0; i < hiddenKeyfileCount; i++) if (hiddenKeyfileFds[i] >= 0) close(hiddenKeyfileFds[i]);
-        return false;
-    }
-
+// The hidden-volume half of creation -- hidden header at 64 KiB plus its backup, data area at the end of the
+// outer volume, hidden file system -- shared by "create outer + hidden volume" and by "add a hidden volume to an
+// existing volume" (createHiddenVolumeInExisting). [sizeBytes] is the container size. Takes ownership of [fd] and
+// of the hidden keyfile fds.
+static bool createHiddenVolumePhase(int fd, int64_t sizeBytes,
+                                    const char* hiddenPassword, int hiddenPim,
+                                    const char* hiddenFileSystem, int64_t hiddenSizeBytes,
+                                    int hiddenCipherId, int hiddenHashId,
+                                    const int* hiddenKeyfileFds, int hiddenKeyfileCount,
+                                    bool quickFormat) {
     const int64_t truncatedSizeBytes = (sizeBytes / 4096) * 4096;
     bool success = false;
     unsigned char hiddenMixedPassword[MAX_PASSWORD_LEN] = {0};
     ScopeZeroize hiddenMixedPasswordGuard(hiddenMixedPassword, sizeof(hiddenMixedPassword));
-    size_t hiddenMixedPasswordLen = std::min(strlen(hiddenPassword), sizeof(hiddenMixedPassword));
+    if (strlen(hiddenPassword) > VC_MAX_PASSWORD_BYTES) {
+        LOGI("createContainerWithHidden: hidden password longer than %zu bytes (UTF-8)", VC_MAX_PASSWORD_BYTES);
+        close(fd);
+        if (hiddenKeyfileFds) for (int i = 0; i < hiddenKeyfileCount; i++) if (hiddenKeyfileFds[i] >= 0) close(hiddenKeyfileFds[i]);
+        return false;
+    }
+    size_t hiddenMixedPasswordLen = strlen(hiddenPassword);
     memcpy(hiddenMixedPassword, hiddenPassword, hiddenMixedPasswordLen);
 
     if (hiddenKeyfileCount > 0 && hiddenKeyfileFds != nullptr) {
@@ -631,14 +635,7 @@ bool createContainerWithHidden(int fd,
         }
 
         unsigned char body[VC_HEADER_BODY_SIZE] = {0};
-        const char magic[] = "VERA";
-        memcpy(body, magic, 4);
-        uint16_t version = 5;
-        body[4] = (version >> 8) & 0xFF;
-        body[5] = version & 0xFF;
-        uint16_t reqVersion = 6;
-        body[6] = (reqVersion >> 8) & 0xFF;
-        body[7] = reqVersion & 0xFF;
+        vcStampHeaderPreamble(body);
 
         auto writeBE64 = [](unsigned char* buf, int offset, uint64_t val) {
             for (int i = 7; i >= 0; --i) { buf[offset + i] = val & 0xFF; val >>= 8; }
@@ -680,37 +677,47 @@ bool createContainerWithHidden(int fd,
             }
         }
 
+        // Separate salt + KDF run for the hidden backup header. Two identical
+        // copies (64 KiB and V-64 KiB) would reveal that a hidden volume exists
+        // to anyone who compares them -- no password needed.
+        unsigned char backupSector[VC_FULL_HEADER_SIZE];
+        const bool backupBuilt = vcBuildFreshlySaltedHeaderSector(
+            body, createCipher, createHash, hiddenMixedPassword, hiddenMixedPasswordLen, clampedPim, backupSector);
         mbedtls_platform_zeroize(body, sizeof(body));
+        if (!backupBuilt) { LOGI("createContainerWithHidden: backup header generation failed"); break; }
+
         unsigned char hdrSector[VC_FULL_HEADER_SIZE];
         memcpy(hdrSector,                  hiddenSalt,    VC_SALT_SIZE);
         memcpy(hdrSector + VC_SALT_SIZE,   encBody, VC_HEADER_BODY_SIZE);
 
         if (pwrite(fd, hdrSector, VC_FULL_HEADER_SIZE, VC_HIDDEN_HEADER_OFFSET) != VC_FULL_HEADER_SIZE) break;
 
-        if (!quickFormat) {
-            CascadeContext dataCtx;
-            if (!cascadeSetKeys(dataCtx, createCipher, hiddenCombinedMasterKey, masterKeyLen)) break;
-
-            const uint64_t START_SECTOR  = hiddenDataStartAbsolute / 512;
-            const uint64_t TOTAL_SECTORS = hiddenDataSize / 512;
-            const unsigned char ZERO_SECTOR[512] = {0};
-            const size_t batchBufBytes = CREATE_FILL_BATCH * 512;
-            std::unique_ptr<unsigned char[]> batch(new unsigned char[batchBufBytes]);
-            bool writeOk = true;
-
-            for (uint64_t s = 0; s < TOTAL_SECTORS && writeOk; ) {
-                const uint64_t rem   = TOTAL_SECTORS - s;
-                const uint64_t count = (rem < CREATE_FILL_BATCH) ? rem : CREATE_FILL_BATCH;
-                for (uint64_t i = 0; i < count; ++i) {
-                    cascadeEncryptSector(dataCtx, START_SECTOR + s + i, ZERO_SECTOR, batch.get() + i * 512);
-                }
-                const ssize_t want = static_cast<ssize_t>(count * 512);
-                if (pwrite(fd, batch.get(), want, static_cast<off_t>((START_SECTOR + s) * 512)) != want) {
-                    writeOk = false;
-                }
-                s += count;
+        // VeraCrypt keeps a backup of the hidden header too, at the very end of
+        // the container (after the outer backup header). Without it a damaged
+        // primary hidden header cannot be recovered, and a later password
+        // change would have no second copy to keep in step. The slot lies in the
+        // trailing header group, clear of the hidden data area [V-A-H, V-A).
+        {
+            uint64_t hiddenBackupOffset = 0;
+            if (!vcgeom::backupHeaderOffset(VOLUME_SIZE, true, &hiddenBackupOffset) ||
+                !vcgeom::headerClearOfDataArea(hiddenBackupOffset, hiddenDataStartAbsolute, hiddenDataSize)) {
+                LOGI("createContainerWithHidden: no valid hidden backup header slot");
+                break;
             }
-            if (!writeOk) break;
+            if (pwrite(fd, backupSector, VC_FULL_HEADER_SIZE, static_cast<off_t>(hiddenBackupOffset)) !=
+                VC_FULL_HEADER_SIZE) {
+                LOGI("createContainerWithHidden: hidden backup header write failed");
+                break;
+            }
+        }
+
+        if (!quickFormat) {
+            if (!vcfill::fillWithRandomizedKey(
+                    createCipher, masterKeyLen, hiddenDataStartAbsolute / 512, hiddenDataSize / 512, CREATE_FILL_BATCH,
+                    [fd](uint64_t off, const unsigned char* p, size_t n) { return vcgeom::pwriteFully(fd, off, p, n); })) {
+                LOGI("createContainerWithHidden: data fill failed");
+                break;
+            }
         }
 
         fsync(fd);
@@ -784,15 +791,51 @@ bool createContainerWithHidden(int fd,
     return success;
 }
 
+bool createContainerWithHidden(int fd,
+                               const char* outerPassword, const char* hiddenPassword,
+                               int outerPim, int hiddenPim,
+                               int64_t sizeBytes,
+                               const char* outerFileSystem, const char* hiddenFileSystem,
+                               int64_t hiddenSizeBytes,
+                               int outerCipherId, int outerHashId,
+                               int hiddenCipherId, int hiddenHashId,
+                               const int* outerKeyfileFds, int outerKeyfileCount,
+                               const int* hiddenKeyfileFds, int hiddenKeyfileCount,
+                               bool quickFormat) {
+    int fdOuter = dup(fd);
+    if (fdOuter < 0) {
+        close(fd);
+        if (outerKeyfileFds) for (int i = 0; i < outerKeyfileCount; i++) if (outerKeyfileFds[i] >= 0) close(outerKeyfileFds[i]);
+        if (hiddenKeyfileFds) for (int i = 0; i < hiddenKeyfileCount; i++) if (hiddenKeyfileFds[i] >= 0) close(hiddenKeyfileFds[i]);
+        return false;
+    }
+
+    bool outerSuccess = createContainer(fdOuter, outerPassword, outerPim, sizeBytes, outerFileSystem,
+                                        outerCipherId, outerHashId, outerKeyfileFds, outerKeyfileCount,
+                                        quickFormat);
+    if (!outerSuccess) {
+        close(fd);
+        if (hiddenKeyfileFds) for (int i = 0; i < hiddenKeyfileCount; i++) if (hiddenKeyfileFds[i] >= 0) close(hiddenKeyfileFds[i]);
+        return false;
+    }
+
+    return createHiddenVolumePhase(fd, sizeBytes, hiddenPassword, hiddenPim, hiddenFileSystem, hiddenSizeBytes,
+                                   hiddenCipherId, hiddenHashId, hiddenKeyfileFds, hiddenKeyfileCount, quickFormat);
+}
+
 bool changeContainerPassword(int fd,
                              const char* oldPassword, const char* newPassword,
                              int oldPim, int newPim,
                              int cipherId, int hashId,
                              const int* oldKeyfileFds, int oldKeyfileCount,
-                             const int* newKeyfileFds, int newKeyfileCount) {
+                             const int* newKeyfileFds, int newKeyfileCount,
+                             int newHashId) {
     bool success = false;
     unsigned char oldMixedPassword[MAX_PASSWORD_LEN] = {0};
     ScopeZeroize oldMixedPasswordGuard(oldMixedPassword, sizeof(oldMixedPassword));
+    // The OLD password keeps the lenient truncation (a volume made by an older build of this
+    // app from a >128-byte password was keyed from its first 128 bytes). The NEW password
+    // must fit, like upstream requires.
     size_t oldMixedPasswordLen = std::min(strlen(oldPassword), sizeof(oldMixedPassword));
     memcpy(oldMixedPassword, oldPassword, oldMixedPasswordLen);
 
@@ -806,7 +849,13 @@ bool changeContainerPassword(int fd,
 
     unsigned char newMixedPassword[MAX_PASSWORD_LEN] = {0};
     ScopeZeroize newMixedPasswordGuard(newMixedPassword, sizeof(newMixedPassword));
-    size_t newMixedPasswordLen = std::min(strlen(newPassword), sizeof(newMixedPassword));
+    if (strlen(newPassword) > VC_MAX_PASSWORD_BYTES) {
+        LOGI("changeContainerPassword: new password longer than %zu bytes (UTF-8)", VC_MAX_PASSWORD_BYTES);
+        close(fd);
+        if (newKeyfileFds) for (int i = 0; i < newKeyfileCount; i++) if (newKeyfileFds[i] >= 0) close(newKeyfileFds[i]);
+        return false;
+    }
+    size_t newMixedPasswordLen = strlen(newPassword);
     memcpy(newMixedPassword, newPassword, newMixedPasswordLen);
 
     if (newKeyfileCount > 0 && newKeyfileFds != nullptr) {
@@ -843,13 +892,43 @@ bool changeContainerPassword(int fd,
         if (!foundMatch) break;
 
         mbedtls_platform_zeroize(recoveredKeyMaterial, sizeof(recoveredKeyMaterial));
+
+        // Like upstream (VolumeHeader::EncryptNew writes the current header
+        // version on every re-encryption): a header written by an older build of
+        // this app carries format version 2, which upstream treats as a legacy
+        // header without CRC protection. Bring it to version 5 and refresh the
+        // header CRC. Headers that are already version >= 5 are left untouched.
+        {
+            const unsigned oldVersion = (static_cast<unsigned>(decryptedBody[VC_HDR_OFF_VERSION]) << 8) |
+                                         decryptedBody[VC_HDR_OFF_VERSION + 1];
+            if (oldVersion < VC_HEADER_FORMAT_VERSION) {
+                vcStampHeaderPreamble(decryptedBody);
+                const uint32_t crc = container_crc32(decryptedBody, VC_HDR_CRC_COVERAGE_LEN);
+                for (int i = 0; i < 4; i++) {
+                    decryptedBody[VC_HDR_OFF_HEADER_CRC + i] = static_cast<unsigned char>(crc >> (24 - 8 * i));
+                }
+            }
+        }
+
         unsigned char newSalt[VC_SALT_SIZE];
-        if (!osRandomBytes(newSalt, sizeof(newSalt))) break;
+        if (!userentropy::fillRandom(newSalt, sizeof(newSalt))) break;
 
         int clampedNewPim = clampPim(newPim);
         unsigned char newHeaderKey[192] = {0};
         ScopeZeroize newHeaderKeyGuard(newHeaderKey, sizeof(newHeaderKey));
-        if (!deriveHeaderKey(matchedHash, newMixedPassword, newMixedPasswordLen,
+        // PRF for the re-encrypted header (both copies): the caller's choice, otherwise the one this
+        // header was found with. An id outside the known range is refused before anything is written
+        // instead of being silently replaced -- the caller asked for a specific algorithm.
+        HashId newHash = matchedHash;
+        if (newHashId != 255) {
+            if (newHashId < 0 || newHashId > static_cast<int>(HashId::kArgon2id)) {
+                LOGI("changeContainerPassword: unknown PRF id %d", newHashId);
+                break;
+            }
+            newHash = static_cast<HashId>(newHashId);
+        }
+
+        if (!deriveHeaderKey(newHash, newMixedPassword, newMixedPasswordLen,
                              newSalt, clampedNewPim, newHeaderKey, sizeof(newHeaderKey))) {
             break;
         }
@@ -876,17 +955,76 @@ bool changeContainerPassword(int fd,
             }
         }
 
+        // Primary and backup each get their own salt and KDF run, as in
+        // upstream's CoreBase::ChangePassword (one pass per header copy).
+        unsigned char backupSector[VC_FULL_HEADER_SIZE];
+        const bool backupBuilt = vcBuildFreshlySaltedHeaderSector(
+            decryptedBody, matchedCipher, newHash, newMixedPassword, newMixedPasswordLen,
+            clampedNewPim, backupSector);
         mbedtls_platform_zeroize(decryptedBody, sizeof(decryptedBody));
+        if (!backupBuilt) break;
+
         unsigned char hdrSector[VC_FULL_HEADER_SIZE];
         memcpy(hdrSector,                  newSalt, VC_SALT_SIZE);
         memcpy(hdrSector + VC_SALT_SIZE,   encBody, VC_HEADER_BODY_SIZE);
 
-        if (pwrite(fd, hdrSector, VC_FULL_HEADER_SIZE, targetOffset) != VC_FULL_HEADER_SIZE) break;
+        // Locate the backup copy of this header slot from the real size of the
+        // container, the way VeraCrypt does (relative to its END). The header's
+        // volume-size field is the size of the data area, i.e. 2*A smaller than
+        // the container, so it cannot be used for this -- doing so used to put
+        // the "backup" 2*A too early, inside user data, and leave the genuine
+        // backup holding the old credentials. Everything is validated before
+        // the first byte is written so a refusal leaves the container untouched.
+        const bool hiddenSlot = (targetOffset != 0);
+        uint64_t containerSize = 0;
+        {
+            struct stat st;
+            if (fstat(fd, &st) == 0 && st.st_size > 0) {
+                containerSize = static_cast<uint64_t>(st.st_size);
+            } else {
+                const off_t end = lseek(fd, 0, SEEK_END);
+                if (end > 0) containerSize = static_cast<uint64_t>(end);
+            }
+        }
+        uint64_t backupOffset = 0;
+        if (!vcgeom::backupHeaderOffset(containerSize, hiddenSlot, &backupOffset)) {
+            LOGI("changeContainerPassword: cannot determine container size");
+            break;
+        }
+        const uint64_t dataAreaLen =
+            fields.encryptedAreaLength != 0 ? fields.encryptedAreaLength : fields.volumeSize;
+        const bool backupClearOfData =
+            vcgeom::headerClearOfDataArea(backupOffset, fields.encryptedAreaStart, dataAreaLen);
+        bool writeBackup = true;
+        if (!backupClearOfData) {
+            if (!hiddenSlot) {
+                // A normal volume whose data area reaches its own backup header
+                // is not a layout we understand; never write over user data.
+                LOGI("changeContainerPassword: backup header would overlap the data area");
+                break;
+            }
+            // Hidden volume laid out by an older version of this app: its data
+            // extends over the hidden backup slot, so there is none to update.
+            writeBackup = false;
+        }
 
-        if (targetOffset == 0) {
-            uint64_t containerVolumeSize = fields.volumeSize;
-            if (pwrite(fd, hdrSector, VC_FULL_HEADER_SIZE,
-                       static_cast<off_t>(containerVolumeSize - VC_DATA_AREA_OFFSET)) != VC_FULL_HEADER_SIZE) {
+        if (pwrite(fd, hdrSector, VC_FULL_HEADER_SIZE, static_cast<off_t>(targetOffset)) != VC_FULL_HEADER_SIZE) break;
+        if (writeBackup &&
+            pwrite(fd, backupSector, VC_FULL_HEADER_SIZE, static_cast<off_t>(backupOffset)) != VC_FULL_HEADER_SIZE) {
+            break;
+        }
+
+        // Read both copies back: a header that did not land where intended must
+        // not be reported as a successful password change.
+        {
+            unsigned char verify[VC_FULL_HEADER_SIZE];
+            if (pread(fd, verify, VC_FULL_HEADER_SIZE, static_cast<off_t>(targetOffset)) != VC_FULL_HEADER_SIZE ||
+                memcmp(verify, hdrSector, VC_FULL_HEADER_SIZE) != 0) {
+                break;
+            }
+            if (writeBackup &&
+                (pread(fd, verify, VC_FULL_HEADER_SIZE, static_cast<off_t>(backupOffset)) != VC_FULL_HEADER_SIZE ||
+                 memcmp(verify, backupSector, VC_FULL_HEADER_SIZE) != 0)) {
                 break;
             }
         }
@@ -956,4 +1094,166 @@ int changeLuksContainerPassword(int fd,
         case LuksChangePasswordResult::kWrongOldPassword: return 1;
         default: return 2;
     }
+}
+
+ExpandOutcome expandVeraCryptContainer(int fd, const char* password, int pim, int cipherId, int hashId,
+                                       const int* keyfileFds, int keyfileCount,
+                                       int64_t newSizeBytes, bool initFreeSpace) {
+    ExpandOutcome outcome = ExpandOutcome::kIoError;
+    unsigned char mixedPassword[MAX_PASSWORD_LEN];
+    size_t mixedLen = std::min(strlen(password), sizeof(mixedPassword));
+    memcpy(mixedPassword, password, mixedLen);
+    unsigned char keyMaterial[192];
+    unsigned char body[VC_HEADER_BODY_SIZE];
+    do {
+        if (keyfileCount > 0 && keyfileFds != nullptr) {
+            if (!applyKeyfilesToPassword(keyfileFds, keyfileCount, mixedPassword, &mixedLen)) {
+                outcome = ExpandOutcome::kBadKeyfile;
+                break;
+            }
+        }
+        struct stat st;
+        if (fstat(fd, &st) != 0 || newSizeBytes <= 0) break;
+        unsigned char sector[VC_FULL_HEADER_SIZE];
+        if (pread(fd, sector, sizeof(sector), 0) != static_cast<ssize_t>(sizeof(sector))) break;
+        CascadeId matchedCipher{};
+        HashId matchedHash{};
+        ParsedHeaderFields fields;
+        if (!deriveAndValidateHeader(sector, mixedPassword, mixedLen, pim, cipherId, hashId,
+                                     keyMaterial, body, matchedCipher, matchedHash, fields)) {
+            outcome = ExpandOutcome::kWrongPassword;
+            break;
+        }
+        VcExpandIo io;
+        io.setSize = [fd](uint64_t n) { return ftruncate(fd, static_cast<off_t>(n)) == 0; };
+        io.writeAt = [fd](uint64_t off, const unsigned char* data, size_t len) {
+            size_t done = 0;
+            while (done < len) {
+                const ssize_t w = pwrite(fd, data + done, len - done, static_cast<off_t>(off + done));
+                if (w <= 0) return false;
+                done += static_cast<size_t>(w);
+            }
+            return true;
+        };
+        io.random = [](unsigned char* p, size_t n) { return userentropy::fillRandom(p, n); };
+        const VcExpandResult r = vcExpandVolume(body, matchedCipher, matchedHash, mixedPassword, mixedLen, pim,
+                                                static_cast<uint64_t>(st.st_size),
+                                                static_cast<uint64_t>(newSizeBytes), initFreeSpace, io);
+        switch (r) {
+            case VcExpandResult::kOk:                 fsync(fd); outcome = ExpandOutcome::kOk; break;
+            case VcExpandResult::kHiddenHeader:
+            case VcExpandResult::kInconsistentHeader: outcome = ExpandOutcome::kNotExpandable; break;
+            case VcExpandResult::kNotLarger:          outcome = ExpandOutcome::kNotLarger; break;
+            default:                                  outcome = ExpandOutcome::kIoError; break;
+        }
+    } while (false);
+    mbedtls_platform_zeroize(mixedPassword, sizeof(mixedPassword));
+    mbedtls_platform_zeroize(keyMaterial, sizeof(keyMaterial));
+    mbedtls_platform_zeroize(body, sizeof(body));
+    close(fd);
+    return outcome;
+}
+
+static void closeFds(const int* fds, int count) {
+    if (fds != nullptr) for (int i = 0; i < count; i++) if (fds[i] >= 0) close(fds[i]);
+}
+
+// Decrypts the standard volume's header, validates it is a plain full-size standard volume and measures the
+// free tail of its file system. [fd] stays open.
+static HiddenHostOutcome inspectOuterVolume(int fd, const unsigned char* password, size_t passwordLen, int pim,
+                                            int cipherId, int hashId, HiddenHostAnalysis* out, uint64_t* containerSize) {
+    struct stat st;
+    if (fstat(fd, &st) != 0) return HiddenHostOutcome::kIoError;
+    unsigned char sector[VC_FULL_HEADER_SIZE];
+    if (pread(fd, sector, sizeof(sector), 0) != static_cast<ssize_t>(sizeof(sector))) return HiddenHostOutcome::kIoError;
+    unsigned char keyMaterial[192];
+    unsigned char body[VC_HEADER_BODY_SIZE];
+    ScopeZeroize keyGuard(keyMaterial, sizeof(keyMaterial));
+    ScopeZeroize bodyGuard(body, sizeof(body));
+    CascadeId matchedCipher{};
+    HashId matchedHash{};
+    ParsedHeaderFields fields;
+    if (!deriveAndValidateHeader(sector, password, passwordLen, pim, cipherId, hashId,
+                                 keyMaterial, body, matchedCipher, matchedHash, fields)) {
+        return HiddenHostOutcome::kWrongPassword;
+    }
+    const uint64_t size = static_cast<uint64_t>(st.st_size);
+    if (fields.isHiddenVolume() || size < 2 * VC_DATA_AREA_OFFSET + 4096 || size % 4096 != 0 ||
+        fields.encryptedAreaStart != VC_DATA_AREA_OFFSET || fields.volumeSize != size - 2 * VC_DATA_AREA_OFFSET) {
+        return HiddenHostOutcome::kInvalid;   // not a plain, full-size standard volume
+    }
+    CascadeContext ctx;
+    if (!cascadeSetKeys(ctx, matchedCipher, body + VC_KEY_OFFSET_MASTER, cascadeSpecFor(matchedCipher).layerCount * 64)) {
+        return HiddenHostOutcome::kIoError;
+    }
+    VcReadFn reader = vcMakeOuterReader(&ctx, fields.encryptedAreaStart, fields.volumeSize,
+        [fd](uint64_t off, unsigned char* buf, size_t len) {
+            size_t done = 0;
+            while (done < len) {
+                const ssize_t r = pread(fd, buf + done, len - done, static_cast<off_t>(off + done));
+                if (r <= 0) return false;
+                done += static_cast<size_t>(r);
+            }
+            return true;
+        });
+    VcFsTail tail;
+    if (!vcAnalyzeFsTail(reader, &tail)) return HiddenHostOutcome::kUnsupportedFs;
+    out->fsKind = static_cast<int>(tail.kind);
+    out->clusterSize = tail.clusterSize;
+    out->maxHiddenBytes = vcMaxHiddenVolumeSize(tail, fields.volumeSize);
+    *containerSize = size;
+    return HiddenHostOutcome::kOk;
+}
+
+HiddenHostOutcome analyzeHiddenVolumeHost(int fd, const char* password, int pim, int cipherId, int hashId,
+                                          const int* keyfileFds, int keyfileCount, HiddenHostAnalysis* out) {
+    unsigned char mixed[MAX_PASSWORD_LEN] = {0};
+    ScopeZeroize mixedGuard(mixed, sizeof(mixed));
+    size_t mixedLen = std::min(strlen(password), sizeof(mixed));
+    memcpy(mixed, password, mixedLen);
+    HiddenHostOutcome outcome = HiddenHostOutcome::kBadKeyfile;
+    if (keyfileCount <= 0 || keyfileFds == nullptr || applyKeyfilesToPassword(keyfileFds, keyfileCount, mixed, &mixedLen)) {
+        uint64_t containerSize = 0;
+        outcome = inspectOuterVolume(fd, mixed, mixedLen, pim, cipherId, hashId, out, &containerSize);
+    }
+    close(fd);
+    return outcome;
+}
+
+HiddenHostOutcome createHiddenVolumeInExisting(int fd,
+                                               const char* outerPassword, int outerPim, int outerCipherId, int outerHashId,
+                                               const int* outerKeyfileFds, int outerKeyfileCount,
+                                               const char* hiddenPassword, int hiddenPim,
+                                               const char* hiddenFileSystem, int64_t hiddenSizeBytes,
+                                               int hiddenCipherId, int hiddenHashId,
+                                               const int* hiddenKeyfileFds, int hiddenKeyfileCount,
+                                               bool quickFormat) {
+    unsigned char mixed[MAX_PASSWORD_LEN] = {0};
+    ScopeZeroize mixedGuard(mixed, sizeof(mixed));
+    size_t mixedLen = std::min(strlen(outerPassword), sizeof(mixed));
+    memcpy(mixed, outerPassword, mixedLen);
+    HiddenHostOutcome outcome = HiddenHostOutcome::kBadKeyfile;
+    HiddenHostAnalysis analysis;
+    uint64_t containerSize = 0;
+    if (outerKeyfileCount <= 0 || outerKeyfileFds == nullptr ||
+        applyKeyfilesToPassword(outerKeyfileFds, outerKeyfileCount, mixed, &mixedLen)) {
+        outcome = inspectOuterVolume(fd, mixed, mixedLen, outerPim, outerCipherId, outerHashId, &analysis, &containerSize);
+    }
+    if (outcome == HiddenHostOutcome::kOk) {
+        if (strlen(hiddenPassword) > VC_MAX_PASSWORD_BYTES ||
+            (outerKeyfileCount <= 0 && hiddenKeyfileCount <= 0 && strcmp(outerPassword, hiddenPassword) == 0)) {
+            outcome = HiddenHostOutcome::kInvalid;   // too long, or identical to the outer password (it could never be told apart)
+        } else if (hiddenSizeBytes <= 0 || static_cast<uint64_t>(hiddenSizeBytes) > analysis.maxHiddenBytes) {
+            outcome = HiddenHostOutcome::kNoSpace;
+        }
+    }
+    if (outcome != HiddenHostOutcome::kOk) {
+        close(fd);
+        closeFds(hiddenKeyfileFds, hiddenKeyfileCount);
+        return outcome;
+    }
+    const bool created = createHiddenVolumePhase(fd, static_cast<int64_t>(containerSize), hiddenPassword, hiddenPim,
+                                                 hiddenFileSystem, hiddenSizeBytes, hiddenCipherId, hiddenHashId,
+                                                 hiddenKeyfileFds, hiddenKeyfileCount, quickFormat);
+    return created ? HiddenHostOutcome::kOk : HiddenHostOutcome::kIoError;
 }

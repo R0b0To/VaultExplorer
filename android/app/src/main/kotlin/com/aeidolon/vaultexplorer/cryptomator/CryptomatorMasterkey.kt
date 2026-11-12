@@ -106,9 +106,35 @@ object CryptomatorMasterkeyFile {
         return parsed
     }
 
-    /** Unwraps the masterkey given the user's passphrase. Throws [InvalidPassphraseException] on wrong password. */
+    /**
+     * The official apps NFC-normalize the passphrase before key derivation (desktop SecurePasswordField,
+     * Android normalizePassword), so every vault they create is keyed from the NFC form.
+     */
+    private fun nfc(passphrase: CharArray): CharArray {
+        if (passphrase.all { it.code < 0x80 }) return passphrase
+        return java.text.Normalizer.normalize(String(passphrase), java.text.Normalizer.Form.NFC).toCharArray()
+    }
+
+    /**
+     * Unwraps the masterkey given the user's passphrase. Tries the NFC-normalized passphrase first (what the
+     * official apps use) and then the raw characters (vaults created by earlier versions of this app from
+     * un-normalized input). Throws [InvalidPassphraseException] on wrong password.
+     */
     @Throws(InvalidPassphraseException::class)
     fun unlock(parsed: ParsedFile, passphrase: CharArray): CryptomatorMasterkey {
+        val normalized = nfc(passphrase)
+        try {
+            return unlockExact(parsed, normalized)
+        } catch (e: InvalidPassphraseException) {
+            if (normalized.contentEquals(passphrase)) throw e
+        } finally {
+            if (normalized !== passphrase) normalized.fill('\u0000')
+        }
+        return unlockExact(parsed, passphrase)
+    }
+
+    @Throws(InvalidPassphraseException::class)
+    private fun unlockExact(parsed: ParsedFile, passphrase: CharArray): CryptomatorMasterkey {
         val kekBytes = Scrypt.scrypt(passphrase, saltAndPepper(parsed.scryptSalt), parsed.scryptCostParam, parsed.scryptBlockSize, 32)
         try {
             val kek = SecretKeySpec(kekBytes, "AES")
@@ -126,7 +152,7 @@ object CryptomatorMasterkeyFile {
     fun lock(masterkey: CryptomatorMasterkey, passphrase: CharArray, random: SecureRandom, vaultVersion: Int = DEFAULT_MASTERKEY_FILE_VERSION): ByteArray {
         val salt = ByteArray(DEFAULT_SCRYPT_SALT_LEN)
         random.nextBytes(salt)
-        val kekBytes = Scrypt.scrypt(passphrase, saltAndPepper(salt), DEFAULT_SCRYPT_COST_PARAM, DEFAULT_SCRYPT_BLOCK_SIZE, 32)
+        val kekBytes = Scrypt.scrypt(nfc(passphrase), saltAndPepper(salt), DEFAULT_SCRYPT_COST_PARAM, DEFAULT_SCRYPT_BLOCK_SIZE, 32)
         try {
             val kek = SecretKeySpec(kekBytes, "AES")
             val encWrapped = aesKeyWrap(kek, masterkey.encKey.encoded)

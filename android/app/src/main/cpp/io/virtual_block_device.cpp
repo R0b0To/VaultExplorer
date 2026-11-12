@@ -138,8 +138,8 @@ bool ensureMounted(int volId) {
     }
 }
 
-void unmountVolume(int volId) {
-    if (volId < 0 || volId >= MAX_VOLUMES) return;
+bool unmountVolume(int volId) {
+    if (volId < 0 || volId >= MAX_VOLUMES) return true;
     auto& v = volumes[volId];
     if (v.fsMounted) {
         if (v.fsType == VolumeState::FS_FATFS) {
@@ -165,8 +165,16 @@ void unmountVolume(int volId) {
     }
 
     // Flush dirty buffers and synchronize physical hardware caches
+    bool durable = true;
     if (v.isUsbSource) {
-        v.usbCache.sync(volId);
+        // A failed flush leaves the acknowledged bytes pending inside usbCache.
+        // Report it instead of swallowing it: the caller must not clear the
+        // cache (VolumeState::reset) unless it has decided to discard them.
+        if (!v.usbCache.sync(volId)) {
+            LOGI("unmountVolume(vol=%d): USB flush/sync failed; buffered writes are still pending",
+                 volId);
+            durable = false;
+        }
     } else if (v.isCompositeSource && v.composite) {
         v.composite->sync();
     } else if (v.fd >= 0) {
@@ -179,6 +187,7 @@ void unmountVolume(int volId) {
     v.ioBufSize = 0;
     std::lock_guard<std::mutex> cacheLock(v.decryptedBlockCacheMutex);
     v.decryptedBlockCache.clear();
+    return durable;
 }
 
 static unsigned char* getVolIoBuf(VolumeState& v, size_t neededBytes) {
@@ -227,8 +236,7 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
     if (count == 0) return RES_PARERR;
 
     VolumeState& v = volumes[pdrv];
-    const bool isLuks = (v.containerFormat != ContainerFormat::kVeraCrypt);
-    const uint32_t luksUnit = (isLuks && v.luksSectorSize >= 512) ? v.luksSectorSize : 512;
+    const uint32_t luksUnit = (v.luksSectorSize >= 512) ? v.luksSectorSize : 512;
 
     if (v.containerFormat == ContainerFormat::kBitLocker) {
         const bool ok = bitlockerRead(pdrv, static_cast<uint64_t>(sector) * luksUnit,
@@ -290,7 +298,10 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
         std::unique_ptr<unsigned char[]> decryptedOut(new unsigned char[totalBytes]);
 
         if (v.containerFormat == ContainerFormat::kVeraCrypt) {
-            parallelCryptoLoop(batch.count, [&](uint32_t i) {
+            // XTS data units are always 512 bytes, also on 1024/2048/4096-byte-sector
+            // volumes (upstream: hostOffset / ENCRYPTION_DATA_UNIT_SIZE), so a logical
+            // sector is processed as luksUnit/512 consecutive data units.
+            parallelCryptoLoop(batch.count * (luksUnit / 512), [&](uint32_t i) {
                 const uint64_t phys512Sector = (startByte / 512) + i;
                 const uint64_t tweak = phys512Sector - v.partitionStartSector;
                 cascadeDecryptSector(v.cascade, tweak, encBuf + (i * 512),
@@ -335,8 +346,7 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
     if (count == 0) return RES_PARERR;
 
     VolumeState& v = volumes[pdrv];
-    const bool isLuks = (v.containerFormat != ContainerFormat::kVeraCrypt);
-    const uint32_t luksUnit = (isLuks && v.luksSectorSize >= 512) ? v.luksSectorSize : 512;
+    const uint32_t luksUnit = (v.luksSectorSize >= 512) ? v.luksSectorSize : 512;
 
     if (volumes[pdrv].containerFormat == ContainerFormat::kBitLocker) {
         const bool ok = bitlockerWrite(pdrv, static_cast<uint64_t>(sector) * luksUnit,
@@ -385,7 +395,10 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
         }
 
         if (v.containerFormat == ContainerFormat::kVeraCrypt) {
-            parallelCryptoLoop(batch.count, [&](uint32_t i) {
+            // XTS data units are always 512 bytes, also on 1024/2048/4096-byte-sector
+            // volumes (upstream: hostOffset / ENCRYPTION_DATA_UNIT_SIZE), so a logical
+            // sector is processed as luksUnit/512 consecutive data units.
+            parallelCryptoLoop(batch.count * (luksUnit / 512), [&](uint32_t i) {
                 const uint64_t phys512Sector = (startByte / 512) + i;
                 const uint64_t tweak = phys512Sector - v.partitionStartSector;
                 cascadeEncryptSector(v.cascade, tweak, curBuf + (i * 512), encBuf + (i * 512));
@@ -433,7 +446,14 @@ extern "C" DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void* buff) {
     switch (cmd) {
         case CTRL_SYNC:
             if (v.isUsbSource) {
-                v.usbCache.sync(pdrv);
+                // Same contract as the fd branch below: FatFs treats RES_OK
+                // as "everything written so far is durable", so a failed
+                // flush or device sync must not be swallowed here.
+                if (!v.usbCache.sync(pdrv)) {
+                    LOGI("disk_ioctl(CTRL_SYNC): USB flush/sync failed on volume %d",
+                         static_cast<int>(pdrv));
+                    return RES_ERROR;
+                }
             } else if (v.isCompositeSource && v.composite) {
                 v.composite->sync();
             } else if (v.fd >= 0) {

@@ -125,5 +125,28 @@ void main() {
 
       expect(checks, 2);
     });
+
+    test('bounds iteration to maxPreloadCount on large playlists', () async {
+      final controller = buildController(ThumbnailCacheMode.appCache);
+      var checks = 0;
+
+      for (int i = 0; i < 1000; i++) {
+        MediaAspectRatioCache.put(container, 'img_$i.jpg', 16, 9);
+      }
+
+      final playlist = List.generate(1000, (i) => 'img_$i.jpg');
+      await controller.preloadAspectRatios(
+        playlist,
+        startIndex: 500,
+        maxPreloadCount: 15,
+        isStillWanted: () {
+          checks++;
+          return true;
+        },
+        onRatioLearned: () {},
+      );
+
+      expect(checks, 15);
+    });
   });
 }

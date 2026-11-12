@@ -20,6 +20,7 @@ import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
+import 'package:vaultexplorer/features/browser/services/category_aggregate_scan.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/widgets/apk_icon_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/archive_thumbnail_support.dart';
@@ -43,6 +44,7 @@ class FileTile extends StatelessWidget {
 
   /// Two-row layout -- see `FileListView.isDetailed`.
   final bool isDetailed;
+  final bool largeThumbnail;
   final bool showItemActionsMenu;
 
   /// Whether [entry]'s name is shown with its extension. Off hides it, except
@@ -84,6 +86,7 @@ class FileTile extends StatelessWidget {
     this.onIconTap,
     this.isCompact = false,
     this.isDetailed = false,
+    this.largeThumbnail = false,
     this.showItemActionsMenu = true,
     this.showFileExtensions = true,
     this.zoomLevel = 1.0,
@@ -144,9 +147,12 @@ class FileTile extends StatelessWidget {
     // launcher icon, which is shown as-is rather than filled into (and
     // clipped by) the row's tinted squircle the way a photo/video frame is.
     bool customLeadingIsIcon = false;
-    final fullPath = currentDirPath.isEmpty
-        ? entry.name
-        : '$currentDirPath/${entry.name}';
+    final itemEntry = entry;
+    final fullPath = itemEntry is CategoryEntry
+        ? itemEntry.path
+        : (currentDirPath.isEmpty
+            ? entry.name
+            : '$currentDirPath/${entry.name}');
     final isImg = MediaViewerConstants.isImage(entry.name);
     final isVid = MediaViewerConstants.isVideo(entry.name);
     final isApk = isApkFile(entry.name);
@@ -158,6 +164,8 @@ class FileTile extends StatelessWidget {
       if (isImg) {
         customLeading = Hero(
           tag: 'media_hero_${container!.volId}_$fullPath',
+          createRectTween: (begin, end) =>
+              MaterialRectArcTween(begin: begin, end: end),
           child: Material(
             type: MaterialType.transparency,
             child: _ListImageThumb(
@@ -176,6 +184,8 @@ class FileTile extends StatelessWidget {
       } else if (isVid) {
         customLeading = Hero(
           tag: 'media_hero_${container!.volId}_$fullPath',
+          createRectTween: (begin, end) =>
+              MaterialRectArcTween(begin: begin, end: end),
           child: Material(
             type: MaterialType.transparency,
             child: _ListVideoThumb(
@@ -274,6 +284,7 @@ class FileTile extends StatelessWidget {
       onIconTap: onIconTap,
       isCompact: isCompact,
       isDetailed: isDetailed,
+      largeThumbnail: largeThumbnail,
       zoomLevel: zoomLevel,
       customLeading: customLeading,
       customLeadingIsIcon: customLeadingIsIcon,
@@ -392,7 +403,7 @@ class _ListImageThumb extends ConsumerWidget {
         archiveContext,
         archiveRootPath,
       ),
-      debounce: const Duration(milliseconds: 100),
+      debounce: const Duration(milliseconds: 30),
       syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
       cacheHeight: quality.scaledSize(180),
       imageBuilder: (context, bytes, cacheHeight) => Image.memory(
@@ -405,18 +416,6 @@ class _ListImageThumb extends ConsumerWidget {
       ),
       loadingBuilder: (context) => Container(
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        child: Center(
-          child: SizedBox(
-            width: 14 * zoomLevel,
-            height: 14 * zoomLevel,
-            child: CircularProgressIndicator(
-              strokeWidth: 1.5,
-              color: Theme.of(
-                context,
-              ).colorScheme.primary.withValues(alpha: 0.6),
-            ),
-          ),
-        ),
       ),
       errorBuilder: (context) => _fallbackWidget(),
     );
@@ -500,7 +499,7 @@ class _ListVideoThumb extends ConsumerWidget {
             archiveContext,
             archiveRootPath,
           ),
-          debounce: const Duration(milliseconds: 150),
+          debounce: const Duration(milliseconds: 60),
           syncLookup: () =>
               thumbnailCache.peekMemory(container, filePath, quality),
           cacheHeight: quality.scaledSize(180),
@@ -514,18 +513,6 @@ class _ListVideoThumb extends ConsumerWidget {
           ),
           loadingBuilder: (context) => Container(
             color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            child: Center(
-              child: SizedBox(
-                width: 14 * zoomLevel,
-                height: 14 * zoomLevel,
-                child: CircularProgressIndicator(
-                  strokeWidth: 1.5,
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.primary.withValues(alpha: 0.6),
-                ),
-              ),
-            ),
           ),
           errorBuilder: (context) => _fallbackWidget(),
         ),
@@ -633,7 +620,7 @@ class _ListApkIconThumb extends ConsumerWidget {
       cache: ThumbnailConcurrency.inFlightThumbnails,
       limiter: ThumbnailConcurrency.imageLimiter,
       fetchFn: (c, p) => _fetch(thumbnailCache, fileIoApi, c, p, cacheMode, quality),
-      debounce: const Duration(milliseconds: 100),
+      debounce: const Duration(milliseconds: 30),
       syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
       cacheHeight: quality.scaledSize(180),
       // An app icon is meant to be seen whole, unlike a photo -- contain
@@ -715,7 +702,7 @@ class _ListBookCoverThumb extends ConsumerWidget {
         mode: cacheMode,
         quality: quality,
       )).bytes,
-      debounce: const Duration(milliseconds: 100),
+      debounce: const Duration(milliseconds: 30),
       syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
       cacheHeight: quality.scaledSize(180),
       imageBuilder: (context, bytes, cacheHeight) => Image.memory(

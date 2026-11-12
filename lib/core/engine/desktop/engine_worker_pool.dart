@@ -210,6 +210,107 @@ Object? veExecute(VeNative n, String op, List<Object?> a) {
       n.lock(a[0] as int);
       return null;
 
+    // ── folder vaults (gocryptfs / Cryptomator / CryFS) ──
+    case 'fvSupported':
+      return n.fvSupported;
+    case 'fvProbe':
+      return n.fvProbe(a[0] as String);
+    case 'fvUnlock':
+      {
+        final m = Map<String, Object?>.from(a[0] as Map);
+        final volId = m['volId'] as int;
+        final ({int rc, String? message, Uint8List? derivedKey}) r;
+        try {
+          r = n.fvUnlock(
+            volId: volId,
+            format: m['format'] as int,
+            root: m['path'] as String,
+            password: m['password'] as Uint8List,
+            combinedKey: m['combinedKey'] as Uint8List?,
+            readOnly: m['readOnly'] as bool,
+            localStateDir: m['localStateDir'] as String,
+            tempDir: m['tempDir'] as String,
+          );
+        } finally {
+          _wipe(m['password'] as Uint8List?);
+          _wipe(m['combinedKey'] as Uint8List?);
+        }
+        if (r.rc != veOk) return {'rc': r.rc, 'message': r.message};
+        final (listRc, files) = n.listDirectory(volId, '');
+        return {
+          'rc': veOk,
+          'format': veFormatWireName(n.containerFormat(volId)),
+          'derivedKey': r.derivedKey,
+          'files': listRc == veOk ? files : const <String>[],
+        };
+      }
+    case 'fvCreate':
+      {
+        final m = Map<String, Object?>.from(a[0] as Map);
+        try {
+          final r = n.fvCreate(
+            format: m['format'] as int,
+            root: m['path'] as String,
+            password: m['password'] as Uint8List,
+            cipher: m['cipher'] as int,
+            plaintextNames: m['plaintextNames'] as bool,
+            deterministicNames: m['deterministicNames'] as bool,
+            longNameMax: m['longNameMax'] as int,
+            blockSize: m['blockSize'] as int,
+            cipherName: m['cipherName'] as String,
+            userEntropy: m['userEntropy'] as Uint8List?,
+            localStateDir: m['localStateDir'] as String,
+            tempDir: m['tempDir'] as String,
+          );
+          return {'rc': r.rc, 'message': r.message};
+        } finally {
+          _wipe(m['password'] as Uint8List?);
+          _wipe(m['userEntropy'] as Uint8List?);
+        }
+      }
+    case 'fvChangePassword':
+      {
+        final m = Map<String, Object?>.from(a[0] as Map);
+        try {
+          final r = n.fvChangePassword(
+            format: m['format'] as int,
+            root: m['path'] as String,
+            oldPassword: m['oldPassword'] as Uint8List,
+            newPassword: m['newPassword'] as Uint8List,
+          );
+          return {'rc': r.rc, 'message': r.message};
+        } finally {
+          _wipe(m['oldPassword'] as Uint8List?);
+          _wipe(m['newPassword'] as Uint8List?);
+        }
+      }
+    case 'fvMigrate':
+      {
+        final m = Map<String, Object?>.from(a[0] as Map);
+        try {
+          final r = n.fvMigrateCryptomator(root: m['path'] as String, password: m['password'] as Uint8List);
+          return {'rc': r.rc, 'message': r.message};
+        } finally {
+          _wipe(m['password'] as Uint8List?);
+        }
+      }
+    case 'fvListSymlinks':
+      {
+        final (rc, entries) = n.fvListSymlinks(a[0] as int, a[1] as String);
+        return [rc, entries];
+      }
+    case 'fvReadSymlink':
+      {
+        final (rc, target) = n.fvReadSymlink(a[0] as int, a[1] as String);
+        return [rc, target];
+      }
+    case 'fvHidden':
+      return n.fvHiddenEntryCount(a[0] as int, a[1] as String);
+    case 'fvFinishWrite':
+      return n.fvFinishWrite(a[0] as int, a[1] as String);
+    case 'fvBatch':
+      return n.fvBatch(a[0] as int, a[1] as int, begin: a[2] as bool);
+
     case 'list':
       {
         final (rc, files) = n.listDirectory(a[0] as int, a[1] as String);
@@ -353,4 +454,9 @@ Object? veExecute(VeNative n, String op, List<Object?> a) {
       return null;
   }
   throw ArgumentError('unknown engine op: $op');
+}
+
+/// Overwrites a secret's worker-side copy once the native call is done.
+void _wipe(Uint8List? bytes) {
+  if (bytes != null) bytes.fillRange(0, bytes.length, 0);
 }

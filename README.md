@@ -27,14 +27,14 @@ VaultExplorer opens VeraCrypt, LUKS, BitLocker, VHD/VHDX, Cryptomator, gocryptfs
 | **BitLocker** | Password or 48-digit recovery key, including BitLocker To Go |
 | **VHD / VHDX** | Fixed and dynamic images containing a VeraCrypt, LUKS, or BitLocker volume, or an unencrypted filesystem |
 | **Cryptomator** | Vault formats 7 and 8 |
-| **gocryptfs** | Format v2, AES-256-GCM, XChaCha20-Poly1305 or AES-SIV |
+| **gocryptfs** | Format v2 as written by gocryptfs 0.7 up to current: AES-256-GCM, XChaCha20-Poly1305 or AES-SIV; encrypted, plaintext or `-deterministic-names` file names; `-longnamemax`; vaults from before HKDF/Raw64. Not supported: FIDO2-protected vaults; symlinks are not shown ([details](android/app/src/main/cpp/foldervault/README.md#gocryptfs-conformance-with-the-official-implementation)) |
 | **CryFS** | Format 0.10 (CryFS 0.10.x–1.0.x), AES or XChaCha20-Poly1305 |
 
 Filesystems: FAT12/16/32, exFAT, NTFS, ext2/3/4.
 
 ## Features
 
-- **File explorer** — list, grid, and masonry views, search, breadcrumbs, folder sizes, bookmarks, per-folder layout and sort, a customizable toolbar, and file manager skins. Thumbnails can size themselves to the grid cell (Auto) or use a manual size, and grid and masonry views can use rounded or square corners with adjustable spacing. Batch rename supports search and replace (optionally regex), date/time, UUID, and counter tokens, case changes, and a live preview. Copy, move, import, export, and extraction never overwrite names that differ only by letter case on case-insensitive filesystems; collisions are renamed `name (1)`
+- **File explorer** — list, grid, and masonry (justified-row mosaic) views, search, breadcrumbs, folder sizes, bookmarks, per-folder layout and sort, a customizable toolbar, and file manager skins. Thumbnails can size themselves to the grid cell (Auto) or use a manual size, and grid and masonry views can use rounded or square corners with adjustable spacing. Batch rename supports search and replace (optionally regex), date/time, UUID, and counter tokens, case changes, and a live preview. Copy, move, import, export, and extraction never overwrite names that differ only by letter case on case-insensitive filesystems; collisions are renamed `name (1)`
 - **Built-in viewers** — photos, video/audio (subtitles, speed control, A-B repeat, equalizer, volume boost, selectable video/audio decoders, contrast and saturation adjustments with presets, media notification controls), PDF, HTML, Markdown, EPUB e-books (contents list, text size and reading themes; JavaScript stays off), comics (`.cbz`, plus `.cbr`/`.cb7`/`.cbt` when they are really ZIPs; a true RAR or password-protected comic opens in the archive browser instead; pages are zoomable and can be read right to left), Word/PowerPoint/Excel and OpenDocument documents (`.docx`, `.pptx`, `.xlsx`, `.ppt`, `.odt`, `.odp`, `.ods` and their macro/template variants; a read-only reading view, not an editor, and not for password-protected files or legacy `.doc`/`.xls`), and a text/code editor (tabs, find and replace, large-file handling), streamed from the encrypted volume. PDF search needs Android 12+ with the system PDF extension. APK files can be sent to the system installer or opened as ZIP
 - **Image editor** — crop, rotate, draw, text, and redaction boxes, with no plaintext temp file
 - **Video editor** — lossless cuts on keyframes: keep or cut out segments, merge the clips or save them separately, or replace the original. Nothing is re-encoded, and embedded subtitle tracks are not preserved
@@ -62,7 +62,7 @@ Filesystems: FAT12/16/32, exFAT, NTFS, ext2/3/4.
 - **Keyfile & Passphrase Generator** — Diceware passphrases, passwords, keyfiles
 - **Encrypt / Decrypt Files** — individual files, no container needed
 - **Hash Verifier** — check files against MD5/SHA checksums
-- **Vault Sync** — compare two folders and copy missing or newer files
+- **Vault Sync** — compare two folders, browse everything on both sides, and copy, mirror or delete (open files, jump to a folder, bulk-select)
 - **Import / Export Passwords** — see Item vault above
 - **Storage Analyzer** and **Duplicate Finder**
 - **Split & Join** — split a container into chunks or rejoin them

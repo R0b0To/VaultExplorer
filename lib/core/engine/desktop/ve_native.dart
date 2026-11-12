@@ -14,7 +14,7 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
-const int kVeAbiVersion = 6;
+const int kVeAbiVersion = 7;
 
 // Result codes (ve_engine.h)
 const int veOk = 0;
@@ -26,6 +26,12 @@ const int veErrInvalidArg = 5;
 const int veErrException = 6;
 const int veErrMountFailed = 7;
 const int veErrAuthFailed = 8;
+
+// Folder-vault formats for ve_fv_* (VE_FV_*), and the container-format codes an unlocked folder-vault
+// slot reports (VE_FORMAT_*, see veFormatWireName).
+const int veFvGocryptfs = 0;
+const int veFvCryptomator = 1;
+const int veFvCryfs = 2;
 
 // Operation flavors / event kinds
 // Hash ids for ve_pbkdf2 / ve_hmac
@@ -50,6 +56,9 @@ String veFormatWireName(int native) => switch (native) {
   2 => 'luks2',
   3 => 'bitlocker',
   4 => 'plain',
+  10 => 'gocryptfs',
+  11 => 'cryptomator',
+  12 => 'cryfs',
   _ => 'unknown',
 };
 
@@ -332,6 +341,24 @@ class VeNative {
     _opCancel = _lib.lookupFunction<Void Function(Int32), void Function(int)>('ve_op_cancel');
     _opUnregister = _lib.lookupFunction<Void Function(Int32), void Function(int)>('ve_op_unregister');
     _poll = _lib.lookupFunction<Int32 Function(Pointer<VeEvent>), int Function(Pointer<VeEvent>)>('ve_poll_event');
+    _fvSupported = _lib.lookupFunction<Int32 Function(), int Function()>('ve_fv_supported');
+    _fvProbe = _lib.lookupFunction<Int32 Function(Pointer<Utf8>, Pointer<Int32>), int Function(Pointer<Utf8>, Pointer<Int32>)>('ve_fv_probe');
+    _fvUnlock = _lib.lookupFunction<
+        Int32 Function(Int32, Int32, Pointer<Utf8>, Pointer<Uint8>, Int32, Pointer<Uint8>, Int32, Int32, Pointer<Utf8>, Pointer<Utf8>, Pointer<VeBuffer>, Pointer<VeBuffer>),
+        int Function(int, int, Pointer<Utf8>, Pointer<Uint8>, int, Pointer<Uint8>, int, int, Pointer<Utf8>, Pointer<Utf8>, Pointer<VeBuffer>, Pointer<VeBuffer>)>('ve_fv_unlock');
+    _fvCreate = _lib.lookupFunction<
+        Int32 Function(Int32, Pointer<Utf8>, Pointer<Uint8>, Int32, Int32, Int32, Int32, Int32, Int32, Pointer<Utf8>, Pointer<Uint8>, Int32, Pointer<Utf8>, Pointer<Utf8>, Pointer<VeBuffer>),
+        int Function(int, Pointer<Utf8>, Pointer<Uint8>, int, int, int, int, int, int, Pointer<Utf8>, Pointer<Uint8>, int, Pointer<Utf8>, Pointer<Utf8>, Pointer<VeBuffer>)>('ve_fv_create');
+    _fvChangePassword = _lib.lookupFunction<
+        Int32 Function(Int32, Pointer<Utf8>, Pointer<Uint8>, Int32, Pointer<Uint8>, Int32, Pointer<VeBuffer>),
+        int Function(int, Pointer<Utf8>, Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<VeBuffer>)>('ve_fv_change_password');
+    _fvMigrate = _lib.lookupFunction<Int32 Function(Pointer<Utf8>, Pointer<Uint8>, Int32, Pointer<VeBuffer>), int Function(Pointer<Utf8>, Pointer<Uint8>, int, Pointer<VeBuffer>)>('ve_fv_migrate_cryptomator');
+    _fvInfo = _lib.lookupFunction<Int32 Function(Int32, Pointer<VeBuffer>), int Function(int, Pointer<VeBuffer>)>('ve_fv_info');
+    _fvListSymlinks = _lib.lookupFunction<Int32 Function(Int32, Pointer<Utf8>, Pointer<VeBuffer>), int Function(int, Pointer<Utf8>, Pointer<VeBuffer>)>('ve_fv_list_symlinks');
+    _fvReadSymlink = _lib.lookupFunction<Int32 Function(Int32, Pointer<Utf8>, Pointer<VeBuffer>), int Function(int, Pointer<Utf8>, Pointer<VeBuffer>)>('ve_fv_read_symlink');
+    _fvHidden = _lib.lookupFunction<Int32 Function(Int32, Pointer<Utf8>), int Function(int, Pointer<Utf8>)>('ve_fv_hidden_entry_count');
+    _fvFinishWrite = _lib.lookupFunction<Int32 Function(Int32, Pointer<Utf8>), int Function(int, Pointer<Utf8>)>('ve_fv_finish_write');
+    _fvBatch = _lib.lookupFunction<Int32 Function(Int32, Int32, Int32), int Function(int, int, int)>('ve_fv_batch');
   }
 
   final DynamicLibrary _lib;
@@ -343,6 +370,18 @@ class VeNative {
   late final int Function() _abiVersion;
   late final int Function() _maxVolumes;
   late final Pointer<Utf8> Function(int) _probe;
+  late final int Function() _fvSupported;
+  late final int Function(Pointer<Utf8>, Pointer<Int32>) _fvProbe;
+  late final int Function(int, int, Pointer<Utf8>, Pointer<Uint8>, int, Pointer<Uint8>, int, int, Pointer<Utf8>, Pointer<Utf8>, Pointer<VeBuffer>, Pointer<VeBuffer>) _fvUnlock;
+  late final int Function(int, Pointer<Utf8>, Pointer<Uint8>, int, int, int, int, int, int, Pointer<Utf8>, Pointer<Uint8>, int, Pointer<Utf8>, Pointer<Utf8>, Pointer<VeBuffer>) _fvCreate;
+  late final int Function(int, Pointer<Utf8>, Pointer<Uint8>, int, Pointer<Uint8>, int, Pointer<VeBuffer>) _fvChangePassword;
+  late final int Function(Pointer<Utf8>, Pointer<Uint8>, int, Pointer<VeBuffer>) _fvMigrate;
+  late final int Function(int, Pointer<VeBuffer>) _fvInfo;
+  late final int Function(int, Pointer<Utf8>, Pointer<VeBuffer>) _fvListSymlinks;
+  late final int Function(int, Pointer<Utf8>, Pointer<VeBuffer>) _fvReadSymlink;
+  late final int Function(int, Pointer<Utf8>) _fvHidden;
+  late final int Function(int, Pointer<Utf8>) _fvFinishWrite;
+  late final int Function(int, int, int) _fvBatch;
   late final int Function(Pointer<VeUnlockParams>) _unlock;
   late final void Function(int) _cancelUnlock;
   late final void Function(int) _lock;
@@ -1018,6 +1057,7 @@ class VeNative {
   /// readOnly, volumeSizeBytes, fileSystem?, and per format cipherId/hashId/hiddenVolume (VeraCrypt)
   /// or luksVersion/cipherId/sectorSize (LUKS). BitLocker only has the first three.
   (int, Map<String, Object?>?) vaultInfo(int volId) {
+    if (_format(volId) >= 10) return fvInfo(volId); // gocryptfs / Cryptomator / CryFS slot
     final p = calloc<VeVaultInfo>();
     try {
       p.ref.structSize = sizeOf<VeVaultInfo>();
@@ -1071,7 +1111,7 @@ class VeNative {
     return (rc, out);
   }
 
-  /// >= 0 size, or a negative -veErr* code.
+  /// >= 0 size, -1 when the path does not exist, or another negative -veErr* code.
   int fileSize(int volId, String path) => _withUtf8(path, (p) => _fileSize(volId, p));
   int folderSize(int volId, String path) => _withUtf8(path, (p) => _folderSize(volId, p));
 
@@ -1115,6 +1155,220 @@ class VeNative {
       calloc.free(f);
     }
   }
+
+  // ── folder vaults (gocryptfs / Cryptomator / CryFS) ────────────────────
+  //
+  // Once unlocked, a folder vault is addressed through its slot with every ordinary call above
+  // (listDirectory, readFileChunk, copyFile, ...). Only what is specific to the format lives here.
+
+  /// False on builds without the folder-vault core (Windows, for now).
+  bool get fvSupported => _fvSupported() != 0;
+
+  /// The folder-vault format [root] looks like (veFv*), or -1.
+  int fvProbe(String root) {
+    final out = calloc<Int32>();
+    try {
+      final rc = _withUtf8(root, (p) => _fvProbe(p, out));
+      return rc == veOk ? out.value : -1;
+    } finally {
+      calloc.free(out);
+    }
+  }
+
+  /// Copies [data] to native memory for the duration of [body] and wipes it afterwards.
+  T _withBytes<T>(Uint8List? data, T Function(Pointer<Uint8> ptr, int len) body) {
+    if (data == null) return body(nullptr, 0);
+    final buf = calloc<Uint8>(data.isEmpty ? 1 : data.length);
+    try {
+      buf.asTypedList(data.length).setAll(0, data);
+      return body(buf, data.length);
+    } finally {
+      buf.asTypedList(data.isEmpty ? 1 : data.length).fillRange(0, data.isEmpty ? 1 : data.length, 0);
+      calloc.free(buf);
+    }
+  }
+
+  /// Takes the contents of [b] (wiping and freeing the native copy) or null when it is empty.
+  Uint8List? _takeBuffer(Pointer<VeBuffer> b) {
+    Uint8List? bytes;
+    if (b.ref.data != nullptr && b.ref.len > 0) bytes = Uint8List.fromList(b.ref.data.asTypedList(b.ref.len));
+    _bufferFree(b);
+    return bytes;
+  }
+
+  String? _takeMessage(Pointer<VeBuffer> b) {
+    final bytes = _takeBuffer(b);
+    return bytes == null ? null : utf8.decode(bytes, allowMalformed: true);
+  }
+
+  /// Opens the vault at [root] into slot [volId]. `rc` is veOk / veErrAuthFailed (wrong password) /
+  /// veErrFailed (not a vault, I/O error); [derivedKey] is the CryFS key the caller may remember.
+  ({int rc, String? message, Uint8List? derivedKey}) fvUnlock({
+    required int volId,
+    required int format,
+    required String root,
+    required Uint8List password,
+    Uint8List? combinedKey,
+    bool readOnly = false,
+    String localStateDir = '',
+    String tempDir = '',
+  }) {
+    final msg = calloc<VeBuffer>();
+    final key = calloc<VeBuffer>();
+    final localP = localStateDir.toNativeUtf8();
+    final tempP = tempDir.toNativeUtf8();
+    try {
+      final rc = _withUtf8(
+        root,
+        (r) => _withBytes(
+          password,
+          (pw, pwLen) => _withBytes(
+            combinedKey,
+            (ck, ckLen) => _fvUnlock(volId, format, r, pw, pwLen, ck, ckLen, readOnly ? 1 : 0, localP, tempP, msg, key),
+          ),
+        ),
+      );
+      return (rc: rc, message: _takeMessage(msg), derivedKey: _takeBuffer(key));
+    } finally {
+      calloc.free(msg);
+      calloc.free(key);
+      calloc.free(localP);
+      calloc.free(tempP);
+    }
+  }
+
+  /// Creates a vault in the (empty) directory [root]. See ve_fv_create for the option meanings.
+  ({int rc, String? message}) fvCreate({
+    required int format,
+    required String root,
+    required Uint8List password,
+    int cipher = 0,
+    bool plaintextNames = false,
+    bool deterministicNames = false,
+    int longNameMax = 0,
+    int blockSize = 0,
+    String cipherName = '',
+    Uint8List? userEntropy,
+    String localStateDir = '',
+    String tempDir = '',
+  }) {
+    final msg = calloc<VeBuffer>();
+    final cipherP = cipherName.toNativeUtf8();
+    final localP = localStateDir.toNativeUtf8();
+    final tempP = tempDir.toNativeUtf8();
+    try {
+      final rc = _withUtf8(
+        root,
+        (r) => _withBytes(
+          password,
+          (pw, pwLen) => _withBytes(
+            userEntropy,
+            (ue, ueLen) => _fvCreate(format, r, pw, pwLen, cipher, plaintextNames ? 1 : 0, deterministicNames ? 1 : 0,
+                longNameMax, blockSize, cipherP, ue, ueLen, localP, tempP, msg),
+          ),
+        ),
+      );
+      return (rc: rc, message: _takeMessage(msg));
+    } finally {
+      calloc.free(msg);
+      calloc.free(cipherP);
+      calloc.free(localP);
+      calloc.free(tempP);
+    }
+  }
+
+  ({int rc, String? message}) fvChangePassword({
+    required int format,
+    required String root,
+    required Uint8List oldPassword,
+    required Uint8List newPassword,
+  }) {
+    final msg = calloc<VeBuffer>();
+    try {
+      final rc = _withUtf8(
+        root,
+        (r) => _withBytes(
+          oldPassword,
+          (o, oLen) => _withBytes(newPassword, (n, nLen) => _fvChangePassword(format, r, o, oLen, n, nLen, msg)),
+        ),
+      );
+      return (rc: rc, message: _takeMessage(msg));
+    } finally {
+      calloc.free(msg);
+    }
+  }
+
+  ({int rc, String? message}) fvMigrateCryptomator({required String root, required Uint8List password}) {
+    final msg = calloc<VeBuffer>();
+    try {
+      final rc = _withUtf8(root, (r) => _withBytes(password, (pw, pwLen) => _fvMigrate(r, pw, pwLen, msg)));
+      return (rc: rc, message: _takeMessage(msg));
+    } finally {
+      calloc.free(msg);
+    }
+  }
+
+  /// The vault's own properties plus `readOnly`, with the keys/types the info screen reads.
+  (int, Map<String, Object?>?) fvInfo(int volId) {
+    final (rc, bytes) = _withBuffer((b) => _fvInfo(volId, b));
+    if (rc != veOk || bytes == null || bytes.length < 4) return (rc, null);
+    final bd = ByteData.sublistView(bytes);
+    var off = 0;
+    String? readStr() {
+      if (off + 4 > bytes.length) return null;
+      final len = bd.getUint32(off, Endian.little);
+      off += 4;
+      if (off + len > bytes.length) return null;
+      final s = utf8.decode(Uint8List.sublistView(bytes, off, off + len), allowMalformed: true);
+      off += len;
+      return s;
+    }
+
+    final count = bd.getUint32(off, Endian.little);
+    off += 4;
+    final map = <String, Object?>{};
+    for (var i = 0; i < count; i++) {
+      final key = readStr();
+      final kind = readStr();
+      final value = readStr();
+      if (key == null || kind == null || value == null) break;
+      map[key] = switch (kind) {
+        'i' => int.tryParse(value) ?? 0,
+        'b' => value == 'true',
+        _ => value,
+      };
+    }
+    return (rc, map);
+  }
+
+  /// Symlinks directly inside [path] as directory-entry wire strings ("L|size|mtime|name").
+  (int, List<String>) fvListSymlinks(int volId, String path) {
+    final (rc, bytes) = _withUtf8(path, (p) => _withBuffer((b) => _fvListSymlinks(volId, p, b)));
+    if (rc != veOk || bytes == null || bytes.length < 4) return (rc, const []);
+    final bd = ByteData.sublistView(bytes);
+    final count = bd.getUint32(0, Endian.little);
+    final out = <String>[];
+    var off = 4;
+    for (var i = 0; i < count && off + 4 <= bytes.length; i++) {
+      final len = bd.getUint32(off, Endian.little);
+      off += 4;
+      if (off + len > bytes.length) break;
+      out.add(utf8.decode(Uint8List.sublistView(bytes, off, off + len), allowMalformed: true));
+      off += len;
+    }
+    return (rc, out);
+  }
+
+  (int, String?) fvReadSymlink(int volId, String path) {
+    final (rc, bytes) = _withUtf8(path, (p) => _withBuffer((b) => _fvReadSymlink(volId, p, b)));
+    return (rc, rc == veOk && bytes != null ? utf8.decode(bytes, allowMalformed: true) : null);
+  }
+
+  /// Entries hidden from listings in [path] (>= 0), or a negative -veErr* code.
+  int fvHiddenEntryCount(int volId, String path) => _withUtf8(path, (p) => _fvHidden(volId, p));
+  int fvFinishWrite(int volId, String path) => _withUtf8(path, (p) => _fvFinishWrite(volId, p));
+  /// kind 0 = writes, 1 = deletes.
+  int fvBatch(int volId, int kind, {required bool begin}) => _fvBatch(volId, kind, begin ? 1 : 0);
 
   // ── operations / events ────────────────────────────────────────────────
 

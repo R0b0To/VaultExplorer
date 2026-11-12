@@ -36,6 +36,21 @@ class LocalFileIoBackend {
   String resolve(String rootPath, String relativePath) =>
       _resolve(rootPath, relativePath);
 
+  Future<bool> entryExists(
+    String rootPath,
+    String relativePath, {
+    required bool isDir,
+  }) async {
+    try {
+      final path = _resolve(rootPath, relativePath);
+      return isDir
+          ? await Directory(path).exists()
+          : await File(path).exists();
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<bool> canListDirectory(String rootPath, String dirPath) async {
     try {
       final directory = Directory(_resolve(rootPath, dirPath));

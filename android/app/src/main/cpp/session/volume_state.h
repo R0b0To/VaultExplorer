@@ -15,6 +15,7 @@
 #include "mbedtls/platform_util.h"
 #include "container_format.h"
 #include "crypto/cascade.h"
+#include "crypto/luks_cipher.h"
 #include "io/decrypted_block_cache.h"
 #include "io/usb_block_cache.h"
 #include "io/fd_write_buffer.h"
@@ -63,7 +64,8 @@ struct VolumeState {
     size_t preservedDerivedKeyLen = 0;
     ContainerFormat containerFormat = ContainerFormat::kVeraCrypt;
     uint32_t luksSectorSize = 512;
-    CascadeContext luksGenericCascade;
+    CascadeContext luksGenericCascade;   // legacy XTS-only context; superseded by luksCipher for all data-path crypto
+    LuksCipherContext luksCipher;        // LUKS data-area cipher: XTS-128/256, CBC-plain/plain64/essiv:sha256
     CascadeContext cascade;
 
     void* disContext = nullptr;
@@ -118,3 +120,15 @@ extern std::mutex slotAllocMutex;
 // Serializes file-backed session registration/teardown with container
 // mutations such as expansion. Acquire before any VolumeState::mutex.
 extern std::mutex volumeLifecycleMutex;
+// Encrypts/decrypts ONE LUKS logical sector ([unitLen] = the segment's sector_size,
+// 512..4096) of a LUKS volume's data area. [sectorNum] is the dm-crypt IV/tweak
+// counter in 512-byte units (physical 512-sector minus partitionStartSector).
+// Dispatches on the volume's cipher (XTS-128/256, CBC with plain/plain64/essiv).
+// On a context that was never initialised the output is zeroed rather than left
+// holding unrelated bytes (cannot happen for a mounted LUKS volume).
+inline void luksCryptUnit(const VolumeState& v, bool encrypt, uint64_t sectorNum, uint32_t unitLen,
+                          const unsigned char* in, unsigned char* out) {
+    if (!luksCipherCrypt(v.luksCipher, encrypt, sectorNum, unitLen, in, out, unitLen)) {
+        for (uint32_t i = 0; i < unitLen; i++) out[i] = 0;
+    }
+}

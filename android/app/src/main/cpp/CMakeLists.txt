@@ -518,6 +518,7 @@ add_library(
         crypto/cascade.cpp
         crypto/kdf_table.cpp
         crypto/luks_header.cpp
+        crypto/luks_cipher.cpp
         crypto/scrypt.cpp
         crypto/cryfs_block_cipher.cpp
         crypto/single_file_crypto.cpp

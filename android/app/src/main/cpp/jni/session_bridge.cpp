@@ -245,6 +245,8 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_emergencyPurgeNative(
         mbedtls_platform_zeroize(&vol.luksGenericCascade, sizeof(vol.luksGenericCascade));
         vol.cascade.initialized = false;
         vol.luksGenericCascade.initialized = false;
+        mbedtls_platform_zeroize(&vol.luksCipher, sizeof(vol.luksCipher));
+        vol.luksCipher.initialized = false;
         vol.dataCtxInitialized = false;
         vol.decryptedBlockCache.clear();
         vol.usbCache.clear();

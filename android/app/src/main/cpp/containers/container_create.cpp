@@ -503,8 +503,10 @@ bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeByte
         bool keySetupOk;
         {
             std::unique_lock<std::shared_mutex> vlock(v.mutex);
-            keySetupOk = cascadeSetKeys(v.luksGenericCascade, dataCipher,
-                                        info.masterKey.data(), info.masterKey.size());
+            LuksCipherSpec createSpec;
+            keySetupOk = luksParseCipherSpec(info.cipherName, info.cipherMode,
+                                             static_cast<uint32_t>(info.masterKey.size()), createSpec) &&
+                         luksCipherInit(v.luksCipher, createSpec, info.masterKey.data(), info.masterKey.size());
             if (keySetupOk) {
                 v.fd = fd;
                 v.dataOffset = info.dataOffsetBytes;
@@ -558,6 +560,7 @@ bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeByte
             v.fd = -1;
             v.dataCtxInitialized = false;
             v.luksGenericCascade.initialized = false;
+            luksCipherWipe(v.luksCipher);
         }
 
         if (!formatted) {
@@ -1480,7 +1483,19 @@ static void growFileSystemOfLuksVolume(int fd, const LuksVolumeInfo& info,
     v.dataAreaLengthBytes = dataAreaLengthBytes;
     v.fileSize = fileSize;
     v.luksSectorSize = static_cast<uint32_t>(info.dataSectorSize >= 512 ? info.dataSectorSize : 512);
-    v.luksGenericCascade = dataCipher;
+    {
+        // The data area was just zero-filled with this exact cipher (XTS-plain64, validated by
+        // luksInfoSupportsDataArea); build the same context for the filesystem grow.
+        LuksCipherSpec growSpec;
+        if (!luksParseCipherSpec(info.cipherName, info.cipherMode,
+                                 static_cast<uint32_t>(info.masterKey.size()), growSpec) ||
+            !luksCipherInit(v.luksCipher, growSpec, info.masterKey.data(), info.masterKey.size())) {
+            LOGI("growFileSystemOfLuksVolume: cipher setup failed");
+            v.fd = -1;
+            v.reset();
+            return;
+        }
+    }
     const uint64_t segmentStartSector = info.dataOffsetBytes / 512;
     v.partitionStartSector = segmentStartSector - info.ivTweak; // validated before the slot is created
     v.matchedCipherId = -1;

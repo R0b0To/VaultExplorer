@@ -47,6 +47,7 @@ void VolumeState::reset() {
     containerFormat = ContainerFormat::kVeraCrypt;
     luksSectorSize = 512;
     luksGenericCascade.initialized = false;
+    luksCipherWipe(luksCipher);
     isCompositeSource = false;
     composite.reset();
 

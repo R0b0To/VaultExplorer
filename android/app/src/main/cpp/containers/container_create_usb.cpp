@@ -465,8 +465,10 @@ UsbCreateResult createUsbLuksContainer(int volId, uint64_t startSector, const ch
         bool keySetupOk;
         {
             std::unique_lock<std::shared_mutex> vlock(v.mutex);
-            keySetupOk = cascadeSetKeys(v.luksGenericCascade, dataCipher,
-                                        info.masterKey.data(), info.masterKey.size());
+            LuksCipherSpec createSpec;
+            keySetupOk = luksParseCipherSpec(info.cipherName, info.cipherMode,
+                                             static_cast<uint32_t>(info.masterKey.size()), createSpec) &&
+                         luksCipherInit(v.luksCipher, createSpec, info.masterKey.data(), info.masterKey.size());
             if (keySetupOk) {
                 v.isUsbSource = true;
                 v.fd = -1;

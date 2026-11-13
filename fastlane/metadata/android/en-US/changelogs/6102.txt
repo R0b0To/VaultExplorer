@@ -1,0 +1,7 @@
+New Music library and advanced gallery filters/grouping
+Symbolic-link support and safer link editing
+Expanded gocryptfs and LUKS compatibility
+VeraCrypt backup-header recovery and desktop-compatible header backups
+Cryptomator v7→v8 migration
+VeraCrypt/LUKS container expansion and hidden volumes
+Improved ext filesystem formatting, password autofill, and safer file operations.

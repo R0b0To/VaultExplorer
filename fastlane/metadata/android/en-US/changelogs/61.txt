@@ -1,0 +1,27 @@
+### Music
+- Added an optional Music library with Tracks, Albums, Artists, Genres and Folders views, search, scanning, queue controls, shuffle/repeat, custom covers and waveform seeking.
+- Enable indexing per location or folder. Tags are read from MP3, FLAC, Ogg, Opus, MP4/M4A and WAV. A playback queue stays within the starting location.
+
+### Gallery and files
+- Added filters and grouping by media type, date, tags, place, camera, orientation, rating, size and folder, plus search across metadata.
+- Added a justified-row mosaic layout, faster large-gallery browsing and offline city grouping.
+- Added symbolic links for Cryptomator vaults and ext2/3/4 or NTFS filesystems in VeraCrypt/LUKS containers. Links stay inside the current vault/container; supported image and video editors save changes to the target.
+- Improved link safety, added notices for hidden Cryptomator entries, improved Markdown rendering and made `.txt` files open in the built-in editor.
+
+### Vault compatibility and recovery
+- Expanded gocryptfs v2 compatibility and added optional deterministic filenames.
+- Expanded LUKS1/LUKS2 support with more encryption modes, ciphers, hashes and keyslot configurations.
+- Added VeraCrypt backup-header recovery and desktop-compatible `.vchdr` header backup import/export.
+- Fixed password handling for emoji and other supplementary Unicode characters, with a legacy unlock fallback for affected older VeraCrypt vaults.
+- Added Cryptomator format 7-to-8 migration, optional key/configuration-file backups and safer handling when a device refuses final vault writes.
+
+### Container and filesystem tools
+- Added VeraCrypt and LUKS container expansion, with optional encrypted initialization of added space and NTFS/ext2/3/4 filesystem growth. FAT/exFAT cannot be expanded in place.
+- Added hidden-volume creation inside standard VeraCrypt volumes. Use hidden-volume protection when writing to the outer volume.
+- Improved ext2/3/4 formatting reliability, especially when reusing previously used container space.
+
+### Usability and reliability
+- Added Android password-manager autofill to supported password fields.
+- Made copy/move safer when a source file disappears, improved zero-byte file handling and cleared deleted items from the in-app clipboard.
+
+SHA256 Signature: `0bde9d3b0ee3f56617d02632c843b1629bf0b2faa4560dff5d26f651dc325f19`

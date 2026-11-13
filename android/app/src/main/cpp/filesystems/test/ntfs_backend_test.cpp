@@ -6,7 +6,7 @@
 // physicalRead()/physicalWrite() are implemented over plain host files, and the
 // volume is configured as an unencrypted flat container, so the backend's
 // "no encryption layer at all -- pass bytes straight through" path is what runs.
-// BitLocker, VHD/VHDX and the cipher cascade are stubbed out; the NTFS logic
+// BitLocker, VHD/VHDX and both cipher engines are stubbed out; the NTFS logic
 // above them is the same code that runs on top of a decrypted BitLocker volume.
 //
 // Oracles are *independent* programs, not the backend reading back its own
@@ -61,6 +61,8 @@ bool bitlockerRead(int, uint64_t, unsigned char*, size_t) { return false; }
 bool bitlockerWrite(int, uint64_t, const unsigned char*, size_t) { return false; }
 void cascadeEncryptSector(const CascadeContext&, uint64_t, const unsigned char*, unsigned char*) {}
 void cascadeDecryptSector(const CascadeContext&, uint64_t, const unsigned char*, unsigned char*) {}
+bool luksCipherCrypt(const LuksCipherContext&, bool, uint64_t, uint32_t,
+                     const unsigned char*, unsigned char*, size_t) { return false; }
 void blockCipherEncryptBlock(const BlockCipherContext&, const unsigned char*, unsigned char*) {}
 void blockCipherDecryptBlock(const BlockCipherContext&, const unsigned char*, unsigned char*) {}
 bool usbFlushAndSync(int) { return true; }

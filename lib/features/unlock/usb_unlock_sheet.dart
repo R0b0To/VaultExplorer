@@ -43,6 +43,10 @@ class UsbUnlockSheet extends ConsumerStatefulWidget {
 }
 
 class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
+  /// See `_UnlockSheetState._kPasswordAutofillHints`: one shared `const` list
+  /// so rebuilds never change the field's autofill configuration.
+  static const List<String> _kPasswordAutofillHints = <String>[AutofillHints.password];
+
   late final TextEditingController _passwordCtrl;
   final _pimCtrl = TextEditingController();
   final _hiddenPasswordCtrl = TextEditingController();
@@ -194,10 +198,15 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
         ),
         body: GestureDetector(
           behavior: HitTestBehavior.opaque,
-          child: SafeArea(
-            child: wideLayout
-                ? _buildWideLayout(context, state, credState, cs, textTheme)
-                : _buildPortraitLayout(context, state, credState, cs, textTheme),
+          // One group for the whole sheet; `cancel` so closing it never makes
+          // the password manager offer to save the vault password.
+          child: AutofillGroup(
+            onDisposeAction: AutofillContextAction.cancel,
+            child: SafeArea(
+              child: wideLayout
+                  ? _buildWideLayout(context, state, credState, cs, textTheme)
+                  : _buildPortraitLayout(context, state, credState, cs, textTheme),
+            ),
           ),
         ),
       ),
@@ -535,6 +544,7 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
                   padding: const EdgeInsets.all(12),
                   child: TextField(
                     controller: _passwordCtrl,
+                    autofillHints: _kPasswordAutofillHints,
                     enabled: canConfigure,
                     obscureText: _revealLocked ? true : _obscure,
                     autocorrect: false,
@@ -704,6 +714,7 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
                 padding: const EdgeInsets.all(12),
                 child: TextField(
                   controller: _hiddenPasswordCtrl,
+                  autofillHints: null, // different secret from the main password
                   obscureText: _hiddenObscure,
                   autocorrect: false,
                   enableSuggestions: false,
@@ -841,6 +852,7 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
           padding: const EdgeInsets.all(12),
           child: TextField(
             controller: _hiddenPasswordCtrl,
+            autofillHints: null, // different secret from the main password
             obscureText: _hiddenObscure,
             autocorrect: false,
             enableSuggestions: false,

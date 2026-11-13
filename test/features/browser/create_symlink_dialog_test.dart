@@ -218,6 +218,100 @@ void main() {
     });
   });
 
+  group('Where the link really lives (folder links on the way)', () {
+    String targetText(WidgetTester tester) =>
+        tester.widget<TextField>(targetField()).controller!.text;
+
+    testWidgets('a native-filesystem target is checked against the physical folder, not the displayed path', (tester) async {
+      // "up" is a folder link back to the root, so "up/b/c" reads 3 deep but is really "b/c": 2 deep.
+      fileIo.physical['up/b/c'] = 'b/c';
+      await openDialog(tester, dir: 'up/b/c', container: cryptomatorContainer(format: 'luks'));
+      await tester.enterText(nameField(), 'ln');
+      await tester.enterText(targetField(), '../../../x');          // fine by the displayed path, leaves the volume for real
+      await tester.pump();
+      expect(find.text('Target must be a relative path that stays inside this container.'), findsOneWidget);
+      expect(createEnabled(tester), isFalse);
+
+      await tester.enterText(targetField(), '../../x');             // lands exactly on the root
+      await tester.pump();
+      expect(find.text('Target must be a relative path that stays inside this container.'), findsNothing);
+      expect(createEnabled(tester), isTrue);
+    });
+
+    testWidgets('and the other way round: a deeper real folder allows what the displayed path would refuse', (tester) async {
+      fileIo.physical['short'] = 'one/two/three';                   // reads 1 deep, is 3 deep
+      await openDialog(tester, dir: 'short', container: cryptomatorContainer(format: 'luks'));
+      await tester.enterText(nameField(), 'ln');
+      await tester.enterText(targetField(), '../../../x');
+      await tester.pump();
+      expect(createEnabled(tester), isTrue);
+    });
+
+    testWidgets('if the folder cannot be resolved, validation falls back to the displayed path', (tester) async {
+      fileIo.physical['a/b'] = null;
+      await openDialog(tester, dir: 'a/b', container: cryptomatorContainer(format: 'luks'));
+      await tester.enterText(nameField(), 'ln');
+      await tester.enterText(targetField(), '../../../x');
+      await tester.pump();
+      expect(find.text('Target must be a relative path that stays inside this container.'), findsOneWidget);
+    });
+
+    testWidgets('the picker builds the relative target from the physical folder and the physical target', (tester) async {
+      fileIo.physical['a-link/sub'] = 'deep/er/sub';                 // reads 2 deep, is 3 deep
+      fileIo.browserListings[''] = ['F|3|0|x.txt'];
+      await openDialog(tester, dir: 'a-link/sub');
+      await tester.tap(find.byTooltip('Browse vault'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('x.txt'));
+      await tester.pumpAndSettle();
+
+      expect(targetText(tester), '../../../x.txt');                   // not "../../x.txt", which the displayed path would give
+      expect(fileIo.physicalCalls, contains(('x.txt', false)));      // the picked entry keeps its own last name
+      expect(fileIo.physicalCalls, contains(('a-link/sub', true)));  // the folder itself is fully resolved
+    });
+
+    testWidgets('a pick below a folder link is resolved through that link', (tester) async {
+      fileIo.physical['docs-link/notes.txt|nofollow'] = 'docs/notes.txt';
+      fileIo.browserListings[''] = ['LD|0|0|docs-link'];
+      fileIo.browserListings['docs-link'] = ['F|3|0|notes.txt'];
+      await openDialog(tester, dir: 'work');
+      await tester.tap(find.byTooltip('Browse vault'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('docs-link'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('notes.txt'));
+      await tester.pumpAndSettle();
+
+      expect(targetText(tester), '../docs/notes.txt');
+    });
+
+    testWidgets('a pick that cannot be resolved safely is refused with a message and fills nothing', (tester) async {
+      fileIo.physical['x.txt|nofollow'] = null;
+      fileIo.browserListings[''] = ['F|3|0|x.txt'];
+      await openDialog(tester, dir: 'a');
+      await tester.tap(find.byTooltip('Browse vault'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('x.txt'));
+      await tester.pumpAndSettle();
+
+      expect(find.text("Can't build a relative target from here. Type the target instead."), findsOneWidget);
+      expect(targetText(tester), '');
+    });
+
+    testWidgets('picking from the vault root gives a plain relative name', (tester) async {
+      fileIo.browserListings[''] = ['D|0|0|docs'];
+      fileIo.browserListings['docs'] = ['F|3|0|a.txt'];
+      await openDialog(tester);
+      await tester.tap(find.byTooltip('Browse vault'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('docs'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('a.txt'));
+      await tester.pumpAndSettle();
+      expect(targetText(tester), 'docs/a.txt');
+    });
+  });
+
   group('Add menu gating', () {
     Widget menu(MountedContainer container, {bool readOnly = false, bool hideImport = false}) => app(
       AddItemMenuButton(

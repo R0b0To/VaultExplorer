@@ -13791,4 +13791,8 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get symbolicLinkTargetOutsideVault =>
       'リンク先はこのコンテナー内に収まる相対パスである必要があります。';
+
+  @override
+  String get symbolicLinkPickerUnresolvable =>
+      'ここからは相対的なリンク先を作成できません。リンク先を直接入力してください。';
 }

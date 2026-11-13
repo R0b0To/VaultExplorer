@@ -850,6 +850,68 @@ class VaultFileIoApi {
     );
   }
 
+  /// Where [path] really is: every link in it is followed, whether it sits in the middle of the path or (with
+  /// [followLast]) is its last name, so the result is a chain of ordinary folders. A relative link target is
+  /// applied from the folder the link physically lives in, so a target built from the path as the browser shows
+  /// it (which may pass through a folder link of a different depth) can point somewhere else, or past the
+  /// container root; this gives the path to build it from.
+  ///
+  /// Fails closed: null when the answer is not certain: an absolute, empty or Windows-style target, a `..` that
+  /// would leave the container, a loop or a chain over 40 hops, or a link that cannot be read. (The native
+  /// engines resolve some of those differently, e.g. Cryptomator clamps `..` at the root, so null here only
+  /// means "do not build a target from this".) Containers that cannot hold links are answered without asking
+  /// the platform anything.
+  Future<String?> resolveVaultPhysicalPath(
+    MountedContainer container,
+    String path, {
+    bool followLast = true,
+  }) async {
+    final canHaveLinks =
+        !_isSaf(container) &&
+        !container.isLocalStorage &&
+        supportsVaultSymbolicLinks(container);
+    final pending = path.split('/').where((s) => s.isNotEmpty).toList();
+    final resolved = <String>[];
+    var hops = 0;
+    while (pending.isNotEmpty) {
+      final segment = pending.removeAt(0);
+      if (segment == '.') continue;
+      if (segment == '..') {
+        if (resolved.isEmpty) return null;
+        resolved.removeLast();
+        continue;
+      }
+      final isLast = pending.every((s) => s == '.');
+      if (!canHaveLinks || (isLast && !followLast)) {
+        resolved.add(segment);
+        continue;
+      }
+      final String? target;
+      try {
+        target = await readVaultSymlinkStrict(container, [
+          ...resolved,
+          segment,
+        ].join('/'));
+      } catch (_) {
+        return null;
+      }
+      if (target == null) {
+        resolved.add(segment);
+        continue;
+      }
+      if (++hops > 40) return null;
+      if (target.isEmpty ||
+          target.startsWith('/') ||
+          target.contains('\\') ||
+          target.contains('\u0000')) {
+        return null;
+      }
+      // Relative to the link's own parent folder, which is exactly [resolved] right now.
+      pending.insertAll(0, target.split('/').where((s) => s.isNotEmpty));
+    }
+    return resolved.join('/');
+  }
+
   /// Resolves [path] through any chain of symbolic links and returns the final
   /// container-relative target path. Returns null when [path] is not a link,
   /// a link is unreadable, a target is absolute/outside the container, or a

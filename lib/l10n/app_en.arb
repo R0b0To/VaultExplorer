@@ -16345,5 +16345,9 @@
   "symbolicLinkTargetOutsideVault": "Target must be a relative path that stays inside this container.",
   "@symbolicLinkTargetOutsideVault": {
     "description": "Error under the symbolic link target field when a native target is absolute or escapes the container root"
+  },
+  "symbolicLinkPickerUnresolvable": "Can't build a relative target from here. Type the target instead.",
+  "@symbolicLinkPickerUnresolvable": {
+    "description": "Shown when the symbolic link target picker cannot build a relative target, e.g. because a folder link on the way cannot be followed safely; the user types the target instead"
   }
 }

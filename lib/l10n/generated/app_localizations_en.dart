@@ -14367,4 +14367,8 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get symbolicLinkTargetOutsideVault =>
       'Target must be a relative path that stays inside this container.';
+
+  @override
+  String get symbolicLinkPickerUnresolvable =>
+      'Can\'t build a relative target from here. Type the target instead.';
 }

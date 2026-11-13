@@ -707,6 +707,74 @@ static void testCryptomatorSymlinks() {
         v.close();
     }
 
+    {   // --- links and the namespace: mkdir never follows the last name, no folder moves into itself, no alias writes --
+        TmpDir t; std::string root = t.sub("v"); auto st = std::make_shared<PosixStorage>(root);
+        CHECK(createCryptomator(*st, pw, 6).status == OpenStatus::Ok);
+        auto r = openCryptomator(st, pw, 6, false, {});
+        CHECK(r.status == OpenStatus::Ok);
+        if (!r.vault) return;
+        Vault& v = *r.vault;
+
+        // mkdir follows links in the PARENT path only; the last name is never followed, so nothing is ever
+        // created at a link's target
+        CHECK(v.createDirectory("real"));
+        CHECK(v.createSymlink("dirlink", "real"));
+        CHECK(v.createDirectory("dirlink"));                                         // link to an existing folder: "mkdir -p" success
+        CHECK(v.createSymlink("ghost", "elsewhere"));
+        CHECK(!v.createDirectory("ghost"));                                          // dangling: refused...
+        CHECK(!has(v, "", "D:elsewhere"));                                           // ...and no folder appears at its target
+        CHECK(put(v, "f.txt", rnd(3, 30)));
+        CHECK(v.createSymlink("filelink", "f.txt"));
+        CHECK(!v.createDirectory("filelink"));                                       // link to a file
+        CHECK(v.createSymlink("abs", "/real"));
+        CHECK(!v.createDirectory("abs"));                                            // absolute target is never resolved
+        CHECK(v.createDirectory("dirlink/sub"));                                     // a link in the parent IS followed
+        CHECK(has(v, "real", "D:sub"));
+        CHECK(!has(v, "", "D:sub"));
+        CHECK(v.createDirectory(""));                                                // the root is always there
+
+        // a folder can never move into itself or one of its own subfolders, directly or through a link that
+        // points back at it (the subtree would be cut off from the vault)
+        CHECK(v.createDirectory("a"));
+        CHECK(v.createDirectory("a/b"));
+        const Bytes keepData = rnd(4, 31);
+        CHECK(put(v, "a/keep.txt", keepData));
+        CHECK(v.createSymlink("toa", "a"));
+        CHECK(!v.renameFile("a", "a/inside"));
+        CHECK(!v.renameFile("a", "a/b/inside"));
+        CHECK(!v.renameFile("a", "toa/inside"));                                     // through the alias
+        CHECK(!v.renameFile("a", "toa/b/inside"));
+        CHECK(!v.renameFile("a/b", "a/b/inside"));
+        CHECK(has(v, "", "D:a"));                                                    // everything is still where it was
+        CHECK(has(v, "a", "F:keep.txt"));
+        CHECK(has(v, "a", "D:b"));
+        CHECK(!has(v, "a", "D:inside"));
+        std::vector<DirEntry> rootList; CHECK(v.listDirectory("", rootList));        // and the root still lists
+        CHECK(v.renameFile("a/b", "b2"));                                            // a subfolder may leave...
+        CHECK(v.renameFile("b2", "a/b3"));                                           // ...and come back under another name
+        CHECK(v.createDirectory("ab"));                                              // "ab" merely starts with "a": not inside "a"
+        CHECK(v.renameFile("a", "ab/a"));
+        CHECK(has(v, "ab", "D:a"));
+        CHECK(v.renameFile("ab/a", "a"));
+        CHECK(v.renameFile("a", "a2"));                                              // renaming in place is fine
+        CHECK(has(v, "a2", "F:keep.txt"));
+        CHECK(has(v, "a2", "D:b3"));
+        CHECK(v.renameFile("a2/keep.txt", "a2/b3/keep.txt"));                        // files are not folders: no restriction
+        CHECK(*get(v, "a2/b3/keep.txt") == keepData);                                // and the content came along
+
+        // two names for one file must not be written at the same time (they share no engine path lock)
+        CHECK(put(v, "real/shared.txt", rnd(5, 32)));
+        CHECK(v.createSymlink("sharedlink", "real/shared.txt"));
+        Bytes w1 = rnd(100, 33), w2 = rnd(100, 34);
+        CHECK(v.writeFileChunk("real/shared.txt", 0, w1.data(), w1.size()));         // the first writer is in flight
+        CHECK(!v.writeFileChunk("sharedlink", 0, w2.data(), w2.size()));             // another name for the same file: refused
+        CHECK(v.finishWrite("real/shared.txt"));
+        CHECK(*get(v, "real/shared.txt") == w1);                                     // intact, never interleaved
+        CHECK(put(v, "sharedlink", w2));                                             // once the first is done the link may write
+        CHECK(*get(v, "real/shared.txt") == w2);
+        v.close();
+    }
+
     {   // --- precedence + hostile content (official order: dir.c9r, symlink.c9r, contents.c9r) -------------------
         TmpDir t; std::string root = t.sub("v"); auto st = std::make_shared<PosixStorage>(root);
         CHECK(createCryptomator(*st, pw, 6).status == OpenStatus::Ok);

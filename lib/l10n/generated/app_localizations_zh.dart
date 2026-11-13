@@ -13580,4 +13580,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get symbolicLinkTargetOutsideVault => '目标必须是保留在此容器内的相对路径。';
+
+  @override
+  String get symbolicLinkPickerUnresolvable => '无法从此处生成相对目标。请手动输入目标。';
 }

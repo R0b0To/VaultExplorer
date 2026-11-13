@@ -13791,4 +13791,8 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get symbolicLinkTargetOutsideVault =>
       '대상은 이 컨테이너 내부에 머무르는 상대 경로여야 합니다.';
+
+  @override
+  String get symbolicLinkPickerUnresolvable =>
+      '여기서는 상대 대상을 만들 수 없습니다. 대상을 직접 입력하세요.';
 }

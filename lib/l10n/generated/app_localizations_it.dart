@@ -14600,4 +14600,8 @@ class AppLocalizationsIt extends AppLocalizations {
   @override
   String get symbolicLinkTargetOutsideVault =>
       'La destinazione deve essere un percorso relativo che rimane all’interno di questo contenitore.';
+
+  @override
+  String get symbolicLinkPickerUnresolvable =>
+      'Da qui non è possibile creare una destinazione relativa. Digita la destinazione.';
 }

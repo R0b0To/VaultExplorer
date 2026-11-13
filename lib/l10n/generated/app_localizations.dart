@@ -24316,6 +24316,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Target must be a relative path that stays inside this container.'**
   String get symbolicLinkTargetOutsideVault;
+
+  /// Shown when the symbolic link target picker cannot build a relative target, e.g. because a folder link on the way cannot be followed safely; the user types the target instead
+  ///
+  /// In en, this message translates to:
+  /// **'Can\'t build a relative target from here. Type the target instead.'**
+  String get symbolicLinkPickerUnresolvable;
 }
 
 class _AppLocalizationsDelegate

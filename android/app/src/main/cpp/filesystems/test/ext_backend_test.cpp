@@ -687,6 +687,19 @@ static void test_native_symlinks_follow_and_manage_link_identity() {
     CHECK(extCreateSymlink(0, "/subdir/nested/up", "../../target.bin"));
     CHECK(getFile(0, "/subdir/nested/up") == payload);
 
+    // "Inside the volume" is judged from where the link PHYSICALLY lives, not from the path it was reached by.
+    // A folder link makes a path shallower or deeper than it reads; both directions must be handled.
+    CHECK(extCreateSymlink(0, "/up", "."));                                          // a folder link back to the root
+    CHECK(!extCreateSymlink(0, "/up/up/up/esc", "../../../x"));                      // reads 3 deep, is 0 deep: would leave the volume
+    CHECK(!extCreateSymlink(0, "/up/esc", "../x"));
+    CHECK(extCreateSymlink(0, "/up/up/stay", "x"));                                  // staying inside is still fine
+    CHECK(extCreateSymlink(0, "/deep-link", "subdir/nested"));                       // reads 1 deep, is 2 deep
+    CHECK(extCreateSymlink(0, "/deep-link/up2", "../../target.bin"));                // legitimate: lands on /target.bin
+    CHECK(getFile(0, "/deep-link/up2") == payload);
+    CHECK(!extCreateSymlink(0, "/deep-link/up3", "../../../target.bin"));            // one too many from the real depth
+    CHECK(extDeleteFile(0, "/up"));
+    CHECK(extDeleteFile(0, "/deep-link"));
+
     // A cycle is refused by the filesystem path resolver instead of hanging.
     CHECK(extCreateSymlink(0, "/loop-a", "loop-b"));
     CHECK(extCreateSymlink(0, "/loop-b", "loop-a"));

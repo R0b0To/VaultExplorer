@@ -39,6 +39,32 @@ class FakeSymlinkFileIo implements VaultFileIoApi {
     return List.of(links);
   }
 
+  /// What [resolveVaultPhysicalPath] answers, keyed by the path (or "path|nofollow" for followLast: false).
+  /// Anything not listed resolves to itself.
+  final Map<String, String?> physical = {};
+  final List<(String, bool)> physicalCalls = [];
+
+  /// Raw listing lines the target picker sees, keyed by folder.
+  final Map<String, List<String>> browserListings = {};
+
+  @override
+  Future<String?> resolveVaultPhysicalPath(
+    MountedContainer container,
+    String path, {
+    bool followLast = true,
+  }) async {
+    physicalCalls.add((path, followLast));
+    final key = followLast ? path : '$path|nofollow';
+    return physical.containsKey(key) ? physical[key] : path;
+  }
+
+  @override
+  Future<List<String>?> listDirectoryForBrowser(
+    MountedContainer container,
+    String dirPath, {
+    bool refresh = false,
+  }) async => browserListings[dirPath] ?? const [];
+
   @override
   Future<int> hiddenEntryCount(MountedContainer container, String dirPath) async => hidden;
 

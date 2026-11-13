@@ -28,16 +28,20 @@ void main() {
   final calls = <MethodCall>[];
   Object? nextResult;
   Object? nextError;
+  final symlinkTargets = <String, String>{}; // path -> what readVaultSymlink answers (absent: not a link)
 
   setUp(() {
     calls.clear();
     nextResult = null;
     nextError = null;
+    symlinkTargets.clear();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
           calls.add(call);
           if (nextError != null) throw nextError!;
-          if (call.method == 'readVaultSymlink') return null;
+          if (call.method == 'readVaultSymlink') {
+            return symlinkTargets[(call.arguments as Map)['path']];
+          }
           return nextResult;
         });
   });
@@ -710,6 +714,79 @@ void main() {
       final local = containerWith(volId: -4, uri: 'file:///storage/x');
       expect(await api.createVaultSymlink(saf, 'ln', 't'), isFalse);
       expect(await api.createVaultSymlink(local, 'ln', 't'), isFalse);
+      expect(calls, isEmpty);
+    });
+  });
+
+  group('resolveVaultPhysicalPath', () {
+    MountedContainer cryptomator() => MountedContainer(
+      uri: 'content://test-container',
+      displayName: 'Vault',
+      volId: 1,
+      rootFiles: const [],
+      mountedAt: DateTime(2026, 1, 1),
+      totalSpace: 1,
+      freeSpace: 1,
+      containerFormat: 'cryptomator',
+    );
+
+    Future<String?> resolve(String path, {bool followLast = true}) =>
+        api.resolveVaultPhysicalPath(cryptomator(), path, followLast: followLast);
+
+    test('a path without links comes back as it is, with dots dropped', () async {
+      expect(await resolve('a/b/c'), 'a/b/c');
+      expect(await resolve('./a//b/./c/'), 'a/b/c');
+      expect(await resolve(''), '');
+    });
+
+    test('a link in the middle of the path is followed from its own folder', () async {
+      symlinkTargets['dl'] = 'x/y';
+      expect(await resolve('dl/file.txt'), 'x/y/file.txt');
+      symlinkTargets['docs/up'] = '../other';                    // relative to docs/, not to the root
+      expect(await resolve('docs/up/f'), 'other/f');
+    });
+
+    test('the last name is followed only when asked to', () async {
+      symlinkTargets['ln'] = 'real';
+      expect(await resolve('ln'), 'real');
+      expect(await resolve('ln', followLast: false), 'ln');
+      expect(await resolve('ln/', followLast: false), 'ln');
+      expect(await resolve('ln/f', followLast: false), 'real/f');    // a middle link is always followed
+    });
+
+    test('chains and ".." after a link use the real location', () async {
+      symlinkTargets['a'] = 'b';
+      symlinkTargets['b'] = 'deep/er';
+      expect(await resolve('a/f'), 'deep/er/f');
+      expect(await resolve('a/../g'), 'deep/g');                  // ".." leaves the REAL folder, not the displayed one
+    });
+
+    test('fails closed: unsafe, unreadable or endless links give null', () async {
+      expect(await resolve('../x'), isNull);                      // above the root
+      symlinkTargets['abs'] = '/etc';
+      expect(await resolve('abs/x'), isNull);                     // absolute
+      symlinkTargets['win'] = 'C:\\Users';
+      expect(await resolve('win/x'), isNull);                     // backslashes
+      symlinkTargets['d/up'] = '../../x';
+      expect(await resolve('d/up/f'), isNull);                    // climbs past the root from depth 1
+      symlinkTargets['loopa'] = 'loopb';
+      symlinkTargets['loopb'] = 'loopa';
+      expect(await resolve('loopa/f'), isNull);                   // a cycle
+      for (var i = 0; i < 45; i++) {
+        symlinkTargets['h$i'] = 'h${i + 1}';
+      }
+      expect(await resolve('h0/f'), isNull);                      // more than 40 hops
+      symlinkTargets['empty'] = '';
+      expect(await resolve('empty/x'), isNull);
+    });
+
+    test('a channel failure while reading a link is null, not a guess', () async {
+      nextError = PlatformException(code: 'ERR');
+      expect(await resolve('a/b'), isNull);
+    });
+
+    test('a container that cannot hold links is answered without asking the platform', () async {
+      expect(await api.resolveVaultPhysicalPath(container, 'a/./b/../c'), 'a/c');
       expect(calls, isEmpty);
     });
   });

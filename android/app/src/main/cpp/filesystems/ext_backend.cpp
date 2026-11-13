@@ -48,24 +48,39 @@ static bool extResolvePathNoFollowFinal(ext2_filsys fs, const std::string& path,
                          nullptr, inode) == 0;
 }
 
-static bool extTargetStaysInside(const std::string& parentPath, const std::string& target) {
+// Number of directories between [dir] and the filesystem root, found by walking ".." entries: the PHYSICAL depth.
+// The depth of a path as written is not enough: "a/b" is shallower than it reads when "a" is a symlink, and a
+// target's ".." steps are applied from the directory the link really lives in, not from the path it was reached by.
+static bool extDirectoryDepth(ext2_filsys fs, ext2_ino_t dir, size_t* depth) {
+    size_t d = 0;
+    for (int guard = 0; dir != EXT2_ROOT_INO; ++guard) {
+        if (guard > 4096) return false;   // a damaged tree (a ".." loop)
+        ext2_ino_t up = 0;
+        if (ext2fs_lookup(fs, dir, "..", 2, nullptr, &up) != 0 || up == 0 || up == dir) return false;
+        dir = up;
+        ++d;
+    }
+    *depth = d;
+    return true;
+}
+
+// A relative target must never climb above the filesystem root. [parentDepth] is the physical depth of the
+// directory the link will be created in (see extDirectoryDepth).
+static bool extTargetStaysInside(size_t parentDepth, const std::string& target) {
     if (target.empty() || target.front() == '/' || target.find('\0') != std::string::npos) return false;
-    std::vector<std::string> stack;
-    auto consume = [&stack](const std::string& value) {
-        size_t start = 0;
-        while (start < value.size()) {
-            while (start < value.size() && value[start] == '/') ++start;
-            if (start >= value.size()) break;
-            size_t end = value.find('/', start);
-            if (end == std::string::npos) end = value.size();
-            const std::string part = value.substr(start, end - start);
-            if (part == "..") { if (stack.empty()) return false; stack.pop_back(); }
-            else if (!part.empty() && part != ".") stack.push_back(part);
-            start = end;
-        }
-        return true;
-    };
-    return consume(parentPath) && consume(target);
+    size_t depth = parentDepth;
+    size_t start = 0;
+    while (start < target.size()) {
+        while (start < target.size() && target[start] == '/') ++start;
+        if (start >= target.size()) break;
+        size_t end = target.find('/', start);
+        if (end == std::string::npos) end = target.size();
+        const std::string part = target.substr(start, end - start);
+        if (part == "..") { if (depth == 0) return false; --depth; }
+        else if (!part.empty() && part != ".") ++depth;
+        start = end;
+    }
+    return true;
 }
 int extDirectoryEntry(ext2_ino_t, int, struct ext2_dir_entry* entry, int, int, char*, void* data) {
     auto* context = static_cast<ExtDirContext*>(data);
@@ -1019,8 +1034,10 @@ bool extCreateSymlink(int volumeId, const std::string& path, const std::string& 
     const std::string parentPath = slash == std::string::npos ? "" : path.substr(0, slash);
     const std::string name = slash == std::string::npos ? path : path.substr(slash + 1);
     ext2_ino_t parent = 0;
-    if (name.empty() || name.size() > EXT2_NAME_LEN || !extTargetStaysInside(parentPath, target) ||
+    size_t parentDepth = 0;
+    if (name.empty() || name.size() > EXT2_NAME_LEN ||
         !extResolvePath(v.extFs, parentPath, &parent) || !extIsDirectory(v.extFs, parent) ||
+        !extDirectoryDepth(v.extFs, parent, &parentDepth) || !extTargetStaysInside(parentDepth, target) ||
         extEntryExists(v.extFs, parent, name)) return false;
     errcode_t err = ext2fs_symlink(v.extFs, parent, 0, name.c_str(), target.c_str());
     if (err == EXT2_ET_DIR_NO_SPACE && ext2fs_expand_dir(v.extFs, parent) == 0) {

@@ -4031,5 +4031,6 @@
   "toolExpandLuksVolumeTitle": "Expandir contenedor LUKS",
   "toolExpandLuksVolumeSubtitle": "Aumentar contenedores LUKS1 y LUKS2, incluidos metadatos LUKS2 de tamaño fijo",
   "luksToolsExpandNote": "Haga una copia de seguridad del contenedor primero. Es compatible con LUKS1 y LUKS2. Los sistemas de archivos NTFS y ext2/3/4 se pueden expandir en el lugar (FAT y exFAT no). El espacio añadido se puede inicializar con ceros cifrados. Si se usa un archivo de clave, este reemplaza a la contraseña.",
-  "vcToolsFsBusy": "Todavía hay archivos abiertos en el volumen. Ciérrelos, bloquee el volumen y luego reintente «Solo expandir el sistema de archivos»."
+  "vcToolsFsBusy": "Todavía hay archivos abiertos en el volumen. Ciérrelos, bloquee el volumen y luego reintente «Solo expandir el sistema de archivos».",
+  "symbolicLinkPickerUnresolvable": "No se puede crear un destino relativo desde aquí. Escribe el destino manualmente."
 }

@@ -14585,4 +14585,8 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get symbolicLinkTargetOutsideVault =>
       'Das Ziel muss ein relativer Pfad innerhalb dieses Containers sein.';
+
+  @override
+  String get symbolicLinkPickerUnresolvable =>
+      'Von hier lässt sich kein relatives Ziel bilden. Geben Sie das Ziel stattdessen ein.';
 }

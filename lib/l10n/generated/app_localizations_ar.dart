@@ -14618,4 +14618,8 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get symbolicLinkTargetOutsideVault =>
       'يجب أن يكون الهدف مسارًا نسبيًا يبقى داخل هذا الحاوي.';
+
+  @override
+  String get symbolicLinkPickerUnresolvable =>
+      'تعذّر إنشاء هدف نسبي من هنا. اكتب الهدف يدويًا.';
 }

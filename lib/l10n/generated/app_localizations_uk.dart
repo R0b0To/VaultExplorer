@@ -14687,4 +14687,8 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get symbolicLinkTargetOutsideVault =>
       'Ціль має бути відносним шляхом у межах цього контейнера.';
+
+  @override
+  String get symbolicLinkPickerUnresolvable =>
+      'Звідси не вдається створити відносну ціль. Введіть ціль вручну.';
 }

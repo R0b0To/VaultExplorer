@@ -847,10 +847,37 @@ std::string ntfsJoinPath(const std::vector<std::string>& parts) {
     return out;
 }
 
-bool ntfsTargetStaysInside(const std::string& parentPath, const std::string& target) {
+// Number of directories between [dir] and the volume root, found by following each directory's parent: the
+// PHYSICAL depth. A path as written can be shallower or deeper than the directory it names when a folder link
+// is part of it, and a target's ".." steps are applied from where the link really lives. [dir] stays owned by
+// the caller.
+static bool ntfsDirectoryDepth(ntfs_inode* dir, size_t* depth) {
+    ntfs_inode* current = dir;
+    bool owned = false;
+    size_t d = 0;
+    for (int guard = 0; guard < 4096; ++guard) {
+        if (current->mft_no == FILE_root) {
+            if (owned) ntfs_inode_close(current);
+            *depth = d;
+            return true;
+        }
+        ntfs_inode* parent = ntfs_dir_parent_inode(current);
+        if (owned) ntfs_inode_close(current);
+        if (!parent) return false;
+        current = parent;
+        owned = true;
+        ++d;
+    }
+    if (owned) ntfs_inode_close(current);
+    return false;   // a damaged tree (a parent loop)
+}
+
+// A relative target must never climb above the volume root. [parentDepth] is the physical depth of the
+// directory the link will be created in (see ntfsDirectoryDepth).
+bool ntfsTargetStaysInside(size_t parentDepth, const std::string& target) {
     if (target.empty() || target.front() == '/' || target.front() == '\\' ||
         target.find('\0') != std::string::npos) return false;
-    std::vector<std::string> combined = ntfsSplitPath(parentPath);
+    std::vector<std::string> combined(parentDepth, "d");   // names are irrelevant, only the depth counts
     const auto targetParts = ntfsSplitPath(target);
     combined.insert(combined.end(), targetParts.begin(), targetParts.end());
     std::vector<std::string> normalized;
@@ -1006,9 +1033,14 @@ bool ntfsCreateSymlink(int volumeId, const std::string& path, const std::string&
     const size_t slash = path.find_last_of('/');
     const std::string parentPath = slash == std::string::npos ? "" : path.substr(0, slash);
     const std::string name = slash == std::string::npos ? path : path.substr(slash + 1);
-    if (name.empty() || !ntfsTargetStaysInside(parentPath, target)) return false;
+    if (name.empty()) return false;
     ntfs_inode* parent = ntfsResolvePath(volume, parentPath, true);
     if (!parent) return false;
+    size_t parentDepth = 0;
+    if (!ntfsDirectoryDepth(parent, &parentDepth) || !ntfsTargetStaysInside(parentDepth, target)) {
+        ntfs_inode_close(parent);
+        return false;
+    }
     ntfschar* unicodeName = nullptr;
     ntfschar* unicodeTarget = nullptr;
     const int nameLength = ntfs_mbstoucs(name.c_str(), &unicodeName);

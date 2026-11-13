@@ -14706,4 +14706,8 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get symbolicLinkTargetOutsideVault =>
       'La cible doit être un chemin relatif qui reste dans ce conteneur.';
+
+  @override
+  String get symbolicLinkPickerUnresolvable =>
+      'Impossible de construire une cible relative à partir d’ici. Saisissez la cible à la place.';
 }

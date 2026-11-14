@@ -684,7 +684,12 @@ open class MainActivity : FlutterFragmentActivity() {
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) systemHandlers.sanitizeClipboard()
+        if (hasFocus) {
+            systemHandlers.sanitizeClipboard()
+            if (systemHandlers.userWantsSecureScreen) {
+                privacyCurtain.armPendingReveal()
+            }
+        }
     }
 
     private fun resizeExecutorPools() {
@@ -1131,7 +1136,7 @@ open class MainActivity : FlutterFragmentActivity() {
                 }
                 ChannelMethods.SET_SECURE_SCREEN -> systemHandlers.handleSetSecureScreen(call, result)
                 ChannelMethods.SET_RECENTS_SNAPSHOT_BLOCKED -> systemHandlers.handleSetRecentsSnapshotBlocked(call, result)
-                ChannelMethods.NOTIFY_RESUMED_FRAME_PAINTED -> { privacyCurtain.reveal(); result.success(true) }
+                ChannelMethods.NOTIFY_RESUMED_FRAME_PAINTED -> { privacyCurtain.onResumedFramePainted(); result.success(true) }
                 ChannelMethods.SET_SENSITIVE_CLIPBOARD_TEXT -> systemHandlers.handleSetSensitiveClipboardText(call, result)
                 ChannelMethods.CLEAR_SENSITIVE_CLIPBOARD_TEXT -> systemHandlers.handleClearSensitiveClipboardText(call, result)
                 ChannelMethods.HAS_ALL_FILES_ACCESS -> systemHandlers.handleHasAllFilesAccess(call, result)

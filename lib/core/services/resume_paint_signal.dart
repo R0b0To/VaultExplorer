@@ -40,5 +40,13 @@ class ResumePaintSignal with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _fileIoApi.notifyResumedFramePainted();
     });
+    // addPostFrameCallback only schedules work for the end of a frame; it
+    // does not request a frame itself. If the current screen has no ticking
+    // animations or pending setState (such as browsing Local Storage),
+    // Flutter would not paint a frame on resume, leaving the native privacy
+    // curtain up until the user touches the screen. Requesting a visual
+    // update guarantees that a frame is actually scheduled and painted.
+    WidgetsBinding.instance.ensureVisualUpdate();
+    WidgetsBinding.instance.scheduleFrame();
   }
 }

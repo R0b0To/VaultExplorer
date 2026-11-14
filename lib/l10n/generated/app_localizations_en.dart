@@ -2473,6 +2473,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'Back up the container first. Supports LUKS1 and LUKS2. NTFS and ext2/3/4 filesystems can be expanded in place (FAT and exFAT cannot). The added space can be initialized with encrypted zeros. A keyfile replaces the password if used.';
 
   @override
+  String get toolExpandBitLockerVolumeTitle => 'Expand BitLocker container';
+
+  @override
+  String get toolExpandBitLockerVolumeSubtitle =>
+      'Grow a BitLocker volume file or VHD/VHDX image and extend its NTFS file system';
+
+  @override
+  String get bitlockerToolsExpandNote =>
+      'Back up the container first. This rewrites BitLocker\'s metadata so the encrypted volume covers the added space, so check the result on a copy before relying on it. Works on fully encrypted BitLocker volumes from Windows 7 or later, either as a raw volume file or inside a fixed or dynamic VHD or VHDX. For a disk image enter the new total disk size: the virtual disk and its last partition (MBR or GPT) are enlarged too, so the BitLocker partition must be the last one. BitLocker To Go and encrypt-on-write (used-space-only) volumes are not supported. NTFS can be expanded in place (FAT and exFAT cannot). The added space can optionally be filled with encrypted zeros. Unlock with the password or the 48-digit recovery key.';
+
+  @override
+  String get bitlockerToolsPasswordLabel => 'Password or recovery key';
+
+  @override
   String get toolHiddenInExistingTitle => 'Add hidden volume';
 
   @override

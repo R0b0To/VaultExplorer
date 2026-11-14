@@ -361,7 +361,9 @@ static jint fsKindCode(const FsGrowReport& report) {
 
 // Packs {container outcome, file-system step, file-system kind}. Container outcome: 0 = ok, 1 = wrong
 // password/keyfile, 2 = not expandable (hidden-volume header / not a plain full-size standard volume),
-// 3 = requested size not larger, 4 = I/O error, 5 = unreadable keyfile. File-system step: -1 = not run,
+// 3 = requested size not larger, 4 = I/O error, 5 = unreadable keyfile, 6 = not LUKS, 7 = damaged/unsupported
+// header or metadata, 8 = container in use, 9 = not a BitLocker volume, 10 = virtual disk cannot be grown,
+// 11 = BitLocker partition cannot be grown (BitLocker tool, disk images). File-system step: -1 = not run,
 // otherwise an FsGrowStatus (filesystems/fs_grow.h). Kind: 0 unknown, 1 FAT12, 2 FAT16, 3 FAT32, 4 exFAT,
 // 5 NTFS, 6 ext2, 7 ext3, 8 ext4.
 static jintArray packExpandResult(JNIEnv* env, ExpandOutcome outcome, const FsGrowReport& report) {
@@ -426,6 +428,43 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_growLuksFileSystemNative(
     const ExpandOutcome outcome = growLuksFileSystem(
         fd, nativePass != nullptr ? nativePass : "",
         kfFds.empty() ? nullptr : kfFds.data(), static_cast<int>(kfFds.size()), &report);
+    vcReleasePasswordUtf8(nativePass);
+    return packExpandResult(env, outcome, report);
+
+    JNI_CATCH_RETURN(nullptr)
+}
+
+// BitLocker (no keyfiles: the credential is a password or a 48-digit recovery key). Same result array as above, with
+// container outcomes 9 = no BitLocker volume found, 10 = virtual disk cannot be grown, 11 = partition cannot be grown.
+// The file may be a raw BitLocker volume or a VHD/VHDX disk image; for an image [newSizeBytes] is the new virtual disk size.
+extern "C" JNIEXPORT jintArray JNICALL
+Java_com_aeidolon_vaultexplorer_NativeEngine_expandBitLockerContainerNative(
+        JNIEnv* env, jobject,
+        jint fd, jstring password, jlong newSizeBytes, jboolean initFreeSpace, jboolean growFileSystem) {
+    JNI_TRY
+
+    const char* nativePass = vcGetPasswordUtf8(env, password);
+    FsGrowReport report;
+    const ExpandOutcome outcome = expandBitLockerContainer(
+        fd, nativePass != nullptr ? nativePass : "",
+        static_cast<int64_t>(newSizeBytes), initFreeSpace == JNI_TRUE,
+        growFileSystem == JNI_TRUE, &report);
+    vcReleasePasswordUtf8(nativePass);
+    return packExpandResult(env, outcome, report);
+
+    JNI_CATCH_RETURN(nullptr)
+}
+
+extern "C" JNIEXPORT jintArray JNICALL
+Java_com_aeidolon_vaultexplorer_NativeEngine_growBitLockerFileSystemNative(
+        JNIEnv* env, jobject,
+        jint fd, jstring password) {
+    JNI_TRY
+
+    const char* nativePass = vcGetPasswordUtf8(env, password);
+    FsGrowReport report;
+    const ExpandOutcome outcome = growBitLockerFileSystem(
+        fd, nativePass != nullptr ? nativePass : "", &report);
     vcReleasePasswordUtf8(nativePass);
     return packExpandResult(env, outcome, report);
 

@@ -4122,6 +4122,30 @@ abstract class AppLocalizations {
   /// **'Back up the container first. Supports LUKS1 and LUKS2. NTFS and ext2/3/4 filesystems can be expanded in place (FAT and exFAT cannot). The added space can be initialized with encrypted zeros. A keyfile replaces the password if used.'**
   String get luksToolsExpandNote;
 
+  /// Tools row: enlarge a raw BitLocker volume file
+  ///
+  /// In en, this message translates to:
+  /// **'Expand BitLocker container'**
+  String get toolExpandBitLockerVolumeTitle;
+
+  /// Tools row subtitle for BitLocker container expansion
+  ///
+  /// In en, this message translates to:
+  /// **'Grow a BitLocker volume file or VHD/VHDX image and extend its NTFS file system'**
+  String get toolExpandBitLockerVolumeSubtitle;
+
+  /// Explains BitLocker container expansion: what is supported, what is rewritten, and the backup advice
+  ///
+  /// In en, this message translates to:
+  /// **'Back up the container first. This rewrites BitLocker\'s metadata so the encrypted volume covers the added space, so check the result on a copy before relying on it. Works on fully encrypted BitLocker volumes from Windows 7 or later, either as a raw volume file or inside a fixed or dynamic VHD or VHDX. For a disk image enter the new total disk size: the virtual disk and its last partition (MBR or GPT) are enlarged too, so the BitLocker partition must be the last one. BitLocker To Go and encrypt-on-write (used-space-only) volumes are not supported. NTFS can be expanded in place (FAT and exFAT cannot). The added space can optionally be filled with encrypted zeros. Unlock with the password or the 48-digit recovery key.'**
+  String get bitlockerToolsExpandNote;
+
+  /// Credential field label for BitLocker tools: a password or the 48-digit recovery key
+  ///
+  /// In en, this message translates to:
+  /// **'Password or recovery key'**
+  String get bitlockerToolsPasswordLabel;
+
   /// Tools row: create a hidden volume inside an existing volume
   ///
   /// In en, this message translates to:

@@ -2517,6 +2517,21 @@ class AppLocalizationsDe extends AppLocalizations {
       'Sichern Sie den Container zuerst. Unterstützt LUKS1 und LUKS2. NTFS- und ext2/3/4-Dateisysteme können direkt vergrößert werden (FAT und exFAT nicht). Der hinzugefügte Speicherplatz kann mit verschlüsselten Nullen initialisiert werden. Eine Schlüsseldatei ersetzt das Passwort, falls verwendet.';
 
   @override
+  String get toolExpandBitLockerVolumeTitle => 'BitLocker-Container erweitern';
+
+  @override
+  String get toolExpandBitLockerVolumeSubtitle =>
+      'Eine BitLocker-Volumedatei oder ein VHD/VHDX-Abbild vergrößern und das NTFS-Dateisystem erweitern';
+
+  @override
+  String get bitlockerToolsExpandNote =>
+      'Sichere zuerst den Container. Dabei werden die BitLocker-Metadaten neu geschrieben, damit das verschlüsselte Volume den hinzugefügten Platz abdeckt – prüfe das Ergebnis daher an einer Kopie, bevor du dich darauf verlässt. Funktioniert mit vollständig verschlüsselten BitLocker-Volumes ab Windows 7, entweder als rohe Volumedatei oder in einer festen oder dynamischen VHD oder VHDX. Gib bei einem Datenträgerabbild die neue Gesamtgröße des Datenträgers ein: Der virtuelle Datenträger und seine letzte Partition (MBR oder GPT) werden ebenfalls vergrößert, deshalb muss die BitLocker-Partition die letzte sein. BitLocker To Go sowie Encrypt-on-Write-Volumes (nur belegter Speicherplatz) werden nicht unterstützt. NTFS lässt sich direkt erweitern (FAT und exFAT nicht). Der hinzugefügte Platz kann optional mit verschlüsselten Nullen gefüllt werden. Entsperre mit dem Passwort oder dem 48-stelligen Wiederherstellungsschlüssel.';
+
+  @override
+  String get bitlockerToolsPasswordLabel =>
+      'Passwort oder Wiederherstellungsschlüssel';
+
+  @override
   String get toolHiddenInExistingTitle => 'Verstecktes Volume hinzufügen';
 
   @override

@@ -119,6 +119,7 @@ class ToolsScreen extends StatelessWidget {
             _buildHeaderBackupRow(context, cs),
             _buildExpandVolumeRow(context, cs),
             _buildExpandLuksVolumeRow(context, cs),
+            _buildExpandBitLockerVolumeRow(context, cs),
             _buildHiddenInExistingRow(context, cs),
           ],
         ),
@@ -192,6 +193,7 @@ class ToolsScreen extends StatelessWidget {
                     _buildHeaderBackupRow(context, cs),
                     _buildExpandVolumeRow(context, cs),
                     _buildExpandLuksVolumeRow(context, cs),
+            _buildExpandBitLockerVolumeRow(context, cs),
                     _buildHiddenInExistingRow(context, cs),
                   ],
                 ),
@@ -377,6 +379,23 @@ class ToolsScreen extends StatelessWidget {
           builder: (_) => SkinAreaScope(
             area: SkinArea.tools,
             child: const VeraCryptVolumeToolsScreen(tool: VeraCryptVolumeTool.expand),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExpandBitLockerVolumeRow(BuildContext context, ColorScheme cs) {
+    return _ToolRow(
+      icon: Icons.unfold_more_rounded,
+      title: context.l10n.toolExpandBitLockerVolumeTitle,
+      subtitle: context.l10n.toolExpandBitLockerVolumeSubtitle,
+      iconColor: cs.secondary,
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => SkinAreaScope(
+            area: SkinArea.tools,
+            child: const VeraCryptVolumeToolsScreen(tool: VeraCryptVolumeTool.expandBitLocker),
           ),
         ),
       ),

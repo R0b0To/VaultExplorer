@@ -2379,6 +2379,20 @@ class AppLocalizationsJa extends AppLocalizations {
       '事前にコンテナのバックアップを作成してください。LUKS1およびLUKS2に対応しています。NTFSおよびext2/3/4ファイルシステムは直接拡張できます（FATおよびexFATは拡張不可）。追加された領域は暗号化されたゼロで初期化できます。キーファイルを使用する場合はパスワードの代わりになります。';
 
   @override
+  String get toolExpandBitLockerVolumeTitle => 'BitLockerコンテナを拡張';
+
+  @override
+  String get toolExpandBitLockerVolumeSubtitle =>
+      'BitLockerボリュームファイルまたはVHD/VHDXイメージを拡大し、NTFSファイルシステムも拡張します';
+
+  @override
+  String get bitlockerToolsExpandNote =>
+      '先にコンテナをバックアップしてください。この操作はBitLockerのメタデータを書き換えて、暗号化ボリュームが追加された領域を含むようにします。結果を頼りにする前に、コピーで確認してください。Windows 7以降の完全に暗号化されたBitLockerボリュームに対応し、未加工のボリュームファイルのほか、固定または動的のVHD・VHDX内のボリュームにも使えます。ディスクイメージでは、ディスク全体の新しいサイズを入力してください。仮想ディスクとその最後のパーティション（MBRまたはGPT）も拡張されるため、BitLockerパーティションは最後のパーティションである必要があります。BitLocker To Goと、書き込み時暗号化（使用領域のみ）のボリュームは非対応です。NTFSはその場で拡張できます（FATとexFATは不可）。追加した領域は、必要に応じて暗号化されたゼロで埋められます。パスワードまたは48桁の回復キーでロックを解除します。';
+
+  @override
+  String get bitlockerToolsPasswordLabel => 'パスワードまたは回復キー';
+
+  @override
   String get toolHiddenInExistingTitle => '隠しボリュームを追加';
 
   @override

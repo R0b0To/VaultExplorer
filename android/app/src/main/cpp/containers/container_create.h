@@ -178,7 +178,9 @@ int changeLuksContainerPassword(int fd,
 // ---- Volume expansion (VeraCrypt Volume Expander; containers/vc_expand.h) --------------------
 enum class ExpandOutcome : int {
     kOk = 0, kWrongPassword = 1, kNotExpandable = 2, kNotLarger = 3, kIoError = 4, kBadKeyfile = 5,
-    kNotLuks = 6, kInvalidHeader = 7, kContainerInUse = 8,
+    kNotLuks = 6, kInvalidHeader = 7, kContainerInUse = 8, kNotBitLocker = 9,
+    kDiskUnsupported = 10,       // BitLocker tool, disk image: the virtual disk cannot be grown
+    kPartitionUnsupported = 11,  // BitLocker tool, disk image: partition table unsupported / BitLocker partition not last
 };
 // Result of the file-system step that can follow an expand (see growFileSystem below).
 struct FsGrowReport {
@@ -222,6 +224,29 @@ ExpandOutcome expandLuksContainer(int fd, const char* password,
 ExpandOutcome growLuksFileSystem(int fd, const char* password,
                                  const int* keyfileFds, int keyfileCount,
                                  FsGrowReport* fsReport);
+
+// ---- BitLocker volume expansion (containers/bl_expand.h, containers/container_expand_bitlocker.cpp) --
+// Grows a BitLocker container to [newSizeBytes]: either a raw single-volume file (Windows 7+ metadata, fully
+// encrypted state, volume header at byte 0) or a fixed/dynamic VHD or VHDX disk image holding the volume in
+// its last partition (MBR or GPT) or directly at the start of the virtual disk. For a raw file the size is the
+// volume size, rounded down to its sector size; for a disk image it is the new virtual disk size, rounded down
+// to 1 MiB, and the virtual disk, the last partition and the BitLocker metadata are all enlarged. [password] is a password or a 48-digit recovery key. The three FVE
+// metadata copies are rewritten with the larger encrypted volume size and re-sealed (CRC-32 + the sealed
+// SHA-256 under the VMK). With [initFreeSpace] the added range is then filled with encrypted zeros; with
+// [growFileSystem] (and [fsReport]) NTFS is grown into it (other file systems report unsupported). The
+// container expansion stands whatever the file system step reports. kNotBitLocker: byte 0 is not a BitLocker
+// volume header; kInvalidHeader: metadata failed verification or is not in the supported layout;
+// kNotExpandable: valid but not a fully encrypted volume that fits its file; kWrongPassword: unlock failed.
+// Always takes ownership of [fd].
+ExpandOutcome expandBitLockerContainer(int fd, const char* password,
+                                       int64_t newSizeBytes, bool initFreeSpace,
+                                       bool growFileSystem = false, FsGrowReport* fsReport = nullptr);
+// Re-runs only the NTFS grow step for a BitLocker volume whose metadata already records the larger size
+// (e.g. after the file-system step of an expand reported busy/needs_check/failed). Same ownership of [fd].
+ExpandOutcome growBitLockerFileSystem(int fd, const char* password, FsGrowReport* fsReport);
+
+// True when [fd] refers to the same file as a currently unlocked volume (callers hold volumeLifecycleMutex).
+bool containerFileIsUnlocked(int fd);
 
 // ---- Hidden volume inside an EXISTING volume (VeraCrypt "direct mode") -------------------------------
 enum class HiddenHostOutcome : int {

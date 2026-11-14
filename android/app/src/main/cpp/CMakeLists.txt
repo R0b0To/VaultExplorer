@@ -488,6 +488,9 @@ add_library(
         session/session_prepare.cpp
         session/bitlocker_backend.cpp
         containers/container_create.cpp
+        containers/container_expand_bitlocker.cpp
+        containers/bl_disk_expand.cpp
+        containers/vdisk.cpp
         containers/vhdx_image.cpp
         containers/vhd_image.cpp
         jni/jni_runtime.cpp
@@ -728,6 +731,30 @@ if(NOT ANDROID)
             containers/test/container_header_test.cpp
             containers/container_header.cpp)
     add_executable(container_utils_crc32_test containers/test/container_utils_crc32_test.cpp)
+    # BitLocker expand core (containers/bl_expand.h): synthetic FVE metadata, rewrite + re-seal checks.
+    add_executable(bl_expand_test containers/test/bl_expand_test.cpp)
+    target_include_directories(bl_expand_test PRIVATE ${mbedtls_SOURCE_DIR}/include)
+    target_link_libraries(bl_expand_test mbedcrypto)
+    list(APPEND VAULTEXPLORER_HOST_TESTS bl_expand_test)
+    add_test(NAME bl_expand_test COMMAND bl_expand_test)
+    # Disk-image expansion: partition tables (MBR/GPT, in memory) and the legacy-VHD half of the virtual-disk growth
+    # (synthetic images). The VHDX growth and the real-BitLocker-in-VHD/VHDX checks are shell scripts that need qemu-img
+    # (containers/test/*_qemu_check.sh) and are not part of ctest.
+    add_executable(disk_partition_test containers/test/disk_partition_test.cpp)
+    target_include_directories(disk_partition_test PRIVATE ${mbedtls_SOURCE_DIR}/include)
+    target_link_libraries(disk_partition_test mbedcrypto)
+    list(APPEND VAULTEXPLORER_HOST_TESTS disk_partition_test)
+    add_test(NAME disk_partition_test COMMAND disk_partition_test)
+    add_executable(vdisk_vhd_test
+            containers/test/vdisk_vhd_test.cpp
+            containers/vdisk.cpp
+            containers/vhd_image.cpp
+            containers/vhdx_image.cpp)
+    target_include_directories(vdisk_vhd_test PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/filesystems/test/host_stubs
+            ${CMAKE_CURRENT_SOURCE_DIR}/containers)
+    list(APPEND VAULTEXPLORER_HOST_TESTS vdisk_vhd_test)
+    add_test(NAME vdisk_vhd_test COMMAND vdisk_vhd_test)
     add_executable(chunked_block_device_test
             containers/test/chunked_block_device_test.cpp
             containers/chunked_block_device.cpp)

@@ -87,9 +87,15 @@ bool bitlockerDetectUsb(int volId, uint64_t partitionStartSector);
 // partitionSizeBytes == 0 means "the whole file is the volume" (the
 // original raw-container behavior) -- whatever's left of the file past
 // partitionStartByte is used as the volume size.
+//
+// [quietProgress] suppresses the unlock-progress events and the per-slot
+// cancellation check. The container tools (Expand BitLocker container, grow
+// file system) unlock through a scratch slot nobody is watching, and must not
+// emit progress for a volume id the UI has never heard of.
 bool prepareBitLockerSession(int fd, const unsigned char* password, size_t passwordLen,
                              int volId, bool readOnly,
-                             uint64_t partitionStartByte = 0, uint64_t partitionSizeBytes = 0);
+                             uint64_t partitionStartByte = 0, uint64_t partitionSizeBytes = 0,
+                             bool quietProgress = false);
 bool prepareUsbBitLockerSession(uint64_t partitionStartSector, uint64_t partitionSizeBytes,
                                 const unsigned char* password, size_t passwordLen,
                                 int volId, bool readOnly);
@@ -110,7 +116,8 @@ bool prepareUsbBitLockerSession(uint64_t partitionStartSector, uint64_t partitio
 // logged but not returned to the caller here.
 bool prepareBitLockerSessionVhdx(int fd, const unsigned char* password, size_t passwordLen,
                                  int volId, bool readOnly,
-                                 uint64_t partitionStartByte, uint64_t partitionSizeBytes);
+                                 uint64_t partitionStartByte, uint64_t partitionSizeBytes,
+                                 bool quietProgress = false);   // see prepareBitLockerSession
 
 // Legacy (pre-Hyper-V) dynamic-VHD variant of prepareBitLockerSession,
 // mirroring prepareBitLockerSessionVhdx above for the same reason: a
@@ -129,7 +136,8 @@ bool prepareBitLockerSessionVhdx(int fd, const unsigned char* password, size_t p
 // the caller here).
 bool prepareBitLockerSessionVhd(int fd, const unsigned char* password, size_t passwordLen,
                                 int volId, bool readOnly,
-                                uint64_t partitionStartByte, uint64_t partitionSizeBytes);
+                                uint64_t partitionStartByte, uint64_t partitionSizeBytes,
+                                bool quietProgress = false);   // see prepareBitLockerSession
 
 // Post-unlock decrypted I/O against volumes[volumeId]'s dis_context_t.
 // `logicalOffset`/byteCount are relative to the start of the BitLocker
@@ -138,6 +146,13 @@ bool prepareBitLockerSessionVhd(int fd, const unsigned char* password, size_t pa
 // that into real encrypted-sector I/O against the fd it opened from
 // DIS_OPT_VOLUME_PATH internally.
 bool bitlockerRead(int volumeId, uint64_t logicalOffset, unsigned char* outBuf, size_t byteCount);
+
+// Copies the unlocked Volume Master Key of volumes[volumeId] into outBuf
+// (32 bytes for the usual AES-256 VMK). Returns the key length, or 0 if the
+// slot has no unlocked BitLocker context or outCap is too small. The caller
+// must wipe the copy. Used by the Expand BitLocker container tool to re-seal
+// the metadata's integrity datum -- nothing else should need the VMK.
+size_t bitlockerExportVmk(int volumeId, unsigned char* outBuf, size_t outCap);
 bool bitlockerWrite(int volumeId, uint64_t logicalOffset, const unsigned char* inBuf, size_t byteCount);
 
 // Releases the dis_context_t owned by this slot (and, for USB sessions, the

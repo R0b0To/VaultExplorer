@@ -44,7 +44,7 @@ extern "C" int vaultexplorer_mkntfs_main(int argc, char* argv[]);
 
 // Caller holds volumeLifecycleMutex, so no new file-backed session can be
 // registered while the identity check and mutation are in progress.
-static bool containerFileIsUnlocked(int fd) {
+bool containerFileIsUnlocked(int fd) {
     if (fd < 0) return false;
     struct stat candidate{};
     if (fstat(fd, &candidate) != 0) return false;

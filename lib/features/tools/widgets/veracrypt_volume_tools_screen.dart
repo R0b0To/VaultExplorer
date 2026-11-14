@@ -14,7 +14,7 @@ import 'package:vaultexplorer/core/widgets/inputs/utf8_byte_limit_formatter.dart
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
 
 /// The desktop-VeraCrypt volume operations that work on an existing container.
-enum VeraCryptVolumeTool { expand, expandLuks, addHidden }
+enum VeraCryptVolumeTool { expand, expandLuks, expandBitLocker, addHidden }
 
 class VeraCryptVolumeToolsScreen extends ConsumerStatefulWidget {
   const VeraCryptVolumeToolsScreen({super.key, required this.tool});
@@ -38,7 +38,9 @@ class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeTool
 
   // expand
   final _sizeCtrl = TextEditingController();
-  bool _initFree = true;
+  // BitLocker volumes are normally only partly pre-filled ("used space only"), so filling the added range with
+  // encrypted zeros is opt-in there; the other formats keep it on by default.
+  late bool _initFree = widget.tool != VeraCryptVolumeTool.expandBitLocker;
   bool _growFs = true;
 
   // hidden volume
@@ -72,6 +74,7 @@ class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeTool
 
   bool get _isExpand => widget.tool != VeraCryptVolumeTool.addHidden;
   bool get _isLuksExpand => widget.tool == VeraCryptVolumeTool.expandLuks;
+  bool get _isBitLockerExpand => widget.tool == VeraCryptVolumeTool.expandBitLocker;
 
   int _pimOf(TextEditingController c) => int.tryParse(c.text.trim()) ?? 0;
 
@@ -182,7 +185,15 @@ class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeTool
     }
     final doneText = context.l10n.vcToolsExpandDone;
     await _guard(() async {
-      final fs = _isLuksExpand
+      final fs = _isBitLockerExpand
+          ? await _api.expandBitLockerContainer(
+              uri: _target!.uri,
+              password: _passwordCtrl.text,
+              newSizeBytes: newSize,
+              initFreeSpace: _initFree,
+              growFileSystem: _growFs,
+            )
+          : _isLuksExpand
           ? await _api.expandLuksContainer(
               uri: _target!.uri,
               password: _passwordCtrl.text,
@@ -209,7 +220,12 @@ class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeTool
   Future<void> _growFileSystemOnly() async {
     if (!_validateCommon()) return;
     await _guard(() async {
-      final fs = _isLuksExpand
+      final fs = _isBitLockerExpand
+          ? await _api.growBitLockerFileSystem(
+              uri: _target!.uri,
+              password: _passwordCtrl.text,
+            )
+          : _isLuksExpand
           ? await _api.growLuksFileSystem(
               uri: _target!.uri,
               password: _passwordCtrl.text,
@@ -348,9 +364,11 @@ class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeTool
     final l10n = context.l10n;
     final cs = context.colors;
     final isWide = context.screen.useWideLayout;
-    final title = _isLuksExpand
-        ? l10n.toolExpandLuksVolumeTitle
-        : (_isExpand ? l10n.toolExpandVolumeTitle : l10n.toolHiddenInExistingTitle);
+    final title = _isBitLockerExpand
+        ? l10n.toolExpandBitLockerVolumeTitle
+        : _isLuksExpand
+            ? l10n.toolExpandLuksVolumeTitle
+            : (_isExpand ? l10n.toolExpandVolumeTitle : l10n.toolHiddenInExistingTitle);
     final host = _host;
     final hiddenReady = host != null && host.maxHiddenBytes > 0;
 
@@ -390,9 +408,11 @@ class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeTool
                               Icon(Icons.info_outline_rounded, color: cs.primary),
                               const SizedBox(width: 12),
                               Expanded(child: Text(
-                                _isLuksExpand
-                                    ? l10n.luksToolsExpandNote
-                                    : (_isExpand ? l10n.vcToolsExpandNote : l10n.vcToolsHiddenNote),
+                                _isBitLockerExpand
+                                    ? l10n.bitlockerToolsExpandNote
+                                    : _isLuksExpand
+                                        ? l10n.luksToolsExpandNote
+                                        : (_isExpand ? l10n.vcToolsExpandNote : l10n.vcToolsHiddenNote),
                                 style: context.typography.bodyMedium,
                               )),
                             ],
@@ -411,23 +431,28 @@ class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeTool
                         ]),
                         const SectionHeader('Credentials'),
                         SectionCard(children: [
-                          Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                            child: _passwordField(controller: _passwordCtrl, label: l10n.vcToolsPasswordLabel)),
-                          if (!_isLuksExpand)
+                          Padding(padding: EdgeInsets.fromLTRB(16, 12, 16, _isBitLockerExpand ? 12 : 4),
+                            child: _passwordField(
+                              controller: _passwordCtrl,
+                              label: _isBitLockerExpand ? l10n.bitlockerToolsPasswordLabel : l10n.vcToolsPasswordLabel,
+                            )),
+                          // BitLocker: password or recovery key only -- no PIM, no keyfiles.
+                          if (!_isLuksExpand && !_isBitLockerExpand)
                             Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                               child: _numberField(controller: _pimCtrl, label: l10n.vcToolsPimLabel)),
-                          Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                            child: KeyfilesPicker(
-                              keyfiles: _keyfiles,
-                              picking: _pickingKeyfiles,
-                              onPick: () => _pickKeyfiles(hidden: false),
-                              onRemove: (k) => setState(() {
-                                _keyfiles = _keyfiles.where((x) => x.uri != k.uri).toList();
-                                _host = null;
-                              }),
-                              enabled: !_busy,
-                              addEnabled: !_isLuksExpand || _keyfiles.isEmpty,
-                            )),
+                          if (!_isBitLockerExpand)
+                            Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                              child: KeyfilesPicker(
+                                keyfiles: _keyfiles,
+                                picking: _pickingKeyfiles,
+                                onPick: () => _pickKeyfiles(hidden: false),
+                                onRemove: (k) => setState(() {
+                                  _keyfiles = _keyfiles.where((x) => x.uri != k.uri).toList();
+                                  _host = null;
+                                }),
+                                enabled: !_busy,
+                                addEnabled: !_isLuksExpand || _keyfiles.isEmpty,
+                              )),
                         ]),
                         const SizedBox(height: 8),
                         if (_isExpand) ...[

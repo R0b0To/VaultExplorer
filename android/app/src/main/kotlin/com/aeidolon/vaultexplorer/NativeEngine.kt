@@ -104,6 +104,20 @@ internal object NativeEngine {
         newSizeBytes: Long, initFreeSpace: Boolean, growFileSystem: Boolean
     ): IntArray?
 
+    /**
+     * Expands a raw single-volume BitLocker file container (rewrites and re-seals the FVE metadata) and optionally
+     * grows its NTFS file system. [password] is a password or a 48-digit recovery key. Same result array as
+     * [expandVeraCryptContainerNative]; container outcome 9 means the file is not a BitLocker volume.
+     */
+    @JvmStatic
+    external fun expandBitLockerContainerNative(
+        fd: Int, password: String, newSizeBytes: Long, initFreeSpace: Boolean, growFileSystem: Boolean
+    ): IntArray?
+
+    /** Only the NTFS step for a BitLocker volume expanded earlier. */
+    @JvmStatic
+    external fun growBitLockerFileSystemNative(fd: Int, password: String): IntArray?
+
     /** Only the file-system step for a LUKS volume expanded earlier. */
     @JvmStatic
     external fun growLuksFileSystemNative(

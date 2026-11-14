@@ -2525,6 +2525,22 @@ class AppLocalizationsFr extends AppLocalizations {
       'Sauvegardez d\'abord le conteneur. Prend en charge LUKS1 et LUKS2. Les systèmes de fichiers NTFS et ext2/3/4 peuvent être agrandis sur place (FAT et exFAT ne sont pas pris en charge). L\'espace ajouté peut être initialisé avec des zéros chiffrés. Un fichier de clé remplace le mot de passe s\'il est utilisé.';
 
   @override
+  String get toolExpandBitLockerVolumeTitle =>
+      'Agrandir un conteneur BitLocker';
+
+  @override
+  String get toolExpandBitLockerVolumeSubtitle =>
+      'Agrandit un fichier de volume BitLocker ou une image VHD/VHDX et étend son système de fichiers NTFS';
+
+  @override
+  String get bitlockerToolsExpandNote =>
+      'Sauvegardez d\'abord le conteneur. Cette opération réécrit les métadonnées BitLocker pour que le volume chiffré couvre l\'espace ajouté ; vérifiez donc le résultat sur une copie avant de vous y fier. Fonctionne avec les volumes BitLocker entièrement chiffrés de Windows 7 ou ultérieur, soit sous forme de fichier de volume brut, soit dans un VHD ou VHDX fixe ou dynamique. Pour une image de disque, saisissez la nouvelle taille totale du disque : le disque virtuel et sa dernière partition (MBR ou GPT) sont également agrandis, la partition BitLocker doit donc être la dernière. BitLocker To Go et les volumes à chiffrement à l\'écriture (espace utilisé uniquement) ne sont pas pris en charge. NTFS peut être étendu sur place (FAT et exFAT non). L\'espace ajouté peut éventuellement être rempli de zéros chiffrés. Déverrouillez avec le mot de passe ou la clé de récupération à 48 chiffres.';
+
+  @override
+  String get bitlockerToolsPasswordLabel =>
+      'Mot de passe ou clé de récupération';
+
+  @override
   String get toolHiddenInExistingTitle => 'Ajouter un volume caché';
 
   @override

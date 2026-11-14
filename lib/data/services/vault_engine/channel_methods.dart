@@ -249,6 +249,8 @@ abstract final class ChannelMethods {
   static const expandLuksContainer = 'expandLuksContainer';
   static const growVeraCryptFileSystem = 'growVeraCryptFileSystem';
   static const growLuksFileSystem = 'growLuksFileSystem';
+  static const expandBitLockerContainer = 'expandBitLockerContainer';
+  static const growBitLockerFileSystem = 'growBitLockerFileSystem';
   static const analyzeHiddenVolumeHost = 'analyzeHiddenVolumeHost';
   static const createHiddenVolumeInExisting = 'createHiddenVolumeInExisting';
   static const resolveFolderVaultConfigFile = 'resolveFolderVaultConfigFile';

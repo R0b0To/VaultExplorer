@@ -4031,6 +4031,10 @@
   "toolExpandLuksVolumeTitle": "扩展 LUKS 容器",
   "toolExpandLuksVolumeSubtitle": "扩大 LUKS1 和 LUKS2 容器，包括固定大小的 LUKS2 元数据",
   "luksToolsExpandNote": "请先备份容器。支持 LUKS1 和 LUKS2。NTFS 和 ext2/3/4 文件系统支持就地扩容（FAT 和 exFAT 不支持）。新增空间可使用加密零进行初始化。如果使用密钥文件，它将替代密码。",
+  "toolExpandBitLockerVolumeTitle": "扩展 BitLocker 容器",
+  "toolExpandBitLockerVolumeSubtitle": "扩大 BitLocker 卷文件或 VHD/VHDX 映像，并扩展其中的 NTFS 文件系统",
+  "bitlockerToolsExpandNote": "请先备份容器。此操作会重写 BitLocker 元数据，使加密卷覆盖新增空间，因此在依赖结果之前请先在副本上验证。适用于 Windows 7 或更高版本、已完全加密的 BitLocker 卷，可以是原始卷文件，也可以位于固定或动态的 VHD、VHDX 中。对于磁盘映像，请输入磁盘新的总大小：虚拟磁盘及其最后一个分区（MBR 或 GPT）也会一并扩展，因此 BitLocker 分区必须是最后一个分区。不支持 BitLocker To Go 以及写入时加密（仅已用空间）的卷。NTFS 可原地扩展（FAT 和 exFAT 不行）。可选择用加密的零填充新增空间。使用密码或 48 位恢复密钥解锁。",
+  "bitlockerToolsPasswordLabel": "密码或恢复密钥",
   "vcToolsFsBusy": "卷中仍有文件处于打开状态。请将其关闭、锁定卷，然后重试“仅扩展文件系统”。",
   "symbolicLinkPickerUnresolvable": "无法从此处生成相对目标。请手动输入目标。"
 }

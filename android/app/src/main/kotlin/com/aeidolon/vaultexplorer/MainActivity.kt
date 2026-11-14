@@ -297,6 +297,8 @@ private object ChannelMethods {
     const val EXPAND_LUKS_CONTAINER = "expandLuksContainer"
     const val GROW_VERACRYPT_FILE_SYSTEM = "growVeraCryptFileSystem"
     const val GROW_LUKS_FILE_SYSTEM = "growLuksFileSystem"
+    const val EXPAND_BITLOCKER_CONTAINER = "expandBitLockerContainer"
+    const val GROW_BITLOCKER_FILE_SYSTEM = "growBitLockerFileSystem"
     const val ANALYZE_HIDDEN_VOLUME_HOST = "analyzeHiddenVolumeHost"
     const val CREATE_HIDDEN_VOLUME_IN_EXISTING = "createHiddenVolumeInExisting"
     const val RESOLVE_FOLDER_VAULT_CONFIG_FILE = "resolveFolderVaultConfigFile"
@@ -1539,6 +1541,8 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.EXPAND_LUKS_CONTAINER -> veraCryptToolsHandlers.handleExpandLuksContainer(call, result)
                 ChannelMethods.GROW_VERACRYPT_FILE_SYSTEM -> veraCryptToolsHandlers.handleGrowFileSystem(call, result)
                 ChannelMethods.GROW_LUKS_FILE_SYSTEM -> veraCryptToolsHandlers.handleGrowLuksFileSystem(call, result)
+                ChannelMethods.EXPAND_BITLOCKER_CONTAINER -> veraCryptToolsHandlers.handleExpandBitLockerContainer(call, result)
+                ChannelMethods.GROW_BITLOCKER_FILE_SYSTEM -> veraCryptToolsHandlers.handleGrowBitLockerFileSystem(call, result)
                 ChannelMethods.ANALYZE_HIDDEN_VOLUME_HOST -> veraCryptToolsHandlers.handleAnalyzeHiddenHost(call, result)
                 ChannelMethods.CREATE_HIDDEN_VOLUME_IN_EXISTING -> veraCryptToolsHandlers.handleCreateHiddenInExisting(call, result)
                 ChannelMethods.RESTORE_CONTAINER_HEADER_REGION ->

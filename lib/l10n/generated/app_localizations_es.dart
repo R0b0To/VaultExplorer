@@ -2512,6 +2512,21 @@ class AppLocalizationsEs extends AppLocalizations {
       'Haga una copia de seguridad del contenedor primero. Es compatible con LUKS1 y LUKS2. Los sistemas de archivos NTFS y ext2/3/4 se pueden expandir en el lugar (FAT y exFAT no). El espacio añadido se puede inicializar con ceros cifrados. Si se usa un archivo de clave, este reemplaza a la contraseña.';
 
   @override
+  String get toolExpandBitLockerVolumeTitle => 'Ampliar contenedor BitLocker';
+
+  @override
+  String get toolExpandBitLockerVolumeSubtitle =>
+      'Aumenta un archivo de volumen BitLocker o una imagen VHD/VHDX y amplía su sistema de archivos NTFS';
+
+  @override
+  String get bitlockerToolsExpandNote =>
+      'Haz primero una copia de seguridad del contenedor. Esto reescribe los metadatos de BitLocker para que el volumen cifrado abarque el espacio añadido, así que comprueba el resultado en una copia antes de fiarte de él. Funciona con volúmenes BitLocker totalmente cifrados de Windows 7 o posterior, ya sea como archivo de volumen sin procesar o dentro de un VHD o VHDX fijo o dinámico. En una imagen de disco introduce el nuevo tamaño total del disco: también se amplían el disco virtual y su última partición (MBR o GPT), por lo que la partición BitLocker debe ser la última. No se admiten BitLocker To Go ni los volúmenes con cifrado al escribir (solo espacio usado). NTFS puede ampliarse en el sitio (FAT y exFAT no). El espacio añadido puede rellenarse opcionalmente con ceros cifrados. Desbloquea con la contraseña o con la clave de recuperación de 48 dígitos.';
+
+  @override
+  String get bitlockerToolsPasswordLabel =>
+      'Contraseña o clave de recuperación';
+
+  @override
   String get toolHiddenInExistingTitle => 'Añadir volumen oculto';
 
   @override

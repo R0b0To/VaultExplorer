@@ -18,6 +18,7 @@ extern "C" {
 #include <dislocker/dislocker.h>
 #include <dislocker/config.h>
 #include <dislocker/virtual_io.h>
+#include <dislocker/vmk_export.h>
 }
 
 #include "jni_callbacks.h"   // usbReadSectors/usbWriteSectors, reportUnlockProgress
@@ -349,7 +350,8 @@ bool bitlockerDetectUsb(int volId, uint64_t partitionStartSector) {
 
 bool prepareBitLockerSession(int fd, const unsigned char* password, size_t passwordLen,
                              int volId, bool readOnly,
-                             uint64_t partitionStartByte, uint64_t partitionSizeBytes) {
+                             uint64_t partitionStartByte, uint64_t partitionSizeBytes,
+                             bool quietProgress) {
     if (volId < 0 || volId >= FF_VOLUMES) { if (fd >= 0) close(fd); return false; }
     if (fd < 0) return false;
 
@@ -376,7 +378,8 @@ bool prepareBitLockerSession(int fd, const unsigned char* password, size_t passw
     ioCtx->totalSize = volumeSizeBytes;
 
     dis_context_t disCtx = nullptr;
-    if (!unlockWithBestCredentialGuess(ioCtx, password, passwordLen, volId, readOnly, &disCtx)) {
+    // A negative id makes the helper skip progress events and the cancel check (see quietProgress).
+    if (!unlockWithBestCredentialGuess(ioCtx, password, passwordLen, quietProgress ? -1 : volId, readOnly, &disCtx)) {
         delete ioCtx;
         close(fd);
         LOGI("prepareBitLockerSession(vol=%d): unlock failed (wrong password/recovery key)", volId);
@@ -415,7 +418,8 @@ bool prepareBitLockerSession(int fd, const unsigned char* password, size_t passw
 
 bool prepareBitLockerSessionVhdx(int fd, const unsigned char* password, size_t passwordLen,
                                  int volId, bool readOnly,
-                                 uint64_t partitionStartByte, uint64_t partitionSizeBytes) {
+                                 uint64_t partitionStartByte, uint64_t partitionSizeBytes,
+                                 bool quietProgress) {
     if (volId < 0 || volId >= FF_VOLUMES) { if (fd >= 0) close(fd); return false; }
     if (fd < 0) return false;
 
@@ -452,7 +456,7 @@ bool prepareBitLockerSessionVhdx(int fd, const unsigned char* password, size_t p
     ioCtx->totalSize = volumeSizeBytes;
 
     dis_context_t disCtx = nullptr;
-    if (!unlockWithBestCredentialGuess(ioCtx, password, passwordLen, volId, actualReadOnly, &disCtx)) {
+    if (!unlockWithBestCredentialGuess(ioCtx, password, passwordLen, quietProgress ? -1 : volId, actualReadOnly, &disCtx)) {
         delete ioCtx->vhdx;
         delete ioCtx;
         close(fd);
@@ -486,7 +490,8 @@ bool prepareBitLockerSessionVhdx(int fd, const unsigned char* password, size_t p
 
 bool prepareBitLockerSessionVhd(int fd, const unsigned char* password, size_t passwordLen,
                                 int volId, bool readOnly,
-                                uint64_t partitionStartByte, uint64_t partitionSizeBytes) {
+                                uint64_t partitionStartByte, uint64_t partitionSizeBytes,
+                                bool quietProgress) {
     if (volId < 0 || volId >= FF_VOLUMES) { if (fd >= 0) close(fd); return false; }
     if (fd < 0) return false;
 
@@ -521,7 +526,7 @@ bool prepareBitLockerSessionVhd(int fd, const unsigned char* password, size_t pa
     ioCtx->totalSize = volumeSizeBytes;
 
     dis_context_t disCtx = nullptr;
-    if (!unlockWithBestCredentialGuess(ioCtx, password, passwordLen, volId, readOnly, &disCtx)) {
+    if (!unlockWithBestCredentialGuess(ioCtx, password, passwordLen, quietProgress ? -1 : volId, readOnly, &disCtx)) {
         delete ioCtx->vhd;
         delete ioCtx;
         close(fd);
@@ -607,6 +612,14 @@ bool bitlockerRead(int volumeId, uint64_t logicalOffset, unsigned char* outBuf, 
     auto* ctx = static_cast<dis_context_t>(v.disContext);
     const int ret = dislock(ctx, outBuf, static_cast<off_t>(logicalOffset), byteCount);
     return ret == static_cast<int>(byteCount);
+}
+
+size_t bitlockerExportVmk(int volumeId, unsigned char* outBuf, size_t outCap) {
+    if (volumeId < 0 || volumeId >= FF_VOLUMES || outBuf == nullptr) return 0;
+    VolumeState& v = volumes[volumeId];
+    if (!v.disContext) return 0;
+    std::lock_guard<std::mutex> lock(v.ioBufMutex);
+    return dis_export_vmk(static_cast<dis_context_t>(v.disContext), outBuf, outCap);
 }
 
 bool bitlockerWrite(int volumeId, uint64_t logicalOffset, const unsigned char* inBuf, size_t byteCount) {

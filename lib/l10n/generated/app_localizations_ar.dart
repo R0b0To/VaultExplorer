@@ -2546,6 +2546,20 @@ class AppLocalizationsAr extends AppLocalizations {
       'قم بعمل نسخة احتياطية للحاوية أولاً. يدعم LUKS1 وLUKS2. يمكن توسيع أنظمة الملفات NTFS وext2/3/4 في مكانها (لا يمكن توسيع FAT وexFAT). يمكن تهيئة المساحة المضافة بأصفار مشفرة. يحل ملف المفتاح محل كلمة المرور إذا تم استخدامه.';
 
   @override
+  String get toolExpandBitLockerVolumeTitle => 'توسيع حاوية BitLocker';
+
+  @override
+  String get toolExpandBitLockerVolumeSubtitle =>
+      'تكبير ملف وحدة BitLocker أو صورة VHD/VHDX وتوسيع نظام ملفات NTFS فيها';
+
+  @override
+  String get bitlockerToolsExpandNote =>
+      'أنشئ نسخة احتياطية من الحاوية أولًا. تعيد هذه الأداة كتابة بيانات BitLocker الوصفية ليغطي الحجم المشفّر المساحة المضافة، لذا تحقق من النتيجة على نسخة قبل الاعتماد عليها. تعمل مع وحدات BitLocker المشفّرة بالكامل من Windows 7 أو أحدث، سواء كملف وحدة خام أو داخل VHD أو VHDX ثابت أو ديناميكي. في صورة القرص أدخل الحجم الإجمالي الجديد للقرص: يُوسَّع القرص الافتراضي وآخر قسم فيه (MBR أو GPT) أيضًا، لذا يجب أن يكون قسم BitLocker هو الأخير. لا تُدعم وحدات BitLocker To Go ولا وحدات التشفير عند الكتابة (المساحة المستخدمة فقط). يمكن توسيع NTFS في مكانه (ولا يمكن توسيع FAT وexFAT). يمكن اختياريًا ملء المساحة المضافة بأصفار مشفّرة. افتح القفل بكلمة المرور أو بمفتاح الاسترداد المكوّن من 48 رقمًا.';
+
+  @override
+  String get bitlockerToolsPasswordLabel => 'كلمة المرور أو مفتاح الاسترداد';
+
+  @override
   String get toolHiddenInExistingTitle => 'إضافة وحدة تخزين مخفية';
 
   @override

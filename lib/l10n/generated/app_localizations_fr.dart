@@ -7048,6 +7048,13 @@ class AppLocalizationsFr extends AppLocalizations {
       'Afficher les fichiers en point et les dossiers système';
 
   @override
+  String get showNoMediaFilesLabel => 'Show Media Hidden by .nomedia';
+
+  @override
+  String get showNoMediaFilesDesc =>
+      'Include media in folders containing a .nomedia file';
+
+  @override
   String get dontAskAgain => 'Ne plus demander';
 
   @override
@@ -14726,4 +14733,128 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get symbolicLinkPickerUnresolvable =>
       'Impossible de construire une cible relative à partir d’ici. Saisissez la cible à la place.';
+
+  @override
+  String get editMetadataAction => 'Modifier les métadonnées';
+
+  @override
+  String get editTagsAction => 'Modifier les tags';
+
+  @override
+  String get editDateTimeAction => 'Modifier la date et l’heure';
+
+  @override
+  String get removeMetadataAction => 'Supprimer les métadonnées';
+
+  @override
+  String get metadataFormatsNote =>
+      'Les tags, dates et suppressions sont écrits dans les images JPEG, PNG et WebP. Les autres fichiers reçoivent seulement une nouvelle date de modification.';
+
+  @override
+  String get metadataReadOnlyMessage => 'Ce coffre est en lecture seule';
+
+  @override
+  String get tagsAddHint => 'Ajouter des tags, séparés par des virgules';
+
+  @override
+  String get tagsNoneYet => 'Aucun tag';
+
+  @override
+  String get dateModeSet => 'Définir';
+
+  @override
+  String get dateModeShift => 'Décaler';
+
+  @override
+  String get dateModeFromModified => 'D’après la date de modification';
+
+  @override
+  String get dateModeFromName => 'D’après le nom du fichier';
+
+  @override
+  String get dateShiftLater => 'Plus tard';
+
+  @override
+  String get dateShiftEarlier => 'Plus tôt';
+
+  @override
+  String get dateDaysLabel => 'Jours';
+
+  @override
+  String get dateHoursLabel => 'Heures';
+
+  @override
+  String get dateMinutesLabel => 'Minutes';
+
+  @override
+  String get dateAlsoSetModified =>
+      'Définir aussi la date de modification du fichier';
+
+  @override
+  String dateFromNameMatches(int matched, int total) {
+    return '$matched noms de fichier sur $total contiennent une date';
+  }
+
+  @override
+  String get stripExifLabel => 'Exif (appareil, date, lieu)';
+
+  @override
+  String get stripXmpLabel => 'XMP (tags, note, données d’édition)';
+
+  @override
+  String get stripIptcLabel => 'IPTC / Photoshop (légendes, crédits)';
+
+  @override
+  String get stripCommentsLabel => 'Commentaires';
+
+  @override
+  String get stripIccLabel =>
+      'Profil colorimétrique (peut changer les couleurs)';
+
+  @override
+  String get stripKeepOrientationLabel => 'Conserver l’orientation';
+
+  @override
+  String get stripKeepOrientationDesc =>
+      'Sans cela, les photos prises en travers peuvent apparaître pivotées';
+
+  @override
+  String get stripWarning =>
+      'Cela réécrit les fichiers et ne peut pas être annulé.';
+
+  @override
+  String metadataProgress(int done, int total) {
+    return 'Mise à jour de $done sur $total';
+  }
+
+  @override
+  String metadataResultUpdated(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count fichiers mis à jour',
+      one: '1 fichier mis à jour',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get metadataResultUnchanged => 'Rien à modifier';
+
+  @override
+  String metadataResultSkipped(int count) {
+    return '$count ignorés (non pris en charge)';
+  }
+
+  @override
+  String metadataResultFailed(int count) {
+    return '$count en échec';
+  }
+
+  @override
+  String get showNoMediaFoldersLabel => 'Afficher les dossiers .nomedia';
+
+  @override
+  String get showNoMediaFoldersDesc =>
+      'Inclure les dossiers contenant un fichier .nomedia, normalement ignorés par les applications de galerie';
 }

@@ -579,4 +579,38 @@ void main() {
       expect(reset.folderLayoutModes, {'c:/a': 'grid'});
     });
   });
+
+  group('FileManagerToolbarConfig showNoMediaFolders', () {
+    test('defaults to false in defaults() factory and constructor', () {
+      expect(FileManagerToolbarConfig.defaults().showNoMediaFolders, isFalse);
+      expect(
+        const FileManagerToolbarConfig(order: [], hidden: {}).showNoMediaFolders,
+        isFalse,
+      );
+    });
+
+    test('copyWith updates showNoMediaFolders', () {
+      final config = FileManagerToolbarConfig.defaults()
+          .copyWith(showNoMediaFolders: true);
+      expect(config.showNoMediaFolders, isTrue);
+    });
+
+    test('round-trips through JSON', () {
+      final json = FileManagerToolbarConfig.defaults()
+          .copyWith(showNoMediaFolders: true)
+          .toJson();
+      expect(json['showNoMediaFolders'], isTrue);
+      expect(
+        FileManagerToolbarConfig.fromJson(json).showNoMediaFolders,
+        isTrue,
+      );
+    });
+
+    test('fromJson falls back to false when key is missing', () {
+      final config = FileManagerToolbarConfig.fromJson(
+        <String, dynamic>{'showBreadcrumbBar': true},
+      );
+      expect(config.showNoMediaFolders, isFalse);
+    });
+  });
 }

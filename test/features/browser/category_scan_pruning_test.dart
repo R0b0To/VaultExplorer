@@ -25,6 +25,7 @@ CategoryScanner _scanner(
   Map<String, List<String>> fs, {
   bool respectNoMedia = false,
   bool showHidden = false,
+  bool showNoMedia = false,
   bool Function(String)? skip,
   List<String>? log,
 }) => CategoryScanner(
@@ -34,6 +35,7 @@ CategoryScanner _scanner(
   showHidden: showHidden,
   skipDirectory: skip,
   respectNoMedia: respectNoMedia,
+  showNoMedia: showNoMedia,
 );
 
 Future<CategoryScanSnapshot> _scan(CategoryScanner s) =>
@@ -141,11 +143,19 @@ void main() {
       expect(r.folderPaths, isNot(contains('Hidden')));
     });
 
-    test('is ignored while hidden files are shown', () async {
+    test('is not lifted by showing hidden files', () async {
       final r = await _scan(
         _scanner(fs, respectNoMedia: true, showHidden: true),
       );
+      expect(r.entries.map((e) => e.name), isNot(contains('Hidden/Deep/c.jpg')));
+    });
+
+    test('is lifted by showNoMedia, which walks the folder', () async {
+      final r = await _scan(
+        _scanner(fs, respectNoMedia: true, showNoMedia: true),
+      );
       expect(r.entries.map((e) => e.name), contains('Hidden/Deep/c.jpg'));
+      expect(r.entries.map((e) => e.name), contains('Hidden/b.jpg'));
     });
 
     test('never prunes the scan root itself', () async {

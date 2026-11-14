@@ -73,7 +73,7 @@ void main() {
 
     test('one bad entry does not discard the rest', () {
       final restored = VaultCategoryIndex.fromJson({
-        'v': 1,
+        'v': VaultCategoryIndex.version,
         'categories': {
           'images': {
             'built': 1,

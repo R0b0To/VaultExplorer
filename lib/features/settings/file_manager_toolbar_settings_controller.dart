@@ -179,6 +179,9 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
   Future<void> setShowHiddenFiles(bool val) =>
       _updateConfig(state.config.copyWith(showHiddenFiles: val));
 
+  Future<void> setShowNoMediaFolders(bool val) =>
+      _updateConfig(state.config.copyWith(showNoMediaFolders: val));
+
   Future<void> setShowBreadcrumbBar(bool val) =>
       _updateConfig(state.config.copyWith(showBreadcrumbBar: val));
 

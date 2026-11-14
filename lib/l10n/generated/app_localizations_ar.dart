@@ -7056,6 +7056,13 @@ class AppLocalizationsAr extends AppLocalizations {
   String get showHiddenFilesDesc => 'عرض الملفات ذات النقطة ومجلدات النظام';
 
   @override
+  String get showNoMediaFilesLabel => 'Show Media Hidden by .nomedia';
+
+  @override
+  String get showNoMediaFilesDesc =>
+      'Include media in folders containing a .nomedia file';
+
+  @override
   String get dontAskAgain => 'عدم السؤال مرة أخرى';
 
   @override
@@ -14636,4 +14643,126 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get symbolicLinkPickerUnresolvable =>
       'تعذّر إنشاء هدف نسبي من هنا. اكتب الهدف يدويًا.';
+
+  @override
+  String get editMetadataAction => 'تعديل البيانات الوصفية';
+
+  @override
+  String get editTagsAction => 'تعديل الوسوم';
+
+  @override
+  String get editDateTimeAction => 'تعديل التاريخ والوقت';
+
+  @override
+  String get removeMetadataAction => 'إزالة البيانات الوصفية';
+
+  @override
+  String get metadataFormatsNote =>
+      'تُكتب الوسوم والتواريخ والإزالة داخل صور JPEG وPNG وWebP. أما الملفات الأخرى فتحصل على تاريخ تعديل جديد فقط.';
+
+  @override
+  String get metadataReadOnlyMessage => 'هذه الخزنة للقراءة فقط';
+
+  @override
+  String get tagsAddHint => 'أضف وسومًا مفصولة بفواصل';
+
+  @override
+  String get tagsNoneYet => 'لا توجد وسوم بعد';
+
+  @override
+  String get dateModeSet => 'تعيين';
+
+  @override
+  String get dateModeShift => 'إزاحة';
+
+  @override
+  String get dateModeFromModified => 'من تاريخ التعديل';
+
+  @override
+  String get dateModeFromName => 'من اسم الملف';
+
+  @override
+  String get dateShiftLater => 'لاحقًا';
+
+  @override
+  String get dateShiftEarlier => 'أبكر';
+
+  @override
+  String get dateDaysLabel => 'أيام';
+
+  @override
+  String get dateHoursLabel => 'ساعات';
+
+  @override
+  String get dateMinutesLabel => 'دقائق';
+
+  @override
+  String get dateAlsoSetModified => 'عيّن أيضًا تاريخ تعديل الملف';
+
+  @override
+  String dateFromNameMatches(int matched, int total) {
+    return '$matched من $total من أسماء الملفات تحتوي على تاريخ';
+  }
+
+  @override
+  String get stripExifLabel => 'Exif (الكاميرا، التاريخ، الموقع)';
+
+  @override
+  String get stripXmpLabel => 'XMP (الوسوم، التقييم، بيانات التحرير)';
+
+  @override
+  String get stripIptcLabel => 'IPTC / Photoshop (التعليقات، الاعتمادات)';
+
+  @override
+  String get stripCommentsLabel => 'التعليقات';
+
+  @override
+  String get stripIccLabel => 'ملف تعريف الألوان (قد يغيّر الألوان)';
+
+  @override
+  String get stripKeepOrientationLabel => 'الاحتفاظ بالاتجاه';
+
+  @override
+  String get stripKeepOrientationDesc =>
+      'بدونه قد تظهر الصور الملتقطة بشكل جانبي مُدارة';
+
+  @override
+  String get stripWarning =>
+      'يؤدي هذا إلى إعادة كتابة الملفات ولا يمكن التراجع عنه.';
+
+  @override
+  String metadataProgress(int done, int total) {
+    return 'جارٍ تحديث $done من $total';
+  }
+
+  @override
+  String metadataResultUpdated(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'تم تحديث $count ملفات',
+      one: 'تم تحديث ملف واحد',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get metadataResultUnchanged => 'لا شيء يحتاج إلى تغيير';
+
+  @override
+  String metadataResultSkipped(int count) {
+    return 'تم تخطي $count (غير مدعوم)';
+  }
+
+  @override
+  String metadataResultFailed(int count) {
+    return 'فشل $count';
+  }
+
+  @override
+  String get showNoMediaFoldersLabel => 'إظهار مجلدات .nomedia';
+
+  @override
+  String get showNoMediaFoldersDesc =>
+      'تضمين المجلدات التي تحتوي على ملف .nomedia والتي تتجاهلها تطبيقات المعرض عادةً';
 }

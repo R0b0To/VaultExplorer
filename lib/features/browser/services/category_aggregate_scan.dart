@@ -252,6 +252,7 @@ class CategoryAggregateScanner {
     required this.matches,
     required this.isHidden,
     required this.showHidden,
+    this.showNoMedia = false,
     this.onError,
     this.maxConcurrency = categoryScanMaxConcurrency,
     this.maxFolders = categoryScanMaxFolders,
@@ -262,6 +263,9 @@ class CategoryAggregateScanner {
   final bool Function(String fileName) matches;
   final bool Function(String name) isHidden;
   final bool showHidden;
+
+  /// See [CategoryScanner.showNoMedia].
+  final bool showNoMedia;
   final void Function(CategorySource source, String dirPath, Object error)?
   onError;
   final int maxConcurrency;
@@ -420,6 +424,7 @@ class CategoryAggregateScanner {
           showHidden: showHidden,
           skipDirectory: target.skipDirectory,
           respectNoMedia: target.respectNoMedia,
+          showNoMedia: showNoMedia,
           onError: onError == null
               ? null
               : (dir, error) => onError!(target.source, dir, error),

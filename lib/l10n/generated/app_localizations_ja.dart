@@ -6650,6 +6650,13 @@ class AppLocalizationsJa extends AppLocalizations {
   String get showHiddenFilesDesc => 'ドットファイルとシステムフォルダを表示します';
 
   @override
+  String get showNoMediaFilesLabel => 'Show Media Hidden by .nomedia';
+
+  @override
+  String get showNoMediaFilesDesc =>
+      'Include media in folders containing a .nomedia file';
+
+  @override
   String get dontAskAgain => '今後表示しない';
 
   @override
@@ -13809,4 +13816,123 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get symbolicLinkPickerUnresolvable =>
       'ここからは相対的なリンク先を作成できません。リンク先を直接入力してください。';
+
+  @override
+  String get editMetadataAction => 'メタデータを編集';
+
+  @override
+  String get editTagsAction => 'タグを編集';
+
+  @override
+  String get editDateTimeAction => '日付と時刻を編集';
+
+  @override
+  String get removeMetadataAction => 'メタデータを削除';
+
+  @override
+  String get metadataFormatsNote =>
+      'タグ、日付、削除は JPEG・PNG・WebP 画像に書き込まれます。その他のファイルは更新日時のみ変更されます。';
+
+  @override
+  String get metadataReadOnlyMessage => 'この保管庫は読み取り専用です';
+
+  @override
+  String get tagsAddHint => 'タグをカンマ区切りで追加';
+
+  @override
+  String get tagsNoneYet => 'タグはまだありません';
+
+  @override
+  String get dateModeSet => '設定';
+
+  @override
+  String get dateModeShift => 'ずらす';
+
+  @override
+  String get dateModeFromModified => '更新日時から';
+
+  @override
+  String get dateModeFromName => 'ファイル名から';
+
+  @override
+  String get dateShiftLater => '後へ';
+
+  @override
+  String get dateShiftEarlier => '前へ';
+
+  @override
+  String get dateDaysLabel => '日';
+
+  @override
+  String get dateHoursLabel => '時間';
+
+  @override
+  String get dateMinutesLabel => '分';
+
+  @override
+  String get dateAlsoSetModified => 'ファイルの更新日時も設定する';
+
+  @override
+  String dateFromNameMatches(int matched, int total) {
+    return '$total 件中 $matched 件のファイル名に日付が含まれています';
+  }
+
+  @override
+  String get stripExifLabel => 'Exif（カメラ、日付、位置情報）';
+
+  @override
+  String get stripXmpLabel => 'XMP（タグ、評価、編集データ）';
+
+  @override
+  String get stripIptcLabel => 'IPTC / Photoshop（キャプション、クレジット）';
+
+  @override
+  String get stripCommentsLabel => 'コメント';
+
+  @override
+  String get stripIccLabel => 'カラープロファイル（色が変わる場合があります）';
+
+  @override
+  String get stripKeepOrientationLabel => '向きを保持';
+
+  @override
+  String get stripKeepOrientationDesc => '保持しないと、横向きで撮影した写真が回転して表示されることがあります';
+
+  @override
+  String get stripWarning => 'ファイルを書き換えます。元に戻すことはできません。';
+
+  @override
+  String metadataProgress(int done, int total) {
+    return '$total 件中 $done 件を更新中';
+  }
+
+  @override
+  String metadataResultUpdated(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 件のファイルを更新しました',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get metadataResultUnchanged => '変更の必要はありませんでした';
+
+  @override
+  String metadataResultSkipped(int count) {
+    return '$count 件をスキップ（非対応）';
+  }
+
+  @override
+  String metadataResultFailed(int count) {
+    return '$count 件が失敗';
+  }
+
+  @override
+  String get showNoMediaFoldersLabel => '.nomedia フォルダーを表示';
+
+  @override
+  String get showNoMediaFoldersDesc =>
+      'ギャラリーアプリが通常スキップする .nomedia ファイル付きのフォルダーを含めます';
 }

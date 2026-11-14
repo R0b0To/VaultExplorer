@@ -11,6 +11,9 @@ import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/features/browser/metadata/image_metadata_editor.dart';
+import 'package:vaultexplorer/features/browser/metadata/image_metadata_reader.dart';
+import 'package:vaultexplorer/features/browser/metadata/metadata_edit_ui.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/file_info_controller.dart';
 
 class FileInfoSheet extends ConsumerStatefulWidget {
@@ -590,6 +593,40 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
                               ],
                             ),
                           ],
+                          if (!widget.entry.isDir && !widget.container.readOnly && ImageMetadataEditor.canEdit(widget.entry.name)) ...[
+                            const SizedBox(height: 16),
+                            OutlinedButton.icon(
+                              icon: const Icon(Icons.sell_outlined),
+                              label: Text(context.l10n.editMetadataAction),
+                              onPressed: () => showMetadataEditMenu(
+                                context,
+                                ref,
+                                [
+                                  MetadataEditTarget(
+                                    container: widget.container,
+                                    path: _fullPath,
+                                    sizeBytes: widget.entry.sizeBytes,
+                                    modifiedSecs: widget.entry.modifiedSecs,
+                                  ),
+                                ],
+                                // Read the file's metadata again to show what changed.
+                                onChanged: (_) => ref
+                                    .read(fileInfoProvider(widget.container.volId, _fullPath).notifier)
+                                    .load(widget.container, widget.entry),
+                              ),
+                            ),
+                          ],
+                          for (final dir in controllerState.allMetadata ?? const <MetadataDirectory>[]) ...[
+                            const SizedBox(height: 16),
+                            _buildSectionTitle(context, dir.name),
+                            AppCard.rows(
+                              dividerIndent: 16,
+                              children: [
+                                for (final tag in dir.tags)
+                                  _buildInfoTile(context, tag.name, tag.value),
+                              ],
+                            ),
+                          ],
                           if (!widget.entry.isDir) ...[
                             const SizedBox(height: 16),
                             _buildSectionTitle(
@@ -844,15 +881,17 @@ class ParsedMetadata {
       gpsCoordinates != null;
 
   String? get megapixels {
-    if (width == null || height == null || width! <= 0 || height! <= 0)
+    if (width == null || height == null || width! <= 0 || height! <= 0) {
       return null;
+    }
     final mp = (width! * height!) / 1000000.0;
     return mp >= 1.0 ? mp.toStringAsFixed(1) : mp.toStringAsFixed(2);
   }
 
   String? get aspectRatioString {
-    if (width == null || height == null || width! <= 0 || height! <= 0)
+    if (width == null || height == null || width! <= 0 || height! <= 0) {
       return null;
+    }
     int gcd(int a, int b) => b == 0 ? a : gcd(b, a % b);
     final divisor = gcd(width!, height!);
     final rw = width! ~/ divisor;
@@ -1174,8 +1213,9 @@ class MetadataParser {
           }
           if (tag == 0x920A) {
             final fl = readRational(valOffset);
-            if (fl != null)
+            if (fl != null) {
               result['focalLength'] = '${fl.toStringAsFixed(1)} mm';
+            }
           }
         }
 

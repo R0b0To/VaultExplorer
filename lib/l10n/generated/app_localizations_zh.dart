@@ -6562,6 +6562,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get showHiddenFilesDesc => '显示点文件和系统文件夹';
 
   @override
+  String get showNoMediaFilesLabel => 'Show Media Hidden by .nomedia';
+
+  @override
+  String get showNoMediaFilesDesc =>
+      'Include media in folders containing a .nomedia file';
+
+  @override
   String get dontAskAgain => '不再询问';
 
   @override
@@ -13597,4 +13604,122 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get symbolicLinkPickerUnresolvable => '无法从此处生成相对目标。请手动输入目标。';
+
+  @override
+  String get editMetadataAction => '编辑元数据';
+
+  @override
+  String get editTagsAction => '编辑标签';
+
+  @override
+  String get editDateTimeAction => '编辑日期和时间';
+
+  @override
+  String get removeMetadataAction => '移除元数据';
+
+  @override
+  String get metadataFormatsNote =>
+      '标签、日期和移除操作会写入 JPEG、PNG 和 WebP 图片。其他文件仅更新修改日期。';
+
+  @override
+  String get metadataReadOnlyMessage => '此保险库为只读';
+
+  @override
+  String get tagsAddHint => '添加标签，以逗号分隔';
+
+  @override
+  String get tagsNoneYet => '暂无标签';
+
+  @override
+  String get dateModeSet => '设置';
+
+  @override
+  String get dateModeShift => '偏移';
+
+  @override
+  String get dateModeFromModified => '来自修改日期';
+
+  @override
+  String get dateModeFromName => '来自文件名';
+
+  @override
+  String get dateShiftLater => '推后';
+
+  @override
+  String get dateShiftEarlier => '提前';
+
+  @override
+  String get dateDaysLabel => '天';
+
+  @override
+  String get dateHoursLabel => '小时';
+
+  @override
+  String get dateMinutesLabel => '分钟';
+
+  @override
+  String get dateAlsoSetModified => '同时设置文件的修改日期';
+
+  @override
+  String dateFromNameMatches(int matched, int total) {
+    return '$total 个文件名中有 $matched 个包含日期';
+  }
+
+  @override
+  String get stripExifLabel => 'Exif（相机、日期、位置）';
+
+  @override
+  String get stripXmpLabel => 'XMP（标签、评分、编辑数据）';
+
+  @override
+  String get stripIptcLabel => 'IPTC / Photoshop（说明、署名）';
+
+  @override
+  String get stripCommentsLabel => '注释';
+
+  @override
+  String get stripIccLabel => '色彩配置文件（可能改变颜色）';
+
+  @override
+  String get stripKeepOrientationLabel => '保留方向';
+
+  @override
+  String get stripKeepOrientationDesc => '不保留时，横向拍摄的照片可能显示为旋转状态';
+
+  @override
+  String get stripWarning => '此操作会重写文件，且无法撤销。';
+
+  @override
+  String metadataProgress(int done, int total) {
+    return '正在更新 $done/$total';
+  }
+
+  @override
+  String metadataResultUpdated(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '已更新 $count 个文件',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get metadataResultUnchanged => '无需更改';
+
+  @override
+  String metadataResultSkipped(int count) {
+    return '已跳过 $count 个（不支持）';
+  }
+
+  @override
+  String metadataResultFailed(int count) {
+    return '$count 个失败';
+  }
+
+  @override
+  String get showNoMediaFoldersLabel => '显示 .nomedia 文件夹';
+
+  @override
+  String get showNoMediaFoldersDesc => '包含带有 .nomedia 文件的文件夹（图库应用通常会跳过这些文件夹）';
 }

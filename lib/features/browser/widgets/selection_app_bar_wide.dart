@@ -26,6 +26,9 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
   final Map<FileManagerAction, WidgetBuilder> actionBuilders;
   final VoidCallback? onFileInfo;
 
+  /// Opens the edit tags / date & time / remove metadata menu. Null hides it.
+  final VoidCallback? onEditMetadata;
+
   /// Set only for a single selected item while a search is showing: offers
   /// "Go to location", which leaves the search and shows the item in the
   /// folder it lives in.
@@ -85,6 +88,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
     this.hideVaultOnlyActions = false,
     this.isInsideArchive = false,
     this.onFileInfo,
+    this.onEditMetadata,
     this.onGoToLocation,
     this.onCopyPath,
     required this.readOnly,
@@ -268,6 +272,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
             if (value == 'go_to_location') onGoToLocation?.call();
             if (value == 'copy_path') onCopyPath?.call();
             if (value == 'file_info') onFileInfo?.call();
+                if (value == 'edit_metadata') onEditMetadata?.call();
           },
           itemBuilder: (context) => applyItemActionMenuConfig(
             [
@@ -504,6 +509,18 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
                     Icon(Icons.link_rounded, color: cs.onSurfaceVariant, size: AppIconSize.small),
                     const SizedBox(width: 12),
                     Text(context.l10n.copyPathAction),
+                  ],
+                ),
+              ),
+            if (onEditMetadata != null)
+              PopupMenuItem<String>(
+                value: 'edit_metadata',
+                enabled: !readOnly,
+                child: Row(
+                  children: [
+                    Icon(Icons.sell_outlined, color: cs.onSurfaceVariant, size: AppIconSize.small),
+                    const SizedBox(width: 12),
+                    Text(context.l10n.editMetadataAction),
                   ],
                 ),
               ),

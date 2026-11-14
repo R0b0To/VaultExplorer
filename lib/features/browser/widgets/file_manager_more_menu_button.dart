@@ -78,6 +78,7 @@ class FileManagerMoreMenuButton extends StatelessWidget {
 
   final FileManagerToolbarConfig? toolbarConfig;
   final ValueChanged<bool>? onToggleShowHiddenFiles;
+  final ValueChanged<bool>? onToggleShowNoMediaFolders;
   final ValueChanged<bool>? onToggleShowGridFileNames;
   final ValueChanged<bool>? onToggleShowFileExtensions;
   final ValueChanged<bool>? onToggleShowListThumbnails;
@@ -110,6 +111,7 @@ class FileManagerMoreMenuButton extends StatelessWidget {
     required this.onToggleGallery,
     this.toolbarConfig,
     this.onToggleShowHiddenFiles,
+    this.onToggleShowNoMediaFolders,
     this.onToggleShowGridFileNames,
     this.onToggleShowFileExtensions,
     this.onToggleShowListThumbnails,
@@ -224,6 +226,7 @@ class FileManagerMoreMenuButton extends StatelessWidget {
               cs: cs,
               toolbarConfig: toolbarConfig!,
               onToggleShowHiddenFiles: onToggleShowHiddenFiles ?? (_) {},
+              onToggleShowNoMediaFolders: onToggleShowNoMediaFolders,
               onToggleShowGridFileNames: onToggleShowGridFileNames ?? (_) {},
               onToggleShowFileExtensions: onToggleShowFileExtensions ?? (_) {},
               onToggleShowListThumbnails: onToggleShowListThumbnails ?? (_) {},
@@ -425,6 +428,7 @@ class FileManagerMoreMenuButton extends StatelessWidget {
             cs: cs,
             toolbarConfig: toolbarConfig!,
             onToggleShowHiddenFiles: onToggleShowHiddenFiles ?? (_) {},
+            onToggleShowNoMediaFolders: onToggleShowNoMediaFolders,
             onToggleShowGridFileNames: onToggleShowGridFileNames ?? (_) {},
             onToggleShowFileExtensions: onToggleShowFileExtensions ?? (_) {},
             onToggleShowListThumbnails: onToggleShowListThumbnails ?? (_) {},

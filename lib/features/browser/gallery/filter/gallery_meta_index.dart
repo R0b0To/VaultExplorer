@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
 import 'dart:math' as math;
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 
@@ -384,6 +383,20 @@ class GalleryMetaIndex extends ChangeNotifier {
       Future.wait([
         for (final v in {..._dirty.keys, ..._writing.keys}) _save(v),
       ]).then((_) {});
+
+  /// Forgets what is known about one file, because its metadata was edited.
+  ///
+  /// [lookup] trusts an entry while the file's size and modified time match,
+  /// and a metadata edit can keep both (a date rewritten in place, the time
+  /// put back so the photo does not look newly changed). Without this the
+  /// gallery would go on showing the old tags and date.
+  void invalidate(int volId, String path) {
+    final removed = _stored[volId]?.remove(path);
+    if (removed == null) return;
+    (_dirty[volId] ??= <String>{}).add(path);
+    _revision++;
+    if (!_maybePublish(force: true)) _scheduleNotify();
+  }
 
   /// Drops what is held (not what is stored) for [volId]; its container was
   /// locked.

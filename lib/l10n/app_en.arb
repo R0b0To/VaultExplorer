@@ -8781,6 +8781,14 @@
   "@showHiddenFilesDesc": {
     "description": "Toggle description for showing hidden files and folders"
   },
+  "showNoMediaFilesLabel": "Show Media Hidden by .nomedia",
+  "@showNoMediaFilesLabel": {
+    "description": "Toggle label for showing media in folders containing a .nomedia file"
+  },
+  "showNoMediaFilesDesc": "Include media in folders containing a .nomedia file",
+  "@showNoMediaFilesDesc": {
+    "description": "Toggle description for showing media in folders containing a .nomedia file"
+  },
   "dontAskAgain": "Don't ask again",
   "@dontAskAgain": {
     "description": "Checkbox label to remember choice and not prompt again"
@@ -16365,5 +16373,80 @@
   "symbolicLinkPickerUnresolvable": "Can't build a relative target from here. Type the target instead.",
   "@symbolicLinkPickerUnresolvable": {
     "description": "Shown when the symbolic link target picker cannot build a relative target, e.g. because a folder link on the way cannot be followed safely; the user types the target instead"
-  }
+  },
+  "editMetadataAction": "Edit metadata",
+  "editTagsAction": "Edit tags",
+  "editDateTimeAction": "Edit date & time",
+  "removeMetadataAction": "Remove metadata",
+  "metadataFormatsNote": "Tags, dates and removal are written into JPEG, PNG and WebP images. Other files only get a new modified date.",
+  "metadataReadOnlyMessage": "This vault is read-only",
+  "tagsAddHint": "Add tags, separated by commas",
+  "tagsNoneYet": "No tags yet",
+  "dateModeSet": "Set",
+  "dateModeShift": "Shift",
+  "dateModeFromModified": "From modified date",
+  "dateModeFromName": "From file name",
+  "dateShiftLater": "Later",
+  "dateShiftEarlier": "Earlier",
+  "dateDaysLabel": "Days",
+  "dateHoursLabel": "Hours",
+  "dateMinutesLabel": "Minutes",
+  "dateAlsoSetModified": "Also set the file's modified date",
+  "dateFromNameMatches": "{matched} of {total} file names contain a date",
+  "@dateFromNameMatches": {
+    "placeholders": {
+      "matched": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "stripExifLabel": "Exif (camera, date, location)",
+  "stripXmpLabel": "XMP (tags, rating, edit data)",
+  "stripIptcLabel": "IPTC / Photoshop (captions, credits)",
+  "stripCommentsLabel": "Comments",
+  "stripIccLabel": "Colour profile (may change colours)",
+  "stripKeepOrientationLabel": "Keep orientation",
+  "stripKeepOrientationDesc": "Without it, photos taken sideways may show rotated",
+  "stripWarning": "This rewrites the files and cannot be undone.",
+  "metadataProgress": "Updating {done} of {total}",
+  "@metadataProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "metadataResultUpdated": "{count, plural, =1{1 file updated} other{{count} files updated}}",
+  "@metadataResultUpdated": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "metadataResultUnchanged": "Nothing needed changing",
+  "metadataResultSkipped": "{count} skipped (not supported)",
+  "@metadataResultSkipped": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "metadataResultFailed": "{count} failed",
+  "@metadataResultFailed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "showNoMediaFoldersLabel": "Show .nomedia folders",
+  "showNoMediaFoldersDesc": "Include folders marked with a .nomedia file, which gallery apps normally skip"
 }

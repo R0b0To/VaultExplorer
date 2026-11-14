@@ -1440,14 +1440,38 @@ class VaultFileIoApi {
     MountedContainer container,
     String fileName,
     Uint8List bytes,
+  ) {
+    Stream<Uint8List> chunks() async* {
+      var offset = 0;
+      do {
+        final remaining = bytes.length - offset;
+        final len = remaining > _wholeFileChunkSize
+            ? _wholeFileChunkSize
+            : remaining;
+        yield Uint8List.sublistView(bytes, offset, offset + len);
+        offset += len;
+      } while (offset < bytes.length);
+    }
+
+    return replaceFileFromChunks(container, fileName, chunks());
+  }
+
+  /// Replaces [fileName] with the bytes [chunks] yields, without ever holding
+  /// the whole file in memory.
+  ///
+  /// This commits atomically by writing a sibling temp file, deleting the old
+  /// path, then renaming the temp file into place, so a failure part-way never
+  /// leaves a half-written file under the real name. That is correct for an
+  /// ordinary file, but deleting [fileName] when it is a symlink destroys the
+  /// link itself. Resolve the link first and commit against its final target
+  /// instead, just as opening a symlink for writing does on a normal
+  /// filesystem. This applies to Cryptomator's virtual links and the native
+  /// ext/NTFS links inside LUKS/VeraCrypt containers.
+  Future<bool> replaceFileFromChunks(
+    MountedContainer container,
+    String fileName,
+    Stream<Uint8List> chunks,
   ) async {
-    // This method commits atomically by writing a sibling temp file, deleting
-    // the old path, then renaming the temp file into place. That is correct
-    // for an ordinary file, but deleting [fileName] when it is a symlink
-    // destroys the link itself. Resolve the link first and commit against its
-    // final target instead, just as opening a symlink for writing does on a
-    // normal filesystem. This applies to Cryptomator's virtual links and the
-    // native ext/NTFS links inside LUKS/VeraCrypt containers.
     var writePath = fileName;
     if (mayHaveVaultSymbolicLinks(container)) {
       try {
@@ -1468,7 +1492,7 @@ class VaultFileIoApi {
         // If the no-follow probe itself failed, do not risk deleting a link
         // that we could not identify. The caller can retry after the I/O
         // error is resolved.
-        logSwallowed('writeWholeFile.resolveSymlink', e, expected: true);
+        logSwallowed('replaceFileFromChunks.resolveSymlink', e, expected: true);
         return false;
       }
     }
@@ -1477,19 +1501,31 @@ class VaultFileIoApi {
     await deleteFile(container, tmpPath);
 
     var offset = 0;
-    do {
-      final remaining = bytes.length - offset;
-      final len = remaining > _wholeFileChunkSize
-          ? _wholeFileChunkSize
-          : remaining;
-      final chunk = Uint8List.sublistView(bytes, offset, offset + len);
-      final ok = await writeFileChunk(container, tmpPath, offset, chunk);
-      if (!ok) {
-        await deleteFile(container, tmpPath);
-        return false;
+    var wroteAny = false;
+    try {
+      await for (final chunk in chunks) {
+        if (chunk.isEmpty && wroteAny) continue;
+        final ok = await writeFileChunk(container, tmpPath, offset, chunk);
+        if (!ok) {
+          await deleteFile(container, tmpPath);
+          return false;
+        }
+        wroteAny = true;
+        offset += chunk.length;
       }
-      offset += len;
-    } while (offset < bytes.length);
+      if (!wroteAny) {
+        // An empty file still has to be created.
+        final ok = await writeFileChunk(container, tmpPath, 0, Uint8List(0));
+        if (!ok) {
+          await deleteFile(container, tmpPath);
+          return false;
+        }
+      }
+    } catch (e) {
+      await deleteFile(container, tmpPath);
+      logSwallowed('replaceFileFromChunks.stream', e);
+      return false;
+    }
 
     final finished = await finishWrite(container, tmpPath);
     if (!finished) {

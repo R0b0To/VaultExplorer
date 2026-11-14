@@ -16,13 +16,18 @@ class DeviceCategoryIndexKey {
     required this.rootPath,
     required this.categoryKey,
     required this.showHidden,
+    this.showNoMedia = false,
   });
 
   final String rootPath;
   final String categoryKey;
   final bool showHidden;
 
-  String get id => '$categoryKey|${showHidden ? 1 : 0}|$rootPath';
+  /// Whether folders with a `.nomedia` marker were included; the same reason
+  /// as [showHidden] applies.
+  final bool showNoMedia;
+
+  String get id => '$categoryKey|${showHidden ? 1 : 0}${showNoMedia ? 'n' : ''}|$rootPath';
 }
 
 /// Remembers what category scans of phone storage found, and answers them
@@ -99,7 +104,9 @@ class DeviceCategoryIndex {
     bool Function(String dirPath)? skipDirectory,
   }) async {
     final api = media;
-    if (api == null || key.showHidden) return null;
+    // The platform media index leaves `.nomedia` folders out, so it cannot
+    // answer a scan that wants them.
+    if (api == null || key.showHidden || key.showNoMedia) return null;
     final rows = await api.query(
       rootPath: key.rootPath,
       extensions: extensions,

@@ -102,6 +102,10 @@ class FileManagerToolbarConfig {
   final bool showStatsBar;
   final bool showBookmarkBar;
   final bool showHiddenFiles;
+
+  /// Whether gallery and category views include folders that hold a
+  /// `.nomedia` file (the marker that asks gallery apps to ignore a folder).
+  final bool showNoMediaFolders;
   final bool showMediaCarousel;
   final bool autoStartPlaylistMode;
   final bool rememberPerFolderLayout;
@@ -201,6 +205,7 @@ class FileManagerToolbarConfig {
     this.showStatsBar = true,
     this.showBookmarkBar = false,
     this.showHiddenFiles = false,
+    this.showNoMediaFolders = false,
     this.showMediaCarousel = true,
     this.autoStartPlaylistMode = true,
     this.rememberPerFolderLayout = true,
@@ -254,6 +259,7 @@ class FileManagerToolbarConfig {
         showStatsBar: true,
         showBookmarkBar: false,
         showHiddenFiles: false,
+        showNoMediaFolders: false,
         showMediaCarousel: true,
         autoStartPlaylistMode: true,
         rememberPerFolderLayout: true,
@@ -410,6 +416,7 @@ class FileManagerToolbarConfig {
     bool? showStatsBar,
     bool? showBookmarkBar,
     bool? showHiddenFiles,
+    bool? showNoMediaFolders,
     bool? showMediaCarousel,
     bool? autoStartPlaylistMode,
     bool? rememberPerFolderLayout,
@@ -458,6 +465,7 @@ class FileManagerToolbarConfig {
         showStatsBar: showStatsBar ?? this.showStatsBar,
         showBookmarkBar: showBookmarkBar ?? this.showBookmarkBar,
         showHiddenFiles: showHiddenFiles ?? this.showHiddenFiles,
+        showNoMediaFolders: showNoMediaFolders ?? this.showNoMediaFolders,
         showMediaCarousel: showMediaCarousel ?? this.showMediaCarousel,
         autoStartPlaylistMode:
             autoStartPlaylistMode ?? this.autoStartPlaylistMode,
@@ -564,6 +572,7 @@ class FileManagerToolbarConfig {
   /// layout half travels in its `interface` section.
   static const Set<String> behaviorKeys = {
     'showHiddenFiles',
+    'showNoMediaFolders',
     'selectByIcon',
     'autoStartPlaylistMode',
     'rememberPerFolderLayout',
@@ -636,6 +645,7 @@ class FileManagerToolbarConfig {
         'showStatsBar': showStatsBar,
         'showBookmarkBar': showBookmarkBar,
         'showHiddenFiles': showHiddenFiles,
+        'showNoMediaFolders': showNoMediaFolders,
         'showMediaCarousel': showMediaCarousel,
         'autoStartPlaylistMode': autoStartPlaylistMode,
         'rememberPerFolderLayout': rememberPerFolderLayout,
@@ -819,6 +829,7 @@ class FileManagerToolbarConfig {
       showStatsBar: j['showStatsBar'] as bool? ?? true,
       showBookmarkBar: j['showBookmarkBar'] as bool? ?? false,
       showHiddenFiles: j['showHiddenFiles'] as bool? ?? false,
+      showNoMediaFolders: j['showNoMediaFolders'] as bool? ?? false,
       showMediaCarousel: j['showMediaCarousel'] as bool? ?? true,
       autoStartPlaylistMode: j['autoStartPlaylistMode'] as bool? ?? true,
       rememberPerFolderLayout: j['rememberPerFolderLayout'] as bool? ?? true,

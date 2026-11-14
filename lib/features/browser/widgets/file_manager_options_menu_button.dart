@@ -10,6 +10,7 @@ List<Widget> buildOptionsMenuItems({
   required ColorScheme cs,
   required FileManagerToolbarConfig toolbarConfig,
   required ValueChanged<bool> onToggleShowHiddenFiles,
+  ValueChanged<bool>? onToggleShowNoMediaFolders,
   required ValueChanged<bool> onToggleShowGridFileNames,
   required ValueChanged<bool> onToggleShowFileExtensions,
   required ValueChanged<bool> onToggleShowListThumbnails,
@@ -55,6 +56,14 @@ List<Widget> buildOptionsMenuItems({
       value: toolbarConfig.showHiddenFiles,
       onChanged: onToggleShowHiddenFiles,
     ),
+    // Only the gallery and category views have `.nomedia` folders to show.
+    if (onToggleShowNoMediaFolders != null)
+      toggleItem(
+        icon: Icons.folder_off_outlined,
+        label: l10n.showNoMediaFoldersLabel,
+        value: toolbarConfig.showNoMediaFolders,
+        onChanged: onToggleShowNoMediaFolders,
+      ),
     toggleItem(
       icon: Icons.title_rounded,
       label: l10n.showFileNamesLabel,
@@ -95,6 +104,7 @@ List<Widget> buildOptionsMenuItems({
 class FileManagerOptionsMenuButton extends StatefulWidget {
   final FileManagerToolbarConfig toolbarConfig;
   final ValueChanged<bool> onToggleShowHiddenFiles;
+  final ValueChanged<bool>? onToggleShowNoMediaFolders;
   final ValueChanged<bool> onToggleShowGridFileNames;
   final ValueChanged<bool> onToggleShowFileExtensions;
   final ValueChanged<bool> onToggleShowListThumbnails;
@@ -104,6 +114,7 @@ class FileManagerOptionsMenuButton extends StatefulWidget {
     super.key,
     required this.toolbarConfig,
     required this.onToggleShowHiddenFiles,
+    this.onToggleShowNoMediaFolders,
     required this.onToggleShowGridFileNames,
     required this.onToggleShowFileExtensions,
     required this.onToggleShowListThumbnails,
@@ -132,6 +143,7 @@ class _FileManagerOptionsMenuButtonState
         cs: cs,
         toolbarConfig: widget.toolbarConfig,
         onToggleShowHiddenFiles: widget.onToggleShowHiddenFiles,
+        onToggleShowNoMediaFolders: widget.onToggleShowNoMediaFolders,
         onToggleShowGridFileNames: widget.onToggleShowGridFileNames,
         onToggleShowFileExtensions: widget.onToggleShowFileExtensions,
         onToggleShowListThumbnails: widget.onToggleShowListThumbnails,

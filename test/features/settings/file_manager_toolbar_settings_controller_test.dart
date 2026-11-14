@@ -43,6 +43,10 @@ void main() {
       await controller.setShowHiddenFiles(true);
       expect(container.read(provider).config.showHiddenFiles, isTrue);
 
+      expect(container.read(provider).config.showNoMediaFolders, isFalse);
+      await controller.setShowNoMediaFolders(true);
+      expect(container.read(provider).config.showNoMediaFolders, isTrue);
+
       await controller.setShowBreadcrumbBar(false);
       expect(container.read(provider).config.showBreadcrumbBar, isFalse);
 

@@ -1,1 +1,51 @@
-{}
+{
+  "ar": [
+    "showNoMediaFilesLabel",
+    "showNoMediaFilesDesc"
+  ],
+
+  "de": [
+    "showNoMediaFilesLabel",
+    "showNoMediaFilesDesc"
+  ],
+
+  "es": [
+    "showNoMediaFilesLabel",
+    "showNoMediaFilesDesc"
+  ],
+
+  "fr": [
+    "showNoMediaFilesLabel",
+    "showNoMediaFilesDesc"
+  ],
+
+  "it": [
+    "showNoMediaFilesLabel",
+    "showNoMediaFilesDesc"
+  ],
+
+  "ja": [
+    "showNoMediaFilesLabel",
+    "showNoMediaFilesDesc"
+  ],
+
+  "ko": [
+    "showNoMediaFilesLabel",
+    "showNoMediaFilesDesc"
+  ],
+
+  "pt": [
+    "showNoMediaFilesLabel",
+    "showNoMediaFilesDesc"
+  ],
+
+  "uk": [
+    "showNoMediaFilesLabel",
+    "showNoMediaFilesDesc"
+  ],
+
+  "zh": [
+    "showNoMediaFilesLabel",
+    "showNoMediaFilesDesc"
+  ]
+}

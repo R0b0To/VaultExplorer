@@ -18,6 +18,9 @@ import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/features/audio_editor/audio_edit_providers.dart';
+import 'package:vaultexplorer/features/browser/metadata/image_metadata_editor.dart';
+import 'package:vaultexplorer/features/browser/metadata/image_metadata_reader.dart';
+import 'package:vaultexplorer/features/browser/metadata/metadata_edit_service.dart';
 import 'package:vaultexplorer/features/browser/viewer/audio_metadata_parser.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/file_info_sheet.dart'
@@ -33,6 +36,10 @@ class FileInfoState {
   final VideoProbe? videoMetadata;
   final AudioProbe? audioMetadata;
   final ParsedAudioMetadata? audioTags;
+
+  /// Every metadata tag stored in an image (Exif, GPS, XMP, IPTC, ICC...),
+  /// grouped by where it lives; null until read, empty when there is none.
+  final List<MetadataDirectory>? allMetadata;
   final String? sha256;
   final bool calculatingSha256;
   final int? folderItemCount;
@@ -45,6 +52,7 @@ class FileInfoState {
     this.videoMetadata,
     this.audioMetadata,
     this.audioTags,
+    this.allMetadata,
     this.sha256,
     this.calculatingSha256 = false,
     this.folderItemCount,
@@ -58,6 +66,7 @@ class FileInfoState {
     VideoProbe? videoMetadata,
     AudioProbe? audioMetadata,
     ParsedAudioMetadata? audioTags,
+    List<MetadataDirectory>? allMetadata,
     String? sha256,
     bool? calculatingSha256,
     int? folderItemCount,
@@ -69,6 +78,7 @@ class FileInfoState {
     videoMetadata: videoMetadata ?? this.videoMetadata,
     audioMetadata: audioMetadata ?? this.audioMetadata,
     audioTags: audioTags ?? this.audioTags,
+    allMetadata: allMetadata ?? this.allMetadata,
     sha256: sha256 ?? this.sha256,
     calculatingSha256: calculatingSha256 ?? this.calculatingSha256,
     folderItemCount: folderItemCount ?? this.folderItemCount,
@@ -169,8 +179,19 @@ class FileInfo extends _$FileInfo {
         }
       }
 
+      // Every tag the image carries, not only the camera ones above.
+      List<MetadataDirectory>? allMetadata;
+      if (!entry.isDir && ImageMetadataEditor.canEdit(entry.name) && entry.sizeBytes > 0) {
+        // Sized afresh: the entry's size is stale after a metadata edit.
+        final source = await MetadataEditService(
+          ref.read(vaultFileIoApiProvider),
+        ).openSource(container, fullPath);
+        if (source != null) allMetadata = await ImageMetadataReader.read(source);
+      }
+
       if (!ref.mounted) return;
       state = state.copyWith(
+        allMetadata: allMetadata,
         metadata: parsed,
         videoMetadata: videoMetadata,
         audioMetadata: audioMetadata,

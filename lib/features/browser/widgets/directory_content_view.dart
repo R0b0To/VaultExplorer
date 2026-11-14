@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/features/browser/metadata/metadata_edit_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
@@ -1494,6 +1495,30 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       actionOrder: _toolbarConfig.itemActionsOrder,
       hiddenActions: _toolbarConfig.hiddenItemActions,
       quickActions: _toolbarConfig.quickItemActions,
+    );
+  }
+
+  /// Tags, date and time, and metadata removal for the selected files.
+  void _editMetadata(List<RawEntry> entries) {
+    final container = widget.container;
+    unawaited(
+      showMetadataEditMenu(
+        context,
+        ref,
+        [
+          for (final e in entries)
+            MetadataEditTarget(
+              container: container,
+              path: _fullPathOf(e),
+              sizeBytes: e.sizeBytes,
+              modifiedSecs: e.modifiedSecs,
+            ),
+        ],
+        onChanged: (_) {
+          exitSelectionMode();
+          unawaited(_loadDirectoryContents(_currentDirPath, refresh: true));
+        },
+      ),
     );
   }
 
@@ -5839,6 +5864,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             onToggleShowHiddenFiles: (v) => _updateToolbarConfigField(
               (c) => c.copyWith(showHiddenFiles: v),
             ),
+            onToggleShowNoMediaFolders: (v) => _updateToolbarConfigField(
+              (c) => c.copyWith(showNoMediaFolders: v),
+            ),
             onToggleShowGridFileNames: (v) => _updateToolbarConfigField(
               (c) => c.copyWith(showGridFileNames: v),
             ),
@@ -6238,18 +6266,10 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       ),
     );
 
-    final view = View.of(context);
-    final rootNavInset = view.padding.bottom / view.devicePixelRatio;
     final hasBottomNavBar = !isLandscape && showActionBar;
-    // When the action bar is hidden (e.g. during search or when disabled in settings),
-    // the content needs to clear the system navigation bar (such as 3-button navigation).
-    // Uses paddingOf and falls back to the window's physical navigation inset.
     final bottomSystemInset = hasBottomNavBar
         ? 0.0
-        : math.max(
-            MediaQuery.paddingOf(context).bottom,
-            MediaQuery.viewInsetsOf(context).bottom == 0 ? rootNavInset : 0.0,
-          );
+        : MediaQuery.paddingOf(context).bottom;
     final baseBottomOffset =
         16.0 + (!isLandscape && showBookmarkBar ? 0.0 : bottomSystemInset);
 
@@ -6392,6 +6412,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         onShowFolderDocumentProviderSheet: _showFolderDocumentProviderSheet,
         onToggleFolderDocumentProvider: _toggleFolderDocumentProvider,
         onSyncSettings: _showSyncSettings,
+        onEditMetadata: _editMetadata,
         onSyncRoot: _showRootSyncSettings,
         onEditImage: _editImage,
         onEditVideo: _editVideo,

@@ -31,14 +31,25 @@ class CategoryIndexQueryTest {
 
     @Test
     fun `selection has one placeholder for the root and one per extension`() {
-        val sql = CategoryIndexQuery.selection("_data", 3)
+        val sql = CategoryIndexQuery.selection("_data", 3, includeNoMedia = true)
         assertEquals("_data LIKE ? AND (_data LIKE ? OR _data LIKE ? OR _data LIKE ?)", sql)
         assertEquals(4, sql.count { it == '?' })
     }
 
     @Test
+    fun `selection excludes nomedia by requiring media_type != 0 when includeNoMedia is false`() {
+        val sql = CategoryIndexQuery.selection("_data", 3, includeNoMedia = false)
+        assertEquals("_data LIKE ? AND (_data LIKE ? OR _data LIKE ? OR _data LIKE ?) AND media_type != 0", sql)
+        assertEquals(4, sql.count { it == '?' })
+    }
+
+    @Test
     fun `a single extension needs no OR`() {
-        assertEquals("_data LIKE ? AND (_data LIKE ?)", CategoryIndexQuery.selection("_data", 1))
+        assertEquals("_data LIKE ? AND (_data LIKE ?)", CategoryIndexQuery.selection("_data", 1, includeNoMedia = true))
+        assertEquals(
+            "_data LIKE ? AND (_data LIKE ?) AND media_type != 0",
+            CategoryIndexQuery.selection("_data", 1, includeNoMedia = false),
+        )
     }
 
     @Test

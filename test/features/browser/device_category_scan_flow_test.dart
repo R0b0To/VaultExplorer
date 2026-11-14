@@ -45,11 +45,13 @@ _open({
   required DeviceCategoryIndex index,
   required bool deep,
   bool showHidden = false,
+  bool showNoMedia = false,
 }) async {
   final key = DeviceCategoryIndexKey(
     rootPath: root,
     categoryKey: 'gallery',
     showHidden: showHidden,
+    showNoMedia: showNoMedia,
   );
   final seed = await index.seed(key);
   final counting = _CountingLister(
@@ -84,6 +86,7 @@ _open({
     matches: _isImage,
     isHidden: _isHidden,
     showHidden: showHidden,
+    showNoMedia: showNoMedia,
   );
   final result = await scanner.scan(
     token: CancellationToken(),
@@ -313,6 +316,47 @@ void main() {
           withHidden.shown.where((s) => s.entries.length == 3 && !s.finished),
           isEmpty,
         );
+      },
+    );
+
+    test(
+      'showing nomedia files includes files in folders with .nomedia and does not reuse seed gathered without nomedia',
+      () async {
+        final index = newIndex();
+        final withoutNoMedia = await _open(
+          root: root.path,
+          index: index,
+          deep: false,
+          showNoMedia: false,
+        );
+        expect(withoutNoMedia.result.entries.map((e) => e.path).toSet(), {
+          'DCIM/Camera/a.jpg',
+          'DCIM/Camera/b.png',
+          'Pictures/Screenshots/c.jpg',
+        });
+
+        final key = DeviceCategoryIndexKey(
+          rootPath: root.path,
+          categoryKey: 'gallery',
+          showHidden: false,
+          showNoMedia: true,
+        );
+        expect(await index.seed(key), isNull);
+
+        final withNoMedia = await _open(
+          root: root.path,
+          index: index,
+          deep: false,
+          showNoMedia: true,
+        );
+        expect(withNoMedia.result.entries.map((e) => e.path).toSet(), {
+          'DCIM/Camera/a.jpg',
+          'DCIM/Camera/b.png',
+          'Pictures/Screenshots/c.jpg',
+          'Hidden/secret.jpg',
+          'Hidden/Deeper/more.jpg',
+        });
+        expect(withNoMedia.listed, contains('Hidden/Deeper'));
       },
     );
   });

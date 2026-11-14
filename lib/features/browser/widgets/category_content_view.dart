@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:path/path.dart' as p;
+import 'package:vaultexplorer/features/browser/gallery/filter/vault_gallery_meta_storage.dart';
+import 'package:vaultexplorer/features/browser/metadata/metadata_edit_ui.dart';
 import 'package:vaultexplorer/core/api/vault_engine_events.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -59,7 +61,6 @@ import 'package:vaultexplorer/features/browser/gallery/filter/gallery_filters.da
 import 'package:vaultexplorer/features/browser/gallery/filter/gallery_grouping.dart';
 import 'package:vaultexplorer/features/browser/gallery/filter/gallery_meta.dart';
 import 'package:vaultexplorer/features/browser/gallery/filter/gallery_meta_index.dart';
-import 'package:vaultexplorer/features/browser/gallery/filter/vault_gallery_meta_storage.dart';
 import 'package:vaultexplorer/features/browser/gallery/filter/gallery_places.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/models/browser_back_policy.dart';
@@ -80,7 +81,6 @@ import 'package:vaultexplorer/features/browser/viewer/media_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/pdf_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/file_info_sheet.dart';
-import 'package:vaultexplorer/features/browser/widgets/date_group.dart';
 import 'package:vaultexplorer/features/browser/widgets/bottom_search_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/breadcrumb_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_item_drag.dart';
@@ -211,14 +211,6 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
   GalleryFilterSet? _itemsFilters;
   GalleryGroupBy? _itemsGroupBy;
   int _itemsMetaRevision = -1;
-
-  /// The sections of [_items], already in the arranged order, computed by the
-  /// same pass that arranged them (see [_groupItems]).
-  List<DateGroup<RawEntry>>? _itemGroups;
-
-  /// The last [GalleryMetaIndex.publishedRevision] this view reacted to.
-  int _seenMetaRevision = 0;
-  Timer? _scrollIdleTimer;
   int _itemsQueryHash = 0;
   int _itemsUnfilteredCount = 0;
   bool _metaWanted = false;
@@ -247,7 +239,6 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
   void initState() {
     super.initState();
     _galleryFilter.addListener(_onGalleryFilterChanged);
-    _scrollController.addListener(_onScrollActivity);
     if (widget.scopedContainer != null) {
       _containers = {widget.scopedContainer!.volId: widget.scopedContainer!};
       final initialDir = widget.initialDirPath ?? '';
@@ -295,16 +286,30 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     });
   }
 
+  bool _deactivated = false;
+
+  @override
+  void deactivate() {
+    _deactivated = true;
+    super.deactivate();
+  }
+
+  @override
+  void activate() {
+    _deactivated = false;
+    super.activate();
+  }
+
   @override
   void dispose() {
     _disposed = true;
+    _deactivated = true;
     _token?.cancel();
     _exitArmTimer?.cancel();
     _events?.removeContainerLockedListener(_onVaultLocked);
     _galleryFilter.removeListener(_onGalleryFilterChanged);
     _galleryFilter.dispose();
     _metaTimer?.cancel();
-    _scrollIdleTimer?.cancel();
     final meta = _metaIndex;
     if (meta != null) {
       meta.removeListener(_onMetaIndexChanged);
@@ -409,10 +414,9 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
   Future<void> _startScan({bool deep = false}) async {
     _token?.cancel();
     final token = _token = CancellationToken();
-    final showHidden = ref
-        .read(fileManagerToolbarSettingsProvider(null))
-        .config
-        .showHiddenFiles;
+    final toolbar = ref.read(fileManagerToolbarSettingsProvider(null)).config;
+    final showHidden = toolbar.showHiddenFiles;
+    final showNoMedia = toolbar.showNoMediaFolders;
 
     setState(() {
       _scanning = true;
@@ -440,7 +444,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       await Future.wait([
         for (final b in bundles)
           if (b.source.isVault)
-            _loadIndexSeed(api, b.container, showHidden).then((seed) {
+            _loadIndexSeed(api, b.container, showHidden, showNoMedia).then((seed) {
               if (seed != null) seeds[b.source.volId] = seed;
             }),
       ]);
@@ -454,7 +458,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     await Future.wait([
       for (final b in bundles)
         if (b.container.isRawLocal)
-          deviceIndex.seed(_deviceKey(b, showHidden)).then((seed) {
+          deviceIndex.seed(_deviceKey(b, showHidden, showNoMedia)).then((seed) {
             if (seed != null) seeds[b.source.volId] = seed;
           }),
     ]);
@@ -477,7 +481,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
               indexLookup: deep
                   ? null
                   : () => deviceIndex.lookup(
-                      _deviceKey(b, showHidden),
+                      _deviceKey(b, showHidden, showNoMedia),
                       extensions: extensions,
                       matches: matches,
                       isHidden: isHiddenEntryName,
@@ -490,12 +494,16 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
               source: b.source,
               listDirectory: (dir) => api.listDirectory(b.container, dir),
               skipDirectory: b.source.isVault ? _skipVaultMetaFolder : null,
+              // Vaults and external locations honour `.nomedia` like phone
+              // storage does; before, only phone storage did.
+              respectNoMedia: widget.category != FileCategory.documents,
               seed: seeds[b.source.volId],
             ),
       ],
       matches: matches,
       isHidden: isHiddenEntryName,
       showHidden: showHidden,
+      showNoMedia: showNoMedia,
     );
 
     final result = await scanner.scan(
@@ -510,17 +518,21 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       _snapshot = _withoutLockedVaults(result);
       _scanning = false;
     });
-    if (indexEnabled) unawaited(_saveIndex(api, bundles, result));
-    unawaited(_rememberDevice(deviceIndex, bundles, result, showHidden));
+    // A scan that includes `.nomedia` folders must not become the stored
+    // index, which the next default scan would show before it finishes.
+    if (indexEnabled && !showNoMedia) unawaited(_saveIndex(api, bundles, result));
+    unawaited(_rememberDevice(deviceIndex, bundles, result, showHidden, showNoMedia));
   }
 
   DeviceCategoryIndexKey _deviceKey(
     _CategorySourceBundle bundle,
     bool showHidden,
+    bool showNoMedia,
   ) => DeviceCategoryIndexKey(
     rootPath: bundle.container.uri,
     categoryKey: _categoryKey,
     showHidden: showHidden,
+    showNoMedia: showNoMedia,
   );
 
   /// Keeps what a finished scan found in phone storage, to show at once the
@@ -531,6 +543,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     List<_CategorySourceBundle> bundles,
     CategoryAggregateSnapshot result,
     bool showHidden,
+    bool showNoMedia,
   ) async {
     if (!result.finished || result.limitReached) return;
     for (final b in bundles) {
@@ -538,7 +551,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           result.failedSources.contains(b.source.volId)) {
         continue;
       }
-      await index.remember(_deviceKey(b, showHidden), [
+      await index.remember(_deviceKey(b, showHidden, showNoMedia), [
         for (final e in result.entries)
           if (e.sourceVolId == b.source.volId)
             RawEntry(
@@ -555,7 +568,11 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     VaultFileIoApi api,
     MountedContainer vault,
     bool showHidden,
+    bool showNoMedia,
   ) async {
+    // The stored index was gathered without `.nomedia` folders, so it cannot
+    // stand in for a scan that includes them.
+    if (showNoMedia) return null;
     try {
       final store = categoryIndexStoreFor(api, vault);
       if (store == null) return null;
@@ -657,17 +674,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     final gallery = _isGallery && !_folderMode;
     final filters = gallery ? _galleryFilter.filters : GalleryFilterSet.empty;
     final groupBy = gallery ? _galleryFilter.groupBy : GalleryGroupBy.none;
-    // Only what the photos' details can change is worth recomputing the
-    // listing for: grouping by folder or type, or no filter at all, never
-    // looks at them. The *published* revision moves in batches, not per photo.
-    final needsMeta =
-        gallery &&
-        (!filters.isEmpty ||
-            _query.trim().isNotEmpty ||
-            (groupBy != GalleryGroupBy.none &&
-                groupBy != GalleryGroupBy.folder &&
-                groupBy != GalleryGroupBy.type));
-    final metaRevision = needsMeta ? (_metaIndex?.publishedRevision ?? 0) : 0;
+    final metaRevision = gallery ? (_metaIndex?.revision ?? 0) : 0;
     final queryHash = gallery ? _query.trim().hashCode : 0;
     final placesLoaded = gallery && _places != null;
     final unchanged =
@@ -722,22 +729,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     });
 
     // Sections other than "none" need each section to be one run of the list.
-    List<DateGroup<RawEntry>>? groups;
-    if (gallery) {
-      final arranged = _galleryGrouper(groupBy).arrangeWithGroups<CategoryEntry>(
-        list,
-      );
-      list = arranged.items;
-      groups = groupBy == GalleryGroupBy.none ? null : arranged.groups;
-    }
-
-    // A refresh that changes nothing the user can see (the usual case once
-    // most dates are known) keeps the very same list, so the views neither
-    // regroup nor relayout.
-    if (_sameListing(_items, _itemGroups, list, groups)) {
-      list = _items;
-      groups = _itemGroups;
-    }
+    if (gallery) list = _galleryGrouper(groupBy).arrange<CategoryEntry>(list);
 
     if (gallery && !identical(_itemsSnapshot, _snapshot)) {
       _scheduleMetaIndexing();
@@ -757,41 +749,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     _itemsQuery = _query;
     _itemsSortBy = _sortBy;
     _itemsSortAscending = _sortAscending;
-    _itemGroups = groups;
     return _items = list;
-  }
-
-  static bool _sameListing(
-    List<CategoryEntry> a,
-    List<DateGroup<RawEntry>>? ga,
-    List<CategoryEntry> b,
-    List<DateGroup<RawEntry>>? gb,
-  ) {
-    if (identical(a, b)) return true;
-    if (a.length != b.length || (ga == null) != (gb == null)) return false;
-    for (var i = 0; i < a.length; i++) {
-      if (!identical(a[i], b[i])) return false;
-    }
-    if (ga != null && gb != null) {
-      if (ga.length != gb.length) return false;
-      for (var i = 0; i < ga.length; i++) {
-        if (ga[i].items.length != gb[i].items.length ||
-            ga[i].date != gb[i].date ||
-            ga[i].label != gb[i].label) {
-          return false;
-        }
-      }
-    }
-    return true;
-  }
-
-  /// The sections the views group their [items] by. For the list this view
-  /// arranged, they are the ones that pass already produced; anything else is
-  /// grouped on demand.
-  List<DateGroup<RawEntry>> _groupItems(List<RawEntry> items) {
-    final cached = _itemGroups;
-    if (cached != null && identical(_items, items)) return cached;
-    return _galleryGrouper(_galleryFilter.groupBy).call(items);
   }
 
   // ── Gallery filter ───────────────────────────────────────────────────────
@@ -813,39 +771,14 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
             (_thumbs[volId]?.cacheMode ?? ThumbnailCacheMode.appCache) !=
             ThumbnailCacheMode.disabled,
       ),
-      // The phone's own storage is never saved to disk, so what was read from
-      // it is kept for the app session: leaving the gallery and coming back
-      // (or toggling gallery mode) continues the scan instead of restarting it.
-      memory: GalleryMetaMemory.app,
-      retain: (volId) => _containers[volId]?.isLocalStorage ?? false,
       notifyEvery: const Duration(seconds: 1),
     );
     index.addListener(_onMetaIndexChanged);
     return index;
   }
 
-  /// The index notifies about progress every second (the filter bar and sheet
-  /// listen for that themselves) and about new details in batches. Only the
-  /// latter changes what this view lists, and re-filtering, sorting and
-  /// grouping every photo is far too much work to do for a progress tick.
   void _onMetaIndexChanged() {
-    if (!mounted || _disposed) return;
-    final published = _metaIndex?.publishedRevision ?? 0;
-    if (published == _seenMetaRevision) return;
-    _seenMetaRevision = published;
-    setState(() {});
-  }
-
-  /// Reading photo headers yields to scrolling: the reads and the listing
-  /// refresh they trigger wait until the list has been still for a moment.
-  void _onScrollActivity() {
-    final meta = _metaIndex;
-    if (meta == null) return;
-    meta.paused = true;
-    _scrollIdleTimer?.cancel();
-    _scrollIdleTimer = Timer(const Duration(milliseconds: 300), () {
-      _metaIndex?.paused = false;
-    });
+    if (mounted && !_disposed) setState(() {});
   }
 
   void _onGalleryFilterChanged() {
@@ -2116,6 +2049,37 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     callback(container, entry.path);
   }
 
+  /// Tags, date and time, and metadata removal for the selected files.
+  void _editMetadata(List<CategoryEntry> entries) {
+    final targets = <MetadataEditTarget>[
+      for (final e in entries)
+        if (!e.isDir && _containers[e.sourceVolId] != null)
+          MetadataEditTarget(
+            container: _containers[e.sourceVolId]!,
+            path: e.path,
+            sizeBytes: e.sizeBytes,
+            modifiedSecs: e.modifiedSecs,
+          ),
+    ];
+    if (targets.isEmpty) return;
+    unawaited(
+      showMetadataEditMenu(
+        context,
+        ref,
+        targets,
+        onChanged: (changed) {
+          // An edit can keep a file's size and modified time, which is what
+          // the cached metadata is checked against, so drop it explicitly.
+          for (final t in changed) {
+            _metaIndex?.invalidate(t.container.volId, t.path);
+          }
+          _clearSelection();
+          unawaited(_startScan());
+        },
+      ),
+    );
+  }
+
   void _showFileInfo(CategoryEntry entry) {
     final container = _containers[entry.sourceVolId];
     if (container == null) return;
@@ -2141,24 +2105,28 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     unawaited(copyPathToClipboard(context, path));
   }
 
-  String _sourceLabel(List<MountedContainer> mounted) {
-    final l10n = context.l10n;
+  String _sourceLabel(
+    List<MountedContainer> mountedVaults, [
+    AppLocalizations? l10n,
+  ]) {
+    final effectiveL10n = l10n ?? (mounted ? context.l10n : null);
     final scoped = widget.scopedContainer;
     if (scoped != null) {
       return _sources[scoped.volId]?.label ?? scoped.displayName;
     }
+    if (effectiveL10n == null) return '';
     switch (_source.kind) {
       case CategorySourceKind.all:
-        return l10n.categorySourceAll;
+        return effectiveL10n.categorySourceAll;
       case CategorySourceKind.device:
-        return l10n.localStorageCardTitle;
+        return effectiveL10n.localStorageCardTitle;
       case CategorySourceKind.vaults:
-        return l10n.vaultsSectionTitle;
+        return effectiveL10n.vaultsSectionTitle;
       case CategorySourceKind.vault:
-        for (final v in mounted) {
+        for (final v in mountedVaults) {
           if (v.volId == _source.volId) return v.displayName;
         }
-        return l10n.vaultsSectionTitle;
+        return effectiveL10n.vaultsSectionTitle;
     }
   }
 
@@ -2231,15 +2199,20 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
   }
 
   /// Builds breadcrumb steps linking segments to locations.
-  List<_CategoryPathStep> _buildPathSteps(CategoryLocation location) {
-    final l10n = context.l10n;
+  List<_CategoryPathStep> _buildPathSteps(
+    CategoryLocation location, [
+    AppLocalizations? l10n,
+  ]) {
+    final effectiveL10n = l10n ?? (mounted ? context.l10n : null);
     final topLocation = _snapshot.contributingSources.length == 1
         ? CategoryLocation(_snapshot.contributingSources.first, '')
         : CategoryLocation.top;
 
     final rootLabel = _scoped
         ? widget.scopedContainer!.displayName
-        : widget.category.label(l10n);
+        : (effectiveL10n != null
+            ? widget.category.label(effectiveL10n)
+            : widget.category.storageKey);
 
     final steps = <_CategoryPathStep>[
       _CategoryPathStep(
@@ -2280,8 +2253,11 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     return steps;
   }
 
-  List<PathSegment> _buildPathStack(CategoryLocation location) {
-    return _buildPathSteps(location).map((s) => s.segment).toList();
+  List<PathSegment> _buildPathStack(
+    CategoryLocation location, [
+    AppLocalizations? l10n,
+  ]) {
+    return _buildPathSteps(location, l10n).map((s) => s.segment).toList();
   }
 
   String _buildLeftTruncatedPath(
@@ -2323,21 +2299,24 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
 
   String _buildStatsSubtitle(
     List<CategoryEntry> items,
-    List<MountedContainer> mountedVaults,
-  ) {
-    final l10n = context.l10n;
-    final sourceOrCategory =
-        _scoped ? widget.category.label(l10n) : _sourceLabel(mountedVaults);
+    List<MountedContainer> mountedVaults, [
+    AppLocalizations? l10n,
+  ]) {
+    final effectiveL10n = l10n ?? (mounted ? context.l10n : null);
+    if (effectiveL10n == null) return '';
+    final sourceOrCategory = _scoped
+        ? widget.category.label(effectiveL10n)
+        : _sourceLabel(mountedVaults, effectiveL10n);
     if (_folderMode) {
       final dirCount = items.where((e) => e.isDir).length;
       final fileCount = items.where((e) => !e.isDir).length;
       final parts = <String>[];
-      if (dirCount > 0) parts.add(l10n.statsFolderCount(dirCount));
-      parts.add(l10n.statsFileCount(fileCount));
+      if (dirCount > 0) parts.add(effectiveL10n.statsFolderCount(dirCount));
+      parts.add(effectiveL10n.statsFileCount(fileCount));
       parts.add(sourceOrCategory);
       return parts.join(' · ');
     }
-    return '${l10n.statsFileCount(items.length)} · $sourceOrCategory';
+    return '${effectiveL10n.statsFileCount(items.length)} · $sourceOrCategory';
   }
 
   @override
@@ -2489,6 +2468,10 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           _updateToolbarConfig((c) => c.copyWith(showHiddenFiles: v));
           _startScan();
         },
+        onToggleShowNoMediaFolders: (v) {
+          _updateToolbarConfig((c) => c.copyWith(showNoMediaFolders: v));
+          _startScan();
+        },
         onToggleShowGridFileNames: (v) {
           _updateToolbarConfig((c) => c.copyWith(showGridFileNames: v));
         },
@@ -2546,14 +2529,21 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
 
     // 1. Regular AppBar
     PreferredSizeWidget regularAppBarFactory(BuildContext context) {
+      if (_deactivated || _disposed) {
+        return const PreferredSize(
+          preferredSize: Size.fromHeight(kToolbarHeight),
+          child: SizedBox.shrink(),
+        );
+      }
       final appBarTheme = Theme.of(context).appBarTheme;
       final cs = Theme.of(context).colorScheme;
+      final l10n = context.l10n;
       final titleStyle = Theme.of(context).textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.bold,
             color: cs.onSurface,
           ) ??
           const TextStyle(fontWeight: FontWeight.bold);
-      final pathStack = _buildPathStack(location);
+      final pathStack = _buildPathStack(location, l10n);
 
       return AppBar(
         leading: Builder(
@@ -2705,7 +2695,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
               Text(
                 _scanning
                     ? l10n.categoryScanning(_snapshot.foldersChecked)
-                    : _buildStatsSubtitle(items, mountedVaults),
+                    : _buildStatsSubtitle(items, mountedVaults, l10n),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
@@ -2731,6 +2721,13 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
 
     // 2. Selection AppBar
     PreferredSizeWidget selectionAppBarFactory(BuildContext context) {
+      if (_deactivated || _disposed) {
+        return const PreferredSize(
+          preferredSize: Size.fromHeight(kToolbarHeight),
+          child: SizedBox.shrink(),
+        );
+      }
+      final l10n = context.l10n;
       final selectedList =
           selection.items.whereType<CategoryEntry>().toList();
       final single = selectedList.length == 1 ? selectedList.single : null;
@@ -2814,6 +2811,9 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
         onFileInfo: () {
           if (single != null) _showFileInfo(single);
         },
+        onEditMetadata: selectedList.every((e) => !e.isDir)
+            ? () => _editMetadata(selectedList)
+            : null,
         onOpenWithApp: () {
           if (single != null) {
             final c = _containers[single.sourceVolId];
@@ -2969,6 +2969,10 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
                 _updateToolbarConfig((c) => c.copyWith(showHiddenFiles: v));
                 _startScan();
               },
+              onToggleShowNoMediaFolders: (v) {
+                _updateToolbarConfig((c) => c.copyWith(showNoMediaFolders: v));
+                _startScan();
+              },
               onToggleShowGridFileNames: (v) {
                 _updateToolbarConfig((c) => c.copyWith(showGridFileNames: v));
               },
@@ -3025,7 +3029,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
             ),
           if (toolbarConfig.showBreadcrumbBar && (_folderMode || _scoped))
             BreadcrumbBar(
-              stack: _buildPathStack(location),
+              stack: _buildPathStack(location, l10n),
               onTap: _onJumpTo,
               forwardStack: _forwardStack,
               onForwardTap: _onForwardTo,
@@ -3161,14 +3165,10 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
         : null;
     // The docked search bar floats over the results, so they have to clear it
     // and the keyboard it rides on, as in the file manager.
-    final view = View.of(context);
-    final rootNavInset = view.padding.bottom / view.devicePixelRatio;
     final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
-    final systemInset = keyboardInset == 0
-        ? math.max(MediaQuery.paddingOf(context).bottom, rootNavInset)
-        : 0.0;
+    final systemInset = MediaQuery.viewPaddingOf(context).bottom;
     final searchClearance = _searchActive
-        ? 64.0 + math.max(keyboardInset, systemInset)
+        ? 64.0 + (keyboardInset > systemInset ? keyboardInset : systemInset)
         : 0.0;
     final selection = ref.watch(fileBrowserSelectionProvider(widget.tabId));
 
@@ -3286,7 +3286,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
               !_folderMode &&
               _galleryFilter.groupBy != GalleryGroupBy.none,
           groupBuilder: _isGallery && !_folderMode
-              ? _groupItems
+              ? _galleryGrouper(_galleryFilter.groupBy).call
               : null,
         );
       case BrowserLayoutMode.masonry:
@@ -3333,7 +3333,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
               !_folderMode &&
               _galleryFilter.groupBy != GalleryGroupBy.none,
           groupBuilder: _isGallery && !_folderMode
-              ? _groupItems
+              ? _galleryGrouper(_galleryFilter.groupBy).call
               : null,
         );
       case BrowserLayoutMode.list:
@@ -3377,7 +3377,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
               !_folderMode &&
               _galleryFilter.groupBy != GalleryGroupBy.none,
           groupBuilder: _isGallery && !_folderMode
-              ? _groupItems
+              ? _galleryGrouper(_galleryFilter.groupBy).call
               : null,
           largeThumbnail: _isGallery,
         );

@@ -266,6 +266,8 @@ Config parsePayload(const std::string& text, const std::string& expectedCipher) 
 }
 }  // namespace
 
+void checkConfigEnvelope(const Bytes& raw) { (void)readKdf(raw); }
+
 Secret deriveCombinedKey(const Bytes& raw, const uint8_t* pw, size_t pwLen) {
     Kdf k = readKdf(raw);
     return crypto::scryptLowMem(pw, pwLen, k.salt.data(), k.salt.size(), (uint32_t)k.N, k.r, k.p, kCombinedKeySize, kScryptMemoryBudget);
@@ -822,6 +824,22 @@ std::optional<DataTree::Node> DataTree::loadNode(const BlockId& id) {
         }
     }
     return n;
+}
+
+void DataTree::walkBlocks(const BlockId& root, const std::function<void(const BlockId&, bool)>& visit) {
+    // Explicit stack: a hostile or damaged tree must not be able to exhaust the call stack. [seen] keeps a block
+    // that is (wrongly) referenced twice from being walked twice.
+    std::vector<BlockId> stack{root};
+    std::unordered_map<BlockId, bool, BlockId::Hash> seen;
+    while (!stack.empty()) {
+        BlockId id = stack.back();
+        stack.pop_back();
+        if (!seen.emplace(id, true).second) continue;
+        auto node = loadNode(id);
+        visit(id, node.has_value());
+        if (!node || node->depth == 0) continue;
+        for (auto it = node->children.rbegin(); it != node->children.rend(); ++it) stack.push_back(*it);
+    }
 }
 
 int64_t DataTree::capacity(int depth) const {

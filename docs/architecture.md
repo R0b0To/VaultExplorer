@@ -54,8 +54,12 @@ complete command-line front-end). Its seams:
 - Concurrency lives in the core: each session serialises namespace changes with
   its own `shared_mutex` and drains in-flight calls on `close()`, so the Kotlin
   `NativeVaultSession` declares `skipsPerVolumeLock` (no second lock on top).
-- Check & Repair (`foldercheck/`) still runs on the Kotlin primitives; it gets
-  the key material of a live session through `NativeVaultSession.keyMaterial()`.
+- Check & Repair of folder vaults is part of the same core (`fv_check.h`,
+  `fv_check_gocryptfs/cryptomator/cryfs.cpp`), working through the same
+  `Storage` abstraction, so it is platform-neutral like the engines. The
+  Kotlin `foldercheck/FolderVaultChecker` only picks the storage (verified
+  raw path or SAF) and maps the native result; a live session's keys are read
+  inside the native core and never reach the JVM.
 
 Both families are unified above the crypto layer by **`volId`** (an `Int`,
 `0..7`): every caller — Dart, `ContainerFileSystem`, the SAF

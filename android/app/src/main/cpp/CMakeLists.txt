@@ -455,7 +455,11 @@ add_library(foldervault_core STATIC
         foldervault/fv_cryptomator.cpp
         foldervault/fv_cryptomator_vault.cpp
         foldervault/fv_cryfs.cpp
-        foldervault/fv_cryfs_vault.cpp)
+        foldervault/fv_cryfs_vault.cpp
+        foldervault/fv_check.cpp
+        foldervault/fv_check_gocryptfs.cpp
+        foldervault/fv_check_cryptomator.cpp
+        foldervault/fv_check_cryfs.cpp)
 set_target_properties(foldervault_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_compile_features(foldervault_core PUBLIC cxx_std_20)
 target_compile_options(foldervault_core PRIVATE -Wall -Wextra)

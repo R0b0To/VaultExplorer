@@ -37,9 +37,10 @@ struct Progress {
     virtual bool cancelled() { return false; }
 };
 
-// Snapshot of the key material a live vault holds, for the Check & Repair
-// tooling that still runs in Kotlin. Format-specific layout, documented in
-// fv_vault.cpp next to each exporter.
+// Snapshot of the key material a live vault holds, for in-process tooling that
+// works next to an unlocked session (Check & Repair, fv_check.h). Hosts must
+// not forward it across a process or language boundary. Format-specific
+// layout, documented next to each exporter.
 struct KeyExport {
     VaultFormat format;
     std::vector<std::pair<std::string, Bytes>> fields;

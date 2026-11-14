@@ -20,6 +20,7 @@
 
 #include "jni_bridge_common.h"
 #include "jni_callbacks.h"
+#include "foldervault/fv_check.h"
 #include "foldervault/fv_vault.h"
 
 namespace {
@@ -771,28 +772,118 @@ FV_JNI(jobjectArray, nativeInfo)(JNIEnv* env, jclass, jlong h) {
     return arr;
 }
 
-// Key export for the Kotlin check & repair tooling: String[] of
-// "f:<name>:<base64>" and "s:<name>:<value>" entries.
-FV_JNI(jobjectArray, nativeExportKeys)(JNIEnv* env, jclass, jlong h) {
-    auto v = lookup(h);
-    if (!v) return nullptr;
-    fv::KeyExport k = v->vault->exportKeys();
+// ----------------------------------------------------------- check & repair --
+//
+// fv_check.h does the work; this only carries its inputs and result across the boundary. Both calls run on the
+// calling thread (an I/O pool thread) and return a String[]:
+//   [0]  outcome: "0" ok, "1" wrong password, "2" not a vault / refused
+//   outcome != 0:   [1] message
+//   check, ok:      [1] filesScanned, [2] deepScan "1"/"0", then repeating (severity, path, message) triples
+//   repair, ok:     [1] fixed, [2] recovered, [3] removed, then the same triples (what is still wrong)
+// [session]: handle of an unlocked vault of this same vault (0 = none). Its keys are read inside the process --
+// they never reach the JVM heap. [opId] > 0 streams the step-by-step log to the repair log panel.
+
+namespace {
+
+fv::check::Hooks checkHooks(JNIEnv* env, jint opId) {
+    fv::check::Hooks h;
+    if (opId > 0 && g_repairLogBridgeClass && g_repairLogReportMethod) {
+        // UTF-16 conversion on purpose (see the file header): paths in the log can hold emoji.
+        h.log = [env, opId](const std::string& m) {
+            jstring js = fromUtf8(env, m);
+            if (!js) return;
+            env->CallStaticVoidMethod(g_repairLogBridgeClass, g_repairLogReportMethod, opId, js);
+            env->DeleteLocalRef(js);
+            clearException(env);
+        };
+    }
+    return h;
+}
+
+void appendIssues(std::vector<std::string>& v, const std::vector<fv::check::Issue>& issues) {
+    for (const auto& i : issues) {
+        v.push_back(std::to_string((int)i.severity));
+        v.push_back(i.path);
+        v.push_back(i.message);
+    }
+}
+
+jobjectArray toStringArray(JNIEnv* env, const std::vector<std::string>& v) {
     jclass sc = env->FindClass("java/lang/String");
-    jobjectArray arr = env->NewObjectArray((jsize)(k.fields.size() + k.strings.size()), sc, nullptr);
-    jsize i = 0;
-    for (auto& f : k.fields) {
-        std::string line = "f:" + f.first + ":" + fv::base64Encode(f.second.data(), f.second.size(), false, true);
-        jstring s = fromUtf8(env, line);
-        env->SetObjectArrayElement(arr, i++, s);
-        env->DeleteLocalRef(s);
-        std::string tmp; tmp.swap(line); fv::secureZero(tmp.data(), tmp.size());
-    }
-    for (auto& s2 : k.strings) {
-        jstring s = fromUtf8(env, "s:" + s2.first + ":" + s2.second);
-        env->SetObjectArrayElement(arr, i++, s);
+    jobjectArray arr = env->NewObjectArray((jsize)v.size(), sc, nullptr);
+    for (jsize i = 0; i < (jsize)v.size(); i++) {
+        jstring s = fromUtf8(env, v[(size_t)i]);
+        env->SetObjectArrayElement(arr, i, s);
         env->DeleteLocalRef(s);
     }
-    for (auto& f : k.fields) fv::secureZero(f.second.data(), f.second.size());
     env->DeleteLocalRef(sc);
     return arr;
+}
+
+int outcomeCode(fv::check::Outcome o) {
+    return o == fv::check::Outcome::Ok ? 0 : o == fv::check::Outcome::WrongPassword ? 1 : 2;
+}
+
+bool wireFormat(jint format, fv::VaultFormat& out) {
+    switch (format) {
+        case 0: out = fv::VaultFormat::Gocryptfs; return true;
+        case 1: out = fv::VaultFormat::Cryptomator; return true;
+        case 2: out = fv::VaultFormat::Cryfs; return true;
+    }
+    return false;
+}
+
+}  // namespace
+
+FV_JNI(jobjectArray, nativeCheck)(JNIEnv* env, jclass, jint format, jstring rawRoot, jobject storageCb, jbyteArray password,
+                                  jlong session, jstring localState, jstring tempDir, jint opId) {
+    fv::VaultFormat vf;
+    if (!wireFormat(format, vf)) return toStringArray(env, {"2", "Unsupported folder vault format."});
+    PwGuard pw{toBytes(env, password)};
+    auto st = makeStorage(env, rawRoot, storageCb);
+    if (!st) return toStringArray(env, {"2", "No storage available"});
+    std::shared_ptr<Holder> holder = session != 0 ? lookup(session) : nullptr;   // kept alive for the whole call
+
+    fv::check::Credentials cr;
+    if (!pw.b.empty()) { cr.password = pw.b.data(); cr.passwordLen = pw.b.size(); }
+    cr.session = holder ? holder->vault.get() : nullptr;
+    fv::check::CheckResult r = fv::check::checkVault(vf, *st, cr, makeEnv(env, localState, tempDir), checkHooks(env, opId));
+    st->close();
+
+    std::vector<std::string> v{std::to_string(outcomeCode(r.outcome))};
+    if (r.outcome != fv::check::Outcome::Ok) {
+        v.push_back(r.message);
+    } else {
+        v.push_back(std::to_string(r.report.filesScanned));
+        v.push_back(r.report.deepScan ? "1" : "0");
+        appendIssues(v, r.report.issues);
+    }
+    return toStringArray(env, v);
+}
+
+FV_JNI(jobjectArray, nativeRepair)(JNIEnv* env, jclass, jint format, jstring rawRoot, jobject storageCb, jbyteArray password,
+                                   jlong session, jstring localState, jstring tempDir, jint opId) {
+    fv::VaultFormat vf;
+    if (!wireFormat(format, vf)) return toStringArray(env, {"2", "Unsupported folder vault format."});
+    PwGuard pw{toBytes(env, password)};
+    auto st = makeStorage(env, rawRoot, storageCb);
+    if (!st) return toStringArray(env, {"2", "No storage available"});
+    std::shared_ptr<Holder> holder = session != 0 ? lookup(session) : nullptr;
+
+    fv::check::Credentials cr;
+    if (!pw.b.empty()) { cr.password = pw.b.data(); cr.passwordLen = pw.b.size(); }
+    cr.session = holder ? holder->vault.get() : nullptr;
+    fv::check::RepairResult r = fv::check::repairVault(vf, *st, cr, makeEnv(env, localState, tempDir), checkHooks(env, opId));
+    st->close();
+
+    std::vector<std::string> v{std::to_string(outcomeCode(r.outcome))};
+    if (r.outcome != fv::check::Outcome::Ok) {
+        v.push_back(r.message);
+    } else {
+        v.push_back(std::to_string(r.report.fixed));
+        v.push_back(std::to_string(r.report.recovered));
+        v.push_back(std::to_string(r.report.removed));
+        appendIssues(v, r.report.remaining);
+    }
+    return toStringArray(env, v);
 }

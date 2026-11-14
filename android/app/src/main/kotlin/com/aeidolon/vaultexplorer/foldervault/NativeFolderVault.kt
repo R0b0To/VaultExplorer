@@ -120,6 +120,22 @@ internal object NativeFolderVault {
     /** Flat triples: key, kind ("s" | "i" | "b"), value. */
     @JvmStatic external fun nativeInfo(handle: Long): Array<String>?
 
-    /** "f:<name>:<base64>" (binary) and "s:<name>:<value>" entries; see [KeyMaterial]. */
-    @JvmStatic external fun nativeExportKeys(handle: Long): Array<String>?
+    /**
+     * Check & Repair (cpp/foldervault/fv_check.h). Both return a String[]:
+     *   [0] outcome "0" ok / "1" wrong password / "2" not a vault or refused; for anything but ok, [1] is the message
+     *   check, ok:  [1] filesScanned, [2] deep scan "1"/"0", then (severity, path, message) triples
+     *   repair, ok: [1] fixed, [2] recovered, [3] removed, then (severity, path, message) triples still wrong
+     * [password] may be null (structure-only check). [session] is the handle of an unlocked vault of the same
+     * vault, or 0; its keys are used inside the native core and never reach the JVM. [opId] > 0 streams the
+     * step-by-step log to the repair log panel.
+     */
+    @JvmStatic external fun nativeCheck(
+        format: Int, rawRoot: String?, storage: FolderVaultStorage?, password: ByteArray?, session: Long,
+        localStateDir: String, tempDir: String, opId: Int,
+    ): Array<String>?
+
+    @JvmStatic external fun nativeRepair(
+        format: Int, rawRoot: String?, storage: FolderVaultStorage?, password: ByteArray?, session: Long,
+        localStateDir: String, tempDir: String, opId: Int,
+    ): Array<String>?
 }

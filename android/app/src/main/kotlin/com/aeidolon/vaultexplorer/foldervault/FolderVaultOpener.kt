@@ -253,6 +253,46 @@ internal object FolderVaultOpener {
         }
     }
 
+    /**
+     * Runs the native Check ([repair] = false) or Repair of a folder vault (cpp/foldervault/fv_check.h) over the verified
+     * raw path when there is one, otherwise over the SAF storage -- the same choice [changePassword] makes. Returns the
+     * native result array (see [NativeFolderVault.nativeCheck]), or ["2", message] if it could not even start. The
+     * password is optional for a check; [sessionHandle] is the native handle of an unlocked vault of the same vault (0 =
+     * none), whose keys the core then uses without ever handing them to the JVM.
+     */
+    fun checkOrRepair(
+        context: Context,
+        vaultRootUri: Uri,
+        format: Int,
+        sentinel: String,
+        repair: Boolean,
+        password: CharArray?,
+        sessionHandle: Long,
+        opId: Int,
+    ): Array<String> {
+        if (!NativeFolderVault.isAvailable) return arrayOf("2", UNAVAILABLE)
+        val root = DocumentFile.fromTreeUri(context, vaultRootUri) ?: return arrayOf("2", "Cannot access the selected folder.")
+        val rawRoot = RawFileResolver.getVerifiedRawVaultRoot(context, vaultRootUri, sentinel, probeWrite = repair)
+        val storage = if (rawRoot == null) safBootstrap(context, root, vaultRootUri) else null
+        val pwBytes = password?.let { utf8(it) }
+        try {
+            val result = try {
+                if (repair) {
+                    NativeFolderVault.nativeRepair(format, rawRoot?.absolutePath, storage, pwBytes, sessionHandle, localStateDir(context), tempDir(context), opId)
+                } else {
+                    NativeFolderVault.nativeCheck(format, rawRoot?.absolutePath, storage, pwBytes, sessionHandle, localStateDir(context), tempDir(context), opId)
+                }
+            } catch (e: Throwable) {
+                VeLog.e(TAG, e) { "native ${if (repair) "repair" else "check"} crashed" }
+                return arrayOf("2", "The ${if (repair) "repair" else "check"} failed: ${e.message}")
+            }
+            return result ?: arrayOf("2", "The native engine returned no result.")
+        } finally {
+            pwBytes?.fill(0)
+            storage?.close()
+        }
+    }
+
     fun changePassword(
         context: Context,
         vaultRootUri: Uri,

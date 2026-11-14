@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <array>
 #include <cstring>
+#include <functional>
 #include <atomic>
 #include <list>
 #include <map>
@@ -56,6 +57,10 @@ struct Config {
 };
 
 constexpr size_t kCombinedKeySize = 88;   // 32 (outer) + 56 (inner, max)
+
+// Password-free structural check of the outer cryfs.config envelope (header string, KDF parameter block).
+// Throws Error(InvalidVault) with a human-readable reason.
+void checkConfigEnvelope(const Bytes& rawConfig);
 
 // Throws Error(InvalidVault / Unsupported / WrongPassword).
 Secret deriveCombinedKey(const Bytes& rawConfig, const uint8_t* pw, size_t pwLen);
@@ -178,6 +183,10 @@ public:
     void deleteSubtrees(const std::vector<BlockId>& kids, int depth);
 
     void deleteBlob(const BlockId& root);
+    // Loads every block of the blob rooted at [root] (decrypting and authenticating each) and reports, per block
+    // id, whether it could be loaded. The children of a block that cannot be loaded are unknown and not visited.
+    // [visit] runs right after each load, so BlockStore::lastViolation() still describes that block.
+    void walkBlocks(const BlockId& root, const std::function<void(const BlockId&, bool loaded)>& visit);
     void patchFirstLeafBytes(const BlockId& root, size_t offset, const uint8_t* bytes, size_t n);
     size_t maxLeafPayload() const { return maxLeaf_; }
     // Upstream CryFS refuses to load inner nodes deeper than this, so a bigger blob could never be read back by it.

@@ -464,11 +464,12 @@ FV_JNI(void, nativeInit)(JNIEnv* env, jclass) {
 }
 
 // format: 0 gocryptfs, 1 cryptomator, 2 cryfs.  Returns a handle (> 0), or
-// 0 = invalid vault, -1 = wrong password; out[0] = message, out[1] = CryFS
+// 0 = invalid vault, -1 = wrong password, -2 = CryFS single-client mode needs the user's consent (retry with
+// disableSingleClientMode); out[0] = message, out[1] = CryFS
 // derived key bytes.
 FV_JNI(jlong, nativeOpen)(JNIEnv* env, jclass, jint format, jstring rawRoot, jobject bootstrap, jobject sessionProvider,
-                          jbyteArray password, jboolean readOnly, jboolean backupKeyFiles, jstring localState,
-                          jstring tempDir, jbyteArray combinedKey, jobjectArray out) {
+                          jbyteArray password, jboolean readOnly, jboolean backupKeyFiles, jboolean disableSingleClientMode,
+                          jstring localState, jstring tempDir, jbyteArray combinedKey, jobjectArray out) {
     PwGuard pw{toBytes(env, password)};
     PwGuard ck{toBytes(env, combinedKey)};
     auto st = makeStorage(env, rawRoot, bootstrap);
@@ -476,6 +477,8 @@ FV_JNI(jlong, nativeOpen)(JNIEnv* env, jclass, jint format, jstring rawRoot, job
     fv::HostEnv henv = makeEnv(env, localState, tempDir);
     // Only Cryptomator reads this; the other formats ignore it.
     henv.backupKeyFilesOnOpen = backupKeyFiles == JNI_TRUE;
+    // Only CryFS reads this: the user agreed to turn off single-client mode for a vault locked to another device.
+    henv.cryfsDisableSingleClientMode = disableSingleClientMode == JNI_TRUE;
 
     fv::StorageFactory factory;
     jobject provider = sessionProvider ? env->NewGlobalRef(sessionProvider) : nullptr;
@@ -518,6 +521,7 @@ FV_JNI(jlong, nativeOpen)(JNIEnv* env, jclass, jint format, jstring rawRoot, job
     if (provider) env->DeleteGlobalRef(provider);
     if (r.status != fv::OpenStatus::Ok || !r.vault) {
         setOut(env, out, 0, fromUtf8(env, r.message));
+        if (r.status == fv::OpenStatus::SingleClientMode) return -2;
         return r.status == fv::OpenStatus::WrongPassword ? -1 : 0;
     }
     if (!r.derivedKey.empty()) setOut(env, out, 1, fromBytes(env, r.derivedKey.data(), r.derivedKey.size()));
@@ -530,7 +534,7 @@ FV_JNI(jlong, nativeOpen)(JNIEnv* env, jclass, jint format, jstring rawRoot, job
 }
 
 // options: gocryptfs [cipher 0..2, plaintextNames 0/1, deterministicNames 0/1, longNameMax 0|62..255]
-// (the last two are optional, older callers pass two); cryfs [blocksize, 0]; cipherName for cryfs.
+// (the last two are optional, older callers pass two); cryfs [blocksize, scryptLogN (0 = default)]; cipherName for cryfs.
 // Returns fv::OpenStatus as int (0 Ok, 1 WrongPassword, 2 InvalidVault); out[0] = message.
 FV_JNI(jint, nativeCreate)(JNIEnv* env, jclass, jint format, jstring rawRoot, jobject storageCb, jbyteArray password,
                            jintArray options, jstring cipherName, jstring localState, jstring tempDir,
@@ -559,6 +563,7 @@ FV_JNI(jint, nativeCreate)(JNIEnv* env, jclass, jint format, jstring rawRoot, jo
         std::string cn = toUtf8(env, cipherName);
         if (!cn.empty()) o.cipher = cn;
         if (opt[0] > 0) o.blocksizeBytes = opt[0];
+        if (opt[1] > 0) o.scryptLogN = opt[1];   // 0 = app default
         r = fv::createCryfs(*st, pw.b.data(), pw.b.size(), o, makeEnv(env, localState, tempDir));
     }
     st->close();

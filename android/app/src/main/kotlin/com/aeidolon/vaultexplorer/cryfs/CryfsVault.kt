@@ -26,17 +26,23 @@ object CryfsVault {
         return saf.childOf(root, CONFIG_FILE_NAME) != null
     }
 
-    fun open(context: Context, vaultRootUri: Uri, password: CharArray, readOnly: Boolean): VaultOpenResult<CryfsSession> =
+    fun open(
+        context: Context, vaultRootUri: Uri, password: CharArray, readOnly: Boolean,
+        disableSingleClientMode: Boolean = false,
+    ): VaultOpenResult<CryfsSession> =
         FolderVaultOpener.open(
             context, vaultRootUri, NativeFolderVault.CRYFS, CONFIG_FILE_NAME, password, null, readOnly,
+            disableSingleClientMode = disableSingleClientMode,
         ) { handle, volRef -> CryfsSession(context, vaultRootUri, handle, readOnly, volRef) }
 
     /** Fast path: reopen with the scrypt output a previous [open] returned as `derivedKey`. */
     fun openWithCombinedKey(
         context: Context, vaultRootUri: Uri, combinedKey: ByteArray, readOnly: Boolean,
+        disableSingleClientMode: Boolean = false,
     ): VaultOpenResult<CryfsSession> =
         FolderVaultOpener.open(
             context, vaultRootUri, NativeFolderVault.CRYFS, CONFIG_FILE_NAME, null, combinedKey, readOnly,
+            disableSingleClientMode = disableSingleClientMode,
         ) { handle, volRef -> CryfsSession(context, vaultRootUri, handle, readOnly, volRef) }
 
     fun create(
@@ -46,10 +52,11 @@ object CryfsVault {
         cipher: String = CryfsConfigFile.DEFAULT_BLOCK_CIPHER,
         blocksizeBytes: Int = CryfsConfigFile.DEFAULT_BLOCKSIZE,
         userEntropy: ByteArray? = null,
+        scryptLogN: Int = 0,
     ): VaultOpenResult<CryfsSession> =
         FolderVaultOpener.create(
             context, vaultRootUri, NativeFolderVault.CRYFS, CONFIG_FILE_NAME, password,
-            intArrayOf(blocksizeBytes, 0), cipher, userEntropy,
+            intArrayOf(blocksizeBytes, scryptLogN), cipher, userEntropy,
         ) { handle, volRef -> CryfsSession(context, vaultRootUri, handle, false, volRef) }
 
     fun changePassword(

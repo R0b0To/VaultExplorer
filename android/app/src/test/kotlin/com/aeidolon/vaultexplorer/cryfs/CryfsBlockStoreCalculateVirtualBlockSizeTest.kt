@@ -41,4 +41,15 @@ class CryfsBlockStoreCalculateVirtualBlockSizeTest {
         // rather than overclaims.
         assertEquals(4010, CryfsBlockStore.calculateVirtualBlockSize(4096, "some-future-cipher"))
     }
+
+    @Test
+    fun `the other ciphers of official CryFS use the same overhead as AES in their mode`() {
+        // twofish/serpent/cast-256/mars: IV(16) + tag(16) for -gcm, IV(16) for -cfb (all 128-bit-block ciphers)
+        for (name in CryfsConfigFile.LEGACY_CIPHER_KEY_BYTES.keys) {
+            val expected = if (name.endsWith("-gcm")) 4018 else 4034
+            assertEquals(name, expected, CryfsBlockStore.calculateVirtualBlockSize(4096, name))
+        }
+        assertEquals(16, CryfsConfigFile.LEGACY_CIPHER_KEY_BYTES.size)
+        assertEquals(56, CryfsConfigFile.LEGACY_CIPHER_KEY_BYTES["mars-448-gcm"])
+    }
 }

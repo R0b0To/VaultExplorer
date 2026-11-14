@@ -88,6 +88,7 @@ internal object FolderVaultOpener {
         combinedKey: ByteArray?,
         readOnly: Boolean,
         backupKeyFiles: Boolean = true,
+        disableSingleClientMode: Boolean = false,
         makeSession: (handle: Long, volRef: AtomicInteger) -> S,
     ): VaultOpenResult<S> {
         if (!NativeFolderVault.isAvailable) return VaultOpenResult.InvalidVault(UNAVAILABLE)
@@ -108,7 +109,7 @@ internal object FolderVaultOpener {
         try {
             val handle = try {
                 NativeFolderVault.nativeOpen(
-                    format, rawRoot?.absolutePath, bootstrap, provider, pw, readOnly, backupKeyFiles,
+                    format, rawRoot?.absolutePath, bootstrap, provider, pw, readOnly, backupKeyFiles, disableSingleClientMode,
                     localStateDir(context), tempDir(context), combinedKey, out,
                 )
             } catch (e: Throwable) {
@@ -120,6 +121,11 @@ internal object FolderVaultOpener {
                     val session = makeSession(handle, volRef)
                     VaultOpenResult.Success(session, root.name ?: "Vault", out[1] as? ByteArray)
                 }
+                handle == NativeFolderVault.SINGLE_CLIENT_MODE ->
+                    VaultOpenResult.InvalidVault(
+                        message(out, "This vault is in single-client mode for another device."),
+                        NativeFolderVault.CODE_SINGLE_CLIENT_MODE,
+                    )
                 handle < 0L -> VaultOpenResult.WrongPassword
                 else -> {
                     val msg = message(out, "Could not open vault.")

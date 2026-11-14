@@ -268,6 +268,12 @@ class CryfsBlockStore(
     }
 
     override fun remove(id: CryfsBlockId): Boolean {
+        val removed = removeFile(id)
+        if (removed) integrityState.markDeleted(id)
+        return removed
+    }
+
+    private fun removeFile(id: CryfsBlockId): Boolean {
         synchronized(decryptedCache) { decryptedCache.remove(id.hex) }
         if (rawRootFolder != null) {
             val file = blockFile(id) ?: return false
@@ -328,7 +334,8 @@ class CryfsBlockStore(
                 "xchacha20-poly1305" -> 40
                 "aes-256-gcm", "aes-128-gcm" -> 32
                 "aes-256-cfb", "aes-128-cfb" -> 16
-                else -> 40
+                // twofish/serpent/cast-256/mars: IV(16) [+ tag(16) for -gcm]
+                else -> if (cipherName in CryfsConfigFile.LEGACY_CIPHER_KEY_BYTES) (if (cipherName.endsWith("-gcm")) 32 else 16) else 40
             }
             val totalOverhead = ON_DISK_HEADER.size + ENCRYPTED_LAYER_HEADER.size + cipherOverhead + INTEGRITY_HEADER_SIZE
             return physicalBlockSize - totalOverhead

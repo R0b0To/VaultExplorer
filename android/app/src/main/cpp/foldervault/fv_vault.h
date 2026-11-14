@@ -123,7 +123,9 @@ public:
 // is known to be right. May throw fv::Error. Empty = keep the bootstrap.
 using StorageFactory = std::function<std::shared_ptr<Storage>()>;
 
-enum class OpenStatus { Ok, WrongPassword, InvalidVault };
+// SingleClientMode (CryFS only): the vault is locked to another device's client id ("single-client mode") and
+// this was a read-write open without HostEnv::cryfsDisableSingleClientMode. Nothing has been changed.
+enum class OpenStatus { Ok, WrongPassword, InvalidVault, SingleClientMode };
 
 struct OpenResult {
     OpenStatus status = OpenStatus::InvalidVault;
@@ -151,6 +153,9 @@ struct HostEnv {
     // effort: an existing backup is verified, never overwritten, and a failure never blocks the unlock.
     // One file per distinct content, so this only ever adds a file when the original changed.
     bool backupKeyFilesOnOpen = true;
+    // CryFS, read-write opens only: the user agreed to turn off single-client mode for a vault that was locked to
+    // another device. Like official CryFS, the lock is then removed from cryfs.config.
+    bool cryfsDisableSingleClientMode = false;
 };
 
 enum class GocryptfsCipher { Aes256Gcm, XChaCha20Poly1305, AesSiv };
@@ -178,6 +183,9 @@ struct GocryptfsCreateOptions {
 struct CryfsCreateOptions {
     std::string cipher = "xchacha20-poly1305";
     int blocksizeBytes = 32 * 1024;
+    // scrypt cost recorded in cryfs.config (official CryFS reads any value). 0 = the app default
+    // (N=2^17, r=8, p=2 -- official C++ CryFS uses N=2^20, r=4, p=8).
+    int scryptLogN = 0, scryptR = 0, scryptP = 0;
 };
 
 // [password] is raw UTF-8 bytes. The caller keeps ownership and wipes it.

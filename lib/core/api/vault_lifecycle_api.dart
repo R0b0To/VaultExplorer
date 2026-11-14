@@ -1002,6 +1002,13 @@ class VaultLifecycleApi {
     bool readOnly = false,
     Uint8List? preservedKey,
     bool cacheDerivedKey = false,
+
+    /// Set only after the user agreed to turn off "single-client mode" -- a lock
+    /// another device put on the vault. Without it, a read-write unlock of such
+    /// a vault fails with a `SINGLE_CLIENT_MODE` [PlatformException] (read-only
+    /// unlocks are allowed). Like official CryFS, agreeing removes the lock from
+    /// the vault's config for every client.
+    bool disableSingleClientMode = false,
   }) async {
     final raw = await _channel
         .invokeMethod<Map<Object?, Object?>>(ChannelMethods.unlockCryfsVault, {
@@ -1013,6 +1020,7 @@ class VaultLifecycleApi {
           'readOnly': readOnly,
           if (preservedKey != null) 'preservedKey': base64Encode(preservedKey),
           'cacheDerivedKey': cacheDerivedKey,
+          if (disableSingleClientMode) 'disableSingleClientMode': true,
         });
     if (raw == null) return null;
 

@@ -17,6 +17,12 @@ internal object NativeFolderVault {
     const val CRYPTOMATOR = 1
     const val CRYFS = 2
 
+    /** [nativeOpen] result: CryFS vault is in single-client mode for another device; needs the user's consent. */
+    const val SINGLE_CLIENT_MODE = -2L
+
+    /** Error code Dart receives (instead of INVALID_VAULT) for [SINGLE_CLIENT_MODE]. */
+    const val CODE_SINGLE_CLIENT_MODE = "SINGLE_CLIENT_MODE"
+
     // Result codes of nativeCreate / nativeChangePassword.
     const val STATUS_OK = 0
     const val STATUS_WRONG_PASSWORD = 1
@@ -38,17 +44,21 @@ internal object NativeFolderVault {
      * been verified, for the storage the session will actually run on (the SAF
      * mirror is only worth building once the password is known to be right).
      *
-     * Returns a handle > 0, 0 for "not a valid vault", -1 for "wrong password".
+     * Returns a handle > 0, 0 for "not a valid vault", -1 for "wrong password", [SINGLE_CLIENT_MODE] when a
+     * CryFS vault is locked to another device and the user has not yet agreed (see [disableSingleClientMode]).
      * out[0] receives the failure message, out[1] the CryFS derived key.
      *
      * [backupKeyFiles] only matters for Cryptomator (the `.bkup` copies of the key files on a read-write
      * unlock); the other formats ignore it.
+     *
+     * [disableSingleClientMode] only matters for CryFS read-write opens: the user agreed to remove the
+     * "single-client mode" lock another device put on the vault (official CryFS asks the same question).
      */
     @JvmStatic external fun nativeOpen(
         format: Int, rawRoot: String?, bootstrap: FolderVaultStorage?,
         sessionProvider: FolderVaultSessionProvider?, password: ByteArray, readOnly: Boolean,
-        backupKeyFiles: Boolean, localStateDir: String, tempDir: String, combinedKey: ByteArray?,
-        out: Array<Any?>,
+        backupKeyFiles: Boolean, disableSingleClientMode: Boolean, localStateDir: String, tempDir: String,
+        combinedKey: ByteArray?, out: Array<Any?>,
     ): Long
 
     /**

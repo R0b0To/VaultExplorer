@@ -2,6 +2,7 @@
 //   Known-answer vectors were produced with Python's `cryptography` package
 //   (an independent implementation); the format engines are additionally
 //   checked against the real gocryptfs / Cryptomator / CryFS in test/interop.
+#include "crypto/scrypt.h"
 #include <cctype>
 #include <filesystem>
 #include <atomic>
@@ -1049,11 +1050,397 @@ static void testCryptomatorMigration() {
     }
 }
 
+
+// ---------------------------------------------------------------------------------------------------------------
+// CryFS interoperability behaviour: format gate, single-client mode, canonical block names, timestamps, integrity.
+// ---------------------------------------------------------------------------------------------------------------
+static bool hasLowerHex(const std::string& s) { for (char c : s) if (c >= 'a' && c <= 'f') return true; return false; }
+
+static int countLowercaseBlockPaths(const std::string& root) {
+    int n = 0;
+    walkFiles(root, [&](const std::string& p, off_t) {
+        std::string rel = p.substr(root.size() + 1);
+        if (rel == "cryfs.config") return;
+        if (hasLowerHex(rel)) n++;
+    });
+    return n;
+}
+
+static void lowercaseAllBlocks(const std::string& root) {
+    std::vector<std::string> files;
+    walkFiles(root, [&](const std::string& p, off_t) { if (p.find("cryfs.config") == std::string::npos) files.push_back(p); });
+    for (auto& f : files) {
+        std::string dir = f.substr(0, f.rfind('/')), nm = f.substr(f.rfind('/') + 1);
+        for (auto& c : nm) c = (char)tolower(c);
+        ::rename(f.c_str(), (dir + "/" + nm).c_str());
+    }
+    DIR* d = opendir(root.c_str());
+    std::vector<std::string> shards;
+    while (auto* e = readdir(d)) { std::string n = e->d_name; if (n.size() == 3 && n != "." && n != "..") shards.push_back(n); }
+    closedir(d);
+    for (auto& s : shards) {
+        std::string l = s; for (auto& c : l) c = (char)tolower(c);
+        ::rename((root + "/" + s).c_str(), (root + "/" + l + ".tmp").c_str());
+        ::rename((root + "/" + l + ".tmp").c_str(), (root + "/" + l).c_str());
+    }
+}
+
+// Known answers produced by Crypto++ 8.9.0 (the library official CryFS 1.x used) for the ciphers the C++ release
+// offers beyond AES/XChaCha: key[i] = 7i+3, IV[i] = 5i+11, plaintext[i] = 3i+1 (37 bytes, so a partial last block).
+// Layout: IV(16) || ciphertext [|| 16-byte GCM tag]. Regenerate with test/cryfs_cipher_kat_gen.cpp (needs Crypto++); test/cryfs_cipher_oracle.cpp cross-checks exhaustively.
+static void testCryfsLegacyCiphers() {
+    std::printf("cryfs: twofish/serpent/cast-256/mars (known answers from Crypto++)\n");
+    struct Kat { const char* name; const char* keyHex; const char* ctHex; };
+    static const Kat kats[] = {
+        {"twofish-256-gcm", "030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dc",
+         "0b10151a1f24292e33383d42474c51562da403e07cd3c7ec607efb4a40879b2d8405a4fdf16df8510ae1d7441b2d198d467f51c8f729918e876057f1ed292e99fbdd69626d"},
+        {"twofish-256-cfb", "030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dc",
+         "0b10151a1f24292e33383d42474c5156376915f3e7df0f79c680cb40967576f81998d9f1303d14ed1bc8f3f5df72676628d5415c8c"},
+        {"twofish-128-gcm", "030a11181f262d343b424950575e656c",
+         "0b10151a1f24292e33383d42474c51569ebc23cf9a7414b5ea461745ac155fd8fd0490c73b6c350ac872aac05717deb843b79cb63404004e16d429271f644496bf02f8e351"},
+        {"twofish-128-cfb", "030a11181f262d343b424950575e656c",
+         "0b10151a1f24292e33383d42474c5156a77bb02212d7e88c417db38e54cd218c8a076941705060b59a5e99d5f7de1cbaeb3c470027"},
+        {"serpent-256-gcm", "030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dc",
+         "0b10151a1f24292e33383d42474c5156383df70d1acc34fe809e1120ecfd41aeab7e3af761ab0617f2f439672cb6947a74a7dcb3a4aeee564d7ac8047d480e6438746ee1bf"},
+        {"serpent-256-cfb", "030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dc",
+         "0b10151a1f24292e33383d42474c5156df94eac53ec6a02cb6cfcefc5269269de8d9361b4ff10d162320dea97dc9a34ec9791c8cee"},
+        {"serpent-128-gcm", "030a11181f262d343b424950575e656c",
+         "0b10151a1f24292e33383d42474c515661961873c0657c4b6ad371aaefcc1c94a2de1c15f5f55f370a4af62ae19f7e8414260ad8c13f9daf1b00dde9c15d88cf8e6d68482a"},
+        {"serpent-128-cfb", "030a11181f262d343b424950575e656c",
+         "0b10151a1f24292e33383d42474c5156e3e1f591920449c9ab3245c6ee2539d80789f725706e4f73c8ffaf391784ca99af56d6310e"},
+        {"cast-256-gcm", "030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dc",
+         "0b10151a1f24292e33383d42474c515615898eadcbf024d088055d471888887ab9d93488e7d15ac95062dc09cc6ad0a109cb2f3f8ae27a8af1b01c0421c8b18d0219bf3d7d"},
+        {"cast-256-cfb", "030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dc",
+         "0b10151a1f24292e33383d42474c5156029f308f2515d7c55a4bc2849495fbaa9b3269c0a91c5d3b1da73edd2f8da1c4f22bdeeffe"},
+        {"mars-256-gcm", "030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dc",
+         "0b10151a1f24292e33383d42474c5156a72feec39f7a4ed8970c531afb68909c8532e8499ab2b71cbc738882eaf5ede29efc0775c93e8101e328341afe88faa9291516e99f"},
+        {"mars-256-cfb", "030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dc",
+         "0b10151a1f24292e33383d42474c51563b195dcc299d50cf934da687f62e7ccc502c1a79355b659b95915dd4260e1a88a2a7c31dd8"},
+        {"mars-448-gcm", "030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3eaf1f8ff060d141b222930373e454c535a61686f767d84",
+         "0b10151a1f24292e33383d42474c5156bae3f95f7287f142ef17b2c7a176ed9871f2109b38a16112df8deefc71e62584505b6aeb1091f41c257c8e27f254437e4eea052691"},
+        {"mars-448-cfb", "030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3eaf1f8ff060d141b222930373e454c535a61686f767d84",
+         "0b10151a1f24292e33383d42474c515632abab441519c50b954f5f285a3f9efe448027f157d664244b078639eda41be2363d41972f"},
+        {"mars-128-gcm", "030a11181f262d343b424950575e656c",
+         "0b10151a1f24292e33383d42474c5156dd9cafba997d3de1e8e04eba46c59c147b716b5a2681f0205c42abdf24630460d7def01f64ab1edff5e9837cf25ace657b83638eb8"},
+        {"mars-128-cfb", "030a11181f262d343b424950575e656c",
+         "0b10151a1f24292e33383d42474c51562a4e17217427a7024c04355ef295541c6cfb742752f2fc847b7509a216b4a3abc18dd67c99"},
+    };
+    auto unhex = [](const char* h) { Bytes b; fromHex(h, b); return b; };
+    Bytes pt(37); for (size_t i = 0; i < pt.size(); i++) pt[i] = (uint8_t)(3 * i + 1);
+    for (const auto& k : kats) {
+        CryfsCipherId id = cryfsCipherIdFromName(k.name);
+        CHECK(id != CryfsCipherId::kUnknown);
+        Bytes key = unhex(k.keyHex), ct = unhex(k.ctHex), out;
+        CHECK_EQ((long)key.size(), (long)cryfsCipherKeyBytes(id));
+        CHECK(cryfsBlockDecrypt(id, key.data(), key.size(), ct.data(), ct.size(), out));   // Crypto++ -> this app
+        CHECK(out == pt);
+        CHECK_EQ(cryfsBlockCleartextSize(id, ct.size()), (long)pt.size());
+        CHECK_EQ((long)ct.size() - (long)pt.size(), cryfsCipherOverheadBytes(id));
+        Bytes mine = cryfsBlockEncrypt(id, key.data(), key.size(), pt.data(), pt.size());  // random IV: round-trip
+        CHECK_EQ(mine.size(), ct.size());
+        Bytes back;
+        CHECK(cryfsBlockDecrypt(id, key.data(), key.size(), mine.data(), mine.size(), back));
+        CHECK(back == pt);
+        if (std::string(k.name).find("-gcm") != std::string::npos) {                      // authenticated modes reject tampering
+            Bytes bad = ct; bad[20] ^= 1;
+            Bytes sink; CHECK(!cryfsBlockDecrypt(id, key.data(), key.size(), bad.data(), bad.size(), sink));
+        }
+        Bytes shortKey(key.begin(), key.end() - 4);
+        CHECK(cryfsBlockEncrypt(id, shortKey.data(), shortKey.size(), pt.data(), pt.size()).empty());   // wrong key size
+    }
+}
+
+static std::string hexOf(const Bytes& b) { return toHex(b.data(), b.size()); }
+
+static void testScryptLowMem() {
+    std::printf("scrypt: low-memory variant matches reference output\n");
+    struct Case { const char* pw; const char* salt; uint32_t N, r, p; size_t len; const char* want; };
+    // Expected values come from OpenSSL's scrypt (Python hashlib.scrypt), i.e. independent of this code base.
+    const Case cases[] = {
+        {"pw", "salt", 1024, 8, 2, 32, "4f2c2a6104b12e0c6e8c68f18654c503092d880124c2c3430a48c183e0b52abc"},
+        {"correct horse", "NaCl0123456789", 1u << 15, 8, 1, 88, "35e1d9bd1901b3ff8a2a314b356e36b6e91d42d45cc3118652d5ff3c38649633a3ce367298f7cfdd50c7b919b227d20d797379ee2c7c4495b0b9f8a5481895f68d1a0b4643412ad647b3e67464e0e97457060d806f47b188"},
+        {"", "s", 4096, 1, 3, 16, "0baa4cef09a7e4e529255e5f1edcbb8e"},
+    };
+    for (const auto& c : cases) {
+        const size_t full = 128 * (size_t)c.r * c.N;
+        for (size_t budget : {full, full / 2, full / 4, full / 64}) {    // strides 1, 2, 4, 64
+            Bytes out(c.len);
+            CHECK(scrypt_crypto_lowmem((const uint8_t*)c.pw, strlen(c.pw), (const uint8_t*)c.salt, strlen(c.salt), c.N, c.r, c.p, out.data(), c.len, budget));
+            CHECK(hexOf(out) == c.want);
+        }
+        Bytes std_(c.len);
+        CHECK(scrypt_crypto((const uint8_t*)c.pw, strlen(c.pw), (const uint8_t*)c.salt, strlen(c.salt), c.N, c.r, c.p, std_.data(), c.len));
+        CHECK(hexOf(std_) == c.want);
+    }
+    // The shared scrypt keeps its 512 MiB guard for other formats; a 1 GiB request is refused up front.
+    Bytes out(32);
+    CHECK(!scrypt_crypto((const uint8_t*)"x", 1, (const uint8_t*)"y", 1, 1u << 20, 8, 1, out.data(), 32));
+    // A budget too small even for the strided layout is rejected, not crashed on.
+    CHECK(!scrypt_crypto_lowmem((const uint8_t*)"x", 1, (const uint8_t*)"y", 1, 1u << 10, 8, 1, out.data(), 32, 64));
+}
+
+// PosixStorage that counts directory listings below the vault root (the root listing is the cheap one).
+struct ShardListCountingStorage : PosixStorage {
+    using PosixStorage::PosixStorage;
+    int shardLists = 0;
+    bool list(const std::string& dir, std::vector<DirEntry>& out) override {
+        if (!dir.empty()) shardLists++;
+        return PosixStorage::list(dir, out);
+    }
+};
+
+static void testCryfsCompat() {
+    std::printf("cryfs compat: format gate / single-client / block names / timestamps / integrity\n");
+    const uint8_t pw[] = "secret";
+    TmpDir t; std::string root = t.sub("v"); HostEnv env; env.cryfsLocalStateDir = t.sub("state"); env.tempDir = t.path;
+    auto st = std::make_shared<PosixStorage>(root);
+    CryfsCreateOptions o; o.blocksizeBytes = 4096; o.scryptLogN = 10; o.scryptR = 8; o.scryptP = 1;
+    CHECK(createCryfs(*st, pw, 6, o, env).status == OpenStatus::Ok);
+
+    auto readCfg = [&]() {
+        Bytes raw; st->readWhole("cryfs.config", raw);
+        return cryfs::parseWithCombinedKey(raw, cryfs::deriveCombinedKey(raw, pw, 6));
+    };
+    // Always edits from the pristine baseline: a config with a bad version cannot be parsed again (by design).
+    Bytes baseRaw; st->readWhole("cryfs.config", baseRaw);
+    const Secret baseKey = cryfs::deriveCombinedKey(baseRaw, pw, 6);
+    const cryfs::Config baseCfg = cryfs::parseWithCombinedKey(baseRaw, baseKey);
+    auto editCfg = [&](const std::function<void(cryfs::Config&)>& edit) {
+        cryfs::Config cfg = baseCfg;
+        edit(cfg);
+        Bytes nb = cryfs::rebuildConfigKeepingKey(baseRaw, baseKey, cfg);
+        CHECK(st->writeWholeAtomic("cryfs.config", nb.data(), nb.size()));
+    };
+    auto openOk = [&](bool ro, const HostEnv& e) {
+        auto r = openCryfs(st, pw, 6, ro, e); CHECK(r.status == OpenStatus::Ok); if (r.vault) r.vault->close(); };
+
+    // ---- format version gate (upstream accepts exactly 0.10)
+    CHECK_EQ(cryfs::compareFormatVersion("0.9", "0.10"), -1);
+    CHECK_EQ(cryfs::compareFormatVersion("0.10", "0.10.0"), 0);
+    CHECK_EQ(cryfs::compareFormatVersion("1.0.3", "0.10"), 1);
+    { bool threw = false; try { cryfs::compareFormatVersion("abc", "0.10"); } catch (const Error&) { threw = true; } CHECK(threw); }
+    editCfg([](cryfs::Config& c) { c.formatVersion = "0.9"; });
+    { auto r = openCryfs(st, pw, 6, false, env); CHECK(r.status == OpenStatus::InvalidVault); CHECK(!r.vault); CHECK(r.message.find("older") != std::string::npos); }
+    editCfg([](cryfs::Config& c) { c.formatVersion = "0.11"; });
+    { auto r = openCryfs(st, pw, 6, false, env); CHECK(r.status == OpenStatus::InvalidVault); CHECK(r.message.find("newer") != std::string::npos); }
+    editCfg([](cryfs::Config& c) { c.formatVersion = "0.10.0"; });
+    openOk(false, env);
+    editCfg([](cryfs::Config& c) { c.formatVersion = "0.10"; });
+
+    // ---- single-client mode: locked to another client id
+    editCfg([](cryfs::Config& c) { c.exclusiveClientId = 4242; });
+    { auto r = openCryfs(st, pw, 6, false, env); CHECK(r.status == OpenStatus::SingleClientMode); CHECK(!r.vault); }
+    openOk(true, env);                         // reading cannot upset the other client
+    HostEnv consent = env; consent.cryfsDisableSingleClientMode = true;
+    openOk(true, consent);                     // consent on a read-only open must not rewrite the config
+    CHECK(readCfg().exclusiveClientId.has_value());
+    { auto r = openCryfs(st, pw, 6, false, env); CHECK(r.status == OpenStatus::SingleClientMode); }   // still refused
+    openOk(false, consent);                    // read-write with consent: lock removed, like official CryFS
+    CHECK(!readCfg().exclusiveClientId.has_value());
+    openOk(false, env);                        // ... and persistent for everyone
+    uint64_t myId; { auto li = cryfs::LocalIntegrityState::open(env.cryfsLocalStateDir, readCfg().filesystemId); myId = li->myClientId(); }
+    editCfg([&](cryfs::Config& c) { c.exclusiveClientId = (int64_t)myId; });
+    openOk(false, env);                        // locked to *this* client: fine
+    editCfg([](cryfs::Config& c) { c.exclusiveClientId.reset(); });
+
+    // ---- canonical block names: one-time pass on open, interrupted-rename recovery, lazy repair on read
+    Bytes d1 = rnd(150000, 31), d2 = rnd(5000, 32);
+    { auto r = openCryfs(st, pw, 6, false, env); CHECK(r.status == OpenStatus::Ok);
+      if (!r.vault) return;
+      CHECK(r.vault->createDirectory("sub")); CHECK(put(*r.vault, "a.bin", d1)); CHECK(put(*r.vault, "sub/b.bin", d2)); r.vault->close(); }
+    CHECK_EQ(countLowercaseBlockPaths(root), 0);                       // new writes are canonical uppercase
+    lowercaseAllBlocks(root);
+    CHECK(countLowercaseBlockPaths(root) > 0);
+    {   // plant a leftover from an interrupted two-step rename
+        std::string victim;
+        walkFiles(root, [&](const std::string& p, off_t) { if (victim.empty() && p.find("cryfs.config") == std::string::npos) victim = p; });
+        CHECK(::rename(victim.c_str(), (victim + ".fvtmp").c_str()) == 0);
+    }
+    std::string stateDir = env.cryfsLocalStateDir + "/" + toHex(readCfg().filesystemId.data(), 16);
+    ::unlink((stateDir + "/block-names-normalized").c_str());
+    { auto r = openCryfs(st, pw, 6, false, env); CHECK(r.status == OpenStatus::Ok);
+      if (!r.vault) return;
+      CHECK_EQ(countLowercaseBlockPaths(root), 0);                      // everything is uppercase again, tmp recovered
+      CHECK(get(*r.vault, "a.bin") == d1); CHECK(get(*r.vault, "sub/b.bin") == d2);
+      r.vault->close(); }
+    CHECK(access((stateDir + "/block-names-normalized").c_str(), F_OK) == 0);
+    {   // flag already set (e.g. an older app build later wrote lowercase again): reading a block repairs it
+        lowercaseAllBlocks(root);
+        int before = countLowercaseBlockPaths(root);
+        auto r = openCryfs(st, pw, 6, false, env); CHECK(r.status == OpenStatus::Ok);
+        if (!r.vault) return;
+        CHECK(get(*r.vault, "a.bin") == d1);
+        r.vault->close();
+        CHECK(countLowercaseBlockPaths(root) < before);
+        // read-only opens never modify the vault
+        lowercaseAllBlocks(root);
+        before = countLowercaseBlockPaths(root);
+        auto ro = openCryfs(st, pw, 6, true, env); CHECK(ro.status == OpenStatus::Ok);
+        if (!ro.vault) return;
+        CHECK(get(*ro.vault, "a.bin") == d1);
+        ro.vault->close();
+        CHECK_EQ(countLowercaseBlockPaths(root), before);
+    }
+
+    // ---- regression: unlocking a vault that has no lowercase block names must not walk it block by block. With direct
+    // file access on slow storage (Android's FUSE-backed shared storage, network shares) that walk is one stat per block
+    // and stalled the unlock for minutes on a large vault.
+    {
+        ::unlink((stateDir + "/block-names-normalized").c_str());
+        ::unlink((stateDir + "/block-names-pending").c_str());
+        { auto r = openCryfs(st, pw, 6, false, env); CHECK(r.status == OpenStatus::Ok); if (!r.vault) return; r.vault->close(); }   // repairs what earlier steps left lowercase
+        CHECK_EQ(countLowercaseBlockPaths(root), 0);
+        {   // the repair leaves emptied lowercase twin folders behind (harmless); drop them so the vault looks like an official one
+            DIR* d = opendir(root.c_str());
+            std::vector<std::string> names;
+            while (auto* e = readdir(d)) { std::string n = e->d_name; if (n.size() == 3 && n != "." && n != "..") names.push_back(n); }
+            closedir(d);
+            for (auto& n : names) { bool lower = false; for (char ch : n) if (ch >= 'a' && ch <= 'f') lower = true; if (lower) ::rmdir((root + "/" + n).c_str()); }
+        }
+        ::unlink((stateDir + "/block-names-normalized").c_str());
+        auto cst = std::make_shared<ShardListCountingStorage>(root);
+        auto r = openCryfs(cst, pw, 6, false, env); CHECK(r.status == OpenStatus::Ok);
+        if (!r.vault) return;
+        CHECK_EQ(cst->shardLists, 0);                                   // only the top-level folder names were looked at
+        CHECK(get(*r.vault, "a.bin") == d1);
+        r.vault->close();
+        CHECK(access((stateDir + "/block-names-normalized").c_str(), F_OK) == 0);   // ... and it is not even checked again
+        cst->shardLists = 0;
+        auto r2 = openCryfs(cst, pw, 6, false, env); CHECK(r2.status == OpenStatus::Ok);
+        if (!r2.vault) return;
+        CHECK_EQ(cst->shardLists, 0);
+        r2.vault->close();
+    }
+
+    // ---- symlinks: stored as upstream does, hidden from listDirectory, moved/deleted like any other node
+    {
+        auto r = openCryfs(st, pw, 6, false, env); CHECK(r.status == OpenStatus::Ok);
+        if (!r.vault) return;
+        auto& v = *r.vault;
+        CHECK(v.createDirectory("links")); CHECK(v.createDirectory("other"));
+        CHECK(v.createSymlink("links/ln", "../a.bin"));
+        CHECK(!v.createSymlink("links/ln", "x"));                       // exists
+        CHECK(!v.createSymlink("links/empty", ""));
+        CHECK(!v.createSymlink("missingdir/ln", "x"));
+        std::vector<DirEntry> l;
+        CHECK(v.listDirectory("links", l)); CHECK_EQ(l.size(), (size_t)0);          // not a file or folder
+        CHECK(v.listSymlinks("links", l)); CHECK_EQ(l.size(), (size_t)1);
+        if (l.size() == 1) { CHECK(l[0].name == "ln"); CHECK(l[0].isSymlink); CHECK(!l[0].isDir); CHECK_EQ(l[0].size, (int64_t)8); }
+        CHECK(v.readSymlink("links/ln") == std::optional<std::string>("../a.bin"));
+        CHECK(!v.readSymlink("a.bin").has_value());                      // a file is not a link
+        CHECK(v.renameFile("links/ln", "other/moved"));                  // parent pointer is rewritten like any move
+        CHECK(!v.readSymlink("links/ln").has_value());
+        CHECK(v.readSymlink("other/moved") == std::optional<std::string>("../a.bin"));
+        r.vault->close();
+        auto r2 = openCryfs(st, pw, 6, false, env); CHECK(r2.status == OpenStatus::Ok);
+        if (!r2.vault) return;
+        CHECK(r2.vault->readSymlink("other/moved") == std::optional<std::string>("../a.bin"));   // survives a reopen
+        CHECK(r2.vault->deleteFile("other/moved"));
+        CHECK(r2.vault->listSymlinks("other", l)); CHECK_EQ(l.size(), (size_t)0);
+        r2.vault->close();
+    }
+
+    // ---- upstream refuses inner nodes deeper than 10 levels, so the app must not write such blobs
+    {
+        TmpDir t4; std::string root4 = t4.sub("v"); HostEnv env4; env4.cryfsLocalStateDir = t4.sub("state"); env4.tempDir = t4.path;
+        auto st4 = std::make_shared<PosixStorage>(root4);
+        CryfsCreateOptions o4; o4.cipher = "aes-256-gcm"; o4.blocksizeBytes = 118;   // logical 40: leaves of 32 bytes, 2 children per node
+        o4.scryptLogN = 10; o4.scryptR = 8; o4.scryptP = 1;
+        CHECK(createCryfs(*st4, pw, 6, o4, env4).status == OpenStatus::Ok);
+        auto r4 = openCryfs(st4, pw, 6, false, env4); CHECK(r4.status == OpenStatus::Ok);
+        if (!r4.vault) return;
+        // 2^10 leaves of 32 bytes, minus the 19-byte file header, is the most depth 10 can hold
+        Bytes fits = rnd(32768 - 19, 77), tooBig = rnd(32768 - 19 + 1, 78);
+        CHECK(put(*r4.vault, "fits.bin", fits));
+        CHECK(get(*r4.vault, "fits.bin") == fits);
+        size_t blocksBefore = 0; walkFiles(root4, [&](const std::string&, off_t) { blocksBefore++; });
+        CHECK(!put(*r4.vault, "toobig.bin", tooBig));                       // refused, not written in a form upstream cannot read
+        size_t blocksAfter = 0; walkFiles(root4, [&](const std::string&, off_t) { blocksAfter++; });
+        CHECK_EQ(blocksAfter, blocksBefore);                                // and nothing was left behind
+        std::vector<DirEntry> l4; CHECK(r4.vault->listDirectory("", l4)); CHECK_EQ(l4.size(), (size_t)1);
+        CHECK(get(*r4.vault, "fits.bin") == fits);
+        r4.vault->close();
+    }
+
+    // ---- timestamps keep nanoseconds; negative seconds are clamped (upstream reads u64 seconds)
+    {
+        std::vector<cryfs::DirRecord> v(2);
+        v[0].name = "x"; v[0].blob.b[0] = 1; v[0].mode = 0100644;
+        v[0].atime = 1700000000; v[0].atimeNs = 123456789; v[0].mtime = 1700000001; v[0].mtimeNs = 5; v[0].ctime = 1700000002; v[0].ctimeNs = 999999999;
+        v[1].name = "neg"; v[1].blob.b[0] = 2; v[1].mode = 0100644; v[1].mtime = -5; v[1].mtimeNs = 77;
+        Bytes b = cryfs::dirSerialize(v);
+        CHECK_EQ(readU32LE(&b[21]), 123456789u);                         // nsec lives right after each 8-byte sec
+        auto p = cryfs::dirParse(b);
+        CHECK_EQ(p.size(), (size_t)2);
+        if (p.size() == 2) {
+            CHECK_EQ(p[0].atime, (int64_t)1700000000); CHECK_EQ(p[0].atimeNs, 123456789u);
+            CHECK_EQ(p[0].mtimeNs, 5u); CHECK_EQ(p[0].ctimeNs, 999999999u);
+            CHECK_EQ(p[1].mtime, (int64_t)0); CHECK_EQ(p[1].mtimeNs, 0u);
+        }
+    }
+
+    // ---- integrity rules (same as upstream CryFS)
+    {
+        TmpDir t2; Bytes fsid(16, 0x11);
+        auto s = cryfs::LocalIntegrityState::open(t2.sub("st"), fsid);
+        cryfs::BlockId B = cryfs::BlockId::random(), D = cryfs::BlockId::random();
+        CHECK(!s->checkAndRecordRead(7, B, 5));
+        CHECK(!s->checkAndRecordRead(7, B, 5));        // same client, same version
+        CHECK(!s->checkAndRecordRead(9, B, 1));        // another client takes the block over
+        auto v = s->checkAndRecordRead(7, B, 5);       // ... then client 7's old copy returns: rollback
+        CHECK(v.has_value() && *v == 5);
+        CHECK(!s->checkAndRecordRead(7, B, 6));        // client 7 really wrote again
+        CHECK(s->checkAndRecordRead(7, B, 5).has_value());   // plain version rollback
+        CHECK(!s->checkAndRecordRead(7, D, 3));
+        s->markDeleted(D);                             // deleted here; a restored copy must be flagged
+        CHECK(s->checkAndRecordRead(7, D, 3).has_value());
+        CHECK(!s->checkAndRecordRead(7, D, 4));
+        s->flush(); s.reset();
+        auto s2 = cryfs::LocalIntegrityState::open(t2.sub("st"), fsid);   // all of it survives a restart
+        CHECK(s2->checkAndRecordRead(7, B, 5).has_value());
+        CHECK(!s2->checkAndRecordRead(9, B, 2));
+        CHECK(s2->checkAndRecordRead(7, B, 6).has_value());              // last writer is now 9, so 7@6 is stale
+        // state written by older builds has no last-writer info: the second rule must not fire on it
+        TmpDir t3; Bytes fs3(16, 0x22); cryfs::BlockId L = cryfs::BlockId::random();
+        std::string dir3 = t3.sub("st") + "/" + toHex(fs3.data(), 16);
+        { std::string cmd = "mkdir -p '" + dir3 + "'"; (void)!system(cmd.c_str()); }
+        { std::ofstream lg(dir3 + "/integritydata.log"); lg << "7:" << L.hex() << "=5\n"; }
+        auto s3 = cryfs::LocalIntegrityState::open(t3.path + "/st", fs3);
+        CHECK(!s3->checkAndRecordRead(7, L, 5));
+    }
+}
+
+// Opt-in (about 20 s, 512 MiB): a cryfs.config written by the official C++ CryFS 0.11.3.
+static void testCryfsCppVector() {
+    std::printf("cryfs: config written by official C++ CryFS 0.11.3\n");
+    std::string path = std::string(FV_VECTORS_DIR) + "/../cryfs/cpp_0_11_config.bin";
+    std::ifstream f(path, std::ios::binary);
+    CHECK(f.good());
+    Bytes raw((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    try {
+        auto combined = cryfs::deriveCombinedKey(raw, (const uint8_t*)"mypassword", 10);
+        auto cfg = cryfs::parseWithCombinedKey(raw, combined);
+        CHECK(cfg.cipherName == "xchacha20-poly1305");
+        CHECK(cfg.formatVersion == "0.10"); CHECK(cfg.createdWithVersion == "0.11.2"); CHECK(cfg.lastOpenedWithVersion == "0.11.3");
+        CHECK_EQ(cfg.blocksizeBytes, 16384);
+        CHECK(!cfg.exclusiveClientId.has_value());
+        CHECK(cfg.rootBlob.hexUpper() == "B7847BAA5663DE6A3155A8017B5A8AC2");
+        CHECK(toHex(cfg.filesystemId.data(), 16) == "abdcb364db327ed401f22e99eb37e78f");
+        CHECK(toHex(cfg.key.data(), cfg.key.size()) == "f8294d3955ff8cc06b787d71de64168dfc4c994046fbabb936b2cfe1629f6772");
+        // re-sealing under the same key must stay readable (this is how "disable single-client mode" is persisted)
+        Bytes again = cryfs::rebuildConfigKeepingKey(raw, combined, cfg);
+        auto cfg2 = cryfs::parseWithCombinedKey(again, combined);
+        CHECK(cfg2.rootBlob == cfg.rootBlob);
+    } catch (const Error& e) { CHECK(false); std::printf("  error: %s\n", e.what()); }
+    CHECK(true);
+}
+
 static void testCryfs(const char* cipher, int bsz) {
     std::printf("cryfs %s @%d\n", cipher, bsz);
     TmpDir t; std::string root = t.sub("v"); HostEnv env; env.cryfsLocalStateDir = t.sub("state"); env.tempDir = t.path;
     auto st = std::make_shared<PosixStorage>(root);
     CryfsCreateOptions o; o.cipher = cipher; o.blocksizeBytes = bsz;
+    o.scryptLogN = 10; o.scryptR = 8; o.scryptP = 1;   // cheap KDF: these tests are about the vault, not scrypt
     const uint8_t pw[] = "secret";
     CHECK(createCryfs(*st, pw, 6, o, env).status == OpenStatus::Ok);
     CHECK(openCryfs(st, (const uint8_t*)"bad", 3, false, env).status == OpenStatus::WrongPassword);
@@ -2082,7 +2469,9 @@ int main(int argc, char** argv) {
         testGocryptfsUnusualNames();
     }
     if (want("cryptomator")) { testCryptomator(false); testCryptomator(true); testCryptomatorCompat(); testCryptomatorSymlinks(); testCryptomatorBackups(); testCryptomatorMigration(); }
-    if (want("cryfs")) { testCryfs("xchacha20-poly1305", 32768); testCryfs("aes-256-gcm", 4096); testCryfs("aes-256-cfb", 8192); }
+    if (want("cryfs")) { testCryfs("xchacha20-poly1305", 32768); testCryfs("aes-256-gcm", 4096); testCryfs("aes-256-cfb", 8192); testCryfsCompat(); testCryfsLegacyCiphers(); testCryfs("twofish-256-gcm", 4096); testCryfs("serpent-128-cfb", 8192); testCryfs("cast-256-gcm", 4096); testCryfs("mars-448-gcm", 4096); }
+    if (want("scrypt")) testScryptLowMem();
+    if (only == "cryfs-vector") testCryfsCppVector();
     if (want("concurrency")) { testConcurrency("gocryptfs"); testConcurrency("cryptomator"); testConcurrency("cryfs"); }
     std::printf("\n%d checks, %d failed\n", g_checks, g_failed);
     return g_failed ? 1 : 0;

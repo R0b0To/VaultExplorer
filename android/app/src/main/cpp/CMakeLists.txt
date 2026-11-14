@@ -523,7 +523,7 @@ add_library(
         crypto/luks_header.cpp
         crypto/luks_cipher.cpp
         crypto/scrypt.cpp
-        crypto/cryfs_block_cipher.cpp
+        crypto/cryfs_block_cipher.cpp crypto/cryfs_legacy_ciphers.cpp
         crypto/single_file_crypto.cpp
         crypto/user_entropy.cpp
         crypto/xchacha20poly1305.cpp
@@ -639,7 +639,7 @@ target_link_libraries(
 
 
 set_source_files_properties(
-        crypto/cryfs_block_cipher.cpp
+        crypto/cryfs_block_cipher.cpp crypto/cryfs_legacy_ciphers.cpp
         crypto/eme.cpp
         crypto/siv.cpp
         crypto/xchacha20poly1305.cpp
@@ -690,7 +690,7 @@ if(NOT ANDROID)
             ${CMAKE_CURRENT_SOURCE_DIR}/jni)
     add_executable(cryfs_block_cipher_test
             test/cryfs_block_cipher_test.cpp
-            crypto/cryfs_block_cipher.cpp
+            crypto/cryfs_block_cipher.cpp crypto/cryfs_legacy_ciphers.cpp
             crypto/xchacha20poly1305.cpp)
     target_include_directories(cryfs_block_cipher_test PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}
@@ -795,7 +795,7 @@ if(NOT ANDROID)
     # those programs and FUSE).
     set(FV_CRYPTO_SOURCES
             crypto/eme.cpp crypto/siv.cpp crypto/scrypt.cpp
-            crypto/xchacha20poly1305.cpp crypto/cryfs_block_cipher.cpp)
+            crypto/xchacha20poly1305.cpp crypto/cryfs_block_cipher.cpp crypto/cryfs_legacy_ciphers.cpp)
     add_executable(foldervault_test foldervault/test/fv_tests.cpp ${FV_CRYPTO_SOURCES})
     target_link_libraries(foldervault_test foldervault_core mbedcrypto)
     # The gocryptfs known-answer vectors are located via an absolute path baked in

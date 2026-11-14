@@ -15,10 +15,18 @@ namespace cryfs {
 namespace {
 
 constexpr const char* TAG = "CryfsSession";
-constexpr uint32_t kDefaultFileMode = 0x81A4, kDefaultDirMode = 0x41ED;
+constexpr uint32_t kDefaultFileMode = 0x81A4, kDefaultDirMode = 0x41ED;   // S_IFREG|0644, S_IFDIR|0755
+constexpr uint32_t kDefaultSymlinkMode = 0xA1FF;                           // S_IFLNK|0777 (upstream requires the type bit)
+constexpr size_t kMaxSymlinkTarget = 32767;
 constexpr int kSliceBytes = 1 << 20;
 
 int64_t nowSec() { return (int64_t)::time(nullptr); }
+void nowTs(int64_t& sec, uint32_t& ns) {
+    struct timespec ts;
+    ::clock_gettime(CLOCK_REALTIME, &ts);
+    sec = (int64_t)ts.tv_sec;
+    ns = (uint32_t)ts.tv_nsec;
+}
 
 struct Resolved {
     std::string name;
@@ -172,7 +180,7 @@ public:
           integrity_(std::move(integ)),
           bs_(*st_, cipherIdOf(cfg_.cipherName), cfg_.key, *integrity_),
           dt_(bs_, virtualBlockSize(cfg_.blocksizeBytes, cfg_.cipherName)),
-          tree_(dt_, cfg_.rootBlob) {}
+          tree_(dt_, cfg_.rootBlob) { bs_.setReadOnly(readOnly_); }
     ~CryfsVault() override { close(); }
 
     BlockStore& blockStore() { return bs_; }
@@ -190,16 +198,80 @@ public:
             if (!dir.isDir()) return false;
             out.clear();
             for (auto& e : tree_.readDirEntries(dir.blob)) {
+                if (e.type == EntryType::Symlink) continue;   // symlinks are only exposed through listSymlinks()
                 DirEntry d;
                 d.name = e.name;
                 d.isDir = e.type == EntryType::Dir;
                 d.size = d.isDir ? 0 : payloadSize(e.blob);
-                d.mtimeMs = e.mtime * 1000;
+                d.mtimeMs = e.mtime * 1000 + (int64_t)(e.mtimeNs / 1000000u);
                 out.push_back(std::move(d));
             }
             return true;
         } catch (const std::exception& e) {
             logMsg(LogLevel::Debug, TAG, std::string("listDirectory failed: ") + e.what());
+            return false;
+        }
+    }
+
+    bool listSymlinks(const std::string& path, std::vector<DirEntry>& out) override {
+        try {
+            Lifecycle::Op op(life_);
+            std::shared_lock<std::shared_mutex> g(tmu_);
+            Resolved dir = tree_.resolve(normalizePath(path));
+            if (!dir.isDir()) return false;
+            out.clear();
+            for (auto& e : tree_.readDirEntries(dir.blob)) {
+                if (e.type != EntryType::Symlink) continue;
+                DirEntry d;
+                d.name = e.name;
+                d.isDir = false;   // CryFS links are not resolved here, so they are never reported as folder links
+                d.isSymlink = true;
+                d.size = payloadSize(e.blob);
+                d.mtimeMs = e.mtime * 1000 + (int64_t)(e.mtimeNs / 1000000u);
+                out.push_back(std::move(d));
+            }
+            return true;
+        } catch (const std::exception& e) {
+            logMsg(LogLevel::Debug, TAG, std::string("listSymlinks failed: ") + e.what());
+            return false;
+        }
+    }
+
+    std::optional<std::string> readSymlink(const std::string& path) override {
+        try {
+            Lifecycle::Op op(life_);
+            std::shared_lock<std::shared_mutex> g(tmu_);
+            Resolved n = tree_.resolve(normalizePath(path));
+            if (!n.entry || n.entry->type != EntryType::Symlink) return std::nullopt;
+            Bytes raw = dt_.readAll(n.blob);
+            if (raw.size() <= kFsHeaderSize) return std::nullopt;
+            // Upstream stores the target bytes as they are; tolerate one trailing NUL (a C string) on read.
+            size_t len = raw.size() - kFsHeaderSize;
+            if (raw[kFsHeaderSize + len - 1] == 0) len--;
+            std::string t((const char*)raw.data() + kFsHeaderSize, len);
+            if (t.empty() || t.size() > kMaxSymlinkTarget || t.find('\0') != std::string::npos || !isValidUtf8(t)) return std::nullopt;
+            return t;
+        } catch (const std::exception& e) {
+            logMsg(LogLevel::Debug, TAG, std::string("readSymlink failed: ") + e.what());
+            return std::nullopt;
+        }
+    }
+
+    bool createSymlink(const std::string& path, const std::string& target) override {
+        if (readOnly_) return false;
+        if (target.empty() || target.size() > kMaxSymlinkTarget || target.find('\0') != std::string::npos || !isValidUtf8(target)) return false;
+        try {
+            Lifecycle::Op op(life_);
+            std::string n = normalizePath(path);
+            std::unique_lock<std::shared_mutex> g(tmu_);
+            if (tree_.tryResolve(n)) return false;
+            Resolved parent = tree_.resolve(parentOf(n));
+            if (!parent.isDir()) return false;
+            BlockId blob = dt_.buildBlob(fsWrap(EntryType::Symlink, parent.blob, Bytes(target.begin(), target.end())));
+            tree_.addEntry(parent.blob, newEntry(EntryType::Symlink, nameOf(n), blob, kDefaultSymlinkMode));
+            return true;
+        } catch (const std::exception& e) {
+            logMsg(LogLevel::Warn, TAG, std::string("createSymlink failed: ") + e.what());
             return false;
         }
     }
@@ -290,7 +362,8 @@ public:
             Resolved node = tree_.resolve(normalizePath(path));
             if (!node.parentBlob || !node.entry) return true;
             DirRecord e = *node.entry;
-            e.mtime = epochSeconds;
+            e.mtime = epochSeconds < 0 ? 0 : epochSeconds;   // upstream stores u64 seconds
+            e.mtimeNs = 0;
             tree_.replaceEntry(*node.parentBlob, e.name, e);
             return true;
         } catch (const std::exception&) { return false; }
@@ -553,7 +626,9 @@ private:
     static DirRecord newEntry(EntryType t, const std::string& name, const BlockId& blob, uint32_t mode) {
         DirRecord e;
         e.type = t; e.name = name; e.blob = blob; e.mode = mode;
-        e.atime = e.mtime = e.ctime = nowSec();
+        nowTs(e.atime, e.atimeNs);
+        e.mtime = e.ctime = e.atime;
+        e.mtimeNs = e.ctimeNs = e.atimeNs;
         return e;
     }
 
@@ -610,7 +685,7 @@ private:
                 replaced = dt_.replaceRoot(existing->blob, scratch);
                 replacedExisting = true;
                 DirRecord e = *existing->entry;
-                e.mtime = nowSec();
+                nowTs(e.mtime, e.mtimeNs);
                 tree_.replaceEntry(*existing->parentBlob, e.name, e);
             } else {
                 tree_.addEntry(parentBlob, newEntry(EntryType::File, nameOf(n), scratch, kDefaultFileMode));
@@ -642,16 +717,30 @@ PlainResult plainFail(OpenStatus s, std::string msg) { PlainResult r; r.status =
 
 // Shared tail of both open flavours.
 OpenResult finishOpen(std::shared_ptr<Storage> s, const Config& cfg, Secret combined, bool readOnly,
-                      const HostEnv& env, const StorageFactory& factory) {
+                      const HostEnv& env, const StorageFactory& factory, const Bytes& rawConfig) {
     OpenResult res;
     auto fail = [&](OpenStatus st, std::string msg) { res.status = st; res.message = std::move(msg); return std::move(res); };
     if (cryfsCipherIdFromName(cfg.cipherName.c_str()) == CryfsCipherId::kUnknown)
         return fail(OpenStatus::InvalidVault, "Vault uses cipher \"" + cfg.cipherName + "\", which this app does not support.");
+    std::unique_ptr<LocalIntegrityState> integrity;
+    try { integrity = LocalIntegrityState::open(env.cryfsLocalStateDir, cfg.filesystemId); }
+    catch (const std::exception& e) { return fail(OpenStatus::InvalidVault, std::string("Could not open vault: ") + e.what()); }
+    // Single-client mode: the vault says only one client id may use it. Official CryFS refuses any other client
+    // unless the user agrees to turn the mode off. Reading cannot disturb that client's integrity checks, so a
+    // read-only open is allowed; a read-write open needs the user's consent (decided before touching anything).
+    bool disableSingleClient = false;
+    if (cfg.exclusiveClientId && (uint64_t)*cfg.exclusiveClientId != integrity->myClientId()) {
+        if (!readOnly && !env.cryfsDisableSingleClientMode)
+            return fail(OpenStatus::SingleClientMode,
+                "This vault is in single-client mode and locked to another device (CryFS client " + std::to_string(*cfg.exclusiveClientId) +
+                "). Changing it from here could make that device report integrity violations. Open it read-only, or allow turning off single-client mode for this vault.");
+        disableSingleClient = !readOnly;
+    }
+    LocalIntegrityState* integ = integrity.get();
     std::shared_ptr<Storage> sessionStorage = s;
     try { if (factory) { auto f = factory(); if (f) sessionStorage = std::move(f); } }
     catch (const std::exception& e) { return fail(OpenStatus::InvalidVault, std::string("Could not open vault: ") + e.what()); }
     try {
-        auto integrity = LocalIntegrityState::open(env.cryfsLocalStateDir, cfg.filesystemId);
         auto vault = std::make_unique<CryfsVault>(sessionStorage, cfg, std::move(integrity), readOnly, env);
         if (!vault->blockStore().load(cfg.rootBlob)) {
             auto v = vault->blockStore().lastViolation();
@@ -663,6 +752,31 @@ OpenResult finishOpen(std::shared_ptr<Storage> s, const Config& cfg, Secret comb
                     "). Refusing to open it to avoid masking possible data loss or tampering -- this is the same protection CryFS's own error 24/25 gives you.");
             }
             return fail(OpenStatus::InvalidVault, "Vault's root directory block is missing or unreadable.");
+        }
+        if (disableSingleClient) {
+            // Persist the consent the way official CryFS does: drop the lock from cryfs.config, re-encrypted
+            // under the already-derived key (same KDF salt/parameters), so the password is not needed again.
+            try {
+                Config updated = cfg;
+                updated.exclusiveClientId.reset();
+                Bytes nb = rebuildConfigKeepingKey(rawConfig, combined, updated);
+                if (!s->writeWholeAtomic(kConfigName, nb.data(), nb.size())) throw Error(Err::Io, "write failed");
+            } catch (const std::exception& e) {
+                vault->close();
+                return fail(OpenStatus::InvalidVault, std::string("Could not turn off single-client mode in cryfs.config: ") + e.what());
+            }
+        }
+        // One-time fix-up of block names written in lowercase by older builds of this app (invisible to official
+        // CryFS on case-sensitive storage). Best effort: a failure never blocks the unlock and is retried next time.
+        // Bounded: it only does real work for vaults an older build wrote in lowercase, and then stops after a few
+        // seconds and carries on at the next unlock ("block-names-pending") instead of stalling this one.
+        if (!readOnly && !integ->flag("block-names-normalized")) {
+            try {
+                bool complete = false;
+                vault->blockStore().normalizeBlockNames(&complete, /*budgetSeconds*/ 4.0, integ->flag("block-names-pending"));
+                if (complete) integ->setFlag("block-names-normalized");
+                else integ->setFlag("block-names-pending");
+            } catch (const std::exception&) {}
         }
         res.status = OpenStatus::Ok;
         res.vault = std::move(vault);
@@ -706,7 +820,7 @@ OpenResult openCryfs(std::shared_ptr<Storage> s, const uint8_t* pw, size_t pwLen
         res.message = std::string("Key derivation error: ") + e.what();
         return res;
     }
-    return finishOpen(std::move(s), cfg, std::move(combined), readOnly, env, factory);
+    return finishOpen(std::move(s), cfg, std::move(combined), readOnly, env, factory, raw);
 }
 
 OpenResult openCryfsWithCombinedKey(std::shared_ptr<Storage> s, const uint8_t* key, size_t keyLen, bool readOnly,
@@ -727,7 +841,7 @@ OpenResult openCryfsWithCombinedKey(std::shared_ptr<Storage> s, const uint8_t* k
         res.message = e.what();
         return res;
     }
-    return finishOpen(std::move(s), cfg, std::move(combined), readOnly, env, factory);
+    return finishOpen(std::move(s), cfg, std::move(combined), readOnly, env, factory, raw);
 }
 
 PlainResult createCryfs(Storage& s, const uint8_t* pw, size_t pwLen, const CryfsCreateOptions& o, const HostEnv& env) {
@@ -736,7 +850,15 @@ PlainResult createCryfs(Storage& s, const uint8_t* pw, size_t pwLen, const Cryfs
         std::vector<DirEntry> existing;
         if (s.list("", existing) && !existing.empty()) return plainFail(OpenStatus::InvalidVault, "Selected folder is not empty.");
         Config cfg = newVaultConfig(o.cipher, o.blocksizeBytes);
-        Bytes cfgBytes = buildConfig(cfg, pw, pwLen);
+        KdfParams kdf = defaultKdfParams();
+        if (o.scryptLogN != 0 || o.scryptR != 0 || o.scryptP != 0) {
+            if (o.scryptLogN != 0) kdf.N = (o.scryptLogN >= 8 && o.scryptLogN <= 24) ? (1u << o.scryptLogN) : 0;
+            if (o.scryptR != 0) kdf.r = (o.scryptR >= 1 && o.scryptR <= 32) ? (uint32_t)o.scryptR : 0;
+            if (o.scryptP != 0) kdf.p = (o.scryptP >= 1 && o.scryptP <= 32) ? (uint32_t)o.scryptP : 0;
+            if (kdf.N == 0 || kdf.r == 0 || kdf.p == 0)
+                return plainFail(OpenStatus::InvalidVault, "Unsupported scrypt cost (log2(N) must be 8..24, r and p 1..32).");
+        }
+        Bytes cfgBytes = buildConfig(cfg, pw, pwLen, &kdf);
         if (!s.writeWhole(kConfigName, cfgBytes.data(), cfgBytes.size()))
             return plainFail(OpenStatus::InvalidVault, "Could not create cryfs.config");
         auto integrity = LocalIntegrityState::open(env.cryfsLocalStateDir, cfg.filesystemId);
@@ -762,7 +884,10 @@ PlainResult changeCryfsPassword(Storage& s, const uint8_t* oldPw, size_t oldLen,
     try {
         Secret combined = deriveCombinedKey(raw, oldPw, oldLen);
         Config cfg = parseWithCombinedKey(raw, combined);
-        Bytes out = buildConfig(cfg, newPw, newLen);
+        // Keep the vault's scrypt cost, unless it is cheaper than today's default (then this is the moment to raise it).
+        KdfParams oldK = readKdfParams(raw), defK = defaultKdfParams();
+        const KdfParams useK = (uint64_t)oldK.N * oldK.r * oldK.p >= (uint64_t)defK.N * defK.r * defK.p ? oldK : defK;
+        Bytes out = buildConfig(cfg, newPw, newLen, &useK);
         if (!s.writeWholeAtomic(kConfigName, out.data(), out.size()))
             return plainFail(OpenStatus::InvalidVault, "Could not write cryfs.config");
         PlainResult ok;

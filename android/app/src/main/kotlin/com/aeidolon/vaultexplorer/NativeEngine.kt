@@ -281,6 +281,12 @@ internal object NativeEngine {
         passphrase: ByteArray, salt: ByteArray, N: Int, r: Int, p: Int, dkLen: Int
     ): ByteArray?
 
+    /** Like [scryptNative] but keeps at most 256 MiB of scrypt memory (slower for big N*r); null if unsupported. */
+    @JvmStatic
+    external fun scryptLowMemNative(
+        passphrase: ByteArray, salt: ByteArray, N: Int, r: Int, p: Int, dkLen: Int
+    ): ByteArray?
+
     @JvmStatic
     external fun argon2idNative(
         password: ByteArray, salt: ByteArray, memoryKiB: Int, iterations: Int, parallelism: Int, outputLen: Int

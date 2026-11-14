@@ -313,4 +313,60 @@ class CryfsLocalIntegrityStateTest {
         val expected = (1..(threadCount * writesPerThread)).map { it.toLong() }.toSet()
         assertEquals(expected, versions.toSet())
     }
+
+    // ---- upstream CryFS rules: last known writer, deleted blocks ----------
+
+    @Test
+    fun `an old copy that comes back after another client took the block over is a rollback`() {
+        val state = open()
+        val block = CryfsBlockId.random(random)
+        assertNull(state.checkAndRecordRead(7L, block, 5L))
+        assertNull(state.checkAndRecordRead(7L, block, 5L)) // same client, same version: fine
+        assertNull(state.checkAndRecordRead(9L, block, 1L)) // another client takes the block over
+        assertEquals(5L, state.checkAndRecordRead(7L, block, 5L)) // client 7's old copy returns
+        assertNull(state.checkAndRecordRead(7L, block, 6L)) // client 7 genuinely wrote again
+        assertEquals(6L, state.checkAndRecordRead(7L, block, 5L)) // plain version rollback
+    }
+
+    @Test
+    fun `reading back a block this client just wrote is never a rollback`() {
+        val state = open()
+        val block = CryfsBlockId.random(random)
+        val version = state.nextVersionForOwnWrite(block)
+        assertNull(state.checkAndRecordRead(state.myClientId, block, version))
+        assertNull(state.checkAndRecordRead(state.myClientId, block, version))
+    }
+
+    @Test
+    fun `a deleted block that reappears is a rollback`() {
+        val state = open()
+        val block = CryfsBlockId.random(random)
+        assertNull(state.checkAndRecordRead(7L, block, 3L))
+        state.markDeleted(block)
+        assertEquals(3L, state.checkAndRecordRead(7L, block, 3L)) // the restored copy
+        assertNull(state.checkAndRecordRead(7L, block, 4L)) // a genuinely newer write is fine
+    }
+
+    @Test
+    fun `last-writer bookkeeping survives a restart`() {
+        val block = CryfsBlockId.random(random)
+        val first = open()
+        assertNull(first.checkAndRecordRead(7L, block, 5L))
+        assertNull(first.checkAndRecordRead(9L, block, 1L))
+        first.flush()
+        val second = open()
+        assertEquals(5L, second.checkAndRecordRead(7L, block, 5L))
+    }
+
+    @Test
+    fun `state written by older builds has no last writer, so the second rule is not applied to it`() {
+        val block = CryfsBlockId.random(random)
+        val dir = File(baseDir, filesystemId.joinToString("") { "%02x".format(it) })
+        dir.mkdirs()
+        File(dir, "integritydata.log").writeText("7:${block.hex}=5\n")
+        val state = open()
+        assertNull(state.checkAndRecordRead(7L, block, 5L)) // unknown last writer: not a violation
+        assertNull(state.checkAndRecordRead(9L, block, 1L))
+        assertEquals(5L, state.checkAndRecordRead(7L, block, 5L)) // now it is known
+    }
 }

@@ -1,5 +1,6 @@
 #include "crypto/cryfs_block_cipher.h"
 #include "crypto/xchacha20poly1305.h"
+#include "crypto/cryfs_legacy_ciphers.h"
 #include "mbedtls/gcm.h"
 #include "mbedtls/aes.h"
 #include "mbedtls/platform_util.h"
@@ -50,7 +51,15 @@ bool randomBytes(uint8_t* buf, size_t len) {
     return mbedtls_ctr_drbg_random(&d.ctr_drbg, buf, len) == 0;
 }
 
+// Index into the cryfs_legacy spec table, or -1 for the AES/XChaCha ids.
+int legacyIndex(CryfsCipherId cipher) {
+    const unsigned v = static_cast<unsigned>(cipher);
+    const unsigned base = static_cast<unsigned>(CryfsCipherId::kLegacyBase);
+    return (v >= base && v < base + cryfs_legacy::kSpecCount) ? static_cast<int>(v - base) : -1;
+}
+
 size_t keyBitsFor(CryfsCipherId cipher) {
+    if (int li = legacyIndex(cipher); li >= 0) return cryfs_legacy::spec(static_cast<size_t>(li)).keyLen * 8;
     switch (cipher) {
         case CryfsCipherId::kAes256Gcm:
         case CryfsCipherId::kAes256Cfb:
@@ -81,6 +90,8 @@ CryfsCipherId cryfsCipherIdFromName(const char* name) {
     if (std::strcmp(name, "aes-128-gcm") == 0) return CryfsCipherId::kAes128Gcm;
     if (std::strcmp(name, "aes-128-cfb") == 0) return CryfsCipherId::kAes128Cfb;
     if (std::strcmp(name, "xchacha20-poly1305") == 0) return CryfsCipherId::kXChaCha20Poly1305;
+    int li = cryfs_legacy::findSpecIndex(name);
+    if (li >= 0) return static_cast<CryfsCipherId>(static_cast<unsigned>(CryfsCipherId::kLegacyBase) + static_cast<unsigned>(li));
     return CryfsCipherId::kUnknown;
 }
 
@@ -98,6 +109,17 @@ std::vector<uint8_t> cryfsBlockEncrypt(CryfsCipherId cipher,
 
         bool ok = xchacha20Poly1305Seal(key, out.data(), nullptr, 0, plaintext, plaintextLen, out.data() + kNonceLen);
         if (!ok) return {};
+        return out;
+    }
+
+    if (int li = legacyIndex(cipher); li >= 0) {
+        const cryfs_legacy::Spec& sp = cryfs_legacy::spec(static_cast<size_t>(li));
+        auto bc = cryfs_legacy::makeBlockCipher(sp.algo, key, keyLen);
+        if (!bc) return {};
+        std::vector<uint8_t> out(kIvSize + plaintextLen + (sp.mode == cryfs_legacy::Mode::Gcm ? kTagSize : 0));
+        if (!randomBytes(out.data(), kIvSize)) return {};
+        if (sp.mode == cryfs_legacy::Mode::Gcm) cryfs_legacy::gcmSeal(*bc, out.data(), plaintext, plaintextLen, out.data() + kIvSize);
+        else cryfs_legacy::cfbCrypt(*bc, true, out.data(), plaintext, plaintextLen, out.data() + kIvSize);
         return out;
     }
 
@@ -173,6 +195,26 @@ bool cryfsBlockDecrypt(CryfsCipherId cipher,
         return true;
     }
 
+    if (int li = legacyIndex(cipher); li >= 0) {
+        const cryfs_legacy::Spec& sp = cryfs_legacy::spec(static_cast<size_t>(li));
+        const bool gcm = sp.mode == cryfs_legacy::Mode::Gcm;
+        const size_t overhead = kIvSize + (gcm ? kTagSize : 0);
+        if (ciphertextLen < overhead) return false;
+        auto bc = cryfs_legacy::makeBlockCipher(sp.algo, key, keyLen);
+        if (!bc) return false;
+        const size_t bodyLen = ciphertextLen - overhead;
+        out.assign(bodyLen, 0);
+        if (gcm) {
+            if (!cryfs_legacy::gcmOpen(*bc, ciphertext, ciphertext + kIvSize, bodyLen, ciphertext + kIvSize + bodyLen, out.data())) {
+                out.clear();
+                return false;
+            }
+        } else {
+            cryfs_legacy::cfbCrypt(*bc, false, ciphertext, ciphertext + kIvSize, bodyLen, out.data());
+        }
+        return true;
+    }
+
     if (isGcm(cipher)) {
         if (ciphertextLen < kIvSize + kTagSize) return false;
         const size_t bodyLen = ciphertextLen - kIvSize - kTagSize;
@@ -224,7 +266,21 @@ bool cryfsBlockDecrypt(CryfsCipherId cipher,
     return false;
 }
 
+int cryfsCipherKeyBytes(CryfsCipherId cipher) { return static_cast<int>(keyBitsFor(cipher) / 8); }
+
+long cryfsCipherOverheadBytes(CryfsCipherId cipher) {
+    if (int li = legacyIndex(cipher); li >= 0) return kIvSize + (cryfs_legacy::spec(static_cast<size_t>(li)).mode == cryfs_legacy::Mode::Gcm ? kTagSize : 0);
+    if (isGcm(cipher)) return kIvSize + kTagSize;
+    if (isCfb(cipher)) return kIvSize;
+    if (cipher == CryfsCipherId::kXChaCha20Poly1305) return 24 + 16;
+    return -1;
+}
+
 long cryfsBlockCleartextSize(CryfsCipherId cipher, size_t ciphertextLen) {
+    if (int li = legacyIndex(cipher); li >= 0) {
+        const size_t overhead = static_cast<size_t>(cryfsCipherOverheadBytes(cipher));
+        return ciphertextLen < overhead ? -1 : static_cast<long>(ciphertextLen - overhead);
+    }
     if (isGcm(cipher)) {
         if (ciphertextLen < kIvSize + kTagSize) return -1;
         return static_cast<long>(ciphertextLen - kIvSize - kTagSize);

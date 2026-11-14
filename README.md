@@ -28,7 +28,7 @@ VaultExplorer opens VeraCrypt, LUKS, BitLocker, VHD/VHDX, Cryptomator, gocryptfs
 | **VHD / VHDX** | Fixed and dynamic images containing a VeraCrypt, LUKS, or BitLocker volume, or an unencrypted filesystem |
 | **Cryptomator** | Vault formats 7 and 8 |
 | **gocryptfs** | Format v2 as written by gocryptfs 0.7 up to current: AES-256-GCM, XChaCha20-Poly1305 or AES-SIV; encrypted, plaintext or `-deterministic-names` file names; `-longnamemax`; vaults from before HKDF/Raw64. Not supported: FIDO2-protected vaults; symlinks are not shown ([details](android/app/src/main/cpp/foldervault/README.md#gocryptfs-conformance-with-the-official-implementation)) |
-| **CryFS** | Format 0.10 (CryFS 0.10.x–1.0.x), AES or XChaCha20-Poly1305 |
+| **CryFS** | Format 0.10 (CryFS 0.10.x–1.0.x and 2.x), all 21 ciphers of the C++ release (AES, XChaCha20-Poly1305, Twofish, Serpent, CAST-256, MARS; GCM and CFB). Official scrypt settings up to 1 GiB are supported on a bounded amount of RAM. Vaults still in an older format, or locked to another device ("single-client mode"), are not modified without your consent. |
 
 Filesystems: FAT12/16/32, exFAT, NTFS, ext2/3/4.
 

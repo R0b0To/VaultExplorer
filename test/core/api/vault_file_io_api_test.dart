@@ -608,46 +608,79 @@ void main() {
   });
 
   group('entryExists', () {
-    test('reports true for existing file when getFileSize > 0', () async {
-      nextResult = 1024;
-      final exists = await api.entryExists(container, 'file.txt', isDir: false);
-      expect(exists, isTrue);
-      expect(calls.single.method, 'getFileSize');
-    });
-
-    test('reports false for missing file when getFileSize < 0', () async {
-      nextResult = -1;
-      final exists = await api.entryExists(container, 'file.txt', isDir: false);
-      expect(exists, isFalse);
-      expect(calls.single.method, 'getFileSize');
-    });
-
-    test('disambiguates 0-byte file against directory listing', () async {
+    void mockVault({
+      List<String>? listing,
+      Map<String, List<String>?>? listingsByDir,
+      int fileSize = -1,
+    }) {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(channel, (call) async {
-            if (call.method == 'getFileSize') return 0;
+            calls.add(call);
+            if (call.method == 'getFileSize') return fileSize;
             if (call.method == 'listDirectory') {
-              return ['F|0|0|file.txt'];
+              if (listingsByDir != null) {
+                return listingsByDir[(call.arguments as Map)['dirPath']];
+              }
+              return listing;
             }
             return null;
           });
+    }
 
+    test('reports true for a file found in its parent listing without '
+        'probing getFileSize', () async {
+      // getFileSize on a mirrored/cloud folder vault pulls the whole file and
+      // can fail (-1) for a file that is plainly there: it must not be asked.
+      mockVault(listing: ['F|1024|0|file.txt'], fileSize: -1);
       final exists = await api.entryExists(container, 'file.txt', isDir: false);
       expect(exists, isTrue);
+      expect(calls.map((c) => c.method), isNot(contains('getFileSize')));
     });
 
-    test('reports false for 0-size file not found in directory listing', () async {
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(channel, (call) async {
-            if (call.method == 'getFileSize') return 0;
-            if (call.method == 'listDirectory') {
-              return ['F|100|0|other.txt'];
-            }
-            return null;
-          });
+    test('reports true for a 0-byte file found in the listing', () async {
+      mockVault(listing: ['F|0|0|file.txt']);
+      expect(
+        await api.entryExists(container, 'file.txt', isDir: false),
+        isTrue,
+      );
+    });
 
-      final exists = await api.entryExists(container, 'file.txt', isDir: false);
-      expect(exists, isFalse);
+    test('looks the file up in its own parent directory', () async {
+      mockVault(
+        listingsByDir: {
+          'docs/inner': ['F|5|0|a.txt'],
+          '': ['F|5|0|other.txt'],
+        },
+      );
+      expect(
+        await api.entryExists(container, 'docs/inner/a.txt', isDir: false),
+        isTrue,
+      );
+      final listed = calls.where((c) => c.method == 'listDirectory').single;
+      expect((listed.arguments as Map)['dirPath'], 'docs/inner');
+    });
+
+    test('reports false when the listing succeeds but lacks the file',
+        () async {
+      mockVault(listing: ['F|100|0|other.txt', 'D|0|0|file.txt']);
+      expect(
+        await api.entryExists(container, 'file.txt', isDir: false),
+        isFalse,
+      );
+    });
+
+    test('falls back to getFileSize only when the listing itself fails',
+        () async {
+      mockVault(listing: null, fileSize: 42);
+      expect(
+        await api.entryExists(container, 'file.txt', isDir: false),
+        isTrue,
+      );
+      mockVault(listing: null, fileSize: -1);
+      expect(
+        await api.entryExists(container, 'file.txt', isDir: false),
+        isFalse,
+      );
     });
 
     test('reports true for existing directory via listDirectory', () async {

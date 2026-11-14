@@ -223,28 +223,44 @@ class VaultFileIoApi {
       final size = await getFileSize(container, path);
       return size >= 0;
     }
-    final size = await getFileSize(container, path);
-    if (size > 0) return true;
-    if (size < 0) return false;
-    // When size == 0, it might be an actual 0-byte file, or a legacy backend
-    // returning 0 on failure. Disambiguate by checking parent directory listing.
+    // Vault file. Deliberately NOT a getFileSize probe: on folder vaults whose
+    // storage is mirrored from a remote/cloud provider, the native getFileSize
+    // runs ensureContentReady, i.e. it pulls the WHOLE file just to answer
+    // "does it exist", and any pull failure/timeout comes back as -1 -- which
+    // callers read as "source missing" (bookmarkTargetMissing) for files that
+    // are plainly there. Directories never hit this because they are checked
+    // through a listing. The parent listing is metadata-only and is the same
+    // data the browser showed the user, so use it for files too.
     final parentDir = p.posix.dirname(path);
     final dirToQuery = (parentDir == '.' || parentDir == '/') ? '' : parentDir;
-    final rawList = await listDirectory(container, dirToQuery);
-    if (rawList == null) return false;
     final targetName = p.posix.basename(path);
     final caseSensitive = namesAreCaseSensitive(container);
-    for (final raw in rawList) {
-      if (raw.startsWith('System:')) continue;
-      final e = RawEntry.parse(raw);
-      if (!e.isDir) {
+    List<String>? rawList;
+    try {
+      rawList = await listDirectoryForBrowser(container, dirToQuery);
+    } catch (_) {
+      rawList = null;
+    }
+    if (rawList != null) {
+      for (final raw in rawList) {
+        if (raw.startsWith('System:')) continue;
+        final RawEntry e;
+        try {
+          e = RawEntry.parse(raw);
+        } on FormatException {
+          continue;
+        }
+        if (e.isDir) continue;
         final matches = caseSensitive
             ? e.name == targetName
             : e.name.toLowerCase() == targetName.toLowerCase();
         if (matches) return true;
       }
+      return false;
     }
-    return false;
+    // The listing itself failed, so it says nothing about the file. Only now
+    // fall back to the size probe.
+    return await getFileSize(container, path) >= 0;
   }
 
   Future<int> getMediaFileSize(

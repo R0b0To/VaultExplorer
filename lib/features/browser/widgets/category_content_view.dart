@@ -59,6 +59,7 @@ import 'package:vaultexplorer/features/browser/gallery/filter/gallery_filters.da
 import 'package:vaultexplorer/features/browser/gallery/filter/gallery_grouping.dart';
 import 'package:vaultexplorer/features/browser/gallery/filter/gallery_meta.dart';
 import 'package:vaultexplorer/features/browser/gallery/filter/gallery_meta_index.dart';
+import 'package:vaultexplorer/features/browser/gallery/filter/vault_gallery_meta_storage.dart';
 import 'package:vaultexplorer/features/browser/gallery/filter/gallery_places.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/models/browser_back_policy.dart';
@@ -79,6 +80,7 @@ import 'package:vaultexplorer/features/browser/viewer/media_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/pdf_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/file_info_sheet.dart';
+import 'package:vaultexplorer/features/browser/widgets/date_group.dart';
 import 'package:vaultexplorer/features/browser/widgets/bottom_search_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/breadcrumb_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_item_drag.dart';
@@ -209,6 +211,14 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
   GalleryFilterSet? _itemsFilters;
   GalleryGroupBy? _itemsGroupBy;
   int _itemsMetaRevision = -1;
+
+  /// The sections of [_items], already in the arranged order, computed by the
+  /// same pass that arranged them (see [_groupItems]).
+  List<DateGroup<RawEntry>>? _itemGroups;
+
+  /// The last [GalleryMetaIndex.publishedRevision] this view reacted to.
+  int _seenMetaRevision = 0;
+  Timer? _scrollIdleTimer;
   int _itemsQueryHash = 0;
   int _itemsUnfilteredCount = 0;
   bool _metaWanted = false;
@@ -237,6 +247,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
   void initState() {
     super.initState();
     _galleryFilter.addListener(_onGalleryFilterChanged);
+    _scrollController.addListener(_onScrollActivity);
     if (widget.scopedContainer != null) {
       _containers = {widget.scopedContainer!.volId: widget.scopedContainer!};
       final initialDir = widget.initialDirPath ?? '';
@@ -293,6 +304,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     _galleryFilter.removeListener(_onGalleryFilterChanged);
     _galleryFilter.dispose();
     _metaTimer?.cancel();
+    _scrollIdleTimer?.cancel();
     final meta = _metaIndex;
     if (meta != null) {
       meta.removeListener(_onMetaIndexChanged);
@@ -645,7 +657,17 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     final gallery = _isGallery && !_folderMode;
     final filters = gallery ? _galleryFilter.filters : GalleryFilterSet.empty;
     final groupBy = gallery ? _galleryFilter.groupBy : GalleryGroupBy.none;
-    final metaRevision = gallery ? (_metaIndex?.revision ?? 0) : 0;
+    // Only what the photos' details can change is worth recomputing the
+    // listing for: grouping by folder or type, or no filter at all, never
+    // looks at them. The *published* revision moves in batches, not per photo.
+    final needsMeta =
+        gallery &&
+        (!filters.isEmpty ||
+            _query.trim().isNotEmpty ||
+            (groupBy != GalleryGroupBy.none &&
+                groupBy != GalleryGroupBy.folder &&
+                groupBy != GalleryGroupBy.type));
+    final metaRevision = needsMeta ? (_metaIndex?.publishedRevision ?? 0) : 0;
     final queryHash = gallery ? _query.trim().hashCode : 0;
     final placesLoaded = gallery && _places != null;
     final unchanged =
@@ -700,7 +722,22 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     });
 
     // Sections other than "none" need each section to be one run of the list.
-    if (gallery) list = _galleryGrouper(groupBy).arrange<CategoryEntry>(list);
+    List<DateGroup<RawEntry>>? groups;
+    if (gallery) {
+      final arranged = _galleryGrouper(groupBy).arrangeWithGroups<CategoryEntry>(
+        list,
+      );
+      list = arranged.items;
+      groups = groupBy == GalleryGroupBy.none ? null : arranged.groups;
+    }
+
+    // A refresh that changes nothing the user can see (the usual case once
+    // most dates are known) keeps the very same list, so the views neither
+    // regroup nor relayout.
+    if (_sameListing(_items, _itemGroups, list, groups)) {
+      list = _items;
+      groups = _itemGroups;
+    }
 
     if (gallery && !identical(_itemsSnapshot, _snapshot)) {
       _scheduleMetaIndexing();
@@ -720,7 +757,41 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     _itemsQuery = _query;
     _itemsSortBy = _sortBy;
     _itemsSortAscending = _sortAscending;
+    _itemGroups = groups;
     return _items = list;
+  }
+
+  static bool _sameListing(
+    List<CategoryEntry> a,
+    List<DateGroup<RawEntry>>? ga,
+    List<CategoryEntry> b,
+    List<DateGroup<RawEntry>>? gb,
+  ) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length || (ga == null) != (gb == null)) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (!identical(a[i], b[i])) return false;
+    }
+    if (ga != null && gb != null) {
+      if (ga.length != gb.length) return false;
+      for (var i = 0; i < ga.length; i++) {
+        if (ga[i].items.length != gb[i].items.length ||
+            ga[i].date != gb[i].date ||
+            ga[i].label != gb[i].label) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  /// The sections the views group their [items] by. For the list this view
+  /// arranged, they are the ones that pass already produced; anything else is
+  /// grouped on demand.
+  List<DateGroup<RawEntry>> _groupItems(List<RawEntry> items) {
+    final cached = _itemGroups;
+    if (cached != null && identical(_items, items)) return cached;
+    return _galleryGrouper(_galleryFilter.groupBy).call(items);
   }
 
   // ── Gallery filter ───────────────────────────────────────────────────────
@@ -742,14 +813,39 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
             (_thumbs[volId]?.cacheMode ?? ThumbnailCacheMode.appCache) !=
             ThumbnailCacheMode.disabled,
       ),
+      // The phone's own storage is never saved to disk, so what was read from
+      // it is kept for the app session: leaving the gallery and coming back
+      // (or toggling gallery mode) continues the scan instead of restarting it.
+      memory: GalleryMetaMemory.app,
+      retain: (volId) => _containers[volId]?.isLocalStorage ?? false,
       notifyEvery: const Duration(seconds: 1),
     );
     index.addListener(_onMetaIndexChanged);
     return index;
   }
 
+  /// The index notifies about progress every second (the filter bar and sheet
+  /// listen for that themselves) and about new details in batches. Only the
+  /// latter changes what this view lists, and re-filtering, sorting and
+  /// grouping every photo is far too much work to do for a progress tick.
   void _onMetaIndexChanged() {
-    if (mounted && !_disposed) setState(() {});
+    if (!mounted || _disposed) return;
+    final published = _metaIndex?.publishedRevision ?? 0;
+    if (published == _seenMetaRevision) return;
+    _seenMetaRevision = published;
+    setState(() {});
+  }
+
+  /// Reading photo headers yields to scrolling: the reads and the listing
+  /// refresh they trigger wait until the list has been still for a moment.
+  void _onScrollActivity() {
+    final meta = _metaIndex;
+    if (meta == null) return;
+    meta.paused = true;
+    _scrollIdleTimer?.cancel();
+    _scrollIdleTimer = Timer(const Duration(milliseconds: 300), () {
+      _metaIndex?.paused = false;
+    });
   }
 
   void _onGalleryFilterChanged() {
@@ -3186,7 +3282,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
               !_folderMode &&
               _galleryFilter.groupBy != GalleryGroupBy.none,
           groupBuilder: _isGallery && !_folderMode
-              ? _galleryGrouper(_galleryFilter.groupBy).call
+              ? _groupItems
               : null,
         );
       case BrowserLayoutMode.masonry:
@@ -3233,7 +3329,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
               !_folderMode &&
               _galleryFilter.groupBy != GalleryGroupBy.none,
           groupBuilder: _isGallery && !_folderMode
-              ? _galleryGrouper(_galleryFilter.groupBy).call
+              ? _groupItems
               : null,
         );
       case BrowserLayoutMode.list:
@@ -3277,7 +3373,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
               !_folderMode &&
               _galleryFilter.groupBy != GalleryGroupBy.none,
           groupBuilder: _isGallery && !_folderMode
-              ? _galleryGrouper(_galleryFilter.groupBy).call
+              ? _groupItems
               : null,
           largeThumbnail: _isGallery,
         );

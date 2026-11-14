@@ -32,6 +32,12 @@ enum GalleryFlow {
   /// every tile going into the currently shortest column. With a constant
   /// ratio this is a plain uniform grid.
   columns,
+
+  /// One full-width row per item, every row [GalleryLayoutSpec.rowExtent]
+  /// tall. This is what the list layouts need: the geometry of a grouped list
+  /// is as exact (and as cheap to look up) as that of a grid, so the whole list
+  /// is one sliver instead of one per group.
+  list,
 }
 
 /// A run of items under an optional header.
@@ -63,6 +69,7 @@ class GalleryLayoutSpec {
     this.maxRowHeightFactor = 2.2,
     this.lastRowHeightFactor = 1.35,
     this.sectionGap = 0.0,
+    this.rowExtent = 0.0,
   }) : assert(columnCount > 0);
 
   /// Width available to the sliver.
@@ -93,6 +100,9 @@ class GalleryLayoutSpec {
 
   /// Space after the last tile of every section.
   final double sectionGap;
+
+  /// [GalleryFlow.list]: the height of every row.
+  final double rowExtent;
 
   double get targetExtent =>
       math.max(1.0, (crossExtent - (columnCount - 1) * spacing) / columnCount);
@@ -442,6 +452,16 @@ class GalleryLayoutModel {
             lefts: lefts,
             widths: widths,
           ),
+          GalleryFlow.list => _layoutList(
+            spec: spec,
+            itemCount: section.itemCount - skipped,
+            firstChild: firstItemChild + skipped,
+            startOffset: resume ? previous.tops[fromChild] : cursor,
+            tops: tops,
+            heights: heights,
+            lefts: lefts,
+            widths: widths,
+          ),
         };
         cursor = sectionEnd;
       }
@@ -597,6 +617,32 @@ class GalleryLayoutModel {
     return cursor - s;
   }
 
+  /// One full-width row per item. Returns the section's end offset (the bottom
+  /// edge of its last row, without trailing spacing).
+  static double _layoutList({
+    required GalleryLayoutSpec spec,
+    required int itemCount,
+    required int firstChild,
+    required double startOffset,
+    required Float64List tops,
+    required Float64List heights,
+    required Float64List lefts,
+    required Float64List widths,
+  }) {
+    final h = spec.rowExtent.isFinite && spec.rowExtent > 0 ? spec.rowExtent : 0.0;
+    final s = spec.spacing;
+    var cursor = startOffset;
+    for (var k = 0; k < itemCount; k++) {
+      final c = firstChild + k;
+      tops[c] = cursor;
+      heights[c] = h;
+      lefts[c] = 0;
+      widths[c] = spec.crossExtent;
+      cursor += h + s;
+    }
+    return itemCount == 0 ? startOffset : cursor - s;
+  }
+
   /// Shortest-column-first placement for one section. Returns the section's end
   /// offset (the bottom of its tallest column, without trailing spacing).
   static double _layoutColumns({
@@ -680,6 +726,7 @@ class GalleryLayoutHost {
     this.spacing = 8.0,
     this.sectionGap = 0.0,
     this.minTileWidth = 56.0,
+    this.rowExtent = 0.0,
   });
 
   GalleryFlow flow;
@@ -687,6 +734,9 @@ class GalleryLayoutHost {
   double spacing;
   double sectionGap;
   double minTileWidth;
+
+  /// [GalleryFlow.list]: the height of every row.
+  double rowExtent;
 
   List<GallerySection> sections = const [];
   GalleryRatioOf ratioOf = _unitRatio;
@@ -726,6 +776,7 @@ class GalleryLayoutHost {
     columnCount: columnCount,
     minTileWidth: minTileWidth,
     sectionGap: sectionGap,
+    rowExtent: rowExtent,
   );
 
   /// Builds a model from the current inputs without adopting it.

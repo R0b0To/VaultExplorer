@@ -98,6 +98,39 @@ class GalleryGrouper {
     ];
   }
 
+  /// [arrange] and the groups of the arranged list in one pass.
+  ///
+  /// Grouping reads the subject of every file (a metadata lookup and an
+  /// allocation each), so a view that needs both the order and the sections
+  /// should not pay for it twice: the groups returned here are already
+  /// expressed in the arranged order (`globalIndices` are the positions in
+  /// `items`), which is exactly what `call(items)` would return for it.
+  ({List<T> items, List<DateGroup<RawEntry>> groups}) arrangeWithGroups<
+    T extends RawEntry
+  >(List<T> items) {
+    if (by == GalleryGroupBy.none || items.isEmpty) {
+      return (items: items, groups: const []);
+    }
+    final groups = call(items);
+    final arranged = <T>[];
+    final rebased = <DateGroup<RawEntry>>[];
+    for (final g in groups) {
+      final start = arranged.length;
+      for (final e in g.items) {
+        arranged.add(e as T);
+      }
+      rebased.add(
+        DateGroup<RawEntry>(
+          date: g.date,
+          label: g.label,
+          items: g.items,
+          globalIndices: List<int>.generate(g.items.length, (k) => start + k),
+        ),
+      );
+    }
+    return (items: arranged, groups: rebased);
+  }
+
   _Info _classify(GalleryFilterSubject s) {
     switch (by) {
       case GalleryGroupBy.none:

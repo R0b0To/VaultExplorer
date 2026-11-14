@@ -244,7 +244,7 @@ class LibraryDetailScreen extends StatelessWidget {
             ),
             SliverToBoxAdapter(
               child: SizedBox(
-                height: 200,
+                height: 140 + LibraryAlbumTile.textAreaHeight(context),
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(

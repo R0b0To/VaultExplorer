@@ -7,7 +7,7 @@ import 'gallery_places.dart';
 /// Everything a filter may look at for one gallery file. A plain value (no
 /// widgets, no listing types) so the filters are testable on their own.
 class GalleryFilterSubject {
-  const GalleryFilterSubject({
+  GalleryFilterSubject({
     required this.sourceVolId,
     required this.name,
     required this.parentPath,
@@ -15,8 +15,10 @@ class GalleryFilterSubject {
     required this.sizeBytes,
     required this.modifiedSecs,
     this.meta = GalleryMeta.empty,
-    this.place,
-  });
+    GalleryPlace? place,
+    this.placeResolver,
+  }) : _place = place,
+       _placeComputed = place != null;
 
   final int sourceVolId;
 
@@ -31,30 +33,47 @@ class GalleryFilterSubject {
   final int sizeBytes;
   final int modifiedSecs;
   final GalleryMeta meta;
+  final GalleryPlaceResolver? placeResolver;
+
+  GalleryPlace? _place;
+  bool _placeComputed;
 
   /// Where it was taken (nearest city, else coordinates); null without GPS.
-  final GalleryPlace? place;
+  GalleryPlace? get place {
+    if (!_placeComputed) {
+      _placeComputed = true;
+      _place = galleryPlaceOf(meta, placeResolver);
+    }
+    return _place;
+  }
 
   /// Pixel size when the file header said (photos only).
   int? get width => meta.width;
   int? get height => meta.height;
 
+  DateTime? _date;
+  bool _dateComputed = false;
+
   /// The date the gallery files this photo under: the date it was taken when
   /// the file says so, else its modified date. A zone-less wall-clock value.
   DateTime? get date {
-    final taken = meta.takenWallClock;
-    if (taken != null) {
-      return DateTime(
-        taken.year,
-        taken.month,
-        taken.day,
-        taken.hour,
-        taken.minute,
-        taken.second,
-      );
+    if (!_dateComputed) {
+      _dateComputed = true;
+      final taken = meta.takenWallClock;
+      if (taken != null) {
+        _date = DateTime(
+          taken.year,
+          taken.month,
+          taken.day,
+          taken.hour,
+          taken.minute,
+          taken.second,
+        );
+      } else if (modifiedSecs > 0) {
+        _date = DateTime.fromMillisecondsSinceEpoch(modifiedSecs * 1000);
+      }
     }
-    if (modifiedSecs <= 0) return null;
-    return DateTime.fromMillisecondsSinceEpoch(modifiedSecs * 1000);
+    return _date;
   }
 
   bool get hasTakenDate => meta.takenSecs != null;

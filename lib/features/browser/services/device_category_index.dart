@@ -175,10 +175,14 @@ class DeviceCategoryIndex {
 
   /// Order-independent fingerprint of a list, so two scans that found the
   /// same files in a different order count as the same result.
-  static int _signature(List<RawEntry> entries) => Object.hash(
-    entries.length,
-    Object.hashAllUnordered([
-      for (final e in entries) Object.hash(e.name, e.sizeBytes, e.modifiedSecs),
-    ]),
-  );
+  static int _signature(List<RawEntry> entries) {
+    var sum = 0;
+    var xor = 0;
+    for (final e in entries) {
+      final h = Object.hash(e.name, e.sizeBytes, e.modifiedSecs);
+      sum = (sum + h) & 0x7fffffff;
+      xor ^= h;
+    }
+    return Object.hash(entries.length, sum, xor);
+  }
 }

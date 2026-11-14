@@ -85,6 +85,7 @@ import 'package:vaultexplorer/features/browser/widgets/bottom_search_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/breadcrumb_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_item_drag.dart';
 import 'package:vaultexplorer/features/browser/widgets/conflict_resolution_sheet.dart';
+import 'package:vaultexplorer/features/browser/widgets/date_group.dart';
 import 'package:vaultexplorer/features/image_editor/image_editor_screen.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_grid_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_item_actions_sheet.dart';
@@ -213,6 +214,8 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
   int _itemsMetaRevision = -1;
   int _itemsQueryHash = 0;
   int _itemsUnfilteredCount = 0;
+  List<DateGroup<RawEntry>>? _itemsGroups;
+  int _lastPublishedRevision = 0;
   bool _metaWanted = false;
   GalleryPlaceResolver? _places;
   bool _placesLoading = false;
@@ -508,6 +511,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
 
     final result = await scanner.scan(
       token: token,
+      progressInterval: const Duration(milliseconds: 500),
       onProgress: (snapshot) {
         if (_disposed || token.isCancelled) return;
         setState(() => _snapshot = _withoutLockedVaults(snapshot));
@@ -674,7 +678,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     final gallery = _isGallery && !_folderMode;
     final filters = gallery ? _galleryFilter.filters : GalleryFilterSet.empty;
     final groupBy = gallery ? _galleryFilter.groupBy : GalleryGroupBy.none;
-    final metaRevision = gallery ? (_metaIndex?.revision ?? 0) : 0;
+    final metaRevision = gallery ? (_metaIndex?.publishedRevision ?? 0) : 0;
     final queryHash = gallery ? _query.trim().hashCode : 0;
     final placesLoaded = gallery && _places != null;
     final unchanged =
@@ -729,7 +733,14 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     });
 
     // Sections other than "none" need each section to be one run of the list.
-    if (gallery) list = _galleryGrouper(groupBy).arrange<CategoryEntry>(list);
+    List<DateGroup<RawEntry>>? groups;
+    if (gallery && groupBy != GalleryGroupBy.none) {
+      final arranged =
+          _galleryGrouper(groupBy).arrangeWithGroups<CategoryEntry>(list);
+      list = arranged.items;
+      groups = arranged.groups;
+    }
+    _itemsGroups = groups;
 
     if (gallery && !identical(_itemsSnapshot, _snapshot)) {
       _scheduleMetaIndexing();
@@ -778,7 +789,12 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
   }
 
   void _onMetaIndexChanged() {
-    if (mounted && !_disposed) setState(() {});
+    if (!mounted || _disposed) return;
+    final pubRev = _metaIndex?.publishedRevision ?? 0;
+    if (pubRev != _lastPublishedRevision) {
+      _lastPublishedRevision = pubRev;
+      setState(() {});
+    }
   }
 
   void _onGalleryFilterChanged() {
@@ -849,6 +865,10 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
 
   GalleryFilterSubject _subjectOf(RawEntry e) {
     final ce = e as CategoryEntry;
+    final metaRev = _metaIndex?.publishedRevision ?? 0;
+    if (ce.cachedSubjectRevision == metaRev && ce.cachedSubject != null) {
+      return ce.cachedSubject! as GalleryFilterSubject;
+    }
     final meta =
         _metaIndex?.lookup(
           ce.sourceVolId,
@@ -857,7 +877,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           ce.modifiedSecs,
         ) ??
         GalleryMeta.empty;
-    return GalleryFilterSubject(
+    final subject = GalleryFilterSubject(
       sourceVolId: ce.sourceVolId,
       name: ce.baseName,
       parentPath: ce.parentPath,
@@ -865,8 +885,11 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       sizeBytes: ce.sizeBytes,
       modifiedSecs: ce.modifiedSecs,
       meta: meta,
-      place: galleryPlaceOf(meta, _places),
+      placeResolver: _places,
     );
+    ce.cachedSubject = subject;
+    ce.cachedSubjectRevision = metaRev;
+    return subject;
   }
 
   bool _matchesGallery(
@@ -3286,7 +3309,9 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
               !_folderMode &&
               _galleryFilter.groupBy != GalleryGroupBy.none,
           groupBuilder: _isGallery && !_folderMode
-              ? _galleryGrouper(_galleryFilter.groupBy).call
+              ? (entries) => identical(entries, _items) && _itemsGroups != null
+                  ? _itemsGroups!
+                  : _galleryGrouper(_galleryFilter.groupBy).call(entries)
               : null,
         );
       case BrowserLayoutMode.masonry:
@@ -3333,7 +3358,9 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
               !_folderMode &&
               _galleryFilter.groupBy != GalleryGroupBy.none,
           groupBuilder: _isGallery && !_folderMode
-              ? _galleryGrouper(_galleryFilter.groupBy).call
+              ? (entries) => identical(entries, _items) && _itemsGroups != null
+                  ? _itemsGroups!
+                  : _galleryGrouper(_galleryFilter.groupBy).call(entries)
               : null,
         );
       case BrowserLayoutMode.list:
@@ -3377,7 +3404,9 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
               !_folderMode &&
               _galleryFilter.groupBy != GalleryGroupBy.none,
           groupBuilder: _isGallery && !_folderMode
-              ? _galleryGrouper(_galleryFilter.groupBy).call
+              ? (entries) => identical(entries, _items) && _itemsGroups != null
+                  ? _itemsGroups!
+                  : _galleryGrouper(_galleryFilter.groupBy).call(entries)
               : null,
           largeThumbnail: _isGallery,
         );

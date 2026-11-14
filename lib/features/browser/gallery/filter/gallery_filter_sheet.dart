@@ -79,16 +79,23 @@ class _GalleryFilterSheetState extends State<GalleryFilterSheet> {
   void initState() {
     super.initState();
     widget.controller.addListener(_changed);
-    widget.index.addListener(_changed);
+    widget.index.addListener(_onIndexChanged);
     _search.addListener(_changed);
   }
 
   @override
   void dispose() {
     widget.controller.removeListener(_changed);
-    widget.index.removeListener(_changed);
+    widget.index.removeListener(_onIndexChanged);
     _search.dispose();
     super.dispose();
+  }
+
+  void _onIndexChanged() {
+    if (!mounted) return;
+    if (widget.index.publishedRevision != _facetsRevision) {
+      setState(() {});
+    }
   }
 
   void _changed() {
@@ -141,25 +148,30 @@ class _GalleryFilterSheetState extends State<GalleryFilterSheet> {
           ],
         ),
       ),
-      if (widget.index.isIndexing)
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                l.galleryFilterIndexing(widget.index.done, widget.index.total),
-                style: theme.textTheme.bodySmall,
-              ),
-              const SizedBox(height: 6),
-              LinearProgressIndicator(
-                value: widget.index.total == 0
-                    ? null
-                    : widget.index.done / widget.index.total,
-              ),
-            ],
-          ),
-        ),
+      ListenableBuilder(
+        listenable: widget.index,
+        builder: (context, _) {
+          if (!widget.index.isIndexing) return const SizedBox.shrink();
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l.galleryFilterIndexing(widget.index.done, widget.index.total),
+                  style: theme.textTheme.bodySmall,
+                ),
+                const SizedBox(height: 6),
+                LinearProgressIndicator(
+                  value: widget.index.total == 0
+                      ? null
+                      : widget.index.done / widget.index.total,
+                ),
+              ],
+            ),
+          );
+        },
+      ),
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
         child: TextField(

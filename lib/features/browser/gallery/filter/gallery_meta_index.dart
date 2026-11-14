@@ -343,9 +343,9 @@ class GalleryMetaIndex extends ChangeNotifier {
     if (_disposed) return;
     var added = 0;
     for (final r in list) {
-      if (!GalleryMetaParser.canParse(_extensionOf(r.path))) continue;
       if (r.size <= 0) continue;
       if (lookup(r.volId, r.path, r.size, r.mtime) != null) continue;
+      if (!GalleryMetaParser.canParse(_extensionOf(r.path))) continue;
       if (!_queued.add(_key(r.volId, r.path))) continue;
       _queue.add(r);
       added++;

@@ -172,6 +172,9 @@ void playLibraryTracks(
 // ── Tiles ───────────────────────────────────────────────────────────────────
 
 class LibraryAlbumTile extends StatelessWidget {
+  static const EdgeInsets _textPadding = EdgeInsets.fromLTRB(8, 4, 8, 6);
+  static const double _lineGap = 1;
+
   final AlbumGroup album;
   final MusicCovers covers;
   final VoidCallback onTap;
@@ -187,6 +190,38 @@ class LibraryAlbumTile extends StatelessWidget {
     this.onPlay,
   });
 
+  /// Height required for the 3-line text block below the 1:1 cover,
+  /// accounting for the current [MediaQuery.textScalerOf] and theme typography.
+  static double textAreaHeight(BuildContext context) {
+    final text = context.typography;
+    final defaultStyle = DefaultTextStyle.of(context);
+    final base = defaultStyle.style;
+    final scaler = MediaQuery.textScalerOf(context);
+    final direction = Directionality.maybeOf(context) ?? TextDirection.ltr;
+
+    double lineHeight(TextStyle? style) {
+      final painter = TextPainter(
+        text: TextSpan(text: 'Ag', style: base.merge(style)),
+        textDirection: direction,
+        textScaler: scaler,
+        textHeightBehavior: defaultStyle.textHeightBehavior,
+        maxLines: 1,
+      )..layout();
+      final h = painter.height;
+      painter.dispose();
+      return h;
+    }
+
+    return (_textPadding.vertical +
+            lineHeight(text.bodyMedium?.copyWith(fontWeight: FontWeight.w700)) +
+            _lineGap +
+            lineHeight(text.bodySmall) +
+            _lineGap +
+            lineHeight(text.labelSmall))
+        .ceilToDouble() +
+        2;
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = context.colors;
@@ -197,12 +232,12 @@ class LibraryAlbumTile extends StatelessWidget {
       shadowColor: cs.shadow.withValues(alpha: 0.35),
       borderRadius: BorderRadius.circular(16),
       clipBehavior: Clip.antiAlias,
-    child: InkWell(
+      child: InkWell(
         onTap: onTap,
         child: LayoutBuilder(
           builder: (context, constraints) {
             final textContent = Padding(
-              padding: const EdgeInsets.fromLTRB(8, 4, 8, 6),
+              padding: _textPadding,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -216,7 +251,7 @@ class LibraryAlbumTile extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: 1),
+                  const SizedBox(height: _lineGap),
                   Text(
                     libraryArtistLabelFor(context, album),
                     maxLines: 1,
@@ -226,7 +261,7 @@ class LibraryAlbumTile extends StatelessWidget {
                     ),
                   ),
                   if (album.tracks.isNotEmpty) ...[
-                    const SizedBox(height: 1),
+                    const SizedBox(height: _lineGap),
                     Text(
                       libraryAlbumDetails(album),
                       maxLines: 1,
@@ -239,6 +274,7 @@ class LibraryAlbumTile extends StatelessWidget {
                 ],
               ),
             );
+
 
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,

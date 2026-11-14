@@ -24,7 +24,11 @@ class CategoryEntry extends RawEntry {
     required super.sizeBytes,
     required super.modifiedSecs,
     this.isSourceRoot = false,
-  }) : super(
+    String? parentPath,
+    String? baseName,
+  }) : parentPath = parentPath ?? parentOfPath(path),
+       baseName = baseName ?? _computeBaseName(path),
+       super(
          name: name,
          lowercaseName: name.toLowerCase(),
          extension: name.contains('.')
@@ -43,12 +47,18 @@ class CategoryEntry extends RawEntry {
   final bool isSourceRoot;
 
   /// The folder [path] sits in, within the source.
-  String get parentPath => parentOfPath(path);
+  final String parentPath;
 
   /// The last segment of [path].
-  String get baseName {
-    final slash = path.lastIndexOf('/');
-    return slash < 0 ? path : path.substring(slash + 1);
+  final String baseName;
+
+  /// Cached subject representation to avoid recreation during filtering and grouping.
+  Object? cachedSubject;
+  int cachedSubjectRevision = -1;
+
+  static String _computeBaseName(String p) {
+    final slash = p.lastIndexOf('/');
+    return slash < 0 ? p : p.substring(slash + 1);
   }
 
   /// This entry shown under another [name] (same file, same identity).
@@ -60,6 +70,8 @@ class CategoryEntry extends RawEntry {
     sizeBytes: sizeBytes,
     modifiedSecs: modifiedSecs,
     isSourceRoot: isSourceRoot,
+    parentPath: parentPath,
+    baseName: baseName,
   );
 
   // Two files with the same path, size and date in different sources are
@@ -321,22 +333,35 @@ class CategoryAggregateScanner {
           );
         }
         final root = byVolId[volId]!.dedupeRoot;
+        if (root == null && seenAbsolute.isEmpty) {
+          entries.addAll(cache);
+          if (snap.folderPaths.isNotEmpty) {
+            folders[volId] = snap.folderPaths;
+          }
+          continue;
+        }
         final keptHere = <CategoryEntry>[];
+        var droppedAny = false;
         for (final entry in cache) {
           if (root != null && !seenAbsolute.add('$root/${entry.path}')) {
+            droppedAny = true;
             continue;
           }
           keptHere.add(entry);
         }
         entries.addAll(keptHere);
-        final set = <String>{};
-        for (final entry in keptHere) {
-          var dir = entry.parentPath;
-          while (dir.isNotEmpty && set.add(dir)) {
-            dir = parentOfPath(dir);
+        if (!droppedAny && snap.folderPaths.isNotEmpty) {
+          folders[volId] = snap.folderPaths;
+        } else {
+          final set = <String>{};
+          for (final entry in keptHere) {
+            var dir = entry.parentPath;
+            while (dir.isNotEmpty && set.add(dir)) {
+              dir = parentOfPath(dir);
+            }
           }
+          if (set.isNotEmpty) folders[volId] = set;
         }
-        if (set.isNotEmpty) folders[volId] = set;
       }
       return CategoryAggregateSnapshot(
         entries: entries,

@@ -6238,10 +6238,18 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       ),
     );
 
+    final view = View.of(context);
+    final rootNavInset = view.padding.bottom / view.devicePixelRatio;
     final hasBottomNavBar = !isLandscape && showActionBar;
+    // When the action bar is hidden (e.g. during search or when disabled in settings),
+    // the content needs to clear the system navigation bar (such as 3-button navigation).
+    // Uses paddingOf and falls back to the window's physical navigation inset.
     final bottomSystemInset = hasBottomNavBar
         ? 0.0
-        : MediaQuery.paddingOf(context).bottom;
+        : math.max(
+            MediaQuery.paddingOf(context).bottom,
+            MediaQuery.viewInsetsOf(context).bottom == 0 ? rootNavInset : 0.0,
+          );
     final baseBottomOffset =
         16.0 + (!isLandscape && showBookmarkBar ? 0.0 : bottomSystemInset);
 

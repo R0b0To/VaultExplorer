@@ -1550,13 +1550,11 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       ),
     );
     final Widget tabStripSlot = stripSlotFor(strip);
-    final Widget bottomBarSlot = ValueListenableBuilder<Widget?>(
-      valueListenable: _chrome.bottomBar,
-      builder: (context, bottomBar, _) => bottomBar ?? const SizedBox.shrink(),
-    );
 
-    final shell = Scaffold(
-      resizeToAvoidBottomInset: false,
+    final shell = ValueListenableBuilder<Widget?>(
+      valueListenable: _chrome.bottomBar,
+      builder: (context, bottomBar, _) => Scaffold(
+        resizeToAvoidBottomInset: false,
       body: Stack(
         fit: StackFit.expand,
         children: [
@@ -1771,15 +1769,16 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                 children: [
                   // The app bar goes under this slot, at the screen's edge, and
                   // so takes over the system navigation inset it would pad for.
-                  MediaQuery.removeViewInsets(
-                    context: context,
-                    removeBottom: true,
-                    child: MediaQuery.removePadding(
+                  if (bottomBar != null)
+                    MediaQuery.removeViewInsets(
                       context: context,
                       removeBottom: true,
-                      child: bottomBarSlot,
+                      child: MediaQuery.removePadding(
+                        context: context,
+                        removeBottom: true,
+                        child: bottomBar,
+                      ),
                     ),
-                  ),
                   _BottomAppBarSlot(
                     workspaceConfig: _workspace,
                     visibility: _appBarVisibilityController,
@@ -1796,7 +1795,8 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                 ],
               ),
             )
-          : bottomBarSlot,
+          : bottomBar,
+      ),
     );
 
     // Must wrap the whole screen: the system-bar probe points sit *behind* the

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
@@ -53,117 +55,129 @@ class _BottomSearchBarState extends State<BottomSearchBar> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final mediaQuery = MediaQuery.of(context);
+    final view = View.of(context);
+    final rootNavInset = view.padding.bottom / view.devicePixelRatio;
+    final keyboardInset = math.max(
+      mediaQuery.viewInsets.bottom,
+      view.viewInsets.bottom / view.devicePixelRatio,
+    );
+    // When the keyboard is dismissed, the search bar must sit above the
+    // system navigation bar (such as the 3-button navigation bar). If an
+    // ancestor widget or Scaffold stripped padding.bottom, fall back to
+    // the root window's physical navigation inset so the bar is never
+    // obscured behind the 3 buttons. When the keyboard is up, its inset
+    // already covers the navigation bar, so no additional nav inset is added.
+    final systemNavBar = keyboardInset == 0
+        ? math.max(mediaQuery.padding.bottom, rootNavInset)
+        : 0.0;
 
     return Padding(
       padding: EdgeInsets.only(
-        bottom: bottomInset + 8,
+        bottom: keyboardInset + systemNavBar + 8,
         left: 8,
         right: 8,
       ),
-      child: SafeArea(
-        top: false,
-        child: Material(
-          elevation: 6,
-          color: cs.surfaceContainerHigh,
-          shape: const StadiumBorder(),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-            child: Row(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.arrow_back_rounded, size: 20),
-                  tooltip: context.l10n.closeSearchTooltip,
-                  visualDensity: VisualDensity.compact,
-                  onPressed: widget.onClose,
+      child: Material(
+        elevation: 6,
+        color: cs.surfaceContainerHigh,
+        shape: const StadiumBorder(),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+          child: Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back_rounded, size: 20),
+                tooltip: context.l10n.closeSearchTooltip,
+                visualDensity: VisualDensity.compact,
+                onPressed: widget.onClose,
+              ),
+              Expanded(
+                child: TextField(
+                  controller: _ctrl,
+                  focusNode: _focusNode,
+                  // enableSuggestions: false is deliberately NOT set here.
+                  // On Android, Flutter's engine can only make IMEs
+                  // (Gboard, Samsung Keyboard, ...) actually honor "no
+                  // suggestions" by setting the native
+                  // TYPE_TEXT_VARIATION_VISIBLE_PASSWORD input flag under
+                  // the hood (flutter/engine#46037). Keyboards treat that
+                  // as a password field and swap to a reduced layout --
+                  // no emoji key, no suggestion strip, sometimes no
+                  // autocapitalization -- instead of the normal keyboard
+                  // every other text field in the app gets. Search gains
+                  // little from suppressing suggestions, so it's left on;
+                  // autocorrect alone is enough to stop it "correcting"
+                  // a real filename mid-search.
+                  autocorrect: false,
+                  onChanged: widget.onChanged,
+                  textInputAction: TextInputAction.search,
+                  style: const TextStyle(fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText:
+                        widget.hintText ??
+                        (widget.isDeepSearch
+                            ? context.l10n.searchInSubfoldersHint
+                            : context.l10n.searchInThisFolderHint),
+                    hintStyle: TextStyle(
+                      color: cs.onSurfaceVariant,
+                      fontSize: 14,
+                    ),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                  ),
                 ),
-                Expanded(
-                  child: TextField(
-                    controller: _ctrl,
-                    focusNode: _focusNode,
-                    // enableSuggestions: false is deliberately NOT set here.
-                    // On Android, Flutter's engine can only make IMEs
-                    // (Gboard, Samsung Keyboard, ...) actually honor "no
-                    // suggestions" by setting the native
-                    // TYPE_TEXT_VARIATION_VISIBLE_PASSWORD input flag under
-                    // the hood (flutter/engine#46037). Keyboards treat that
-                    // as a password field and swap to a reduced layout --
-                    // no emoji key, no suggestion strip, sometimes no
-                    // autocapitalization -- instead of the normal keyboard
-                    // every other text field in the app gets. Search gains
-                    // little from suppressing suggestions, so it's left on;
-                    // autocorrect alone is enough to stop it "correcting"
-                    // a real filename mid-search.
-                    autocorrect: false,
-                    onChanged: widget.onChanged,
-                    textInputAction: TextInputAction.search,
-                    style: const TextStyle(fontSize: 14),
-                    decoration: InputDecoration(
-                      hintText:
-                          widget.hintText ??
-                          (widget.isDeepSearch
-                              ? context.l10n.searchInSubfoldersHint
-                              : context.l10n.searchInThisFolderHint),
-                      hintStyle: TextStyle(
-                        color: cs.onSurfaceVariant,
-                        fontSize: 14,
-                      ),
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 8),
+              ),
+              if (widget.isSearchingSubfolders)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: cs.primary,
                     ),
                   ),
                 ),
-                if (widget.isSearchingSubfolders)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                    child: SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: cs.primary,
-                      ),
+              ValueListenableBuilder<TextEditingValue>(
+                valueListenable: _ctrl,
+                builder: (context, value, child) {
+                  if (value.text.isEmpty) return const SizedBox.shrink();
+                  return IconButton(
+                    icon: const Icon(Icons.clear_rounded, size: 18),
+                    tooltip: context.l10n.clearTooltip,
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () {
+                      _ctrl.clear();
+                      widget.onChanged('');
+                    },
+                  );
+                },
+              ),
+              if (widget.onDeepSearchToggle != null)
+                Tooltip(
+                  message: widget.isDeepSearch
+                      ? context.l10n.deepSearchEnabledTooltip
+                      : context.l10n.deepSearchDisabledTooltip,
+                  child: IconButton(
+                    icon: Icon(
+                      widget.isDeepSearch
+                          ? Icons.account_tree_rounded
+                          : Icons.account_tree_outlined,
+                      color: widget.isDeepSearch ? cs.primary : cs.onSurfaceVariant,
+                      size: 20,
                     ),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () =>
+                        widget.onDeepSearchToggle!(!widget.isDeepSearch),
                   ),
-                ValueListenableBuilder<TextEditingValue>(
-                  valueListenable: _ctrl,
-                  builder: (context, value, child) {
-                    if (value.text.isEmpty) return const SizedBox.shrink();
-                    return IconButton(
-                      icon: const Icon(Icons.clear_rounded, size: 18),
-                      tooltip: context.l10n.clearTooltip,
-                      visualDensity: VisualDensity.compact,
-                      onPressed: () {
-                        _ctrl.clear();
-                        widget.onChanged('');
-                      },
-                    );
-                  },
                 ),
-                if (widget.onDeepSearchToggle != null)
-                  Tooltip(
-                    message: widget.isDeepSearch
-                        ? context.l10n.deepSearchEnabledTooltip
-                        : context.l10n.deepSearchDisabledTooltip,
-                    child: IconButton(
-                      icon: Icon(
-                        widget.isDeepSearch
-                            ? Icons.account_tree_rounded
-                            : Icons.account_tree_outlined,
-                        color: widget.isDeepSearch ? cs.primary : cs.onSurfaceVariant,
-                        size: 20,
-                      ),
-                      visualDensity: VisualDensity.compact,
-                      onPressed: () =>
-                          widget.onDeepSearchToggle!(!widget.isDeepSearch),
-                    ),
-                  ),
-                const SizedBox(width: 4),
-              ],
-            ),
+              const SizedBox(width: 4),
+            ],
           ),
         ),
       ),

@@ -3161,10 +3161,14 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
         : null;
     // The docked search bar floats over the results, so they have to clear it
     // and the keyboard it rides on, as in the file manager.
+    final view = View.of(context);
+    final rootNavInset = view.padding.bottom / view.devicePixelRatio;
     final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
-    final systemInset = MediaQuery.viewPaddingOf(context).bottom;
+    final systemInset = keyboardInset == 0
+        ? math.max(MediaQuery.paddingOf(context).bottom, rootNavInset)
+        : 0.0;
     final searchClearance = _searchActive
-        ? 64.0 + (keyboardInset > systemInset ? keyboardInset : systemInset)
+        ? 64.0 + math.max(keyboardInset, systemInset)
         : 0.0;
     final selection = ref.watch(fileBrowserSelectionProvider(widget.tabId));
 

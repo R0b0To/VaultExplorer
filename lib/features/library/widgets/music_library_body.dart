@@ -329,7 +329,7 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
               hub: _hub,
               compact: true,
               onEditFolders: () =>
-                  unawaited(editMusicFolders(context, ref, widget.container)),
+                  unawaited(editMusicFolders(context, ref, widget.entry)),
             ),
             IconButton.filledTonal(
               visualDensity: VisualDensity.compact,
@@ -932,10 +932,10 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
     },
     onToggleMode: () {
       _popDetails();
-      unawaited(toggleMusicMode(context, ref, widget.container));
+      unawaited(toggleMusicMode(context, ref, widget.entry));
     },
     onEditFolders: () =>
-        unawaited(editMusicFolders(context, ref, widget.container)),
+        unawaited(editMusicFolders(context, ref, widget.entry)),
   );
 
   void _openAlbum(AlbumGroup a) {

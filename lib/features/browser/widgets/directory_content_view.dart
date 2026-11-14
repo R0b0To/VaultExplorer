@@ -546,10 +546,19 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
 
   FileManagerToolbarConfig _toolbarConfig = FileManagerToolbarConfig.defaults();
 
-  /// Music mode for this location. While one of its library views is showing
-  /// the file toolbar has nothing to act on, so it is hidden (see
+  /// Music mode for this tab. It is the tab's own: another tab on the same
+  /// location keeps whatever mode it is in. While one of its library views is
+  /// showing the file toolbar has nothing to act on, so it is hidden (see
   /// [_shownToolbarConfig]).
-  late final MusicModeEntry _music = musicModeEntryFor(ref, widget.container);
+  late final MusicModeEntry _music = musicModeEntryFor(
+    ref,
+    widget.container,
+    widget.tabId,
+  );
+
+  /// Whether music mode was on in this tab at the last [_onMusicChanged], to
+  /// tell a mode change from a change of the shared folders.
+  bool _lastTabMusicEnabled = false;
 
   /// The toolbar is also held back until the saved music mode setting has been
   /// read: a vault that opens in music mode must not show the file toolbar for
@@ -562,17 +571,26 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
 
   void _onMusicChanged() {
     if (!mounted) return;
+    final enabled = _music.config.enabled;
+    final modeChanged = enabled != _lastTabMusicEnabled;
+    _lastTabMusicEnabled = enabled;
     setState(() {});
     _syncMusicModeHint();
+    // This tab switched between music mode and the listing: what new tabs
+    // open in follows the latest choice.
+    if (modeChanged) {
+      _publishGalleryDefault(!enabled && _isGalleryMode);
+    }
   }
 
-  /// Keeps the on-device music mode hint equal to the real saved setting, so
-  /// the next cold open of this storage can show the right view at once. Runs
-  /// only after the real setting has been read.
+  /// Keeps the on-device music mode hint equal to the saved default for new
+  /// tabs, so the next cold open of this storage can show the right view at
+  /// once. Runs only after the real setting has been read. (Not this tab's own
+  /// state: the hint predicts what a newly opened tab starts in.)
   void _syncMusicModeHint() {
     if (!_music.loaded || !_toolbarConfigReady) return;
     final uri = widget.container.uri;
-    final enabled = _music.config.enabled;
+    final enabled = _music.savedDefaultEnabled;
     if (_toolbarConfig.isMusicModeHintedForStorage(uri) == enabled) return;
     unawaited(
       _updateToolbarConfigField(
@@ -910,6 +928,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         if (next != null) _onDropReveal(next);
       },
     );
+    _lastTabMusicEnabled = _music.config.enabled;
     _music.addListener(_onMusicChanged);
     _wasActiveTab = _isActiveTab;
     _wasMultiTab = _hasMultipleTabs;
@@ -1740,7 +1759,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     if (mounted &&
         !hasGoToLocationRequest &&
         _currentFilter == null &&
-        _toolbarConfig.isGalleryModeForStorage(widget.container.uri)) {
+        _toolbarConfig.isGalleryModeForStorage(widget.container.uri) &&
+        !_music.config.enabled) {
       _onFilterChosen('gallery');
     }
   }
@@ -2236,16 +2256,14 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     _signalActivity();
     _navNotifier.setFilter(value);
 
-    // Keep persisted gallery mode in sync with the filter selection.
-    final uri = widget.container.uri;
+    // Gallery mode is this tab's own (it is the tab's filter). The saved flag
+    // is only what tabs opened from now on start in, so it follows the latest
+    // choice and never changes a tab that is already open.
     final isGalleryFilter = value == 'gallery';
-    if (_toolbarConfig.isGalleryModeForStorage(uri) != isGalleryFilter) {
-      final effectiveUri = widget.container.isLocalStorage
-          ? null
-          : widget.container.uri;
-      ref
-          .read(fileManagerToolbarSettingsProvider(effectiveUri).notifier)
-          .setGalleryModeForStorage(uri, isGalleryFilter);
+    _publishGalleryDefault(isGalleryFilter && !_music.config.enabled);
+    if (isGalleryFilter && !_music.config.enabled) {
+      // Gallery is now the latest choice: new tabs must not open in music mode.
+      unawaited(_music.setDefaultForNewTabs(false));
     }
 
     if (value == null &&
@@ -2264,8 +2282,20 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     if (mounted) _queueItemReveal(name);
   }
 
-  bool get _isGalleryMode =>
-      _toolbarConfig.isGalleryModeForStorage(widget.container.uri);
+  /// Whether THIS tab is in gallery mode. Read from the tab's own filter, not
+  /// from the saved per-storage flag, which other tabs on the same storage
+  /// also write.
+  bool get _isGalleryMode => _currentFilter == 'gallery';
+
+  /// Records whether tabs opened from now on start in gallery mode.
+  void _publishGalleryDefault(bool enabled) {
+    final uri = widget.container.uri;
+    if (_toolbarConfig.isGalleryModeForStorage(uri) == enabled) return;
+    final effectiveUri = widget.container.isLocalStorage ? null : uri;
+    ref
+        .read(fileManagerToolbarSettingsProvider(effectiveUri).notifier)
+        .setGalleryModeForStorage(uri, enabled);
+  }
 
   /// The visible toolbar actions, excluding the filter button in gallery mode.
   List<FileManagerAction> get _visibleActions {
@@ -2277,9 +2307,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   }
 
   void _toggleGalleryMode() {
-    final uri = widget.container.uri;
-    final isCurrentlyEnabled = _toolbarConfig.isGalleryModeForStorage(uri);
-    final enable = !isCurrentlyEnabled;
+    final enable = !_isGalleryMode;
 
     if (enable) {
       _onFilterChosen('gallery');
@@ -5716,7 +5744,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       ),
       FileManagerAction.gallery: (context) => IconButton(
         icon: Icon(
-          toolbarConfig.isGalleryModeForStorage(widget.container.uri)
+          _isGalleryMode
               ? Icons.photo_library_rounded
               : Icons.photo_library_outlined,
         ),
@@ -5748,13 +5776,12 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         onPressed: canPlayMedia ? _startMediaViewerFromCurrentLocation : null,
       ),
       FileManagerAction.musicMode: (context) {
-        final music = musicModeEntryFor(ref, widget.container);
+        final music = _music;
         return ListenableBuilder(
           listenable: music,
           builder: (context, _) => MusicModeSwitchButton(
             musicMode: music.config.enabled,
-            onPressed: () =>
-                unawaited(toggleMusicMode(context, ref, widget.container)),
+            onPressed: () => unawaited(toggleMusicMode(context, ref, music)),
           ),
         );
       },
@@ -5825,7 +5852,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       // If the Add FAB is hidden via config, More takes the primary bottom-right slot.
       final moreRight = showAddFab ? (baseRight + 68.0) : baseRight;
 
-      final musicEntry = musicModeEntryFor(ref, widget.container);
+      final musicEntry = _music;
       widgets.add(
         Positioned(
           right: moreRight,
@@ -5855,10 +5882,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             onPlayMedia: _startMediaViewerFromCurrentLocation,
               musicModeActive: musicEntry.config.enabled,
               onToggleMusicMode: () =>
-                  unawaited(toggleMusicMode(context, ref, widget.container)),
-            isGalleryMode: _toolbarConfig.isGalleryModeForStorage(
-              widget.container.uri,
-            ),
+                  unawaited(toggleMusicMode(context, ref, musicEntry)),
+            isGalleryMode: _isGalleryMode,
             onToggleGallery: _toggleGalleryMode,
             toolbarConfig: _toolbarConfig,
             onToggleShowHiddenFiles: (v) => _updateToolbarConfigField(
@@ -6600,9 +6625,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             hub: ref.read(musicLibraryProvider).hub,
             showMenu: false,
             onToggleMode: () =>
-                unawaited(toggleMusicMode(context, ref, widget.container)),
+                unawaited(toggleMusicMode(context, ref, _music)),
             onEditFolders: () =>
-                unawaited(editMusicFolders(context, ref, widget.container)),
+                unawaited(editMusicFolders(context, ref, _music)),
           )
         : null;
     final Widget? embeddedBottomBar = selectionBottomBar ??

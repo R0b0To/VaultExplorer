@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/features/browser/models/tab_id.dart';
 import 'package:vaultexplorer/features/library/controllers/music_mode.dart';
 import 'package:vaultexplorer/features/library/data/library_index_store.dart';
 import 'package:vaultexplorer/features/library/models/music_config.dart';
@@ -259,45 +260,216 @@ void main() {
   });
 
   group('MusicModeRegistry', () {
-    test('one entry per container, shared', () {
+    const tabA = TabId(1);
+    const tabB = TabId(2);
+
+    test('one entry per tab, shared by everything showing that tab', () {
       final r = MusicModeRegistry(store);
-      expect(identical(r.entryFor(_vault('/a')), r.entryFor(_vault('/a'))), isTrue);
-      expect(identical(r.entryFor(_vault('/a')), r.entryFor(_vault('/b'))), isFalse);
+      expect(
+        identical(r.entryFor(_vault('/a'), tabA), r.entryFor(_vault('/a'), tabA)),
+        isTrue,
+      );
+      expect(
+        identical(r.entryFor(_vault('/a'), tabA), r.entryFor(_vault('/b'), tabB)),
+        isFalse,
+      );
+    });
+
+    test('two tabs on one container get their own entries and one scope', () {
+      final r = MusicModeRegistry(store);
+      final c = _vault('/a');
+      final first = r.entryFor(c, tabA);
+      final second = r.entryFor(c, tabB);
+      expect(identical(first, second), isFalse);
+      expect(r.entryCount, 2);
+      expect(r.scopeCount, 1);
     });
 
     test('an entry lives until its last holder releases it', () {
       final r = MusicModeRegistry(store);
       final c = _vault('/a');
-      final first = r.acquire(c);
-      final second = r.acquire(c); // e.g. the same vault in a second pane
+      final first = r.acquire(c, tabA);
+      final second = r.acquire(c, tabA); // e.g. the host rebuilt in a new pane
       expect(identical(first, second), isTrue);
 
-      r.release(c);
+      r.release(c, tabA);
       expect(r.entryCount, 1);
-      r.release(c);
+      r.release(c, tabA);
       expect(r.entryCount, 0);
+      expect(r.scopeCount, 0);
+    });
+
+    test('the container scope outlives a tab while another tab holds it', () {
+      final r = MusicModeRegistry(store);
+      final c = _vault('/a');
+      r.acquire(c, tabA);
+      r.acquire(c, tabB);
+      r.release(c, tabA);
+      expect(r.entryCount, 1);
+      expect(r.scopeCount, 1);
+      r.release(c, tabB);
+      expect(r.scopeCount, 0);
     });
 
     test('after everything lets go, a new entry reloads the saved setting', () async {
       final r = MusicModeRegistry(store);
       final c = _vault('/a');
-      final e = r.acquire(c);
+      final e = r.acquire(c, tabA);
       await e.load();
       await e.enable(folders: ['Music']);
-      r.release(c);
+      r.release(c, tabA);
 
-      final back = r.acquire(c);
+      final back = r.acquire(c, tabA);
       expect(identical(back, e), isFalse);
       await back.load();
       expect(back.config.enabled, isTrue);
       expect(back.config.folders, ['Music']);
-      r.release(c);
+      r.release(c, tabA);
     });
 
     test('releasing something never acquired is harmless', () {
       final r = MusicModeRegistry(store);
-      r.release(_vault('/zzz'));
+      r.release(_vault('/zzz'), tabA);
       expect(r.entryCount, 0);
+      expect(r.scopeCount, 0);
+    });
+  });
+
+  group('modes are per tab on the same container', () {
+    const tabA = TabId(1);
+    const tabB = TabId(2);
+    const tabC = TabId(3);
+
+    test('enabling in one tab leaves the other tab on the file listing', () async {
+      final r = MusicModeRegistry(store);
+      final c = _vault('/a');
+      final a = r.acquire(c, tabA);
+      final b = r.acquire(c, tabB);
+      await a.load();
+      await b.load();
+
+      await a.enable(folders: ['Music']);
+
+      expect(a.config.enabled, isTrue);
+      expect(a.libraryVisible, isTrue);
+      expect(b.config.enabled, isFalse);
+      expect(b.libraryVisible, isFalse);
+      expect(b.category, MusicCategory.files);
+      r.release(c, tabA);
+      r.release(c, tabB);
+    });
+
+    test('disabling in one tab leaves the other tab in music mode', () async {
+      final r = MusicModeRegistry(store);
+      final c = _vault('/a');
+      final a = r.acquire(c, tabA);
+      final b = r.acquire(c, tabB);
+      await a.load();
+      await a.enable();
+      await b.enable();
+
+      await a.disable();
+
+      expect(a.config.enabled, isFalse);
+      expect(b.config.enabled, isTrue);
+      expect(b.libraryVisible, isTrue);
+      r.release(c, tabA);
+      r.release(c, tabB);
+    });
+
+    test('the library view is chosen per tab', () async {
+      final r = MusicModeRegistry(store);
+      final c = _vault('/a');
+      final a = r.acquire(c, tabA);
+      final b = r.acquire(c, tabB);
+      await a.enable();
+      await b.enable();
+
+      a.setCategory(MusicCategory.tracks);
+
+      expect(a.category, MusicCategory.tracks);
+      expect(b.category, MusicCategory.albums);
+      r.release(c, tabA);
+      r.release(c, tabB);
+    });
+
+    test('the covered folders are shared by every tab on the container', () async {
+      final r = MusicModeRegistry(store);
+      final c = _vault('/a');
+      final a = r.acquire(c, tabA);
+      final b = r.acquire(c, tabB);
+      await a.load();
+      var bNotified = 0;
+      b.addListener(() => bNotified++);
+
+      await a.enable(folders: ['Music']);
+      expect(b.config.folders, ['Music']);
+      expect(b.config.enabled, isFalse);
+
+      await b.setFolders(['Podcasts']);
+      expect(a.config.folders, ['Podcasts']);
+      expect(bNotified, greaterThan(0));
+      r.release(c, tabA);
+      r.release(c, tabB);
+    });
+
+    test('a tab opened later starts in the latest saved choice', () async {
+      final r = MusicModeRegistry(store);
+      final c = _vault('/a');
+      final a = r.acquire(c, tabA);
+      await a.load();
+      await a.enable(folders: ['Music']);
+
+      final later = r.acquire(c, tabC);
+      expect(later.loaded, isTrue);
+      expect(later.config.enabled, isTrue);
+      expect(later.category, MusicCategory.albums);
+
+      // Turning it off in the new tab changes what the NEXT tab opens in, not
+      // the tab that is still in music mode.
+      await later.disable();
+      expect(a.config.enabled, isTrue);
+      expect(a.libraryVisible, isTrue);
+      expect(a.savedDefaultEnabled, isFalse);
+      final next = r.acquire(c, const TabId(4));
+      expect(next.config.enabled, isFalse);
+      r.release(c, tabA);
+      r.release(c, tabC);
+      r.release(c, const TabId(4));
+    });
+
+    test('setDefaultForNewTabs never changes tabs that are already open', () async {
+      final r = MusicModeRegistry(store);
+      final c = _vault('/a');
+      final a = r.acquire(c, tabA);
+      await a.load();
+      await a.enable();
+
+      await a.setDefaultForNewTabs(false);
+
+      expect(a.config.enabled, isTrue);
+      expect(a.savedDefaultEnabled, isFalse);
+      r.release(c, tabA);
+    });
+
+    test('a tab that chose a mode before the load finished keeps it', () async {
+      final r = MusicModeRegistry(store);
+      final c = _vault('/a');
+      // The vault was saved with music mode on.
+      final seed = MusicModeEntry(c, store);
+      await seed.load();
+      await seed.enable(folders: ['Music']);
+      seed.dispose();
+
+      final a = r.acquire(c, tabA);
+      await a.disable(); // chosen before the saved setting was adopted
+      await a.load();
+
+      expect(a.config.enabled, isFalse);
+      // ...and it was saved on top of the saved folders, not over them.
+      expect(a.savedDefaultEnabled, isFalse);
+      expect(a.config.folders, ['Music']);
+      r.release(c, tabA);
     });
   });
 }

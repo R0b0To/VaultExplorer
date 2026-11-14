@@ -52,12 +52,13 @@ void main() {
 
   group('FileBrowserOperationsController.pasteStandardTransfer', () {
     test('returns null without showing conflict sheet if all source items are missing', () async {
-      // Mock: getFileSize returns -1 (missing), listDirectory returns existing file in dest
+      // Mock: getFileSize returns -1 (missing), listDirectory returns existing file in dest only
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(channel, (call) async {
             if (call.method == 'getFileSize') return -1;
             if (call.method == 'listDirectory') {
-              return ['F|100|0|test.txt'];
+              final uri = (call.arguments as Map)['filePath'];
+              return uri == destContainer.uri ? ['F|100|0|test.txt'] : <String>[];
             }
             return null;
           });
@@ -92,8 +93,13 @@ void main() {
               return -1; // 'deleted.txt' is missing
             }
             if (call.method == 'listDirectory') {
-              // Destination has both names
-              return ['F|100|0|alive.txt', 'F|100|0|deleted.txt'];
+              final uri = (call.arguments as Map)['filePath'];
+              if (uri == destContainer.uri) {
+                // Destination has both names
+                return ['F|100|0|alive.txt', 'F|100|0|deleted.txt'];
+              }
+              // Source only has alive.txt ('deleted.txt' is missing)
+              return ['F|100|0|alive.txt'];
             }
             return null;
           });

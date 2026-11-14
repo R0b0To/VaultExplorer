@@ -156,7 +156,9 @@ String? _mergeSegments(_MergeJob job) {
         merged.remove(path);
         merged[path] = v.cast<Object?>();
       }
-    } catch (_) {}
+    } catch (_) {
+      // A damaged segment counts as none; the next compaction drops it.
+    }
   }
   if (merged.isEmpty) return null;
   while (merged.length > job.limit) {

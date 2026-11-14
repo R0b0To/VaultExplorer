@@ -216,12 +216,15 @@ class VaultFileIoApi {
     if (isDir) {
       return canListDirectory(container, path);
     }
-    if (container.isLocalStorage) {
-      return _local.entryExists(container.uri, path, isDir: false);
-    }
+    // SAF must be tested BEFORE isLocalStorage: added storage locations are
+    // volId < 0 too, and their uri is a content:// tree, not a filesystem path,
+    // so File(uri/path).exists() is always false and every file looked missing.
     if (_isSaf(container)) {
       final size = await getFileSize(container, path);
       return size >= 0;
+    }
+    if (container.isLocalStorage) {
+      return _local.entryExists(container.uri, path, isDir: false);
     }
     // Vault file. Deliberately NOT a getFileSize probe: on folder vaults whose
     // storage is mirrored from a remote/cloud provider, the native getFileSize

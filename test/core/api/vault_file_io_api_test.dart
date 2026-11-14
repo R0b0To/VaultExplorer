@@ -562,6 +562,18 @@ void main() {
           });
     }
 
+    test('entryExists on a SAF file asks the SAF provider, not the local '
+        'filesystem (regression: files in added storage locations looked '
+        'missing)', () async {
+      mockChannel((call) => call.method == 'safGetFileSize' ? 1234 : null);
+      expect(await api.entryExists(saf, 'Docs/a.txt', isDir: false), isTrue);
+      expect(calls.single.method, 'safGetFileSize');
+
+      calls.clear();
+      mockChannel((call) => call.method == 'safGetFileSize' ? -1 : null);
+      expect(await api.entryExists(saf, 'Docs/a.txt', isDir: false), isFalse);
+    });
+
     test('getFolderSize sums a SAF tree instead of reporting 0', () async {
       final listings = <String, List<Map<String, Object>>>{
         '': [

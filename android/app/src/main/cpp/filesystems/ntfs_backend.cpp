@@ -44,6 +44,8 @@ extern "C" {
 
 static bool ntfsIsDirectoryInode(const ntfs_inode* ni);
 
+static bool ntfsIsDirectoryInode(const ntfs_inode* ni);
+
 namespace {
 bool ntfsIsSymlinkInode(const ntfs_inode* inode);
 constexpr int kMaxVolumes = FF_VOLUMES;

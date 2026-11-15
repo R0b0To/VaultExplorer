@@ -518,6 +518,12 @@ class _CreateSymlinkDialogState extends ConsumerState<_CreateSymlinkDialog>
   /// only lets the dialog say so before the user taps Create.
   Set<String> _linkNames = const {};
 
+  /// Where the folder this link will live in really is (every link in its path followed). Relative targets
+  /// are applied from this folder, not from the path the browser reached it by, which can pass through a
+  /// folder link of a different depth. Null while loading or when it could not be established; validation then
+  /// falls back to the displayed path (the native engine remains the authority and refuses an escaping target).
+  String? _physicalDirPath;
+
   @override
   void initState() {
     super.initState();
@@ -525,6 +531,16 @@ class _CreateSymlinkDialogState extends ConsumerState<_CreateSymlinkDialog>
     _targetCtrl = TextEditingController();
     _fsType = resolveFilesystemType(widget.container);
     unawaited(_loadLinkNames());
+    unawaited(_resolvePhysicalDir());
+  }
+
+  Future<void> _resolvePhysicalDir() async {
+    final resolved = await _fileIoApi.resolveVaultPhysicalPath(
+      widget.container,
+      widget.currentDirPath,
+    );
+    if (!mounted) return;
+    setState(() => _physicalDirPath = resolved);
   }
 
   @override
@@ -558,7 +574,7 @@ class _CreateSymlinkDialogState extends ConsumerState<_CreateSymlinkDialog>
 
   SymlinkTargetIssue? get _targetIssue => validateSymlinkTarget(
     _targetCtrl.text,
-    parentPath: widget.currentDirPath,
+    parentPath: _physicalDirPath ?? widget.currentDirPath,
     requireRelativeInsideVault: _requiresRelativeTarget,
   );
 
@@ -584,12 +600,32 @@ class _CreateSymlinkDialogState extends ConsumerState<_CreateSymlinkDialog>
     );
     if (!mounted || selectedPath == null) return;
 
-    // Cryptomator stores a symlink target relative to the directory containing
-    // the link. Keep it relative so the native resolver can enforce the
-    // same-vault boundary without ever accepting a host/absolute path.
-    final from = widget.currentDirPath.isEmpty ? '.' : widget.currentDirPath;
-    final relativeTarget = p.posix.relative(selectedPath, from: from);
-    _targetCtrl.text = relativeTarget;
+    // A target is stored relative to the folder the link physically lives in, and it is applied from there.
+    // Both ends are therefore resolved through any folder links first: the path as displayed can be shallower
+    // or deeper than the real location, and a relative path built from displayed paths would then point at the
+    // wrong place. The picked entry keeps its own last name (a link to a link stays a link to that link).
+    final physicalDir =
+        _physicalDirPath ??
+        await _fileIoApi.resolveVaultPhysicalPath(
+          widget.container,
+          widget.currentDirPath,
+        );
+    final physicalTarget = await _fileIoApi.resolveVaultPhysicalPath(
+      widget.container,
+      selectedPath,
+      followLast: false,
+    );
+    if (!mounted) return;
+    if (physicalDir == null || physicalTarget == null) {
+      showAppSnackBar(
+        context,
+        message: context.l10n.symbolicLinkPickerUnresolvable,
+        tone: AppBannerTone.error,
+      );
+      return;
+    }
+    final from = physicalDir.isEmpty ? '.' : physicalDir;
+    _targetCtrl.text = p.posix.relative(physicalTarget, from: from);
     setState(() {});
   }
 

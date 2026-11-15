@@ -212,6 +212,9 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     end: 1.0,
   ).animate(_loopTransitionController);
   final Map<TabId, GlobalKey> _directoryViewKeys = {};
+  // A tab's music mode lives in its host's entry, so the host keeps its element
+  // (like the directory view inside it) when the tab changes panes.
+  final Map<TabId, GlobalKey> _musicHostKeys = {};
   final Map<TabId, GlobalKey> _categoryViewKeys = {};
   final Map<TabId, GlobalKey> _dashboardViewKeys = {};
   bool _popScheduled = false;
@@ -419,6 +422,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
 
     final liveTabIds = next.tabs.map((tab) => tab.tabId).toSet();
     _directoryViewKeys.removeWhere((id, _) => !liveTabIds.contains(id));
+    _musicHostKeys.removeWhere((id, _) => !liveTabIds.contains(id));
     _categoryViewKeys.removeWhere((id, _) => !liveTabIds.contains(id));
     _dashboardViewKeys.removeWhere((id, _) => !liveTabIds.contains(id));
     if (next.tabs.isEmpty && !_popScheduled) {
@@ -598,7 +602,11 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     }
     return SkinAreaScope(
       area: SkinArea.files,
-      child: MusicModeHost(container: tab.container!, child: DirectoryContentView(
+      child: MusicModeHost(
+        key: _musicHostKeys.putIfAbsent(tab.tabId, GlobalKey.new),
+        container: tab.container!,
+        tabId: tab.tabId,
+        child: DirectoryContentView(
         key: _directoryViewKeys.putIfAbsent(tab.tabId, GlobalKey.new),
         container: tab.container!,
         tabId: tab.tabId,
@@ -1550,13 +1558,11 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       ),
     );
     final Widget tabStripSlot = stripSlotFor(strip);
-    final Widget bottomBarSlot = ValueListenableBuilder<Widget?>(
-      valueListenable: _chrome.bottomBar,
-      builder: (context, bottomBar, _) => bottomBar ?? const SizedBox.shrink(),
-    );
 
-    final shell = Scaffold(
-      resizeToAvoidBottomInset: false,
+    final shell = ValueListenableBuilder<Widget?>(
+      valueListenable: _chrome.bottomBar,
+      builder: (context, bottomBar, _) => Scaffold(
+        resizeToAvoidBottomInset: false,
       body: Stack(
         fit: StackFit.expand,
         children: [
@@ -1771,15 +1777,16 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                 children: [
                   // The app bar goes under this slot, at the screen's edge, and
                   // so takes over the system navigation inset it would pad for.
-                  MediaQuery.removeViewInsets(
-                    context: context,
-                    removeBottom: true,
-                    child: MediaQuery.removePadding(
+                  if (bottomBar != null)
+                    MediaQuery.removeViewInsets(
                       context: context,
                       removeBottom: true,
-                      child: bottomBarSlot,
+                      child: MediaQuery.removePadding(
+                        context: context,
+                        removeBottom: true,
+                        child: bottomBar,
+                      ),
                     ),
-                  ),
                   _BottomAppBarSlot(
                     workspaceConfig: _workspace,
                     visibility: _appBarVisibilityController,
@@ -1796,7 +1803,8 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                 ],
               ),
             )
-          : bottomBarSlot,
+          : bottomBar,
+      ),
     );
 
     // Must wrap the whole screen: the system-bar probe points sit *behind* the

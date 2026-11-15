@@ -572,12 +572,23 @@ public:
         try {
             Lifecycle::Op op(life_);
             std::string n = normalizePath(path);
+            if (n.empty()) return true;   // the vault root always exists
             std::unique_lock<std::shared_mutex> ns(ns_);
-            auto resolved = resolveSymlinkPathLocked(n);
-            if (!resolved) return false;
-            n = *resolved;
-            if (n.empty()) return true; // a shortcut resolving to the vault root
-            if (auto existing = tree_.resolve(n)) return existing->isDir;
+            // Links are followed in the parent path only. The last name is NOT followed: mkdir on a name that a
+            // link already holds must never create a folder at the link's target (POSIX answers EEXIST).
+            auto parentResolved = resolveSymlinkPathLocked(parentOf(n));
+            if (!parentResolved) return false;
+            n = joinPath(*parentResolved, nameOf(n));
+            if (auto existing = tree_.resolve(n)) {
+                if (!existing->isSymlink) return existing->isDir;
+                // "mkdir -p" semantics: a link to an existing folder counts as that folder being there; a link to
+                // a file, or a dangling one, does not (and creates nothing).
+                auto target = resolveSymlinkPathLocked(n);
+                if (!target) return false;
+                if (target->empty()) return true;
+                auto t = tree_.resolve(*target);
+                return t && t->isDir && !t->isSymlink;
+            }
             std::string parentPath = parentOf(n), name = nameOf(n);
             std::string parentId;
             if (!tree_.resolveDirId(parentPath, parentId)) return false;
@@ -615,6 +626,14 @@ public:
             std::string newN = joinPath(*newParentResolved, nameOf(newInput));
             auto node = tree_.resolve(oldN);
             if (!node) return false;
+            // A folder can never move into itself or into one of its own subfolders: its node would end up
+            // inside the folder it names and the whole subtree would be cut off from the vault. Both paths are
+            // physical here (links in the parents are already resolved), so a prefix test is exact. It also
+            // catches a destination that is reached through a link pointing back at the source.
+            if (node->isDir && !node->isSymlink) {
+                const std::string destParent = parentOf(newN);
+                if (destParent == oldN || startsWith(destParent, (oldN + "/").c_str())) return false;
+            }
             std::string oldParent = parentOf(oldN), newParent = parentOf(newN), newName = nameOf(newN);
             std::string newParentId;
             if (!tree_.resolveDirId(newParent, newParentId)) return false;
@@ -871,8 +890,19 @@ private:
         } else {
             phys = createNewFileNode(parentPhys, nc_.encryptFilename(name, parentId));
         }
-        st_->markWritePending(phys);
-        { std::lock_guard<std::mutex> g(pmu_); pending_[original] = phys; }
+        {
+            std::lock_guard<std::mutex> g(pmu_);
+            // Two names for one file (a path through a link, and the real path) share no engine path lock, so a
+            // second concurrent writer through another name is refused here rather than letting both write the
+            // same physical file. A batched import defers publishing, so a finished write stays "pending" until
+            // the batch ends and must not count; rewriting through the same name was always fine.
+            if (!batchWrite_)
+                for (const auto& kv : pending_)
+                    if (kv.second == phys && kv.first != original)
+                        throw Error(Err::Exists, "another write to the same file is in progress");
+            st_->markWritePending(phys);
+            pending_[original] = phys;
+        }
         return phys;
     }
 
@@ -897,8 +927,9 @@ private:
 
     // Resolve Cryptomator symlinks like a POSIX path walk, but with the vault root as
     // the boundary. Absolute targets are rejected; relative targets are interpreted
-    // from the link's parent. A bounded hop count and visited set prevent cycles.
+    // from the link's parent. A bounded hop count (kMaxSymlinkHops) stops cycles.
     // Caller must hold ns_ (shared or exclusive).
+    static constexpr int kMaxSymlinkHops = 40;
     std::optional<std::string> resolveSymlinkPathLocked(const std::string& input) {
         if (!input.empty() && input.front() == '/') return std::nullopt;
         std::vector<std::string> pending = splitSegments(normalizePath(input));
@@ -921,7 +952,7 @@ private:
                 return std::nullopt;
             }
             if (node->isSymlink) {
-                if (++hops > 40) return std::nullopt;
+                if (++hops > kMaxSymlinkHops) return std::nullopt;
                 std::string target;
                 st_->ensureContentReady(node->symlinkFile);
                 if (!readSmallEncryptedFile(*st_, fmt_, node->symlinkFile, kMaxSymlinkLength, target) ||

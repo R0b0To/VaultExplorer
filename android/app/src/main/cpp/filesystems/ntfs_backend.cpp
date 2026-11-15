@@ -53,21 +53,6 @@ const bool kNtfsDevicePositionsInitialized = []() {
     return true;
 }();
 
-static void genericLuksXtsCrypt(const XtsLayerKey& layer, bool encrypt, size_t dataLen,
-                                const unsigned char tweakSeed[16],
-                                const unsigned char* in, unsigned char* out) {
-    unsigned char T[16];
-    blockCipherEncryptBlock(layer.tweakKey, tweakSeed, T);
-    for (size_t b = 0; b < dataLen / 16; b++) {
-        unsigned char tmp[16];
-        for (int j = 0; j < 16; j++) tmp[j] = in[b * 16 + j] ^ T[j];
-        if (encrypt) blockCipherEncryptBlock(layer.dataKeyEnc, tmp, tmp);
-        else         blockCipherDecryptBlock(layer.dataKeyDec, tmp, tmp);
-        for (int j = 0; j < 16; j++) out[b * 16 + j] = tmp[j] ^ T[j];
-        xtsMultiplyTweak(T);
-    }
-}
-
 int ntfsVolumeId(const ntfs_device* device) {
     if (device->d_private) return *static_cast<const int*>(device->d_private);
     return (device->d_name && std::strncmp(device->d_name, "ve", 2) == 0)
@@ -207,20 +192,14 @@ s64 ntfsPread(ntfs_device* device, void* buffer, s64 count, s64 offset) {
         for (uint32_t i = 0; i < unitCount; ++i) {
             const uint64_t phys512Sector = (physicalStartByte / 512) + i;
             const uint64_t sectorNum = phys512Sector - volume.partitionStartSector;
-            unsigned char tweakBuf[16] = {0};
-            for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorNum >> (b * 8)) & 0xFF;
-            genericLuksXtsCrypt(volume.luksGenericCascade.layers[0], false, 512, tweakBuf,
-                                 encrypted + i * 512, plaintext + i * 512);
+            luksCryptUnit(volume, false, sectorNum, 512, encrypted + i * 512, plaintext + i * 512);
         }
     } else {
         for (uint32_t i = 0; i < unitCount; ++i) {
             const uint64_t unitByteOffset = physicalStartByte + static_cast<uint64_t>(i) * luksUnit;
             const uint64_t phys512Sector = unitByteOffset / 512;
             const uint64_t sectorTweak = phys512Sector - volume.partitionStartSector;
-            unsigned char tweakBuf[16] = {0};
-            for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;
-            genericLuksXtsCrypt(volume.luksGenericCascade.layers[0], false, luksUnit, tweakBuf,
-                                 encrypted + i * luksUnit, plaintext + i * luksUnit);
+            luksCryptUnit(volume, false, sectorTweak, luksUnit, encrypted + i * luksUnit, plaintext + i * luksUnit);
         }
     }
 
@@ -296,20 +275,14 @@ s64 ntfsPwrite(ntfs_device* device, const void* buffer, s64 count, s64 offset) {
             for (uint32_t i = 0; i < unitCount; ++i) {
                 const uint64_t phys512Sector = (physicalStartByte / 512) + i;
                 const uint64_t sectorNum = phys512Sector - volume.partitionStartSector;
-                unsigned char tweakBuf[16] = {0};
-                for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorNum >> (b * 8)) & 0xFF;
-                genericLuksXtsCrypt(volume.luksGenericCascade.layers[0], false, 512, tweakBuf,
-                                     encrypted + i * 512, sectors + i * 512);
+                luksCryptUnit(volume, false, sectorNum, 512, encrypted + i * 512, sectors + i * 512);
             }
         } else {
             for (uint32_t i = 0; i < unitCount; ++i) {
                 const uint64_t unitByteOffset = physicalStartByte + static_cast<uint64_t>(i) * luksUnit;
                 const uint64_t phys512Sector = unitByteOffset / 512;
                 const uint64_t sectorTweak = phys512Sector - volume.partitionStartSector;
-                unsigned char tweakBuf[16] = {0};
-                for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;
-                genericLuksXtsCrypt(volume.luksGenericCascade.layers[0], false, luksUnit, tweakBuf,
-                                     encrypted + i * luksUnit, sectors + i * luksUnit);
+                luksCryptUnit(volume, false, sectorTweak, luksUnit, encrypted + i * luksUnit, sectors + i * luksUnit);
             }
         }
     }
@@ -329,20 +302,14 @@ s64 ntfsPwrite(ntfs_device* device, const void* buffer, s64 count, s64 offset) {
         for (uint32_t i = 0; i < unitCount; ++i) {
             const uint64_t phys512Sector = (physicalStartByte / 512) + i;
             const uint64_t sectorNum = phys512Sector - volume.partitionStartSector;
-            unsigned char tweakBuf[16] = {0};
-            for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorNum >> (b * 8)) & 0xFF;
-            genericLuksXtsCrypt(volume.luksGenericCascade.layers[0], true, 512, tweakBuf,
-                                 sectors + i * 512, encryptedOut + i * 512);
+            luksCryptUnit(volume, true, sectorNum, 512, sectors + i * 512, encryptedOut + i * 512);
         }
     } else {
         for (uint32_t i = 0; i < unitCount; ++i) {
             const uint64_t unitByteOffset = physicalStartByte + static_cast<uint64_t>(i) * luksUnit;
             const uint64_t phys512Sector = unitByteOffset / 512;
             const uint64_t sectorTweak = phys512Sector - volume.partitionStartSector;
-            unsigned char tweakBuf[16] = {0};
-            for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;
-            genericLuksXtsCrypt(volume.luksGenericCascade.layers[0], true, luksUnit, tweakBuf,
-                                 sectors + i * luksUnit, encryptedOut + i * luksUnit);
+            luksCryptUnit(volume, true, sectorTweak, luksUnit, sectors + i * luksUnit, encryptedOut + i * luksUnit);
         }
     }
 
@@ -887,10 +854,37 @@ std::string ntfsJoinPath(const std::vector<std::string>& parts) {
     return out;
 }
 
-bool ntfsTargetStaysInside(const std::string& parentPath, const std::string& target) {
+// Number of directories between [dir] and the volume root, found by following each directory's parent: the
+// PHYSICAL depth. A path as written can be shallower or deeper than the directory it names when a folder link
+// is part of it, and a target's ".." steps are applied from where the link really lives. [dir] stays owned by
+// the caller.
+static bool ntfsDirectoryDepth(ntfs_inode* dir, size_t* depth) {
+    ntfs_inode* current = dir;
+    bool owned = false;
+    size_t d = 0;
+    for (int guard = 0; guard < 4096; ++guard) {
+        if (current->mft_no == FILE_root) {
+            if (owned) ntfs_inode_close(current);
+            *depth = d;
+            return true;
+        }
+        ntfs_inode* parent = ntfs_dir_parent_inode(current);
+        if (owned) ntfs_inode_close(current);
+        if (!parent) return false;
+        current = parent;
+        owned = true;
+        ++d;
+    }
+    if (owned) ntfs_inode_close(current);
+    return false;   // a damaged tree (a parent loop)
+}
+
+// A relative target must never climb above the volume root. [parentDepth] is the physical depth of the
+// directory the link will be created in (see ntfsDirectoryDepth).
+bool ntfsTargetStaysInside(size_t parentDepth, const std::string& target) {
     if (target.empty() || target.front() == '/' || target.front() == '\\' ||
         target.find('\0') != std::string::npos) return false;
-    std::vector<std::string> combined = ntfsSplitPath(parentPath);
+    std::vector<std::string> combined(parentDepth, "d");   // names are irrelevant, only the depth counts
     const auto targetParts = ntfsSplitPath(target);
     combined.insert(combined.end(), targetParts.begin(), targetParts.end());
     std::vector<std::string> normalized;
@@ -1046,9 +1040,14 @@ bool ntfsCreateSymlink(int volumeId, const std::string& path, const std::string&
     const size_t slash = path.find_last_of('/');
     const std::string parentPath = slash == std::string::npos ? "" : path.substr(0, slash);
     const std::string name = slash == std::string::npos ? path : path.substr(slash + 1);
-    if (name.empty() || !ntfsTargetStaysInside(parentPath, target)) return false;
+    if (name.empty()) return false;
     ntfs_inode* parent = ntfsResolvePath(volume, parentPath, true);
     if (!parent) return false;
+    size_t parentDepth = 0;
+    if (!ntfsDirectoryDepth(parent, &parentDepth) || !ntfsTargetStaysInside(parentDepth, target)) {
+        ntfs_inode_close(parent);
+        return false;
+    }
     ntfschar* unicodeName = nullptr;
     ntfschar* unicodeTarget = nullptr;
     const int nameLength = ntfs_mbstoucs(name.c_str(), &unicodeName);

@@ -174,6 +174,47 @@ class VeraCryptToolsApi {
     }
   }
 
+  /// Expands a raw single-volume BitLocker file container: the FVE metadata is rewritten and re-sealed so the
+  /// encrypted volume covers the added space, then NTFS is grown into it. [password] is a password or a 48-digit
+  /// recovery key. Works on raw BitLocker volume files and on fixed/dynamic VHD or VHDX disk images (for those, [newSizeBytes] is the new virtual disk size). Fails with NOT_BITLOCKER when no BitLocker volume is found, NOT_EXPANDABLE for BitLocker To Go or
+  /// volumes that are not fully encrypted.
+  Future<FileSystemGrowInfo> expandBitLockerContainer({
+    required String uri,
+    required String password,
+    required int newSizeBytes,
+    bool initFreeSpace = false,
+    bool growFileSystem = true,
+  }) async {
+    try {
+      final raw = await _channel.invokeMethod<Map<Object?, Object?>>(ChannelMethods.expandBitLockerContainer, {
+        'uri': uri,
+        'password': password,
+        'newSizeBytes': newSizeBytes,
+        'initFreeSpace': initFreeSpace,
+        'growFileSystem': growFileSystem,
+      });
+      return FileSystemGrowInfo.fromMap(raw);
+    } on PlatformException catch (e) {
+      throw VeraCryptToolsException(e.code, e.message ?? e.code);
+    }
+  }
+
+  /// Re-runs only the NTFS grow step of a BitLocker volume whose metadata already records the larger size.
+  Future<FileSystemGrowInfo> growBitLockerFileSystem({
+    required String uri,
+    required String password,
+  }) async {
+    try {
+      final raw = await _channel.invokeMethod<Map<Object?, Object?>>(ChannelMethods.growBitLockerFileSystem, {
+        'uri': uri,
+        'password': password,
+      });
+      return FileSystemGrowInfo.fromMap(raw);
+    } on PlatformException catch (e) {
+      throw VeraCryptToolsException(e.code, e.message ?? e.code);
+    }
+  }
+
   /// Reads the outer volume's cluster map and returns the largest hidden volume that fits at its end.
   Future<HiddenHostInfo> analyzeHiddenHost({
     required String uri,

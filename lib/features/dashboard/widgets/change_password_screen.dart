@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart' show AutofillContextAction;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
@@ -88,7 +89,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                 controller: _oldPasswordCtrl,
                 obscureText: _oldObscure,
                 onChanged: (_) => setState(() {}),
-                autofillHints: null,
+                autofillHints: const <String>[AutofillHints.password],
                 decoration: InputDecoration(
                   labelText: context.l10n.oldPasswordLabel,
                   prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: cs.primary),
@@ -296,6 +297,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: AutofillGroup(
+              onDisposeAction: AutofillContextAction.cancel,
               child: wideLayout
                   ? Row(
                       crossAxisAlignment: CrossAxisAlignment.start,

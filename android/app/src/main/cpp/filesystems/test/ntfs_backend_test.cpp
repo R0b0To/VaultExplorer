@@ -6,7 +6,7 @@
 // physicalRead()/physicalWrite() are implemented over plain host files, and the
 // volume is configured as an unencrypted flat container, so the backend's
 // "no encryption layer at all -- pass bytes straight through" path is what runs.
-// BitLocker, VHD/VHDX and the cipher cascade are stubbed out; the NTFS logic
+// BitLocker, VHD/VHDX and both cipher engines are stubbed out; the NTFS logic
 // above them is the same code that runs on top of a decrypted BitLocker volume.
 //
 // Oracles are *independent* programs, not the backend reading back its own
@@ -61,6 +61,8 @@ bool bitlockerRead(int, uint64_t, unsigned char*, size_t) { return false; }
 bool bitlockerWrite(int, uint64_t, const unsigned char*, size_t) { return false; }
 void cascadeEncryptSector(const CascadeContext&, uint64_t, const unsigned char*, unsigned char*) {}
 void cascadeDecryptSector(const CascadeContext&, uint64_t, const unsigned char*, unsigned char*) {}
+bool luksCipherCrypt(const LuksCipherContext&, bool, uint64_t, uint32_t,
+                     const unsigned char*, unsigned char*, size_t) { return false; }
 void blockCipherEncryptBlock(const BlockCipherContext&, const unsigned char*, unsigned char*) {}
 void blockCipherDecryptBlock(const BlockCipherContext&, const unsigned char*, unsigned char*) {}
 bool usbFlushAndSync(int) { return true; }
@@ -497,6 +499,51 @@ static void test_directory_cannot_move_into_itself() {
     v.fsckClean("directory into itself");
 }
 
+static void test_native_symlinks_follow_and_stay_inside_the_volume() {
+    Vol v;
+    CHECK(v.format(32));
+    const Bytes payload = pseudoRandom(3000, 91);
+    CHECK(putFile(0, "target.bin", payload));
+    CHECK(ntfsCreateSymlink(0, "file-link", "target.bin"));
+    std::string target;
+    CHECK(ntfsReadSymlink(0, "file-link", target));
+    CHECK_EQ(target, "target.bin");
+    CHECK(!ntfsCreateSymlink(0, "file-link", "other"));                              // the name is taken
+    CHECK(!ntfsCreateSymlink(0, "target.bin", "other"));                             // so is a file's
+    CHECK(!ntfsCreateSymlink(0, "empty", ""));
+    CHECK(!ntfsCreateSymlink(0, "abs", "/target.bin"));                              // absolute targets are refused
+    CHECK(!ntfsCreateSymlink(0, "abs2", "\\target.bin"));
+    std::vector<std::string> links;
+    ntfsListSymlinks(0, "", links);
+    CHECK_EQ(links.size(), 1u);
+
+    CHECK(ntfsCreateDirectory(0, "subdir"));
+    CHECK(ntfsCreateDirectory(0, "subdir/nested"));
+    CHECK(!ntfsCreateSymlink(0, "escape", "../../outside"));                         // relative targets stay inside the volume
+    CHECK(ntfsCreateSymlink(0, "subdir/nested/up", "../../target.bin"));
+    CHECK(getFile(0, "subdir/nested/up") == payload);                                // reads follow the link
+
+    // "Inside the volume" is judged from where the link PHYSICALLY lives, not from the path it was reached by.
+    // A folder link makes a path shallower or deeper than it reads; both directions must be handled.
+    CHECK(ntfsCreateDirectory(0, "b"));
+    CHECK(ntfsCreateDirectory(0, "b/c"));
+    CHECK(ntfsCreateSymlink(0, "up", "."));                                          // a folder link back to the root
+    CHECK(!ntfsCreateSymlink(0, "up/b/c/esc", "../../../x"));                        // reads 3 deep, is 2 deep: would leave the volume
+    CHECK(!ntfsCreateSymlink(0, "up/esc", "../x"));                                  // reads 1 deep, is 0 deep
+    CHECK(ntfsCreateSymlink(0, "up/b/c/stay", "../../x"));                           // lands exactly on the root: still fine
+    CHECK(ntfsCreateSymlink(0, "up/stay2", "x"));
+    CHECK(ntfsCreateSymlink(0, "deep-link", "subdir/nested"));                       // reads 1 deep, is 2 deep
+    CHECK(ntfsCreateSymlink(0, "deep-link/up2", "../../target.bin"));                // legitimate: lands on target.bin
+    CHECK(getFile(0, "deep-link/up2") == payload);
+    CHECK(!ntfsCreateSymlink(0, "deep-link/up3", "../../../target.bin"));            // one too many from the real depth
+
+    CHECK(ntfsDeleteFile(0, "up"));
+    CHECK(ntfsDeleteFile(0, "deep-link"));
+    CHECK(ntfsDeleteFile(0, "file-link"));
+    CHECK(getFile(0, "target.bin") == payload);                                      // deleting a link leaves its target alone
+    v.fsckClean("native symlinks");
+}
+
 static void test_delete_rules() {
     Vol v;
     CHECK(v.format(48));
@@ -911,6 +958,7 @@ int main() {
         T(test_rename_reports_success_and_changes_only_the_name),
         T(test_directory_move_keeps_contents),
         T(test_directory_cannot_move_into_itself),
+        T(test_native_symlinks_follow_and_stay_inside_the_volume),
         T(test_delete_rules),
         T(test_writes_refuse_directories),
         T(test_large_directory_grows),

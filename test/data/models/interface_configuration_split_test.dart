@@ -184,6 +184,7 @@ FileManagerToolbarConfig _customToolbar() {
     skin: const FileManagerSkin(monospaceNames: true),
     // behavior
     showHiddenFiles: !d.showHiddenFiles,
+    showNoMediaFolders: !d.showNoMediaFolders,
     selectByIcon: !d.selectByIcon,
     autoStartPlaylistMode: !d.autoStartPlaylistMode,
     rememberPerFolderLayout: !d.rememberPerFolderLayout,

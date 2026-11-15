@@ -506,8 +506,11 @@ static bool prepareLuksSession(int fd, const unsigned char* password, size_t pas
         return false;
     }
 
-    if (luksInfo.cipherMode.rfind("xts-plain64", 0) != 0) {
-        LOGI("prepareLuksSession(vol=%d): unsupported cipher mode '%s'", volId, luksInfo.cipherMode.c_str());
+    LuksCipherSpec luksSpec;
+    if (!luksParseCipherSpec(luksInfo.cipherName, luksInfo.cipherMode,
+                             static_cast<uint32_t>(luksInfo.masterKey.size()), luksSpec)) {
+        LOGI("prepareLuksSession(vol=%d): unsupported cipher/mode '%s-%s' with a %zu-byte key", volId,
+             luksInfo.cipherName.c_str(), luksInfo.cipherMode.c_str(), luksInfo.masterKey.size());
         mbedtls_platform_zeroize(luksInfo.masterKey.data(), luksInfo.masterKey.size());
         if (!keyfileBuf.empty()) mbedtls_platform_zeroize(keyfileBuf.data(), keyfileBuf.size());
         close(fd);
@@ -528,18 +531,8 @@ static bool prepareLuksSession(int fd, const unsigned char* password, size_t pas
         return false;
     }
     int mappedHash = 0; // kSha512, display-only for LUKS
-CascadeContext luksCascade;
-    CascadeSpec spec = cascadeSpecFor(dataCipher);
-    if (spec.layerCount != 1 || luksInfo.masterKey.size() != static_cast<size_t>(spec.layerCount) * 64) {
-        LOGI("prepareLuksSession(vol=%d): unsupported key size for %s (got %zu bytes)",
-             volId, luksInfo.cipherName.c_str(), luksInfo.masterKey.size());
-        mbedtls_platform_zeroize(luksInfo.masterKey.data(), luksInfo.masterKey.size());
-        if (!keyfileBuf.empty()) mbedtls_platform_zeroize(keyfileBuf.data(), keyfileBuf.size());
-        close(fd);
-        return false;
-    }
-
-    if (!cascadeSetKeys(luksCascade, dataCipher, luksInfo.masterKey.data(), luksInfo.masterKey.size())) {
+    std::unique_ptr<LuksCipherContext> luksCipherCtx(new LuksCipherContext());
+    if (!luksCipherInit(*luksCipherCtx, luksSpec, luksInfo.masterKey.data(), luksInfo.masterKey.size())) {
         mbedtls_platform_zeroize(luksInfo.masterKey.data(), luksInfo.masterKey.size());
         if (!keyfileBuf.empty()) mbedtls_platform_zeroize(keyfileBuf.data(), keyfileBuf.size());
         close(fd);
@@ -559,7 +552,8 @@ CascadeContext luksCascade;
         v.fileSize = fileSize;
         v.matchedCipherId = static_cast<int>(dataCipher);
         v.matchedHashId = mappedHash;
-        v.luksGenericCascade = luksCascade;
+        v.luksCipher = *luksCipherCtx;
+        luksCipherWipe(*luksCipherCtx);
         v.readOnly = readOnly;
         
         const uint64_t segmentStartSector = luksInfo.dataOffsetBytes / 512;
@@ -1541,8 +1535,11 @@ static bool prepareUsbLuksSession(uint64_t partitionStartSector, uint64_t partit
         return false;
     }
 
-    if (luksInfo.cipherMode.rfind("xts-plain64", 0) != 0) {
-        LOGI("prepareUsbLuksSession(vol=%d): unsupported cipher mode '%s'", volId, luksInfo.cipherMode.c_str());
+    LuksCipherSpec luksSpec;
+    if (!luksParseCipherSpec(luksInfo.cipherName, luksInfo.cipherMode,
+                             static_cast<uint32_t>(luksInfo.masterKey.size()), luksSpec)) {
+        LOGI("prepareUsbLuksSession(vol=%d): unsupported cipher/mode '%s-%s' with a %zu-byte key", volId,
+             luksInfo.cipherName.c_str(), luksInfo.cipherMode.c_str(), luksInfo.masterKey.size());
         mbedtls_platform_zeroize(luksInfo.masterKey.data(), luksInfo.masterKey.size());
         if (!keyfileBuf.empty()) mbedtls_platform_zeroize(keyfileBuf.data(), keyfileBuf.size());
         return false;
@@ -1568,18 +1565,8 @@ static bool prepareUsbLuksSession(uint64_t partitionStartSector, uint64_t partit
         if (!keyfileBuf.empty()) mbedtls_platform_zeroize(keyfileBuf.data(), keyfileBuf.size());
         return false;
     }
-
-    CascadeContext luksCascade;
-    CascadeSpec spec = cascadeSpecFor(dataCipher);
-    if (spec.layerCount != 1 || luksInfo.masterKey.size() != static_cast<size_t>(spec.layerCount) * 64) {
-        LOGI("prepareUsbLuksSession(vol=%d): unsupported key size for %s (got %zu bytes)",
-             volId, luksInfo.cipherName.c_str(), luksInfo.masterKey.size());
-        mbedtls_platform_zeroize(luksInfo.masterKey.data(), luksInfo.masterKey.size());
-        if (!keyfileBuf.empty()) mbedtls_platform_zeroize(keyfileBuf.data(), keyfileBuf.size());
-        return false;
-    }
-
-    if (!cascadeSetKeys(luksCascade, dataCipher, luksInfo.masterKey.data(), luksInfo.masterKey.size())) {
+    std::unique_ptr<LuksCipherContext> luksCipherCtx(new LuksCipherContext());
+    if (!luksCipherInit(*luksCipherCtx, luksSpec, luksInfo.masterKey.data(), luksInfo.masterKey.size())) {
         mbedtls_platform_zeroize(luksInfo.masterKey.data(), luksInfo.masterKey.size());
         if (!keyfileBuf.empty()) mbedtls_platform_zeroize(keyfileBuf.data(), keyfileBuf.size());
         return false;
@@ -1598,7 +1585,8 @@ static bool prepareUsbLuksSession(uint64_t partitionStartSector, uint64_t partit
         v.isHiddenVolume = false;
         v.matchedCipherId = static_cast<int>(dataCipher);
         v.matchedHashId = mappedHash;
-        v.luksGenericCascade = luksCascade;
+        v.luksCipher = *luksCipherCtx;
+        luksCipherWipe(*luksCipherCtx);
         v.readOnly = readOnly;
 
         const uint64_t segmentStartSector = (baseOffset + luksInfo.dataOffsetBytes) / 512;

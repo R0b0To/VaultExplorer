@@ -79,16 +79,23 @@ class _GalleryFilterSheetState extends State<GalleryFilterSheet> {
   void initState() {
     super.initState();
     widget.controller.addListener(_changed);
-    widget.index.addListener(_changed);
+    widget.index.addListener(_onIndexChanged);
     _search.addListener(_changed);
   }
 
   @override
   void dispose() {
     widget.controller.removeListener(_changed);
-    widget.index.removeListener(_changed);
+    widget.index.removeListener(_onIndexChanged);
     _search.dispose();
     super.dispose();
+  }
+
+  void _onIndexChanged() {
+    if (!mounted) return;
+    if (widget.index.publishedRevision != _facetsRevision) {
+      setState(() {});
+    }
   }
 
   void _changed() {
@@ -97,8 +104,11 @@ class _GalleryFilterSheetState extends State<GalleryFilterSheet> {
 
   GalleryFacets get _currentFacets {
     final cached = _facets;
-    if (cached != null && _facetsRevision == widget.index.revision) return cached;
-    _facetsRevision = widget.index.revision;
+    // Published, not live: the facets are recounted per batch of new details,
+    // not per photo read while the sheet is open.
+    final revision = widget.index.publishedRevision;
+    if (cached != null && _facetsRevision == revision) return cached;
+    _facetsRevision = revision;
     return _facets = GalleryFacets.compute(
       widget.subjects(),
       labels: context.galleryFilterLabels,
@@ -138,25 +148,30 @@ class _GalleryFilterSheetState extends State<GalleryFilterSheet> {
           ],
         ),
       ),
-      if (widget.index.isIndexing)
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                l.galleryFilterIndexing(widget.index.done, widget.index.total),
-                style: theme.textTheme.bodySmall,
-              ),
-              const SizedBox(height: 6),
-              LinearProgressIndicator(
-                value: widget.index.total == 0
-                    ? null
-                    : widget.index.done / widget.index.total,
-              ),
-            ],
-          ),
-        ),
+      ListenableBuilder(
+        listenable: widget.index,
+        builder: (context, _) {
+          if (!widget.index.isIndexing) return const SizedBox.shrink();
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l.galleryFilterIndexing(widget.index.done, widget.index.total),
+                  style: theme.textTheme.bodySmall,
+                ),
+                const SizedBox(height: 6),
+                LinearProgressIndicator(
+                  value: widget.index.total == 0
+                      ? null
+                      : widget.index.done / widget.index.total,
+                ),
+              ],
+            ),
+          );
+        },
+      ),
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
         child: TextField(
@@ -386,6 +401,15 @@ class GalleryFilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The index reports its progress here directly: the screen only rebuilds
+    // when new details change what it lists, not for every progress tick.
+    return ListenableBuilder(
+      listenable: index,
+      builder: (context, _) => _buildBar(context),
+    );
+  }
+
+  Widget _buildBar(BuildContext context) {
     final filters = controller.filters.filters;
     final indexing = index.isIndexing;
     if (filters.isEmpty && !indexing) return const SizedBox.shrink();

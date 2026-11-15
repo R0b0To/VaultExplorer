@@ -57,6 +57,38 @@ class VeraCryptToolsHandlers(
         }
     }
 
+    /**
+     * Expands a raw single-volume BitLocker file container. BitLocker has no keyfiles here: the credential is a
+     * password or a 48-digit recovery key, both typed into [password].
+     */
+    fun handleExpandBitLockerContainer(call: MethodCall, result: MethodChannel.Result) {
+        val uri = call.argument<String>("uri")
+        val password = call.argument<String>("password") ?: ""
+        val newSizeBytes = call.argument<Number>("newSizeBytes")?.toLong() ?: 0L
+        val initFreeSpace = call.argument<Boolean>("initFreeSpace") ?: false
+        val growFileSystem = call.argument<Boolean>("growFileSystem") ?: true
+        if (uri.isNullOrEmpty() || newSizeBytes <= 0L || password.isEmpty()) {
+            result.error("INVALID_ARGS", "uri, newSizeBytes and a password or recovery key are required", null)
+            return
+        }
+        runFileSystemTool(result, uri, null, isBitLocker = true) { pfd, _ ->
+            NativeEngine.expandBitLockerContainerNative(pfd, password, newSizeBytes, initFreeSpace, growFileSystem)
+        }
+    }
+
+    /** Retries only the NTFS grow step of a BitLocker volume whose metadata already records the larger size. */
+    fun handleGrowBitLockerFileSystem(call: MethodCall, result: MethodChannel.Result) {
+        val uri = call.argument<String>("uri")
+        val password = call.argument<String>("password") ?: ""
+        if (uri.isNullOrEmpty() || password.isEmpty()) {
+            result.error("INVALID_ARGS", "uri and a password or recovery key are required", null)
+            return
+        }
+        runFileSystemTool(result, uri, null, isBitLocker = true) { pfd, _ ->
+            NativeEngine.growBitLockerFileSystemNative(pfd, password)
+        }
+    }
+
     /** Grows only the file system of a volume that was expanded earlier, into the space it does not use yet. */
     fun handleGrowFileSystem(call: MethodCall, result: MethodChannel.Result) {
         val uri = call.argument<String>("uri")
@@ -96,6 +128,7 @@ class VeraCryptToolsHandlers(
      */
     private fun runFileSystemTool(
         result: MethodChannel.Result, uri: String, keyfilePaths: List<String>?, isLuks: Boolean = false,
+        isBitLocker: Boolean = false,
         nativeCall: (pfd: Int, keyfileFds: IntArray?) -> IntArray?,
     ) {
         ioExecutor.execute {
@@ -111,16 +144,32 @@ class VeraCryptToolsHandlers(
                         1 -> result.error("PASSWORD_INCORRECT", "Incorrect password", null)
                         2 -> result.error(
                             "NOT_EXPANDABLE",
-                            if (isLuks) "This LUKS container uses an unsupported segment layout or inconsistent metadata."
-                            else "Only a standard volume that fills its container can be expanded.",
+                            when {
+                                isBitLocker -> "This BitLocker volume can't be expanded. It must be a fully encrypted Windows 7 or later volume in the classic layout (not BitLocker To Go, and not the encrypt-on-write / used-space-only layout) that fits inside its file."
+                                isLuks -> "This LUKS container uses an unsupported segment layout or inconsistent metadata."
+                                else -> "Only a standard volume that fills its container can be expanded."
+                            },
                             null,
                         )
                         3 -> result.error("NOT_LARGER", "The new size must be larger than the current size.", null)
                         5 -> result.error("KEYFILE_ERROR", "A keyfile could not be read.", null)
                         6 -> result.error("NOT_LUKS", "The selected file is not a LUKS container.", null)
-                        7 -> result.error("INVALID_HEADER", "The LUKS header is damaged or unsupported.", null)
+                        7 -> result.error(
+                            "INVALID_HEADER",
+                            if (isBitLocker) "The BitLocker metadata is damaged, failed verification or uses an unsupported layout, so nothing was changed."
+                            else "The LUKS header is damaged or unsupported.",
+                            null,
+                        )
                         8 -> result.error("CONTAINER_IN_USE", "Close the unlocked volume before expanding or growing its file system.", null)
-                        else -> result.error("IO_ERROR", "Could not complete the volume operation (code $outcome)", null)
+                        9 -> result.error("NOT_BITLOCKER", "No BitLocker volume was found. The file must be a raw BitLocker volume, or a fixed/dynamic VHD or VHDX with a BitLocker partition (or a BitLocker volume that fills the whole virtual disk).", null)
+                        10 -> result.error("DISK_UNSUPPORTED", "This virtual disk can't be grown in place: differencing disks, VHDX files with a pending log, 4096-byte logical sectors, or a disk whose allocation table has no room for the added space are not supported. Nothing was changed.", null)
+                        11 -> result.error("PARTITION_UNSUPPORTED", "The BitLocker partition can't be grown: it must be the last partition of an MBR or GPT disk (no extended partitions). Nothing was changed.", null)
+                        else -> result.error(
+                            "IO_ERROR",
+                            if (isBitLocker) "Could not complete the volume operation (code $outcome). If the container was already expanded, use \"Grow file system only\" to finish."
+                            else "Could not complete the volume operation (code $outcome)",
+                            null,
+                        )
                     }
                 }
             } catch (e: Exception) {

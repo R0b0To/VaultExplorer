@@ -355,9 +355,12 @@ class VaultUnlockHandlers(
             try { Base64.getDecoder().decode(it) } catch (_: IllegalArgumentException) { null }
         }
         val cacheDerivedKey = call.argument<Boolean>("cacheDerivedKey") ?: false
+        // The user agreed to turn off "single-client mode" (a lock another device put on the vault).
+        val disableSingleClientMode = call.argument<Boolean>("disableSingleClientMode") ?: false
         handleUnlockDirectoryVault(
             call, result, ContainerLifecycleCore.DirectoryVaultFormat.CRYFS, "cryfs",
             preservedKey = preservedKey, cacheDerivedKey = cacheDerivedKey,
+            disableSingleClientMode = disableSingleClientMode,
         )
     }
 
@@ -376,6 +379,7 @@ class VaultUnlockHandlers(
         wireFormatName: String,
         preservedKey: ByteArray? = null,
         cacheDerivedKey: Boolean = false,
+        disableSingleClientMode: Boolean = false,
     ) {
         val uriString = call.argument<String>("filePath")
         val password = call.argument<String>("password")
@@ -408,6 +412,7 @@ class VaultUnlockHandlers(
                 preservedKey = preservedKey,
                 cacheDerivedKey = cacheDerivedKey,
                 derivedKeyHandlers = derivedKeyHandlers,
+                disableSingleClientMode = disableSingleClientMode,
             )
             activity.runOnUiThread {
                 when (outcome) {
@@ -426,7 +431,7 @@ class VaultUnlockHandlers(
                     is ContainerLifecycleCore.DirectoryVaultOutcome.AuthFailure ->
                         result.error("AUTH_FAIL", outcome.code.name, outcome.code.name)
                     is ContainerLifecycleCore.DirectoryVaultOutcome.InvalidVault ->
-                        result.error("INVALID_VAULT", outcome.reason, null)
+                        result.error(outcome.code ?: "INVALID_VAULT", outcome.reason, null)
                     is ContainerLifecycleCore.DirectoryVaultOutcome.Error ->
                         nativeOps.dispatchNativeError(outcome.exception, result)
                 }

@@ -2,6 +2,7 @@
 //   Known-answer vectors were produced with Python's `cryptography` package
 //   (an independent implementation); the format engines are additionally
 //   checked against the real gocryptfs / Cryptomator / CryFS in test/interop.
+#include "crypto/scrypt.h"
 #include <cctype>
 #include <filesystem>
 #include <atomic>
@@ -19,6 +20,7 @@
 #include <sys/stat.h>
 
 #include "../../crypto/eme.h"
+#include "../fv_check.h"
 #include "../fv_cryptomator.h"
 #include "../fv_cryfs.h"
 #include "../fv_gocryptfs.h"
@@ -707,6 +709,74 @@ static void testCryptomatorSymlinks() {
         v.close();
     }
 
+    {   // --- links and the namespace: mkdir never follows the last name, no folder moves into itself, no alias writes --
+        TmpDir t; std::string root = t.sub("v"); auto st = std::make_shared<PosixStorage>(root);
+        CHECK(createCryptomator(*st, pw, 6).status == OpenStatus::Ok);
+        auto r = openCryptomator(st, pw, 6, false, {});
+        CHECK(r.status == OpenStatus::Ok);
+        if (!r.vault) return;
+        Vault& v = *r.vault;
+
+        // mkdir follows links in the PARENT path only; the last name is never followed, so nothing is ever
+        // created at a link's target
+        CHECK(v.createDirectory("real"));
+        CHECK(v.createSymlink("dirlink", "real"));
+        CHECK(v.createDirectory("dirlink"));                                         // link to an existing folder: "mkdir -p" success
+        CHECK(v.createSymlink("ghost", "elsewhere"));
+        CHECK(!v.createDirectory("ghost"));                                          // dangling: refused...
+        CHECK(!has(v, "", "D:elsewhere"));                                           // ...and no folder appears at its target
+        CHECK(put(v, "f.txt", rnd(3, 30)));
+        CHECK(v.createSymlink("filelink", "f.txt"));
+        CHECK(!v.createDirectory("filelink"));                                       // link to a file
+        CHECK(v.createSymlink("abs", "/real"));
+        CHECK(!v.createDirectory("abs"));                                            // absolute target is never resolved
+        CHECK(v.createDirectory("dirlink/sub"));                                     // a link in the parent IS followed
+        CHECK(has(v, "real", "D:sub"));
+        CHECK(!has(v, "", "D:sub"));
+        CHECK(v.createDirectory(""));                                                // the root is always there
+
+        // a folder can never move into itself or one of its own subfolders, directly or through a link that
+        // points back at it (the subtree would be cut off from the vault)
+        CHECK(v.createDirectory("a"));
+        CHECK(v.createDirectory("a/b"));
+        const Bytes keepData = rnd(4, 31);
+        CHECK(put(v, "a/keep.txt", keepData));
+        CHECK(v.createSymlink("toa", "a"));
+        CHECK(!v.renameFile("a", "a/inside"));
+        CHECK(!v.renameFile("a", "a/b/inside"));
+        CHECK(!v.renameFile("a", "toa/inside"));                                     // through the alias
+        CHECK(!v.renameFile("a", "toa/b/inside"));
+        CHECK(!v.renameFile("a/b", "a/b/inside"));
+        CHECK(has(v, "", "D:a"));                                                    // everything is still where it was
+        CHECK(has(v, "a", "F:keep.txt"));
+        CHECK(has(v, "a", "D:b"));
+        CHECK(!has(v, "a", "D:inside"));
+        std::vector<DirEntry> rootList; CHECK(v.listDirectory("", rootList));        // and the root still lists
+        CHECK(v.renameFile("a/b", "b2"));                                            // a subfolder may leave...
+        CHECK(v.renameFile("b2", "a/b3"));                                           // ...and come back under another name
+        CHECK(v.createDirectory("ab"));                                              // "ab" merely starts with "a": not inside "a"
+        CHECK(v.renameFile("a", "ab/a"));
+        CHECK(has(v, "ab", "D:a"));
+        CHECK(v.renameFile("ab/a", "a"));
+        CHECK(v.renameFile("a", "a2"));                                              // renaming in place is fine
+        CHECK(has(v, "a2", "F:keep.txt"));
+        CHECK(has(v, "a2", "D:b3"));
+        CHECK(v.renameFile("a2/keep.txt", "a2/b3/keep.txt"));                        // files are not folders: no restriction
+        CHECK(*get(v, "a2/b3/keep.txt") == keepData);                                // and the content came along
+
+        // two names for one file must not be written at the same time (they share no engine path lock)
+        CHECK(put(v, "real/shared.txt", rnd(5, 32)));
+        CHECK(v.createSymlink("sharedlink", "real/shared.txt"));
+        Bytes w1 = rnd(100, 33), w2 = rnd(100, 34);
+        CHECK(v.writeFileChunk("real/shared.txt", 0, w1.data(), w1.size()));         // the first writer is in flight
+        CHECK(!v.writeFileChunk("sharedlink", 0, w2.data(), w2.size()));             // another name for the same file: refused
+        CHECK(v.finishWrite("real/shared.txt"));
+        CHECK(*get(v, "real/shared.txt") == w1);                                     // intact, never interleaved
+        CHECK(put(v, "sharedlink", w2));                                             // once the first is done the link may write
+        CHECK(*get(v, "real/shared.txt") == w2);
+        v.close();
+    }
+
     {   // --- precedence + hostile content (official order: dir.c9r, symlink.c9r, contents.c9r) -------------------
         TmpDir t; std::string root = t.sub("v"); auto st = std::make_shared<PosixStorage>(root);
         CHECK(createCryptomator(*st, pw, 6).status == OpenStatus::Ok);
@@ -981,11 +1051,397 @@ static void testCryptomatorMigration() {
     }
 }
 
+
+// ---------------------------------------------------------------------------------------------------------------
+// CryFS interoperability behaviour: format gate, single-client mode, canonical block names, timestamps, integrity.
+// ---------------------------------------------------------------------------------------------------------------
+static bool hasLowerHex(const std::string& s) { for (char c : s) if (c >= 'a' && c <= 'f') return true; return false; }
+
+static int countLowercaseBlockPaths(const std::string& root) {
+    int n = 0;
+    walkFiles(root, [&](const std::string& p, off_t) {
+        std::string rel = p.substr(root.size() + 1);
+        if (rel == "cryfs.config") return;
+        if (hasLowerHex(rel)) n++;
+    });
+    return n;
+}
+
+static void lowercaseAllBlocks(const std::string& root) {
+    std::vector<std::string> files;
+    walkFiles(root, [&](const std::string& p, off_t) { if (p.find("cryfs.config") == std::string::npos) files.push_back(p); });
+    for (auto& f : files) {
+        std::string dir = f.substr(0, f.rfind('/')), nm = f.substr(f.rfind('/') + 1);
+        for (auto& c : nm) c = (char)tolower(c);
+        ::rename(f.c_str(), (dir + "/" + nm).c_str());
+    }
+    DIR* d = opendir(root.c_str());
+    std::vector<std::string> shards;
+    while (auto* e = readdir(d)) { std::string n = e->d_name; if (n.size() == 3 && n != "." && n != "..") shards.push_back(n); }
+    closedir(d);
+    for (auto& s : shards) {
+        std::string l = s; for (auto& c : l) c = (char)tolower(c);
+        ::rename((root + "/" + s).c_str(), (root + "/" + l + ".tmp").c_str());
+        ::rename((root + "/" + l + ".tmp").c_str(), (root + "/" + l).c_str());
+    }
+}
+
+// Known answers produced by Crypto++ 8.9.0 (the library official CryFS 1.x used) for the ciphers the C++ release
+// offers beyond AES/XChaCha: key[i] = 7i+3, IV[i] = 5i+11, plaintext[i] = 3i+1 (37 bytes, so a partial last block).
+// Layout: IV(16) || ciphertext [|| 16-byte GCM tag]. Regenerate with test/cryfs_cipher_kat_gen.cpp (needs Crypto++); test/cryfs_cipher_oracle.cpp cross-checks exhaustively.
+static void testCryfsLegacyCiphers() {
+    std::printf("cryfs: twofish/serpent/cast-256/mars (known answers from Crypto++)\n");
+    struct Kat { const char* name; const char* keyHex; const char* ctHex; };
+    static const Kat kats[] = {
+        {"twofish-256-gcm", "030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dc",
+         "0b10151a1f24292e33383d42474c51562da403e07cd3c7ec607efb4a40879b2d8405a4fdf16df8510ae1d7441b2d198d467f51c8f729918e876057f1ed292e99fbdd69626d"},
+        {"twofish-256-cfb", "030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dc",
+         "0b10151a1f24292e33383d42474c5156376915f3e7df0f79c680cb40967576f81998d9f1303d14ed1bc8f3f5df72676628d5415c8c"},
+        {"twofish-128-gcm", "030a11181f262d343b424950575e656c",
+         "0b10151a1f24292e33383d42474c51569ebc23cf9a7414b5ea461745ac155fd8fd0490c73b6c350ac872aac05717deb843b79cb63404004e16d429271f644496bf02f8e351"},
+        {"twofish-128-cfb", "030a11181f262d343b424950575e656c",
+         "0b10151a1f24292e33383d42474c5156a77bb02212d7e88c417db38e54cd218c8a076941705060b59a5e99d5f7de1cbaeb3c470027"},
+        {"serpent-256-gcm", "030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dc",
+         "0b10151a1f24292e33383d42474c5156383df70d1acc34fe809e1120ecfd41aeab7e3af761ab0617f2f439672cb6947a74a7dcb3a4aeee564d7ac8047d480e6438746ee1bf"},
+        {"serpent-256-cfb", "030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dc",
+         "0b10151a1f24292e33383d42474c5156df94eac53ec6a02cb6cfcefc5269269de8d9361b4ff10d162320dea97dc9a34ec9791c8cee"},
+        {"serpent-128-gcm", "030a11181f262d343b424950575e656c",
+         "0b10151a1f24292e33383d42474c515661961873c0657c4b6ad371aaefcc1c94a2de1c15f5f55f370a4af62ae19f7e8414260ad8c13f9daf1b00dde9c15d88cf8e6d68482a"},
+        {"serpent-128-cfb", "030a11181f262d343b424950575e656c",
+         "0b10151a1f24292e33383d42474c5156e3e1f591920449c9ab3245c6ee2539d80789f725706e4f73c8ffaf391784ca99af56d6310e"},
+        {"cast-256-gcm", "030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dc",
+         "0b10151a1f24292e33383d42474c515615898eadcbf024d088055d471888887ab9d93488e7d15ac95062dc09cc6ad0a109cb2f3f8ae27a8af1b01c0421c8b18d0219bf3d7d"},
+        {"cast-256-cfb", "030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dc",
+         "0b10151a1f24292e33383d42474c5156029f308f2515d7c55a4bc2849495fbaa9b3269c0a91c5d3b1da73edd2f8da1c4f22bdeeffe"},
+        {"mars-256-gcm", "030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dc",
+         "0b10151a1f24292e33383d42474c5156a72feec39f7a4ed8970c531afb68909c8532e8499ab2b71cbc738882eaf5ede29efc0775c93e8101e328341afe88faa9291516e99f"},
+        {"mars-256-cfb", "030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dc",
+         "0b10151a1f24292e33383d42474c51563b195dcc299d50cf934da687f62e7ccc502c1a79355b659b95915dd4260e1a88a2a7c31dd8"},
+        {"mars-448-gcm", "030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3eaf1f8ff060d141b222930373e454c535a61686f767d84",
+         "0b10151a1f24292e33383d42474c5156bae3f95f7287f142ef17b2c7a176ed9871f2109b38a16112df8deefc71e62584505b6aeb1091f41c257c8e27f254437e4eea052691"},
+        {"mars-448-cfb", "030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3eaf1f8ff060d141b222930373e454c535a61686f767d84",
+         "0b10151a1f24292e33383d42474c515632abab441519c50b954f5f285a3f9efe448027f157d664244b078639eda41be2363d41972f"},
+        {"mars-128-gcm", "030a11181f262d343b424950575e656c",
+         "0b10151a1f24292e33383d42474c5156dd9cafba997d3de1e8e04eba46c59c147b716b5a2681f0205c42abdf24630460d7def01f64ab1edff5e9837cf25ace657b83638eb8"},
+        {"mars-128-cfb", "030a11181f262d343b424950575e656c",
+         "0b10151a1f24292e33383d42474c51562a4e17217427a7024c04355ef295541c6cfb742752f2fc847b7509a216b4a3abc18dd67c99"},
+    };
+    auto unhex = [](const char* h) { Bytes b; fromHex(h, b); return b; };
+    Bytes pt(37); for (size_t i = 0; i < pt.size(); i++) pt[i] = (uint8_t)(3 * i + 1);
+    for (const auto& k : kats) {
+        CryfsCipherId id = cryfsCipherIdFromName(k.name);
+        CHECK(id != CryfsCipherId::kUnknown);
+        Bytes key = unhex(k.keyHex), ct = unhex(k.ctHex), out;
+        CHECK_EQ((long)key.size(), (long)cryfsCipherKeyBytes(id));
+        CHECK(cryfsBlockDecrypt(id, key.data(), key.size(), ct.data(), ct.size(), out));   // Crypto++ -> this app
+        CHECK(out == pt);
+        CHECK_EQ(cryfsBlockCleartextSize(id, ct.size()), (long)pt.size());
+        CHECK_EQ((long)ct.size() - (long)pt.size(), cryfsCipherOverheadBytes(id));
+        Bytes mine = cryfsBlockEncrypt(id, key.data(), key.size(), pt.data(), pt.size());  // random IV: round-trip
+        CHECK_EQ(mine.size(), ct.size());
+        Bytes back;
+        CHECK(cryfsBlockDecrypt(id, key.data(), key.size(), mine.data(), mine.size(), back));
+        CHECK(back == pt);
+        if (std::string(k.name).find("-gcm") != std::string::npos) {                      // authenticated modes reject tampering
+            Bytes bad = ct; bad[20] ^= 1;
+            Bytes sink; CHECK(!cryfsBlockDecrypt(id, key.data(), key.size(), bad.data(), bad.size(), sink));
+        }
+        Bytes shortKey(key.begin(), key.end() - 4);
+        CHECK(cryfsBlockEncrypt(id, shortKey.data(), shortKey.size(), pt.data(), pt.size()).empty());   // wrong key size
+    }
+}
+
+static std::string hexOf(const Bytes& b) { return toHex(b.data(), b.size()); }
+
+static void testScryptLowMem() {
+    std::printf("scrypt: low-memory variant matches reference output\n");
+    struct Case { const char* pw; const char* salt; uint32_t N, r, p; size_t len; const char* want; };
+    // Expected values come from OpenSSL's scrypt (Python hashlib.scrypt), i.e. independent of this code base.
+    const Case cases[] = {
+        {"pw", "salt", 1024, 8, 2, 32, "4f2c2a6104b12e0c6e8c68f18654c503092d880124c2c3430a48c183e0b52abc"},
+        {"correct horse", "NaCl0123456789", 1u << 15, 8, 1, 88, "35e1d9bd1901b3ff8a2a314b356e36b6e91d42d45cc3118652d5ff3c38649633a3ce367298f7cfdd50c7b919b227d20d797379ee2c7c4495b0b9f8a5481895f68d1a0b4643412ad647b3e67464e0e97457060d806f47b188"},
+        {"", "s", 4096, 1, 3, 16, "0baa4cef09a7e4e529255e5f1edcbb8e"},
+    };
+    for (const auto& c : cases) {
+        const size_t full = 128 * (size_t)c.r * c.N;
+        for (size_t budget : {full, full / 2, full / 4, full / 64}) {    // strides 1, 2, 4, 64
+            Bytes out(c.len);
+            CHECK(scrypt_crypto_lowmem((const uint8_t*)c.pw, strlen(c.pw), (const uint8_t*)c.salt, strlen(c.salt), c.N, c.r, c.p, out.data(), c.len, budget));
+            CHECK(hexOf(out) == c.want);
+        }
+        Bytes std_(c.len);
+        CHECK(scrypt_crypto((const uint8_t*)c.pw, strlen(c.pw), (const uint8_t*)c.salt, strlen(c.salt), c.N, c.r, c.p, std_.data(), c.len));
+        CHECK(hexOf(std_) == c.want);
+    }
+    // The shared scrypt keeps its 512 MiB guard for other formats; a 1 GiB request is refused up front.
+    Bytes out(32);
+    CHECK(!scrypt_crypto((const uint8_t*)"x", 1, (const uint8_t*)"y", 1, 1u << 20, 8, 1, out.data(), 32));
+    // A budget too small even for the strided layout is rejected, not crashed on.
+    CHECK(!scrypt_crypto_lowmem((const uint8_t*)"x", 1, (const uint8_t*)"y", 1, 1u << 10, 8, 1, out.data(), 32, 64));
+}
+
+// PosixStorage that counts directory listings below the vault root (the root listing is the cheap one).
+struct ShardListCountingStorage : PosixStorage {
+    using PosixStorage::PosixStorage;
+    int shardLists = 0;
+    bool list(const std::string& dir, std::vector<DirEntry>& out) override {
+        if (!dir.empty()) shardLists++;
+        return PosixStorage::list(dir, out);
+    }
+};
+
+static void testCryfsCompat() {
+    std::printf("cryfs compat: format gate / single-client / block names / timestamps / integrity\n");
+    const uint8_t pw[] = "secret";
+    TmpDir t; std::string root = t.sub("v"); HostEnv env; env.cryfsLocalStateDir = t.sub("state"); env.tempDir = t.path;
+    auto st = std::make_shared<PosixStorage>(root);
+    CryfsCreateOptions o; o.blocksizeBytes = 4096; o.scryptLogN = 10; o.scryptR = 8; o.scryptP = 1;
+    CHECK(createCryfs(*st, pw, 6, o, env).status == OpenStatus::Ok);
+
+    auto readCfg = [&]() {
+        Bytes raw; st->readWhole("cryfs.config", raw);
+        return cryfs::parseWithCombinedKey(raw, cryfs::deriveCombinedKey(raw, pw, 6));
+    };
+    // Always edits from the pristine baseline: a config with a bad version cannot be parsed again (by design).
+    Bytes baseRaw; st->readWhole("cryfs.config", baseRaw);
+    const Secret baseKey = cryfs::deriveCombinedKey(baseRaw, pw, 6);
+    const cryfs::Config baseCfg = cryfs::parseWithCombinedKey(baseRaw, baseKey);
+    auto editCfg = [&](const std::function<void(cryfs::Config&)>& edit) {
+        cryfs::Config cfg = baseCfg;
+        edit(cfg);
+        Bytes nb = cryfs::rebuildConfigKeepingKey(baseRaw, baseKey, cfg);
+        CHECK(st->writeWholeAtomic("cryfs.config", nb.data(), nb.size()));
+    };
+    auto openOk = [&](bool ro, const HostEnv& e) {
+        auto r = openCryfs(st, pw, 6, ro, e); CHECK(r.status == OpenStatus::Ok); if (r.vault) r.vault->close(); };
+
+    // ---- format version gate (upstream accepts exactly 0.10)
+    CHECK_EQ(cryfs::compareFormatVersion("0.9", "0.10"), -1);
+    CHECK_EQ(cryfs::compareFormatVersion("0.10", "0.10.0"), 0);
+    CHECK_EQ(cryfs::compareFormatVersion("1.0.3", "0.10"), 1);
+    { bool threw = false; try { cryfs::compareFormatVersion("abc", "0.10"); } catch (const Error&) { threw = true; } CHECK(threw); }
+    editCfg([](cryfs::Config& c) { c.formatVersion = "0.9"; });
+    { auto r = openCryfs(st, pw, 6, false, env); CHECK(r.status == OpenStatus::InvalidVault); CHECK(!r.vault); CHECK(r.message.find("older") != std::string::npos); }
+    editCfg([](cryfs::Config& c) { c.formatVersion = "0.11"; });
+    { auto r = openCryfs(st, pw, 6, false, env); CHECK(r.status == OpenStatus::InvalidVault); CHECK(r.message.find("newer") != std::string::npos); }
+    editCfg([](cryfs::Config& c) { c.formatVersion = "0.10.0"; });
+    openOk(false, env);
+    editCfg([](cryfs::Config& c) { c.formatVersion = "0.10"; });
+
+    // ---- single-client mode: locked to another client id
+    editCfg([](cryfs::Config& c) { c.exclusiveClientId = 4242; });
+    { auto r = openCryfs(st, pw, 6, false, env); CHECK(r.status == OpenStatus::SingleClientMode); CHECK(!r.vault); }
+    openOk(true, env);                         // reading cannot upset the other client
+    HostEnv consent = env; consent.cryfsDisableSingleClientMode = true;
+    openOk(true, consent);                     // consent on a read-only open must not rewrite the config
+    CHECK(readCfg().exclusiveClientId.has_value());
+    { auto r = openCryfs(st, pw, 6, false, env); CHECK(r.status == OpenStatus::SingleClientMode); }   // still refused
+    openOk(false, consent);                    // read-write with consent: lock removed, like official CryFS
+    CHECK(!readCfg().exclusiveClientId.has_value());
+    openOk(false, env);                        // ... and persistent for everyone
+    uint64_t myId; { auto li = cryfs::LocalIntegrityState::open(env.cryfsLocalStateDir, readCfg().filesystemId); myId = li->myClientId(); }
+    editCfg([&](cryfs::Config& c) { c.exclusiveClientId = (int64_t)myId; });
+    openOk(false, env);                        // locked to *this* client: fine
+    editCfg([](cryfs::Config& c) { c.exclusiveClientId.reset(); });
+
+    // ---- canonical block names: one-time pass on open, interrupted-rename recovery, lazy repair on read
+    Bytes d1 = rnd(150000, 31), d2 = rnd(5000, 32);
+    { auto r = openCryfs(st, pw, 6, false, env); CHECK(r.status == OpenStatus::Ok);
+      if (!r.vault) return;
+      CHECK(r.vault->createDirectory("sub")); CHECK(put(*r.vault, "a.bin", d1)); CHECK(put(*r.vault, "sub/b.bin", d2)); r.vault->close(); }
+    CHECK_EQ(countLowercaseBlockPaths(root), 0);                       // new writes are canonical uppercase
+    lowercaseAllBlocks(root);
+    CHECK(countLowercaseBlockPaths(root) > 0);
+    {   // plant a leftover from an interrupted two-step rename
+        std::string victim;
+        walkFiles(root, [&](const std::string& p, off_t) { if (victim.empty() && p.find("cryfs.config") == std::string::npos) victim = p; });
+        CHECK(::rename(victim.c_str(), (victim + ".fvtmp").c_str()) == 0);
+    }
+    std::string stateDir = env.cryfsLocalStateDir + "/" + toHex(readCfg().filesystemId.data(), 16);
+    ::unlink((stateDir + "/block-names-normalized").c_str());
+    { auto r = openCryfs(st, pw, 6, false, env); CHECK(r.status == OpenStatus::Ok);
+      if (!r.vault) return;
+      CHECK_EQ(countLowercaseBlockPaths(root), 0);                      // everything is uppercase again, tmp recovered
+      CHECK(get(*r.vault, "a.bin") == d1); CHECK(get(*r.vault, "sub/b.bin") == d2);
+      r.vault->close(); }
+    CHECK(access((stateDir + "/block-names-normalized").c_str(), F_OK) == 0);
+    {   // flag already set (e.g. an older app build later wrote lowercase again): reading a block repairs it
+        lowercaseAllBlocks(root);
+        int before = countLowercaseBlockPaths(root);
+        auto r = openCryfs(st, pw, 6, false, env); CHECK(r.status == OpenStatus::Ok);
+        if (!r.vault) return;
+        CHECK(get(*r.vault, "a.bin") == d1);
+        r.vault->close();
+        CHECK(countLowercaseBlockPaths(root) < before);
+        // read-only opens never modify the vault
+        lowercaseAllBlocks(root);
+        before = countLowercaseBlockPaths(root);
+        auto ro = openCryfs(st, pw, 6, true, env); CHECK(ro.status == OpenStatus::Ok);
+        if (!ro.vault) return;
+        CHECK(get(*ro.vault, "a.bin") == d1);
+        ro.vault->close();
+        CHECK_EQ(countLowercaseBlockPaths(root), before);
+    }
+
+    // ---- regression: unlocking a vault that has no lowercase block names must not walk it block by block. With direct
+    // file access on slow storage (Android's FUSE-backed shared storage, network shares) that walk is one stat per block
+    // and stalled the unlock for minutes on a large vault.
+    {
+        ::unlink((stateDir + "/block-names-normalized").c_str());
+        ::unlink((stateDir + "/block-names-pending").c_str());
+        { auto r = openCryfs(st, pw, 6, false, env); CHECK(r.status == OpenStatus::Ok); if (!r.vault) return; r.vault->close(); }   // repairs what earlier steps left lowercase
+        CHECK_EQ(countLowercaseBlockPaths(root), 0);
+        {   // the repair leaves emptied lowercase twin folders behind (harmless); drop them so the vault looks like an official one
+            DIR* d = opendir(root.c_str());
+            std::vector<std::string> names;
+            while (auto* e = readdir(d)) { std::string n = e->d_name; if (n.size() == 3 && n != "." && n != "..") names.push_back(n); }
+            closedir(d);
+            for (auto& n : names) { bool lower = false; for (char ch : n) if (ch >= 'a' && ch <= 'f') lower = true; if (lower) ::rmdir((root + "/" + n).c_str()); }
+        }
+        ::unlink((stateDir + "/block-names-normalized").c_str());
+        auto cst = std::make_shared<ShardListCountingStorage>(root);
+        auto r = openCryfs(cst, pw, 6, false, env); CHECK(r.status == OpenStatus::Ok);
+        if (!r.vault) return;
+        CHECK_EQ(cst->shardLists, 0);                                   // only the top-level folder names were looked at
+        CHECK(get(*r.vault, "a.bin") == d1);
+        r.vault->close();
+        CHECK(access((stateDir + "/block-names-normalized").c_str(), F_OK) == 0);   // ... and it is not even checked again
+        cst->shardLists = 0;
+        auto r2 = openCryfs(cst, pw, 6, false, env); CHECK(r2.status == OpenStatus::Ok);
+        if (!r2.vault) return;
+        CHECK_EQ(cst->shardLists, 0);
+        r2.vault->close();
+    }
+
+    // ---- symlinks: stored as upstream does, hidden from listDirectory, moved/deleted like any other node
+    {
+        auto r = openCryfs(st, pw, 6, false, env); CHECK(r.status == OpenStatus::Ok);
+        if (!r.vault) return;
+        auto& v = *r.vault;
+        CHECK(v.createDirectory("links")); CHECK(v.createDirectory("other"));
+        CHECK(v.createSymlink("links/ln", "../a.bin"));
+        CHECK(!v.createSymlink("links/ln", "x"));                       // exists
+        CHECK(!v.createSymlink("links/empty", ""));
+        CHECK(!v.createSymlink("missingdir/ln", "x"));
+        std::vector<DirEntry> l;
+        CHECK(v.listDirectory("links", l)); CHECK_EQ(l.size(), (size_t)0);          // not a file or folder
+        CHECK(v.listSymlinks("links", l)); CHECK_EQ(l.size(), (size_t)1);
+        if (l.size() == 1) { CHECK(l[0].name == "ln"); CHECK(l[0].isSymlink); CHECK(!l[0].isDir); CHECK_EQ(l[0].size, (int64_t)8); }
+        CHECK(v.readSymlink("links/ln") == std::optional<std::string>("../a.bin"));
+        CHECK(!v.readSymlink("a.bin").has_value());                      // a file is not a link
+        CHECK(v.renameFile("links/ln", "other/moved"));                  // parent pointer is rewritten like any move
+        CHECK(!v.readSymlink("links/ln").has_value());
+        CHECK(v.readSymlink("other/moved") == std::optional<std::string>("../a.bin"));
+        r.vault->close();
+        auto r2 = openCryfs(st, pw, 6, false, env); CHECK(r2.status == OpenStatus::Ok);
+        if (!r2.vault) return;
+        CHECK(r2.vault->readSymlink("other/moved") == std::optional<std::string>("../a.bin"));   // survives a reopen
+        CHECK(r2.vault->deleteFile("other/moved"));
+        CHECK(r2.vault->listSymlinks("other", l)); CHECK_EQ(l.size(), (size_t)0);
+        r2.vault->close();
+    }
+
+    // ---- upstream refuses inner nodes deeper than 10 levels, so the app must not write such blobs
+    {
+        TmpDir t4; std::string root4 = t4.sub("v"); HostEnv env4; env4.cryfsLocalStateDir = t4.sub("state"); env4.tempDir = t4.path;
+        auto st4 = std::make_shared<PosixStorage>(root4);
+        CryfsCreateOptions o4; o4.cipher = "aes-256-gcm"; o4.blocksizeBytes = 118;   // logical 40: leaves of 32 bytes, 2 children per node
+        o4.scryptLogN = 10; o4.scryptR = 8; o4.scryptP = 1;
+        CHECK(createCryfs(*st4, pw, 6, o4, env4).status == OpenStatus::Ok);
+        auto r4 = openCryfs(st4, pw, 6, false, env4); CHECK(r4.status == OpenStatus::Ok);
+        if (!r4.vault) return;
+        // 2^10 leaves of 32 bytes, minus the 19-byte file header, is the most depth 10 can hold
+        Bytes fits = rnd(32768 - 19, 77), tooBig = rnd(32768 - 19 + 1, 78);
+        CHECK(put(*r4.vault, "fits.bin", fits));
+        CHECK(get(*r4.vault, "fits.bin") == fits);
+        size_t blocksBefore = 0; walkFiles(root4, [&](const std::string&, off_t) { blocksBefore++; });
+        CHECK(!put(*r4.vault, "toobig.bin", tooBig));                       // refused, not written in a form upstream cannot read
+        size_t blocksAfter = 0; walkFiles(root4, [&](const std::string&, off_t) { blocksAfter++; });
+        CHECK_EQ(blocksAfter, blocksBefore);                                // and nothing was left behind
+        std::vector<DirEntry> l4; CHECK(r4.vault->listDirectory("", l4)); CHECK_EQ(l4.size(), (size_t)1);
+        CHECK(get(*r4.vault, "fits.bin") == fits);
+        r4.vault->close();
+    }
+
+    // ---- timestamps keep nanoseconds; negative seconds are clamped (upstream reads u64 seconds)
+    {
+        std::vector<cryfs::DirRecord> v(2);
+        v[0].name = "x"; v[0].blob.b[0] = 1; v[0].mode = 0100644;
+        v[0].atime = 1700000000; v[0].atimeNs = 123456789; v[0].mtime = 1700000001; v[0].mtimeNs = 5; v[0].ctime = 1700000002; v[0].ctimeNs = 999999999;
+        v[1].name = "neg"; v[1].blob.b[0] = 2; v[1].mode = 0100644; v[1].mtime = -5; v[1].mtimeNs = 77;
+        Bytes b = cryfs::dirSerialize(v);
+        CHECK_EQ(readU32LE(&b[21]), 123456789u);                         // nsec lives right after each 8-byte sec
+        auto p = cryfs::dirParse(b);
+        CHECK_EQ(p.size(), (size_t)2);
+        if (p.size() == 2) {
+            CHECK_EQ(p[0].atime, (int64_t)1700000000); CHECK_EQ(p[0].atimeNs, 123456789u);
+            CHECK_EQ(p[0].mtimeNs, 5u); CHECK_EQ(p[0].ctimeNs, 999999999u);
+            CHECK_EQ(p[1].mtime, (int64_t)0); CHECK_EQ(p[1].mtimeNs, 0u);
+        }
+    }
+
+    // ---- integrity rules (same as upstream CryFS)
+    {
+        TmpDir t2; Bytes fsid(16, 0x11);
+        auto s = cryfs::LocalIntegrityState::open(t2.sub("st"), fsid);
+        cryfs::BlockId B = cryfs::BlockId::random(), D = cryfs::BlockId::random();
+        CHECK(!s->checkAndRecordRead(7, B, 5));
+        CHECK(!s->checkAndRecordRead(7, B, 5));        // same client, same version
+        CHECK(!s->checkAndRecordRead(9, B, 1));        // another client takes the block over
+        auto v = s->checkAndRecordRead(7, B, 5);       // ... then client 7's old copy returns: rollback
+        CHECK(v.has_value() && *v == 5);
+        CHECK(!s->checkAndRecordRead(7, B, 6));        // client 7 really wrote again
+        CHECK(s->checkAndRecordRead(7, B, 5).has_value());   // plain version rollback
+        CHECK(!s->checkAndRecordRead(7, D, 3));
+        s->markDeleted(D);                             // deleted here; a restored copy must be flagged
+        CHECK(s->checkAndRecordRead(7, D, 3).has_value());
+        CHECK(!s->checkAndRecordRead(7, D, 4));
+        s->flush(); s.reset();
+        auto s2 = cryfs::LocalIntegrityState::open(t2.sub("st"), fsid);   // all of it survives a restart
+        CHECK(s2->checkAndRecordRead(7, B, 5).has_value());
+        CHECK(!s2->checkAndRecordRead(9, B, 2));
+        CHECK(s2->checkAndRecordRead(7, B, 6).has_value());              // last writer is now 9, so 7@6 is stale
+        // state written by older builds has no last-writer info: the second rule must not fire on it
+        TmpDir t3; Bytes fs3(16, 0x22); cryfs::BlockId L = cryfs::BlockId::random();
+        std::string dir3 = t3.sub("st") + "/" + toHex(fs3.data(), 16);
+        { std::string cmd = "mkdir -p '" + dir3 + "'"; (void)!system(cmd.c_str()); }
+        { std::ofstream lg(dir3 + "/integritydata.log"); lg << "7:" << L.hex() << "=5\n"; }
+        auto s3 = cryfs::LocalIntegrityState::open(t3.path + "/st", fs3);
+        CHECK(!s3->checkAndRecordRead(7, L, 5));
+    }
+}
+
+// Opt-in (about 20 s, 512 MiB): a cryfs.config written by the official C++ CryFS 0.11.3.
+static void testCryfsCppVector() {
+    std::printf("cryfs: config written by official C++ CryFS 0.11.3\n");
+    std::string path = std::string(FV_VECTORS_DIR) + "/../cryfs/cpp_0_11_config.bin";
+    std::ifstream f(path, std::ios::binary);
+    CHECK(f.good());
+    Bytes raw((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    try {
+        auto combined = cryfs::deriveCombinedKey(raw, (const uint8_t*)"mypassword", 10);
+        auto cfg = cryfs::parseWithCombinedKey(raw, combined);
+        CHECK(cfg.cipherName == "xchacha20-poly1305");
+        CHECK(cfg.formatVersion == "0.10"); CHECK(cfg.createdWithVersion == "0.11.2"); CHECK(cfg.lastOpenedWithVersion == "0.11.3");
+        CHECK_EQ(cfg.blocksizeBytes, 16384);
+        CHECK(!cfg.exclusiveClientId.has_value());
+        CHECK(cfg.rootBlob.hexUpper() == "B7847BAA5663DE6A3155A8017B5A8AC2");
+        CHECK(toHex(cfg.filesystemId.data(), 16) == "abdcb364db327ed401f22e99eb37e78f");
+        CHECK(toHex(cfg.key.data(), cfg.key.size()) == "f8294d3955ff8cc06b787d71de64168dfc4c994046fbabb936b2cfe1629f6772");
+        // re-sealing under the same key must stay readable (this is how "disable single-client mode" is persisted)
+        Bytes again = cryfs::rebuildConfigKeepingKey(raw, combined, cfg);
+        auto cfg2 = cryfs::parseWithCombinedKey(again, combined);
+        CHECK(cfg2.rootBlob == cfg.rootBlob);
+    } catch (const Error& e) { CHECK(false); std::printf("  error: %s\n", e.what()); }
+    CHECK(true);
+}
+
 static void testCryfs(const char* cipher, int bsz) {
     std::printf("cryfs %s @%d\n", cipher, bsz);
     TmpDir t; std::string root = t.sub("v"); HostEnv env; env.cryfsLocalStateDir = t.sub("state"); env.tempDir = t.path;
     auto st = std::make_shared<PosixStorage>(root);
     CryfsCreateOptions o; o.cipher = cipher; o.blocksizeBytes = bsz;
+    o.scryptLogN = 10; o.scryptR = 8; o.scryptP = 1;   // cheap KDF: these tests are about the vault, not scrypt
     const uint8_t pw[] = "secret";
     CHECK(createCryfs(*st, pw, 6, o, env).status == OpenStatus::Ok);
     CHECK(openCryfs(st, (const uint8_t*)"bad", 3, false, env).status == OpenStatus::WrongPassword);
@@ -1992,6 +2448,746 @@ static void testGocryptfsLegacyKeys() {
 }
 
 
+
+// ============================================================== check & repair ==
+//
+// Every scenario builds a real vault on disk, damages the *ciphertext* the way sync tools, interrupted writes or
+// disk errors do, and then runs the tool. The properties that matter are asserted on the vault itself: after a
+// repair, rescued entries must be visible through the normal vault API with their original bytes.
+
+namespace ck = fv::check;
+
+static bool hasIssue(const std::vector<ck::Issue>& v, ck::Severity sev, const std::string& pathPart, const std::string& msgPart) {
+    for (const auto& i : v)
+        if (i.severity == sev && i.path.find(pathPart) != std::string::npos && i.message.find(msgPart) != std::string::npos) return true;
+    return false;
+}
+static bool anyOfSeverity(const std::vector<ck::Issue>& v, ck::Severity sev) {
+    for (const auto& i : v) if (i.severity == sev) return true;
+    return false;
+}
+static void dumpIssues(const std::vector<ck::Issue>& v) {
+    for (const auto& i : v) std::printf("    [%d] %s: %s\n", (int)i.severity, i.path.c_str(), i.message.c_str());
+}
+static ck::Credentials credsPw(const Bytes& pw) { ck::Credentials c; c.password = pw.data(); c.passwordLen = pw.size(); return c; }
+static Bytes B(const char* s) { return Bytes((const uint8_t*)s, (const uint8_t*)s + std::strlen(s)); }
+
+// Finds, in directory [vdir] of an open vault, the file whose content equals [want]; returns its name or "".
+static std::string findByContent(Vault& v, const std::string& vdir, const Bytes& want) {
+    std::vector<DirEntry> es;
+    if (!v.listDirectory(vdir, es)) return "";
+    for (auto& e : es) {
+        if (e.isDir) continue;
+        auto d = get(v, vdir.empty() ? e.name : vdir + "/" + e.name);
+        if (d && *d == want) return e.name;
+    }
+    return "";
+}
+
+// ---- gocryptfs --------------------------------------------------------------------------------------------------
+
+struct GcFixture {
+    TmpDir t;
+    std::string root;
+    std::shared_ptr<PosixStorage> st;
+    Bytes pw = B("check-me");
+    Bytes top = rnd(700, 31), big = rnd(200000, 32), a = rnd(5000, 33), b = rnd(9000, 34), c = rnd(3000, 35), lng = rnd(6000, 36);
+    std::string longName = std::string(200, 'L') + ".txt";
+
+    explicit GcFixture(bool plain = false, GocryptfsCipher cipher = GocryptfsCipher::Aes256Gcm) {
+        root = t.sub("v");
+        st = std::make_shared<PosixStorage>(root);
+        GocryptfsCreateOptions o; o.cipher = cipher; o.plaintextNames = plain; o.scryptLogN = 10;
+        CHECK(createGocryptfs(*st, pw.data(), pw.size(), o).status == OpenStatus::Ok);
+        auto r = open();
+        CHECK(r.status == OpenStatus::Ok);
+        if (!r.vault) return;
+        Vault& v = *r.vault;
+        CHECK(put(v, "top.txt", top));
+        CHECK(put(v, "big.bin", big));
+        CHECK(v.createDirectory("sub"));
+        CHECK(put(v, "sub/a.txt", a));
+        CHECK(put(v, "sub/b.bin", b));
+        CHECK(put(v, "sub/" + longName, lng));
+        CHECK(v.createDirectory("sub/deeper"));
+        CHECK(put(v, "sub/deeper/c.txt", c));
+        v.close();
+    }
+    OpenResult open(bool readOnly = false) { return openGocryptfs(st, pw.data(), pw.size(), readOnly, {}); }
+
+    // Physical path (relative to the vault root) of a cleartext path.
+    std::string phys(const std::string& vpath) {
+        Bytes raw; st->readWhole("gocryptfs.conf", raw);
+        auto cfg = gocryptfs::Config::parse(std::string(raw.begin(), raw.end()));
+        auto mk = gocryptfs::unlockMasterkey(cfg, pw.data(), pw.size());
+        auto keys = gocryptfs::deriveSessionKeys(cfg, mk);
+        gocryptfs::NameCryptor nc(keys.nameKey, cfg.longNameMax, cfg.plaintextNames, cfg.raw64());
+        std::string cur;
+        for (const std::string& seg : splitSegments(vpath)) {
+            Bytes iv(16, 0);
+            if (!cfg.plaintextNames && cfg.hasDirIV()) st->readWhole(joinPath(cur, "gocryptfs.diriv"), iv);
+            std::string cipher = cfg.plaintextNames ? seg : nc.encryptName(seg, iv.data());
+            cur = joinPath(cur, !cfg.plaintextNames && nc.isOverLongNameLimit(cipher) ? nc.hashLongName(cipher) : cipher);
+        }
+        return cur;
+    }
+    std::string abs(const std::string& rel) const { return root + "/" + rel; }
+};
+
+static void testCheckGocryptfs() {
+    std::puts("check & repair: gocryptfs check");
+    for (bool plain : {false, true}) {
+        GcFixture f(plain);
+        const std::string label = plain ? "plaintext names" : "encrypted names";
+        std::printf("  %s\n", label.c_str());
+        auto r = ck::checkVault(VaultFormat::Gocryptfs, *f.st, credsPw(f.pw), {});
+        CHECK(r.outcome == ck::Outcome::Ok);
+        CHECK(r.report.deepScan);
+        CHECK_EQ(r.report.filesScanned, 6);
+        if (!r.report.healthy()) dumpIssues(r.report.issues);
+        CHECK(r.report.healthy());
+        CHECK(r.report.issues.empty());
+
+        // structure only
+        ck::Credentials none;
+        auto s = ck::checkVault(VaultFormat::Gocryptfs, *f.st, none, {});
+        CHECK(s.outcome == ck::Outcome::Ok && !s.report.deepScan && s.report.healthy());
+        CHECK_EQ(s.report.filesScanned, 6);
+
+        // wrong password / not a vault
+        Bytes bad = B("nope");
+        CHECK(ck::checkVault(VaultFormat::Gocryptfs, *f.st, credsPw(bad), {}).outcome == ck::Outcome::WrongPassword);
+        TmpDir empty; PosixStorage es(empty.sub("e"));
+        auto inv = ck::checkVault(VaultFormat::Gocryptfs, es, credsPw(f.pw), {});
+        CHECK(inv.outcome == ck::Outcome::InvalidVault && inv.message.find("gocryptfs.conf") != std::string::npos);
+
+        // through an unlocked session: same answer, no password
+        auto o = f.open();
+        CHECK(o.status == OpenStatus::Ok);
+        if (o.vault) {
+            ck::Credentials sc; sc.session = o.vault.get();
+            auto rs = ck::checkVault(VaultFormat::Gocryptfs, *f.st, sc, {});
+            CHECK(rs.outcome == ck::Outcome::Ok && rs.report.deepScan && rs.report.healthy());
+            CHECK_EQ(rs.report.filesScanned, 6);
+            // a session of another format is refused
+            o.vault->close();
+        }
+
+        // progress is reported
+        std::vector<std::string> log;
+        ck::Hooks h; h.log = [&](const std::string& m) { log.push_back(m); };
+        ck::checkVault(VaultFormat::Gocryptfs, *f.st, credsPw(f.pw), {}, h);
+        CHECK(!log.empty());
+    }
+
+    // ---- damage ----
+    {   // a flipped byte in a chunk
+        GcFixture f;
+        flipByte(f.abs(f.phys("big.bin")), 18 + 5 * 4136 + 100);   // chunk 5
+        auto r = ck::checkVault(VaultFormat::Gocryptfs, *f.st, credsPw(f.pw), {});
+        CHECK(r.outcome == ck::Outcome::Ok && !r.report.healthy());
+        CHECK(hasIssue(r.report.issues, ck::Severity::Critical, "/big.bin", "Chunk 5 authentication failed"));
+        CHECK_EQ(r.report.issues.size(), (size_t)1);
+    }
+    {   // damaged header
+        GcFixture f;
+        flipByte(f.abs(f.phys("top.txt")), 1);   // version 2 -> 0x5A02
+        auto r = ck::checkVault(VaultFormat::Gocryptfs, *f.st, credsPw(f.pw), {});
+        CHECK(hasIssue(r.report.issues, ck::Severity::Critical, "/top.txt", "File header corrupted"));
+    }
+    {   // missing diriv in a sub folder: reported once, at that folder
+        GcFixture f;
+        std::filesystem::remove(f.abs(joinPath(f.phys("sub"), "gocryptfs.diriv")));
+        auto r = ck::checkVault(VaultFormat::Gocryptfs, *f.st, credsPw(f.pw), {});
+        CHECK(hasIssue(r.report.issues, ck::Severity::Critical, "", "Missing gocryptfs.diriv"));
+        CHECK(!r.report.healthy());
+        // also visible without a password
+        ck::Credentials none;
+        auto s = ck::checkVault(VaultFormat::Gocryptfs, *f.st, none, {});
+        CHECK(hasIssue(s.report.issues, ck::Severity::Critical, "", "Missing gocryptfs.diriv"));
+    }
+    {   // all-zero diriv is invalid too
+        GcFixture f;
+        spit(f.abs(joinPath(f.phys("sub"), "gocryptfs.diriv")), std::string(16, '\0'));
+        auto r = ck::checkVault(VaultFormat::Gocryptfs, *f.st, credsPw(f.pw), {});
+        CHECK(hasIssue(r.report.issues, ck::Severity::Critical, "gocryptfs.diriv", "invalid"));
+    }
+    {   // 0-byte file, orphaned sidecar, name that does not decrypt
+        GcFixture f;
+        spit(f.abs(f.phys("top.txt")), "");
+        spit(f.abs("gocryptfs.longname.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.name"), "x");
+        std::filesystem::rename(f.abs(f.phys("big.bin")), f.abs("garbagegarbagegarbagegarbagegarbagegarbage"));
+        auto r = ck::checkVault(VaultFormat::Gocryptfs, *f.st, credsPw(f.pw), {});
+        CHECK(hasIssue(r.report.issues, ck::Severity::Warning, "/top.txt", "0-byte"));
+        CHECK(hasIssue(r.report.issues, ck::Severity::Info, "gocryptfs.longname", "Orphaned"));
+        CHECK(hasIssue(r.report.issues, ck::Severity::Critical, "garbagegarbage", "Filename doesn't decrypt"));
+    }
+    {   // plaintext names: a user file called "x.name" is just a file
+        GcFixture f(true);
+        spit(f.abs("notes.name"), "this is a user file");
+        spit(f.abs("gocryptfs.diriv"), "also a user file");
+        auto r = ck::checkVault(VaultFormat::Gocryptfs, *f.st, credsPw(f.pw), {});
+        CHECK(r.outcome == ck::Outcome::Ok);
+        CHECK(!hasIssue(r.report.issues, ck::Severity::Info, "notes.name", "Orphaned"));
+    }
+}
+
+static void testRepairGocryptfs() {
+    std::puts("check & repair: gocryptfs repair");
+    {   // missing diriv in a folder: every entry below it is rescued under names the vault can read
+        GcFixture f;
+        std::filesystem::remove(f.abs(joinPath(f.phys("sub"), "gocryptfs.diriv")));
+        auto r = ck::repairVault(VaultFormat::Gocryptfs, *f.st, credsPw(f.pw), {});
+        CHECK(r.outcome == ck::Outcome::Ok);
+        if (!r.report.healthy()) dumpIssues(r.report.remaining);
+        CHECK(r.report.healthy());
+        CHECK(r.report.fixed >= 1);
+        CHECK(r.report.recovered >= 3);   // a.txt, b.bin, long file (files) + deeper (folder)
+        auto o = f.open();
+        CHECK(o.status == OpenStatus::Ok);
+        if (o.vault) {
+            Vault& v = *o.vault;
+            CHECK(has(v, "", "D:LOST+FOUND"));
+            CHECK(names(v, "sub").empty());
+            CHECK(!findByContent(v, "LOST+FOUND", f.a).empty());
+            CHECK(!findByContent(v, "LOST+FOUND", f.b).empty());
+            CHECK(!findByContent(v, "LOST+FOUND", f.lng).empty());
+            // the folder keeps its own diriv, so what is inside stays readable
+            std::string dirName;
+            for (auto& n : names(v, "LOST+FOUND")) if (n.rfind("D:recovered_dir_", 0) == 0) dirName = n.substr(2);
+            CHECK(!dirName.empty());
+            CHECK(!dirName.empty() && get(v, "LOST+FOUND/" + dirName + "/c.txt") == f.c);
+            // unrelated files untouched
+            CHECK(get(v, "top.txt") == f.top);
+            CHECK(get(v, "big.bin") == f.big);
+        }
+        // a second repair finds nothing to do
+        auto r2 = ck::repairVault(VaultFormat::Gocryptfs, *f.st, credsPw(f.pw), {});
+        CHECK(r2.outcome == ck::Outcome::Ok && r2.report.healthy());
+        CHECK_EQ(r2.report.fixed + r2.report.recovered + r2.report.removed, 0);
+    }
+    {   // a file whose name is damaged, one with a bad header version, a 0-byte file, an orphan sidecar
+        GcFixture f;
+        const std::string topPhys = f.phys("top.txt");
+        const std::string subA = f.phys("sub/a.txt");
+        std::filesystem::rename(f.abs(topPhys), f.abs("brokenbrokenbrokenbrokenbrokenbrokenbroken"));
+        // header: version 2 -> 3
+        { FILE* fp = std::fopen(f.abs(f.phys("sub/b.bin")).c_str(), "r+b"); std::fseek(fp, 1, SEEK_SET); std::fputc(3, fp); std::fclose(fp); }
+        spit(f.abs(subA), "");
+        spit(f.abs(joinPath(f.phys("sub"), "gocryptfs.longname.BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.name")), "x");
+        auto r = ck::repairVault(VaultFormat::Gocryptfs, *f.st, credsPw(f.pw), {});
+        CHECK(r.outcome == ck::Outcome::Ok);
+        // The quarantined file is still corrupt, and the final check says so -- but nothing else is left.
+        CHECK_EQ(r.report.remaining.size(), (size_t)1);
+        CHECK(hasIssue(r.report.remaining, ck::Severity::Critical, "/LOST+FOUND/corrupt_version_3_b.bin", "Unsupported file format version 3"));
+        CHECK(r.report.removed >= 1);     // the orphan sidecar
+        CHECK(r.report.recovered >= 2);   // renamed top.txt, bad-version b.bin
+        CHECK(r.report.fixed >= 1);       // the 0-byte a.txt got its header
+        auto o = f.open();
+        CHECK(o.status == OpenStatus::Ok);
+        if (o.vault) {
+            Vault& v = *o.vault;
+            CHECK(!findByContent(v, "LOST+FOUND", f.top).empty());
+            bool corrupt = false;
+            for (auto& n : names(v, "LOST+FOUND")) if (n == "F:corrupt_version_3_b.bin") corrupt = true;
+            CHECK(corrupt);
+            CHECK(has(v, "sub", "F:a.txt") && v.getFileSize("sub/a.txt") == 0);
+            CHECK(get(v, "sub/deeper/c.txt") == f.c);
+        }
+    }
+    {   // a name that fits no folder's diriv AND a bad name that is a whole folder
+        GcFixture f;
+        std::filesystem::rename(f.abs(f.phys("sub/deeper")), f.abs(joinPath(f.phys("sub"), "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")));
+        auto r = ck::repairVault(VaultFormat::Gocryptfs, *f.st, credsPw(f.pw), {});
+        CHECK(r.outcome == ck::Outcome::Ok && r.report.healthy());
+        CHECK_EQ(r.report.recovered, 1);
+        auto o = f.open();
+        if (o.vault) {
+            std::string dirName;
+            for (auto& n : names(*o.vault, "LOST+FOUND")) if (n.rfind("D:recovered_dir_", 0) == 0) dirName = n.substr(2);
+            CHECK(!dirName.empty() && get(*o.vault, "LOST+FOUND/" + dirName + "/c.txt") == f.c);
+        }
+    }
+    {   // config restored from the backup; a corrupt backup is never put in its place
+        GcFixture f;
+        Bytes conf;
+        CHECK(f.st->readWhole("gocryptfs.conf", conf));
+        spit(f.abs("gocryptfs.conf.bak"), std::string(conf.begin(), conf.end()));
+        std::filesystem::remove(f.abs("gocryptfs.conf"));
+        auto r = ck::repairVault(VaultFormat::Gocryptfs, *f.st, credsPw(f.pw), {});
+        CHECK(r.outcome == ck::Outcome::Ok && r.report.healthy() && r.report.fixed >= 1);
+        CHECK(f.open().status == OpenStatus::Ok);
+
+        GcFixture g;
+        spit(g.abs("gocryptfs.conf.bak"), "{ not json");
+        std::filesystem::remove(g.abs("gocryptfs.conf"));
+        auto r2 = ck::repairVault(VaultFormat::Gocryptfs, *g.st, credsPw(g.pw), {});
+        CHECK(r2.outcome == ck::Outcome::InvalidVault);
+        CHECK(!std::filesystem::exists(g.abs("gocryptfs.conf")));
+
+        GcFixture h;
+        std::filesystem::remove(h.abs("gocryptfs.conf"));
+        CHECK(ck::repairVault(VaultFormat::Gocryptfs, *h.st, credsPw(h.pw), {}).message.find("no backup") != std::string::npos);
+    }
+    {   // plaintext names: nothing that merely looks like a gocryptfs special file may be deleted or moved
+        GcFixture f(true);
+        spit(f.abs("notes.name"), "user data 1");
+        spit(f.abs(joinPath(f.phys("sub"), "gocryptfs.diriv")), "user data 2");
+        spit(f.abs("gocryptfs.longname.ZZZ.name"), "user data 3");
+        auto r = ck::repairVault(VaultFormat::Gocryptfs, *f.st, credsPw(f.pw), {});
+        CHECK(r.outcome == ck::Outcome::Ok);
+        CHECK_EQ(r.report.removed, 0);
+        CHECK(std::filesystem::exists(f.abs("notes.name")));
+        CHECK(std::filesystem::exists(f.abs(joinPath("sub", "gocryptfs.diriv"))));
+        CHECK(std::filesystem::exists(f.abs("gocryptfs.longname.ZZZ.name")));
+    }
+    {   // refusals: no password, wrong password
+        GcFixture f;
+        ck::Credentials none;
+        CHECK(ck::repairVault(VaultFormat::Gocryptfs, *f.st, none, {}).outcome == ck::Outcome::WrongPassword);
+        Bytes bad = B("nope");
+        CHECK(ck::repairVault(VaultFormat::Gocryptfs, *f.st, credsPw(bad), {}).outcome == ck::Outcome::WrongPassword);
+    }
+    {   // with the unlocked vault as credentials; its caches are dropped so the result shows at once
+        GcFixture f;
+        std::filesystem::remove(f.abs(joinPath(f.phys("sub"), "gocryptfs.diriv")));
+        auto o = f.open();
+        CHECK(o.status == OpenStatus::Ok);
+        if (o.vault) {
+            ck::Credentials sc; sc.session = o.vault.get();
+            auto r = ck::repairVault(VaultFormat::Gocryptfs, *f.st, sc, {});
+            CHECK(r.outcome == ck::Outcome::Ok && r.report.healthy());
+            CHECK(has(*o.vault, "", "D:LOST+FOUND"));
+            CHECK(!findByContent(*o.vault, "LOST+FOUND", f.a).empty());
+            o.vault->close();
+        }
+    }
+    {   // every cipher
+        for (auto cipher : {GocryptfsCipher::XChaCha20Poly1305, GocryptfsCipher::AesSiv}) {
+            GcFixture f(false, cipher);
+            CHECK(ck::checkVault(VaultFormat::Gocryptfs, *f.st, credsPw(f.pw), {}).report.healthy());
+            std::filesystem::remove(f.abs(joinPath(f.phys("sub"), "gocryptfs.diriv")));
+            auto r = ck::repairVault(VaultFormat::Gocryptfs, *f.st, credsPw(f.pw), {});
+            CHECK(r.outcome == ck::Outcome::Ok && r.report.healthy());
+            auto o = f.open();
+            CHECK(o.vault && !findByContent(*o.vault, "LOST+FOUND", f.b).empty());
+        }
+    }
+}
+
+// ---- Cryptomator ------------------------------------------------------------------------------------------------
+
+struct CmFixture {
+    TmpDir t;
+    std::string root;
+    std::shared_ptr<PosixStorage> st;
+    Bytes pw = B("check-me-too");
+    Bytes top = rnd(700, 41), big = rnd(100000, 42), a = rnd(5000, 43), b = rnd(9000, 44), c = rnd(3000, 45), lng = rnd(6000, 46);
+    std::string longName = std::string(150, 'M') + ".txt";   // encrypts past the 220-character threshold -> .c9s
+
+    CmFixture() {
+        root = t.sub("v");
+        st = std::make_shared<PosixStorage>(root);
+        CHECK(createCryptomator(*st, pw.data(), pw.size()).status == OpenStatus::Ok);
+        auto r = open();
+        CHECK(r.status == OpenStatus::Ok);
+        if (!r.vault) return;
+        Vault& v = *r.vault;
+        CHECK(put(v, "top.txt", top));
+        CHECK(put(v, "big.bin", big));
+        CHECK(v.createDirectory("sub"));
+        CHECK(put(v, "sub/a.txt", a));
+        CHECK(put(v, "sub/b.bin", b));
+        CHECK(put(v, "sub/" + longName, lng));
+        CHECK(v.createDirectory("sub/deeper"));
+        CHECK(put(v, "sub/deeper/c.txt", c));
+        CHECK(v.createSymlink("link", "top.txt"));
+        v.close();
+    }
+    OpenResult open() { return openCryptomator(st, pw.data(), pw.size(), false, {}); }
+
+    cryptomator::Masterkey mk() {
+        Bytes raw; st->readWhole("masterkey.cryptomator", raw);
+        return cryptomator::unlockMasterkeyCompat(cryptomator::MasterkeyFile::parse(std::string(raw.begin(), raw.end())), pw.data(), pw.size());
+    }
+    std::string dirFolder(cryptomator::NameCryptor& nc, const std::string& dirId) {
+        std::string h = nc.hashDirectoryId(dirId);
+        return "d/" + h.substr(0, 2) + "/" + h.substr(2);
+    }
+    // Physical node path (the .c9r / .c9s entry) of a cleartext path, and the dirId when it is a folder.
+    std::string node(const std::string& vpath, std::string* dirIdOut = nullptr) {
+        auto key = mk();
+        cryptomator::NameCryptor nc(key);
+        std::string dirId, cur;
+        auto segs = splitSegments(vpath);
+        for (size_t i = 0; i < segs.size(); i++) {
+            std::string full = nc.encryptFilename(segs[i], dirId) + ".c9r";
+            cur = joinPath(dirFolder(nc, dirId), (int)full.size() > 220 ? shortOf(full) : full);
+            if (i + 1 < segs.size() || dirIdOut) {
+                Bytes b;
+                if (st->readWhole(joinPath(cur, "dir.c9r"), b)) dirId.assign(b.begin(), b.end());
+            }
+        }
+        if (dirIdOut) *dirIdOut = dirId;
+        return cur;
+    }
+    static std::string shortOf(const std::string& full) {
+        Bytes h = crypto::hash(crypto::Md::Sha1, (const uint8_t*)full.data(), full.size());
+        return base64Encode(h.data(), h.size(), true, true) + ".c9s";
+    }
+    // The contents file of a file node.
+    std::string contentsOf(const std::string& vpath) {
+        std::string n = node(vpath);
+        return endsWith(n, ".c9s") ? joinPath(n, "contents.c9r") : n;
+    }
+    std::string abs(const std::string& rel) const { return root + "/" + rel; }
+    static bool endsWith(const std::string& s, const std::string& suf) { return s.size() >= suf.size() && s.compare(s.size() - suf.size(), suf.size(), suf) == 0; }
+};
+
+static void testCheckCryptomator() {
+    std::puts("check & repair: cryptomator check");
+    {
+        CmFixture f;
+        auto r = ck::checkVault(VaultFormat::Cryptomator, *f.st, credsPw(f.pw), {});
+        CHECK(r.outcome == ck::Outcome::Ok && r.report.deepScan);
+        if (!r.report.healthy() || !r.report.issues.empty()) dumpIssues(r.report.issues);
+        CHECK(r.report.healthy());
+        CHECK(r.report.issues.empty());   // including the symlink: it must not be reported as a broken directory node
+        CHECK_EQ(r.report.filesScanned, 6);
+
+        ck::Credentials none;
+        auto s = ck::checkVault(VaultFormat::Cryptomator, *f.st, none, {});
+        CHECK(s.outcome == ck::Outcome::Ok && !s.report.deepScan && s.report.healthy());
+        CHECK(s.report.filesScanned >= 3);   // root, sub, deeper
+
+        Bytes bad = B("nope");
+        CHECK(ck::checkVault(VaultFormat::Cryptomator, *f.st, credsPw(bad), {}).outcome == ck::Outcome::WrongPassword);
+
+        auto o = f.open();
+        if (o.vault) {
+            ck::Credentials sc; sc.session = o.vault.get();
+            auto rs = ck::checkVault(VaultFormat::Cryptomator, *f.st, sc, {});
+            CHECK(rs.outcome == ck::Outcome::Ok && rs.report.deepScan && rs.report.healthy());
+            CHECK_EQ(rs.report.filesScanned, 6);
+            o.vault->close();
+        }
+        // not a vault / missing pieces
+        TmpDir e; PosixStorage es(e.sub("e"));
+        CHECK(ck::checkVault(VaultFormat::Cryptomator, es, credsPw(f.pw), {}).outcome == ck::Outcome::InvalidVault);
+        std::filesystem::rename(f.abs("d"), f.abs("d_gone"));
+        auto nd = ck::checkVault(VaultFormat::Cryptomator, *f.st, credsPw(f.pw), {});
+        CHECK(nd.outcome == ck::Outcome::InvalidVault && nd.message.find("'d' data directory") != std::string::npos);
+        std::filesystem::rename(f.abs("d_gone"), f.abs("d"));
+        std::filesystem::remove(f.abs("vault.cryptomator"));
+        auto nv = ck::checkVault(VaultFormat::Cryptomator, *f.st, credsPw(f.pw), {});
+        CHECK(nv.outcome == ck::Outcome::InvalidVault && nv.message.find("vault.cryptomator is missing") != std::string::npos);
+    }
+    {   // flipped chunk byte, header
+        CmFixture f;
+        flipByte(f.abs(f.contentsOf("big.bin")), 68 + 3 * 32816 + 50);   // header is 68 bytes in SIV_GCM; chunk 3
+        flipByte(f.abs(f.contentsOf("top.txt")), 5);
+        auto r = ck::checkVault(VaultFormat::Cryptomator, *f.st, credsPw(f.pw), {});
+        CHECK(hasIssue(r.report.issues, ck::Severity::Critical, "/big.bin", "authentication failed"));
+        CHECK(hasIssue(r.report.issues, ck::Severity::Critical, "/top.txt", "header fails authentication"));
+        CHECK(!r.report.healthy());
+    }
+    {   // broken dir.c9r, empty dir.c9r
+        CmFixture f;
+        spit(f.abs(joinPath(f.node("sub/deeper"), "dir.c9r")), "");
+        std::filesystem::remove(f.abs(joinPath(f.node("sub"), "dir.c9r")));
+        auto r = ck::checkVault(VaultFormat::Cryptomator, *f.st, credsPw(f.pw), {});
+        CHECK(hasIssue(r.report.issues, ck::Severity::Critical, "/sub", "missing dir.c9r"));
+        CHECK(!r.report.healthy());
+        CHECK(r.outcome == ck::Outcome::Ok);
+    }
+    {   // an orphaned data folder
+        CmFixture f;
+        std::filesystem::create_directories(f.abs("d/AB/CDEFGHIJKLMNOPQRSTUVWXYZ234567"));
+        spit(f.abs("d/AB/CDEFGHIJKLMNOPQRSTUVWXYZ234567/something.c9r"), "x");
+        std::filesystem::create_directories(f.abs("d/AB/ABCDEFGHIJKLMNOPQRSTUVWXYZ2345"));
+        auto r = ck::checkVault(VaultFormat::Cryptomator, *f.st, credsPw(f.pw), {});
+        CHECK(hasIssue(r.report.issues, ck::Severity::Warning, "CDEFGHIJKLMNOPQRSTUVWXYZ234567", "orphaned"));
+        CHECK(hasIssue(r.report.issues, ck::Severity::Info, "ABCDEFGHIJKLMNOPQRSTUVWXYZ2345", "Empty orphaned"));
+    }
+    {   // a vault.cryptomator that does not verify: reported, names still scanned, contents skipped
+        CmFixture f;
+        Bytes jwt; f.st->readWhole("vault.cryptomator", jwt);
+        std::string t(jwt.begin(), jwt.end());
+        t[t.size() - 3] = t[t.size() - 3] == 'A' ? 'B' : 'A';
+        spit(f.abs("vault.cryptomator"), t);
+        auto r = ck::checkVault(VaultFormat::Cryptomator, *f.st, credsPw(f.pw), {});
+        CHECK(r.outcome == ck::Outcome::Ok && !r.report.deepScan);
+        CHECK(hasIssue(r.report.issues, ck::Severity::Critical, "vault.cryptomator", ""));
+        CHECK_EQ(r.report.issues.size(), (size_t)1);   // no flood of bogus per-file failures
+        CHECK(ck::repairVault(VaultFormat::Cryptomator, *f.st, credsPw(f.pw), {}).outcome == ck::Outcome::InvalidVault);
+    }
+}
+
+static void testCheckRepairCryptomatorFormat7() {
+    std::puts("check & repair: cryptomator format 7 (SIV_CTRMAC, no vault.cryptomator)");
+    TmpDir t; std::string root = t.sub("v");
+    auto st = std::make_shared<PosixStorage>(root);
+    const Bytes pw = B("seven");
+    CHECK(createCryptomator(*st, pw.data(), pw.size()).status == OpenStatus::Ok);
+    Bytes mkRaw; st->readWhole("masterkey.cryptomator", mkRaw);
+    auto mk = cryptomator::unlockMasterkey(cryptomator::MasterkeyFile::parse(std::string(mkRaw.begin(), mkRaw.end())), pw.data(), pw.size());
+    std::string mkJson = cryptomator::lockMasterkey(mk, pw.data(), pw.size(), 7);
+    CHECK(st->writeWhole("masterkey.cryptomator", (const uint8_t*)mkJson.data(), mkJson.size()));
+    CHECK(st->remove("vault.cryptomator"));
+    Bytes a = rnd(5000, 61), b = rnd(70000, 62);
+    {
+        auto r = openCryptomator(st, pw.data(), pw.size(), false, {});
+        CHECK(r.status == OpenStatus::Ok);
+        if (!r.vault) return;
+        CHECK(r.vault->createDirectory("sub"));
+        CHECK(put(*r.vault, "sub/a.txt", a));
+        CHECK(put(*r.vault, "b.bin", b));
+        r.vault->close();
+    }
+    auto c = ck::checkVault(VaultFormat::Cryptomator, *st, credsPw(pw), {});
+    CHECK(c.outcome == ck::Outcome::Ok && c.report.deepScan);
+    CHECK_EQ(c.report.filesScanned, 2);
+    CHECK_EQ(c.report.issues.size(), (size_t)1);
+    CHECK(hasIssue(c.report.issues, ck::Severity::Warning, "/", "format-7"));
+    // damage a chunk: detected with the right cipher
+    cryptomator::NameCryptor nc(mk);
+    std::string bn = nc.encryptFilename("b.bin", "") + ".c9r";
+    std::string h = nc.hashDirectoryId("");
+    const std::string bPath = root + "/d/" + h.substr(0, 2) + "/" + h.substr(2) + "/" + bn;
+    flipByte(bPath, 100);
+    auto d = ck::checkVault(VaultFormat::Cryptomator, *st, credsPw(pw), {});
+    CHECK(hasIssue(d.report.issues, ck::Severity::Critical, "/b.bin", "authentication"));
+    flipByte(bPath, 100);
+    // repair works without a vault.cryptomator for a genuine format-7 key file
+    auto r = ck::repairVault(VaultFormat::Cryptomator, *st, credsPw(pw), {});
+    CHECK(r.outcome == ck::Outcome::Ok && r.report.healthy());
+    // and the same files through a live session
+    auto o = openCryptomator(st, pw.data(), pw.size(), false, {});
+    if (o.vault) {
+        ck::Credentials sc; sc.session = o.vault.get();
+        auto rs = ck::checkVault(VaultFormat::Cryptomator, *st, sc, {});
+        CHECK(rs.report.deepScan && rs.report.filesScanned == 2 && rs.report.issues.size() == 1);
+        o.vault->close();
+    }
+}
+
+static void testRepairCryptomator() {
+    std::puts("check & repair: cryptomator repair");
+    {   // a damaged dir.c9r: the folder gets a new identity, and the old backing folder -- found through its
+        // dirid.c9r -- is hooked into /LOST+FOUND with every name intact
+        CmFixture f;
+        std::string deeperId;
+        f.node("sub/deeper", &deeperId);
+        spit(f.abs(joinPath(f.node("sub/deeper"), "dir.c9r")), "");
+        auto r = ck::repairVault(VaultFormat::Cryptomator, *f.st, credsPw(f.pw), {});
+        CHECK(r.outcome == ck::Outcome::Ok);
+        if (!r.report.healthy()) dumpIssues(r.report.remaining);
+        CHECK(r.report.healthy());
+        CHECK(r.report.fixed >= 1);
+        CHECK(r.report.recovered >= 1);
+        auto o = f.open();
+        CHECK(o.status == OpenStatus::Ok);
+        if (o.vault) {
+            Vault& v = *o.vault;
+            CHECK(has(v, "sub", "D:deeper") && names(v, "sub/deeper").empty());
+            std::string adopted;
+            for (auto& n : names(v, "LOST+FOUND")) if (n.rfind("D:orphan_data_", 0) == 0) adopted = n.substr(2);
+            CHECK(!adopted.empty());
+            CHECK(!adopted.empty() && get(v, "LOST+FOUND/" + adopted + "/c.txt") == f.c);
+            CHECK(get(v, "sub/a.txt") == f.a);
+            CHECK(v.readSymlink("link") == std::optional<std::string>("top.txt"));
+        }
+        auto r2 = ck::repairVault(VaultFormat::Cryptomator, *f.st, credsPw(f.pw), {});
+        CHECK(r2.outcome == ck::Outcome::Ok && r2.report.healthy());
+        CHECK_EQ(r2.report.fixed + r2.report.recovered + r2.report.removed, 0);
+    }
+    {   // a file whose name does not decrypt is kept, under a readable name
+        CmFixture f;
+        std::filesystem::rename(f.abs(f.node("top.txt")), f.abs(joinPath(parentOf(f.node("top.txt")), "NOTAVALIDCIPHERTEXTNAMEATALLNOTAVALID.c9r")));
+        std::vector<std::string> lg; ck::Hooks hk; hk.log = [&](const std::string& m) { lg.push_back(m); };
+        auto r = ck::repairVault(VaultFormat::Cryptomator, *f.st, credsPw(f.pw), {}, hk);
+        if (!(r.report.healthy() && r.report.recovered == 1)) { for (auto& m : lg) std::printf("    log: %s\n", m.c_str()); dumpIssues(r.report.remaining); }
+        CHECK(r.outcome == ck::Outcome::Ok && r.report.healthy() && r.report.recovered == 1);
+        auto o = f.open();
+        CHECK(o.vault && !findByContent(*o.vault, "LOST+FOUND", f.top).empty());
+        CHECK(o.vault && get(*o.vault, "big.bin") == f.big);
+    }
+    {   // a directory node with a damaged name keeps its whole subtree
+        CmFixture f;
+        std::filesystem::rename(f.abs(f.node("sub")), f.abs(joinPath(parentOf(f.node("sub")), "NOTAVALIDCIPHERTEXTNAMEATALLNOTAVALID.c9r")));
+        std::vector<std::string> lg; ck::Hooks hk; hk.log = [&](const std::string& m) { lg.push_back(m); };
+        auto r = ck::repairVault(VaultFormat::Cryptomator, *f.st, credsPw(f.pw), {}, hk);
+        if (!(r.report.healthy() && r.report.recovered == 1)) { for (auto& m : lg) std::printf("    log: %s\n", m.c_str()); dumpIssues(r.report.remaining); }
+        CHECK(r.outcome == ck::Outcome::Ok && r.report.healthy());
+        CHECK_EQ(r.report.recovered, 1);
+        auto o = f.open();
+        if (o.vault) {
+            std::string dirName;
+            for (auto& n : names(*o.vault, "LOST+FOUND")) if (n.rfind("D:recovered_dir_", 0) == 0) dirName = n.substr(2);
+            CHECK(!dirName.empty());
+            CHECK(!dirName.empty() && get(*o.vault, "LOST+FOUND/" + dirName + "/a.txt") == f.a);
+            CHECK(!dirName.empty() && get(*o.vault, "LOST+FOUND/" + dirName + "/deeper/c.txt") == f.c);
+        }
+    }
+    {   // an empty orphan is deleted; things that are not ours are left alone; symlinks survive
+        CmFixture f;
+        std::filesystem::create_directories(f.abs("d/AB/ABCDEFGHIJKLMNOPQRSTUVWXYZ2345"));
+        const std::string rootFolder = f.abs(parentOf(f.node("top.txt")));
+        std::filesystem::create_directories(rootFolder + "/not_a_vault_node");
+        spit(rootFolder + "/not_a_vault_node/keep.txt", "mine");
+        std::filesystem::create_directories(rootFolder + "/.sync");
+        std::filesystem::create_directories(rootFolder + "/empty_foreign");
+        auto r = ck::repairVault(VaultFormat::Cryptomator, *f.st, credsPw(f.pw), {});
+        CHECK(r.outcome == ck::Outcome::Ok);
+        CHECK_EQ(r.report.removed, 1);
+        CHECK(!std::filesystem::exists(f.abs("d/AB/ABCDEFGHIJKLMNOPQRSTUVWXYZ2345")));
+        CHECK(std::filesystem::exists(rootFolder + "/not_a_vault_node/keep.txt"));
+        CHECK(std::filesystem::exists(rootFolder + "/.sync") && std::filesystem::exists(rootFolder + "/empty_foreign"));
+        CHECK(!std::filesystem::exists(rootFolder + "/not_a_vault_node/dir.c9r"));
+        auto o = f.open();
+        CHECK(o.vault && o.vault->readSymlink("link") == std::optional<std::string>("top.txt"));
+        CHECK(o.vault && !has(*o.vault, "", "D:link"));
+    }
+    {   // an orphan that cannot prove what it was (no dirid.c9r) is left exactly where it is
+        CmFixture f;
+        std::filesystem::create_directories(f.abs("d/AB/CDEFGHIJKLMNOPQRSTUVWXYZ234567"));
+        spit(f.abs("d/AB/CDEFGHIJKLMNOPQRSTUVWXYZ234567/something.c9r"), "x");
+        auto r = ck::repairVault(VaultFormat::Cryptomator, *f.st, credsPw(f.pw), {});
+        CHECK(r.outcome == ck::Outcome::Ok);
+        CHECK_EQ(r.report.recovered, 0);
+        CHECK(std::filesystem::exists(f.abs("d/AB/CDEFGHIJKLMNOPQRSTUVWXYZ234567/something.c9r")));
+        CHECK(hasIssue(r.report.remaining, ck::Severity::Warning, "CDEFGHIJKLMNOPQRSTUVWXYZ234567", "orphaned"));
+    }
+    {   // a missing backing folder is created; refusals
+        CmFixture f;
+        std::string deeperId;
+        f.node("sub/deeper", &deeperId);
+        {
+            auto key = f.mk(); cryptomator::NameCryptor nc(key);
+            std::filesystem::remove_all(f.abs(f.dirFolder(nc, deeperId)));
+        }
+        auto r = ck::repairVault(VaultFormat::Cryptomator, *f.st, credsPw(f.pw), {});
+        CHECK(r.outcome == ck::Outcome::Ok && r.report.healthy() && r.report.fixed >= 1);
+        ck::Credentials none;
+        CHECK(ck::repairVault(VaultFormat::Cryptomator, *f.st, none, {}).outcome == ck::Outcome::WrongPassword);
+        Bytes bad = B("nope");
+        CHECK(ck::repairVault(VaultFormat::Cryptomator, *f.st, credsPw(bad), {}).outcome == ck::Outcome::WrongPassword);
+    }
+    {   // with the unlocked vault as credentials
+        CmFixture f;
+        spit(f.abs(joinPath(f.node("sub/deeper"), "dir.c9r")), "");
+        auto o = f.open();
+        CHECK(o.status == OpenStatus::Ok);
+        if (o.vault) {
+            ck::Credentials sc; sc.session = o.vault.get();
+            auto r = ck::repairVault(VaultFormat::Cryptomator, *f.st, sc, {});
+            CHECK(r.outcome == ck::Outcome::Ok && r.report.healthy());
+            CHECK(has(*o.vault, "", "D:LOST+FOUND"));
+            o.vault->close();
+        }
+    }
+}
+
+// ---- CryFS ------------------------------------------------------------------------------------------------------
+
+static void testCheckCryfs() {
+    std::puts("check & repair: cryfs check");
+    TmpDir t; std::string root = t.sub("v"); HostEnv env; env.cryfsLocalStateDir = t.sub("state"); env.tempDir = t.path;
+    auto st = std::make_shared<PosixStorage>(root);
+    CryfsCreateOptions o; o.cipher = "xchacha20-poly1305"; o.blocksizeBytes = 4096;   // small blocks: multi-level trees
+    const Bytes pw = B("cryfs-check");
+    CHECK(createCryfs(*st, pw.data(), pw.size(), o, env).status == OpenStatus::Ok);
+    Bytes big = rnd(300000, 51), small = rnd(500, 52);
+    {
+        auto r = openCryfs(st, pw.data(), pw.size(), false, env);
+        CHECK(r.status == OpenStatus::Ok);
+        if (!r.vault) return;
+        CHECK(put(*r.vault, "big.bin", big));
+        CHECK(r.vault->createDirectory("d1"));
+        CHECK(r.vault->createDirectory("d1/d2"));
+        CHECK(put(*r.vault, "d1/small.txt", small));
+        CHECK(put(*r.vault, "d1/d2/also.bin", rnd(40000, 53)));
+        r.vault->close();
+    }
+    auto healthy = ck::checkVault(VaultFormat::Cryfs, *st, credsPw(pw), env);
+    CHECK(healthy.outcome == ck::Outcome::Ok && healthy.report.deepScan);
+    if (!healthy.report.healthy()) dumpIssues(healthy.report.issues);
+    CHECK(healthy.report.healthy());
+    CHECK(healthy.report.filesScanned > 50);
+
+    ck::Credentials none;
+    auto s = ck::checkVault(VaultFormat::Cryfs, *st, none, env);
+    CHECK(s.outcome == ck::Outcome::Ok && !s.report.deepScan && s.report.healthy());
+    CHECK_EQ(s.report.filesScanned, healthy.report.filesScanned);
+    Bytes bad = B("nope");
+    CHECK(ck::checkVault(VaultFormat::Cryfs, *st, credsPw(bad), env).outcome == ck::Outcome::WrongPassword);
+
+    // with an unlocked session (scratch integrity state; the session's own is left alone)
+    {
+        auto r = openCryfs(st, pw.data(), pw.size(), false, env);
+        CHECK(r.status == OpenStatus::Ok);
+        if (r.vault) {
+            ck::Credentials sc; sc.session = r.vault.get();
+            auto rs = ck::checkVault(VaultFormat::Cryfs, *st, sc, env);
+            CHECK(rs.outcome == ck::Outcome::Ok && rs.report.deepScan && rs.report.healthy());
+            CHECK(get(*r.vault, "big.bin") == big);   // the session still works
+            r.vault->close();
+        }
+    }
+
+    // a leftover block nothing references: informational only
+    {
+        std::string blockPath;
+        std::string shard;
+        for (auto& e : std::filesystem::directory_iterator(root))
+            if (e.is_directory() && e.path().filename().string().size() == 3) { shard = e.path().string(); break; }
+        for (auto& e : std::filesystem::directory_iterator(shard)) { blockPath = e.path().string(); break; }
+        std::filesystem::copy_file(blockPath, shard + "/00000000000000000000000000000");
+        auto r = ck::checkVault(VaultFormat::Cryfs, *st, credsPw(pw), env);
+        CHECK(r.outcome == ck::Outcome::Ok && r.report.healthy());
+        CHECK(hasIssue(r.report.issues, ck::Severity::Info, "/", "not part of any file or folder"));
+        std::filesystem::remove(shard + "/00000000000000000000000000000");
+    }
+
+    // find the blocks of big.bin (the largest ones) and damage them
+    std::vector<std::pair<off_t, std::string>> files;
+    walkFiles(root, [&](const std::string& p, off_t sz) { files.push_back({sz, p}); });
+    std::string victim;
+    for (auto& f : files) if (f.second.find("cryfs.config") == std::string::npos) { victim = f.second; break; }
+    // flipped byte -> damaged
+    flipByte(victim, 60);
+    auto d = ck::checkVault(VaultFormat::Cryfs, *st, credsPw(pw), env);
+    CHECK(d.outcome == ck::Outcome::Ok && !d.report.healthy());
+    CHECK(hasIssue(d.report.issues, ck::Severity::Critical, "", "is damaged"));
+    flipByte(victim, 60);   // undo
+    CHECK(ck::checkVault(VaultFormat::Cryfs, *st, credsPw(pw), env).report.healthy());
+    // deleted -> missing
+    Bytes saved; { std::ifstream in(victim, std::ios::binary); saved.assign(std::istreambuf_iterator<char>(in), {}); }
+    std::filesystem::remove(victim);
+    auto m = ck::checkVault(VaultFormat::Cryfs, *st, credsPw(pw), env);
+    CHECK(!m.report.healthy());
+    CHECK(hasIssue(m.report.issues, ck::Severity::Critical, "", "is missing"));
+    { std::ofstream out(victim, std::ios::binary); out.write((const char*)saved.data(), (std::streamsize)saved.size()); }
+    CHECK(ck::checkVault(VaultFormat::Cryfs, *st, credsPw(pw), env).report.healthy());
+
+    // not a vault, broken config, no automatic repair
+    TmpDir e; PosixStorage es(e.sub("e"));
+    CHECK(ck::checkVault(VaultFormat::Cryfs, es, credsPw(pw), env).outcome == ck::Outcome::InvalidVault);
+    spit(root + "/cryfs.config", "not a cryfs config");
+    CHECK(ck::checkVault(VaultFormat::Cryfs, *st, none, env).outcome == ck::Outcome::InvalidVault);
+    auto rep = ck::repairVault(VaultFormat::Cryfs, *st, credsPw(pw), env);
+    CHECK(rep.outcome == ck::Outcome::InvalidVault && rep.message.find("Cryptomator and gocryptfs") != std::string::npos);
+}
+
+static void testCheckRepair() {
+    testCheckGocryptfs();
+    testRepairGocryptfs();
+    testCheckCryptomator();
+    testCheckRepairCryptomatorFormat7();
+    testRepairCryptomator();
+    testCheckCryfs();
+}
+
 int main(int argc, char** argv) {
     std::string only = argc > 1 ? argv[1] : "";
     auto want = [&](const char* n) { return only.empty() || only == n; };
@@ -2014,7 +3210,10 @@ int main(int argc, char** argv) {
         testGocryptfsUnusualNames();
     }
     if (want("cryptomator")) { testCryptomator(false); testCryptomator(true); testCryptomatorCompat(); testCryptomatorSymlinks(); testCryptomatorBackups(); testCryptomatorMigration(); }
-    if (want("cryfs")) { testCryfs("xchacha20-poly1305", 32768); testCryfs("aes-256-gcm", 4096); testCryfs("aes-256-cfb", 8192); }
+    if (want("cryfs")) { testCryfs("xchacha20-poly1305", 32768); testCryfs("aes-256-gcm", 4096); testCryfs("aes-256-cfb", 8192); testCryfsCompat(); testCryfsLegacyCiphers(); testCryfs("twofish-256-gcm", 4096); testCryfs("serpent-128-cfb", 8192); testCryfs("cast-256-gcm", 4096); testCryfs("mars-448-gcm", 4096); }
+    if (want("scrypt")) testScryptLowMem();
+    if (only == "cryfs-vector") testCryfsCppVector();
+    if (want("check")) testCheckRepair();
     if (want("concurrency")) { testConcurrency("gocryptfs"); testConcurrency("cryptomator"); testConcurrency("cryfs"); }
     std::printf("\n%d checks, %d failed\n", g_checks, g_failed);
     return g_failed ? 1 : 0;

@@ -2,6 +2,7 @@ import 'dart:async' show unawaited;
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -329,7 +330,7 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
               hub: _hub,
               compact: true,
               onEditFolders: () =>
-                  unawaited(editMusicFolders(context, ref, widget.container)),
+                  unawaited(editMusicFolders(context, ref, widget.entry)),
             ),
             IconButton.filledTonal(
               visualDensity: VisualDensity.compact,
@@ -619,11 +620,11 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
                 key: const PageStorageKey('music-albums'),
                 controller: _albumsScroll,
                 padding: const EdgeInsets.all(AppSpacing.md),
-                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                gridDelegate: _AlbumGridDelegate(
                   maxCrossAxisExtent: 190,
                   mainAxisSpacing: AppSpacing.md,
                   crossAxisSpacing: AppSpacing.md,
-                  childAspectRatio: 0.7,
+                  textAreaHeight: LibraryAlbumTile.textAreaHeight(context),
                 ),
                 itemCount: albums.length,
                 itemBuilder: (context, i) => LibraryAlbumTile(
@@ -932,10 +933,10 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
     },
     onToggleMode: () {
       _popDetails();
-      unawaited(toggleMusicMode(context, ref, widget.container));
+      unawaited(toggleMusicMode(context, ref, widget.entry));
     },
     onEditFolders: () =>
-        unawaited(editMusicFolders(context, ref, widget.container)),
+        unawaited(editMusicFolders(context, ref, widget.entry)),
   );
 
   void _openAlbum(AlbumGroup a) {
@@ -1049,5 +1050,35 @@ class _MusicLibraryBodyState extends ConsumerState<MusicLibraryBody> {
     if (!saved) {
       messenger?.showSnackBar(SnackBar(content: Text(l10n.musicCoverFailed)));
     }
+  }
+}
+class _AlbumGridDelegate extends SliverGridDelegateWithMaxCrossAxisExtent {
+  final double textAreaHeight;
+
+  const _AlbumGridDelegate({
+    required super.maxCrossAxisExtent,
+    required super.mainAxisSpacing,
+    required super.crossAxisSpacing,
+    required this.textAreaHeight,
+  });
+
+  @override
+  SliverGridLayout getLayout(SliverConstraints constraints) {
+    final base = super.getLayout(constraints) as SliverGridRegularTileLayout;
+    final tileHeight = base.childCrossAxisExtent + textAreaHeight;
+    return SliverGridRegularTileLayout(
+      crossAxisCount: base.crossAxisCount,
+      mainAxisStride: tileHeight + mainAxisSpacing,
+      crossAxisStride: base.crossAxisStride,
+      childMainAxisExtent: tileHeight,
+      childCrossAxisExtent: base.childCrossAxisExtent,
+      reverseCrossAxis: base.reverseCrossAxis,
+    );
+  }
+
+  @override
+  bool shouldRelayout(_AlbumGridDelegate oldDelegate) {
+    return super.shouldRelayout(oldDelegate) ||
+        textAreaHeight != oldDelegate.textAreaHeight;
   }
 }

@@ -3,12 +3,16 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/features/browser/models/tab_id.dart';
 import 'package:vaultexplorer/features/library/controllers/library_providers.dart';
 import 'package:vaultexplorer/features/library/controllers/music_mode.dart';
 import 'package:vaultexplorer/features/library/widgets/music_library_body.dart';
 import 'package:vaultexplorer/features/library/widgets/music_mini_player.dart';
 
 /// Wraps one file manager tab's content and adds music mode to it.
+///
+/// Music mode belongs to the tab: another tab on the same location can stay on
+/// the file listing (or be in gallery mode) while this one shows the library.
 ///
 /// With the mode off [child] (the normal file listing) fills the space exactly
 /// as before. With it on, the Albums / Artists / Genres / Tracks views replace
@@ -19,15 +23,19 @@ import 'package:vaultexplorer/features/library/widgets/music_mini_player.dart';
 /// The library is shared: every tab with music mode on feeds the same merged
 /// library (see `MusicHub`), so a vault and the phone's music appear together,
 /// and two tabs on the same location share one scan. A location's library exists
-/// only while at least one tab holds it with the mode on; closing the tab or
-/// locking the vault drops it from memory.
+/// only while at least one tab holds it with the mode on; leaving music mode in
+/// the last such tab, closing it or locking the vault drops it from memory.
 class MusicModeHost extends ConsumerStatefulWidget {
   final MountedContainer container;
+
+  /// The tab this host belongs to; its music mode entry is keyed by it.
+  final TabId tabId;
   final Widget child;
 
   const MusicModeHost({
     super.key,
     required this.container,
+    required this.tabId,
     required this.child,
   });
 
@@ -47,7 +55,7 @@ class _MusicModeHostState extends ConsumerState<MusicModeHost> {
     super.initState();
     _registry = ref.read(musicModeRegistryProvider);
     _library = ref.read(musicLibraryProvider);
-    _entry = _registry.acquire(widget.container);
+    _entry = _registry.acquire(widget.container, widget.tabId);
     _entry.addListener(_onEntryChanged);
     _syncLibrary();
   }
@@ -56,7 +64,7 @@ class _MusicModeHostState extends ConsumerState<MusicModeHost> {
   void dispose() {
     _entry.removeListener(_onEntryChanged);
     _detach();
-    _registry.release(widget.container);
+    _registry.release(widget.container, widget.tabId);
     super.dispose();
   }
 

@@ -5,6 +5,7 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -82,5 +83,37 @@ class CryfsConfigFileTest {
         val parsed = CryfsConfigFile.parse(raw, password)
 
         assertEquals(4 * 1024 * 1024, parsed.blocksizeBytes)
+    }
+
+    @Test
+    fun `a filesystem format other than 0_10 is rejected with a clear message`() {
+        // Upstream only accepts exactly 0.10; an older vault would be damaged by writing current-format blocks
+        // into it, and a newer one may have a layout this app does not know.
+        val password = "correct horse battery staple".toCharArray()
+        val base = CryfsConfigFile.newVaultConfig(random)
+
+        val older = CryfsConfigFile.build(base.copy(formatVersion = "0.9"), password, random)
+        val tooOld = assertThrows(CryfsConfigException::class.java) { CryfsConfigFile.parse(older, password) }
+        assertTrue(tooOld.message!!.contains("older"))
+
+        val newer = CryfsConfigFile.build(base.copy(formatVersion = "0.11"), password, random)
+        val tooNew = assertThrows(CryfsConfigException::class.java) { CryfsConfigFile.parse(newer, password) }
+        assertTrue(tooNew.message!!.contains("newer"))
+
+        // "0.10.0" is the same version as "0.10" (numeric comparison, like upstream).
+        val same = CryfsConfigFile.build(base.copy(formatVersion = "0.10.0"), password, random)
+        assertEquals("0.10.0", CryfsConfigFile.parse(same, password).formatVersion)
+    }
+
+    @Test
+    fun `a config that is not a valid exclusive client id is rejected`() {
+        val password = "correct horse battery staple".toCharArray()
+        val base = CryfsConfigFile.newVaultConfig(random)
+        val zero = CryfsConfigFile.build(base.copy(exclusiveClientId = 0L), password, random)
+        assertThrows(CryfsConfigException::class.java) { CryfsConfigFile.parse(zero, password) }
+        val tooBig = CryfsConfigFile.build(base.copy(exclusiveClientId = 0x1_0000_0000L), password, random)
+        assertThrows(CryfsConfigException::class.java) { CryfsConfigFile.parse(tooBig, password) }
+        val ok = CryfsConfigFile.build(base.copy(exclusiveClientId = 4242L), password, random)
+        assertEquals(4242L, CryfsConfigFile.parse(ok, password).exclusiveClientId)
     }
 }

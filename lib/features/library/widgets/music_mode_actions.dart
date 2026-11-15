@@ -2,24 +2,29 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/features/browser/models/tab_id.dart';
 import 'package:vaultexplorer/features/library/controllers/library_providers.dart';
 import 'package:vaultexplorer/features/library/controllers/music_mode.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/features/library/widgets/music_scope_sheet.dart';
 
-/// The music mode entry for [container]; what the toolbar button and the bar
-/// both listen to.
-MusicModeEntry musicModeEntryFor(WidgetRef ref, MountedContainer container) =>
-    ref.read(musicModeRegistryProvider).entryFor(container);
+/// The music mode entry of the tab [tabId] showing [container]; what that
+/// tab's toolbar button and bar both listen to. Every tab has its own, so music
+/// mode in one tab never switches another tab on the same container.
+MusicModeEntry musicModeEntryFor(
+  WidgetRef ref,
+  MountedContainer container,
+  TabId tabId,
+) => ref.read(musicModeRegistryProvider).entryFor(container, tabId);
 
-/// The toolbar button: turns music mode off, or asks which folders to cover and
-/// turns it on.
+/// The toolbar button: turns music mode off in the tab that owns [entry], or
+/// asks which folders to cover and turns it on there.
 Future<void> toggleMusicMode(
   BuildContext context,
   WidgetRef ref,
-  MountedContainer container,
+  MusicModeEntry entry,
 ) async {
-  final entry = musicModeEntryFor(ref, container);
+  final container = entry.container;
   final fileIo = ref.read(vaultFileIoApiProvider);
   await entry.load();
   if (entry.config.enabled) {
@@ -39,13 +44,13 @@ Future<void> toggleMusicMode(
   await entry.enable(folders: folders);
 }
 
-/// Changes which folders music mode covers.
+/// Changes which folders music mode covers (for every tab on the container).
 Future<void> editMusicFolders(
   BuildContext context,
   WidgetRef ref,
-  MountedContainer container,
+  MusicModeEntry entry,
 ) async {
-  final entry = musicModeEntryFor(ref, container);
+  final container = entry.container;
   final fileIo = ref.read(vaultFileIoApiProvider);
   final folders = await showMusicScopeSheet(
     context,

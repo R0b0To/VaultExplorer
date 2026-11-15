@@ -54,13 +54,14 @@ class CategoryIndexHandlers(
         val rootPath = call.argument<String>("rootPath")
         val extensions = call.argument<List<String>>("extensions")
         val limit = (call.argument<Number>("limit")?.toInt() ?: DEFAULT_LIMIT).coerceIn(1, MAX_LIMIT)
+        val includeNoMedia = call.argument<Boolean>("includeNoMedia") ?: false
         if (rootPath.isNullOrEmpty() || extensions == null) {
             result.error("INVALID_ARGS", "rootPath and extensions are required", null)
             return
         }
         ioExecutor.execute {
             val response: Map<String, Any>? = try {
-                query(rootPath, extensions, limit)
+                query(rootPath, extensions, limit, includeNoMedia)
             } catch (e: Exception) {
                 VeLog.w(TAG, e) { "category index query failed: ${e.message}" }
                 null
@@ -69,7 +70,12 @@ class CategoryIndexHandlers(
         }
     }
 
-    private fun query(rootPath: String, rawExtensions: List<String>, limit: Int): Map<String, Any>? {
+    private fun query(
+        rootPath: String,
+        rawExtensions: List<String>,
+        limit: Int,
+        includeNoMedia: Boolean = false,
+    ): Map<String, Any>? {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
         val extensions = CategoryIndexQuery.sanitizeExtensions(rawExtensions)
         if (extensions.isEmpty()) return mapOf("entries" to emptyList<String>(), "truncated" to false)
@@ -78,7 +84,7 @@ class CategoryIndexHandlers(
         val args = Bundle().apply {
             putString(
                 ContentResolver.QUERY_ARG_SQL_SELECTION,
-                CategoryIndexQuery.selection(DATA_COLUMN, extensions.size),
+                CategoryIndexQuery.selection(DATA_COLUMN, extensions.size, includeNoMedia),
             )
             putStringArray(
                 ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS,

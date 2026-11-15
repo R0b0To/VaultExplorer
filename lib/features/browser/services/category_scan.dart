@@ -119,6 +119,7 @@ class CategoryScanner {
     required this.showHidden,
     this.skipDirectory,
     this.respectNoMedia = false,
+    this.showNoMedia = false,
     this.onError,
     this.sharedSemaphore,
     this.maxDepth = categoryScanMaxDepth,
@@ -151,6 +152,9 @@ class CategoryScanner {
   /// left out. A lister has to report the marker (see
   /// [kNoMediaMarkerName]); it is hidden by name, so [matches] never sees it.
   final bool respectNoMedia;
+
+  /// Whether folders holding a `.nomedia` marker are scanned anyway.
+  final bool showNoMedia;
 
   /// Called when one folder could not be listed. The walk carries on.
   final void Function(String dirPath, Object error)? onError;
@@ -229,7 +233,7 @@ class CategoryScanner {
       final subdirs = <String>[];
       try {
         final listed = RawEntry.parseAll(raw);
-        if (respectNoMedia && !showHidden && depth > 0) {
+        if (respectNoMedia && !showNoMedia && depth > 0) {
           for (final entry in listed) {
             if (!entry.isDir && entry.name == kNoMediaMarkerName) {
               publishIfDue();

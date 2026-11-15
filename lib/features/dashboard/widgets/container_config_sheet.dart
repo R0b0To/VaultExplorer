@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart' show AutofillContextAction;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:material_ui/material_ui.dart';
@@ -857,76 +858,79 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      TextField(
-                        controller: _passwordCtrl,
-                        obscureText: _revealLocked ? true : !_showPassword,
-                        enableInteractiveSelection: !_revealLocked,
-                        autofillHints: null,
-                        onChanged: (val) {
-                          if (val.isEmpty) _prefillCleared = true;
-                          setState(() {});
-                        },
-                        decoration: InputDecoration(
-                          filled: true,
-                          fillColor: cs.surfaceContainerHighest,
-                          labelText:
-                              context.l10n.containerPasswordOptionalLabel,
-                          prefixIcon: const Icon(
-                            Icons.lock_outline_rounded,
-                            size: 20,
-                          ),
-                          suffixIcon: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (_passwordPrefilled)
-                                Padding(
-                                  padding: const EdgeInsets.only(right: 4),
-                                  child: Tooltip(
-                                    message:
-                                        context.l10n.usingSavedPasswordTooltip,
-                                    child: Icon(
-                                      Icons.bookmark_rounded,
-                                      size: 20,
-                                      color: cs.primary,
+                      AutofillGroup(
+                        onDisposeAction: AutofillContextAction.cancel,
+                        child: TextField(
+                          controller: _passwordCtrl,
+                          obscureText: _revealLocked ? true : !_showPassword,
+                          enableInteractiveSelection: !_revealLocked,
+                          autofillHints: const <String>[AutofillHints.password],
+                          onChanged: (val) {
+                            if (val.isEmpty) _prefillCleared = true;
+                            setState(() {});
+                          },
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: cs.surfaceContainerHighest,
+                            labelText:
+                                context.l10n.containerPasswordOptionalLabel,
+                            prefixIcon: const Icon(
+                              Icons.lock_outline_rounded,
+                              size: 20,
+                            ),
+                            suffixIcon: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (_passwordPrefilled)
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 4),
+                                    child: Tooltip(
+                                      message:
+                                          context.l10n.usingSavedPasswordTooltip,
+                                      child: Icon(
+                                        Icons.bookmark_rounded,
+                                        size: 20,
+                                        color: cs.primary,
+                                      ),
                                     ),
                                   ),
-                                ),
-                              PasswordVisibilityToggle(
-                                obscured: _revealLocked ? true : !_showPassword,
-                                enabled: !_revealLocked,
-                                onToggle: () => setState(
-                                  () => _showPassword = !_showPassword,
-                                ),
-                              ),
-                              if (widget.existingRecord != null &&
-                                  widget.existingRecord!.unlockMethod !=
-                                      ContainerUnlockMethod.password)
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.close_rounded,
-                                    size: 20,
+                                PasswordVisibilityToggle(
+                                  obscured: _revealLocked ? true : !_showPassword,
+                                  enabled: !_revealLocked,
+                                  onToggle: () => setState(
+                                    () => _showPassword = !_showPassword,
                                   ),
-                                  tooltip: context
-                                      .l10n
-                                      .cancelUpdatingPasswordTooltip,
-                                  onPressed: () {
-                                    ref
-                                        .read(
-                                          containerConfigControllerProvider(
-                                            _params,
-                                          ).notifier,
-                                        )
-                                        .setChangePassword(false);
-                                    _passwordCtrl.clear();
-                                    _prefillCleared = true;
-                                  },
                                 ),
-                            ],
-                          ),
-                          hintText: context.l10n.passwordHintContainer,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(18),
-                            borderSide: BorderSide.none,
+                                if (widget.existingRecord != null &&
+                                    widget.existingRecord!.unlockMethod !=
+                                        ContainerUnlockMethod.password)
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.close_rounded,
+                                      size: 20,
+                                    ),
+                                    tooltip: context
+                                        .l10n
+                                        .cancelUpdatingPasswordTooltip,
+                                    onPressed: () {
+                                      ref
+                                          .read(
+                                            containerConfigControllerProvider(
+                                              _params,
+                                            ).notifier,
+                                          )
+                                          .setChangePassword(false);
+                                      _passwordCtrl.clear();
+                                      _prefillCleared = true;
+                                    },
+                                  ),
+                              ],
+                            ),
+                            hintText: context.l10n.passwordHintContainer,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(18),
+                              borderSide: BorderSide.none,
+                            ),
                           ),
                         ),
                       ),

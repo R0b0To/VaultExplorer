@@ -1,0 +1,22 @@
+### Metadata
+- Added an image metadata editor: edit tags, set or shift dates (or take them from the modified date or file name), and remove metadata. Works on single files or a whole selection, with progress and a result summary.
+- Tags, dates and removal are written into JPEG, PNG and WebP images; other files only get a new modified date. Removal can target Exif, XMP, IPTC/Photoshop, comments and the colour profile, with an option to keep orientation. Read-only vaults are never modified.
+
+### Gallery and files
+- Gallery index is now stored as a log of small files, so adding photos writes one file instead of rewriting the whole index. Photo header parsing runs on a background isolate, and grouped views build their group index once per list.
+- Added an option to show media in folders containing a `.nomedia` file (off by default).
+- Music mode is now per tab; the saved setting only sets the default for tabs opened afterwards.
+- Fixed the bottom search bar sitting under the system navigation bar.
+
+### Vault compatibility and recovery
+- CryFS: added the Twofish, Serpent, CAST-256 and MARS cipher modes offered by official CryFS 1.x, and support for scrypt parameters up to 1 GiB.
+- CryFS: clear message when a vault is in single-client mode for another device.
+- Folder vault Check & Repair (gocryptfs, Cryptomator, CryFS) now runs in the native core; key material no longer leaves it.
+
+### Container and filesystem tools
+- Added Expand BitLocker container: grows a BitLocker volume file or a fixed/dynamic VHD or VHDX image (virtual disk, last MBR/GPT partition, BitLocker metadata and NTFS). Back up the container first.
+
+### Privacy and reliability
+- Added a privacy curtain that covers the screen the moment the app is paused and is removed only after the first frame is painted on resume.
+
+SHA256 Signature: `0bde9d3b0ee3f56617d02632c843b1629bf0b2faa4560dff5d26f651dc325f19`

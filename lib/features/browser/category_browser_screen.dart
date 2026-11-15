@@ -54,7 +54,6 @@ import 'package:vaultexplorer/features/sync/domain/sync_ignore_matcher.dart'
     show kVaultMetaDir;
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
-import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
 /// Asks the host to open [container] at the folder holding [path], as if the
 /// user had browsed there. Supplied by whoever opens the category browser
@@ -198,6 +197,18 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
         _onMountedVaultsChanged,
       );
     }
+    ref.listenManual<FileManagerToolbarSettingsState>(
+      fileManagerToolbarSettingsProvider(null),
+      (prev, next) {
+        if (prev == null) return;
+        final oldConfig = prev.config;
+        final newConfig = next.config;
+        if (oldConfig.showHiddenFiles != newConfig.showHiddenFiles ||
+            oldConfig.showNoMediaFolders != newConfig.showNoMediaFolders) {
+          unawaited(_startScan());
+        }
+      },
+    );
     // Not here: collecting the sources reads localized labels, which cannot
     // be looked up before initState has finished.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -312,10 +323,9 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
   Future<void> _startScan({bool deep = false}) async {
     _token?.cancel();
     final token = _token = CancellationToken();
-    final showHidden = ref
-        .read(fileManagerToolbarSettingsProvider(null))
-        .config
-        .showHiddenFiles;
+    final toolbar = ref.read(fileManagerToolbarSettingsProvider(null)).config;
+    final showHidden = toolbar.showHiddenFiles;
+    final showNoMedia = toolbar.showNoMediaFolders;
     setState(() {
       _scanning = true;
       _snapshot = CategoryAggregateSnapshot.empty;
@@ -341,7 +351,7 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
       await Future.wait([
         for (final b in bundles)
           if (b.source.isVault)
-            _loadIndexSeed(api, b.container, showHidden).then((seed) {
+            _loadIndexSeed(api, b.container, showHidden, showNoMedia).then((seed) {
               if (seed != null) seeds[b.source.volId] = seed;
             }),
       ]);
@@ -354,7 +364,7 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
     await Future.wait([
       for (final b in bundles)
         if (b.container.isRawLocal)
-          deviceIndex.seed(_deviceKey(b, showHidden)).then((seed) {
+          deviceIndex.seed(_deviceKey(b, showHidden, showNoMedia)).then((seed) {
             if (seed != null) seeds[b.source.volId] = seed;
           }),
     ]);
@@ -377,7 +387,7 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
               indexLookup: deep
                   ? null
                   : () => deviceIndex.lookup(
-                      _deviceKey(b, showHidden),
+                      _deviceKey(b, showHidden, showNoMedia),
                       extensions: extensions,
                       matches: matches,
                       isHidden: isHiddenEntryName,
@@ -390,6 +400,9 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
               source: b.source,
               listDirectory: (dir) => api.listDirectory(b.container, dir),
               skipDirectory: b.source.isVault ? _skipVaultMetaFolder : null,
+              // Vaults and external locations honour `.nomedia` like phone
+              // storage does; before, only phone storage did.
+              respectNoMedia: widget.category != FileCategory.documents,
               seed: seeds[b.source.volId],
             ),
       ],
@@ -409,15 +422,21 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
       _snapshot = _withoutLockedVaults(result);
       _scanning = false;
     });
-    if (indexEnabled) unawaited(_saveIndex(api, bundles, result));
-    unawaited(_rememberDevice(deviceIndex, bundles, result, showHidden));
+    // A scan that includes `.nomedia` folders must not become the stored
+    // index, which the next default scan would show before it finishes.
+    if (indexEnabled && !showNoMedia) unawaited(_saveIndex(api, bundles, result));
+    unawaited(_rememberDevice(deviceIndex, bundles, result, showHidden, showNoMedia));
   }
 
-  DeviceCategoryIndexKey _deviceKey(_SourceBundle bundle, bool showHidden) =>
-      DeviceCategoryIndexKey(
+  DeviceCategoryIndexKey _deviceKey(
+    _SourceBundle bundle,
+    bool showHidden,
+    bool showNoMedia,
+  ) => DeviceCategoryIndexKey(
         rootPath: bundle.container.uri,
         categoryKey: _categoryKey,
         showHidden: showHidden,
+        showNoMedia: showNoMedia,
       );
 
   /// Keeps what a finished scan found in phone storage, to show at once the
@@ -428,6 +447,7 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
     List<_SourceBundle> bundles,
     CategoryAggregateSnapshot result,
     bool showHidden,
+    bool showNoMedia,
   ) async {
     if (!result.finished || result.limitReached) return;
     for (final b in bundles) {
@@ -435,7 +455,7 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
           result.failedSources.contains(b.source.volId)) {
         continue;
       }
-      await index.remember(_deviceKey(b, showHidden), [
+      await index.remember(_deviceKey(b, showHidden, showNoMedia), [
         for (final e in result.entries)
           if (e.sourceVolId == b.source.volId)
             RawEntry(
@@ -454,7 +474,11 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
     VaultFileIoApi api,
     MountedContainer vault,
     bool showHidden,
+    bool showNoMedia,
   ) async {
+    // The stored index was gathered without `.nomedia` folders, so it cannot
+    // stand in for a scan that includes them.
+    if (showNoMedia) return null;
     try {
       final store = categoryIndexStoreFor(api, vault);
       if (store == null) return null;
@@ -1312,7 +1336,7 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
         resizeToAvoidBottomInset: false,
         appBar: selecting && !toolbarConfig.bottomSelectionBar
             ? _buildSelectionBar(l10n)
-            : _buildAppBar(l10n, mountedVaults, hasLocations),
+            : _buildAppBar(l10n, mountedVaults, hasLocations, toolbarConfig),
         bottomNavigationBar: selecting && toolbarConfig.bottomSelectionBar
             ? Builder(
                 builder: (slotContext) => Padding(
@@ -1377,6 +1401,7 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
     AppLocalizations l10n,
     List<MountedContainer> mountedVaults,
     bool hasLocations,
+    FileManagerToolbarConfig toolbarConfig,
   ) {
     final subtitle = _scanning
         ? l10n.categoryScanning(_snapshot.foldersChecked)
@@ -1442,6 +1467,18 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
             switch (value) {
               case 'folders':
                 _setFolderMode(!_folderMode);
+              case 'hidden':
+                unawaited(
+                  ref
+                      .read(fileManagerToolbarSettingsProvider(null).notifier)
+                      .setShowHiddenFiles(!toolbarConfig.showHiddenFiles),
+                );
+              case 'nomedia':
+                unawaited(
+                  ref
+                      .read(fileManagerToolbarSettingsProvider(null).notifier)
+                      .setShowNoMediaFolders(!toolbarConfig.showNoMediaFolders),
+                );
               case 'grid':
                 _setLayout(BrowserLayoutMode.grid);
               case 'list':
@@ -1469,6 +1506,16 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
               value: 'folders',
               checked: _folderMode,
               child: Text(l10n.categoryFolderStructure),
+            ),
+            CheckedPopupMenuItem<String>(
+              value: 'hidden',
+              checked: toolbarConfig.showHiddenFiles,
+              child: Text(l10n.showHiddenFilesLabel),
+            ),
+            CheckedPopupMenuItem<String>(
+              value: 'nomedia',
+              checked: toolbarConfig.showNoMediaFolders,
+              child: Text(l10n.showNoMediaFoldersLabel),
             ),
             const PopupMenuDivider(),
             CheckedPopupMenuItem<String>(

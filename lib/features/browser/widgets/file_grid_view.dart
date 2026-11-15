@@ -24,6 +24,7 @@ import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
 import 'package:vaultexplorer/features/browser/services/category_aggregate_scan.dart';
+import 'package:vaultexplorer/features/browser/gallery/gallery_group_index.dart';
 import 'package:vaultexplorer/features/browser/gallery/gallery_layout.dart';
 import 'package:vaultexplorer/features/browser/gallery/gallery_sliver.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
@@ -224,7 +225,7 @@ class FileGridViewState extends State<FileGridView>
   final GalleryLayoutHost _groupHost = GalleryLayoutHost(
     flow: GalleryFlow.columns,
   );
-  _GridGroups? _groups;
+  GalleryGroupIndex<RawEntry>? _groups;
   String _groupHostKey = '';
 
   // Animation controller for clearly visible column morph transition
@@ -499,13 +500,13 @@ class FileGridViewState extends State<FileGridView>
     );
   }
 
-  _GridGroups _groupsFor(List<RawEntry> items) {
+  GalleryGroupIndex<RawEntry> _groupsFor(List<RawEntry> items) {
     final cached = _groups;
     if (cached != null && identical(cached.source, items)) return cached;
-    return _groups = _GridGroups(items, (widget.groupBuilder ?? computeDateGroups)(items));
+    return _groups = GalleryGroupIndex<RawEntry>(items, (widget.groupBuilder ?? computeDateGroups)(items));
   }
 
-  void _syncGroupHost(_GridGroups groups, double aspect, double headerExtent) {
+  void _syncGroupHost(GalleryGroupIndex<RawEntry> groups, double aspect, double headerExtent) {
     final key =
         '${identityHashCode(groups)}|$_crossAxisCount|${widget.spacing}|$aspect|$headerExtent';
     if (key == _groupHostKey) return;
@@ -1333,33 +1334,3 @@ class _BookCoverGridThumb extends ConsumerWidget {
   );
 }
 
-/// The date groups of a list, plus the map from a child index of the grouped
-/// sliver (a header per group, then its items) back to a group and an item.
-class _GridGroups {
-  _GridGroups(this.source, this.groups)
-    : childCount = source.length + groups.length,
-      childGroup = Int32List(source.length + groups.length),
-      childLocal = Int32List(source.length + groups.length) {
-    var c = 0;
-    for (var g = 0; g < groups.length; g++) {
-      childGroup[c] = g;
-      childLocal[c] = -1;
-      c++;
-      for (var j = 0; j < groups[g].items.length; j++) {
-        childGroup[c] = g;
-        childLocal[c] = j;
-        c++;
-      }
-    }
-  }
-
-  final List<RawEntry> source;
-  final List<DateGroup<RawEntry>> groups;
-  final int childCount;
-
-  /// Child index -> group.
-  final Int32List childGroup;
-
-  /// Child index -> index inside the group, or -1 for the group's header.
-  final Int32List childLocal;
-}

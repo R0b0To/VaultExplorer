@@ -15,6 +15,7 @@ fv_engine.*       chunked file engine shared by gocryptfs + Cryptomator (random-
 fv_gocryptfs*     config, EME names, long names, AES-256-GCM / XChaCha20-Poly1305 / AES-SIV content, tree, session
 fv_cryptomator*   masterkey + JWT, SIV names, .c9s shortening, SIV_GCM / SIV_CTRMAC content, tree, session
 fv_cryfs*         config, block store + local integrity state, blob data tree, dir blobs, session
+fv_check*         Check & Repair for folder vaults: public API fv_check.h, one file per format (see below)
 fv_pool.h         small worker pool (CryFS fan-out)
 test/             fv_tests.cpp (unit/scenario/stress), fvcli.cpp, interop/ (real gocryptfs / Cryptomator / CryFS)
 ```
@@ -57,11 +58,51 @@ normalised before encryption; the core carries no Unicode tables -- Android inst
 non-ASCII names that arrive in decomposed form are affected) and, optionally,
 `fv::setLogger`.
 
+## Check & Repair
+
+`fv_check.h` is the vault Check & Repair tool, in the same portable core -- there is nothing Android-specific
+about it, so a desktop front-end gets it by linking `foldervault_core` (`fvcli <fmt> <dir> <pw|-> check|repair`
+is a complete example).
+
+```cpp
+fv::check::Credentials cr;  cr.password = pw;  cr.passwordLen = pwLen;     // or cr.session = unlockedVault.get()
+fv::check::Hooks hooks;     hooks.log = [](const std::string& line) { ... };    // optional live log
+auto c = fv::check::checkVault(fv::VaultFormat::Cryptomator, *storage, cr, env, hooks);
+auto r = fv::check::repairVault(fv::VaultFormat::Gocryptfs,  *storage, cr, env, hooks);
+```
+
+Everything goes through `fv::Storage`, so it works on a plain folder, on SAF, or on any backend a host implements.
+Results are plain structs (`Outcome` ok / wrong password / invalid vault, `Issue{severity, path, message}`,
+counters); report paths are cleartext paths with a leading `/`.
+
+* **Check** is read-only. *Without credentials* it checks the layout only (config files parse, `gocryptfs.diriv`
+  present and valid, Cryptomator `dir.c9r`/`name.c9s`/`contents.c9r` nodes complete, CryFS config envelope and block
+  files). *With a password or an unlocked `Vault`* it also decrypts every file name and authenticates every file
+  header and every chunk (gocryptfs, Cryptomator) or every block of every blob (CryFS: missing, damaged or rolled-back
+  blocks, unreadable directory blobs; unreferenced blocks are an `Info` line). It walks the same rules the engines use,
+  so the tool and the vault cannot disagree about what is broken.
+* **Repair** (gocryptfs, Cryptomator) needs credentials and never deletes anything that can still be recovered. What
+  cannot be put back where it belongs is *moved* into a `/LOST+FOUND` folder in the vault, under a fresh name written
+  the way the vault itself writes names, so it shows up in the vault afterwards with its original bytes. It restores a
+  missing `gocryptfs.conf` from `gocryptfs.conf.bak` (the backup is validated first), recreates a missing or invalid
+  `gocryptfs.diriv` (only when the file is absent or its content is invalid, never when it merely could not be read),
+  gives files with a damaged name or header a readable home, removes empty leftovers and orphaned long-name sidecars,
+  repairs Cryptomator `dir.c9r` pointers and missing backing folders, and adopts orphaned Cryptomator backing folders
+  when their `dirid.c9r` proves what directory they were. A final check, reusing the keys already in hand (one scrypt
+  run), reports what is still wrong.
+* **Credentials**: a password, or an unlocked `Vault` of the same vault. A `Vault` supplies its keys through
+  `Vault::exportKeys()` (inside the process: on Android they never reach the JVM) and has its caches invalidated after a
+  repair. CryFS opens its integrity state in `HostEnv::cryfsLocalStateDir` as an open does, or in a throw-away folder
+  under `HostEnv::tempDir` when an unlocked session already holds it.
+* Things the tool deliberately does **not** do: touch anything with a name that merely looks special (with plaintext
+  gocryptfs names `x.name` and `gocryptfs.diriv` are ordinary files; Cryptomator folders without a `.c9r`/`.c9s`
+  suffix, dot-files and `symlink.c9r` nodes are left alone), repair CryFS, or guess a directory id it cannot prove.
+
 ## Testing
 
 ```
 cmake --build <build> --target foldervault_test fvcli   # host build, no Android toolchain
-ctest -R foldervault_test                               # 2455 checks, about a minute
+ctest -R foldervault_test                               # 3938 checks, about a minute
 FVCLI=<build>/fvcli CRYPTOMATOR_CLI=<cryptomator-cli> test/interop/run_all.sh   # real implementations over FUSE
 test/interop/oracle/fetch_oracle.sh                     # once: the official cryptofs jars (needs a JDK 21)
 FVCLI=<build>/fvcli test/interop/run_all.sh             # ...then also runs the cryptomator_{symlink,backup,migrate} cross-checks
@@ -222,8 +263,5 @@ Deliberate, each one verified against the real client where one exists:
   format 7 vault (including a format 8 key file whose `vault.cryptomator` has not synced yet) and, unlike
   official, aborts before changing anything if the backup cannot be written.
 
-Not migrated: `foldercheck/` (Check & Repair) keeps running on the Kotlin primitives and gets a live
-session's keys from `NativeVaultSession.keyMaterial()`; `looksLikeVault` probes stay in Kotlin. Those primitives
-(`GocryptfsConfig`, `GocryptfsMasterkey`, `GocryptfsFileNameCryptor`) follow the same rules as the engine above
-(pre-HKDF / pre-Raw64 vaults, `LongNameMax`, strict base64, FIDO2 refused); their unit tests include the same
-official-vector known answers.
+Not migrated: the `looksLikeVault` probes stay in Kotlin. Check & Repair used to run on the Kotlin primitives
+(`foldercheck/`, fed by a key export onto the JVM heap); it now lives in `fv_check*` and the key export is gone.

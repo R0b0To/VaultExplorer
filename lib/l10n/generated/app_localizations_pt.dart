@@ -2510,6 +2510,20 @@ class AppLocalizationsPt extends AppLocalizations {
       'Faça backup do contêiner primeiro. Suporta LUKS1 e LUKS2. Os sistemas de arquivos NTFS e ext2/3/4 podem ser expandidos diretamente (FAT e exFAT não podem). O espaço adicionado pode ser inicializado com zeros criptografados. Se usado, um arquivo de chave substitui a senha.';
 
   @override
+  String get toolExpandBitLockerVolumeTitle => 'Expandir contêiner BitLocker';
+
+  @override
+  String get toolExpandBitLockerVolumeSubtitle =>
+      'Aumenta um arquivo de volume BitLocker ou uma imagem VHD/VHDX e estende o sistema de arquivos NTFS';
+
+  @override
+  String get bitlockerToolsExpandNote =>
+      'Faça primeiro um backup do contêiner. Isso reescreve os metadados do BitLocker para que o volume criptografado cubra o espaço adicionado, então confira o resultado em uma cópia antes de confiar nele. Funciona com volumes BitLocker totalmente criptografados do Windows 7 ou posterior, como arquivo de volume bruto ou dentro de um VHD ou VHDX fixo ou dinâmico. Em uma imagem de disco, informe o novo tamanho total do disco: o disco virtual e sua última partição (MBR ou GPT) também são ampliados, então a partição BitLocker precisa ser a última. BitLocker To Go e volumes com criptografia na gravação (somente espaço usado) não são compatíveis. O NTFS pode ser expandido no local (FAT e exFAT não). O espaço adicionado pode ser preenchido opcionalmente com zeros criptografados. Desbloqueie com a senha ou com a chave de recuperação de 48 dígitos.';
+
+  @override
+  String get bitlockerToolsPasswordLabel => 'Senha ou chave de recuperação';
+
+  @override
   String get toolHiddenInExistingTitle => 'Adicionar volume oculto';
 
   @override
@@ -6981,6 +6995,13 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get showHiddenFilesDesc =>
       'Exibir arquivos ocultos (dotfiles) e pastas do sistema';
+
+  @override
+  String get showNoMediaFilesLabel => 'Show Media Hidden by .nomedia';
+
+  @override
+  String get showNoMediaFilesDesc =>
+      'Include media in folders containing a .nomedia file';
 
   @override
   String get dontAskAgain => 'Não perguntar novamente';
@@ -14585,4 +14606,131 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get symbolicLinkTargetOutsideVault =>
       'O destino deve ser um caminho relativo que permaneça dentro deste contêiner.';
+
+  @override
+  String get symbolicLinkPickerUnresolvable =>
+      'Não é possível criar um destino relativo a partir daqui. Digite o destino.';
+
+  @override
+  String get editMetadataAction => 'Editar metadados';
+
+  @override
+  String get editTagsAction => 'Editar etiquetas';
+
+  @override
+  String get editDateTimeAction => 'Editar data e hora';
+
+  @override
+  String get removeMetadataAction => 'Remover metadados';
+
+  @override
+  String get metadataFormatsNote =>
+      'Etiquetas, datas e remoção são gravadas em imagens JPEG, PNG e WebP. Os outros arquivos só recebem uma nova data de modificação.';
+
+  @override
+  String get metadataReadOnlyMessage => 'Este cofre é somente leitura';
+
+  @override
+  String get tagsAddHint => 'Adicione etiquetas separadas por vírgulas';
+
+  @override
+  String get tagsNoneYet => 'Ainda sem etiquetas';
+
+  @override
+  String get dateModeSet => 'Definir';
+
+  @override
+  String get dateModeShift => 'Deslocar';
+
+  @override
+  String get dateModeFromModified => 'Da data de modificação';
+
+  @override
+  String get dateModeFromName => 'Do nome do arquivo';
+
+  @override
+  String get dateShiftLater => 'Mais tarde';
+
+  @override
+  String get dateShiftEarlier => 'Mais cedo';
+
+  @override
+  String get dateDaysLabel => 'Dias';
+
+  @override
+  String get dateHoursLabel => 'Horas';
+
+  @override
+  String get dateMinutesLabel => 'Minutos';
+
+  @override
+  String get dateAlsoSetModified =>
+      'Definir também a data de modificação do arquivo';
+
+  @override
+  String dateFromNameMatches(int matched, int total) {
+    return '$matched de $total nomes de arquivo contêm uma data';
+  }
+
+  @override
+  String get stripExifLabel => 'Exif (câmera, data, local)';
+
+  @override
+  String get stripXmpLabel => 'XMP (etiquetas, avaliação, dados de edição)';
+
+  @override
+  String get stripIptcLabel => 'IPTC / Photoshop (legendas, créditos)';
+
+  @override
+  String get stripCommentsLabel => 'Comentários';
+
+  @override
+  String get stripIccLabel => 'Perfil de cor (pode alterar as cores)';
+
+  @override
+  String get stripKeepOrientationLabel => 'Manter a orientação';
+
+  @override
+  String get stripKeepOrientationDesc =>
+      'Sem ela, fotos tiradas de lado podem aparecer giradas';
+
+  @override
+  String get stripWarning =>
+      'Isto reescreve os arquivos e não pode ser desfeito.';
+
+  @override
+  String metadataProgress(int done, int total) {
+    return 'Atualizando $done de $total';
+  }
+
+  @override
+  String metadataResultUpdated(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count arquivos atualizados',
+      one: '1 arquivo atualizado',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get metadataResultUnchanged => 'Nada a alterar';
+
+  @override
+  String metadataResultSkipped(int count) {
+    return '$count ignorados (não compatíveis)';
+  }
+
+  @override
+  String metadataResultFailed(int count) {
+    return '$count com falha';
+  }
+
+  @override
+  String get showNoMediaFoldersLabel => 'Mostrar pastas .nomedia';
+
+  @override
+  String get showNoMediaFoldersDesc =>
+      'Incluir pastas com um arquivo .nomedia, que os apps de galeria normalmente ignoram';
 }

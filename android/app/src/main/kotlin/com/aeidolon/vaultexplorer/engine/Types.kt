@@ -27,5 +27,6 @@ sealed class VaultOpenResult<out S> {
         val derivedKey: ByteArray? = null,
     ) : VaultOpenResult<S>()
     object WrongPassword : VaultOpenResult<Nothing>()
-    data class InvalidVault(val reason: String) : VaultOpenResult<Nothing>()
+    /** [code] is non-null only for failures the caller can resolve (e.g. NativeFolderVault.CODE_SINGLE_CLIENT_MODE). */
+    data class InvalidVault(val reason: String, val code: String? = null) : VaultOpenResult<Nothing>()
 }

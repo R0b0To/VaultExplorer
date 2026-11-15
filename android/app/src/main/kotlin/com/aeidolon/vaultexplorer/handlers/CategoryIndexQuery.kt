@@ -30,11 +30,16 @@ internal object CategoryIndexQuery {
     /** [root] with exactly one trailing slash: the prefix every path under it starts with. */
     fun prefixFor(root: String): String = if (root.endsWith("/")) root else "$root/"
 
-    /** `column LIKE <root>/% AND (column LIKE %.ext1 OR column LIKE %.ext2 ...)`. */
-    fun selection(column: String, extensionCount: Int): String {
+    /**
+     * `column LIKE <root>/% AND (column LIKE %.ext1 OR column LIKE %.ext2 ...)`.
+     * When [includeNoMedia] is false, files in folders marked with `.nomedia`
+     * (which Android sets to MEDIA_TYPE_NONE = 0) are excluded by requiring `media_type != 0`.
+     */
+    fun selection(column: String, extensionCount: Int, includeNoMedia: Boolean = false): String {
         require(extensionCount > 0) { "at least one extension is required" }
         val anyExtension = (0 until extensionCount).joinToString(" OR ") { "$column LIKE ?" }
-        return "$column LIKE ? AND ($anyExtension)"
+        val noMediaFilter = if (includeNoMedia) "" else " AND media_type != 0"
+        return "$column LIKE ? AND ($anyExtension)$noMediaFilter"
     }
 
     /** The bind arguments for [selection], in order: the root prefix, then one per extension. */

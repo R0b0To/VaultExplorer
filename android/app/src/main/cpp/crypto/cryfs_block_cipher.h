@@ -11,6 +11,9 @@ enum class CryfsCipherId : uint8_t {
     kAes128Gcm = 2,   // "aes-128-gcm"
     kAes128Cfb = 3,   // "aes-128-cfb"
     kXChaCha20Poly1305 = 4, // "xchacha20-poly1305" - CryFS 1.0+ default
+    // 16 + n: the other ciphers official C++ CryFS 1.x offers (twofish-*, serpent-*, cast-256-*, mars-*, each in
+    // -gcm and -cfb flavour); n indexes cryfs_legacy::spec() (crypto/cryfs_legacy_ciphers.h).
+    kLegacyBase = 16,
     kUnknown = 255,
 };
 
@@ -26,3 +29,8 @@ bool cryfsBlockDecrypt(CryfsCipherId cipher,
                         std::vector<uint8_t>& out);
 
 long cryfsBlockCleartextSize(CryfsCipherId cipher, size_t ciphertextLen);
+
+// Key length in bytes the cipher needs, or 0 for kUnknown.
+int cryfsCipherKeyBytes(CryfsCipherId cipher);
+// Bytes a block grows by when encrypted (IV/nonce + tag), or -1 for kUnknown.
+long cryfsCipherOverheadBytes(CryfsCipherId cipher);

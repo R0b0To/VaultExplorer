@@ -1,11 +1,11 @@
 package com.aeidolon.vaultexplorer
 
+import android.app.Activity
 import android.os.Handler
 import android.os.Looper
 import android.util.TypedValue
 import android.view.View
 import android.view.ViewGroup
-import com.aeidolon.vaultexplorer.handlers.SystemPermissionHandlers
 
 /**
  * Covers the Activity's content with a plain, branding-free scrim the
@@ -47,7 +47,7 @@ import com.aeidolon.vaultexplorer.handlers.SystemPermissionHandlers
  * path: the OS's own task-snapshot mechanism, which this curtain (being
  * purely about the *live* frame) has no influence over.
  */
-class PrivacyCurtain(private val activity: MainActivity) {
+class PrivacyCurtain(private val activity: Activity) {
 
     private var curtain: View? = null
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -59,6 +59,7 @@ class PrivacyCurtain(private val activity: MainActivity) {
     // that's already been superseded) revealing the curtain during a
     // *later* pause it doesn't belong to.
     private var isForeground = false
+    private var hasResumedFramePainted = false
 
     // Bumped on every show(); a safety-net Runnable captures the token it
     // was armed with and checks it still matches before firing, so a
@@ -69,6 +70,7 @@ class PrivacyCurtain(private val activity: MainActivity) {
 
     /** Call once, after `super.onCreate()`, while the content view exists. */
     fun install() {
+        if (curtain != null) return
         val root = activity.findViewById<ViewGroup>(android.R.id.content) ?: return
 
         val background = TypedValue()
@@ -96,6 +98,7 @@ class PrivacyCurtain(private val activity: MainActivity) {
      */
     fun show() {
         isForeground = false
+        hasResumedFramePainted = false
         pendingSafetyNet?.let { mainHandler.removeCallbacks(it) }
         pendingSafetyNet = null
         revealToken++
@@ -106,14 +109,18 @@ class PrivacyCurtain(private val activity: MainActivity) {
     }
 
     /**
-     * Call from [MainActivity.onResume]. Keeps the curtain up until
-     * [reveal] is called - either by the `notifyResumedFramePainted`
-     * channel call once Dart confirms a post-resume frame painted, or by
-     * the [safetyNetMs] fallback below, whichever comes first.
+     * Call from [MainActivity.onResume] or [MainActivity.onWindowFocusChanged] when focused.
+     * Keeps the curtain up until [reveal] is called - either by the
+     * `notifyResumedFramePainted` channel call once Dart confirms a post-resume frame
+     * painted, or by the [safetyNetMs] fallback below, whichever comes first.
      */
     fun armPendingReveal(safetyNetMs: Long = 600L) {
         if (curtain?.visibility != View.VISIBLE) return
         isForeground = true
+        if (hasResumedFramePainted) {
+            reveal()
+            return
+        }
         pendingSafetyNet?.let { mainHandler.removeCallbacks(it) }
         val tokenAtArmTime = revealToken
         val runnable = Runnable { reveal(tokenAtArmTime) }
@@ -122,13 +129,26 @@ class PrivacyCurtain(private val activity: MainActivity) {
     }
 
     /**
+     * Hides the curtain once Dart confirms a post-resume frame painted via
+     * `notifyResumedFramePainted`.
+     */
+    fun onResumedFramePainted() {
+        hasResumedFramePainted = true
+        if (isForeground || activity.hasWindowFocus()) {
+            isForeground = true
+            reveal()
+        }
+    }
+
+    /**
      * Hides the curtain. Called either from the `notifyResumedFramePainted`
-     * channel handler (no args - always applies to the current cycle) or
+     * channel handler (via [onResumedFramePainted] or directly) or
      * from the safety-net Runnable scheduled in [armPendingReveal] (passes
      * the token it was armed with, so a superseded timeout is a no-op).
      */
     fun reveal(expectedToken: Int = revealToken) {
-        if (!isForeground) return
+        if (!isForeground && !activity.hasWindowFocus()) return
+        isForeground = true
         if (expectedToken != revealToken) return
         pendingSafetyNet?.let { mainHandler.removeCallbacks(it) }
         pendingSafetyNet = null

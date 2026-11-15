@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart' show AutofillContextAction;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -87,30 +88,33 @@ class _MigrateCryptomatorVaultScreenState
                 ),
               ),
               const SizedBox(height: 16),
-              TextField(
-                controller: _passwordCtrl,
-                obscureText: _obscure,
-                enabled: !state.isProcessing,
-                autofillHints: null,
-                onChanged: (value) => ref
-                    .read(provider.notifier)
-                    .setPasswordFilled(value.isNotEmpty),
-                decoration: InputDecoration(
-                  labelText: context.l10n.passwordLabel,
-                  filled: true,
-                  fillColor: cs.surfaceContainerHighest,
-                  prefixIcon: Icon(
-                    Icons.lock_outline_rounded,
-                    size: 20,
-                    color: cs.primary,
-                  ),
-                  suffixIcon: PasswordVisibilityToggle(
-                    obscured: _obscure,
-                    onToggle: () => setState(() => _obscure = !_obscure),
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(18),
-                    borderSide: BorderSide.none,
+              AutofillGroup(
+                onDisposeAction: AutofillContextAction.cancel,
+                child: TextField(
+                  controller: _passwordCtrl,
+                  obscureText: _obscure,
+                  enabled: !state.isProcessing,
+                  autofillHints: const <String>[AutofillHints.password],
+                  onChanged: (value) => ref
+                      .read(provider.notifier)
+                      .setPasswordFilled(value.isNotEmpty),
+                  decoration: InputDecoration(
+                    labelText: context.l10n.passwordLabel,
+                    filled: true,
+                    fillColor: cs.surfaceContainerHighest,
+                    prefixIcon: Icon(
+                      Icons.lock_outline_rounded,
+                      size: 20,
+                      color: cs.primary,
+                    ),
+                    suffixIcon: PasswordVisibilityToggle(
+                      obscured: _obscure,
+                      onToggle: () => setState(() => _obscure = !_obscure),
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(18),
+                      borderSide: BorderSide.none,
+                    ),
                   ),
                 ),
               ),

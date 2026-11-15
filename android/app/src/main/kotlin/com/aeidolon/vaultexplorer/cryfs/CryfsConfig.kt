@@ -70,10 +70,45 @@ object CryfsConfigFile {
         return bytes
     }
 
+    /**
+     * Key sizes in bytes of the ciphers official C++ CryFS 1.x offers besides AES and XChaCha20-Poly1305. They are
+     * implemented natively (crypto/cryfs_legacy_ciphers.cpp) and verified against Crypto++, the library CryFS used.
+     * Every "-gcm" one has a 16-byte IV and a 16-byte tag; every "-cfb" one a 16-byte IV and no tag.
+     */
+    val LEGACY_CIPHER_KEY_BYTES: Map<String, Int> = mapOf(
+        "twofish-256-gcm" to 32, "twofish-256-cfb" to 32, "twofish-128-gcm" to 16, "twofish-128-cfb" to 16,
+        "serpent-256-gcm" to 32, "serpent-256-cfb" to 32, "serpent-128-gcm" to 16, "serpent-128-cfb" to 16,
+        "cast-256-gcm" to 32, "cast-256-cfb" to 32,
+        "mars-256-gcm" to 32, "mars-256-cfb" to 32, "mars-448-gcm" to 56, "mars-448-cfb" to 56,
+        "mars-128-gcm" to 16, "mars-128-cfb" to 16,
+    )
+
     private fun cipherKeySizeBytes(cipherName: String): Int = when (cipherName) {
         "aes-256-gcm", "aes-256-cfb", "xchacha20-poly1305" -> 32
         "aes-128-gcm", "aes-128-cfb" -> 16
-        else -> throw CryfsUnsupportedCipherException(cipherName)
+        else -> LEGACY_CIPHER_KEY_BYTES[cipherName] ?: throw CryfsUnsupportedCipherException(cipherName)
+    }
+
+    /** Numeric dotted-version comparison ("0.10" == "0.10.0", "0.9" < "0.10"), like upstream's version parsing. */
+    private fun compareDottedVersions(a: String, b: String): Int {
+        fun parts(s: String): IntArray {
+            val p = s.split('.')
+            if (p.size > 3 || p.any { it.isEmpty() || it.length > 9 || !it.all { c -> c in '0'..'9' } }) {
+                throw CryfsConfigException("cryfs.config has an unparsable version string: \"$s\".")
+            }
+            return IntArray(3) { i -> p.getOrNull(i)?.toInt() ?: 0 }
+        }
+        val x = parts(a)
+        val y = parts(b)
+        for (i in 0..2) if (x[i] != y[i]) return if (x[i] < y[i]) -1 else 1
+        return 0
+    }
+
+    /** scrypt via the low-memory path; large official parameters must neither OOM nor be misreported as a wrong password. */
+    private fun deriveScrypt(passwordBytes: ByteArray, kdf: KdfHeader): ByteArray = try {
+        Scrypt.scryptLowMem(passwordBytes, kdf.salt, kdf.scryptN, kdf.scryptR, COMBINED_KEY_SIZE, kdf.scryptP)
+    } catch (e: UnsupportedOperationException) {
+        throw CryfsConfigException(e.message ?: "This vault's scrypt settings are not supported on this device.")
     }
 
     /** Size in bytes of the scrypt output ([parse]'s `combinedKey`); the shape
@@ -152,9 +187,7 @@ object CryfsConfigFile {
         val kdf = readKdfHeader(raw)
         val passwordBytes = passwordToUtf8Bytes(password)
         return try {
-            Scrypt.scrypt(
-                passwordBytes, kdf.salt, kdf.scryptN, kdf.scryptR, COMBINED_KEY_SIZE, kdf.scryptP
-            )
+            deriveScrypt(passwordBytes, kdf)
         } finally {
             passwordBytes.fill(0)
         }
@@ -165,9 +198,7 @@ object CryfsConfigFile {
         val kdf = readKdfHeader(raw)
         val passwordBytes = passwordToUtf8Bytes(password)
         val combinedKey = try {
-            Scrypt.scrypt(
-                passwordBytes, kdf.salt, kdf.scryptN, kdf.scryptR, COMBINED_KEY_SIZE, kdf.scryptP
-            )
+            deriveScrypt(passwordBytes, kdf)
         } finally {
             passwordBytes.fill(0)
         }
@@ -249,43 +280,75 @@ object CryfsConfigFile {
             )
         }
 
-        val migrations = json.optJSONObject("migrations")
-        if (migrations != null) {
-            val hasVersionNumbers = migrations.optString("hasVersionNumbers") == "true" || migrations.optBoolean("hasVersionNumbers", false)
-            val hasParentPointers = migrations.optString("hasParentPointers") == "true" || migrations.optBoolean("hasParentPointers", false)
-            if (!hasVersionNumbers || !hasParentPointers) {
-                throw CryfsConfigException(
-                    "cryfs.config has unexpected \"migrations\" flags; this app only supports current-format vaults."
-                )
-            }
+        // Format gate, mirroring upstream's loader: a missing "version" means a pre-0.10 vault.
+        val formatVersion = if (json.has("version")) json.optString("version", "") else "0.8"
+        val versionCmp = compareDottedVersions(formatVersion, FORMAT_VERSION)
+        if (versionCmp < 0) {
+            throw CryfsConfigException(
+                "This vault uses CryFS filesystem format $formatVersion, which is older than the supported $FORMAT_VERSION. " +
+                    "Open it once with CryFS 0.10 or newer (for example on a computer) so it gets migrated, then try again."
+            )
+        }
+        if (versionCmp > 0) {
+            throw CryfsConfigException(
+                "This vault uses CryFS filesystem format $formatVersion, which is newer than the $FORMAT_VERSION this app supports. " +
+                    "Please update the app."
+            )
         }
 
-        val formatVersion = json.optString("version", json.optString("formatVersion", "0.10"))
-        val createdWithVersion = json.optString("createdWithVersion", json.optString("created_with_version", "0.10"))
-        val lastOpenedWithVersion = json.optString("lastOpenedWithVersion", json.optString("last_opened_with_version", "0.10"))
+        val migrations = json.optJSONObject("migrations")
+            ?: throw CryfsConfigException(
+                "cryfs.config has no \"migrations\" section: this vault has not been migrated to the current CryFS format. " +
+                    "Open it once with CryFS 0.10 or newer to migrate it, then try again."
+            )
+        val hasVersionNumbers = migrations.optString("hasVersionNumbers") == "true" || migrations.optBoolean("hasVersionNumbers", false)
+        val hasParentPointers = migrations.optString("hasParentPointers") == "true" || migrations.optBoolean("hasParentPointers", false)
+        if (!hasVersionNumbers || !hasParentPointers) {
+            throw CryfsConfigException(
+                "cryfs.config says this vault has not been fully migrated (\"migrations\" flags are not set). " +
+                    "Open it once with CryFS 0.10 or newer to migrate it, then try again."
+            )
+        }
 
-        val blocksizeBytes = parseFlexibleLong(json, "blocksizeBytes") 
-            ?: parseFlexibleLong(json, "blocksize")
-            ?: throw CryfsConfigException("cryfs.config is missing blocksize field.")
+        fun required(key: String): String {
+            val v = if (json.has(key) && !json.isNull(key)) json.optString(key, "") else ""
+            if (v.isEmpty()) throw CryfsConfigException("cryfs.config is missing the required field \"$key\".")
+            return v
+        }
+        val createdWithVersion = required("createdWithVersion")
+        val lastOpenedWithVersion = required("lastOpenedWithVersion")
 
-        val exclusiveClientId = parseFlexibleLong(json, "exclusiveClientId") 
-            ?: parseFlexibleLong(json, "exclusive_client_id")
+        val blocksizeBytes = parseFlexibleLong(json, "blocksizeBytes")
+            ?: throw CryfsConfigException("cryfs.config is missing the required field \"blocksizeBytes\".")
+        if (blocksizeBytes <= 0L || blocksizeBytes > (1L shl 30) ||
+            CryfsBlockStore.calculateVirtualBlockSize(blocksizeBytes.toInt(), cipher) < 8 + 2 * 16
+        ) {
+            throw CryfsConfigException("cryfs.config has an invalid block size: $blocksizeBytes.")
+        }
 
-        val rootBlobStr = json.optString("rootblob", json.optString("root_blob", json.optString("rootBlob", "")))
-        if (rootBlobStr.isEmpty()) throw CryfsConfigException("cryfs.config is missing the required root blob ID field.")
+        val exclusiveClientId = parseFlexibleLong(json, "exclusiveClientId")
+        if (exclusiveClientId != null && (exclusiveClientId <= 0L || exclusiveClientId > 0xFFFFFFFFL)) {
+            throw CryfsConfigException("cryfs.config has an invalid exclusiveClientId.")
+        }
 
-        val keyStr = json.optString("key", json.optString("enc_key", json.optString("encKey", "")))
-        if (keyStr.isEmpty()) throw CryfsConfigException("cryfs.config is missing the required encryption key field.")
-
-        val fsIdStr = json.optString("filesystemId", json.optString("filesystem_id", ""))
-        if (fsIdStr.isEmpty()) throw CryfsConfigException("cryfs.config is missing the required filesystem ID field.")
+        val rootBlobStr = required("rootblob")
+        val keyStr = required("key")
+        val fsIdStr = required("filesystemId")
+        val key = LittleEndian.hexToBytes(keyStr)
+        if (key.size != cipherKeySizeBytes(cipher)) {
+            throw CryfsConfigException("cryfs.config encryption key has the wrong length for cipher \"$cipher\".")
+        }
+        val filesystemId = LittleEndian.hexToBytes(fsIdStr)
+        if (filesystemId.size != 16) {
+            throw CryfsConfigException("cryfs.config filesystem ID is not 16 bytes.")
+        }
 
         return CryfsConfig(
             blockCipherName = cipher,
-            encryptionKey = LittleEndian.hexToBytes(keyStr),
+            encryptionKey = key,
             blocksizeBytes = blocksizeBytes.toInt(),
             rootBlobId = CryfsBlockId.fromHex(rootBlobStr),
-            filesystemId = LittleEndian.hexToBytes(fsIdStr),
+            filesystemId = filesystemId,
             exclusiveClientId = exclusiveClientId,
             formatVersion = formatVersion,
             createdWithVersion = createdWithVersion,

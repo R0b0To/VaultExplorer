@@ -56,6 +56,10 @@ Secret hkdfSha256(const uint8_t* secret, size_t secretLen, const std::string& in
 // parameters exceed the native layer's safety caps.
 Secret scrypt(const uint8_t* pass, size_t passLen, const uint8_t* salt, size_t saltLen,
               uint32_t N, uint32_t r, uint32_t p, size_t outLen);
+// As scrypt(), but for CryFS: accepts everything official clients write (up to 1 GiB of scrypt memory) by
+// keeping only [vBudgetBytes] of it in RAM and recomputing the rest.
+Secret scryptLowMem(const uint8_t* pass, size_t passLen, const uint8_t* salt, size_t saltLen,
+                    uint32_t N, uint32_t r, uint32_t p, size_t outLen, size_t vBudgetBytes);
 
 // ---- block / stream primitives -------------------------------------------
 

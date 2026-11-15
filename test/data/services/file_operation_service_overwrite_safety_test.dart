@@ -95,11 +95,14 @@ void main() {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(channel, (call) async {
             if (call.method == 'getFileSize') {
-              // Source file is missing
               return -1;
             }
             if (call.method == 'listDirectory') {
-              return ['F|100|0|doc.txt'];
+              // Only the destination vault has doc.txt; the source listing
+              // does not, which is what "source is missing" means now that
+              // existence is decided from the parent listing.
+              final uri = (call.arguments as Map)['filePath'];
+              return uri == 'content://vaultB' ? ['F|100|0|doc.txt'] : <String>[];
             }
             if (call.method == 'deleteFile') {
               deletedPaths.add((call.arguments as Map)['fileName'] as String);

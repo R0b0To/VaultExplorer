@@ -96,6 +96,7 @@ PreferredSizeWidget buildBrowserAppBar(
   onShowFolderDocumentProviderSheet,
   required Future<void> Function(RawEntry entry) onToggleFolderDocumentProvider,
   void Function(RawEntry entry)? onSyncSettings,
+  void Function(List<RawEntry> entries)? onEditMetadata,
   VoidCallback? onSyncRoot,
   required Future<void> Function(String fileName, String fullPath) onEditImage,
   required Future<void> Function(String fullPath) onEditVideo,
@@ -311,6 +312,13 @@ PreferredSizeWidget buildBrowserAppBar(
       await onEditAudio?.call(path);
     }
 
+    // Tags, dates and metadata removal apply to files only.
+    final editMetadata = onEditMetadata != null &&
+            selectedItems.isNotEmpty &&
+            selectedItems.every((e) => !e.isDir)
+        ? () => onEditMetadata(selectedItems.toList())
+        : null;
+
     void doSyncSettings() {
       final entry = selectedItems.first;
       onExitSelectionMode();
@@ -361,6 +369,7 @@ PreferredSizeWidget buildBrowserAppBar(
         onToggleDocumentProvider: doToggleDocProvider,
         onSyncSettings: doSyncSettings,
         onFileInfo: doShowFileInfo,
+        onEditMetadata: editMetadata,
         onGoToLocation: goToLocation,
         onCopyPath: copyPath,
         showEditImageOption: showEditImageOption,
@@ -411,6 +420,7 @@ PreferredSizeWidget buildBrowserAppBar(
       showShareOption: showShareOption,
       onShare: onShare,
       onToggleDocumentProvider: doToggleDocProvider,
+      onEditMetadata: editMetadata,
       onSyncSettings: doSyncSettings,
       onPin: () => onTogglePin(pin: true),
       onUnpin: () => onTogglePin(pin: false),
@@ -471,7 +481,7 @@ PreferredSizeWidget buildBrowserAppBar(
     );
   }
 
-  String _buildLeftTruncatedPath(
+  String buildLeftTruncatedPath(
     String rootName,
     List<PathSegment> stack,
     double maxWidth,
@@ -571,7 +581,7 @@ PreferredSizeWidget buildBrowserAppBar(
           60.0,
           2000.0,
         );
-        final displayTitle = _buildLeftTruncatedPath(
+        final displayTitle = buildLeftTruncatedPath(
           container.displayName,
           pathStack,
           availableWidth,

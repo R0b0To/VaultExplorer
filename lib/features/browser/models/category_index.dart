@@ -71,7 +71,7 @@ class VaultCategoryIndex {
 
   /// Bumped when the stored layout changes; an index of another version is
   /// ignored (and replaced by the next scan) rather than misread.
-  static const int version = 1;
+  static const int version = 2;
 
   /// By `FileCategory.storageKey`.
   final Map<String, CategoryIndexSection> sections;
@@ -106,8 +106,7 @@ class VaultCategoryIndex {
       sections[key] = CategoryIndexSection(
         builtAtSecs: built,
         entries: [
-          for (final f in files)
-            if (CategoryIndexEntry.tryFromJson(f) case final entry?) entry,
+          for (final f in files) ?CategoryIndexEntry.tryFromJson(f),
         ],
       );
     }

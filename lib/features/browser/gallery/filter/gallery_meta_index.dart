@@ -2,29 +2,44 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
 import 'dart:math' as math;
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
-import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
-import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
-import 'package:vaultexplorer/core/utils/raw_entry.dart';
-import 'package:vaultexplorer/data/models/mounted_container.dart';
-import 'package:vaultexplorer/features/sync/domain/sync_ignore_matcher.dart';
 
 import 'gallery_meta.dart';
 import 'gallery_meta_parser.dart';
+import 'gallery_meta_worker.dart';
 
 /// Reads the first [length] bytes of [path] in the source [volId].
 typedef GalleryHeaderReader =
     Future<Uint8List?> Function(int volId, String path, int length);
 
-/// Where the index of one source is kept between sessions.
-abstract interface class GalleryMetaStorage {
-  /// The stored text, or null when nothing is stored (or it cannot be read).
-  Future<String?> load(int volId);
+/// Parses one photo header (see [GalleryMetaWorker.parse]).
+typedef GalleryHeaderParser = Future<GalleryMeta> Function(Uint8List bytes);
 
-  /// Whether [json] was stored.
-  Future<bool> save(int volId, String json);
+/// Where the index of one source is kept between sessions.
+///
+/// The index is stored as an append-only log of *segments*, each one the JSON
+/// of a batch of photos (`{"v": 1, "e": {path: [size, mtime, ...meta]}}`), the
+/// later segment winning for a path. Saving a batch therefore costs the size of
+/// the batch, not of the whole library, and a legacy single-file index is just
+/// a log of one segment.
+abstract interface class GalleryMetaStorage {
+  /// Whether anything of [volId] can be stored at all right now. False for a
+  /// source that never is (the phone's own storage, a read-only vault, one
+  /// whose owner turned persistent caching off): the index then does not
+  /// build batches that would only be refused.
+  bool persists(int volId);
+
+  /// Every stored segment of [volId], oldest first. Empty when nothing is
+  /// stored (or it cannot be read).
+  Future<List<String>> loadSegments(int volId);
+
+  /// Stores [json] as a new, newest segment. Whether it was stored.
+  Future<bool> appendSegment(int volId, String json);
+
+  /// Replaces every stored segment by the single [json] (compaction). The old
+  /// segments are only dropped once [json] is safely stored. Whether it was.
+  Future<bool> replaceSegments(int volId, String json);
 }
 
 /// One file the index should know about.
@@ -39,18 +54,117 @@ class GalleryIndexRequest {
   final int mtime;
 }
 
-// Top-level so `compute` can run them in another isolate without dragging the
-// index (a ChangeNotifier with timers) along in a closure.
-Object? _decodeIndex(String text) => jsonDecode(text);
-
-String _encodeIndex(Map<String, List<Object?>> snapshot) =>
-    jsonEncode({'v': GalleryMetaIndex.storageVersion, 'e': snapshot});
-
 class _Stored {
   const _Stored(this.size, this.mtime, this.meta);
   final int size;
   final int mtime;
   final GalleryMeta meta;
+}
+
+/// Results kept in memory for the whole app session and shared by every
+/// [GalleryMetaIndex] given it, so that leaving the gallery (or toggling gallery
+/// mode, or anything else that rebuilds the view) does not throw away what was
+/// read from sources that are never saved to disk, like the phone's own
+/// storage. Nothing here is written anywhere; it is gone with the process.
+class GalleryMetaMemory {
+  GalleryMetaMemory();
+
+  /// The one the app uses.
+  static final GalleryMetaMemory app = GalleryMetaMemory();
+
+  final Map<int, LinkedHashMap<String, _Stored>> _maps = {};
+
+  LinkedHashMap<String, _Stored> _mapFor(int volId) =>
+      _maps.putIfAbsent(volId, LinkedHashMap.new);
+
+  /// How many photos are remembered for [volId].
+  int entryCount(int volId) => _maps[volId]?.length ?? 0;
+
+  /// Forgets [volId], or everything.
+  void clear([int? volId]) {
+    if (volId == null) {
+      _maps.clear();
+    } else {
+      _maps.remove(volId);
+    }
+  }
+}
+
+class _MergeJob {
+  const _MergeJob(this.texts, this.limit);
+  final List<String> texts;
+  final int limit;
+}
+
+// Top-level so `compute` can run them in another isolate without dragging the
+// index (a ChangeNotifier with timers) along in a closure.
+
+String _encodeIndex(Map<String, List<Object?>> snapshot) =>
+    jsonEncode({'v': GalleryMetaIndex.storageVersion, 'e': snapshot});
+
+/// The entries of one decoded segment, or null when it is not one of ours.
+Map<Object?, Object?>? _entriesOf(Object? decoded) {
+  if (decoded is! Map || decoded['v'] != GalleryMetaIndex.storageVersion) {
+    return null;
+  }
+  final entries = decoded['e'];
+  return entries is Map ? entries.cast<Object?, Object?>() : null;
+}
+
+/// Decodes and merges stored segments (oldest first, the newer one winning),
+/// entirely on the worker isolate so that a large library does not stall the
+/// UI isolate while it is parsed and its objects are built.
+LinkedHashMap<String, _Stored> _decodeSegments(List<String> texts) {
+  final merged = LinkedHashMap<String, _Stored>();
+  for (final text in texts) {
+    try {
+      final entries = _entriesOf(jsonDecode(text));
+      if (entries == null) continue;
+      for (final e in entries.entries) {
+        final path = e.key;
+        final v = e.value;
+        if (path is! String || v is! List || v.length != 11) continue;
+        final size = v[0];
+        final mtime = v[1];
+        if (size is! int || mtime is! int) continue;
+        final meta = GalleryMeta.tryFromJson(v.sublist(2));
+        if (meta == null) continue;
+        merged.remove(path); // a newer entry moves to the newest end
+        merged[path] = _Stored(size, mtime, meta);
+      }
+    } catch (_) {
+      // A damaged segment counts as none; the next compaction drops it.
+    }
+  }
+  return merged;
+}
+
+/// Merges stored segments into the text of one, without building objects.
+/// Null when nothing valid was found (so a damaged store is never "replaced"
+/// by an empty one).
+String? _mergeSegments(_MergeJob job) {
+  final merged = LinkedHashMap<String, List<Object?>>();
+  for (final text in job.texts) {
+    try {
+      final entries = _entriesOf(jsonDecode(text));
+      if (entries == null) continue;
+      for (final e in entries.entries) {
+        final path = e.key;
+        final v = e.value;
+        if (path is! String || v is! List || v.length != 11) continue;
+        if (v[0] is! int || v[1] is! int) continue;
+        merged.remove(path);
+        merged[path] = v.cast<Object?>();
+      }
+    } catch (_) {
+      // A damaged segment counts as none; the next compaction drops it.
+    }
+  }
+  if (merged.isEmpty) return null;
+  while (merged.length > job.limit) {
+    merged.remove(merged.keys.first);
+  }
+  return jsonEncode({'v': GalleryMetaIndex.storageVersion, 'e': merged});
 }
 
 /// The date, place, camera, keywords and rating of every photo the gallery has
@@ -59,21 +173,40 @@ class _Stored {
 ///
 /// Photos are read lazily and in the background: [ensure] queues the ones not
 /// known yet (or changed since: an entry is valid only for the size and date
-/// it was read at), a few at a time, and [notifyListeners] fires (at most every
-/// [notifyEvery]) as results arrive, so a view can refilter as the index fills.
-/// Only the start of each file is read ([GalleryMetaParser.headerBytes]).
+/// it was read at), a few at a time. Only the start of each file is read
+/// ([GalleryMetaParser.headerBytes]), and it is *parsed on a worker isolate*
+/// ([GalleryMetaWorker]), so a scan of a large library does not take frames
+/// from the UI.
+///
+/// Two signals come out of it, because they cost very different amounts to act
+/// on:
+///  * [notifyListeners] at most every [notifyEvery] while photos are read: the
+///    progress ([done], [total], [isIndexing]). Cheap to show.
+///  * [publishedRevision], which advances (together with a notification) only
+///    when [notifyBatch] new results are in, or [maxPublishDelay] has passed,
+///    or the run ended, and never while [paused]. A view that refilters,
+///    re-sorts and regroups its photos should key on this one, not on
+///    [revision], which moves with every single photo.
 ///
 /// With a [storage] the index is loaded at the first request for a source and
-/// saved back (in the background, in batches) so the next session starts with
-/// everything already known. Without one it lives for the session only, which
-/// is what the phone's own storage gets: nothing is written to it.
+/// each batch of [saveEvery] photos is appended to it in the background, so the
+/// next session starts with everything already known and no save ever costs
+/// more than one batch. Without one it lives for the session only, which is
+/// what the phone's own storage gets: nothing is written to it.
 class GalleryMetaIndex extends ChangeNotifier {
   GalleryMetaIndex({
     required this.readHeader,
     this.storage,
+    this.memory,
+    this.retain,
+    this.parse,
     this.concurrency = 3,
     this.notifyEvery = const Duration(milliseconds: 500),
-    this.saveEvery = 200,
+    this.notifyBatch = 500,
+    this.maxPublishDelay = const Duration(seconds: 4),
+    this.saveEvery = 500,
+    this.compactAfter = 8,
+    this.maxSegments = 48,
   });
 
   /// Upper bound of entries kept per source; the oldest are dropped first and
@@ -84,28 +217,88 @@ class GalleryMetaIndex extends ChangeNotifier {
 
   final GalleryHeaderReader readHeader;
   final GalleryMetaStorage? storage;
+
+  /// Where the results of the sources [retain] selects are kept between
+  /// indexes (see [GalleryMetaMemory]).
+  final GalleryMetaMemory? memory;
+
+  /// Whether the results of [volId] go to [memory]. Meant for sources that are
+  /// never saved to [storage]: a vault's results stay private to the index and
+  /// are dropped with it (they are on disk, inside the vault, anyway).
+  final bool Function(int volId)? retain;
+
+  /// How a header is parsed. Null: on a [GalleryMetaWorker] owned by the index.
+  final GalleryHeaderParser? parse;
   final int concurrency;
+
+  /// Minimum time between two progress notifications.
   final Duration notifyEvery;
+
+  /// New results after which [publishedRevision] advances.
+  final int notifyBatch;
+
+  /// The longest results are held back from [publishedRevision] while the run
+  /// goes on.
+  final Duration maxPublishDelay;
+
+  /// Photos read between two appends to [storage].
   final int saveEvery;
 
+  /// Stored segments of a source above which they are merged into one when the
+  /// run ends, and the count above which they are merged during a run.
+  final int compactAfter;
+  final int maxSegments;
+
   final Map<int, LinkedHashMap<String, _Stored>> _stored = {};
+
+  /// Sources whose map is the one in [memory].
+  final Set<int> _shared = {};
   final Map<int, Future<void>> _loading = {};
-  final Set<int> _dirty = {};
+
+  /// Paths read since the last append, per source: what the next segment holds.
+  final Map<int, Set<String>> _dirty = {};
   final Map<int, Future<void>> _writing = {};
-  final List<GalleryIndexRequest> _queue = [];
+
+  /// Stored segments per source, as far as this session knows.
+  final Map<int, int> _segments = {};
+
+  // A queue, not a list: taking the first element of a 40,000-long list moves
+  // the other 39,999 on every single photo.
+  final Queue<GalleryIndexRequest> _queue = Queue();
   final Set<String> _queued = {};
+
+  GalleryMetaWorker? _ownedWorker;
 
   int _inFlight = 0;
   int _revision = 0;
+  int _published = 0;
   int _enqueued = 0;
   int _done = 0;
   int _sinceSave = 0;
   bool _disposed = false;
+  bool _paused = false;
   Timer? _notifyTimer;
   bool _notifyDue = false;
+  final Stopwatch _sincePublish = Stopwatch()..start();
 
-  /// Bumped whenever the answer of [lookup] may have changed.
+  /// Bumped whenever the answer of [lookup] may have changed (every photo).
   int get revision => _revision;
+
+  /// [revision] as of the last time the results were published to views: it
+  /// moves in batches (see the class comment).
+  int get publishedRevision => _published;
+
+  /// Whether starting new reads is held back (the list is being scrolled).
+  /// Reads in progress finish; publishing resumes when this is cleared.
+  bool get paused => _paused;
+  set paused(bool value) {
+    if (_paused == value) return;
+    _paused = value;
+    if (!value && !_disposed) {
+      _pump();
+      _maybePublish();
+    }
+  }
 
   /// Photos waiting to be read or being read.
   int get pending => _queue.length + _inFlight;
@@ -117,6 +310,19 @@ class GalleryMetaIndex extends ChangeNotifier {
   bool get isIndexing => pending > 0;
 
   String _key(int volId, String path) => '$volId|$path';
+
+  /// The results held for [volId]: the session-wide map for a retained source,
+  /// else one of the index's own.
+  LinkedHashMap<String, _Stored> _mapFor(int volId) {
+    final existing = _stored[volId];
+    if (existing != null) return existing;
+    final mem = memory;
+    if (mem != null && (retain?.call(volId) ?? false)) {
+      _shared.add(volId);
+      return _stored[volId] = mem._mapFor(volId);
+    }
+    return _stored[volId] = LinkedHashMap<String, _Stored>();
+  }
 
   /// What is known about the file, or null when it is unknown or the file
   /// changed since it was read.
@@ -139,9 +345,9 @@ class GalleryMetaIndex extends ChangeNotifier {
     if (_disposed) return;
     var added = 0;
     for (final r in list) {
-      if (!GalleryMetaParser.canParse(_extensionOf(r.path))) continue;
       if (r.size <= 0) continue;
       if (lookup(r.volId, r.path, r.size, r.mtime) != null) continue;
+      if (!GalleryMetaParser.canParse(_extensionOf(r.path))) continue;
       if (!_queued.add(_key(r.volId, r.path))) continue;
       _queue.add(r);
       added++;
@@ -170,34 +376,64 @@ class GalleryMetaIndex extends ChangeNotifier {
     _scheduleNotify();
   }
 
-  /// Writes everything not saved yet. Call before a source is locked.
-  Future<void> flush() async {
-    await Future.wait([for (final v in _dirty.toList()) _save(v)]);
+  /// Writes everything not saved yet, and completes once every write started
+  /// so far has finished. Call before a source is locked.
+  ///
+  /// What is to be written is captured synchronously, so it is safe to call
+  /// right before [dispose].
+  Future<void> flush() =>
+      Future.wait([
+        for (final v in {..._dirty.keys, ..._writing.keys}) _save(v),
+      ]).then((_) {});
+
+  /// Forgets what is known about one file, because its metadata was edited.
+  ///
+  /// [lookup] trusts an entry while the file's size and modified time match,
+  /// and a metadata edit can keep both (a date rewritten in place, the time
+  /// put back so the photo does not look newly changed). Without this the
+  /// gallery would go on showing the old tags and date.
+  void invalidate(int volId, String path) {
+    final removed = _stored[volId]?.remove(path);
+    if (removed == null) return;
+    (_dirty[volId] ??= <String>{}).add(path);
+    _revision++;
+    if (!_maybePublish(force: true)) _scheduleNotify();
   }
 
   /// Drops what is held (not what is stored) for [volId]; its container was
   /// locked.
   void forget(int volId) {
     _stored.remove(volId);
+    if (_shared.remove(volId)) memory?.clear(volId);
     _loading.remove(volId);
     _dirty.remove(volId);
+    _segments.remove(volId);
     _queue.removeWhere((r) {
       final hit = r.volId == volId;
       if (hit) _queued.remove(_key(r.volId, r.path));
       return hit;
     });
     _revision++;
-    _scheduleNotify();
+    if (!_maybePublish(force: true)) _scheduleNotify();
   }
 
   // ── Reading ──────────────────────────────────────────────────────────────
 
   void _pump() {
-    while (!_disposed && _inFlight < concurrency && _queue.isNotEmpty) {
-      final r = _queue.removeAt(0);
+    while (!_disposed &&
+        !_paused &&
+        _inFlight < concurrency &&
+        _queue.isNotEmpty) {
+      final r = _queue.removeFirst();
       _inFlight++;
       unawaited(_process(r));
     }
+  }
+
+  Future<GalleryMeta> _parse(Uint8List bytes) {
+    final custom = parse;
+    if (custom != null) return custom(bytes);
+    return (_ownedWorker ??= GalleryMetaWorker()).parse(bytes);
   }
 
   Future<void> _process(GalleryIndexRequest r) async {
@@ -205,7 +441,7 @@ class GalleryMetaIndex extends ChangeNotifier {
     try {
       final length = math.min(r.size, GalleryMetaParser.headerBytes);
       final bytes = await readHeader(r.volId, r.path, length);
-      if (bytes != null) meta = GalleryMetaParser.parse(bytes);
+      if (bytes != null) meta = await _parse(bytes);
     } catch (_) {
       // Unreadable now (locked, removed): left unknown, asked again later.
     }
@@ -214,23 +450,54 @@ class GalleryMetaIndex extends ChangeNotifier {
     _queued.remove(_key(r.volId, r.path));
     if (_disposed) return;
     if (meta != null) {
-      final map = _stored.putIfAbsent(r.volId, LinkedHashMap.new);
+      final map = _mapFor(r.volId);
       map.remove(r.path); // a re-read entry moves to the newest end
       map[r.path] = _Stored(r.size, r.mtime, meta);
+      if (map.length > maxEntriesPerSource) map.remove(map.keys.first);
       _revision++;
-      _dirty.add(r.volId);
+      (_dirty[r.volId] ??= <String>{}).add(r.path);
       _sinceSave++;
       if (_sinceSave >= saveEvery) {
         _sinceSave = 0;
         unawaited(flush());
       }
     }
-    if (_queue.isEmpty && _inFlight == 0) {
+    final idle = _queue.isEmpty && _inFlight == 0;
+    if (idle) {
       _sinceSave = 0;
-      unawaited(flush());
+      unawaited(_finishRun());
     }
-    _scheduleNotify(force: _queue.isEmpty && _inFlight == 0);
+    if (!_maybePublish()) _scheduleNotify(force: idle);
     _pump();
+  }
+
+  Future<void> _finishRun() async {
+    await flush();
+    if (_disposed) return;
+    for (final v in _stored.keys.toList()) {
+      _maybeCompact(v, idle: true);
+    }
+  }
+
+  /// Advances [publishedRevision] to [revision] (and notifies) when enough has
+  /// accumulated. Returns whether it did.
+  bool _maybePublish({bool force = false}) {
+    if (_disposed || _revision == _published) return false;
+    if (!force) {
+      if (_paused) return false;
+      final idle = _queue.isEmpty && _inFlight == 0;
+      final due =
+          idle ||
+          _revision - _published >= notifyBatch ||
+          _sincePublish.elapsed >= maxPublishDelay;
+      if (!due) return false;
+    }
+    _published = _revision;
+    _sincePublish
+      ..reset()
+      ..start();
+    _scheduleNotify(force: true);
+    return true;
   }
 
   void _scheduleNotify({bool force = false}) {
@@ -247,7 +514,8 @@ class GalleryMetaIndex extends ChangeNotifier {
       _notifyTimer = null;
       if (_disposed || !_notifyDue) return;
       _notifyDue = false;
-      notifyListeners();
+      // Long enough since the last batch: publish it with the tick.
+      if (!_maybePublish()) notifyListeners();
     });
   }
 
@@ -258,65 +526,103 @@ class GalleryMetaIndex extends ChangeNotifier {
   }
 
   Future<void> _doLoad(int volId) async {
-    final map = _stored.putIfAbsent(volId, LinkedHashMap.new);
+    final seeded = _mapFor(volId);
+    if (seeded.isNotEmpty) {
+      // Already known from an earlier index of this session.
+      _revision++;
+      _maybePublish(force: true);
+    }
     final st = storage;
     if (st == null) return;
     try {
-      final text = await st.load(volId);
-      if (text == null || text.isEmpty) return;
-      final decoded = await compute(_decodeIndex, text);
-      if (decoded is! Map || decoded['v'] != storageVersion) return;
-      final entries = decoded['e'];
-      if (entries is! Map) return;
-      for (final e in entries.entries) {
-        final path = e.key;
-        final v = e.value;
-        if (path is! String || v is! List || v.length != 11) continue;
-        final size = v[0];
-        final mtime = v[1];
-        if (size is! int || mtime is! int) continue;
-        final meta = GalleryMeta.tryFromJson(v.sublist(2));
-        if (meta == null) continue;
+      final texts = await st.loadSegments(volId);
+      _segments[volId] = texts.length;
+      if (texts.isEmpty) return;
+      // Parsed, validated and turned into objects off the UI isolate.
+      final decoded = await compute(_decodeSegments, texts);
+      if (_disposed) return;
+      final map = _stored[volId];
+      if (map == null) return; // forgotten while loading
+      if (map.isEmpty && !_shared.contains(volId)) {
+        _stored[volId] = decoded;
+      } else {
         // Anything read this session is newer than what was stored.
-        map.putIfAbsent(path, () => _Stored(size, mtime, meta));
+        for (final e in decoded.entries) {
+          map.putIfAbsent(e.key, () => e.value);
+        }
       }
       _revision++;
-      _scheduleNotify();
+      _maybePublish(force: true);
+      if (texts.length > compactAfter) _maybeCompact(volId, idle: true);
     } catch (_) {
       // A damaged index counts as none; the next run replaces it.
     }
   }
 
+  /// Appends the photos read since the last append as one new segment: work
+  /// proportional to the batch, whatever the size of the library.
   Future<void> _save(int volId) {
     final st = storage;
-    if (st == null) {
-      _dirty.remove(volId);
-      return Future.value();
-    }
-    // One write at a time per source; a later request waits for the running
-    // one and then writes the newest state.
-    final previous = _writing[volId] ?? Future<void>.value();
-    final next = previous.then((_) async {
-      if (!_dirty.remove(volId)) return;
-      final map = _stored[volId];
-      if (map == null || map.isEmpty) return;
-      while (map.length > maxEntriesPerSource) {
-        map.remove(map.keys.first);
-      }
-      final snapshot = <String, List<Object?>>{
-        for (final e in map.entries)
-          e.key: [e.value.size, e.value.mtime, ...e.value.meta.toJson()],
-      };
+    final paths = _dirty.remove(volId);
+    final running = _writing[volId] ?? Future<void>.value();
+    // A source that cannot be saved (the phone's own storage) must not cost a
+    // snapshot, an encode and a refused write for every batch.
+    if (st == null || !st.persists(volId)) return running;
+    if (paths == null || paths.isEmpty) return running;
+    final map = _stored[volId];
+    if (map == null) return running;
+    // Captured now (O(batch)), written later.
+    final snapshot = <String, List<Object?>>{
+      for (final p in paths)
+        if (map[p] case final s?) p: [s.size, s.mtime, ...s.meta.toJson()],
+    };
+    if (snapshot.isEmpty) return running;
+    // One write at a time per source, in order.
+    final next = running.then((_) async {
       try {
         final text = await compute(_encodeIndex, snapshot);
-        final ok = await st.save(volId, text);
-        if (!ok) _dirty.add(volId);
+        if (await st.appendSegment(volId, text)) {
+          final count = (_segments[volId] ?? 0) + 1;
+          _segments[volId] = count;
+          if (count > maxSegments) _maybeCompact(volId, idle: false);
+        } else {
+          (_dirty[volId] ??= <String>{}).addAll(snapshot.keys);
+        }
       } catch (_) {
-        _dirty.add(volId);
+        (_dirty[volId] ??= <String>{}).addAll(snapshot.keys);
       }
     });
     _writing[volId] = next;
     return next;
+  }
+
+  /// Merges the stored segments of [volId] into one when there are more than
+  /// the limit. The merge reads the stored text and works on a worker isolate,
+  /// queued behind the appends so none can be lost to it.
+  void _maybeCompact(int volId, {required bool idle}) {
+    final st = storage;
+    if (st == null || _disposed) return;
+    final limit = idle ? compactAfter : maxSegments;
+    if ((_segments[volId] ?? 0) <= limit) return;
+    final running = _writing[volId] ?? Future<void>.value();
+    _writing[volId] = running.then((_) async {
+      try {
+        final texts = await st.loadSegments(volId);
+        if (texts.length <= 1) {
+          _segments[volId] = texts.length;
+          return;
+        }
+        final merged = await compute(
+          _mergeSegments,
+          _MergeJob(texts, maxEntriesPerSource),
+        );
+        if (merged != null && await st.replaceSegments(volId, merged)) {
+          _segments[volId] = 1;
+        }
+      } catch (_) {
+        // Compaction is an optimisation: the log stays valid without it.
+      }
+    });
   }
 
   static String _extensionOf(String path) {
@@ -331,53 +637,8 @@ class GalleryMetaIndex extends ChangeNotifier {
     _disposed = true;
     _notifyTimer?.cancel();
     _queue.clear();
+    _ownedWorker?.dispose();
+    _ownedWorker = null;
     super.dispose();
-  }
-}
-
-/// Keeps a vault's gallery index in `/.vaultexplorer/gallery_meta.json`, inside
-/// the encrypted vault next to its other per-vault files (see
-/// `VaultMediaIndexStorage`): encrypted with the vault, carried with it, and
-/// readable only while it is unlocked. The phone's own storage and read-only
-/// vaults get nothing written.
-class VaultGalleryMetaStorage implements GalleryMetaStorage {
-  VaultGalleryMetaStorage(this._io, this._containerOf, {this.allowWrite});
-
-  static const String fileName = 'gallery_meta.json';
-  static const String filePath = '$kVaultMetaDir/$fileName';
-
-  final VaultFileIoApi _io;
-  final MountedContainer? Function(int volId) _containerOf;
-
-  /// Whether the source may be written to at all (false when its owner turned
-  /// persistent caching off: nothing derived from the files is then kept).
-  final bool Function(int volId)? allowWrite;
-
-  MountedContainer? _writable(int volId) {
-    final c = _containerOf(volId);
-    if (c == null || c.isLocalStorage) return null;
-    return c;
-  }
-
-  @override
-  Future<String?> load(int volId) async {
-    final c = _writable(volId);
-    if (c == null) return null;
-    final raw = await _io.listDirectory(c, kVaultMetaDir);
-    if (raw == null) return null;
-    final exists = RawEntry.parseAll(raw).any((e) => !e.isDir && e.name == fileName);
-    if (!exists) return null;
-    final bytes = await _io.readWholeFile(c, filePath);
-    if (bytes == null || bytes.isEmpty) return null;
-    return utf8.decode(bytes, allowMalformed: true);
-  }
-
-  @override
-  Future<bool> save(int volId, String json) async {
-    final c = _writable(volId);
-    if (c == null || c.readOnly) return false;
-    if (allowWrite != null && !allowWrite!(volId)) return false;
-    await _io.createDirectory(c, kVaultMetaDir);
-    return _io.writeWholeFile(c, filePath, Uint8List.fromList(utf8.encode(json)));
   }
 }

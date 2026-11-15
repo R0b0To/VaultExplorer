@@ -4122,6 +4122,30 @@ abstract class AppLocalizations {
   /// **'Back up the container first. Supports LUKS1 and LUKS2. NTFS and ext2/3/4 filesystems can be expanded in place (FAT and exFAT cannot). The added space can be initialized with encrypted zeros. A keyfile replaces the password if used.'**
   String get luksToolsExpandNote;
 
+  /// Tools row: enlarge a raw BitLocker volume file
+  ///
+  /// In en, this message translates to:
+  /// **'Expand BitLocker container'**
+  String get toolExpandBitLockerVolumeTitle;
+
+  /// Tools row subtitle for BitLocker container expansion
+  ///
+  /// In en, this message translates to:
+  /// **'Grow a BitLocker volume file or VHD/VHDX image and extend its NTFS file system'**
+  String get toolExpandBitLockerVolumeSubtitle;
+
+  /// Explains BitLocker container expansion: what is supported, what is rewritten, and the backup advice
+  ///
+  /// In en, this message translates to:
+  /// **'Back up the container first. This rewrites BitLocker\'s metadata so the encrypted volume covers the added space, so check the result on a copy before relying on it. Works on fully encrypted BitLocker volumes from Windows 7 or later, either as a raw volume file or inside a fixed or dynamic VHD or VHDX. For a disk image enter the new total disk size: the virtual disk and its last partition (MBR or GPT) are enlarged too, so the BitLocker partition must be the last one. BitLocker To Go and encrypt-on-write (used-space-only) volumes are not supported. NTFS can be expanded in place (FAT and exFAT cannot). The added space can optionally be filled with encrypted zeros. Unlock with the password or the 48-digit recovery key.'**
+  String get bitlockerToolsExpandNote;
+
+  /// Credential field label for BitLocker tools: a password or the 48-digit recovery key
+  ///
+  /// In en, this message translates to:
+  /// **'Password or recovery key'**
+  String get bitlockerToolsPasswordLabel;
+
   /// Tools row: create a hidden volume inside an existing volume
   ///
   /// In en, this message translates to:
@@ -11364,6 +11388,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Display dotfiles and system folders'**
   String get showHiddenFilesDesc;
+
+  /// Toggle label for showing media in folders containing a .nomedia file
+  ///
+  /// In en, this message translates to:
+  /// **'Show Media Hidden by .nomedia'**
+  String get showNoMediaFilesLabel;
+
+  /// Toggle description for showing media in folders containing a .nomedia file
+  ///
+  /// In en, this message translates to:
+  /// **'Include media in folders containing a .nomedia file'**
+  String get showNoMediaFilesDesc;
 
   /// Checkbox label to remember choice and not prompt again
   ///
@@ -24316,6 +24352,216 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Target must be a relative path that stays inside this container.'**
   String get symbolicLinkTargetOutsideVault;
+
+  /// Shown when the symbolic link target picker cannot build a relative target, e.g. because a folder link on the way cannot be followed safely; the user types the target instead
+  ///
+  /// In en, this message translates to:
+  /// **'Can\'t build a relative target from here. Type the target instead.'**
+  String get symbolicLinkPickerUnresolvable;
+
+  /// No description provided for @editMetadataAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit metadata'**
+  String get editMetadataAction;
+
+  /// No description provided for @editTagsAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit tags'**
+  String get editTagsAction;
+
+  /// No description provided for @editDateTimeAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit date & time'**
+  String get editDateTimeAction;
+
+  /// No description provided for @removeMetadataAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove metadata'**
+  String get removeMetadataAction;
+
+  /// No description provided for @metadataFormatsNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Tags, dates and removal are written into JPEG, PNG and WebP images. Other files only get a new modified date.'**
+  String get metadataFormatsNote;
+
+  /// No description provided for @metadataReadOnlyMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This vault is read-only'**
+  String get metadataReadOnlyMessage;
+
+  /// No description provided for @tagsAddHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add tags, separated by commas'**
+  String get tagsAddHint;
+
+  /// No description provided for @tagsNoneYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No tags yet'**
+  String get tagsNoneYet;
+
+  /// No description provided for @dateModeSet.
+  ///
+  /// In en, this message translates to:
+  /// **'Set'**
+  String get dateModeSet;
+
+  /// No description provided for @dateModeShift.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift'**
+  String get dateModeShift;
+
+  /// No description provided for @dateModeFromModified.
+  ///
+  /// In en, this message translates to:
+  /// **'From modified date'**
+  String get dateModeFromModified;
+
+  /// No description provided for @dateModeFromName.
+  ///
+  /// In en, this message translates to:
+  /// **'From file name'**
+  String get dateModeFromName;
+
+  /// No description provided for @dateShiftLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Later'**
+  String get dateShiftLater;
+
+  /// No description provided for @dateShiftEarlier.
+  ///
+  /// In en, this message translates to:
+  /// **'Earlier'**
+  String get dateShiftEarlier;
+
+  /// No description provided for @dateDaysLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Days'**
+  String get dateDaysLabel;
+
+  /// No description provided for @dateHoursLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Hours'**
+  String get dateHoursLabel;
+
+  /// No description provided for @dateMinutesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Minutes'**
+  String get dateMinutesLabel;
+
+  /// No description provided for @dateAlsoSetModified.
+  ///
+  /// In en, this message translates to:
+  /// **'Also set the file\'s modified date'**
+  String get dateAlsoSetModified;
+
+  /// No description provided for @dateFromNameMatches.
+  ///
+  /// In en, this message translates to:
+  /// **'{matched} of {total} file names contain a date'**
+  String dateFromNameMatches(int matched, int total);
+
+  /// No description provided for @stripExifLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Exif (camera, date, location)'**
+  String get stripExifLabel;
+
+  /// No description provided for @stripXmpLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'XMP (tags, rating, edit data)'**
+  String get stripXmpLabel;
+
+  /// No description provided for @stripIptcLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'IPTC / Photoshop (captions, credits)'**
+  String get stripIptcLabel;
+
+  /// No description provided for @stripCommentsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Comments'**
+  String get stripCommentsLabel;
+
+  /// No description provided for @stripIccLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Colour profile (may change colours)'**
+  String get stripIccLabel;
+
+  /// No description provided for @stripKeepOrientationLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep orientation'**
+  String get stripKeepOrientationLabel;
+
+  /// No description provided for @stripKeepOrientationDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Without it, photos taken sideways may show rotated'**
+  String get stripKeepOrientationDesc;
+
+  /// No description provided for @stripWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'This rewrites the files and cannot be undone.'**
+  String get stripWarning;
+
+  /// No description provided for @metadataProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Updating {done} of {total}'**
+  String metadataProgress(int done, int total);
+
+  /// No description provided for @metadataResultUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 file updated} other{{count} files updated}}'**
+  String metadataResultUpdated(int count);
+
+  /// No description provided for @metadataResultUnchanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing needed changing'**
+  String get metadataResultUnchanged;
+
+  /// No description provided for @metadataResultSkipped.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} skipped (not supported)'**
+  String metadataResultSkipped(int count);
+
+  /// No description provided for @metadataResultFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} failed'**
+  String metadataResultFailed(int count);
+
+  /// No description provided for @showNoMediaFoldersLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Show .nomedia folders'**
+  String get showNoMediaFoldersLabel;
+
+  /// No description provided for @showNoMediaFoldersDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Include folders marked with a .nomedia file, which gallery apps normally skip'**
+  String get showNoMediaFoldersDesc;
 }
 
 class _AppLocalizationsDelegate

@@ -16,13 +16,18 @@ class DeviceCategoryIndexKey {
     required this.rootPath,
     required this.categoryKey,
     required this.showHidden,
+    this.showNoMedia = false,
   });
 
   final String rootPath;
   final String categoryKey;
   final bool showHidden;
 
-  String get id => '$categoryKey|${showHidden ? 1 : 0}|$rootPath';
+  /// Whether folders with a `.nomedia` marker were included; the same reason
+  /// as [showHidden] applies.
+  final bool showNoMedia;
+
+  String get id => '$categoryKey|${showHidden ? 1 : 0}${showNoMedia ? 'n' : ''}|$rootPath';
 }
 
 /// Remembers what category scans of phone storage found, and answers them
@@ -99,7 +104,9 @@ class DeviceCategoryIndex {
     bool Function(String dirPath)? skipDirectory,
   }) async {
     final api = media;
-    if (api == null || key.showHidden) return null;
+    // The platform media index leaves `.nomedia` folders out, so it cannot
+    // answer a scan that wants them.
+    if (api == null || key.showHidden || key.showNoMedia) return null;
     final rows = await api.query(
       rootPath: key.rootPath,
       extensions: extensions,
@@ -168,10 +175,14 @@ class DeviceCategoryIndex {
 
   /// Order-independent fingerprint of a list, so two scans that found the
   /// same files in a different order count as the same result.
-  static int _signature(List<RawEntry> entries) => Object.hash(
-    entries.length,
-    Object.hashAllUnordered([
-      for (final e in entries) Object.hash(e.name, e.sizeBytes, e.modifiedSecs),
-    ]),
-  );
+  static int _signature(List<RawEntry> entries) {
+    var sum = 0;
+    var xor = 0;
+    for (final e in entries) {
+      final h = Object.hash(e.name, e.sizeBytes, e.modifiedSecs);
+      sum = (sum + h) & 0x7fffffff;
+      xor ^= h;
+    }
+    return Object.hash(entries.length, sum, xor);
+  }
 }

@@ -172,6 +172,99 @@ void main() {
     });
   });
 
+  group('list flow', () {
+    GalleryLayoutModel list(List<GallerySection> sections, {double row = 72, double spacing = 0, double gap = 0}) =>
+        GalleryLayoutModel.compute(
+          sections: sections,
+          spec: GalleryLayoutSpec(
+            crossExtent: 400,
+            spacing: spacing,
+            flow: GalleryFlow.list,
+            columnCount: 1,
+            rowExtent: row,
+            sectionGap: gap,
+          ),
+          ratioOf: (_) => 1.0,
+        );
+
+    test('every row is full width and rowExtent tall, headers keep their extent', () {
+      final m = list([
+        const GallerySection(itemCount: 3, headerExtent: 40),
+        const GallerySection(itemCount: 2, headerExtent: 40),
+      ]);
+      expect(m.childCount, 7);
+      // header, 3 rows, header, 2 rows
+      final expectedTops = [0.0, 40.0, 112.0, 184.0, 256.0, 296.0, 368.0];
+      final expectedHeights = [40.0, 72.0, 72.0, 72.0, 40.0, 72.0, 72.0];
+      for (var c = 0; c < m.childCount; c++) {
+        expect(m.tops[c], expectedTops[c], reason: 'top of $c');
+        expect(m.heights[c], expectedHeights[c], reason: 'height of $c');
+        expect(m.lefts[c], 0.0);
+        expect(m.widths[c], 400.0);
+      }
+      expect(m.maxExtent, 440.0);
+    });
+
+    test('offset queries are exact for thousands of groups', () {
+      final sections = [
+        for (var s = 0; s < 3000; s++) const GallerySection(itemCount: 4, headerExtent: 44),
+      ];
+      final m = list(sections);
+      expect(m.childCount, 3000 * 5);
+      expect(m.maxExtent, 3000 * (44 + 4 * 72.0));
+      // Jumping anywhere finds the child under the offset without walking.
+      for (final off in [0.0, 1.0, 43.9, 44.0, 500.0, 123456.0, m.maxExtent - 1]) {
+        final c = m.minChildForOffset(off);
+        expect(m.tops[c] <= off + 1e-9 && m.bottomOf(c) > off - 1e-9, isTrue, reason: 'offset $off');
+      }
+    });
+
+    test('spacing is added between rows only', () {
+      final m = list([const GallerySection(itemCount: 3)], spacing: 4);
+      expect(m.tops[1], 76.0);
+      expect(m.tops[2], 152.0);
+      expect(m.maxExtent, 3 * 72.0 + 2 * 4.0);
+    });
+
+    test('a frozen prefix resumed inside a section equals a full layout', () {
+      final sections = [
+        for (var s = 0; s < 50; s++) GallerySection(itemCount: 1 + s % 7, headerExtent: 44),
+      ];
+      final full = list(sections, row: 80);
+      final partial = GalleryLayoutModel.recomputeFrom(
+        previous: list(sections, row: 80),
+        fromChild: 123,
+        sections: sections,
+        spec: const GalleryLayoutSpec(
+          crossExtent: 400,
+          spacing: 0,
+          flow: GalleryFlow.list,
+          columnCount: 1,
+          rowExtent: 80,
+        ),
+        ratioOf: (_) => 1.0,
+      );
+      expect(partial.childCount, full.childCount);
+      for (var c = 0; c < full.childCount; c++) {
+        expect(partial.tops[c], full.tops[c], reason: 'top of $c');
+        expect(partial.heights[c], full.heights[c], reason: 'height of $c');
+      }
+    });
+
+    test('a zoom change (new rowExtent) through the host is picked up after invalidate', () {
+      final host = GalleryLayoutHost(flow: GalleryFlow.list, columnCount: 1, spacing: 0)
+        ..rowExtent = 60
+        ..sections = const [GallerySection(itemCount: 10, headerExtent: 40)];
+      final a = host.modelFor(400);
+      expect(a.maxExtent, 40 + 10 * 60.0);
+      host
+        ..rowExtent = 90
+        ..invalidate();
+      final b = host.modelFor(400);
+      expect(b.maxExtent, 40 + 10 * 90.0);
+    });
+  });
+
   group('sections and headers', () {
     test('headers occupy a child each and items follow in display order', () {
       final sections = [
@@ -384,10 +477,12 @@ void main() {
         for (var c = 1; c < partial.childCount; c++) {
           expect(partial.tops[c] >= partial.tops[c - 1] - 1e-9, isTrue);
         }
-        // The tail follows the new ratios.
-        final i = old.itemOfChild[aligned + 10];
-        final c = partial.childOfItem[i];
-        expect((partial.widths[c] / partial.heights[c] - r2[i]).abs() < 1e-6, isTrue);
+        // The tail follows the new ratios (list rows ignore ratios).
+        if (flow != GalleryFlow.list) {
+          final i = old.itemOfChild[aligned + 10];
+          final c = partial.childOfItem[i];
+          expect((partial.widths[c] / partial.heights[c] - r2[i]).abs() < 1e-6, isTrue);
+        }
       });
     }
 

@@ -6,7 +6,6 @@ import com.aeidolon.vaultexplorer.DirEntryWire
 import com.aeidolon.vaultexplorer.container.ContainerFormat
 import com.aeidolon.vaultexplorer.container.VaultBackend
 import com.aeidolon.vaultexplorer.saf.VaultPathUtils
-import java.util.Base64
 
 /**
  * [VaultBackend] for the three folder-vault formats. Every call goes straight
@@ -32,8 +31,6 @@ open class NativeVaultSession internal constructor(
         get() = volIdRef.get()
         set(value) { volIdRef.set(value) }
     @Volatile private var handle: Long = handle
-    private val keyMaterialLock = Any()
-    private var keyMaterial: KeyMaterial? = null
 
     private inline fun <T> withHandle(failure: T, block: (Long) -> T): T {
         val h = handle
@@ -119,54 +116,12 @@ open class NativeVaultSession internal constructor(
         return out
     }
 
-    /**
-     * Snapshot of the key material this session holds, for the Check & Repair
-     * tooling, which still runs on the Kotlin primitives. Cached; the copy
-     * lives on the JVM heap exactly as the old Kotlin sessions' keys did.
-     */
-    internal fun keyMaterial(): KeyMaterial = synchronized(keyMaterialLock) {
-        keyMaterial ?: run {
-            val h = handle
-            val lines = if (h == 0L) null else NativeFolderVault.nativeExportKeys(h)
-            KeyMaterial.parse(lines ?: throw IllegalStateException("vault session is closed")).also { keyMaterial = it }
-        }
-    }
+    /** The native session handle (0 once closed), for tools that run inside the native core next to this session. */
+    internal fun nativeHandle(): Long = handle
 
     override fun close() {
         val h = handle
         handle = 0L
-        synchronized(keyMaterialLock) {
-            keyMaterial?.wipe()
-            keyMaterial = null
-        }
         if (h != 0L) NativeFolderVault.nativeClose(h)
-    }
-}
-
-/** Parsed output of nativeExportKeys. */
-internal class KeyMaterial private constructor(
-    private val binary: Map<String, ByteArray>,
-    private val text: Map<String, String>,
-) {
-    fun bytes(name: String): ByteArray = binary[name]?.copyOf() ?: throw IllegalStateException("missing key field $name")
-    fun string(name: String): String = text[name] ?: throw IllegalStateException("missing field $name")
-    fun stringOrNull(name: String): String? = text[name]
-    fun wipe() { binary.values.forEach { it.fill(0) } }
-
-    companion object {
-        fun parse(lines: Array<String>): KeyMaterial {
-            val bin = HashMap<String, ByteArray>()
-            val txt = HashMap<String, String>()
-            for (l in lines) {
-                if (l.length < 4) continue
-                val kind = l[0]
-                val sep = l.indexOf(':', 2)
-                if (l[1] != ':' || sep < 0) continue
-                val name = l.substring(2, sep)
-                val value = l.substring(sep + 1)
-                if (kind == 'f') bin[name] = Base64.getDecoder().decode(value) else if (kind == 's') txt[name] = value
-            }
-            return KeyMaterial(bin, txt)
-        }
     }
 }

@@ -59,7 +59,25 @@ class CryfsLocalIntegrityState private constructor(
         val next = (knownVersions[key] ?: 0L) + 1
         knownVersions[key] = next
         appendMutation(key, next)
+        recordLastWriter(blockId, myClientId)
         return next
+    }
+
+    /**
+     * Records that this client deleted [blockId], so a copy of it that comes back later (e.g. a sync conflict
+     * restoring an old file) is flagged as a rollback -- the same bookkeeping upstream CryFS does.
+     */
+    @Synchronized
+    fun markDeleted(blockId: CryfsBlockId) {
+        recordLastWriter(blockId, DELETED_MARKER)
+    }
+
+    /** Last known writer of a block ("L:<hex>" in the persisted files, shared with the native core); 0 = deleted. */
+    private fun recordLastWriter(blockId: CryfsBlockId, clientId: Long) {
+        val key = lastWriterKey(blockId)
+        if (knownVersions[key] == clientId) return
+        knownVersions[key] = clientId
+        appendMutation(key, clientId)
     }
 
     /**
@@ -70,16 +88,26 @@ class CryfsLocalIntegrityState private constructor(
      * for that *exact* (client, block) pair -- which is this app's
      * equivalent of CryFS's error 24/25. A plain repeat read of an
      * already-known version is accepted as a cheap no-op, not re-logged.
+     *
+     * Like upstream CryFS, it is also a rollback when a *different* client (or "deleted") was the block's last
+     * known writer and [version] is not newer than what [writerClientId] was seen to write before: an old copy
+     * of the block came back. If the last writer is unknown (state written by older builds) that second rule
+     * is skipped rather than guessed.
      */
     @Synchronized
     fun checkAndRecordRead(writerClientId: Long, blockId: CryfsBlockId, version: Long): Long? {
         val key = keyFor(writerClientId, blockId)
         val known = knownVersions[key]
-        if (known != null && version < known) return known
+        val last = knownVersions[lastWriterKey(blockId)]
+        if (known != null) {
+            val lastIsOther = last != null && last != writerClientId
+            if (version < known || (lastIsOther && version <= known)) return known
+        }
         if (known == null || version > known) {
             knownVersions[key] = version
             appendMutation(key, version)
         }
+        recordLastWriter(blockId, writerClientId)
         return null
     }
 
@@ -93,7 +121,9 @@ class CryfsLocalIntegrityState private constructor(
             out.fd.sync()
         }
         pendingLogLines++
-        if (pendingLogLines >= COMPACTION_THRESHOLD) compact()
+        // Compact once the log is as long as the snapshot (but never more often than every COMPACTION_THRESHOLD
+        // records): rewriting the whole snapshot every 200 records made first reads quadratic in the block count.
+        if (pendingLogLines >= maxOf(COMPACTION_THRESHOLD, knownVersions.size)) compact()
     }
 
     /** Forces a compaction pass now regardless of the log's current size --
@@ -132,6 +162,8 @@ class CryfsLocalIntegrityState private constructor(
         private const val COMPACTION_THRESHOLD = 200
 
         private fun keyFor(clientId: Long, blockId: CryfsBlockId) = "$clientId:${blockId.hex}"
+        private fun lastWriterKey(blockId: CryfsBlockId) = "L:${blockId.hex}"
+        private const val DELETED_MARKER = 0L
 
         /**
          * Loads (or lazily creates) the local integrity state for one vault,

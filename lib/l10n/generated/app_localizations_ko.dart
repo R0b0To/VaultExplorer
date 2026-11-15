@@ -2378,6 +2378,20 @@ class AppLocalizationsKo extends AppLocalizations {
       '먼저 컨테이너를 백업하세요. LUKS1 및 LUKS2를 지원합니다. NTFS 및 ext2/3/4 파일 시스템은 제자리 확장이 가능합니다(FAT 및 exFAT은 불가). 추가된 공간은 암호화된 0으로 초기화할 수 있습니다. 키 파일을 사용하는 경우 비밀번호를 대체합니다.';
 
   @override
+  String get toolExpandBitLockerVolumeTitle => 'BitLocker 컨테이너 확장';
+
+  @override
+  String get toolExpandBitLockerVolumeSubtitle =>
+      'BitLocker 볼륨 파일 또는 VHD/VHDX 이미지를 키우고 NTFS 파일 시스템을 확장합니다';
+
+  @override
+  String get bitlockerToolsExpandNote =>
+      '먼저 컨테이너를 백업하세요. 이 작업은 암호화된 볼륨이 추가된 공간을 포함하도록 BitLocker 메타데이터를 다시 기록하므로, 의존하기 전에 사본으로 결과를 확인하세요. Windows 7 이상의 완전히 암호화된 BitLocker 볼륨에서 작동하며, 원시 볼륨 파일이나 고정 또는 동적 VHD, VHDX 안의 볼륨 모두 가능합니다. 디스크 이미지는 디스크 전체의 새 크기를 입력하세요. 가상 디스크와 그 마지막 파티션(MBR 또는 GPT)도 함께 확장되므로 BitLocker 파티션이 마지막 파티션이어야 합니다. BitLocker To Go와 쓰기 시 암호화(사용 중인 공간만) 볼륨은 지원되지 않습니다. NTFS는 제자리에서 확장할 수 있습니다(FAT와 exFAT는 불가). 추가된 공간은 선택적으로 암호화된 0으로 채울 수 있습니다. 비밀번호 또는 48자리 복구 키로 잠금을 해제하세요.';
+
+  @override
+  String get bitlockerToolsPasswordLabel => '비밀번호 또는 복구 키';
+
+  @override
   String get toolHiddenInExistingTitle => '숨김 볼륨 추가';
 
   @override
@@ -6628,6 +6642,13 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get showHiddenFilesDesc => '점 파일 및 시스템 폴더를 표시합니다';
+
+  @override
+  String get showNoMediaFilesLabel => 'Show Media Hidden by .nomedia';
+
+  @override
+  String get showNoMediaFilesDesc =>
+      'Include media in folders containing a .nomedia file';
 
   @override
   String get dontAskAgain => '다시 묻지 않기';
@@ -13791,4 +13812,127 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get symbolicLinkTargetOutsideVault =>
       '대상은 이 컨테이너 내부에 머무르는 상대 경로여야 합니다.';
+
+  @override
+  String get symbolicLinkPickerUnresolvable =>
+      '여기서는 상대 대상을 만들 수 없습니다. 대상을 직접 입력하세요.';
+
+  @override
+  String get editMetadataAction => '메타데이터 편집';
+
+  @override
+  String get editTagsAction => '태그 편집';
+
+  @override
+  String get editDateTimeAction => '날짜 및 시간 편집';
+
+  @override
+  String get removeMetadataAction => '메타데이터 제거';
+
+  @override
+  String get metadataFormatsNote =>
+      '태그, 날짜, 제거는 JPEG, PNG, WebP 이미지에 기록됩니다. 다른 파일은 수정 날짜만 변경됩니다.';
+
+  @override
+  String get metadataReadOnlyMessage => '이 보관함은 읽기 전용입니다';
+
+  @override
+  String get tagsAddHint => '쉼표로 구분하여 태그 추가';
+
+  @override
+  String get tagsNoneYet => '아직 태그가 없습니다';
+
+  @override
+  String get dateModeSet => '설정';
+
+  @override
+  String get dateModeShift => '이동';
+
+  @override
+  String get dateModeFromModified => '수정 날짜에서';
+
+  @override
+  String get dateModeFromName => '파일 이름에서';
+
+  @override
+  String get dateShiftLater => '나중으로';
+
+  @override
+  String get dateShiftEarlier => '이전으로';
+
+  @override
+  String get dateDaysLabel => '일';
+
+  @override
+  String get dateHoursLabel => '시간';
+
+  @override
+  String get dateMinutesLabel => '분';
+
+  @override
+  String get dateAlsoSetModified => '파일 수정 날짜도 설정';
+
+  @override
+  String dateFromNameMatches(int matched, int total) {
+    return '파일 이름 $total개 중 $matched개에 날짜가 포함되어 있습니다';
+  }
+
+  @override
+  String get stripExifLabel => 'Exif(카메라, 날짜, 위치)';
+
+  @override
+  String get stripXmpLabel => 'XMP(태그, 평점, 편집 데이터)';
+
+  @override
+  String get stripIptcLabel => 'IPTC / Photoshop(캡션, 크레딧)';
+
+  @override
+  String get stripCommentsLabel => '댓글';
+
+  @override
+  String get stripIccLabel => '색상 프로필(색상이 바뀔 수 있음)';
+
+  @override
+  String get stripKeepOrientationLabel => '방향 유지';
+
+  @override
+  String get stripKeepOrientationDesc => '유지하지 않으면 가로로 찍은 사진이 회전되어 보일 수 있습니다';
+
+  @override
+  String get stripWarning => '파일을 다시 쓰며 되돌릴 수 없습니다.';
+
+  @override
+  String metadataProgress(int done, int total) {
+    return '$total개 중 $done개 업데이트 중';
+  }
+
+  @override
+  String metadataResultUpdated(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '파일 $count개 업데이트됨',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get metadataResultUnchanged => '변경할 내용이 없습니다';
+
+  @override
+  String metadataResultSkipped(int count) {
+    return '$count개 건너뜀(지원되지 않음)';
+  }
+
+  @override
+  String metadataResultFailed(int count) {
+    return '$count개 실패';
+  }
+
+  @override
+  String get showNoMediaFoldersLabel => '.nomedia 폴더 표시';
+
+  @override
+  String get showNoMediaFoldersDesc =>
+      '갤러리 앱이 보통 건너뛰는 .nomedia 파일이 있는 폴더를 포함합니다';
 }

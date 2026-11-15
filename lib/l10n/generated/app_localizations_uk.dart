@@ -2538,6 +2538,20 @@ class AppLocalizationsUk extends AppLocalizations {
       'Спочатку створіть резервну копію контейнера. Підтримуються LUKS1 та LUKS2. Файлові системи NTFS та ext2/3/4 можна розширювати безпосередньо (FAT та exFAT не підтримуються). Додане місце можна ініціалізувати зашифрованими нулями. Файл ключа замінює пароль, якщо використовується.';
 
   @override
+  String get toolExpandBitLockerVolumeTitle => 'Розширити контейнер BitLocker';
+
+  @override
+  String get toolExpandBitLockerVolumeSubtitle =>
+      'Збільшує файл тому BitLocker або образ VHD/VHDX і розширює файлову систему NTFS';
+
+  @override
+  String get bitlockerToolsExpandNote =>
+      'Спершу створіть резервну копію контейнера. Ця дія переписує метадані BitLocker, щоб зашифрований том охоплював додане місце, тож перевірте результат на копії, перш ніж покладатися на нього. Працює з повністю зашифрованими томами BitLocker із Windows 7 або новішої — як необроблений файл тому, так і всередині фіксованого чи динамічного VHD або VHDX. Для образу диска введіть новий загальний розмір диска: віртуальний диск і його останній розділ (MBR або GPT) також збільшуються, тому розділ BitLocker має бути останнім. BitLocker To Go і томи із шифруванням під час запису (лише використаний простір) не підтримуються. NTFS можна розширити на місці (FAT і exFAT — ні). Додане місце за бажанням можна заповнити зашифрованими нулями. Розблокуйте паролем або 48-значним ключем відновлення.';
+
+  @override
+  String get bitlockerToolsPasswordLabel => 'Пароль або ключ відновлення';
+
+  @override
   String get toolHiddenInExistingTitle => 'Додати прихований том';
 
   @override
@@ -7020,6 +7034,13 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get showHiddenFilesDesc =>
       'Відображати файли з крапкою на початку та системні папки';
+
+  @override
+  String get showNoMediaFilesLabel => 'Show Media Hidden by .nomedia';
+
+  @override
+  String get showNoMediaFilesDesc =>
+      'Include media in folders containing a .nomedia file';
 
   @override
   String get dontAskAgain => 'Більше не запитувати';
@@ -14687,4 +14708,129 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get symbolicLinkTargetOutsideVault =>
       'Ціль має бути відносним шляхом у межах цього контейнера.';
+
+  @override
+  String get symbolicLinkPickerUnresolvable =>
+      'Звідси не вдається створити відносну ціль. Введіть ціль вручну.';
+
+  @override
+  String get editMetadataAction => 'Редагувати метадані';
+
+  @override
+  String get editTagsAction => 'Редагувати теги';
+
+  @override
+  String get editDateTimeAction => 'Редагувати дату й час';
+
+  @override
+  String get removeMetadataAction => 'Видалити метадані';
+
+  @override
+  String get metadataFormatsNote =>
+      'Теги, дати та видалення записуються в зображення JPEG, PNG і WebP. Інші файли отримують лише нову дату змінення.';
+
+  @override
+  String get metadataReadOnlyMessage => 'Це сховище лише для читання';
+
+  @override
+  String get tagsAddHint => 'Додайте теги, розділені комами';
+
+  @override
+  String get tagsNoneYet => 'Тегів ще немає';
+
+  @override
+  String get dateModeSet => 'Встановити';
+
+  @override
+  String get dateModeShift => 'Зсунути';
+
+  @override
+  String get dateModeFromModified => 'З дати змінення';
+
+  @override
+  String get dateModeFromName => 'З імені файлу';
+
+  @override
+  String get dateShiftLater => 'Пізніше';
+
+  @override
+  String get dateShiftEarlier => 'Раніше';
+
+  @override
+  String get dateDaysLabel => 'Дні';
+
+  @override
+  String get dateHoursLabel => 'Години';
+
+  @override
+  String get dateMinutesLabel => 'Хвилини';
+
+  @override
+  String get dateAlsoSetModified => 'Також встановити дату змінення файлу';
+
+  @override
+  String dateFromNameMatches(int matched, int total) {
+    return '$matched із $total імен файлів містять дату';
+  }
+
+  @override
+  String get stripExifLabel => 'Exif (камера, дата, місце)';
+
+  @override
+  String get stripXmpLabel => 'XMP (теги, оцінка, дані редагування)';
+
+  @override
+  String get stripIptcLabel => 'IPTC / Photoshop (підписи, авторство)';
+
+  @override
+  String get stripCommentsLabel => 'Коментарі';
+
+  @override
+  String get stripIccLabel => 'Профіль кольору (може змінити кольори)';
+
+  @override
+  String get stripKeepOrientationLabel => 'Зберегти орієнтацію';
+
+  @override
+  String get stripKeepOrientationDesc =>
+      'Без цього фото, зняті боком, можуть відображатися повернутими';
+
+  @override
+  String get stripWarning => 'Це перезаписує файли й не може бути скасоване.';
+
+  @override
+  String metadataProgress(int done, int total) {
+    return 'Оновлення $done з $total';
+  }
+
+  @override
+  String metadataResultUpdated(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Оновлено файлів: $count',
+      one: 'Оновлено 1 файл',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get metadataResultUnchanged => 'Нічого змінювати';
+
+  @override
+  String metadataResultSkipped(int count) {
+    return 'Пропущено: $count (не підтримується)';
+  }
+
+  @override
+  String metadataResultFailed(int count) {
+    return 'Не вдалося: $count';
+  }
+
+  @override
+  String get showNoMediaFoldersLabel => 'Показувати папки .nomedia';
+
+  @override
+  String get showNoMediaFoldersDesc =>
+      'Включити папки з файлом .nomedia, які застосунки галереї зазвичай пропускають';
 }

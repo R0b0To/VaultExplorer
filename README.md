@@ -23,12 +23,12 @@ VaultExplorer opens VeraCrypt, LUKS, BitLocker, VHD/VHDX, Cryptomator, gocryptfs
 | Format | Details |
 |---|---|
 | **VeraCrypt** | Standard and hidden volumes, PIM, keyfiles, all ciphers and cascades (AES, Serpent, Twofish, Camellia, Kuznyechik), password change |
-| **LUKS1 / LUKS2** | `xts-plain64`, PBKDF2 or Argon2id/i, passphrase or keyfile |
+| **LUKS1 / LUKS2** | `xts-plain64` / `xts-plain` (AES-128 and AES-256, Serpent, Twofish, Camellia, Kuznyechik) and `cbc-plain` / `cbc-plain64` / `cbc-essiv:sha256` (AES, plus the other ciphers at 256 bit); PBKDF2 (SHA-1/224/256/384/512, SHA-3, RIPEMD-160, Whirlpool) or Argon2id/i; 512-4096 byte sectors; any LUKS2 metadata size, multiple keyslots, keyslot priorities; passphrase or keyfile; password change. Not supported: dm-integrity / AEAD volumes, in-progress reencryption, `ecb` / `lrw` / `benbi` / `tcw` modes, AES-192, Argon2 memory above 1 GiB. Interoperability with upstream cryptsetup is checked by the differential suite in [`crypto/test/luks_compat`](android/app/src/main/cpp/crypto/test/luks_compat/README.md) |
 | **BitLocker** | Password or 48-digit recovery key, including BitLocker To Go |
 | **VHD / VHDX** | Fixed and dynamic images containing a VeraCrypt, LUKS, or BitLocker volume, or an unencrypted filesystem |
 | **Cryptomator** | Vault formats 7 and 8 |
 | **gocryptfs** | Format v2 as written by gocryptfs 0.7 up to current: AES-256-GCM, XChaCha20-Poly1305 or AES-SIV; encrypted, plaintext or `-deterministic-names` file names; `-longnamemax`; vaults from before HKDF/Raw64. Not supported: FIDO2-protected vaults; symlinks are not shown ([details](android/app/src/main/cpp/foldervault/README.md#gocryptfs-conformance-with-the-official-implementation)) |
-| **CryFS** | Format 0.10 (CryFS 0.10.x–1.0.x), AES or XChaCha20-Poly1305 |
+| **CryFS** | Format 0.10 (CryFS 0.10.x–1.0.x and 2.x), all 21 ciphers of the C++ release (AES, XChaCha20-Poly1305, Twofish, Serpent, CAST-256, MARS; GCM and CFB). Official scrypt settings up to 1 GiB are supported on a bounded amount of RAM. Vaults still in an older format, or locked to another device ("single-client mode"), are not modified without your consent. |
 
 Filesystems: FAT12/16/32, exFAT, NTFS, ext2/3/4.
 

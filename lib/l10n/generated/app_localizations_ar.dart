@@ -2546,6 +2546,20 @@ class AppLocalizationsAr extends AppLocalizations {
       'قم بعمل نسخة احتياطية للحاوية أولاً. يدعم LUKS1 وLUKS2. يمكن توسيع أنظمة الملفات NTFS وext2/3/4 في مكانها (لا يمكن توسيع FAT وexFAT). يمكن تهيئة المساحة المضافة بأصفار مشفرة. يحل ملف المفتاح محل كلمة المرور إذا تم استخدامه.';
 
   @override
+  String get toolExpandBitLockerVolumeTitle => 'توسيع حاوية BitLocker';
+
+  @override
+  String get toolExpandBitLockerVolumeSubtitle =>
+      'تكبير ملف وحدة BitLocker أو صورة VHD/VHDX وتوسيع نظام ملفات NTFS فيها';
+
+  @override
+  String get bitlockerToolsExpandNote =>
+      'أنشئ نسخة احتياطية من الحاوية أولًا. تعيد هذه الأداة كتابة بيانات BitLocker الوصفية ليغطي الحجم المشفّر المساحة المضافة، لذا تحقق من النتيجة على نسخة قبل الاعتماد عليها. تعمل مع وحدات BitLocker المشفّرة بالكامل من Windows 7 أو أحدث، سواء كملف وحدة خام أو داخل VHD أو VHDX ثابت أو ديناميكي. في صورة القرص أدخل الحجم الإجمالي الجديد للقرص: يُوسَّع القرص الافتراضي وآخر قسم فيه (MBR أو GPT) أيضًا، لذا يجب أن يكون قسم BitLocker هو الأخير. لا تُدعم وحدات BitLocker To Go ولا وحدات التشفير عند الكتابة (المساحة المستخدمة فقط). يمكن توسيع NTFS في مكانه (ولا يمكن توسيع FAT وexFAT). يمكن اختياريًا ملء المساحة المضافة بأصفار مشفّرة. افتح القفل بكلمة المرور أو بمفتاح الاسترداد المكوّن من 48 رقمًا.';
+
+  @override
+  String get bitlockerToolsPasswordLabel => 'كلمة المرور أو مفتاح الاسترداد';
+
+  @override
   String get toolHiddenInExistingTitle => 'إضافة وحدة تخزين مخفية';
 
   @override
@@ -7040,6 +7054,13 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get showHiddenFilesDesc => 'عرض الملفات ذات النقطة ومجلدات النظام';
+
+  @override
+  String get showNoMediaFilesLabel => 'Show Media Hidden by .nomedia';
+
+  @override
+  String get showNoMediaFilesDesc =>
+      'Include media in folders containing a .nomedia file';
 
   @override
   String get dontAskAgain => 'عدم السؤال مرة أخرى';
@@ -14618,4 +14639,130 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get symbolicLinkTargetOutsideVault =>
       'يجب أن يكون الهدف مسارًا نسبيًا يبقى داخل هذا الحاوي.';
+
+  @override
+  String get symbolicLinkPickerUnresolvable =>
+      'تعذّر إنشاء هدف نسبي من هنا. اكتب الهدف يدويًا.';
+
+  @override
+  String get editMetadataAction => 'تعديل البيانات الوصفية';
+
+  @override
+  String get editTagsAction => 'تعديل الوسوم';
+
+  @override
+  String get editDateTimeAction => 'تعديل التاريخ والوقت';
+
+  @override
+  String get removeMetadataAction => 'إزالة البيانات الوصفية';
+
+  @override
+  String get metadataFormatsNote =>
+      'تُكتب الوسوم والتواريخ والإزالة داخل صور JPEG وPNG وWebP. أما الملفات الأخرى فتحصل على تاريخ تعديل جديد فقط.';
+
+  @override
+  String get metadataReadOnlyMessage => 'هذه الخزنة للقراءة فقط';
+
+  @override
+  String get tagsAddHint => 'أضف وسومًا مفصولة بفواصل';
+
+  @override
+  String get tagsNoneYet => 'لا توجد وسوم بعد';
+
+  @override
+  String get dateModeSet => 'تعيين';
+
+  @override
+  String get dateModeShift => 'إزاحة';
+
+  @override
+  String get dateModeFromModified => 'من تاريخ التعديل';
+
+  @override
+  String get dateModeFromName => 'من اسم الملف';
+
+  @override
+  String get dateShiftLater => 'لاحقًا';
+
+  @override
+  String get dateShiftEarlier => 'أبكر';
+
+  @override
+  String get dateDaysLabel => 'أيام';
+
+  @override
+  String get dateHoursLabel => 'ساعات';
+
+  @override
+  String get dateMinutesLabel => 'دقائق';
+
+  @override
+  String get dateAlsoSetModified => 'عيّن أيضًا تاريخ تعديل الملف';
+
+  @override
+  String dateFromNameMatches(int matched, int total) {
+    return '$matched من $total من أسماء الملفات تحتوي على تاريخ';
+  }
+
+  @override
+  String get stripExifLabel => 'Exif (الكاميرا، التاريخ، الموقع)';
+
+  @override
+  String get stripXmpLabel => 'XMP (الوسوم، التقييم، بيانات التحرير)';
+
+  @override
+  String get stripIptcLabel => 'IPTC / Photoshop (التعليقات، الاعتمادات)';
+
+  @override
+  String get stripCommentsLabel => 'التعليقات';
+
+  @override
+  String get stripIccLabel => 'ملف تعريف الألوان (قد يغيّر الألوان)';
+
+  @override
+  String get stripKeepOrientationLabel => 'الاحتفاظ بالاتجاه';
+
+  @override
+  String get stripKeepOrientationDesc =>
+      'بدونه قد تظهر الصور الملتقطة بشكل جانبي مُدارة';
+
+  @override
+  String get stripWarning =>
+      'يؤدي هذا إلى إعادة كتابة الملفات ولا يمكن التراجع عنه.';
+
+  @override
+  String metadataProgress(int done, int total) {
+    return 'جارٍ تحديث $done من $total';
+  }
+
+  @override
+  String metadataResultUpdated(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'تم تحديث $count ملفات',
+      one: 'تم تحديث ملف واحد',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get metadataResultUnchanged => 'لا شيء يحتاج إلى تغيير';
+
+  @override
+  String metadataResultSkipped(int count) {
+    return 'تم تخطي $count (غير مدعوم)';
+  }
+
+  @override
+  String metadataResultFailed(int count) {
+    return 'فشل $count';
+  }
+
+  @override
+  String get showNoMediaFoldersLabel => 'إظهار مجلدات .nomedia';
+
+  @override
+  String get showNoMediaFoldersDesc =>
+      'تضمين المجلدات التي تحتوي على ملف .nomedia والتي تتجاهلها تطبيقات المعرض عادةً';
 }

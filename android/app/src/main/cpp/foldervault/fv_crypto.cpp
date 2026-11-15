@@ -167,6 +167,15 @@ Secret scrypt(const uint8_t* pass, size_t passLen, const uint8_t* salt, size_t s
     return out;
 }
 
+Secret scryptLowMem(const uint8_t* pass, size_t passLen, const uint8_t* salt, size_t saltLen,
+                    uint32_t N, uint32_t r, uint32_t p, size_t outLen, size_t vBudgetBytes) {
+    Secret out(outLen);
+    if (!scrypt_crypto_lowmem(pass, passLen, salt, saltLen, N, r, p, out.data(), outLen, vBudgetBytes))
+        throw Error(Err::Unsupported, "This vault's scrypt settings (N=" + std::to_string(N) + ", r=" + std::to_string(r) + ", p=" +
+                                      std::to_string(p) + ") are invalid or need more memory than is available on this device.");
+    return out;
+}
+
 // -------------------------------------------------------- key wrap / CTR --
 
 static const uint8_t kRfc3394Iv[8] = {0xA6, 0xA6, 0xA6, 0xA6, 0xA6, 0xA6, 0xA6, 0xA6};

@@ -6,6 +6,9 @@
 //
 // commands: create [opts] | ls P | cat P | get P LOCAL | put P LOCAL |
 //           putchunks P LOCAL | mkdir P | mv A B | rm P | size P | du P |
+//           check | repair   (Check & Repair; password "-" = none: structure-only check. Prints one
+//                       "ISSUE <TAB> severity <TAB> path <TAB> message" line per finding; exit 0 healthy,
+//                       4 issues remain, 3 wrong password, 1 not a vault / refused)
 //           passwd NEWPW | migrate7to8 | probe | info | touch P EPOCH |
 //           lsl P (symlinks of folder P) | lslt P (same, with mtime) | readlink P | symlink P TARGET | hidden P (entries not shown) |
 //           tree [P]   (recursive, one "D|F <TAB> size <TAB> sha256 <TAB> path" line per entry, names
@@ -20,6 +23,7 @@
 #include <iostream>
 #include <sstream>
 
+#include "../fv_check.h"
 #include "../fv_crypto.h"
 #include "../fv_vault.h"
 
@@ -129,6 +133,35 @@ int main(int argc, char** argv) {
         if (r.status != OpenStatus::Ok) { std::fprintf(stderr, "migrate failed (%d): %s\n", (int)r.status, r.message.c_str()); return r.status == OpenStatus::WrongPassword ? 3 : 1; }
         std::puts("migrated");
         return 0;
+    }
+
+    if (cmd == "check" || cmd == "repair") {
+        const VaultFormat vf = fmt == "gocryptfs" ? VaultFormat::Gocryptfs : fmt == "cryptomator" ? VaultFormat::Cryptomator : VaultFormat::Cryfs;
+        check::Credentials cr;
+        if (pw != "-") { cr.password = p; cr.passwordLen = pw.size(); }
+        check::Hooks hooks;
+        hooks.log = [](const std::string& m) { std::fprintf(stderr, "%s\n", m.c_str()); };
+        auto printIssues = [](const std::vector<check::Issue>& v) {
+            for (const auto& i : v) std::printf("ISSUE\t%d\t%s\t%s\n", (int)i.severity, escName(i.path).c_str(), escName(i.message).c_str());
+        };
+        if (cmd == "check") {
+            auto r = check::checkVault(vf, *st, cr, env, hooks);
+            if (r.outcome != check::Outcome::Ok) {
+                std::fprintf(stderr, "%s: %s\n", r.outcome == check::Outcome::WrongPassword ? "wrong password" : "invalid", r.message.c_str());
+                return r.outcome == check::Outcome::WrongPassword ? 3 : 1;
+            }
+            printIssues(r.report.issues);
+            std::printf("checked %d file(s), deep scan %s, %s\n", r.report.filesScanned, r.report.deepScan ? "yes" : "no", r.report.healthy() ? "healthy" : "NOT healthy");
+            return r.report.healthy() ? 0 : 4;
+        }
+        auto r = check::repairVault(vf, *st, cr, env, hooks);
+        if (r.outcome != check::Outcome::Ok) {
+            std::fprintf(stderr, "%s: %s\n", r.outcome == check::Outcome::WrongPassword ? "wrong password" : "refused", r.message.c_str());
+            return r.outcome == check::Outcome::WrongPassword ? 3 : 1;
+        }
+        printIssues(r.report.remaining);
+        std::printf("fixed %d, recovered %d, removed %d, %s\n", r.report.fixed, r.report.recovered, r.report.removed, r.report.healthy() ? "healthy" : "NOT healthy");
+        return r.report.healthy() ? 0 : 4;
     }
 
     OpenResult r;

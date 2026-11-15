@@ -201,10 +201,6 @@ static unsigned char* getVolIoBuf(VolumeState& v, size_t neededBytes) {
 extern "C" DSTATUS disk_initialize(BYTE) { return 0; }
 extern "C" DSTATUS disk_status(BYTE)     { return 0; }
 
-static void genericLuksXtsCrypt(const XtsLayerKey& layer, bool encrypt, size_t dataLen,
-                                const unsigned char tweakSeed[16],
-                                const unsigned char* in, unsigned char* out);
-
 template <typename WorkFn>
 static void parallelCryptoLoop(uint32_t count, WorkFn&& workFn) {
     constexpr uint32_t kMinUnitsForParallel = 256;
@@ -311,20 +307,14 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
             parallelCryptoLoop(batch.count, [&](uint32_t i) {
                 const uint64_t phys512Sector = (startByte / 512) + i;
                 const uint64_t sectorNum = phys512Sector - v.partitionStartSector;
-                unsigned char tweakBuf[16] = {0};
-                for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorNum >> (b * 8)) & 0xFF;
-                genericLuksXtsCrypt(v.luksGenericCascade.layers[0], false, 512, tweakBuf,
-                                     encBuf + (i * 512), decryptedOut.get() + (i * 512));
+                luksCryptUnit(v, false, sectorNum, 512, encBuf + (i * 512), decryptedOut.get() + (i * 512));
             });
         } else {
             parallelCryptoLoop(batch.count, [&](uint32_t unitIdx) {
                 const uint64_t unitByteOffset = startByte + (static_cast<uint64_t>(unitIdx) * luksUnit);
                 const uint64_t phys512Sector = unitByteOffset / 512;
                 const uint64_t sectorTweak = phys512Sector - v.partitionStartSector;
-                unsigned char tweakBuf[16] = {0};
-                for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;
-                genericLuksXtsCrypt(v.luksGenericCascade.layers[0], false, luksUnit, tweakBuf,
-                                     encBuf + (unitIdx * luksUnit), decryptedOut.get() + (unitIdx * luksUnit));
+                luksCryptUnit(v, false, sectorTweak, luksUnit, encBuf + (unitIdx * luksUnit), decryptedOut.get() + (unitIdx * luksUnit));
             });
         }
 
@@ -407,20 +397,14 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
             parallelCryptoLoop(batch.count, [&](uint32_t i) {
                 const uint64_t phys512Sector = (startByte / 512) + i;
                 const uint64_t sectorNum = phys512Sector - v.partitionStartSector;
-                unsigned char tweakBuf[16] = {0};
-                for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorNum >> (b * 8)) & 0xFF;
-                genericLuksXtsCrypt(v.luksGenericCascade.layers[0], true, 512, tweakBuf,
-                                     curBuf + (i * 512), encBuf + (i * 512));
+                luksCryptUnit(v, true, sectorNum, 512, curBuf + (i * 512), encBuf + (i * 512));
             });
         } else {
             parallelCryptoLoop(batch.count, [&](uint32_t unitIdx) {
                 const uint64_t unitByteOffset = startByte + (static_cast<uint64_t>(unitIdx) * luksUnit);
                 const uint64_t phys512Sector = unitByteOffset / 512;
                 const uint64_t sectorTweak = phys512Sector - v.partitionStartSector;
-                unsigned char tweakBuf[16] = {0};
-                for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;
-                genericLuksXtsCrypt(v.luksGenericCascade.layers[0], true, luksUnit, tweakBuf,
-                                     curBuf + (unitIdx * luksUnit), encBuf + (unitIdx * luksUnit));
+                luksCryptUnit(v, true, sectorTweak, luksUnit, curBuf + (unitIdx * luksUnit), encBuf + (unitIdx * luksUnit));
             });
         }
 
@@ -506,19 +490,4 @@ extern "C" DWORD get_fattime() {
         ((t.tm_min  & 0x3F) << 5)  |
         ((t.tm_sec / 2) & 0x1F));
     return (static_cast<DWORD>(fdate) << 16) | ftime;
-}
-
-static void genericLuksXtsCrypt(const XtsLayerKey& layer, bool encrypt, size_t dataLen,
-                                 const unsigned char tweakSeed[16],
-                                 const unsigned char* in, unsigned char* out) {
-    unsigned char T[16];
-    blockCipherEncryptBlock(layer.tweakKey, tweakSeed, T);
-    for (size_t b = 0; b < dataLen / 16; b++) {
-        unsigned char tmp[16];
-        for (int j = 0; j < 16; j++) tmp[j] = in[b * 16 + j] ^ T[j];
-        if (encrypt) blockCipherEncryptBlock(layer.dataKeyEnc, tmp, tmp);
-        else         blockCipherDecryptBlock(layer.dataKeyDec, tmp, tmp);
-        for (int j = 0; j < 16; j++) out[b * 16 + j] = tmp[j] ^ T[j];
-        xtsMultiplyTweak(T);
-    }
 }

@@ -1,4 +1,6 @@
 #include "fv_cryfs.h"
+#include <chrono>
+#include <set>
 
 #include <algorithm>
 #include <cstdio>
@@ -55,12 +57,17 @@ std::optional<BlockId> BlockId::fromHex(const std::string& in) {
 static constexpr const char* kOuterHeader = "cryfs.config;1;scrypt";
 static constexpr const char* kInnerHeader = "cryfs.config.inner;0";
 static constexpr size_t kOuterConfigSize = 1024, kInnerConfigSize = 900, kOuterKeySize = 32;
-static constexpr uint32_t kScryptN = 1u << 15, kScryptR = 8, kScryptP = 1;
+// New-vault default: 8x the work of the previous 2^15/8/1, 128 MiB. Official C++ CryFS defaults to
+// 2^20/4/8 (512 MiB, ~128x); pass KdfParams to buildConfig to choose another cost.
+// Official defaults need 512 MiB (C++) to 1 GiB (Rust 2.0) of scrypt memory; keep at most this much in RAM.
+static constexpr size_t kScryptMemoryBudget = 256u * 1024 * 1024;
+static constexpr uint32_t kScryptN = 1u << 17, kScryptR = 8, kScryptP = 2;
 
 int cipherKeySize(const std::string& n) {
-    if (n == "aes-256-gcm" || n == "aes-256-cfb" || n == "xchacha20-poly1305") return 32;
-    if (n == "aes-128-gcm" || n == "aes-128-cfb") return 16;
-    throw Error(Err::Unsupported, "Vault uses cipher \"" + n + "\", which this app does not support.");
+    const CryfsCipherId id = cryfsCipherIdFromName(n.c_str());
+    if (id == CryfsCipherId::kUnknown)
+        throw Error(Err::Unsupported, "Vault uses cipher \"" + n + "\", which this app does not support.");
+    return cryfsCipherKeyBytes(id);
 }
 
 static CryfsCipherId cipherId(const std::string& n) {
@@ -71,11 +78,36 @@ static CryfsCipherId cipherId(const std::string& n) {
 }
 
 int virtualBlockSize(int physical, const std::string& cipher) {
-    int overhead = cipher == "xchacha20-poly1305" ? 40
-                 : (cipher == "aes-256-gcm" || cipher == "aes-128-gcm") ? 32
-                 : (cipher == "aes-256-cfb" || cipher == "aes-128-cfb") ? 16 : 40;
+    const long o = cryfsCipherOverheadBytes(cryfsCipherIdFromName(cipher.c_str()));
+    const int overhead = o < 0 ? 40 : (int)o;
     return physical - (14 + 2 + overhead + 2 + 16 + 4 + 8);
 }
+
+static bool parseDotted(const std::string& s, uint32_t out[3]) {
+    out[0] = out[1] = out[2] = 0;
+    if (s.empty()) return false;
+    size_t pos = 0;
+    int part = 0;
+    while (true) {
+        size_t end = pos;
+        while (end < s.size() && s[end] >= '0' && s[end] <= '9') end++;
+        if (end == pos || end - pos > 9 || part >= 3) return false;
+        out[part++] = (uint32_t)std::stoul(s.substr(pos, end - pos));
+        if (end == s.size()) return true;
+        if (s[end] != '.') return false;
+        pos = end + 1;
+    }
+}
+
+int compareFormatVersion(const std::string& a, const std::string& b) {
+    uint32_t x[3], y[3];
+    if (!parseDotted(a, x)) throw Error(Err::InvalidVault, "cryfs.config has an unparsable version string: \"" + a + "\".");
+    if (!parseDotted(b, y)) throw Error(Err::InvalidVault, "cryfs.config has an unparsable version string: \"" + b + "\".");
+    for (int i = 0; i < 3; i++) if (x[i] != y[i]) return x[i] < y[i] ? -1 : 1;
+    return 0;
+}
+
+KdfParams defaultKdfParams() { return KdfParams{kScryptN, kScryptR, kScryptP}; }
 
 static bool readCString(const Bytes& b, size_t start, std::string& out, size_t& next) {
     size_t i = start;
@@ -167,46 +199,78 @@ Config parsePayload(const std::string& text, const std::string& expectedCipher) 
     std::string cipher = optStr(*j, "cipher", "");
     if (cipher != expectedCipher)
         throw Error(Err::InvalidVault, "Cipher in config JSON (\"" + cipher + "\") doesn't match the inner-layer cipher (\"" + expectedCipher + "\").");
-    if (const json::Value* m = j->find("migrations")) {
+    // Format gate, mirroring upstream's loader: a missing "version" means a pre-0.10 vault.
+    {
+        const json::Value* vv = j->find("version");
+        std::string version = vv ? optStr(*j, "version", "") : "0.8";
+        int cmp = compareFormatVersion(version, kSupportedFormatVersion);
+        if (cmp < 0)
+            throw Error(Err::Unsupported, "This vault uses CryFS filesystem format " + version + ", which is older than the supported " +
+                kSupportedFormatVersion + ". Open it once with CryFS 0.10 or newer (for example on a computer) so it gets migrated, then try again.");
+        if (cmp > 0)
+            throw Error(Err::Unsupported, "This vault uses CryFS filesystem format " + version + ", which is newer than the " +
+                kSupportedFormatVersion + " this app supports. Please update the app.");
+    }
+    const json::Value* m = j->find("migrations");
+    if (!m || !m->isObject())
+        throw Error(Err::Unsupported, "cryfs.config has no \"migrations\" section: this vault has not been migrated to the current CryFS format. "
+                                      "Open it once with CryFS 0.10 or newer to migrate it, then try again.");
+    {
         auto flag = [&](const char* k) {
             const json::Value* v = m->find(k);
             return v && ((v->isString() && v->asString() == "true") || v->asBool(false));
         };
         if (!flag("hasVersionNumbers") || !flag("hasParentPointers"))
-            throw Error(Err::InvalidVault, "cryfs.config has unexpected \"migrations\" flags; this app only supports current-format vaults.");
+            throw Error(Err::Unsupported, "cryfs.config says this vault has not been fully migrated (\"migrations\" flags are not set). "
+                                          "Open it once with CryFS 0.10 or newer to migrate it, then try again.");
     }
+    auto required = [&](const char* k) {
+        const json::Value* v = j->find(k);
+        if (!v || !(v->isString() || v->isInt()))
+            throw Error(Err::InvalidVault, std::string("cryfs.config is missing the required field \"") + k + "\".");
+        return optStr(*j, k, "");
+    };
     Config c;
     c.cipherName = cipher;
-    c.formatVersion = optStr(*j, "version", optStr(*j, "formatVersion", "0.10"));
-    c.createdWithVersion = optStr(*j, "createdWithVersion", optStr(*j, "created_with_version", "0.10"));
-    c.lastOpenedWithVersion = optStr(*j, "lastOpenedWithVersion", optStr(*j, "last_opened_with_version", "0.10"));
+    c.formatVersion = required("version");
+    c.createdWithVersion = required("createdWithVersion");
+    c.lastOpenedWithVersion = required("lastOpenedWithVersion");
     auto bs = flexLong(*j, "blocksizeBytes");
-    if (!bs) bs = flexLong(*j, "blocksize");
-    if (!bs) throw Error(Err::InvalidVault, "cryfs.config is missing blocksize field.");
+    if (!bs) throw Error(Err::InvalidVault, "cryfs.config is missing the required field \"blocksizeBytes\".");
+    if (*bs <= 0 || *bs > (1ll << 30) || virtualBlockSize((int)*bs, cipher) < 8 + 2 * 16)
+        throw Error(Err::InvalidVault, "cryfs.config has an invalid block size: " + std::to_string(*bs) + ".");
     c.blocksizeBytes = (int)*bs;
     c.exclusiveClientId = flexLong(*j, "exclusiveClientId");
-    if (!c.exclusiveClientId) c.exclusiveClientId = flexLong(*j, "exclusive_client_id");
-    std::string root_ = optStr(*j, "rootblob", optStr(*j, "root_blob", optStr(*j, "rootBlob", "")));
-    if (root_.empty()) throw Error(Err::InvalidVault, "cryfs.config is missing the required root blob ID field.");
+    if (c.exclusiveClientId && (*c.exclusiveClientId <= 0 || *c.exclusiveClientId > 0xFFFFFFFFll))
+        throw Error(Err::InvalidVault, "cryfs.config has an invalid exclusiveClientId.");
+    std::string root_ = optStr(*j, "rootblob", "");
+    if (root_.empty()) throw Error(Err::InvalidVault, "cryfs.config is missing the required field \"rootblob\".");
     auto rid = BlockId::fromHex(root_);
     if (!rid) throw Error(Err::InvalidVault, "cryfs.config has an invalid root blob ID.");
     c.rootBlob = *rid;
-    std::string key = optStr(*j, "key", optStr(*j, "enc_key", optStr(*j, "encKey", "")));
-    if (key.empty()) throw Error(Err::InvalidVault, "cryfs.config is missing the required encryption key field.");
+    std::string key = optStr(*j, "key", "");
+    if (key.empty()) throw Error(Err::InvalidVault, "cryfs.config is missing the required field \"key\".");
     Bytes kb;
     if (!fv::fromHex(key, kb)) throw Error(Err::InvalidVault, "cryfs.config encryption key is not valid hex.");
+    if ((int)kb.size() != cipherKeySize(cipher)) {
+        secureZero(kb.data(), kb.size());
+        throw Error(Err::InvalidVault, "cryfs.config encryption key has the wrong length for cipher \"" + cipher + "\".");
+    }
     c.key = Secret(kb);
     secureZero(kb.data(), kb.size());
-    std::string fsid = optStr(*j, "filesystemId", optStr(*j, "filesystem_id", ""));
-    if (fsid.empty()) throw Error(Err::InvalidVault, "cryfs.config is missing the required filesystem ID field.");
-    if (!fv::fromHex(fsid, c.filesystemId)) throw Error(Err::InvalidVault, "cryfs.config filesystem ID is not valid hex.");
+    std::string fsid = optStr(*j, "filesystemId", "");
+    if (fsid.empty()) throw Error(Err::InvalidVault, "cryfs.config is missing the required field \"filesystemId\".");
+    if (!fv::fromHex(fsid, c.filesystemId) || c.filesystemId.size() != 16)
+        throw Error(Err::InvalidVault, "cryfs.config filesystem ID is not 16 bytes of valid hex.");
     return c;
 }
 }  // namespace
 
+void checkConfigEnvelope(const Bytes& raw) { (void)readKdf(raw); }
+
 Secret deriveCombinedKey(const Bytes& raw, const uint8_t* pw, size_t pwLen) {
     Kdf k = readKdf(raw);
-    return crypto::scrypt(pw, pwLen, k.salt.data(), k.salt.size(), (uint32_t)k.N, k.r, k.p, kCombinedKeySize);
+    return crypto::scryptLowMem(pw, pwLen, k.salt.data(), k.salt.size(), (uint32_t)k.N, k.r, k.p, kCombinedKeySize, kScryptMemoryBudget);
 }
 
 Config parseWithCombinedKey(const Bytes& raw, const Secret& combined) {
@@ -248,7 +312,8 @@ Config newVaultConfig(const std::string& cipher, int blocksizeBytes) {
     return c;
 }
 
-Bytes buildConfig(const Config& c, const uint8_t* pw, size_t pwLen) {
+namespace {
+Bytes sealConfig(const Config& c, const Secret& combined, uint64_t kN, uint32_t kR, uint32_t kP, const Bytes& salt) {
     json::Value inner = json::Value::object();
     inner.set("rootblob", json::Value::string(c.rootBlob.hexUpper()));
     inner.set("key", json::Value::string(upperHex(c.key.data(), c.key.size())));
@@ -270,8 +335,6 @@ Bytes buildConfig(const Config& c, const uint8_t* pw, size_t pwLen) {
 
     CryfsCipherId cid = cipherId(c.cipherName);
     int ks = cipherKeySize(c.cipherName);
-    Bytes salt = crypto::randomKeyBytes(32);
-    Secret combined = crypto::scrypt(pw, pwLen, salt.data(), salt.size(), kScryptN, kScryptR, kScryptP, kCombinedKeySize);
 
     Bytes padded = addPadding(payload, kInnerConfigSize);
     Bytes encryptedConfig = cryfsBlockEncrypt(cid, combined.data() + kOuterKeySize, (size_t)ks, padded.data(), padded.size());
@@ -285,9 +348,9 @@ Bytes buildConfig(const Config& c, const uint8_t* pw, size_t pwLen) {
     if (encryptedInner.empty()) throw Error(Err::Io, "config encryption failed");
 
     Bytes kdfParams(16 + salt.size());
-    writeU64LE(kdfParams.data(), kScryptN);
-    writeU32LE(kdfParams.data() + 8, kScryptR);
-    writeU32LE(kdfParams.data() + 12, kScryptP);
+    writeU64LE(kdfParams.data(), kN);
+    writeU32LE(kdfParams.data() + 8, kR);
+    writeU32LE(kdfParams.data() + 12, kP);
     std::memcpy(kdfParams.data() + 16, salt.data(), salt.size());
     Bytes out = cstr(kOuterHeader);
     uint8_t len[8];
@@ -296,6 +359,28 @@ Bytes buildConfig(const Config& c, const uint8_t* pw, size_t pwLen) {
     out.insert(out.end(), kdfParams.begin(), kdfParams.end());
     out.insert(out.end(), encryptedInner.begin(), encryptedInner.end());
     return out;
+}
+}  // namespace
+
+Bytes buildConfig(const Config& c, const uint8_t* pw, size_t pwLen, const KdfParams* kdf) {
+    KdfParams k = kdf ? *kdf : defaultKdfParams();
+    if (k.N < 2 || (k.N & (k.N - 1)) != 0 || k.r == 0 || k.p == 0)
+        throw Error(Err::InvalidVault, "Invalid scrypt parameters (N must be a power of two, r and p at least 1).");
+    Bytes salt = crypto::randomKeyBytes(32);
+    Secret combined = crypto::scryptLowMem(pw, pwLen, salt.data(), salt.size(), k.N, k.r, k.p, kCombinedKeySize, kScryptMemoryBudget);
+    if (combined.size() != kCombinedKeySize) throw Error(Err::Io, "Key derivation failed (not enough memory for the requested scrypt cost?).");
+    return sealConfig(c, combined, k.N, k.r, k.p, salt);
+}
+
+KdfParams readKdfParams(const Bytes& raw) {
+    Kdf k = readKdf(raw);
+    return KdfParams{(uint32_t)k.N, k.r, k.p};
+}
+
+Bytes rebuildConfigKeepingKey(const Bytes& oldRaw, const Secret& combined, const Config& c) {
+    if (combined.size() != kCombinedKeySize) throw Error(Err::Io, "Missing derived key.");
+    Kdf kdf = readKdf(oldRaw);
+    return sealConfig(c, combined, kdf.N, kdf.r, kdf.p, kdf.salt);
 }
 
 // ---------------------------------------------------- integrity bookkeeping --
@@ -373,7 +458,7 @@ std::unique_ptr<LocalIntegrityState> LocalIntegrityState::open(const std::string
             json::Value v = json::parse(snap);
             for (auto& kv : v.members()) {
                 const json::Value& x = kv.second;
-                s->known_[kv.first] = x.isString() ? std::strtoull(x.asString().c_str(), nullptr, 10) : (uint64_t)x.asInt();
+                s->ingest(kv.first, x.isString() ? std::strtoull(x.asString().c_str(), nullptr, 10) : (uint64_t)x.asInt());
             }
         } catch (const std::exception&) {}
     }
@@ -390,7 +475,7 @@ std::unique_ptr<LocalIntegrityState> LocalIntegrityState::open(const std::string
             char* e = nullptr;
             unsigned long long v = std::strtoull(line.c_str() + eq + 1, &e, 10);
             if (e == line.c_str() + eq + 1) continue;
-            s->known_[line.substr(0, eq)] = v;
+            s->ingest(line.substr(0, eq), v);
             s->pendingLines_++;
         }
     }
@@ -398,6 +483,17 @@ std::unique_ptr<LocalIntegrityState> LocalIntegrityState::open(const std::string
     if (!s->log_) throw Error(Err::Io, "cannot open CryFS integrity log");
     return s;
 }
+
+void LocalIntegrityState::ingest(const std::string& key, uint64_t v) {
+    if (key.size() == 34 && key[0] == 'L' && key[1] == ':') {
+        if (auto id = BlockId::fromHex(key.substr(2))) last_[*id] = (uint32_t)v;
+        return;
+    }
+    known_[key] = v;
+}
+
+bool LocalIntegrityState::flag(const char* name) const { bool ok; slurpText(dir_ + "/" + name, ok); return ok; }
+void LocalIntegrityState::setFlag(const char* name) { writeFileAtomic(dir_ + "/" + name, "1"); }
 
 LocalIntegrityState::~LocalIntegrityState() {
     try { flush(); } catch (...) {}
@@ -409,12 +505,16 @@ void LocalIntegrityState::append(const std::string& key, uint64_t version, bool 
     std::fwrite(line.data(), 1, line.size(), log_);
     std::fflush(log_);
     if (durable) ::fsync(::fileno(log_));
-    if (++pendingLines_ >= 200) compact();
+    // Every record is flushed right away, so compaction is only about bounding the log. Rewriting the whole
+    // snapshot every 200 records made first reads quadratic in the number of blocks; compacting once the log is as
+    // long as the snapshot (never more often than every 200 records) is amortised O(1) per record.
+    if (++pendingLines_ >= std::max<size_t>(200, known_.size() + last_.size())) compact();
 }
 
 void LocalIntegrityState::compact() {
     json::Value snap = json::Value::object();
     for (auto& kv : known_) snap.set(kv.first, json::Value::string(std::to_string(kv.second)));
+    for (auto& kv : last_) snap.set("L:" + kv.first.hex(), json::Value::string(std::to_string(kv.second)));
     writeFileAtomic(dir_ + "/integritydata.snapshot", snap.dump(0));
     std::fclose(log_);
     log_ = std::fopen((dir_ + "/integritydata.log").c_str(), "wb");   // truncate
@@ -434,17 +534,40 @@ uint64_t LocalIntegrityState::nextVersionForOwnWrite(const BlockId& id, bool dur
     uint64_t next = known_[key] + 1;
     known_[key] = next;
     append(key, next, durable);
+    auto lit = last_.find(id);
+    if (lit == last_.end() || lit->second != (uint32_t)myClientId_) {
+        last_[id] = (uint32_t)myClientId_;
+        append("L:" + id.hex(), myClientId_, durable);
+    }
     return next;
+}
+
+void LocalIntegrityState::markDeleted(const BlockId& id) {
+    std::lock_guard<std::mutex> g(mu_);
+    auto lit = last_.find(id);
+    if (lit != last_.end() && lit->second == 0) return;
+    last_[id] = 0;
+    append("L:" + id.hex(), 0, false);
 }
 
 std::optional<uint64_t> LocalIntegrityState::checkAndRecordRead(uint64_t writer, const BlockId& id, uint64_t version) {
     std::lock_guard<std::mutex> g(mu_);
     std::string key = keyFor(writer, id);
     auto it = known_.find(key);
-    if (it != known_.end() && version < it->second) return it->second;
+    auto lit = last_.find(id);
+    if (it != known_.end()) {
+        const uint64_t known = it->second;
+        // A different client (or "deleted") was the last known writer: even the same version again is stale.
+        const bool lastIsOther = lit != last_.end() && lit->second != (uint32_t)writer;
+        if (known > version || (lastIsOther && known >= version)) return known;
+    }
     if (it == known_.end() || version > it->second) {
         known_[key] = version;
         append(key, version, false);
+    }
+    if (lit == last_.end() || lit->second != (uint32_t)writer) {
+        last_[id] = (uint32_t)writer;
+        append("L:" + id.hex(), writer, false);
     }
     return std::nullopt;
 }
@@ -492,7 +615,11 @@ std::optional<Bytes> BlockStore::load(const BlockId& id) {
     Bytes cached;
     if (cacheGet(id, cached)) return cached;
     Bytes raw;
-    if (!st_.readWhole(id.pathUpper(), raw) && !st_.readWhole(id.pathLower(), raw)) return std::nullopt;
+    bool fromLower = false;
+    if (!st_.readWhole(id.pathUpper(), raw)) {
+        if (!st_.readWhole(id.pathLower(), raw)) return std::nullopt;
+        fromLower = true;   // only reachable on case-sensitive storage, where it is a distinct legacy file
+    }
     const size_t prefix = sizeof(kOnDiskHeader) + sizeof(kEncLayerHeader);
     if (raw.size() < prefix) return std::nullopt;
     if (std::memcmp(raw.data(), kOnDiskHeader, sizeof(kOnDiskHeader)) != 0) return std::nullopt;
@@ -504,15 +631,22 @@ std::optional<Bytes> BlockStore::load(const BlockId& id) {
     if (std::memcmp(plain.data() + 2, id.b.data(), 16) != 0) return std::nullopt;
     uint64_t writer = readU32LE(plain.data() + 18);
     uint64_t version = readU64LE(plain.data() + 22);
+    if (version == 0 || writer == 0) return std::nullopt;   // upstream rejects both as malformed
     if (auto known = integrity_.checkAndRecordRead(writer, id, version)) {
         std::lock_guard<std::mutex> g(vmu_);
         violation_ = IntegrityViolation{id, writer, version, *known};
         logMsg(LogLevel::Error, TAG, "Rejecting block " + id.hex() + ": client " + std::to_string(writer) + " claims version " +
-               std::to_string(version) + ", lower than the recorded " + std::to_string(*known) + " -- looks like a rollback.");
+               std::to_string(version) + ", but version " + std::to_string(*known) + " was already recorded -- looks like a rollback.");
         return std::nullopt;
     }
     Bytes payload(plain.begin() + kIntegrityHeader, plain.end());
     secureZero(plain.data(), plain.size());
+    if (fromLower && !readOnly_.load()) {
+        // Older builds wrote lowercase names, which official CryFS cannot see: fix this block as it is touched
+        // (best effort; the full one-time pass runs on open). The block has just been verified.
+        const std::string upPath = id.pathUpper();
+        if (st_.mkdir(parentOf(upPath))) st_.rename(id.pathLower(), upPath);
+    }
     cachePut(id, payload);
     return payload;
 }
@@ -533,12 +667,15 @@ void BlockStore::store(const BlockId& id, const Bytes& payload, bool isNew) {
     std::memcpy(onDisk.data(), kOnDiskHeader, sizeof(kOnDiskHeader));
     std::memcpy(onDisk.data() + sizeof(kOnDiskHeader), kEncLayerHeader, sizeof(kEncLayerHeader));
     std::memcpy(onDisk.data() + prefix, enc.data(), enc.size());
-    // Overwrites keep whichever spelling the existing file has; new blocks use
-    // the canonical uppercase one.
-    std::string path = id.pathUpper();
+    // Always the canonical uppercase spelling (what official CryFS reads). A lowercase file from an older build
+    // is a *separate* file only on case-sensitive storage -- which is exactly when stat(upper) fails while
+    // stat(lower) succeeds -- and is then superseded by this write. On case-insensitive storage both stats hit
+    // the same file, so nothing may be deleted.
+    const std::string path = id.pathUpper();
+    bool staleLower = false;
     if (!isNew) {
         DirEntry de;
-        if (!st_.stat(path, de) && st_.stat(id.pathLower(), de)) path = id.pathLower();
+        staleLower = !st_.stat(path, de) && st_.stat(id.pathLower(), de);
     }
     const std::string shard = parentOf(path);
     bool known;
@@ -550,6 +687,7 @@ void BlockStore::store(const BlockId& id, const Bytes& payload, bool isNew) {
     }
     if (!st_.writeBlock(path, onDisk.data(), onDisk.size()))
         throw Error(Err::Io, "Could not write block " + id.hex());
+    if (staleLower) st_.remove(id.pathLower());   // best effort; the uppercase copy is authoritative
     cachePut(id, payload);
 }
 
@@ -558,7 +696,110 @@ bool BlockStore::remove(const BlockId& id) {
     bool ok = st_.remove(id.pathUpper());
     DirEntry de;
     if (st_.stat(id.pathLower(), de)) ok = st_.remove(id.pathLower()) && ok;   // legacy spelling
+    if (ok) integrity_.markDeleted(id);
     return ok;
+}
+
+namespace {
+bool isHexStr(const std::string& s) {
+    if (s.empty()) return false;
+    for (char c : s) if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))) return false;
+    return true;
+}
+std::string upperHexStr(std::string s) { for (auto& c : s) if (c >= 'a' && c <= 'f') c = (char)(c - 32); return s; }
+constexpr const char* kTmpSuffix = ".fvtmp";
+}  // namespace
+
+size_t BlockStore::normalizeBlockNames(bool* complete, double budgetSeconds, bool forceFull) {
+    size_t renamed = 0;
+    bool ok = true;
+    std::vector<DirEntry> top;
+    if (!st_.list("", top)) { if (complete) *complete = false; return 0; }
+    std::set<std::string> topNames;
+    for (auto& e : top) topNames.insert(e.name);
+
+    // Older builds wrote the whole path in lowercase, so a vault they touched has shard folders with a-f letters in
+    // lowercase. Official CryFS (and this app since) only ever writes uppercase. If no lowercase shard folder
+    // exists there is nothing to repair -- and looking inside every shard (one stat per block, each a round trip on
+    // FUSE / network storage) would only delay the unlock.
+    auto hasLowerLetter = [](const std::string& s) { for (char ch : s) if (ch >= 'a' && ch <= 'f') return true; return false; };
+    auto hasUpperLetter = [](const std::string& s) { for (char ch : s) if (ch >= 'A' && ch <= 'F') return true; return false; };
+    bool needed = forceFull;
+    for (const auto& sd : top)
+        if (sd.isDir && sd.name.size() == 3 && isHexStr(sd.name) && hasLowerLetter(sd.name)) { needed = true; break; }
+    if (!needed) { if (complete) *complete = true; return 0; }
+
+    const auto started = std::chrono::steady_clock::now();
+    auto outOfTime = [&] {
+        return budgetSeconds > 0 &&
+               std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count() > budgetSeconds;
+    };
+    // Lowercase shard folders first (they are the evidence of the problem), then digit-only ones, whose blocks can
+    // still have lowercase names. Shards that contain an uppercase letter are already canonical: older builds never
+    // wrote them (and the per-block repair on read creates them with uppercase block names only).
+    std::vector<const DirEntry*> todo;
+    for (const auto& sd : top)
+        if (sd.isDir && sd.name.size() == 3 && isHexStr(sd.name) && hasLowerLetter(sd.name)) todo.push_back(&sd);
+    for (const auto& sd : top)
+        if (sd.isDir && sd.name.size() == 3 && isHexStr(sd.name) && !hasLowerLetter(sd.name) && !hasUpperLetter(sd.name)) todo.push_back(&sd);
+    for (const DirEntry* sdp : todo) {
+        const auto& sd = *sdp;
+        if (outOfTime()) { ok = false; break; }
+        std::string shard = sd.name;
+        const std::string upShard = upperHexStr(shard);
+        bool distinctUpper = false;   // case-sensitive storage with both "abc" and "ABC" present
+        if (shard != upShard) {
+            if (topNames.count(upShard)) distinctUpper = true;
+            else {
+                // Two steps via a temporary name, so this also works on case-insensitive storage.
+                const std::string tmp = upShard + kTmpSuffix;
+                if (!st_.rename(shard, tmp)) { ok = false; continue; }
+                if (!st_.rename(tmp, upShard)) { st_.rename(tmp, shard); ok = false; continue; }
+                shard = upShard;
+            }
+        }
+        std::vector<DirEntry> files;
+        if (!st_.list(shard, files)) { ok = false; continue; }
+        std::set<std::string> present, upperPresent;
+        for (auto& f : files) present.insert(f.name);
+        if (distinctUpper) {
+            std::vector<DirEntry> uf;
+            if (!st_.list(upShard, uf)) { ok = false; continue; }
+            for (auto& f : uf) upperPresent.insert(f.name);
+        }
+        for (const auto& f : files) {
+            if (f.isDir) continue;
+            const size_t blockNameLen = 29;
+            if (f.name.size() == blockNameLen + 6 && f.name.compare(blockNameLen, 6, kTmpSuffix) == 0 &&
+                isHexStr(f.name.substr(0, blockNameLen))) {
+                // Left behind by an interrupted rename: finish it (or drop it if a newer copy exists).
+                const std::string base = upperHexStr(f.name.substr(0, blockNameLen));
+                if (present.count(base)) st_.remove(shard + "/" + f.name);
+                else if (st_.rename(shard + "/" + f.name, shard + "/" + base)) renamed++;
+                else ok = false;
+                continue;
+            }
+            if (f.name.size() != blockNameLen || !isHexStr(f.name)) continue;
+            const std::string up = upperHexStr(f.name);
+            if (up == f.name && !distinctUpper) continue;   // already canonical
+            if (distinctUpper) {
+                if (upperPresent.count(up)) continue;       // an uppercase copy exists; reads prefer it
+                if (st_.rename(shard + "/" + f.name, upShard + "/" + up)) renamed++; else ok = false;
+                continue;
+            }
+            if (present.count(up)) continue;                // distinct uppercase twin: leave the stale one alone
+            const std::string tmp = shard + "/" + up + kTmpSuffix;
+            if (!st_.rename(shard + "/" + f.name, tmp)) { ok = false; continue; }
+            if (!st_.rename(tmp, shard + "/" + up)) { st_.rename(tmp, shard + "/" + f.name); ok = false; continue; }
+            renamed++;
+        }
+    }
+    if (renamed > 0) {
+        { std::lock_guard<std::mutex> g(smu_); shards_.clear(); }
+        st_.invalidateAll();
+    }
+    if (complete) *complete = ok;
+    return renamed;
 }
 
 // -------------------------------------------------------------- data tree --
@@ -583,6 +824,22 @@ std::optional<DataTree::Node> DataTree::loadNode(const BlockId& id) {
         }
     }
     return n;
+}
+
+void DataTree::walkBlocks(const BlockId& root, const std::function<void(const BlockId&, bool)>& visit) {
+    // Explicit stack: a hostile or damaged tree must not be able to exhaust the call stack. [seen] keeps a block
+    // that is (wrongly) referenced twice from being walked twice.
+    std::vector<BlockId> stack{root};
+    std::unordered_map<BlockId, bool, BlockId::Hash> seen;
+    while (!stack.empty()) {
+        BlockId id = stack.back();
+        stack.pop_back();
+        if (!seen.emplace(id, true).second) continue;
+        auto node = loadNode(id);
+        visit(id, node.has_value());
+        if (!node || node->depth == 0) continue;
+        for (auto it = node->children.rbegin(); it != node->children.rend(); ++it) stack.push_back(*it);
+    }
 }
 
 int64_t DataTree::capacity(int depth) const {
@@ -688,6 +945,19 @@ BlockId DataTree::writeInner(int depth, const std::vector<BlockId>& kids, size_t
     return id;
 }
 
+uint64_t DataTree::maxLeafCount() const {
+    uint64_t n = 1;
+    for (int i = 0; i < kMaxTreeDepth; i++) {
+        if (n > UINT64_MAX / maxChildren_) return UINT64_MAX;
+        n *= maxChildren_;
+    }
+    return n;
+}
+
+static Error blobTooLarge() {
+    return Error(Err::Unsupported, "This is too large for the vault's block size: official CryFS cannot read blobs whose tree is deeper than 10 levels.");
+}
+
 BlockId DataTree::buildUp(std::vector<BlockId> level) {
     int depth = 1;
     while (level.size() > 1) {
@@ -703,6 +973,7 @@ BlockId DataTree::buildUp(std::vector<BlockId> level) {
 
 BlockId DataTree::buildBlob(const Bytes& content) {
     if (content.size() <= maxLeaf_) return writeLeaf(content.data(), content.size());
+    if ((content.size() + maxLeaf_ - 1) / maxLeaf_ > maxLeafCount()) throw blobTooLarge();   // before writing anything
     std::vector<BlockId> level;
     std::deque<std::future<BlockId>> futs;
     constexpr size_t kMaxInFlight = 128;
@@ -724,6 +995,8 @@ BlockId DataTree::buildBlobStream(ByteSource& src) {
     constexpr size_t kMaxInFlight = 128;
     Bytes buf(maxLeaf_);
     bool any = false;
+    uint64_t leaves = 0;
+    const uint64_t leafLimit = maxLeafCount();
     try {
         for (;;) {
             size_t got = 0;
@@ -735,6 +1008,7 @@ BlockId DataTree::buildBlobStream(ByteSource& src) {
             }
             if (got == 0) break;
             any = true;
+            if (++leaves > leafLimit) throw blobTooLarge();   // the catch below removes what was already written
             Bytes chunk(buf.begin(), buf.begin() + (long)got);
             if (futs.size() >= kMaxInFlight) { level.push_back(futs.front().get()); futs.pop_front(); }
             futs.push_back(Pool::shared().submit([this, c = std::move(chunk)] { return writeLeaf(c.data(), c.size()); }));
@@ -823,9 +1097,14 @@ Bytes dirSerialize(std::vector<DirRecord> entries) {
         writeU32LE(fixed + 1, e.mode);
         writeU32LE(fixed + 5, e.uid);
         writeU32LE(fixed + 9, e.gid);
-        writeU64LE(fixed + 13, (uint64_t)e.atime);
-        writeU64LE(fixed + 25, (uint64_t)e.mtime);
-        writeU64LE(fixed + 37, (uint64_t)e.ctime);
+        // Upstream reads tv_sec as u64: a negative (pre-1970) value would make it reject the whole directory.
+        auto putTime = [&](uint8_t* p, int64_t sec, uint32_t ns) {
+            writeU64LE(p, sec < 0 ? 0 : (uint64_t)sec);
+            writeU32LE(p + 8, sec < 0 ? 0 : (ns > 999999999u ? 999999999u : ns));
+        };
+        putTime(fixed + 13, e.atime, e.atimeNs);
+        putTime(fixed + 25, e.mtime, e.mtimeNs);
+        putTime(fixed + 37, e.ctime, e.ctimeNs);
         out.insert(out.end(), fixed, fixed + kFixedFields);
         out.insert(out.end(), e.name.begin(), e.name.end());
         out.push_back(0);
@@ -849,6 +1128,9 @@ std::vector<DirRecord> dirParse(const Bytes& b) {
         e.atime = (int64_t)readU64LE(&b[pos + 13]);
         e.mtime = (int64_t)readU64LE(&b[pos + 25]);
         e.ctime = (int64_t)readU64LE(&b[pos + 37]);
+        e.atimeNs = readU32LE(&b[pos + 21]);
+        e.mtimeNs = readU32LE(&b[pos + 33]);
+        e.ctimeNs = readU32LE(&b[pos + 45]);
         pos += kFixedFields;
         size_t ns = pos;
         while (pos < b.size() && b[pos] != 0) pos++;

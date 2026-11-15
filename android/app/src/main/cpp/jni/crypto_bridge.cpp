@@ -488,6 +488,35 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_argon2idNative(
     JNI_CATCH_RETURN(nullptr)
 }
 
+// Same as scryptNative, but keeps at most 256 MiB of scrypt memory (time-memory trade-off), so CryFS vaults created
+// with official settings (up to 1 GiB) can be handled. See scrypt_crypto_lowmem.
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_aeidolon_vaultexplorer_NativeEngine_scryptLowMemNative(
+        JNIEnv* env, jobject,
+        jbyteArray passphrase, jbyteArray salt, jint N, jint r, jint p, jint dkLen) {
+    JNI_TRY
+    if (passphrase == nullptr || salt == nullptr || dkLen <= 0 || N <= 0 || r <= 0 || p <= 0) return nullptr;
+    jsize pwLen = env->GetArrayLength(passphrase);
+    jsize saltLen = env->GetArrayLength(salt);
+    jbyte* pwData = env->GetByteArrayElements(passphrase, nullptr);
+    jbyte* saltData = env->GetByteArrayElements(salt, nullptr);
+    std::vector<uint8_t> out(static_cast<size_t>(dkLen));
+    bool ok = scrypt_crypto_lowmem(
+        reinterpret_cast<const uint8_t*>(pwData), static_cast<size_t>(pwLen),
+        reinterpret_cast<const uint8_t*>(saltData), static_cast<size_t>(saltLen),
+        static_cast<uint32_t>(N), static_cast<uint32_t>(r), static_cast<uint32_t>(p),
+        out.data(), static_cast<size_t>(dkLen), 256u * 1024 * 1024
+    );
+    env->ReleaseByteArrayElements(passphrase, pwData, JNI_ABORT);
+    env->ReleaseByteArrayElements(salt, saltData, JNI_ABORT);
+    if (!ok) return nullptr;
+    jbyteArray result = env->NewByteArray(dkLen);
+    env->SetByteArrayRegion(result, 0, dkLen, reinterpret_cast<const jbyte*>(out.data()));
+    mbedtls_platform_zeroize(out.data(), out.size());
+    return result;
+    JNI_CATCH_RETURN(nullptr)
+}
+
 extern "C" JNIEXPORT jbyteArray JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_scryptNative(
         JNIEnv* env, jobject,

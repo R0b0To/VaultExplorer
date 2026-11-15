@@ -2,24 +2,9 @@ import 'package:intl/intl.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/features/browser/widgets/date_group.dart';
 
-class DateGroup<T> {
-  final DateTime? date;
-
-  /// Header text of a group that is not a plain day (a month, a folder, a
-  /// camera...). Null for the day groups [computeDateGroups] makes, whose
-  /// header is built from [date] by [formatDateGroupHeader].
-  final String? label;
-  final List<T> items;
-  final List<int> globalIndices;
-
-  DateGroup({
-    required this.date,
-    this.label,
-    required this.items,
-    required this.globalIndices,
-  });
-}
+export 'package:vaultexplorer/features/browser/widgets/date_group.dart';
 
 List<DateGroup<RawEntry>> computeDateGroups(
   List<RawEntry> items, {
@@ -83,11 +68,14 @@ String formatDateGroupHeader(DateTime? date, BuildContext context) {
 /// Height a [GalleryDateHeader] needs, for gallery layouts that reserve the
 /// header's space up front instead of measuring it: its padding, one line of
 /// the title style, and a little air above the first row of the day.
-double galleryDateHeaderExtent(BuildContext context) {
+///
+/// [textScaler] overrides the ambient one, for a view that scales its own text
+/// (the list's pinch zoom) below the context it computes the extent from.
+double galleryDateHeaderExtent(BuildContext context, {TextScaler? textScaler}) {
   final style = Theme.of(context).textTheme.titleMedium;
-  final line = MediaQuery.textScalerOf(
-    context,
-  ).scale((style?.fontSize ?? 16.0) * 1.5);
+  final line = (textScaler ?? MediaQuery.textScalerOf(context)).scale(
+    (style?.fontSize ?? 16.0) * 1.5,
+  );
   return 16.0 + line + 8.0 + 4.0;
 }
 

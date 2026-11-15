@@ -8,6 +8,9 @@ import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
+import 'package:vaultexplorer/features/browser/gallery/gallery_group_index.dart';
+import 'package:vaultexplorer/features/browser/gallery/gallery_layout.dart';
+import 'package:vaultexplorer/features/browser/gallery/gallery_sliver.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/widgets/directory_tile.dart';
 import 'package:vaultexplorer/features/browser/widgets/fast_scrollbar.dart';
@@ -178,21 +181,16 @@ class FileListViewState extends State<FileListView> {
     final itemExtent = _computeItemExtent(_zoomLevel);
 
     if (widget.groupByDate) {
-      final groups = (widget.groupBuilder ?? computeDateGroups)(widget.items);
-      final headerH = galleryDateHeaderExtent(context);
-      var runningTop = 0.0;
-      for (final group in groups) {
-        runningTop += headerH;
-        for (var j = 0; j < group.items.length; j++) {
-          final gIdx = group.globalIndices[j];
-          if (globalIndices.contains(gIdx)) {
-            result[gIdx] = (
-              top: runningTop,
-              height: itemExtent,
-            );
-          }
-          runningTop += itemExtent;
-        }
+      // Same model the sliver lays out with, so a drag-select hit-tests
+      // exactly what is on screen (and nothing is regrouped per pointer move).
+      final groups = _groupsFor(widget.items);
+      final model = _groupModelFor(_zoomLevel);
+      if (model == null) return result;
+      for (final index in globalIndices) {
+        if (index < 0 || index >= groups.childOfGlobal.length) continue;
+        final child = groups.childOfGlobal[index];
+        if (child < 0 || child >= model.childCount) continue;
+        result[index] = (top: model.tops[child], height: model.heights[child]);
       }
       return result;
     }
@@ -221,6 +219,23 @@ class FileListViewState extends State<FileListView> {
   bool _isAtTopAnchor = false;
   double _anchorCenterItemIndex = 0.0;
 
+  // Grouped (gallery) mode: the whole list is ONE sliver whose geometry comes
+  // from this host, not a sliver pair per day. A viewport lays out every one
+  // of its slivers on every scrolled frame and builds at least one child in
+  // each (flutter#49027), so a sliver per day makes every frame, and above all
+  // every scrollbar jump, cost O(days). See gallery_sliver.dart.
+  final GalleryLayoutHost _groupHost = GalleryLayoutHost(
+    flow: GalleryFlow.list,
+    columnCount: 1,
+    spacing: 0,
+  );
+  GalleryGroupIndex<RawEntry>? _groups;
+  String _groupHostKey = '';
+
+  // Grouped pinch zoom keeps the child under the viewport centre in place.
+  int _anchorChild = -1;
+  double _anchorChildFraction = 0.0;
+
   @override
   void initState() {
     super.initState();
@@ -237,6 +252,73 @@ class FileListViewState extends State<FileListView> {
       return _entryIndexMap[key.value];
     }
     return null;
+  }
+
+  /// [_findChildIndex] for the grouped sliver, whose child indices also count
+  /// the headers.
+  int? _findGroupedChildIndex(GalleryGroupIndex<RawEntry> groups, Key key) {
+    final global = _findChildIndex(key);
+    if (global == null || global < 0 || global >= groups.childOfGlobal.length) {
+      return null;
+    }
+    final child = groups.childOfGlobal[global];
+    return child < 0 ? null : child;
+  }
+
+  /// The groups of `widget.items`, computed once per list (not per build, and
+  /// not per geometry query): grouping reads a metadata subject for every file.
+  /// A new [FileListView.groupBuilder] only takes effect with a new list.
+  GalleryGroupIndex<RawEntry> _groupsFor(List<RawEntry> items) {
+    final cached = _groups;
+    if (cached != null && identical(cached.source, items)) return cached;
+    return _groups = GalleryGroupIndex<RawEntry>(
+      items,
+      (widget.groupBuilder ?? computeDateGroups)(items),
+    );
+  }
+
+  /// Height of a date header at [zoom] (the list scales its text with the
+  /// zoom below the context this is computed from).
+  double _headerExtentFor(double zoom) => galleryDateHeaderExtent(
+    context,
+    textScaler: TextScaler.linear(
+      MediaQuery.textScalerOf(context).scale(1.0) * zoom,
+    ),
+  );
+
+  /// Feeds the host with the current groups and sizes; invalidates it only
+  /// when one of them changed.
+  void _syncGroupHost(
+    GalleryGroupIndex<RawEntry> groups,
+    double itemExtent,
+    double headerExtent,
+  ) {
+    final key = '${identityHashCode(groups)}|$itemExtent|$headerExtent';
+    if (key == _groupHostKey) return;
+    _groupHostKey = key;
+    _groupHost
+      ..rowExtent = itemExtent
+      ..sections = [
+        for (final g in groups.groups)
+          GallerySection(itemCount: g.items.length, headerExtent: headerExtent),
+      ]
+      ..invalidate();
+  }
+
+  /// The grouped layout at [zoom], computed now rather than at the next layout
+  /// pass (the pinch handler needs it to place the scroll offset before the
+  /// frame is built). Null while there is nothing to lay out.
+  GalleryLayoutModel? _groupModelFor(double zoom) {
+    if (!widget.groupByDate) return null;
+    final groups = _groupsFor(widget.items);
+    _syncGroupHost(groups, _computeItemExtent(zoom), _headerExtentFor(zoom));
+    // Rows span the full width and their height does not depend on it, so any
+    // positive width gives the same offsets before the first layout pass.
+    final cross = _groupHost.sliverCrossExtent > 0
+        ? _groupHost.sliverCrossExtent
+        : MediaQuery.sizeOf(context).width;
+    final model = _groupHost.modelFor(cross);
+    return model.childCount == 0 ? null : model;
   }
 
   @override
@@ -295,6 +377,18 @@ class FileListViewState extends State<FileListView> {
         _anchorCenterItemIndex = currentExtent > 0
             ? (centerY / currentExtent)
             : 0.0;
+        _anchorChild = -1;
+        if (widget.groupByDate) {
+          final model = _groupModelFor(_zoomLevel);
+          if (model != null) {
+            final c = model.minChildForOffset(centerY);
+            _anchorChild = c;
+            final h = model.heights[c];
+            _anchorChildFraction = h > 0
+                ? ((centerY - model.tops[c]) / h).clamp(0.0, 1.0).toDouble()
+                : 0.0;
+          }
+        }
       }
     }
   }
@@ -329,13 +423,32 @@ class FileListViewState extends State<FileListView> {
       if (controller != null && controller.hasClients) {
         final newExtent = _computeItemExtent(newZoom);
         final viewport = controller.position.viewportDimension;
-        final trueMaxScroll = _computeMaxScroll(newExtent, viewport);
+        final GalleryLayoutModel? groupModel = widget.groupByDate
+            ? _groupModelFor(newZoom)
+            : null;
+        if (widget.groupByDate && groupModel == null) return;
+        final trueMaxScroll = groupModel != null
+            ? math.max(
+                0.0,
+                groupModel.maxExtent + widget.bottomClearance - viewport,
+              )
+            : _computeMaxScroll(newExtent, viewport);
 
         final double targetOffset;
         if (_isAtTopAnchor) {
           targetOffset = 0.0;
         } else if (_isAtBottomAnchor) {
           targetOffset = trueMaxScroll;
+        } else if (groupModel != null) {
+          final c = _anchorChild;
+          if (c < 0 || c >= groupModel.childCount) {
+            return;
+          }
+          final targetCenterY =
+              groupModel.tops[c] + _anchorChildFraction * groupModel.heights[c];
+          targetOffset = (targetCenterY - (viewport / 2.0))
+              .clamp(0.0, trueMaxScroll)
+              .toDouble();
         } else {
           final targetCenterY = _anchorCenterItemIndex * newExtent;
           targetOffset = (targetCenterY - (viewport / 2.0))
@@ -445,43 +558,60 @@ class FileListViewState extends State<FileListView> {
     );
   }
 
-  Widget _buildDateGroupedListView(ScrollController? controller) {
-    final groups = (widget.groupBuilder ?? computeDateGroups)(widget.items);
-    final slivers = <Widget>[];
-    for (final group in groups) {
-      slivers.add(
-        SliverToBoxAdapter(
+  Widget _buildGroupedChild(
+    BuildContext context,
+    GalleryGroupIndex<RawEntry> groups,
+    int child,
+  ) {
+    final g = groups.childGroup[child];
+    final local = groups.childLocal[child];
+    final group = groups.groups[g];
+    if (local < 0) {
+      // The sliver gives the header a tight box of exactly the extent the
+      // layout reserved; Align keeps the header at its natural size inside it.
+      return Align(
+        key: ValueKey('gallery_header:$g'),
+        alignment: Alignment.topLeft,
+        child: Padding(
+          padding: const EdgeInsets.only(top: 4),
           child: GalleryDateHeader(
             title: group.label ?? formatDateGroupHeader(group.date, context),
             count: group.items.length,
           ),
         ),
       );
-      slivers.add(
-        SliverList(
-          delegate: SliverChildBuilderDelegate(
-            (context, localIndex) {
-              final entry = group.items[localIndex];
-              final globalIndex = group.globalIndices[localIndex];
-              return _buildItemRow(context, entry, globalIndex);
-            },
-            childCount: group.items.length,
-          ),
-        ),
-      );
     }
-    if (widget.bottomClearance > 0) {
-      slivers.add(
-        SliverToBoxAdapter(
-          child: SizedBox(height: widget.bottomClearance),
-        ),
-      );
-    }
+    return _buildItemRow(context, group.items[local], group.globalIndices[local]);
+  }
+
+  /// Grouped (gallery) list: one sliver for every group, laid out from a
+  /// pre-computed model (see [_groupHost]).
+  Widget _buildDateGroupedListView(
+    ScrollController? controller,
+    double itemExtent,
+    ScrollPhysics scrollPhysics,
+  ) {
+    final groups = _groupsFor(widget.items);
+    _syncGroupHost(groups, itemExtent, _headerExtentFor(_zoomLevel));
     return CustomScrollView(
       controller: controller,
       cacheExtent: MediaQuery.sizeOf(context).height * 1.5,
-      physics: const AlwaysScrollableScrollPhysics(),
-      slivers: slivers,
+      physics: scrollPhysics,
+      slivers: [
+        SliverPadding(
+          padding: EdgeInsets.only(bottom: widget.bottomClearance),
+          sliver: GallerySliverGrid(
+            host: _groupHost,
+            delegate: SliverChildBuilderDelegate(
+              (context, child) => _buildGroupedChild(context, groups, child),
+              childCount: groups.childCount,
+              addAutomaticKeepAlives: false,
+              findChildIndexCallback: (key) =>
+                  _findGroupedChildIndex(groups, key),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -530,7 +660,7 @@ class FileListViewState extends State<FileListView> {
                 onNotification: _onScrollNotification,
                 child: widget.scrollController == null
                     ? (widget.groupByDate
-                        ? _buildDateGroupedListView(null)
+                        ? _buildDateGroupedListView(null, itemExtent, scrollPhysics)
                         : _buildListView(null, itemExtent, scrollPhysics, total))
                     : FastScrollbar(
                         controller: widget.scrollController!,
@@ -541,7 +671,11 @@ class FileListViewState extends State<FileListView> {
                           bottom: widget.bottomClearance,
                         ),
                         child: widget.groupByDate
-                            ? _buildDateGroupedListView(widget.scrollController)
+                            ? _buildDateGroupedListView(
+                                widget.scrollController,
+                                itemExtent,
+                                scrollPhysics,
+                              )
                             : _buildListView(
                                 widget.scrollController,
                                 itemExtent,

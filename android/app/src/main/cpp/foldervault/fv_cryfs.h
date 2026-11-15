@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <array>
 #include <cstring>
+#include <functional>
 #include <atomic>
 #include <list>
 #include <map>
@@ -57,10 +58,28 @@ struct Config {
 
 constexpr size_t kCombinedKeySize = 88;   // 32 (outer) + 56 (inner, max)
 
+// Password-free structural check of the outer cryfs.config envelope (header string, KDF parameter block).
+// Throws Error(InvalidVault) with a human-readable reason.
+void checkConfigEnvelope(const Bytes& rawConfig);
+
 // Throws Error(InvalidVault / Unsupported / WrongPassword).
 Secret deriveCombinedKey(const Bytes& rawConfig, const uint8_t* pw, size_t pwLen);
 Config parseWithCombinedKey(const Bytes& rawConfig, const Secret& combinedKey);
-Bytes buildConfig(const Config& c, const uint8_t* pw, size_t pwLen);
+// scrypt cost recorded in (and read back from) cryfs.config. Any values are
+// readable by official CryFS; only the cost of guessing the password differs.
+struct KdfParams { uint32_t N = 1u << 17, r = 8, p = 2; };
+KdfParams defaultKdfParams();
+KdfParams readKdfParams(const Bytes& rawConfig);   // throws InvalidVault on a malformed file
+// [kdf] == nullptr uses defaultKdfParams().
+Bytes buildConfig(const Config& c, const uint8_t* pw, size_t pwLen, const KdfParams* kdf = nullptr);
+// Re-encrypts [c] keeping the KDF parameters/salt of [oldRaw] and the
+// already-derived [combinedKey] -- no password needed. Used to persist a
+// config change (e.g. disabling single-client mode) the way official CryFS does.
+Bytes rebuildConfigKeepingKey(const Bytes& oldRaw, const Secret& combinedKey, const Config& c);
+// Numeric dotted-version comparison ("0.10" == "0.10.0" > "0.9"). Throws
+// InvalidVault if either side is not a dotted number.
+int compareFormatVersion(const std::string& a, const std::string& b);
+constexpr const char* kSupportedFormatVersion = "0.10";
 Config newVaultConfig(const std::string& cipher, int blocksizeBytes);
 int cipherKeySize(const std::string& cipherName);       // throws Unsupported
 int virtualBlockSize(int physicalBlockSize, const std::string& cipherName);
@@ -75,16 +94,27 @@ public:
     // [durable]: fsync the reservation before returning (overwrites). New
     // blocks need not: an unrecorded version is simply learned on first read.
     uint64_t nextVersionForOwnWrite(const BlockId& id, bool durable);
-    // Returns the already-known higher version if [version] is a rollback.
+    // Same rules as upstream CryFS: returns the already-known version if [version] is older than what
+    // [writerClientId] was seen to write, or -- when a *different* client was the last known writer of the
+    // block -- not newer than it (an old copy came back).
     std::optional<uint64_t> checkAndRecordRead(uint64_t writerClientId, const BlockId& id, uint64_t version);
+    // Records that this client deleted the block, so a restored copy of it is flagged as a rollback.
+    void markDeleted(const BlockId& id);
+    // Small per-vault markers kept next to the integrity data (e.g. "block names normalised").
+    bool flag(const char* name) const;
+    void setFlag(const char* name);
     void flush();
 private:
     LocalIntegrityState() = default;
     void append(const std::string& key, uint64_t version, bool durable);
+    void ingest(const std::string& key, uint64_t value);
     void compact();
     std::string dir_;
     uint64_t myClientId_ = 0;
     std::unordered_map<std::string, uint64_t> known_;
+    // Last known writer per block ("L:<hex>" in the persisted files); 0 = the block was deleted. Absent = unknown
+    // (state written by older builds), in which case the second rollback rule is not applied.
+    std::unordered_map<BlockId, uint32_t, BlockId::Hash> last_;
     FILE* log_ = nullptr;
     int pendingLines_ = 0;
     std::mutex mu_;
@@ -99,6 +129,15 @@ public:
     void store(const BlockId& id, const Bytes& payload, bool isNew);
     bool remove(const BlockId& id);
     void clearCache();
+    void setReadOnly(bool ro) { readOnly_ = ro; }
+    // Renames block files/shard folders written in lowercase by older builds of this app to the canonical
+    // uppercase spelling official CryFS expects. Idempotent; [complete] tells whether nothing was left to do.
+    // This is only ever needed for vaults an older build of this app wrote, so it first looks at the top-level
+    // folder names only (cheap) and does nothing for vaults that have no lowercase shard folder -- walking every
+    // block of a large vault on slow storage would otherwise stall the unlock for minutes. When there is work, it
+    // stops after [budgetSeconds] (<= 0: no limit) with *complete == false; the caller passes [forceFull] on the
+    // next open so an interrupted pass is resumed even though the folder names alone no longer show the need.
+    size_t normalizeBlockNames(bool* complete, double budgetSeconds = 0, bool forceFull = false);
     void flushIntegrity() { integrity_.flush(); }
     std::optional<IntegrityViolation> lastViolation() const;
 private:
@@ -116,6 +155,7 @@ private:
     std::unordered_map<std::string, bool> shards_;   // shard dirs known to exist
     mutable std::mutex vmu_;
     std::optional<IntegrityViolation> violation_;
+    std::atomic<bool> readOnly_{false};
     static constexpr size_t kCacheEntries = 1024;
 };
 
@@ -143,8 +183,16 @@ public:
     void deleteSubtrees(const std::vector<BlockId>& kids, int depth);
 
     void deleteBlob(const BlockId& root);
+    // Loads every block of the blob rooted at [root] (decrypting and authenticating each) and reports, per block
+    // id, whether it could be loaded. The children of a block that cannot be loaded are unknown and not visited.
+    // [visit] runs right after each load, so BlockStore::lastViolation() still describes that block.
+    void walkBlocks(const BlockId& root, const std::function<void(const BlockId&, bool loaded)>& visit);
     void patchFirstLeafBytes(const BlockId& root, size_t offset, const uint8_t* bytes, size_t n);
     size_t maxLeafPayload() const { return maxLeaf_; }
+    // Upstream CryFS refuses to load inner nodes deeper than this, so a bigger blob could never be read back by it.
+    static constexpr int kMaxTreeDepth = 10;
+    // Most leaves a blob may have (maxChildren^kMaxTreeDepth, saturating).
+    uint64_t maxLeafCount() const;
 private:
     static constexpr size_t kNodeHeader = 8;
     struct Node { int depth = 0; Bytes leaf; std::vector<BlockId> children; };
@@ -167,7 +215,8 @@ struct DirRecord {
     std::string name;
     BlockId blob;
     uint32_t mode = 0, uid = 0, gid = 0;
-    int64_t atime = 0, mtime = 0, ctime = 0;
+    int64_t atime = 0, mtime = 0, ctime = 0;          // seconds since the epoch (upstream stores u64)
+    uint32_t atimeNs = 0, mtimeNs = 0, ctimeNs = 0;   // nanoseconds, preserved across rewrites
 };
 
 constexpr size_t kFsHeaderSize = 2 + 1 + 16;

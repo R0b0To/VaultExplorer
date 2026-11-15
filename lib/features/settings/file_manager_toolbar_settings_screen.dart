@@ -482,6 +482,35 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                             ),
+                            value: state.config.showNoMediaFolders,
+                            onChanged: (v) => ref
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
+                                .setShowNoMediaFolders(v),
+                            title: Text(
+                              context.l10n.showNoMediaFoldersLabel,
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              context.l10n.showNoMediaFoldersDesc,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                            secondary: Icon(
+                              Icons.folder_off_outlined,
+                              color: cs.primary,
+                            ),
+                          ),
+                          SwitchListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
                             value: state.config.showFileExtensions,
                             onChanged: (v) => ref
                                 .read(

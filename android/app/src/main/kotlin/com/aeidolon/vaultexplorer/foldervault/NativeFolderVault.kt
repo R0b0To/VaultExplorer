@@ -17,6 +17,12 @@ internal object NativeFolderVault {
     const val CRYPTOMATOR = 1
     const val CRYFS = 2
 
+    /** [nativeOpen] result: CryFS vault is in single-client mode for another device; needs the user's consent. */
+    const val SINGLE_CLIENT_MODE = -2L
+
+    /** Error code Dart receives (instead of INVALID_VAULT) for [SINGLE_CLIENT_MODE]. */
+    const val CODE_SINGLE_CLIENT_MODE = "SINGLE_CLIENT_MODE"
+
     // Result codes of nativeCreate / nativeChangePassword.
     const val STATUS_OK = 0
     const val STATUS_WRONG_PASSWORD = 1
@@ -38,17 +44,21 @@ internal object NativeFolderVault {
      * been verified, for the storage the session will actually run on (the SAF
      * mirror is only worth building once the password is known to be right).
      *
-     * Returns a handle > 0, 0 for "not a valid vault", -1 for "wrong password".
+     * Returns a handle > 0, 0 for "not a valid vault", -1 for "wrong password", [SINGLE_CLIENT_MODE] when a
+     * CryFS vault is locked to another device and the user has not yet agreed (see [disableSingleClientMode]).
      * out[0] receives the failure message, out[1] the CryFS derived key.
      *
      * [backupKeyFiles] only matters for Cryptomator (the `.bkup` copies of the key files on a read-write
      * unlock); the other formats ignore it.
+     *
+     * [disableSingleClientMode] only matters for CryFS read-write opens: the user agreed to remove the
+     * "single-client mode" lock another device put on the vault (official CryFS asks the same question).
      */
     @JvmStatic external fun nativeOpen(
         format: Int, rawRoot: String?, bootstrap: FolderVaultStorage?,
         sessionProvider: FolderVaultSessionProvider?, password: ByteArray, readOnly: Boolean,
-        backupKeyFiles: Boolean, localStateDir: String, tempDir: String, combinedKey: ByteArray?,
-        out: Array<Any?>,
+        backupKeyFiles: Boolean, disableSingleClientMode: Boolean, localStateDir: String, tempDir: String,
+        combinedKey: ByteArray?, out: Array<Any?>,
     ): Long
 
     /**
@@ -110,6 +120,22 @@ internal object NativeFolderVault {
     /** Flat triples: key, kind ("s" | "i" | "b"), value. */
     @JvmStatic external fun nativeInfo(handle: Long): Array<String>?
 
-    /** "f:<name>:<base64>" (binary) and "s:<name>:<value>" entries; see [KeyMaterial]. */
-    @JvmStatic external fun nativeExportKeys(handle: Long): Array<String>?
+    /**
+     * Check & Repair (cpp/foldervault/fv_check.h). Both return a String[]:
+     *   [0] outcome "0" ok / "1" wrong password / "2" not a vault or refused; for anything but ok, [1] is the message
+     *   check, ok:  [1] filesScanned, [2] deep scan "1"/"0", then (severity, path, message) triples
+     *   repair, ok: [1] fixed, [2] recovered, [3] removed, then (severity, path, message) triples still wrong
+     * [password] may be null (structure-only check). [session] is the handle of an unlocked vault of the same
+     * vault, or 0; its keys are used inside the native core and never reach the JVM. [opId] > 0 streams the
+     * step-by-step log to the repair log panel.
+     */
+    @JvmStatic external fun nativeCheck(
+        format: Int, rawRoot: String?, storage: FolderVaultStorage?, password: ByteArray?, session: Long,
+        localStateDir: String, tempDir: String, opId: Int,
+    ): Array<String>?
+
+    @JvmStatic external fun nativeRepair(
+        format: Int, rawRoot: String?, storage: FolderVaultStorage?, password: ByteArray?, session: Long,
+        localStateDir: String, tempDir: String, opId: Int,
+    ): Array<String>?
 }

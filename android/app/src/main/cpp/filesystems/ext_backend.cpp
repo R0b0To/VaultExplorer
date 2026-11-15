@@ -50,24 +50,39 @@ static bool extResolvePathNoFollowFinal(ext2_filsys fs, const std::string& path,
                          nullptr, inode) == 0;
 }
 
-static bool extTargetStaysInside(const std::string& parentPath, const std::string& target) {
+// Number of directories between [dir] and the filesystem root, found by walking ".." entries: the PHYSICAL depth.
+// The depth of a path as written is not enough: "a/b" is shallower than it reads when "a" is a symlink, and a
+// target's ".." steps are applied from the directory the link really lives in, not from the path it was reached by.
+static bool extDirectoryDepth(ext2_filsys fs, ext2_ino_t dir, size_t* depth) {
+    size_t d = 0;
+    for (int guard = 0; dir != EXT2_ROOT_INO; ++guard) {
+        if (guard > 4096) return false;   // a damaged tree (a ".." loop)
+        ext2_ino_t up = 0;
+        if (ext2fs_lookup(fs, dir, "..", 2, nullptr, &up) != 0 || up == 0 || up == dir) return false;
+        dir = up;
+        ++d;
+    }
+    *depth = d;
+    return true;
+}
+
+// A relative target must never climb above the filesystem root. [parentDepth] is the physical depth of the
+// directory the link will be created in (see extDirectoryDepth).
+static bool extTargetStaysInside(size_t parentDepth, const std::string& target) {
     if (target.empty() || target.front() == '/' || target.find('\0') != std::string::npos) return false;
-    std::vector<std::string> stack;
-    auto consume = [&stack](const std::string& value) {
-        size_t start = 0;
-        while (start < value.size()) {
-            while (start < value.size() && value[start] == '/') ++start;
-            if (start >= value.size()) break;
-            size_t end = value.find('/', start);
-            if (end == std::string::npos) end = value.size();
-            const std::string part = value.substr(start, end - start);
-            if (part == "..") { if (stack.empty()) return false; stack.pop_back(); }
-            else if (!part.empty() && part != ".") stack.push_back(part);
-            start = end;
-        }
-        return true;
-    };
-    return consume(parentPath) && consume(target);
+    size_t depth = parentDepth;
+    size_t start = 0;
+    while (start < target.size()) {
+        while (start < target.size() && target[start] == '/') ++start;
+        if (start >= target.size()) break;
+        size_t end = target.find('/', start);
+        if (end == std::string::npos) end = target.size();
+        const std::string part = target.substr(start, end - start);
+        if (part == "..") { if (depth == 0) return false; --depth; }
+        else if (!part.empty() && part != ".") ++depth;
+        start = end;
+    }
+    return true;
 }
 int extDirectoryEntry(ext2_ino_t, int, struct ext2_dir_entry* entry, int, int, char*, void* data) {
     auto* context = static_cast<ExtDirContext*>(data);
@@ -374,11 +389,67 @@ errcode_t extIoOpenBound(const char* name, int flags, io_channel* out) {
     return result;
 }
 }
+namespace {
+// Wipes everything formatExtVolume() relies on being clean: block 0 (boot area, stale
+// signatures) and every inode table.
+//
+// libext2fs only *reserves* these blocks (ext2fs_allocate_tables); writing them is the
+// caller's job, which mke2fs does. The payload underneath is never trustworthy: a
+// container that was not quick-formatted decrypts to noise, and a re-formatted volume still
+// holds the previous filesystem. Stale inode tables are harmful rather than cosmetic: inode 8
+// (the journal) with a leftover nonzero i_blocks makes ext2fs_add_journal_inode3() fail
+// with EEXIST, and a filesystem that claims a journal it does not have is rejected by the
+// kernel.
+errcode_t zeroFormatTargets(ext2_filsys fs) {
+    errcode_t err = ext2fs_zero_blocks2(fs, 0, 1, nullptr, nullptr);
+    if (err) return err;
+    for (dgrp_t group = 0; group < fs->group_desc_count; ++group) {
+        const blk64_t table = ext2fs_inode_table_loc(fs, group);
+        if (table == 0) return EXT2_ET_MISSING_INODE_TABLE;
+        err = ext2fs_zero_blocks2(fs, table, static_cast<int>(fs->inode_blocks_per_group),
+                                  nullptr, nullptr);
+        if (err) return err;
+    }
+    return 0;
+}
+
+// What the root directory looks like to every user of the volume: world-accessible, since
+// the container itself is the access boundary.
+errcode_t openUpRootDirectory(ext2_filsys fs) {
+    ext2_inode root{};
+    errcode_t err = ext2fs_read_inode(fs, EXT2_ROOT_INO, &root);
+    if (err) return err;
+    root.i_mode = LINUX_S_IFDIR | 0777;
+    root.i_uid = root.i_gid = 0;
+    root.i_links_count = 2;
+    root.i_atime = root.i_mtime = root.i_ctime = static_cast<uint32_t>(time(nullptr));
+    return ext2fs_write_inode(fs, EXT2_ROOT_INO, &root);
+}
+
+errcode_t addJournal(ext2_filsys fs, uint64_t totalBlocks) {
+    ext2fs_journal_params journal{};
+    journal.num_journal_blocks = static_cast<blk_t>(std::min<uint64_t>(8192, totalBlocks / 32));
+    if (journal.num_journal_blocks < 1024) journal.num_journal_blocks = 1024;
+    // The device name libext2fs sees is a synthetic volume id ("0", "1", ...), not a host
+    // block device, so the mount-table probe is meaningless here (and can fail outright
+    // where /proc/mounts is unreadable). VaultExplorer owns the volume exclusively.
+    errcode_t err = ext2fs_add_journal_inode3(fs, &journal, 0, EXT2_MKJOURNAL_NO_MNT_CHECK);
+    if (err) return err;
+    // libext2fs sets HAS_JOURNAL itself once the journal inode is real; trust but verify.
+    if (!EXT2_HAS_COMPAT_FEATURE(fs->super, EXT3_FEATURE_COMPAT_HAS_JOURNAL) ||
+        fs->super->s_journal_inum != EXT2_JOURNAL_INO || fs->super->s_journal_dev != 0)
+        return EXT2_ET_BAD_INODE_NUM;
+    return 0;
+}
+}  // namespace
+
 bool formatExtVolume(int volumeId, const char* variant) {
+    if (volumeId < 0 || volumeId >= FF_VOLUMES || !variant) return false;
     const bool ext3 = strncasecmp(variant, "ext3", 4) == 0;
     const bool ext4 = strncasecmp(variant, "ext4", 4) == 0;
     const uint64_t totalBlocks = volumes[volumeId].dataAreaLengthBytes / 4096;
     if (totalBlocks < 1024) return false;
+
     ext2_super_block params{};
     params.s_rev_level = EXT2_DYNAMIC_REV;
     params.s_inode_size = 256;
@@ -387,26 +458,41 @@ bool formatExtVolume(int volumeId, const char* variant) {
     params.s_blocks_per_group = 32768;
     params.s_inodes_per_group = 2048;
     ext2fs_blocks_count_set(&params, totalBlocks);
-    // A journal is only actually written below when this holds -- the
-    // HAS_JOURNAL compat bit must track that exact condition, or every
-    // reader (blkid, the kernel, extGetFilesystemLabel() below) will see
-    // a plain ext2 volume regardless of what was requested.
-    const bool willHaveJournal = (ext3 || ext4) && totalBlocks > 2048;
-    params.s_feature_incompat = 0x0002;
-    params.s_feature_ro_compat = 0x0001;
-    params.s_feature_compat = 0x0020;
-    if (willHaveJournal) params.s_feature_compat |= 0x0004;  // EXT3_FEATURE_COMPAT_HAS_JOURNAL
-    if (ext4) params.s_feature_incompat |= 0x0040;
+    // HAS_JOURNAL is deliberately NOT requested here: libext2fs sets it when (and only
+    // when) the journal inode has been created. Declaring it up front is what let a failed
+    // journal leave a filesystem that advertised a journal it did not have.
+    params.s_feature_incompat = 0x0002;  // FILETYPE
+    params.s_feature_ro_compat = 0x0001; // SPARSE_SUPER
+    params.s_feature_compat = 0x0020;    // DIR_INDEX
+    if (ext4) params.s_feature_incompat |= 0x0040;  // EXTENTS
+    // Too small for a useful journal: ext3 then reads as ext2, ext4 stays journal-less.
+    const bool wantJournal = (ext3 || ext4) && totalBlocks > 2048;
+
     char deviceName[16];
     std::snprintf(deviceName, sizeof(deviceName), "%d", volumeId);
     ext2_filsys fs = nullptr;
-    if (ext2fs_initialize(deviceName, 0, &params, &encryptedExtIoManager, &fs) != 0) return false;
+    const errcode_t initError = ext2fs_initialize(deviceName, 0, &params, &encryptedExtIoManager, &fs);
+    if (initError != 0) {
+        EXT_LOGE("formatExtVolume: ext2fs_initialize failed: %s (err=%lu)",
+                 error_message(initError), static_cast<unsigned long>(initError));
+        return false;
+    }
+    // Every failure below discards the half-built filesystem (ext2fs_free) rather than
+    // closing it: closing would flush a superblock for a filesystem that is not finished.
+    auto giveUp = [&fs](const char* step, errcode_t err) {
+        EXT_LOGE("formatExtVolume: %s failed: %s (err=%lu)", step, error_message(err),
+                 static_cast<unsigned long>(err));
+        ext2fs_free(fs);
+        return false;
+    };
+
     fs->flags |= EXT2_FLAG_RW;
+    const uint32_t now = static_cast<uint32_t>(time(nullptr));
     fs->super->s_state = 1;
     fs->super->s_max_mnt_count = 20;
-    fs->super->s_lastcheck = static_cast<uint32_t>(time(nullptr));
-    fs->super->s_mtime = static_cast<uint32_t>(time(nullptr));
-    fs->super->s_wtime = static_cast<uint32_t>(time(nullptr));
+    fs->super->s_lastcheck = now;
+    fs->super->s_mtime = now;
+    fs->super->s_wtime = now;
     unsigned char uuid[16];
     if (osRandomBytes(uuid, sizeof(uuid))) {
         uuid[6] = (uuid[6] & 0x0F) | 0x40;
@@ -415,24 +501,16 @@ bool formatExtVolume(int volumeId, const char* variant) {
     }
     std::strncpy(reinterpret_cast<char*>(fs->super->s_last_mounted), "/", sizeof(fs->super->s_last_mounted));
     fs->super->s_r_blocks_count = 0;
-    if (ext2fs_allocate_tables(fs) != 0) { ext2fs_close(fs); return false; }
-    ext2fs_write_inode_bitmap(fs);
-    ext2fs_write_block_bitmap(fs);
-    ext2fs_mkdir(fs, EXT2_ROOT_INO, EXT2_ROOT_INO, nullptr);
-    ext2_inode root{};
-    if (ext2fs_read_inode(fs, EXT2_ROOT_INO, &root) == 0) {
-        root.i_mode = LINUX_S_IFDIR | 0777;
-        root.i_uid = root.i_gid = 0;
-        root.i_links_count = 2;
-        root.i_atime = root.i_mtime = root.i_ctime = static_cast<uint32_t>(time(nullptr));
-        ext2fs_write_inode(fs, EXT2_ROOT_INO, &root);
-    }
-    ext2fs_mkdir(fs, EXT2_ROOT_INO, 0, "lost+found");
-    if (willHaveJournal) {
-        ext2fs_journal_params journal{};
-        journal.num_journal_blocks = static_cast<blk_t>(std::min<uint64_t>(8192, totalBlocks / 32));
-        if (journal.num_journal_blocks < 1024) journal.num_journal_blocks = 1024;
-        ext2fs_add_journal_inode3(fs, &journal, 0, 0);
+
+    if (errcode_t err = ext2fs_allocate_tables(fs)) return giveUp("allocating tables", err);
+    if (errcode_t err = zeroFormatTargets(fs)) return giveUp("zeroing block 0 and inode tables", err);
+    if (errcode_t err = ext2fs_mkdir(fs, EXT2_ROOT_INO, EXT2_ROOT_INO, nullptr))
+        return giveUp("creating the root directory", err);
+    if (errcode_t err = openUpRootDirectory(fs)) return giveUp("setting root directory mode", err);
+    if (errcode_t err = ext2fs_mkdir(fs, EXT2_ROOT_INO, 0, "lost+found"))
+        return giveUp("creating lost+found", err);
+    if (wantJournal) {
+        if (errcode_t err = addJournal(fs, totalBlocks)) return giveUp("creating the journal", err);
     }
     for (ext2_ino_t inode = EXT2_BAD_INO; inode < fs->super->s_first_ino; ++inode) {
         if (!ext2fs_test_inode_bitmap2(fs->inode_map, inode))
@@ -441,8 +519,12 @@ bool formatExtVolume(int volumeId, const char* variant) {
     ext2fs_mark_ib_dirty(fs);
     ext2fs_mark_bb_dirty(fs);
     ext2fs_mark_super_dirty(fs);
-    ext2fs_flush(fs);
-    ext2fs_close(fs);
+    if (errcode_t err = ext2fs_flush(fs)) return giveUp("writing filesystem metadata", err);
+    if (errcode_t err = ext2fs_close(fs)) {
+        EXT_LOGE("formatExtVolume: closing the filesystem failed: %s (err=%lu)",
+                 error_message(err), static_cast<unsigned long>(err));
+        return false;
+    }
     return true;
 }
 bool ensureExtBitmapsLoaded(int volumeId) {
@@ -952,8 +1034,10 @@ bool extCreateSymlink(int volumeId, const std::string& path, const std::string& 
     const std::string parentPath = slash == std::string::npos ? "" : path.substr(0, slash);
     const std::string name = slash == std::string::npos ? path : path.substr(slash + 1);
     ext2_ino_t parent = 0;
-    if (name.empty() || name.size() > EXT2_NAME_LEN || !extTargetStaysInside(parentPath, target) ||
+    size_t parentDepth = 0;
+    if (name.empty() || name.size() > EXT2_NAME_LEN ||
         !extResolvePath(v.extFs, parentPath, &parent) || !extIsDirectory(v.extFs, parent) ||
+        !extDirectoryDepth(v.extFs, parent, &parentDepth) || !extTargetStaysInside(parentDepth, target) ||
         extEntryExists(v.extFs, parent, name)) return false;
     errcode_t err = ext2fs_symlink(v.extFs, parent, 0, name.c_str(), target.c_str());
     if (err == EXT2_ET_DIR_NO_SPACE && ext2fs_expand_dir(v.extFs, parent) == 0) {

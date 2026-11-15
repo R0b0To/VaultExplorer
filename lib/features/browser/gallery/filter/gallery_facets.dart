@@ -100,11 +100,11 @@ class GalleryFacets {
         ratingAtLeast[n]++;
       }
 
-      for (final c in GallerySizeClass.values) {
-        if (GallerySizeFilter(c).positive(s)) {
-          sizes.update(c, (v) => v + 1, ifAbsent: () => 1);
-        }
-      }
+      const mb = 1024 * 1024;
+      final sizeClass = s.sizeBytes < mb
+          ? GallerySizeClass.small
+          : (s.sizeBytes < 10 * mb ? GallerySizeClass.medium : GallerySizeClass.large);
+      sizes.update(sizeClass, (v) => v + 1, ifAbsent: () => 1);
 
       folders.update(
         (vol: s.sourceVolId, path: s.parentPath),
@@ -112,19 +112,20 @@ class GalleryFacets {
         ifAbsent: () => 1,
       );
 
-      for (final m in GalleryMissing.values) {
-        if (GalleryMissingFilter(m).positive(s)) {
-          missing.update(m, (v) => v + 1, ifAbsent: () => 1);
-        }
-      }
+      if (!s.meta.hasLocation) missing.update(GalleryMissing.location, (v) => v + 1, ifAbsent: () => 1);
+      if (s.meta.tags.isEmpty) missing.update(GalleryMissing.tags, (v) => v + 1, ifAbsent: () => 1);
+      if (s.meta.camera == null) missing.update(GalleryMissing.camera, (v) => v + 1, ifAbsent: () => 1);
+      if (!s.hasTakenDate) missing.update(GalleryMissing.dateTaken, (v) => v + 1, ifAbsent: () => 1);
     }
 
     List<GalleryFacet> byCount(List<GalleryFacet> list) {
+      if (list.length <= 1) return list;
+      final sortKeys = <GalleryFacet, String>{
+        for (final f in list) f: f.filter.label(labels).toLowerCase(),
+      };
       list.sort((a, b) {
         final c = b.count.compareTo(a.count);
-        return c != 0
-            ? c
-            : a.filter.label(labels).toLowerCase().compareTo(b.filter.label(labels).toLowerCase());
+        return c != 0 ? c : sortKeys[a]!.compareTo(sortKeys[b]!);
       });
       return list;
     }

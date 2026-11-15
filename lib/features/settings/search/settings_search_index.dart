@@ -522,6 +522,14 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
     keywords: ['dotfiles', 'hidden', 'invisible'],
   ),
   _e(
+    'file_manager.nomedia_folders',
+    SettingsDestination.fileManager,
+    (l) => l.showNoMediaFoldersLabel,
+    section: (l) => l.browserLayoutSectionHeader,
+    details: [(l) => l.showNoMediaFoldersDesc],
+    keywords: ['nomedia', 'gallery', 'hidden folders', 'ignored'],
+  ),
+  _e(
     'file_manager.file_extensions',
     SettingsDestination.fileManager,
     (l) => l.showFileExtensionsLabel,

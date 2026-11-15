@@ -530,7 +530,11 @@ if(NOT (VAULTEXPLORER_DESKTOP AND WIN32))
             foldervault/fv_cryptomator.cpp
             foldervault/fv_cryptomator_vault.cpp
             foldervault/fv_cryfs.cpp
-            foldervault/fv_cryfs_vault.cpp)
+            foldervault/fv_cryfs_vault.cpp
+            foldervault/fv_check.cpp
+            foldervault/fv_check_gocryptfs.cpp
+            foldervault/fv_check_cryptomator.cpp
+            foldervault/fv_check_cryfs.cpp)
     set_target_properties(foldervault_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
     target_compile_features(foldervault_core PUBLIC cxx_std_20)
     target_compile_options(foldervault_core PRIVATE -Wall -Wextra)
@@ -567,6 +571,9 @@ set(VE_ENGINE_SOURCES
         session/session_prepare.cpp
         session/bitlocker_backend.cpp
         containers/container_create.cpp
+        containers/container_expand_bitlocker.cpp
+        containers/bl_disk_expand.cpp
+        containers/vdisk.cpp
         containers/vhdx_image.cpp
         containers/vhd_image.cpp
         jni/jni_runtime.cpp
@@ -597,8 +604,9 @@ set(VE_ENGINE_SOURCES
         crypto/cascade.cpp
         crypto/kdf_table.cpp
         crypto/luks_header.cpp
+        crypto/luks_cipher.cpp
         crypto/scrypt.cpp
-        crypto/cryfs_block_cipher.cpp
+        crypto/cryfs_block_cipher.cpp crypto/cryfs_legacy_ciphers.cpp
         crypto/single_file_crypto.cpp
         crypto/user_entropy.cpp
         crypto/xchacha20poly1305.cpp
@@ -815,7 +823,7 @@ endif()
 
 
 set_source_files_properties(
-        crypto/cryfs_block_cipher.cpp
+        crypto/cryfs_block_cipher.cpp crypto/cryfs_legacy_ciphers.cpp
         crypto/eme.cpp
         crypto/siv.cpp
         crypto/xchacha20poly1305.cpp
@@ -866,7 +874,7 @@ if(NOT ANDROID)
             ${CMAKE_CURRENT_SOURCE_DIR}/jni)
     add_executable(cryfs_block_cipher_test
             test/cryfs_block_cipher_test.cpp
-            crypto/cryfs_block_cipher.cpp
+            crypto/cryfs_block_cipher.cpp crypto/cryfs_legacy_ciphers.cpp
             crypto/xchacha20poly1305.cpp)
     target_include_directories(cryfs_block_cipher_test PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}
@@ -907,6 +915,30 @@ if(NOT ANDROID)
             containers/test/container_header_test.cpp
             containers/container_header.cpp)
     add_executable(container_utils_crc32_test containers/test/container_utils_crc32_test.cpp)
+    # BitLocker expand core (containers/bl_expand.h): synthetic FVE metadata, rewrite + re-seal checks.
+    add_executable(bl_expand_test containers/test/bl_expand_test.cpp)
+    target_include_directories(bl_expand_test PRIVATE ${mbedtls_SOURCE_DIR}/include)
+    target_link_libraries(bl_expand_test mbedcrypto)
+    list(APPEND VAULTEXPLORER_HOST_TESTS bl_expand_test)
+    add_test(NAME bl_expand_test COMMAND bl_expand_test)
+    # Disk-image expansion: partition tables (MBR/GPT, in memory) and the legacy-VHD half of the virtual-disk growth
+    # (synthetic images). The VHDX growth and the real-BitLocker-in-VHD/VHDX checks are shell scripts that need qemu-img
+    # (containers/test/*_qemu_check.sh) and are not part of ctest.
+    add_executable(disk_partition_test containers/test/disk_partition_test.cpp)
+    target_include_directories(disk_partition_test PRIVATE ${mbedtls_SOURCE_DIR}/include)
+    target_link_libraries(disk_partition_test mbedcrypto)
+    list(APPEND VAULTEXPLORER_HOST_TESTS disk_partition_test)
+    add_test(NAME disk_partition_test COMMAND disk_partition_test)
+    add_executable(vdisk_vhd_test
+            containers/test/vdisk_vhd_test.cpp
+            containers/vdisk.cpp
+            containers/vhd_image.cpp
+            containers/vhdx_image.cpp)
+    target_include_directories(vdisk_vhd_test PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/filesystems/test/host_stubs
+            ${CMAKE_CURRENT_SOURCE_DIR}/containers)
+    list(APPEND VAULTEXPLORER_HOST_TESTS vdisk_vhd_test)
+    add_test(NAME vdisk_vhd_test COMMAND vdisk_vhd_test)
     add_executable(chunked_block_device_test
             containers/test/chunked_block_device_test.cpp
             containers/chunked_block_device.cpp)
@@ -947,7 +979,7 @@ if(NOT ANDROID)
     # those programs and FUSE).
     set(FV_CRYPTO_SOURCES
             crypto/eme.cpp crypto/siv.cpp crypto/scrypt.cpp
-            crypto/xchacha20poly1305.cpp crypto/cryfs_block_cipher.cpp)
+            crypto/xchacha20poly1305.cpp crypto/cryfs_block_cipher.cpp crypto/cryfs_legacy_ciphers.cpp)
     add_executable(foldervault_test foldervault/test/fv_tests.cpp ${FV_CRYPTO_SOURCES})
     target_link_libraries(foldervault_test foldervault_core mbedcrypto)
     # The gocryptfs known-answer vectors are located via an absolute path baked in

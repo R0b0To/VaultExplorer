@@ -16,13 +16,14 @@ import com.aeidolon.vaultexplorer.foldervault.NativeFolderVault
  * (cpp/foldervault/fv_cryptomator*.cpp).
  */
 object CryptomatorVault {
-    private const val MASTERKEY_FILE_NAME = "masterkey.cryptomator"
+    private val MASTERKEY_FILE_NAME: String get() = NativeFolderVault.configFileName(NativeFolderVault.CRYPTOMATOR)
     const val CURRENT_VAULT_FORMAT = 8
     const val CURRENT_CIPHER_COMBO = "SIV_GCM"
 
     fun looksLikeVault(context: Context, treeUri: Uri): Boolean {
         val root = DocumentFile.fromTreeUri(context, treeUri) ?: return false
-        return root.listFiles().any { it.name == MASTERKEY_FILE_NAME }
+        val name = MASTERKEY_FILE_NAME
+        return name.isNotEmpty() && root.listFiles().any { it.name == name }
     }
 
     /**

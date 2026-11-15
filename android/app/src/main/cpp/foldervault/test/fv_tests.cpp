@@ -3,6 +3,7 @@
 //   (an independent implementation); the format engines are additionally
 //   checked against the real gocryptfs / Cryptomator / CryFS in test/interop.
 #include "crypto/scrypt.h"
+#include "crypto/xchacha20poly1305.h"
 #include <cctype>
 #include <filesystem>
 #include <atomic>
@@ -12,6 +13,7 @@
 #include <fstream>
 #include <functional>
 #include <random>
+#include <set>
 #include <sstream>
 #include <thread>
 #include <unistd.h>
@@ -23,6 +25,7 @@
 #include "../fv_check.h"
 #include "../fv_cryptomator.h"
 #include "../fv_cryfs.h"
+#include "../fv_formats.h"
 #include "../fv_gocryptfs.h"
 #include "../fv_json.h"
 #include "../fv_vault.h"
@@ -3179,6 +3182,284 @@ static void testCheckCryfs() {
     CHECK(rep.outcome == ck::Outcome::InvalidVault && rep.message.find("Cryptomator and gocryptfs") != std::string::npos);
 }
 
+
+// ============================================================== format knowledge (fv_formats.h) ==
+
+static void testFormatKnowledge() {
+    std::puts("format knowledge: names, probes, config validation, create options");
+    VaultFormat f;
+    CHECK(formatFromWireName("gocryptfs", f) && f == VaultFormat::Gocryptfs);
+    CHECK(formatFromWireName("cryptomator", f) && f == VaultFormat::Cryptomator);
+    CHECK(formatFromWireName("directory_vault", f) && f == VaultFormat::Cryptomator);   // legacy alias
+    CHECK(formatFromWireName("cryfs", f) && f == VaultFormat::Cryfs);
+    CHECK(!formatFromWireName("veracrypt", f) && !formatFromWireName("", f) && !formatFromWireName("Cryfs", f));
+    for (VaultFormat v : {VaultFormat::Gocryptfs, VaultFormat::Cryptomator, VaultFormat::Cryfs}) {
+        VaultFormat back;
+        CHECK(formatFromWireName(formatWireName(v), back) && back == v);
+        CHECK_EQ(std::string(formatWireName(v)), std::string(check::formatWire(v)));
+    }
+    CHECK_EQ(std::string(configFileName(VaultFormat::Gocryptfs)), "gocryptfs.conf");
+    CHECK_EQ(std::string(configFileName(VaultFormat::Cryptomator)), "masterkey.cryptomator");
+    CHECK_EQ(std::string(configFileName(VaultFormat::Cryfs)), "cryfs.config");
+
+    // cipher names
+    CHECK(gocryptfsCipherFromName("aes-256-gcm") == GocryptfsCipher::Aes256Gcm);
+    CHECK(gocryptfsCipherFromName("xchacha20-poly1305") == GocryptfsCipher::XChaCha20Poly1305);
+    CHECK(gocryptfsCipherFromName("aes-siv") == GocryptfsCipher::AesSiv);
+    CHECK(gocryptfsCipherFromName("") == GocryptfsCipher::Aes256Gcm);
+    CHECK(gocryptfsCipherFromName("rot13") == GocryptfsCipher::Aes256Gcm);
+
+    // CryFS create options: anything unsupported or out of range falls back to the defaults
+    const CryfsCreateOptions def;
+    auto norm = [](const char* cipher, int bs) { CryfsCreateOptions o; o.cipher = cipher; o.blocksizeBytes = bs; normalizeCryfsCreateOptions(o); return o; };
+    CHECK_EQ(norm("", 0).cipher, def.cipher);              CHECK_EQ(norm("", 0).blocksizeBytes, def.blocksizeBytes);
+    CHECK_EQ(norm("aes-256-gcm", 65536).cipher, std::string("aes-256-gcm"));
+    CHECK_EQ(norm("aes-256-gcm", 65536).blocksizeBytes, 65536);
+    CHECK_EQ(norm("xchacha20-poly1305", 4096).blocksizeBytes, 4096);
+    CHECK_EQ(norm("twofish-256-gcm", 32768).cipher, def.cipher);   // a legacy cipher is never offered at creation
+    CHECK_EQ(norm("bogus", 32768).cipher, def.cipher);
+    for (int bad : {-5, 0, 4095, 64 * 1024 * 1024 + 1, 2000000000}) CHECK_EQ(norm("aes-256-gcm", bad).blocksizeBytes, def.blocksizeBytes);
+    CHECK_EQ(norm("aes-256-gcm", kCryfsMinBlockSize).blocksizeBytes, kCryfsMinBlockSize);
+    CHECK_EQ(norm("aes-256-gcm", kCryfsMaxBlockSize).blocksizeBytes, kCryfsMaxBlockSize);
+
+    // probes and config validation over real vaults
+    TmpDir t;
+    const Bytes pw = B("probe-pw");
+    auto make = [&](VaultFormat v, const std::string& name) {
+        auto st = std::make_shared<PosixStorage>(t.sub(name));
+        if (v == VaultFormat::Gocryptfs) { GocryptfsCreateOptions o; o.scryptLogN = 10; CHECK(createGocryptfs(*st, pw.data(), pw.size(), o).status == OpenStatus::Ok); }
+        else if (v == VaultFormat::Cryptomator) CHECK(createCryptomator(*st, pw.data(), pw.size()).status == OpenStatus::Ok);
+        else { HostEnv env; env.cryfsLocalStateDir = t.sub("state"); env.tempDir = t.path; CryfsCreateOptions o; o.scryptLogN = 10; o.scryptR = 8; o.scryptP = 1;
+               CHECK(createCryfs(*st, pw.data(), pw.size(), o, env).status == OpenStatus::Ok); }
+        return st;
+    };
+    auto g = make(VaultFormat::Gocryptfs, "g"), c = make(VaultFormat::Cryptomator, "c"), y = make(VaultFormat::Cryfs, "y");
+    const std::pair<VaultFormat, std::shared_ptr<PosixStorage>> all[] = {{VaultFormat::Gocryptfs, g}, {VaultFormat::Cryptomator, c}, {VaultFormat::Cryfs, y}};
+    PosixStorage empty(t.sub("empty"));
+    for (auto& a : all) {
+        for (auto& b : all) CHECK_EQ(looksLikeVault(a.first, *b.second), a.second == b.second);
+        CHECK(!looksLikeVault(a.first, empty));
+    }
+    {   // a *folder* with the marker's name is not a vault
+        PosixStorage d(t.sub("dirmarker")); CHECK(d.mkdir("gocryptfs.conf")); CHECK(!looksLikeVault(VaultFormat::Gocryptfs, d));
+    }
+    for (auto& a : all) {
+        Bytes cfg; CHECK(a.second->readWhole(configFileName(a.first), cfg));
+        std::string why;
+        CHECK(validateConfigFile(a.first, cfg, why));
+        // damage: truncated, garbage, empty
+        Bytes cut(cfg.begin(), cfg.begin() + (long)(cfg.size() / 2));
+        CHECK(!validateConfigFile(a.first, cut, why) && !why.empty());
+        Bytes junk = B("this is not a config file at all"); junk.resize(2048, 'x');
+        why.clear(); CHECK(!validateConfigFile(a.first, junk, why) && !why.empty());
+        why.clear(); CHECK(!validateConfigFile(a.first, Bytes(), why) && !why.empty());
+        // a config of ANOTHER format is not accepted either
+        for (auto& b : all) if (b.first != a.first) {
+            Bytes other; CHECK(b.second->readWhole(configFileName(b.first), other));
+            why.clear(); CHECK(!validateConfigFile(a.first, other, why));
+        }
+    }
+    {   // CryFS: the envelope is judged, not just a prefix; a short file is "not genuine"
+        Bytes cfg; CHECK(y->readWhole("cryfs.config", cfg));
+        std::string why;
+        Bytes bad = cfg; bad[3] ^= 0x20;                       // header text damaged
+        CHECK(!validateConfigFile(VaultFormat::Cryfs, bad, why));
+        Bytes shortOne(cfg.begin(), cfg.begin() + 200); why.clear();
+        CHECK(!validateConfigFile(VaultFormat::Cryfs, shortOne, why) && why.find("genuine") != std::string::npos);
+        // the real config written by official CryFS 0.11.3 is accepted
+        std::ifstream in(std::string(FV_VECTORS_DIR) + "/../cryfs/cpp_0_11_config.bin", std::ios::binary);
+        if (in) { Bytes real((std::istreambuf_iterator<char>(in)), {}); why.clear(); CHECK(validateConfigFile(VaultFormat::Cryfs, real, why)); }
+    }
+}
+
+// ================================================ coverage ported from the retired Kotlin unit tests ==
+//
+// The Kotlin copies of the ciphers, the CryFS block store/tree/integrity state and the gocryptfs/Cryptomator
+// primitives are gone; these are the cases their unit tests covered that nothing in this suite did.
+
+static void testRetiredKotlinCoverage() {
+    std::puts("ported coverage: XChaCha20 vectors, CryFS block overhead, integrity-state durability, Cryptomator chunks");
+
+    // ---- HChaCha20 and XChaCha20-Poly1305 known answers (draft-irtf-cfrg-xchacha-03; the AEAD value was also
+    //      reproduced independently with PyCryptodome)
+    {
+        Bytes key(32), nonce16 = hex("000000090000004a0000000031415927"), sub(32);
+        for (int i = 0; i < 32; i++) key[(size_t)i] = (uint8_t)i;
+        hchacha20(key.data(), nonce16.data(), sub.data());
+        CHECK_EQ(hexs(sub), "82413b4227b27bfed30e42508a877d73a0f9e4d58a74a853c12ec41326d3ecdc");
+
+        Bytes k(32), n(24);
+        for (int i = 0; i < 32; i++) k[(size_t)i] = (uint8_t)(0x80 + i);
+        for (int i = 0; i < 24; i++) n[(size_t)i] = (uint8_t)(0x40 + i);
+        Bytes aad = hex("50515253c0c1c2c3c4c5c6c7");
+        const char* ptText = "Ladies and Gentlemen of the class of '99: If I could offer you only one tip for the future, sunscreen would be it.";
+        Bytes pt((const uint8_t*)ptText, (const uint8_t*)ptText + std::strlen(ptText));
+        Bytes out(pt.size() + 16);
+        CHECK(xchacha20Poly1305Seal(k.data(), n.data(), aad.data(), aad.size(), pt.data(), pt.size(), out.data()));
+        CHECK_EQ(hexs(out),
+                 "bd6d179d3e83d43b9576579493c0e939572a1700252bfaccbed2902c21396cbb731c7f1b0b4aa6440bf3a82f4eda7e39ae64c6708c54c216cb96b72e1213b4522f8c9ba40db5d945b11b69b982c1bb9e3f3fac2bc369488f76b2383565d3fff921f9664c97637da9768812f615c68b13b52e"
+                 "c0875924c1c7987947deafd8780acf49");
+        Bytes back(pt.size());
+        CHECK(xchacha20Poly1305Open(k.data(), n.data(), aad.data(), aad.size(), out.data(), pt.size(), out.data() + pt.size(), back.data()));
+        CHECK(back == pt);
+        Bytes wrongNonce = n; wrongNonce[0]++;
+        CHECK(!xchacha20Poly1305Open(k.data(), wrongNonce.data(), aad.data(), aad.size(), out.data(), pt.size(), out.data() + pt.size(), back.data()));
+        Bytes wrongAad = aad; wrongAad[0]++;
+        CHECK(!xchacha20Poly1305Open(k.data(), n.data(), wrongAad.data(), wrongAad.size(), out.data(), pt.size(), out.data() + pt.size(), back.data()));
+        // empty plaintext still authenticates
+        Bytes tagOnly(16);
+        CHECK(xchacha20Poly1305Seal(k.data(), n.data(), nullptr, 0, nullptr, 0, tagOnly.data()));
+        CHECK(xchacha20Poly1305Open(k.data(), n.data(), nullptr, 0, tagOnly.data(), 0, tagOnly.data(), nullptr));
+        tagOnly[0] ^= 1;
+        CHECK(!xchacha20Poly1305Open(k.data(), n.data(), nullptr, 0, tagOnly.data(), 0, tagOnly.data(), nullptr));
+    }
+
+    // ---- gocryptfs names: ciphertext that cannot be a name at all
+    {
+        gocryptfs::NameCryptor nc(Secret(Bytes(32, 7)), 255, false, true);
+        const Bytes iv(16, 9);
+        auto fails = [&](const std::string& n) { try { nc.decryptName(n, iv.data()); return false; } catch (const Error&) { return true; } };
+        CHECK(fails(""));                                               // empty
+        CHECK(fails("!!!not base64!!!"));                               // malformed base64
+        Bytes twenty(20, 1);
+        CHECK(fails(base64Encode(twenty.data(), twenty.size(), true, false)));   // not a multiple of the 16-byte block
+    }
+
+    // ---- CryFS: bytes of every physical block that are not user data, per cipher
+    {
+        CHECK_EQ(cryfs::virtualBlockSize(4096, "xchacha20-poly1305"), 4010);
+        CHECK_EQ(cryfs::virtualBlockSize(4 * 1024 * 1024, "xchacha20-poly1305"), 4194218);
+        for (const char* n : {"aes-256-gcm", "aes-128-gcm"}) CHECK_EQ(cryfs::virtualBlockSize(4096, n), 4018);
+        for (const char* n : {"aes-256-cfb", "aes-128-cfb"}) CHECK_EQ(cryfs::virtualBlockSize(4096, n), 4034);
+        CHECK_EQ(cryfs::virtualBlockSize(4096, "some-future-cipher"), 4010);   // unknown: the largest overhead, never zero
+        // the other ciphers of official CryFS cost what AES costs in the same mode
+        for (const char* n : {"twofish-256-gcm", "twofish-128-gcm", "serpent-256-gcm", "cast-256-gcm", "mars-448-gcm"}) CHECK_EQ(cryfs::virtualBlockSize(4096, n), 4018);
+        for (const char* n : {"twofish-256-cfb", "serpent-128-cfb", "cast-256-cfb", "mars-256-cfb"}) CHECK_EQ(cryfs::virtualBlockSize(4096, n), 4034);
+    }
+
+    // ---- CryFS local integrity state: durability and fail-safe recovery
+    {
+        Bytes fsid(16, 0x33);
+        const std::string stateDirName = toHex(fsid.data(), 16);
+        TmpDir t;
+        const std::string base = t.sub("st");
+        const std::string dir = base + "/" + stateDirName;
+        cryfs::BlockId A = cryfs::BlockId::random(), B2 = cryfs::BlockId::random();
+
+        auto s = cryfs::LocalIntegrityState::open(base, fsid);
+        const uint64_t myId = s->myClientId();
+        CHECK(myId != 0);
+        CHECK_EQ(s->nextVersionForOwnWrite(A, false), (uint64_t)1);
+        CHECK_EQ(s->nextVersionForOwnWrite(A, true), (uint64_t)2);
+        CHECK_EQ(s->nextVersionForOwnWrite(B2, false), (uint64_t)1);   // blocks count independently
+        s.reset();
+        s = cryfs::LocalIntegrityState::open(base, fsid);
+        CHECK_EQ(s->myClientId(), myId);                               // the client id is stable
+        CHECK_EQ(s->nextVersionForOwnWrite(A, false), (uint64_t)3);    // reservations survive a restart
+        CHECK_EQ(s->nextVersionForOwnWrite(B2, false), (uint64_t)2);
+
+        // past the compaction threshold (log -> snapshot) the history is exact
+        cryfs::BlockId C = cryfs::BlockId::random();
+        for (int i = 0; i < 450; i++) s->nextVersionForOwnWrite(C, false);
+        CHECK_EQ(s->nextVersionForOwnWrite(C, false), (uint64_t)451);
+        s.reset();
+        s = cryfs::LocalIntegrityState::open(base, fsid);
+        CHECK_EQ(s->nextVersionForOwnWrite(C, false), (uint64_t)452);
+        CHECK_EQ(s->nextVersionForOwnWrite(A, false), (uint64_t)4);
+        // a rollback is still caught after all that
+        CHECK(s->checkAndRecordRead(myId, C, 10).has_value());
+
+        // a corrupted snapshot is not trusted, and failing that way is safe: no throw, no invented history
+        cryfs::BlockId D = cryfs::BlockId::random();
+        CHECK_EQ(s->nextVersionForOwnWrite(D, false), (uint64_t)1);
+        s->flush();                                                    // forces a snapshot
+        s.reset();
+        const std::string snap = dir + "/integritydata.snapshot";
+        CHECK(std::filesystem::exists(snap));
+        { std::ofstream w(snap, std::ios::binary | std::ios::trunc); w << "{not valid json"; }
+        std::unique_ptr<cryfs::LocalIntegrityState> s2;
+        try { s2 = cryfs::LocalIntegrityState::open(base, fsid); } catch (...) { CHECK(false); }
+        if (s2) { CHECK_EQ(s2->myClientId(), myId); CHECK_EQ(s2->nextVersionForOwnWrite(D, false), (uint64_t)1); }
+        s2.reset();
+
+        // malformed log lines are skipped, the valid ones around them still count
+        TmpDir t2; Bytes fs2(16, 0x44); cryfs::BlockId L = cryfs::BlockId::random(), M = cryfs::BlockId::random();
+        const std::string d2 = t2.sub("st") + "/" + toHex(fs2.data(), 16);
+        std::filesystem::create_directories(d2);
+        { std::ofstream lg(d2 + "/integritydata.log");
+          lg << "garbage line without an equals sign\n=5\n7:" << L.hex() << "=notanumber\n\n"
+             << "7:" << L.hex() << "=5\n" << "7:" << M.hex() << "=2\n" << "truncated-last-line-7:" << M.hex() << "="; }
+        auto s3 = cryfs::LocalIntegrityState::open(t2.path + "/st", fs2);
+        CHECK(s3->checkAndRecordRead(7, L, 3).has_value() && *s3->checkAndRecordRead(7, L, 3) == 5);   // 7@5 was read
+        CHECK(s3->checkAndRecordRead(7, M, 1).has_value() && *s3->checkAndRecordRead(7, M, 1) == 2);
+
+        // concurrent reservations never hand out the same version twice
+        TmpDir t3; Bytes fs3(16, 0x55); cryfs::BlockId Z = cryfs::BlockId::random();
+        auto s4 = cryfs::LocalIntegrityState::open(t3.sub("st"), fs3);
+        std::vector<std::vector<uint64_t>> got(8);
+        std::vector<std::thread> th;
+        for (int i = 0; i < 8; i++) th.emplace_back([&, i] { for (int k = 0; k < 50; k++) got[(size_t)i].push_back(s4->nextVersionForOwnWrite(Z, false)); });
+        for (auto& x : th) x.join();
+        std::set<uint64_t> uniq; uint64_t maxV = 0;
+        for (auto& v : got) for (uint64_t x : v) { uniq.insert(x); maxV = std::max(maxV, x); }
+        CHECK_EQ(uniq.size(), (size_t)400);
+        CHECK_EQ(maxV, (uint64_t)400);
+    }
+
+    // ---- Cryptomator content: header and chunk authentication, both cipher combos
+    for (cryptomator::Combo combo : {cryptomator::Combo::SivGcm, cryptomator::Combo::SivCtrMac}) {
+        const char* label = combo == cryptomator::Combo::SivGcm ? "SIV_GCM" : "SIV_CTRMAC";
+        std::printf("  content %s\n", label);
+        Bytes raw(64); for (int i = 0; i < 64; i++) raw[(size_t)i] = (uint8_t)(i * 5 + 1);
+        cryptomator::Masterkey mk{Secret(raw)};
+        Bytes raw2 = raw; raw2[0] ^= 1; raw2[32] ^= 1;   // differs in both halves: GCM authenticates the header with the first, CTR+HMAC with the second
+        cryptomator::Masterkey other{Secret(raw2)};
+        cryptomator::ContentFormat fmt(mk, combo), otherFmt(other, combo);
+        const size_t cs = fmt.cleartextChunk(), ccs = fmt.ciphertextChunk();
+
+        // header round trip: a header written by one format object is accepted by another with the same key,
+        // refused under a different masterkey, and refused when any byte is changed
+        Bytes hdr; auto key = fmt.newHeader(hdr);
+        CHECK_EQ(hdr.size(), fmt.headerSize());
+        CHECK(fmt.decodeHeader(hdr.data(), hdr.size()) != nullptr);
+        { cryptomator::ContentFormat again(mk, combo); CHECK(again.decodeHeader(hdr.data(), hdr.size()) != nullptr); }
+        bool threw = false;
+        try { otherFmt.decodeHeader(hdr.data(), hdr.size()); } catch (const Error& e) { threw = e.code() == Err::Auth; }
+        CHECK(threw);
+        for (size_t i : {size_t(0), hdr.size() / 2, hdr.size() - 1}) {
+            Bytes bad = hdr; bad[i] ^= 0x01; threw = false;
+            try { fmt.decodeHeader(bad.data(), bad.size()); } catch (const Error& e) { threw = e.code() == Err::Auth; }
+            CHECK(threw);
+        }
+
+        // chunk round trips for empty, partial and full chunks, and for several chunks at once
+        for (size_t n : {size_t(0), size_t(1), size_t(100), cs - 1, cs, cs + 1, 3 * cs, 3 * cs + 17}) {
+            Bytes in = rnd(n, (uint32_t)(n + 3)), enc(fmt.encryptedSize(n)), dec(n);
+            fmt.encrypt(*key, 0, in.data(), n, enc.data());
+            CHECK_EQ(fmt.decryptedSize(enc.size()), n);
+            if (n) { fmt.decrypt(*key, 0, enc.data(), enc.size(), dec.data()); CHECK(dec == in); }
+            // sizes are inverses at every boundary
+            CHECK_EQ(fmt.cleartextSize((int64_t)(hdr.size() + enc.size())), (int64_t)n);
+        }
+
+        // tampering with the ciphertext, and decrypting under a different chunk number, are both caught
+        Bytes in = rnd(cs + 500, 91), enc(fmt.encryptedSize(in.size())), dec(in.size());
+        fmt.encrypt(*key, 0, in.data(), in.size(), enc.data());
+        for (size_t at : {size_t(3), ccs - 2, ccs + 40}) {
+            Bytes bad = enc; bad[at] ^= 0x01; threw = false;
+            try { fmt.decrypt(*key, 0, bad.data(), bad.size(), dec.data()); } catch (const Error& e) { threw = e.code() == Err::Auth; }
+            CHECK(threw);
+        }
+        threw = false;
+        try { fmt.decrypt(*key, 1, enc.data(), enc.size(), dec.data()); } catch (const Error& e) { threw = e.code() == Err::Auth; }
+        CHECK(threw);                                                  // chunk numbers are authenticated
+        // chunk 1 decrypts on its own when addressed as chunk 1
+        Bytes second(in.size() - cs);
+        fmt.decrypt(*key, 1, enc.data() + ccs, enc.size() - ccs, second.data());
+        CHECK(second == Bytes(in.begin() + (long)cs, in.end()));
+    }
+}
+
 static void testCheckRepair() {
     testCheckGocryptfs();
     testRepairGocryptfs();
@@ -3214,6 +3495,8 @@ int main(int argc, char** argv) {
     if (want("scrypt")) testScryptLowMem();
     if (only == "cryfs-vector") testCryfsCppVector();
     if (want("check")) testCheckRepair();
+    if (want("formats")) testFormatKnowledge();
+    if (want("parity")) testRetiredKotlinCoverage();
     if (want("concurrency")) { testConcurrency("gocryptfs"); testConcurrency("cryptomator"); testConcurrency("cryfs"); }
     std::printf("\n%d checks, %d failed\n", g_checks, g_failed);
     return g_failed ? 1 : 0;

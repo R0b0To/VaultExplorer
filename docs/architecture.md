@@ -115,7 +115,8 @@ Flutter/Dart UI  ──MethodChannel──▶  MainActivity + *Handlers (Kotlin)
 - **Kotlin** owns the `MethodChannel` surface, the executor/thread topology,
   the per-`volId` session registries (both of them — see §3.2), SAF
   (`ContainerDocumentsProvider`), USB mass-storage device access, the
-  pure-Kotlin directory-vault backends, and the automation `BroadcastReceiver`
+  the thin Kotlin wrappers around the native directory-vault sessions (SAF
+  storage, raw-path-versus-SAF choice, JNI), and the automation `BroadcastReceiver`
   entry point (§5.4), which reaches the same `ContainerEngine`/session
   registries without going through the `MethodChannel` at all.
 - **C++** owns the actual cryptographic sessions for block-device formats,

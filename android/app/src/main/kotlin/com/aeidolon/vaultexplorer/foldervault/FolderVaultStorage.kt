@@ -335,8 +335,8 @@ class SafFolderVaultStorage(
 }
 
 /**
- * CryFS in mirror mode. Block files are addressed by an id, so (as the old
- * CryfsBlockStore did) they are located on the REAL tree by deterministic
+ * CryFS in mirror mode. Block files are addressed by an id, so (as the native
+ * block store does) they are located on the REAL tree by deterministic
  * lookup instead of listing 4096 shard directories: local I/O happens in the
  * mirror directory, and each block is pulled / pushed individually.
  */

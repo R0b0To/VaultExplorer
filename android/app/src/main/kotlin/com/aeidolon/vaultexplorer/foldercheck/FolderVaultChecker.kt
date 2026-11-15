@@ -6,6 +6,7 @@ import android.net.Uri
 import com.aeidolon.vaultexplorer.container.ContainerFormat
 import com.aeidolon.vaultexplorer.container.VaultBackendRegistry
 import com.aeidolon.vaultexplorer.foldervault.FolderVaultOpener
+import com.aeidolon.vaultexplorer.foldervault.NativeFolderVault
 import com.aeidolon.vaultexplorer.foldervault.NativeVaultSession
 
 enum class FolderVaultIssueSeverity(val wire: Int) { INFO(0), WARNING(1), CRITICAL(2) }
@@ -61,11 +62,21 @@ object FolderVaultChecker {
 
     private class Wire(val format: Int, val sentinel: String, val formatWire: String, val container: ContainerFormat)
 
-    private fun wireOf(formatWire: String): Wire? = when (formatWire) {
-        "gocryptfs" -> Wire(0, "gocryptfs.conf", "gocryptfs", ContainerFormat.GOCRYPTFS)
-        "cryptomator", "directory_vault" -> Wire(1, "masterkey.cryptomator", "cryptomator", ContainerFormat.CRYPTOMATOR)
-        "cryfs" -> Wire(2, "cryfs.config", "cryfs", ContainerFormat.CRYFS)
-        else -> null
+    private fun wireOf(formatWire: String): Wire? {
+        val format = NativeFolderVault.formatFromWire(formatWire)
+        val container = when (format) {
+            NativeFolderVault.GOCRYPTFS -> ContainerFormat.GOCRYPTFS
+            NativeFolderVault.CRYPTOMATOR -> ContainerFormat.CRYPTOMATOR
+            NativeFolderVault.CRYFS -> ContainerFormat.CRYFS
+            else -> return null
+        }
+        // The canonical wire name: the legacy "directory_vault" is Cryptomator.
+        val canonical = when (container) {
+            ContainerFormat.GOCRYPTFS -> "gocryptfs"
+            ContainerFormat.CRYPTOMATOR -> "cryptomator"
+            else -> "cryfs"
+        }
+        return Wire(format, NativeFolderVault.configFileName(format), canonical, container)
     }
 
     private fun severityOf(code: String?): FolderVaultIssueSeverity = when (code) {

@@ -457,6 +457,7 @@ add_library(foldervault_core STATIC
         foldervault/fv_cryfs.cpp
         foldervault/fv_cryfs_vault.cpp
         foldervault/fv_check.cpp
+        foldervault/fv_formats.cpp
         foldervault/fv_check_gocryptfs.cpp
         foldervault/fv_check_cryptomator.cpp
         foldervault/fv_check_cryfs.cpp)

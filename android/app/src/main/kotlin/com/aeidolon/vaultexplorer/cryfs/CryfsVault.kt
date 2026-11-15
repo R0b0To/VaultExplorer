@@ -18,12 +18,13 @@ import com.aeidolon.vaultexplorer.saf.SafDocumentOps
  * kept in filesDir/cryfs_localstate exactly as before.
  */
 object CryfsVault {
-    private const val CONFIG_FILE_NAME = "cryfs.config"
+    private val CONFIG_FILE_NAME: String get() = NativeFolderVault.configFileName(NativeFolderVault.CRYFS)
 
     fun looksLikeVault(context: Context, treeUri: Uri): Boolean {
         val root = DocumentFile.fromTreeUri(context, treeUri) ?: return false
         val saf = SafDocumentOps(context)
-        return saf.childOf(root, CONFIG_FILE_NAME) != null
+        val name = CONFIG_FILE_NAME
+        return name.isNotEmpty() && saf.childOf(root, name) != null
     }
 
     fun open(
@@ -49,8 +50,10 @@ object CryfsVault {
         context: Context,
         vaultRootUri: Uri,
         password: CharArray,
-        cipher: String = CryfsConfigFile.DEFAULT_BLOCK_CIPHER,
-        blocksizeBytes: Int = CryfsConfigFile.DEFAULT_BLOCKSIZE,
+        // Empty cipher / 0 block size = the native defaults; anything unsupported or out of range falls back to
+        // them too (cpp/foldervault/fv_formats.h, normalizeCryfsCreateOptions).
+        cipher: String = "",
+        blocksizeBytes: Int = 0,
         userEntropy: ByteArray? = null,
         scryptLogN: Int = 0,
     ): VaultOpenResult<CryfsSession> =

@@ -21,6 +21,7 @@
 #include "jni_bridge_common.h"
 #include "jni_callbacks.h"
 #include "foldervault/fv_check.h"
+#include "foldervault/fv_formats.h"
 #include "foldervault/fv_vault.h"
 
 namespace {
@@ -552,7 +553,7 @@ FV_JNI(jint, nativeCreate)(JNIEnv* env, jclass, jint format, jstring rawRoot, jo
     fv::PlainResult r;
     if (format == 0) {
         fv::GocryptfsCreateOptions o;
-        o.cipher = opt[0] == 1 ? fv::GocryptfsCipher::XChaCha20Poly1305 : opt[0] == 2 ? fv::GocryptfsCipher::AesSiv : fv::GocryptfsCipher::Aes256Gcm;
+        o.cipher = fv::gocryptfsCipherFromName(toUtf8(env, cipherName));   // opt[0] is unused for gocryptfs
         o.plaintextNames = opt[1] != 0;
         o.deterministicNames = opt[2] != 0;
         o.longNameMax = opt[3];
@@ -563,8 +564,9 @@ FV_JNI(jint, nativeCreate)(JNIEnv* env, jclass, jint format, jstring rawRoot, jo
         fv::CryfsCreateOptions o;
         std::string cn = toUtf8(env, cipherName);
         if (!cn.empty()) o.cipher = cn;
-        if (opt[0] > 0) o.blocksizeBytes = opt[0];
+        if (opt[0] != 0) o.blocksizeBytes = opt[0];
         if (opt[1] > 0) o.scryptLogN = opt[1];   // 0 = app default
+        fv::normalizeCryfsCreateOptions(o);      // unsupported cipher / out-of-range block size -> defaults
         r = fv::createCryfs(*st, pw.b.data(), pw.b.size(), o, makeEnv(env, localState, tempDir));
     }
     st->close();
@@ -886,4 +888,29 @@ FV_JNI(jobjectArray, nativeRepair)(JNIEnv* env, jclass, jint format, jstring raw
         appendIssues(v, r.report.remaining);
     }
     return toStringArray(env, v);
+}
+
+// ------------------------------------------------- format knowledge (fv_formats.h) --
+
+// The legacy wire name "directory_vault" means Cryptomator. -1 = unknown.
+FV_JNI(jint, nativeFormatFromWire)(JNIEnv* env, jclass, jstring wire) {
+    fv::VaultFormat f;
+    if (!fv::formatFromWireName(toUtf8(env, wire), f)) return -1;
+    return f == fv::VaultFormat::Gocryptfs ? 0 : f == fv::VaultFormat::Cryptomator ? 1 : 2;
+}
+
+// The file that marks a vault of [format] (gocryptfs.conf / masterkey.cryptomator / cryfs.config); "" if unknown.
+FV_JNI(jstring, nativeConfigFileName)(JNIEnv* env, jclass, jint format) {
+    fv::VaultFormat f;
+    if (!wireFormat(format, f)) return fromUtf8(env, "");
+    return fromUtf8(env, fv::configFileName(f));
+}
+
+// Password-free structural check of a config file's bytes: null when it is fine, else the reason.
+FV_JNI(jstring, nativeValidateConfig)(JNIEnv* env, jclass, jint format, jbyteArray content) {
+    fv::VaultFormat f;
+    if (!wireFormat(format, f)) return fromUtf8(env, "Unknown folder vault format.");
+    std::string reason;
+    if (fv::validateConfigFile(f, toBytes(env, content), reason)) return nullptr;
+    return fromUtf8(env, reason);
 }

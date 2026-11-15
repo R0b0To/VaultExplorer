@@ -15,6 +15,7 @@ fv_engine.*       chunked file engine shared by gocryptfs + Cryptomator (random-
 fv_gocryptfs*     config, EME names, long names, AES-256-GCM / XChaCha20-Poly1305 / AES-SIV content, tree, session
 fv_cryptomator*   masterkey + JWT, SIV names, .c9s shortening, SIV_GCM / SIV_CTRMAC content, tree, session
 fv_cryfs*         config, block store + local integrity state, blob data tree, dir blobs, session
+fv_formats.h/.cpp format knowledge for hosts: config file names, wire names, config validation, create defaults
 fv_check*         Check & Repair for folder vaults: public API fv_check.h, one file per format (see below)
 fv_pool.h         small worker pool (CryFS fan-out)
 test/             fv_tests.cpp (unit/scenario/stress), fvcli.cpp, interop/ (real gocryptfs / Cryptomator / CryFS)
@@ -102,7 +103,7 @@ counters); report paths are cleartext paths with a leading `/`.
 
 ```
 cmake --build <build> --target foldervault_test fvcli   # host build, no Android toolchain
-ctest -R foldervault_test                               # 3938 checks, about a minute
+ctest -R foldervault_test                               # 4137 checks, about a minute
 FVCLI=<build>/fvcli CRYPTOMATOR_CLI=<cryptomator-cli> test/interop/run_all.sh   # real implementations over FUSE
 test/interop/oracle/fetch_oracle.sh                     # once: the official cryptofs jars (needs a JDK 21)
 FVCLI=<build>/fvcli test/interop/run_all.sh             # ...then also runs the cryptomator_{symlink,backup,migrate} cross-checks
@@ -263,5 +264,14 @@ Deliberate, each one verified against the real client where one exists:
   format 7 vault (including a format 8 key file whose `vault.cryptomator` has not synced yet) and, unlike
   official, aborts before changing anything if the backup cannot be written.
 
-Not migrated: the `looksLikeVault` probes stay in Kotlin. Check & Repair used to run on the Kotlin primitives
-(`foldercheck/`, fed by a key export onto the JVM heap); it now lives in `fv_check*` and the key export is gone.
+Nothing of the formats remains in Kotlin. The per-format Kotlin primitives (ciphers, config parsers, the CryFS
+block store, tree and integrity state) are gone, and with them the Kotlin copies of the file names and rules:
+`fv_formats.h` answers which file marks a format (`configFileName`), how a config file is validated before a
+backup is restored over it (`validateConfigFile`), what a "create" call accepts (`gocryptfsCipherFromName`,
+`normalizeCryfsCreateOptions`) and whether a folder looks like a vault (`looksLikeVault`; Android's SAF probes
+use the file name from there). The Android handlers only ask. Check & Repair used to run on those Kotlin primitives (fed by a key export onto the JVM heap); it now
+lives in `fv_check*` and the key export is gone.
+
+What stays in Kotlin on purpose is the Android adapter layer: the SAF/mirror `FolderVaultStorage`, the JNI wrappers
+(`NativeFolderVault`, `NativeVaultSession`, `FolderVaultOpener`) and the handlers that turn Dart arguments into
+native calls. A desktop host supplies its own `Storage` (`PosixStorage` is one) and calls the same functions.

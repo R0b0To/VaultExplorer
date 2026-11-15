@@ -37,6 +37,28 @@ internal object NativeFolderVault {
 
     @JvmStatic external fun nativeInit()
 
+    // ---- format knowledge (cpp/foldervault/fv_formats.h): the one place that knows the file names and rules.
+    private val configNames = arrayOfNulls<String>(3)
+
+    /** The file that marks a vault of [format] (and that header backup saves/restores); "" if unavailable. */
+    fun configFileName(format: Int): String {
+        if (!isAvailable || format !in 0..2) return ""
+        return configNames[format] ?: nativeConfigFileName(format).also { configNames[format] = it }
+    }
+
+    /** [GOCRYPTFS]/[CRYPTOMATOR]/[CRYFS] for a wire name ("directory_vault" = Cryptomator), or -1. */
+    fun formatFromWire(wire: String): Int = if (isAvailable) nativeFormatFromWire(wire) else -1
+
+    /** Password-free check that [content] is a genuine config file of [format]: null if so, else the reason. */
+    fun validateConfig(format: Int, content: ByteArray): String? =
+        if (isAvailable) nativeValidateConfig(format, content) else UNAVAILABLE_REASON
+
+    private const val UNAVAILABLE_REASON = "The native vault engine is not available."
+
+    @JvmStatic external fun nativeFormatFromWire(wire: String): Int
+    @JvmStatic external fun nativeConfigFileName(format: Int): String
+    @JvmStatic external fun nativeValidateConfig(format: Int, content: ByteArray): String?
+
     /**
      * Exactly one of [rawRoot] (a verified local directory; the core does all
      * I/O itself) or [bootstrap] (callbacks) locates the vault for the unlock

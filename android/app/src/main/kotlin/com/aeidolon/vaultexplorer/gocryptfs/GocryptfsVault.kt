@@ -17,12 +17,13 @@ import com.aeidolon.vaultexplorer.saf.SafDocumentOps
  * vault's files are read from.
  */
 object GocryptfsVault {
-    private const val CONFIG_FILE_NAME = "gocryptfs.conf"
+    private val CONFIG_FILE_NAME: String get() = NativeFolderVault.configFileName(NativeFolderVault.GOCRYPTFS)
 
     fun looksLikeVault(context: Context, treeUri: Uri): Boolean {
         val root = DocumentFile.fromTreeUri(context, treeUri) ?: return false
         val saf = SafDocumentOps(context)
-        return saf.childOf(root, CONFIG_FILE_NAME) != null
+        val name = CONFIG_FILE_NAME
+        return name.isNotEmpty() && saf.childOf(root, name) != null
     }
 
     fun open(context: Context, vaultRootUri: Uri, password: CharArray, readOnly: Boolean): VaultOpenResult<GocryptfsSession> =
@@ -34,7 +35,8 @@ object GocryptfsVault {
         context: Context,
         vaultRootUri: Uri,
         password: CharArray,
-        cipher: GocryptfsCipher = GocryptfsCipher.AES_256_GCM,
+        // "aes-256-gcm", "xchacha20-poly1305" or "aes-siv"; anything else (or empty) = the native default, AES-256-GCM.
+        cipher: String = "",
         plaintextNames: Boolean = false,
         userEntropy: ByteArray? = null,
         // gocryptfs -deterministic-names: no gocryptfs.diriv files, so two devices that create the same
@@ -43,16 +45,10 @@ object GocryptfsVault {
         // gocryptfs -longnamemax: 0 = default (255), otherwise 62..255.
         longNameMax: Int = 0,
     ): VaultOpenResult<GocryptfsSession> {
-        // Same order as the native enum: 0 = AES-256-GCM, 1 = XChaCha20-Poly1305, 2 = AES-SIV.
-        val cipherIndex = when (cipher) {
-            GocryptfsCipher.AES_256_GCM -> 0
-            GocryptfsCipher.XCHACHA20_POLY1305 -> 1
-            GocryptfsCipher.AES_SIV -> 2
-        }
         return FolderVaultOpener.create(
             context, vaultRootUri, NativeFolderVault.GOCRYPTFS, CONFIG_FILE_NAME, password,
-            intArrayOf(cipherIndex, if (plaintextNames) 1 else 0, if (deterministicNames) 1 else 0, longNameMax),
-            null, userEntropy,
+            intArrayOf(0, if (plaintextNames) 1 else 0, if (deterministicNames) 1 else 0, longNameMax),
+            cipher, userEntropy,
         ) { handle, volRef -> GocryptfsSession(context, vaultRootUri, handle, false, volRef) }
     }
 

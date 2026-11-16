@@ -434,8 +434,12 @@ class VaultFileIoApi {
     int quality = 70,
     bool preserveAlpha = false,
   }) async {
+    final sentAtMs = PerfTrace.enabled
+        ? DateTime.now().millisecondsSinceEpoch
+        : 0;
+    final t0 = PerfTrace.begin();
     try {
-      return await _channel
+      final bytes = await _channel
           .invokeMethod<Uint8List>(ChannelMethods.getImageThumbnail, {
             'filePath': container.uri,
             'fileName': fileName,
@@ -443,7 +447,17 @@ class VaultFileIoApi {
             'quality': quality,
             'preserveAlpha': preserveAlpha,
             'isLocalStorage': container.isLocalStorage,
+            if (sentAtMs != 0) 'sentAtMs': sentAtMs,
           });
+      if (t0 != 0) {
+        final done = PerfTrace.begin();
+        if (done - t0 >= 250000) {
+          final dot = fileName.lastIndexOf('.');
+          final ext = dot < 0 ? '' : fileName.substring(dot + 1).toLowerCase();
+          PerfTrace.sink('SLOW thumb.channel_img ext=$ext us=${done - t0}');
+        }
+      }
+      return bytes;
     } on PlatformException catch (e) {
       switch (e.code) {
         case 'IMAGE_TOO_LARGE':
@@ -824,9 +838,9 @@ class VaultFileIoApi {
         refresh: refresh,
       );
       PerfTrace.end('io.list.local', localT0, slowMs: 150);
-      // A growable copy (just references): the repository's own list is shared
-      // with its cache and must never be mutated by whoever shows it.
-      return ParsedDirectoryListing(List<RawEntry>.of(entries));
+    // The repository returns an UnmodifiableListView replaced on refresh,
+      // avoiding a 40k-element array copy on the UI thread.
+      return ParsedDirectoryListing(entries, preSortedByNameAsc: true);
     }
     final raw = await listDirectoryForBrowser(
       container,

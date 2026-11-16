@@ -596,7 +596,7 @@ class FileListViewState extends State<FileListView> {
     _syncGroupHost(groups, itemExtent, _headerExtentFor(_zoomLevel));
    return CustomScrollView(
       controller: controller,
-      cacheExtent: MediaQuery.sizeOf(context).height * 0.75,
+      cacheExtent: MediaQuery.sizeOf(context).height * 0.4,
       physics: scrollPhysics,
       slivers: [
         SliverPadding(
@@ -619,7 +619,7 @@ class FileListViewState extends State<FileListView> {
   Widget _buildListView(ScrollController? controller, double itemExtent, ScrollPhysics scrollPhysics, int total) {
    return ListView.builder(
       controller: controller,
-      cacheExtent: MediaQuery.sizeOf(context).height * 0.75,
+      cacheExtent: MediaQuery.sizeOf(context).height * 0.4,
       physics: scrollPhysics,
       itemExtent: itemExtent,
       findChildIndexCallback: _findChildIndex,

@@ -42,23 +42,24 @@ class DeviceCapabilityService {
               64 * 1024 * 1024;
           break;
 
-        case 'HIGH':
+          case 'HIGH':
           ThumbnailConcurrency.resizeForDevice(
             imageConcurrency: 6,
-            videoConcurrency: 2,
+            videoConcurrency: 4,
             inFlightCapacity: 240,
           );
           ThumbnailCacheService.resizeMemoryBudget(64 * 1024 * 1024); // 64 MB
           FullResImageCache.resize(300 * 1024 * 1024); // 300 MB
           PaintingBinding.instance.imageCache.maximumSizeBytes =
-              192 * 1024 * 1024;
+              256 * 1024 * 1024;
+          PaintingBinding.instance.imageCache.maximumSize = 1500;
           break;
 
         case 'MEDIUM':
         default:
           ThumbnailConcurrency.resizeForDevice(
             imageConcurrency: 4,
-            videoConcurrency: 1,
+            videoConcurrency: 2,
             inFlightCapacity: 160,
           );
           ThumbnailCacheService.resizeMemoryBudget(40 * 1024 * 1024); // 40 MB

@@ -18,7 +18,7 @@ part 'async_thumbnail_controller.g.dart';
 
 typedef ThumbnailFetchFn = Future<Uint8List> Function(MountedContainer, String);
 typedef ThumbnailSyncLookup = Uint8List? Function();
-
+typedef ThumbnailCacheLookup = Future<Uint8List?> Function();
 class AsyncThumbnailState {
   final Uint8List? bytes;
   final bool isLoading;
@@ -60,8 +60,8 @@ class AsyncThumbnailLoader extends _$AsyncThumbnailLoader {
   MountedContainer? _container;
   ThumbnailFetchFn? _fetchFn;
   ThumbnailSyncLookup? _syncLookup;
-  LruCache<String, Future<Uint8List>>? _cache;
-  PriorityTaskQueue? _limiter;
+  ThumbnailCacheLookup? _cacheLookup;
+  LruCache<String, Future<Uint8List>>? _cache;  PriorityTaskQueue? _limiter;
   Duration _debounce = const Duration(milliseconds: 30);
   TaskPriority _priority = TaskPriority.visible;
   TaskPriority Function()? _priorityResolver;
@@ -121,6 +121,7 @@ class AsyncThumbnailLoader extends _$AsyncThumbnailLoader {
     required LruCache<String, Future<Uint8List>> cache,
     required PriorityTaskQueue limiter,
     ThumbnailSyncLookup? syncLookup,
+    ThumbnailCacheLookup? cacheLookup,
     Duration debounce = const Duration(milliseconds: 30),
     TaskPriority priority = TaskPriority.visible,
     TaskPriority Function()? priorityResolver,
@@ -131,8 +132,8 @@ class AsyncThumbnailLoader extends _$AsyncThumbnailLoader {
     _container = container;
     _fetchFn = fetchFn;
     _syncLookup = syncLookup;
-    _cache = cache;
-    _limiter = limiter;
+    _cacheLookup = cacheLookup;
+    _cache = cache;    _limiter = limiter;
     _debounce = debounce;
     _priority = priority;
 
@@ -251,7 +252,9 @@ class AsyncThumbnailLoader extends _$AsyncThumbnailLoader {
     var future = cache[cacheKey];
 
     if (future == null) {
-      if (ref.mounted) state = state._copy(isLoading: true, hasError: false);
+      if (ref.mounted && (!state.isLoading || state.hasError)) {
+        state = state._copy(isLoading: true, hasError: false);
+      }
 
       if (_debounce > Duration.zero) {
         await Future.delayed(_debounce);
@@ -316,13 +319,27 @@ class AsyncThumbnailLoader extends _$AsyncThumbnailLoader {
     }
   }
 
-  Future<Uint8List> _fetchWithQueue(
+ Future<Uint8List> _fetchWithQueue(
     MountedContainer container,
     String targetPath,
     ThumbnailFetchFn fetchFn,
     PriorityTaskQueue limiter,
     TaskPriority priority,
   ) async {
+    final cacheLookup = _cacheLookup;
+    if (cacheLookup != null) {
+      final diskT0 = PerfTrace.begin();
+      final cached = await cacheLookup();
+      PerfTrace.end('thumb.disk_cache', diskT0);
+      if (!ref.mounted) {
+        throw Exception('Cancelled before processing');
+      }
+      if (cached != null && cached.isNotEmpty) {
+        PerfTrace.count('thumb.tile.disk_hit');
+        return cached;
+      }
+    }
+
     final completer = Completer<void>();
     _limiterCompleter = completer;
     bool acquired = false;
@@ -358,6 +375,14 @@ class AsyncThumbnailLoader extends _$AsyncThumbnailLoader {
               e is! ImagePreviewUnavailableException &&
               e is! PermanentThumbnailFailure);
       PerfTrace.end('thumb.fetch', fetchT0, slowMs: 300);
+      if (fetchT0 != 0) {
+        final fetchDone = PerfTrace.begin();
+        if (fetchDone - fetchT0 >= 300000) {
+          final dot = targetPath.lastIndexOf('.');
+          final ext = dot < 0 ? '' : targetPath.substring(dot + 1).toLowerCase();
+          PerfTrace.sink('SLOW thumb.fetch_ext ext=$ext us=${fetchDone - fetchT0}');
+        }
+      }
       return data;
     } finally {
       if (_limiterCompleter == completer) _limiterCompleter = null;

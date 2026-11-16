@@ -14,7 +14,7 @@ import 'async_thumbnail_controller.dart';
 
 export 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart';
 export 'async_thumbnail_controller.dart'
-    show ThumbnailFetchFn, ThumbnailSyncLookup;
+    show ThumbnailFetchFn, ThumbnailSyncLookup, ThumbnailCacheLookup;
 
 /// Generic async thumbnail loader.
 ///
@@ -36,6 +36,7 @@ class AsyncThumbnail extends ConsumerStatefulWidget {
   final ThumbnailFetchFn fetchFn;
   final Duration debounce;
   final ThumbnailSyncLookup? syncLookup;
+  final ThumbnailCacheLookup? cacheLookup;
   final int? cacheHeight;
 
   final TaskPriority priority;
@@ -53,8 +54,9 @@ class AsyncThumbnail extends ConsumerStatefulWidget {
     required this.limiter,
     required this.fetchFn,
     required this.imageBuilder,
-    this.debounce = const Duration(milliseconds: 30),
+   this.debounce = const Duration(milliseconds: 30),
     this.syncLookup,
+    this.cacheLookup,
     this.cacheHeight,
     this.priority = TaskPriority.visible,
     this.loadingBuilder,
@@ -142,6 +144,7 @@ class _AsyncThumbnailState extends ConsumerState<AsyncThumbnail> {
           cache: widget.cache,
           limiter: widget.limiter,
           syncLookup: widget.syncLookup,
+          cacheLookup: widget.cacheLookup,
           debounce: _debounceFor(widget.debounce),
           priority: widget.priority,
           priorityResolver: _resolvePriority,

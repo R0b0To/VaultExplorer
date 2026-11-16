@@ -1559,11 +1559,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     );
     final Widget tabStripSlot = stripSlotFor(strip);
 
-    final shell = ValueListenableBuilder<Widget?>(
-      valueListenable: _chrome.bottomBar,
-      builder: (context, bottomBar, _) => Scaffold(
-        resizeToAvoidBottomInset: false,
-      body: Stack(
+    final Widget shellBody = Stack(
         fit: StackFit.expand,
         children: [
           SafeArea(
@@ -1654,19 +1650,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                         }
 
                         _publishVisibleTabs(const <TabId>{});
-                        // Only the pager gets the larger touch slop; every page
-                        // keeps the platform's own, so lists inside a tab scroll
-                        // as usual.
-                        final pageMedia = MediaQuery.of(context);
-                        final pagerMedia = pageMedia.copyWith(
-                          gestureSettings: DeviceGestureSettings(
-                            touchSlop:
-                                (pageMedia.gestureSettings.touchSlop ??
-                                    kTouchSlop) *
-                                _tabPagerSlopFactor,
-                          ),
-                        );
-                        return Listener(
+                         return Listener(
                           behavior: HitTestBehavior.translucent,
                           onPointerDown: _onBrowserPointerDown,
                           onPointerMove: _onBrowserPointerMove,
@@ -1682,8 +1666,11 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                                 ),
                             child: FadeTransition(
                               opacity: _loopFade,
-                              child: MediaQuery(
-                                data: pagerMedia,
+                              // Only the pager gets the larger touch slop; every page
+                              // keeps the platform's own, and isolating MediaQuery here
+                              // prevents keyboard animations from rebuilding all tabs.
+                              child: _ScaledTouchSlopMediaQuery(
+                                slopFactor: _tabPagerSlopFactor,
                                 child: PageView.builder(
                                   controller: _pageController,
                                   // The larger slop would otherwise swallow the
@@ -1728,12 +1715,11 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                                       key: ValueKey<TabId>(tab.tabId),
                                       controller: _pageController,
                                       index: index,
-                                      child: MediaQuery(
-                                        data: pageMedia,
-                                        child: _buildTabContent(
-                                          tab,
-                                          isActive: pageIsActive,
-                                        ),
+                                      restoreTouchSlopFactor:
+                                          _tabPagerSlopFactor,
+                                      child: _buildTabContent(
+                                        tab,
+                                        isActive: pageIsActive,
                                       ),
                                     );
                                   },
@@ -1760,19 +1746,27 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
               ),
             ),
         ],
-      ),
-      floatingActionButton: ValueListenableBuilder<Widget?>(
+      );
+
+    final shell = ValueListenableBuilder<Widget?>(
+      valueListenable: _chrome.bottomBar,
+      child: shellBody,
+      builder: (context, bottomBar, bodyChild) => Scaffold(
+        resizeToAvoidBottomInset: false,
+        body: bodyChild,
+        floatingActionButton: ValueListenableBuilder<Widget?>(
         valueListenable: _chrome.floatingAction,
         builder: (context, action, _) => action ?? const SizedBox.shrink(),
       ),
-      bottomNavigationBar: appBarAtBottom
-          ? Padding(
-              // Scaffold lets the keyboard cover its bottom bar, and the app
-              // bar holds the search field, so it rides above the keyboard.
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.viewInsetsOf(context).bottom,
-              ),
-              child: Column(
+       bottomNavigationBar: appBarAtBottom
+          ? Builder(
+              builder: (bottomContext) => Padding(
+                // Scaffold lets the keyboard cover its bottom bar, and the app
+                // bar holds the search field, so it rides above the keyboard.
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.viewInsetsOf(bottomContext).bottom,
+                ),
+                child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // The app bar goes under this slot, at the screen's edge, and
@@ -1802,6 +1796,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                   ),
                 ],
               ),
+            ),
             )
           : bottomBar,
       ),
@@ -2098,15 +2093,66 @@ class _BottomAppBarSlot extends ConsumerWidget {
 /// the page's position in the viewport rather than the active tab: during a
 /// swipe both the leaving and the entering page are partly visible, and both
 /// must keep painting their thumbnails until the leaving one is fully gone.
+class _ScaledTouchSlopMediaQuery extends StatelessWidget {
+  const _ScaledTouchSlopMediaQuery({
+    required this.slopFactor,
+    required this.child,
+  });
+
+  final double slopFactor;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final data = MediaQuery.of(context);
+    final originalSlop = data.gestureSettings.touchSlop ?? kTouchSlop;
+    return MediaQuery(
+      data: data.copyWith(
+        gestureSettings: DeviceGestureSettings(
+          touchSlop: originalSlop * slopFactor,
+        ),
+      ),
+      child: child,
+    );
+  }
+}
+
+class _RestoredTouchSlopMediaQuery extends StatelessWidget {
+  const _RestoredTouchSlopMediaQuery({
+    required this.slopFactor,
+    required this.child,
+  });
+
+  final double slopFactor;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final data = MediaQuery.of(context);
+    final scaledSlop =
+        data.gestureSettings.touchSlop ?? (kTouchSlop * slopFactor);
+    return MediaQuery(
+      data: data.copyWith(
+        gestureSettings: DeviceGestureSettings(
+          touchSlop: scaledSlop / slopFactor,
+        ),
+      ),
+      child: child,
+    );
+  }
+}
+
 class _BrowserTabPage extends StatefulWidget {
   final PageController controller;
   final int index;
+  final double restoreTouchSlopFactor;
   final Widget child;
 
   const _BrowserTabPage({
     super.key,
     required this.controller,
     required this.index,
+    this.restoreTouchSlopFactor = 1.0,
     required this.child,
   });
 
@@ -2190,7 +2236,12 @@ class _BrowserTabPageState extends State<_BrowserTabPage>
       child: Material(
         type: MaterialType.transparency,
         clipBehavior: Clip.hardEdge,
-        child: widget.child,
+        child: widget.restoreTouchSlopFactor == 1.0
+            ? widget.child
+            : _RestoredTouchSlopMediaQuery(
+                slopFactor: widget.restoreTouchSlopFactor,
+                child: widget.child,
+              ),
       ),
     );
   }
@@ -2325,19 +2376,11 @@ class _PaneTabPagerState extends State<_PaneTabPager> {
 
   @override
   Widget build(BuildContext context) {
-    final pageMedia = MediaQuery.of(context);
-    final pagerMedia = pageMedia.copyWith(
-      gestureSettings: DeviceGestureSettings(
-        touchSlop:
-            (pageMedia.gestureSettings.touchSlop ?? kTouchSlop) *
-            widget.slopFactor,
-      ),
-    );
     final tabs = widget.tabs;
     return FadeTransition(
       opacity: widget.fade,
-      child: MediaQuery(
-        data: pagerMedia,
+      child: _ScaledTouchSlopMediaQuery(
+        slopFactor: widget.slopFactor,
         child: PageView.builder(
           controller: _controller,
           dragStartBehavior: DragStartBehavior.down,
@@ -2362,10 +2405,8 @@ class _PaneTabPagerState extends State<_PaneTabPager> {
               key: ValueKey<TabId>(tab.tabId),
               controller: _controller,
               index: index,
-              child: MediaQuery(
-                data: pageMedia,
-                child: widget.pageBuilder(tab),
-              ),
+              restoreTouchSlopFactor: widget.slopFactor,
+              child: widget.pageBuilder(tab),
             );
           },
         ),

@@ -534,26 +534,9 @@ void _onControllerChange() {
         fit: StackFit.passthrough,
         children: [
           ScrollSpeedScope(fast: _speedNotifier, child: widget.child),
-          Positioned.fill(
-            child: ValueListenableBuilder<int>(
-              valueListenable: _overlayTick,
-              builder: (context, _, _) {
-                final cs = Theme.of(context).colorScheme;
-                final scrollbarTheme = Theme.of(context).scrollbarTheme;
-                final thumbColor =
-                    scrollbarTheme.thumbColor?.resolve({
-                      if (_isDragging) WidgetState.dragged,
-                    }) ??
-                    (_isDragging
-                        ? cs.primary
-                        : cs.primary.withValues(alpha: 0.5));
-                final trackColor =
-                    scrollbarTheme.trackColor?.resolve({
-                      if (_isDragging) WidgetState.dragged,
-                    }) ??
-                    cs.primary.withValues(alpha: 0.15);
-                return LayoutBuilder(
-                  builder: (context, constraints) {
+         Positioned.fill(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
                 final isVertical = widget.axis == Axis.vertical;
                 final leadingInset = isVertical
                     ? widget.padding.top
@@ -566,12 +549,6 @@ void _onControllerChange() {
                     : constraints.maxWidth - leadingInset - trailingInset;
 
                 if (trackExtent <= 0) return const SizedBox.shrink();
-
-                final canScroll = _canScroll;
-                final thumbExtent = _calculateThumbExtent(trackExtent);
-                final travelDistance = trackExtent - thumbExtent;
-                final thumbStart =
-                    leadingInset + (_scrollFraction * travelDistance);
 
                 final interactiveTrack = GestureDetector(
                   behavior: HitTestBehavior.translucent,
@@ -597,27 +574,51 @@ void _onControllerChange() {
                   child: const SizedBox.expand(),
                 );
 
-                return Stack(
-                  key: _trackKey,
-                  children: [
-                    // Interactive edge strip covering the full track.
-                    if (canScroll)
-                      isVertical
-                          ? Positioned(
-                              right: 0,
-                              top: leadingInset,
-                              height: trackExtent,
-                              width: widget.touchWidth,
-                              child: interactiveTrack,
-                            )
-                          : Positioned(
-                              bottom: 0,
-                              left: leadingInset,
-                              width: trackExtent,
-                              height: widget.touchWidth,
-                              child: interactiveTrack,
-                            ),
+                return ValueListenableBuilder<int>(
+                  valueListenable: _overlayTick,
+                  child: interactiveTrack,
+                  builder: (context, _, cachedTrack) {
+                    final cs = Theme.of(context).colorScheme;
+                    final scrollbarTheme = Theme.of(context).scrollbarTheme;
+                    final thumbColor =
+                        scrollbarTheme.thumbColor?.resolve({
+                          if (_isDragging) WidgetState.dragged,
+                        }) ??
+                        (_isDragging
+                            ? cs.primary
+                            : cs.primary.withValues(alpha: 0.5));
+                    final trackColor =
+                        scrollbarTheme.trackColor?.resolve({
+                          if (_isDragging) WidgetState.dragged,
+                        }) ??
+                        cs.primary.withValues(alpha: 0.15);
 
+                    final canScroll = _canScroll;
+                    final thumbExtent = _calculateThumbExtent(trackExtent);
+                    final travelDistance = trackExtent - thumbExtent;
+                    final thumbStart =
+                        leadingInset + (_scrollFraction * travelDistance);
+
+                    return Stack(
+                      key: _trackKey,
+                      children: [
+                        // Interactive edge strip covering the full track.
+                        if (canScroll)
+                          isVertical
+                              ? Positioned(
+                                  right: 0,
+                                  top: leadingInset,
+                                  height: trackExtent,
+                                  width: widget.touchWidth,
+                                  child: cachedTrack!,
+                                )
+                              : Positioned(
+                                  bottom: 0,
+                                  left: leadingInset,
+                                  width: trackExtent,
+                                  height: widget.touchWidth,
+                                  child: cachedTrack!,
+                                ),
                     // Guide track line when actively dragging
                     if (_isDragging && canScroll)
                       isVertical
@@ -753,8 +754,8 @@ void _onControllerChange() {
                           ),
                         ),
                       ),
-                  ],
-                );
+                 ],
+                    );
                   },
                 );
               },

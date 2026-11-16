@@ -41,8 +41,8 @@ class ContainerInputStream(
         return actual
     }
 
-    override fun skip(n: Long): Long {
-        if (n <= 0) return 0
+   override fun skip(n: Long): Long {
+        if (n <= 0 || fileSize < 0) return 0
         val actualSkip = minOf(n, fileSize - position)
         position += actualSkip
         return actualSkip
@@ -70,7 +70,15 @@ class ContainerMediaDataSource(
     private val volId: Int
 ) : MediaDataSource() {
 
+   companion object {
+        private const val READ_AHEAD_BYTES = 128 * 1024
+        private const val MAX_CACHED_WINDOWS = 4
+    }
+
+    private class CachedWindow(val start: Long, val data: ByteArray)
+
     private var cachedSize: Long = -1L
+    private val windows = ArrayList<CachedWindow>(MAX_CACHED_WINDOWS)
 
     override fun getSize(): Long {
         if (cachedSize >= 0) return cachedSize
@@ -83,25 +91,69 @@ class ContainerMediaDataSource(
         return size
     }
 
+    @Synchronized
     override fun readAt(position: Long, buffer: ByteArray, offset: Int, size: Int): Int {
+        if (size <= 0) return 0
         val fileLength = getSize()
-        if (position >= fileLength) {
+        if (fileLength <= 0L || position < 0L || position >= fileLength) {
             return -1
         }
-        val readSize = minOf(size.toLong(), fileLength - position).toInt()
+        val maxWritable = buffer.size - offset
+        if (offset < 0 || maxWritable <= 0) return 0
+        val readSize = minOf(size.toLong(), fileLength - position, maxWritable.toLong()).toInt()
         if (readSize <= 0) return -1
+
+        for (i in windows.lastIndex downTo 0) {
+            val w = windows[i]
+            if (position >= w.start && position < w.start + w.data.size) {
+                val inOffset = (position - w.start).toInt()
+                val avail = w.data.size - inOffset
+                if (avail >= readSize || w.start + w.data.size >= fileLength) {
+                    val n = minOf(readSize, avail)
+                    System.arraycopy(w.data, inOffset, buffer, offset, n)
+                    if (i != windows.lastIndex) {
+                        windows.removeAt(i)
+                        windows.add(w)
+                    }
+                    return n
+                }
+            }
+        }
+
         return try {
-            val chunk = ContainerFileSystem.readFileChunk(volId, fileName, position, readSize)
-            if (chunk == null || chunk.isEmpty()) {
+            if (readSize >= READ_AHEAD_BYTES) {
+                val chunk = ContainerFileSystem.readFileChunk(volId, fileName, position, readSize)
+                if (chunk == null || chunk.isEmpty()) {
+                    return -1
+                }
+                val actualRead = minOf(chunk.size, readSize)
+                System.arraycopy(chunk, 0, buffer, offset, actualRead)
+                chunk.fill(0)
+                return actualRead
+            }
+
+            val fetchSize = minOf(READ_AHEAD_BYTES.toLong(), fileLength - position).toInt()
+            val fetched = ContainerFileSystem.readFileChunk(volId, fileName, position, fetchSize)
+            if (fetched == null || fetched.isEmpty()) {
                 return -1
             }
-            val actualRead = minOf(chunk.size, readSize)
-            System.arraycopy(chunk, 0, buffer, offset, actualRead)
+            if (windows.size >= MAX_CACHED_WINDOWS) {
+                windows.removeAt(0).data.fill(0)
+            }
+            windows.add(CachedWindow(position, fetched))
+            val actualRead = minOf(fetched.size, readSize)
+            System.arraycopy(fetched, 0, buffer, offset, actualRead)
             actualRead
         } catch (e: Exception) {
             -1
         }
     }
 
-    override fun close() {}
+    @Synchronized
+    override fun close() {
+        for (w in windows) {
+            w.data.fill(0)
+        }
+        windows.clear()
+    }
 }

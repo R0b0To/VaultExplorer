@@ -130,15 +130,12 @@ class FileTile extends StatelessWidget {
 
   Widget _buildTile(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    String displayName = entry.name;
-    final ext = displayName.split('.').last;
+   String displayName = entry.name;
+    final dot = displayName.lastIndexOf('.');
+    final ext = dot < 0 ? displayName : displayName.substring(dot + 1);
     final vaultIcon = entry.isSymlink ? null : vaultIconForExt(ext);
-    if (vaultIcon != null) {
-      final parts = displayName.split('.');
-      if (parts.length > 1) {
-        parts.removeLast();
-        displayName = parts.join('.');
-      }
+    if (vaultIcon != null && dot > 0) {
+      displayName = displayName.substring(0, dot);
     }
     // Folders have no extension: "backup.2024" is a whole name.
     if (!showFileExtensions &&
@@ -512,8 +509,9 @@ class _ListImageThumb extends ConsumerWidget {
     ThumbnailCacheMode mode,
     ThumbnailQuality quality,
     ArchiveContext? archiveContext,
-    String? archiveRootPath,
-  ) async {
+    String? archiveRootPath, {
+    bool skipCache = false,
+  }) async {
     if (archiveContext != null && archiveRootPath != null) {
       // Sourced by extracting the entry rather than the native container
       // thumbnail API -- see archive_thumbnail_support.dart. Cached
@@ -531,7 +529,7 @@ class _ListImageThumb extends ConsumerWidget {
       thumbnailCache.cacheInMemory(container, path, bytes, quality);
       return bytes;
     }
-    if (mode != ThumbnailCacheMode.disabled) {
+    if (!skipCache && mode != ThumbnailCacheMode.disabled) {
       final cached = await thumbnailCache.fetch(
         container: container,
         filePath: path,
@@ -572,6 +570,8 @@ class _ListImageThumb extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
     final fileIoApi = ref.read(vaultFileIoApiProvider);
+    final hasDiskCache =
+        archiveContext == null && cacheMode != ThumbnailCacheMode.disabled;
     return AsyncThumbnail(
       key: ValueKey('list_img:$filePath'),
       container: container,
@@ -588,13 +588,23 @@ class _ListImageThumb extends ConsumerWidget {
         quality,
         archiveContext,
         archiveRootPath,
+        skipCache: hasDiskCache,
       ),
       debounce: const Duration(milliseconds: 30),
       syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
+      cacheLookup: hasDiskCache
+          ? () => thumbnailCache.fetch(
+                container: container,
+                filePath: filePath,
+                mode: cacheMode,
+                quality: quality,
+              )
+          : null,
       cacheHeight: quality.scaledSize(180),
       imageBuilder: (context, bytes, cacheHeight) => Image.memory(
         bytes,
         fit: BoxFit.cover,
+        filterQuality: FilterQuality.low,
         width: double.infinity,
         height: double.infinity,
         cacheHeight: cacheHeight,
@@ -648,8 +658,9 @@ class _ListVideoThumb extends ConsumerWidget {
     ThumbnailCacheMode mode,
     ThumbnailQuality quality,
     ArchiveContext? archiveContext,
-    String? archiveRootPath,
-  ) => VideoThumbnailFetcher.fetch(
+    String? archiveRootPath, {
+    bool checkCache = true,
+  }) => VideoThumbnailFetcher.fetch(
     thumbnailCache,
     fileIoApi,
     container,
@@ -659,12 +670,15 @@ class _ListVideoThumb extends ConsumerWidget {
     targetSize: quality.scaledSize(180),
     archiveContext: archiveContext,
     archiveRootPath: archiveRootPath,
+    checkCache: checkCache,
   );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
     final fileIoApi = ref.read(vaultFileIoApiProvider);
+    final hasDiskCache =
+        archiveContext == null && cacheMode != ThumbnailCacheMode.disabled;
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -684,14 +698,24 @@ class _ListVideoThumb extends ConsumerWidget {
             quality,
             archiveContext,
             archiveRootPath,
+            checkCache: !hasDiskCache,
           ),
           debounce: const Duration(milliseconds: 60),
           syncLookup: () =>
               thumbnailCache.peekMemory(container, filePath, quality),
+          cacheLookup: hasDiskCache
+              ? () => thumbnailCache.fetch(
+                    container: container,
+                    filePath: filePath,
+                    mode: cacheMode,
+                    quality: quality,
+                  )
+              : null,
           cacheHeight: quality.scaledSize(180),
           imageBuilder: (context, bytes, cacheHeight) => Image.memory(
             bytes,
             fit: BoxFit.cover,
+            filterQuality: FilterQuality.low,
             width: double.infinity,
             height: double.infinity,
             cacheHeight: cacheHeight,
@@ -808,6 +832,14 @@ class _ListApkIconThumb extends ConsumerWidget {
       fetchFn: (c, p) => _fetch(thumbnailCache, fileIoApi, c, p, cacheMode, quality),
       debounce: const Duration(milliseconds: 30),
       syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
+      cacheLookup: cacheMode != ThumbnailCacheMode.disabled
+          ? () => thumbnailCache.fetch(
+                container: container,
+                filePath: filePath,
+                mode: cacheMode,
+                quality: quality,
+              )
+          : null,
       cacheHeight: quality.scaledSize(180),
       // An app icon is meant to be seen whole, unlike a photo -- contain
       // rather than image/video's cover, so it's never cropped. The row
@@ -819,6 +851,7 @@ class _ListApkIconThumb extends ConsumerWidget {
       imageBuilder: (context, bytes, cacheHeight) => Image.memory(
         bytes,
         fit: BoxFit.contain,
+        filterQuality: FilterQuality.low,
         cacheHeight: cacheHeight,
         errorBuilder: (_, _, _) => _fallbackWidget(),
       ),
@@ -890,10 +923,19 @@ class _ListBookCoverThumb extends ConsumerWidget {
       )).bytes,
       debounce: const Duration(milliseconds: 30),
       syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
+      cacheLookup: cacheMode != ThumbnailCacheMode.disabled
+          ? () => thumbnailCache.fetch(
+                container: container,
+                filePath: filePath,
+                mode: cacheMode,
+                quality: quality,
+              )
+          : null,
       cacheHeight: quality.scaledSize(180),
       imageBuilder: (context, bytes, cacheHeight) => Image.memory(
         bytes,
         fit: BoxFit.cover,
+        filterQuality: FilterQuality.low,
         alignment: Alignment.topCenter,
         width: double.infinity,
         height: double.infinity,

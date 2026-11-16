@@ -244,6 +244,17 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   int? _selectionAppBarSignature;
   BrowserAppBarFactory? _selectionAppBarFactory;
 
+  Object? _dbgLastNav;
+  Object? _dbgLastSel;
+  Object? _dbgLastAggSel;
+  Object? _dbgLastSort;
+  Object? _dbgLastSearch;
+  Object? _dbgLastToolbar;
+  Object? _dbgLastItems;
+  bool? _dbgLastDragLocked;
+  (Size, EdgeInsets, EdgeInsets, Orientation)? _dbgLastMq;
+  ColorScheme? _dbgLastTheme;
+
   BrowserAppBarFactory _appBarFactoryFor({
     required int signature,
     required bool selectionMode,
@@ -624,29 +635,21 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   int? _lastBuiltFloatingActionSignature;
   int? _lastPublishedFloatingActionSignature;
   Widget? _lastBuiltFloatingAction;
-  List<RawEntry>? _itemsUsedForFloatingActionSignature;
-  int _cachedFloatingActionItemsSignature = 0;
+  List<RawEntry>? _canPlayMediaItemsSource;
+  bool _cachedCanPlayMedia = false;
 
-  int _floatingActionItemsSignature() {
-    final items = _currentItems;
-    if (identical(items, _itemsUsedForFloatingActionSignature)) {
-      return _cachedFloatingActionItemsSignature;
+  bool _canPlayMediaIn(List<RawEntry> items) {
+    if (identical(items, _canPlayMediaItemsSource)) return _cachedCanPlayMedia;
+    _canPlayMediaItemsSource = items;
+    for (final e in items) {
+      if (e.isDir || _isSupportedMedia(e.name)) {
+        return _cachedCanPlayMedia = true;
+      }
     }
-    _itemsUsedForFloatingActionSignature = items;
-    _cachedFloatingActionItemsSignature = Object.hashAll(
-      items.map(
-        (entry) => Object.hash(
-          entry.name,
-          entry.isDir,
-          entry.sizeBytes,
-          entry.modifiedSecs,
-          entry.isPlaceholder,
-        ),
-      ),
-    );
-    return _cachedFloatingActionItemsSignature;
+    return _cachedCanPlayMedia = false;
   }
 
+  int _floatingActionItemsSignature() => _canPlayMediaIn(_currentItems) ? 1 : 0;
   FileBrowserPinsBookmarksState get _pinsBookmarks =>
       ref.watch(fileBrowserPinsBookmarksProvider(widget.container.volId));
   FileBrowserPinsBookmarks get _pinsBookmarksNotifier => ref.read(
@@ -1025,7 +1028,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     final result = <int, ({double top, double height})>{};
     if (targets.isEmpty) return result;
     final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+        MediaQuery.orientationOf(context) == Orientation.landscape;
 
     switch (_layoutMode) {
       case BrowserLayoutMode.list:
@@ -5795,12 +5798,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     required SortBy sortBy,
     required bool sortAscending,
   }) {
-    final hasLocalMedia = currentItems
-        .where((e) => !e.isDir)
-        .map((e) => e.name)
-        .any(_isSupportedMedia);
-    final hasSubfolders = currentItems.any((e) => e.isDir);
-    final canPlayMedia = hasLocalMedia || hasSubfolders;
+    final canPlayMedia = _canPlayMediaIn(currentItems);
     return {
       FileManagerAction.search: (context) => IconButton(
         icon: Icon(
@@ -5896,6 +5894,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     return _listingCache.resolve(
       BrowserListingInputs(
         items: _currentItems,
+        preSortedByNameAsc: _nav.preSortedByNameAsc,
         placeholders: placeholders,
         pendingDeletedNames: pendingDeletedNames,
         query: query,
@@ -5926,12 +5925,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     final widgets = <Widget>[];
 
     if (showMore) {
-      final hasLocalMedia = _currentItems
-          .where((e) => !e.isDir)
-          .map((e) => e.name)
-          .any(_isSupportedMedia);
-      final hasSubfolders = _currentItems.any((e) => e.isDir);
-      final canPlayMedia = hasLocalMedia || hasSubfolders;
+      final canPlayMedia = _canPlayMediaIn(_currentItems);
 
       // When the Add FAB is visible, place More to its left (56dp FAB + 12dp spacing = 68dp).
       // If the Add FAB is hidden via config, More takes the primary bottom-right slot.
@@ -6027,9 +6021,10 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     // Every file/folder tile, and the bookmark bar, below this point reads the
     // user's chosen skin from here. Kept as a thin wrapper so the (very
     // large) screen body itself is untouched.
+    final t0 = PerfTrace.begin();
     PerfTrace.count('ui.dir_view.build');
     final skinTokens = Theme.of(context).extension<AppSkinTokens>();
-    return FileManagerSkinScope(
+    final built = FileManagerSkinScope(
       skin: skinTokens == null
           ? _toolbarConfig.skin
           : skinTokens.fileManagerFollowsAppSkin
@@ -6037,6 +6032,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
           : skinTokens.manualFileManagerSkin,
       child: _buildBrowser(context),
     );
+    PerfTrace.end('ui.dir_view.build_ms', t0, slowMs: 25);
+    return built;
   }
 
   Widget _buildBrowser(BuildContext context) {
@@ -6080,25 +6077,23 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     final effectiveToolbarUri = widget.container.isLocalStorage
         ? null
         : widget.container.uri;
-    ref.listen<FileManagerToolbarSettingsState>(
+   ref.listen<FileManagerToolbarSettingsState>(
       fileManagerToolbarSettingsProvider(effectiveToolbarUri),
       (previous, next) {
         if (next.loading) return;
         if (previous?.config != next.config) {
-          setState(() {
-            _toolbarConfig = next.config;
-            _toolbarConfigReady = true;
-            // The app-wide thumbnail default (or the Local Storage slot) may
-            // be what changed, and this browser may be following it.
-            _applyResolvedThumbnails(next.config);
-          });
+          _toolbarConfig = next.config;
+          _toolbarConfigReady = true;
+          _applyResolvedThumbnails(next.config);
+          if (_isVisibleTab) setState(() {});
         }
-        // Vault records were rewritten in bulk ("reset all vaults to the
-        // default"); a vault's own thumbnail settings live in its record, so
-        // re-read it.
         if (previous?.thumbnailOverridesRevision !=
             next.thumbnailOverridesRevision) {
-          _loadToolbarConfig();
+          if (_isVisibleTab) {
+            _loadToolbarConfig();
+          } else {
+            _navNotifier.markNeedsRefresh();
+          }
         }
       },
     );
@@ -6106,7 +6101,11 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       if (previous?.running == true &&
           !next.running &&
           next.lastCompletedReport?.didWork == true) {
-        _loadDirectoryContents(_currentDirPath, refresh: true);
+        if (_isVisibleTab) {
+          _loadDirectoryContents(_currentDirPath, refresh: true);
+        } else {
+          _navNotifier.markNeedsRefresh();
+        }
       }
     });
     // The hosting shell closes a vault's tabs when it locks, detaches, or its
@@ -6151,7 +6150,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       previewSort,
     );
     final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+        MediaQuery.orientationOf(context) == Orientation.landscape;
     // True while another viewport owns a drag: this one is then only a drop
     // target. Selecting this watch by tab keeps the source viewport (and any
     // idle one) from rebuilding when a drag starts or ends.
@@ -6224,6 +6223,71 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         insideArchive: nav.archiveContext != null,
         items: items,
       ));
+    }
+
+    if (PerfTrace.enabled) {
+      // Read MediaQuery without subscribing to aspects (like viewInsets) that
+      // _buildBrowser does not otherwise watch when search is closed.
+      final mqData = context.getInheritedWidgetOfExactType<MediaQuery>()?.data;
+      final mq = mqData == null
+          ? (Size.zero, EdgeInsets.zero, EdgeInsets.zero, Orientation.portrait)
+          : (mqData.size, mqData.padding, mqData.viewInsets, mqData.orientation);
+      // Compare colorScheme identity rather than ThemeData (ThemeData.localize
+      // allocates a fresh wrapper on every Theme.of call).
+      final themeScheme = Theme.of(context).colorScheme;
+      final sortState = ref.read(fileBrowserSortProvider(_stateKey));
+      final navChanged = !identical(_dbgLastNav, appBarNavigation);
+      final selChanged = !identical(_dbgLastSel, localSelection);
+      final aggSelChanged = _dbgLastAggSel != aggregateSelection;
+      final sortChanged = !identical(_dbgLastSort, sortState);
+      final searchChanged = !identical(_dbgLastSearch, appBarSearch);
+      final toolbarChanged = !identical(_dbgLastToolbar, _toolbarConfig);
+      final itemsChanged = !identical(_dbgLastItems, _currentItems);
+      final dragChanged = _dbgLastDragLocked != dragLocked;
+      final mqChanged = _dbgLastMq != mq;
+      final themeChanged = !identical(_dbgLastTheme, themeScheme);
+
+      if (navChanged) PerfTrace.count('ui.dir_view.why.nav');
+      if (selChanged) PerfTrace.count('ui.dir_view.why.sel');
+      if (aggSelChanged) PerfTrace.count('ui.dir_view.why.agg_sel');
+      if (sortChanged) PerfTrace.count('ui.dir_view.why.sort');
+      if (searchChanged) PerfTrace.count('ui.dir_view.why.search');
+      if (toolbarChanged) PerfTrace.count('ui.dir_view.why.toolbar');
+      if (itemsChanged) PerfTrace.count('ui.dir_view.why.items');
+      if (dragChanged) PerfTrace.count('ui.dir_view.why.drag');
+      if (mqChanged) {
+        PerfTrace.count('ui.dir_view.why.mq');
+        final prevMq = _dbgLastMq;
+        if (prevMq != null) {
+          if (prevMq.$1 != mq.$1) PerfTrace.count('ui.dir_view.why.mq.size');
+          if (prevMq.$2 != mq.$2) PerfTrace.count('ui.dir_view.why.mq.pad');
+          if (prevMq.$3 != mq.$3) PerfTrace.count('ui.dir_view.why.mq.insets');
+          if (prevMq.$4 != mq.$4) PerfTrace.count('ui.dir_view.why.mq.orient');
+        }
+      }
+      if (themeChanged) PerfTrace.count('ui.dir_view.why.theme');
+      if (!navChanged &&
+          !selChanged &&
+          !aggSelChanged &&
+          !sortChanged &&
+          !searchChanged &&
+          !toolbarChanged &&
+          !dragChanged &&
+          !mqChanged &&
+          !themeChanged) {
+        PerfTrace.count('ui.dir_view.why.other_or_parent');
+      }
+
+      _dbgLastNav = appBarNavigation;
+      _dbgLastSel = localSelection;
+      _dbgLastAggSel = aggregateSelection;
+      _dbgLastSort = sortState;
+      _dbgLastSearch = appBarSearch;
+      _dbgLastToolbar = _toolbarConfig;
+      _dbgLastItems = _currentItems;
+      _dbgLastDragLocked = dragLocked;
+      _dbgLastMq = mq;
+      _dbgLastTheme = themeScheme;
     }
 
     final hasAnySelection =
@@ -6368,10 +6432,13 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     final baseBottomOffset =
         16.0 + (!isLandscape && showBookmarkBar ? 0.0 : bottomSystemInset);
 
-    final bool hasClipboardFab =
+   final bool hasClipboardFab =
+        _isActiveTab &&
         !selectionBarVisible &&
         !_searchActive &&
-        ref.watch(crossContainerClipboardProvider).hasItems;
+        ref.watch(
+          crossContainerClipboardProvider.select((clip) => clip.hasItems),
+        );
     final bool hasFabToolbar =
         useFab && !_searchActive && _visibleActions.isNotEmpty;
 

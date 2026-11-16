@@ -255,7 +255,11 @@ class RawEntry {
 /// parsed straight back, and parses the wire form and looks for the
 /// `System:TRUNCATED` marker in a single pass for the sources that don't.
 class ParsedDirectoryListing {
-  const ParsedDirectoryListing(this.entries, {this.truncated = false});
+  const ParsedDirectoryListing(
+    this.entries, {
+    this.truncated = false,
+    this.preSortedByNameAsc = false,
+  });
 
   /// Parses wire-format lines (see [RawEntry.parse]); `System:*` sentinel
   /// lines are dropped, and `System:TRUNCATED` sets [truncated].
@@ -276,4 +280,8 @@ class ParsedDirectoryListing {
 
   /// True when the folder has more children than native was willing to list.
   final bool truncated;
+
+  /// True when [entries] are already partitioned (dirs first) and sorted by
+  /// [naturalCompare] on `lowercaseName` ascending.
+  final bool preSortedByNameAsc;
 }

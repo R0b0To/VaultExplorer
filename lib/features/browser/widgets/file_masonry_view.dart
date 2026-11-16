@@ -234,12 +234,14 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
   ThumbnailCacheMode _cacheModeOf(RawEntry entry) =>
       widget.cacheModeFor?.call(entry) ?? widget.thumbnailCacheMode;
 
-  Orientation? _lastOrientation;
+ Orientation? _lastOrientation;
   late int _columnCount;
   double _baselineScale = 1.0;
   late final ThumbnailCacheService _thumbnailCache;
   late final GalleryRatioPrefetcher _prefetcher;
   TextScaler _textScaler = TextScaler.noScaling;
+  double _screenWidth = 0.0;
+  double _devicePixelRatio = 1.0;
 
   // ── Display model ──────────────────────────────────────────────────────────
   // Everything the layout needs, as flat arrays indexed by *display* index (the
@@ -270,10 +272,15 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
   double _headerExtent = 56.0;
 
   // ── Ratio learning and reflow ──────────────────────────────────────────────
+  static const int _kNoDirtyItem = 0x7fffffff;
   bool _ratiosDirty = false;
+  int _dirtyFromItem = _kNoDirtyItem;
+  double _footerLineHeight = 16.0;
   Timer? _flushTimer;
+  bool _flushTimerIsLazy = false;
   Timer? _followTimer;
   bool _diskPreloadRunning = false;
+  bool _tickerEnabled = true;
 
   /// Only decide how a reflow is applied (see [GalleryLayoutHost.reflow]);
   /// nothing in this view waits for them to become false.
@@ -304,6 +311,7 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
 
   /// Media items whose real size is not known yet.
   int _unknownVisuals = 0;
+  bool _hasIconCells = false;
 
   /// The index of every container shown here has been loaded. Until then the
   /// view shows nothing (a moment, once per unlock) instead of a layout that
@@ -335,7 +343,11 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
   static const _imageDefaultRatio = 1.0;
   static const _videoDefaultRatio = 16.0 / 9.0;
   // Until a book's cover size is known (and for a book with no cover).
-  static const _bookDefaultRatio = 2.0 / 3.0;
+    static const _bookDefaultRatio = 2.0 / 3.0;
+  static final Set<String> _imageExtSet =
+      MediaViewerConstants.imageExtensions.toSet();
+  static final Set<String> _videoExtSet =
+      MediaViewerConstants.videoExtensions.toSet();
 
   @override
   void initState() {
@@ -344,7 +356,11 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
     _index = ref.read(mediaIndexServiceProvider);
     _columnCount = widget.initialColumns;
     final fileIoApi = ref.read(vaultFileIoApiProvider);
-    _prefetcher = GalleryRatioPrefetcher(probe: fileIoApi.probeImageDimensions);
+   _prefetcher = GalleryRatioPrefetcher(
+      probe: fileIoApi.probeImageDimensions,
+      lookAhead: 450,
+      lookBehind: 150,
+    );
 
     _morphController = AnimationController(
       vsync: this,
@@ -411,22 +427,37 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
     // Runs for *every* MediaQuery change (the keyboard animating, for one), so
     // only touch the layout when something it depends on really changed.
     var layoutInputsChanged = false;
-    final textScaler = MediaQuery.textScalerOf(context);
+    _screenWidth = MediaQuery.sizeOf(context).width;
+    _devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
+   final textScaler = MediaQuery.textScalerOf(context);
     if (textScaler != _textScaler) {
       _textScaler = textScaler;
+      _footerLineHeight = textScaler.scale(16.0);
       layoutInputsChanged = true;
     }
-    final orientation = MediaQuery.of(context).orientation;
+    final orientation = MediaQuery.orientationOf(context);
     if (_lastOrientation != orientation) {
       _columnCount = widget.initialColumns.clamp(_minColumns, _maxColumns);
       _lastOrientation = orientation;
       layoutInputsChanged = true;
     }
-    final headerExtent = _computeHeaderExtent(context);
+     final headerExtent = _computeHeaderExtent(context);
     if (headerExtent != _headerExtent) {
       _headerExtent = headerExtent;
       _sections = _buildSections();
       layoutInputsChanged = true;
+    }
+    final ticker = TickerMode.valuesOf(context).enabled;
+    if (_tickerEnabled != ticker) {
+      _tickerEnabled = ticker;
+      if (!ticker) {
+        _followTimer?.cancel();
+        _followTimer = null;
+        _prefetcher.stop();
+      } else {
+        _startProbing();
+        _ensureFollowTimer();
+      }
     }
     if (layoutInputsChanged) _syncHost();
   }
@@ -485,7 +516,7 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
   /// Only an estimate: the card is handed a fixed height and the preview takes
   /// whatever the real footer leaves.
   double _footerHeight(double tileWidth) {
-    final lineHeight = _textScaler.scale(16.0);
+    final lineHeight = _footerLineHeight;
     final hasMoreSlot =
         widget.showItemActionsMenu && widget.onFileLongMenu != null;
     if (hasMoreSlot) {
@@ -518,7 +549,7 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
   }
 
   /// Pushes the view's current settings into the layout host and invalidates it.
-  void _syncHost() {
+ void _syncHost() {
     _host
       ..columnCount = _columnCount
       ..spacing = widget.spacing
@@ -526,13 +557,19 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
       ..minTileWidth = 72.0
       ..sections = _sections
       ..ratioOf = _ratioOf
-      ..footerOf = _footerOf
+      ..footerOf = (widget.showFileNames || _hasIconCells) ? _footerOf : null
+      ..directRatios = _ratio
+      ..directKinds = _kind
+      ..constantFooterFor = widget.showFileNames ? _footerHeight : null
+      ..iconFooterFor =
+          (!widget.showFileNames && _hasIconCells) ? _footerHeight : null
       ..invalidate();
   }
 
   /// Rebuilds every per-item array for the current items. O(items); runs when
   /// the list changes, never while scrolling.
   void _rebuildDisplay() {
+    final perfT0 = PerfTrace.begin();
     final items = widget.items;
     List<RawEntry> display;
     Int32List? global;
@@ -559,58 +596,142 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
     _kind = Uint8List(n);
     _ratio = Float32List(n);
     _known = Uint8List(n);
-    _pathHash = Int64List(n);
+  _pathHash = Int64List(n);
     _inIndex = Uint8List(n);
     _unknownVisuals = 0;
+    _hasIconCells = false;
 
-    // Sizes already learned for this directory: from the media index (valid
-    // only for the file as it is now: same size, same modified time), else
-    // from what this session has seen. One lookup per item, no path strings.
     final dirState = MediaPathHash.stateOfDir(widget.currentDirPath);
     final targets = <String, (MountedContainer, ThumbnailCacheMode)>{};
     final memoryLookups = <String, double? Function(String)>{};
+    final insideArchive = widget.archiveContext != null;
+    final defaultImgRatio = _clampRatio(_imageDefaultRatio);
+    final defaultVidRatio = _clampRatio(_videoDefaultRatio);
+    final defaultBookRatio = _clampRatio(_bookDefaultRatio);
+
+    final singleSource =
+        widget.containerFor == null && widget.cacheModeFor == null;
+    final singleContainer = singleSource ? widget.container : null;
+    final singleIndexEmpty =
+        singleContainer != null && _index.isEmpty(singleContainer);
+    final singleMemEmpty =
+        singleContainer != null &&
+        MediaAspectRatioCache.isEmptyFor(singleContainer);
+    final singleDirRatios = (!singleMemEmpty && singleContainer != null)
+        ? MediaAspectRatioCache.dirMapFor(
+            singleContainer,
+            widget.currentDirPath,
+          )
+        : null;
+    if (singleContainer != null && n > 0) {
+      targets[singleContainer.uri] = (
+        singleContainer,
+        widget.thumbnailCacheMode,
+      );
+    }
+
     for (var i = 0; i < n; i++) {
       final entry = display[i];
-      if (entry.isDir || !_hasVisualPreview(entry.name)) {
+      if (entry.isDir) {
         _ratio[i] = _iconRatio;
         _known[i] = 1;
+        _hasIconCells = true;
         continue;
       }
-      final probeable =
-          widget.archiveContext == null &&
-          MediaViewerConstants.isImage(entry.name);
-      _kind[i] = probeable ? 1 : 2;
-      final container = _containerOf(entry);
-      targets.putIfAbsent(container.uri, () => (container, _cacheModeOf(entry)));
-      final hash = MediaPathHash.ofName(dirState, entry.name);
-      _pathHash[i] = hash;
+      final ext = entry.extension;
+      final isImg = _imageExtSet.contains(ext);
+      final isVid = !isImg && !insideArchive && _videoExtSet.contains(ext);
+      final isBook =
+          !isImg &&
+          !isVid &&
+          !insideArchive &&
+          (ext == 'epub' || ext.startsWith('cb')) &&
+          isBookWithCover(entry.name);
+      if (!isImg && !isVid && !isBook) {
+        _ratio[i] = _iconRatio;
+        _known[i] = 1;
+        _hasIconCells = true;
+        continue;
+      }
 
-      final packed = _index.lookup(
-        container,
-        hash,
-        entry.sizeBytes,
-        entry.modifiedSecs,
-      );
-      if (packed != 0) {
-        _ratio[i] = _clampRatio(
-          MediaIndex.widthOf(packed) / MediaIndex.heightOf(packed),
-        );
-        _known[i] = 1;
-        _inIndex[i] = 1;
-        continue;
-      }
-      final lookup = memoryLookups.putIfAbsent(
-        container.uri,
-        () => MediaAspectRatioCache.lookupIn(container, widget.currentDirPath),
-      );
-      final learned = lookup(entry.name);
-      if (learned != null) {
-        _ratio[i] = _clampRatio(learned);
-        _known[i] = 1;
+      _kind[i] = (!insideArchive && isImg) ? 1 : 2;
+      if (singleSource) {
+        if (!singleIndexEmpty) {
+          final hash = MediaPathHash.ofName(dirState, entry.name);
+          _pathHash[i] = hash;
+          final packed = _index.lookup(
+            singleContainer!,
+            hash,
+            entry.sizeBytes,
+            entry.modifiedSecs,
+          );
+          if (packed != 0) {
+            _ratio[i] = _clampRatio(
+              MediaIndex.widthOf(packed) / MediaIndex.heightOf(packed),
+            );
+            _known[i] = 1;
+            _inIndex[i] = 1;
+            continue;
+          }
+        }
+        if (!singleMemEmpty) {
+          final learned =
+              singleDirRatios != null && !entry.name.contains('/')
+                  ? singleDirRatios[entry.name]
+                  : MediaAspectRatioCache.lookupIn(
+                      singleContainer!,
+                      widget.currentDirPath,
+                    )(entry.name);
+          if (learned != null) {
+            _ratio[i] = _clampRatio(learned);
+            _known[i] = 1;
+            continue;
+          }
+        }
       } else {
-        _ratio[i] = _defaultRatioFor(entry.name);
-        _unknownVisuals++;
+        final container = _containerOf(entry);
+        targets.putIfAbsent(
+          container.uri,
+          () => (container, _cacheModeOf(entry)),
+        );
+        if (!_index.isEmpty(container)) {
+          final hash = MediaPathHash.ofName(dirState, entry.name);
+          _pathHash[i] = hash;
+          final packed = _index.lookup(
+            container,
+            hash,
+            entry.sizeBytes,
+            entry.modifiedSecs,
+          );
+          if (packed != 0) {
+            _ratio[i] = _clampRatio(
+              MediaIndex.widthOf(packed) / MediaIndex.heightOf(packed),
+            );
+            _known[i] = 1;
+            _inIndex[i] = 1;
+            continue;
+          }
+        }
+        if (!MediaAspectRatioCache.isEmptyFor(container)) {
+          final lookup = memoryLookups.putIfAbsent(
+            container.uri,
+            () => MediaAspectRatioCache.lookupIn(
+              container,
+              widget.currentDirPath,
+            ),
+          );
+          final learned = lookup(entry.name);
+          if (learned != null) {
+            _ratio[i] = _clampRatio(learned);
+            _known[i] = 1;
+            continue;
+          }
+        }
       }
+      _ratio[i] = isVid
+          ? defaultVidRatio
+          : (isBook ? defaultBookRatio : defaultImgRatio);
+      _unknownVisuals++;
     }
     _indexTargets = targets;
     _indexReady = targets.values.every((t) => _index.isReady(t.$1));
@@ -641,9 +762,11 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
       _childSection = childSection;
     }
 
-    _ratiosDirty = false;
+   _ratiosDirty = false;
+    _dirtyFromItem = _kNoDirtyItem;
     _flushTimer?.cancel();
     _syncHost();
+    PerfTrace.end('ui.masonry.rebuild_display', perfT0, slowMs: 16);
   }
 
   // ── The media index ────────────────────────────────────────────────────────
@@ -713,13 +836,21 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
 
   /// Takes the sizes the index has for items that were built before it was
   /// loaded.
-  void _hydrateFromIndex() {
+void _hydrateFromIndex() {
+    final dirState = MediaPathHash.stateOfDir(widget.currentDirPath);
     for (var i = 0; i < _display.length; i++) {
       if (_kind[i] == 0 || _inIndex[i] == 1) continue;
       final entry = _display[i];
+      final container = _containerOf(entry);
+      if (_index.isEmpty(container)) continue;
+      var hash = _pathHash[i];
+      if (hash == 0) {
+        hash = MediaPathHash.ofName(dirState, entry.name);
+        _pathHash[i] = hash;
+      }
       final packed = _index.lookup(
-        _containerOf(entry),
-        _pathHash[i],
+        container,
+        hash,
         entry.sizeBytes,
         entry.modifiedSecs,
       );
@@ -730,6 +861,7 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
       );
       _known[i] = 1;
       _inIndex[i] = 1;
+      if (i < _dirtyFromItem) _dirtyFromItem = i;
     }
   }
 
@@ -748,10 +880,16 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
         displayIndex < _display.length &&
         identical(_display[displayIndex], entry);
     if (sameEntry && _inIndex[displayIndex] == 1) return;
-    final hash = sameEntry
-        ? _pathHash[displayIndex]
-        : MediaPathHash.ofPath(fullPath);
-    _index.record(
+    int hash;
+    if (sameEntry) {
+      hash = _pathHash[displayIndex];
+      if (hash == 0) {
+        hash = MediaPathHash.ofPath(fullPath);
+        _pathHash[displayIndex] = hash;
+      }
+    } else {
+      hash = MediaPathHash.ofPath(fullPath);
+    }    _index.record(
       container,
       hash,
       entry.sizeBytes,
@@ -779,6 +917,7 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
     _known[displayIndex] = 1;
     _ratio[displayIndex] = ratio;
     _ratiosDirty = true;
+    if (displayIndex < _dirtyFromItem) _dirtyFromItem = displayIndex;
     _scheduleFlush();
   }
 
@@ -823,13 +962,12 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
     _applyRatio(displayIndex, width / height);
   }
 
-  void _learnFromMemoryCache(int displayIndex, RawEntry entry, String path) {
+   void _learnFromMemoryCache(int displayIndex, RawEntry entry, String path) {
     final cached = _thumbnailCache.peekMemoryWithSize(
       _containerOf(entry),
       path,
-      widget.thumbnailQuality,
-    );
-    if (cached == null) return;
+      _effectiveQualityOf(entry),
+    );    if (cached == null) return;
     final w = cached.$2;
     final h = cached.$3;
     if (w == null || h == null || w <= 0 || h <= 0) return;
@@ -837,9 +975,44 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
     _applyRatio(displayIndex, w / h);
   }
 
-  void _scheduleFlush([Duration delay = const Duration(milliseconds: 100)]) {
-    if (_flushTimer?.isActive ?? false) return;
-    _flushTimer = Timer(delay, _flush);
+   void _scheduleFlush([Duration? delay]) {
+    Duration effectiveDelay;
+    bool isLazy = false;
+    if (delay != null) {
+      effectiveDelay = delay;
+    } else if (_display.length >= 2000) {
+      final model = _host.current;
+      final dirty = _dirtyFromItem;
+      var offscreenBelow = false;
+      if (model != null &&
+          dirty >= 0 &&
+          dirty < model.childOfItem.length &&
+          _host.viewportExtent > 0) {
+        final dirtyChild = model.childOfItem[dirty];
+        final viewportEnd = _host.sliverScrollOffset + _host.viewportExtent;
+        if (dirtyChild >= 0 &&
+            dirtyChild < model.childCount &&
+            model.tops[dirtyChild] > viewportEnd + 400.0) {
+          offscreenBelow = true;
+        }
+      }
+      isLazy = offscreenBelow;
+      effectiveDelay = offscreenBelow
+          ? const Duration(milliseconds: 700)
+          : const Duration(milliseconds: 220);
+    } else {
+      effectiveDelay = const Duration(milliseconds: 100);
+    }
+
+    if (_flushTimer?.isActive ?? false) {
+      if (_flushTimerIsLazy && !isLazy) {
+        _flushTimer!.cancel();
+      } else {
+        return;
+      }
+    }
+    _flushTimerIsLazy = isLazy;
+    _flushTimer = Timer(effectiveDelay, _flush);
   }
 
   /// Applies the sizes learned since the last flush. Never waits for a scroll
@@ -853,7 +1026,8 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
   /// soon as the scroll stops, with an anchor on the tile at the top of the
   /// screen, so that pass moves nothing visible either.
   void _flush() {
-    if (!mounted) return;
+    _flushTimerIsLazy = false;
+    if (!mounted || !_tickerEnabled) return;
     if (!_ratiosDirty && !_host.hasStalePrefix) return;
     final width = _host.sliverCrossExtent;
     if (width <= 0) {
@@ -864,12 +1038,16 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
       _scheduleFlush(const Duration(milliseconds: 120));
       return;
     }
-    final result = _host.reflow(
+    final flushT0 = PerfTrace.begin();
+    final dirtyFrom = _dirtyFromItem;
+    _dirtyFromItem = _kNoDirtyItem;
+    _host.reflow(
       crossExtent: width,
       freezeAboveViewport: _freezeLayout,
+      dirtyFromItem: dirtyFrom,
     );
+    PerfTrace.end('ui.masonry.flush', flushT0, slowMs: 20);
     _ratiosDirty = false;
-    if (result == GalleryReflowResult.applied) setState(() {});
     // Keep refreshing the rows above while scrolling goes on (the top row
     // moves, and so does the part that is up to date).
     if (_host.hasStalePrefix) _scheduleFlush(const Duration(milliseconds: 120));
@@ -904,7 +1082,7 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
   }
 
   void _followTick() {
-    if (!mounted) return;
+    if (!mounted || !_tickerEnabled) return;
     if (_unknownVisuals <= 0) {
       _ensureFollowTimer();
       return;
@@ -947,7 +1125,6 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
   Future<void> _preloadDiskAspectRatios(int start, int end) async {
     _diskPreloadRunning = true;
     try {
-      final quality = widget.thumbnailQuality;
       var sinceYield = 0;
       for (var i = start; i < end && i < _display.length; i++) {
         if (_kind[i] != 2 || _known[i] == 1) continue;
@@ -961,6 +1138,7 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
         }
         final container = _containerOf(entry);
         final fullPath = _fullPathOf(entry);
+        final quality = _effectiveQualityOf(entry);
         try {
           final cached = await _thumbnailCache.fetchWithSize(
             container: container,
@@ -999,25 +1177,27 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
   ThumbnailQuality _effectiveQualityOf(RawEntry entry) {
     final q = widget.qualityFor?.call(entry) ?? widget.thumbnailQuality;
     if (!q.auto) return q;
-    final width = MediaQuery.sizeOf(context).width;
+    final width = _screenWidth > 0 ? _screenWidth : MediaQuery.sizeOf(context).width;
+    final dpr = _screenWidth > 0 ? _devicePixelRatio : MediaQuery.devicePixelRatioOf(context);
     final cellWidth =
         (width - 2 * _kSideInset - (_columnCount - 1) * widget.spacing) /
         _columnCount;
-    return q.resolveForCell(
+     return q.resolveForCell(
       logicalWidth: _flow == GalleryFlow.rows ? cellWidth * 1.5 : cellWidth,
-      devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+      devicePixelRatio: dpr,
+      oversample: _flow == GalleryFlow.rows ? 1.0 : ThumbnailQuality.coverOversample,
     );
   }
 
   int get _minColumns {
     final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+        MediaQuery.orientationOf(context) == Orientation.landscape;
     return isLandscape ? 2 : 1;
   }
 
   int get _maxColumns {
     final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+        MediaQuery.orientationOf(context) == Orientation.landscape;
     return isLandscape ? 6 : 3;
   }
 
@@ -1157,10 +1337,13 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
     );
   }
 
-  Widget _buildScrollView(ScrollController? controller) {
+   Widget _buildScrollView(ScrollController? controller) {
     return AnimatedBuilder(
       animation: _morphController,
       builder: (context, child) {
+        if (_morphController.isCompleted && _scaleAnimation.value == 1.0) {
+          return child!;
+        }
         return ClipRect(
           child: Transform.scale(
             scale: _scaleAnimation.value,
@@ -1169,10 +1352,9 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
           ),
         );
       },
-      child: CustomScrollView(
+       child: CustomScrollView(
         controller: controller,
-        cacheExtent: MediaQuery.sizeOf(context).height * 0.75,
-        physics:
+        cacheExtent: MediaQuery.sizeOf(context).height * 0.4,        physics:
             const AlwaysScrollableScrollPhysics(), // Native physics that cannot freeze
         slivers: [
           SliverPadding(
@@ -1240,10 +1422,15 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
     );
   }
 
+   static String _extensionOfName(String fileName) {
+    final dot = fileName.lastIndexOf('.');
+    return dot < 0 ? fileName : fileName.substring(dot + 1);
+  }
+
   /// Whether this file's cell is sized by decoded artwork (and so needs a
   /// real aspect ratio) rather than by a centred icon.
   bool _hasVisualPreview(String fileName) {
-    final ext = fileName.split('.').last;
+    final ext = _extensionOfName(fileName);
     if (vaultIconForExt(ext) != null) return false;
     if (widget.archiveContext != null &&
         MediaViewerConstants.isVideo(fileName)) {
@@ -1273,8 +1460,13 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
       color: isSelected ? cs.primary : skin.folderIconColor(cs),
     );
 
+   final cellWidth =
+        (_screenWidth > 0 ? _screenWidth : MediaQuery.sizeOf(context).width) -
+            2 * _kSideInset -
+            (_columnCount - 1) * widget.spacing;
     return GridCardShell(
       cornerRadius: widget.cornerRadius,
+      compactFooter: (cellWidth / _columnCount) < 100,
       key: ValueKey(
         'dir:$fullPath:${widget.isPinned?.call(entry)}:${widget.isBookmark?.call(entry)}:$isMounted',
       ),
@@ -1329,18 +1521,14 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
     final cacheMode = _cacheModeOf(entry);
     final cleanName = entry.name;
     final isSelected = widget.selectedItems.contains(entry);
-    String displayName = cleanName;
-    final ext = cleanName.split('.').last;
+  String displayName = cleanName;
+    final dot = cleanName.lastIndexOf('.');
+    final ext = dot < 0 ? cleanName : cleanName.substring(dot + 1);
     final skin = FileManagerSkinScope.of(context);
     final vaultIcon = entry.isSymlink ? null : vaultIconForExt(ext);
-    if (vaultIcon != null) {
-      final nameParts = cleanName.split('.');
-      if (nameParts.length > 1) {
-        nameParts.removeLast();
-        displayName = nameParts.join('.');
-      }
-    }
-    final query = widget.searchQuery;
+    if (vaultIcon != null && dot > 0) {
+      displayName = cleanName.substring(0, dot);
+    }    final query = widget.searchQuery;
     if (!widget.showFileExtensions && (query == null || query.isEmpty)) {
       displayName = stripFileExtension(cleanName);
     }
@@ -1562,8 +1750,13 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
       );
     }
 
+   final masonryGridWidth =
+        (_screenWidth > 0 ? _screenWidth : MediaQuery.sizeOf(context).width) -
+            2 * _kSideInset -
+            (_columnCount - 1) * widget.spacing;
     return GridCardShell(
       cornerRadius: widget.cornerRadius,
+      compactFooter: (masonryGridWidth / _columnCount) < 100,
       key: ValueKey(
         'file:$fullPath:${widget.isPinned?.call(entry)}:${widget.isBookmark?.call(entry)}',
       ),
@@ -1614,6 +1807,9 @@ class _EncryptedImageMasonryThumb extends ConsumerWidget {
     this.archiveRootPath,
   });
 
+  static final Set<String> _inFlightSizeChecks = <String>{};
+  static final Set<String> _completedSizeChecks = <String>{};
+
   static Future<void> _checkAndReportSizeFromBytes(
     MountedContainer container,
     String path,
@@ -1621,19 +1817,59 @@ class _EncryptedImageMasonryThumb extends ConsumerWidget {
     void Function(int width, int height) onSizeKnown,
   ) async {
     if (bytes.isEmpty) return;
+    if (MediaAspectRatioCache.get(container, path) != null) return;
+    final key = '${container.volId}:$path:${identityHashCode(bytes)}';
+    if (_completedSizeChecks.contains(key) || !_inFlightSizeChecks.add(key)) {
+      return;
+    }
     try {
       final codec = await ui.instantiateImageCodec(bytes);
       final frame = await codec.getNextFrame();
       onSizeKnown(frame.image.width, frame.image.height);
       frame.image.dispose();
       codec.dispose();
+      if (_completedSizeChecks.length > 1000) _completedSizeChecks.clear();
+      _completedSizeChecks.add(key);
     } catch (e) {
       VeLog.w(
         'FileMasonryView',
         'Decode-for-size failed for ${VeLog.censorName(path)}',
         e,
       );
+    } finally {
+      _inFlightSizeChecks.remove(key);
     }
+  }
+
+ static Future<Uint8List?> _fetchFromCache(
+    ThumbnailCacheService thumbnailCache,
+    MountedContainer container,
+    String path,
+    ThumbnailCacheMode mode,
+    ThumbnailQuality quality,
+    void Function(int width, int height) onSizeKnown,
+  ) async {
+    final cached = await thumbnailCache.fetchWithSize(
+      container: container,
+      filePath: path,
+      mode: mode,
+      quality: quality,
+    );
+    if (cached != null && cached.$1.isNotEmpty) {
+      final (bytes, width, height) = cached;
+      if (width != null && height != null) {
+        onSizeKnown(width, height);
+      } else {
+        await _checkAndReportSizeFromBytes(
+          container,
+          path,
+          bytes,
+          onSizeKnown,
+        );
+      }
+      return bytes;
+    }
+    return null;
   }
 
   static Future<Uint8List> _fetch(
@@ -1645,8 +1881,9 @@ class _EncryptedImageMasonryThumb extends ConsumerWidget {
     ThumbnailQuality quality,
     void Function(int width, int height) onSizeKnown,
     ArchiveContext? archiveContext,
-    String? archiveRootPath,
-  ) async {
+    String? archiveRootPath, {
+    bool skipCache = false,
+  }) async {
     if (archiveContext != null && archiveRootPath != null) {
       final bytes = await fetchArchiveEntryForThumbnail(
         archiveContext: archiveContext,
@@ -1660,27 +1897,16 @@ class _EncryptedImageMasonryThumb extends ConsumerWidget {
       await _checkAndReportSizeFromBytes(container, path, bytes, onSizeKnown);
       return bytes;
     }
-    if (mode != ThumbnailCacheMode.disabled) {
-      final cached = await thumbnailCache.fetchWithSize(
-        container: container,
-        filePath: path,
-        mode: mode,
-        quality: quality,
+    if (!skipCache && mode != ThumbnailCacheMode.disabled) {
+      final hit = await _fetchFromCache(
+        thumbnailCache,
+        container,
+        path,
+        mode,
+        quality,
+        onSizeKnown,
       );
-      if (cached != null && cached.$1.isNotEmpty) {
-        final (bytes, width, height) = cached;
-        if (width != null && height != null) {
-          onSizeKnown(width, height);
-        } else {
-          await _checkAndReportSizeFromBytes(
-            container,
-            path,
-            bytes,
-            onSizeKnown,
-          );
-        }
-        return bytes;
-      }
+      if (hit != null) return hit;
     }
     final thumb = await fileIoApi.getImageThumbnailWithSize(
       container,
@@ -1727,6 +1953,8 @@ class _EncryptedImageMasonryThumb extends ConsumerWidget {
     final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
     final fileIoApi = ref.read(vaultFileIoApiProvider);
     final cs = Theme.of(context).colorScheme;
+    final hasDiskCache =
+        archiveContext == null && cacheMode != ThumbnailCacheMode.disabled;
 
     final syncEntry = thumbnailCache.peekMemoryWithSize(
       container,
@@ -1759,13 +1987,25 @@ class _EncryptedImageMasonryThumb extends ConsumerWidget {
         onSizeKnown,
         archiveContext,
         archiveRootPath,
+        skipCache: hasDiskCache,
       ),
       debounce: const Duration(milliseconds: 30),
       syncLookup: () => syncBytes,
+      cacheLookup: hasDiskCache
+          ? () => _fetchFromCache(
+                thumbnailCache,
+                container,
+                filePath,
+                cacheMode,
+                quality,
+                onSizeKnown,
+              )
+          : null,
       cacheHeight: quality.scaledSize(180),
       imageBuilder: (context, bytes, cacheHeight) => Image.memory(
         bytes,
         fit: BoxFit.cover,
+        filterQuality: FilterQuality.low,
         cacheHeight: cacheHeight,
         errorBuilder: (_, _, _) => _errorPlaceholder(cs),
       ),
@@ -1808,6 +2048,9 @@ class _VideoMasonryThumb extends ConsumerWidget {
     this.archiveRootPath,
   });
 
+  static final Set<String> _inFlightSizeChecks = <String>{};
+  static final Set<String> _completedSizeChecks = <String>{};
+
   static Future<void> _checkAndReportSizeFromBytes(
     MountedContainer container,
     String path,
@@ -1815,22 +2058,31 @@ class _VideoMasonryThumb extends ConsumerWidget {
     void Function(int width, int height) onSizeKnown,
   ) async {
     if (bytes.isEmpty) return;
+    if (MediaAspectRatioCache.get(container, path) != null) return;
+    final key = '${container.volId}:$path:${identityHashCode(bytes)}';
+    if (_completedSizeChecks.contains(key) || !_inFlightSizeChecks.add(key)) {
+      return;
+    }
     try {
       final codec = await ui.instantiateImageCodec(bytes);
       final frame = await codec.getNextFrame();
       onSizeKnown(frame.image.width, frame.image.height);
       frame.image.dispose();
       codec.dispose();
+      if (_completedSizeChecks.length > 1000) _completedSizeChecks.clear();
+      _completedSizeChecks.add(key);
     } catch (e) {
       VeLog.w(
         'FileMasonryView',
         'Decode-for-size failed for ${VeLog.censorName(path)}',
         e,
       );
+    } finally {
+      _inFlightSizeChecks.remove(key);
     }
   }
 
-  static Future<Uint8List> _fetch(
+   static Future<Uint8List> _fetch(
     ThumbnailCacheService thumbnailCache,
     VaultFileIoApi fileIoApi,
     MountedContainer container,
@@ -1839,8 +2091,9 @@ class _VideoMasonryThumb extends ConsumerWidget {
     ThumbnailQuality quality,
     void Function(int width, int height) onSizeKnown,
     ArchiveContext? archiveContext,
-    String? archiveRootPath,
-  ) => VideoThumbnailFetcher.fetchWithSize(
+    String? archiveRootPath, {
+    bool checkCache = true,
+  }) => VideoThumbnailFetcher.fetchWithSize(
     thumbnailCache,
     fileIoApi,
     container,
@@ -1853,6 +2106,7 @@ class _VideoMasonryThumb extends ConsumerWidget {
         _checkAndReportSizeFromBytes(container, path, bytes, onSizeKnown),
     archiveContext: archiveContext,
     archiveRootPath: archiveRootPath,
+    checkCache: checkCache,
   );
 
   @override
@@ -1860,6 +2114,8 @@ class _VideoMasonryThumb extends ConsumerWidget {
     final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
     final fileIoApi = ref.read(vaultFileIoApiProvider);
     final cs = Theme.of(context).colorScheme;
+    final hasDiskCache =
+        archiveContext == null && cacheMode != ThumbnailCacheMode.disabled;
 
     final syncEntry = thumbnailCache.peekMemoryWithSize(
       container,
@@ -1895,13 +2151,38 @@ class _VideoMasonryThumb extends ConsumerWidget {
             onSizeKnown,
             archiveContext,
             archiveRootPath,
+            checkCache: !hasDiskCache,
           ),
           debounce: const Duration(milliseconds: 60),
           syncLookup: () => syncBytes,
+          cacheLookup: hasDiskCache
+              ? () async {
+                  final cached = await thumbnailCache.fetchWithSize(
+                    container: container,
+                    filePath: filePath,
+                    mode: cacheMode,
+                    quality: quality,
+                  );
+                  if (cached == null || cached.$1.isEmpty) return null;
+                  final (bytes, width, height) = cached;
+                  if (width != null && height != null) {
+                    onSizeKnown(width, height);
+                  } else {
+                    await _checkAndReportSizeFromBytes(
+                      container,
+                      filePath,
+                      bytes,
+                      onSizeKnown,
+                    );
+                  }
+                  return bytes;
+                }
+              : null,
           cacheHeight: quality.scaledSize(180),
           imageBuilder: (context, bytes, cacheHeight) => Image.memory(
             bytes,
             fit: BoxFit.cover,
+            filterQuality: FilterQuality.low,
             cacheHeight: cacheHeight,
             errorBuilder: (_, _, _) => _errorPlaceholder(cs),
           ),
@@ -2009,12 +2290,21 @@ class _ApkIconMasonryThumb extends ConsumerWidget {
       quality: quality,
       fetchFn: (c, p) =>
           _fetch(thumbnailCache, fileIoApi, c, p, cacheMode, quality),
-      debounce: const Duration(milliseconds: 30),
+     debounce: const Duration(milliseconds: 30),
       syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
+      cacheLookup: cacheMode != ThumbnailCacheMode.disabled
+          ? () => thumbnailCache.fetch(
+                container: container,
+                filePath: filePath,
+                mode: cacheMode,
+                quality: quality,
+              )
+          : null,
       cacheHeight: quality.scaledSize(180),
       imageBuilder: (context, bytes, cacheHeight) => Image.memory(
         bytes,
         fit: BoxFit.contain,
+        filterQuality: FilterQuality.low,
         cacheHeight: cacheHeight,
         errorBuilder: (_, _, _) => _fallbackWidget(),
       ),
@@ -2095,10 +2385,27 @@ class _BookCoverMasonryThumb extends ConsumerWidget {
       },
       debounce: const Duration(milliseconds: 30),
       syncLookup: () => syncBytes,
+      cacheLookup: cacheMode != ThumbnailCacheMode.disabled
+          ? () async {
+              final cached = await thumbnailCache.fetchWithSize(
+                container: container,
+                filePath: filePath,
+                mode: cacheMode,
+                quality: quality,
+              );
+              if (cached == null || cached.$1.isEmpty) return null;
+              final (bytes, width, height) = cached;
+              if (width != null && height != null && width > 0 && height > 0) {
+                onSizeKnown(width, height);
+              }
+              return bytes;
+            }
+          : null,
       cacheHeight: quality.scaledSize(180),
       imageBuilder: (context, bytes, cacheHeight) => Image.memory(
         bytes,
         fit: BoxFit.cover,
+        filterQuality: FilterQuality.low,
         cacheHeight: cacheHeight,
         errorBuilder: (_, _, _) => _fallbackWidget(),
       ),

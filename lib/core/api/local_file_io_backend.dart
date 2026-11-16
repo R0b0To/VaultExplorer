@@ -118,8 +118,8 @@ class LocalFileIoBackend {
       if (!await srcFile.exists()) return false;
       final destFile = File(_resolve(rootPath, fileName));
       await destFile.parent.create(recursive: true);
-      await srcFile.copy(destFile.path);
-      DecoyLocalRepository.clearCache();
+         await srcFile.copy(destFile.path);
+      DecoyLocalRepository.invalidatePathAndParent(destFile.path);
       return true;
     } catch (_) {
       return false;
@@ -179,10 +179,9 @@ class LocalFileIoBackend {
       await raf.setPosition(offset);
       await raf.writeFrom(data);
       await raf.flush();
-      if (offset == 0) {
-        DecoyLocalRepository.clearCache();
-      }
-      return true;
+       if (offset == 0) {
+        DecoyLocalRepository.invalidatePathAndParent(file.path);
+      }      return true;
     } catch (_) {
       return false;
     } finally {
@@ -196,9 +195,8 @@ class LocalFileIoBackend {
       if (await FileSystemEntity.type(path) != FileSystemEntityType.notFound) {
         return false;
       }
-      await Directory(path).create(recursive: false);
-      DecoyLocalRepository.clearCache();
-      return true;
+        await Directory(path).create(recursive: false);
+      DecoyLocalRepository.invalidatePathAndParent(path);      return true;
     } catch (_) {
       return false;
     }
@@ -221,8 +219,8 @@ class LocalFileIoBackend {
       } else {
         await File(from).rename(to);
       }
-      DecoyLocalRepository.clearCache();
-      return true;
+      DecoyLocalRepository.invalidatePathAndParent(from);
+      DecoyLocalRepository.invalidatePathAndParent(to);      return true;
     } catch (_) {
       return false;
     }
@@ -231,7 +229,6 @@ class LocalFileIoBackend {
   Future<bool> deleteFile(String rootPath, String fileName) async {
     try {
       await _repo.delete(_resolve(rootPath, fileName));
-      DecoyLocalRepository.clearCache();
       return true;
     } catch (_) {
       return false;

@@ -31,13 +31,13 @@ class ThumbnailQuality {
   /// [scaledSize] allow).
   static const int maxManualSize = 1000;
 
-  /// Largest edge an auto-resolved thumbnail may ask for. 1 column on a
-  /// 1440px-wide phone needs ~1400px; the native decoder additionally
-  /// bounds its decode area, so this is not a memory guarantee.
-  static const int maxAutoSize = 1536;
+  /// Largest edge an auto-resolved thumbnail may ask for. Keeping auto grids
+  /// at or below 768px avoids exhausting Flutter's 192 MB ImageCache (~100+
+  /// textures instead of ~59 at 1408px) and prevents multi-pass native scaling
+  /// bottlenecks.
+  static const int maxAutoSize = 640;
   static const int _autoMinSize = 128;
-  static const int _autoBucket = 64;
-
+  static const List<int> _autoTiers = [128, 192, 256, 384, 512, 640];
   /// Thumbnails are fit-within (the *long* edge equals the requested size)
   /// while tiles are filled/cropped by the *short* edge. 4:3 is the usual
   /// photo shape, so a 4:3 source fills the cell at 1:1 device pixels.
@@ -75,11 +75,19 @@ class ThumbnailQuality {
         devicePixelRatio <= 0) {
       return this;
     }
-    final wanted = (logicalWidth * devicePixelRatio * oversample).ceil();
-    final bucketed = ((wanted + _autoBucket - 1) ~/ _autoBucket) * _autoBucket;
+ final wanted = (logicalWidth * devicePixelRatio * oversample).ceil();
+    var snapped = _autoTiers.last;
+    var bestDiff = (wanted - snapped).abs();
+    for (final tier in _autoTiers) {
+      final diff = (wanted - tier).abs();
+      if (diff < bestDiff) {
+        bestDiff = diff;
+        snapped = tier;
+      }
+    }
     return ThumbnailQuality(
       quality: quality,
-      size: bucketed.clamp(_autoMinSize, maxAutoSize),
+      size: snapped.clamp(_autoMinSize, maxAutoSize),
       auto: true,
       cellSized: true,
     );

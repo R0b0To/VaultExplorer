@@ -154,32 +154,27 @@ class _FolderThumbnailPreviewState
       scanAcquired = true;
       if (!mounted || !_tickerEnabled || token != _token) return;
 
-      List<String>? raw;
-      try {
-        raw = await fileIoApi.listDirectory(
-          widget.container,
-          widget.folderPath,
-        );
-      } catch (_) {
-        raw = null;
-      }
+      final listing = await () async {
+        try {
+          return await fileIoApi.listDirectoryEntriesForBrowser(
+            widget.container,
+            widget.folderPath,
+          );
+        } catch (_) {
+          return null;
+        }
+      }();
+      final entries = listing?.entries;
       if (!mounted ||
           !_tickerEnabled ||
           token != _token ||
-          raw == null ||
-          raw.isEmpty) {
+          entries == null ||
+          entries.isEmpty) {
         return;
       }
 
-      for (final line in raw) {
-        if (line.startsWith('System:')) continue;
-        final RawEntry entry;
-        try {
-          entry = RawEntry.parse(line);
-        } catch (_) {
-          continue;
-        }
-        if (entry.isDir || entry.isPlaceholder) continue;
+      for (final entry in entries) {
+        if (entry.isDir || entry.isPlaceholder || entry.isSymlink) continue;
         if (!MediaViewerConstants.isImage(entry.name) &&
             !MediaViewerConstants.isVideo(entry.name)) {
           continue;
@@ -194,18 +189,34 @@ class _FolderThumbnailPreviewState
 
       if (candidates.isEmpty) return;
 
-      // 1. Check if any candidate has a pre-cached thumbnail
+      // 1a. Check in-memory cache synchronously across all candidates first to
+      // avoid sequential disk reads when a later entry is already resident.
       for (final path in candidates) {
-        final bytes = await thumbnailCache.fetch(
-          container: widget.container,
-          filePath: path,
-          mode: widget.cacheMode,
-          quality: widget.quality,
+        final mem = thumbnailCache.peekMemory(
+          widget.container,
+          path,
+          widget.quality,
         );
-        if (!mounted || !_tickerEnabled || token != _token) return;
-        if (bytes != null && bytes.isNotEmpty) {
-          hit = bytes;
+        if (mem != null && mem.isNotEmpty) {
+          hit = mem;
           break;
+        }
+      }
+
+      // 1b. Fall back to disk/in-container cache if none were in memory.
+      if (hit == null) {
+        for (final path in candidates) {
+          final bytes = await thumbnailCache.fetch(
+            container: widget.container,
+            filePath: path,
+            mode: widget.cacheMode,
+            quality: widget.quality,
+          );
+          if (!mounted || !_tickerEnabled || token != _token) return;
+          if (bytes != null && bytes.isNotEmpty) {
+            hit = bytes;
+            break;
+          }
         }
       }
     } finally {

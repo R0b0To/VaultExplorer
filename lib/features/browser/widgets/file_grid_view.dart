@@ -232,6 +232,7 @@ class FileGridViewState extends State<FileGridView>
   double? _viewportWidth;
   double _baselineScale = 1.0;
   final Map<RawEntry, int> _entryIndexMap = {};
+  ThumbnailQuality? _resolvedDefaultQuality;
 
   int? _anchorItemIndex;
 
@@ -280,7 +281,7 @@ class FileGridViewState extends State<FileGridView>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final orientation = MediaQuery.of(context).orientation;
+    final orientation = MediaQuery.orientationOf(context);
     if (_lastOrientation != orientation) {
       _crossAxisCount = widget.initialColumns.clamp(_minColumns, _maxColumns);
       _lastOrientation = orientation;
@@ -305,7 +306,7 @@ class FileGridViewState extends State<FileGridView>
 
   int get _maxColumns {
     final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+        MediaQuery.orientationOf(context) == Orientation.landscape;
     return isLandscape ? 7 : 4;
   }
 
@@ -333,21 +334,29 @@ class FileGridViewState extends State<FileGridView>
     return tileWidth / totalHeight;
   }
 
+ ThumbnailQuality _resolveDefaultQuality() {
+    final q = widget.thumbnailQuality;
+    if (!q.auto) return q;
+    return q.resolveForCell(
+      logicalWidth: _getTileWidth(_crossAxisCount, context),
+      devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+    );
+  }
+
   /// The thumbnail quality to request for the current grid. For an auto
   /// quality this is derived from the real pixel width of a cell (same
   /// geometry as the grid delegate below), so fewer columns => sharper
   /// thumbnails, matching how Fossify Gallery sizes them.
- ThumbnailQuality _effectiveQualityOf(RawEntry entry) {
-    PerfTrace.gauge('ui.grid.cols', _crossAxisCount);
-    final q = widget.qualityFor?.call(entry) ?? widget.thumbnailQuality;
-    final resolved = !q.auto
-        ? q
-        : q.resolveForCell(
-            logicalWidth: _getTileWidth(_crossAxisCount, context),
-            devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
-          );
-    PerfTrace.gauge('thumb.grid.target_px', resolved.scaledSize(180));
-    return resolved;
+  ThumbnailQuality _effectiveQualityOf(RawEntry entry) {
+    if (widget.qualityFor == null) {
+      return _resolvedDefaultQuality ??= _resolveDefaultQuality();
+    }
+    final q = widget.qualityFor!.call(entry);
+    if (!q.auto) return q;
+    return q.resolveForCell(
+      logicalWidth: _getTileWidth(_crossAxisCount, context),
+      devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+    );
   }
 
   double _getTileHeight(int columns) {
@@ -483,10 +492,13 @@ class FileGridViewState extends State<FileGridView>
     );
   }
 
-  Widget _buildAnimatedGridView(ScrollController? controller, int total) {
+Widget _buildAnimatedGridView(ScrollController? controller, int total) {
     return AnimatedBuilder(
       animation: _morphController,
       builder: (context, child) {
+        if (_morphController.isCompleted && _scaleAnimation.value == 1.0) {
+          return child!;
+        }
         return ClipRect(
           child: Transform.scale(
             scale: _scaleAnimation.value,
@@ -497,8 +509,7 @@ class FileGridViewState extends State<FileGridView>
       },
  child: GridView.builder(
         controller: controller,
-        cacheExtent: MediaQuery.sizeOf(context).height * 0.75,
-        physics:
+        cacheExtent: MediaQuery.sizeOf(context).height * 0.4,        physics:
             const AlwaysScrollableScrollPhysics(), // Native scroll physics that cannot freeze
         findChildIndexCallback: _findChildIndex,
         // No tile asks to be kept alive. The default wraps every one in an
@@ -557,6 +568,9 @@ class FileGridViewState extends State<FileGridView>
     return AnimatedBuilder(
       animation: _morphController,
       builder: (context, child) {
+        if (_morphController.isCompleted && _scaleAnimation.value == 1.0) {
+          return child!;
+        }
         return ClipRect(
           child: Transform.scale(
             scale: _scaleAnimation.value,
@@ -565,9 +579,9 @@ class FileGridViewState extends State<FileGridView>
           ),
         );
       },
-     child: CustomScrollView(
+      child: CustomScrollView(
         controller: controller,
-        cacheExtent: MediaQuery.sizeOf(context).height * 0.75,
+        cacheExtent: MediaQuery.sizeOf(context).height * 0.4,
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           SliverPadding(
@@ -613,9 +627,10 @@ class FileGridViewState extends State<FileGridView>
     );
   }
 
-  @override
+   @override
   Widget build(BuildContext context) {
     PerfTrace.count('ui.grid.build');
+    PerfTrace.gauge('ui.grid.cols', _crossAxisCount);
     final total = widget.items.length;
 
     return LayoutBuilder(
@@ -623,7 +638,11 @@ class FileGridViewState extends State<FileGridView>
         _viewportWidth = constraints.maxWidth.isFinite
             ? constraints.maxWidth
             : null;
-
+        if (widget.qualityFor == null) {
+          final resolved = _resolveDefaultQuality();
+          _resolvedDefaultQuality = resolved;
+          PerfTrace.gauge('thumb.grid.target_px', resolved.scaledSize(180));
+        }
         return HoldRangeSelectContainer(
           items: widget.items,
           selectedItems: widget.selectedItems,
@@ -688,6 +707,7 @@ class FileGridViewState extends State<FileGridView>
 
     return GridCardShell(
       cornerRadius: widget.cornerRadius,
+      compactFooter: _getTileWidth(_crossAxisCount, context) < 100,
       cardColor: GridCardUtils.folderCardColor(cs, isMounted: false),
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
@@ -737,18 +757,14 @@ class FileGridViewState extends State<FileGridView>
             ? cleanName
             : '${widget.currentDirPath}/$cleanName');
     final isSelected = widget.selectedItems.contains(entry);
-    String displayName = cleanName;
-    final ext = cleanName.split('.').last;
+   String displayName = cleanName;
+    final dot = cleanName.lastIndexOf('.');
+    final ext = dot < 0 ? cleanName : cleanName.substring(dot + 1);
     final skin = FileManagerSkinScope.of(context);
     final vaultIcon = entry.isSymlink ? null : vaultIconForExt(ext);
-    if (vaultIcon != null) {
-      final nameParts = cleanName.split('.');
-      if (nameParts.length > 1) {
-        nameParts.removeLast();
-        displayName = nameParts.join('.');
-      }
-    }
-    final query = widget.searchQuery;
+    if (vaultIcon != null && dot > 0) {
+      displayName = cleanName.substring(0, dot);
+    }    final query = widget.searchQuery;
     if (!widget.showFileExtensions && (query == null || query.isEmpty)) {
       displayName = stripFileExtension(cleanName);
     }
@@ -926,8 +942,9 @@ class FileGridViewState extends State<FileGridView>
       );
     }
 
-    return GridCardShell(
+   return GridCardShell(
       cornerRadius: widget.cornerRadius,
+      compactFooter: _getTileWidth(_crossAxisCount, context) < 100,
       cardColor: GridCardUtils.folderCardColor(cs, isMounted: false),
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
@@ -971,7 +988,7 @@ class _EncryptedImageGridThumb extends ConsumerWidget {
     this.archiveRootPath,
   });
 
-  static Future<Uint8List> _fetch(
+ static Future<Uint8List> _fetch(
     ThumbnailCacheService thumbnailCache,
     VaultFileIoApi fileIoApi,
     MountedContainer container,
@@ -979,8 +996,9 @@ class _EncryptedImageGridThumb extends ConsumerWidget {
     ThumbnailCacheMode mode,
     ThumbnailQuality quality,
     ArchiveContext? archiveContext,
-    String? archiveRootPath,
-  ) async {
+    String? archiveRootPath, {
+    bool skipCache = false,
+  }) async {
     if (archiveContext != null && archiveRootPath != null) {
       final bytes = await fetchArchiveEntryForThumbnail(
         archiveContext: archiveContext,
@@ -993,7 +1011,7 @@ class _EncryptedImageGridThumb extends ConsumerWidget {
       thumbnailCache.cacheInMemory(container, path, bytes, quality);
       return bytes;
     }
-    if (mode != ThumbnailCacheMode.disabled) {
+    if (!skipCache && mode != ThumbnailCacheMode.disabled) {
       final cached = await thumbnailCache.fetch(
         container: container,
         filePath: path,
@@ -1035,6 +1053,8 @@ class _EncryptedImageGridThumb extends ConsumerWidget {
     final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
     final fileIoApi = ref.read(vaultFileIoApiProvider);
     final cs = Theme.of(context).colorScheme;
+    final hasDiskCache =
+        archiveContext == null && cacheMode != ThumbnailCacheMode.disabled;
 
     return AsyncThumbnail(
       key: ValueKey('img:$filePath'),
@@ -1052,13 +1072,23 @@ class _EncryptedImageGridThumb extends ConsumerWidget {
         quality,
         archiveContext,
         archiveRootPath,
+        skipCache: hasDiskCache,
       ),
       debounce: const Duration(milliseconds: 30),
       syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
+      cacheLookup: hasDiskCache
+          ? () => thumbnailCache.fetch(
+                container: container,
+                filePath: filePath,
+                mode: cacheMode,
+                quality: quality,
+              )
+          : null,
       cacheHeight: quality.scaledSize(180),
       imageBuilder: (context, bytes, cacheHeight) => Image.memory(
         bytes,
         fit: BoxFit.cover,
+        filterQuality: FilterQuality.low,
         cacheHeight: cacheHeight,
         errorBuilder: (_, _, _) => _errorPlaceholder(cs),
       ),
@@ -1107,8 +1137,9 @@ class _VideoThumb extends ConsumerWidget {
     ThumbnailCacheMode mode,
     ThumbnailQuality quality,
     ArchiveContext? archiveContext,
-    String? archiveRootPath,
-  ) => VideoThumbnailFetcher.fetch(
+    String? archiveRootPath, {
+    bool checkCache = true,
+  }) => VideoThumbnailFetcher.fetch(
     thumbnailCache,
     fileIoApi,
     container,
@@ -1118,6 +1149,7 @@ class _VideoThumb extends ConsumerWidget {
     targetSize: quality.scaledSize(180),
     archiveContext: archiveContext,
     archiveRootPath: archiveRootPath,
+    checkCache: checkCache,
   );
 
   @override
@@ -1125,6 +1157,8 @@ class _VideoThumb extends ConsumerWidget {
     final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
     final fileIoApi = ref.read(vaultFileIoApiProvider);
     final cs = Theme.of(context).colorScheme;
+    final hasDiskCache =
+        archiveContext == null && cacheMode != ThumbnailCacheMode.disabled;
 
     return Stack(
       fit: StackFit.expand,
@@ -1145,14 +1179,24 @@ class _VideoThumb extends ConsumerWidget {
             quality,
             archiveContext,
             archiveRootPath,
+            checkCache: !hasDiskCache,
           ),
           debounce: const Duration(milliseconds: 60),
           syncLookup: () =>
               thumbnailCache.peekMemory(container, filePath, quality),
+          cacheLookup: hasDiskCache
+              ? () => thumbnailCache.fetch(
+                    container: container,
+                    filePath: filePath,
+                    mode: cacheMode,
+                    quality: quality,
+                  )
+              : null,
           cacheHeight: quality.scaledSize(180),
           imageBuilder: (context, bytes, cacheHeight) => Image.memory(
             bytes,
             fit: BoxFit.cover,
+            filterQuality: FilterQuality.low,
             cacheHeight: cacheHeight,
             errorBuilder: (_, _, _) => _errorPlaceholder(cs),
           ),
@@ -1260,12 +1304,21 @@ class _ApkIconGridThumb extends ConsumerWidget {
       quality: quality,
       fetchFn: (c, p) =>
           _fetch(thumbnailCache, fileIoApi, c, p, cacheMode, quality),
-      debounce: const Duration(milliseconds: 30),
+     debounce: const Duration(milliseconds: 30),
       syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
+      cacheLookup: cacheMode != ThumbnailCacheMode.disabled
+          ? () => thumbnailCache.fetch(
+                container: container,
+                filePath: filePath,
+                mode: cacheMode,
+                quality: quality,
+              )
+          : null,
       cacheHeight: quality.scaledSize(180),
       imageBuilder: (context, bytes, cacheHeight) => Image.memory(
         bytes,
         fit: BoxFit.contain,
+        filterQuality: FilterQuality.low,
         cacheHeight: cacheHeight,
         errorBuilder: (_, _, _) => _fallbackWidget(),
       ),
@@ -1331,14 +1384,22 @@ class _BookCoverGridThumb extends ConsumerWidget {
       cacheHeight: quality.scaledSize(180),
       // Covers are portrait and the cell is usually squarer: anchor to the top,
       // where the title is, so a crop trims the bottom rather than the middle.
+      cacheLookup: cacheMode != ThumbnailCacheMode.disabled
+          ? () => thumbnailCache.fetch(
+                container: container,
+                filePath: filePath,
+                mode: cacheMode,
+                quality: quality,
+              )
+          : null,
       imageBuilder: (context, bytes, cacheHeight) => Image.memory(
         bytes,
         fit: BoxFit.cover,
+        filterQuality: FilterQuality.low,
         alignment: Alignment.topCenter,
         cacheHeight: cacheHeight,
         errorBuilder: (_, _, _) => _fallbackWidget(),
-      ),
-      loadingBuilder: (context) => _fallbackWidget(),
+      ),      loadingBuilder: (context) => _fallbackWidget(),
       errorBuilder: (context) => _fallbackWidget(),
     );
   }

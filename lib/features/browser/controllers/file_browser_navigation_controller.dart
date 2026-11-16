@@ -31,6 +31,7 @@ class PathSegment {
   /// used to render the parent view during an interactive back-gesture.
   List<RawEntry>? previewItems;
   BrowserLayoutMode? previewLayoutMode;
+  bool preSortedByNameAsc;
 
   PathSegment(
     this.label,
@@ -41,6 +42,7 @@ class PathSegment {
     this.scrollOffset = 0.0,
     this.previewItems,
     this.previewLayoutMode,
+    this.preSortedByNameAsc = false,
   });
 }
 
@@ -57,6 +59,7 @@ class FileBrowserNavigationState {
   /// that archive has been closed.
   final List<PathSegment> forwardStack;
   final List<RawEntry> currentItems;
+  final bool preSortedByNameAsc;
   final bool isLoading;
   final bool isListingTruncated;
   final String? statusMessage;
@@ -79,6 +82,7 @@ class FileBrowserNavigationState {
     this.pathStack = const [],
     this.forwardStack = const [],
     this.currentItems = const [],
+    this.preSortedByNameAsc = false,
     this.isLoading = false,
     this.isListingTruncated = false,
     this.statusMessage,
@@ -112,6 +116,7 @@ class FileBrowserNavigationState {
     List<PathSegment>? pathStack,
     List<PathSegment>? forwardStack,
     List<RawEntry>? currentItems,
+    bool? preSortedByNameAsc,
     bool? isLoading,
     bool? isListingTruncated,
     String? statusMessage,
@@ -137,6 +142,7 @@ class FileBrowserNavigationState {
       pathStack: pathStack ?? this.pathStack,
       forwardStack: forwardStack ?? this.forwardStack,
       currentItems: currentItems ?? this.currentItems,
+      preSortedByNameAsc: preSortedByNameAsc ?? this.preSortedByNameAsc,
       isLoading: isLoading ?? this.isLoading,
       isListingTruncated: isListingTruncated ?? this.isListingTruncated,
       statusMessage: clearStatusMessage
@@ -386,6 +392,8 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
         );
       }
       final isTruncated = listing?.truncated ?? false;
+      final preSorted =
+          !listingFailed && (listing?.preSortedByNameAsc ?? false);
       final parsed = listing?.entries ?? <RawEntry>[];
 
       // A refresh of a folder that is already on screen almost always finds
@@ -405,6 +413,7 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
         if (!unchanged || segment.items == null) {
           segment.items = List<RawEntry>.of(parsed);
         }
+        segment.preSortedByNameAsc = preSorted;
         segment.layoutMode = layoutMode ?? state.layoutMode;
       }
 
@@ -419,6 +428,7 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
 
       state = state.copyWith(
         currentItems: shown,
+        preSortedByNameAsc: preSorted,
         isListingTruncated: isTruncated,
         isLoading: false,
         needsRefresh: listingFailed,
@@ -470,6 +480,7 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
 
     state = state.copyWith(
       currentItems: parsed,
+      preSortedByNameAsc: false,
       isListingTruncated: false,
       isLoading: false,
       layoutMode: layoutMode ?? state.layoutMode,
@@ -733,6 +744,7 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
       pathStack: newStack,
       forwardStack: followsForward ? forward.sublist(1) : const [],
       currentItems: cached ?? const [],
+      preSortedByNameAsc: false,
       clearCurrentFilter: true,
       isLoading: cached == null,
       layoutMode: layoutMode ?? state.layoutMode,
@@ -761,6 +773,8 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
       pathStack: newStack,
       forwardStack: _forwardAfterBack([removed], archiveClosed: closesArchive),
       currentItems: List<RawEntry>.of(restoredItems),
+      preSortedByNameAsc:
+          targetSegment.items != null && targetSegment.preSortedByNameAsc,
       clearCurrentFilter: true,
       isLoading: restoredItems.isEmpty,
       layoutMode: layoutMode ?? targetSegment.layoutMode ?? state.layoutMode,
@@ -791,6 +805,8 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
       pathStack: newStack,
       forwardStack: _forwardAfterBack(removed, archiveClosed: closesArchive),
       currentItems: List<RawEntry>.of(restoredItems),
+      preSortedByNameAsc:
+          targetSegment.items != null && targetSegment.preSortedByNameAsc,
       clearCurrentFilter: true,
       isLoading: restoredItems.isEmpty,
       layoutMode: layoutMode ?? targetSegment.layoutMode ?? state.layoutMode,
@@ -814,6 +830,7 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
       pathStack: [...state.pathStack, ...moved],
       forwardStack: forward.sublist(steps),
       currentItems: List<RawEntry>.of(restoredItems),
+      preSortedByNameAsc: target.items != null && target.preSortedByNameAsc,
       clearCurrentFilter: true,
       isLoading: restoredItems.isEmpty,
       layoutMode: layoutMode ?? target.layoutMode ?? state.layoutMode,

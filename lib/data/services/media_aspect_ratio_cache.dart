@@ -32,6 +32,14 @@ class MediaAspectRatioCache {
   static double? get(MountedContainer container, String filePath) =>
       _getByPath(container.uri, filePath);
 
+  static bool isEmptyFor(MountedContainer container) =>
+      (_byUri[container.uri]?.count ?? 0) == 0;
+
+  static Map<String, double>? dirMapFor(
+    MountedContainer container,
+    String dirPath,
+  ) => _byUri[container.uri]?.dirs[dirPath];
+
   /// A lookup for the files directly inside [dirPath] ("" = the container's
   /// root, or a view whose entry names already are full paths, like the
   /// category views). Returns the ratio of `dirPath/name`, or null.

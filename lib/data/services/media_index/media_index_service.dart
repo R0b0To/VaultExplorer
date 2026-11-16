@@ -89,6 +89,12 @@ class MediaIndexService {
   bool isReady(MountedContainer container) =>
       _states[container.uri]?.ready ?? false;
 
+  /// True when [container] has no recorded entries (or is not ready yet).
+  bool isEmpty(MountedContainer container) {
+    final state = _states[container.uri];
+    return state == null || !state.ready || state.index.isEmpty;
+  }
+
   /// Loads the container's stored index (once per mount) and applies
   /// [access]. Safe to call again; calls that overlap share one read.
   Future<void> attach(MountedContainer container, MediaIndexAccess access) {

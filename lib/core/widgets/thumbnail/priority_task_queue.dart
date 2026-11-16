@@ -147,10 +147,9 @@ class PriorityTaskQueue {
     _drainNext();
   }
 
-int get _nonVisibleCap {
-    if (maxConcurrency <= 1) return maxConcurrency;
-    if (maxConcurrency <= 3) return maxConcurrency - 1;
-    return maxConcurrency - 2;
+  int _nonVisibleCapFor(TaskPriority priority) {
+    if (priority == TaskPriority.background) return 1;
+    return (maxConcurrency ~/ 2).clamp(1, 4);
   }
 
   bool _canAdmit(TaskPriority priority) {
@@ -160,9 +159,10 @@ int get _nonVisibleCap {
 
   bool _canAdmitTier(TaskPriority priority) {
     if (priority != TaskPriority.visible) {
+      if (_waiting[TaskPriority.visible]!.isNotEmpty) return false;
       final nonVisibleRunning =
           _running - (_runningByTier[TaskPriority.visible] ?? 0);
-      if (nonVisibleRunning >= _nonVisibleCap) return false;
+      if (nonVisibleRunning >= _nonVisibleCapFor(priority)) return false;
     }
     return _playbackGateAllows(priority);
   }

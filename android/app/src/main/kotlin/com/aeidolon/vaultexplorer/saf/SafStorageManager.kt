@@ -727,8 +727,8 @@ class SafStorageManager(private val context: Context) {
                                 alternate?.recycle()
                             }
                         }
-                        val scaled = scaledToFit(frame, targetSize)
-                        val stream = ByteArrayOutputStream()
+                         val scaled = scaledToFit(frame, targetSize)
+                        val stream = ByteArrayOutputStream(32768)
                         scaled.compress(Bitmap.CompressFormat.JPEG, quality.coerceIn(1, 100), stream)
                         val bytes = stream.toByteArray()
                         val w = frame.width
@@ -812,9 +812,29 @@ class SafStorageManager(private val context: Context) {
                     BitmapFactory.decodeStream(stream, null, decodeOptions)
                 } ?: return null
 
-                val oriented = applyExifOrientation(decoded, exifOrientationMatrix(exifOrientation))
-                val scaled = scaledToFit(oriented, targetSize)
-                val stream = ByteArrayOutputStream()
+                  val orientationMatrix = exifOrientationMatrix(exifOrientation)
+                val dW = decoded.width
+                val dH = decoded.height
+                val maxDim = maxOf(dW, dH)
+                val needsScale = maxDim > targetSize && maxDim > 0
+                val scale = if (needsScale) targetSize.toFloat() / maxDim else 1f
+                val scaled = if (needsScale && (dW * scale < 1f || dH * scale < 1f)) {
+                    val oriented = applyExifOrientation(decoded, orientationMatrix)
+                    scaledToFit(oriented, targetSize).also {
+                        if (it != oriented) oriented.recycle()
+                    }
+                } else {
+                    val combined = Matrix(orientationMatrix)
+                    if (needsScale) combined.preScale(scale, scale)
+                    if (combined.isIdentity) {
+                        decoded
+                    } else {
+                        Bitmap.createBitmap(decoded, 0, 0, dW, dH, combined, true).also {
+                            if (it != decoded) decoded.recycle()
+                        }
+                    }
+                }
+                val stream = ByteArrayOutputStream(32768)
                 val format = if (preserveAlpha) {
                     Bitmap.CompressFormat.WEBP
                 } else {
@@ -822,8 +842,7 @@ class SafStorageManager(private val context: Context) {
                 }
                 scaled.compress(format, quality.coerceIn(1, 100), stream)
                 val bytes = stream.toByteArray()
-                if (scaled != oriented) scaled.recycle()
-                oriented.recycle()
+                scaled.recycle()
 
                 mapOf("bytes" to bytes, "width" to srcW, "height" to srcH)
             } finally {

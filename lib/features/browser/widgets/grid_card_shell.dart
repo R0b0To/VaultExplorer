@@ -115,6 +115,10 @@ class GridCardShell extends StatelessWidget {
   /// default rounded look; 0 gives square cards.
   final double cornerRadius;
 
+  /// When non-null, skips the footer [LayoutBuilder] used to detect narrow
+  /// cards (`tileWidth < 100`).
+  final bool? compactFooter;
+
   const GridCardShell({
     super.key,
     required this.preview,
@@ -138,8 +142,8 @@ class GridCardShell extends StatelessWidget {
     this.isFolder = false,
     this.aspectRatio,
     this.cornerRadius = 12.0,
+    this.compactFooter,
   });
-
   @override
   Widget build(BuildContext context) {
     final perfT0 = PerfTrace.begin();
@@ -278,41 +282,43 @@ class GridCardShell extends StatelessWidget {
       ),
     );
 
+     Widget buildMoreFooter(bool compact) {
+      final size = compact ? 24.0 : 28.0;
+      return Padding(
+        padding: EdgeInsetsDirectional.fromSTEB(
+          compact ? 8 : 10,
+          compact ? 4 : 3,
+          2,
+          compact ? 4 : 3,
+        ),
+        child: Row(
+          children: [
+            Expanded(child: Center(child: nameLabel)),
+            SizedBox(
+              width: size,
+              height: size,
+              child: moreVisible
+                  ? IconButton(
+                      padding: EdgeInsets.zero,
+                      iconSize: compact ? 18 : 20,
+                      color: cs.onSurfaceVariant,
+                      icon: const Icon(Icons.more_vert_rounded),
+                      onPressed: onMoreTap,
+                    )
+                  : null,
+            ),
+          ],
+        ),
+      );
+    }
+
     Widget footer = hasMoreSlot
-        ? LayoutBuilder(
-            builder: (context, constraints) {
-              // Dense grids have narrow cards; keep the button from eating
-              // the name.
-              final compact = constraints.maxWidth < 100;
-              final size = compact ? 24.0 : 28.0;
-              return Padding(
-                padding: EdgeInsetsDirectional.fromSTEB(
-                  compact ? 8 : 10,
-                  compact ? 4 : 3,
-                  2,
-                  compact ? 4 : 3,
-                ),
-                child: Row(
-                  children: [
-                    Expanded(child: Center(child: nameLabel)),
-                    SizedBox(
-                      width: size,
-                      height: size,
-                      child: moreVisible
-                          ? IconButton(
-                              padding: EdgeInsets.zero,
-                              iconSize: compact ? 18 : 20,
-                              color: cs.onSurfaceVariant,
-                              icon: const Icon(Icons.more_vert_rounded),
-                              onPressed: onMoreTap,
-                            )
-                          : null,
-                    ),
-                  ],
-                ),
-              );
-            },
-          )
+        ? (compactFooter != null
+            ? buildMoreFooter(compactFooter!)
+            : LayoutBuilder(
+                builder: (context, constraints) =>
+                    buildMoreFooter(constraints.maxWidth < 100),
+              ))
         : Container(
             alignment: Alignment.center,
             width: double.infinity,
@@ -353,8 +359,11 @@ class GridCardShell extends StatelessWidget {
       }
     }
 
-    Widget cell = Card(
+     Widget cell = Card(
       margin: EdgeInsets.zero,
+      elevation: 0,
+      shadowColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(cornerRadius),

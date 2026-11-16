@@ -96,7 +96,7 @@ Widget buildBrowserBody(
     );
   }
   final isLandscape =
-      MediaQuery.of(context).orientation == Orientation.landscape;
+      MediaQuery.orientationOf(context) == Orientation.landscape;
   final content = switch (layoutMode) {
     BrowserLayoutMode.grid => FileGridView(
       key: gridKey,

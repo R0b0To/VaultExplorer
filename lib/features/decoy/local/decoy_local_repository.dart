@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:isolate';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:vaultexplorer/core/utils/natural_sort.dart';
 import 'package:vaultexplorer/core/utils/perf_trace.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 
@@ -29,12 +30,26 @@ class DecoyLocalRepository {
       LinkedHashMap<String, _CachedListing>();
   static const int _cacheMaxFolders = 16;
   static const _cacheTtl = Duration(seconds: 15);
+  static const _largeFolderCacheTtl = Duration(minutes: 2);
+  static const int _largeFolderThreshold = 2000;
 
   /// Clears the in-memory cache of directory listings.
   static void clearCache() {
     _cache.clear();
   }
 
+  /// Drops only [dirPath] from the listing cache so mutations in one folder
+  /// do not evict cached 40,000-entry folders elsewhere.
+  static void invalidateDirectory(String dirPath) {
+    _cache.remove(dirPath);
+  }
+
+  /// Drops the parent folder of [entryPath] (and [entryPath] itself if it was
+  /// a cached directory).
+  static void invalidatePathAndParent(String entryPath) {
+    _cache.remove(entryPath);
+    _cache.remove(p.dirname(entryPath));
+  }
   /// Resolves the true public storage root (e.g. `/storage/emulated/0`),
   /// independent of Android version/OEM quirks -- same approach the decoy
   /// archive screen already uses to find Downloads, generalized to return
@@ -68,11 +83,17 @@ class DecoyLocalRepository {
   Future<List<RawEntry>> listDirectory(String path, {bool refresh = false}) async {
     final perfT0 = PerfTrace.begin();
     final cached = _cache.remove(path);
+    var missReason = refresh
+        ? 'refresh(hadCache=${cached != null})'
+        : (cached == null ? 'cold_or_evicted(n=${_cache.length})' : '');
     if (!refresh && cached != null) {
       // One stat of the folder itself decides whether the cached listing is
       // still good; far cheaper than listing and stat'ing every child again.
+     final ttl = cached.entries.length >= _largeFolderThreshold
+          ? _largeFolderCacheTtl
+          : _cacheTtl;
       final age = DateTime.now().difference(cached.cachedAt);
-      if (age < _cacheTtl) {
+      if (age < ttl) {
         final modified = await _folderModified(path);
         if (modified != null && modified == cached.folderModified) {
           _cache[path] = cached; // re-insert: most recently used
@@ -80,6 +101,11 @@ class DecoyLocalRepository {
           PerfTrace.end('local.list.cached', perfT0);
           return cached.entries;
         }
+        missReason = modified == null
+            ? 'mtime_null'
+            : 'mtime_changed(${cached.folderModified.millisecondsSinceEpoch}->${modified.millisecondsSinceEpoch})';
+      } else {
+        missReason = 'ttl(${age.inSeconds}s>=${ttl.inSeconds}s,n=${cached.entries.length})';
       }
     }
     PerfTrace.count('local.list.cache_miss');
@@ -90,8 +116,16 @@ class DecoyLocalRepository {
     final folderModified = await _folderModified(path);
     final out = await Isolate.run(() => _listDirectorySync(path));
     PerfTrace.end('local.list.isolate', perfT0, slowMs: 150);
+    PerfTrace.record('local.list.readdir', out.listUs);
+    PerfTrace.record('local.list.stat', out.statUs);
+    if (perfT0 != 0) {
+      PerfTrace.sink(
+        'local.list.detail key=${path.hashCode} miss=$missReason count=${out.entries.length} '
+        'readdirMs=${out.listUs ~/ 1000} statMs=${out.statUs ~/ 1000} sortMs=${out.sortUs ~/ 1000}',
+      );
+    }
 
-    final result = List<RawEntry>.unmodifiable(out);
+  final result = UnmodifiableListView<RawEntry>(out.entries);
     if (folderModified != null) {
       _cache[path] = _CachedListing(result, folderModified, DateTime.now());
       while (_cache.length > _cacheMaxFolders) {
@@ -135,7 +169,7 @@ class DecoyLocalRepository {
   }
 
 Future<Directory> createFolder(String parentPath, String desiredName) async {
-    clearCache();
+    invalidateDirectory(parentPath);
     final name = desiredName.trim();
     if (name.isEmpty) {
       throw ArgumentError('Folder name cannot be empty');
@@ -149,8 +183,8 @@ Future<Directory> createFolder(String parentPath, String desiredName) async {
     return dir.create(recursive: false);
   }
 
-  Future<String> rename(String path, String newName) async {
-    clearCache();
+ Future<String> rename(String path, String newName) async {
+    invalidatePathAndParent(path);
     final trimmed = newName.trim();
     if (trimmed.isEmpty) {
       throw ArgumentError('Name cannot be empty');
@@ -167,7 +201,7 @@ Future<Directory> createFolder(String parentPath, String desiredName) async {
   }
 
   Future<void> delete(String path) async {
-    clearCache();
+    invalidatePathAndParent(path);
     final type = await FileSystemEntity.type(path);
     if (type == FileSystemEntityType.directory) {
       await Directory(path).delete(recursive: true);
@@ -177,7 +211,7 @@ Future<Directory> createFolder(String parentPath, String desiredName) async {
   }
 
   Future<String> copyInto(String sourcePath, String destDirPath) async {
-    clearCache();
+    invalidateDirectory(destDirPath);;
     final name = await _uniqueName(destDirPath, p.basename(sourcePath));
     final destPath = p.join(destDirPath, name);
     final type = await FileSystemEntity.type(sourcePath);
@@ -189,8 +223,9 @@ Future<Directory> createFolder(String parentPath, String desiredName) async {
     return destPath;
   }
 
-  Future<String> moveInto(String sourcePath, String destDirPath) async {
-    clearCache();
+ Future<String> moveInto(String sourcePath, String destDirPath) async {
+    invalidatePathAndParent(sourcePath);
+    invalidateDirectory(destDirPath);
     final name = await _uniqueName(destDirPath, p.basename(sourcePath));
     final destPath = p.join(destDirPath, name);
     try {
@@ -234,12 +269,21 @@ Future<Directory> createFolder(String parentPath, String desiredName) async {
   }
 }
 
-List<RawEntry> _listDirectorySync(String path) {
+({List<RawEntry> entries, int listUs, int statUs, int sortUs}) _listDirectorySync(String path) {
   final dir = Directory(path);
-  if (!dir.existsSync()) return <RawEntry>[];
-  final entries = <RawEntry>[];
+  if (!dir.existsSync()) {
+    return (entries: <RawEntry>[], listUs: 0, statUs: 0, sortUs: 0);
+  }
+  final dirs = <RawEntry>[];
+  final files = <RawEntry>[];
+  var listUs = 0;
+  var statUs = 0;
+  var sortUs = 0;
   try {
+    final sw = Stopwatch()..start();
     final items = dir.listSync(followLinks: false);
+    listUs = sw.elapsedMicroseconds;
+    sw.reset();
     for (final item in items) {
       try {
         if (item is Directory) {
@@ -253,7 +297,7 @@ List<RawEntry> _listDirectorySync(String path) {
           }
           final name = _baseName(item.path);
           final lower = name.toLowerCase();
-          entries.add(RawEntry(
+          dirs.add(RawEntry(
             name: name,
             isDir: true,
             sizeBytes: 0,
@@ -267,7 +311,7 @@ List<RawEntry> _listDirectorySync(String path) {
           final lower = name.toLowerCase();
           final dot = lower.lastIndexOf('.');
           final ext = dot < 0 ? '' : lower.substring(dot + 1);
-          entries.add(RawEntry(
+          files.add(RawEntry(
             name: name,
             isDir: false,
             sizeBytes: stat.size,
@@ -280,10 +324,24 @@ List<RawEntry> _listDirectorySync(String path) {
         continue;
       }
     }
+    statUs = sw.elapsedMicroseconds;
+    sw.reset();
+    // Pre-sort on this worker isolate in natural-name order so the UI thread
+    // can skip the 600k-comparison sort on large folders opened by name.
+    if (dirs.length > 1) {
+      dirs.sort((a, b) => naturalCompare(a.lowercaseName, b.lowercaseName));
+    }
+    if (files.length > 1) {
+      files.sort((a, b) => naturalCompare(a.lowercaseName, b.lowercaseName));
+    }
+    sortUs = sw.elapsedMicroseconds;
   } catch (_) {
     // Unreadable directory or stream error mid-listing
   }
-  return entries;
+  final entries = dirs.isEmpty
+      ? files
+      : (files.isEmpty ? dirs : <RawEntry>[...dirs, ...files]);
+  return (entries: entries, listUs: listUs, statUs: statUs, sortUs: sortUs);
 }
 
 /// Last path segment of an entry returned by `Directory.listSync`.

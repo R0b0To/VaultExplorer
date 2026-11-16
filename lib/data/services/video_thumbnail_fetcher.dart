@@ -83,6 +83,7 @@ class VideoThumbnailFetcher {
     required int targetSize,
     ArchiveContext? archiveContext,
     String? archiveRootPath,
+    bool checkCache = true,
   }) async {
     if (archiveContext != null && archiveRootPath != null) {
       final bytes = await fetchArchiveVideoEntryForThumbnail(
@@ -97,7 +98,7 @@ class VideoThumbnailFetcher {
       return bytes;
     }
 
-    if (mode != ThumbnailCacheMode.disabled) {
+    if (checkCache && mode != ThumbnailCacheMode.disabled) {
       final cached = await thumbnailCache.fetch(
         container: container,
         filePath: filePath,
@@ -147,7 +148,7 @@ class VideoThumbnailFetcher {
   /// the real aspect ratio. [onUnknownSize] is called instead when a cache
   /// *hit* has no size on record (e.g. written before dimensions were
   /// tracked, or the `.meta` sidecar is missing/unreadable).
-  static Future<Uint8List> fetchWithSize(
+   static Future<Uint8List> fetchWithSize(
     ThumbnailCacheService thumbnailCache,
     VaultFileIoApi fileIoApi,
     MountedContainer container,
@@ -159,6 +160,7 @@ class VideoThumbnailFetcher {
     required Future<void> Function(Uint8List bytes) onUnknownSize,
     ArchiveContext? archiveContext,
     String? archiveRootPath,
+    bool checkCache = true,
   }) async {
     if (archiveContext != null && archiveRootPath != null) {
       final (bytes, width, height) =
@@ -186,7 +188,7 @@ class VideoThumbnailFetcher {
       return bytes;
     }
 
-    if (mode != ThumbnailCacheMode.disabled) {
+    if (checkCache && mode != ThumbnailCacheMode.disabled) {
       final cached = await thumbnailCache.fetchWithSize(
         container: container,
         filePath: filePath,

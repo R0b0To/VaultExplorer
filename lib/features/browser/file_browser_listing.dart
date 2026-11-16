@@ -1,6 +1,5 @@
-import 'dart:collection';
-
 import 'package:flutter/foundation.dart';
+import 'package:vaultexplorer/core/utils/natural_sort.dart';
 import 'package:vaultexplorer/core/utils/perf_trace.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/features/browser/file_browser_predicates.dart';
@@ -129,6 +128,7 @@ List<RawEntry> searchAwareVisibleItems(
 class BrowserListingInputs {
   const BrowserListingInputs({
     required this.items,
+    this.preSortedByNameAsc = false,
     required this.placeholders,
     required this.pendingDeletedNames,
     required this.query,
@@ -145,6 +145,7 @@ class BrowserListingInputs {
 
   /// The directory's own entries.
   final List<RawEntry> items;
+  final bool preSortedByNameAsc;
 
   /// Entries that stand in for transfers still in progress.
   final List<RawEntry> placeholders;
@@ -172,6 +173,7 @@ class BrowserListingInputs {
   /// re-sorting the directory on every progress tick would be wasted work.
   bool sameListingAs(BrowserListingInputs other) =>
       identical(items, other.items) &&
+      preSortedByNameAsc == other.preSortedByNameAsc &&
       identical(deepSearchResults, other.deepSearchResults) &&
       currentDirPath == other.currentDirPath &&
       query == other.query &&
@@ -210,73 +212,272 @@ class BrowserListing {
   final int fileCount;
 }
 
+Comparator<RawEntry> _comparatorFor(SortBy sortBy, bool asc) {
+  switch (sortBy) {
+    case SortBy.name:
+      return asc
+          ? (ea, eb) => naturalCompare(ea.lowercaseName, eb.lowercaseName)
+          : (ea, eb) => naturalCompare(eb.lowercaseName, ea.lowercaseName);
+    case SortBy.size:
+      return (ea, eb) {
+        var r = ea.sizeBytes.compareTo(eb.sizeBytes);
+        if (r == 0) r = naturalCompare(ea.lowercaseName, eb.lowercaseName);
+        return asc ? r : -r;
+      };
+    case SortBy.extension:
+      return (ea, eb) {
+        var r = ea.extension.compareTo(eb.extension);
+        if (r == 0) r = naturalCompare(ea.lowercaseName, eb.lowercaseName);
+        return asc ? r : -r;
+      };
+    case SortBy.date:
+      return (ea, eb) {
+        var r = ea.modifiedSecs.compareTo(eb.modifiedSecs);
+        if (r == 0) r = naturalCompare(ea.lowercaseName, eb.lowercaseName);
+        return asc ? r : -r;
+      };
+  }
+}
+
 BrowserListing buildBrowserListing(BrowserListingInputs inputs) {
   final hasPlaceholders = inputs.placeholders.isNotEmpty;
   final hasPendingDeletes = inputs.pendingDeletedNames.isNotEmpty;
+  final hasQuery = inputs.searchActive && inputs.query.isNotEmpty;
+  final comparator = _comparatorFor(inputs.sortBy, inputs.sortAscending);
 
-  final Iterable<RawEntry> visibleCurrent = hasPendingDeletes
-      ? inputs.items.where((e) => !inputs.pendingDeletedNames.contains(e.name))
-      : inputs.items;
-
-  final List<RawEntry> combined;
-  if (!hasPlaceholders) {
-    combined = visibleCurrent is List<RawEntry>
-        ? visibleCurrent
-        : visibleCurrent.toList();
-  } else {
-    final existingNamesLower =
-        visibleCurrent.map((e) => e.lowercaseName).toSet();
-    final uniquePlaceholders = inputs.placeholders.where(
-      (p) => !existingNamesLower.contains(p.lowercaseName),
-    );
-    combined = [...visibleCurrent, ...uniquePlaceholders];
-  }
-
-  final items = searchAwareVisibleItems(
-    combined,
-    query: inputs.query,
-    searchActive: inputs.searchActive,
-    deepSearch: inputs.deepSearch,
-    deepSearchResults: inputs.deepSearchResults,
-    showHidden: inputs.showHidden,
-    typeFilter: inputs.typeFilter,
-  );
-
-  // With pinned paths, compareBrowserEntries builds two path strings per
-  // comparison (about n log n comparisons). Work out who is pinned once per
-  // entry instead and look it up by identity while sorting.
-  final pinnedPaths = inputs.pinnedPaths;
-  if (pinnedPaths.isEmpty) {
-    items.sort(
-      (ea, eb) => _compareDirsThenSort(
-        ea,
-        eb,
-        sortBy: inputs.sortBy,
-        sortAscending: inputs.sortAscending,
-      ),
-    );
-  } else {
-    final pinned = HashSet<RawEntry>.identity();
-    for (final item in items) {
-      if (isPinned(item, inputs.currentDirPath, pinnedPaths)) pinned.add(item);
+  Set<String>? pinnedNamesInDir;
+  if (inputs.pinnedPaths.isNotEmpty) {
+    final prefix =
+        inputs.currentDirPath.isEmpty ? '' : '${inputs.currentDirPath}/';
+    for (final path in inputs.pinnedPaths) {
+      if (prefix.isEmpty) {
+        if (!path.contains('/')) (pinnedNamesInDir ??= <String>{}).add(path);
+      } else if (path.startsWith(prefix)) {
+        final rest = path.substring(prefix.length);
+        if (!rest.contains('/')) (pinnedNamesInDir ??= <String>{}).add(rest);
+      }
     }
-    items.sort((ea, eb) {
-      final aPinned = pinned.contains(ea);
-      final bPinned = pinned.contains(eb);
-      if (aPinned != bPinned) return aPinned ? -1 : 1;
-      return _compareDirsThenSort(
-        ea,
-        eb,
-        sortBy: inputs.sortBy,
-        sortAscending: inputs.sortAscending,
-      );
-    });
   }
 
-  var dirCount = 0;
-  for (final item in items) {
-    if (item.isDir) dirCount++;
+  final List<RawEntry> visible;
+  if (!hasPlaceholders &&
+      !hasPendingDeletes &&
+      !hasQuery &&
+      inputs.typeFilter == null) {
+    if (inputs.preSortedByNameAsc &&
+        inputs.sortBy == SortBy.name &&
+        inputs.sortAscending &&
+        pinnedNamesInDir == null) {
+      if (inputs.showHidden) {
+        var dirCount = 0;
+        while (dirCount < inputs.items.length && inputs.items[dirCount].isDir) {
+          dirCount++;
+        }
+        return BrowserListing(
+          items: inputs.items,
+          dirCount: dirCount,
+          fileCount: inputs.items.length - dirCount,
+        );
+      }
+      var dirCount = 0;
+      var skippedAny = false;
+      for (final item in inputs.items) {
+        if (isHiddenEntryName(item.name)) {
+          skippedAny = true;
+          continue;
+        }
+        if (item.isDir) dirCount++;
+      }
+      final result = skippedAny
+          ? [
+              for (final item in inputs.items)
+                if (!isHiddenEntryName(item.name)) item,
+            ]
+          : inputs.items;
+      return BrowserListing(
+        items: result,
+        dirCount: dirCount,
+        fileCount: result.length - dirCount,
+      );
+    }
+    if (inputs.showHidden && pinnedNamesInDir == null) {
+      visible = inputs.items;
+    } else if (!inputs.showHidden && pinnedNamesInDir == null) {
+      var dirCount = 0;
+      var seenFile = false;
+      var alreadyPartitionedAndSorted = true;
+      var skippedAny = false;
+      RawEntry? prev;
+      for (final item in inputs.items) {
+        if (isHiddenEntryName(item.name)) {
+          skippedAny = true;
+          continue;
+        }
+        if (item.isDir) {
+          if (seenFile) {
+            alreadyPartitionedAndSorted = false;
+            break;
+          }
+          dirCount++;
+          if (prev != null && comparator(prev, item) > 0) {
+            alreadyPartitionedAndSorted = false;
+            break;
+          }
+        } else {
+          if (!seenFile) {
+            seenFile = true;
+            prev = null;
+          }
+          if (prev != null && comparator(prev, item) > 0) {
+            alreadyPartitionedAndSorted = false;
+            break;
+          }
+        }
+        prev = item;
+      }
+      if (alreadyPartitionedAndSorted) {
+        final result = skippedAny
+            ? [
+                for (final item in inputs.items)
+                  if (!isHiddenEntryName(item.name)) item,
+              ]
+            : inputs.items;
+        return BrowserListing(
+          items: result,
+          dirCount: dirCount,
+          fileCount: result.length - dirCount,
+        );
+      }
+      visible = inputs.items
+          .where((item) => !isHiddenEntryName(item.name))
+          .toList();
+    } else {
+      visible = inputs.showHidden
+          ? inputs.items
+          : inputs.items
+              .where((item) => !isHiddenEntryName(item.name))
+              .toList();
+    }
+  } else {
+    final Iterable<RawEntry> visibleCurrent = hasPendingDeletes
+        ? inputs.items.where((e) => !inputs.pendingDeletedNames.contains(e.name))
+        : inputs.items;
+
+    final List<RawEntry> combined;
+    if (!hasPlaceholders) {
+      combined = visibleCurrent is List<RawEntry>
+          ? visibleCurrent
+          : visibleCurrent.toList();
+    } else {
+      final existingNamesLower =
+          visibleCurrent.map((e) => e.lowercaseName).toSet();
+      final uniquePlaceholders = inputs.placeholders.where(
+        (p) => !existingNamesLower.contains(p.lowercaseName),
+      );
+      combined = [...visibleCurrent, ...uniquePlaceholders];
+    }
+
+    visible = searchAwareVisibleItems(
+      combined,
+      query: inputs.query,
+      searchActive: inputs.searchActive,
+      deepSearch: inputs.deepSearch,
+      deepSearchResults: inputs.deepSearchResults,
+      showHidden: inputs.showHidden,
+      typeFilter: inputs.typeFilter,
+    );
   }
+
+  final dirs = <RawEntry>[];
+  final files = <RawEntry>[];
+
+  bool isSorted(List<RawEntry> list) {
+    for (var i = 1; i < list.length; i++) {
+      if (comparator(list[i - 1], list[i]) > 0) return false;
+    }
+    return true;
+  }
+
+  if (pinnedNamesInDir == null) {
+    var dirCount = 0;
+    var seenFile = false;
+    var alreadyPartitionedAndSorted = true;
+    RawEntry? prev;
+    for (final item in visible) {
+      if (item.isDir) {
+        if (seenFile) {
+          alreadyPartitionedAndSorted = false;
+          break;
+        }
+        dirCount++;
+        if (prev != null && comparator(prev, item) > 0) {
+          alreadyPartitionedAndSorted = false;
+          break;
+        }
+      } else {
+        if (!seenFile) {
+          seenFile = true;
+          prev = null;
+        }
+        if (prev != null && comparator(prev, item) > 0) {
+          alreadyPartitionedAndSorted = false;
+          break;
+        }
+      }
+      prev = item;
+    }
+    if (alreadyPartitionedAndSorted) {
+      return BrowserListing(
+        items: visible,
+        dirCount: dirCount,
+        fileCount: visible.length - dirCount,
+      );
+    }
+
+    for (final item in visible) {
+      if (item.isDir) {
+        dirs.add(item);
+      } else {
+        files.add(item);
+      }
+    }
+    if (dirs.length > 1 && !isSorted(dirs)) dirs.sort(comparator);
+    if (files.length > 1 && !isSorted(files)) files.sort(comparator);
+    final items = dirs.isEmpty
+        ? files
+        : (files.isEmpty ? dirs : <RawEntry>[...dirs, ...files]);
+    return BrowserListing(
+      items: items,
+      dirCount: dirs.length,
+      fileCount: files.length,
+    );
+  }
+
+  final pinnedDirs = <RawEntry>[];
+  final pinnedFiles = <RawEntry>[];
+  for (final item in visible) {
+    if (pinnedNamesInDir.contains(item.name)) {
+      if (item.isDir) {
+        pinnedDirs.add(item);
+      } else {
+        pinnedFiles.add(item);
+      }
+    } else if (item.isDir) {
+      dirs.add(item);
+    } else {
+      files.add(item);
+    }
+  }
+  if (pinnedDirs.length > 1 && !isSorted(pinnedDirs)) {
+    pinnedDirs.sort(comparator);
+  }
+  if (pinnedFiles.length > 1 && !isSorted(pinnedFiles)) {
+    pinnedFiles.sort(comparator);
+  }
+  if (dirs.length > 1 && !isSorted(dirs)) dirs.sort(comparator);
+  if (files.length > 1 && !isSorted(files)) files.sort(comparator);
+  final items = <RawEntry>[...pinnedDirs, ...pinnedFiles, ...dirs, ...files];
+  final dirCount = pinnedDirs.length + dirs.length;
   return BrowserListing(
     items: items,
     dirCount: dirCount,
@@ -284,23 +485,29 @@ BrowserListing buildBrowserListing(BrowserListingInputs inputs) {
   );
 }
 
-/// Remembers the last listing so a rebuild that changed nothing relevant (a
-/// scroll tick, a thumbnail arriving) does not sort the directory again.
+/// Remembers recent listings so a rebuild or folder/tab switch that changed
+/// nothing relevant does not sort the directory again.
 class BrowserListingCache {
-  BrowserListingInputs? _inputs;
-  BrowserListing? _listing;
+  static const int _maxEntries = 6;
+  final List<({BrowserListingInputs inputs, BrowserListing listing})> _entries =
+      [];
 
   BrowserListing resolve(BrowserListingInputs inputs) {
-    final cached = _listing;
-    final previous = _inputs;
-    if (cached != null && previous != null && previous.sameListingAs(inputs)) {
-      return cached;
+    for (var i = 0; i < _entries.length; i++) {
+      final entry = _entries[i];
+      if (entry.inputs.sameListingAs(inputs)) {
+        if (i != 0) {
+          _entries.removeAt(i);
+          _entries.insert(0, entry);
+        }
+        return entry.listing;
+      }
     }
-   final perfT0 = PerfTrace.begin();
+    final perfT0 = PerfTrace.begin();
     final listing = buildBrowserListing(inputs);
     PerfTrace.end('browser.listing.build', perfT0, slowMs: 16);
-    _inputs = inputs;
-    _listing = listing;
+    _entries.insert(0, (inputs: inputs, listing: listing));
+    if (_entries.length > _maxEntries) _entries.removeLast();
     return listing;
   }
 }

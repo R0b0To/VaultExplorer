@@ -76,6 +76,7 @@ class MediaIndex {
 
   /// Entries held (an entry measured again counts twice until [compact]).
   int get length => _hashes.length + _overlay.length;
+  bool get isEmpty => _hashes.isEmpty && _overlay.isEmpty;
 
   /// Changes made since the last [markSaved].
   bool get hasUnsavedChanges => _revision != _savedRevision;

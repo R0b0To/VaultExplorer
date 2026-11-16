@@ -115,10 +115,34 @@ class _RenderGallerySliverGrid extends RenderSliverGrid {
   _RenderGallerySliverGrid({
     required super.childManager,
     required super.gridDelegate,
-    required this.host,
-  });
+    required GalleryLayoutHost host,
+  }) : _host = host;
 
-  GalleryLayoutHost host;
+  GalleryLayoutHost _host;
+  GalleryLayoutHost get host => _host;
+  set host(GalleryLayoutHost value) {
+    if (identical(_host, value)) return;
+    if (attached) _host.removeLayoutListener(_onHostLayoutAdopted);
+    _host = value;
+    if (attached) _host.addLayoutListener(_onHostLayoutAdopted);
+    markNeedsLayout();
+  }
+
+  void _onHostLayoutAdopted() {
+    markNeedsLayout();
+  }
+
+  @override
+  void attach(PipelineOwner owner) {
+    super.attach(owner);
+    _host.addLayoutListener(_onHostLayoutAdopted);
+  }
+
+  @override
+  void detach() {
+    _host.removeLayoutListener(_onHostLayoutAdopted);
+    super.detach();
+  }
 
   @override
   void performLayout() {

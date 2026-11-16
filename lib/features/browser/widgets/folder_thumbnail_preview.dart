@@ -25,6 +25,7 @@ class FolderThumbnailPreview extends ConsumerStatefulWidget {
 
   static const int maxScan = 30;
   static const Duration scanDebounce = Duration(milliseconds: 350);
+  static final PriorityTaskQueue _scanLimiter = PriorityTaskQueue(2);
 
   // Caches only positive hits so newly populated folders can be scanned
   static final Map<String, Uint8List> _sessionCache = {};
@@ -135,63 +136,81 @@ class _FolderThumbnailPreviewState
     FolderThumbnailPreview._sessionCache[key] = bytes;
   }
 
-  Future<void> _scan() async {
+ Future<void> _scan() async {
     if (!_tickerEnabled) return;
     final token = ++_token;
     final fileIoApi = ref.read(vaultFileIoApiProvider);
     final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
 
-    List<String>? raw;
-    try {
-      raw = await fileIoApi.listDirectory(widget.container, widget.folderPath);
-    } catch (_) {
-      raw = null;
-    }
-    if (!mounted ||
-        !_tickerEnabled ||
-        token != _token ||
-        raw == null ||
-        raw.isEmpty) {
-      return;
-    }
-
+    final scanCompleter = Completer<void>();
+    var scanAcquired = false;
     final candidates = <String>[];
-    for (final line in raw) {
-      if (line.startsWith('System:')) continue;
-      final RawEntry entry;
-      try {
-        entry = RawEntry.parse(line);
-      } catch (_) {
-        continue;
-      }
-      if (entry.isDir || entry.isPlaceholder) continue;
-      if (!MediaViewerConstants.isImage(entry.name) &&
-          !MediaViewerConstants.isVideo(entry.name)) {
-        continue;
-      }
-      candidates.add(
-        widget.folderPath.isEmpty
-            ? entry.name
-            : '${widget.folderPath}/${entry.name}',
-      );
-      if (candidates.length >= FolderThumbnailPreview.maxScan) break;
-    }
-
-    if (candidates.isEmpty) return;
-
-    // 1. Check if any candidate has a pre-cached thumbnail
     Uint8List? hit;
-    for (final path in candidates) {
-      final bytes = await thumbnailCache.fetch(
-        container: widget.container,
-        filePath: path,
-        mode: widget.cacheMode,
-        quality: widget.quality,
+      try {
+      await FolderThumbnailPreview._scanLimiter.acquire(
+        scanCompleter,
+        priority: TaskPriority.background,
       );
+      scanAcquired = true;
       if (!mounted || !_tickerEnabled || token != _token) return;
-      if (bytes != null && bytes.isNotEmpty) {
-        hit = bytes;
-        break;
+
+      List<String>? raw;
+      try {
+        raw = await fileIoApi.listDirectory(
+          widget.container,
+          widget.folderPath,
+        );
+      } catch (_) {
+        raw = null;
+      }
+      if (!mounted ||
+          !_tickerEnabled ||
+          token != _token ||
+          raw == null ||
+          raw.isEmpty) {
+        return;
+      }
+
+      for (final line in raw) {
+        if (line.startsWith('System:')) continue;
+        final RawEntry entry;
+        try {
+          entry = RawEntry.parse(line);
+        } catch (_) {
+          continue;
+        }
+        if (entry.isDir || entry.isPlaceholder) continue;
+        if (!MediaViewerConstants.isImage(entry.name) &&
+            !MediaViewerConstants.isVideo(entry.name)) {
+          continue;
+        }
+        candidates.add(
+          widget.folderPath.isEmpty
+              ? entry.name
+              : '${widget.folderPath}/${entry.name}',
+        );
+        if (candidates.length >= FolderThumbnailPreview.maxScan) break;
+      }
+
+      if (candidates.isEmpty) return;
+
+      // 1. Check if any candidate has a pre-cached thumbnail
+      for (final path in candidates) {
+        final bytes = await thumbnailCache.fetch(
+          container: widget.container,
+          filePath: path,
+          mode: widget.cacheMode,
+          quality: widget.quality,
+        );
+        if (!mounted || !_tickerEnabled || token != _token) return;
+        if (bytes != null && bytes.isNotEmpty) {
+          hit = bytes;
+          break;
+        }
+      }
+    } finally {
+      if (scanAcquired) {
+        FolderThumbnailPreview._scanLimiter.release(scanCompleter);
       }
     }
 

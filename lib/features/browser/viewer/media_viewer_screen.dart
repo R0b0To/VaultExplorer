@@ -618,7 +618,11 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       thumbnailCache: ref.read(thumbnailCacheServiceProvider),
       thumbnailQuality: widget.thumbnailQuality,
       thumbnailCacheMode: widget.thumbnailCacheMode,
-    );
+    )..onRatioLearned = () {
+        // A video thumbnail taught the viewer a shape it had been guessing
+        // at (16:9): lay the carousel out again, coalesced.
+        if (mounted) _scheduleGeometryRebuild();
+      };
     ThumbnailConcurrency.videoLimiter.cancelAll();
     if (!widget.startInMiniPlayer) {
       SystemChrome.setPreferredOrientations(DeviceOrientation.values);

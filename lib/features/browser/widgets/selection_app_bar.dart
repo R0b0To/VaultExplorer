@@ -270,6 +270,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                 shown(FileItemAction.bookmark)) ||
             (onGoToLocation != null && shown(FileItemAction.goToLocation)) ||
             (onCopyPath != null && shown(FileItemAction.copyPath)) ||
+            (onEditMetadata != null && shown(FileItemAction.editMetadata)) ||
             singleSelected;
 
         Widget buildActionButton(FileItemAction action) => switch (action) {

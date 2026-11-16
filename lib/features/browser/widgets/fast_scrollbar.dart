@@ -94,6 +94,7 @@ class _FastScrollbarState extends State<FastScrollbar>
   static const double _kExtentSmoothing = 0.15;
 
   bool _postFrameCallbackPending = false;
+  final ValueNotifier<int> _overlayTick = ValueNotifier<int>(0);
 
   late final bool _ownsSpeedNotifier = widget.scrollSpeed == null;
   late final ValueNotifier<bool> _speedNotifier =
@@ -160,29 +161,30 @@ class _FastScrollbarState extends State<FastScrollbar>
       _dragSmoothedExtent = null;
       widget.onDragStateChanged?.call(false);
     }
-    _fadeController.dispose();
+     _fadeController.dispose();
+    _overlayTick.dispose();
     if (_ownsSpeedNotifier) _speedNotifier.dispose();
     super.dispose();
   }
 
-  /// Safely runs [fn] and schedules a rebuild without throwing "Build scheduled during frame".
-  void _safeSetState(VoidCallback fn) {
+  /// Safely updates scrollbar overlay state without rebuilding the wrapped scrollable.
+  void _notifyOverlay([VoidCallback? fn]) {
+    fn?.call();
     if (!mounted) return;
 
     if (SchedulerBinding.instance.schedulerPhase ==
         SchedulerPhase.persistentCallbacks) {
-      fn();
       if (!_postFrameCallbackPending) {
         _postFrameCallbackPending = true;
         SchedulerBinding.instance.addPostFrameCallback((_) {
           _postFrameCallbackPending = false;
           if (mounted) {
-            setState(() {});
+            _overlayTick.value++;
           }
         });
       }
     } else {
-      setState(fn);
+      _overlayTick.value++;
     }
   }
 
@@ -224,7 +226,7 @@ void _onControllerChange() {
       if (pos.hasContentDimensions && pos.maxScrollExtent > 0) {
         final newFraction = (pos.pixels / pos.maxScrollExtent).clamp(0.0, 1.0);
         if ((newFraction - _scrollFraction).abs() > 0.0005) {
-          _safeSetState(() {
+          _notifyOverlay(() {
             _scrollFraction = newFraction;
           });
         }
@@ -250,9 +252,11 @@ void _onControllerChange() {
           _startAutoHideTimer();
         }
 
-        _safeSetState(() {
-          _scrollFraction = newFraction;
-        });
+        if ((newFraction - _scrollFraction).abs() > 0.0005) {
+          _notifyOverlay(() {
+            _scrollFraction = newFraction;
+          });
+        }
       }
     }
     return false;
@@ -402,7 +406,7 @@ void _onControllerChange() {
 
     ThumbnailConcurrency.imageLimiter.cancelTier(TaskPriority.visible);
 
-    try {
+     try {
       // Fires on every index change while dragging the scrubber, so this is
       // deliberately unlogged — haptics are also unsupported on some
       // devices, which is an expected, non-actionable failure.
@@ -411,7 +415,7 @@ void _onControllerChange() {
       // Haptics are unavailable on some devices; non-actionable (see above).
     }
 
-    setState(() {});
+    _notifyOverlay();
   }
 
   void _notifyDragState(bool dragging) {
@@ -496,7 +500,7 @@ void _onControllerChange() {
       _scrollFraction = fraction;
       widget.controller.jumpTo(_dragTargetOffset(fraction, previousFraction));
       _popupBadge = _computePopupBadge(fraction);
-      setState(() {});
+      _notifyOverlay();
     }
   }
 
@@ -508,7 +512,7 @@ void _onControllerChange() {
     _notifyDragState(false);
     _popupBadge = null;
     _startAutoHideTimer();
-    setState(() {});
+    _notifyOverlay();
   }
 
   void _handleDragCancel() {
@@ -519,24 +523,11 @@ void _onControllerChange() {
     _notifyDragState(false);
     _popupBadge = null;
     _startAutoHideTimer();
-    setState(() {});
+    _notifyOverlay();
   }
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final scrollbarTheme = Theme.of(context).scrollbarTheme;
-    final thumbColor =
-        scrollbarTheme.thumbColor?.resolve({
-          if (_isDragging) WidgetState.dragged,
-        }) ??
-        (_isDragging ? cs.primary : cs.primary.withValues(alpha: 0.5));
-    final trackColor =
-        scrollbarTheme.trackColor?.resolve({
-          if (_isDragging) WidgetState.dragged,
-        }) ??
-        cs.primary.withValues(alpha: 0.15);
-
     return NotificationListener<ScrollNotification>(
       onNotification: _handleScrollNotification,
       child: Stack(
@@ -544,8 +535,25 @@ void _onControllerChange() {
         children: [
           ScrollSpeedScope(fast: _speedNotifier, child: widget.child),
           Positioned.fill(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
+            child: ValueListenableBuilder<int>(
+              valueListenable: _overlayTick,
+              builder: (context, _, _) {
+                final cs = Theme.of(context).colorScheme;
+                final scrollbarTheme = Theme.of(context).scrollbarTheme;
+                final thumbColor =
+                    scrollbarTheme.thumbColor?.resolve({
+                      if (_isDragging) WidgetState.dragged,
+                    }) ??
+                    (_isDragging
+                        ? cs.primary
+                        : cs.primary.withValues(alpha: 0.5));
+                final trackColor =
+                    scrollbarTheme.trackColor?.resolve({
+                      if (_isDragging) WidgetState.dragged,
+                    }) ??
+                    cs.primary.withValues(alpha: 0.15);
+                return LayoutBuilder(
+                  builder: (context, constraints) {
                 final isVertical = widget.axis == Axis.vertical;
                 final leadingInset = isVertical
                     ? widget.padding.top
@@ -746,6 +754,8 @@ void _onControllerChange() {
                         ),
                       ),
                   ],
+                );
+                  },
                 );
               },
             ),

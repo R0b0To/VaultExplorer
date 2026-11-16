@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/theme/file_manager_skin_scope.dart';
+import 'package:vaultexplorer/core/utils/perf_trace.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
@@ -78,8 +79,15 @@ class DirectoryTile extends StatelessWidget {
     this.showThumbnailPreview = true,
   });
 
-  @override
+ @override
   Widget build(BuildContext context) {
+    final perfT0 = PerfTrace.begin();
+    final built = _buildTile(context);
+    PerfTrace.end('ui.dir_tile.build', perfT0, slowMs: 16);
+    return built;
+  }
+
+  Widget _buildTile(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final skin = FileManagerSkinScope.of(context);
     final folderIcon = skin.folderIcon;

@@ -16,6 +16,7 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.io.IOException
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 
 class ArchiveHandlers(
@@ -23,8 +24,18 @@ class ArchiveHandlers(
     private val ioExecutor: ExecutorService,
     private val nativeOps: NativeOpSupport,
 ) {
-    private companion object {
-        const val TAG = "ArchiveHandlers"
+    companion object {
+        private const val TAG = "ArchiveHandlers"
+
+        /**
+         * Absolute paths of `arch_scan_*.tmp` files a live in-vault archive scan is still
+         * using. The startup sweep deletes leftovers of a killed process (they hold decrypted
+         * archive bytes) but must skip these.
+         */
+        private val activeScanTempFiles: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
+        fun isActiveScanTempFile(file: File): Boolean =
+            activeScanTempFiles.contains(file.absolutePath)
     }
 
     /** Securely removes one temporary file created for archive preview.
@@ -264,6 +275,7 @@ class ArchiveHandlers(
         ioExecutor.execute {
             if (isFolderVault) {
                 val tempFile = File.createTempFile("arch_scan_", ".tmp", activity.cacheDir)
+                activeScanTempFiles.add(tempFile.absolutePath)
                 var pfd: ParcelFileDescriptor? = null
                 try {
                     val extracted = ContainerFileSystem.extractToFile(volId, vaultPath, tempFile.absolutePath)
@@ -282,6 +294,7 @@ class ArchiveHandlers(
                 } finally {
                     runCatching { pfd?.close() }
                     SecureFileWipe.secureDeleteFile(tempFile)
+                    activeScanTempFiles.remove(tempFile.absolutePath)
                 }
             } else {
                 try {

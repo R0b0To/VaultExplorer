@@ -13,6 +13,7 @@ import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/theme/file_manager_skin_scope.dart';
 import 'package:vaultexplorer/core/utils/file_display_name.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
+import 'package:vaultexplorer/core/utils/perf_trace.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';
@@ -40,6 +41,19 @@ import 'package:vaultexplorer/features/browser/widgets/grid_card_shell.dart';
 import 'package:vaultexplorer/features/browser/widgets/hold_range_select_container.dart';
 import 'package:vaultexplorer/features/browser/widgets/shortcut_target_preview.dart';
 import 'package:vaultexplorer/features/browser/widgets/thumbnail_raw_fallback.dart';
+
+Widget _transparentHeroShuttle(
+  BuildContext flightContext,
+  Animation<double> animation,
+  HeroFlightDirection flightDirection,
+  BuildContext fromHeroContext,
+  BuildContext toHeroContext,
+) {
+  final hero = (flightDirection == HeroFlightDirection.push
+      ? toHeroContext.widget
+      : fromHeroContext.widget) as Hero;
+  return Material(type: MaterialType.transparency, child: hero.child);
+}
 
 class FileGridView extends StatefulWidget {
   final MountedContainer container;
@@ -323,14 +337,17 @@ class FileGridViewState extends State<FileGridView>
   /// quality this is derived from the real pixel width of a cell (same
   /// geometry as the grid delegate below), so fewer columns => sharper
   /// thumbnails, matching how Fossify Gallery sizes them.
-  ThumbnailQuality _effectiveQualityOf(RawEntry entry) {
+ ThumbnailQuality _effectiveQualityOf(RawEntry entry) {
+    PerfTrace.gauge('ui.grid.cols', _crossAxisCount);
     final q = widget.qualityFor?.call(entry) ?? widget.thumbnailQuality;
-    if (!q.auto) return q;
-    final tileWidth = _getTileWidth(_crossAxisCount, context);
-    return q.resolveForCell(
-      logicalWidth: tileWidth,
-      devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
-    );
+    final resolved = !q.auto
+        ? q
+        : q.resolveForCell(
+            logicalWidth: _getTileWidth(_crossAxisCount, context),
+            devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+          );
+    PerfTrace.gauge('thumb.grid.target_px', resolved.scaledSize(180));
+    return resolved;
   }
 
   double _getTileHeight(int columns) {
@@ -478,12 +495,16 @@ class FileGridViewState extends State<FileGridView>
           ),
         );
       },
-      child: GridView.builder(
+ child: GridView.builder(
         controller: controller,
-        cacheExtent: MediaQuery.sizeOf(context).height * 1.5,
+        cacheExtent: MediaQuery.sizeOf(context).height * 0.75,
         physics:
             const AlwaysScrollableScrollPhysics(), // Native scroll physics that cannot freeze
         findChildIndexCallback: _findChildIndex,
+        // No tile asks to be kept alive. The default wraps every one in an
+        // extra widget that only exists to listen for that (the date-grouped
+        // grid, masonry and list builders already switch it off).
+        addAutomaticKeepAlives: false,
         padding: EdgeInsets.fromLTRB(10, 12, 10, widget.bottomClearance),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: _crossAxisCount,
@@ -544,9 +565,9 @@ class FileGridViewState extends State<FileGridView>
           ),
         );
       },
-      child: CustomScrollView(
+     child: CustomScrollView(
         controller: controller,
-        cacheExtent: MediaQuery.sizeOf(context).height * 1.5,
+        cacheExtent: MediaQuery.sizeOf(context).height * 0.75,
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           SliverPadding(
@@ -594,6 +615,7 @@ class FileGridViewState extends State<FileGridView>
 
   @override
   Widget build(BuildContext context) {
+    PerfTrace.count('ui.grid.build');
     final total = widget.items.length;
 
     return LayoutBuilder(
@@ -772,14 +794,12 @@ class FileGridViewState extends State<FileGridView>
               tag: 'media_hero_${targetContainer.volId}_$fullPath',
               createRectTween: (begin, end) =>
                   MaterialRectArcTween(begin: begin, end: end),
-              child: Material(
-                type: MaterialType.transparency,
-                child: _EncryptedImageGridThumb(
-                  container: targetContainer,
-                  filePath: targetPath,
-                  cacheMode: _cacheModeOf(entry),
-                  quality: _effectiveQualityOf(entry),
-                ),
+              flightShuttleBuilder: _transparentHeroShuttle,
+              child: _EncryptedImageGridThumb(
+                container: targetContainer,
+                filePath: targetPath,
+                cacheMode: _cacheModeOf(entry),
+                quality: _effectiveQualityOf(entry),
               ),
             );
           }
@@ -788,14 +808,12 @@ class FileGridViewState extends State<FileGridView>
               tag: 'media_hero_${targetContainer.volId}_$fullPath',
               createRectTween: (begin, end) =>
                   MaterialRectArcTween(begin: begin, end: end),
-              child: Material(
-                type: MaterialType.transparency,
-                child: _VideoThumb(
-                  container: targetContainer,
-                  filePath: targetPath,
-                  cacheMode: _cacheModeOf(entry),
-                  quality: _effectiveQualityOf(entry),
-                ),
+              flightShuttleBuilder: _transparentHeroShuttle,
+              child: _VideoThumb(
+                container: targetContainer,
+                filePath: targetPath,
+                cacheMode: _cacheModeOf(entry),
+                quality: _effectiveQualityOf(entry),
               ),
             );
           }
@@ -845,16 +863,14 @@ class FileGridViewState extends State<FileGridView>
         tag: 'media_hero_${_containerOf(entry).volId}_$fullPath',
         createRectTween: (begin, end) =>
             MaterialRectArcTween(begin: begin, end: end),
-        child: Material(
-          type: MaterialType.transparency,
-          child: _EncryptedImageGridThumb(
-            container: _containerOf(entry),
-            filePath: fullPath,
-            cacheMode: _cacheModeOf(entry),
-            quality: _effectiveQualityOf(entry),
-            archiveContext: widget.archiveContext,
-            archiveRootPath: widget.archiveRootPath,
-          ),
+        flightShuttleBuilder: _transparentHeroShuttle,
+        child: _EncryptedImageGridThumb(
+          container: _containerOf(entry),
+          filePath: fullPath,
+          cacheMode: _cacheModeOf(entry),
+          quality: _effectiveQualityOf(entry),
+          archiveContext: widget.archiveContext,
+          archiveRootPath: widget.archiveRootPath,
         ),
       );
     } else if (isVid) {
@@ -862,16 +878,14 @@ class FileGridViewState extends State<FileGridView>
         tag: 'media_hero_${_containerOf(entry).volId}_$fullPath',
         createRectTween: (begin, end) =>
             MaterialRectArcTween(begin: begin, end: end),
-        child: Material(
-          type: MaterialType.transparency,
-          child: _VideoThumb(
-            container: _containerOf(entry),
-            filePath: fullPath,
-            cacheMode: _cacheModeOf(entry),
-            quality: _effectiveQualityOf(entry),
-            archiveContext: widget.archiveContext,
-            archiveRootPath: widget.archiveRootPath,
-          ),
+        flightShuttleBuilder: _transparentHeroShuttle,
+        child: _VideoThumb(
+          container: _containerOf(entry),
+          filePath: fullPath,
+          cacheMode: _cacheModeOf(entry),
+          quality: _effectiveQualityOf(entry),
+          archiveContext: widget.archiveContext,
+          archiveRootPath: widget.archiveRootPath,
         ),
       );
     } else if (isApk && widget.archiveContext == null) {

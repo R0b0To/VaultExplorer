@@ -19,7 +19,10 @@ namespace lockpolicy {
 //   flush()    -> bool : make buffered data durable; false = the device refused
 //   teardown() -> bool : unmount the filesystem and flush again; false = that flush failed
 //   reset()            : drop all volume state, INCLUDING any pending write cache
-// `flushable` is false for backing stores with no separate flush step to try first.
+// `flushable` is false for backing stores with no separate flush step to try first. The app now
+// passes true for every volume: each has a flush step (flushVolumeForLock covers dirty
+// filesystem state and the USB cache / composite carriers / fd write-behind buffer), and
+// reset() drops whatever an fd volume's write-behind buffer still holds.
 // Returns true when the volume ended up locked (reset() ran).
 template <typename FlushFn, typename TeardownFn, typename ResetFn>
 bool lockVolume(bool flushable, bool force, FlushFn&& flush, TeardownFn&& teardown, ResetFn&& reset,

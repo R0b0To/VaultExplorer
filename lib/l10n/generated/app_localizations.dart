@@ -8592,31 +8592,31 @@ abstract class AppLocalizations {
   /// **'Unbookmark selected'**
   String get unbookmarkSelectedAction;
 
-  /// No description provided for @bookmarkedCount.
+  /// Confirmation message showing how many items were bookmarked
   ///
   /// In en, this message translates to:
   /// **'{count, plural, =1{Bookmarked 1 item} other{Bookmarked {count} items}}'**
   String bookmarkedCount(num count);
 
-  /// No description provided for @unbookmarkedCount.
+  /// Confirmation message showing how many items were unbookmarked
   ///
   /// In en, this message translates to:
   /// **'{count, plural, =1{Unbookmarked 1 item} other{Unbookmarked {count} items}}'**
   String unbookmarkedCount(num count);
 
-  /// No description provided for @showBookmarkBarLabel.
+  /// Label for the setting that shows the bookmark bar
   ///
   /// In en, this message translates to:
   /// **'Show Bookmark Bar'**
   String get showBookmarkBarLabel;
 
-  /// No description provided for @showBookmarkBarDesc.
+  /// Description for the setting that shows the bookmark bar
   ///
   /// In en, this message translates to:
   /// **'Display bookmarked items in a bookmark bar or sidebar'**
   String get showBookmarkBarDesc;
 
-  /// No description provided for @bookmarkBarSectionHeader.
+  /// Heading of the bookmark bar section
   ///
   /// In en, this message translates to:
   /// **'Bookmark Bar'**
@@ -16187,103 +16187,103 @@ abstract class AppLocalizations {
   /// **'Customize Actions'**
   String get textEditorCustomizeActionsTitle;
 
-  /// No description provided for @actionUndo.
+  /// Label for the editor undo action
   ///
   /// In en, this message translates to:
   /// **'Undo'**
   String get actionUndo;
 
-  /// No description provided for @actionRedo.
+  /// Label for the editor redo action
   ///
   /// In en, this message translates to:
   /// **'Redo'**
   String get actionRedo;
 
-  /// No description provided for @actionCursorLeft.
+  /// Label for moving the text cursor left in the editor
   ///
   /// In en, this message translates to:
   /// **'Move Cursor Left'**
   String get actionCursorLeft;
 
-  /// No description provided for @actionCursorRight.
+  /// Label for moving the text cursor right in the editor
   ///
   /// In en, this message translates to:
   /// **'Move Cursor Right'**
   String get actionCursorRight;
 
-  /// No description provided for @actionSelectWord.
+  /// Label for selecting the current word in the editor
   ///
   /// In en, this message translates to:
   /// **'Select Word'**
   String get actionSelectWord;
 
-  /// No description provided for @actionCopy.
+  /// Label for copying the selection in the editor
   ///
   /// In en, this message translates to:
   /// **'Copy'**
   String get actionCopy;
 
-  /// No description provided for @actionCut.
+  /// Label for cutting the selection in the editor
   ///
   /// In en, this message translates to:
   /// **'Cut'**
   String get actionCut;
 
-  /// No description provided for @actionPaste.
+  /// Label for pasting clipboard content in the editor
   ///
   /// In en, this message translates to:
   /// **'Paste'**
   String get actionPaste;
 
-  /// No description provided for @actionFind.
+  /// Label for opening find and replace in the editor
   ///
   /// In en, this message translates to:
   /// **'Find & Replace'**
   String get actionFind;
 
-  /// No description provided for @actionWordWrap.
+  /// Label for toggling word wrap in the editor
   ///
   /// In en, this message translates to:
   /// **'Word Wrap'**
   String get actionWordWrap;
 
-  /// No description provided for @actionGoToLine.
+  /// Label for jumping to a specific line in the editor
   ///
   /// In en, this message translates to:
   /// **'Go to Line'**
   String get actionGoToLine;
 
-  /// No description provided for @actionGoToStart.
+  /// Label for moving the cursor to the start of the document
   ///
   /// In en, this message translates to:
   /// **'Go to Start'**
   String get actionGoToStart;
 
-  /// No description provided for @actionGoToEnd.
+  /// Label for moving the cursor to the end of the document
   ///
   /// In en, this message translates to:
   /// **'Go to End'**
   String get actionGoToEnd;
 
-  /// No description provided for @actionIndent.
+  /// Label for indenting the selected code or text
   ///
   /// In en, this message translates to:
   /// **'Indent'**
   String get actionIndent;
 
-  /// No description provided for @actionOutdent.
+  /// Label for outdenting the selected code or text
   ///
   /// In en, this message translates to:
   /// **'Outdent'**
   String get actionOutdent;
 
-  /// No description provided for @actionFormat.
+  /// Label for formatting the code in the editor
   ///
   /// In en, this message translates to:
   /// **'Format Code'**
   String get actionFormat;
 
-  /// No description provided for @actionReadOnly.
+  /// Label for toggling read-only mode in the editor
   ///
   /// In en, this message translates to:
   /// **'Toggle Read-Only'**
@@ -19187,7 +19187,7 @@ abstract class AppLocalizations {
   /// **'File manager'**
   String get skinFileManager;
 
-  /// No description provided for @skinFolderAndFileGlyphsTilesAndLabelColors.
+  /// Description of the file manager skin settings for folder and file glyphs, tiles, and label colors.
   ///
   /// In en, this message translates to:
   /// **'Folder and file glyphs, tiles, and label colors.'**
@@ -19601,85 +19601,85 @@ abstract class AppLocalizations {
   /// **'{item} name color'**
   String skinNameColorForItem(String item);
 
-  /// No description provided for @skinFileIconColorSettingDescription.
+  /// Explanation that the file icon color is configured in the file manager settings.
   ///
   /// In en, this message translates to:
   /// **'This color is controlled by the icon color setting in the file manager section.'**
   String get skinFileIconColorSettingDescription;
 
-  /// No description provided for @skinFileNameColorSettingDescription.
+  /// Explanation that the file name color is configured in the file manager settings.
   ///
   /// In en, this message translates to:
   /// **'This color is controlled by the name color setting in the file manager section.'**
   String get skinFileNameColorSettingDescription;
 
-  /// No description provided for @skinExportedSingle.
+  /// Confirmation shown after exporting a single skin.
   ///
   /// In en, this message translates to:
   /// **'Skin exported.'**
   String get skinExportedSingle;
 
-  /// No description provided for @skinExportedMultiple.
+  /// Confirmation shown after exporting multiple skins.
   ///
   /// In en, this message translates to:
   /// **'Skins exported.'**
   String get skinExportedMultiple;
 
-  /// No description provided for @skinExportSkinsOnly.
+  /// Option to export only skins, without interface settings.
   ///
   /// In en, this message translates to:
   /// **'Skins only'**
   String get skinExportSkinsOnly;
 
-  /// No description provided for @skinExportSkinsOnlySubtitle.
+  /// Subtitle describing the shareable skins-only export.
   ///
   /// In en, this message translates to:
   /// **'Colors and icon styles. Safe to share.'**
   String get skinExportSkinsOnlySubtitle;
 
-  /// No description provided for @skinExportSkinsAndInterface.
+  /// Option to export skins together with interface settings.
   ///
   /// In en, this message translates to:
   /// **'Skins and interface'**
   String get skinExportSkinsAndInterface;
 
-  /// No description provided for @skinExportSkinsAndInterfaceSubtitle.
+  /// Subtitle describing the interface settings included in a personal backup export.
   ///
   /// In en, this message translates to:
   /// **'Also saves theme mode, toolbar and grid layout, editor appearance and media viewer layout. For your own backups.'**
   String get skinExportSkinsAndInterfaceSubtitle;
 
-  /// No description provided for @skinAppearanceExported.
+  /// Confirmation shown after exporting skins and interface settings.
   ///
   /// In en, this message translates to:
   /// **'Skins and interface exported.'**
   String get skinAppearanceExported;
 
-  /// No description provided for @skinImportInterfaceTitle.
+  /// Title of the prompt asking whether to apply imported interface settings.
   ///
   /// In en, this message translates to:
   /// **'Apply interface settings?'**
   String get skinImportInterfaceTitle;
 
-  /// No description provided for @skinImportInterfaceMessage.
+  /// Prompt explaining which current interface settings will be replaced by an import.
   ///
   /// In en, this message translates to:
   /// **'This file also contains interface settings. Applying them replaces your current theme mode, toolbar and grid layout, editor appearance and media viewer layout.'**
   String get skinImportInterfaceMessage;
 
-  /// No description provided for @skinImportInterfaceApply.
+  /// Button to apply interface settings included in an imported file.
   ///
   /// In en, this message translates to:
   /// **'Apply'**
   String get skinImportInterfaceApply;
 
-  /// No description provided for @skinImportInterfaceSkip.
+  /// Button to import skins without applying interface settings.
   ///
   /// In en, this message translates to:
   /// **'Skins only'**
   String get skinImportInterfaceSkip;
 
-  /// No description provided for @skinInterfaceApplied.
+  /// Confirmation shown after applying imported interface settings.
   ///
   /// In en, this message translates to:
   /// **'Interface settings applied.'**
@@ -19709,109 +19709,109 @@ abstract class AppLocalizations {
   /// **'Couldn\'t open the app settings. Open Settings > Apps > VaultExplorer > Battery and choose Unrestricted.'**
   String get automationBatterySettingsOpenFailedMessage;
 
-  /// No description provided for @skinPreviewMountedVaultName.
+  /// Label for a mounted vault in the skin preview
   ///
   /// In en, this message translates to:
   /// **'Personal vault'**
   String get skinPreviewMountedVaultName;
 
-  /// No description provided for @skinPreviewVaultName.
+  /// Label for a vault title in the skin preview
   ///
   /// In en, this message translates to:
   /// **'Vault title'**
   String get skinPreviewVaultName;
 
-  /// No description provided for @skinMainTextColorAlsoColorsRegularMenuItems.
+  /// Text explaining that the main text color also affects regular menu actions in the skin preview
   ///
   /// In en, this message translates to:
   /// **'Vault titles and regular menu actions share the app main text color.'**
   String get skinMainTextColorAlsoColorsRegularMenuItems;
 
-  /// No description provided for @skinStatusBannerExamples.
+  /// Section heading for status banner examples in the skin preview
   ///
   /// In en, this message translates to:
   /// **'Status banners'**
   String get skinStatusBannerExamples;
 
-  /// No description provided for @skinSuccessBanner.
+  /// Label for the success banner example in the skin preview
   ///
   /// In en, this message translates to:
   /// **'Success banner'**
   String get skinSuccessBanner;
 
-  /// No description provided for @skinWarningBanner.
+  /// Label for the warning banner example in the skin preview
   ///
   /// In en, this message translates to:
   /// **'Warning banner'**
   String get skinWarningBanner;
 
-  /// No description provided for @skinErrorBanner.
+  /// Label for the error banner example in the skin preview
   ///
   /// In en, this message translates to:
   /// **'Error banner'**
   String get skinErrorBanner;
 
-  /// No description provided for @skinSuccessBannerUsesSuccessContainer.
+  /// Explanation that success banners use success container colors in the skin preview
   ///
   /// In en, this message translates to:
   /// **'The banner fill and message use success colors.'**
   String get skinSuccessBannerUsesSuccessContainer;
 
-  /// No description provided for @skinWarningBannerUsesWarningContainer.
+  /// Explanation that warning banners use warning container colors in the skin preview
   ///
   /// In en, this message translates to:
   /// **'The banner fill and message use warning colors.'**
   String get skinWarningBannerUsesWarningContainer;
 
-  /// No description provided for @skinErrorBannerUsesErrorContainer.
+  /// Explanation that error banners use error container colors in the skin preview
   ///
   /// In en, this message translates to:
   /// **'The banner fill and message use error colors.'**
   String get skinErrorBannerUsesErrorContainer;
 
-  /// No description provided for @skinPreviewChangesSaved.
+  /// Status message shown in the skin preview after saving changes
   ///
   /// In en, this message translates to:
   /// **'Changes saved'**
   String get skinPreviewChangesSaved;
 
-  /// No description provided for @skinPreviewStorageAlmostFull.
+  /// Status message shown in the skin preview when storage is nearly full
   ///
   /// In en, this message translates to:
   /// **'Storage is almost full'**
   String get skinPreviewStorageAlmostFull;
 
-  /// No description provided for @skinPreviewCouldNotUnlockVault.
+  /// Status message shown in the skin preview when a vault could not be unlocked
   ///
   /// In en, this message translates to:
   /// **'Could not unlock the vault'**
   String get skinPreviewCouldNotUnlockVault;
 
-  /// No description provided for @skinSurfaceAndBorderExamples.
+  /// Section heading for surfaces and borders examples in the skin preview
   ///
   /// In en, this message translates to:
   /// **'Surfaces and borders'**
   String get skinSurfaceAndBorderExamples;
 
-  /// No description provided for @skinFileRowDetailsColor.
+  /// Label for the file row details color in the skin preview
   ///
   /// In en, this message translates to:
   /// **'File row details color'**
   String get skinFileRowDetailsColor;
 
-  /// No description provided for @skinFileActionOverflowIconColor.
+  /// Label for the file row action overflow icon color in the skin preview
   ///
   /// In en, this message translates to:
   /// **'File row action icon color'**
   String get skinFileActionOverflowIconColor;
 
-  /// No description provided for @skinMatchingElementsHighlightTogether.
+  /// Text explaining that matching preview elements are highlighted together in the skin preview
   ///
   /// In en, this message translates to:
   /// **'Other preview elements with the same color are highlighted too.'**
   String get skinMatchingElementsHighlightTogether;
 
-  /// No description provided for @skinStatusBannerTextColor.
+  /// Text explaining that the banner text color is controlled by the selected color in the skin preview
   ///
   /// In en, this message translates to:
   /// **'The banner text uses this color.'**
@@ -19997,85 +19997,85 @@ abstract class AppLocalizations {
   /// **'Editor panel background'**
   String get skinEditorPanelBackground;
 
-  /// No description provided for @skinEditorPanelBackgroundDescription.
+  /// Description of the shared background color used by the editor sidebar and More Actions menus
   ///
   /// In en, this message translates to:
   /// **'Shared background for the editor sidebar and More Actions menus.'**
   String get skinEditorPanelBackgroundDescription;
 
-  /// No description provided for @skinFollowAppSkin.
+  /// Setting that makes the file manager follow the selected app skin
   ///
   /// In en, this message translates to:
   /// **'Follow app skin'**
   String get skinFollowAppSkin;
 
-  /// No description provided for @fileSkinFollowAppSkinDescription.
+  /// Explains that file and folder styling follows the selected app skin
   ///
   /// In en, this message translates to:
   /// **'File and folder styling follows the selected app skin.'**
   String get fileSkinFollowAppSkinDescription;
 
-  /// No description provided for @fileSkinUseIndependentStylesDescription.
+  /// Explains how choosing file manager styles affects the Follow app skin setting
   ///
   /// In en, this message translates to:
   /// **'These options set the File Manager’s own style. If it follows App Skin, changing a preset or style below turns off Follow app skin.'**
   String get fileSkinUseIndependentStylesDescription;
 
-  /// No description provided for @fileSkinManagedByAppSkinTitle.
+  /// Title shown when the file manager follows the app skin
   ///
   /// In en, this message translates to:
   /// **'File manager is following the app skin'**
   String get fileSkinManagedByAppSkinTitle;
 
-  /// No description provided for @fileSkinManagedByAppSkinDescription.
+  /// Explains that the preview follows the active app skin and how changing styles creates an independent file manager skin
   ///
   /// In en, this message translates to:
   /// **'The preview uses the active App Skin. Changing a preset or style below saves an independent file manager skin and turns off Follow app skin.'**
   String get fileSkinManagedByAppSkinDescription;
 
-  /// No description provided for @skinFileManagerIndependentTitle.
+  /// Title shown when the file manager uses an independent skin
   ///
   /// In en, this message translates to:
   /// **'File manager uses an independent skin'**
   String get skinFileManagerIndependentTitle;
 
-  /// No description provided for @skinFileManagerIndependentDescription.
+  /// Explains that app skin changes do not affect the file manager while it uses an independent skin
   ///
   /// In en, this message translates to:
   /// **'Changes to file and folder styles in this App Skin will not appear in File Manager while it uses its own skin. Turn on Follow app skin to apply this App Skin there.'**
   String get skinFileManagerIndependentDescription;
 
-  /// No description provided for @skinChooseOrCreateSkin.
+  /// Action to select an existing skin or create a new one
   ///
   /// In en, this message translates to:
   /// **'Choose or create a skin'**
   String get skinChooseOrCreateSkin;
 
-  /// No description provided for @skinSkinShortcutCustomDescription.
+  /// Explains the scope of editing app-wide colors and shared tokens
   ///
   /// In en, this message translates to:
   /// **'Edit app-wide colors and shared tokens. Component overrides stay on this page.'**
   String get skinSkinShortcutCustomDescription;
 
-  /// No description provided for @skinSkinShortcutPresetDescription.
+  /// Explains the option to browse built-in skins or create a custom skin
   ///
   /// In en, this message translates to:
   /// **'Browse built-in skins or create a custom skin from this look.'**
   String get skinSkinShortcutPresetDescription;
 
-  /// No description provided for @textEditorUseIndependentAppearanceDescription.
+  /// Instruction to choose an editor background and syntax theme independent of the app skin
   ///
   /// In en, this message translates to:
   /// **'Choose an independent editor background and syntax theme below.'**
   String get textEditorUseIndependentAppearanceDescription;
 
-  /// No description provided for @fileSkinComponentStyling.
+  /// Heading for file manager component styling options
   ///
   /// In en, this message translates to:
   /// **'Component styling'**
   String get fileSkinComponentStyling;
 
-  /// No description provided for @textEditorStyling.
+  /// Heading for text editor styling options
   ///
   /// In en, this message translates to:
   /// **'Editor styling'**
@@ -24359,109 +24359,109 @@ abstract class AppLocalizations {
   /// **'Can\'t build a relative target from here. Type the target instead.'**
   String get symbolicLinkPickerUnresolvable;
 
-  /// No description provided for @editMetadataAction.
+  /// Action to edit a file's metadata
   ///
   /// In en, this message translates to:
   /// **'Edit metadata'**
   String get editMetadataAction;
 
-  /// No description provided for @editTagsAction.
+  /// Action to edit a file's tags
   ///
   /// In en, this message translates to:
   /// **'Edit tags'**
   String get editTagsAction;
 
-  /// No description provided for @editDateTimeAction.
+  /// Action to edit a file's date and time metadata
   ///
   /// In en, this message translates to:
   /// **'Edit date & time'**
   String get editDateTimeAction;
 
-  /// No description provided for @removeMetadataAction.
+  /// Action to remove metadata from files
   ///
   /// In en, this message translates to:
   /// **'Remove metadata'**
   String get removeMetadataAction;
 
-  /// No description provided for @metadataFormatsNote.
+  /// Note explaining which file formats support metadata changes
   ///
   /// In en, this message translates to:
   /// **'Tags, dates and removal are written into JPEG, PNG and WebP images. Other files only get a new modified date.'**
   String get metadataFormatsNote;
 
-  /// No description provided for @metadataReadOnlyMessage.
+  /// Message shown when metadata cannot be changed because the vault is read-only
   ///
   /// In en, this message translates to:
   /// **'This vault is read-only'**
   String get metadataReadOnlyMessage;
 
-  /// No description provided for @tagsAddHint.
+  /// Hint in the tag editor explaining how to enter tags
   ///
   /// In en, this message translates to:
   /// **'Add tags, separated by commas'**
   String get tagsAddHint;
 
-  /// No description provided for @tagsNoneYet.
+  /// Message shown when a file has no tags
   ///
   /// In en, this message translates to:
   /// **'No tags yet'**
   String get tagsNoneYet;
 
-  /// No description provided for @dateModeSet.
+  /// Option to set a file's date and time to a specific value
   ///
   /// In en, this message translates to:
   /// **'Set'**
   String get dateModeSet;
 
-  /// No description provided for @dateModeShift.
+  /// Option to shift a file's date and time earlier or later
   ///
   /// In en, this message translates to:
   /// **'Shift'**
   String get dateModeShift;
 
-  /// No description provided for @dateModeFromModified.
+  /// Option to use a file's modified date as its date and time
   ///
   /// In en, this message translates to:
   /// **'From modified date'**
   String get dateModeFromModified;
 
-  /// No description provided for @dateModeFromName.
+  /// Option to extract a date and time from the file name
   ///
   /// In en, this message translates to:
   /// **'From file name'**
   String get dateModeFromName;
 
-  /// No description provided for @dateShiftLater.
+  /// Direction option for shifting a file's date and time later
   ///
   /// In en, this message translates to:
   /// **'Later'**
   String get dateShiftLater;
 
-  /// No description provided for @dateShiftEarlier.
+  /// Direction option for shifting a file's date and time earlier
   ///
   /// In en, this message translates to:
   /// **'Earlier'**
   String get dateShiftEarlier;
 
-  /// No description provided for @dateDaysLabel.
+  /// Label for the number of days in a date and time shift
   ///
   /// In en, this message translates to:
   /// **'Days'**
   String get dateDaysLabel;
 
-  /// No description provided for @dateHoursLabel.
+  /// Label for the number of hours in a date and time shift
   ///
   /// In en, this message translates to:
   /// **'Hours'**
   String get dateHoursLabel;
 
-  /// No description provided for @dateMinutesLabel.
+  /// Label for the number of minutes in a date and time shift
   ///
   /// In en, this message translates to:
   /// **'Minutes'**
   String get dateMinutesLabel;
 
-  /// No description provided for @dateAlsoSetModified.
+  /// Option to also update the file's modified date when changing its date and time metadata
   ///
   /// In en, this message translates to:
   /// **'Also set the file\'s modified date'**
@@ -24473,49 +24473,49 @@ abstract class AppLocalizations {
   /// **'{matched} of {total} file names contain a date'**
   String dateFromNameMatches(int matched, int total);
 
-  /// No description provided for @stripExifLabel.
+  /// Label for the option to strip EXIF image metadata
   ///
   /// In en, this message translates to:
   /// **'Exif (camera, date, location)'**
   String get stripExifLabel;
 
-  /// No description provided for @stripXmpLabel.
+  /// Label for the option to strip XMP image metadata
   ///
   /// In en, this message translates to:
   /// **'XMP (tags, rating, edit data)'**
   String get stripXmpLabel;
 
-  /// No description provided for @stripIptcLabel.
+  /// Label for the option to strip IPTC / Photoshop image metadata
   ///
   /// In en, this message translates to:
   /// **'IPTC / Photoshop (captions, credits)'**
   String get stripIptcLabel;
 
-  /// No description provided for @stripCommentsLabel.
+  /// Label for the option to strip image comments metadata
   ///
   /// In en, this message translates to:
   /// **'Comments'**
   String get stripCommentsLabel;
 
-  /// No description provided for @stripIccLabel.
+  /// Label for the option to strip ICC colour profile metadata
   ///
   /// In en, this message translates to:
   /// **'Colour profile (may change colours)'**
   String get stripIccLabel;
 
-  /// No description provided for @stripKeepOrientationLabel.
+  /// Label for the option to preserve image orientation when stripping metadata
   ///
   /// In en, this message translates to:
   /// **'Keep orientation'**
   String get stripKeepOrientationLabel;
 
-  /// No description provided for @stripKeepOrientationDesc.
+  /// Description for the option to preserve image orientation when stripping metadata
   ///
   /// In en, this message translates to:
   /// **'Without it, photos taken sideways may show rotated'**
   String get stripKeepOrientationDesc;
 
-  /// No description provided for @stripWarning.
+  /// Warning shown before rewriting files while stripping metadata
   ///
   /// In en, this message translates to:
   /// **'This rewrites the files and cannot be undone.'**
@@ -24533,7 +24533,7 @@ abstract class AppLocalizations {
   /// **'{count, plural, =1{1 file updated} other{{count} files updated}}'**
   String metadataResultUpdated(int count);
 
-  /// No description provided for @metadataResultUnchanged.
+  /// Message shown when metadata cleanup found no files needing changes
   ///
   /// In en, this message translates to:
   /// **'Nothing needed changing'**
@@ -24551,13 +24551,13 @@ abstract class AppLocalizations {
   /// **'{count} failed'**
   String metadataResultFailed(int count);
 
-  /// No description provided for @showNoMediaFoldersLabel.
+  /// Label for the option to show folders marked with a .nomedia file
   ///
   /// In en, this message translates to:
   /// **'Show .nomedia folders'**
   String get showNoMediaFoldersLabel;
 
-  /// No description provided for @showNoMediaFoldersDesc.
+  /// Description for the option to include folders marked with a .nomedia file
   ///
   /// In en, this message translates to:
   /// **'Include folders marked with a .nomedia file, which gallery apps normally skip'**

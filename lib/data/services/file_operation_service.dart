@@ -829,6 +829,85 @@ class FileOperationService extends ChangeNotifier {
     return '$fileName-${DateTime.now().millisecondsSinceEpoch}';
   }
 
+  // ── Copy name of a symbolic link ──────────────────────────────────────────
+
+  /// The name a *copy* of the symbolic link called [linkName] should get,
+  /// given that the link points at a file called [targetName].
+  ///
+  /// Copying a link copies the file it points at, not the link, but the copy
+  /// used to keep the link's own name. A link's name is arbitrary -- it often
+  /// has no extension ("Holiday") or a different one -- so the copy landed in
+  /// the new place as a file nothing could open. The copy keeps the link's
+  /// name and gains the target's extension unless it already ends with it:
+  /// "Holiday" -> "Holiday.jpg", "Holiday.JPG" stays as it is.
+  ///
+  /// A target with no extension leaves the name alone.
+  static String nameWithTargetExtension(String linkName, String targetName) {
+    final ext = _extensionOf(targetName);
+    if (ext.isEmpty) return linkName;
+    // Already ends with the target's last extension: a name like "backup.gz"
+    // for a ".tar.gz" target is left as the person named it.
+    final lastDot = targetName.lastIndexOf('.');
+    final last = targetName.substring(lastDot).toLowerCase();
+    if (linkName.toLowerCase().endsWith(last)) return linkName;
+    return '$linkName$ext';
+  }
+
+  /// ".jpg" for "a.jpg", ".tar.gz" for "a.tar.gz", "" when there is none. A
+  /// leading dot alone (".bashrc") is a name, not an extension.
+  static String _extensionOf(String fileName) {
+    final compound = RegExp(r'\.tar\.[^./\\\s]+$', caseSensitive: false)
+        .firstMatch(fileName);
+    if (compound != null && compound.start > 0) return compound.group(0)!;
+    final dot = fileName.lastIndexOf('.');
+    if (dot <= 0 || dot == fileName.length - 1) return '';
+    return fileName.substring(dot);
+  }
+
+  /// The name to give the copy of [item] made from [src]. Only a symbolic link
+  /// to a file is renamed (see [nameWithTargetExtension]); everything else,
+  /// and any link that cannot be resolved inside its container, keeps its
+  /// name. A failed lookup is never a reason to fail the copy.
+  ///
+  /// [linkNamesByDir] holds each folder's file-link names, read once per
+  /// folder (one call) so a large paste does not ask the container about
+  /// every file; the caller shares one map across the items of a paste.
+  Future<String> _copyNameFor(
+    MountedContainer src,
+    ClipboardItem item,
+    Map<String, Set<String>> linkNamesByDir,
+  ) async {
+    final name = item.name;
+    if (item.isDir || !mayHaveVaultSymbolicLinks(src)) return name;
+    try {
+      final parent = p.posix.dirname(item.path);
+      final dir = parent == '.' ? '' : parent;
+      var linkNames = linkNamesByDir[dir];
+      if (linkNames == null) {
+        final links = await _fileIoApi.listVaultSymlinks(src, dir);
+        linkNames = {
+          for (final link in links)
+            if (!link.isDir) link.name,
+        };
+        linkNamesByDir[dir] = linkNames;
+      }
+      if (!linkNames.contains(name)) return name;
+      final target = await _fileIoApi.resolveVaultSymlinkTargetPath(
+        src,
+        item.path,
+      );
+      if (target == null) return name; // a link we cannot follow
+      return nameWithTargetExtension(name, p.posix.basename(target));
+    } catch (e) {
+      VeLog.w(
+        'FileOperationService',
+        'link target lookup failed for ${VeLog.censorName(name)}; copy keeps its name',
+        e,
+      );
+      return name;
+    }
+  }
+
   // ── Operation runner: Archive Create ──────────────────────────────────────
 
   Future<void> _runArchiveCreate(
@@ -1404,8 +1483,14 @@ class FileOperationService extends ChangeNotifier {
       final destCaseSensitive = isDestinationCaseSensitive(dest);
       final claimedDestLeaves = <String>{};
 
+      final linkNamesByDir = <String, Set<String>>{};
       for (final item in op.items) {
-        final fileName = item.name;
+        // A move inside one container renames the link itself and keeps its
+        // name; every other transfer writes the target's content as a new
+        // file, which needs the target's extension (see [_copyNameFor]).
+        final fileName = (op.isCut && src.volId == dest.volId)
+            ? item.name
+            : await _copyNameFor(src, item, linkNamesByDir);
         String destPath = op.destDirPath.isEmpty
             ? fileName
             : '${op.destDirPath}/$fileName';

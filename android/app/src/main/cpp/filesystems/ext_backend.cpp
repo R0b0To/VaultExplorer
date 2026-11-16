@@ -371,8 +371,11 @@ errcode_t extIoFlush(io_channel c) {
         return (volume.composite && !volume.composite->sync()) ? EXT2_ET_SHORT_WRITE : 0;
     }
     if (volume.fd >= 0) {
-        volume.fdWriteBuffer.flush(volume.fd);
+        // The write-behind flush result matters as much as fsync's: a failed flush leaves the
+        // bytes only in the buffer, which ext2fs_flush() must not be told is durable.
+        const bool flushed = volume.fdWriteBuffer.flush(volume.fd);
         if (fsync(volume.fd) != 0) return EXT2_ET_SHORT_WRITE;
+        if (!flushed) return EXT2_ET_SHORT_WRITE;
     }
     return 0;
 }
@@ -650,6 +653,63 @@ bool extClearDirtyState(int volumeId) {
     }
     return true;
 }
+bool extFlushForLock(int volumeId) {
+    if (volumeId < 0 || volumeId >= FF_VOLUMES) return true;
+    VolumeState& v = volumes[volumeId];
+    if (!v.extFs || v.readOnly) return true;
+    bool ok = true;
+    for (ExtStream* stream : v.openExtStreams) {
+        if (!stream || !stream->file) continue;
+        if (const errcode_t err = ext2fs_file_flush(stream->file)) {
+            EXT_LOGE("extFlushForLock(vol=%d): ext2fs_file_flush failed: %s (err=%lu)", volumeId,
+                     error_message(err), static_cast<unsigned long>(err));
+            ok = false;
+        }
+    }
+    if (const errcode_t err = ext2fs_flush(v.extFs)) {
+        EXT_LOGE("extFlushForLock(vol=%d): ext2fs_flush failed: %s (err=%lu)", volumeId,
+                 error_message(err), static_cast<unsigned long>(err));
+        ok = false;
+    }
+    return ok;
+}
+
+bool extUnmount(int volumeId, bool keepOnFailure) {
+    if (volumeId < 0 || volumeId >= FF_VOLUMES) return true;
+    VolumeState& v = volumes[volumeId];
+    if (!v.extFs) return true;
+    bool ok = true;
+    for (ExtStream* stream : v.openExtStreams) {
+        // The handle is consumed even when closing it fails, so the wrapper goes either way.
+        if (stream->file) {
+            if (const errcode_t err = ext2fs_file_close(stream->file)) {
+                EXT_LOGE("extUnmount(vol=%d): ext2fs_file_close failed: %s (err=%lu)", volumeId,
+                         error_message(err), static_cast<unsigned long>(err));
+                ok = false;
+            }
+        }
+        delete stream;
+    }
+    v.openExtStreams.clear();
+    if (!v.readOnly) {
+        if (const errcode_t err = ext2fs_flush(v.extFs)) {
+            EXT_LOGE("extUnmount(vol=%d): ext2fs_flush failed: %s (err=%lu)", volumeId,
+                     error_message(err), static_cast<unsigned long>(err));
+            ok = false;
+            if (keepOnFailure) return false;   // nothing closed yet: a retry flushes again
+        }
+    }
+    if (const errcode_t err = ext2fs_close(v.extFs)) {
+        EXT_LOGE("extUnmount(vol=%d): ext2fs_close failed: %s (err=%lu)", volumeId,
+                 error_message(err), static_cast<unsigned long>(err));
+        ok = false;
+        if (keepOnFailure) return false;       // ext2fs_close() did not free it
+    }
+    v.extFs = nullptr;
+    v.extBitmapsLoaded = false;
+    return ok;
+}
+
 namespace {
 struct ExtBlockBitmapRebuild {
     ext2_filsys fs;
@@ -1084,6 +1144,18 @@ bool extReadFileChunk(int volumeId, const std::string& path, uint64_t offset, si
     }
     return success;
 }
+// ext2fs_flush() returns the error from io_channel_flush -> extIoFlush, which on a USB source is a
+// failed write-back or device barrier. A mutation whose flush failed has not durably happened, so
+// every operation below reports that instead of claiming success (a later sync may still succeed,
+// but the caller has to be told this one did not).
+static bool extFlushOk(ext2_filsys fs, const char* what) {
+    const errcode_t err = ext2fs_flush(fs);
+    if (err) {
+        EXT_LOGE("%s: ext2fs_flush failed: %s (err=%lu)", what, error_message(err),
+                 static_cast<unsigned long>(err));
+    }
+    return err == 0;
+}
 bool extWriteFileChunk(int volumeId, const std::string& path, uint64_t offset, const uint8_t* data, size_t length) {
     auto& v = volumes[volumeId];
     bool success = false;
@@ -1096,8 +1168,7 @@ bool extWriteFileChunk(int volumeId, const std::string& path, uint64_t offset, c
         if (ext2fs_file_llseek(file, static_cast<__u64>(offset), EXT2_SEEK_SET, &position) == 0 &&
             ext2fs_file_write(file, data, static_cast<unsigned int>(length), &written) == 0 &&
             written == static_cast<unsigned int>(length) && ext2fs_file_flush(file) == 0) {
-            ext2fs_flush(v.extFs);
-            success = true;
+            success = extFlushOk(v.extFs, "extWriteFileChunk");
         }
         ext2fs_file_close(file);
     }
@@ -1144,7 +1215,7 @@ bool extCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const 
     ok = ok && (ext2fs_file_flush(destFile) == 0);
     ext2fs_file_close(destFile);
     ext2fs_file_close(srcFile);
-    if (ok) ext2fs_flush(destV.extFs);
+    if (ok) ok = extFlushOk(destV.extFs, "extCopyFile");
     return ok;
 }
 bool extWriteBackFile(int volumeId, const std::string& targetPath, const std::string& sourceHostPath,
@@ -1247,7 +1318,7 @@ bool extDeleteFile(int volumeId, const std::string& path) {
         if (ext2fs_unlink(v.extFs, parent, name.c_str(), ino, 0) == 0) {
             success = isDir ? extReleaseDirectoryInode(v.extFs, parent, ino)
                             : extReleaseInodeIfUnlinked(v.extFs, ino, false);
-            ext2fs_flush(v.extFs);
+            if (!extFlushOk(v.extFs, "extDeleteFile")) success = false;
         }
     }
     return success;
@@ -1273,8 +1344,7 @@ bool extCreateDirectory(int volumeId, const std::string& path) {
             }
         }
         if (mkdirErr == 0) {
-            ext2fs_flush(v.extFs);
-            success = true;
+            success = extFlushOk(v.extFs, "extCreateDirectory");
         } else {
             EXT_LOGE("extCreateDirectory: ext2fs_mkdir failed for '%s' in parent %u err=%lu (%s)",
                      name.c_str(), parent, (unsigned long)mkdirErr, error_message(mkdirErr));
@@ -1357,7 +1427,7 @@ bool extRenameFile(int volumeId, const std::string& oldPath, const std::string& 
                 ext2fs_unlink(v.extFs, newParentIno, newName.c_str(), srcIno, 0);
             }
         }
-        if (success) ext2fs_flush(v.extFs);
+        if (success) success = extFlushOk(v.extFs, "extRename");
     }
     return success;
 }
@@ -1372,8 +1442,7 @@ bool extSetLastModifiedTime(int volumeId, const std::string& path, uint64_t epoc
             inode.i_atime = static_cast<__u32>(epochSeconds);
             inode.i_ctime = static_cast<__u32>(epochSeconds);
             if (ext2fs_write_inode(v.extFs, ino, &inode) == 0) {
-                ext2fs_flush(v.extFs);
-                success = true;
+                success = extFlushOk(v.extFs, "extSetLastModifiedTime");
             }
         }
     }

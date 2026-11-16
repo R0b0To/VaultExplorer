@@ -13,6 +13,7 @@ const Map<String, FileItemAction> _actionForMenuValue = {
   'edit_image': FileItemAction.editImage,
   'edit_video': FileItemAction.editVideo,
   'edit_audio': FileItemAction.editAudio,
+  'edit_metadata': FileItemAction.editMetadata,
   'rename': FileItemAction.rename,
   'copy': FileItemAction.copy,
   'cut': FileItemAction.move,

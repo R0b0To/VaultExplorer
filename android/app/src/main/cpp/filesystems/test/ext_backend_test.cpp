@@ -23,6 +23,7 @@
 // NOT covered here: the NTFS backend (needs the ntfs-3g tree and an NTFS image
 // maker) and FAT. See docs/architecture.md section 5.3 for the shared contract.
 #include <algorithm>
+#include <csignal>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -30,6 +31,11 @@
 #include <string>
 #include <vector>
 
+#include <fcntl.h>
+#include <sys/resource.h>
+#include <unistd.h>
+
+#include "backing_flush.h"
 #include "diskio.h"
 #include "filesystems/ext_backend.h"
 #include "session/volume_state.h"
@@ -780,6 +786,141 @@ static void test_usb_io_flush_reaches_the_device() {
     vs.usbCache.clear();
 }
 
+// Every mutating operation ends in ext2fs_flush(), and on a USB source that reaches the device barrier
+// through extIoFlush. The operations used to ignore ext2fs_flush()'s result and report success, so a
+// refused barrier looked exactly like a durable write to the caller. They must now report the failure
+// (the in-memory change stays in place; the point is that the caller is not told it is safe on the device).
+static void test_mutations_report_a_failed_usb_flush() {
+    Vol v;
+    CHECK(v.format("ext4", 16));
+    VolumeState& vs = volumes[0];
+    g_usbDevice[0].reset(16u << 20);
+    vs.isUsbSource = true;
+    CHECK(extCreateDirectory(0, "/d"));
+    CHECK(putFile(0, "/seed", pseudoRandom(3000, 5)));
+    CHECK(putFile(0, "/victim", pseudoRandom(100, 6)));
+
+    g_usbDevice[0].refuseSync = true;
+    const int syncsBefore = g_usbDevice[0].syncCalls;
+    CHECK(!putFile(0, "/w", pseudoRandom(100, 7)));                    // extWriteFileChunk
+    CHECK(!extCreateDirectory(0, "/e"));                               // extCreateDirectory
+    CHECK(!extRenameFile(0, "/seed", "/seed2"));                       // extRenameFile
+    CHECK(!extSetLastModifiedTime(0, "/seed2", 1600000000));           // extSetLastModifiedTime
+    CHECK(!extCopyFile(0, "/seed2", 0, "/seed-copy"));                 // extCopyFile
+    CHECK(!extDeleteFile(0, "/victim"));                               // extDeleteFile
+    CHECK(g_usbDevice[0].syncCalls > syncsBefore);                     // the barrier was really attempted
+
+    // Device recovered: the same kinds of operation succeed again.
+    g_usbDevice[0].refuseSync = false;
+    CHECK(putFile(0, "/ok", pseudoRandom(100, 8)));
+    CHECK(extCreateDirectory(0, "/ok-dir"));
+    CHECK(extRenameFile(0, "/ok", "/ok2"));
+    CHECK(extSetLastModifiedTime(0, "/ok2", 1600000000));
+    CHECK(extCopyFile(0, "/ok2", 0, "/ok-copy"));
+    CHECK(extDeleteFile(0, "/ok-copy"));
+
+    vs.isUsbSource = false;
+    vs.usbCache.clear();
+    v.fsckClean("failed USB flush");
+}
+// Locking tears the filesystem down. extFlushForLock() is the non-consuming first half (a failure must
+// leave the volume untouched and usable) and extUnmount() the consuming second half (a failure must be
+// reported, and with keepOnFailure the still-valid filesystem must stay in volumes[].extFs for a retry,
+// because libext2fs' ext2fs_close() returns before freeing it on error). Both used to ignore every
+// libext2fs result, so a failed flush became an ordinary successful lock.
+static void test_lock_flush_and_unmount_report_failures_and_keep_state() {
+    Vol v;
+    CHECK(v.format("ext4", 16));
+    VolumeState& vs = volumes[0];
+    g_usbDevice[0].reset(16u << 20);
+    vs.isUsbSource = true;
+    const Bytes data = pseudoRandom(5000, 31);
+    CHECK(putFile(0, "/f", data));
+    CHECK(extFlushForLock(0));                        // healthy device
+
+    // Device barrier refused: the flush reports it and nothing was torn down.
+    g_usbDevice[0].refuseSync = true;
+    CHECK(!extFlushForLock(0));
+    CHECK(vs.extFs != nullptr);
+    CHECK(getFile(0, "/f") == data);                  // the volume is still fully usable
+
+    // A stream is open when the lock arrives. keepOnFailure: refused, filesystem kept, retry possible.
+    CHECK(extOpenStream(0, "/f") != nullptr);
+    CHECK_EQ(vs.openExtStreams.size(), static_cast<size_t>(1));
+    CHECK(!extUnmount(0, true));
+    CHECK(vs.extFs != nullptr);
+    g_usbDevice[0].refuseSync = false;                // device recovered: the same call now succeeds
+    CHECK(extUnmount(0, true));
+    CHECK(vs.extFs == nullptr);
+    CHECK(vs.openExtStreams.empty());
+
+    // Without keepOnFailure (every other caller) the filesystem is always released, failure or not.
+    CHECK(v.mount());
+    g_usbDevice[0].refuseSync = true;
+    CHECK(!extUnmount(0, false));
+    CHECK(vs.extFs == nullptr);
+    g_usbDevice[0].refuseSync = false;
+
+    // A read-only mount has nothing to flush and must never be written.
+    vs.isUsbSource = false;
+    vs.usbCache.clear();
+    volumes[0].readOnly = true;
+    CHECK(v.mount());
+    CHECK(extFlushForLock(0));
+    CHECK(extUnmount(0, true));
+    volumes[0].readOnly = false;
+
+    CHECK(v.mount());
+    CHECK(getFile(0, "/f") == data);
+    v.fsckClean("lock flush/unmount");
+}
+// flushVolumeBacking() is the one definition of "everything below the filesystem is durable" shared by
+// FatFs' CTRL_SYNC, ntfsSync and the lock path. The USB cache and the fd write-behind buffer both keep
+// acknowledged bytes after a failed flush -- but VolumeState::reset() drops them, so a caller that
+// ignored the result and then reset lost data. Real UsbBlockCache / FdWriteBuffer here; the failing
+// "device" is the fake USB device and an RLIMIT_FSIZE ceiling (EFBIG) on a real fd.
+static void test_backing_flush_reports_failures_and_keeps_the_bytes() {
+    VolumeState& vs = volumes[0];
+    const Bytes px(512, 0x42);
+
+    // USB: a refused barrier is reported, the bytes stay pending, a retry persists them.
+    g_usbDevice[0].reset(1u << 20);
+    vs.isUsbSource = true;
+    CHECK(vs.usbCache.write(0, 4096, px.data(), px.size()));
+    g_usbDevice[0].refuseSync = true;
+    CHECK(!flushVolumeBacking(vs, 0));
+    g_usbDevice[0].refuseSync = false;
+    CHECK(flushVolumeBacking(vs, 0));
+    CHECK_EQ(g_usbDevice[0].media[4096], 0x42);
+    vs.isUsbSource = false;
+    vs.usbCache.clear();
+
+    // fd write-behind: a failed flush is reported (the old ntfsSync/unmountVolume dropped this result),
+    // the buffer keeps the bytes, and a retry after the failure clears persists them.
+    char path[] = "/tmp/ve_backing_flushXXXXXX";
+    const int fd = mkstemp(path);
+    CHECK(fd >= 0);
+    if (fd < 0) return;
+    unlink(path);
+    vs.fd = fd;
+    CHECK(vs.fdWriteBuffer.write(fd, 4096, px.data(), px.size()));
+    std::signal(SIGXFSZ, SIG_IGN);
+    struct rlimit saved;
+    getrlimit(RLIMIT_FSIZE, &saved);
+    struct rlimit tight = {1024, saved.rlim_max};
+    setrlimit(RLIMIT_FSIZE, &tight);
+    CHECK(!flushVolumeBacking(vs, 0));
+    setrlimit(RLIMIT_FSIZE, &saved);
+    CHECK(flushVolumeBacking(vs, 0));
+    unsigned char b = 0;
+    CHECK_EQ(pread(fd, &b, 1, 4096), 1);
+    CHECK_EQ(b, 0x42);
+    vs.fdWriteBuffer.reset();
+    vs.fd = -1;
+    close(fd);
+
+    CHECK(flushVolumeBacking(vs, 0));   // no backing store to flush: nothing to report
+}
 
 // ---- Growing the file system after the container was expanded ------------------------
 // Extends the image file by [addMiB] (zeros, or random bytes to mimic a quick expand whose new area
@@ -925,6 +1066,9 @@ int main() {
         T(test_read_only_mount_changes_nothing),
         T(test_native_symlinks_follow_and_manage_link_identity),
         T(test_usb_io_flush_reaches_the_device),
+        T(test_mutations_report_a_failed_usb_flush),
+        T(test_lock_flush_and_unmount_report_failures_and_keep_state),
+        T(test_backing_flush_reports_failures_and_keeps_the_bytes),
         T(test_grow_variants_pass_fsck),
         T(test_grow_images_made_by_system_mkfs),
         T(test_grow_refusals),

@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/utils/perf_trace.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
@@ -593,9 +594,9 @@ class FileListViewState extends State<FileListView> {
   ) {
     final groups = _groupsFor(widget.items);
     _syncGroupHost(groups, itemExtent, _headerExtentFor(_zoomLevel));
-    return CustomScrollView(
+   return CustomScrollView(
       controller: controller,
-      cacheExtent: MediaQuery.sizeOf(context).height * 1.5,
+      cacheExtent: MediaQuery.sizeOf(context).height * 0.75,
       physics: scrollPhysics,
       slivers: [
         SliverPadding(
@@ -616,12 +617,14 @@ class FileListViewState extends State<FileListView> {
   }
 
   Widget _buildListView(ScrollController? controller, double itemExtent, ScrollPhysics scrollPhysics, int total) {
-    return ListView.builder(
+   return ListView.builder(
       controller: controller,
-      cacheExtent: MediaQuery.sizeOf(context).height * 1.5,
+      cacheExtent: MediaQuery.sizeOf(context).height * 0.75,
       physics: scrollPhysics,
       itemExtent: itemExtent,
       findChildIndexCallback: _findChildIndex,
+      // No row asks to be kept alive; see the grid view.
+      addAutomaticKeepAlives: false,
       padding: EdgeInsets.only(
         top: 0,
         bottom: widget.bottomClearance,
@@ -632,6 +635,7 @@ class FileListViewState extends State<FileListView> {
   }
   @override
   Widget build(BuildContext context) {
+    PerfTrace.count('ui.list.build');
     final total = widget.items.length;
     final itemExtent = _computeItemExtent(_zoomLevel);
     final scrollPhysics = _ZoomScrollPhysics(isZooming: () => _isZooming);

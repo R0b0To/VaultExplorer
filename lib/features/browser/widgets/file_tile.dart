@@ -12,6 +12,7 @@ import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/theme/file_manager_skin_scope.dart';
 import 'package:vaultexplorer/core/utils/file_display_name.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
+import 'package:vaultexplorer/core/utils/perf_trace.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';
@@ -30,6 +31,19 @@ import 'package:vaultexplorer/features/browser/widgets/book_cover_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/shortcut_target_preview.dart';
 import 'package:vaultexplorer/features/browser/widgets/thumbnail_raw_fallback.dart';
 import 'package:vaultexplorer/features/browser/widgets/tile_selection_style.dart';
+
+Widget _transparentHeroShuttle(
+  BuildContext flightContext,
+  Animation<double> animation,
+  HeroFlightDirection flightDirection,
+  BuildContext fromHeroContext,
+  BuildContext toHeroContext,
+) {
+  final hero = (flightDirection == HeroFlightDirection.push
+      ? toHeroContext.widget
+      : fromHeroContext.widget) as Hero;
+  return Material(type: MaterialType.transparency, child: hero.child);
+}
 
 class FileTile extends StatelessWidget {
   final RawEntry entry;
@@ -108,6 +122,13 @@ class FileTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final perfT0 = PerfTrace.begin();
+    final built = _buildTile(context);
+    PerfTrace.end('ui.file_tile.build', perfT0, slowMs: 16);
+    return built;
+  }
+
+  Widget _buildTile(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     String displayName = entry.name;
     final ext = displayName.split('.').last;
@@ -169,22 +190,20 @@ class FileTile extends StatelessWidget {
         // (or a misleading one). Resolve its in-vault target before deciding
         // which thumbnail pipeline to use. The thumbnail is fetched from the
         // final target path, while the row and its badge remain the shortcut.
-        customLeading = Hero(
+               customLeading = Hero(
           tag: 'media_hero_${container!.volId}_$fullPath',
           createRectTween: (begin, end) =>
               MaterialRectArcTween(begin: begin, end: end),
-          child: Material(
-            type: MaterialType.transparency,
-            child: _ShortcutMediaThumb(
-              container: container!,
-              linkPath: fullPath,
-              cacheMode: thumbnailCacheMode,
-              quality: thumbnailQuality,
-              fallbackIcon: displayIcon,
-              fallbackColor: iconColor,
-              zoomLevel: zoomLevel,
-              showMediaThumbnail: showThumbnail,
-            ),
+          flightShuttleBuilder: _transparentHeroShuttle,
+          child: _ShortcutMediaThumb(
+            container: container!,
+            linkPath: fullPath,
+            cacheMode: thumbnailCacheMode,
+            quality: thumbnailQuality,
+            fallbackIcon: displayIcon,
+            fallbackColor: iconColor,
+            zoomLevel: zoomLevel,
+            showMediaThumbnail: showThumbnail,
           ),
         );
       } else if (showThumbnail && isImg) {
@@ -192,19 +211,17 @@ class FileTile extends StatelessWidget {
           tag: 'media_hero_${container!.volId}_$fullPath',
           createRectTween: (begin, end) =>
               MaterialRectArcTween(begin: begin, end: end),
-          child: Material(
-            type: MaterialType.transparency,
-            child: _ListImageThumb(
-              container: container!,
-              filePath: fullPath,
-              cacheMode: thumbnailCacheMode,
-              quality: thumbnailQuality,
-              fallbackIcon: displayIcon,
-              fallbackColor: iconColor,
-              zoomLevel: zoomLevel,
-              archiveContext: archiveContext,
-              archiveRootPath: archiveRootPath,
-            ),
+          flightShuttleBuilder: _transparentHeroShuttle,
+          child: _ListImageThumb(
+            container: container!,
+            filePath: fullPath,
+            cacheMode: thumbnailCacheMode,
+            quality: thumbnailQuality,
+            fallbackIcon: displayIcon,
+            fallbackColor: iconColor,
+            zoomLevel: zoomLevel,
+            archiveContext: archiveContext,
+            archiveRootPath: archiveRootPath,
           ),
         );
       } else if (showThumbnail && isVid) {
@@ -212,19 +229,17 @@ class FileTile extends StatelessWidget {
           tag: 'media_hero_${container!.volId}_$fullPath',
           createRectTween: (begin, end) =>
               MaterialRectArcTween(begin: begin, end: end),
-          child: Material(
-            type: MaterialType.transparency,
-            child: _ListVideoThumb(
-              container: container!,
-              filePath: fullPath,
-              cacheMode: thumbnailCacheMode,
-              quality: thumbnailQuality,
-              fallbackIcon: displayIcon,
-              fallbackColor: iconColor,
-              zoomLevel: zoomLevel,
-              archiveContext: archiveContext,
-              archiveRootPath: archiveRootPath,
-            ),
+          flightShuttleBuilder: _transparentHeroShuttle,
+          child: _ListVideoThumb(
+            container: container!,
+            filePath: fullPath,
+            cacheMode: thumbnailCacheMode,
+            quality: thumbnailQuality,
+            fallbackIcon: displayIcon,
+            fallbackColor: iconColor,
+            zoomLevel: zoomLevel,
+            archiveContext: archiveContext,
+            archiveRootPath: archiveRootPath,
           ),
         );
       } else if (showThumbnail && isApk && archiveContext == null) {

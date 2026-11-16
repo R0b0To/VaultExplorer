@@ -44,10 +44,23 @@ int main(int argc, char** argv) {
         assert(init ? last > 0 : last == 0);
         // old data untouched
         unsigned char chk[512]; cascadeDecryptSector(dc, 131072 / 512, &img[131072], chk); assert(!memcmp(chk, sec, 512));
-        // new data area: encrypted zeros (init) decrypt to zeros; quick leaves the sparse zero extension
+        // new data area: init fills it with zeros encrypted under a TEMPORARY random key, so under the
+        // volume's real key it decodes to noise (a real-key fill decoded to all zeros, which exposes where a
+        // hidden volume starts and ends to whoever has the outer password). Quick leaves the sparse zero extension.
         const uint64_t probe = OLD;                                                              // first byte after the old end, inside the new data area
         cascadeDecryptSector(dc, probe / 512, &img[probe], chk);
-        if (init) { for (int i = 0; i < 512; i++) assert(chk[i] == 0); assert(img[probe] != 0 || img[probe + 1] != 0); }
+        if (init) {
+            int zeros = 0; for (int i = 0; i < 512; i++) zeros += (chk[i] == 0);
+            assert(zeros < 64);                                                                  // noise: ~2 of 512 expected
+            // whole filled range [old end - 128K, new end - 128K): ~1/256 zero bytes, not all of them
+            uint64_t total = 0, zeroBytes = 0; unsigned char dec[512];
+            for (uint64_t off = OLD - 131072; off < N - 131072; off += 512) {
+                cascadeDecryptSector(dc, off / 512, &img[off], dec);
+                for (int i = 0; i < 512; i++) { ++total; zeroBytes += (dec[i] == 0); }
+            }
+            assert(total > 0 && zeroBytes < total / 64);
+            assert(img[probe] != 0 || img[probe + 1] != 0);
+        }
         else { for (int i = 0; i < 512; i++) assert(img[probe + 4096 + i] == 0); }
         // the old backup header group (old end - 128K) no longer looks like it did
         bool wiped = false; for (int i = 0; i < 512; i++) if (img[OLD - 131072 + i] != 0x5C) wiped = true; assert(wiped);
@@ -60,6 +73,14 @@ int main(int argc, char** argv) {
       makeBody(b, OLD); assert(vcExpandVolume(b, CascadeId::kAes, HashId::kSha512, pw, pwLen, 1, OLD, OLD, true, io) == VcExpandResult::kNotLarger);
       makeBody(b, OLD); be64(b + VC_HDR_OFF_HIDDEN_VOL_SIZE, 4096); assert(vcExpandVolume(b, CascadeId::kAes, HashId::kSha512, pw, pwLen, 1, OLD, NEW, true, io) == VcExpandResult::kHiddenHeader);
       makeBody(b, OLD + 4096); assert(vcExpandVolume(b, CascadeId::kAes, HashId::kSha512, pw, pwLen, 1, OLD, NEW, true, io) == VcExpandResult::kInconsistentHeader); }
+    // Fill failures surface as the right result (the fill now goes through vcfill::fillWithRandomizedKey).
+    { unsigned char b[VC_HEADER_BODY_SIZE]; VcExpandIo io; io.setSize = [&](uint64_t) { return true; };
+      io.random = [&](unsigned char* p, size_t n) { memset(p, 1, n); return true; };
+      io.writeAt = [&](uint64_t, const unsigned char*, size_t) { return false; };
+      makeBody(b, OLD); assert(vcExpandVolume(b, CascadeId::kAes, HashId::kSha512, pw, pwLen, 1, OLD, NEW, true, io) == VcExpandResult::kIoError);
+      io.writeAt = [&](uint64_t, const unsigned char*, size_t) { return true; };
+      io.progress = [&](uint64_t, uint64_t) { return false; };
+      makeBody(b, OLD); assert(vcExpandVolume(b, CascadeId::kAes, HashId::kSha512, pw, pwLen, 1, OLD, NEW, true, io) == VcExpandResult::kCancelled); }
     printf("vc_expand_test: all assertions passed\n");
     return 0;
 }

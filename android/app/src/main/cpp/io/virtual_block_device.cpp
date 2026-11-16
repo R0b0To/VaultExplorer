@@ -30,6 +30,7 @@
 #include "volume_state.h"
 #include "jni_callbacks.h"
 #include "block_io.h"
+#include "backing_flush.h"
 #include "filesystems/stream_handles.h"
 #include "virtual_block_device.h"
 
@@ -138,48 +139,87 @@ bool ensureMounted(int volId) {
     }
 }
 
-bool unmountVolume(int volId) {
+bool flushVolumeForLock(int volId) {
     if (volId < 0 || volId >= MAX_VOLUMES) return true;
     auto& v = volumes[volId];
-    if (v.fsMounted) {
+    bool ok = true;
+    if (v.fsMounted && !v.readOnly) {
         if (v.fsType == VolumeState::FS_FATFS) {
-            f_mount(nullptr, drivePaths[volId], 0);
+            for (FIL* f : v.openStreams) {
+                if (f_sync(f) != FR_OK) {
+                    LOGI("flushVolumeForLock(vol=%d): f_sync failed on an open file", volId);
+                    ok = false;
+                }
+            }
+        } else if (v.fsType == VolumeState::FS_NTFS && v.ntfsVol) {
+            // Only inodes ntfs-3g itself marks dirty (the guard its own close/umount paths use):
+            // ntfs_inode_sync() also rewrites STANDARD_INFORMATION of a clean inode.
+            auto syncIfDirty = [&](ntfs_inode* ni) {
+                if (!ni || !(NInoDirty(ni) || NInoAttrListDirty(ni))) return;
+                if (ntfs_inode_sync(ni) != 0) {
+                    LOGI("flushVolumeForLock(vol=%d): ntfs_inode_sync failed (errno=%d)", volId, errno);
+                    ok = false;
+                }
+            };
+            for (NtfsStream* ns : v.openNtfsStreams) syncIfDirty(ns->inode);
+            syncIfDirty(v.ntfsVol->lcnbmp_ni);
+            syncIfDirty(v.ntfsVol->mft_ni);
+            syncIfDirty(v.ntfsVol->mftmirr_ni);
+        } else if (v.fsType == VolumeState::FS_EXT && v.extFs) {
+            if (!extFlushForLock(volId)) ok = false;
+        }
+    }
+    if (!flushVolumeBacking(v, volId)) {
+        LOGI("flushVolumeForLock(vol=%d): backing-store flush failed; buffered writes are still pending",
+             volId);
+        ok = false;
+    }
+    return ok;
+}
+
+bool unmountVolume(int volId, bool keepOnFailure) {
+    if (volId < 0 || volId >= MAX_VOLUMES) return true;
+    auto& v = volumes[volId];
+    bool durable = true;
+    if (v.fsMounted) {
+        bool keepMounted = false;
+        if (v.fsType == VolumeState::FS_FATFS) {
+            if (f_mount(nullptr, drivePaths[volId], 0) != FR_OK) {
+                LOGI("unmountVolume(vol=%d): f_mount(unregister) failed", volId);
+                durable = false;
+            }
         } else if (v.fsType == VolumeState::FS_NTFS && v.ntfsVol) {
             void* priv = v.ntfsVol->dev->d_private;
-            ntfs_umount(v.ntfsVol, FALSE);
+            // ntfs_umount() frees the volume and its device even when it reports an error (its
+            // `force` argument is ignored), so there is no state to keep on failure. What can be
+            // retried -- dirty inodes and the backing store -- is flushed by flushVolumeForLock()
+            // while the volume is still mounted.
+            if (ntfs_umount(v.ntfsVol, FALSE) != 0) {
+                LOGI("unmountVolume(vol=%d): ntfs_umount failed (errno=%d)", volId, errno);
+                durable = false;
+            }
             if (priv) delete static_cast<int*>(priv);
             v.ntfsVol = nullptr;
         } else if (v.fsType == VolumeState::FS_EXT && v.extFs) {
-            for (ExtStream* stream : v.openExtStreams) {
-                ext2fs_file_close(stream->file);
-                delete stream;
-            }
-            v.openExtStreams.clear();
-            ext2fs_flush(v.extFs);
-            ext2fs_close(v.extFs);
-            v.extFs = nullptr;
-            v.extBitmapsLoaded = false;
+            if (!extUnmount(volId, keepOnFailure)) durable = false;
+            // With keepOnFailure a filesystem libext2fs refused to close is still valid and
+            // still in extFs: leave it mounted so the lock can be retried.
+            keepMounted = (v.extFs != nullptr);
         }
-        v.fsMounted = false;
-        v.fsType = VolumeState::FS_UNKNOWN;
+        if (!keepMounted) {
+            v.fsMounted = false;
+            v.fsType = VolumeState::FS_UNKNOWN;
+        }
     }
 
-    // Flush dirty buffers and synchronize physical hardware caches
-    bool durable = true;
-    if (v.isUsbSource) {
-        // A failed flush leaves the acknowledged bytes pending inside usbCache.
-        // Report it instead of swallowing it: the caller must not clear the
-        // cache (VolumeState::reset) unless it has decided to discard them.
-        if (!v.usbCache.sync(volId)) {
-            LOGI("unmountVolume(vol=%d): USB flush/sync failed; buffered writes are still pending",
-                 volId);
-            durable = false;
-        }
-    } else if (v.isCompositeSource && v.composite) {
-        v.composite->sync();
-    } else if (v.fd >= 0) {
-        v.fdWriteBuffer.flush(v.fd);
-        fsync(v.fd);
+    // Flush dirty buffers and synchronize physical hardware caches. A failed flush leaves the
+    // acknowledged bytes pending (USB cache, fd write-behind buffer), so report it instead of
+    // swallowing it: the caller must not reset the volume (which drops them) unless it has
+    // decided to discard them.
+    if (!flushVolumeBacking(v, volId)) {
+        LOGI("unmountVolume(vol=%d): backing-store flush failed; buffered writes are still pending",
+             volId);
+        durable = false;
     }
 
     std::lock_guard<std::mutex> bufLock(v.ioBufMutex);
@@ -429,33 +469,15 @@ extern "C" DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void* buff) {
 
     switch (cmd) {
         case CTRL_SYNC:
-            if (v.isUsbSource) {
-                // Same contract as the fd branch below: FatFs treats RES_OK
-                // as "everything written so far is durable", so a failed
-                // flush or device sync must not be swallowed here.
-                if (!v.usbCache.sync(pdrv)) {
-                    LOGI("disk_ioctl(CTRL_SYNC): USB flush/sync failed on volume %d",
-                         static_cast<int>(pdrv));
-                    return RES_ERROR;
-                }
-            } else if (v.isCompositeSource && v.composite) {
-                v.composite->sync();
-            } else if (v.fd >= 0) {
-                // FatFs calls CTRL_SYNC from f_sync/f_close and trusts the
-                // result to mean "everything written so far is durable".
-                // A failed write-behind flush has to surface here, otherwise
-                // the file is reported closed OK while its data/size never
-                // reached the container (zero-byte or truncated files).
-                // fsync stays best-effort: some fd types reject it with
-                // EINVAL, which says nothing about the data.
-                const bool flushed = v.fdWriteBuffer.flush(v.fd);
-                const int flushErrno = errno;  // before fsync can overwrite it
-                fsync(v.fd);
-                if (!flushed) {
-                    LOGI("disk_ioctl(CTRL_SYNC): write-behind flush failed on volume %d (errno=%d)",
-                         static_cast<int>(pdrv), flushErrno);
-                    return RES_ERROR;
-                }
+            // FatFs calls CTRL_SYNC from f_sync/f_close and trusts the result to mean
+            // "everything written so far is durable". A failed USB flush/barrier, composite
+            // sync or write-behind flush has to surface here, otherwise the file is reported
+            // closed OK while its data/size never reached the container (zero-byte or
+            // truncated files). See backing_flush.h for what each backing store reports.
+            if (!flushVolumeBacking(v, pdrv)) {
+                LOGI("disk_ioctl(CTRL_SYNC): backing-store flush failed on volume %d (errno=%d)",
+                     static_cast<int>(pdrv), errno);
+                return RES_ERROR;
             }
             return RES_OK;
         case GET_SECTOR_COUNT:

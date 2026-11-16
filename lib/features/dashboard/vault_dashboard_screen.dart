@@ -20,6 +20,7 @@ import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/browser/browser_tabs_host.dart';
+import 'package:vaultexplorer/features/browser/controllers/chrome_bar_slot.dart';
 import 'package:vaultexplorer/features/browser/models/browser_tab_origin.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
@@ -74,6 +75,9 @@ class VaultDashboard extends ConsumerStatefulWidget {
 
 class VaultDashboardState extends ConsumerState<VaultDashboard>
     with WidgetsBindingObserver, SingleTickerProviderStateMixin {
+  // Holds this tab's bottom bar for the chrome hub. See [ChromeBarSlot].
+  final ChromeBarSlot _bottomBarSlot = ChromeBarSlot();
+
   SessionLockController get _lockController =>
       ref.read(sessionLockControllerProvider);
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
@@ -1028,8 +1032,9 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         widget.onFloatingActionChanged?.call(dashboardFloatingAction);
+        // A stable slot rather than a new widget per build: see [ChromeBarSlot].
         widget.onBottomBarChanged?.call(
-          state.showUndoBar ? dashboardBottomBar : null,
+          _bottomBarSlot.publish(state.showUndoBar ? dashboardBottomBar : null),
         );
       });
     }

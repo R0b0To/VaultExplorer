@@ -100,7 +100,7 @@ void main() {
 
       expect(e.config.enabled, isTrue);
       expect(e.config.folders, ['Music']); // nested folder collapsed
-      expect(e.category, MusicCategory.albums);
+      expect(e.category, MusicCategory.tracks);
       expect(e.libraryVisible, isTrue);
       expect(notified, greaterThan(0));
       expect(platform.vault.keys.single, '/a|.vaultexplorer/music.json');
@@ -119,7 +119,7 @@ void main() {
       expect(second.config.folders, ['Music']);
       // Music mode never reopens as the file listing with only the toolbar:
       // a saved enabled mode opens on the library.
-      expect(second.category, MusicCategory.albums);
+      expect(second.category, MusicCategory.tracks);
       expect(second.libraryVisible, isTrue);
       second.dispose();
     });
@@ -188,7 +188,7 @@ void main() {
 
       expect(e.hint, isTrue);
       expect(e.expectedEnabled, isTrue);
-      expect(e.category, MusicCategory.albums);
+      expect(e.category, MusicCategory.tracks);
       expect(e.pendingView, isTrue); // the view waits for the real setting
       e.dispose();
     });
@@ -385,10 +385,10 @@ void main() {
       await a.enable();
       await b.enable();
 
-      a.setCategory(MusicCategory.tracks);
+      a.setCategory(MusicCategory.albums);
 
-      expect(a.category, MusicCategory.tracks);
-      expect(b.category, MusicCategory.albums);
+      expect(a.category, MusicCategory.albums);
+      expect(b.category, MusicCategory.tracks);
       r.release(c, tabA);
       r.release(c, tabB);
     });
@@ -423,7 +423,7 @@ void main() {
       final later = r.acquire(c, tabC);
       expect(later.loaded, isTrue);
       expect(later.config.enabled, isTrue);
-      expect(later.category, MusicCategory.albums);
+      expect(later.category, MusicCategory.tracks);
 
       // Turning it off in the new tab changes what the NEXT tab opens in, not
       // the tab that is still in music mode.

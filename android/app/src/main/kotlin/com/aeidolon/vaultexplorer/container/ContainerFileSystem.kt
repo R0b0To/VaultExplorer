@@ -2,6 +2,7 @@ package com.aeidolon.vaultexplorer.container
 
 import java.io.FileNotFoundException
 import com.aeidolon.vaultexplorer.MainActivity
+import com.aeidolon.vaultexplorer.PerfLog
 import com.aeidolon.vaultexplorer.VeLog
 import com.aeidolon.vaultexplorer.bridge.CopyProgressBridge
 import com.aeidolon.vaultexplorer.cancellation.CopyCancellation
@@ -12,7 +13,11 @@ object ContainerFileSystem {
 
     inline fun <T> withReadLock(volId: Int, block: () -> T): T {
         val lock = ContainerSessionRegistry.locks[volId].readLock()
+        // How long this caller sat waiting for the volume's lock (behind a
+        // writer, or behind a writer queued ahead of it on the fair lock).
+        val waitStart = PerfLog.begin()
         lock.lock()
+        PerfLog.end("fs.read_lock_wait", waitStart)
         try {
             return block()
         } finally {
@@ -22,7 +27,9 @@ object ContainerFileSystem {
 
     inline fun <T> withWriteLock(volId: Int, block: () -> T): T {
         val lock = ContainerSessionRegistry.locks[volId].writeLock()
+        val waitStart = PerfLog.begin()
         lock.lock()
+        PerfLog.end("fs.write_lock_wait", waitStart)
         try {
             return block()
         } finally {

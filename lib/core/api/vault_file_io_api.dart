@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
 import 'package:vaultexplorer/core/utils/image_preview_exception.dart';
+import 'package:vaultexplorer/core/utils/perf_trace.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/utils/vault_symlink.dart';
@@ -717,10 +718,12 @@ class VaultFileIoApi {
 
     if (isSaf) {
       try {
+        final safT0 = PerfTrace.begin();
         final rawList = await _channel.invokeMethod(
           ChannelMethods.safListDirectory,
           {'treeUri': container.uri, 'dirPath': dirPath, 'refresh': refresh},
         );
+        PerfTrace.end('io.list.saf.channel', safT0, slowMs: 150);
         VeLog.d(
           'VaultFileIoApi',
           'safListDirectory response item count: ${rawList?.length}',
@@ -753,10 +756,12 @@ class VaultFileIoApi {
     if (container.isLocalStorage) {
       return _local.listDirectory(container.uri, dirPath, refresh: refresh);
     }
+    final perfT0 = PerfTrace.begin();
     final result = await _channel.invokeMethod<List<Object?>>(
       ChannelMethods.listDirectory,
       {'filePath': container.uri, 'dirPath': dirPath, 'refresh': refresh},
     );
+    PerfTrace.end('io.list.vault.channel', perfT0, slowMs: 150);
     return result?.cast<String>();
   }
 
@@ -769,9 +774,26 @@ class VaultFileIoApi {
     String dirPath, {
     bool refresh = false,
   }) async {
+    if (!mayHaveVaultSymbolicLinks(container)) {
+      return listDirectory(container, dirPath, refresh: refresh);
+    }
+
+    // The symlink lookup does not depend on the listing, so start both at
+    // once instead of paying a second channel round trip (and a second
+    // executor hop) after the first one returns. [listVaultSymlinks] never
+    // throws, so a failing listing cannot leave an unhandled error behind.
+    //
+    // A refresh is the exception: that listing first drops the native
+    // directory cache (under the volume's write lock), and the symlink read
+    // should see the state after that, so it stays sequential.
+    final Future<List<VaultSymlink>>? linksInFlight = refresh
+        ? null
+        : listVaultSymlinks(container, dirPath);
     final entries = await listDirectory(container, dirPath, refresh: refresh);
-    if (entries == null || !mayHaveVaultSymbolicLinks(container)) return entries;
-    final links = await listVaultSymlinks(container, dirPath);
+    if (entries == null) return entries;
+    final perfT0 = PerfTrace.begin();
+    final links = await (linksInFlight ?? listVaultSymlinks(container, dirPath));
+    PerfTrace.end('io.list.vault.symlinks_wait', perfT0, slowMs: 100);
     if (links.isEmpty) return entries;
     final merged = List<String>.of(entries);
     for (final link in links) {
@@ -781,6 +803,41 @@ class VaultFileIoApi {
       );
     }
     return merged;
+  }
+
+  /// [listDirectoryForBrowser], already parsed into entries.
+  ///
+  /// Plain device storage hands back the entries it already built, so it skips
+  /// formatting each one into a wire string and parsing it again; every other
+  /// source is parsed here in one pass that also notes `System:TRUNCATED`.
+  /// Null means the listing failed (same as [listDirectoryForBrowser]).
+  Future<ParsedDirectoryListing?> listDirectoryEntriesForBrowser(
+    MountedContainer container,
+    String dirPath, {
+    bool refresh = false,
+  }) async {
+    if (!_isSaf(container) && container.isLocalStorage) {
+      final localT0 = PerfTrace.begin();
+      final entries = await _local.listDirectoryEntries(
+        container.uri,
+        dirPath,
+        refresh: refresh,
+      );
+      PerfTrace.end('io.list.local', localT0, slowMs: 150);
+      // A growable copy (just references): the repository's own list is shared
+      // with its cache and must never be mutated by whoever shows it.
+      return ParsedDirectoryListing(List<RawEntry>.of(entries));
+    }
+    final raw = await listDirectoryForBrowser(
+      container,
+      dirPath,
+      refresh: refresh,
+    );
+    if (raw == null) return null;
+    final perfT0 = PerfTrace.begin();
+    final listing = ParsedDirectoryListing.fromWire(raw);
+    PerfTrace.end('io.list.parse', perfT0, slowMs: 30);
+    return listing;
   }
 
   /// The symbolic links of one folder in a supported vault/container.

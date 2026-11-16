@@ -18,6 +18,7 @@ import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
 import 'package:vaultexplorer/core/utils/cancellation_token.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/path_clipboard.dart';
+import 'package:vaultexplorer/core/utils/perf_trace.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/activity/clipboard_fab.dart';
@@ -49,6 +50,7 @@ import 'package:vaultexplorer/features/browser/archive_file_viewer.dart';
 import 'package:vaultexplorer/features/browser/archive_preview_file.dart';
 import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_chrome_hub.dart';
+import 'package:vaultexplorer/features/browser/controllers/chrome_bar_slot.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
 import 'package:vaultexplorer/features/browser/models/browser_back_policy.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
@@ -382,8 +384,15 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   BrowserLayoutMode get _layoutMode => _nav.layoutMode;
   String? get _currentFilter => _nav.currentFilter;
   ArchiveContext? get _archiveContext => _nav.archiveContext;
-  bool get _isContainerLocked => _nav.isContainerLocked;
-  double? get _backGestureProgress => _nav.backGestureProgress;
+ bool get _isContainerLocked => _nav.isContainerLocked;
+  final ValueNotifier<double?> _backGestureProgress = ValueNotifier<double?>(null);
+  final ValueNotifier<bool> _backGestureShowPreview = ValueNotifier<bool>(false);
+  List<RawEntry>? _cachedPreviewSource;
+  String? _cachedPreviewDirPath;
+  SortBy? _cachedPreviewSortBy;
+  bool? _cachedPreviewSortAsc;
+  bool? _cachedPreviewShowHidden;
+  List<RawEntry>? _cachedSortedPreviewItems;
   List<RawEntry>? get _backGesturePreviewItems => _nav.backGesturePreviewItems;
   BrowserLayoutMode? get _backGesturePreviewLayoutMode =>
       _nav.backGesturePreviewLayoutMode;
@@ -571,6 +580,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
 
   void _onMusicChanged() {
     if (!mounted) return;
+    PerfTrace.count('ui.dir_view.notify.music');
     final enabled = _music.config.enabled;
     final modeChanged = enabled != _lastTabMusicEnabled;
     _lastTabMusicEnabled = enabled;
@@ -704,6 +714,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
 
   void _onOperationsChanged() {
     if (!mounted) return;
+    PerfTrace.count('ui.dir_view.notify.operations');
     final hasActiveTargetingCurrent = _opSvc.activeOperations.any(
       (op) =>
           !op.isDelete &&
@@ -772,6 +783,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   // come before the refreshed listing does, so it waits as "pending" until an
   // item of that name is actually listed.
   ProviderSubscription<BrowserDropReveal?>? _dropRevealSub;
+  // Holds this tab's bottom bar for the chrome hub. See [ChromeBarSlot].
+  final ChromeBarSlot _bottomBarSlot = ChromeBarSlot();
+
   Set<String> _pendingRevealNames = const {};
   int _pendingRevealToken = 0;
   Timer? _pendingRevealExpiry;
@@ -952,8 +966,10 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     WidgetsBinding.instance.removeObserver(this);
     _opReloadTimer?.cancel();
     _exitArmTimer?.cancel();
-    _opSvc.removeListener(_onOperationsChanged);
+     _opSvc.removeListener(_onOperationsChanged);
     _opSvc.removeVolumeContentChangedListener(_onVolumeContentChanged);
+    _backGestureProgress.dispose();
+    _backGestureShowPreview.dispose();
     if (widget.scrollController == null) _browserScrollController.dispose();
     _backGesturePreviewScrollController.dispose();
     _vaultEvents.removeContainerLockedListener(_onContainerLockedEvent);
@@ -1412,6 +1428,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
           currentDirPath: _currentDirPath,
         );
       },
+      onEditMetadata: entry.isDir || entry.isPlaceholder
+          ? null
+          : () => _editMetadata([entry]),
       onExtract: canExtract
           ? () async {
               setSelectedItems({entry});
@@ -1690,8 +1709,13 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   void _signalActivity() => widget.onUserActivity?.call();
   Future<void> _initSettingsAndContents() async {
     _navNotifier.setLoading(true);
-    // Loads once however many places ask (the drawer may have already).
-    unawaited(_pinsBookmarksNotifier.ensureLoaded(widget.container));
+    // Loads once however many places ask (the drawer may have already). Kept
+    // as a future because the first listing must not appear before it is
+    // done: the marks start out empty, and a listing drawn from that empty
+    // state would put pinned items in their sorted place and then lift them to
+    // the top when the marks arrive -- the visible jump the first time a vault
+    // is opened.
+    final marksLoaded = _pinsBookmarksNotifier.ensureLoaded(widget.container);
     try {
       // Independent of one another, so they run together instead of each
       // waiting for the previous one's secure-storage round trip.
@@ -1734,6 +1758,13 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         setState(() => _toolbarConfigReady = true);
       }
     }
+    // The marks are one small file and have been loading alongside the
+    // settings above, so this normally costs nothing. The cap keeps a slow or
+    // unreachable store from holding the listing back: past it the marks
+    // simply arrive late, as they used to.
+    await marksLoaded
+        .timeout(const Duration(seconds: 2), onTimeout: () {})
+        .catchError((Object _) {});
     final initialPath = widget.initialPath;
     if (!_resumedNavigation &&
         initialPath != null &&
@@ -2565,21 +2596,33 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     final parentPath = targetSegment?.fatPath ?? '';
     final parentLayoutMode = _getLayoutModeForFolder(parentPath);
 
-    return _navNotifier.startBackGesture(
+      final started = _navNotifier.startBackGesture(
       backEvent.progress,
       layoutMode: parentLayoutMode,
     );
+    if (started) {
+      _backGestureProgress.value = backEvent.progress;
+      _backGestureShowPreview.value = backEvent.progress >= 0.18;
+    }
+    return started;
   }
 
   @override
   void handleUpdateBackGestureProgress(PredictiveBackEvent backEvent) {
     if (!_isOwnRouteCurrent) return;
-    _navNotifier.updateBackGestureProgress(backEvent.progress);
+    PerfTrace.count('ui.dir_view.back_progress');
+    _backGestureProgress.value = backEvent.progress;
+    final show = backEvent.progress >= 0.18;
+    if (_backGestureShowPreview.value != show) {
+      _backGestureShowPreview.value = show;
+    }
   }
 
   @override
   void handleCancelBackGesture() {
     if (!_isOwnRouteCurrent) return;
+    _backGestureProgress.value = null;
+    _backGestureShowPreview.value = false;
     _navNotifier.cancelBackGesture();
   }
 
@@ -2587,7 +2630,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   void handleCommitBackGesture() {
     if (!_isOwnRouteCurrent) return;
     final targetPath = _backGesturePreviewDirPath;
-    _navNotifier.commitBackGesture();
+    _backGestureProgress.value = 1.0;
+    _backGestureShowPreview.value = true;
     _navigateUp();
     if (targetPath != null) _hideBackGesturePreviewWhenReady(targetPath);
   }
@@ -2597,7 +2641,48 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       await Future.delayed(const Duration(milliseconds: 30));
     }
     if (!mounted) return;
+    _backGestureProgress.value = null;
+    _backGestureShowPreview.value = false;
     _navNotifier.clearBackGesturePreview();
+  }
+
+  List<RawEntry>? _getSortedBackPreviewItems(
+    List<RawEntry>? rawItems,
+    String previewDirPath,
+    ({SortBy sortBy, bool sortAscending}) previewSort,
+  ) {
+    if (rawItems == null) {
+      _cachedPreviewSource = null;
+      _cachedSortedPreviewItems = null;
+      return null;
+    }
+    final showHidden = _toolbarConfig.showHiddenFiles;
+    if (identical(_cachedPreviewSource, rawItems) &&
+        _cachedPreviewDirPath == previewDirPath &&
+        _cachedPreviewSortBy == previewSort.sortBy &&
+        _cachedPreviewSortAsc == previewSort.sortAscending &&
+        _cachedPreviewShowHidden == showHidden &&
+        _cachedSortedPreviewItems != null) {
+      return _cachedSortedPreviewItems;
+    }
+    final sorted = List<RawEntry>.of(
+      rawItems.where((item) => showHidden || !isHiddenEntryName(item.name)),
+    )..sort(
+        (ea, eb) => compareBrowserEntries(
+          ea,
+          eb,
+          currentDirPath: previewDirPath,
+          pinnedPaths: _pinnedPaths,
+          sortBy: previewSort.sortBy,
+          sortAscending: previewSort.sortAscending,
+        ),
+      );
+    _cachedPreviewSource = rawItems;
+    _cachedPreviewDirPath = previewDirPath;
+    _cachedPreviewSortBy = previewSort.sortBy;
+    _cachedPreviewSortAsc = previewSort.sortAscending;
+    _cachedPreviewShowHidden = showHidden;
+    return _cachedSortedPreviewItems = sorted;
   }
 
   /// Steps forward into the folder history that going back left in place.
@@ -5942,6 +6027,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     // Every file/folder tile, and the bookmark bar, below this point reads the
     // user's chosen skin from here. Kept as a thin wrapper so the (very
     // large) screen body itself is untouched.
+    PerfTrace.count('ui.dir_view.build');
     final skinTokens = Theme.of(context).extension<AppSkinTokens>();
     return FileManagerSkinScope(
       skin: skinTokens == null
@@ -6056,30 +6142,14 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     // The folder being swiped back to is shown in the sort it will be landed in
     // (see [_navigateUp]), not the sort of the folder being left, which may
     // have been changed since.
-    final previewSort = _backGesturePreviewDirPath != null
+     final previewSort = _backGesturePreviewDirPath != null
         ? _getSortStateForFolder(previewDirPath)
         : (sortBy: sortBy, sortAscending: sortAscending);
-    final sortedPreviewItems =
-        (_backGestureProgress != null && _backGesturePreviewItems != null)
-        ? (List<RawEntry>.of(
-            _backGesturePreviewItems!.where((item) {
-              if (!_toolbarConfig.showHiddenFiles &&
-                  isHiddenEntryName(item.name)) {
-                return false;
-              }
-              return true;
-            }),
-          )..sort(
-            (ea, eb) => compareBrowserEntries(
-              ea,
-              eb,
-              currentDirPath: previewDirPath,
-              pinnedPaths: _pinnedPaths,
-              sortBy: previewSort.sortBy,
-              sortAscending: previewSort.sortAscending,
-            ),
-          ))
-        : null;
+    final sortedPreviewItems = _getSortedBackPreviewItems(
+      _backGesturePreviewItems,
+      previewDirPath,
+      previewSort,
+    );
     final isLandscape =
         MediaQuery.of(context).orientation == Orientation.landscape;
     // True while another viewport owns a drag: this one is then only a drop
@@ -6636,7 +6706,13 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     if (_isActiveTab) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || !_isActiveTab) return;
-        _chrome.setBottomBar(widget.tabId, embeddedBottomBar);
+        // The hub gets a slot that never changes; the bar itself is swapped
+        // inside it. Publishing the freshly built bar widget made the tab
+        // shell rebuild every tab, this screen included, on every frame.
+        _chrome.setBottomBar(
+          widget.tabId,
+          _bottomBarSlot.publish(embeddedBottomBar),
+        );
       });
     }
 
@@ -6962,103 +7038,137 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                           ),
                                           ),
                                               ),
-                                          if (_backGestureProgress != null)
+                                          if (sortedPreviewItems != null)
                                             Positioned.fill(
                                               child: IgnorePointer(
                                                 child: Stack(
                                                   fit: StackFit.expand,
                                                   children: [
-                                                    if (_backGestureProgress! >=
-                                                            0.18 &&
-                                                        sortedPreviewItems !=
-                                                            null) ...[
-                                                      ColoredBox(
-                                                        color: Theme.of(
-                                                          context,
-                                                        ).scaffoldBackgroundColor,
-                                                      ),
-                                                      buildBrowserBody(
+                                                    ValueListenableBuilder<bool>(
+                                                      valueListenable:
+                                                          _backGestureShowPreview,
+                                                      builder: (
                                                         context,
-                                                        sortedPreviewItems,
-                                                        isLoading: false,
-                                                        currentItems:
-                                                            sortedPreviewItems,
-                                                        atRoot:
-                                                            _backGesturePreviewAtRoot,
-                                                        onNavigateUp: null,
-                                                        searchQuery: '',
-                                                        layoutMode:
-                                                            _backGesturePreviewLayoutMode ??
-                                                            _layoutMode,
-                                                        container:
-                                                            widget.container,
-                                                        currentDirPath:
-                                                            previewDirPath,
-                                                        thumbnailCacheMode:
-                                                            _resolvedThumbnailCacheMode,
-                                                        thumbnailQuality:
-                                                            _resolvedThumbnailQuality,
-                                                        toolbarConfig:
-                                                            _toolbarConfig,
-                                                        isSelectionMode: false,
-                                                        selectedItems: const {},
-                                                        searchActive: false,
-                                                        bottomClearance:
-                                                            bottomContentClearance,
-                                                        mountedDocProviderFolders:
-                                                            _mountedDocProviderFolders,
-                                                        isFolderMounted: (e) =>
-                                                            isFolderMounted(
-                                                              e,
-                                                              previewDirPath,
-                                                              _mountedDocProviderFolders,
+                                                        showPreview,
+                                                        _,
+                                                      ) {
+                                                        if (!showPreview) {
+                                                          return const SizedBox.shrink();
+                                                        }
+                                                        return Stack(
+                                                          fit: StackFit.expand,
+                                                          children: [
+                                                            ColoredBox(
+                                                              color: Theme.of(
+                                                                context,
+                                                              ).scaffoldBackgroundColor,
                                                             ),
-                                                        isPinned: (e) =>
-                                                            isPinned(
-                                                              e,
-                                                              previewDirPath,
-                                                              _pinnedPaths,
+                                                            buildBrowserBody(
+                                                              context,
+                                                              sortedPreviewItems,
+                                                              isLoading: false,
+                                                              currentItems:
+                                                                  sortedPreviewItems,
+                                                              atRoot:
+                                                                  _backGesturePreviewAtRoot,
+                                                              onNavigateUp: null,
+                                                              searchQuery: '',
+                                                              layoutMode:
+                                                                  _backGesturePreviewLayoutMode ??
+                                                                  _layoutMode,
+                                                              container:
+                                                                  widget.container,
+                                                              currentDirPath:
+                                                                  previewDirPath,
+                                                              thumbnailCacheMode:
+                                                                  _resolvedThumbnailCacheMode,
+                                                              thumbnailQuality:
+                                                                  _resolvedThumbnailQuality,
+                                                              toolbarConfig:
+                                                                  _toolbarConfig,
+                                                              isSelectionMode:
+                                                                  false,
+                                                              selectedItems:
+                                                                  const {},
+                                                              searchActive: false,
+                                                              bottomClearance:
+                                                                  bottomContentClearance,
+                                                              mountedDocProviderFolders:
+                                                                  _mountedDocProviderFolders,
+                                                              isFolderMounted: (e) =>
+                                                                  isFolderMounted(
+                                                                    e,
+                                                                    previewDirPath,
+                                                                    _mountedDocProviderFolders,
+                                                                  ),
+                                                              isPinned: (e) =>
+                                                                  isPinned(
+                                                                    e,
+                                                                    previewDirPath,
+                                                                    _pinnedPaths,
+                                                                  ),
+                                                              isBookmark: (e) =>
+                                                                  isBookmark(
+                                                                    e,
+                                                                    previewDirPath,
+                                                                    _bookmarkPaths,
+                                                                  ),
+                                                              isFolderSynced:
+                                                                  _isFolderSynced,
+                                                              onDirTap: (_) {},
+                                                              onFileTap: (_) {},
+                                                              onItemLongPress:
+                                                                  (_) {},
+                                                              onIconTap: (_) {},
+                                                              onItemMoreTap:
+                                                                  (_) {},
+                                                              onGridColumnCountChanged:
+                                                                  (_) {},
+                                                              onMasonryColumnCountChanged:
+                                                                  (_) {},
+                                                              onListZoomLevelChanged:
+                                                                  (_) {},
+                                                              onRefresh:
+                                                                  () async {},
+                                                              isListingTruncated:
+                                                                  false,
+                                                              scrollController:
+                                                                  _backGesturePreviewScrollController,
+                                                              archiveContext:
+                                                                  previewArchiveContext,
+                                                              archiveRootPath:
+                                                                  previewArchiveRootPath,
+                                                              sortBy:
+                                                                  previewSort
+                                                                      .sortBy,
                                                             ),
-                                                        isBookmark: (e) =>
-                                                            isBookmark(
-                                                              e,
-                                                              previewDirPath,
-                                                              _bookmarkPaths,
-                                                            ),
-                                                        isFolderSynced:
-                                                            _isFolderSynced,
-                                                        onDirTap: (_) {},
-                                                        onFileTap: (_) {},
-                                                        onItemLongPress: (_) {},
-                                                        onIconTap: (_) {},
-                                                        onItemMoreTap: (_) {},
-                                                        onGridColumnCountChanged:
-                                                            (_) {},
-                                                        onMasonryColumnCountChanged:
-                                                            (_) {},
-                                                        onListZoomLevelChanged:
-                                                            (_) {},
-                                                        onRefresh: () async {},
-                                                        isListingTruncated:
-                                                            false,
-                                                        scrollController:
-                                                            _backGesturePreviewScrollController,
-                                                        archiveContext:
-                                                            previewArchiveContext,
-                                                        archiveRootPath:
-                                                            previewArchiveRootPath,
-                                                        sortBy: previewSort.sortBy,
-                                                      ),
-                                                    ],
-                                                    Opacity(
-                                                      opacity: _fadeScrimOpacity(
-                                                        _backGestureProgress!,
-                                                      ),
-                                                      child: ColoredBox(
-                                                        color: Theme.of(
-                                                          context,
-                                                        ).scaffoldBackgroundColor,
-                                                      ),
+                                                          ],
+                                                        );
+                                                      },
+                                                    ),
+                                                    ValueListenableBuilder<double?>(
+                                                      valueListenable:
+                                                          _backGestureProgress,
+                                                      builder: (
+                                                        context,
+                                                        progress,
+                                                        _,
+                                                      ) {
+                                                        if (progress == null) {
+                                                          return const SizedBox.shrink();
+                                                        }
+                                                        return Opacity(
+                                                          opacity:
+                                                              _fadeScrimOpacity(
+                                                                progress,
+                                                              ),
+                                                          child: ColoredBox(
+                                                            color: Theme.of(
+                                                              context,
+                                                            ).scaffoldBackgroundColor,
+                                                          ),
+                                                        );
+                                                      },
                                                     ),
                                                   ],
                                                 ),

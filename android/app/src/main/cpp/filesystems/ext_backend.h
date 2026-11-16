@@ -65,6 +65,20 @@ std::string extGetFilesystemLabel(int volumeId);
 // even needed. [volumeId]'s ext2_filsys must already be mounted (VolumeState::extFs).
 bool extIsDirty(int volumeId);
 bool extClearDirtyState(int volumeId);
+
+// Locking a volume (jni/session_bridge.cpp lockVolumeLocked, io/virtual_block_device.cpp
+// unmountVolume). Both return true only when every step succeeded, so a filesystem-level failure
+// is never reported as an ordinary successful lock.
+//  - extFlushForLock: writes out every open stream's buffered data and the filesystem metadata.
+//    Nothing is closed or freed, so on failure the volume is exactly as usable as before and the
+//    call can be repeated. No-op for a read-only mount.
+//  - extUnmount: closes the open streams, flushes and closes the filesystem. libext2fs frees a
+//    file handle even when closing it fails, but ext2fs_close() returns BEFORE freeing the
+//    filesystem when its final flush or bitmap write fails, so with [keepOnFailure] the failed
+//    filesystem stays in VolumeState::extFs and the unmount can be retried. Without it extFs is
+//    always cleared (the pre-existing behaviour every other caller relies on).
+bool extFlushForLock(int volumeId);
+bool extUnmount(int volumeId, bool keepOnFailure);
 // A conservative directory-entry pass for Check & Repair. It removes only
 // entries whose inode cannot be read or whose metadata is impossible for this
 // volume; it never guesses at inode/block ownership.

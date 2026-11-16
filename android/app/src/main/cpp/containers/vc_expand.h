@@ -4,9 +4,12 @@
 // What desktop does, and what this does:
 //   * only a STANDARD volume is expanded (not a hidden-volume header);
 //   * the host file is extended; the data area grows from (old - 256 KiB) to (new - 256 KiB);
-//   * the new space is initialised with data encrypted under the volume's own key (so it looks like
-//     the rest of the volume) -- or, in quick mode, only the old embedded backup header (now inside
-//     the data area) is wiped with random bytes and the rest stays as the sparse extension;
+//   * the new space is initialised with zeros encrypted under a TEMPORARY random key (VeraCrypt's
+//     ExpandVolume.c calls FormatNoFs, whose full-fill path randomises the key), so under the
+//     volume's real key it decodes to noise, never to zeros -- see vc_free_space_fill.h for why a
+//     real-key fill would expose a hidden volume. In quick mode only the old embedded backup header
+//     (now inside the data area) is wiped with random bytes and the rest stays as the sparse
+//     extension;
 //   * the volume header gets the new volume size / encrypted-area length and a fresh salt; the
 //     embedded backup header is written at the NEW end (V-128 KiB) BEFORE the primary header, both
 //     under independent salts, and the new tail header group is random filler.
@@ -21,6 +24,7 @@
 #include <functional>
 #include <memory>
 #include "vc_geometry.h"
+#include "vc_free_space_fill.h"
 #include "vc_header_build.h"
 
 enum class VcExpandResult { kOk, kHiddenHeader, kNotLarger, kInconsistentHeader, kIoError, kBuildFailed, kCancelled };
@@ -48,23 +52,26 @@ inline VcExpandResult vcExpandVolume(unsigned char* body, CascadeId cipher, Hash
         return VcExpandResult::kInconsistentHeader;               // not a plain full-size standard volume
     }
     const CascadeSpec spec = cascadeSpecFor(cipher);
-    CascadeContext dataCtx;
-    if (!cascadeSetKeys(dataCtx, cipher, body + VC_KEY_OFFSET_MASTER, spec.layerCount * 64)) return VcExpandResult::kBuildFailed;
 
     if (!io.setSize(newSize)) return VcExpandResult::kIoError;
 
     const uint64_t newStart = oldSize - G, newEnd = newSize - G;   // [newStart, newEnd) is the added data area
     if (initFreeSpace) {
         constexpr uint64_t kBatch = 2048;                          // sectors per write (1 MiB)
-        std::unique_ptr<unsigned char[]> buf(new unsigned char[kBatch * 512]);
-        static const unsigned char zero[512] = {0};
         const uint64_t total = (newEnd - newStart) / 512;
-        for (uint64_t s = 0; s < total;) {
-            const uint64_t n = (total - s < kBatch) ? total - s : kBatch;
-            for (uint64_t i = 0; i < n; i++) cascadeEncryptSector(dataCtx, newStart / 512 + s + i, zero, buf.get() + i * 512);
-            if (!io.writeAt(newStart + s * 512, buf.get(), n * 512)) return VcExpandResult::kIoError;
-            s += n;
-            if (io.progress && !io.progress(s, total)) return VcExpandResult::kCancelled;
+        uint64_t done = 0;
+        bool ioFailed = false, cancelled = false;
+        const bool filled = vcfill::fillWithRandomizedKey(
+            cipher, spec.layerCount * 64, newStart / 512, total, kBatch,
+            [&](uint64_t offset, const unsigned char* data, size_t n) {
+                if (!io.writeAt(offset, data, n)) { ioFailed = true; return false; }
+                done += n / 512;
+                if (io.progress && !io.progress(done, total)) { cancelled = true; return false; }
+                return true;
+            });
+        if (!filled) {
+            if (cancelled) return VcExpandResult::kCancelled;
+            return ioFailed ? VcExpandResult::kIoError : VcExpandResult::kBuildFailed;
         }
     } else {
         // Quick expand: the old embedded backup header group now lies inside the data area -- wipe it.

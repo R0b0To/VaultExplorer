@@ -493,8 +493,13 @@ open class MainActivity : FlutterFragmentActivity() {
             com.aeidolon.vaultexplorer.camera.QuickCaptureScratchpadPlugin.sweepOrphanedScratchpads(applicationContext)
             SecureFileWipe.sweepOrphanedFiles(
                 cacheDir,
-                listOf("thumb_", "export_", "archive_browse_", "ve_copy_", "vc_import_"),
-                isInUse = com.aeidolon.vaultexplorer.container.ContainerEngine::isActiveCopyTempFile,
+                // arch_scan_: plaintext archive extracted for an in-vault scan; a SIGKILL
+                // mid-scan skips the scan's own finally-block wipe.
+                listOf("thumb_", "export_", "archive_browse_", "ve_copy_", "vc_import_", "arch_scan_"),
+                isInUse = { file ->
+                    com.aeidolon.vaultexplorer.container.ContainerEngine.isActiveCopyTempFile(file) ||
+                        com.aeidolon.vaultexplorer.handlers.ArchiveHandlers.isActiveScanTempFile(file)
+                },
             )
             com.aeidolon.vaultexplorer.saf.MirrorSyncCoordinator.sweepOrphanedMirrors(applicationContext)
             QuickCaptureShortcuts.refreshDynamicShortcut(applicationContext)

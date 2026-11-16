@@ -45,6 +45,7 @@ import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
 import 'package:vaultexplorer/data/services/thumbnail_settings_resolver.dart';
 import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_chrome_hub.dart';
+import 'package:vaultexplorer/features/browser/controllers/chrome_bar_slot.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart'
     show PathSegment;
@@ -222,6 +223,9 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
   bool _itemsPlacesLoaded = false;
   Timer? _metaTimer;
   GalleryFilterLabels _galleryLabels = const GalleryFilterLabels();
+
+  // Holds this tab's bottom bar for the chrome hub. See [ChromeBarSlot].
+  final ChromeBarSlot _bottomBarSlot = ChromeBarSlot();
 
   late final BrowserChromeHub _chrome = ref.read(
     browserChromeProvider(widget.workspaceConfig),
@@ -2205,6 +2209,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       },
       onShare: () => _share([entry]),
       onEditImage: (isImg && !container.readOnly) ? () => _editImage(entry) : null,
+      onEditMetadata: entry.isDir ? null : () => _editMetadata([entry]),
       onCopyPath: () => _copyPath(entry),
       onGoToLocation: widget.onShowInFolder != null
           ? () => _showInFolder(entry)
@@ -2938,7 +2943,11 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
                   builders: actionBuilders,
                 )
               : null);
-      _chrome.setBottomBar(widget.tabId, bottomBarWidget);
+      // A stable slot, not the freshly built bar: see [ChromeBarSlot].
+      _chrome.setBottomBar(
+        widget.tabId,
+        _bottomBarSlot.publish(bottomBarWidget),
+      );
 
       final showFloatingAction =
           useFab && !_searchActive && visibleActions.isNotEmpty;

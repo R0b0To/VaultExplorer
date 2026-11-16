@@ -50,6 +50,10 @@ class FileItemActionsSheet extends ConsumerWidget {
   final VoidCallback? onEditImage;
   final VoidCallback? onEditVideo;
   final VoidCallback? onEditAudio;
+
+  /// Tags, date and time, and metadata removal for this file. Not offered for
+  /// folders, so the caller leaves it null there.
+  final VoidCallback? onEditMetadata;
   final VoidCallback? onToggleDocProvider;
   final VoidCallback? onSyncSettings;
 
@@ -106,6 +110,7 @@ class FileItemActionsSheet extends ConsumerWidget {
     this.onEditImage,
     this.onEditVideo,
     this.onEditAudio,
+    this.onEditMetadata,
     this.onToggleDocProvider,
     this.onSyncSettings,
     this.onExport,
@@ -147,6 +152,7 @@ class FileItemActionsSheet extends ConsumerWidget {
     VoidCallback? onEditImage,
     VoidCallback? onEditVideo,
     VoidCallback? onEditAudio,
+    VoidCallback? onEditMetadata,
     VoidCallback? onToggleDocProvider,
     VoidCallback? onSyncSettings,
     VoidCallback? onExport,
@@ -193,6 +199,7 @@ class FileItemActionsSheet extends ConsumerWidget {
         onEditImage: onEditImage,
         onEditVideo: onEditVideo,
         onEditAudio: onEditAudio,
+        onEditMetadata: onEditMetadata,
         onToggleDocProvider: onToggleDocProvider,
         onSyncSettings: onSyncSettings,
         onExport: onExport,
@@ -216,82 +223,16 @@ class FileItemActionsSheet extends ConsumerWidget {
     Color fallbackIconColor,
   ) {
     if (customLeading != null) return customLeading!;
-
-    final cleanName = entry.name;
-    final fullPath = currentDirPath.isEmpty
-        ? cleanName
-        : '$currentDirPath/$cleanName';
-    final ext = cleanName.contains('.')
-        ? cleanName.split('.').last.toLowerCase()
-        : '';
-    final vaultIcon = vaultIconForExt(ext);
-    final vaultColor = vaultColorForExt(ext);
-
-    if (entry.isDir) {
-      return FolderThumbnailPreview(
-        container: container,
-        folderPath: fullPath,
-        cacheMode: thumbnailCacheMode,
-        quality: thumbnailQuality,
-        iconSize: 24,
-        child: Center(
-          child: Icon(fallbackIcon, color: fallbackIconColor, size: 24),
-        ),
-      );
-    }
-
-    if (vaultIcon != null) {
-      return Center(child: Icon(vaultIcon, color: vaultColor, size: 24));
-    }
-
-    final isImg =
-        MediaViewerConstants.isImage(cleanName) && !entry.isPlaceholder;
-    final isVid =
-        MediaViewerConstants.isVideo(cleanName) && !entry.isPlaceholder;
-
-    if (isImg) {
-      return _ItemImageThumbnail(
-        container: container,
-        filePath: fullPath,
-        cacheMode: thumbnailCacheMode,
-        quality: thumbnailQuality,
-        archiveContext: archiveContext,
-        archiveRootPath: archiveRootPath,
-        fallbackIcon: fallbackIcon,
-        fallbackIconColor: fallbackIconColor,
-      );
-    }
-
-    if (isVid) {
-      return _ItemVideoThumbnail(
-        container: container,
-        filePath: fullPath,
-        cacheMode: thumbnailCacheMode,
-        quality: thumbnailQuality,
-        fallbackIcon: fallbackIcon,
-        fallbackIconColor: fallbackIconColor,
-        archiveContext: archiveContext,
-        archiveRootPath: archiveRootPath,
-      );
-    }
-
-    // Not for a book nested inside an open archive: it has no container/local
-    // path of its own for the native side to open (same rule as the tiles).
-    if (isBookWithCover(cleanName) &&
-        !entry.isPlaceholder &&
-        archiveContext == null) {
-      return _ItemBookCover(
-        container: container,
-        filePath: fullPath,
-        cacheMode: thumbnailCacheMode,
-        quality: thumbnailQuality,
-        fallbackIcon: fallbackIcon,
-        fallbackIconColor: fallbackIconColor,
-      );
-    }
-
-    return Center(
-      child: Icon(fallbackIcon, color: fallbackIconColor, size: 24),
+    return FileThumbnailLeading(
+      entry: entry,
+      container: container,
+      currentDirPath: currentDirPath,
+      cacheMode: thumbnailCacheMode,
+      quality: thumbnailQuality,
+      archiveContext: archiveContext,
+      archiveRootPath: archiveRootPath,
+      fallbackIcon: fallbackIcon,
+      fallbackIconColor: fallbackIconColor,
     );
   }
 
@@ -378,6 +319,14 @@ class FileItemActionsSheet extends ConsumerWidget {
           label: l10n.audioEditorEditAction,
           enabled: !isReadOnly,
           onTap: onEditAudio!,
+        );
+      case FileItemAction.editMetadata:
+        if (inArchive || entry.isDir || onEditMetadata == null) return null;
+        return _ActionSpec(
+          icon: Icons.sell_outlined,
+          label: l10n.editMetadataAction,
+          enabled: !isReadOnly,
+          onTap: onEditMetadata!,
         );
       case FileItemAction.rename:
         if (inArchive) return null;
@@ -651,6 +600,119 @@ class FileItemActionsSheet extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// What an item's sheet shows at the start of its header: the thumbnail of an
+/// image, video or book cover, a folder's preview, or the file-type icon.
+///
+/// Shared by the item actions sheet and the file info sheet so both show the
+/// same picture for the same file.
+class FileThumbnailLeading extends ConsumerWidget {
+  final RawEntry entry;
+  final MountedContainer container;
+  final String currentDirPath;
+  final ThumbnailCacheMode cacheMode;
+  final ThumbnailQuality quality;
+  final ArchiveContext? archiveContext;
+  final String? archiveRootPath;
+  final IconData fallbackIcon;
+  final Color fallbackIconColor;
+
+  const FileThumbnailLeading({
+    super.key,
+    required this.entry,
+    required this.container,
+    required this.currentDirPath,
+    required this.fallbackIcon,
+    required this.fallbackIconColor,
+    this.cacheMode = ThumbnailCacheMode.appCache,
+    this.quality = ThumbnailQuality.defaultQuality,
+    this.archiveContext,
+    this.archiveRootPath,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final thumbnailCacheMode = cacheMode;
+    final thumbnailQuality = quality;
+
+    final cleanName = entry.name;
+    final fullPath = currentDirPath.isEmpty
+        ? cleanName
+        : '$currentDirPath/$cleanName';
+    final ext = cleanName.contains('.')
+        ? cleanName.split('.').last.toLowerCase()
+        : '';
+    final vaultIcon = vaultIconForExt(ext);
+    final vaultColor = vaultColorForExt(ext);
+
+    if (entry.isDir) {
+      return FolderThumbnailPreview(
+        container: container,
+        folderPath: fullPath,
+        cacheMode: thumbnailCacheMode,
+        quality: thumbnailQuality,
+        iconSize: 24,
+        child: Center(
+          child: Icon(fallbackIcon, color: fallbackIconColor, size: 24),
+        ),
+      );
+    }
+
+    if (vaultIcon != null) {
+      return Center(child: Icon(vaultIcon, color: vaultColor, size: 24));
+    }
+
+    final isImg =
+        MediaViewerConstants.isImage(cleanName) && !entry.isPlaceholder;
+    final isVid =
+        MediaViewerConstants.isVideo(cleanName) && !entry.isPlaceholder;
+
+    if (isImg) {
+      return _ItemImageThumbnail(
+        container: container,
+        filePath: fullPath,
+        cacheMode: thumbnailCacheMode,
+        quality: thumbnailQuality,
+        archiveContext: archiveContext,
+        archiveRootPath: archiveRootPath,
+        fallbackIcon: fallbackIcon,
+        fallbackIconColor: fallbackIconColor,
+      );
+    }
+
+    if (isVid) {
+      return _ItemVideoThumbnail(
+        container: container,
+        filePath: fullPath,
+        cacheMode: thumbnailCacheMode,
+        quality: thumbnailQuality,
+        fallbackIcon: fallbackIcon,
+        fallbackIconColor: fallbackIconColor,
+        archiveContext: archiveContext,
+        archiveRootPath: archiveRootPath,
+      );
+    }
+
+    // Not for a book nested inside an open archive: it has no container/local
+    // path of its own for the native side to open (same rule as the tiles).
+    if (isBookWithCover(cleanName) &&
+        !entry.isPlaceholder &&
+        archiveContext == null) {
+      return _ItemBookCover(
+        container: container,
+        filePath: fullPath,
+        cacheMode: thumbnailCacheMode,
+        quality: thumbnailQuality,
+        fallbackIcon: fallbackIcon,
+        fallbackIconColor: fallbackIconColor,
+      );
+    }
+
+    return Center(
+      child: Icon(fallbackIcon, color: fallbackIconColor, size: 24),
     );
   }
 }

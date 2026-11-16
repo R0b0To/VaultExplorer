@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/core/utils/directory_listing_cache.dart';
+import 'package:vaultexplorer/core/utils/perf_trace.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/data/models/archive_models.dart';
@@ -175,6 +177,41 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
   int _loadGeneration = 0;
   ArchiveContext? _liveArchiveContext;
 
+  // Recently listed folders. Revisiting one shows its entries immediately
+  // while the normal background listing confirms them (stale-while-revalidate);
+  // before, only the folders on the current breadcrumb were remembered, so any
+  // other revisit began with an empty screen and a spinner.
+  final DirectoryListingCache _listingCache = DirectoryListingCache();
+
+  // Identifies the container the cache above belongs to, so nothing listed
+  // from one mounted container is ever shown for another.
+  String? _listingCacheScope;
+
+  void _syncListingCacheScope(MountedContainer container) {
+    final scope = '${container.volId}:${container.mountedAt.millisecondsSinceEpoch}';
+    if (_listingCacheScope == scope) return;
+    _listingCache.clear();
+    _listingCacheScope = scope;
+  }
+
+  /// The remembered listing of [path] to show at once, or null. Never used
+  /// inside an archive: its virtual paths could collide with real folders.
+  List<RawEntry>? _cachedListing(String path) {
+    if (state.archiveContext != null) return null;
+    final cached = _listingCache.get(path);
+    PerfTrace.count(cached == null ? 'nav.cache_miss' : 'nav.cache_hit');
+    return cached;
+  }
+
+  /// What to show immediately when returning to [segment]: its own saved
+  /// entries, or -- when it has none yet (it was left before its listing
+  /// finished) -- whatever the cache remembers.
+  List<RawEntry> _restorableItems(PathSegment segment) {
+    final own = segment.items;
+    if (own != null && own.isNotEmpty) return own;
+    return _cachedListing(segment.fatPath) ?? own ?? const <RawEntry>[];
+  }
+
   @override
   FileBrowserNavigationState build(TabId tabId) {
     ref.onDispose(() {
@@ -253,13 +290,20 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
     final parentSegment = state.pathStack[state.pathStack.length - 2];
     if (parentSegment.items != null && parentSegment.items!.isNotEmpty) return;
 
+    final scopeAtStart = _listingCacheScope;
     unawaited(() async {
       try {
-        final raw = await ref
+        final listing = await ref
             .read(vaultFileIoApiProvider)
-            .listDirectoryForBrowser(container, parentSegment.fatPath);
-        if (raw != null) {
-          parentSegment.items = RawEntry.parseAll(raw);
+            .listDirectoryEntriesForBrowser(container, parentSegment.fatPath);
+        if (listing != null) {
+          parentSegment.items = listing.entries;
+          if (ref.mounted &&
+              !listing.truncated &&
+              state.archiveContext == null &&
+              _listingCacheScope == scopeAtStart) {
+            _listingCache.put(parentSegment.fatPath, listing.entries);
+          }
         }
       } catch (e) {
         VeLog.w(
@@ -288,6 +332,8 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
     if (state.pathStack.isNotEmpty) {
       state.pathStack.last.items = List<RawEntry>.of(updated);
     }
+    // The remembered listing still has the deleted entries.
+    _listingCache.remove(state.currentDirPath);
   }
 
   void setLoading(bool loading) {
@@ -315,9 +361,12 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
     }
 
     try {
-      final items = await ref
+      _syncListingCacheScope(container);
+      final perfT0 = PerfTrace.begin();
+      final listing = await ref
           .read(vaultFileIoApiProvider)
-          .listDirectoryForBrowser(container, path, refresh: refresh);
+          .listDirectoryEntriesForBrowser(container, path, refresh: refresh);
+      PerfTrace.end('nav.list_total', perfT0, slowMs: 250);
 
       if (!ref.mounted ||
           generation != _loadGeneration ||
@@ -329,26 +378,47 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
       // as null; a real empty folder is an empty list). Show nothing, but
       // don't remember it as this folder's contents and re-list as soon as
       // the view is shown again.
-      final listingFailed = items == null;
+      final listingFailed = listing == null;
       if (listingFailed) {
         VeLog.w(
           'FileBrowserNavigation',
           'Directory listing failed at ${VeLog.censorUri(path)}',
         );
       }
-      final isTruncated = items?.any((f) => f == 'System:TRUNCATED') ?? false;
-      final parsed = items == null ? <RawEntry>[] : RawEntry.parseAll(items);
+      final isTruncated = listing?.truncated ?? false;
+      final parsed = listing?.entries ?? <RawEntry>[];
+
+      // A refresh of a folder that is already on screen almost always finds
+      // it unchanged. Keep the list instance in that case: everything keyed on
+      // it (the sorted/filtered view, layout, thumbnails' tiles) stays valid
+      // instead of being rebuilt for identical content.
+      final unchanged =
+          !listingFailed && RawEntry.sameEntries(state.currentItems, parsed);
+      PerfTrace.count(unchanged ? 'nav.listing_unchanged' : 'nav.listing_changed');
+      final shown = unchanged ? state.currentItems : parsed;
 
       // Save the freshly loaded items on the active path segment
       if (!listingFailed &&
           state.pathStack.isNotEmpty &&
           state.pathStack.last.fatPath == path) {
-        state.pathStack.last.items = List<RawEntry>.of(parsed);
-        state.pathStack.last.layoutMode = layoutMode ?? state.layoutMode;
+        final segment = state.pathStack.last;
+        if (!unchanged || segment.items == null) {
+          segment.items = List<RawEntry>.of(parsed);
+        }
+        segment.layoutMode = layoutMode ?? state.layoutMode;
+      }
+
+      // Remember it for the next visit. A failed listing must not leave an
+      // older one behind to be shown for an unreadable folder, and a cut-short
+      // one would show the wrong "truncated" state if replayed from here.
+      if (listingFailed || isTruncated) {
+        _listingCache.remove(path);
+      } else {
+        _listingCache.put(path, shown);
       }
 
       state = state.copyWith(
-        currentItems: parsed,
+        currentItems: shown,
         isListingTruncated: isTruncated,
         isLoading: false,
         needsRefresh: listingFailed,
@@ -654,12 +724,17 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
     final forward = state.forwardStack;
     final followsForward = forward.isNotEmpty && forward.first.fatPath == newPath;
 
+    // A folder listed before opens straight onto its remembered entries; the
+    // listing the caller starts next confirms or corrects them. One never
+    // listed before still starts empty with a spinner.
+    final cached = _cachedListing(newPath);
+
     state = state.copyWith(
       pathStack: newStack,
       forwardStack: followsForward ? forward.sublist(1) : const [],
-      currentItems: const [],
+      currentItems: cached ?? const [],
       clearCurrentFilter: true,
-      isLoading: true,
+      isLoading: cached == null,
       layoutMode: layoutMode ?? state.layoutMode,
     );
   }
@@ -680,7 +755,7 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
     final newPath = targetSegment.fatPath;
 
     // Immediately restore cached items from the parent segment
-    final restoredItems = targetSegment.items ?? const <RawEntry>[];
+    final restoredItems = _restorableItems(targetSegment);
 
     state = state.copyWith(
       pathStack: newStack,
@@ -710,7 +785,7 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
     final targetSegment = state.pathStack[index];
     final newStack = state.pathStack.sublist(0, index + 1);
     final newPath = targetSegment.fatPath;
-    final restoredItems = targetSegment.items ?? const <RawEntry>[];
+    final restoredItems = _restorableItems(targetSegment);
 
     state = state.copyWith(
       pathStack: newStack,
@@ -733,7 +808,7 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
 
     final moved = forward.sublist(0, steps);
     final target = moved.last;
-    final restoredItems = target.items ?? const <RawEntry>[];
+    final restoredItems = _restorableItems(target);
 
     state = state.copyWith(
       pathStack: [...state.pathStack, ...moved],

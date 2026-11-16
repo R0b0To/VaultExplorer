@@ -30,6 +30,7 @@ extern "C" {
 #include "crypto/cascade.h"
 #include "crypto/xts_tweak.h"
 #include "volume_state.h"
+#include "backing_flush.h"
 #include "bitlocker_backend.h"
 #include "containers/vhd_image.h"
 #include "containers/vhdx_image.h"
@@ -331,21 +332,13 @@ s64 ntfsWrite(ntfs_device* device, const void* buffer, s64 count) {
 int ntfsSync(ntfs_device* device) {
     const int volumeId = ntfsVolumeId(device);
     if (volumeId < 0 || volumeId >= kMaxVolumes) return 0;
-    auto& v = volumes[volumeId];
-    if (v.isUsbSource) {
-        // USB sessions have no fd (it is -1): without this branch the sync did
-        // nothing and reported success while writes were still in the USB cache.
-        if (!v.usbCache.sync(volumeId)) {
-            errno = EIO;
-            return -1;
-        }
-        return 0;
-    }
-    if (v.isCompositeSource && v.composite) {
-        v.composite->sync();
-    } else if (v.fd >= 0) {
-        v.fdWriteBuffer.flush(v.fd);
-        fsync(v.fd);
+    // USB sessions have no fd (it is -1) and keep acknowledged writes in the USB cache, and an fd
+    // volume keeps them in the write-behind buffer: every backing store has to report a failed
+    // flush here, because ntfs-3g trusts this result (ntfs_inode_sync / ntfs_umount) to mean the
+    // metadata is durable.
+    if (!flushVolumeBacking(volumes[volumeId], volumeId)) {
+        errno = EIO;
+        return -1;
     }
     return 0;
 }

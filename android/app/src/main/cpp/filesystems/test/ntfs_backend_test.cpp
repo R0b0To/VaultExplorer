@@ -26,7 +26,10 @@
 #include <cerrno>
 #include <unistd.h>
 
+#include <sys/resource.h>
+
 #include <algorithm>
+#include <csignal>
 #include <cstdint>
 #include <cstdio>
 #include <string>
@@ -823,6 +826,45 @@ static void test_usb_sync_reaches_the_device() {
     vs.usbCache.clear();
 }
 
+// Same contract for a plain fd volume: its acknowledged writes sit in the fd write-behind buffer, and
+// ntfsSync used to call flush() and fsync() and report success whatever they did. ntfs-3g trusts this
+// result (ntfs_inode_sync, ntfs_umount), so a failed flush must come back as -1/EIO with the bytes kept
+// for a retry -- VolumeState::reset() would drop them. The failure is an RLIMIT_FSIZE ceiling (EFBIG) on a
+// real fd, lifted again afterwards.
+static void test_fd_sync_reports_a_failed_writebehind_flush() {
+    Vol v;
+    CHECK(v.format(8));
+    VolumeState& vs = volumes[0];
+    char path[] = "/tmp/ve_ntfs_fd_syncXXXXXX";
+    const int fd = mkstemp(path);
+    CHECK(fd >= 0);
+    if (fd < 0) return;
+    unlink(path);
+    struct ntfs_device* dev = ntfs_device_alloc("vaultexplorer", 0, &vExplorer_ntfs_ops, &g_deviceId[0]);
+    CHECK(dev != nullptr);
+    if (dev) {
+        vs.fd = fd;
+        const Bytes px(512, 0x6D);
+        CHECK(vs.fdWriteBuffer.write(fd, 4096, px.data(), px.size()));
+        std::signal(SIGXFSZ, SIG_IGN);
+        struct rlimit saved;
+        getrlimit(RLIMIT_FSIZE, &saved);
+        struct rlimit tight = {1024, saved.rlim_max};
+        setrlimit(RLIMIT_FSIZE, &tight);
+        errno = 0;
+        CHECK_EQ(dev->d_ops->sync(dev), -1);
+        CHECK_EQ(errno, EIO);
+        setrlimit(RLIMIT_FSIZE, &saved);
+        CHECK_EQ(dev->d_ops->sync(dev), 0);          // the buffer kept the bytes: the retry persists them
+        unsigned char b = 0;
+        CHECK_EQ(pread(fd, &b, 1, 4096), 1);
+        CHECK_EQ(b, 0x6D);
+        vs.fdWriteBuffer.reset();
+        vs.fd = -1;
+        ntfs_device_free(dev);
+    }
+    close(fd);
+}
 
 // ---- Growing the file system after the container was expanded ------------------------
 static const bool g_haveResize = commandExists("ntfsresize");
@@ -968,6 +1010,7 @@ int main() {
         T(test_native_symlinks_follow_and_manage_link_identity),
         T(test_read_only_mount_changes_nothing),
         T(test_usb_sync_reaches_the_device),
+        T(test_fd_sync_reports_a_failed_writebehind_flush),
         T(test_grow_variants),
         T(test_grow_refusals),
     };

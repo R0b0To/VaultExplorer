@@ -1,7 +1,9 @@
+import 'dart:collection';
 import 'dart:io';
 import 'dart:isolate';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:vaultexplorer/core/utils/perf_trace.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 
 /// Real, on-disk file operations for the decoy's local storage explorer.
@@ -17,16 +19,20 @@ import 'package:vaultexplorer/core/utils/raw_entry.dart';
 class DecoyLocalRepository {
   const DecoyLocalRepository();
 
-  static List<RawEntry>? _cachedRootEntries;
-  static String? _cachedRootPath;
-  static DateTime? _cachedAt;
+  // Recently listed folders, least recently used first. This used to be a
+  // single slot, so going from folder A to B and back to A listed A again
+  // from scratch (a new isolate plus a stat per file). Entries are only
+  // reused while the folder's own modification time is unchanged -- adding,
+  // removing or renaming a child updates it -- and for at most [_cacheTtl],
+  // which bounds how long an in-place change to a file's size can go unseen.
+  static final LinkedHashMap<String, _CachedListing> _cache =
+      LinkedHashMap<String, _CachedListing>();
+  static const int _cacheMaxFolders = 16;
   static const _cacheTtl = Duration(seconds: 15);
 
-  /// Clears the in-memory cache of the root directory listing.
+  /// Clears the in-memory cache of directory listings.
   static void clearCache() {
-    _cachedRootEntries = null;
-    _cachedRootPath = null;
-    _cachedAt = null;
+    _cache.clear();
   }
 
   /// Resolves the true public storage root (e.g. `/storage/emulated/0`),
@@ -60,23 +66,50 @@ class DecoyLocalRepository {
   /// skipped rather than failing the whole listing, mirroring how the
   /// decoy archive screen already tolerates a failed Downloads scan.
   Future<List<RawEntry>> listDirectory(String path, {bool refresh = false}) async {
-    final now = DateTime.now();
-    if (!refresh &&
-        _cachedRootPath == path &&
-        _cachedRootEntries != null &&
-        _cachedAt != null &&
-        now.difference(_cachedAt!) < _cacheTtl) {
-      return _cachedRootEntries!;
+    final perfT0 = PerfTrace.begin();
+    final cached = _cache.remove(path);
+    if (!refresh && cached != null) {
+      // One stat of the folder itself decides whether the cached listing is
+      // still good; far cheaper than listing and stat'ing every child again.
+      final age = DateTime.now().difference(cached.cachedAt);
+      if (age < _cacheTtl) {
+        final modified = await _folderModified(path);
+        if (modified != null && modified == cached.folderModified) {
+          _cache[path] = cached; // re-insert: most recently used
+          PerfTrace.count('local.list.cache_hit');
+          PerfTrace.end('local.list.cached', perfT0);
+          return cached.entries;
+        }
+      }
     }
+    PerfTrace.count('local.list.cache_miss');
 
+    // Stat the folder *before* listing it: a change that lands while the
+    // listing runs then leaves a newer mtime on disk than the one remembered,
+    // so the next lookup re-lists instead of trusting a half-old result.
+    final folderModified = await _folderModified(path);
     final out = await Isolate.run(() => _listDirectorySync(path));
+    PerfTrace.end('local.list.isolate', perfT0, slowMs: 150);
 
     final result = List<RawEntry>.unmodifiable(out);
-    _cachedRootPath = path;
-    _cachedRootEntries = result;
-    _cachedAt = DateTime.now();
+    if (folderModified != null) {
+      _cache[path] = _CachedListing(result, folderModified, DateTime.now());
+      while (_cache.length > _cacheMaxFolders) {
+        _cache.remove(_cache.keys.first);
+      }
+    }
 
     return result;
+  }
+
+  /// The folder's own last-modified time, or null when it cannot be read.
+  static Future<DateTime?> _folderModified(String path) async {
+    try {
+      final stat = await FileStat.stat(path);
+      return stat.type == FileSystemEntityType.notFound ? null : stat.modified;
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Recursive byte total for a folder -- used for the selection summary
@@ -218,7 +251,7 @@ List<RawEntry> _listDirectorySync(String path) {
             // Folder metadata is optional; keep the entry with modifiedSecs 0
             // if stat fails because of permissions or a concurrent filesystem change.
           }
-          final name = p.basename(item.path);
+          final name = _baseName(item.path);
           final lower = name.toLowerCase();
           entries.add(RawEntry(
             name: name,
@@ -230,9 +263,10 @@ List<RawEntry> _listDirectorySync(String path) {
           ));
         } else if (item is File) {
           final stat = item.statSync();
-          final name = p.basename(item.path);
+          final name = _baseName(item.path);
           final lower = name.toLowerCase();
-          final ext = lower.contains('.') ? lower.split('.').last : '';
+          final dot = lower.lastIndexOf('.');
+          final ext = dot < 0 ? '' : lower.substring(dot + 1);
           entries.add(RawEntry(
             name: name,
             isDir: false,
@@ -250,4 +284,19 @@ List<RawEntry> _listDirectorySync(String path) {
     // Unreadable directory or stream error mid-listing
   }
   return entries;
+}
+
+/// Last path segment of an entry returned by `Directory.listSync`.
+///
+/// Those paths are always `<directory>/<name>` with `/` separators on Android,
+/// so cutting after the last `/` is exact and avoids `package:path`'s full
+/// parse of every entry (a listing of thousands of files called it once each).
+String _baseName(String path) => path.substring(path.lastIndexOf('/') + 1);
+
+class _CachedListing {
+  _CachedListing(this.entries, this.folderModified, this.cachedAt);
+
+  final List<RawEntry> entries;
+  final DateTime folderModified;
+  final DateTime cachedAt;
 }

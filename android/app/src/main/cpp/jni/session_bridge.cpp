@@ -4,6 +4,7 @@
 // Kotlin/Dart changes.
 
 #include <jni.h>
+#include <cerrno>
 #include <cstring>
 #include <vector>
 #include <mutex>
@@ -163,32 +164,52 @@ static bool lockVolumeLocked(int volId, bool force) {
     VolumeState& v = volumes[volId];
     bool discarded = false;
     const bool locked = lockpolicy::lockVolume(
-        v.isUsbSource, force,
-        // Flush while the filesystem is still mounted: if the device is already failing,
+        // Every backing store has a flush step to try first (USB cache + barrier, composite
+        // carriers, fd write-behind buffer), and the filesystem has its own dirty state.
+        true, force,
+        // Flush while the filesystem is still mounted: if the device or the filesystem refuses,
         // nothing has been torn down and the vault stays fully usable.
         [&] {
-            const bool ok = v.usbCache.sync(volId);
-            if (!ok) LOGI("lockNative(vol=%d): USB flush failed, volume left open for retry", volId);
+            const bool ok = flushVolumeForLock(volId);
+            if (!ok) LOGI("lockNative(vol=%d): flush failed, volume left open for retry", volId);
             return ok;
         },
         [&] {
-            // Close FAT streams
+            // Close FAT streams. FatFs leaves a FIL it failed to close valid, so a normal lock
+            // keeps it (and the mounted filesystem) for a retry; a forced lock drops it.
+            bool streamsClosed = true;
+            std::vector<FIL*> stillOpen;
             for (FIL* f : v.openStreams) {
-                f_close(f);
-                delete f;
+                if (f_close(f) == FR_OK) {
+                    delete f;
+                    continue;
+                }
+                streamsClosed = false;
+                if (force) delete f; else stillOpen.push_back(f);
             }
-            v.openStreams.clear();
+            v.openStreams.swap(stillOpen);
+            if (!streamsClosed && !force) {
+                LOGI("lockNative(vol=%d): f_close failed, volume left open for retry", volId);
+                return false;
+            }
 
-            // Close NTFS streams
+            // Close NTFS streams. ntfs_inode_close() syncs the inode first; the dirty ones were
+            // already flushed while still retryable (flushVolumeForLock), so a failure here is
+            // unexpected and is reported rather than ignored.
+            bool ntfsStreamsClosed = true;
             for (NtfsStream* ns : v.openNtfsStreams) {
                 ntfs_attr_close(ns->attr);
-                ntfs_inode_close(ns->inode);
+                if (ntfs_inode_close(ns->inode) != 0) {
+                    LOGI("lockNative(vol=%d): ntfs_inode_close failed (errno=%d)", volId, errno);
+                    ntfsStreamsClosed = false;
+                }
                 delete ns;
             }
             v.openNtfsStreams.clear();
 
-            const bool durable = unmountVolume(volId);
-            if (!durable) LOGI("lockNative(vol=%d): final USB flush failed", volId);
+            const bool durable = unmountVolume(volId, /*keepOnFailure=*/!force) && streamsClosed &&
+                                 ntfsStreamsClosed;
+            if (!durable) LOGI("lockNative(vol=%d): filesystem close or final flush failed", volId);
             return durable;
         },
         // reset() clears the USB write cache, so it only runs once that is intended.

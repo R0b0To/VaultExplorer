@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/utils/perf_trace.dart';
 import 'package:vaultexplorer/core/theme/file_manager_skin_scope.dart';
 import 'package:vaultexplorer/data/models/file_manager_skin.dart';
 import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
@@ -141,6 +142,13 @@ class GridCardShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final perfT0 = PerfTrace.begin();
+    final built = _buildCard(context);
+    PerfTrace.end('ui.grid_card.build', perfT0);
+    return built;
+  }
+
+  Widget _buildCard(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final skin = FileManagerSkinScope.of(context);
@@ -155,8 +163,8 @@ class GridCardShell extends StatelessWidget {
     Widget previewStack = Stack(
       fit: StackFit.expand,
       children: [
-        // Keep preview paint, including folder badges, out of the name row.
-        ClipRect(child: preview),
+          // Keep preview paint, including folder badges, out of the name row.
+        if (showFileName) ClipRect(child: preview) else preview,
         if (isSelected)
           DecoratedBox(
             decoration: BoxDecoration(
@@ -360,9 +368,9 @@ class GridCardShell extends StatelessWidget {
       ),
     );
 
-    if (isPlaceholder) {
+   if (isPlaceholder) {
       cell = Opacity(opacity: 0.5, child: cell);
     }
-    return cell;
+    return RepaintBoundary(child: cell);
   }
 }

@@ -17,6 +17,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:path/path.dart' as p;
+import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/features/decoy/local/decoy_local_repository.dart';
 
 class LocalFileIoBackend {
@@ -67,11 +68,27 @@ class LocalFileIoBackend {
     String dirPath, {
     bool refresh = false,
   }) async {
-    final entries = await _repo.listDirectory(
-      _resolve(rootPath, dirPath),
+    final entries = await listDirectoryEntries(
+      rootPath,
+      dirPath,
       refresh: refresh,
     );
     return entries.map((e) => e.raw).toList();
+  }
+
+  /// The same listing as [listDirectory], as the [RawEntry] values the
+  /// repository already produced -- for callers (the interactive browser)
+  /// that want entries, not wire strings, so nothing is formatted only to be
+  /// parsed straight back.
+  Future<List<RawEntry>> listDirectoryEntries(
+    String rootPath,
+    String dirPath, {
+    bool refresh = false,
+  }) {
+    return _repo.listDirectory(
+      _resolve(rootPath, dirPath),
+      refresh: refresh,
+    );
   }
 
   Future<bool> decryptFile(

@@ -13,6 +13,7 @@ import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/utils/perf_trace.dart';
 import 'package:vaultexplorer/core/theme/file_manager_skin_scope.dart';
 import 'package:vaultexplorer/core/utils/file_display_name.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
@@ -48,6 +49,19 @@ import 'package:vaultexplorer/features/browser/widgets/grid_card_shell.dart';
 import 'package:vaultexplorer/features/browser/widgets/hold_range_select_container.dart';
 import 'package:vaultexplorer/features/browser/widgets/shortcut_target_preview.dart';
 import 'package:vaultexplorer/features/browser/widgets/thumbnail_raw_fallback.dart';
+
+Widget _transparentHeroShuttle(
+  BuildContext flightContext,
+  Animation<double> animation,
+  HeroFlightDirection flightDirection,
+  BuildContext fromHeroContext,
+  BuildContext toHeroContext,
+) {
+  final hero = (flightDirection == HeroFlightDirection.push
+      ? toHeroContext.widget
+      : fromHeroContext.widget) as Hero;
+  return Material(type: MaterialType.transparency, child: hero.child);
+}
 
 class FileMasonryView extends ConsumerStatefulWidget {
   final MountedContainer container;
@@ -1157,7 +1171,7 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
       },
       child: CustomScrollView(
         controller: controller,
-        cacheExtent: MediaQuery.sizeOf(context).height * 1.5,
+        cacheExtent: MediaQuery.sizeOf(context).height * 0.75,
         physics:
             const AlwaysScrollableScrollPhysics(), // Native physics that cannot freeze
         slivers: [
@@ -1188,6 +1202,7 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
 
   @override
   Widget build(BuildContext context) {
+    PerfTrace.count('ui.masonry.build');
     final total = widget.items.length;
     if (total == 0) return const SizedBox.shrink();
     // The stored sizes of the media index are on their way (a moment, once per
@@ -1369,21 +1384,19 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
               tag: 'media_hero_${container.volId}_$fullPath',
               createRectTween: (begin, end) =>
                   MaterialRectArcTween(begin: begin, end: end),
-              child: Material(
-                type: MaterialType.transparency,
-                child: _EncryptedImageMasonryThumb(
+              flightShuttleBuilder: _transparentHeroShuttle,
+              child: _EncryptedImageMasonryThumb(
+                container: container,
+                filePath: targetPath,
+                cacheMode: cacheMode,
+                quality: _effectiveQualityOf(entry),
+                onSizeKnown: (w, h) => _onSizeKnown(
+                  displayIndex,
+                  entry,
+                  fullPath,
+                  w,
+                  h,
                   container: container,
-                  filePath: targetPath,
-                  cacheMode: cacheMode,
-                  quality: _effectiveQualityOf(entry),
-                  onSizeKnown: (w, h) => _onSizeKnown(
-                    displayIndex,
-                    entry,
-                    fullPath,
-                    w,
-                    h,
-                    container: container,
-                  ),
                 ),
               ),
             );
@@ -1393,21 +1406,19 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
               tag: 'media_hero_${container.volId}_$fullPath',
               createRectTween: (begin, end) =>
                   MaterialRectArcTween(begin: begin, end: end),
-              child: Material(
-                type: MaterialType.transparency,
-                child: _VideoMasonryThumb(
+              flightShuttleBuilder: _transparentHeroShuttle,
+              child: _VideoMasonryThumb(
+                container: container,
+                filePath: targetPath,
+                cacheMode: cacheMode,
+                quality: _effectiveQualityOf(entry),
+                onSizeKnown: (w, h) => _onSizeKnown(
+                  displayIndex,
+                  entry,
+                  fullPath,
+                  w,
+                  h,
                   container: container,
-                  filePath: targetPath,
-                  cacheMode: cacheMode,
-                  quality: _effectiveQualityOf(entry),
-                  onSizeKnown: (w, h) => _onSizeKnown(
-                    displayIndex,
-                    entry,
-                    fullPath,
-                    w,
-                    h,
-                    container: container,
-                  ),
                 ),
               ),
             );
@@ -1466,24 +1477,22 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
         tag: 'media_hero_${container.volId}_$fullPath',
         createRectTween: (begin, end) =>
             MaterialRectArcTween(begin: begin, end: end),
-        child: Material(
-          type: MaterialType.transparency,
-          child: _EncryptedImageMasonryThumb(
+        flightShuttleBuilder: _transparentHeroShuttle,
+        child: _EncryptedImageMasonryThumb(
+          container: container,
+          filePath: fullPath,
+          cacheMode: cacheMode,
+          quality: _effectiveQualityOf(entry),
+          onSizeKnown: (w, h) => _onSizeKnown(
+            displayIndex,
+            entry,
+            fullPath,
+            w,
+            h,
             container: container,
-            filePath: fullPath,
-            cacheMode: cacheMode,
-            quality: _effectiveQualityOf(entry),
-            onSizeKnown: (w, h) => _onSizeKnown(
-              displayIndex,
-              entry,
-              fullPath,
-              w,
-              h,
-              container: container,
-            ),
-            archiveContext: widget.archiveContext,
-            archiveRootPath: widget.archiveRootPath,
           ),
+          archiveContext: widget.archiveContext,
+          archiveRootPath: widget.archiveRootPath,
         ),
       );
     } else if (isVid) {
@@ -1491,24 +1500,22 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
         tag: 'media_hero_${container.volId}_$fullPath',
         createRectTween: (begin, end) =>
             MaterialRectArcTween(begin: begin, end: end),
-        child: Material(
-          type: MaterialType.transparency,
-          child: _VideoMasonryThumb(
+        flightShuttleBuilder: _transparentHeroShuttle,
+        child: _VideoMasonryThumb(
+          container: container,
+          filePath: fullPath,
+          cacheMode: cacheMode,
+          quality: _effectiveQualityOf(entry),
+          onSizeKnown: (w, h) => _onSizeKnown(
+            displayIndex,
+            entry,
+            fullPath,
+            w,
+            h,
             container: container,
-            filePath: fullPath,
-            cacheMode: cacheMode,
-            quality: _effectiveQualityOf(entry),
-            onSizeKnown: (w, h) => _onSizeKnown(
-              displayIndex,
-              entry,
-              fullPath,
-              w,
-              h,
-              container: container,
-            ),
-            archiveContext: widget.archiveContext,
-            archiveRootPath: widget.archiveRootPath,
           ),
+          archiveContext: widget.archiveContext,
+          archiveRootPath: widget.archiveRootPath,
         ),
       );
     } else if (isApk && widget.archiveContext == null) {

@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:vaultexplorer/core/utils/perf_trace.dart';
+
 /// Tells whether a scrollable is moving too fast for what it shows to be read.
 ///
 /// Fed with the scroll offset every time it changes ([sample]); it keeps a
@@ -48,6 +50,8 @@ class ScrollSpeedTracker {
   /// clock) in a viewport [viewportExtent] tall.
   void sample(double pixels, double viewportExtent, Duration now) {
     if (viewportExtent <= 0) return;
+    // Lets frame timings be reported separately for "while scrolling".
+    PerfTrace.markScroll();
     final lastPixels = _lastPixels;
     final lastTime = _lastTime;
     if (lastPixels != null && lastTime != null) {

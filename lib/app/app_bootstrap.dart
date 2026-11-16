@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:vaultexplorer/app/perf_trace_setup.dart';
 import 'package:vaultexplorer/app/vault_explorer_app.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
@@ -19,11 +20,15 @@ import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/archive_service.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/services/derived_key_expiry_service.dart';
+import 'package:vaultexplorer/core/utils/frame_jank_monitor.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 
 void configurePlatformIntegrations(ProviderContainer container) {
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  // Reports dropped frames into the PerfTrace log (a no-op unless tracing is on).
+  FrameJankMonitor.start();
+  registerPerfTraceDiagnostics();
   MemoryPressureObserver.register();
   ThumbnailRetrySignal.register();
   final fileIoApi = container.read(vaultFileIoApiProvider);

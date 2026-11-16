@@ -14,6 +14,7 @@ import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
+import android.webkit.WebStorage
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import com.aeidolon.vaultexplorer.container.ContainerFileSystem
@@ -401,6 +402,33 @@ class HtmlViewerViewFactory(
     }
 }
 
+/**
+ * Every in-vault page is served from the one fixed virtual origin above, so with DOM storage on,
+ * whatever a script (JavaScript is opt-in per document) puts in localStorage is shared with every
+ * other document opened from any vault, and it survives locking the vault and restarting the app
+ * in the WebView's profile on disk. Nothing from a vault is meant to outlive the page that
+ * produced it, so the storage is emptied when the first viewer opens (this also removes what a
+ * killed process left behind) and again when the last one closes. Viewers that are open at the
+ * same time keep sharing it until then. Both calls run on the main thread.
+ */
+private object HtmlViewerWebStorage {
+    private var openViewers = 0
+
+    fun viewerOpened() {
+        if (openViewers == 0) clear()
+        openViewers++
+    }
+
+    fun viewerClosed() {
+        if (openViewers > 0) openViewers--
+        if (openViewers == 0) clear()
+    }
+
+    private fun clear() {
+        runCatching { WebStorage.getInstance().deleteAllData() }
+    }
+}
+
 @SuppressLint("SetJavaScriptEnabled")
 class HtmlViewerView(
     context: Context,
@@ -427,6 +455,7 @@ class HtmlViewerView(
     private var eventSink: EventChannel.EventSink? = null
 
     init {
+        HtmlViewerWebStorage.viewerOpened()
         webView.configurePagedMode(
             enabled = bookToken != null && bookPagedMode,
             twoPageLandscape = bookToken != null && bookTwoPageLandscape,
@@ -875,5 +904,6 @@ class HtmlViewerView(
         webView.stopLoading()
         webView.loadUrl("about:blank")
         webView.destroy()
+        HtmlViewerWebStorage.viewerClosed()
     }
 }

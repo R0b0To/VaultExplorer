@@ -6615,10 +6615,35 @@
   "bookmarkSelectedAction": "Bookmark selected",
   "unbookmarkSelectedAction": "Unbookmark selected",
   "bookmarkedCount": "{count, plural, =1{Bookmarked 1 item} other{Bookmarked {count} items}}",
+  "@bookmarkedCount": {
+    "description": "Confirmation message showing how many items were bookmarked",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
   "unbookmarkedCount": "{count, plural, =1{Unbookmarked 1 item} other{Unbookmarked {count} items}}",
+  "@unbookmarkedCount": {
+    "description": "Confirmation message showing how many items were unbookmarked",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
   "showBookmarkBarLabel": "Show Bookmark Bar",
+  "@showBookmarkBarLabel": {
+    "description": "Label for the setting that shows the bookmark bar"
+  },
   "showBookmarkBarDesc": "Display bookmarked items in a bookmark bar or sidebar",
+  "@showBookmarkBarDesc": {
+    "description": "Description for the setting that shows the bookmark bar"
+  },
   "bookmarkBarSectionHeader": "Bookmark Bar",
+  "@bookmarkBarSectionHeader": {
+    "description": "Heading of the bookmark bar section"
+  },
   "noBookmarksYet": "No items bookmarked yet",
   "reorderBookmarksTitle": "Rearrange Bookmarks",
   "reorderBookmarksDesc": "Drag items to reorder them in the bookmark bar",
@@ -10616,7 +10641,10 @@
   },
   "repairFolderVaultIssuesCount": "{count, plural, =1{1 issue found} other{{count} issues found}}",
   "@repairFolderVaultIssuesCount": {
-    "description": "Pluralized issue count in folder vault report"
+    "description": "Pluralized issue count in folder vault report",
+    "placeholders": {
+      "count": {}
+    }
   },
   "repairFolderVaultStructureOnlySuffix": " (structure only -- run a deep scan for a full content check)",
   "@repairFolderVaultStructureOnlySuffix": {
@@ -10628,7 +10656,12 @@
   },
   "repairFolderVaultSummary": "Repair summary: {fixed} fixed, {recovered} recovered to /LOST+FOUND, {removed} cleaned up.",
   "@repairFolderVaultSummary": {
-    "description": "Summary of repairs performed on a folder vault"
+    "description": "Summary of repairs performed on a folder vault",
+    "placeholders": {
+      "fixed": {},
+      "recovered": {},
+      "removed": {}
+    }
   },
   "repairAndRecoverVaultButton": "Repair & Recover Vault",
   "@repairAndRecoverVaultButton": {
@@ -10640,7 +10673,10 @@
   },
   "panicPurgeCompletedMessage": "Panic purge completed ({count} locked).",
   "@panicPurgeCompletedMessage": {
-    "description": "Snackbar shown after panic purge finishes"
+    "description": "Snackbar shown after panic purge finishes",
+    "placeholders": {
+      "count": {}
+    }
   },
   "usbPermissionRequiredError": "USB permission required",
   "@usbPermissionRequiredError": {
@@ -10652,7 +10688,10 @@
   },
   "logcatLinesCount": "{count, plural, =1{1 line} other{{count} lines}}",
   "@logcatLinesCount": {
-    "description": "Line counter badge in logcat screen"
+    "description": "Line counter badge in logcat screen",
+    "placeholders": {
+      "count": {}
+    }
   },
   "compositeSpaceTooSmallError": "Allocatable space is too small (minimum 300 KB required)",
   "@compositeSpaceTooSmallError": {
@@ -12223,22 +12262,73 @@
     "description": "Title for action customizer dialog"
   },
   "actionUndo": "Undo",
+  "@actionUndo": {
+    "description": "Label for the editor undo action"
+  },
   "actionRedo": "Redo",
+  "@actionRedo": {
+    "description": "Label for the editor redo action"
+  },
   "actionCursorLeft": "Move Cursor Left",
+  "@actionCursorLeft": {
+    "description": "Label for moving the text cursor left in the editor"
+  },
   "actionCursorRight": "Move Cursor Right",
+  "@actionCursorRight": {
+    "description": "Label for moving the text cursor right in the editor"
+  },
   "actionSelectWord": "Select Word",
+  "@actionSelectWord": {
+    "description": "Label for selecting the current word in the editor"
+  },
   "actionCopy": "Copy",
+  "@actionCopy": {
+    "description": "Label for copying the selection in the editor"
+  },
   "actionCut": "Cut",
+  "@actionCut": {
+    "description": "Label for cutting the selection in the editor"
+  },
   "actionPaste": "Paste",
+  "@actionPaste": {
+    "description": "Label for pasting clipboard content in the editor"
+  },
   "actionFind": "Find & Replace",
+  "@actionFind": {
+    "description": "Label for opening find and replace in the editor"
+  },
   "actionWordWrap": "Word Wrap",
+  "@actionWordWrap": {
+    "description": "Label for toggling word wrap in the editor"
+  },
   "actionGoToLine": "Go to Line",
+  "@actionGoToLine": {
+    "description": "Label for jumping to a specific line in the editor"
+  },
   "actionGoToStart": "Go to Start",
+  "@actionGoToStart": {
+    "description": "Label for moving the cursor to the start of the document"
+  },
   "actionGoToEnd": "Go to End",
+  "@actionGoToEnd": {
+    "description": "Label for moving the cursor to the end of the document"
+  },
   "actionIndent": "Indent",
+  "@actionIndent": {
+    "description": "Label for indenting the selected code or text"
+  },
   "actionOutdent": "Outdent",
+  "@actionOutdent": {
+    "description": "Label for outdenting the selected code or text"
+  },
   "actionFormat": "Format Code",
+  "@actionFormat": {
+    "description": "Label for formatting the code in the editor"
+  },
   "actionReadOnly": "Toggle Read-Only",
+  "@actionReadOnly": {
+    "description": "Label for toggling read-only mode in the editor"
+  },
   "screenLockOnlyAutoLockOption": "Screen Lock Only",
   "@screenLockOnlyAutoLockOption": {
     "description": "Option meaning auto-lock reacts only to the screen turning off, not to plain app backgrounding; also reused as the dashboard auto-lock badge label for this mode"
@@ -13427,6 +13517,9 @@
   "textEditorDefaultFromTheme": "Default (from theme)",
   "skinFileManager": "File manager",
   "skinFolderAndFileGlyphsTilesAndLabelColors": "Folder and file glyphs, tiles, and label colors.",
+  "@skinFolderAndFileGlyphsTilesAndLabelColors": {
+    "description": "Description of the file manager skin settings for folder and file glyphs, tiles, and label colors."
+  },
   "skinDetailsTextColor": "Details text color",
   "skinUseTheAppSSupportingTextColor": "Use the app’s supporting text color",
   "skinCustomColor": "Custom color",
@@ -13496,19 +13589,61 @@
   "skinIconColorForItem": "{item} icon color",
   "skinNameColorForItem": "{item} name color",
   "skinFileIconColorSettingDescription": "This color is controlled by the icon color setting in the file manager section.",
+  "@skinFileIconColorSettingDescription": {
+    "description": "Explanation that the file icon color is configured in the file manager settings."
+  },
   "skinFileNameColorSettingDescription": "This color is controlled by the name color setting in the file manager section.",
+  "@skinFileNameColorSettingDescription": {
+    "description": "Explanation that the file name color is configured in the file manager settings."
+  },
   "skinExportedSingle": "Skin exported.",
+  "@skinExportedSingle": {
+    "description": "Confirmation shown after exporting a single skin."
+  },
   "skinExportedMultiple": "Skins exported.",
+  "@skinExportedMultiple": {
+    "description": "Confirmation shown after exporting multiple skins."
+  },
   "skinExportSkinsOnly": "Skins only",
+  "@skinExportSkinsOnly": {
+    "description": "Option to export only skins, without interface settings."
+  },
   "skinExportSkinsOnlySubtitle": "Colors and icon styles. Safe to share.",
+  "@skinExportSkinsOnlySubtitle": {
+    "description": "Subtitle describing the shareable skins-only export."
+  },
   "skinExportSkinsAndInterface": "Skins and interface",
+  "@skinExportSkinsAndInterface": {
+    "description": "Option to export skins together with interface settings."
+  },
   "skinExportSkinsAndInterfaceSubtitle": "Also saves theme mode, toolbar and grid layout, editor appearance and media viewer layout. For your own backups.",
+  "@skinExportSkinsAndInterfaceSubtitle": {
+    "description": "Subtitle describing the interface settings included in a personal backup export."
+  },
   "skinAppearanceExported": "Skins and interface exported.",
+  "@skinAppearanceExported": {
+    "description": "Confirmation shown after exporting skins and interface settings."
+  },
   "skinImportInterfaceTitle": "Apply interface settings?",
+  "@skinImportInterfaceTitle": {
+    "description": "Title of the prompt asking whether to apply imported interface settings."
+  },
   "skinImportInterfaceMessage": "This file also contains interface settings. Applying them replaces your current theme mode, toolbar and grid layout, editor appearance and media viewer layout.",
+  "@skinImportInterfaceMessage": {
+    "description": "Prompt explaining which current interface settings will be replaced by an import."
+  },
   "skinImportInterfaceApply": "Apply",
+  "@skinImportInterfaceApply": {
+    "description": "Button to apply interface settings included in an imported file."
+  },
   "skinImportInterfaceSkip": "Skins only",
+  "@skinImportInterfaceSkip": {
+    "description": "Button to import skins without applying interface settings."
+  },
   "skinInterfaceApplied": "Interface settings applied.",
+  "@skinInterfaceApplied": {
+    "description": "Confirmation shown after applying imported interface settings."
+  },
   "@skinImportSucceeded": {
     "description": "Confirmation shown after importing one or more app skins.",
     "placeholders": {
@@ -13582,23 +13717,77 @@
     "description": "Snackbar shown when the system app settings page could not be opened from the automation battery hint card"
   },
   "skinPreviewMountedVaultName": "Personal vault",
+  "@skinPreviewMountedVaultName": {
+    "description": "Label for a mounted vault in the skin preview"
+  },
   "skinPreviewVaultName": "Vault title",
+  "@skinPreviewVaultName": {
+    "description": "Label for a vault title in the skin preview"
+  },
   "skinMainTextColorAlsoColorsRegularMenuItems": "Vault titles and regular menu actions share the app main text color.",
+  "@skinMainTextColorAlsoColorsRegularMenuItems": {
+    "description": "Text explaining that the main text color also affects regular menu actions in the skin preview"
+  },
   "skinStatusBannerExamples": "Status banners",
+  "@skinStatusBannerExamples": {
+    "description": "Section heading for status banner examples in the skin preview"
+  },
   "skinSuccessBanner": "Success banner",
+  "@skinSuccessBanner": {
+    "description": "Label for the success banner example in the skin preview"
+  },
   "skinWarningBanner": "Warning banner",
+  "@skinWarningBanner": {
+    "description": "Label for the warning banner example in the skin preview"
+  },
   "skinErrorBanner": "Error banner",
+  "@skinErrorBanner": {
+    "description": "Label for the error banner example in the skin preview"
+  },
   "skinSuccessBannerUsesSuccessContainer": "The banner fill and message use success colors.",
+  "@skinSuccessBannerUsesSuccessContainer": {
+    "description": "Explanation that success banners use success container colors in the skin preview"
+  },
   "skinWarningBannerUsesWarningContainer": "The banner fill and message use warning colors.",
+  "@skinWarningBannerUsesWarningContainer": {
+    "description": "Explanation that warning banners use warning container colors in the skin preview"
+  },
   "skinErrorBannerUsesErrorContainer": "The banner fill and message use error colors.",
+  "@skinErrorBannerUsesErrorContainer": {
+    "description": "Explanation that error banners use error container colors in the skin preview"
+  },
   "skinPreviewChangesSaved": "Changes saved",
+  "@skinPreviewChangesSaved": {
+    "description": "Status message shown in the skin preview after saving changes"
+  },
   "skinPreviewStorageAlmostFull": "Storage is almost full",
+  "@skinPreviewStorageAlmostFull": {
+    "description": "Status message shown in the skin preview when storage is nearly full"
+  },
   "skinPreviewCouldNotUnlockVault": "Could not unlock the vault",
+  "@skinPreviewCouldNotUnlockVault": {
+    "description": "Status message shown in the skin preview when a vault could not be unlocked"
+  },
   "skinSurfaceAndBorderExamples": "Surfaces and borders",
+  "@skinSurfaceAndBorderExamples": {
+    "description": "Section heading for surfaces and borders examples in the skin preview"
+  },
   "skinFileRowDetailsColor": "File row details color",
+  "@skinFileRowDetailsColor": {
+    "description": "Label for the file row details color in the skin preview"
+  },
   "skinFileActionOverflowIconColor": "File row action icon color",
+  "@skinFileActionOverflowIconColor": {
+    "description": "Label for the file row action overflow icon color in the skin preview"
+  },
   "skinMatchingElementsHighlightTogether": "Other preview elements with the same color are highlighted too.",
+  "@skinMatchingElementsHighlightTogether": {
+    "description": "Text explaining that matching preview elements are highlighted together in the skin preview"
+  },
   "skinStatusBannerTextColor": "The banner text uses this color.",
+  "@skinStatusBannerTextColor": {
+    "description": "Text explaining that the banner text color is controlled by the selected color in the skin preview"
+  },
   "apkOpenPackageInstaller": "Package installer",
   "@apkOpenPackageInstaller": {
     "description": "Choice label in the APK open dialog (and the file-associations list in settings): hand the .apk to the Android package installer"
@@ -13810,19 +13999,61 @@
     "description": "Custom skin color used behind the text editor sidebar and More Actions menu"
   },
   "skinEditorPanelBackgroundDescription": "Shared background for the editor sidebar and More Actions menus.",
+  "@skinEditorPanelBackgroundDescription": {
+    "description": "Description of the shared background color used by the editor sidebar and More Actions menus"
+  },
   "skinFollowAppSkin": "Follow app skin",
+  "@skinFollowAppSkin": {
+    "description": "Setting that makes the file manager follow the selected app skin"
+  },
   "fileSkinFollowAppSkinDescription": "File and folder styling follows the selected app skin.",
+  "@fileSkinFollowAppSkinDescription": {
+    "description": "Explains that file and folder styling follows the selected app skin"
+  },
   "fileSkinUseIndependentStylesDescription": "These options set the File Manager’s own style. If it follows App Skin, changing a preset or style below turns off Follow app skin.",
+  "@fileSkinUseIndependentStylesDescription": {
+    "description": "Explains how choosing file manager styles affects the Follow app skin setting"
+  },
   "fileSkinManagedByAppSkinTitle": "File manager is following the app skin",
+  "@fileSkinManagedByAppSkinTitle": {
+    "description": "Title shown when the file manager follows the app skin"
+  },
   "fileSkinManagedByAppSkinDescription": "The preview uses the active App Skin. Changing a preset or style below saves an independent file manager skin and turns off Follow app skin.",
+  "@fileSkinManagedByAppSkinDescription": {
+    "description": "Explains that the preview follows the active app skin and how changing styles creates an independent file manager skin"
+  },
   "skinFileManagerIndependentTitle": "File manager uses an independent skin",
+  "@skinFileManagerIndependentTitle": {
+    "description": "Title shown when the file manager uses an independent skin"
+  },
   "skinFileManagerIndependentDescription": "Changes to file and folder styles in this App Skin will not appear in File Manager while it uses its own skin. Turn on Follow app skin to apply this App Skin there.",
+  "@skinFileManagerIndependentDescription": {
+    "description": "Explains that app skin changes do not affect the file manager while it uses an independent skin"
+  },
   "skinChooseOrCreateSkin": "Choose or create a skin",
+  "@skinChooseOrCreateSkin": {
+    "description": "Action to select an existing skin or create a new one"
+  },
   "skinSkinShortcutCustomDescription": "Edit app-wide colors and shared tokens. Component overrides stay on this page.",
+  "@skinSkinShortcutCustomDescription": {
+    "description": "Explains the scope of editing app-wide colors and shared tokens"
+  },
   "skinSkinShortcutPresetDescription": "Browse built-in skins or create a custom skin from this look.",
+  "@skinSkinShortcutPresetDescription": {
+    "description": "Explains the option to browse built-in skins or create a custom skin"
+  },
   "textEditorUseIndependentAppearanceDescription": "Choose an independent editor background and syntax theme below.",
+  "@textEditorUseIndependentAppearanceDescription": {
+    "description": "Instruction to choose an editor background and syntax theme independent of the app skin"
+  },
   "fileSkinComponentStyling": "Component styling",
+  "@fileSkinComponentStyling": {
+    "description": "Heading for file manager component styling options"
+  },
   "textEditorStyling": "Editor styling",
+  "@textEditorStyling": {
+    "description": "Heading for text editor styling options"
+  },
   "audioFilePropertiesSectionHeader": "AUDIO",
   "@audioFilePropertiesSectionHeader": {
     "description": "Section header for technical properties of an audio file"
@@ -16375,23 +16606,77 @@
     "description": "Shown when the symbolic link target picker cannot build a relative target, e.g. because a folder link on the way cannot be followed safely; the user types the target instead"
   },
   "editMetadataAction": "Edit metadata",
+  "@editMetadataAction": {
+    "description": "Action to edit a file's metadata"
+  },
   "editTagsAction": "Edit tags",
+  "@editTagsAction": {
+    "description": "Action to edit a file's tags"
+  },
   "editDateTimeAction": "Edit date & time",
+  "@editDateTimeAction": {
+    "description": "Action to edit a file's date and time metadata"
+  },
   "removeMetadataAction": "Remove metadata",
+  "@removeMetadataAction": {
+    "description": "Action to remove metadata from files"
+  },
   "metadataFormatsNote": "Tags, dates and removal are written into JPEG, PNG and WebP images. Other files only get a new modified date.",
+  "@metadataFormatsNote": {
+    "description": "Note explaining which file formats support metadata changes"
+  },
   "metadataReadOnlyMessage": "This vault is read-only",
+  "@metadataReadOnlyMessage": {
+    "description": "Message shown when metadata cannot be changed because the vault is read-only"
+  },
   "tagsAddHint": "Add tags, separated by commas",
+  "@tagsAddHint": {
+    "description": "Hint in the tag editor explaining how to enter tags"
+  },
   "tagsNoneYet": "No tags yet",
+  "@tagsNoneYet": {
+    "description": "Message shown when a file has no tags"
+  },
   "dateModeSet": "Set",
+  "@dateModeSet": {
+    "description": "Option to set a file's date and time to a specific value"
+  },
   "dateModeShift": "Shift",
+  "@dateModeShift": {
+    "description": "Option to shift a file's date and time earlier or later"
+  },
   "dateModeFromModified": "From modified date",
+  "@dateModeFromModified": {
+    "description": "Option to use a file's modified date as its date and time"
+  },
   "dateModeFromName": "From file name",
+  "@dateModeFromName": {
+    "description": "Option to extract a date and time from the file name"
+  },
   "dateShiftLater": "Later",
+  "@dateShiftLater": {
+    "description": "Direction option for shifting a file's date and time later"
+  },
   "dateShiftEarlier": "Earlier",
+  "@dateShiftEarlier": {
+    "description": "Direction option for shifting a file's date and time earlier"
+  },
   "dateDaysLabel": "Days",
+  "@dateDaysLabel": {
+    "description": "Label for the number of days in a date and time shift"
+  },
   "dateHoursLabel": "Hours",
+  "@dateHoursLabel": {
+    "description": "Label for the number of hours in a date and time shift"
+  },
   "dateMinutesLabel": "Minutes",
+  "@dateMinutesLabel": {
+    "description": "Label for the number of minutes in a date and time shift"
+  },
   "dateAlsoSetModified": "Also set the file's modified date",
+  "@dateAlsoSetModified": {
+    "description": "Option to also update the file's modified date when changing its date and time metadata"
+  },
   "dateFromNameMatches": "{matched} of {total} file names contain a date",
   "@dateFromNameMatches": {
     "placeholders": {
@@ -16404,13 +16689,37 @@
     }
   },
   "stripExifLabel": "Exif (camera, date, location)",
+  "@stripExifLabel": {
+    "description": "Label for the option to strip EXIF image metadata"
+  },
   "stripXmpLabel": "XMP (tags, rating, edit data)",
+  "@stripXmpLabel": {
+    "description": "Label for the option to strip XMP image metadata"
+  },
   "stripIptcLabel": "IPTC / Photoshop (captions, credits)",
+  "@stripIptcLabel": {
+    "description": "Label for the option to strip IPTC / Photoshop image metadata"
+  },
   "stripCommentsLabel": "Comments",
+  "@stripCommentsLabel": {
+    "description": "Label for the option to strip image comments metadata"
+  },
   "stripIccLabel": "Colour profile (may change colours)",
+  "@stripIccLabel": {
+    "description": "Label for the option to strip ICC colour profile metadata"
+  },
   "stripKeepOrientationLabel": "Keep orientation",
+  "@stripKeepOrientationLabel": {
+    "description": "Label for the option to preserve image orientation when stripping metadata"
+  },
   "stripKeepOrientationDesc": "Without it, photos taken sideways may show rotated",
+  "@stripKeepOrientationDesc": {
+    "description": "Description for the option to preserve image orientation when stripping metadata"
+  },
   "stripWarning": "This rewrites the files and cannot be undone.",
+  "@stripWarning": {
+    "description": "Warning shown before rewriting files while stripping metadata"
+  },
   "metadataProgress": "Updating {done} of {total}",
   "@metadataProgress": {
     "placeholders": {
@@ -16431,6 +16740,9 @@
     }
   },
   "metadataResultUnchanged": "Nothing needed changing",
+  "@metadataResultUnchanged": {
+    "description": "Message shown when metadata cleanup found no files needing changes"
+  },
   "metadataResultSkipped": "{count} skipped (not supported)",
   "@metadataResultSkipped": {
     "placeholders": {
@@ -16448,5 +16760,11 @@
     }
   },
   "showNoMediaFoldersLabel": "Show .nomedia folders",
-  "showNoMediaFoldersDesc": "Include folders marked with a .nomedia file, which gallery apps normally skip"
+  "@showNoMediaFoldersLabel": {
+    "description": "Label for the option to show folders marked with a .nomedia file"
+  },
+  "showNoMediaFoldersDesc": "Include folders marked with a .nomedia file, which gallery apps normally skip",
+  "@showNoMediaFoldersDesc": {
+    "description": "Description for the option to include folders marked with a .nomedia file"
+  }
 }

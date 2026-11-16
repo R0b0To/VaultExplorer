@@ -1,6 +1,7 @@
 import 'dart:collection';
 
 import 'package:flutter/foundation.dart';
+import 'package:vaultexplorer/core/utils/perf_trace.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/features/browser/file_browser_predicates.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
@@ -295,7 +296,9 @@ class BrowserListingCache {
     if (cached != null && previous != null && previous.sameListingAs(inputs)) {
       return cached;
     }
+   final perfT0 = PerfTrace.begin();
     final listing = buildBrowserListing(inputs);
+    PerfTrace.end('browser.listing.build', perfT0, slowMs: 16);
     _inputs = inputs;
     _listing = listing;
     return listing;

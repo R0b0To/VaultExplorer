@@ -23,6 +23,7 @@ enum FileItemAction {
   editImage,
   editVideo,
   editAudio,
+  editMetadata,
   rename,
   copy,
   move,
@@ -60,7 +61,8 @@ enum FileItemAction {
     FileItemAction.share ||
     FileItemAction.editImage ||
     FileItemAction.editVideo ||
-    FileItemAction.editAudio => 2,
+    FileItemAction.editAudio ||
+    FileItemAction.editMetadata => 2,
     FileItemAction.rename ||
     FileItemAction.copy ||
     FileItemAction.move ||
@@ -85,6 +87,7 @@ enum FileItemAction {
     FileItemAction.editImage => Icons.edit_outlined,
     FileItemAction.editVideo => Icons.content_cut_rounded,
     FileItemAction.editAudio => Icons.graphic_eq_rounded,
+    FileItemAction.editMetadata => Icons.sell_outlined,
     FileItemAction.rename => Icons.drive_file_rename_outline_rounded,
     FileItemAction.copy => Icons.copy_rounded,
     FileItemAction.move => Icons.cut_rounded,
@@ -112,6 +115,7 @@ enum FileItemAction {
     FileItemAction.editImage => l10n.editImageAction,
     FileItemAction.editVideo => l10n.videoEditorEditAction,
     FileItemAction.editAudio => l10n.audioEditorEditAction,
+    FileItemAction.editMetadata => l10n.editMetadataAction,
     FileItemAction.rename => l10n.renameAction,
     FileItemAction.copy => l10n.copyAction,
     FileItemAction.move => l10n.moveAction,

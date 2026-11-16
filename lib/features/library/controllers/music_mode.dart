@@ -93,10 +93,16 @@ class MusicScope extends ChangeNotifier {
 /// they cover are shared through the container's [MusicScope].
 ///
 /// A tab opens in the container's saved default mode, and music mode always
-/// opens on the library (Albums): enabling it does, and so does adopting a
+/// opens on the library ([startCategory], the Tracks view): enabling it does, and so does adopting a
 /// saved enabled default, so a tab never opens on the file listing with just
 /// the music toolbar underneath it.
 class MusicModeEntry extends ChangeNotifier {
+  /// The view music mode opens on, whether it was just turned on, restored
+  /// from the saved default or expected from the on-device hint. Tracks, not
+  /// Albums: the songs themselves are what someone switching to music mode
+  /// is after, and Albums is one tab away.
+  static const MusicCategory startCategory = MusicCategory.tracks;
+
   final MountedContainer container;
   final MusicScope _scope;
   final bool _ownsScope;
@@ -153,7 +159,7 @@ class MusicModeEntry extends ChangeNotifier {
   void applyHint(bool enabled) {
     if (loaded || _settled || _hint == enabled) return;
     _hint = enabled;
-    if (enabled) _category = MusicCategory.albums;
+    if (enabled) _category = startCategory;
     _notify();
   }
 
@@ -172,16 +178,16 @@ class MusicModeEntry extends ChangeNotifier {
   void _adoptDefault() {
     _settled = true;
     _enabled = _scope.config.enabled;
-    _category = _enabled ? MusicCategory.albums : MusicCategory.files;
+    _category = _enabled ? startCategory : MusicCategory.files;
   }
 
   /// Turns music mode on in this tab for [folders] (empty: the whole
-  /// container) and opens the Albums view. The folders are shared by every tab
+  /// container) and opens the Tracks view. The folders are shared by every tab
   /// on the container; the switch is this tab's alone.
   Future<void> enable({List<String> folders = const []}) async {
     _settled = true;
     _enabled = true;
-    _category = MusicCategory.albums;
+    _category = startCategory;
     _notify();
     await _scope.save(
       MusicConfig(enabled: true, folders: MusicConfig.normalizeFolders(folders)),

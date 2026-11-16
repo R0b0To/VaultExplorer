@@ -7,6 +7,7 @@ import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/core/services/thumbnail_refresh_signal.dart';
 import 'package:vaultexplorer/core/services/thumbnail_retry_signal.dart';
 import 'package:vaultexplorer/core/utils/lru_cache.dart';
+import 'package:vaultexplorer/core/utils/perf_trace.dart';
 import 'package:vaultexplorer/core/utils/image_preview_exception.dart';
 import 'package:vaultexplorer/core/utils/retry.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart';
@@ -63,6 +64,7 @@ class AsyncThumbnailLoader extends _$AsyncThumbnailLoader {
   PriorityTaskQueue? _limiter;
   Duration _debounce = const Duration(milliseconds: 30);
   TaskPriority _priority = TaskPriority.visible;
+  TaskPriority Function()? _priorityResolver;
   bool _started = false;
   Completer<void>? _limiterCompleter;
 
@@ -121,9 +123,11 @@ class AsyncThumbnailLoader extends _$AsyncThumbnailLoader {
     ThumbnailSyncLookup? syncLookup,
     Duration debounce = const Duration(milliseconds: 30),
     TaskPriority priority = TaskPriority.visible,
+    TaskPriority Function()? priorityResolver,
   }) {
     if (_started) return;
     _started = true;
+    _priorityResolver = priorityResolver;
     _container = container;
     _fetchFn = fetchFn;
     _syncLookup = syncLookup;
@@ -144,6 +148,7 @@ class AsyncThumbnailLoader extends _$AsyncThumbnailLoader {
       if (!ref.mounted) return;
       final syncBytes = syncLookup?.call();
       if (syncBytes != null) {
+        PerfTrace.count('thumb.tile.mem_hit');
         state = AsyncThumbnailState(bytes: syncBytes, isLoading: false);
       } else {
         _load();
@@ -239,6 +244,9 @@ class AsyncThumbnailLoader extends _$AsyncThumbnailLoader {
     final limiter = _limiter;
     if (container == null || fetchFn == null || cache == null || limiter == null) return;
 
+    // Time from "this tile wants a thumbnail" to "the bytes are on screen",
+    // including the debounce, the queue and the fetch: what the user feels.
+    final loadT0 = PerfTrace.begin();
     final cacheKey = _inFlightKey(container);
     var future = cache[cacheKey];
 
@@ -256,13 +264,21 @@ class AsyncThumbnailLoader extends _$AsyncThumbnailLoader {
 
       final syncBytes = _syncLookup?.call();
       if (syncBytes != null) {
+        PerfTrace.count('thumb.tile.mem_hit_after_debounce');
         state = AsyncThumbnailState(bytes: syncBytes, isLoading: false);
         return;
       }
 
       future = cache[cacheKey];
       if (future == null) {
-        future = _fetchWithQueue(container, filePath, fetchFn, limiter, _priority);
+        // Decided now, not when the tile was built: by this point the tile has
+        // been laid out, so it is known whether it is on screen or only built
+        // ahead of the viewport.
+        final priority = _priorityResolver?.call() ?? _priority;
+        if (priority != TaskPriority.visible) {
+          PerfTrace.count('thumb.tile.queued_${priority.name}');
+        }
+        future = _fetchWithQueue(container, filePath, fetchFn, limiter, priority);
         cache[cacheKey] = future;
         final storedFuture = future;
         unawaited(
@@ -277,11 +293,13 @@ class AsyncThumbnailLoader extends _$AsyncThumbnailLoader {
       final data = await future.timeout(_watchdogTimeout);
       if (!ref.mounted || generation != _loadGeneration) return;
       _cancellationRetries = 0;
+      PerfTrace.end('thumb.tile_latency', loadT0, slowMs: 500);
       state = AsyncThumbnailState(bytes: data, isLoading: false);
     } catch (e) {
       if (!ref.mounted || generation != _loadGeneration) return;
       final errStr = e.toString();
       final isCancellation = errStr.contains('Cancelled') || errStr.contains('cancelled');
+      PerfTrace.count(isCancellation ? 'thumb.tile.cancelled' : 'thumb.tile.failed');
       if (isCancellation && _cancellationRetries < _maxCancellationRetries) {
         // Dequeued/cancelled due to rapid scrolling, not a missing or
         // corrupt file. Retry after a brief delay if this instance is
@@ -310,14 +328,23 @@ class AsyncThumbnailLoader extends _$AsyncThumbnailLoader {
     bool acquired = false;
 
     try {
+      final queueT0 = PerfTrace.begin();
       await limiter.acquire(completer, priority: priority);
+      PerfTrace.end('thumb.queue_wait', queueT0);
+      // Which tier waited how long: if on-screen tiles still wait long, the
+      // queue is the problem; if only the ahead-of-viewport ones do, it is
+      // working as intended.
+      if (queueT0 != 0) {
+        PerfTrace.end('thumb.queue_wait.${priority.name}', queueT0);
+      }
       acquired = true;
 
       if (!ref.mounted) {
         throw Exception('Cancelled before processing');
       }
 
-      return await retryWithBackoff<Uint8List>((attempt) {
+      final fetchT0 = PerfTrace.begin();
+      final data = await retryWithBackoff<Uint8List>((attempt) {
         if (!ref.mounted) {
           throw Exception('Cancelled before retry attempt $attempt');
         }
@@ -330,6 +357,8 @@ class AsyncThumbnailLoader extends _$AsyncThumbnailLoader {
           retryIf: (e) =>
               e is! ImagePreviewUnavailableException &&
               e is! PermanentThumbnailFailure);
+      PerfTrace.end('thumb.fetch', fetchT0, slowMs: 300);
+      return data;
     } finally {
       if (_limiterCompleter == completer) _limiterCompleter = null;
       if (acquired) limiter.release(completer);

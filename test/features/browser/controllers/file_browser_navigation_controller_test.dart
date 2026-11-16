@@ -595,6 +595,140 @@ void main() {
       });
     });
 
+    group('listing cache (stale-while-revalidate)', () {
+      const photos = RawEntry(name: 'Photos', isDir: true, sizeBytes: 0, modifiedSecs: 0);
+
+      test('re-entering a folder listed before opens straight onto its entries', () async {
+        final subscription = container.listen(fileBrowserNavigationProvider(const TabId(1)), (_, _) {});
+        final notifier = container.read(fileBrowserNavigationProvider(const TabId(1)).notifier);
+        notifier.initRoot(rootLabel: 'Vault');
+
+        // First visit: nothing is remembered, so it starts empty with a spinner.
+        notifier.enterDirectory(photos, newPath: 'Photos');
+        var state = container.read(fileBrowserNavigationProvider(const TabId(1)));
+        expect(state.isLoading, isTrue);
+        expect(state.currentItems, isEmpty);
+        dirListingResponse = ['F|1|1|a.jpg', 'F|2|1|b.jpg'];
+        await notifier.loadDirectoryContents(_testContainer(1), 'Photos');
+
+        // Leave and come back: the remembered entries are there at once.
+        notifier.navigateUp();
+        notifier.enterDirectory(photos, newPath: 'Photos');
+        state = container.read(fileBrowserNavigationProvider(const TabId(1)));
+        expect(state.isLoading, isFalse);
+        expect(state.currentItems.map((e) => e.name), ['a.jpg', 'b.jpg']);
+
+        subscription.close();
+      });
+
+      test('the listing that follows corrects what was shown from the cache', () async {
+        final subscription = container.listen(fileBrowserNavigationProvider(const TabId(1)), (_, _) {});
+        final notifier = container.read(fileBrowserNavigationProvider(const TabId(1)).notifier);
+        notifier.initRoot(rootLabel: 'Vault');
+
+        notifier.enterDirectory(photos, newPath: 'Photos');
+        dirListingResponse = ['F|1|1|a.jpg'];
+        await notifier.loadDirectoryContents(_testContainer(1), 'Photos');
+        notifier.navigateUp();
+        notifier.enterDirectory(photos, newPath: 'Photos');
+
+        // The folder changed meanwhile.
+        dirListingResponse = ['F|1|1|a.jpg', 'F|2|1|new.jpg'];
+        await notifier.loadDirectoryContents(_testContainer(1), 'Photos');
+
+        final state = container.read(fileBrowserNavigationProvider(const TabId(1)));
+        expect(state.currentItems.map((e) => e.name), ['a.jpg', 'new.jpg']);
+        expect(state.isLoading, isFalse);
+
+        subscription.close();
+      });
+
+      test('a refresh that finds nothing changed keeps the same list instance', () async {
+        final subscription = container.listen(fileBrowserNavigationProvider(const TabId(1)), (_, _) {});
+        final notifier = container.read(fileBrowserNavigationProvider(const TabId(1)).notifier);
+        notifier.initRoot(rootLabel: 'Vault');
+
+        dirListingResponse = ['F|100|1000|file1.txt', 'D|0|1000|Photos'];
+        await notifier.loadDirectoryContents(_testContainer(1), '');
+        final first = container.read(fileBrowserNavigationProvider(const TabId(1))).currentItems;
+
+        await notifier.loadDirectoryContents(_testContainer(1), '', refresh: true);
+        final second = container.read(fileBrowserNavigationProvider(const TabId(1))).currentItems;
+        expect(identical(first, second), isTrue);
+
+        // A real change still replaces it.
+        dirListingResponse = ['F|100|1000|file1.txt'];
+        await notifier.loadDirectoryContents(_testContainer(1), '', refresh: true);
+        final third = container.read(fileBrowserNavigationProvider(const TabId(1))).currentItems;
+        expect(third, hasLength(1));
+        expect(identical(first, third), isFalse);
+
+        subscription.close();
+      });
+
+      test('a folder whose listing failed is not shown from the cache next time', () async {
+        final subscription = container.listen(fileBrowserNavigationProvider(const TabId(1)), (_, _) {});
+        final notifier = container.read(fileBrowserNavigationProvider(const TabId(1)).notifier);
+        notifier.initRoot(rootLabel: 'Vault');
+
+        notifier.enterDirectory(photos, newPath: 'Photos');
+        dirListingResponse = ['F|1|1|a.jpg'];
+        await notifier.loadDirectoryContents(_testContainer(1), 'Photos');
+
+        // It now fails to list (native answers null).
+        notifier.navigateUp();
+        notifier.enterDirectory(photos, newPath: 'Photos');
+        dirListingNull = true;
+        await notifier.loadDirectoryContents(_testContainer(1), 'Photos');
+
+        // The next visit must not replay the old entries for an unreadable folder.
+        notifier.navigateUp();
+        notifier.enterDirectory(photos, newPath: 'Photos');
+        final state = container.read(fileBrowserNavigationProvider(const TabId(1)));
+        expect(state.isLoading, isTrue);
+        expect(state.currentItems, isEmpty);
+
+        subscription.close();
+      });
+
+      test('removeItemsByName forgets the remembered listing of the folder', () async {
+        final subscription = container.listen(fileBrowserNavigationProvider(const TabId(1)), (_, _) {});
+        final notifier = container.read(fileBrowserNavigationProvider(const TabId(1)).notifier);
+        notifier.initRoot(rootLabel: 'Vault');
+
+        notifier.enterDirectory(photos, newPath: 'Photos');
+        dirListingResponse = ['F|1|1|a.jpg', 'F|2|1|b.jpg'];
+        await notifier.loadDirectoryContents(_testContainer(1), 'Photos');
+        notifier.removeItemsByName({'a.jpg'});
+
+        notifier.navigateUp();
+        notifier.enterDirectory(photos, newPath: 'Photos');
+        final state = container.read(fileBrowserNavigationProvider(const TabId(1)));
+        expect(state.isLoading, isTrue);
+        expect(state.currentItems, isEmpty);
+
+        subscription.close();
+      });
+
+      test('a listing that was cut short is not remembered', () async {
+        final subscription = container.listen(fileBrowserNavigationProvider(const TabId(1)), (_, _) {});
+        final notifier = container.read(fileBrowserNavigationProvider(const TabId(1)).notifier);
+        notifier.initRoot(rootLabel: 'Vault');
+
+        notifier.enterDirectory(photos, newPath: 'Photos');
+        dirListingResponse = ['F|1|1|a.jpg', 'System:TRUNCATED'];
+        await notifier.loadDirectoryContents(_testContainer(1), 'Photos');
+
+        notifier.navigateUp();
+        notifier.enterDirectory(photos, newPath: 'Photos');
+        final state = container.read(fileBrowserNavigationProvider(const TabId(1)));
+        expect(state.isLoading, isTrue);
+        expect(state.currentItems, isEmpty);
+
+        subscription.close();
+      });
+    });
+
     group('archive opening, navigation, and exit', () {
       test('openArchive parses a real zip and lists its root', () async {
         final subscription = container.listen(fileBrowserNavigationProvider(const TabId(1)), (_, _) {});

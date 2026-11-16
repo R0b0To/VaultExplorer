@@ -5,16 +5,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:intl/intl.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/services/thumbnail_settings_resolver.dart';
 import 'package:vaultexplorer/features/browser/metadata/image_metadata_editor.dart';
 import 'package:vaultexplorer/features/browser/metadata/image_metadata_reader.dart';
 import 'package:vaultexplorer/features/browser/metadata/metadata_edit_ui.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/file_info_controller.dart';
+import 'package:vaultexplorer/features/browser/widgets/file_item_actions_sheet.dart'
+    show FileThumbnailLeading;
+import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 
 class FileInfoSheet extends ConsumerStatefulWidget {
   final MountedContainer container;
@@ -79,6 +84,59 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
     });
   }
 
+  /// The header picture: the file's own thumbnail for an image, video or book
+  /// cover, otherwise the tinted type icon. The thumbnail follows the same
+  /// cache mode and quality as the vault's file listing, and is held back
+  /// until those settings have loaded -- a vault whose owner turned the
+  /// thumbnail cache off must not get one written because its settings had
+  /// not arrived yet.
+  Widget _buildHeaderLeading(BuildContext context, ColorScheme cs) {
+    final entry = widget.entry;
+    final tint = entry.isDir ? cs.secondary : colorForFile(entry.name);
+    final icon = entry.isDir ? Icons.folder_rounded : iconForFile(entry.name);
+    final iconBox = Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: tint.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(icon, size: 24, color: tint),
+    );
+    if (entry.isDir) return iconBox;
+
+    final settingsState = ref.watch(
+      fileManagerToolbarSettingsProvider(
+        widget.container.isLocalStorage ? null : widget.container.uri,
+      ),
+    );
+    if (settingsState.loading) return iconBox;
+    final thumbs = resolveThumbnailSettings(
+      config: settingsState.config,
+      isLocalStorage: widget.container.isLocalStorage,
+      record: settingsState.record,
+    );
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: tint.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: SizedBox.expand(
+        child: FileThumbnailLeading(
+          entry: entry,
+          container: widget.container,
+          currentDirPath: widget.currentDirPath,
+          cacheMode: thumbs.cacheMode,
+          quality: thumbs.quality,
+          fallbackIcon: icon,
+          fallbackIconColor: tint,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final controllerState = ref.watch(
@@ -132,26 +190,7 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
           children: [
             Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color:
-                        (widget.entry.isDir
-                                ? cs.secondary
-                                : colorForFile(widget.entry.name))
-                            .withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    widget.entry.isDir
-                        ? Icons.folder_rounded
-                        : iconForFile(widget.entry.name),
-                    size: 24,
-                    color: widget.entry.isDir
-                        ? cs.secondary
-                        : colorForFile(widget.entry.name),
-                  ),
-                ),
+                _buildHeaderLeading(context, cs),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(

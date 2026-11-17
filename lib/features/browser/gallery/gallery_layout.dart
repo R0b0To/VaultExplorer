@@ -1027,11 +1027,10 @@ class GalleryLayoutHost {
     int dirtyFromItem = 0,
   }) {
     final old = _model;
-    final fromItem = math.min(dirtyFromItem, _staleFromItem);
+    final fromItem = math.max(0, math.min(dirtyFromItem, _staleFromItem));
     if (old == null ||
         old.childCount == 0 ||
-        old.crossExtent != crossExtent ||
-        fromItem <= 0) {
+        old.crossExtent != crossExtent) {
       adopt(buildCandidate(crossExtent));
       _staleFromItem = _kNoDirtyItem;
       hasStalePrefix = false;

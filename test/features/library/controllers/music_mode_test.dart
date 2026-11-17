@@ -163,8 +163,8 @@ void main() {
       await e.enable();
       var notified = 0;
       e.addListener(() => notified++);
-      e.setCategory(MusicCategory.tracks);
-      e.setCategory(MusicCategory.tracks);
+      e.setCategory(MusicCategory.albums);
+      e.setCategory(MusicCategory.albums);
       e.setCategory(MusicCategory.files);
       expect(notified, 2);
       expect(e.libraryVisible, isFalse);

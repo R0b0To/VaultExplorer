@@ -623,13 +623,6 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
             widget.currentDirPath,
           )
         : null;
-    if (singleContainer != null && n > 0) {
-      targets[singleContainer.uri] = (
-        singleContainer,
-        widget.thumbnailCacheMode,
-      );
-    }
-
     for (var i = 0; i < n; i++) {
       final entry = display[i];
       if (entry.isDir) {
@@ -656,6 +649,10 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
 
       _kind[i] = (!insideArchive && isImg) ? 1 : 2;
       if (singleSource) {
+        targets.putIfAbsent(
+          singleContainer!.uri,
+          () => (singleContainer, widget.thumbnailCacheMode),
+        );
         if (!singleIndexEmpty) {
           final hash = MediaPathHash.ofName(dirState, entry.name);
           _pathHash[i] = hash;

@@ -803,14 +803,14 @@ void main() {
 
   group('resident fallback by quality kind', () {
     const rawAuto = ThumbnailQuality(quality: 80, size: 500, auto: true);
-    final cell448 = rawAuto.resolveForCell(logicalWidth: 108, devicePixelRatio: 3);
-    final cell704 = rawAuto.resolveForCell(logicalWidth: 166, devicePixelRatio: 3);
-    final cell320 = rawAuto.resolveForCell(logicalWidth: 70, devicePixelRatio: 3);
+    final cell384 = rawAuto.resolveForCell(logicalWidth: 108, devicePixelRatio: 3);
+    final cell640 = rawAuto.resolveForCell(logicalWidth: 166, devicePixelRatio: 3);
+    final cell256 = rawAuto.resolveForCell(logicalWidth: 70, devicePixelRatio: 3);
 
     test('sanity: the sizes used below', () {
-      expect(cell448.size, 448);
-      expect(cell704.size, 704);
-      expect(cell320.size, 320);
+      expect(cell384.size, 384);
+      expect(cell640.size, 640);
+      expect(cell256.size, 256);
     });
 
     test(
@@ -818,7 +818,7 @@ void main() {
       'thumbnail as its placeholder',
       () {
         final c = _container('gocryptfs', 'content://fallback-viewer');
-        ThumbnailCacheService.putInMemory(c, '/a.jpg', _thumb(1), cell448);
+        ThumbnailCacheService.putInMemory(c, '/a.jpg', _thumb(1), cell384);
 
         expect(
           ThumbnailCacheService.getFromMemory(c, '/a.jpg', rawAuto),
@@ -833,15 +833,15 @@ void main() {
       'accepts an equal or larger one',
       () {
         final c = _container('gocryptfs', 'content://fallback-tile');
-        ThumbnailCacheService.putInMemory(c, '/b.jpg', _thumb(2), cell448);
+        ThumbnailCacheService.putInMemory(c, '/b.jpg', _thumb(2), cell384);
 
-        expect(ThumbnailCacheService.getFromMemory(c, '/b.jpg', cell704), isNull);
+        expect(ThumbnailCacheService.getFromMemory(c, '/b.jpg', cell640), isNull);
         expect(
-          ThumbnailCacheService.getFromMemory(c, '/b.jpg', cell448),
+          ThumbnailCacheService.getFromMemory(c, '/b.jpg', cell384),
           equals(_thumb(2)),
         );
         expect(
-          ThumbnailCacheService.getFromMemory(c, '/b.jpg', cell320),
+          ThumbnailCacheService.getFromMemory(c, '/b.jpg', cell256),
           equals(_thumb(2)),
         );
       },
@@ -858,7 +858,7 @@ void main() {
         logicalWidth: 340,
         devicePixelRatio: 3,
       );
-      expect(cell.size, 1408);
+      expect(cell.size, 640);
       await ThumbnailCacheService.put(
         container: first,
         filePath: '/pics/a.jpg',

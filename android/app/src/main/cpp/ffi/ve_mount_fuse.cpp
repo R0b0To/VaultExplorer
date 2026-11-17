@@ -84,6 +84,7 @@ extern "C" VE_API int32_t ve_mount_last_error(char* buf, size_t cap) {
 #include <unistd.h>
 
 #include "ve_mount_fs.h"
+#include "ve_mount_places.h"
 
 extern char** environ;
 
@@ -567,6 +568,7 @@ int32_t unmountOne(const std::shared_ptr<Mount>& m, bool force) {
     gApi.fnDestroy(m->fuse);
     m->fuse = nullptr;
     m->reaped.store(true);
+    vemount::placesRemove(m->mountPoint);
     {
         std::lock_guard<std::mutex> g(gMu);
         gMounts.erase(m->id);
@@ -597,6 +599,8 @@ extern "C" VE_API int32_t ve_mount(int32_t vol, const char* mountPointUtf8, cons
         setLastError(reason);
         return VE_ERR_UNSUPPORTED;
     }
+    static std::once_flag staleOnce;
+    std::call_once(staleOnce, []() { vemount::placesCleanStale(); });  // sidebar entries from a crashed run
     bool fv = false, ci = false, ro = false;
     if (!ve_internal_vol_traits(vol, &fv, &ci, &ro)) return VE_ERR_NOT_UNLOCKED;
     {
@@ -674,6 +678,8 @@ extern "C" VE_API int32_t ve_mount(int32_t vol, const char* mountPointUtf8, cons
         unmountOne(m, true);
         return VE_ERR_MOUNT_FAILED;
     }
+    // Mounts are not "devices" to the file manager: list it in the sidebar, or it just looks like nothing happened.
+    vemount::placesAdd(m->mountPoint, opts && opts->volume_name && opts->volume_name[0] ? opts->volume_name : "VaultExplorer");
     *outId = m->id;
     return VE_OK;
 }
@@ -747,7 +753,9 @@ extern "C" VE_API int32_t ve_mount_supported(char* reason_buf, size_t reason_cap
 #if defined(_WIN32)
     copyOut("this build has no WinFsp support (WinFsp headers were missing at build time)", reason_buf, reason_cap);
 #else
-    copyOut("this build has no FUSE support (libfuse3 development headers were missing at build time)",
+    copyOut("this engine was built without FUSE support: install the libfuse3 development package "
+            "(Debian/Ubuntu/KDE neon: libfuse3-dev; Fedora/openSUSE: fuse3-devel; Arch: fuse3) and rebuild the "
+            "engine with scripts/build_desktop_engine.sh",
             reason_buf, reason_cap);
 #endif
     return 0;

@@ -10,6 +10,7 @@
 #include "ve_engine.h"
 #include "ve_mount_fs.h"
 #include "ve_mount_internal.h"
+#include "ve_mount_places.h"
 
 #include <algorithm>
 #include <atomic>
@@ -408,6 +409,109 @@ static void suite(const char* label, int vol, bool fv, bool ci) {
     std::printf("  %d checks so far, %d failed\n", g_checks, g_failures);
 }
 
+
+// ── sidebar entries (Dolphin / GTK bookmarks) ────────────────────────────────────────────────────────
+
+static std::string readAll(const std::string& p) {
+    FILE* f = std::fopen(p.c_str(), "rb");
+    if (!f) return "<missing>";
+    std::string s;
+    char b[4096];
+    while (size_t n = fread(b, 1, sizeof(b), f)) s.append(b, n);
+    std::fclose(f);
+    return s;
+}
+static void writeAll(const std::string& p, const std::string& s) {
+    FILE* f = std::fopen(p.c_str(), "wb");
+    if (f) { std::fwrite(s.data(), 1, s.size(), f); std::fclose(f); }
+}
+static int countOf(const std::string& hay, const std::string& needle) {
+    int n = 0;
+    for (size_t pos = hay.find(needle); pos != std::string::npos; pos = hay.find(needle, pos + needle.size())) ++n;
+    return n;
+}
+
+static void placesTest() {
+    std::printf("== sidebar entries ==\n");
+    const std::string home = tmp("ve_places_home");
+    sh("rm -rf '" + home + "' && mkdir -p '" + home + "/.local/share' '" + home + "/.config/gtk-3.0'");
+    setenv("HOME", home.c_str(), 1);
+    unsetenv("XDG_DATA_HOME");
+    unsetenv("XDG_CONFIG_HOME");
+    unsetenv("XDG_STATE_HOME");
+    unsetenv("VE_NO_PLACES");
+    const std::string dolphin = home + "/.local/share/user-places.xbel";
+    const std::string gtk = home + "/.config/gtk-3.0/bookmarks";
+    const std::string state = home + "/.local/state/VaultExplorer/mounts.txt";
+    const std::string origXbel =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE xbel>\n"
+        "<xbel xmlns:bookmark=\"http://www.freedesktop.org/standards/desktop-bookmarks\" "
+        "xmlns:kdepriv=\"http://www.kde.org/kdepriv\" xmlns:mime=\"http://www.freedesktop.org/standards/shared-mime-info\">\n"
+        " <info>\n  <metadata owner=\"http://www.kde.org\">\n   <kde_places_version>4</kde_places_version>\n  </metadata>\n </info>\n"
+        " <bookmark href=\"file:///home/u\">\n  <title>Home</title>\n  <info>\n"
+        "   <metadata owner=\"http://freedesktop.org\">\n    <bookmark:icon name=\"user-home\"/>\n   </metadata>\n"
+        "   <metadata owner=\"http://www.kde.org\">\n    <ID>1</ID>\n    <isSystemItem>true</isSystemItem>\n   </metadata>\n"
+        "  </info>\n </bookmark>\n</xbel>\n";
+    const std::string origGtk = "file:///home/u/Documents Documents\nfile:///tmp\n";
+    writeAll(dolphin, origXbel);
+    writeAll(gtk, origGtk);
+
+    const std::string mp1 = "/tmp/x/My Vault (2)";
+    const std::string uri1 = "file:///tmp/x/My%20Vault%20%282%29";
+    vemount::placesAdd(mp1, "My <Vault> & co");
+    std::string d = readAll(dolphin), g = readAll(gtk);
+    CHECK_EQ(countOf(d, "href=\"" + uri1 + "\""), 1);
+    CHECK_EQ(countOf(d, "<title>My &lt;Vault&gt; &amp; co</title>"), 1);
+    CHECK_EQ(countOf(d, "owner=\"https://vaultexplorer.app\""), 1);
+    CHECK_EQ(countOf(d, "href=\"file:///home/u\""), 1);   // the user's own entry is untouched
+    CHECK_EQ(countOf(g, uri1 + " My <Vault> & co\n"), 1);
+    CHECK(g.find("file:///tmp\n") != std::string::npos);
+    CHECK(readAll(state).find(mp1) != std::string::npos);
+    writeAll("/tmp/ve_places_sample.xbel", d);  // validated as XML by the caller
+
+    vemount::placesAdd(mp1, "My <Vault> & co");  // idempotent
+    d = readAll(dolphin); g = readAll(gtk);
+    CHECK_EQ(countOf(d, "href=\"" + uri1 + "\""), 1);
+    CHECK_EQ(countOf(g, uri1), 1);
+
+    vemount::placesAdd("/tmp/other", "Other");
+    vemount::placesRemove(mp1);
+    d = readAll(dolphin); g = readAll(gtk);
+    CHECK_EQ(countOf(d, uri1), 0);
+    CHECK_EQ(countOf(d, "href=\"file:///tmp/other\""), 1);
+    CHECK_EQ(countOf(g, uri1), 0);
+    vemount::placesRemove("/tmp/other");
+    CHECK(readAll(dolphin) == origXbel);  // exactly what it was before we touched it
+    CHECK(readAll(gtk) == origGtk);
+    CHECK_EQ(readAll(state).size(), 0);
+
+    // a crash leaves entries behind; the next run's first mount cleans them up
+    vemount::placesAdd("/tmp/crashed", "Crashed");
+    CHECK(readAll(dolphin) != origXbel);
+    vemount::placesCleanStale();
+    CHECK(readAll(dolphin) == origXbel);
+    CHECK(readAll(gtk) == origGtk);
+
+    // a file manager that is not installed (no bookmark file) is not touched or created
+    sh("rm -f '" + dolphin + "' '" + gtk + "'");
+    vemount::placesAdd("/tmp/y", "Y");
+    CHECK(readAll(dolphin) == "<missing>");
+    CHECK(readAll(gtk) == "<missing>");
+
+    // an unrelated / corrupt places file is left alone
+    writeAll(dolphin, "not xml at all");
+    vemount::placesAdd("/tmp/y", "Y");
+    CHECK(readAll(dolphin) == "not xml at all");
+
+    // opt-out
+    writeAll(dolphin, origXbel);
+    setenv("VE_NO_PLACES", "1", 1);
+    vemount::placesAdd("/tmp/z", "Z");
+    CHECK(readAll(dolphin) == origXbel);
+    unsetenv("VE_NO_PLACES");
+    sh("rm -rf '" + home + "'");
+}
+
 // ── fixtures ─────────────────────────────────────────────────────────────────────────────────────────
 
 static void runContainer(const char* fsName) {
@@ -546,6 +650,24 @@ static void osMountSuite(const char* label, int vol, bool fv) {
     g_fv = fv;
     const std::string mp = tmp(std::string("ve_osmount_") + label);
     sh("rm -rf '" + mp + "'");
+    // A fake home with a Dolphin places file and a GTK bookmarks file: the mount must list itself there and
+    // every way out must take the entry away again.
+    const std::string fakeHome = tmp(std::string("ve_osmount_home_") + label);
+    sh("rm -rf '" + fakeHome + "' && mkdir -p '" + fakeHome + "/.local/share' '" + fakeHome + "/.config/gtk-3.0'");
+    const std::string xbel = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE xbel>\n<xbel>\n</xbel>\n";
+    const std::string gtkOrig = "file:///tmp tmp\n";
+    writeAll(fakeHome + "/.local/share/user-places.xbel", xbel);
+    writeAll(fakeHome + "/.config/gtk-3.0/bookmarks", gtkOrig);
+    setenv("HOME", fakeHome.c_str(), 1);
+    unsetenv("XDG_DATA_HOME"); unsetenv("XDG_CONFIG_HOME"); unsetenv("XDG_STATE_HOME");
+    auto listed = [&]() {
+        return readAll(fakeHome + "/.local/share/user-places.xbel").find("file://" + mp) != std::string::npos &&
+               readAll(fakeHome + "/.config/gtk-3.0/bookmarks").find("file://" + mp) != std::string::npos;
+    };
+    auto pristine = [&]() {
+        return readAll(fakeHome + "/.local/share/user-places.xbel") == xbel &&
+               readAll(fakeHome + "/.config/gtk-3.0/bookmarks") == gtkOrig;
+    };
     ve_set_mount_callback(onMountEvent);
     ve_mount_options mo;
     std::memset(&mo, 0, sizeof(mo));
@@ -562,6 +684,7 @@ static void osMountSuite(const char* label, int vol, bool fv) {
     g_conn.store(connectionOf(mp));
     std::printf("  mounted at %s (connection %ld)\n", mp.c_str(), g_conn.load());
     CHECK(id > 0);
+    CHECK(listed());  // visible in the Dolphin / GTK sidebar
 
     CHECK_EQ(P("test -d " + mp), 0);
     ve_buffer lb{};
@@ -613,6 +736,7 @@ static void osMountSuite(const char* label, int vol, bool fv) {
         if (!who.empty()) std::printf("  holders before unmount:\n%s", who.c_str());
     }
     CHECK_EQ(ve_unmount(id, 0), VE_OK);
+    CHECK(pristine());                                      // sidebar entry removed again
     CHECK(P("test -e " + mp + "/hello.txt") != 0);        // really gone
     CHECK(abiRead(vol, "/hello.txt") == "hello mount");     // and nothing was lost
 
@@ -624,13 +748,16 @@ static void osMountSuite(const char* label, int vol, bool fv) {
     for (int i = 0; i < 60 && g_endedMount.load() == 0; ++i) std::this_thread::sleep_for(std::chrono::milliseconds(50));
     CHECK_EQ(g_endedMount.load(), id);
     CHECK_EQ(ve_unmount(id, 1), VE_OK);
+    CHECK(pristine());                                      // an ejected mount does not leave its entry behind
 
     // locking while mounted, with a client still holding a file open: the mount goes away first
     CHECK_EQ(ve_mount(vol, mp.c_str(), &mo, &id), VE_OK);
     g_conn.store(connectionOf(mp));
     sh("(sh -c 'exec 3< " + mp + "/hello.txt; sleep 8' &) ; sleep 0.5");
+    CHECK(listed());
     ve_lock(vol);
     CHECK(P("test -e " + mp + "/hello.txt") != 0);
+    CHECK(pristine());                                      // and neither does locking
     sh("pkill -f 'sleep 8' 2>/dev/null");
     ve_buffer lb2{};
     CHECK_EQ(ve_list_mounts(&lb2), VE_OK);
@@ -638,6 +765,7 @@ static void osMountSuite(const char* label, int vol, bool fv) {
     ve_buffer_free(&lb2);
     g_conn.store(-1);
     rmdir(mp.c_str());
+    sh("rm -rf '" + fakeHome + "'");
     std::printf("  %d checks so far, %d failed\n", g_checks, g_failures);
 }
 
@@ -712,6 +840,7 @@ int main(int argc, char** argv) {
         for (auto& w : want) if (w == n) return true;
         return false;
     };
+    if (on("places")) placesTest();
     if (on("fat")) runContainer("fat");
     if (on("exfat")) runContainer("exfat");
     if (on("ntfs")) runContainer("ntfs");

@@ -84,8 +84,21 @@ bookkeeping, eject watcher), and `desktop_engine_host.dart` answers the three ex
 | Expose a folder (browser) | that folder is mounted and opened; remembered folders (`autoMountFolders`) are re-mounted at unlock without opening a window |
 | Un-expose / lock | unmounted (`ve_lock` always unmounts first) |
 
-Mounts live under `~/.local/share/VaultExplorer/mnt/<name>` (hidden `.local`: Ctrl+H in a file manager).
-There is no sidebar entry yet.
+Mounts live under `~/.local/share/VaultExplorer/mnt/<name>` (a hidden path) and, on Linux, are listed in the
+file manager's sidebar -- see below.
+
+## Sidebar entry (Linux)
+
+A FUSE mount is not a "device" to Dolphin or Nautilus, so it does not appear by itself. `ffi/ve_mount_places.cpp`
+(like Cryptomator's `integrations-linux`) adds it to:
+
+* KDE Dolphin: `$XDG_DATA_HOME/user-places.xbel` (an XBEL bookmark tagged with its own metadata owner)
+* GTK file managers (Nautilus, Thunar, Nemo, PCManFM...): `$XDG_CONFIG_HOME/gtk-3.0/bookmarks`
+
+Only files that already exist are touched; writes are atomic; the entry is removed on unmount, eject and lock;
+entries a crashed run left behind are removed the next time anything is mounted (a small record is kept in
+`$XDG_STATE_HOME/VaultExplorer/mounts.txt`). Set `VE_NO_PLACES=1` to turn it off. Tested with fake home
+directories (`ve_mount_test places`, and through the real-mount test).
 
 ## If nothing happens
 
@@ -95,6 +108,11 @@ There is no sidebar entry yet.
 3. Run the app from a terminal and look for `[desktop-mounts]` lines -- they give the reason
    ("libfuse3 not found", "mount point is not empty", "this engine build has no OS-mount support", ...).
 4. Flatpak / Snap sandboxes cannot use FUSE without extra permissions.
+5. Is it really mounted? `mount | grep vaultexplorer` and `ls ~/.local/share/VaultExplorer/mnt`. If it is, but the
+   sidebar shows nothing, check that `~/.local/share/user-places.xbel` (Dolphin) or
+   `~/.config/gtk-3.0/bookmarks` exists -- they are only edited when they already exist.
+6. The app and the engine must agree on the ABI: `kVeAbiVersion` in `ve_native.dart` must equal
+   `VE_ABI_VERSION` in `ve_engine.h` (both 9).
 
 ## Windows (WinFsp) specifics
 
@@ -138,8 +156,6 @@ this process is both FUSE server and (through children) client, so a bug would o
 * Reads go through `ve_read_file_chunk` per request (open/seek/read/close inside the backend); the
   stream API would be cheaper for large sequential reads.
 * No xattrs, no `fallocate` modes other than plain extend, `chmod`/`chown` are accepted and ignored.
-* Linux file-manager sidebar entry (Nautilus `gtk-3.0/bookmarks`, Dolphin `user-places.xbel`) and
-  "reveal in file manager" are not done; see Cryptomator's `integrations-linux` for the approach.
 * NTFS: ntfs-3g prints "Could not delete inode cache entry" on unlink/rename (also in the unmodified
   smoke test), and in some runs "Index lookup failed" / "Failed to sync FILE_NAME" -- all checks pass, but
   run `ntfsfix`/`ntfsck` on a vault used heavily through a mount before trusting it.

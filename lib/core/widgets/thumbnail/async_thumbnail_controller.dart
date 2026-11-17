@@ -309,7 +309,7 @@ class AsyncThumbnailLoader extends _$AsyncThumbnailLoader {
         // still live -- bounded by [_maxCancellationRetries], see there.
         _cancellationRetries++;
         // Back off so a burst of cancellations doesn't retry in lockstep.
-        final delayMs = (150 * _cancellationRetries).clamp(150, 1200);
+        final delayMs = (40 * _cancellationRetries).clamp(40, 200);
         Future.delayed(Duration(milliseconds: delayMs), () {
           if (ref.mounted) _load();
         });

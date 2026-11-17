@@ -572,11 +572,13 @@ class ThumbnailHandlers(
             videoDecoderLock.lock()
             true
         } else {
-            // Non-blocking check: software MediaCodec runs ~170ms avg in parallel
-            // across cores, while waiting on a 235-535ms retriever stalls the
-            // videoLimiter slot. If SW returns null, the lock_busy fallback below
-            // still acquires videoDecoderLock.
-            videoDecoderLock.tryLock()
+            // Wait up to 100ms for hardware decoder lock before falling back to
+            // CPU software decoding, preventing catastrophic lock contention and 680ms SW decodes.
+            try {
+                videoDecoderLock.tryLock(100L, TimeUnit.MILLISECONDS)
+            } catch (_: InterruptedException) {
+                false
+            }
         }
         PerfLog.end("thumb.vid.lock_wait", lockStart)
         lockWaitMs = (System.nanoTime() - lockT0) / 1_000_000L
@@ -1466,6 +1468,120 @@ class ThumbnailHandlers(
         return ExifInterface.ORIENTATION_NORMAL
     }
 
+    /**
+     * Fast-path EXIF orientation reader for JPEGs.
+     * Scans the APP1 segment in the first 16 KB of [stream] (must support mark/reset)
+     * and extracts the TIFF IFD0 orientation tag (0x0112) without invoking
+     * [ExifInterface] or scanning through megabytes of pixel data.
+     * Returns null if not a JPEG, if APP1 is absent or beyond 16 KB, or if parsing fails.
+     */
+    private fun readJpegExifOrientation(stream: BufferedInputStream): Int? {
+        val peekLimit = 16 * 1024
+        stream.mark(peekLimit)
+        val buf = ByteArray(peekLimit)
+        var totalRead = 0
+        while (totalRead < buf.size) {
+            val n = stream.read(buf, totalRead, buf.size - totalRead)
+            if (n <= 0) break
+            totalRead += n
+        }
+        try {
+            stream.reset()
+        } catch (_: Exception) {
+            return null
+        }
+        if (totalRead < 4) return null
+        if ((buf[0].toInt() and 0xFF) != 0xFF || (buf[1].toInt() and 0xFF) != 0xD8) {
+            return null
+        }
+
+        var pos = 2
+        while (pos + 4 <= totalRead) {
+            if ((buf[pos].toInt() and 0xFF) != 0xFF) return null
+            while (pos < totalRead && (buf[pos].toInt() and 0xFF) == 0xFF) {
+                pos++
+            }
+            if (pos >= totalRead) return null
+            val marker = buf[pos++].toInt() and 0xFF
+            if (marker == 0xDA || marker == 0xD9) return null
+
+            if (pos + 2 > totalRead) return null
+            val segLen = ((buf[pos].toInt() and 0xFF) shl 8) or (buf[pos + 1].toInt() and 0xFF)
+            pos += 2
+            val payloadLen = segLen - 2
+            if (payloadLen < 0) return null
+
+            if (marker == 0xE1) {
+                if (payloadLen >= 14 && pos + payloadLen <= totalRead) {
+                    if (buf[pos] == 'E'.code.toByte() &&
+                        buf[pos + 1] == 'x'.code.toByte() &&
+                        buf[pos + 2] == 'i'.code.toByte() &&
+                        buf[pos + 3] == 'f'.code.toByte() &&
+                        buf[pos + 4] == 0.toByte() &&
+                        buf[pos + 5] == 0.toByte()
+                    ) {
+                        val tiff = pos + 6
+                        val tiffLen = payloadLen - 6
+                        if (tiffLen >= 8) {
+                            val isLE = buf[tiff] == 'I'.code.toByte() && buf[tiff + 1] == 'I'.code.toByte()
+                            val isBE = buf[tiff] == 'M'.code.toByte() && buf[tiff + 1] == 'M'.code.toByte()
+                            if (isLE || isBE) {
+                                val magic = if (isLE) {
+                                    (buf[tiff + 2].toInt() and 0xFF) or ((buf[tiff + 3].toInt() and 0xFF) shl 8)
+                                } else {
+                                    ((buf[tiff + 2].toInt() and 0xFF) shl 8) or (buf[tiff + 3].toInt() and 0xFF)
+                                }
+                                if (magic == 42) {
+                                    val ifd0Offset = if (isLE) {
+                                        (buf[tiff + 4].toLong() and 0xFFL) or
+                                            ((buf[tiff + 5].toLong() and 0xFFL) shl 8) or
+                                            ((buf[tiff + 6].toLong() and 0xFFL) shl 16) or
+                                            ((buf[tiff + 7].toLong() and 0xFFL) shl 24)
+                                    } else {
+                                        ((buf[tiff + 4].toLong() and 0xFFL) shl 24) or
+                                            ((buf[tiff + 5].toLong() and 0xFFL) shl 16) or
+                                            ((buf[tiff + 6].toLong() and 0xFFL) shl 8) or
+                                            (buf[tiff + 7].toLong() and 0xFFL)
+                                    }
+                                    val ifd0 = tiff + ifd0Offset.toInt()
+                                    if (ifd0 >= tiff && ifd0 + 2 <= pos + payloadLen) {
+                                        val count = if (isLE) {
+                                            (buf[ifd0].toInt() and 0xFF) or ((buf[ifd0 + 1].toInt() and 0xFF) shl 8)
+                                        } else {
+                                            ((buf[ifd0].toInt() and 0xFF) shl 8) or (buf[ifd0 + 1].toInt() and 0xFF)
+                                        }
+                                        var entryPos = ifd0 + 2
+                                        for (i in 0 until count) {
+                                            if (entryPos + 12 > pos + payloadLen) break
+                                            val tag = if (isLE) {
+                                                (buf[entryPos].toInt() and 0xFF) or ((buf[entryPos + 1].toInt() and 0xFF) shl 8)
+                                            } else {
+                                                ((buf[entryPos].toInt() and 0xFF) shl 8) or (buf[entryPos + 1].toInt() and 0xFF)
+                                            }
+                                            if (tag == 0x0112) {
+                                                val orientation = if (isLE) {
+                                                    (buf[entryPos + 8].toInt() and 0xFF) or ((buf[entryPos + 9].toInt() and 0xFF) shl 8)
+                                                } else {
+                                                    ((buf[entryPos + 8].toInt() and 0xFF) shl 8) or (buf[entryPos + 9].toInt() and 0xFF)
+                                                }
+                                                if (orientation in 1..8) {
+                                                    return orientation
+                                                }
+                                            }
+                                            entryPos += 12
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            pos += payloadLen
+        }
+        return null
+    }
+
     /** Single-pass native scaling + EXIF orientation via API 28+ [ImageDecoder]
      *  for local files. Returns null if [ImageDecoder] cannot handle the format
      *  so the caller falls back to [BitmapFactory]. */
@@ -1700,21 +1816,26 @@ class ThumbnailHandlers(
                 orientation
             }
         } else if (exifSniff.mightHaveExif) {
-            inputStream.mark(exifMarkLimit)
-            val orientation = runCatching {
-                ExifInterface(inputStream).getAttributeInt(
-                    ExifInterface.TAG_ORIENTATION,
-                    ExifInterface.ORIENTATION_NORMAL,
-                )
-            }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
-            try {
-                inputStream.reset()
-            } catch (e: Exception) {
-                exifResetFailed = true
-                inputStream.close()
-                inputStream = openImageInputStream(uriString, fileName, volId, isLocalStorage, localFile, streamStats)
+            val fastJpegOrientation = readJpegExifOrientation(inputStream)
+            if (fastJpegOrientation != null) {
+                fastJpegOrientation
+            } else {
+                inputStream.mark(exifMarkLimit)
+                val orientation = runCatching {
+                    ExifInterface(inputStream).getAttributeInt(
+                        ExifInterface.TAG_ORIENTATION,
+                        ExifInterface.ORIENTATION_NORMAL,
+                    )
+                }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
+                try {
+                    inputStream.reset()
+                } catch (e: Exception) {
+                    exifResetFailed = true
+                    inputStream.close()
+                    inputStream = openImageInputStream(uriString, fileName, volId, isLocalStorage, localFile, streamStats)
+                }
+                orientation
             }
-            orientation
         } else {
             ExifInterface.ORIENTATION_NORMAL
         }
@@ -2221,20 +2342,25 @@ class ThumbnailHandlers(
             var stream = openImageInputStream(uriString, fileName, volId, isLocalStorage, localFile)
             val markLimit = 1024 * 1024
             val exifOrientation = if (mightHaveExif(stream)) {
-                stream.mark(markLimit)
-                val orientation = runCatching {
-                    ExifInterface(stream).getAttributeInt(
-                        ExifInterface.TAG_ORIENTATION,
-                        ExifInterface.ORIENTATION_NORMAL,
-                    )
-                }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
-                try {
-                    stream.reset()
-                } catch (e: Exception) {
-                    stream.close()
-                    stream = openImageInputStream(uriString, fileName, volId, isLocalStorage, localFile)
+                val fastJpegOrientation = readJpegExifOrientation(stream)
+                if (fastJpegOrientation != null) {
+                    fastJpegOrientation
+                } else {
+                    stream.mark(markLimit)
+                    val orientation = runCatching {
+                        ExifInterface(stream).getAttributeInt(
+                            ExifInterface.TAG_ORIENTATION,
+                            ExifInterface.ORIENTATION_NORMAL,
+                        )
+                    }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
+                    try {
+                        stream.reset()
+                    } catch (e: Exception) {
+                        stream.close()
+                        stream = openImageInputStream(uriString, fileName, volId, isLocalStorage, localFile)
+                    }
+                    orientation
                 }
-                orientation
             } else {
                 ExifInterface.ORIENTATION_NORMAL
             }

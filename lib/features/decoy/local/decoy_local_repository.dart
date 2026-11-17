@@ -28,9 +28,9 @@ class DecoyLocalRepository {
   // which bounds how long an in-place change to a file's size can go unseen.
   static final LinkedHashMap<String, _CachedListing> _cache =
       LinkedHashMap<String, _CachedListing>();
-  static const int _cacheMaxFolders = 16;
-  static const _cacheTtl = Duration(seconds: 15);
-  static const _largeFolderCacheTtl = Duration(minutes: 2);
+  static const int _cacheMaxFolders = 32;
+  static const _cacheTtl = Duration(seconds: 60);
+  static const _largeFolderCacheTtl = Duration(minutes: 15);
   static const int _largeFolderThreshold = 2000;
 
   /// Clears the in-memory cache of directory listings.
@@ -349,7 +349,12 @@ Future<Directory> createFolder(String parentPath, String desiredName) async {
 /// Those paths are always `<directory>/<name>` with `/` separators on Android,
 /// so cutting after the last `/` is exact and avoids `package:path`'s full
 /// parse of every entry (a listing of thousands of files called it once each).
-String _baseName(String path) => path.substring(path.lastIndexOf('/') + 1);
+String _baseName(String path) {
+  final slash = path.lastIndexOf('/');
+  final backslash = path.lastIndexOf(r'\');
+  final idx = slash > backslash ? slash : backslash;
+  return idx >= 0 ? path.substring(idx + 1) : path;
+}
 
 class _CachedListing {
   _CachedListing(this.entries, this.folderModified, this.cachedAt);

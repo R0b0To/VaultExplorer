@@ -83,9 +83,8 @@ class _SkinAreaScopeState extends State<SkinAreaScope> {
     return _SkinAreaMarker(
       colors: colors,
       baseTheme: base,
-      child: AnimatedTheme(
+      child: Theme(
         data: _scoped!,
-        duration: Duration.zero,
         child: widget.child,
       ),
     );

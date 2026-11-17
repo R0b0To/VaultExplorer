@@ -6454,14 +6454,14 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     // inset (plus the system inset above), so the list has to clear that same
     // height. Without it the bar sits on top of the last results while the
     // keyboard is up, and they cannot be scrolled out from under it.
-    final double searchBarKeyboardLift = _searchActive
-        ? MediaQuery.viewInsetsOf(context).bottom
-        : 0.0;
-    final bottomContentClearance =
+    // The keyboard insets subscription is kept in the descendant DragTarget
+    // builder below so animating the keyboard does not rebuild the entire
+    // directory view and its app bar / toolbar controls on every frame.
+    final baseBottomContentClearance =
         bottomSystemInset +
         (hasFloatingActions ? 16.0 + fabClearance : 0.0) +
         (showBookmarkBarInViewport ? 48.0 : 0.0) +
-        (_searchActive ? 64.0 + searchBarKeyboardLift : 0.0);
+        (_searchActive ? 64.0 : 0.0);
 
     final double bannerBottomOffset = _searchActive
         ? 0.0
@@ -6970,7 +6970,12 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                                   selectedItems: selectedItems,
                                                   searchActive: _searchActive,
                                               bottomClearance:
-                                                  bottomContentClearance,
+                                                  baseBottomContentClearance +
+                                                  (_searchActive
+                                                      ? MediaQuery.viewInsetsOf(
+                                                          context,
+                                                        ).bottom
+                                                      : 0.0),
                                               mountedDocProviderFolders:
                                                   _mountedDocProviderFolders,
                                                         isFolderMounted:
@@ -7159,7 +7164,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                                                   const {},
                                                               searchActive: false,
                                                               bottomClearance:
-                                                                  bottomContentClearance,
+                                                                  baseBottomContentClearance,
                                                               mountedDocProviderFolders:
                                                                   _mountedDocProviderFolders,
                                                               isFolderMounted: (e) =>

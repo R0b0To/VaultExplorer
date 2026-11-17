@@ -45,7 +45,7 @@ class DeviceCapabilityService {
           case 'HIGH':
           ThumbnailConcurrency.resizeForDevice(
             imageConcurrency: 6,
-            videoConcurrency: 4,
+            videoConcurrency: 2,
             inFlightCapacity: 240,
           );
           ThumbnailCacheService.resizeMemoryBudget(64 * 1024 * 1024); // 64 MB

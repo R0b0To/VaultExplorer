@@ -405,6 +405,9 @@ void _onControllerChange() {
     _popupBadge = _computePopupBadge(fraction);
 
     ThumbnailConcurrency.imageLimiter.cancelTier(TaskPriority.visible);
+    ThumbnailConcurrency.imageLimiter.cancelTier(TaskPriority.adjacent);
+    ThumbnailConcurrency.videoLimiter.cancelTier(TaskPriority.visible);
+    ThumbnailConcurrency.videoLimiter.cancelTier(TaskPriority.adjacent);
 
      try {
       // Fires on every index change while dragging the scrubber, so this is

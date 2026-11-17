@@ -1367,8 +1367,7 @@ class ThumbnailHandlers(
         ContainerInputStream(activity, uriString, fileName, volId).apply { mark(0) }
     }
 
-  private fun imageBufferSize(isLocalStorage: Boolean, localFile: java.io.File?): Int =
-        if (isLocalStorage && localFile != null) 65536 else 262144
+    private fun imageBufferSize(isLocalStorage: Boolean, localFile: java.io.File?): Int = 65536
 
     private fun openImageInputStream(
         uriString: String,

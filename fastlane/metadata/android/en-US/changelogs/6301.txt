@@ -1,0 +1,6 @@
+• Faster folder navigation and smoother file browsing.
+• Optimized thumbnail loading, caching and video previews.
+• Improved gallery performance, sorting and media handling.
+• Enhanced folder-vault operations and filesystem reliability.
+• Fixed symbolic-link extension handling.
+• Music mode now opens directly in Tracks view.

@@ -10,6 +10,7 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/features/browser/viewer/close_on_container_lock.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/theme/file_manager_skin_scope.dart';
@@ -3192,10 +3193,15 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       if (!mounted) return;
       _navNotifier.setLoading(false);
 
+      // The preview shows a copy under a throw-away local container, so the
+      // screen cannot tell which vault it came from: close it here if the
+      // archive's vault is locked while it is open.
       if (fileName.toLowerCase().endsWith('.pdf')) {
-        await Navigator.push(
+        await pushClosingWhenVolumeGone<void>(
           context,
-          MaterialPageRoute(
+          _vaultEvents,
+          widget.container.volId,
+          MaterialPageRoute<void>(
             builder: (_) => PdfViewerScreen(
               container: previewContainer,
               filePath: stagedFileName,
@@ -3203,8 +3209,10 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
           ),
         );
       } else {
-        await Navigator.push(
+        await pushClosingWhenVolumeGone<void>(
           context,
+          _vaultEvents,
+          widget.container.volId,
           _buildMediaViewerRoute(
             mediaFiles: [stagedFileName],
             initialIndex: 0,
@@ -3233,9 +3241,11 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         readOnly: true,
       );
       _navNotifier.setLoading(false);
-      await Navigator.push(
+      await pushClosingWhenVolumeGone<void>(
         context,
-        MaterialPageRoute(
+        _vaultEvents,
+        widget.container.volId,
+        MaterialPageRoute<void>(
           builder: (_) => TextEditorScreen(
             container: previewContainer,
             filePath: p.basename(preview.path),

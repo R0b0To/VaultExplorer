@@ -75,6 +75,7 @@ extern "C" VE_API int32_t ve_mount_last_error(char* buf, size_t cap) {
 #include <dirent.h>
 #include <dlfcn.h>
 #include <fcntl.h>
+#include <link.h>  // dlinfo / link_map (glibc), for the loaded-library path in loadApi()
 #include <poll.h>
 #include <signal.h>
 #include <spawn.h>
@@ -120,23 +121,48 @@ bool sym(void* lib, const char* name, T& out) {
 
 void loadApi() {
     const char* names[] = {"libfuse3.so.4", "libfuse3.so.3", "libfuse3.so"};
+    const char* loadedAs = nullptr;
     for (const char* n : names) {
         gApi.lib = dlopen(n, RTLD_NOW | RTLD_LOCAL);
-        if (gApi.lib) break;
+        if (gApi.lib) {
+            loadedAs = n;
+            break;
+        }
     }
     if (!gApi.lib) {
         gApiError = "libfuse3 not found (install the 'fuse3' package)";
         return;
     }
-    const bool ok = sym(gApi.lib, "fuse_new", gApi.fnNew) && sym(gApi.lib, "fuse_mount", gApi.fnMount) &&
-                    sym(gApi.lib, "fuse_unmount", gApi.fnUnmount) && sym(gApi.lib, "fuse_destroy", gApi.fnDestroy) &&
-                    sym(gApi.lib, "fuse_exit", gApi.fnExit) && sym(gApi.lib, "fuse_loop", gApi.fnLoop) &&
-                    sym(gApi.lib, "fuse_get_context", gApi.fnContext) &&
-                    sym(gApi.lib, "fuse_opt_add_arg", gApi.fnOptAddArg) &&
-                    sym(gApi.lib, "fuse_opt_free_args", gApi.fnOptFreeArgs);
-    sym(gApi.lib, "fuse_pkgversion", gApi.fnPkgVersion);
-    if (!ok) {
-        gApiError = "libfuse3 is installed but missing expected symbols (too old?)";
+    // Resolve everything (no short-circuit) so the error can name every symbol that is missing.
+    std::string missing;
+    auto need = [&](const char* name, auto& out, const char* alt = nullptr) {
+        if (sym(gApi.lib, name, out) || (alt && sym(gApi.lib, alt, out))) return;
+        if (!missing.empty()) missing += ", ";
+        missing += name;
+    };
+    // libfuse >= 3.17 (libfuse3.so.4) exports `fuse_new` only as a non-default (compat) symbol version, which
+    // dlsym() cannot see; the <fuse.h> macro there calls _fuse_new_31 (extra version argument) instead. The plain
+    // 4-argument entry point is exported as the default-version symbol `fuse_new_31` on every 3.x >= 3.1 -- the same
+    // function pre-3.17 programs get, so behaviour matches what older libfuse3 builds always did.
+    need("fuse_new", gApi.fnNew, "fuse_new_31");
+    need("fuse_mount", gApi.fnMount);
+    need("fuse_unmount", gApi.fnUnmount);
+    need("fuse_destroy", gApi.fnDestroy);
+    need("fuse_exit", gApi.fnExit);
+    need("fuse_loop", gApi.fnLoop);
+    need("fuse_get_context", gApi.fnContext);
+    need("fuse_opt_add_arg", gApi.fnOptAddArg);
+    need("fuse_opt_free_args", gApi.fnOptFreeArgs);
+    sym(gApi.lib, "fuse_pkgversion", gApi.fnPkgVersion);  // optional
+    if (!missing.empty()) {
+        // Say *which* library the dynamic loader actually picked: a different libfuse3 earlier on the
+        // search path (LD_LIBRARY_PATH, conda, a snap/flatpak runtime, ...) is a likelier culprit than age.
+        std::string where = loadedAs;
+#if defined(__GLIBC__)
+        struct link_map* lm = nullptr;
+        if (dlinfo(gApi.lib, RTLD_DI_LINKMAP, &lm) == 0 && lm && lm->l_name && *lm->l_name) where = lm->l_name;
+#endif
+        gApiError = "libfuse3 loaded from " + where + " is missing: " + missing;
         dlclose(gApi.lib);
         gApi.lib = nullptr;
     }

@@ -14,7 +14,7 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
-const int kVeAbiVersion = 8;
+const int kVeAbiVersion = 9;
 
 // Result codes (ve_engine.h)
 const int veOk = 0;
@@ -26,6 +26,8 @@ const int veErrInvalidArg = 5;
 const int veErrException = 6;
 const int veErrMountFailed = 7;
 const int veErrAuthFailed = 8;
+const int veErrUnsupported = 9;
+const int veErrBusy = 10;
 
 // Folder-vault formats for ve_fv_* (VE_FV_*), and the container-format codes an unlocked folder-vault
 // slot reports (VE_FORMAT_*, see veFormatWireName).
@@ -66,6 +68,31 @@ final class VeBuffer extends Struct {
   external Pointer<Uint8> data;
   @Size()
   external int len;
+}
+
+/// `ve_mount_options` (ve_engine.h).
+final class VeMountOptions extends Struct {
+  @Int32()
+  external int structSize;
+  @Int32()
+  external int readOnly;
+  @Int32()
+  external int allowOther;
+  @Int32()
+  external int maxBufferMb;
+  external Pointer<Utf8> volumeName;
+  external Pointer<Utf8> subPath;
+}
+
+/// One row of `ve_list_mounts`.
+class VeMountInfo {
+  const VeMountInfo({required this.id, required this.volId, required this.ended, required this.mountPoint});
+  final int id;
+  final int volId;
+
+  /// True when the mount went away without ve_unmount (ejected from outside) and still needs reaping.
+  final bool ended;
+  final String mountPoint;
 }
 
 final class VeUnlockParams extends Struct {
@@ -389,6 +416,21 @@ class VeNative {
   late final int Function(Pointer<VeUnlockParams>) _unlock;
   late final void Function(int) _cancelUnlock;
   late final void Function(int) _lock;
+
+  // OS mounts (ABI 9). Bound lazily so a library built without them still loads; callers check
+  // [hasMounts] first.
+  bool get hasMounts => _lib.providesSymbol('ve_mount');
+  late final int Function(Pointer<Utf8>, int) _mountSupported =
+      _lib.lookupFunction<Int32 Function(Pointer<Utf8>, Size), int Function(Pointer<Utf8>, int)>('ve_mount_supported');
+  late final int Function(int, Pointer<Utf8>, Pointer<VeMountOptions>, Pointer<Int64>) _mount = _lib.lookupFunction<
+      Int32 Function(Int32, Pointer<Utf8>, Pointer<VeMountOptions>, Pointer<Int64>),
+      int Function(int, Pointer<Utf8>, Pointer<VeMountOptions>, Pointer<Int64>)>('ve_mount');
+  late final int Function(int, int) _unmount =
+      _lib.lookupFunction<Int32 Function(Int64, Int32), int Function(int, int)>('ve_unmount');
+  late final int Function(Pointer<VeBuffer>) _listMounts =
+      _lib.lookupFunction<Int32 Function(Pointer<VeBuffer>), int Function(Pointer<VeBuffer>)>('ve_list_mounts');
+  late final int Function(Pointer<Utf8>, int) _mountLastError =
+      _lib.lookupFunction<Int32 Function(Pointer<Utf8>, Size), int Function(Pointer<Utf8>, int)>('ve_mount_last_error');
   late final int Function(int) _format;
   late final int Function(int) _matchedCipher;
   late final int Function(int) _matchedHash;
@@ -1051,6 +1093,99 @@ class VeNative {
 
   void requestCancelUnlock(int volId) => _cancelUnlock(volId);
   void lock(int volId) => _lock(volId);
+
+  // ── OS mounts: expose an unlocked slot as a real folder (Linux: FUSE 3) ──
+
+  /// (available, reason when not). Cheap; safe to call repeatedly.
+  (bool, String) mountSupported() {
+    if (!hasMounts) return (false, 'this engine build has no OS-mount support');
+    final buf = calloc<Uint8>(256);
+    try {
+      final ok = _mountSupported(buf.cast<Utf8>(), 256) == 1;
+      return (ok, buf.cast<Utf8>().toDartString());
+    } finally {
+      calloc.free(buf);
+    }
+  }
+
+  /// Why the most recent mount/unmount failed, in words a user can act on.
+  String mountLastError() {
+    if (!hasMounts) return '';
+    final buf = calloc<Uint8>(512);
+    try {
+      _mountLastError(buf.cast<Utf8>(), 512);
+      return buf.cast<Utf8>().toDartString();
+    } finally {
+      calloc.free(buf);
+    }
+  }
+
+  /// Mounts [volId] (or its folder [subPath], vault-relative, e.g. `/Documents`) at [mountPoint].
+  /// Returns (veOk | ve* error, mount id). Blocks until the mount is serving requests: call it from a
+  /// worker isolate, not the UI isolate.
+  (int, int) mount(
+    int volId,
+    String mountPoint, {
+    bool readOnly = false,
+    bool allowOther = false,
+    int maxBufferMb = 0,
+    String? volumeName,
+    String? subPath,
+  }) {
+    if (!hasMounts) return (veErrUnsupported, 0);
+    final opts = calloc<VeMountOptions>();
+    final outId = calloc<Int64>();
+    Pointer<Utf8>? name;
+    Pointer<Utf8>? sub;
+    try {
+      name = volumeName?.toNativeUtf8();
+      sub = subPath?.toNativeUtf8();
+      opts.ref
+        ..structSize = sizeOf<VeMountOptions>()
+        ..readOnly = readOnly ? 1 : 0
+        ..allowOther = allowOther ? 1 : 0
+        ..maxBufferMb = maxBufferMb
+        ..volumeName = name ?? nullptr
+        ..subPath = sub ?? nullptr;
+      final rc = _withUtf8(mountPoint, (mp) => _mount(volId, mp, opts, outId));
+      return (rc, rc == veOk ? outId.value : 0);
+    } finally {
+      if (name != null) calloc.free(name);
+      if (sub != null) calloc.free(sub);
+      calloc.free(opts);
+      calloc.free(outId);
+    }
+  }
+
+  /// [force] false returns [veErrBusy] while files are open; true detaches regardless. Also reaps a
+  /// mount that already ended on its own.
+  int unmount(int mountId, {bool force = false}) => hasMounts ? _unmount(mountId, force ? 1 : 0) : veOk;
+
+  List<VeMountInfo> listMounts() {
+    if (!hasMounts) return const [];
+    final (rc, bytes) = _withBuffer((b) => _listMounts(b));
+    if (rc != veOk || bytes == null || bytes.length < 4) return const [];
+    final bd = ByteData.sublistView(bytes);
+    final count = bd.getUint32(0, Endian.little);
+    final out = <VeMountInfo>[];
+    var off = 4;
+    for (var i = 0; i < count && off + 4 <= bytes.length; i++) {
+      final len = bd.getUint32(off, Endian.little);
+      off += 4;
+      if (off + len > bytes.length) break;
+      final row = utf8.decode(Uint8List.sublistView(bytes, off, off + len), allowMalformed: true);
+      off += len;
+      final parts = row.split('|');
+      if (parts.length < 4) continue;
+      out.add(VeMountInfo(
+        id: int.tryParse(parts[0]) ?? 0,
+        volId: int.tryParse(parts[1]) ?? -1,
+        ended: parts[2] == 'ended',
+        mountPoint: parts.sublist(3).join('|'),
+      ));
+    }
+    return out;
+  }
   int containerFormat(int volId) => _format(volId);
   int matchedCipherId(int volId) => _matchedCipher(volId);
   int matchedHashId(int volId) => _matchedHash(volId);

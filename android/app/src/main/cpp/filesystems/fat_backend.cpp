@@ -285,6 +285,81 @@ bool fatWriteFileChunk(int volumeId, const std::string& path, uint64_t offset, c
     return success;
 }
 
+// Desktop mount layer (ffi/ve_mount_*): in-place write that does NOT truncate at offset 0. The caller
+// guarantees offset <= current size (it extends with fatTruncateFile first), so no hole is ever left
+// holding stale cluster contents.
+bool fatWriteFileAt(int volumeId, const std::string& path, uint64_t offset, const uint8_t* data, size_t length) {
+    ensureFatFsValid(volumeId);
+    if (sizeof(FSIZE_t) < sizeof(uint64_t) && offset > 0xFFFFFFFFull) return false;  // (FatFs defines a max() macro)
+    FIL f;
+    bool success = false;
+    std::string fatPath = std::string(drivePaths[volumeId]) + "/" + path;
+    const BYTE openMode = FA_WRITE | FA_OPEN_ALWAYS;
+    FRESULT fr = f_open(&f, fatPath.c_str(), openMode);
+    if (fatRemountForRetry(volumeId, fr)) {
+        fr = f_open(&f, fatPath.c_str(), openMode);
+    }
+    if (fr == FR_OK) {
+        const FRESULT seekRes = f_lseek(&f, static_cast<FSIZE_t>(offset));
+        if (seekRes == FR_OK) {
+            UINT bw = 0;
+            const FRESULT writeRes = f_write(&f, data, static_cast<UINT>(length), &bw);
+            if (writeRes == FR_OK && bw == static_cast<UINT>(length)) {
+                success = true;
+            } else {
+                logFatFailure(writeRes == FR_OK ? "writeAt(short)" : "writeAt", volumeId, writeRes);
+            }
+        } else {
+            logFatFailure("seekAt", volumeId, seekRes);
+        }
+        const FRESULT closeRes = f_close(&f);
+        if (closeRes != FR_OK) {
+            logFatFailure("closeAt", volumeId, closeRes);
+            success = false;
+        }
+    } else {
+        logFatFailure("open(writeAt)", volumeId, fr);
+    }
+    return success;
+}
+
+// Sets the size of an existing file. Shrinking drops the tail; growing appends explicit zeros (FatFs
+// would otherwise leave the new clusters uninitialised).
+bool fatTruncateFile(int volumeId, const std::string& path, uint64_t newSize) {
+    ensureFatFsValid(volumeId);
+    if (sizeof(FSIZE_t) < sizeof(uint64_t) && newSize > 0xFFFFFFFFull) return false;
+    FIL f;
+    std::string fatPath = std::string(drivePaths[volumeId]) + "/" + path;
+    const BYTE openMode = FA_READ | FA_WRITE | FA_OPEN_EXISTING;
+    FRESULT fr = f_open(&f, fatPath.c_str(), openMode);
+    if (fatRemountForRetry(volumeId, fr)) {
+        fr = f_open(&f, fatPath.c_str(), openMode);
+    }
+    if (fr != FR_OK) {
+        logFatFailure("open(truncate)", volumeId, fr);
+        return false;
+    }
+    bool ok = true;
+    const uint64_t cur = static_cast<uint64_t>(f_size(&f));
+    if (newSize < cur) {
+        ok = f_lseek(&f, static_cast<FSIZE_t>(newSize)) == FR_OK && f_truncate(&f) == FR_OK;
+    } else if (newSize > cur) {
+        ok = f_lseek(&f, static_cast<FSIZE_t>(cur)) == FR_OK;
+        static const uint8_t kZeros[4096] = {0};
+        uint64_t pos = cur;
+        while (ok && pos < newSize) {
+            const UINT n = static_cast<UINT>(std::min<uint64_t>(sizeof(kZeros), newSize - pos));
+            UINT bw = 0;
+            const FRESULT wr = f_write(&f, kZeros, n, &bw);
+            if (wr != FR_OK || bw != n) { ok = false; break; }
+            pos += n;
+        }
+    }
+    const FRESULT closeRes = f_close(&f);
+    if (closeRes != FR_OK) ok = false;
+    return ok;
+}
+
 bool fatCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const std::string& destPath,
                   const CopyProgressCallback& onProgress) {
     ensureFatFsValid(srcVolId);

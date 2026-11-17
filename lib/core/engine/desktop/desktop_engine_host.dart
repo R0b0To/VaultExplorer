@@ -28,6 +28,7 @@ import 'desktop_crypto.dart';
 import 'desktop_external.dart';
 import 'desktop_hash.dart';
 import 'desktop_images.dart';
+import 'desktop_mounts.dart';
 import 'desktop_secure_store.dart';
 import 'desktop_split_join.dart';
 import 'desktop_transfers.dart';
@@ -81,6 +82,10 @@ class DesktopEngineHost {
   /// Handing files to other apps + a few host-file helpers (see desktop_external.dart).
   final DesktopExternal _external = DesktopExternal();
 
+  /// "Expose this folder" as a real directory in the OS (FUSE on Linux; see desktop_mounts.dart) -- the
+  /// desktop counterpart of Android's DocumentsProvider.
+  late final DesktopMounts _mounts = DesktopMounts(pool: pool);
+
   final Map<String, int> _volByUri = {};
   final Map<int, String> _uriByVol = {};
   final Map<int, _SessionMeta> _meta = {};
@@ -114,7 +119,6 @@ class DesktopEngineHost {
     'openBatterySettings': true,
     'requestNotificationPermission': true,
     'openAppSettings': true,
-    'getMountedContainerFolders': <Object?>[],
     'isShareTargetEnabled': false,
     'setShareTargetEnabled': null,
     'isUsbAttachPromptEnabled': false,
@@ -232,6 +236,24 @@ class DesktopEngineHost {
           final meta = vol == null ? null : _meta[vol];
           if (meta == null) return false;
           meta.displayName = (args['displayName'] as String?) ?? meta.displayName;
+          // The per-container "document provider" setting: on Android it registers the container as a
+          // DocumentsProvider root; here it is an OS mount of the whole vault, following the setting live.
+          final dp = args['documentProvider'];
+          if (dp is bool) {
+            final uri = args['filePath'] as String;
+            if (dp) {
+              final ok = await _mounts.mount(
+                vol: vol!,
+                path: '',
+                displayName: meta.displayName,
+                containerName: p.basenameWithoutExtension(uri),
+                readOnly: meta.readOnly,
+              );
+              if (ok) _reveal(vol, '');
+            } else {
+              await _mounts.unmount(vol: vol!, path: '');
+            }
+          }
           return true;
         }
       case ChannelMethods.getDeviceCapabilityProfile:
@@ -336,6 +358,29 @@ class DesktopEngineHost {
         return null;
       case ChannelMethods.lockContainer:
         return _lock(args['filePath'] as String);
+
+      // ── OS mounts (Android: the folder DocumentsProvider) ──
+      case ChannelMethods.mountContainerFolder:
+        {
+          final uri = args['filePath'] as String;
+          final vol = _vol(uri);
+          final path = (args['path'] as String?) ?? '';
+          final ok = await _mounts.mount(
+            vol: vol,
+            path: path,
+            displayName: args['displayName'] as String?,
+            containerName: p.basenameWithoutExtension(uri),
+          );
+          if (ok) _reveal(vol, path);
+          return ok;
+        }
+      case ChannelMethods.unmountContainerFolder:
+        return _mounts.unmount(vol: _vol(args['filePath']), path: (args['path'] as String?) ?? '');
+      case ChannelMethods.getMountedContainerFolders:
+        {
+          final vol = _volByUri[args['filePath']];
+          return vol == null ? <Object?>[] : _mounts.paths(vol);
+        }
 
       case ChannelMethods.listDirectory:
         {
@@ -597,6 +642,7 @@ class DesktopEngineHost {
     // to hold it, so it is not surfaced.
     final derived = result['derivedKey'];
     if (derived is Uint8List) derived.fillRange(0, derived.length, 0);
+    _exposeAfterUnlock(vol, root, args);
     return {
       'volId': vol,
       'files': (result['files'] as List<Object?>).cast<String>(),
@@ -894,6 +940,7 @@ class DesktopEngineHost {
           format: result['format'] as String,
           readOnly: args['readOnly'] == true,
         );
+        _exposeAfterUnlock(vol, uri, args);
         return {
           'volId': vol,
           'files': (result['files'] as List<Object?>).cast<String>(),
@@ -917,6 +964,57 @@ class DesktopEngineHost {
     }
   }
 
+  /// Opens a mounted folder in the OS file manager. There is no sidebar entry for it yet and the mounts
+  /// live under a hidden ~/.local path, so without this an explicit "expose" would look like nothing happened.
+  void _reveal(int vol, String path) {
+    final mp = _mounts.mountPointOf(vol, path);
+    if (mp == null) return;
+    // A bare drive letter ("Z:") means "the current directory on Z:"; Explorer needs "Z:\\".
+    final target = (Platform.isWindows && mp.length == 2 && mp[1] == ':') ? '$mp\\' : mp;
+    unawaited(_external.launch(target));
+  }
+
+  /// Android registers a container as a DocumentsProvider root at unlock (the per-container "document
+  /// provider" setting) and re-exposes the folders the user had exposed before (`autoMountFolders`). The
+  /// desktop equivalent is an OS mount of the whole vault / of those folders. Fire-and-forget: unlocking
+  /// must not wait on (or fail because of) a mount; a failure is logged with its reason.
+  void _exposeAfterUnlock(int vol, String uri, Map<Object?, Object?> args) {
+    final whole = args['documentProvider'] == true;
+    final folders = <String>[
+      for (final f in (args['autoMountFolders'] as List?) ?? const <Object?>[])
+        if (f is String && f.isNotEmpty) f,
+    ];
+    if (!whole && folders.isEmpty) return;
+    final meta = _meta[vol];
+    final container = p.basenameWithoutExtension(uri);
+    unawaited(() async {
+      if (whole) {
+        final ok = await _mounts.mount(
+          vol: vol,
+          path: '',
+          displayName: meta?.displayName,
+          containerName: container,
+          readOnly: meta?.readOnly ?? false,
+        );
+        if (ok) {
+          _reveal(vol, '');
+        } else {
+          debugPrint('[desktop-mounts] could not expose "$container": ${_mounts.lastError}');
+        }
+      }
+      for (final f in folders) {
+        final ok = await _mounts.mount(
+          vol: vol,
+          path: f,
+          displayName: p.basename(f),
+          containerName: container,
+          readOnly: meta?.readOnly ?? false,
+        );
+        if (!ok) debugPrint('[desktop-mounts] could not expose "$f": ${_mounts.lastError}');
+      }
+    }());
+  }
+
   Future<bool> _lock(String uri) async {
     final vol = _volByUri[uri];
     if (vol == null) return true; // already locked
@@ -929,6 +1027,7 @@ class DesktopEngineHost {
   // ── sessions ───────────────────────────────────────────────────────────
 
   void _forget(int vol) {
+    _mounts.forgetVolume(vol); // the engine unmounts a slot's mounts when it locks it
     final uri = _uriByVol.remove(vol);
     if (uri != null) _volByUri.remove(uri);
     _meta.remove(vol);
@@ -1230,6 +1329,7 @@ class DesktopEngineHost {
     _uriByVol.clear();
     _volByUri.clear();
     _meta.clear();
+    await _mounts.dispose();
     await _external.cleanupAll();
     await _hash.dispose();
     await pool.dispose();

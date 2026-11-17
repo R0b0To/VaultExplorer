@@ -210,6 +210,34 @@ Object? veExecute(VeNative n, String op, List<Object?> a) {
       n.lock(a[0] as int);
       return null;
 
+    // ── OS mounts ──
+    case 'mountSupported':
+      {
+        final (ok, reason) = n.mountSupported();
+        return [ok, reason];
+      }
+    case 'mount':
+      {
+        // [vol, mountPoint, readOnly, volumeName, subPath]
+        final (rc, id) = n.mount(
+          a[0] as int,
+          a[1] as String,
+          readOnly: a[2] as bool,
+          volumeName: a[3] as String?,
+          subPath: a[4] as String?,
+        );
+        return [rc, id, rc == veOk ? '' : n.mountLastError()];
+      }
+    case 'unmount':
+      {
+        final rc = n.unmount(a[0] as int, force: a[1] as bool);
+        return [rc, rc == veOk ? '' : n.mountLastError()];
+      }
+    case 'listMounts':
+      return [
+        for (final m in n.listMounts()) [m.id, m.volId, m.ended, m.mountPoint],
+      ];
+
     // ── folder vaults (gocryptfs / Cryptomator / CryFS) ──
     case 'fvSupported':
       return n.fvSupported;

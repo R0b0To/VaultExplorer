@@ -13,6 +13,7 @@
 
 #include "ve_engine.h"
 #include "ve_foldervault.h"
+#include "ve_mount_internal.h"
 
 #include <algorithm>
 #include <atomic>
@@ -284,6 +285,9 @@ extern "C" VE_API void ve_request_cancel_unlock(int32_t vol_id) {
 
 extern "C" VE_API void ve_lock(int32_t vol_id) {
     try {
+        // OS mounts first: they commit pending writes through this very slot, and must be gone before the
+        // keys are wiped (otherwise a live mount would hand out errors -- or worse, stale data).
+        ve_internal_unmount_volume(vol_id);
         if (vefv::isSlot(vol_id)) { vefv::closeSlot(vol_id); return; }  // folder vault: wipe keys, free the slot
         lockSlot(vol_id);
     } catch (...) {}
@@ -622,6 +626,59 @@ extern "C" VE_API int32_t ve_set_last_modified(int32_t vol, const char* path, in
         return okOrFailed(fsSetLastModifiedTime(vol, path, static_cast<uint64_t>(epoch_seconds)));
     });
     VE_CATCH(VE_ERR_EXCEPTION)
+}
+
+// ── random-access writes (desktop mount layer) ───────────────────────────────────────────────────────
+
+extern "C" VE_API int32_t ve_write_file_at(int32_t vol, const char* path, int64_t offset, const uint8_t* data, size_t len) {
+    if (!path || !validVol(vol) || offset < 0 || len > kMaxChunk || (len > 0 && !data)) return VE_ERR_INVALID_ARG;
+    VE_TRY
+    if (vefv::isSlot(vol)) return VE_ERR_UNSUPPORTED;
+    return withMounted(vol, "writeFileAt", true, [&](auto&) {
+        return okOrFailed(fsWriteFileAt(vol, path, static_cast<uint64_t>(offset), data, len));
+    });
+    VE_CATCH(VE_ERR_EXCEPTION)
+}
+
+extern "C" VE_API int32_t ve_truncate(int32_t vol, const char* path, int64_t size) {
+    if (!path || !validVol(vol) || size < 0) return VE_ERR_INVALID_ARG;
+    VE_TRY
+    if (vefv::isSlot(vol)) return VE_ERR_UNSUPPORTED;
+    return withMounted(vol, "truncate", true, [&](auto&) {
+        return okOrFailed(fsTruncateFile(vol, path, static_cast<uint64_t>(size)));
+    });
+    VE_CATCH(VE_ERR_EXCEPTION)
+}
+
+extern "C" VE_API int32_t ve_create_empty_file(int32_t vol, const char* path) {
+    if (!path || !validVol(vol)) return VE_ERR_INVALID_ARG;
+    VE_TRY
+    if (vefv::isSlot(vol)) {
+        int32_t rc = vefv::writeChunk(vol, path, 0, nullptr, 0);
+        return rc == VE_OK ? vefv::finishWrite(vol, path) : rc;
+    }
+    return withMounted(vol, "createEmptyFile", true, [&](auto&) {
+        return okOrFailed(fsCreateEmptyFile(vol, path));
+    });
+    VE_CATCH(VE_ERR_EXCEPTION)
+}
+
+// Facts the mount layer needs that the public ABI does not carry (see ve_mount_internal.h).
+bool ve_internal_vol_traits(int32_t vol, bool* folderVault, bool* caseInsensitive, bool* readOnly) {
+    if (!validVol(vol)) return false;
+    const bool fv = vefv::isSlot(vol);
+    if (folderVault) *folderVault = fv;
+    if (fv) {
+        if (caseInsensitive) *caseInsensitive = false;
+        if (readOnly) *readOnly = vefv::isReadOnly(vol);
+        return true;
+    }
+    if (caseInsensitive) {
+        const auto t = volumes[vol].fsType;
+        *caseInsensitive = (t == VolumeState::FS_FATFS || t == VolumeState::FS_NTFS);
+    }
+    if (readOnly) *readOnly = isVolumeReadOnly(vol);
+    return true;
 }
 
 extern "C" VE_API int32_t ve_import_file(int32_t vol, const char* vault_path,

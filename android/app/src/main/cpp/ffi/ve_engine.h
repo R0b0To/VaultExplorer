@@ -38,7 +38,7 @@ extern "C" {
 #  define VE_API __attribute__((visibility("default")))
 #endif
 
-#define VE_ABI_VERSION 8 /* bump whenever a function/struct is added or changed; the Dart side checks it */
+#define VE_ABI_VERSION 9 /* bump whenever a function/struct is added or changed; the Dart side checks it */
 
 /* ---- result codes ------------------------------------------------------- */
 #define VE_OK 0
@@ -50,6 +50,8 @@ extern "C" {
 #define VE_ERR_EXCEPTION 6     /* a C++ exception was caught at the boundary */
 #define VE_ERR_MOUNT_FAILED 7  /* decrypted OK but the filesystem could not be mounted */
 #define VE_ERR_AUTH_FAILED 8   /* the supplied OLD password / keyfile did not verify (LUKS password change) */
+#define VE_ERR_UNSUPPORTED 9   /* the operation does not exist for this kind of slot / on this platform */
+#define VE_ERR_BUSY 10         /* refused because the resource is in use (e.g. unmount with open files) */
 
 /* ---- library info / logging -------------------------------------------- */
 VE_API int32_t ve_abi_version(void);
@@ -449,6 +451,52 @@ VE_API int32_t ve_fv_hidden_entry_count(int32_t vol_id, const char* path);
 VE_API int32_t ve_fv_finish_write(int32_t vol_id, const char* path);
 /* Brackets a burst of writes (kind 0) or deletes (kind 1) so the vault can defer index work. */
 VE_API int32_t ve_fv_batch(int32_t vol_id, int32_t kind, int32_t begin);
+
+/* ---- random-access writes (block containers) ------------------------------------------------------
+ * ve_write_file_chunk keeps its historical meaning (a write at offset 0 REPLACES the file). The two calls
+ * below are for callers that need ordinary file semantics -- the OS mount layer.
+ *   ve_write_file_at     writes `len` bytes at `offset` into an EXISTING file without touching the rest.
+ *                        `offset` must be <= the current size (grow with ve_truncate first).
+ *   ve_truncate          sets the size of an existing file; growing zero-fills.
+ *   ve_create_empty_file creates an empty file (a folder vault commits it immediately).
+ * Folder-vault slots only accept chunks in order from offset 0 + ve_fv_finish_write, so the first two
+ * return VE_ERR_UNSUPPORTED there (the mount layer buffers instead). */
+VE_API int32_t ve_write_file_at(int32_t vol_id, const char* path, int64_t offset, const uint8_t* data, size_t len);
+VE_API int32_t ve_truncate(int32_t vol_id, const char* path, int64_t size);
+VE_API int32_t ve_create_empty_file(int32_t vol_id, const char* path);
+
+/* ---- OS mounts (Linux: FUSE 3; Windows: WinFsp, not built yet) -------------------------------------
+ * Exposes an unlocked slot as a real folder / drive so any application and the file manager can use it --
+ * the desktop equivalent of the Android DocumentsProvider. Works for every format behind a slot.
+ *   ve_mount_supported  1 if mounting can work on this machine; else 0 and a short human-readable reason
+ *                       in reason_buf (e.g. "libfuse3 / fusermount3 not found").
+ *   ve_mount            mount_point must be an existing, empty directory owned by the caller (or absent,
+ *                       in which case it is created). *out_mount_id receives the mount's id.
+ *   ve_unmount          unmounts and commits pending writes. force=0 returns VE_ERR_BUSY if files are open;
+ *                       force=1 detaches regardless. Also reaps a mount that already ended on its own.
+ *   ve_list_mounts      u32 count, then per mount u32 length + UTF-8 "<id>|<vol>|<state>|<mount point>"
+ *                       with state "active" or "ended" (someone unmounted it from outside).
+ *   ve_set_mount_callback  event 1 = mount `mount_id` ended without ve_unmount (external eject / crash of the
+ *                       FUSE side). Called from a native thread: forward it to Dart with NativeCallable.listener.
+ * ve_lock() unmounts every mount of the slot first, so key material is never wiped under a live mount. */
+typedef struct ve_mount_options {
+    int32_t struct_size;        /* sizeof(ve_mount_options) */
+    int32_t read_only;          /* mount read-only even if the slot is writable */
+    int32_t allow_other;        /* let other users reach it (Linux: needs user_allow_other in /etc/fuse.conf) */
+    int32_t max_buffer_mb;      /* per open file, folder vaults: in-memory cap for in-place edits; 0 = 256 */
+    const char* volume_name;    /* shown by the file manager; NULL = "VaultExplorer" */
+    const char* sub_path;       /* vault folder to expose, e.g. "/Documents"; NULL or "/" = whole vault */
+} ve_mount_options;
+
+VE_API int32_t ve_mount_supported(char* reason_buf, size_t reason_cap);
+VE_API int32_t ve_mount(int32_t vol_id, const char* mount_point_utf8, const ve_mount_options* opts,
+                        int64_t* out_mount_id);
+VE_API int32_t ve_unmount(int64_t mount_id, int32_t force);
+VE_API int32_t ve_list_mounts(ve_buffer* out);
+VE_API void ve_set_mount_callback(void (*cb)(int64_t mount_id, int32_t event));
+/* Human-readable reason for the most recent failed ve_mount / ve_unmount (e.g. "mount point is not empty").
+ * Returns the message length; copies at most cap-1 bytes + NUL into buf. */
+VE_API int32_t ve_mount_last_error(char* buf, size_t cap);
 
 #ifdef __cplusplus
 }

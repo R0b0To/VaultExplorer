@@ -1103,6 +1103,42 @@ bool extWriteFileChunk(int volumeId, const std::string& path, uint64_t offset, c
     }
     return success;
 }
+
+// Desktop mount layer: in-place write without the truncate at offset 0 (the file must already exist).
+bool extWriteFileAt(int volumeId, const std::string& path, uint64_t offset, const uint8_t* data, size_t length) {
+    auto& v = volumes[volumeId];
+    bool success = false;
+    ensureExtBitmapsLoaded(volumeId);
+    ext2_file_t file = nullptr;
+    if (extOpenFile(v.extFs, path, true, false, &file)) {
+        __u64 position = 0;
+        unsigned int written = 0;
+        if (ext2fs_file_llseek(file, static_cast<__u64>(offset), EXT2_SEEK_SET, &position) == 0 &&
+            (length == 0 ||
+             (ext2fs_file_write(file, data, static_cast<unsigned int>(length), &written) == 0 &&
+              written == static_cast<unsigned int>(length))) &&
+            ext2fs_file_flush(file) == 0) {
+            ext2fs_flush(v.extFs);
+            success = true;
+        }
+        ext2fs_file_close(file);
+    }
+    return success;
+}
+
+// Sets the size of an existing file (grown space is a hole and reads back as zeros).
+bool extTruncateFile(int volumeId, const std::string& path, uint64_t newSize) {
+    auto& v = volumes[volumeId];
+    bool ok = false;
+    ensureExtBitmapsLoaded(volumeId);
+    ext2_file_t file = nullptr;
+    if (extOpenFile(v.extFs, path, true, false, &file)) {
+        ok = ext2fs_file_set_size2(file, static_cast<ext2_off64_t>(newSize)) == 0 && ext2fs_file_flush(file) == 0;
+        ext2fs_file_close(file);
+        if (ok) ext2fs_flush(v.extFs);
+    }
+    return ok;
+}
 bool extCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const std::string& destPath,
                   const CopyProgressCallback& onProgress) {
     auto& srcV = volumes[srcVolId];

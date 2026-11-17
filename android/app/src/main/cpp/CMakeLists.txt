@@ -646,7 +646,9 @@ if(VAULTEXPLORER_DESKTOP)
             ffi/ve_engine.cpp
             ffi/ve_crypto.cpp
             ffi/ve_foldervault.cpp
-            ffi/ve_callbacks.cpp)
+            ffi/ve_callbacks.cpp
+            ffi/ve_mount_fs.cpp
+            ffi/ve_mount_fuse.cpp)
     if(WIN32)
         # pread/pwrite over CRT descriptors + BCryptGenRandom (the only file that includes <windows.h>)
         list(APPEND VE_ENGINE_SOURCES ffi/ve_win_platform.cpp)
@@ -774,6 +776,36 @@ if(VAULTEXPLORER_DESKTOP)
     find_package(Threads REQUIRED)
     target_link_libraries(vaultexplorer Threads::Threads)
     if(WIN32)
+        # OS mounts through WinFsp's FUSE 3 API (ffi/ve_mount_winfsp.cpp). winfsp-x64.dll is loaded at run time
+        # from WinFsp's install dir, so only WinFsp's *headers* (the "Developer" install component, or
+        # -DVE_WINFSP_INCLUDE_DIR=<winfsp>/inc) are needed to build. They are not vendored: WinFsp is
+        # GPLv3 with a FLOSS exception -- check that against this project's license.
+        find_path(VE_WINFSP_INCLUDE_DIR fuse3/fuse.h
+            PATHS "$ENV{ProgramFiles\(x86\)}/WinFsp/inc" "$ENV{ProgramFiles}/WinFsp/inc" "C:/Program Files (x86)/WinFsp/inc")
+        if(VE_WINFSP_INCLUDE_DIR)
+            target_sources(vaultexplorer PRIVATE ffi/ve_mount_winfsp.cpp)
+            target_compile_definitions(vaultexplorer PRIVATE VE_HAVE_WINFSP=1)
+            target_include_directories(vaultexplorer PRIVATE ${VE_WINFSP_INCLUDE_DIR})
+            message(STATUS "WinFsp headers found (${VE_WINFSP_INCLUDE_DIR}): OS mounts enabled")
+        else()
+            message(WARNING "WinFsp headers not found: building WITHOUT OS mounts (install WinFsp with the Developer component, or pass -DVE_WINFSP_INCLUDE_DIR=...)")
+        endif()
+    endif()
+    if(NOT WIN32)
+        # OS mounts (ffi/ve_mount_*.cpp). libfuse3 is dlopen()ed at runtime, so the library never links to it
+        # and still loads on machines without FUSE; only the *headers* are needed here, for the struct layouts.
+        find_path(VE_FUSE3_INCLUDE_DIR fuse3/fuse.h)
+        if(VE_FUSE3_INCLUDE_DIR)
+            target_compile_definitions(vaultexplorer PRIVATE VE_HAVE_FUSE3=1)
+            target_include_directories(vaultexplorer PRIVATE ${VE_FUSE3_INCLUDE_DIR})
+            set_source_files_properties(ffi/ve_mount_fuse.cpp PROPERTIES COMPILE_DEFINITIONS "_FILE_OFFSET_BITS=64")
+            message(STATUS "FUSE 3 headers found (${VE_FUSE3_INCLUDE_DIR}): OS mounts enabled")
+        else()
+            message(WARNING "libfuse3 development headers not found (Debian/Ubuntu: libfuse3-dev): building WITHOUT OS mounts")
+        endif()
+        target_link_libraries(vaultexplorer ${CMAKE_DL_LIBS})
+    endif()
+    if(WIN32)
         target_compile_definitions(vaultexplorer PRIVATE VE_NO_FOLDERVAULT=1)
     endif()
     if(WIN32)
@@ -818,6 +850,15 @@ if(VAULTEXPLORER_DESKTOP)
     target_link_libraries(ve_smoke_test vaultexplorer)
     if(WIN32)
         target_link_options(ve_smoke_test PRIVATE -static)
+    endif()
+
+    # Mount-layer test. It compiles ffi/ve_mount_fs.cpp into itself (the library keeps its internals
+    # hidden) and drives it through the exported ve_* ABI, on every container format and a folder vault.
+    # (POSIX-only: it drives real FUSE mounts with fusermount3, cp, sed, ...)
+    if(NOT WIN32)
+        add_executable(ve_mount_test ffi/test/ve_mount_test.cpp ffi/ve_mount_fs.cpp)
+        target_include_directories(ve_mount_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ffi)
+        target_link_libraries(ve_mount_test vaultexplorer mbedcrypto)
     endif()
 endif()
 

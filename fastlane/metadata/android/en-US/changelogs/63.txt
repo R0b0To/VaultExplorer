@@ -33,3 +33,5 @@
 - Added directory listing cache, MD5 utility, and browser controller tests.
 - Expanded native folder-vault tests and documentation.
 - Removed duplicated Kotlin implementations of folder-vault cryptographic and format-handling components in favor of the native implementation.
+
+SHA256 Signature: `0bde9d3b0ee3f56617d02632c843b1629bf0b2faa4560dff5d26f651dc325f19`

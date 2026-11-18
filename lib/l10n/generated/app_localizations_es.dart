@@ -7002,12 +7002,11 @@ class AppLocalizationsEs extends AppLocalizations {
       'Mostrar archivos ocultos y carpetas del sistema';
 
   @override
-  String get showNoMediaFilesLabel =>
-      'Mostrar contenido multimedia oculto por .nomedia';
+  String get showNoMediaFilesLabel => 'Mostrar archivos .nomedia';
 
   @override
   String get showNoMediaFilesDesc =>
-      'Incluir el contenido multimedia de las carpetas con un archivo .nomedia';
+      'Mostrar los archivos .nomedia en las listas de carpetas';
 
   @override
   String get dontAskAgain => 'No volver a preguntar';

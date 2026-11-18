@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
+import 'package:vaultexplorer/core/widgets/menus/back_dismissible_menu_anchor.dart';
 
 /// The quick options menu items, shared between [FileManagerOptionsMenuButton]'s
 /// own MenuAnchor and any other cascade (e.g. the FAB toolbar's "More" menu)
@@ -175,7 +176,7 @@ class _FileManagerOptionsMenuButtonState
     final cs = Theme.of(context).colorScheme;
     final l10n = context.l10n;
 
-    return MenuAnchor(
+    return BackDismissibleMenuAnchor(
       controller: _controller,
       alignmentOffset: const Offset(0, 4),
       menuChildren: buildOptionsMenuItems(

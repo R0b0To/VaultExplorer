@@ -110,6 +110,7 @@ import 'package:vaultexplorer/features/tools/models/tool_models.dart'
 import 'package:vaultexplorer/features/tools/widgets/single_file_crypto_sheet.dart';
 import 'package:vaultexplorer/features/sync/domain/sync_ignore_matcher.dart'
     show kVaultMetaDir;
+import 'package:vaultexplorer/core/widgets/menus/back_dismissible_menu_anchor.dart';
 
 typedef CategoryShowInFolderCallback = void Function(
   MountedContainer container,
@@ -2784,7 +2785,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
                   availableWidth,
                   titleStyle,
                 );
-                return MenuAnchor(
+                return BackDismissibleMenuAnchor(
                   builder: (ctx, controller, child) => InkWell(
                     borderRadius: BorderRadius.circular(8),
                     onTap: () {
@@ -3195,12 +3196,26 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       _chrome.setFloatingAction(widget.tabId, floatingWidget);
     });
 
-    final canPop = !isSelecting && !_searchActive && !_canGoUp && !_scoped;
+    // Only the focused tab has a say in back. Hidden tabs stay mounted (and so
+    // keep their PopScope registered with the route), so a background gallery
+    // tab with a scoped gallery open must not veto the system back, or the
+    // shell's "press back again to exit" can never actually exit. Watched, so
+    // the PopScope updates when this tab gains or loses focus.
+    final isActiveTabForBack = ref.watch(
+      activeBrowserTabProvider(
+        widget.workspaceConfig,
+      ).select((tab) => tab?.tabId == widget.tabId),
+    );
+    final canPop =
+        !isActiveTabForBack ||
+        (!isSelecting && !_searchActive && !_canGoUp && !_scoped);
 
     return PopScope(
       canPop: canPop,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop || !_isActiveTab) return;
+        // A menu is open: this press closes it (BackDismissibleMenuAnchor).
+        if (OpenMenuBackGuard.hasOpenMenu) return;
         if (isSelecting) {
           _clearSelection();
         } else if (_searchActive) {

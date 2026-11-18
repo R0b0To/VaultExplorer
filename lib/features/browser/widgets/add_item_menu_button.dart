@@ -8,6 +8,7 @@ import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart'
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/vault_item.dart';
 import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
+import 'package:vaultexplorer/core/widgets/menus/back_dismissible_menu_anchor.dart';
 
 /// App-bar "add item" popup button: new folder/file, camera capture, import
 /// files/folder, and the "Secure Item" submenu for each vault format.
@@ -136,7 +137,7 @@ class _AddItemMenuButtonState extends ConsumerState<AddItemMenuButton> {
             .withLockSuppression(widget.onExtractArchive),
       );
     }
-    return MenuAnchor(
+    return BackDismissibleMenuAnchor(
       builder: (context, controller, child) => _anchorButton(
         cs,
         icon: Icons.add_rounded,

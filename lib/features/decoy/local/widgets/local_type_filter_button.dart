@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/widgets/menus/back_dismissible_menu_anchor.dart';
 
 enum LocalTypeFilter { all, image, video, audio, document }
 
@@ -29,7 +30,7 @@ class LocalTypeFilterButton extends StatelessWidget {
       (LocalTypeFilter.audio, l10n.filesFilterAudio, Icons.audiotrack_outlined),
       (LocalTypeFilter.document, l10n.filesFilterDocuments, Icons.description_outlined),
     ];
-    return MenuAnchor(
+    return BackDismissibleMenuAnchor(
       builder: (context, controller, child) => IconButton(
         icon: Icon(
           value == LocalTypeFilter.all ? Icons.filter_list_rounded : Icons.filter_alt_rounded,

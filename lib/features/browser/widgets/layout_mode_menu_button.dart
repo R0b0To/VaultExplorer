@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
 import 'package:vaultexplorer/data/models/grid_aspect_ratio.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/widgets/menus/back_dismissible_menu_anchor.dart';
 
 /// The layout-mode options, shared between [LayoutModeMenuButton]'s own
 /// MenuAnchor and any other cascade (e.g. the FAB toolbar's "More" menu)
@@ -121,7 +122,7 @@ class _LayoutModeMenuButtonState extends State<LayoutModeMenuButton> {
       BrowserLayoutMode.grid => Icons.grid_view_rounded,
       BrowserLayoutMode.masonry => Icons.dashboard_rounded,
     };
-    return MenuAnchor(
+    return BackDismissibleMenuAnchor(
       builder: (context, controller, child) => IconButton(
         icon: Icon(currentIcon),
         tooltip: context.l10n.layoutOptionsTooltip,

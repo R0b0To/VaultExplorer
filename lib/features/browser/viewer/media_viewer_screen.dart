@@ -84,6 +84,7 @@ import '../../../core/theme/app_theme.dart';
 import 'native_video_controller.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
+import 'package:vaultexplorer/core/widgets/menus/back_dismissible_menu_anchor.dart';
 
 class MediaViewerScreen extends ConsumerStatefulWidget {
   final MountedContainer container;
@@ -3990,6 +3991,8 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
+        // A menu is open: this press closes it (BackDismissibleMenuAnchor).
+        if (OpenMenuBackGuard.hasOpenMenu) return;
         // A back press is as likely a misstap as any other touch: it only
         // points at the lock button.
         if (_controlsLocked) {

@@ -40,6 +40,7 @@ import 'package:vaultexplorer/features/camera/quick_capture_screen.dart';
 import 'package:vaultexplorer/features/tools/tools_screen.dart';
 import 'package:vaultexplorer/features/unlock/unlock_sheet.dart';
 import 'package:vaultexplorer/features/unlock/usb_unlock_sheet.dart';
+import 'package:vaultexplorer/core/widgets/menus/back_dismissible_menu_anchor.dart';
 
 const _kLogTag = 'MainShell';
 
@@ -1055,6 +1056,8 @@ class _MainShellState extends ConsumerState<MainShell>
       canPop: atHome && (_exitArmed || widget.returnToDecoyOnBackground),
       onPopInvokedWithResult: (bool didPop, Object? result) {
         if (didPop) return;
+        // A menu is open: this press closes it (BackDismissibleMenuAnchor).
+        if (OpenMenuBackGuard.hasOpenMenu) return;
         // The focused folder tab handles back itself.
         if (browserContentVisible && !dashboardLocationIsActive) return;
         if (atHome) {

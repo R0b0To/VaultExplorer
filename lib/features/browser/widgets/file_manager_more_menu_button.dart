@@ -9,6 +9,7 @@ import 'package:vaultexplorer/features/browser/widgets/file_manager_options_menu
 import 'package:vaultexplorer/features/browser/widgets/filter_menu_button.dart';
 import 'package:vaultexplorer/features/browser/widgets/layout_mode_menu_button.dart';
 import 'package:vaultexplorer/features/browser/widgets/sort_menu_button.dart';
+import 'package:vaultexplorer/core/widgets/menus/back_dismissible_menu_anchor.dart';
 
 /// Floating-toolbar "More" button: a single cascading [MenuAnchor] holding
 /// every toolbar action other than Add (which is promoted to its own FAB).
@@ -255,7 +256,7 @@ class FileManagerMoreMenuButton extends StatelessWidget {
       return _buildSingleActionFab(context, cs, l10n, actions.single);
     }
 
-    return MenuAnchor(
+    return BackDismissibleMenuAnchor(
       builder: (context, controller, child) => _fabShell(
         cs: cs,
         icon: Icon(Icons.more_horiz_rounded, color: cs.onSurface),
@@ -305,7 +306,7 @@ class FileManagerMoreMenuButton extends StatelessWidget {
       required List<Widget> menuChildren,
       required String tooltip,
     }) {
-      return MenuAnchor(
+      return BackDismissibleMenuAnchor(
         builder: (context, controller, child) => _fabShell(
           cs: cs,
           icon: icon,

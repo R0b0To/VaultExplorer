@@ -133,6 +133,7 @@ import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 import 'package:vaultexplorer/features/browser/models/file_category.dart';
+import 'package:vaultexplorer/core/widgets/menus/back_dismissible_menu_anchor.dart';
 
 // PathSegment used to be declared in this file; it now lives in the
 // navigation controller (see FileBrowserNavigation). Re-exported from here
@@ -7361,6 +7362,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         canPop: canPop,
         onPopInvokedWithResult: (bool didPop, Object? result) {
           if (didPop || !_isActiveTab) return;
+          // A menu is open: this press closes it (BackDismissibleMenuAnchor).
+          if (OpenMenuBackGuard.hasOpenMenu) return;
           _onSystemBack();
         },
         child: browserBody,

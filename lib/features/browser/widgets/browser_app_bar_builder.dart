@@ -20,6 +20,7 @@ import 'package:vaultexplorer/features/browser/widgets/selection_app_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/selection_app_bar_wide.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
+import 'package:vaultexplorer/core/widgets/menus/back_dismissible_menu_anchor.dart';
 
 PreferredSizeWidget buildBrowserAppBar(
   BuildContext context, {
@@ -587,7 +588,7 @@ PreferredSizeWidget buildBrowserAppBar(
           availableWidth,
           style,
         );
-        return MenuAnchor(
+        return BackDismissibleMenuAnchor(
           builder: (ctx, controller, child) => InkWell(
             borderRadius: BorderRadius.circular(8),
             onTap: () {

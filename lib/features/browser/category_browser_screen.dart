@@ -54,6 +54,7 @@ import 'package:vaultexplorer/features/sync/domain/sync_ignore_matcher.dart'
     show kVaultMetaDir;
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
+import 'package:vaultexplorer/core/widgets/menus/back_dismissible_menu_anchor.dart';
 
 /// Asks the host to open [container] at the folder holding [path], as if the
 /// user had browsed there. Supplied by whoever opens the category browser
@@ -1328,7 +1329,8 @@ class _CategoryBrowserScreenState extends ConsumerState<CategoryBrowserScreen> {
     return PopScope(
       canPop: !selecting && !_searchActive && !_canGoUp,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _handleBack();
+        // A menu is open: this press closes it (BackDismissibleMenuAnchor).
+        if (!didPop && !OpenMenuBackGuard.hasOpenMenu) _handleBack();
       },
       child: Scaffold(
         // Same as the file manager: the search bar lifts itself by the

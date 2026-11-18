@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/widgets/menus/back_dismissible_menu_anchor.dart';
 
 Widget _filterMenuItem(
   BuildContext context,
@@ -88,7 +89,7 @@ class _FilterMenuButtonState extends State<FilterMenuButton> {
     final cs = Theme.of(context).colorScheme;
     final isFilterActive = widget.currentFilter != null;
 
-    return MenuAnchor(
+    return BackDismissibleMenuAnchor(
       builder: (context, controller, child) => IconButton(
         icon: Icon(
           isFilterActive ? Icons.filter_alt_rounded : Icons.filter_alt_outlined,

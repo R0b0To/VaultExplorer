@@ -7426,7 +7426,7 @@ class AppLocalizationsPt extends AppLocalizations {
   String get advancedRenameSeparator => 'Separador';
 
   @override
-  String get advancedRenameSeparatorHint => '_ or -';
+  String get advancedRenameSeparatorHint => '_ ou -';
 
   @override
   String get advancedRenameLivePreview => 'Pré-visualização ao vivo';
@@ -8232,7 +8232,7 @@ class AppLocalizationsPt extends AppLocalizations {
   String get triggerPanicButton => 'Disparar Pânico';
 
   @override
-  String get sectionPanicBootTrigger => 'Wipe on Reboot';
+  String get sectionPanicBootTrigger => 'Apagar ao reiniciar';
 
   @override
   String get panicBootTriggerLevelLabel => 'Nível a executar ao reiniciar';
@@ -9526,57 +9526,59 @@ class AppLocalizationsPt extends AppLocalizations {
   String get cameraReviewPhotosTooltip => 'Revisar fotos capturadas';
 
   @override
-  String get vaultItemTypeAuthenticator => 'Authenticator';
+  String get vaultItemTypeAuthenticator => 'Autenticador';
 
   @override
-  String get fieldIssuer => 'Issuer';
+  String get fieldIssuer => 'Emissor';
 
   @override
-  String get fieldAuthenticatorAccount => 'Account';
+  String get fieldAuthenticatorAccount => 'Conta';
 
   @override
-  String get fieldSecretKey => 'Secret Key';
+  String get fieldSecretKey => 'Chave secreta';
 
   @override
-  String get fieldTotpAlgorithm => 'Algorithm (default: SHA1)';
+  String get fieldTotpAlgorithm => 'Algoritmo (padrão: SHA1)';
 
   @override
-  String get fieldTotpDigits => 'Digits (default: 6)';
+  String get fieldTotpDigits => 'Dígitos (padrão: 6)';
 
   @override
-  String get fieldTotpPeriod => 'Refresh Interval, seconds (default: 30)';
+  String get fieldTotpPeriod =>
+      'Intervalo de atualização, segundos (padrão: 30)';
 
   @override
-  String get authenticatorScreenTitle => 'Authenticator';
+  String get authenticatorScreenTitle => 'Autenticador';
 
   @override
-  String get authenticatorAppBarTooltip => 'Authenticator codes';
+  String get authenticatorAppBarTooltip => 'Códigos do autenticador';
 
   @override
-  String get authenticatorEmptyStateTitle => 'No authenticator codes yet';
+  String get authenticatorEmptyStateTitle =>
+      'Nenhum código de autenticador ainda';
 
   @override
   String get authenticatorEmptyStateMessage =>
-      'Add a TOTP secret to a password item, or create a standalone Authenticator item, in any unlocked vault to see live codes here.';
+      'Adicione um segredo TOTP a um item de senha ou crie um item Autenticador independente em qualquer cofre desbloqueado para ver os códigos em tempo real aqui.';
 
   @override
   String get authenticatorNoVaultsUnlockedMessage =>
-      'Unlock a vault to see its authenticator codes here.';
+      'Desbloqueie um cofre para ver seus códigos de autenticador aqui.';
 
   @override
-  String get authenticatorCodeLabel => 'Code';
+  String get authenticatorCodeLabel => 'Código';
 
   @override
-  String get authenticatorInvalidSecretError => 'Invalid secret';
+  String get authenticatorInvalidSecretError => 'Segredo inválido';
 
   @override
-  String get authenticatorAddButtonTooltip => 'Add authenticator';
+  String get authenticatorAddButtonTooltip => 'Adicionar autenticador';
 
   @override
-  String get authenticatorChooseVaultTitle => 'Choose a vault';
+  String get authenticatorChooseVaultTitle => 'Escolha um cofre';
 
   @override
-  String get authenticatorOpenItemTooltip => 'Open item';
+  String get authenticatorOpenItemTooltip => 'Abrir item';
 
   @override
   String get authenticatorNextCodeLabel => 'Próximo código';
@@ -10022,82 +10024,82 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
-  String get videoEditorEditAction => 'Edit video';
+  String get videoEditorEditAction => 'Editar vídeo';
 
   @override
-  String get videoEditorExportAction => 'Export';
+  String get videoEditorExportAction => 'Exportar';
 
   @override
-  String get videoEditorTimelineLabel => 'Video timeline';
+  String get videoEditorTimelineLabel => 'Linha do tempo do vídeo';
 
   @override
-  String get videoEditorSetStart => 'Set start';
+  String get videoEditorSetStart => 'Definir início';
 
   @override
-  String get videoEditorSetEnd => 'Set end';
+  String get videoEditorSetEnd => 'Definir fim';
 
   @override
-  String get videoEditorAddSegment => 'Add';
+  String get videoEditorAddSegment => 'Adicionar';
 
   @override
-  String get videoEditorSplit => 'Split';
+  String get videoEditorSplit => 'Dividir';
 
   @override
-  String get videoEditorDeleteSegment => 'Delete';
+  String get videoEditorDeleteSegment => 'Excluir';
 
   @override
-  String get videoEditorModeKeep => 'Keep';
+  String get videoEditorModeKeep => 'Manter';
 
   @override
-  String get videoEditorModeCutOut => 'Cut out';
+  String get videoEditorModeCutOut => 'Cortar';
 
   @override
   String get videoEditorNoSegments =>
-      'No segments yet. Move the playhead and tap Add.';
+      'Nenhum segmento ainda. Mova o indicador de reprodução e toque em Adicionar.';
 
   @override
   String videoEditorOutputSummary(int count, String duration) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Output: $count clips · $duration',
-      one: 'Output: 1 clip · $duration',
+      other: 'Saída: $count clipes · $duration',
+      one: 'Saída: 1 clipe · $duration',
     );
     return '$_temp0';
   }
 
   @override
   String videoEditorSnapNote(String start, String end) {
-    return 'Lossless cut starts on a keyframe: $start – $end';
+    return 'O corte sem perdas começa em um quadro-chave: $start – $end';
   }
 
   @override
   String get videoEditorBoundaryInvalid =>
-      'That would leave the segment too short.';
+      'Isso deixaria o segmento muito curto.';
 
   @override
-  String get videoEditorNoRoom => 'There is no room for a segment here.';
+  String get videoEditorNoRoom => 'Não há espaço para um segmento aqui.';
 
   @override
-  String get videoEditorNothingToExport => 'Nothing to export.';
+  String get videoEditorNothingToExport => 'Nada para exportar.';
 
   @override
   String get videoEditorReadOnly =>
-      'This vault is read-only, so the edited video can\'t be saved.';
+      'Este cofre é somente leitura, portanto o vídeo editado não pode ser salvo.';
 
   @override
   String videoEditorLoadFailed(String message) {
-    return 'Couldn\'t open this video: $message';
+    return 'Não foi possível abrir este vídeo: $message';
   }
 
   @override
-  String get videoEditorZoomIn => 'Zoom in';
+  String get videoEditorZoomIn => 'Aproximar';
 
   @override
-  String get videoEditorZoomOut => 'Zoom out';
+  String get videoEditorZoomOut => 'Afastar';
 
   @override
-  String get videoEditorZoomFit => 'Fit to screen';
+  String get videoEditorZoomFit => 'Ajustar à tela';
 
   @override
   String get videoEditorPrevFrame => 'Quadro anterior';
@@ -10106,92 +10108,92 @@ class AppLocalizationsPt extends AppLocalizations {
   String get videoEditorNextFrame => 'Próximo quadro';
 
   @override
-  String get videoEditorPrevKeyframe => 'Previous keyframe';
+  String get videoEditorPrevKeyframe => 'Quadro-chave anterior';
 
   @override
-  String get videoEditorNextKeyframe => 'Next keyframe';
+  String get videoEditorNextKeyframe => 'Próximo quadro-chave';
 
   @override
-  String get videoEditorExporting => 'Exporting video';
+  String get videoEditorExporting => 'Exportando vídeo';
 
   @override
   String videoEditorCutting(int current, int total) {
-    return 'Cutting clip $current of $total';
+    return 'Cortando clipe $current de $total';
   }
 
   @override
-  String get videoEditorCuttingOne => 'Cutting…';
+  String get videoEditorCuttingOne => 'Cortando…';
 
   @override
-  String get videoEditorSaving => 'Saving…';
+  String get videoEditorSaving => 'Salvando…';
 
   @override
   String videoEditorSaved(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Saved $count videos',
-      one: 'Saved 1 video',
+      other: '$count vídeos salvos',
+      one: '1 vídeo salvo',
     );
     return '$_temp0';
   }
 
   @override
   String get videoEditorAudioDropped =>
-      'Some audio tracks couldn\'t be copied.';
+      'Algumas faixas de áudio não puderam ser copiadas.';
 
   @override
   String videoEditorExportFailed(String message) {
-    return 'Export failed: $message';
+    return 'Falha na exportação: $message';
   }
 
   @override
-  String get videoEditorExportCancelled => 'Export cancelled';
+  String get videoEditorExportCancelled => 'Exportação cancelada';
 
   @override
-  String get videoEditorExportTitle => 'Export';
+  String get videoEditorExportTitle => 'Exportar';
 
   @override
   String videoEditorExportSummary(int count, String duration) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count clips · $duration',
-      one: '1 clip · $duration',
+      other: '$count clipes · $duration',
+      one: '1 clipe · $duration',
     );
     return '$_temp0';
   }
 
   @override
-  String get videoEditorExportSingle => 'Save as new video';
+  String get videoEditorExportSingle => 'Salvar como novo vídeo';
 
   @override
-  String get videoEditorExportSingleHint => 'The original stays untouched.';
+  String get videoEditorExportSingleHint => 'O original permanece inalterado.';
 
   @override
-  String get videoEditorExportMerge => 'Merge into one video';
+  String get videoEditorExportMerge => 'Mesclar em um único vídeo';
 
   @override
   String get videoEditorExportMergeHint =>
-      'Clips are joined in timeline order.';
+      'Os clipes são unidos na ordem da linha do tempo.';
 
   @override
-  String get videoEditorExportSeparate => 'Save as separate videos';
+  String get videoEditorExportSeparate => 'Salvar como vídeos separados';
 
   @override
   String videoEditorExportSeparateHint(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count new files',
-      one: 'One new file',
+      other: '$count novos arquivos',
+      one: 'Um novo arquivo',
     );
     return '$_temp0';
   }
 
   @override
   String get videoEditorLosslessNote =>
-      'Cuts are lossless, so nothing is re-encoded. Each clip starts at the nearest keyframe before your start point and ends at the next keyframe after your end point. The thin bars under the timeline show exactly what will be saved.';
+      'Os cortes são sem perdas, portanto nada é recodificado. Cada clipe começa no quadro-chave mais próximo antes do seu ponto inicial e termina no próximo quadro-chave após o seu ponto final. As barras finas sob a linha do tempo mostram exatamente o que será salvo.';
 
   @override
   String get videoEditorAnalyzing => 'Analisando vídeo…';
@@ -10545,11 +10547,11 @@ class AppLocalizationsPt extends AppLocalizations {
   String get autoSyncSavedScheduled => 'Regra e agendamento diário guardados.';
 
   @override
-  String get autoSyncScheduledTimeTitle => 'Daily run time';
+  String get autoSyncScheduledTimeTitle => 'Horário de execução diário';
 
   @override
   String get autoSyncScheduledTimeSubtitle =>
-      'Device local time. For a quick test, choose a time a minute or two from now; Android may run it later.';
+      'Hora local do dispositivo. Para um teste rápido, escolha um horário daqui a um ou dois minutos; o Android pode executá-lo mais tarde.';
 
   @override
   String get autoSyncExactAlarmAccessTitle =>

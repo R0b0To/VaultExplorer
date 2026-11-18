@@ -6973,7 +6973,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get advancedRenameSeparator => '分隔符';
 
   @override
-  String get advancedRenameSeparatorHint => '_ or -';
+  String get advancedRenameSeparatorHint => '_ 或 -';
 
   @override
   String get advancedRenameLivePreview => '实时预览';
@@ -7726,7 +7726,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get triggerPanicButton => '触发恐慌';
 
   @override
-  String get sectionPanicBootTrigger => 'Wipe on Reboot';
+  String get sectionPanicBootTrigger => '重启时清除';
 
   @override
   String get panicBootTriggerLevelLabel => '重启时运行的级别';
@@ -8886,57 +8886,56 @@ class AppLocalizationsZh extends AppLocalizations {
   String get cameraReviewPhotosTooltip => '查看已拍摄照片';
 
   @override
-  String get vaultItemTypeAuthenticator => 'Authenticator';
+  String get vaultItemTypeAuthenticator => '身份验证器';
 
   @override
-  String get fieldIssuer => 'Issuer';
+  String get fieldIssuer => '发行方';
 
   @override
-  String get fieldAuthenticatorAccount => 'Account';
+  String get fieldAuthenticatorAccount => '账户';
 
   @override
-  String get fieldSecretKey => 'Secret Key';
+  String get fieldSecretKey => '密钥';
 
   @override
-  String get fieldTotpAlgorithm => 'Algorithm (default: SHA1)';
+  String get fieldTotpAlgorithm => '算法（默认：SHA1）';
 
   @override
-  String get fieldTotpDigits => 'Digits (default: 6)';
+  String get fieldTotpDigits => '位数（默认：6）';
 
   @override
-  String get fieldTotpPeriod => 'Refresh Interval, seconds (default: 30)';
+  String get fieldTotpPeriod => '刷新间隔，秒（默认：30）';
 
   @override
-  String get authenticatorScreenTitle => 'Authenticator';
+  String get authenticatorScreenTitle => '身份验证器';
 
   @override
-  String get authenticatorAppBarTooltip => 'Authenticator codes';
+  String get authenticatorAppBarTooltip => '身份验证器代码';
 
   @override
-  String get authenticatorEmptyStateTitle => 'No authenticator codes yet';
+  String get authenticatorEmptyStateTitle => '暂无身份验证器代码';
 
   @override
   String get authenticatorEmptyStateMessage =>
-      'Add a TOTP secret to a password item, or create a standalone Authenticator item, in any unlocked vault to see live codes here.';
+      '在任何已解锁的保管库中向密码项目添加 TOTP 密钥，或创建独立的身份验证器项目，即可在此处查看实时代码。';
 
   @override
-  String get authenticatorNoVaultsUnlockedMessage =>
-      'Unlock a vault to see its authenticator codes here.';
+  String get authenticatorNoVaultsUnlockedMessage => '解锁保管库以在此处查看其身份验证器代码。';
 
   @override
-  String get authenticatorCodeLabel => 'Code';
+  String get authenticatorCodeLabel => '代码';
 
   @override
-  String get authenticatorInvalidSecretError => 'Invalid secret';
+  String get authenticatorInvalidSecretError => '无效的密钥';
 
   @override
-  String get authenticatorAddButtonTooltip => 'Add authenticator';
+  String get authenticatorAddButtonTooltip => '添加身份验证器';
 
   @override
-  String get authenticatorChooseVaultTitle => 'Choose a vault';
+  String get authenticatorChooseVaultTitle => '选择保管库';
 
   @override
-  String get authenticatorOpenItemTooltip => 'Open item';
+  String get authenticatorOpenItemTooltip => '打开项目';
 
   @override
   String get authenticatorNextCodeLabel => '下一个验证码';
@@ -9354,82 +9353,78 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get videoEditorEditAction => 'Edit video';
+  String get videoEditorEditAction => '编辑视频';
 
   @override
-  String get videoEditorExportAction => 'Export';
+  String get videoEditorExportAction => '导出';
 
   @override
-  String get videoEditorTimelineLabel => 'Video timeline';
+  String get videoEditorTimelineLabel => '视频时间线';
 
   @override
-  String get videoEditorSetStart => 'Set start';
+  String get videoEditorSetStart => '设置起点';
 
   @override
-  String get videoEditorSetEnd => 'Set end';
+  String get videoEditorSetEnd => '设置终点';
 
   @override
-  String get videoEditorAddSegment => 'Add';
+  String get videoEditorAddSegment => '添加';
 
   @override
-  String get videoEditorSplit => 'Split';
+  String get videoEditorSplit => '拆分';
 
   @override
-  String get videoEditorDeleteSegment => 'Delete';
+  String get videoEditorDeleteSegment => '删除';
 
   @override
-  String get videoEditorModeKeep => 'Keep';
+  String get videoEditorModeKeep => '保留';
 
   @override
-  String get videoEditorModeCutOut => 'Cut out';
+  String get videoEditorModeCutOut => '剪出';
 
   @override
-  String get videoEditorNoSegments =>
-      'No segments yet. Move the playhead and tap Add.';
+  String get videoEditorNoSegments => '暂无片段。移动播放指针并点击“添加”。';
 
   @override
   String videoEditorOutputSummary(int count, String duration) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Output: $count clips · $duration',
-      one: 'Output: 1 clip · $duration',
+      other: '输出：$count 个片段 · $duration',
     );
     return '$_temp0';
   }
 
   @override
   String videoEditorSnapNote(String start, String end) {
-    return 'Lossless cut starts on a keyframe: $start – $end';
+    return '无损剪切从关键帧开始：$start – $end';
   }
 
   @override
-  String get videoEditorBoundaryInvalid =>
-      'That would leave the segment too short.';
+  String get videoEditorBoundaryInvalid => '这会导致片段过短。';
 
   @override
-  String get videoEditorNoRoom => 'There is no room for a segment here.';
+  String get videoEditorNoRoom => '此处没有放置片段的空间。';
 
   @override
-  String get videoEditorNothingToExport => 'Nothing to export.';
+  String get videoEditorNothingToExport => '没有可导出的内容。';
 
   @override
-  String get videoEditorReadOnly =>
-      'This vault is read-only, so the edited video can\'t be saved.';
+  String get videoEditorReadOnly => '此保管库为只读模式，因此无法保存编辑后的视频。';
 
   @override
   String videoEditorLoadFailed(String message) {
-    return 'Couldn\'t open this video: $message';
+    return '无法打开此视频：$message';
   }
 
   @override
-  String get videoEditorZoomIn => 'Zoom in';
+  String get videoEditorZoomIn => '放大';
 
   @override
-  String get videoEditorZoomOut => 'Zoom out';
+  String get videoEditorZoomOut => '缩小';
 
   @override
-  String get videoEditorZoomFit => 'Fit to screen';
+  String get videoEditorZoomFit => '适应屏幕';
 
   @override
   String get videoEditorPrevFrame => '上一帧';
@@ -9438,92 +9433,87 @@ class AppLocalizationsZh extends AppLocalizations {
   String get videoEditorNextFrame => '下一帧';
 
   @override
-  String get videoEditorPrevKeyframe => 'Previous keyframe';
+  String get videoEditorPrevKeyframe => '上一个关键帧';
 
   @override
-  String get videoEditorNextKeyframe => 'Next keyframe';
+  String get videoEditorNextKeyframe => '下一个关键帧';
 
   @override
-  String get videoEditorExporting => 'Exporting video';
+  String get videoEditorExporting => '正在导出视频';
 
   @override
   String videoEditorCutting(int current, int total) {
-    return 'Cutting clip $current of $total';
+    return '正在剪辑片段 $current / $total';
   }
 
   @override
-  String get videoEditorCuttingOne => 'Cutting…';
+  String get videoEditorCuttingOne => '正在剪辑…';
 
   @override
-  String get videoEditorSaving => 'Saving…';
+  String get videoEditorSaving => '正在保存…';
 
   @override
   String videoEditorSaved(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Saved $count videos',
-      one: 'Saved 1 video',
+      other: '已保存 $count 个视频',
     );
     return '$_temp0';
   }
 
   @override
-  String get videoEditorAudioDropped =>
-      'Some audio tracks couldn\'t be copied.';
+  String get videoEditorAudioDropped => '无法复制部分音轨。';
 
   @override
   String videoEditorExportFailed(String message) {
-    return 'Export failed: $message';
+    return '导出失败：$message';
   }
 
   @override
-  String get videoEditorExportCancelled => 'Export cancelled';
+  String get videoEditorExportCancelled => '导出已取消';
 
   @override
-  String get videoEditorExportTitle => 'Export';
+  String get videoEditorExportTitle => '导出';
 
   @override
   String videoEditorExportSummary(int count, String duration) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count clips · $duration',
-      one: '1 clip · $duration',
+      other: '$count 个片段 · $duration',
     );
     return '$_temp0';
   }
 
   @override
-  String get videoEditorExportSingle => 'Save as new video';
+  String get videoEditorExportSingle => '保存为新视频';
 
   @override
-  String get videoEditorExportSingleHint => 'The original stays untouched.';
+  String get videoEditorExportSingleHint => '原始文件保持不变。';
 
   @override
-  String get videoEditorExportMerge => 'Merge into one video';
+  String get videoEditorExportMerge => '合并为一个视频';
 
   @override
-  String get videoEditorExportMergeHint =>
-      'Clips are joined in timeline order.';
+  String get videoEditorExportMergeHint => '片段按时间线顺序拼接。';
 
   @override
-  String get videoEditorExportSeparate => 'Save as separate videos';
+  String get videoEditorExportSeparate => '保存为单独的视频';
 
   @override
   String videoEditorExportSeparateHint(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count new files',
-      one: 'One new file',
+      other: '$count 个新文件',
     );
     return '$_temp0';
   }
 
   @override
   String get videoEditorLosslessNote =>
-      'Cuts are lossless, so nothing is re-encoded. Each clip starts at the nearest keyframe before your start point and ends at the next keyframe after your end point. The thin bars under the timeline show exactly what will be saved.';
+      '剪切为无损处理，不会重新编码。每个片段均从起始点前最近的关键帧开始，并在结束点后的下一个关键帧结束。时间线下方细条精确显示将要保存的内容。';
 
   @override
   String get videoEditorAnalyzing => '正在分析视频…';
@@ -9853,11 +9843,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get autoSyncSavedScheduled => '规则和每日计划已保存。';
 
   @override
-  String get autoSyncScheduledTimeTitle => 'Daily run time';
+  String get autoSyncScheduledTimeTitle => '每日运行时间';
 
   @override
   String get autoSyncScheduledTimeSubtitle =>
-      'Device local time. For a quick test, choose a time a minute or two from now; Android may run it later.';
+      '设备本地时间。如需快速测试，请选择从现在起一两分钟后的时间；Android 可能会稍后运行。';
 
   @override
   String get autoSyncExactAlarmAccessTitle => '允许每日同步使用精确闹钟？';

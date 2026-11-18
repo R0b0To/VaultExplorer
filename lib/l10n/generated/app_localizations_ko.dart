@@ -7057,7 +7057,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get advancedRenameSeparator => '구분 기호';
 
   @override
-  String get advancedRenameSeparatorHint => '_ or -';
+  String get advancedRenameSeparatorHint => '_ 또는 -';
 
   @override
   String get advancedRenameLivePreview => '실시간 미리보기';
@@ -7817,7 +7817,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get triggerPanicButton => '패닉 실행';
 
   @override
-  String get sectionPanicBootTrigger => 'Wipe on Reboot';
+  String get sectionPanicBootTrigger => '재부팅 시 삭제';
 
   @override
   String get panicBootTriggerLevelLabel => '재부팅 시 실행할 레벨';
@@ -9010,57 +9010,57 @@ class AppLocalizationsKo extends AppLocalizations {
   String get cameraReviewPhotosTooltip => '촬영한 사진 검토';
 
   @override
-  String get vaultItemTypeAuthenticator => 'Authenticator';
+  String get vaultItemTypeAuthenticator => '인증기';
 
   @override
-  String get fieldIssuer => 'Issuer';
+  String get fieldIssuer => '발급자';
 
   @override
-  String get fieldAuthenticatorAccount => 'Account';
+  String get fieldAuthenticatorAccount => '계정';
 
   @override
-  String get fieldSecretKey => 'Secret Key';
+  String get fieldSecretKey => '비밀 키';
 
   @override
-  String get fieldTotpAlgorithm => 'Algorithm (default: SHA1)';
+  String get fieldTotpAlgorithm => '알고리즘 (기본값: SHA1)';
 
   @override
-  String get fieldTotpDigits => 'Digits (default: 6)';
+  String get fieldTotpDigits => '자릿수 (기본값: 6)';
 
   @override
-  String get fieldTotpPeriod => 'Refresh Interval, seconds (default: 30)';
+  String get fieldTotpPeriod => '새로고침 간격, 초 (기본값: 30)';
 
   @override
-  String get authenticatorScreenTitle => 'Authenticator';
+  String get authenticatorScreenTitle => '인증기';
 
   @override
-  String get authenticatorAppBarTooltip => 'Authenticator codes';
+  String get authenticatorAppBarTooltip => '인증기 코드';
 
   @override
-  String get authenticatorEmptyStateTitle => 'No authenticator codes yet';
+  String get authenticatorEmptyStateTitle => '아직 인증기 코드가 없습니다';
 
   @override
   String get authenticatorEmptyStateMessage =>
-      'Add a TOTP secret to a password item, or create a standalone Authenticator item, in any unlocked vault to see live codes here.';
+      '잠금 해제된 보관함의 비밀번호 항목에 TOTP 비밀값을 추가하거나 독립형 인증기 항목을 생성하여 실시간 코드를 확인하세요.';
 
   @override
   String get authenticatorNoVaultsUnlockedMessage =>
-      'Unlock a vault to see its authenticator codes here.';
+      '보관함을 잠금 해제하여 인증기 코드를 확인하세요.';
 
   @override
-  String get authenticatorCodeLabel => 'Code';
+  String get authenticatorCodeLabel => '코드';
 
   @override
-  String get authenticatorInvalidSecretError => 'Invalid secret';
+  String get authenticatorInvalidSecretError => '잘못된 비밀값';
 
   @override
-  String get authenticatorAddButtonTooltip => 'Add authenticator';
+  String get authenticatorAddButtonTooltip => '인증기 추가';
 
   @override
-  String get authenticatorChooseVaultTitle => 'Choose a vault';
+  String get authenticatorChooseVaultTitle => '보관함 선택';
 
   @override
-  String get authenticatorOpenItemTooltip => 'Open item';
+  String get authenticatorOpenItemTooltip => '항목 열기';
 
   @override
   String get authenticatorNextCodeLabel => '다음 코드';
@@ -9486,82 +9486,78 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String get videoEditorEditAction => 'Edit video';
+  String get videoEditorEditAction => '동영상 편집';
 
   @override
-  String get videoEditorExportAction => 'Export';
+  String get videoEditorExportAction => '내보내기';
 
   @override
-  String get videoEditorTimelineLabel => 'Video timeline';
+  String get videoEditorTimelineLabel => '동영상 타임라인';
 
   @override
-  String get videoEditorSetStart => 'Set start';
+  String get videoEditorSetStart => '시작 설정';
 
   @override
-  String get videoEditorSetEnd => 'Set end';
+  String get videoEditorSetEnd => '끝 설정';
 
   @override
-  String get videoEditorAddSegment => 'Add';
+  String get videoEditorAddSegment => '추가';
 
   @override
-  String get videoEditorSplit => 'Split';
+  String get videoEditorSplit => '분할';
 
   @override
-  String get videoEditorDeleteSegment => 'Delete';
+  String get videoEditorDeleteSegment => '삭제';
 
   @override
-  String get videoEditorModeKeep => 'Keep';
+  String get videoEditorModeKeep => '유지';
 
   @override
-  String get videoEditorModeCutOut => 'Cut out';
+  String get videoEditorModeCutOut => '잘라내기';
 
   @override
-  String get videoEditorNoSegments =>
-      'No segments yet. Move the playhead and tap Add.';
+  String get videoEditorNoSegments => '아직 세그먼트가 없습니다. 재생 헤드를 이동하고 추가를 탭하세요.';
 
   @override
   String videoEditorOutputSummary(int count, String duration) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Output: $count clips · $duration',
-      one: 'Output: 1 clip · $duration',
+      other: '출력: 클립 $count개 · $duration',
     );
     return '$_temp0';
   }
 
   @override
   String videoEditorSnapNote(String start, String end) {
-    return 'Lossless cut starts on a keyframe: $start – $end';
+    return '무손실 컷은 키프레임에서 시작됩니다: $start – $end';
   }
 
   @override
-  String get videoEditorBoundaryInvalid =>
-      'That would leave the segment too short.';
+  String get videoEditorBoundaryInvalid => '세그먼트가 너무 짧아집니다.';
 
   @override
-  String get videoEditorNoRoom => 'There is no room for a segment here.';
+  String get videoEditorNoRoom => '여기에 세그먼트를 추가할 공간이 없습니다.';
 
   @override
-  String get videoEditorNothingToExport => 'Nothing to export.';
+  String get videoEditorNothingToExport => '내보낼 항목이 없습니다.';
 
   @override
-  String get videoEditorReadOnly =>
-      'This vault is read-only, so the edited video can\'t be saved.';
+  String get videoEditorReadOnly => '이 보관함은 읽기 전용이므로 편집한 동영상을 저장할 수 없습니다.';
 
   @override
   String videoEditorLoadFailed(String message) {
-    return 'Couldn\'t open this video: $message';
+    return '이 동영상을 열 수 없습니다: $message';
   }
 
   @override
-  String get videoEditorZoomIn => 'Zoom in';
+  String get videoEditorZoomIn => '확대';
 
   @override
-  String get videoEditorZoomOut => 'Zoom out';
+  String get videoEditorZoomOut => '축소';
 
   @override
-  String get videoEditorZoomFit => 'Fit to screen';
+  String get videoEditorZoomFit => '화면에 맞추기';
 
   @override
   String get videoEditorPrevFrame => '이전 프레임';
@@ -9570,92 +9566,87 @@ class AppLocalizationsKo extends AppLocalizations {
   String get videoEditorNextFrame => '다음 프레임';
 
   @override
-  String get videoEditorPrevKeyframe => 'Previous keyframe';
+  String get videoEditorPrevKeyframe => '이전 키프레임';
 
   @override
-  String get videoEditorNextKeyframe => 'Next keyframe';
+  String get videoEditorNextKeyframe => '다음 키프레임';
 
   @override
-  String get videoEditorExporting => 'Exporting video';
+  String get videoEditorExporting => '동영상 내보내는 중';
 
   @override
   String videoEditorCutting(int current, int total) {
-    return 'Cutting clip $current of $total';
+    return '클립 $current/$total 자르는 중';
   }
 
   @override
-  String get videoEditorCuttingOne => 'Cutting…';
+  String get videoEditorCuttingOne => '자르는 중…';
 
   @override
-  String get videoEditorSaving => 'Saving…';
+  String get videoEditorSaving => '저장 중…';
 
   @override
   String videoEditorSaved(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Saved $count videos',
-      one: 'Saved 1 video',
+      other: '동영상 $count개를 저장했습니다',
     );
     return '$_temp0';
   }
 
   @override
-  String get videoEditorAudioDropped =>
-      'Some audio tracks couldn\'t be copied.';
+  String get videoEditorAudioDropped => '일부 오디오 트랙을 복사할 수 없습니다.';
 
   @override
   String videoEditorExportFailed(String message) {
-    return 'Export failed: $message';
+    return '내보내기 실패: $message';
   }
 
   @override
-  String get videoEditorExportCancelled => 'Export cancelled';
+  String get videoEditorExportCancelled => '내보내기가 취소되었습니다';
 
   @override
-  String get videoEditorExportTitle => 'Export';
+  String get videoEditorExportTitle => '내보내기';
 
   @override
   String videoEditorExportSummary(int count, String duration) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count clips · $duration',
-      one: '1 clip · $duration',
+      other: '클립 $count개 · $duration',
     );
     return '$_temp0';
   }
 
   @override
-  String get videoEditorExportSingle => 'Save as new video';
+  String get videoEditorExportSingle => '새 동영상으로 저장';
 
   @override
-  String get videoEditorExportSingleHint => 'The original stays untouched.';
+  String get videoEditorExportSingleHint => '원본은 그대로 유지됩니다.';
 
   @override
-  String get videoEditorExportMerge => 'Merge into one video';
+  String get videoEditorExportMerge => '하나의 동영상으로 병합';
 
   @override
-  String get videoEditorExportMergeHint =>
-      'Clips are joined in timeline order.';
+  String get videoEditorExportMergeHint => '클립은 타임라인 순서대로 병합됩니다.';
 
   @override
-  String get videoEditorExportSeparate => 'Save as separate videos';
+  String get videoEditorExportSeparate => '개별 동영상으로 저장';
 
   @override
   String videoEditorExportSeparateHint(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count new files',
-      one: 'One new file',
+      other: '새 파일 $count개',
     );
     return '$_temp0';
   }
 
   @override
   String get videoEditorLosslessNote =>
-      'Cuts are lossless, so nothing is re-encoded. Each clip starts at the nearest keyframe before your start point and ends at the next keyframe after your end point. The thin bars under the timeline show exactly what will be saved.';
+      '무손실 컷이므로 다시 인코딩되지 않습니다. 각 클립은 시작 지점 이전의 가장 가까운 키프레임에서 시작하여 종료 지점 이후의 다음 키프레임에서 끝납니다. 타임라인 아래의 얇은 막대는 저장될 정확한 영역을 보여줍니다.';
 
   @override
   String get videoEditorAnalyzing => '동영상 분석 중…';
@@ -9993,11 +9984,11 @@ class AppLocalizationsKo extends AppLocalizations {
   String get autoSyncSavedScheduled => '규칙과 일일 일정을 저장했습니다.';
 
   @override
-  String get autoSyncScheduledTimeTitle => 'Daily run time';
+  String get autoSyncScheduledTimeTitle => '매일 실행 시간';
 
   @override
   String get autoSyncScheduledTimeSubtitle =>
-      'Device local time. For a quick test, choose a time a minute or two from now; Android may run it later.';
+      '기기 현지 시간입니다. 빠른 테스트를 위해 지금으로부터 1~2분 후의 시간을 선택하세요. Android에서 나중에 실행할 수도 있습니다.';
 
   @override
   String get autoSyncExactAlarmAccessTitle => '매일 동기화에 정확한 알람을 허용할까요?';

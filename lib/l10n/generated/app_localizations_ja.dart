@@ -7062,7 +7062,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get advancedRenameSeparator => '区切り文字';
 
   @override
-  String get advancedRenameSeparatorHint => '_ or -';
+  String get advancedRenameSeparatorHint => '_ または -';
 
   @override
   String get advancedRenameLivePreview => 'リアルタイムプレビュー';
@@ -7822,7 +7822,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get triggerPanicButton => 'パニックを実行';
 
   @override
-  String get sectionPanicBootTrigger => 'Wipe on Reboot';
+  String get sectionPanicBootTrigger => '再起動時に消去';
 
   @override
   String get panicBootTriggerLevelLabel => '再起動時に実行するレベル';
@@ -9015,57 +9015,57 @@ class AppLocalizationsJa extends AppLocalizations {
   String get cameraReviewPhotosTooltip => '撮影した写真を確認';
 
   @override
-  String get vaultItemTypeAuthenticator => 'Authenticator';
+  String get vaultItemTypeAuthenticator => '認証システム';
 
   @override
-  String get fieldIssuer => 'Issuer';
+  String get fieldIssuer => '発行者';
 
   @override
-  String get fieldAuthenticatorAccount => 'Account';
+  String get fieldAuthenticatorAccount => 'アカウント';
 
   @override
-  String get fieldSecretKey => 'Secret Key';
+  String get fieldSecretKey => 'シークレットキー';
 
   @override
-  String get fieldTotpAlgorithm => 'Algorithm (default: SHA1)';
+  String get fieldTotpAlgorithm => 'アルゴリズム（デフォルト：SHA1）';
 
   @override
-  String get fieldTotpDigits => 'Digits (default: 6)';
+  String get fieldTotpDigits => '桁数（デフォルト：6）';
 
   @override
-  String get fieldTotpPeriod => 'Refresh Interval, seconds (default: 30)';
+  String get fieldTotpPeriod => '更新間隔（秒、デフォルト：30）';
 
   @override
-  String get authenticatorScreenTitle => 'Authenticator';
+  String get authenticatorScreenTitle => '認証システム';
 
   @override
-  String get authenticatorAppBarTooltip => 'Authenticator codes';
+  String get authenticatorAppBarTooltip => '認証コード';
 
   @override
-  String get authenticatorEmptyStateTitle => 'No authenticator codes yet';
+  String get authenticatorEmptyStateTitle => '認証コードはまだありません';
 
   @override
   String get authenticatorEmptyStateMessage =>
-      'Add a TOTP secret to a password item, or create a standalone Authenticator item, in any unlocked vault to see live codes here.';
+      'ロック解除された保管庫でパスワード項目にTOTPシークレットを追加するか、単独の認証システム項目を作成すると、ここにライブコードが表示されます。';
 
   @override
   String get authenticatorNoVaultsUnlockedMessage =>
-      'Unlock a vault to see its authenticator codes here.';
+      '保管庫のロックを解除すると、ここに認証コードが表示されます。';
 
   @override
-  String get authenticatorCodeLabel => 'Code';
+  String get authenticatorCodeLabel => 'コード';
 
   @override
-  String get authenticatorInvalidSecretError => 'Invalid secret';
+  String get authenticatorInvalidSecretError => '無効なシークレット';
 
   @override
-  String get authenticatorAddButtonTooltip => 'Add authenticator';
+  String get authenticatorAddButtonTooltip => '認証システムを追加';
 
   @override
-  String get authenticatorChooseVaultTitle => 'Choose a vault';
+  String get authenticatorChooseVaultTitle => '保管庫を選択';
 
   @override
-  String get authenticatorOpenItemTooltip => 'Open item';
+  String get authenticatorOpenItemTooltip => '項目を開く';
 
   @override
   String get authenticatorNextCodeLabel => '次のコード';
@@ -9493,82 +9493,78 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
-  String get videoEditorEditAction => 'Edit video';
+  String get videoEditorEditAction => '動画を編集';
 
   @override
-  String get videoEditorExportAction => 'Export';
+  String get videoEditorExportAction => 'エクスポート';
 
   @override
-  String get videoEditorTimelineLabel => 'Video timeline';
+  String get videoEditorTimelineLabel => '動画タイムライン';
 
   @override
-  String get videoEditorSetStart => 'Set start';
+  String get videoEditorSetStart => '開始を設定';
 
   @override
-  String get videoEditorSetEnd => 'Set end';
+  String get videoEditorSetEnd => '終了を設定';
 
   @override
-  String get videoEditorAddSegment => 'Add';
+  String get videoEditorAddSegment => '追加';
 
   @override
-  String get videoEditorSplit => 'Split';
+  String get videoEditorSplit => '分割';
 
   @override
-  String get videoEditorDeleteSegment => 'Delete';
+  String get videoEditorDeleteSegment => '削除';
 
   @override
-  String get videoEditorModeKeep => 'Keep';
+  String get videoEditorModeKeep => '保持';
 
   @override
-  String get videoEditorModeCutOut => 'Cut out';
+  String get videoEditorModeCutOut => 'カット';
 
   @override
-  String get videoEditorNoSegments =>
-      'No segments yet. Move the playhead and tap Add.';
+  String get videoEditorNoSegments => 'セグメントはまだありません。再生ヘッドを移動して「追加」をタップしてください。';
 
   @override
   String videoEditorOutputSummary(int count, String duration) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Output: $count clips · $duration',
-      one: 'Output: 1 clip · $duration',
+      other: '出力：$count件のクリップ · $duration',
     );
     return '$_temp0';
   }
 
   @override
   String videoEditorSnapNote(String start, String end) {
-    return 'Lossless cut starts on a keyframe: $start – $end';
+    return 'ロスレスカットはキーフレームから開始します：$start – $end';
   }
 
   @override
-  String get videoEditorBoundaryInvalid =>
-      'That would leave the segment too short.';
+  String get videoEditorBoundaryInvalid => 'セグメントが短すぎます。';
 
   @override
-  String get videoEditorNoRoom => 'There is no room for a segment here.';
+  String get videoEditorNoRoom => 'ここにセグメントを配置するスペースがありません。';
 
   @override
-  String get videoEditorNothingToExport => 'Nothing to export.';
+  String get videoEditorNothingToExport => 'エクスポートするものがありません。';
 
   @override
-  String get videoEditorReadOnly =>
-      'This vault is read-only, so the edited video can\'t be saved.';
+  String get videoEditorReadOnly => 'この保管庫は読み取り専用のため、編集した動画を保存できません。';
 
   @override
   String videoEditorLoadFailed(String message) {
-    return 'Couldn\'t open this video: $message';
+    return 'この動画を開けませんでした：$message';
   }
 
   @override
-  String get videoEditorZoomIn => 'Zoom in';
+  String get videoEditorZoomIn => '拡大';
 
   @override
-  String get videoEditorZoomOut => 'Zoom out';
+  String get videoEditorZoomOut => '縮小';
 
   @override
-  String get videoEditorZoomFit => 'Fit to screen';
+  String get videoEditorZoomFit => '画面に合わせる';
 
   @override
   String get videoEditorPrevFrame => '前のフレーム';
@@ -9577,92 +9573,87 @@ class AppLocalizationsJa extends AppLocalizations {
   String get videoEditorNextFrame => '次のフレーム';
 
   @override
-  String get videoEditorPrevKeyframe => 'Previous keyframe';
+  String get videoEditorPrevKeyframe => '前のキーフレーム';
 
   @override
-  String get videoEditorNextKeyframe => 'Next keyframe';
+  String get videoEditorNextKeyframe => '次のキーフレーム';
 
   @override
-  String get videoEditorExporting => 'Exporting video';
+  String get videoEditorExporting => '動画をエクスポート中';
 
   @override
   String videoEditorCutting(int current, int total) {
-    return 'Cutting clip $current of $total';
+    return 'クリップ $current / $total をカット中';
   }
 
   @override
-  String get videoEditorCuttingOne => 'Cutting…';
+  String get videoEditorCuttingOne => 'カット中…';
 
   @override
-  String get videoEditorSaving => 'Saving…';
+  String get videoEditorSaving => '保存中…';
 
   @override
   String videoEditorSaved(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Saved $count videos',
-      one: 'Saved 1 video',
+      other: '$count件の動画を保存しました',
     );
     return '$_temp0';
   }
 
   @override
-  String get videoEditorAudioDropped =>
-      'Some audio tracks couldn\'t be copied.';
+  String get videoEditorAudioDropped => '一部のオーディオトラックをコピーできませんでした。';
 
   @override
   String videoEditorExportFailed(String message) {
-    return 'Export failed: $message';
+    return 'エクスポートに失敗しました：$message';
   }
 
   @override
-  String get videoEditorExportCancelled => 'Export cancelled';
+  String get videoEditorExportCancelled => 'エクスポートがキャンセルされました';
 
   @override
-  String get videoEditorExportTitle => 'Export';
+  String get videoEditorExportTitle => 'エクスポート';
 
   @override
   String videoEditorExportSummary(int count, String duration) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count clips · $duration',
-      one: '1 clip · $duration',
+      other: '$count件のクリップ · $duration',
     );
     return '$_temp0';
   }
 
   @override
-  String get videoEditorExportSingle => 'Save as new video';
+  String get videoEditorExportSingle => '新しい動画として保存';
 
   @override
-  String get videoEditorExportSingleHint => 'The original stays untouched.';
+  String get videoEditorExportSingleHint => '元の動画は変更されません。';
 
   @override
-  String get videoEditorExportMerge => 'Merge into one video';
+  String get videoEditorExportMerge => '1つの動画に結合';
 
   @override
-  String get videoEditorExportMergeHint =>
-      'Clips are joined in timeline order.';
+  String get videoEditorExportMergeHint => 'クリップはタイムライン順に結合されます。';
 
   @override
-  String get videoEditorExportSeparate => 'Save as separate videos';
+  String get videoEditorExportSeparate => '個別の動画として保存';
 
   @override
   String videoEditorExportSeparateHint(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count new files',
-      one: 'One new file',
+      other: '$count個の新しいファイル',
     );
     return '$_temp0';
   }
 
   @override
   String get videoEditorLosslessNote =>
-      'Cuts are lossless, so nothing is re-encoded. Each clip starts at the nearest keyframe before your start point and ends at the next keyframe after your end point. The thin bars under the timeline show exactly what will be saved.';
+      'カットはロスレス（無劣化）のため、再エンコードは行われません。各クリップは開始点の手前にある最も近いキーフレームから始まり、終了点の後の次のキーフレームで終了します。タイムライン下の細いバーは、実際に保存される範囲を正確に示しています。';
 
   @override
   String get videoEditorAnalyzing => '動画を解析中…';
@@ -9999,11 +9990,11 @@ class AppLocalizationsJa extends AppLocalizations {
   String get autoSyncSavedScheduled => 'ルールと毎日のスケジュールを保存しました。';
 
   @override
-  String get autoSyncScheduledTimeTitle => 'Daily run time';
+  String get autoSyncScheduledTimeTitle => '毎日の実行時刻';
 
   @override
   String get autoSyncScheduledTimeSubtitle =>
-      'Device local time. For a quick test, choose a time a minute or two from now; Android may run it later.';
+      '端末の現地時間。簡単なテストを行うには、今から1〜2分後の時刻を選択してください（Androidによって遅れて実行される場合があります）。';
 
   @override
   String get autoSyncExactAlarmAccessTitle => '毎日の同期に正確なアラームを許可しますか？';

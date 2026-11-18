@@ -6886,11 +6886,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get showHiddenFilesDesc => 'Display dotfiles and system folders';
 
   @override
-  String get showNoMediaFilesLabel => 'Show Media Hidden by .nomedia';
+  String get showNoMediaFilesLabel => 'Show .nomedia files';
 
   @override
   String get showNoMediaFilesDesc =>
-      'Include media in folders containing a .nomedia file';
+      'Display .nomedia files in folder listings';
 
   @override
   String get dontAskAgain => 'Don\'t ask again';
@@ -8446,6 +8446,20 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get autoHideAppBarDesc =>
       'Hide the top bar when scrolling down to maximize viewing space';
+
+  @override
+  String get autoHideToolbarLabel => 'Auto-hide toolbar on scroll';
+
+  @override
+  String get autoHideToolbarDesc =>
+      'Hide the bottom toolbar when scrolling down to maximize viewing space';
+
+  @override
+  String get autoHideBreadcrumbBarLabel => 'Auto-hide breadcrumb bar on scroll';
+
+  @override
+  String get autoHideBreadcrumbBarDesc =>
+      'Hide the path navigation bar when scrolling down to maximize viewing space';
 
   @override
   String get useFabForToolbarLabel => 'Use floating button for toolbar';

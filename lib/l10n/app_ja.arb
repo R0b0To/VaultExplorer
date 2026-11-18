@@ -4076,5 +4076,11 @@
   "metadataResultSkipped": "{count} 件をスキップ（非対応）",
   "metadataResultFailed": "{count} 件が失敗",
   "showNoMediaFoldersLabel": ".nomedia フォルダーを表示",
-  "showNoMediaFoldersDesc": "ギャラリーアプリが通常スキップする .nomedia ファイル付きのフォルダーを含めます"
+  "showNoMediaFoldersDesc": "ギャラリーアプリが通常スキップする .nomedia ファイル付きのフォルダーを含めます",
+  "showNoMediaFilesLabel": ".nomedia ファイルを表示",
+  "showNoMediaFilesDesc": "フォルダー一覧に .nomedia ファイルを表示します",
+  "autoHideToolbarLabel": "スクロール時にツールバーを自動で隠す",
+  "autoHideToolbarDesc": "下にスクロールすると下部のツールバーを非表示にし、表示スペースを広げます",
+  "autoHideBreadcrumbBarLabel": "スクロール時にパンくずバーを自動で隠す",
+  "autoHideBreadcrumbBarDesc": "下にスクロールするとパスナビゲーションバーを非表示にし、表示スペースを広げます"
 }

@@ -116,6 +116,8 @@ class FileManagerToolbarConfig {
   final bool resetSizeOnLayoutChange;
   final bool autoHideAppBar;
   final bool autoHideTabBar;
+  final bool autoHideToolbar;
+  final bool autoHideBreadcrumbBar;
   final bool useFabForToolbar;
   final bool bottomSelectionBar;
   final Map<String, String> folderLayoutModes;
@@ -220,6 +222,8 @@ class FileManagerToolbarConfig {
     this.resetSizeOnLayoutChange = true,
     this.autoHideAppBar = false,
     this.autoHideTabBar = false,
+    this.autoHideToolbar = false,
+    this.autoHideBreadcrumbBar = false,
     this.useFabForToolbar = false,
     this.bottomSelectionBar = false,
     this.folderLayoutModes = const {},
@@ -277,6 +281,8 @@ class FileManagerToolbarConfig {
         resetSizeOnLayoutChange: true,
         autoHideAppBar: false,
         autoHideTabBar: false,
+        autoHideToolbar: false,
+        autoHideBreadcrumbBar: false,
         useFabForToolbar: false,
         bottomSelectionBar: false,
         folderLayoutModes: {},
@@ -499,6 +505,8 @@ class FileManagerToolbarConfig {
     bool? resetSizeOnLayoutChange,
     bool? autoHideAppBar,
     bool? autoHideTabBar,
+    bool? autoHideToolbar,
+    bool? autoHideBreadcrumbBar,
     bool? useFabForToolbar,
     bool? bottomSelectionBar,
     Map<String, String>? folderLayoutModes,
@@ -554,6 +562,9 @@ class FileManagerToolbarConfig {
             resetSizeOnLayoutChange ?? this.resetSizeOnLayoutChange,
         autoHideAppBar: autoHideAppBar ?? this.autoHideAppBar,
         autoHideTabBar: autoHideTabBar ?? this.autoHideTabBar,
+        autoHideToolbar: autoHideToolbar ?? this.autoHideToolbar,
+        autoHideBreadcrumbBar:
+            autoHideBreadcrumbBar ?? this.autoHideBreadcrumbBar,
         useFabForToolbar: useFabForToolbar ?? this.useFabForToolbar,
         bottomSelectionBar: bottomSelectionBar ?? this.bottomSelectionBar,
         folderLayoutModes: folderLayoutModes ?? this.folderLayoutModes,
@@ -628,6 +639,8 @@ class FileManagerToolbarConfig {
     'showMediaCarousel',
     'autoHideAppBar',
     'autoHideTabBar',
+    'autoHideToolbar',
+    'autoHideBreadcrumbBar',
     'useFabForToolbar',
     'bottomSelectionBar',
     'detailColumnsOrder',
@@ -740,6 +753,8 @@ class FileManagerToolbarConfig {
         'resetSizeOnLayoutChange': resetSizeOnLayoutChange,
         'autoHideAppBar': autoHideAppBar,
         'autoHideTabBar': autoHideTabBar,
+        'autoHideToolbar': autoHideToolbar,
+        'autoHideBreadcrumbBar': autoHideBreadcrumbBar,
         'useFabForToolbar': useFabForToolbar,
         'bottomSelectionBar': bottomSelectionBar,
         'folderLayoutModes': folderLayoutModes,
@@ -951,6 +966,8 @@ class FileManagerToolbarConfig {
       resetSizeOnLayoutChange: j['resetSizeOnLayoutChange'] as bool? ?? true,
       autoHideAppBar: j['autoHideAppBar'] as bool? ?? false,
       autoHideTabBar: j['autoHideTabBar'] as bool? ?? false,
+      autoHideToolbar: j['autoHideToolbar'] as bool? ?? false,
+      autoHideBreadcrumbBar: j['autoHideBreadcrumbBar'] as bool? ?? false,
       useFabForToolbar: j['useFabForToolbar'] as bool? ?? false,
       bottomSelectionBar: j['bottomSelectionBar'] as bool? ?? false,
       folderLayoutModes: rawFolderLayoutModes,

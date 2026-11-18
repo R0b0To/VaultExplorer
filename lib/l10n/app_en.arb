@@ -8806,13 +8806,13 @@
   "@showHiddenFilesDesc": {
     "description": "Toggle description for showing hidden files and folders"
   },
-  "showNoMediaFilesLabel": "Show Media Hidden by .nomedia",
+  "showNoMediaFilesLabel": "Show .nomedia files",
   "@showNoMediaFilesLabel": {
-    "description": "Toggle label for showing media in folders containing a .nomedia file"
+    "description": "Label for toggle option to display .nomedia files"
   },
-  "showNoMediaFilesDesc": "Include media in folders containing a .nomedia file",
+  "showNoMediaFilesDesc": "Display .nomedia files in folder listings",
   "@showNoMediaFilesDesc": {
-    "description": "Toggle description for showing media in folders containing a .nomedia file"
+    "description": "Description explaining that .nomedia files will be shown in folder listings"
   },
   "dontAskAgain": "Don't ask again",
   "@dontAskAgain": {
@@ -10808,6 +10808,22 @@
   "autoHideAppBarDesc": "Hide the top bar when scrolling down to maximize viewing space",
   "@autoHideAppBarDesc": {
     "description": "Description explaining that the top app bar hides when scrolling down"
+  },
+  "autoHideToolbarLabel": "Auto-hide toolbar on scroll",
+  "@autoHideToolbarLabel": {
+    "description": "Label for toggle option to auto-hide the bottom toolbar when scrolling down"
+  },
+  "autoHideToolbarDesc": "Hide the bottom toolbar when scrolling down to maximize viewing space",
+  "@autoHideToolbarDesc": {
+    "description": "Description explaining that the bottom toolbar hides when scrolling down"
+  },
+  "autoHideBreadcrumbBarLabel": "Auto-hide breadcrumb bar on scroll",
+  "@autoHideBreadcrumbBarLabel": {
+    "description": "Label for toggle option to auto-hide the path navigation bar when scrolling down"
+  },
+  "autoHideBreadcrumbBarDesc": "Hide the path navigation bar when scrolling down to maximize viewing space",
+  "@autoHideBreadcrumbBarDesc": {
+    "description": "Description explaining that the breadcrumb bar hides when scrolling down"
   },
   "useFabForToolbarLabel": "Use floating button for toolbar",
   "@useFabForToolbarLabel": {

@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:vaultexplorer/data/models/audio_recording_quality.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
 import 'package:vaultexplorer/data/models/tab_swipe_gestures.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
@@ -154,6 +153,8 @@ FileManagerToolbarConfig _customToolbar() {
     showMediaCarousel: !d.showMediaCarousel,
     autoHideAppBar: !d.autoHideAppBar,
     autoHideTabBar: !d.autoHideTabBar,
+    autoHideToolbar: !d.autoHideToolbar,
+    autoHideBreadcrumbBar: !d.autoHideBreadcrumbBar,
     showFileExtensions: !d.showFileExtensions,
     useFabForToolbar: !d.useFabForToolbar,
     bottomSelectionBar: !d.bottomSelectionBar,

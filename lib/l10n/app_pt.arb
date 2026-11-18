@@ -4076,5 +4076,11 @@
   "metadataResultSkipped": "{count} ignorados (não compatíveis)",
   "metadataResultFailed": "{count} com falha",
   "showNoMediaFoldersLabel": "Mostrar pastas .nomedia",
-  "showNoMediaFoldersDesc": "Incluir pastas com um arquivo .nomedia, que os apps de galeria normalmente ignoram"
+  "showNoMediaFoldersDesc": "Incluir pastas com um arquivo .nomedia, que os apps de galeria normalmente ignoram",
+  "showNoMediaFilesLabel": "Mostrar arquivos .nomedia",
+  "showNoMediaFilesDesc": "Exibir arquivos .nomedia nas listas de pastas",
+  "autoHideToolbarLabel": "Ocultar barra de ferramentas automaticamente ao rolar",
+  "autoHideToolbarDesc": "Oculta a barra de ferramentas inferior ao rolar para baixo para maximizar o espaço de visualização",
+  "autoHideBreadcrumbBarLabel": "Ocultar barra de caminho automaticamente ao rolar",
+  "autoHideBreadcrumbBarDesc": "Oculta a barra de navegação de caminho ao rolar para baixo para maximizar o espaço de visualização"
 }

@@ -696,4 +696,48 @@ void main() {
       expect(decoded.isMusicPromptSkippedForStorage('vault://other'), isFalse);
     });
   });
+
+  group('FileManagerToolbarConfig auto-hide toolbar and breadcrumb bar', () {
+    test('default to false in defaults() and constructor', () {
+      final config = FileManagerToolbarConfig.defaults();
+      expect(config.autoHideToolbar, isFalse);
+      expect(config.autoHideBreadcrumbBar, isFalse);
+      const ctorConfig = FileManagerToolbarConfig(order: [], hidden: {});
+      expect(ctorConfig.autoHideToolbar, isFalse);
+      expect(ctorConfig.autoHideBreadcrumbBar, isFalse);
+    });
+
+    test('copyWith updates autoHideToolbar and autoHideBreadcrumbBar', () {
+      final config = FileManagerToolbarConfig.defaults().copyWith(
+        autoHideToolbar: true,
+        autoHideBreadcrumbBar: true,
+      );
+      expect(config.autoHideToolbar, isTrue);
+      expect(config.autoHideBreadcrumbBar, isTrue);
+    });
+
+    test('survives JSON round trip', () {
+      final config = FileManagerToolbarConfig.defaults().copyWith(
+        autoHideToolbar: true,
+        autoHideBreadcrumbBar: true,
+      );
+      final json = config.toJson();
+      expect(json['autoHideToolbar'], isTrue);
+      expect(json['autoHideBreadcrumbBar'], isTrue);
+
+      final decoded = FileManagerToolbarConfig.fromJson(
+        jsonDecode(jsonEncode(json)) as Map<String, dynamic>,
+      );
+      expect(decoded.autoHideToolbar, isTrue);
+      expect(decoded.autoHideBreadcrumbBar, isTrue);
+    });
+
+    test('fromJson falls back to false when keys are missing', () {
+      final decoded = FileManagerToolbarConfig.fromJson(
+        <String, dynamic>{'showBreadcrumbBar': true},
+      );
+      expect(decoded.autoHideToolbar, isFalse);
+      expect(decoded.autoHideBreadcrumbBar, isFalse);
+    });
+  });
 }

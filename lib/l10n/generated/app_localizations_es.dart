@@ -7002,11 +7002,11 @@ class AppLocalizationsEs extends AppLocalizations {
       'Mostrar archivos ocultos y carpetas del sistema';
 
   @override
-  String get showNoMediaFilesLabel => 'Show Media Hidden by .nomedia';
+  String get showNoMediaFilesLabel => 'Mostrar archivos .nomedia';
 
   @override
   String get showNoMediaFilesDesc =>
-      'Include media in folders containing a .nomedia file';
+      'Mostrar los archivos .nomedia en las listas de carpetas';
 
   @override
   String get dontAskAgain => 'No volver a preguntar';
@@ -8592,6 +8592,22 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get autoHideAppBarDesc =>
       'Ocultar la barra superior al desplazarse hacia abajo para maximizar el espacio';
+
+  @override
+  String get autoHideToolbarLabel =>
+      'Ocultar automáticamente la barra de herramientas al desplazarse';
+
+  @override
+  String get autoHideToolbarDesc =>
+      'Oculta la barra de herramientas inferior al desplazarse hacia abajo para maximizar el espacio de visualización';
+
+  @override
+  String get autoHideBreadcrumbBarLabel =>
+      'Ocultar automáticamente la barra de ruta al desplazarse';
+
+  @override
+  String get autoHideBreadcrumbBarDesc =>
+      'Oculta la barra de navegación de ruta al desplazarse hacia abajo para maximizar el espacio de visualización';
 
   @override
   String get useFabForToolbarLabel => 'Usar botón flotante para la barra';

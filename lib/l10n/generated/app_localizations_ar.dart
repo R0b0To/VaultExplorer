@@ -7056,11 +7056,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get showHiddenFilesDesc => 'عرض الملفات ذات النقطة ومجلدات النظام';
 
   @override
-  String get showNoMediaFilesLabel => 'Show Media Hidden by .nomedia';
+  String get showNoMediaFilesLabel => 'إظهار ملفات .nomedia';
 
   @override
-  String get showNoMediaFilesDesc =>
-      'Include media in folders containing a .nomedia file';
+  String get showNoMediaFilesDesc => 'عرض ملفات .nomedia في قوائم المجلدات';
 
   @override
   String get dontAskAgain => 'عدم السؤال مرة أخرى';
@@ -8634,6 +8633,21 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get autoHideAppBarDesc =>
       'إخفاء الشريط العلوي عند التمرير لأسفل لزيادة مساحة العرض';
+
+  @override
+  String get autoHideToolbarLabel => 'إخفاء شريط الأدوات تلقائيًا عند التمرير';
+
+  @override
+  String get autoHideToolbarDesc =>
+      'إخفاء شريط الأدوات السفلي عند التمرير للأسفل لتكبير مساحة العرض';
+
+  @override
+  String get autoHideBreadcrumbBarLabel =>
+      'إخفاء شريط المسار تلقائيًا عند التمرير';
+
+  @override
+  String get autoHideBreadcrumbBarDesc =>
+      'إخفاء شريط التنقل بالمسار عند التمرير للأسفل لتكبير مساحة العرض';
 
   @override
   String get useFabForToolbarLabel => 'استخدام زر عائم لشريط الأدوات';

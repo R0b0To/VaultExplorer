@@ -4076,5 +4076,11 @@
   "metadataResultSkipped": "{count} ignorati (non supportati)",
   "metadataResultFailed": "{count} non riusciti",
   "showNoMediaFoldersLabel": "Mostra cartelle .nomedia",
-  "showNoMediaFoldersDesc": "Includi le cartelle con un file .nomedia, che le app galleria normalmente saltano"
+  "showNoMediaFoldersDesc": "Includi le cartelle con un file .nomedia, che le app galleria normalmente saltano",
+  "showNoMediaFilesLabel": "Mostra file .nomedia",
+  "showNoMediaFilesDesc": "Mostra i file .nomedia negli elenchi delle cartelle",
+  "autoHideToolbarLabel": "Nascondi automaticamente la barra degli strumenti allo scorrimento",
+  "autoHideToolbarDesc": "Nasconde la barra degli strumenti inferiore scorrendo verso il basso per massimizzare lo spazio di visualizzazione",
+  "autoHideBreadcrumbBarLabel": "Nascondi automaticamente la barra del percorso allo scorrimento",
+  "autoHideBreadcrumbBarDesc": "Nasconde la barra di navigazione del percorso scorrendo verso il basso per massimizzare lo spazio di visualizzazione"
 }

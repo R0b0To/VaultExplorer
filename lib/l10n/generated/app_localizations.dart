@@ -11389,16 +11389,16 @@ abstract class AppLocalizations {
   /// **'Display dotfiles and system folders'**
   String get showHiddenFilesDesc;
 
-  /// Toggle label for showing media in folders containing a .nomedia file
+  /// Label for toggle option to display .nomedia files
   ///
   /// In en, this message translates to:
-  /// **'Show Media Hidden by .nomedia'**
+  /// **'Show .nomedia files'**
   String get showNoMediaFilesLabel;
 
-  /// Toggle description for showing media in folders containing a .nomedia file
+  /// Description explaining that .nomedia files will be shown in folder listings
   ///
   /// In en, this message translates to:
-  /// **'Include media in folders containing a .nomedia file'**
+  /// **'Display .nomedia files in folder listings'**
   String get showNoMediaFilesDesc;
 
   /// Checkbox label to remember choice and not prompt again
@@ -14110,6 +14110,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Hide the top bar when scrolling down to maximize viewing space'**
   String get autoHideAppBarDesc;
+
+  /// Label for toggle option to auto-hide the bottom toolbar when scrolling down
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-hide toolbar on scroll'**
+  String get autoHideToolbarLabel;
+
+  /// Description explaining that the bottom toolbar hides when scrolling down
+  ///
+  /// In en, this message translates to:
+  /// **'Hide the bottom toolbar when scrolling down to maximize viewing space'**
+  String get autoHideToolbarDesc;
+
+  /// Label for toggle option to auto-hide the path navigation bar when scrolling down
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-hide breadcrumb bar on scroll'**
+  String get autoHideBreadcrumbBarLabel;
+
+  /// Description explaining that the breadcrumb bar hides when scrolling down
+  ///
+  /// In en, this message translates to:
+  /// **'Hide the path navigation bar when scrolling down to maximize viewing space'**
+  String get autoHideBreadcrumbBarDesc;
 
   /// Label for option to collapse bottom toolbar actions into a floating action button
   ///

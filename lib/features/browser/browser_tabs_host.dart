@@ -203,6 +203,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   late final ProviderSubscription<BrowserChromeHub> _chromeSubscription;
   late final AnimationController _appBarVisibilityController;
   late final AnimationController _tabBarVisibilityController;
+  late final AnimationController _toolbarVisibilityController;
 
   /// Fades the pages back in after the tabs loop, so wrapping from one end to
   /// the other reads as a transition rather than a jump.
@@ -222,6 +223,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   bool _edgeDrawerGestureActive = false;
   bool _restoreAppBarScheduled = false;
   bool _restoreTabBarScheduled = false;
+  bool _restoreToolbarScheduled = false;
   bool _newTabPromptScheduled = false;
   bool _loopScheduled = false;
 
@@ -344,6 +346,11 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       duration: const Duration(milliseconds: 220),
       value: 1.0,
     );
+    _toolbarVisibilityController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+      value: 1.0,
+    );
     _loopTransitionController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 200),
@@ -369,6 +376,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     _chromeSubscription.close();
     _appBarVisibilityController.dispose();
     _tabBarVisibilityController.dispose();
+    _toolbarVisibilityController.dispose();
     _loopTransitionController.dispose();
     _dropPane.dispose();
     super.dispose();
@@ -637,6 +645,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     required bool swipeEnabled,
     required bool autoHideAppBar,
     required bool autoHideTabBar,
+    required bool autoHideToolbar,
     bool dividerAfter = false,
   }) {
     final isActive = shownTabId == activeTabId;
@@ -661,6 +670,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                               notification,
                               enabled: autoHideAppBar,
                               autoHideTabBar: autoHideTabBar,
+                              autoHideToolbar: autoHideToolbar,
                               // The pane being touched drives the bars even
                               // before it has been given focus.
                               active: isActive || _touchedPane == pane,
@@ -797,6 +807,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     ScrollNotification notification, {
     required bool enabled,
     required bool autoHideTabBar,
+    required bool autoHideToolbar,
     required bool active,
   }) {
     if (notification.metrics.axis == Axis.horizontal) {
@@ -826,6 +837,12 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       notification,
       enabled: autoHideTabBar,
       barHeight: kBrowserTabStripHeight,
+    );
+    _updateChromeVisibilityFromScroll(
+      _toolbarVisibilityController,
+      notification,
+      enabled: autoHideToolbar,
+      barHeight: kToolbarHeight,
     );
     return false;
   }
@@ -990,6 +1007,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     for (final controller in [
       _appBarVisibilityController,
       _tabBarVisibilityController,
+      _toolbarVisibilityController,
     ]) {
       final value = controller.value;
       final double? target = atTop
@@ -1353,6 +1371,11 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
         toolbarSettingsUri,
       ).select((settings) => settings.config.autoHideTabBar),
     );
+    final autoHideToolbar = ref.watch(
+      fileManagerToolbarSettingsProvider(
+        toolbarSettingsUri,
+      ).select((settings) => settings.config.autoHideToolbar),
+    );
     if (!autoHideAppBar &&
         _appBarVisibilityController.value != 1.0 &&
         !_restoreAppBarScheduled) {
@@ -1369,6 +1392,15 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _restoreTabBarScheduled = false;
         if (mounted) _tabBarVisibilityController.value = 1.0;
+      });
+    }
+    if (!autoHideToolbar &&
+        _toolbarVisibilityController.value != 1.0 &&
+        !_restoreToolbarScheduled) {
+      _restoreToolbarScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _restoreToolbarScheduled = false;
+        if (mounted) _toolbarVisibilityController.value = 1.0;
       });
     }
     final selectionHasItems = ref.watch(
@@ -1627,6 +1659,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                                 swipeEnabled: swipeEnabled,
                                 autoHideAppBar: autoHideAppBar,
                                 autoHideTabBar: autoHideTabBar,
+                                autoHideToolbar: autoHideToolbar,
                                 dividerAfter: true,
                               ),
                               _buildDualPaneViewport(
@@ -1644,6 +1677,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                                 swipeEnabled: swipeEnabled,
                                 autoHideAppBar: autoHideAppBar,
                                 autoHideTabBar: autoHideTabBar,
+                                autoHideToolbar: autoHideToolbar,
                               ),
                             ],
                           );
@@ -1662,6 +1696,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                                   notification,
                                   enabled: autoHideAppBar,
                                   autoHideTabBar: autoHideTabBar,
+                                  autoHideToolbar: autoHideToolbar,
                                   active: activeTabId != null,
                                 ),
                             child: FadeTransition(
@@ -1751,7 +1786,24 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     final shell = ValueListenableBuilder<Widget?>(
       valueListenable: _chrome.bottomBar,
       child: shellBody,
-      builder: (context, bottomBar, bodyChild) => Scaffold(
+      builder: (context, rawBottomBar, bodyChild) {
+        // Wrap the bottom bar in an auto-hide animation when enabled.
+        final Widget? bottomBar = rawBottomBar == null
+            ? null
+            : autoHideToolbar
+                ? ClipRect(
+                    child: AnimatedBuilder(
+                      animation: _toolbarVisibilityController,
+                      builder: (context, child) => Align(
+                        alignment: Alignment.topCenter,
+                        heightFactor: _toolbarVisibilityController.value,
+                        child: child,
+                      ),
+                      child: rawBottomBar,
+                    ),
+                  )
+                : rawBottomBar;
+        return Scaffold(
         resizeToAvoidBottomInset: false,
         body: bodyChild,
         floatingActionButton: ValueListenableBuilder<Widget?>(
@@ -1799,7 +1851,8 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
             ),
             )
           : bottomBar,
-      ),
+      );
+      },
     );
 
     // Must wrap the whole screen: the system-bar probe points sit *behind* the

@@ -95,6 +95,7 @@ import 'package:vaultexplorer/features/browser/widgets/book_cover_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_grid_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_list_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_masonry_view.dart';
+import 'package:vaultexplorer/features/browser/widgets/auto_hide_scroll_host.dart';
 import 'package:vaultexplorer/features/browser/widgets/bookmark_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/bottom_search_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/breadcrumb_bar.dart';
@@ -7022,24 +7023,28 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                       ),
                                 ),
                               Expanded(
-                                child: Column(
-                                  children: [
-                                    if (_toolbarConfig.showBreadcrumbBar)
-                                      IgnorePointer(
-                                        ignoring: dragLocked,
-                                        child: BreadcrumbBar(
-                                          stack: _pathStack,
-                                          onTap: _jumpTo,
-                                          forwardStack: _forwardStack,
-                                          onForwardTap: _navigateForward,
-                                        ),
-                                      ),
-                                    if (!widget.container.isLocalStorage &&
-                                        _archiveContext == null)
-                                      const SyncStatusBanner(),
+                                child: AutoHideScrollHost(
+                                  enabled: _toolbarConfig.autoHideBreadcrumbBar,
+                                  resetKey: _currentDirPath,
+                                  bar: _toolbarConfig.showBreadcrumbBar
+                                      ? IgnorePointer(
+                                          ignoring: dragLocked,
+                                          child: BreadcrumbBar(
+                                            stack: _pathStack,
+                                            onTap: _jumpTo,
+                                            forwardStack: _forwardStack,
+                                            onForwardTap: _navigateForward,
+                                          ),
+                                        )
+                                      : null,
+                                  child: Column(
+                                    children: [
+                                      if (!widget.container.isLocalStorage &&
+                                          _archiveContext == null)
+                                        const SyncStatusBanner(),
 
-                                    Expanded(
-                                      child: Stack(
+                                      Expanded(
+                                        child: Stack(
                                         children: [
                                           KeyedSubtree(
                                             key: ValueKey(_currentDirPath),
@@ -7371,10 +7376,11 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                         ],
                                       ),
                                     ),
-                                  ],
+                                      ],
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
                           ),
                           AnimatedPositioned(
                             duration: AppMotion.short2,

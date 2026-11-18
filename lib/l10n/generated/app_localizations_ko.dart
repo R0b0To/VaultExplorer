@@ -6644,11 +6644,10 @@ class AppLocalizationsKo extends AppLocalizations {
   String get showHiddenFilesDesc => '점 파일 및 시스템 폴더를 표시합니다';
 
   @override
-  String get showNoMediaFilesLabel => 'Show Media Hidden by .nomedia';
+  String get showNoMediaFilesLabel => '.nomedia 파일 표시';
 
   @override
-  String get showNoMediaFilesDesc =>
-      'Include media in folders containing a .nomedia file';
+  String get showNoMediaFilesDesc => '폴더 목록에 .nomedia 파일을 표시합니다';
 
   @override
   String get dontAskAgain => '다시 묻지 않기';
@@ -8132,6 +8131,19 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get autoHideAppBarDesc => '아래로 스크롤할 때 상단 표시줄을 숨겨 화면 공간을 최대화';
+
+  @override
+  String get autoHideToolbarLabel => '스크롤 시 도구 모음 자동 숨기기';
+
+  @override
+  String get autoHideToolbarDesc => '아래로 스크롤할 때 하단 도구 모음을 숨겨 보기 공간을 최대화합니다';
+
+  @override
+  String get autoHideBreadcrumbBarLabel => '스크롤 시 경로 표시줄 자동 숨기기';
+
+  @override
+  String get autoHideBreadcrumbBarDesc =>
+      '아래로 스크롤할 때 경로 탐색 표시줄을 숨겨 보기 공간을 최대화합니다';
 
   @override
   String get useFabForToolbarLabel => '도구 모음에 플로팅 버튼 사용';

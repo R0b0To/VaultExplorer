@@ -85,6 +85,7 @@ import 'package:vaultexplorer/features/browser/viewer/media_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/pdf_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/file_info_sheet.dart';
+import 'package:vaultexplorer/features/browser/widgets/auto_hide_scroll_host.dart';
 import 'package:vaultexplorer/features/browser/widgets/bottom_search_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/breadcrumb_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_item_drag.dart';
@@ -3274,22 +3275,35 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
                 ),
               ),
             ),
-          if (toolbarConfig.showBreadcrumbBar && (_folderMode || _scoped))
-            BreadcrumbBar(
-              stack: _buildPathStack(location, l10n),
-              onTap: _onJumpTo,
-              forwardStack: _forwardStack,
-              onForwardTap: _onForwardTo,
+          Expanded(
+            child: AutoHideScrollHost(
+              enabled: toolbarConfig.autoHideBreadcrumbBar,
+              resetKey: location,
+              bar: (toolbarConfig.showBreadcrumbBar && (_folderMode || _scoped))
+                  ? BreadcrumbBar(
+                      stack: _buildPathStack(location, l10n),
+                      onTap: _onJumpTo,
+                      forwardStack: _forwardStack,
+                      onForwardTap: _onForwardTo,
+                    )
+                  : null,
+              child: Column(
+                children: [
+                  if (_isGallery && !_folderMode)
+                    GalleryFilterBar(
+                      controller: _galleryFilter,
+                      index: _meta,
+                      shown: items.length,
+                      total: _itemsUnfilteredCount,
+                      onOpen: _openGalleryFilter,
+                    ),
+                  Expanded(
+                    child: _buildBody(items, toolbarConfig, mountedVaults),
+                  ),
+                ],
+              ),
             ),
-          if (_isGallery && !_folderMode)
-            GalleryFilterBar(
-              controller: _galleryFilter,
-              index: _meta,
-              shown: items.length,
-              total: _itemsUnfilteredCount,
-              onOpen: _openGalleryFilter,
-            ),
-          Expanded(child: _buildBody(items, toolbarConfig, mountedVaults)),
+          ),
         ],
             ),
           ),

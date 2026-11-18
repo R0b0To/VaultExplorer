@@ -173,6 +173,12 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
   Future<void> setAutoHideTabBar(bool val) =>
       _updateConfig(state.config.copyWith(autoHideTabBar: val));
 
+  Future<void> setAutoHideToolbar(bool val) =>
+      _updateConfig(state.config.copyWith(autoHideToolbar: val));
+
+  Future<void> setAutoHideBreadcrumbBar(bool val) =>
+      _updateConfig(state.config.copyWith(autoHideBreadcrumbBar: val));
+
   Future<void> setUseFabForToolbar(bool val) =>
       _updateConfig(state.config.copyWith(useFabForToolbar: val));
 

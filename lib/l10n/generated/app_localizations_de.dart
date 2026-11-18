@@ -6991,11 +6991,11 @@ class AppLocalizationsDe extends AppLocalizations {
       'Versteckte Dateien und Systemordner anzeigen';
 
   @override
-  String get showNoMediaFilesLabel => 'Show Media Hidden by .nomedia';
+  String get showNoMediaFilesLabel => '.nomedia-Dateien anzeigen';
 
   @override
   String get showNoMediaFilesDesc =>
-      'Include media in folders containing a .nomedia file';
+      '.nomedia-Dateien in Ordnerlisten anzeigen';
 
   @override
   String get dontAskAgain => 'Nicht erneut fragen';
@@ -8574,6 +8574,22 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get autoHideAppBarDesc =>
       'Obere Leiste beim Herunterscrollen ausblenden, um den Anzeigebereich zu maximieren';
+
+  @override
+  String get autoHideToolbarLabel =>
+      'Symbolleiste beim Scrollen automatisch ausblenden';
+
+  @override
+  String get autoHideToolbarDesc =>
+      'Untere Symbolleiste beim Herunterscrollen ausblenden, um den Anzeigebereich zu maximieren';
+
+  @override
+  String get autoHideBreadcrumbBarLabel =>
+      'Breadcrumb-Leiste beim Scrollen automatisch ausblenden';
+
+  @override
+  String get autoHideBreadcrumbBarDesc =>
+      'Pfadnavigationsleiste beim Herunterscrollen ausblenden, um den Anzeigebereich zu maximieren';
 
   @override
   String get useFabForToolbarLabel =>

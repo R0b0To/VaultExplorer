@@ -7036,11 +7036,11 @@ class AppLocalizationsUk extends AppLocalizations {
       'Відображати файли з крапкою на початку та системні папки';
 
   @override
-  String get showNoMediaFilesLabel => 'Show Media Hidden by .nomedia';
+  String get showNoMediaFilesLabel => 'Показувати файли .nomedia';
 
   @override
   String get showNoMediaFilesDesc =>
-      'Include media in folders containing a .nomedia file';
+      'Показувати файли .nomedia у списках папок';
 
   @override
   String get dontAskAgain => 'Більше не запитувати';
@@ -8631,6 +8631,22 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get autoHideAppBarDesc =>
       'Приховувати верхню панель під час прокручування вниз, щоб збільшити простір перегляду';
+
+  @override
+  String get autoHideToolbarLabel =>
+      'Автоматично ховати панель інструментів під час прокручування';
+
+  @override
+  String get autoHideToolbarDesc =>
+      'Ховати нижню панель інструментів під час прокручування вниз, щоб збільшити простір перегляду';
+
+  @override
+  String get autoHideBreadcrumbBarLabel =>
+      'Автоматично ховати панель шляху під час прокручування';
+
+  @override
+  String get autoHideBreadcrumbBarDesc =>
+      'Ховати панель навігації шляхом під час прокручування вниз, щоб збільшити простір перегляду';
 
   @override
   String get useFabForToolbarLabel => 'Плавуча кнопка для панелі інструментів';

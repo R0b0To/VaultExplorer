@@ -4076,5 +4076,11 @@
   "metadataResultSkipped": "{count} übersprungen (nicht unterstützt)",
   "metadataResultFailed": "{count} fehlgeschlagen",
   "showNoMediaFoldersLabel": ".nomedia-Ordner anzeigen",
-  "showNoMediaFoldersDesc": "Ordner mit einer .nomedia-Datei einbeziehen, die Galerie-Apps normalerweise überspringen"
+  "showNoMediaFoldersDesc": "Ordner mit einer .nomedia-Datei einbeziehen, die Galerie-Apps normalerweise überspringen",
+  "showNoMediaFilesLabel": ".nomedia-Dateien anzeigen",
+  "showNoMediaFilesDesc": ".nomedia-Dateien in Ordnerlisten anzeigen",
+  "autoHideToolbarLabel": "Symbolleiste beim Scrollen automatisch ausblenden",
+  "autoHideToolbarDesc": "Untere Symbolleiste beim Herunterscrollen ausblenden, um den Anzeigebereich zu maximieren",
+  "autoHideBreadcrumbBarLabel": "Breadcrumb-Leiste beim Scrollen automatisch ausblenden",
+  "autoHideBreadcrumbBarDesc": "Pfadnavigationsleiste beim Herunterscrollen ausblenden, um den Anzeigebereich zu maximieren"
 }

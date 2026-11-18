@@ -4076,5 +4076,11 @@
   "metadataResultSkipped": "تم تخطي {count} (غير مدعوم)",
   "metadataResultFailed": "فشل {count}",
   "showNoMediaFoldersLabel": "إظهار مجلدات .nomedia",
-  "showNoMediaFoldersDesc": "تضمين المجلدات التي تحتوي على ملف .nomedia والتي تتجاهلها تطبيقات المعرض عادةً"
+  "showNoMediaFoldersDesc": "تضمين المجلدات التي تحتوي على ملف .nomedia والتي تتجاهلها تطبيقات المعرض عادةً",
+  "showNoMediaFilesLabel": "إظهار ملفات .nomedia",
+  "showNoMediaFilesDesc": "عرض ملفات .nomedia في قوائم المجلدات",
+  "autoHideToolbarLabel": "إخفاء شريط الأدوات تلقائيًا عند التمرير",
+  "autoHideToolbarDesc": "إخفاء شريط الأدوات السفلي عند التمرير للأسفل لتكبير مساحة العرض",
+  "autoHideBreadcrumbBarLabel": "إخفاء شريط المسار تلقائيًا عند التمرير",
+  "autoHideBreadcrumbBarDesc": "إخفاء شريط التنقل بالمسار عند التمرير للأسفل لتكبير مساحة العرض"
 }

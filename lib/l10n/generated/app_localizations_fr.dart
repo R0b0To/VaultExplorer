@@ -7048,11 +7048,11 @@ class AppLocalizationsFr extends AppLocalizations {
       'Afficher les fichiers en point et les dossiers système';
 
   @override
-  String get showNoMediaFilesLabel => 'Show Media Hidden by .nomedia';
+  String get showNoMediaFilesLabel => 'Afficher les fichiers .nomedia';
 
   @override
   String get showNoMediaFilesDesc =>
-      'Include media in folders containing a .nomedia file';
+      'Afficher les fichiers .nomedia dans les listes de dossiers';
 
   @override
   String get dontAskAgain => 'Ne plus demander';
@@ -8648,6 +8648,22 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get autoHideAppBarDesc =>
       'Masquer la barre supérieure lors du défilement vers le bas pour maximiser l’espace';
+
+  @override
+  String get autoHideToolbarLabel =>
+      'Masquer automatiquement la barre d\'outils au défilement';
+
+  @override
+  String get autoHideToolbarDesc =>
+      'Masquer la barre d\'outils inférieure lors du défilement vers le bas pour maximiser l\'espace d\'affichage';
+
+  @override
+  String get autoHideBreadcrumbBarLabel =>
+      'Masquer automatiquement le fil d\'Ariane au défilement';
+
+  @override
+  String get autoHideBreadcrumbBarDesc =>
+      'Masquer la barre de navigation du chemin lors du défilement vers le bas pour maximiser l\'espace d\'affichage';
 
   @override
   String get useFabForToolbarLabel => 'Bouton flottant pour la barre d’outils';

@@ -295,6 +295,64 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                             ),
+                            value: state.config.autoHideToolbar,
+                            onChanged: (v) => ref
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
+                                .setAutoHideToolbar(v),
+                            title: Text(
+                              context.l10n.autoHideToolbarLabel,
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              context.l10n.autoHideToolbarDesc,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                            secondary: Icon(
+                              Icons.view_agenda_outlined,
+                              color: cs.primary,
+                            ),
+                          ),
+                          SwitchListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
+                            value: state.config.autoHideBreadcrumbBar,
+                            onChanged: (v) => ref
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
+                                .setAutoHideBreadcrumbBar(v),
+                            title: Text(
+                              context.l10n.autoHideBreadcrumbBarLabel,
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              context.l10n.autoHideBreadcrumbBarDesc,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                            secondary: Icon(
+                              Icons.navigation_rounded,
+                              color: cs.primary,
+                            ),
+                          ),
+                          SwitchListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
                             value: state.config.showBreadcrumbBar,
                             onChanged: (v) => ref
                                 .read(

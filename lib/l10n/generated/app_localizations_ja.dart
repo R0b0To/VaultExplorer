@@ -6650,11 +6650,10 @@ class AppLocalizationsJa extends AppLocalizations {
   String get showHiddenFilesDesc => 'ドットファイルとシステムフォルダを表示します';
 
   @override
-  String get showNoMediaFilesLabel => 'Show Media Hidden by .nomedia';
+  String get showNoMediaFilesLabel => '.nomedia ファイルを表示';
 
   @override
-  String get showNoMediaFilesDesc =>
-      'Include media in folders containing a .nomedia file';
+  String get showNoMediaFilesDesc => 'フォルダー一覧に .nomedia ファイルを表示します';
 
   @override
   String get dontAskAgain => '今後表示しない';
@@ -8136,6 +8135,19 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get autoHideAppBarDesc => '下方向にスクロールしたときに上部バーを非表示にして表示領域を最大化';
+
+  @override
+  String get autoHideToolbarLabel => 'スクロール時にツールバーを自動で隠す';
+
+  @override
+  String get autoHideToolbarDesc => '下にスクロールすると下部のツールバーを非表示にし、表示スペースを広げます';
+
+  @override
+  String get autoHideBreadcrumbBarLabel => 'スクロール時にパンくずバーを自動で隠す';
+
+  @override
+  String get autoHideBreadcrumbBarDesc =>
+      '下にスクロールするとパスナビゲーションバーを非表示にし、表示スペースを広げます';
 
   @override
   String get useFabForToolbarLabel => 'ツールバーにフローティングボタンを使用';

@@ -4076,5 +4076,11 @@
   "metadataResultSkipped": "{count}개 건너뜀(지원되지 않음)",
   "metadataResultFailed": "{count}개 실패",
   "showNoMediaFoldersLabel": ".nomedia 폴더 표시",
-  "showNoMediaFoldersDesc": "갤러리 앱이 보통 건너뛰는 .nomedia 파일이 있는 폴더를 포함합니다"
+  "showNoMediaFoldersDesc": "갤러리 앱이 보통 건너뛰는 .nomedia 파일이 있는 폴더를 포함합니다",
+  "showNoMediaFilesLabel": ".nomedia 파일 표시",
+  "showNoMediaFilesDesc": "폴더 목록에 .nomedia 파일을 표시합니다",
+  "autoHideToolbarLabel": "스크롤 시 도구 모음 자동 숨기기",
+  "autoHideToolbarDesc": "아래로 스크롤할 때 하단 도구 모음을 숨겨 보기 공간을 최대화합니다",
+  "autoHideBreadcrumbBarLabel": "스크롤 시 경로 표시줄 자동 숨기기",
+  "autoHideBreadcrumbBarDesc": "아래로 스크롤할 때 경로 탐색 표시줄을 숨겨 보기 공간을 최대화합니다"
 }

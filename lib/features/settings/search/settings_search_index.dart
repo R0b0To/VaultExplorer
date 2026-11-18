@@ -570,6 +570,22 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
     keywords: ['tabs', 'tab strip', 'scroll', 'hide'],
   ),
   _e(
+    'file_manager.auto_hide_toolbar',
+    SettingsDestination.fileManager,
+    (l) => l.autoHideToolbarLabel,
+    section: (l) => l.browserLayoutSectionHeader,
+    details: [(l) => l.autoHideToolbarDesc],
+    keywords: ['bottom bar', 'toolbar', 'action bar', 'scroll', 'hide'],
+  ),
+  _e(
+    'file_manager.auto_hide_breadcrumb_bar',
+    SettingsDestination.fileManager,
+    (l) => l.autoHideBreadcrumbBarLabel,
+    section: (l) => l.browserLayoutSectionHeader,
+    details: [(l) => l.autoHideBreadcrumbBarDesc],
+    keywords: ['breadcrumb', 'path', 'navigation', 'scroll', 'hide'],
+  ),
+  _e(
     'file_manager.app_bar_at_bottom',
     SettingsDestination.fileManager,
     (l) => l.appBarAtBottomLabel,

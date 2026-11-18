@@ -4076,5 +4076,11 @@
   "metadataResultSkipped": "Пропущено: {count} (не підтримується)",
   "metadataResultFailed": "Не вдалося: {count}",
   "showNoMediaFoldersLabel": "Показувати папки .nomedia",
-  "showNoMediaFoldersDesc": "Включити папки з файлом .nomedia, які застосунки галереї зазвичай пропускають"
+  "showNoMediaFoldersDesc": "Включити папки з файлом .nomedia, які застосунки галереї зазвичай пропускають",
+  "showNoMediaFilesLabel": "Показувати файли .nomedia",
+  "showNoMediaFilesDesc": "Показувати файли .nomedia у списках папок",
+  "autoHideToolbarLabel": "Автоматично ховати панель інструментів під час прокручування",
+  "autoHideToolbarDesc": "Ховати нижню панель інструментів під час прокручування вниз, щоб збільшити простір перегляду",
+  "autoHideBreadcrumbBarLabel": "Автоматично ховати панель шляху під час прокручування",
+  "autoHideBreadcrumbBarDesc": "Ховати панель навігації шляхом під час прокручування вниз, щоб збільшити простір перегляду"
 }

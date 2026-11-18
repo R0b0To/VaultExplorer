@@ -4076,5 +4076,11 @@
   "metadataResultSkipped": "已跳过 {count} 个（不支持）",
   "metadataResultFailed": "{count} 个失败",
   "showNoMediaFoldersLabel": "显示 .nomedia 文件夹",
-  "showNoMediaFoldersDesc": "包含带有 .nomedia 文件的文件夹（图库应用通常会跳过这些文件夹）"
+  "showNoMediaFoldersDesc": "包含带有 .nomedia 文件的文件夹（图库应用通常会跳过这些文件夹）",
+  "showNoMediaFilesLabel": "显示 .nomedia 文件",
+  "showNoMediaFilesDesc": "在文件夹列表中显示 .nomedia 文件",
+  "autoHideToolbarLabel": "滚动时自动隐藏工具栏",
+  "autoHideToolbarDesc": "向下滚动时隐藏底部工具栏，以最大化查看空间",
+  "autoHideBreadcrumbBarLabel": "滚动时自动隐藏路径栏",
+  "autoHideBreadcrumbBarDesc": "向下滚动时隐藏路径导航栏，以最大化查看空间"
 }

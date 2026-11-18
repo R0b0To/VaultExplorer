@@ -6562,11 +6562,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get showHiddenFilesDesc => '显示点文件和系统文件夹';
 
   @override
-  String get showNoMediaFilesLabel => 'Show Media Hidden by .nomedia';
+  String get showNoMediaFilesLabel => '显示 .nomedia 文件';
 
   @override
-  String get showNoMediaFilesDesc =>
-      'Include media in folders containing a .nomedia file';
+  String get showNoMediaFilesDesc => '在文件夹列表中显示 .nomedia 文件';
 
   @override
   String get dontAskAgain => '不再询问';
@@ -8025,6 +8024,18 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get autoHideAppBarDesc => '向下滚动时隐藏顶部栏以最大化查看空间';
+
+  @override
+  String get autoHideToolbarLabel => '滚动时自动隐藏工具栏';
+
+  @override
+  String get autoHideToolbarDesc => '向下滚动时隐藏底部工具栏，以最大化查看空间';
+
+  @override
+  String get autoHideBreadcrumbBarLabel => '滚动时自动隐藏路径栏';
+
+  @override
+  String get autoHideBreadcrumbBarDesc => '向下滚动时隐藏路径导航栏，以最大化查看空间';
 
   @override
   String get useFabForToolbarLabel => '使用浮动按钮作为工具栏';

@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/utils/lru_cache.dart';
 import 'package:vaultexplorer/core/utils/perf_trace.dart';
-import 'package:vaultexplorer/core/widgets/scroll_speed_scope.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart';
@@ -70,18 +69,6 @@ class AsyncThumbnail extends ConsumerStatefulWidget {
 class _AsyncThumbnailState extends ConsumerState<AsyncThumbnail> {
   bool _tickerEnabled = true;
 
-  /// The scrollable this tile is in is moving too fast to read (see
-  /// [ScrollSpeedScope]): a tile that has not asked for its thumbnail yet
-  /// waits, which costs nothing, instead of creating a loader that its own
-  /// disposal cancels a few frames later.
-  bool _scrollIsFast = false;
-
-  /// This tile has asked for its thumbnail at least once. From then on it is
-  /// served normally, fast scroll or not.
-  bool _armed = false;
-
-  bool get _mayLoad => _tickerEnabled && (!_scrollIsFast || _armed);
-
   // The family key is rebuilt (an allocation plus hashing a DateTime, a path
   // and an enum) every time it is asked for, and `build` asks for it several
   // times. It only changes when the tile is pointed at a different file,
@@ -105,8 +92,7 @@ class _AsyncThumbnailState extends ConsumerState<AsyncThumbnail> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     _tickerEnabled = TickerMode.valuesOf(context).enabled;
-    _scrollIsFast = ScrollSpeedScope.isFastOf(context);
-    if (_mayLoad) _ensureLoaded();
+    if (_tickerEnabled) _ensureLoaded();
   }
 
   @override
@@ -128,14 +114,12 @@ class _AsyncThumbnailState extends ConsumerState<AsyncThumbnail> {
         oldWidget.container.volId != widget.container.volId ||
         oldWidget.container.mountedAt != widget.container.mountedAt) {
       _providerCache = null;
-      _armed = false;
-      if (_mayLoad) _ensureLoaded();
+      if (_tickerEnabled) _ensureLoaded();
     }
   }
 
   void _ensureLoaded() {
     if (!_tickerEnabled) return;
-    _armed = true;
     ref
         .read(_provider.notifier)
         .ensureLoaded(
@@ -154,11 +138,9 @@ class _AsyncThumbnailState extends ConsumerState<AsyncThumbnail> {
   /// A third of what the call site asked for (30 ms becomes 10 ms), unless it
   /// is already short.
   ///
-  /// The debounce exists so a tile that is built and gone within a frame or
-  /// two never reaches the queue. Fast scrolling is already handled by the
-  /// scroll-speed gate in [build], so the full wait only added latency to
-  /// every tile that stays on screen: about a third of the time a cached
-  /// thumbnail took to appear.
+  /// The short delay lets tiles that leave within a frame or two avoid joining
+  /// the queue. Viewport-aware priority keeps any remaining offscreen work
+  /// behind thumbnails that are on screen.
   static Duration _debounceFor(Duration requested) =>
       requested <= const Duration(milliseconds: 12)
       ? requested
@@ -218,18 +200,7 @@ class _AsyncThumbnailState extends ConsumerState<AsyncThumbnail> {
 
   Widget _buildTile(BuildContext context) {
     _tickerEnabled = TickerMode.valuesOf(context).enabled;
-    _scrollIsFast = ScrollSpeedScope.isFastOf(context);
     if (!_tickerEnabled) {
-      return widget.loadingBuilder?.call(context) ?? const SizedBox.shrink();
-    }
-    if (_scrollIsFast && !_armed) {
-      // Too fast to read. A thumbnail that is already in memory is still shown
-      // (it is free); anything else waits until the scroll slows down, which
-      // rebuilds this tile (see ScrollSpeedScope).
-      final hit = widget.syncLookup?.call();
-      if (hit != null && hit.isNotEmpty) {
-        return widget.imageBuilder(context, hit, widget.cacheHeight);
-      }
       return widget.loadingBuilder?.call(context) ?? const SizedBox.shrink();
     }
     // Arming on every build, not just on mount. `ensureLoaded` is a no-op

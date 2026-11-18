@@ -34,6 +34,7 @@ import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
 import 'package:vaultexplorer/features/browser/services/category_aggregate_scan.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
+import 'package:vaultexplorer/features/browser/gallery/gallery_anchor.dart';
 import 'package:vaultexplorer/features/browser/gallery/gallery_layout.dart';
 import 'package:vaultexplorer/features/browser/gallery/gallery_ratio_prefetcher.dart';
 import 'package:vaultexplorer/features/browser/gallery/gallery_sliver.dart';
@@ -104,6 +105,11 @@ class FileMasonryView extends ConsumerStatefulWidget {
   final double bottomClearance;
   final bool groupByDate;
 
+  /// Keep what is at the top of the screen where it is when [items] changes
+  /// under the person (the gallery's filter results come in, a rescan ends),
+  /// instead of leaving the scroll offset as it was while the content moves.
+  final bool anchorOnItemsChange;
+
   /// Builds the sections when [groupByDate] is on. Null keeps the day
   /// sections ([computeDateGroups]); the gallery filter passes its own to
   /// group by month, folder, place, camera...
@@ -167,6 +173,7 @@ class FileMasonryView extends ConsumerStatefulWidget {
     this.scrollController,
     this.bottomClearance = 0.0,
     this.groupByDate = false,
+    this.anchorOnItemsChange = false,
     this.groupBuilder,
     this.archiveContext,
     this.archiveRootPath,
@@ -480,7 +487,17 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
         oldWidget.items != widget.items ||
         oldWidget.groupByDate != widget.groupByDate ||
         oldWidget.archiveContext != widget.archiveContext) {
+      // The same folder shown from a new list (filter results, a rescan): what
+      // is at the top of the screen stays there.
+      final held = widget.anchorOnItemsChange &&
+              oldWidget.items != widget.items &&
+              oldWidget.currentDirPath == widget.currentDirPath &&
+              oldWidget.groupByDate == widget.groupByDate
+          ? _host.captureTopItem()
+          : null;
+      final previousDisplay = _display;
       _rebuildDisplay();
+      if (held != null) _holdAnchor(held, previousDisplay);
       _afterDisplayRebuilt();
     } else if (oldWidget.thumbnailCacheMode != widget.thumbnailCacheMode) {
       // The caching mode decides whether the media index may be saved.
@@ -492,6 +509,23 @@ class FileMasonryViewState extends ConsumerState<FileMasonryView>
         (oldWidget.onFileLongMenu == null) != (widget.onFileLongMenu == null)) {
       _syncHost();
     }
+  }
+
+  /// After [_rebuildDisplay] for a new list: has the next layout pass keep the
+  /// entry [held] was (the one at the top of the screen) at the same place.
+  void _holdAnchor(
+    ({int child, int item, double viewportOffset}) held,
+    List<RawEntry> previousDisplay,
+  ) {
+    final next = findAnchorIndex<RawEntry>(
+      previousDisplay,
+      held.item,
+      _display,
+      galleryAnchorKey,
+    );
+    final model = _host.prepareModel();
+    if (next == null || model == null || next >= model.itemCount) return;
+    _host.adoptAnchored(model, model.childOfItem[next], held.viewportOffset);
   }
 
   // ── Layout inputs ──────────────────────────────────────────────────────────

@@ -1129,6 +1129,52 @@ class GalleryLayoutHost {
     return GalleryAnchor(child: c, viewportOffset: m.tops[c] - sliverScrollOffset);
   }
 
+  /// The item nearest the top of the screen (headers skipped): the child that
+  /// draws it, its item index, and where its top edge is relative to the
+  /// scroll offset. Null before the first layout and at the very top of the
+  /// list, where there is nothing to hold in place and what is added above
+  /// simply shows.
+  ///
+  /// This is the first half of keeping the view still when the *list* changes
+  /// (a filter result came in, a rescan finished): the caller finds the same
+  /// entry in the new list, builds the new model with [prepareModel], and hands
+  /// the entry's new child to [adoptAnchored].
+  ({int child, int item, double viewportOffset})? captureTopItem() {
+    final m = _model;
+    if (m == null || m.childCount == 0 || sliverScrollOffset <= 0.5) {
+      return null;
+    }
+    var c = m.minChildForOffset(sliverScrollOffset);
+    while (c < m.childCount && m.isHeader(c)) {
+      c++;
+    }
+    if (c >= m.childCount) return null;
+    return (
+      child: c,
+      item: m.itemOfChild[c],
+      viewportOffset: m.tops[c] - sliverScrollOffset,
+    );
+  }
+
+  /// The layout of the current sections at the width of the last layout pass,
+  /// built now. Null while nothing has been laid out yet (the width is not
+  /// known), in which case there is no scroll position to keep either.
+  GalleryLayoutModel? prepareModel() =>
+      sliverCrossExtent > 0 ? buildCandidate(sliverCrossExtent) : null;
+
+  /// Makes [model] (from [prepareModel]) the layout in use, and has the next
+  /// layout pass correct the scroll offset so [child] sits [viewportOffset]
+  /// below the top of the screen. The correction happens inside that pass, so
+  /// no frame is painted with the content shifted.
+  void adoptAnchored(
+    GalleryLayoutModel model,
+    int child,
+    double viewportOffset,
+  ) {
+    adoptQuietly(model);
+    pendingAnchor = GalleryAnchor(child: child, viewportOffset: viewportOffset);
+  }
+
   /// The anchor that keeps whatever is at [offsetInViewport] (e.g. the pinch's
   /// focal point) at that same place on screen.
   GalleryAnchor? captureAnchorAt(double offsetInViewport) {

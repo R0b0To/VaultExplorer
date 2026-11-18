@@ -25,6 +25,7 @@ import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
 import 'package:vaultexplorer/features/browser/services/category_aggregate_scan.dart';
+import 'package:vaultexplorer/features/browser/gallery/gallery_anchor.dart';
 import 'package:vaultexplorer/features/browser/gallery/gallery_group_index.dart';
 import 'package:vaultexplorer/features/browser/gallery/gallery_layout.dart';
 import 'package:vaultexplorer/features/browser/gallery/gallery_sliver.dart';
@@ -101,6 +102,11 @@ class FileGridView extends StatefulWidget {
   final SortBy? sortBy;
   final bool groupByDate;
 
+  /// Keep what is at the top of the screen where it is when [items] changes
+  /// under the person (the gallery's filter results come in, a rescan ends),
+  /// instead of leaving the scroll offset as it was while the content moves.
+  final bool anchorOnItemsChange;
+
   /// Builds the sections when [groupByDate] is on. Null keeps the day
   /// sections ([computeDateGroups]); the gallery filter passes its own to
   /// group by month, folder, place, camera...
@@ -164,6 +170,7 @@ class FileGridView extends StatefulWidget {
     this.archiveRootPath,
     this.sortBy,
     this.groupByDate = false,
+    this.anchorOnItemsChange = false,
     this.groupBuilder,
     this.containerFor,
     this.folderPreviewPaths,
@@ -248,6 +255,10 @@ class FileGridViewState extends State<FileGridView>
   GalleryGroupIndex<RawEntry>? _groups;
   String _groupHostKey = '';
 
+  /// The groups the host was last laid out from: when a new list replaces
+  /// them, what was at the top of the screen is looked up in the new groups.
+  GalleryGroupIndex<RawEntry>? _hostGroups;
+
   // Animation controller for clearly visible column morph transition
   late final AnimationController _morphController;
   late Animation<double> _scaleAnimation;
@@ -304,7 +315,36 @@ class FileGridViewState extends State<FileGridView>
     }
     if (oldWidget.items != widget.items) {
       _entryIndexMap.clear();
+      if (widget.anchorOnItemsChange &&
+          !widget.groupByDate &&
+          !oldWidget.groupByDate) {
+        _keepPlainAnchor(oldWidget.items);
+      }
     }
+  }
+
+  /// The plain (not sectioned) grid: every row is the same height, so where
+  /// the entry that was first on screen now is follows from its index. The
+  /// offset is corrected before this frame is laid out (no frame shows the
+  /// content shifted). The sectioned grid does the same through its layout
+  /// host, see [_syncGroupHost].
+  void _keepPlainAnchor(List<RawEntry> previous) {
+    final controller = widget.scrollController;
+    if (controller == null || !controller.hasClients) return;
+    final position = controller.position;
+    if (!position.hasPixels) return;
+    final target = uniformAnchorOffset<RawEntry>(
+      previous: previous,
+      next: widget.items,
+      keyOf: galleryAnchorKey,
+      offset: position.pixels,
+      rowExtent: _getTileHeight(_crossAxisCount) + widget.spacing,
+      columns: _crossAxisCount,
+      topPadding: 12.0,
+    );
+    if (target == null) return;
+    final delta = target - position.pixels;
+    if (delta.abs() > 0.5) position.correctBy(delta);
   }
 
   int get _minColumns => 1;
@@ -548,6 +588,15 @@ Widget _buildAnimatedGridView(ScrollController? controller, int total) {
         '${identityHashCode(groups)}|$_crossAxisCount|${widget.spacing}|$aspect|$headerExtent';
     if (key == _groupHostKey) return;
     _groupHostKey = key;
+    // A new list (not a new zoom or width): note what is at the top of the
+    // screen now, while the host still holds the layout the person is seeing.
+    final previous = _hostGroups;
+    final held = widget.anchorOnItemsChange &&
+            previous != null &&
+            !identical(previous, groups)
+        ? _groupHost.captureTopItem()
+        : null;
+    _hostGroups = groups;
     _groupHost
       ..columnCount = _crossAxisCount
       ..spacing = widget.spacing
@@ -559,6 +608,16 @@ Widget _buildAnimatedGridView(ScrollController? controller, int total) {
       ..ratioOf = ((_) => aspect)
       ..footerOf = null
       ..invalidate();
+    if (held == null) return;
+    final carried = carryGroupAnchor<RawEntry>(
+      GalleryAnchor(child: held.child, viewportOffset: held.viewportOffset),
+      previous!,
+      groups,
+      galleryAnchorKey,
+    );
+    final model = _groupHost.prepareModel();
+    if (carried == null || model == null) return;
+    _groupHost.adoptAnchored(model, carried.child, carried.viewportOffset);
   }
 
   Widget _buildDateGroupedGridView(ScrollController? controller) {

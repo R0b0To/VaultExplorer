@@ -206,6 +206,15 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
   bool _searchActive = false;
   String _query = '';
   final ScrollController _scrollController = ScrollController();
+
+  // While the list is being scrolled nothing that would move its content is
+  // applied: the filter index holds its results back, and scan progress is
+  // kept aside, both applied when the scrolling has stopped. (An offset
+  // correction cannot survive a fling, so a change landing mid-fling would
+  // shift the photos under the finger.)
+  bool _userScrolling = false;
+  Timer? _scrollIdleTimer;
+  CategoryAggregateSnapshot? _deferredSnapshot;
   final GlobalKey<FileGridViewState> _gridKey = GlobalKey<FileGridViewState>();
   final GlobalKey<FileMasonryViewState> _masonryKey =
       GlobalKey<FileMasonryViewState>();
@@ -280,6 +289,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScrollTick);
     _galleryFilter.addListener(_onGalleryFilterChanged);
     if (widget.scopedContainer != null) {
       _containers = {widget.scopedContainer!.volId: widget.scopedContainer!};
@@ -394,6 +404,8 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       unawaited(meta.flush());
       meta.dispose();
     }
+    _scrollIdleTimer?.cancel();
+    _scrollController.removeListener(_onScrollTick);
     _scrollController.dispose();
     super.dispose();
   }
@@ -488,7 +500,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
   /// [DeviceCategoryIndex]). [deep] skips the index and walks, for the cases
   /// where it must not be trusted to know about a change: a pull to refresh,
   /// and a rescan after an operation that wrote files.
-  Future<void> _startScan({bool deep = false}) async {
+  Future<void> _startScan({bool deep = false, bool keepResults = false}) async {
     _token?.cancel();
     final token = _token = CancellationToken();
     final toolbar = ref.read(fileManagerToolbarSettingsProvider(null)).config;
@@ -497,9 +509,17 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     // Folders chosen for the gallery; empty scans each source whole.
     final roots = _scoped && _isGallery ? _galleryRoots : const <String>[];
 
+    // A rescan of what is already shown (after an operation, a refresh, a
+    // vault mounted) leaves the list on screen until the result is in: blanking
+    // it first loses the scroll position. A scan of something else (another
+    // source or folder choice, hidden files shown) starts from nothing.
+    final keep =
+        (deep || keepResults) && _snapshot.entries.isNotEmpty;
+    _deferredSnapshot = null;
+
     setState(() {
       _scanning = true;
-      _snapshot = CategoryAggregateSnapshot.empty;
+      if (!keep) _snapshot = CategoryAggregateSnapshot.empty;
       _forwardStack = const [];
       _forwardLocations = const [];
     });
@@ -592,10 +612,16 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       progressInterval: const Duration(milliseconds: 500),
       onProgress: (snapshot) {
         if (_disposed || token.isCancelled) return;
+        if (keep) return; // what is shown stays until the scan is done
+        if (_userScrolling && _snapshot.entries.isNotEmpty) {
+          _deferredSnapshot = snapshot;
+          return;
+        }
         setState(() => _snapshot = _withoutLockedVaults(snapshot));
       },
     );
     if (_disposed || token.isCancelled) return;
+    _deferredSnapshot = null;
     setState(() {
       _snapshot = _withoutLockedVaults(result);
       _scanning = false;
@@ -860,7 +886,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     final prevIds = {if (previous != null) for (final v in previous) v.volId};
     final nextIds = {for (final v in next) v.volId};
     if (nextIds.any((id) => !prevIds.contains(id))) {
-      unawaited(_startScan());
+      unawaited(_startScan(keepResults: true));
     }
   }
 
@@ -972,14 +998,50 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       storage: VaultGalleryMetaStorage(
         io,
         (volId) => _containers[volId],
-        allowWrite: (volId) =>
-            (_thumbs[volId]?.cacheMode ?? ThumbnailCacheMode.appCache) !=
-            ThumbnailCacheMode.disabled,
+        allowWrite: (volId) => _metaCacheMode(volId) != ThumbnailCacheMode.disabled,
+        // Phone storage keeps its index next to the thumbnails, but only when
+        // the thumbnails go to the hidden folder there.
+        keepInHiddenFolder: (volId) =>
+            _metaCacheMode(volId) == ThumbnailCacheMode.inContainer,
       ),
+      // What was read from a source that is never saved to disk (phone storage
+      // without the hidden folder) outlives the gallery view, so opening the
+      // gallery again in this session does not read every photo again.
+      memory: GalleryMetaMemory.app,
+      retain: (volId) => _containers[volId]?.isLocalStorage ?? false,
       notifyEvery: const Duration(seconds: 1),
     );
     index.addListener(_onMetaIndexChanged);
+    if (_userScrolling) index.paused = true;
     return index;
+  }
+
+  ThumbnailCacheMode _metaCacheMode(int volId) =>
+      _thumbs[volId]?.cacheMode ?? ThumbnailCacheMode.appCache;
+
+  /// Every move of the list. The first one holds back what would change the
+  /// list under the finger; [_onScrollIdle] lets it through again once the
+  /// scrolling has been quiet for a moment.
+  void _onScrollTick() {
+    if (_disposed) return;
+    if (!_userScrolling) {
+      _userScrolling = true;
+      _metaIndex?.paused = true;
+    }
+    _scrollIdleTimer?.cancel();
+    _scrollIdleTimer = Timer(const Duration(milliseconds: 250), _onScrollIdle);
+  }
+
+  void _onScrollIdle() {
+    _scrollIdleTimer = null;
+    if (_disposed || !mounted) return;
+    _userScrolling = false;
+    _metaIndex?.paused = false;
+    final deferred = _deferredSnapshot;
+    if (deferred != null) {
+      _deferredSnapshot = null;
+      setState(() => _snapshot = _withoutLockedVaults(deferred));
+    }
   }
 
   void _onMetaIndexChanged() {
@@ -1045,6 +1107,13 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
 
   void _startMetaIndexing() {
     if (_disposed || !_isGallery) return;
+    // Where a source may keep its index depends on its thumbnail settings; the
+    // stored index of one whose settings are still loading would be skipped
+    // for the whole session.
+    if (_thumbs.values.any((t) => t == null)) {
+      _scheduleMetaIndexing();
+      return;
+    }
     final meta = _meta;
     final entries = _snapshot.entries;
     unawaited(meta.loadStored({for (final e in entries) e.sourceVolId}));
@@ -2291,7 +2360,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
             _metaIndex?.invalidate(t.container.volId, t.path);
           }
           _clearSelection();
-          unawaited(_startScan());
+          unawaited(_startScan(keepResults: true));
         },
       ),
     );
@@ -3544,6 +3613,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           searchQuery: query,
           bottomClearance: searchClearance,
           sortBy: _sortBy,
+          anchorOnItemsChange: _isGallery && !_folderMode,
           groupByDate: _isGallery &&
               !_folderMode &&
               _galleryFilter.groupBy != GalleryGroupBy.none,
@@ -3594,6 +3664,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           searchQuery: query,
           bottomClearance: searchClearance,
           sortBy: _sortBy,
+          anchorOnItemsChange: _isGallery && !_folderMode,
           groupByDate: _isGallery &&
               !_folderMode &&
               _galleryFilter.groupBy != GalleryGroupBy.none,
@@ -3641,6 +3712,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           searchQuery: query,
           bottomClearance: searchClearance,
           sortBy: _sortBy,
+          anchorOnItemsChange: _isGallery && !_folderMode,
           groupByDate: _isGallery &&
               !_folderMode &&
               _galleryFilter.groupBy != GalleryGroupBy.none,

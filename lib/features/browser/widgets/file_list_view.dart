@@ -9,6 +9,7 @@ import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
+import 'package:vaultexplorer/features/browser/gallery/gallery_anchor.dart';
 import 'package:vaultexplorer/features/browser/gallery/gallery_group_index.dart';
 import 'package:vaultexplorer/features/browser/gallery/gallery_layout.dart';
 import 'package:vaultexplorer/features/browser/gallery/gallery_sliver.dart';
@@ -99,6 +100,11 @@ class FileListView extends StatefulWidget {
   final bool largeThumbnail;
   final bool groupByDate;
 
+  /// Keep what is at the top of the screen where it is when [items] changes
+  /// under the person (the gallery's filter results come in, a rescan ends),
+  /// instead of leaving the scroll offset as it was while the content moves.
+  final bool anchorOnItemsChange;
+
   /// Builds the sections when [groupByDate] is on. Null keeps the day
   /// sections ([computeDateGroups]); the gallery filter passes its own to
   /// group by month, folder, place, camera...
@@ -134,6 +140,7 @@ class FileListView extends StatefulWidget {
     this.isDetailed = false,
     this.largeThumbnail = false,
     this.groupByDate = false,
+    this.anchorOnItemsChange = false,
     this.groupBuilder,
     required this.selectedItems,
     this.detailColumns = const [FileDetailColumn.date, FileDetailColumn.size],
@@ -238,6 +245,9 @@ class FileListViewState extends State<FileListView> {
   GalleryGroupIndex<RawEntry>? _groups;
   String _groupHostKey = '';
 
+  /// The groups the host was last laid out from (see the grid view).
+  GalleryGroupIndex<RawEntry>? _hostGroups;
+
   // Grouped pinch zoom keeps the child under the viewport centre in place.
   int _anchorChild = -1;
   double _anchorChildFraction = 0.0;
@@ -302,6 +312,15 @@ class FileListViewState extends State<FileListView> {
     final key = '${identityHashCode(groups)}|$itemExtent|$headerExtent';
     if (key == _groupHostKey) return;
     _groupHostKey = key;
+    // A new list (not a new zoom): note what is at the top of the screen now,
+    // while the host still holds the layout the person is seeing.
+    final previous = _hostGroups;
+    final held = widget.anchorOnItemsChange &&
+            previous != null &&
+            !identical(previous, groups)
+        ? _groupHost.captureTopItem()
+        : null;
+    _hostGroups = groups;
     _groupHost
       ..rowExtent = itemExtent
       ..sections = [
@@ -309,6 +328,16 @@ class FileListViewState extends State<FileListView> {
           GallerySection(itemCount: g.items.length, headerExtent: headerExtent),
       ]
       ..invalidate();
+    if (held == null) return;
+    final carried = carryGroupAnchor<RawEntry>(
+      GalleryAnchor(child: held.child, viewportOffset: held.viewportOffset),
+      previous!,
+      groups,
+      galleryAnchorKey,
+    );
+    final model = _groupHost.prepareModel();
+    if (carried == null || model == null) return;
+    _groupHost.adoptAnchored(model, carried.child, carried.viewportOffset);
   }
 
   /// The grouped layout at [zoom], computed now rather than at the next layout
@@ -335,7 +364,33 @@ class FileListViewState extends State<FileListView> {
     }
     if (oldWidget.items != widget.items) {
       _entryIndexMap.clear();
+      if (widget.anchorOnItemsChange &&
+          !widget.groupByDate &&
+          !oldWidget.groupByDate) {
+        _keepPlainAnchor(oldWidget.items);
+      }
     }
+  }
+
+  /// The plain (not sectioned) list: every row is [_computeItemExtent] tall, so
+  /// where the entry that was first on screen now is follows from its index.
+  /// Corrected before this frame is laid out. The sectioned list does the same
+  /// through its layout host, see [_syncGroupHost].
+  void _keepPlainAnchor(List<RawEntry> previous) {
+    final controller = widget.scrollController;
+    if (controller == null || !controller.hasClients) return;
+    final position = controller.position;
+    if (!position.hasPixels) return;
+    final target = uniformAnchorOffset<RawEntry>(
+      previous: previous,
+      next: widget.items,
+      keyOf: galleryAnchorKey,
+      offset: position.pixels,
+      rowExtent: _computeItemExtent(_zoomLevel),
+    );
+    if (target == null) return;
+    final delta = target - position.pixels;
+    if (delta.abs() > 0.5) position.correctBy(delta);
   }
 
   double _computeItemExtent(double zoom) {

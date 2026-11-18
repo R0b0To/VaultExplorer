@@ -42,3 +42,26 @@ A gallery opened on a vault or on phone storage scans the whole storage by defau
 choice is saved per storage on this device, and the scan then starts from those folders only. Ticking nothing, or
 choosing **Scan everything**, goes back to the whole storage. While folders are chosen, the gallery's top is the storage
 root, and the partial scan is never stored as the storage's category index.
+
+## Where the metadata index is kept, and what it does while you scroll
+
+The index of what was read from the photos (date taken, place, camera, tags) is kept per source:
+
+- **Vaults**: in `/.vaultexplorer`, inside the vault, as long as thumbnail caching is on and the vault is writable.
+- **Phone storage and other plain locations**: in the hidden `.thumbcache` folder, next to the thumbnails, and only when
+  that folder is the thumbnail cache chosen for the storage. Clearing the thumbnail cache removes the index too. With
+  any other thumbnail setting nothing is written to the storage.
+- **Whatever is not saved** (phone storage without the hidden folder) is kept in memory for the session
+  (`GalleryMetaMemory.app`), so opening the gallery again does not read every photo again. It is gone when the app is
+  closed. An entry is only used while the file's size and date still match.
+
+The list must not move under the finger:
+
+- While the gallery scrolls, the index holds back what it has read and scan progress is kept aside; both are applied
+  when the scrolling has been still for a moment.
+- When the list changes while the view is not at its top (filter results arrived, a scan ended, a vault was mounted),
+  the photo that was first on screen stays where it was (if it was filtered out, the nearest one that remains).
+  This is `captureTopItem` / `adoptAnchored` on the layout host for the sectioned grid, list and masonry, and a
+  direct offset correction for the plain grid and list (`gallery_anchor.dart`).
+- A rescan of what is already shown (refresh, after an operation, a vault mounted) keeps the list on screen until
+  the new result is in, instead of blanking it first.

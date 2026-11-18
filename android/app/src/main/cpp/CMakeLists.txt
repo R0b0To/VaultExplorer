@@ -931,6 +931,8 @@ if(NOT ANDROID)
         endif()
     endforeach()
 
+    add_custom_target(host_tests DEPENDS ${VAULTEXPLORER_HOST_TESTS})
+
     enable_testing()
     add_test(NAME sector_batching_test COMMAND sector_batching_test)
     add_test(NAME fs_scan_test COMMAND fs_scan_test)

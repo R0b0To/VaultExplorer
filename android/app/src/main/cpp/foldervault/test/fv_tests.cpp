@@ -1525,9 +1525,10 @@ static void testConcurrency(const char* fmt) {
     auto st = std::make_shared<PosixStorage>(root);
     const uint8_t pw[] = "pw";
     OpenResult r;
-    if (std::string(fmt) == "gocryptfs") { createGocryptfs(*st, pw, 2, {}); r = openGocryptfs(st, pw, 2, false, env); }
+    // Cheap KDF for all formats: this test exercises concurrency, not key derivation.
+    if (std::string(fmt) == "gocryptfs") { GocryptfsCreateOptions go; go.scryptLogN = 10; createGocryptfs(*st, pw, 2, go); r = openGocryptfs(st, pw, 2, false, env); }
     else if (std::string(fmt) == "cryptomator") { createCryptomator(*st, pw, 2); r = openCryptomator(st, pw, 2, false, env); }
-    else { CryfsCreateOptions o; o.blocksizeBytes = 8192; createCryfs(*st, pw, 2, o, env); r = openCryfs(st, pw, 2, false, env); }
+    else { CryfsCreateOptions o; o.blocksizeBytes = 8192; o.scryptLogN = 10; o.scryptR = 8; o.scryptP = 1; createCryfs(*st, pw, 2, o, env); r = openCryfs(st, pw, 2, false, env); }
     CHECK(r.status == OpenStatus::Ok);
     if (!r.vault) return;
     Vault& v = *r.vault;

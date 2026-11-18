@@ -46,6 +46,11 @@ struct VolumeState {
     uint64_t dataAreaLengthBytes = 0;
     bool isHiddenVolume = false;
     bool dataCtxInitialized = false;
+    // Identifies which unlock session currently owns this slot: bumped every time the slot
+    // is torn down (reset(), the emergency purge) and never cleared, so a holder that
+    // captured it (vm::BlockVolume) can tell "the session I was made for" from a later
+    // unlock of some other container in the same slot. Written and read under `mutex`.
+    uint64_t sessionEpoch = 0;
     uint64_t fileSize = 0;
     bool fsMounted = false;
     bool isUsbSource = false;

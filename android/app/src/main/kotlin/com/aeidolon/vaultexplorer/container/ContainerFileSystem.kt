@@ -6,6 +6,8 @@ import com.aeidolon.vaultexplorer.PerfLog
 import com.aeidolon.vaultexplorer.VeLog
 import com.aeidolon.vaultexplorer.bridge.CopyProgressBridge
 import com.aeidolon.vaultexplorer.cancellation.CopyCancellation
+import com.aeidolon.vaultexplorer.foldervault.NativeVaultSession
+import com.aeidolon.vaultexplorer.volman.NativeVolumeManager
 
 object ContainerFileSystem {
 
@@ -100,6 +102,16 @@ object ContainerFileSystem {
                 writeBack = { path, source -> writeBackFile(destVolId, path, source, opId) })
         }
 
+        // The native volume manager (cpp/volman) does this whole transfer in one call: chunks go from
+        // the source to the destination in C++ memory, with the same progress, cancellation and
+        // "delete what this attempt created" behaviour as the loop below. Only when a side cannot be
+        // handed to it (library without the manager, volume not attachable) does the Kotlin loop run.
+        when (copyViaNativeManager(srcVolId, srcPath, destVolId, destPath, opId)) {
+            NativeVolumeManager.COPY_OK -> return true
+            NativeVolumeManager.COPY_FAILED, NativeVolumeManager.COPY_CANCELLED -> return false
+            else -> Unit
+        }
+
         val input = VaultCopyInputStream(
             total = total,
             readChunk = { offset, length -> readFileChunk(srcVolId, srcPath, offset, length) },
@@ -133,6 +145,49 @@ object ContainerFileSystem {
         } catch (_: Exception) {
         }
         return false
+    }
+
+    /**
+     * [NativeVolumeManager.COPY_NOT_ATTACHED] when the native manager cannot take part (not available,
+     * or a side cannot be attached); otherwise the native copy's own result. Attaching is lazy and the
+     * native side drops slots whose container was locked, so there is no lifecycle to keep in sync.
+     */
+    private fun copyViaNativeManager(
+        srcVolId: Int, srcPath: String, destVolId: Int, destPath: String, opId: Int,
+    ): Int {
+        if (!NativeVolumeManager.isAvailable) return NativeVolumeManager.COPY_NOT_ATTACHED
+        val attached = try {
+            attachToNativeManager(srcVolId) && attachToNativeManager(destVolId)
+        } catch (e: Exception) {
+            VeLog.w("ContainerFileSystem") { "native volume manager attach failed: ${e.message}" }
+            false
+        } catch (_: UnsatisfiedLinkError) {
+            false
+        }
+        if (!attached) return NativeVolumeManager.COPY_NOT_ATTACHED
+        // Past this point the copy may have started: an exception is a failed copy, never a reason to
+        // run the Kotlin loop over it a second time (progress would be reported twice).
+        return try {
+            NativeVolumeManager.nativeCopyFile(srcVolId, srcPath, destVolId, destPath, opId)
+        } catch (e: Exception) {
+            VeLog.w("ContainerFileSystem") { "native copy failed: ${e.message}" }
+            NativeVolumeManager.COPY_FAILED
+        }
+    }
+
+    /**
+     * Makes sure native manager slot [volId] holds the volume this session is: the shared folder-vault
+     * session, or the engine's block-device volume. The tag names the session, so a slot that still
+     * belongs to another live session is never taken over (false -> the caller keeps its own path).
+     */
+    private fun attachToNativeManager(volId: Int): Boolean {
+        val backend = VaultBackendRegistry.get(volId)
+        if (backend != null) {
+            val handle = (backend as? NativeVaultSession)?.nativeHandle() ?: return false
+            return handle != 0L && NativeVolumeManager.nativeAttachFolderVault(volId, handle, "fv:$handle")
+        }
+        val session = ContainerSessionRegistry.activeSessions[volId] ?: return false
+        return NativeVolumeManager.nativeAttachBlock(volId, "blk:${session.uri}")
     }
 
     /** Disk-image destinations take the file as offset-addressed chunks. */

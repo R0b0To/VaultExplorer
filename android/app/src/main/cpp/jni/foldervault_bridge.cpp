@@ -20,6 +20,7 @@
 
 #include "jni_bridge_common.h"
 #include "jni_callbacks.h"
+#include "foldervault_registry.h"
 #include "foldervault/fv_check.h"
 #include "foldervault/fv_formats.h"
 #include "foldervault/fv_vault.h"
@@ -442,6 +443,17 @@ struct PwGuard {
 #define FV_JNI(ret, name) extern "C" JNIEXPORT ret JNICALL Java_com_aeidolon_vaultexplorer_foldervault_NativeFolderVault_##name
 
 }  // namespace
+
+// A shared view of the vault behind `handle` for the volume manager (volman_bridge.cpp). The
+// returned pointer keeps the registry entry alive, so the manager never touches a freed
+// session; closing is still decided by nativeClose / the manager, and fv::Vault::closed() tells
+// the other side. Aliasing: the Holder owns the vault, the returned pointer shares the Holder.
+std::shared_ptr<fv::Vault> foldervaultShare(jlong handle) {
+    auto holder = lookup(handle);
+    if (!holder || !holder->vault) return nullptr;
+    fv::Vault* vault = holder->vault.get();
+    return std::shared_ptr<fv::Vault>(std::move(holder), vault);
+}
 
 // ================================================================ exports ==
 

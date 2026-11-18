@@ -60,6 +60,10 @@ public:
 
     virtual VaultFormat format() const = 0;
     virtual bool readOnly() const = 0;
+    // True once close() has begun (here or from another holder of the session).
+    // Every other call then fails fast; hosts use it to notice a vault that was
+    // closed behind their back.
+    virtual bool closed() const { return false; }
 
     // ---- namespace (paths are cleartext, '/'-separated) ----------------
     virtual bool listDirectory(const std::string& path, std::vector<DirEntry>& out) = 0;

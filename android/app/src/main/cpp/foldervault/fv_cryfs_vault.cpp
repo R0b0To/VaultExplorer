@@ -188,6 +188,7 @@ public:
 
     VaultFormat format() const override { return VaultFormat::Cryfs; }
     bool readOnly() const override { return readOnly_; }
+    bool closed() const override { return life_.isClosed(); }
 
     // ---- namespace --------------------------------------------------------
     bool listDirectory(const std::string& path, std::vector<DirEntry>& out) override {

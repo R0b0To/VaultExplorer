@@ -54,12 +54,71 @@ complete command-line front-end). Its seams:
 - Concurrency lives in the core: each session serialises namespace changes with
   its own `shared_mutex` and drains in-flight calls on `close()`, so the Kotlin
   `NativeVaultSession` declares `skipsPerVolumeLock` (no second lock on top).
+  In-flight tracking (`fv::Lifecycle`) is a counter, not a reader-writer lock: a
+  call registers or, once the vault is closing, fails fast -- it never blocks
+  behind `close()`. That is what keeps a copy *between* two vaults safe (the
+  destination's `importStream` pulls from the source while holding its own
+  registration), including on writer-preferring locks such as Windows' `SRWLOCK`.
 - Check & Repair of folder vaults is part of the same core (`fv_check.h`,
   `fv_check_gocryptfs/cryptomator/cryfs.cpp`), working through the same
   `Storage` abstraction, so it is platform-neutral like the engines. The
   Kotlin `foldercheck/FolderVaultChecker` only picks the storage (verified
   raw path or SAF) and maps the native result; a live session's keys are read
   inside the native core and never reach the JVM.
+
+**Volume manager** (`cpp/volman/`). The unification described next is being moved
+out of Kotlin into a second platform-neutral C++ library, so a desktop front-end
+gets it for free instead of rewriting `ContainerEngine`. `vm::Volume`
+(`vm_volume.h`) is the one operation set any unlocked volume offers (listing in
+the §5.3 wire format, chunked I/O, `importStream`, batching, space/info, optional
+native read streams, `alive()`); `vm::VolumeManager` (`vm_manager.h`) owns the slot
+table (`reserveSlot` / `attach` / `close`, an opaque per-slot tag -- the session on
+Android, a path on desktop -- and removal listeners) and forwards every operation by
+`volId`, answering `NotUnlocked` for an empty slot or a volume that is no longer
+`alive()`; dead slots are swept on the next `reserveSlot` / `attach`. It also provides
+read streams addressed by handle (native where a volume has them, otherwise emulated
+with positioned reads; handles die with their volume) and `copyFile`, a copy between
+any two volumes that moves the bytes through memory only: source chunks are read,
+handed to the destination's `importStream` and wiped, a short read fails the copy
+instead of ending it, and a failed or cancelled copy removes what it created. No
+plaintext is staged on disk for any pair of families -- which is also why the copy
+cannot be written as a `writeFileChunk` loop: CryFS's incremental writer keeps its
+data in a scratch file.
+
+Two adapters sit under the interface. `vm_foldervault` adapts an `fv::Vault`
+(shared, so the manager and a host that keeps its own handle see one session;
+`fv::Vault::closed()` tells either side the other closed it). `vm_block_volume`
+adapts an engine-mounted block-device volume over `filesystems/fs_ops.h`: it takes
+`volumes[volId].mutex`, calls `ensureMounted`, then the matching `fsXxx()`, like the JNI
+entry points, but re-checks "still unlocked" *under* the mutex. It is tied to the unlock
+session it was made for through `VolumeState::sessionEpoch` (bumped by `reset()` and the
+emergency purge, never cleared): once that session ends the adapter stays dead even if
+another container is unlocked into the same engine slot, so a stale manager slot can never
+serve the new container's files under the old container's name. `BlockVolume::close()` only
+detaches; locking the container stays with the session layer. `vm_block_volume.cpp` needs
+the engine, so it is compiled into the engine target, not into `volman_core`.
+
+Android status: `jni/volman_bridge.cpp` (`NativeVolumeManager.kt`) exposes attach /
+is-attached / copy. Slots are attached lazily right before use and cleaned up by the
+native side (no lock/unlock hooks), and each attach carries a session tag so a slot owned
+by another live session is never taken over. `ContainerFileSystem.copyFileStreaming` calls
+the native copy for every transfer that involves a folder vault (the block-to-block path
+already was one native call) and falls back to its Kotlin loop only when a side cannot be
+attached. Everything else -- listing, per-chunk I/O, streams, `ContainerEngine`'s
+dispatch, `ContainerSessionRegistry`'s locks -- still runs in Kotlin and moves over
+operation by operation.
+
+**Transfer helpers** (`cpp/xfer/`). A third platform-neutral library for byte-level work that
+needs no policy: content hashing (MD5 / SHA-1 / SHA-256 / SHA-512, several in one pass, on the
+mbedtls the folder-vault core already links) and splitting / joining files into numbered parts
+(`.001`, `.002`, ...; `.NNN` / `.partN` sequence resolution; a best-effort `manifest.json`), on
+abstract byte sources and sinks. `xfer_host` is the `std::filesystem` front end a desktop program
+calls; `volman/vm_xfer` reads a vault file as a source and hashes it in one native call. The
+Android handlers (`HashVerifierHandlers`, `SplitJoinHandlers`) are unchanged: their data arrives as
+SAF streams, so a native port gains nothing there. The import/export *policy* (case folding,
+"name (1)" collisions, the free-space margin) is deliberately not here: it is already decided in
+Dart (`makeUniqueName`, `foldEntryName`, `kFreeSpaceSafetyMargin`) and mirrored in Kotlin, and Dart
+is the portable layer -- a third copy in C++ would add drift, not portability.
 
 Both families are unified above the crypto layer by **`volId`** (an `Int`,
 `0..7`): every caller — Dart, `ContainerFileSystem`, the SAF
@@ -1269,6 +1328,13 @@ than take this summary on faith:
   scenarios, tamper/rollback/legacy-name handling, thread stress; the
   `foldervault/test/interop/` scripts additionally drive `fvcli` against the real
   gocryptfs, Cryptomator and CryFS and are not part of CTest),
+  `volman_test` (the volume manager: slots, streams, copy, dead-slot and close
+  semantics on an in-memory volume, then real gocryptfs / Cryptomator / CryFS vaults
+  behind the manager with copies between every pair of formats) and
+  `volman_block_test` (the block-device adapter on the real `volumes[]` table over a fake
+  filesystem layer, beside real vaults; registered only where `<openssl/aes.h>` exists),
+  `xfer_test` (hash known-answer vectors, part naming and sequence resolution, split / join on
+  in-memory streams and on real files),
   `composite_block_device_test`, `sector_batching_test`, `fs_scan_test`,
   `kdf_table_test`, `decrypted_block_cache_test`, `cryfs_block_cipher_test`,
   `utf16le_password_test`, `container_header_test`,

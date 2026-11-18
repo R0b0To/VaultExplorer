@@ -479,6 +479,43 @@ if(ANDROID)
     target_link_libraries(foldervault_core PUBLIC crypto)
 endif()
 
+# Transfer helpers: content hashing (MD5 / SHA-1 / SHA-256 / SHA-512, several in one pass)
+# and splitting / joining files into numbered parts, on abstract byte sources and sinks.
+# Platform-neutral C++ like foldervault_core and volman_core -- no JNI, Android or Flutter
+# types. xfer_core is pure (it only needs mbedtls and is what volman_core links); xfer_host
+# adds the std::filesystem front end a desktop program calls directly, and is left out of the
+# default build so the Android library does not compile code it never uses.
+add_library(xfer_core STATIC
+        xfer/xfer_hash.cpp
+        xfer/xfer_split.cpp)
+set_target_properties(xfer_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_compile_features(xfer_core PUBLIC cxx_std_20)
+target_compile_options(xfer_core PRIVATE $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall> $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wextra>)
+target_include_directories(xfer_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${mbedtls_SOURCE_DIR}/include)
+target_link_libraries(xfer_core PUBLIC mbedcrypto)
+
+add_library(xfer_host STATIC EXCLUDE_FROM_ALL xfer/xfer_host.cpp)
+set_target_properties(xfer_host PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_compile_options(xfer_host PRIVATE $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall> $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wextra>)
+target_link_libraries(xfer_host PUBLIC xfer_core)
+
+# Volume manager: the slot table of unlocked volumes and every operation addressed
+# by slot (listing, I/O, read streams, copy between any two volumes), over one
+# vm::Volume interface. Platform-neutral C++ like foldervault_core -- no JNI, Android
+# or Flutter types -- so the Android JNI layer and a desktop front-end sit on the
+# same calls (see volman/vm_manager.h). Folder vaults plug in through vm_foldervault;
+# block-device volumes through volman/vm_block_volume.cpp, which needs the engine
+# (volumes[], fs_ops.h) and is therefore compiled into the engine target below, not here.
+add_library(volman_core STATIC
+        volman/vm_manager.cpp
+        volman/vm_foldervault.cpp
+        volman/vm_xfer.cpp)
+set_target_properties(volman_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_compile_features(volman_core PUBLIC cxx_std_20)
+target_compile_options(volman_core PRIVATE $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall> $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wextra>)
+target_include_directories(volman_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(volman_core PUBLIC foldervault_core xfer_core)
+
 # 4. Build target
 add_library(
         vaultexplorer
@@ -487,6 +524,8 @@ add_library(
         jni/jni_bridge_common.cpp
         jni/crypto_bridge.cpp
         jni/foldervault_bridge.cpp
+        jni/volman_bridge.cpp
+        volman/vm_block_volume.cpp
         jni/session_bridge.cpp
         jni/container_lifecycle_bridge.cpp
         jni/filesystem_bridge.cpp
@@ -640,7 +679,8 @@ target_link_libraries(
         libgav1_static
         ${ARCHIVE_ENGINE_LIBRARY}
         ZXing::ZXing
-        foldervault_core)
+        foldervault_core
+        volman_core)
 
 
 set_source_files_properties(
@@ -650,6 +690,8 @@ set_source_files_properties(
         crypto/xchacha20poly1305.cpp
         jni/crypto_bridge.cpp
         jni/foldervault_bridge.cpp
+        jni/volman_bridge.cpp
+        volman/vm_block_volume.cpp
         PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra"
 )
 
@@ -813,6 +855,52 @@ if(NOT ANDROID)
     target_link_libraries(fvcli foldervault_core mbedcrypto)
     list(APPEND VAULTEXPLORER_HOST_TESTS foldervault_test)
 
+    # Volume manager: slots, streams, copy and close semantics on an in-memory
+    # volume, plus real gocryptfs / Cryptomator / CryFS vaults behind the same
+    # manager (copies between every pair of formats, cancellation, close while
+    # calls are in flight).
+    add_executable(volman_test volman/test/vm_tests.cpp ${FV_CRYPTO_SOURCES})
+    target_link_libraries(volman_test volman_core foldervault_core mbedcrypto)
+    list(APPEND VAULTEXPLORER_HOST_TESTS volman_test)
+
+    # Transfer helpers: hashing against known answers (vectors from hashlib), part naming and
+    # sequence resolution, split / join on in-memory streams (part boundaries, cancel, write /
+    # close / read failures) and on real files (round trips, UTF-8 names, refusing to overwrite
+    # a part).
+    add_executable(xfer_test xfer/test/xfer_tests.cpp)
+    target_link_libraries(xfer_test xfer_host xfer_core)
+    list(APPEND VAULTEXPLORER_HOST_TESTS xfer_test)
+
+    # BlockVolume (volman/vm_block_volume.cpp) on the real VolumeState table, with an
+    # in-memory fake of the filesystem layer underneath (the fsXxx() functions) and real
+    # gocryptfs / Cryptomator vaults beside it in one VolumeManager: refusal on a locked or
+    # read-only volume, end-of-file vs failure, streams, a container locked (and another
+    # unlocked into the same slot) behind the manager's back, close() draining.
+    # volume_state.h pulls in crypto/cipher_shim.h (<openssl/aes.h>), so this test is only
+    # registered where those headers exist (libssl-dev); the stub <jni.h> is enough.
+    find_path(VM_OPENSSL_INCLUDE_DIR openssl/aes.h)
+    if(VM_OPENSSL_INCLUDE_DIR)
+        add_executable(volman_block_test
+                volman/test/vm_block_tests.cpp volman/vm_block_volume.cpp ${FV_CRYPTO_SOURCES})
+        # volman/test/ntfs_stub comes first: its volume.h adds ntfs-3g's min()/max() macros to the
+        # stub, so a bare std::min in a TU that sees volume_state.h fails here as it does in the Android build.
+        target_include_directories(volman_block_test PRIVATE
+                ${CMAKE_CURRENT_SOURCE_DIR}/volman/test/ntfs_stub
+                ${CMAKE_CURRENT_SOURCE_DIR}/filesystems/test/host_stubs
+                ${CMAKE_CURRENT_SOURCE_DIR}/session
+                ${CMAKE_CURRENT_SOURCE_DIR}/io
+                ${CMAKE_CURRENT_SOURCE_DIR}/filesystems
+                ${CMAKE_CURRENT_SOURCE_DIR}/containers
+                ${CMAKE_CURRENT_SOURCE_DIR}/crypto
+                ${CMAKE_CURRENT_SOURCE_DIR}/jni
+                ${CMAKE_CURRENT_SOURCE_DIR}/archive
+                ${CMAKE_CURRENT_SOURCE_DIR}/Common
+                ${mbedtls_SOURCE_DIR}/include
+                ${VM_OPENSSL_INCLUDE_DIR})
+        target_link_libraries(volman_block_test volman_core foldervault_core mbedcrypto)
+        list(APPEND VAULTEXPLORER_HOST_TESTS volman_block_test)
+    endif()
+
     set(VAULTEXPLORER_HOST_TESTS
             sector_batching_test
             fs_scan_test
@@ -859,6 +947,11 @@ if(NOT ANDROID)
     add_test(NAME user_entropy_test COMMAND user_entropy_test)
     add_test(NAME utf16le_password_test COMMAND utf16le_password_test)
     add_test(NAME foldervault_test COMMAND foldervault_test)
+    add_test(NAME volman_test COMMAND volman_test)
+    add_test(NAME xfer_test COMMAND xfer_test)
+    if(TARGET volman_block_test)
+        add_test(NAME volman_block_test COMMAND volman_block_test)
+    endif()
     add_test(NAME container_header_test COMMAND container_header_test)
     add_test(NAME container_utils_crc32_test COMMAND container_utils_crc32_test)
     add_test(NAME chunked_block_device_test COMMAND chunked_block_device_test)

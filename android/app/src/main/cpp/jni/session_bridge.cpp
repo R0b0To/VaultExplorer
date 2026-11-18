@@ -247,6 +247,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_emergencyPurgeNative(
         std::lock_guard<std::mutex> lifecycleLock(volumeLifecycleMutex);
         VolumeState& vol = volumes[volId];
         std::unique_lock<std::shared_mutex> lock(vol.mutex);
+        ++vol.sessionEpoch;   // this purge ends the session without going through reset()
 
         // Zeroize master/preserved key material
         if (vol.preservedDerivedKey != nullptr && vol.preservedDerivedKeyLen > 0) {

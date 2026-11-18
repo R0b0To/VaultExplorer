@@ -310,6 +310,24 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
     await _updateConfig(newConfig);
   }
 
+  Future<void> setGalleryPromptSkippedForStorage(
+    String containerUri,
+    bool skipped,
+  ) async {
+    final newConfig =
+        state.config.withGalleryPromptSkippedForStorage(containerUri, skipped);
+    await _updateConfig(newConfig);
+  }
+
+  Future<void> setMusicPromptSkippedForStorage(
+    String containerUri,
+    bool skipped,
+  ) async {
+    final newConfig =
+        state.config.withMusicPromptSkippedForStorage(containerUri, skipped);
+    await _updateConfig(newConfig);
+  }
+
   Future<void> reorderActions(int oldIndex, int newIndex) async {
     final order = List<FileManagerAction>.from(state.config.order);
     final moved = order.removeAt(oldIndex);

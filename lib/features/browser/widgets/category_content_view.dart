@@ -70,7 +70,8 @@ import 'package:vaultexplorer/features/browser/models/category_source.dart';
 import 'package:vaultexplorer/features/browser/models/file_category.dart';
 import 'package:vaultexplorer/features/browser/models/file_category_presentation.dart';
 import 'package:vaultexplorer/features/browser/models/tab_id.dart';
-import 'package:vaultexplorer/features/browser/gallery/gallery_folder_picker_sheet.dart';
+import 'package:vaultexplorer/features/browser/gallery/gallery_scope_sheet.dart';
+import 'package:vaultexplorer/features/library/controllers/library_providers.dart';
 import 'package:vaultexplorer/features/browser/services/category_aggregate_scan.dart';
 import 'package:vaultexplorer/features/browser/services/category_scan.dart';
 import 'package:vaultexplorer/features/browser/services/category_listing.dart';
@@ -685,25 +686,39 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
   Future<void> _pickGalleryFolders() async {
     final scoped = widget.scopedContainer;
     if (scoped == null || !mounted) return;
-    final api = ref.read(vaultFileIoApiProvider);
-    final CategoryDirectoryLister lister = scoped.isRawLocal
-        ? rawLocalCategoryLister(rootPath: scoped.uri, matches: (_) => false)
-        : (dir) => api.listDirectory(scoped, dir);
-    final showHidden =
-        ref.read(fileManagerToolbarSettingsProvider(null)).config.showHiddenFiles;
-    final chosen = await showGalleryFolderPicker(
+    final fileIo = ref.read(vaultFileIoApiProvider);
+    final toolbarSettings =
+        ref.read(fileManagerToolbarSettingsProvider(_scopedToolbarUri));
+    final showHidden = toolbarSettings.config.showHiddenFiles;
+    final isSkipped =
+        toolbarSettings.config.isGalleryPromptSkippedForStorage(scoped.uri);
+    final chosen = await showGalleryScopeSheet(
       context,
-      listDirectory: lister,
-      initial: _galleryRoots,
+      container: scoped,
+      access: libraryFileAccess(fileIo, scoped),
+      initialFolders: _galleryRoots,
+      initialDontAskAgain: isSkipped,
+      turningOn: false,
+      preferChoosing: false,
       showHidden: showHidden,
       skipDirectory:
           scoped.isRawLocal ? skipDeviceCategoryFolder : _skipVaultMetaFolder,
     );
-    if (chosen == null || !mounted || _sameRoots(chosen, _galleryRoots)) return;
-    await ref
-        .read(fileManagerToolbarSettingsProvider(_scopedToolbarUri).notifier)
-        .setGalleryFoldersForStorage(scoped.uri, chosen);
-    if (mounted && !_sameRoots(_galleryRoots, chosen)) _applyGalleryRoots(chosen);
+    if (chosen == null || !mounted) return;
+    final notifier = ref.read(
+      fileManagerToolbarSettingsProvider(_scopedToolbarUri).notifier,
+    );
+    if (chosen.dontAskAgain != isSkipped) {
+      await notifier.setGalleryPromptSkippedForStorage(
+        scoped.uri,
+        chosen.dontAskAgain,
+      );
+    }
+    if (_sameRoots(chosen.folders, _galleryRoots)) return;
+    await notifier.setGalleryFoldersForStorage(scoped.uri, chosen.folders);
+    if (mounted && !_sameRoots(_galleryRoots, chosen.folders)) {
+      _applyGalleryRoots(chosen.folders);
+    }
   }
 
   DeviceCategoryIndexKey _deviceKey(
@@ -2916,6 +2931,16 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
             tooltip: l10n.categoryFolderStructure,
             onPressed: () => _setFolderMode(!_folderMode),
           ),
+          if (_scoped && _isGallery)
+            IconButton(
+              icon: Badge(
+                isLabelVisible: _galleryRoots.isNotEmpty,
+                label: Text('${_galleryRoots.length}'),
+                child: const Icon(Icons.folder_outlined),
+              ),
+              tooltip: l10n.galleryFoldersMenu,
+              onPressed: _pickGalleryFolders,
+            ),
           if (isLandscape && showActionBar)
             ...visibleActions.map((a) => actionBuilders[a]!(context)),
         ],

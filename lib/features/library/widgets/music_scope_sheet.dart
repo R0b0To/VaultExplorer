@@ -1,26 +1,41 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/theme/file_manager_skin_scope.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/features/browser/widgets/tile_selection_style.dart';
 import 'package:vaultexplorer/features/library/controllers/library_controller.dart';
 import 'package:vaultexplorer/features/library/index/library_index.dart';
 import 'package:vaultexplorer/features/library/models/music_config.dart';
 
+/// Result of confirming a scope sheet (music or gallery).
+class ScopeSheetResult {
+  final List<String> folders;
+  final bool dontAskAgain;
+
+  const ScopeSheetResult({
+    required this.folders,
+    this.dontAskAgain = false,
+  });
+}
+
 /// Asks which folders music mode should cover.
 ///
-/// Returns the chosen folders (empty means the whole location), or null when
-/// cancelled. [turningOn] switches the confirm button between "Start" and
-/// "Save". Phone and external storage open on "Only some folders": their root is
-/// everything on the device, and indexing all of it is rarely what is wanted.
-Future<List<String>?> showMusicScopeSheet(
+/// Returns the chosen folders and whether "Don't ask again" was checked (empty
+/// folders means the whole location), or null when cancelled. [turningOn]
+/// switches the confirm button between "Start" and "Save". Phone and external
+/// storage open on "Only some folders": their root is everything on the device,
+/// and indexing all of it is rarely what is wanted.
+Future<ScopeSheetResult?> showMusicScopeSheet(
   BuildContext context, {
   required MountedContainer container,
   required LibraryFileAccess access,
   required List<String> initialFolders,
   required bool turningOn,
   required bool preferChoosing,
+  bool initialDontAskAgain = false,
 }) {
-  return showModalBottomSheet<List<String>>(
+  return showModalBottomSheet<ScopeSheetResult>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
@@ -30,6 +45,7 @@ Future<List<String>?> showMusicScopeSheet(
       initialFolders: initialFolders,
       turningOn: turningOn,
       preferChoosing: preferChoosing,
+      initialDontAskAgain: initialDontAskAgain,
     ),
   );
 }
@@ -39,12 +55,14 @@ class _MusicScopeSheet extends StatefulWidget {
   final List<String> initialFolders;
   final bool turningOn;
   final bool preferChoosing;
+  final bool initialDontAskAgain;
 
   const _MusicScopeSheet({
     required this.access,
     required this.initialFolders,
     required this.turningOn,
     required this.preferChoosing,
+    this.initialDontAskAgain = false,
   });
 
   @override
@@ -54,15 +72,16 @@ class _MusicScopeSheet extends StatefulWidget {
 class _MusicScopeSheetState extends State<_MusicScopeSheet> {
   late bool _choosing = widget.initialFolders.isNotEmpty || widget.preferChoosing;
   late List<String> _folders = List.of(widget.initialFolders);
+  late bool _dontAskAgain = widget.initialDontAskAgain;
 
   bool get _canConfirm => !_choosing || _folders.isNotEmpty;
 
   Future<void> _addFolder() async {
-    final picked = await Navigator.of(context).push<String>(
+    final picked = await Navigator.of(context).push<List<String>>(
       MaterialPageRoute(builder: (_) => _MusicFolderPicker(access: widget.access)),
     );
-    if (picked == null || !mounted) return;
-    setState(() => _folders = List.of(MusicConfig.normalizeFolders([..._folders, picked])));
+    if (picked == null || picked.isEmpty || !mounted) return;
+    setState(() => _folders = List.of(MusicConfig.normalizeFolders([..._folders, ...picked])));
   }
 
   @override
@@ -70,97 +89,136 @@ class _MusicScopeSheetState extends State<_MusicScopeSheet> {
     final l10n = context.l10n;
     final text = context.typography;
     final cs = context.colors;
-    return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(
-        AppSpacing.lg,
-        0,
-        AppSpacing.lg,
-        AppSpacing.lg + MediaQuery.viewInsetsOf(context).bottom,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(l10n.musicScopeTitle, style: text.titleLarge),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            l10n.musicScopeMessage,
-            style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            0,
+            AppSpacing.lg,
+            AppSpacing.lg,
           ),
-          const SizedBox(height: AppSpacing.md),
-          SizedBox(
-            width: double.infinity,
-            child: SegmentedButton<bool>(
-              segments: [
-                ButtonSegment<bool>(value: false, label: Text(l10n.musicScopeAll)),
-                ButtonSegment<bool>(value: true, label: Text(l10n.musicScopeChoose)),
-              ],
-              selected: {_choosing},
-              onSelectionChanged: (s) => setState(() => _choosing = s.first),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          if (!_choosing)
-            Text(
-              l10n.musicScopeAllHint,
-              style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-            )
-          else ...[
-            if (_folders.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                child: Text(
-                  l10n.musicScopeNoFolders,
-                  style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-                ),
-              ),
-            for (final f in _folders)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.folder_outlined),
-                title: Text(f, maxLines: 1, overflow: TextOverflow.ellipsis),
-                trailing: IconButton(
-                  tooltip: l10n.musicScopeRemoveFolder,
-                  icon: const Icon(Icons.close_rounded),
-                  onPressed: () => setState(() => _folders = [
-                        for (final x in _folders)
-                          if (x != f) x,
-                      ]),
-                ),
-              ),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: _addFolder,
-                icon: const Icon(Icons.add_rounded),
-                label: Text(l10n.musicScopeAddFolder),
-              ),
-            ),
-          ],
-          const SizedBox(height: AppSpacing.md),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text(l10n.cancel),
+              Text(l10n.musicScopeTitle, style: text.titleLarge),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                l10n.musicScopeMessage,
+                style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
               ),
-              const SizedBox(width: AppSpacing.sm),
-              FilledButton(
-                onPressed: _canConfirm
-                    ? () => Navigator.of(context).pop(_choosing ? _folders : <String>[])
-                    : null,
-                child: Text(widget.turningOn ? l10n.musicScopeStart : l10n.save),
+              const SizedBox(height: AppSpacing.md),
+              SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<bool>(
+                  segments: [
+                    ButtonSegment<bool>(value: false, label: Text(l10n.musicScopeAll)),
+                    ButtonSegment<bool>(value: true, label: Text(l10n.musicScopeChoose)),
+                  ],
+                  selected: {_choosing},
+                  onSelectionChanged: (s) => setState(() => _choosing = s.first),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              if (!_choosing)
+                Text(
+                  l10n.musicScopeAllHint,
+                  style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                )
+              else ...[
+                if (_folders.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                    child: Text(
+                      l10n.musicScopeNoFolders,
+                      style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                  ),
+                for (final f in _folders)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.folder_outlined),
+                    title: Text(f, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    trailing: IconButton(
+                      tooltip: l10n.musicScopeRemoveFolder,
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: () => setState(() => _folders = [
+                            for (final x in _folders)
+                              if (x != f) x,
+                          ]),
+                    ),
+                  ),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: _addFolder,
+                    icon: const Icon(Icons.add_rounded),
+                    label: Text(l10n.musicScopeAddFolder),
+                  ),
+                ),
+              ],
+              const SizedBox(height: AppSpacing.md),
+              InkWell(
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                onTap: () => setState(() => _dontAskAgain = !_dontAskAgain),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: Checkbox(
+                          value: _dontAskAgain,
+                          onChanged: (val) =>
+                              setState(() => _dontAskAgain = val ?? false),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Text(
+                          l10n.dontAskAgain,
+                          style: text.bodyMedium,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text(l10n.cancel),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  FilledButton(
+                    onPressed: _canConfirm
+                        ? () => Navigator.of(context).pop(
+                              ScopeSheetResult(
+                                folders: _choosing ? _folders : <String>[],
+                                dontAskAgain: _dontAskAgain,
+                              ),
+                            )
+                        : null,
+                    child: Text(widget.turningOn ? l10n.musicScopeStart : l10n.save),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
-/// Browses a container's folders one level at a time and returns the one the
+/// Browses a container's folders one level at a time and returns the ones the
 /// person adds. Works the same for vaults, phone storage and external storage:
 /// it only uses the listing the scanner uses.
 class _MusicFolderPicker extends StatefulWidget {
@@ -175,6 +233,7 @@ class _MusicFolderPicker extends StatefulWidget {
 class _MusicFolderPickerState extends State<_MusicFolderPicker> {
   String _path = '';
   List<String> _dirs = const [];
+  final Set<String> _selected = <String>{};
   bool _loading = true;
   bool _failed = false;
 
@@ -187,6 +246,7 @@ class _MusicFolderPickerState extends State<_MusicFolderPicker> {
   Future<void> _load(String path) async {
     setState(() {
       _path = path;
+      _selected.clear();
       _loading = true;
       _failed = false;
     });
@@ -221,17 +281,54 @@ class _MusicFolderPickerState extends State<_MusicFolderPicker> {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final title = _path.isEmpty ? l10n.musicScopePickerRoot : _path.substring(_path.lastIndexOf('/') + 1);
+    final inSelectionMode = _selected.isNotEmpty;
     return PopScope(
-      canPop: _path.isEmpty,
+      canPop: !inSelectionMode && _path.isEmpty,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _up();
+        if (didPop) return;
+        if (inSelectionMode) {
+          setState(() => _selected.clear());
+          return;
+        }
+        _up();
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
-          leading: BackButton(
-            onPressed: () => _path.isEmpty ? Navigator.of(context).pop() : _up(),
+          leading: inSelectionMode
+              ? IconButton(
+                  icon: const Icon(Icons.close_rounded),
+                  onPressed: () => setState(() => _selected.clear()),
+                )
+              : BackButton(
+                  onPressed: () => _path.isEmpty ? Navigator.of(context).pop() : _up(),
+                ),
+          title: Text(
+            inSelectionMode ? '${_selected.length}' : title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
+          actions: [
+            if (inSelectionMode)
+              IconButton(
+                tooltip: _selected.length == _dirs.length
+                    ? l10n.deselectAll
+                    : l10n.selectAll,
+                icon: Icon(
+                  _selected.length == _dirs.length
+                      ? Icons.deselect_rounded
+                      : Icons.select_all_rounded,
+                ),
+                onPressed: () {
+                  setState(() {
+                    if (_selected.length == _dirs.length) {
+                      _selected.clear();
+                    } else {
+                      _selected.addAll(_dirs);
+                    }
+                  });
+                },
+              ),
+          ],
         ),
         body: _loading
             ? const Center(child: CircularProgressIndicator())
@@ -244,25 +341,133 @@ class _MusicFolderPickerState extends State<_MusicFolderPicker> {
                   )
                 : ListView.builder(
                     itemCount: _dirs.length,
-                    itemBuilder: (context, i) => ListTile(
-                      leading: const Icon(Icons.folder_outlined),
-                      title: Text(_dirs[i], maxLines: 1, overflow: TextOverflow.ellipsis),
-                      trailing: const Icon(Icons.chevron_right_rounded),
-                      onTap: () => _load(_join(_dirs[i])),
-                    ),
+                    itemBuilder: (context, i) {
+                      final dir = _dirs[i];
+                      final isSelected = _selected.contains(dir);
+                      final cs = Theme.of(context).colorScheme;
+                      final skin = FileManagerSkinScope.of(context);
+                      final folderIcon = skin.folderIcon;
+                      final iconColor = skin.folderIconColor(cs);
+                      final iconBackground =
+                          cs.secondaryContainer.withValues(alpha: 0.4);
+
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.sm,
+                          vertical: 1,
+                        ),
+                        child: ListTile(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                          ),
+                          selected: isSelected,
+                          selectedTileColor:
+                              TileSelectionStyle.selectedBackground(cs),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md,
+                            vertical: 2,
+                          ),
+                          leading: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () {
+                              setState(() {
+                                if (isSelected) {
+                                  _selected.remove(dir);
+                                } else {
+                                  _selected.add(dir);
+                                }
+                              });
+                            },
+                            child: Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? cs.primaryContainer
+                                    : iconBackground,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                folderIcon,
+                                size: 22,
+                                color: isSelected ? cs.primary : iconColor,
+                              ),
+                            ),
+                          ),
+                          title: Text(
+                            dir,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontWeight: TileSelectionStyle.titleWeight,
+                            ),
+                          ),
+                          trailing: SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: Center(
+                              child: inSelectionMode
+                                  ? TileSelectionIndicator(selected: isSelected)
+                                  : Icon(
+                                      Icons.chevron_right_rounded,
+                                      color: cs.onSurfaceVariant,
+                                      size: 20,
+                                    ),
+                            ),
+                          ),
+                          onTap: () {
+                            if (inSelectionMode) {
+                              setState(() {
+                                if (isSelected) {
+                                  _selected.remove(dir);
+                                } else {
+                                  _selected.add(dir);
+                                }
+                              });
+                            } else {
+                              _load(_join(dir));
+                            }
+                          },
+                          onLongPress: () {
+                            setState(() {
+                              if (isSelected) {
+                                _selected.remove(dir);
+                              } else {
+                                _selected.add(dir);
+                              }
+                            });
+                          },
+                        ),
+                      );
+                    },
                   ),
-        bottomNavigationBar: _path.isEmpty
-            ? null
-            : SafeArea(
+        bottomNavigationBar: inSelectionMode
+            ? SafeArea(
+                top: false,
                 child: Padding(
                   padding: const EdgeInsets.all(AppSpacing.md),
                   child: FilledButton.icon(
-                    onPressed: () => Navigator.of(context).pop(_path),
+                    onPressed: () => Navigator.of(context).pop<List<String>>(
+                      _selected.map(_join).toList(),
+                    ),
                     icon: const Icon(Icons.add_rounded),
-                    label: Text(l10n.musicScopePickerAdd),
+                    label: Text('${l10n.add} (${_selected.length})'),
                   ),
                 ),
-              ),
+              )
+            : _path.isEmpty
+                ? null
+                : SafeArea(
+                    top: false,
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      child: FilledButton.icon(
+                        onPressed: () => Navigator.of(context).pop<List<String>>([_path]),
+                        icon: const Icon(Icons.add_rounded),
+                        label: Text(l10n.musicScopePickerAdd),
+                      ),
+                    ),
+                  ),
       ),
     );
   }

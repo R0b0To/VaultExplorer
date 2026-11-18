@@ -653,4 +653,47 @@ void main() {
       expect(lenient.galleryFoldersForStorage('vault://empty'), isEmpty);
     });
   });
+
+  group('FileManagerToolbarConfig prompt skipping', () {
+    test('defaults to empty sets', () {
+      final config = FileManagerToolbarConfig.defaults();
+      expect(config.skipGalleryPromptStorageUris, isEmpty);
+      expect(config.skipMusicPromptStorageUris, isEmpty);
+      expect(config.isGalleryPromptSkippedForStorage('vault://a'), isFalse);
+      expect(config.isMusicPromptSkippedForStorage('vault://a'), isFalse);
+    });
+
+    test('withGalleryPromptSkippedForStorage adds and removes', () {
+      var config = FileManagerToolbarConfig.defaults();
+      config = config.withGalleryPromptSkippedForStorage('vault://a', true);
+      expect(config.isGalleryPromptSkippedForStorage('vault://a'), isTrue);
+      expect(config.isGalleryPromptSkippedForStorage('vault://b'), isFalse);
+
+      config = config.withGalleryPromptSkippedForStorage('vault://a', false);
+      expect(config.isGalleryPromptSkippedForStorage('vault://a'), isFalse);
+    });
+
+    test('withMusicPromptSkippedForStorage adds and removes', () {
+      var config = FileManagerToolbarConfig.defaults();
+      config = config.withMusicPromptSkippedForStorage('vault://a', true);
+      expect(config.isMusicPromptSkippedForStorage('vault://a'), isTrue);
+      expect(config.isMusicPromptSkippedForStorage('vault://b'), isFalse);
+
+      config = config.withMusicPromptSkippedForStorage('vault://a', false);
+      expect(config.isMusicPromptSkippedForStorage('vault://a'), isFalse);
+    });
+
+    test('survives JSON round trip', () {
+      final config = FileManagerToolbarConfig.defaults()
+          .withGalleryPromptSkippedForStorage('vault://gallery', true)
+          .withMusicPromptSkippedForStorage('vault://music', true);
+      final decoded = FileManagerToolbarConfig.fromJson(
+        jsonDecode(jsonEncode(config.toJson())) as Map<String, dynamic>,
+      );
+      expect(decoded.isGalleryPromptSkippedForStorage('vault://gallery'), isTrue);
+      expect(decoded.isGalleryPromptSkippedForStorage('vault://other'), isFalse);
+      expect(decoded.isMusicPromptSkippedForStorage('vault://music'), isTrue);
+      expect(decoded.isMusicPromptSkippedForStorage('vault://other'), isFalse);
+    });
+  });
 }

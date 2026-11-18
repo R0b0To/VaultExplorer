@@ -7,6 +7,7 @@ import 'package:vaultexplorer/features/library/controllers/library_providers.dar
 import 'package:vaultexplorer/features/library/controllers/music_mode.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/features/library/widgets/music_scope_sheet.dart';
+import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 
 /// The music mode entry of the tab [tabId] showing [container]; what that
 /// tab's toolbar button and bar both listen to. Every tab has its own, so music
@@ -32,16 +33,33 @@ Future<void> toggleMusicMode(
     return;
   }
   if (!context.mounted) return;
-  final folders = await showMusicScopeSheet(
+  final effectiveToolbarUri = container.isLocalStorage ? null : container.uri;
+  final toolbarSettings =
+      ref.read(fileManagerToolbarSettingsProvider(effectiveToolbarUri));
+  final isSkipped =
+      toolbarSettings.config.isMusicPromptSkippedForStorage(container.uri);
+
+  if (isSkipped) {
+    await entry.enable(folders: entry.config.folders);
+    return;
+  }
+
+  final res = await showMusicScopeSheet(
     context,
     container: container,
     access: libraryFileAccess(fileIo, container),
     initialFolders: entry.config.folders,
+    initialDontAskAgain: isSkipped,
     turningOn: true,
     preferChoosing: container.isLocalStorage && entry.config.folders.isEmpty,
   );
-  if (folders == null) return;
-  await entry.enable(folders: folders);
+  if (res == null) return;
+  if (res.dontAskAgain != isSkipped) {
+    await ref
+        .read(fileManagerToolbarSettingsProvider(effectiveToolbarUri).notifier)
+        .setMusicPromptSkippedForStorage(container.uri, res.dontAskAgain);
+  }
+  await entry.enable(folders: res.folders);
 }
 
 /// Changes which folders music mode covers (for every tab on the container).
@@ -52,14 +70,26 @@ Future<void> editMusicFolders(
 ) async {
   final container = entry.container;
   final fileIo = ref.read(vaultFileIoApiProvider);
-  final folders = await showMusicScopeSheet(
+  final effectiveToolbarUri = container.isLocalStorage ? null : container.uri;
+  final toolbarSettings =
+      ref.read(fileManagerToolbarSettingsProvider(effectiveToolbarUri));
+  final isSkipped =
+      toolbarSettings.config.isMusicPromptSkippedForStorage(container.uri);
+
+  final res = await showMusicScopeSheet(
     context,
     container: container,
     access: libraryFileAccess(fileIo, container),
     initialFolders: entry.config.folders,
+    initialDontAskAgain: isSkipped,
     turningOn: false,
     preferChoosing: false,
   );
-  if (folders == null) return;
-  await entry.setFolders(folders);
+  if (res == null) return;
+  if (res.dontAskAgain != isSkipped) {
+    await ref
+        .read(fileManagerToolbarSettingsProvider(effectiveToolbarUri).notifier)
+        .setMusicPromptSkippedForStorage(container.uri, res.dontAskAgain);
+  }
+  await entry.setFolders(res.folders);
 }

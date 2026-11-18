@@ -87,6 +87,10 @@ import 'package:vaultexplorer/features/browser/widgets/browser_item_drag.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_pane_scope.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_manager_more_menu_button.dart';
 import 'package:vaultexplorer/features/browser/gallery/gallery_layout.dart';
+import 'package:vaultexplorer/features/browser/gallery/gallery_scope_sheet.dart';
+import 'package:vaultexplorer/features/browser/services/category_walk_policy.dart';
+import 'package:vaultexplorer/features/sync/domain/sync_ignore_matcher.dart'
+    show kVaultMetaDir;
 import 'package:vaultexplorer/features/browser/widgets/book_cover_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_grid_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_list_view.dart';
@@ -2344,13 +2348,93 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         .toList(growable: false);
   }
 
-  void _toggleGalleryMode() {
+  static bool _skipVaultMetaFolder(String dirPath) => dirPath == kVaultMetaDir;
+
+  Future<void> _toggleGalleryMode() async {
     final enable = !_isGalleryMode;
 
     if (enable) {
+      final isSkipped =
+          _toolbarConfig.isGalleryPromptSkippedForStorage(widget.container.uri);
+      if (!isSkipped) {
+        final initial =
+            _toolbarConfig.galleryFoldersForStorage(widget.container.uri);
+        final fileIo = ref.read(vaultFileIoApiProvider);
+        final showHidden = _toolbarConfig.showHiddenFiles;
+        final chosen = await showGalleryScopeSheet(
+          context,
+          container: widget.container,
+          access: libraryFileAccess(fileIo, widget.container),
+          initialFolders: initial,
+          initialDontAskAgain: isSkipped,
+          turningOn: true,
+          preferChoosing: widget.container.isLocalStorage && initial.isEmpty,
+          showHidden: showHidden,
+          skipDirectory: widget.container.isRawLocal
+              ? skipDeviceCategoryFolder
+              : _skipVaultMetaFolder,
+        );
+        if (chosen == null || !mounted) return;
+        final effectiveToolbarUri = widget.container.isLocalStorage
+            ? null
+            : widget.container.uri;
+        final notifier = ref.read(
+          fileManagerToolbarSettingsProvider(effectiveToolbarUri).notifier,
+        );
+        await notifier.setGalleryFoldersForStorage(
+          widget.container.uri,
+          chosen.folders,
+        );
+        if (chosen.dontAskAgain != isSkipped) {
+          await notifier.setGalleryPromptSkippedForStorage(
+            widget.container.uri,
+            chosen.dontAskAgain,
+          );
+        }
+        if (!mounted) return;
+      }
       _onFilterChosen('gallery');
     } else {
       _onFilterChosen(null);
+    }
+  }
+
+  Future<void> _editGalleryFolders() async {
+    final isSkipped =
+        _toolbarConfig.isGalleryPromptSkippedForStorage(widget.container.uri);
+    final initial =
+        _toolbarConfig.galleryFoldersForStorage(widget.container.uri);
+    final fileIo = ref.read(vaultFileIoApiProvider);
+    final showHidden = _toolbarConfig.showHiddenFiles;
+    final chosen = await showGalleryScopeSheet(
+      context,
+      container: widget.container,
+      access: libraryFileAccess(fileIo, widget.container),
+      initialFolders: initial,
+      initialDontAskAgain: isSkipped,
+      turningOn: false,
+      preferChoosing: false,
+      showHidden: showHidden,
+      skipDirectory: widget.container.isRawLocal
+          ? skipDeviceCategoryFolder
+          : _skipVaultMetaFolder,
+    );
+    if (chosen == null || !mounted) return;
+    final effectiveToolbarUri = widget.container.isLocalStorage
+        ? null
+        : widget.container.uri;
+    final notifier = ref.read(
+      fileManagerToolbarSettingsProvider(effectiveToolbarUri).notifier,
+    );
+    await notifier.setGalleryFoldersForStorage(
+      widget.container.uri,
+      chosen.folders,
+    );
+    if (chosen.dontAskAgain != isSkipped) {
+      await notifier.setGalleryPromptSkippedForStorage(
+        widget.container.uri,
+        chosen.dontAskAgain,
+      );
     }
   }
 
@@ -5860,7 +5944,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
               : Icons.photo_library_outlined,
         ),
         tooltip: context.l10n.galleryModeTooltip,
-        onPressed: _toggleGalleryMode,
+        onPressed: () => unawaited(_toggleGalleryMode()),
       ),
       FileManagerAction.viewToggle: (context) => LayoutModeMenuButton(
         layoutMode: layoutMode,
@@ -5907,6 +5991,10 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         onToggleShowListThumbnails: (v) =>
             _updateToolbarConfigField((c) => c.copyWith(showListThumbnails: v)),
         onOpenSettings: _openFileManagerSettings,
+        onPickGalleryFolders: () => unawaited(_editGalleryFolders()),
+        galleryFolderCount: toolbarConfig
+            .galleryFoldersForStorage(widget.container.uri)
+            .length,
       ),
     };
   }
@@ -5991,7 +6079,11 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
               onToggleMusicMode: () =>
                   unawaited(toggleMusicMode(context, ref, musicEntry)),
             isGalleryMode: _isGalleryMode,
-            onToggleGallery: _toggleGalleryMode,
+            onToggleGallery: () => unawaited(_toggleGalleryMode()),
+            onPickGalleryFolders: () => unawaited(_editGalleryFolders()),
+            galleryFolderCount: _toolbarConfig
+                .galleryFoldersForStorage(widget.container.uri)
+                .length,
             toolbarConfig: _toolbarConfig,
             onToggleShowHiddenFiles: (v) => _updateToolbarConfigField(
               (c) => c.copyWith(showHiddenFiles: v),

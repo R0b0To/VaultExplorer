@@ -131,6 +131,8 @@ class FileManagerToolbarConfig {
   /// list) is scanned whole. Kept on this device like the other per-storage
   /// state, and not exported.
   final Map<String, List<String>> galleryFoldersByStorage;
+  final Set<String> skipGalleryPromptStorageUris;
+  final Set<String> skipMusicPromptStorageUris;
 
   /// URIs of storages whose music mode was on the last time it was read from
   /// the storage itself. Only a hint kept on this device so a vault can open
@@ -225,6 +227,8 @@ class FileManagerToolbarConfig {
     this.folderSortModes = const {},
     this.galleryModeStorageUris = const {},
     this.galleryFoldersByStorage = const {},
+    this.skipGalleryPromptStorageUris = const {},
+    this.skipMusicPromptStorageUris = const {},
     this.musicModeStorageUris = const {},
     this.collapsedBookmarkGroupUris = const {},
     this.detailColumnsOrder = const [
@@ -280,6 +284,8 @@ class FileManagerToolbarConfig {
         folderSortModes: {},
         galleryModeStorageUris: {},
         galleryFoldersByStorage: {},
+        skipGalleryPromptStorageUris: {},
+        skipMusicPromptStorageUris: {},
         musicModeStorageUris: {},
         detailColumnsOrder: [
           FileDetailColumn.date,
@@ -419,6 +425,48 @@ class FileManagerToolbarConfig {
     return copyWith(galleryFoldersByStorage: next);
   }
 
+  /// Whether the gallery mode prompt was dismissed with "Don't ask again" for
+  /// [containerUri].
+  bool isGalleryPromptSkippedForStorage(String containerUri) =>
+      skipGalleryPromptStorageUris.contains(containerUri);
+
+  FileManagerToolbarConfig withGalleryPromptSkippedForStorage(
+    String containerUri,
+    bool skipped,
+  ) {
+    if (skipped == skipGalleryPromptStorageUris.contains(containerUri)) {
+      return this;
+    }
+    final next = Set<String>.from(skipGalleryPromptStorageUris);
+    if (skipped) {
+      next.add(containerUri);
+    } else {
+      next.remove(containerUri);
+    }
+    return copyWith(skipGalleryPromptStorageUris: next);
+  }
+
+  /// Whether the music mode prompt was dismissed with "Don't ask again" for
+  /// [containerUri].
+  bool isMusicPromptSkippedForStorage(String containerUri) =>
+      skipMusicPromptStorageUris.contains(containerUri);
+
+  FileManagerToolbarConfig withMusicPromptSkippedForStorage(
+    String containerUri,
+    bool skipped,
+  ) {
+    if (skipped == skipMusicPromptStorageUris.contains(containerUri)) {
+      return this;
+    }
+    final next = Set<String>.from(skipMusicPromptStorageUris);
+    if (skipped) {
+      next.add(containerUri);
+    } else {
+      next.remove(containerUri);
+    }
+    return copyWith(skipMusicPromptStorageUris: next);
+  }
+
   /// Whether the music mode hint says it is on for [containerUri].
   bool isMusicModeHintedForStorage(String containerUri) =>
       musicModeStorageUris.contains(containerUri);
@@ -458,6 +506,8 @@ class FileManagerToolbarConfig {
     Map<String, String>? folderSortModes,
     Set<String>? galleryModeStorageUris,
     Map<String, List<String>>? galleryFoldersByStorage,
+    Set<String>? skipGalleryPromptStorageUris,
+    Set<String>? skipMusicPromptStorageUris,
     Set<String>? musicModeStorageUris,
     Set<String>? collapsedBookmarkGroupUris,
     List<FileDetailColumn>? detailColumnsOrder,
@@ -514,6 +564,10 @@ class FileManagerToolbarConfig {
             galleryModeStorageUris ?? this.galleryModeStorageUris,
         galleryFoldersByStorage:
             galleryFoldersByStorage ?? this.galleryFoldersByStorage,
+        skipGalleryPromptStorageUris:
+            skipGalleryPromptStorageUris ?? this.skipGalleryPromptStorageUris,
+        skipMusicPromptStorageUris:
+            skipMusicPromptStorageUris ?? this.skipMusicPromptStorageUris,
         musicModeStorageUris:
             musicModeStorageUris ?? this.musicModeStorageUris,
         collapsedBookmarkGroupUris:
@@ -624,6 +678,8 @@ class FileManagerToolbarConfig {
     'folderSortModes',
     'galleryModeStorageUris',
     'galleryFoldersByStorage',
+    'skipGalleryPromptStorageUris',
+    'skipMusicPromptStorageUris',
     'musicModeStorageUris',
     'collapsedBookmarkGroupUris',
   };
@@ -691,6 +747,10 @@ class FileManagerToolbarConfig {
         'folderSortModes': folderSortModes,
         'galleryModeStorageUris': galleryModeStorageUris.toList()..sort(),
         'galleryFoldersByStorage': galleryFoldersByStorage,
+        'skipGalleryPromptStorageUris':
+            skipGalleryPromptStorageUris.toList()..sort(),
+        'skipMusicPromptStorageUris':
+            skipMusicPromptStorageUris.toList()..sort(),
         'musicModeStorageUris': musicModeStorageUris.toList()..sort(),
         'collapsedBookmarkGroupUris': collapsedBookmarkGroupUris.toList()
           ..sort(),
@@ -834,6 +894,16 @@ class FileManagerToolbarConfig {
             .whereType<String>()
             .where((uri) => uri.isNotEmpty)
             .toSet();
+    final skipGalleryPromptStorageUris =
+        (j['skipGalleryPromptStorageUris'] as List<dynamic>? ?? const [])
+            .whereType<String>()
+            .where((uri) => uri.isNotEmpty)
+            .toSet();
+    final skipMusicPromptStorageUris =
+        (j['skipMusicPromptStorageUris'] as List<dynamic>? ?? const [])
+            .whereType<String>()
+            .where((uri) => uri.isNotEmpty)
+            .toSet();
     final defaultThumbnailCacheMode = ThumbnailCacheMode.fromJson(
           j['defaultThumbnailCacheMode'] as String?,
         ) ??
@@ -888,6 +958,8 @@ class FileManagerToolbarConfig {
       folderSortModes: rawFolderSortModes,
       galleryModeStorageUris: galleryModeStorageUris,
       galleryFoldersByStorage: galleryFoldersByStorage,
+      skipGalleryPromptStorageUris: skipGalleryPromptStorageUris,
+      skipMusicPromptStorageUris: skipMusicPromptStorageUris,
       musicModeStorageUris: musicModeStorageUris,
       collapsedBookmarkGroupUris: collapsedBookmarkGroupUris,
       detailColumnsOrder: rawDetailColumns.isEmpty

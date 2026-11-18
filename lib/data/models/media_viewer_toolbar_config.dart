@@ -142,7 +142,7 @@ class MediaViewerToolbarConfig {
     this.defaultAspectRatioMode = VideoAspectRatioMode.bestFit,
     this.holdToSpeedMultiplier = 2.0,
     this.swipeToSeekEnabled = false,
-    this.swipeToDismissEnabled = false,
+    this.swipeToDismissEnabled = true,
     this.resumePlaybackMode = ResumePlaybackMode.askEveryTime,
     this.keepAudioPlayingAfterClose = false,
     this.pictureInPictureEnabled = false,
@@ -558,7 +558,7 @@ class MediaViewerToolbarConfig {
       holdToSpeedMultiplier:
           (j['holdToSpeedMultiplier'] as num?)?.toDouble() ?? 2.0,
       swipeToSeekEnabled: j['swipeToSeekEnabled'] as bool? ?? false,
-      swipeToDismissEnabled: j['swipeToDismissEnabled'] as bool? ?? false,
+      swipeToDismissEnabled: j['swipeToDismissEnabled'] as bool? ?? true,
       resumePlaybackMode: ResumePlaybackMode.values.firstWhere(
         (mode) => mode.name == j['resumePlaybackMode'],
         orElse: () => ResumePlaybackMode.askEveryTime,

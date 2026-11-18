@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -1433,7 +1434,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
           currentDirPath: _currentDirPath,
         );
       },
-      onEditMetadata: entry.isDir || entry.isPlaceholder
+      onEditMetadata: entry.isDir || entry.isPlaceholder || _archiveContext != null
           ? null
           : () => _editMetadata([entry]),
       onExtract: canExtract
@@ -1543,6 +1544,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
 
   /// Tags, date and time, and metadata removal for the selected files.
   void _editMetadata(List<RawEntry> entries) {
+    if (_archiveContext != null) return;
     final container = widget.container;
     unawaited(
       showMetadataEditMenu(
@@ -4491,19 +4493,33 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       var archiveContext = clip.archiveContext;
       if (archiveContext == null) return;
 
-      final targetArchivePath = clip.isPartialExtract
-          ? archiveContext.archivePathInContainer
-          : clip.items.firstOrNull?.path;
-      if (targetArchivePath != null) {
-        final exists = await fileIoApi.entryExists(
-          srcContainer,
-          targetArchivePath,
-          isDir: false,
-        );
-        if (!exists) {
+      if (archiveContext.isNested) {
+        final localPath = archiveContext.localPathOrUri;
+        if (localPath == null || !await File(localPath).exists()) {
           _setStatus(context.l10n.bookmarkTargetMissing, error: true);
           _clip.clear();
           return;
+        }
+      } else {
+        final targetArchivePath = clip.isPartialExtract
+            ? archiveContext.archivePathInContainer
+            : clip.items.firstOrNull?.path;
+        if (targetArchivePath != null) {
+          var exists = await fileIoApi.entryExists(
+            srcContainer,
+            targetArchivePath,
+            isDir: false,
+          );
+          if (!exists &&
+              srcContainer.isLocalStorage &&
+              archiveContext.localPathOrUri != null) {
+            exists = await File(archiveContext.localPathOrUri!).exists();
+          }
+          if (!exists) {
+            _setStatus(context.l10n.bookmarkTargetMissing, error: true);
+            _clip.clear();
+            return;
+          }
         }
       }
 
@@ -5056,6 +5072,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             ? await ArchiveService.openLocal(
                 pathOrUri: p.join(widget.container.uri, fullPath),
                 archiveName: entry.name,
+                archivePathInContainer: fullPath,
                 pathStackEntryIndex: _pathStack.length,
                 passphrase: passphrase,
               )
@@ -6585,7 +6602,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         onShowFolderDocumentProviderSheet: _showFolderDocumentProviderSheet,
         onToggleFolderDocumentProvider: _toggleFolderDocumentProvider,
         onSyncSettings: _showSyncSettings,
-        onEditMetadata: _editMetadata,
+        onEditMetadata: _archiveContext != null ? null : _editMetadata,
         onSyncRoot: _showRootSyncSettings,
         onEditImage: _editImage,
         onEditVideo: _editVideo,

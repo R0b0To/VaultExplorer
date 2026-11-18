@@ -599,6 +599,7 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
           ? await ArchiveService.openLocal(
               pathOrUri: p.join(container.uri, fullPath),
               archiveName: archiveName,
+              archivePathInContainer: fullPath,
               pathStackEntryIndex: state.pathStack.length,
               passphrase: passphrase,
             )

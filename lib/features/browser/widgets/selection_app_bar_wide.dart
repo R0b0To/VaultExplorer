@@ -512,7 +512,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
                   ],
                 ),
               ),
-            if (onEditMetadata != null)
+            if (!isInsideArchive && onEditMetadata != null)
               PopupMenuItem<String>(
                 value: 'edit_metadata',
                 enabled: !readOnly,
@@ -524,7 +524,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
                   ],
                 ),
               ),
-            if (singleFileSelected || singleFolderSelected)
+            if (!isInsideArchive && (singleFileSelected || singleFolderSelected))
               PopupMenuItem<String>(
                 value: 'file_info',
                 child: Row(

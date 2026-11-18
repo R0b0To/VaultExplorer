@@ -44,9 +44,9 @@ void main() {
   });
 
   group('MediaViewerToolbarConfig swipeToDismissEnabled', () {
-    test('is off by default', () {
-      expect(MediaViewerToolbarConfig.defaults().swipeToDismissEnabled, isFalse);
-      expect(const MediaViewerToolbarConfig().swipeToDismissEnabled, isFalse);
+    test('is on by default', () {
+      expect(MediaViewerToolbarConfig.defaults().swipeToDismissEnabled, isTrue);
+      expect(const MediaViewerToolbarConfig().swipeToDismissEnabled, isTrue);
     });
 
     test('copyWith updates it without touching swipeToSeekEnabled', () {
@@ -74,11 +74,11 @@ void main() {
       );
     });
 
-    test('fromJson falls back to false for configs saved before it existed', () {
+    test('fromJson falls back to true for configs saved before it existed', () {
       final config = MediaViewerToolbarConfig.fromJson(<String, dynamic>{
         'showProgressBar': true,
       });
-      expect(config.swipeToDismissEnabled, isFalse);
+      expect(config.swipeToDismissEnabled, isTrue);
     });
   });
 

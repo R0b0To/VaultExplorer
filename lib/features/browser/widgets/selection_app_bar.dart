@@ -270,7 +270,9 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                 shown(FileItemAction.bookmark)) ||
             (onGoToLocation != null && shown(FileItemAction.goToLocation)) ||
             (onCopyPath != null && shown(FileItemAction.copyPath)) ||
-            (onEditMetadata != null && shown(FileItemAction.editMetadata)) ||
+            (!isInsideArchive &&
+                onEditMetadata != null &&
+                shown(FileItemAction.editMetadata)) ||
             singleSelected;
 
         Widget buildActionButton(FileItemAction action) => switch (action) {
@@ -723,7 +725,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                       ],
                     ),
                   ),
-                if (onEditMetadata != null)
+                if (!isInsideArchive && onEditMetadata != null)
                   PopupMenuItem<String>(
                     value: 'edit_metadata',
                     enabled: !readOnly,
@@ -735,7 +737,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                       ],
                     ),
                   ),
-                if (singleSelected)
+                if (!isInsideArchive && singleSelected)
                   PopupMenuItem<String>(
                     value: 'file_info',
                     child: Row(

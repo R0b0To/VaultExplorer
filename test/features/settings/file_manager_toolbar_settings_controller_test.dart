@@ -225,13 +225,13 @@ void main() {
       final controller = container.read(provider.notifier);
       await controller.load(null);
 
-      expect(container.read(provider).config.mediaViewerToolbarConfig.swipeToDismissEnabled, isFalse);
-
-      await controller.setMediaViewerSwipeToDismissEnabled(true);
       expect(container.read(provider).config.mediaViewerToolbarConfig.swipeToDismissEnabled, isTrue);
 
       await controller.setMediaViewerSwipeToDismissEnabled(false);
       expect(container.read(provider).config.mediaViewerToolbarConfig.swipeToDismissEnabled, isFalse);
+
+      await controller.setMediaViewerSwipeToDismissEnabled(true);
+      expect(container.read(provider).config.mediaViewerToolbarConfig.swipeToDismissEnabled, isTrue);
     });
 
     test('setMediaViewerSwipeToSeekEnabled updates mediaViewerToolbarConfig', () async {

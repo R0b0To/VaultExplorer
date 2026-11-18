@@ -467,4 +467,236 @@ void main() {
       }
     }
   });
+
+  group('SelectionAppBar / SelectionAppBarWide - edit metadata in archive', () {
+    testWidgets('SelectionAppBar does not show Edit metadata when isInsideArchive is true', (tester) async {
+      await tester.pumpWidget(
+        _buildTestApp(
+          SelectionAppBar(
+            selectedCount: 1,
+            selectionLabel: '15 MB',
+            singleSelected: true,
+            singleFileSelected: true,
+            isInsideArchive: true,
+            onEditMetadata: () {},
+            showEditVideoOption: false,
+            onEditVideo: () {},
+            showEditImageOption: false,
+            onEditImage: () {},
+            onClose: () {},
+            onSelectAll: () {},
+            onRename: () {},
+            onCopy: () {},
+            onCut: () {},
+            onExport: () {},
+            onCompressSelection: () {},
+            onExtractSelectedArchive: () {},
+            onDelete: () {},
+            onOpenWithApp: () {},
+            onShare: () {},
+            showPinOption: false,
+            showUnpinOption: false,
+            onPin: () {},
+            onUnpin: () {},
+            showBookmarkOption: false,
+            showUnbookmarkOption: false,
+            onBookmark: () {},
+            onUnbookmark: () {},
+            showEncryptOption: false,
+            showDecryptOption: false,
+            onEncrypt: () {},
+            onDecrypt: () {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final moreButton = find.byIcon(Icons.more_vert_rounded);
+      expect(moreButton, findsOneWidget);
+      await tester.tap(moreButton);
+      await tester.pumpAndSettle();
+
+      final editMetadataFinder = find.byWidgetPredicate(
+        (widget) => widget is PopupMenuItem<String> && widget.value == 'edit_metadata',
+      );
+      expect(editMetadataFinder, findsNothing);
+    });
+
+    testWidgets('SelectionAppBar shows Edit metadata when outside archive and callback provided', (tester) async {
+      var edited = false;
+      await tester.pumpWidget(
+        _buildTestApp(
+          SelectionAppBar(
+            selectedCount: 1,
+            selectionLabel: '15 MB',
+            singleSelected: true,
+            singleFileSelected: true,
+            isInsideArchive: false,
+            onEditMetadata: () => edited = true,
+            showEditVideoOption: false,
+            onEditVideo: () {},
+            showEditImageOption: false,
+            onEditImage: () {},
+            onClose: () {},
+            onSelectAll: () {},
+            onRename: () {},
+            onCopy: () {},
+            onCut: () {},
+            onExport: () {},
+            onCompressSelection: () {},
+            onExtractSelectedArchive: () {},
+            onDelete: () {},
+            onOpenWithApp: () {},
+            onShare: () {},
+            showPinOption: false,
+            showUnpinOption: false,
+            onPin: () {},
+            onUnpin: () {},
+            showBookmarkOption: false,
+            showUnbookmarkOption: false,
+            onBookmark: () {},
+            onUnbookmark: () {},
+            showEncryptOption: false,
+            showDecryptOption: false,
+            onEncrypt: () {},
+            onDecrypt: () {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final moreButton = find.byIcon(Icons.more_vert_rounded);
+      expect(moreButton, findsOneWidget);
+      await tester.tap(moreButton);
+      await tester.pumpAndSettle();
+
+      final editMetadataFinder = find.byWidgetPredicate(
+        (widget) => widget is PopupMenuItem<String> && widget.value == 'edit_metadata',
+      );
+      expect(editMetadataFinder, findsOneWidget);
+      await tester.tap(editMetadataFinder);
+      await tester.pumpAndSettle();
+      expect(edited, isTrue);
+    });
+
+    testWidgets('SelectionAppBarWide does not show Edit metadata when isInsideArchive is true', (tester) async {
+      await tester.pumpWidget(
+        _buildTestApp(
+          SelectionAppBarWide(
+            selectedCount: 1,
+            selectionLabel: '15 MB',
+            singleFileSelected: true,
+            singleFolderSelected: false,
+            singleArchiveSelected: false,
+            folderDocumentProviderMounted: false,
+            readOnly: false,
+            isInsideArchive: true,
+            onEditMetadata: () {},
+            showPinOption: false,
+            showUnpinOption: false,
+            showBookmarkOption: false,
+            showUnbookmarkOption: false,
+            showEncryptOption: false,
+            showDecryptOption: false,
+            showActionBar: false,
+            visibleActions: const [],
+            actionBuilders: const {},
+            onEditVideo: () {},
+            onEditImage: () {},
+            onClose: () {},
+            onSelectAll: () {},
+            onRename: () {},
+            onCopy: () {},
+            onCut: () {},
+            onExport: () {},
+            onCompressSelection: () {},
+            onExtractSelectedArchive: () {},
+            onDelete: () {},
+            onOpenWithApp: () {},
+            onShare: () {},
+            onToggleDocumentProvider: () {},
+            onPin: () {},
+            onUnpin: () {},
+            onBookmark: () {},
+            onUnbookmark: () {},
+            onEncrypt: () {},
+            onDecrypt: () {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final moreButton = find.byIcon(Icons.more_vert_rounded);
+      expect(moreButton, findsOneWidget);
+      await tester.tap(moreButton);
+      await tester.pumpAndSettle();
+
+      final editMetadataFinder = find.byWidgetPredicate(
+        (widget) => widget is PopupMenuItem<String> && widget.value == 'edit_metadata',
+      );
+      expect(editMetadataFinder, findsNothing);
+    });
+
+    testWidgets('SelectionAppBarWide shows Edit metadata when outside archive and callback provided', (tester) async {
+      var edited = false;
+      await tester.pumpWidget(
+        _buildTestApp(
+          SelectionAppBarWide(
+            selectedCount: 1,
+            selectionLabel: '15 MB',
+            singleFileSelected: true,
+            singleFolderSelected: false,
+            singleArchiveSelected: false,
+            folderDocumentProviderMounted: false,
+            readOnly: false,
+            isInsideArchive: false,
+            onEditMetadata: () => edited = true,
+            showPinOption: false,
+            showUnpinOption: false,
+            showBookmarkOption: false,
+            showUnbookmarkOption: false,
+            showEncryptOption: false,
+            showDecryptOption: false,
+            showActionBar: false,
+            visibleActions: const [],
+            actionBuilders: const {},
+            onEditVideo: () {},
+            onEditImage: () {},
+            onClose: () {},
+            onSelectAll: () {},
+            onRename: () {},
+            onCopy: () {},
+            onCut: () {},
+            onExport: () {},
+            onCompressSelection: () {},
+            onExtractSelectedArchive: () {},
+            onDelete: () {},
+            onOpenWithApp: () {},
+            onShare: () {},
+            onToggleDocumentProvider: () {},
+            onPin: () {},
+            onUnpin: () {},
+            onBookmark: () {},
+            onUnbookmark: () {},
+            onEncrypt: () {},
+            onDecrypt: () {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final moreButton = find.byIcon(Icons.more_vert_rounded);
+      expect(moreButton, findsOneWidget);
+      await tester.tap(moreButton);
+      await tester.pumpAndSettle();
+
+      final editMetadataFinder = find.byWidgetPredicate(
+        (widget) => widget is PopupMenuItem<String> && widget.value == 'edit_metadata',
+      );
+      expect(editMetadataFinder, findsOneWidget);
+      await tester.tap(editMetadataFinder);
+      await tester.pumpAndSettle();
+      expect(edited, isTrue);
+    });
+  });
 }

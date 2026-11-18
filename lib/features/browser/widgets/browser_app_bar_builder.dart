@@ -313,8 +313,10 @@ PreferredSizeWidget buildBrowserAppBar(
       await onEditAudio?.call(path);
     }
 
-    // Tags, dates and metadata removal apply to files only.
+    // Tags, dates and metadata removal apply to files only, and cannot
+    // be run on virtual entries inside an archive.
     final editMetadata = onEditMetadata != null &&
+            !isInsideArchive &&
             selectedItems.isNotEmpty &&
             selectedItems.every((e) => !e.isDir)
         ? () => onEditMetadata(selectedItems.toList())

@@ -8,6 +8,7 @@ import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
+import 'package:vaultexplorer/features/browser/services/category_aggregate_scan.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_thumbnail_preview.dart';
 import 'package:vaultexplorer/features/browser/widgets/tile_selection_style.dart';
 
@@ -42,6 +43,10 @@ class DirectoryTile extends StatelessWidget {
   /// instead of the plain folder icon -- see [FolderThumbnailPreview].
   final MountedContainer? container;
   final String currentDirPath;
+
+  /// Files already known to lie inside this folder, best cover first. When
+  /// given, the cover comes from these instead of listing the folder.
+  final List<String>? previewPaths;
   final ThumbnailCacheMode cacheMode;
   final ThumbnailQuality quality;
 
@@ -74,6 +79,7 @@ class DirectoryTile extends StatelessWidget {
     this.isSynced = false,
     this.container,
     this.currentDirPath = '',
+    this.previewPaths,
     this.cacheMode = ThumbnailCacheMode.appCache,
     this.quality = ThumbnailQuality.defaultQuality,
     this.showThumbnailPreview = true,
@@ -161,12 +167,20 @@ class DirectoryTile extends StatelessWidget {
 
     Widget? customLeading;
     if (showPreview) {
-      final folderPath =
-          currentDirPath.isEmpty ? entry.name : '$currentDirPath/${entry.name}';
+      // A folder listed by a category or gallery scan carries its own full
+      // path; its name alone is relative and can sit anywhere in the tree.
+      // (`entry` is a field, which Dart does not promote, so use a local.)
+      final tileEntry = entry;
+      final folderPath = tileEntry is CategoryEntry
+          ? tileEntry.path
+          : (currentDirPath.isEmpty
+                ? tileEntry.name
+                : '$currentDirPath/${tileEntry.name}');
       customLeading = FolderThumbnailPreview(
         key: ValueKey('folder_preview:${container!.uri}:$folderPath'),
         container: container!,
         folderPath: folderPath,
+        previewPaths: previewPaths,
         cacheMode: cacheMode,
         quality: quality,
         iconSize: folderIconSize,

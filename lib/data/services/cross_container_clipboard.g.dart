@@ -42,7 +42,7 @@ final class CrossContainerClipboardProvider
 }
 
 String _$crossContainerClipboardHash() =>
-    r'6943ec3953b132fe650e22614de33823ba6a8fc8';
+    r'607a71cc74ef8dd04eec881e97c7203030d54765';
 
 abstract class _$CrossContainerClipboard extends $Notifier<ClipboardState> {
   ClipboardState build();

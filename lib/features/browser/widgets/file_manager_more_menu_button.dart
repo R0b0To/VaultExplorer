@@ -84,6 +84,12 @@ class FileManagerMoreMenuButton extends StatelessWidget {
   final ValueChanged<bool>? onToggleShowListThumbnails;
   final VoidCallback? onOpenSettings;
 
+  /// Opens the gallery's folder picker; null outside the gallery.
+  final VoidCallback? onPickGalleryFolders;
+
+  /// How many folders the gallery is limited to (0 scans everything).
+  final int galleryFolderCount;
+
   const FileManagerMoreMenuButton({
     super.key,
     required this.actions,
@@ -116,6 +122,8 @@ class FileManagerMoreMenuButton extends StatelessWidget {
     this.onToggleShowFileExtensions,
     this.onToggleShowListThumbnails,
     this.onOpenSettings,
+    this.onPickGalleryFolders,
+    this.galleryFolderCount = 0,
   });
 
   @override
@@ -231,6 +239,8 @@ class FileManagerMoreMenuButton extends StatelessWidget {
               onToggleShowFileExtensions: onToggleShowFileExtensions ?? (_) {},
               onToggleShowListThumbnails: onToggleShowListThumbnails ?? (_) {},
               onOpenSettings: onOpenSettings ?? () {},
+              onPickGalleryFolders: onPickGalleryFolders,
+              galleryFolderCount: galleryFolderCount,
             ),
             child: Text(l10n.optionsAction),
           );
@@ -433,6 +443,8 @@ class FileManagerMoreMenuButton extends StatelessWidget {
             onToggleShowFileExtensions: onToggleShowFileExtensions ?? (_) {},
             onToggleShowListThumbnails: onToggleShowListThumbnails ?? (_) {},
             onOpenSettings: onOpenSettings ?? () {},
+            onPickGalleryFolders: onPickGalleryFolders,
+            galleryFolderCount: galleryFolderCount,
           ),
         );
     }

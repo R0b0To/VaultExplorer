@@ -23927,6 +23927,42 @@ abstract class AppLocalizations {
   /// **'Clear'**
   String get galleryFilterClear;
 
+  /// Segment under the gallery filter's Tags header: a photo needs at least one of the selected tags
+  ///
+  /// In en, this message translates to:
+  /// **'Match any'**
+  String get galleryFilterMatchAny;
+
+  /// Segment under the gallery filter's Tags header: a photo needs every selected tag
+  ///
+  /// In en, this message translates to:
+  /// **'Match all'**
+  String get galleryFilterMatchAll;
+
+  /// Options-menu entry and title of the sheet where the gallery's folders are chosen
+  ///
+  /// In en, this message translates to:
+  /// **'Gallery folders'**
+  String get galleryFoldersMenu;
+
+  /// Explains the gallery folder picker: subfolders are included and choosing none scans the whole storage
+  ///
+  /// In en, this message translates to:
+  /// **'Choose which folders the gallery scans. Subfolders are included. With none chosen, the whole storage is scanned.'**
+  String get galleryFoldersHint;
+
+  /// Button in the gallery folder picker that clears the choice so the whole storage is scanned
+  ///
+  /// In en, this message translates to:
+  /// **'Scan everything'**
+  String get galleryFoldersUseAll;
+
+  /// Button in the gallery folder picker that applies the chosen folders
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get galleryFoldersApply;
+
   /// Header of the gallery filter sheet when filters are applied: how many items are left out of the total
   ///
   /// In en, this message translates to:

@@ -59,7 +59,7 @@ final class AutomationSettingsProvider
 }
 
 String _$automationSettingsHash() =>
-    r'1fa496df57c06f44a07a267f002a1c6efb1b4ae6';
+    r'1adf8a838e2f7bac612cad91943f5fc0804cce42';
 
 final class AutomationSettingsFamily extends $Family
     with

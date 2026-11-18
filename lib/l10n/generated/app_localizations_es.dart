@@ -14407,6 +14407,25 @@ class AppLocalizationsEs extends AppLocalizations {
   String get galleryFilterClear => 'Borrar';
 
   @override
+  String get galleryFilterMatchAny => 'Cualquiera';
+
+  @override
+  String get galleryFilterMatchAll => 'Todas';
+
+  @override
+  String get galleryFoldersMenu => 'Carpetas de la galería';
+
+  @override
+  String get galleryFoldersHint =>
+      'Elige las carpetas que analiza la galería. Se incluyen las subcarpetas. Si no eliges ninguna, se analiza todo el almacenamiento.';
+
+  @override
+  String get galleryFoldersUseAll => 'Analizar todo';
+
+  @override
+  String get galleryFoldersApply => 'Aplicar';
+
+  @override
   String galleryFilterShownOfTotal(int shown, int total) {
     return '$shown de $total mostrados';
   }

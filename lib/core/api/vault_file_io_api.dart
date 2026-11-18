@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
 import 'package:vaultexplorer/core/utils/image_preview_exception.dart';
+import 'package:vaultexplorer/core/utils/listing_job.dart';
 import 'package:vaultexplorer/core/utils/perf_trace.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
@@ -852,6 +853,44 @@ class VaultFileIoApi {
     final listing = ParsedDirectoryListing.fromWire(raw);
     PerfTrace.end('io.list.parse', perfT0, slowMs: 30);
     return listing;
+  }
+
+  /// [listDirectoryEntriesForBrowser] as a job the caller can abandon, with
+  /// progress for folders that take long to read.
+  ///
+  /// Plain device storage reads big folders slowly (Android's storage layer
+  /// costs about 0.1 ms per entry, so 40,000 files take several seconds), so
+  /// there [onPartial] receives a few growing, name-sorted snapshots while the
+  /// folder is still being read, and the job's result is the finished listing.
+  /// Every other source is a single native call that cannot be interrupted or
+  /// reported on part-way: its job just completes with the listing, and
+  /// [onPartial] is never called. Null means the listing failed or the job was
+  /// cancelled; the caller tells them apart by whether it still wanted it.
+  ListingJob<ParsedDirectoryListing> startDirectoryListingForBrowser(
+    MountedContainer container,
+    String dirPath, {
+    bool refresh = false,
+    void Function(List<RawEntry> partial)? onPartial,
+  }) {
+    if (!_isSaf(container) && container.isLocalStorage) {
+      final localT0 = PerfTrace.begin();
+      return _local
+          .listDirectoryProgressive(
+            container.uri,
+            dirPath,
+            refresh: refresh,
+            onPartial: onPartial,
+          )
+          // The worker already pre-sorted in natural-name order; the repository
+          // list is unmodifiable and the browser only ever reads it.
+          .map((entries) {
+            PerfTrace.end('io.list.local', localT0, slowMs: 150);
+            return ParsedDirectoryListing(entries, preSortedByNameAsc: true);
+          });
+    }
+    return ListingJob<ParsedDirectoryListing>.uninterruptible(
+      listDirectoryEntriesForBrowser(container, dirPath, refresh: refresh),
+    );
   }
 
   /// The symbolic links of one folder in a supported vault/container.

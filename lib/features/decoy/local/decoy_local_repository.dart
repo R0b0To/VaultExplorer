@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:collection';
 import 'dart:io';
 import 'dart:isolate';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:vaultexplorer/core/utils/listing_job.dart';
 import 'package:vaultexplorer/core/utils/natural_sort.dart';
 import 'package:vaultexplorer/core/utils/perf_trace.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
@@ -82,32 +84,14 @@ class DecoyLocalRepository {
   /// decoy archive screen already tolerates a failed Downloads scan.
   Future<List<RawEntry>> listDirectory(String path, {bool refresh = false}) async {
     final perfT0 = PerfTrace.begin();
-    final cached = _cache.remove(path);
-    var missReason = refresh
-        ? 'refresh(hadCache=${cached != null})'
-        : (cached == null ? 'cold_or_evicted(n=${_cache.length})' : '');
-    if (!refresh && cached != null) {
-      // One stat of the folder itself decides whether the cached listing is
-      // still good; far cheaper than listing and stat'ing every child again.
-     final ttl = cached.entries.length >= _largeFolderThreshold
-          ? _largeFolderCacheTtl
-          : _cacheTtl;
-      final age = DateTime.now().difference(cached.cachedAt);
-      if (age < ttl) {
-        final modified = await _folderModified(path);
-        if (modified != null && modified == cached.folderModified) {
-          _cache[path] = cached; // re-insert: most recently used
-          PerfTrace.count('local.list.cache_hit');
-          PerfTrace.end('local.list.cached', perfT0);
-          return cached.entries;
-        }
-        missReason = modified == null
-            ? 'mtime_null'
-            : 'mtime_changed(${cached.folderModified.millisecondsSinceEpoch}->${modified.millisecondsSinceEpoch})';
-      } else {
-        missReason = 'ttl(${age.inSeconds}s>=${ttl.inSeconds}s,n=${cached.entries.length})';
-      }
+    final lookup = await _lookupCached(path, refresh);
+    final hit = lookup.hit;
+    if (hit != null) {
+      PerfTrace.count('local.list.cache_hit');
+      PerfTrace.end('local.list.cached', perfT0);
+      return hit;
     }
+    final missReason = lookup.missReason;
     PerfTrace.count('local.list.cache_miss');
 
     // Stat the folder *before* listing it: a change that lands while the
@@ -125,15 +109,75 @@ class DecoyLocalRepository {
       );
     }
 
-  final result = UnmodifiableListView<RawEntry>(out.entries);
-    if (folderModified != null) {
-      _cache[path] = _CachedListing(result, folderModified, DateTime.now());
-      while (_cache.length > _cacheMaxFolders) {
-        _cache.remove(_cache.keys.first);
+    final result = UnmodifiableListView<RawEntry>(out.entries);
+    _remember(path, folderModified, result);
+    return result;
+  }
+
+  /// Like [listDirectory], but for folders too big to wait for: while the
+  /// folder is still being read it hands [onPartial] a few growing,
+  /// name-sorted snapshots (see [ProgressiveListingConfig]) so the first
+  /// screenful can be shown long before the last entry is read. The returned
+  /// job's result is the complete listing, exactly what [listDirectory]
+  /// would give, and only that complete listing is remembered.
+  ///
+  /// A cached folder, or one that is read quickly, never produces a partial:
+  /// the result just arrives. Cancelling the job stops the worker reading.
+  ListingJob<List<RawEntry>> listDirectoryProgressive(
+    String path, {
+    bool refresh = false,
+    void Function(List<RawEntry> partial)? onPartial,
+    ProgressiveListingConfig config = const ProgressiveListingConfig(),
+  }) {
+    final run = _ProgressiveListing(path, refresh, onPartial, config);
+    unawaited(run.start());
+    return ListingJob<List<RawEntry>>(run.result, run.cancel);
+  }
+
+  /// The cached listing of [path] if it is still good, otherwise null and why
+  /// not. A cached entry is reused only while the folder's own modification
+  /// time is unchanged and it has not outlived its TTL.
+  static Future<({List<RawEntry>? hit, String missReason})> _lookupCached(
+    String path,
+    bool refresh,
+  ) async {
+    final cached = _cache.remove(path);
+    var missReason = refresh
+        ? 'refresh(hadCache=${cached != null})'
+        : (cached == null ? 'cold_or_evicted(n=${_cache.length})' : '');
+    if (!refresh && cached != null) {
+      // One stat of the folder itself decides whether the cached listing is
+      // still good; far cheaper than listing and stat'ing every child again.
+      final ttl = cached.entries.length >= _largeFolderThreshold
+          ? _largeFolderCacheTtl
+          : _cacheTtl;
+      final age = DateTime.now().difference(cached.cachedAt);
+      if (age < ttl) {
+        final modified = await _folderModified(path);
+        if (modified != null && modified == cached.folderModified) {
+          _cache[path] = cached; // re-insert: most recently used
+          return (hit: cached.entries, missReason: '');
+        }
+        missReason = modified == null
+            ? 'mtime_null'
+            : 'mtime_changed(${cached.folderModified.millisecondsSinceEpoch}->${modified.millisecondsSinceEpoch})';
+      } else {
+        missReason = 'ttl(${age.inSeconds}s>=${ttl.inSeconds}s,n=${cached.entries.length})';
       }
     }
+    return (hit: null, missReason: missReason);
+  }
 
-    return result;
+  static void _remember(
+    String path,
+    DateTime? folderModified,
+    List<RawEntry> result,
+  ) {
+    if (folderModified == null) return;
+    _cache[path] = _CachedListing(result, folderModified, DateTime.now());
+    while (_cache.length > _cacheMaxFolders) {
+      _cache.remove(_cache.keys.first);
+    }
   }
 
   /// The folder's own last-modified time, or null when it cannot be read.
@@ -285,44 +329,9 @@ Future<Directory> createFolder(String parentPath, String desiredName) async {
     listUs = sw.elapsedMicroseconds;
     sw.reset();
     for (final item in items) {
-      try {
-        if (item is Directory) {
-          int modifiedSecs = 0;
-          try {
-            final stat = item.statSync();
-            modifiedSecs = stat.modified.millisecondsSinceEpoch ~/ 1000;
-          } catch (_) {
-            // Folder metadata is optional; keep the entry with modifiedSecs 0
-            // if stat fails because of permissions or a concurrent filesystem change.
-          }
-          final name = _baseName(item.path);
-          final lower = name.toLowerCase();
-          dirs.add(RawEntry(
-            name: name,
-            isDir: true,
-            sizeBytes: 0,
-            modifiedSecs: modifiedSecs,
-            lowercaseName: lower,
-            extension: '',
-          ));
-        } else if (item is File) {
-          final stat = item.statSync();
-          final name = _baseName(item.path);
-          final lower = name.toLowerCase();
-          final dot = lower.lastIndexOf('.');
-          final ext = dot < 0 ? '' : lower.substring(dot + 1);
-          files.add(RawEntry(
-            name: name,
-            isDir: false,
-            sizeBytes: stat.size,
-            modifiedSecs: stat.modified.millisecondsSinceEpoch ~/ 1000,
-            lowercaseName: lower,
-            extension: ext,
-          ));
-        }
-      } catch (_) {
-        continue;
-      }
+      final entry = _entryFor(item);
+      if (entry == null) continue;
+      (entry.isDir ? dirs : files).add(entry);
     }
     statUs = sw.elapsedMicroseconds;
     sw.reset();
@@ -362,4 +371,281 @@ class _CachedListing {
   final List<RawEntry> entries;
   final DateTime folderModified;
   final DateTime cachedAt;
+}
+
+/// One directory child as a [RawEntry], or null if it is neither a file nor a
+/// folder or cannot be read (permission-denied system folders, broken
+/// symlinks, a concurrent delete). Shared by the one-shot and the progressive
+/// listing so both produce identical entries.
+RawEntry? _entryFor(FileSystemEntity item) {
+  try {
+    if (item is Directory) {
+      int modifiedSecs = 0;
+      try {
+        final stat = item.statSync();
+        modifiedSecs = stat.modified.millisecondsSinceEpoch ~/ 1000;
+      } catch (_) {
+        // Folder metadata is optional; keep the entry with modifiedSecs 0
+        // if stat fails because of permissions or a concurrent filesystem change.
+      }
+      final name = _baseName(item.path);
+      return RawEntry(
+        name: name,
+        isDir: true,
+        sizeBytes: 0,
+        modifiedSecs: modifiedSecs,
+        lowercaseName: name.toLowerCase(),
+        extension: '',
+      );
+    }
+    if (item is File) {
+      final stat = item.statSync();
+      final name = _baseName(item.path);
+      final lower = name.toLowerCase();
+      final dot = lower.lastIndexOf('.');
+      return RawEntry(
+        name: name,
+        isDir: false,
+        sizeBytes: stat.size,
+        modifiedSecs: stat.modified.millisecondsSinceEpoch ~/ 1000,
+        lowercaseName: lower,
+        extension: dot < 0 ? '' : lower.substring(dot + 1),
+      );
+    }
+  } catch (_) {
+    return null;
+  }
+  return null;
+}
+
+/// When a folder that is still being read is shown in part.
+///
+/// A snapshot is sent once the listing has been running for the next time in
+/// [schedule] *and* holds at least [minPartialEntries] entries and half again
+/// as many as the previous snapshot. A folder that finishes before the first
+/// time (anything on fast storage, and every ordinary-sized folder) is never
+/// shown in part; the finished listing simply arrives.
+class ProgressiveListingConfig {
+  const ProgressiveListingConfig({
+    this.schedule = const <Duration>[
+      Duration(milliseconds: 250),
+      Duration(seconds: 1),
+      Duration(milliseconds: 2500),
+    ],
+    this.minPartialEntries = 200,
+  });
+
+  final List<Duration> schedule;
+  final int minPartialEntries;
+}
+
+typedef _ProgressiveOutcome = ({
+  List<RawEntry> entries,
+  int listUs,
+  int statUs,
+  int sortUs,
+  int partials,
+  int firstPartialUs,
+});
+
+/// Reads one folder on a worker isolate and reports growing snapshots.
+class _ProgressiveListing {
+  _ProgressiveListing(this.path, this.refresh, this.onPartial, this.config);
+
+  final String path;
+  final bool refresh;
+  final void Function(List<RawEntry> partial)? onPartial;
+  final ProgressiveListingConfig config;
+
+  final Completer<List<RawEntry>?> _done = Completer<List<RawEntry>?>();
+  bool _cancelled = false;
+  SendPort? _control;
+
+  Future<List<RawEntry>?> get result => _done.future;
+
+  Future<void> start() async {
+    final perfT0 = PerfTrace.begin();
+    ReceivePort? partials;
+    try {
+      final lookup = await DecoyLocalRepository._lookupCached(path, refresh);
+      if (_cancelled) return;
+      final hit = lookup.hit;
+      if (hit != null) {
+        PerfTrace.count('local.list.cache_hit');
+        PerfTrace.end('local.list.cached', perfT0);
+        _finish(hit);
+        return;
+      }
+      PerfTrace.count('local.list.cache_miss');
+
+      // As in the one-shot listing: stat the folder before reading it.
+      final folderModified = await DecoyLocalRepository._folderModified(path);
+      if (_cancelled) return;
+
+      partials = ReceivePort()..listen(_onWorkerMessage);
+      final out = await _spawnWorker(path, partials.sendPort, config);
+      // A cancelled run may have been cut short, so it is neither reported
+      // nor remembered.
+      if (_cancelled) return;
+
+      PerfTrace.end('local.list.isolate', perfT0, slowMs: 150);
+      PerfTrace.record('local.list.readdir', out.listUs);
+      PerfTrace.record('local.list.stat', out.statUs);
+      if (out.partials > 0) {
+        PerfTrace.record('local.list.first_partial', out.firstPartialUs);
+      }
+      if (perfT0 != 0) {
+        PerfTrace.sink(
+          'local.list.detail key=${path.hashCode} miss=${lookup.missReason} count=${out.entries.length} '
+          'readdirMs=${out.listUs ~/ 1000} statMs=${out.statUs ~/ 1000} sortMs=${out.sortUs ~/ 1000} '
+          'progressive partials=${out.partials} firstPartialMs=${out.firstPartialUs ~/ 1000}',
+        );
+      }
+
+      final listing = UnmodifiableListView<RawEntry>(out.entries);
+      DecoyLocalRepository._remember(path, folderModified, listing);
+      _finish(listing);
+    } catch (error, stack) {
+      if (!_done.isCompleted) _done.completeError(error, stack);
+    } finally {
+      partials?.close();
+    }
+  }
+
+  /// Kept out of the instance so the closure sent to the isolate captures only
+  /// the path, the port and the config, never this object.
+  static Future<_ProgressiveOutcome> _spawnWorker(
+    String path,
+    SendPort partials,
+    ProgressiveListingConfig config,
+  ) {
+    return Isolate.run(() => _listDirectoryProgressive(path, partials, config));
+  }
+
+  void _onWorkerMessage(Object? message) {
+    if (message is SendPort) {
+      // The worker's control port. If cancelled before it arrived, say so now.
+      _control = message;
+      if (_cancelled) message.send('cancel');
+      return;
+    }
+    if (_cancelled || message is! List) return;
+    PerfTrace.count('local.list.partial');
+    onPartial?.call(UnmodifiableListView<RawEntry>(message.cast<RawEntry>()));
+  }
+
+  /// Stops reading. The result completes with null at once; the worker notices
+  /// at its next entry, ends, and its (possibly incomplete) outcome is dropped.
+  void cancel() {
+    if (_cancelled) return;
+    _cancelled = true;
+    _control?.send('cancel');
+    _finish(null);
+  }
+
+  void _finish(List<RawEntry>? value) {
+    if (!_done.isCompleted) _done.complete(value);
+  }
+}
+
+/// Runs on a worker isolate: streams the folder, sending name-sorted snapshots
+/// to [partials] on the schedule in [config], and returns the full, sorted
+/// listing. Sends its own control port first so the caller can cancel it.
+Future<_ProgressiveOutcome> _listDirectoryProgressive(
+  String path,
+  SendPort partials,
+  ProgressiveListingConfig config,
+) async {
+  final control = ReceivePort();
+  var cancelled = false;
+  control.listen((message) {
+    if (message == 'cancel') cancelled = true;
+  });
+  partials.send(control.sendPort);
+
+  final dirs = <RawEntry>[];
+  final files = <RawEntry>[];
+  var statUs = 0;
+  var sortUs = 0;
+  var partialCount = 0;
+  var firstPartialUs = 0;
+  final total = Stopwatch()..start();
+  try {
+    if (!await Directory(path).exists()) {
+      return _emptyOutcome;
+    }
+    final stat = Stopwatch();
+    var next = 0;
+    var lastCount = 0;
+    await for (final item in Directory(path).list(followLinks: false)) {
+      if (cancelled) break;
+      stat.start();
+      final entry = _entryFor(item);
+      stat.stop();
+      if (entry == null) continue;
+      (entry.isDir ? dirs : files).add(entry);
+
+      if (next < config.schedule.length) {
+        final count = dirs.length + files.length;
+        if (count >= config.minPartialEntries &&
+            count >= lastCount + (lastCount >> 1) &&
+            total.elapsed >= config.schedule[next]) {
+          final sortWatch = Stopwatch()..start();
+          partials.send(_sortedSnapshot(dirs, files));
+          sortUs += sortWatch.elapsedMicroseconds;
+          lastCount = count;
+          next++;
+          partialCount++;
+          if (partialCount == 1) firstPartialUs = total.elapsedMicroseconds;
+        }
+      }
+    }
+    statUs = stat.elapsedMicroseconds;
+    if (cancelled) return _emptyOutcome;
+
+    final sortWatch = Stopwatch()..start();
+    // Pre-sort here, off the UI thread, in natural-name order.
+    if (dirs.length > 1) {
+      dirs.sort((a, b) => naturalCompare(a.lowercaseName, b.lowercaseName));
+    }
+    if (files.length > 1) {
+      files.sort((a, b) => naturalCompare(a.lowercaseName, b.lowercaseName));
+    }
+    sortUs += sortWatch.elapsedMicroseconds;
+  } catch (_) {
+    // Unreadable directory or stream error mid-listing: keep what was read,
+    // as the one-shot listing does.
+  } finally {
+    control.close();
+  }
+  final entries = dirs.isEmpty
+      ? files
+      : (files.isEmpty ? dirs : <RawEntry>[...dirs, ...files]);
+  return (
+    entries: entries,
+    listUs: total.elapsedMicroseconds - statUs - sortUs,
+    statUs: statUs,
+    sortUs: sortUs,
+    partials: partialCount,
+    firstPartialUs: firstPartialUs,
+  );
+}
+
+const _ProgressiveOutcome _emptyOutcome = (
+  entries: <RawEntry>[],
+  listUs: 0,
+  statUs: 0,
+  sortUs: 0,
+  partials: 0,
+  firstPartialUs: 0,
+);
+
+/// Folders first, each group in natural-name order: the same order the final
+/// listing has, so a snapshot can be shown as it is.
+List<RawEntry> _sortedSnapshot(List<RawEntry> dirs, List<RawEntry> files) {
+  int byName(RawEntry a, RawEntry b) =>
+      naturalCompare(a.lowercaseName, b.lowercaseName);
+  final sortedDirs = List<RawEntry>.of(dirs)..sort(byName);
+  final sortedFiles = List<RawEntry>.of(files)..sort(byName);
+  return <RawEntry>[...sortedDirs, ...sortedFiles];
 }

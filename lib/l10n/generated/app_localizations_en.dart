@@ -14151,6 +14151,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get galleryFilterClear => 'Clear';
 
   @override
+  String get galleryFilterMatchAny => 'Match any';
+
+  @override
+  String get galleryFilterMatchAll => 'Match all';
+
+  @override
+  String get galleryFoldersMenu => 'Gallery folders';
+
+  @override
+  String get galleryFoldersHint =>
+      'Choose which folders the gallery scans. Subfolders are included. With none chosen, the whole storage is scanned.';
+
+  @override
+  String get galleryFoldersUseAll => 'Scan everything';
+
+  @override
+  String get galleryFoldersApply => 'Apply';
+
+  @override
   String galleryFilterShownOfTotal(int shown, int total) {
     return '$shown of $total shown';
   }

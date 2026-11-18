@@ -12,7 +12,7 @@ Code: `lib/features/browser/gallery/filter/`
 | `gallery_meta.dart` | Per-photo facts: date taken, GPS, camera, XMP keywords, rating, pixel size |
 | `gallery_meta_parser.dart` | Pure reader of EXIF + XMP (JPEG, PNG, WebP). Never throws |
 | `gallery_meta_index.dart` | Background reader + cache; stored in `/.vaultexplorer/gallery_meta.json` inside the vault |
-| `gallery_filters.dart` | Filter classes and `GalleryFilterSet` (same kind = OR, different kinds = AND, excluded = always removes) |
+| `gallery_filters.dart` | Filter classes and `GalleryFilterSet` (same kind = OR, different kinds = AND, excluded = always removes; with `matchAllTags` several selected tags are AND instead, set by the Match any / Match all control in the Tags section) |
 | `gallery_places.dart` | Offline nearest-city lookup (`GalleryPlaceResolver`) and the coordinate fallback |
 | `gallery_facets.dart` | Choices (with counts) offered by the sheet |
 | `gallery_grouping.dart` | `GalleryGrouper`: sections + `arrange` so each section is one run of the list |
@@ -34,3 +34,11 @@ Localization: every visible string is an ARB key (`gallery*`, 45 keys, ten trans
 `dart run scripts/update_l10n_keys.dart` and then `flutter gen-l10n`. The filter logic stays free of
 generated code: it receives a `GalleryFilterLabels` that the UI builds from the translations
 (`gallery_filter_l10n.dart`); tests use the English defaults.
+
+## Choosing the gallery's folders
+
+A gallery opened on a vault or on phone storage scans the whole storage by default. The gallery's options menu has a
+**Gallery folders** entry that opens a folder tree: tick the folders to scan (subfolders are included) and apply. The
+choice is saved per storage on this device, and the scan then starts from those folders only. Ticking nothing, or
+choosing **Scan everything**, goes back to the whole storage. While folders are chosen, the gallery's top is the storage
+root, and the partial scan is never stored as the storage's category index.

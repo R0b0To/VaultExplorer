@@ -112,6 +112,10 @@ class FileListView extends StatefulWidget {
   /// entry belongs to [container], as in any ordinary folder listing.
   final MountedContainer Function(RawEntry entry)? containerFor;
 
+  /// Files already known to lie inside a folder, best cover first (see
+  /// [FolderThumbnailPreview.previewPaths]).
+  final List<String>? Function(RawEntry folder)? folderPreviewPaths;
+
   /// The thumbnail cache policy that applies to an entry, for a listing that
   /// mixes containers whose owners chose different policies (the category
   /// browser). When null every entry follows [thumbnailCacheMode].
@@ -162,6 +166,7 @@ class FileListView extends StatefulWidget {
     this.archiveRootPath,
     this.sortBy,
     this.containerFor,
+    this.folderPreviewPaths,
     this.cacheModeFor,
     this.qualityFor,
   });
@@ -501,6 +506,7 @@ class FileListViewState extends State<FileListView> {
         isSynced: widget.isFolderSynced?.call(entry) ?? false,
         container: (widget.containerFor?.call(entry) ?? widget.container),
         currentDirPath: widget.currentDirPath,
+        previewPaths: widget.folderPreviewPaths?.call(entry),
         cacheMode: _cacheModeOf(entry),
         quality: _qualityOf(entry),
         showThumbnailPreview: widget.showThumbnails,

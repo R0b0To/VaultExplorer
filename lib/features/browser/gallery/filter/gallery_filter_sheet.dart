@@ -212,7 +212,7 @@ class _GalleryFilterSheetState extends State<GalleryFilterSheet> {
         matchesNeedle,
       ),
       _dateSection(facets, matchesNeedle),
-      _section('tag', l.galleryFilterSectionTags, facets.tags.where(matchesNeedle).toList(), (_) => true),
+      _tagsSection(facets.tags.where(matchesNeedle).toList(), l),
       _section('place', l.galleryFilterSectionPlaces, facets.places.where(matchesNeedle).toList(), (_) => true,
           tooltip: (f) => galleryPlaceHint(f.filter as GalleryPlaceFilter, labels)),
       _section('camera', l.galleryFilterSectionCameras, facets.cameras.where(matchesNeedle).toList(), (_) => true),
@@ -282,6 +282,46 @@ class _GalleryFilterSheetState extends State<GalleryFilterSheet> {
             const SizedBox(height: 8),
             _chips('month', months),
           ],
+        ],
+      ),
+    );
+  }
+
+  /// The tag chips with the choice of how several selected tags combine.
+  Widget _tagsSection(List<GalleryFacet> tags, AppLocalizations l) {
+    if (tags.isEmpty) return const SizedBox.shrink();
+    final controller = widget.controller;
+    return _titled(
+      l.galleryFilterSectionTags,
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SegmentedButton<bool>(
+            showSelectedIcon: false,
+            style: const ButtonStyle(visualDensity: VisualDensity.compact),
+            segments: [
+              ButtonSegment(
+                value: false,
+                label: Text(
+                  l.galleryFilterMatchAny,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              ButtonSegment(
+                value: true,
+                label: Text(
+                  l.galleryFilterMatchAll,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+            selected: {controller.filters.matchAllTags},
+            onSelectionChanged: (v) => controller.setMatchAllTags(v.first),
+          ),
+          const SizedBox(height: 8),
+          _chips('tag', tags),
         ],
       ),
     );
@@ -433,6 +473,28 @@ class GalleryFilterBar extends StatelessWidget {
                     label: Text('$shown / $total'),
                     onPressed: onOpen,
                   ),
+                  // Says that the selected tags must all be there, so a short
+                  // list is not mistaken for an "any" match. A tap goes back.
+                  if (controller.filters.matchAllTags &&
+                      filters
+                              .where(
+                                (f) =>
+                                    f.kind == GalleryFilterKind.tag &&
+                                    !f.reversed,
+                              )
+                              .length >
+                          1)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: ActionChip(
+                        avatar: const Icon(Icons.label_rounded, size: 16),
+                        label: Text(
+                          '${context.l10n.galleryFilterSectionTags}: '
+                          '${context.l10n.galleryFilterMatchAll}',
+                        ),
+                        onPressed: () => controller.setMatchAllTags(false),
+                      ),
+                    ),
                   for (final f in filters)
                     Padding(
                       padding: const EdgeInsets.only(left: 8),

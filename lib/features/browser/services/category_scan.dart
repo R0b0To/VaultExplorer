@@ -106,6 +106,40 @@ void _addAncestors(Set<String> folders, String dirPath) {
   }
 }
 
+/// Reduces folders chosen as scan starting points to the ones worth walking.
+///
+/// Paths are '/'-separated and relative to the storage root. Stray slashes are
+/// trimmed, duplicates collapse, and a folder lying inside another chosen
+/// folder is dropped, because the walk over its ancestor already reaches it
+/// (keeping both would list every file in it twice). Choosing the storage
+/// root itself, or nothing at all, means "scan everything" and gives an empty
+/// list, which is what [CategoryScanner.scan] reads as "start at the root".
+List<String> normalizeScanRoots(Iterable<String> roots) {
+  final cleaned = <String>{};
+  for (final raw in roots) {
+    final path = raw.replaceAll(RegExp(r'^/+|/+$'), '');
+    if (path.isEmpty) return const <String>[];
+    cleaned.add(path);
+  }
+  final sorted = cleaned.toList()..sort();
+  final kept = <String>[];
+  for (final path in sorted) {
+    if (kept.any((ancestor) => path.startsWith('$ancestor/'))) continue;
+    kept.add(path);
+  }
+  return kept;
+}
+
+/// Whether the file at [path] lies inside one of [roots] (already normalized
+/// by [normalizeScanRoots]). An empty [roots] means the whole storage.
+bool pathIsWithinScanRoots(String path, List<String> roots) {
+  if (roots.isEmpty) return true;
+  for (final root in roots) {
+    if (path.startsWith('$root/')) return true;
+  }
+  return false;
+}
+
 /// Walks a storage's folder tree and collects every file [matches] accepts.
 ///
 /// It knows nothing about vaults, SAF or widgets: listing goes through
@@ -169,13 +203,17 @@ class CategoryScanner {
   final int maxFolders;
   final int maxResults;
 
-  /// Scans from the storage root. [onProgress] gets a snapshot at most about
-  /// every [progressInterval] while the walk runs, so a caller can show files
-  /// as they turn up; the returned snapshot is the final one.
+  /// Scans from the storage root, or, when [roots] is not empty, only from
+  /// those folders (paths from the storage root, see [normalizeScanRoots]).
+  /// Every reported path stays relative to the storage root either way.
+  /// [onProgress] gets a snapshot at most about every [progressInterval] while
+  /// the walk runs, so a caller can show files as they turn up; the returned
+  /// snapshot is the final one.
   Future<CategoryScanSnapshot> scan({
     required CancellationToken token,
     void Function(CategoryScanSnapshot snapshot)? onProgress,
     Duration progressInterval = const Duration(milliseconds: 250),
+    List<String> roots = const <String>[],
   }) async {
     final entries = <RawEntry>[];
     final folders = <String>{};
@@ -266,7 +304,15 @@ class CategoryScanner {
       await Future.wait(subdirs.map((path) => walk(path, depth + 1)));
     }
 
-    await walk('', 0);
+    final starts = normalizeScanRoots(roots);
+    if (starts.isEmpty) {
+      await walk('', 0);
+    } else {
+      // A chosen folder is the top of its own walk, so a `.nomedia` marker in
+      // it does not prune it (the person picked it on purpose), the same as
+      // for the storage root.
+      await Future.wait(starts.map((start) => walk(start, 0)));
+    }
     return snapshot(finished: !token.isCancelled);
   }
 }

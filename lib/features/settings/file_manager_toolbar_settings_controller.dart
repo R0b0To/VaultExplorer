@@ -299,6 +299,17 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
     await _updateConfig(newConfig);
   }
 
+  /// Limits [containerUri]'s gallery to [folders] (paths from the storage
+  /// root, subfolders included); an empty list scans the whole storage.
+  Future<void> setGalleryFoldersForStorage(
+    String containerUri,
+    List<String> folders,
+  ) async {
+    final newConfig =
+        state.config.withGalleryFoldersForStorage(containerUri, folders);
+    await _updateConfig(newConfig);
+  }
+
   Future<void> reorderActions(int oldIndex, int newIndex) async {
     final order = List<FileManagerAction>.from(state.config.order);
     final moved = order.removeAt(oldIndex);

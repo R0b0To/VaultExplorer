@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/directory_listing_cache.dart';
+import 'package:vaultexplorer/core/utils/listing_job.dart';
 import 'package:vaultexplorer/core/utils/perf_trace.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';
@@ -62,6 +63,11 @@ class FileBrowserNavigationState {
   final bool preSortedByNameAsc;
   final bool isLoading;
   final bool isListingTruncated;
+
+  /// The folder whose listing [currentItems] is only the first part of, while
+  /// that listing is still being read; null otherwise. Kept as a path (not a
+  /// flag) so it stops applying by itself the moment the user is anywhere else.
+  final String? partialListingPath;
   final String? statusMessage;
   final bool statusIsError;
   final int? freeSpace;
@@ -85,6 +91,7 @@ class FileBrowserNavigationState {
     this.preSortedByNameAsc = false,
     this.isLoading = false,
     this.isListingTruncated = false,
+    this.partialListingPath,
     this.statusMessage,
     this.statusIsError = false,
     this.freeSpace,
@@ -104,6 +111,11 @@ class FileBrowserNavigationState {
 
   bool get hasForward => forwardStack.isNotEmpty;
 
+  /// True while this folder's listing is still being read and [currentItems]
+  /// holds only the first part of it (a big folder on slow storage).
+  bool get isListingPartial =>
+      isLoading && partialListingPath != null && partialListingPath == currentDirPath;
+
   String get currentDirPath => pathStack.isEmpty ? '' : pathStack.last.fatPath;
 
   String? get archiveRootPath => archiveContext == null
@@ -119,6 +131,8 @@ class FileBrowserNavigationState {
     bool? preSortedByNameAsc,
     bool? isLoading,
     bool? isListingTruncated,
+    String? partialListingPath,
+    bool clearPartialListing = false,
     String? statusMessage,
     bool clearStatusMessage = false,
     bool? statusIsError,
@@ -145,6 +159,9 @@ class FileBrowserNavigationState {
       preSortedByNameAsc: preSortedByNameAsc ?? this.preSortedByNameAsc,
       isLoading: isLoading ?? this.isLoading,
       isListingTruncated: isListingTruncated ?? this.isListingTruncated,
+      partialListingPath: clearPartialListing
+          ? null
+          : (partialListingPath ?? this.partialListingPath),
       statusMessage: clearStatusMessage
           ? null
           : (statusMessage ?? this.statusMessage),
@@ -189,6 +206,16 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
   // other revisit began with an empty screen and a spinner.
   final DirectoryListingCache _listingCache = DirectoryListingCache();
 
+  // The listing currently being read, so a newer one (or leaving the screen)
+  // can stop it instead of letting a worker keep reading a huge folder that
+  // nobody is waiting for.
+  ListingJob<ParsedDirectoryListing>? _activeListing;
+
+  void _cancelActiveListing() {
+    _activeListing?.cancel();
+    _activeListing = null;
+  }
+
   // Identifies the container the cache above belongs to, so nothing listed
   // from one mounted container is ever shown for another.
   String? _listingCacheScope;
@@ -221,6 +248,7 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
   @override
   FileBrowserNavigationState build(TabId tabId) {
     ref.onDispose(() {
+      _cancelActiveListing();
       // The whole chain: a nested archive's parents each hold their own
       // state, and none of them has a view left to close them.
       _liveArchiveContext?.disposeChain();
@@ -328,13 +356,14 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
     // them after this optimistic removal; the caller starts a fresh read once
     // the related metadata cleanup is done.
     _loadGeneration++;
+    _cancelActiveListing();
     // Exact names: `deletedNames` come from the entries that were actually
     // deleted, and on a case-sensitive destination "Notes" and "notes" are
     // different entries -- deleting one must not hide the other.
     final updated = state.currentItems
         .where((e) => !deletedNames.contains(e.name))
         .toList();
-    state = state.copyWith(currentItems: updated);
+    state = state.copyWith(currentItems: updated, clearPartialListing: true);
     if (state.pathStack.isNotEmpty) {
       state.pathStack.last.items = List<RawEntry>.of(updated);
     }
@@ -354,6 +383,7 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
     VoidCallback? onActivity,
   }) async {
     final generation = ++_loadGeneration;
+    _cancelActiveListing();
     onActivity?.call();
 
     state = state.copyWith(
@@ -369,9 +399,19 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
     try {
       _syncListingCacheScope(container);
       final perfT0 = PerfTrace.begin();
-      final listing = await ref
+      final job = ref
           .read(vaultFileIoApiProvider)
-          .listDirectoryEntriesForBrowser(container, path, refresh: refresh);
+          .startDirectoryListingForBrowser(
+            container,
+            path,
+            refresh: refresh,
+            onPartial: (partial) =>
+                _showPartialListing(generation, path, partial, perfT0),
+          );
+      _activeListing = job;
+      final listing = await job.result.whenComplete(() {
+        if (identical(_activeListing, job)) _activeListing = null;
+      });
       PerfTrace.end('nav.list_total', perfT0, slowMs: 250);
 
       if (!ref.mounted ||
@@ -431,6 +471,7 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
         preSortedByNameAsc: preSorted,
         isListingTruncated: isTruncated,
         isLoading: false,
+        clearPartialListing: true,
         needsRefresh: listingFailed,
       );
 
@@ -456,9 +497,47 @@ class FileBrowserNavigation extends _$FileBrowserNavigation {
       );
     } catch (e) {
       if (!ref.mounted || generation != _loadGeneration) return;
-      state = state.copyWith(isLoading: false);
+      state = state.copyWith(isLoading: false, clearPartialListing: true);
       rethrow;
     }
+  }
+
+  /// Shows the first part of a big folder's listing while the rest is still
+  /// being read.
+  ///
+  /// Only a folder that is showing nothing, or an earlier part of this same
+  /// listing, takes one. A folder that already shows its previous contents
+  /// (a refresh, or a revisit served from the cache) keeps them until the
+  /// finished listing arrives: replacing a full list with a smaller one would
+  /// make items vanish and come back. `isLoading` stays true, so everything
+  /// that waits for the finished listing (revealing a new item, scrolling to
+  /// one, the back-gesture preview) keeps waiting for it.
+  void _showPartialListing(
+    int generation,
+    String path,
+    List<RawEntry> partial,
+    int perfT0,
+  ) {
+    if (!ref.mounted ||
+        generation != _loadGeneration ||
+        path != state.currentDirPath ||
+        state.archiveContext != null) {
+      return;
+    }
+    if (state.currentItems.isNotEmpty && state.partialListingPath != path) {
+      return;
+    }
+    PerfTrace.count('nav.listing_partial');
+    // How long the user waited to see anything: compare with nav.list_total.
+    if (state.partialListingPath != path) {
+      PerfTrace.end('nav.first_partial_visible', perfT0);
+    }
+    state = state.copyWith(
+      currentItems: partial,
+      preSortedByNameAsc: true,
+      isLoading: true,
+      partialListingPath: path,
+    );
   }
 
   void _loadArchiveContents(String path, {BrowserLayoutMode? layoutMode}) {

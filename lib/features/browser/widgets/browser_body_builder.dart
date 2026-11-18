@@ -48,6 +48,10 @@ Widget buildBrowserBody(
   required void Function(double newZoom) onListZoomLevelChanged,
   required Future<void> Function() onRefresh,
   required bool isListingTruncated,
+
+  /// True while a big folder is still being read and [currentItems] is only
+  /// the first part of it: shows a thin progress bar over the top.
+  bool isListingInProgress = false,
   ValueChanged<Set<RawEntry>>? onSelectionChanged,
   bool enableFileDrag = false,
   BrowserItemDropHandler? onFileDrop,
@@ -219,11 +223,29 @@ Widget buildBrowserBody(
     ),
   };
   final refreshable = RefreshIndicator(onRefresh: onRefresh, child: content);
-  if (!isListingTruncated) return refreshable;
+  // Always a Stack, with the list as its pass-through child and the progress
+  // bar an optional overlay after it: wrapping the list only while the bar is
+  // showing would re-parent it when the bar appears and again when it goes,
+  // rebuilding every tile each time.
+  final body = Stack(
+    fit: StackFit.passthrough,
+    clipBehavior: Clip.none,
+    children: [
+      refreshable,
+      if (isListingInProgress)
+        const Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: LinearProgressIndicator(minHeight: 2),
+        ),
+    ],
+  );
+  if (!isListingTruncated) return body;
   return Column(
     children: [
       const TruncatedBanner(),
-      Expanded(child: refreshable),
+      Expanded(child: body),
     ],
   );
 }

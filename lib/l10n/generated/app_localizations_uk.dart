@@ -14470,6 +14470,25 @@ class AppLocalizationsUk extends AppLocalizations {
   String get galleryFilterClear => 'Скинути';
 
   @override
+  String get galleryFilterMatchAny => 'Будь-який';
+
+  @override
+  String get galleryFilterMatchAll => 'Усі';
+
+  @override
+  String get galleryFoldersMenu => 'Папки галереї';
+
+  @override
+  String get galleryFoldersHint =>
+      'Виберіть папки, які сканує галерея. Вкладені папки включено. Якщо нічого не вибрано, сканується все сховище.';
+
+  @override
+  String get galleryFoldersUseAll => 'Сканувати все';
+
+  @override
+  String get galleryFoldersApply => 'Застосувати';
+
+  @override
   String galleryFilterShownOfTotal(int shown, int total) {
     return 'Показано $shown із $total';
   }

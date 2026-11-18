@@ -613,4 +613,44 @@ void main() {
       expect(config.showNoMediaFolders, isFalse);
     });
   });
+  group('FileManagerToolbarConfig galleryFoldersByStorage', () {
+    test('is empty by default, so a gallery scans its whole storage', () {
+      final config = FileManagerToolbarConfig.defaults();
+      expect(config.galleryFoldersForStorage('vault://a'), isEmpty);
+    });
+
+    test('stores folders per storage and an empty list clears the choice', () {
+      var config = FileManagerToolbarConfig.defaults()
+          .withGalleryFoldersForStorage('vault://a', ['DCIM', 'Trips/2024'])
+          .withGalleryFoldersForStorage('vault://b', ['Pics']);
+      expect(config.galleryFoldersForStorage('vault://a'),
+          ['DCIM', 'Trips/2024']);
+      expect(config.galleryFoldersForStorage('vault://b'), ['Pics']);
+
+      config = config.withGalleryFoldersForStorage('vault://a', const []);
+      expect(config.galleryFoldersForStorage('vault://a'), isEmpty);
+      expect(config.galleryFoldersByStorage.containsKey('vault://a'), isFalse);
+      expect(config.galleryFoldersForStorage('vault://b'), ['Pics']);
+    });
+
+    test('survives a JSON round trip and ignores malformed entries', () {
+      final config = FileManagerToolbarConfig.defaults()
+          .withGalleryFoldersForStorage('vault://a', ['DCIM']);
+      final decoded = FileManagerToolbarConfig.fromJson(
+        jsonDecode(jsonEncode(config.toJson())) as Map<String, dynamic>,
+      );
+      expect(decoded.galleryFoldersForStorage('vault://a'), ['DCIM']);
+
+      final json = jsonDecode(jsonEncode(config.toJson())) as Map<String, dynamic>;
+      json['galleryFoldersByStorage'] = {
+        'vault://ok': ['A', '', 3],
+        'vault://bad': 'nope',
+        'vault://empty': <String>[],
+      };
+      final lenient = FileManagerToolbarConfig.fromJson(json);
+      expect(lenient.galleryFoldersForStorage('vault://ok'), ['A']);
+      expect(lenient.galleryFoldersForStorage('vault://bad'), isEmpty);
+      expect(lenient.galleryFoldersForStorage('vault://empty'), isEmpty);
+    });
+  });
 }

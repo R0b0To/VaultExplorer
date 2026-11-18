@@ -15,6 +15,8 @@ List<Widget> buildOptionsMenuItems({
   required ValueChanged<bool> onToggleShowFileExtensions,
   required ValueChanged<bool> onToggleShowListThumbnails,
   required VoidCallback onOpenSettings,
+  VoidCallback? onPickGalleryFolders,
+  int galleryFolderCount = 0,
 }) {
   final l10n = context.l10n;
 
@@ -64,6 +66,36 @@ List<Widget> buildOptionsMenuItems({
         value: toolbarConfig.showNoMediaFolders,
         onChanged: onToggleShowNoMediaFolders,
       ),
+    // Only the gallery can be limited to chosen folders.
+    if (onPickGalleryFolders != null)
+      MenuItemButton(
+        leadingIcon: Icon(
+          Icons.folder_open_rounded,
+          size: 20,
+          color: galleryFolderCount > 0 ? cs.primary : cs.onSurfaceVariant,
+        ),
+        trailingIcon: galleryFolderCount > 0
+            ? Text(
+                '$galleryFolderCount',
+                style: TextStyle(
+                  color: cs.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              )
+            : Icon(
+                Icons.chevron_right_rounded,
+                size: 20,
+                color: cs.onSurfaceVariant,
+              ),
+        onPressed: onPickGalleryFolders,
+        child: Text(
+          l10n.galleryFoldersMenu,
+          style: TextStyle(
+            fontWeight: galleryFolderCount > 0 ? FontWeight.w600 : null,
+            color: galleryFolderCount > 0 ? cs.primary : null,
+          ),
+        ),
+      ),
     toggleItem(
       icon: Icons.title_rounded,
       label: l10n.showFileNamesLabel,
@@ -110,6 +142,12 @@ class FileManagerOptionsMenuButton extends StatefulWidget {
   final ValueChanged<bool> onToggleShowListThumbnails;
   final VoidCallback onOpenSettings;
 
+  /// Opens the gallery's folder picker; null outside the gallery.
+  final VoidCallback? onPickGalleryFolders;
+
+  /// How many folders the gallery is limited to (0 scans everything).
+  final int galleryFolderCount;
+
   const FileManagerOptionsMenuButton({
     super.key,
     required this.toolbarConfig,
@@ -119,6 +157,8 @@ class FileManagerOptionsMenuButton extends StatefulWidget {
     required this.onToggleShowFileExtensions,
     required this.onToggleShowListThumbnails,
     required this.onOpenSettings,
+    this.onPickGalleryFolders,
+    this.galleryFolderCount = 0,
   });
 
   @override
@@ -148,6 +188,8 @@ class _FileManagerOptionsMenuButtonState
         onToggleShowFileExtensions: widget.onToggleShowFileExtensions,
         onToggleShowListThumbnails: widget.onToggleShowListThumbnails,
         onOpenSettings: widget.onOpenSettings,
+        onPickGalleryFolders: widget.onPickGalleryFolders,
+        galleryFolderCount: widget.galleryFolderCount,
       ),
       builder: (context, controller, child) {
         return IconButton(

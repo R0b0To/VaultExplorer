@@ -23,6 +23,10 @@ class FolderThumbnailPreview extends ConsumerStatefulWidget {
   final double? iconSize;
   final double? previewSize;
 
+  /// Files already known to be inside the folder (at any depth), best first.
+  /// When given, the cover comes from these and the folder is not listed.
+  final List<String>? previewPaths;
+
   static const int maxScan = 30;
   static const Duration scanDebounce = Duration(milliseconds: 350);
   static final PriorityTaskQueue _scanLimiter = PriorityTaskQueue(2);
@@ -45,6 +49,7 @@ class FolderThumbnailPreview extends ConsumerStatefulWidget {
     required this.child,
     this.iconSize,
     this.previewSize,
+    this.previewPaths,
   });
 
   @override
@@ -154,37 +159,43 @@ class _FolderThumbnailPreviewState
       scanAcquired = true;
       if (!mounted || !_tickerEnabled || token != _token) return;
 
-      final listing = await () async {
-        try {
-          return await fileIoApi.listDirectoryEntriesForBrowser(
-            widget.container,
-            widget.folderPath,
-          );
-        } catch (_) {
-          return null;
+      final known = widget.previewPaths;
+      if (known != null && known.isNotEmpty) {
+        // The scan already found what is inside, at any depth.
+        candidates.addAll(known.take(FolderThumbnailPreview.maxScan));
+      } else {
+        final listing = await () async {
+          try {
+            return await fileIoApi.listDirectoryEntriesForBrowser(
+              widget.container,
+              widget.folderPath,
+            );
+          } catch (_) {
+            return null;
+          }
+        }();
+        final entries = listing?.entries;
+        if (!mounted ||
+            !_tickerEnabled ||
+            token != _token ||
+            entries == null ||
+            entries.isEmpty) {
+          return;
         }
-      }();
-      final entries = listing?.entries;
-      if (!mounted ||
-          !_tickerEnabled ||
-          token != _token ||
-          entries == null ||
-          entries.isEmpty) {
-        return;
-      }
 
-      for (final entry in entries) {
-        if (entry.isDir || entry.isPlaceholder || entry.isSymlink) continue;
-        if (!MediaViewerConstants.isImage(entry.name) &&
-            !MediaViewerConstants.isVideo(entry.name)) {
-          continue;
+        for (final entry in entries) {
+          if (entry.isDir || entry.isPlaceholder || entry.isSymlink) continue;
+          if (!MediaViewerConstants.isImage(entry.name) &&
+              !MediaViewerConstants.isVideo(entry.name)) {
+            continue;
+          }
+          candidates.add(
+            widget.folderPath.isEmpty
+                ? entry.name
+                : '${widget.folderPath}/${entry.name}',
+          );
+          if (candidates.length >= FolderThumbnailPreview.maxScan) break;
         }
-        candidates.add(
-          widget.folderPath.isEmpty
-              ? entry.name
-              : '${widget.folderPath}/${entry.name}',
-        );
-        if (candidates.length >= FolderThumbnailPreview.maxScan) break;
       }
 
       if (candidates.isEmpty) return;

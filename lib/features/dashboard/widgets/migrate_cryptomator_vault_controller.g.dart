@@ -64,7 +64,7 @@ final class MigrateCryptomatorVaultProvider
 }
 
 String _$migrateCryptomatorVaultHash() =>
-    r'a140300f96654009a00415fcd7e035799a372cb1';
+    r'fdc51cbf27a616dc3db1b9886fa3503facea3500';
 
 final class MigrateCryptomatorVaultFamily extends $Family
     with

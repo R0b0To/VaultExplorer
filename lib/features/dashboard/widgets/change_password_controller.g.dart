@@ -58,7 +58,7 @@ final class ChangePasswordProvider
   }
 }
 
-String _$changePasswordHash() => r'2e7f52758244902820fe392fe772a278c36698d3';
+String _$changePasswordHash() => r'97e72912cdbfa5ff08c82b7ceb86f963f021ab1e';
 
 final class ChangePasswordFamily extends $Family
     with

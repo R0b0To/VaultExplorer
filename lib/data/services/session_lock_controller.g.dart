@@ -55,4 +55,4 @@ final class SessionLockControllerProvider
 }
 
 String _$sessionLockControllerHash() =>
-    r'5f294df98f6780d6b7d4b0fe32c4817398746673';
+    r'bfe3f73af6bb3e81790e1d6f42b12f24c7aae59a';

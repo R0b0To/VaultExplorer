@@ -17,6 +17,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:path/path.dart' as p;
+import 'package:vaultexplorer/core/utils/listing_job.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/features/decoy/local/decoy_local_repository.dart';
 
@@ -88,6 +89,23 @@ class LocalFileIoBackend {
     return _repo.listDirectory(
       _resolve(rootPath, dirPath),
       refresh: refresh,
+    );
+  }
+
+  /// [listDirectoryEntries] for a folder that may be huge: while it is still
+  /// being read, [onPartial] receives growing name-sorted snapshots, and the
+  /// returned job completes with the finished listing. See
+  /// [DecoyLocalRepository.listDirectoryProgressive].
+  ListingJob<List<RawEntry>> listDirectoryProgressive(
+    String rootPath,
+    String dirPath, {
+    bool refresh = false,
+    void Function(List<RawEntry> partial)? onPartial,
+  }) {
+    return _repo.listDirectoryProgressive(
+      _resolve(rootPath, dirPath),
+      refresh: refresh,
+      onPartial: onPartial,
     );
   }
 

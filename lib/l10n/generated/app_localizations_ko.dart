@@ -13581,6 +13581,25 @@ class AppLocalizationsKo extends AppLocalizations {
   String get galleryFilterClear => '지우기';
 
   @override
+  String get galleryFilterMatchAny => '하나라도';
+
+  @override
+  String get galleryFilterMatchAll => '모두';
+
+  @override
+  String get galleryFoldersMenu => '갤러리 폴더';
+
+  @override
+  String get galleryFoldersHint =>
+      '갤러리가 검색할 폴더를 선택하세요. 하위 폴더도 포함됩니다. 아무것도 선택하지 않으면 저장소 전체를 검색합니다.';
+
+  @override
+  String get galleryFoldersUseAll => '전체 검색';
+
+  @override
+  String get galleryFoldersApply => '적용';
+
+  @override
   String galleryFilterShownOfTotal(int shown, int total) {
     return '$total개 중 $shown개 표시';
   }

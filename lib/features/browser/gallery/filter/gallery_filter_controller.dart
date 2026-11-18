@@ -42,5 +42,10 @@ class GalleryFilterController extends ChangeNotifier {
 
   void remove(GalleryFilter f) => filters = _filters.remove(f);
 
-  void clear() => filters = GalleryFilterSet.empty;
+  void clear() => filters = _filters.clear();
+
+  /// Whether several selected tags all have to match (true) or any one is
+  /// enough (false).
+  void setMatchAllTags(bool value) =>
+      filters = _filters.withMatchAllTags(value);
 }

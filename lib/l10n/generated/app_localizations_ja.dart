@@ -13581,6 +13581,25 @@ class AppLocalizationsJa extends AppLocalizations {
   String get galleryFilterClear => 'クリア';
 
   @override
+  String get galleryFilterMatchAny => 'いずれか';
+
+  @override
+  String get galleryFilterMatchAll => 'すべて';
+
+  @override
+  String get galleryFoldersMenu => 'ギャラリーのフォルダ';
+
+  @override
+  String get galleryFoldersHint =>
+      'ギャラリーがスキャンするフォルダを選択します。サブフォルダも含まれます。何も選択しない場合は、ストレージ全体をスキャンします。';
+
+  @override
+  String get galleryFoldersUseAll => 'すべてスキャン';
+
+  @override
+  String get galleryFoldersApply => '適用';
+
+  @override
   String galleryFilterShownOfTotal(int shown, int total) {
     return '$total件中$shown件を表示';
   }

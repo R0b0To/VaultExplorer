@@ -134,10 +134,18 @@ class CategoryScanTarget {
     this.respectNoMedia = false,
     this.indexLookup,
     this.seed,
+    this.roots = const <String>[],
   });
 
   final CategorySource source;
   final CategoryDirectoryLister listDirectory;
+
+  /// Folders (paths from the source's root) to scan instead of the whole
+  /// source; empty scans everything. A [seed] or [indexLookup] answer is cut
+  /// down to the files inside them, so a cheaper answer for the whole source
+  /// never leaks files from outside the chosen folders. See
+  /// [normalizeScanRoots].
+  final List<String> roots;
   final bool Function(String dirPath)? skipDirectory;
 
   /// See [CategoryScanner.respectNoMedia].
@@ -382,8 +390,16 @@ class CategoryAggregateScanner {
     }
 
     for (final target in targets) {
-      final seed = target.seed;
-      if (seed == null || seed.isEmpty) continue;
+      final roots = normalizeScanRoots(target.roots);
+      final allSeed = target.seed;
+      if (allSeed == null || allSeed.isEmpty) continue;
+      final seed = roots.isEmpty
+          ? allSeed
+          : [
+              for (final entry in allSeed)
+                if (pathIsWithinScanRoots(entry.name, roots)) entry,
+            ];
+      if (seed.isEmpty) continue;
       final seedFolders = <String>{};
       for (final entry in seed) {
         var dir = parentOfPath(entry.name);
@@ -408,6 +424,7 @@ class CategoryAggregateScanner {
     await Future.wait(
       targets.map((target) async {
         final volId = target.source.volId;
+        final targetRoots = normalizeScanRoots(target.roots);
         final lookup = target.indexLookup;
         if (lookup != null) {
           CategoryIndexHit? hit;
@@ -418,15 +435,21 @@ class CategoryAggregateScanner {
           }
           if (token.isCancelled) return;
           if (hit != null) {
+            final hitEntries = targetRoots.isEmpty
+                ? hit.entries
+                : [
+                    for (final entry in hit.entries)
+                      if (pathIsWithinScanRoots(entry.name, targetRoots)) entry,
+                  ];
             final folders = <String>{};
-            for (final entry in hit.entries) {
+            for (final entry in hitEntries) {
               var dir = parentOfPath(entry.name);
               while (dir.isNotEmpty && folders.add(dir)) {
                 dir = parentOfPath(dir);
               }
             }
             latest[volId] = CategoryScanSnapshot(
-              entries: List<RawEntry>.of(hit.entries),
+              entries: List<RawEntry>.of(hitEntries),
               folderPaths: folders,
               foldersChecked: 0,
               finished: true,
@@ -461,6 +484,7 @@ class CategoryAggregateScanner {
           final result = await scanner.scan(
             token: token,
             progressInterval: progressInterval,
+            roots: targetRoots,
             onProgress: (snapshot) {
               if (seeded.contains(volId)) return;
               latest[volId] = snapshot;

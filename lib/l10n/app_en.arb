@@ -16276,6 +16276,30 @@
   "@galleryFilterClear": {
     "description": "Button that removes every gallery filter (filter sheet and filter bar)"
   },
+  "galleryFilterMatchAny": "Match any",
+  "@galleryFilterMatchAny": {
+    "description": "Segment under the gallery filter's Tags header: a photo needs at least one of the selected tags"
+  },
+  "galleryFilterMatchAll": "Match all",
+  "@galleryFilterMatchAll": {
+    "description": "Segment under the gallery filter's Tags header: a photo needs every selected tag"
+  },
+  "galleryFoldersMenu": "Gallery folders",
+  "@galleryFoldersMenu": {
+    "description": "Options-menu entry and title of the sheet where the gallery's folders are chosen"
+  },
+  "galleryFoldersHint": "Choose which folders the gallery scans. Subfolders are included. With none chosen, the whole storage is scanned.",
+  "@galleryFoldersHint": {
+    "description": "Explains the gallery folder picker: subfolders are included and choosing none scans the whole storage"
+  },
+  "galleryFoldersUseAll": "Scan everything",
+  "@galleryFoldersUseAll": {
+    "description": "Button in the gallery folder picker that clears the choice so the whole storage is scanned"
+  },
+  "galleryFoldersApply": "Apply",
+  "@galleryFoldersApply": {
+    "description": "Button in the gallery folder picker that applies the chosen folders"
+  },
   "galleryFilterShownOfTotal": "{shown} of {total} shown",
   "@galleryFilterShownOfTotal": {
     "description": "Header of the gallery filter sheet when filters are applied: how many items are left out of the total",

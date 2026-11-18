@@ -126,6 +126,12 @@ class FileManagerToolbarConfig {
   /// have gallery mode active.
   final Set<String> galleryModeStorageUris;
 
+  /// The folders each storage's gallery scans, by storage URI: paths from the
+  /// storage root, subfolders included. A storage with no entry (or an empty
+  /// list) is scanned whole. Kept on this device like the other per-storage
+  /// state, and not exported.
+  final Map<String, List<String>> galleryFoldersByStorage;
+
   /// URIs of storages whose music mode was on the last time it was read from
   /// the storage itself. Only a hint kept on this device so a vault can open
   /// straight into the right view before its own saved setting (the source of
@@ -218,6 +224,7 @@ class FileManagerToolbarConfig {
     this.folderGridAspectRatios = const {},
     this.folderSortModes = const {},
     this.galleryModeStorageUris = const {},
+    this.galleryFoldersByStorage = const {},
     this.musicModeStorageUris = const {},
     this.collapsedBookmarkGroupUris = const {},
     this.detailColumnsOrder = const [
@@ -272,6 +279,7 @@ class FileManagerToolbarConfig {
         folderGridAspectRatios: {},
         folderSortModes: {},
         galleryModeStorageUris: {},
+        galleryFoldersByStorage: {},
         musicModeStorageUris: {},
         detailColumnsOrder: [
           FileDetailColumn.date,
@@ -391,6 +399,26 @@ class FileManagerToolbarConfig {
     return copyWith(galleryModeStorageUris: next);
   }
 
+  /// The folders [containerUri]'s gallery is limited to; empty when it scans
+  /// the whole storage.
+  List<String> galleryFoldersForStorage(String containerUri) =>
+      galleryFoldersByStorage[containerUri] ?? const <String>[];
+
+  /// [folders] replaces the choice for [containerUri]; an empty list goes back
+  /// to scanning the whole storage and leaves no entry behind.
+  FileManagerToolbarConfig withGalleryFoldersForStorage(
+    String containerUri,
+    List<String> folders,
+  ) {
+    final next = Map<String, List<String>>.from(galleryFoldersByStorage);
+    if (folders.isEmpty) {
+      next.remove(containerUri);
+    } else {
+      next[containerUri] = List<String>.unmodifiable(folders);
+    }
+    return copyWith(galleryFoldersByStorage: next);
+  }
+
   /// Whether the music mode hint says it is on for [containerUri].
   bool isMusicModeHintedForStorage(String containerUri) =>
       musicModeStorageUris.contains(containerUri);
@@ -429,6 +457,7 @@ class FileManagerToolbarConfig {
     Map<String, String>? folderGridAspectRatios,
     Map<String, String>? folderSortModes,
     Set<String>? galleryModeStorageUris,
+    Map<String, List<String>>? galleryFoldersByStorage,
     Set<String>? musicModeStorageUris,
     Set<String>? collapsedBookmarkGroupUris,
     List<FileDetailColumn>? detailColumnsOrder,
@@ -483,6 +512,8 @@ class FileManagerToolbarConfig {
         folderSortModes: folderSortModes ?? this.folderSortModes,
         galleryModeStorageUris:
             galleryModeStorageUris ?? this.galleryModeStorageUris,
+        galleryFoldersByStorage:
+            galleryFoldersByStorage ?? this.galleryFoldersByStorage,
         musicModeStorageUris:
             musicModeStorageUris ?? this.musicModeStorageUris,
         collapsedBookmarkGroupUris:
@@ -592,6 +623,7 @@ class FileManagerToolbarConfig {
     'folderGridAspectRatios',
     'folderSortModes',
     'galleryModeStorageUris',
+    'galleryFoldersByStorage',
     'musicModeStorageUris',
     'collapsedBookmarkGroupUris',
   };
@@ -658,6 +690,7 @@ class FileManagerToolbarConfig {
         'folderGridAspectRatios': folderGridAspectRatios,
         'folderSortModes': folderSortModes,
         'galleryModeStorageUris': galleryModeStorageUris.toList()..sort(),
+        'galleryFoldersByStorage': galleryFoldersByStorage,
         'musicModeStorageUris': musicModeStorageUris.toList()..sort(),
         'collapsedBookmarkGroupUris': collapsedBookmarkGroupUris.toList()
           ..sort(),
@@ -784,6 +817,18 @@ class FileManagerToolbarConfig {
             .whereType<String>()
             .where((uri) => uri.isNotEmpty)
             .toSet();
+    final galleryFoldersByStorage = <String, List<String>>{};
+    final rawGalleryFolders = j['galleryFoldersByStorage'];
+    if (rawGalleryFolders is Map) {
+      rawGalleryFolders.forEach((uri, folders) {
+        if (uri is! String || uri.isEmpty || folders is! List) return;
+        final cleaned = [
+          for (final f in folders)
+            if (f is String && f.isNotEmpty) f,
+        ];
+        if (cleaned.isNotEmpty) galleryFoldersByStorage[uri] = cleaned;
+      });
+    }
     final musicModeStorageUris =
         (j['musicModeStorageUris'] as List<dynamic>? ?? const [])
             .whereType<String>()
@@ -842,6 +887,7 @@ class FileManagerToolbarConfig {
       folderGridAspectRatios: rawFolderGridAspectRatios,
       folderSortModes: rawFolderSortModes,
       galleryModeStorageUris: galleryModeStorageUris,
+      galleryFoldersByStorage: galleryFoldersByStorage,
       musicModeStorageUris: musicModeStorageUris,
       collapsedBookmarkGroupUris: collapsedBookmarkGroupUris,
       detailColumnsOrder: rawDetailColumns.isEmpty

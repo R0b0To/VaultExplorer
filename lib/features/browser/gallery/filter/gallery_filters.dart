@@ -544,11 +544,19 @@ class GalleryMissingFilter extends GalleryFilter {
 /// The filters currently applied to the gallery. Immutable: every change
 /// returns a new set, so a view can tell by identity whether it changed.
 class GalleryFilterSet {
-  const GalleryFilterSet([this.filters = const []]);
+  const GalleryFilterSet([this.filters = const [], this.matchAllTags = false]);
 
   static const GalleryFilterSet empty = GalleryFilterSet();
 
   final List<GalleryFilter> filters;
+
+  /// When true, a photo must carry every selected tag instead of any one of
+  /// them. It only changes how several *selected* tags combine: excluded tags
+  /// always remove a photo, and other kinds of filter are unaffected.
+  final bool matchAllTags;
+
+  GalleryFilterSet withMatchAllTags(bool value) =>
+      value == matchAllTags ? this : GalleryFilterSet(filters, value);
 
   bool get isEmpty => filters.isEmpty;
   bool get isNotEmpty => filters.isNotEmpty;
@@ -569,10 +577,12 @@ class GalleryFilterSet {
     for (final x in filters)
       if (x.id != f.id) x,
     f,
-  ]);
+  ], matchAllTags);
 
-  GalleryFilterSet remove(GalleryFilter f) =>
-      GalleryFilterSet([for (final x in filters) if (x.id != f.id) x]);
+  GalleryFilterSet remove(GalleryFilter f) => GalleryFilterSet([
+    for (final x in filters)
+      if (x.id != f.id) x,
+  ], matchAllTags);
 
   /// Off -> on -> off for a filter chip.
   GalleryFilterSet toggle(GalleryFilter f) =>
@@ -585,7 +595,10 @@ class GalleryFilterSet {
     return add(current.first.toggled());
   }
 
-  GalleryFilterSet clear() => empty;
+  /// Drops every filter. How tags combine is a mode the person chose, not a
+  /// filter, so it stays.
+  GalleryFilterSet clear() =>
+      filters.isEmpty ? this : GalleryFilterSet(const [], matchAllTags);
 
   bool matches(GalleryFilterSubject s) {
     if (filters.isEmpty) return true;
@@ -593,6 +606,9 @@ class GalleryFilterSet {
     for (final f in filters) {
       if (f.reversed) {
         if (!f.matches(s)) return false;
+      } else if (matchAllTags && f.kind == GalleryFilterKind.tag) {
+        // Every selected tag has to be there.
+        if (!f.positive(s)) return false;
       } else {
         alternatives[f.kind] = (alternatives[f.kind] ?? false) || f.positive(s);
       }
@@ -612,7 +628,9 @@ class GalleryFilterSet {
 
   @override
   bool operator ==(Object other) {
-    if (other is! GalleryFilterSet || other.filters.length != filters.length) {
+    if (other is! GalleryFilterSet ||
+        other.matchAllTags != matchAllTags ||
+        other.filters.length != filters.length) {
       return false;
     }
     for (var i = 0; i < filters.length; i++) {
@@ -622,5 +640,5 @@ class GalleryFilterSet {
   }
 
   @override
-  int get hashCode => Object.hashAll(filters);
+  int get hashCode => Object.hash(matchAllTags, Object.hashAll(filters));
 }

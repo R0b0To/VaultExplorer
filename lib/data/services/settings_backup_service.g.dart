@@ -65,4 +65,4 @@ final class SettingsBackupServiceProvider
 }
 
 String _$settingsBackupServiceHash() =>
-    r'1fe41b726366b9a708069ffc8d790c1e12a689e5';
+    r'cc98886fbb4c97f32ecda940fa2f2bd91476952e';

@@ -43,7 +43,7 @@ final class AuthenticatorRegistryProvider
 }
 
 String _$authenticatorRegistryHash() =>
-    r'9f3d07793987510fa6abf3f4aeb59c3ed778820a';
+    r'0a359a350a79fbf645f7efcb767abeb07b8fb651';
 
 abstract class _$AuthenticatorRegistry
     extends $Notifier<AuthenticatorRegistryState> {

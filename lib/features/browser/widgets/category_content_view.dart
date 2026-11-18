@@ -70,7 +70,9 @@ import 'package:vaultexplorer/features/browser/models/category_source.dart';
 import 'package:vaultexplorer/features/browser/models/file_category.dart';
 import 'package:vaultexplorer/features/browser/models/file_category_presentation.dart';
 import 'package:vaultexplorer/features/browser/models/tab_id.dart';
+import 'package:vaultexplorer/features/browser/gallery/gallery_folder_picker_sheet.dart';
 import 'package:vaultexplorer/features/browser/services/category_aggregate_scan.dart';
+import 'package:vaultexplorer/features/browser/services/category_scan.dart';
 import 'package:vaultexplorer/features/browser/services/category_listing.dart';
 import 'package:vaultexplorer/features/browser/services/category_walk_policy.dart';
 import 'package:vaultexplorer/features/browser/services/device_category_index.dart';
@@ -178,6 +180,14 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
 
   CategoryLocation _location = CategoryLocation.top;
   late CategoryLocation _initialLocation;
+
+  /// The folder a scoped gallery was opened from (its album root while no
+  /// folders are chosen).
+  String _openedDir = '';
+
+  /// The folders the scoped gallery scans (paths from the storage root,
+  /// subfolders included); empty scans the whole storage.
+  List<String> _galleryRoots = const [];
   List<PathSegment> _forwardStack = const [];
   List<CategoryLocation> _forwardLocations = const [];
   CategoryAggregateSnapshot _snapshot = CategoryAggregateSnapshot.empty;
@@ -234,6 +244,28 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
   String get _categoryKey => widget.category.storageKey;
   bool get _scoped => widget.scopedContainer != null;
   bool get _isGallery => widget.category == FileCategory.gallery;
+  /// Which toolbar-settings provider holds this storage's per-storage state
+  /// (phone storage shares the global one).
+  String? get _scopedToolbarUri {
+    final c = widget.scopedContainer;
+    if (c == null) return null;
+    return c.isLocalStorage ? null : c.uri;
+  }
+
+  List<String> _readGalleryRoots(FileManagerToolbarConfig config) {
+    final c = widget.scopedContainer;
+    if (c == null || !_isGallery) return const [];
+    return normalizeScanRoots(config.galleryFoldersForStorage(c.uri));
+  }
+
+  static bool _sameRoots(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
   bool get _usesVaults =>
       _scoped ? !widget.scopedContainer!.isLocalStorage : widget.includeVaults;
 
@@ -249,10 +281,18 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     if (widget.scopedContainer != null) {
       _containers = {widget.scopedContainer!.volId: widget.scopedContainer!};
       final initialDir = widget.initialDirPath ?? '';
+      _openedDir = initialDir;
+      _galleryRoots = _readGalleryRoots(
+        ref.read(fileManagerToolbarSettingsProvider(_scopedToolbarUri)).config,
+      );
       // A scoped gallery keeps the folder it was opened from as its album
       // root; the category scan may cover the whole container, but the listing
-      // is limited to this location.
-      _location = CategoryLocation(widget.scopedContainer!.volId, initialDir);
+      // is limited to this location. Once folders were chosen for the gallery
+      // they can lie anywhere, so it then starts at the storage root.
+      _location = CategoryLocation(
+        widget.scopedContainer!.volId,
+        _galleryRoots.isEmpty ? initialDir : '',
+      );
       _folderMode = !_isGallery;
     } else {
       _location = CategoryLocation.top;
@@ -285,6 +325,33 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       ref.listenManual<List<MountedContainer>>(
         vaultDashboardControllerProvider.select((s) => s.mounted),
         _onMountedVaultsChanged,
+      );
+    }
+
+    // Showing hidden files or `.nomedia` folders changes what a scan finds, so
+    // rescan once the new value is really in the provider. The toggles save
+    // through a microtask, so scanning right after the tap would still read
+    // the old value.
+    ref.listenManual<FileManagerToolbarSettingsState>(
+      fileManagerToolbarSettingsProvider(null),
+      (previous, next) {
+        if (_disposed || previous == null) return;
+        final was = previous.config;
+        final now = next.config;
+        if (was.showHiddenFiles != now.showHiddenFiles ||
+            was.showNoMediaFolders != now.showNoMediaFolders) {
+          unawaited(_startScan());
+        }
+      },
+    );
+    if (_scoped && _isGallery) {
+      ref.listenManual<FileManagerToolbarSettingsState>(
+        fileManagerToolbarSettingsProvider(_scopedToolbarUri),
+        (previous, next) {
+          if (_disposed || next.loading) return;
+          final roots = _readGalleryRoots(next.config);
+          if (!_sameRoots(roots, _galleryRoots)) _applyGalleryRoots(roots);
+        },
       );
     }
 
@@ -424,6 +491,8 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     final toolbar = ref.read(fileManagerToolbarSettingsProvider(null)).config;
     final showHidden = toolbar.showHiddenFiles;
     final showNoMedia = toolbar.showNoMediaFolders;
+    // Folders chosen for the gallery; empty scans each source whole.
+    final roots = _scoped && _isGallery ? _galleryRoots : const <String>[];
 
     setState(() {
       _scanning = true;
@@ -495,6 +564,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
                       skipDirectory: skipDeviceCategoryFolder,
                     ),
               seed: seeds[b.source.volId],
+              roots: roots,
             )
           else
             CategoryScanTarget(
@@ -505,6 +575,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
               // storage does; before, only phone storage did.
               respectNoMedia: widget.category != FileCategory.documents,
               seed: seeds[b.source.volId],
+              roots: roots,
             ),
       ],
       matches: matches,
@@ -528,8 +599,110 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     });
     // A scan that includes `.nomedia` folders must not become the stored
     // index, which the next default scan would show before it finishes.
-    if (indexEnabled && !showNoMedia) unawaited(_saveIndex(api, bundles, result));
-    unawaited(_rememberDevice(deviceIndex, bundles, result, showHidden, showNoMedia));
+    // A scan limited to chosen folders is only part of the storage, so it
+    // must not stand in for the whole in the stored or remembered index.
+    if (roots.isEmpty) {
+      if (indexEnabled && !showNoMedia) {
+        unawaited(_saveIndex(api, bundles, result));
+      }
+      unawaited(
+        _rememberDevice(deviceIndex, bundles, result, showHidden, showNoMedia),
+      );
+    }
+  }
+
+  // Covers for the folder tiles, taken from what the scan already found: for
+  // every folder, the best few photos or videos anywhere beneath it. Listing
+  // the folder instead only sees files directly inside, so a folder that holds
+  // nothing but sub-folders (DCIM, say) never got a cover.
+  static const int _coversPerFolder = 8;
+  CategoryAggregateSnapshot? _coversSnapshot;
+  Map<String, List<CategoryEntry>> _covers = const {};
+
+  /// Photos before videos (only photos can be turned into a cover), newer
+  /// first.
+  static int _coverOrder(CategoryEntry a, CategoryEntry b) {
+    final aImage = MediaViewerConstants.isImage(a.baseName);
+    final bImage = MediaViewerConstants.isImage(b.baseName);
+    if (aImage != bImage) return aImage ? -1 : 1;
+    return b.modifiedSecs.compareTo(a.modifiedSecs);
+  }
+
+  void _indexCovers() {
+    final index = <String, List<CategoryEntry>>{};
+    for (final e in _snapshot.entries) {
+      if (e.isDir) continue;
+      if (!MediaViewerConstants.isImage(e.baseName) &&
+          !MediaViewerConstants.isVideo(e.baseName)) {
+        continue;
+      }
+      var dir = e.parentPath;
+      while (true) {
+        final list = index.putIfAbsent('${e.sourceVolId}:$dir', () => []);
+        if (list.length < _coversPerFolder ||
+            _coverOrder(e, list.last) < 0) {
+          var at = list.length;
+          while (at > 0 && _coverOrder(e, list[at - 1]) < 0) {
+            at--;
+          }
+          list.insert(at, e);
+          if (list.length > _coversPerFolder) list.removeLast();
+        }
+        if (dir.isEmpty) break;
+        final slash = dir.lastIndexOf('/');
+        dir = slash < 0 ? '' : dir.substring(0, slash);
+      }
+    }
+    _covers = index;
+    _coversSnapshot = _snapshot;
+  }
+
+  /// The files a folder tile may use as its cover, or null to let the tile
+  /// look inside the folder itself.
+  List<String>? _folderCoverPaths(RawEntry folder) {
+    if (folder is! CategoryEntry) return null;
+    if (!identical(_coversSnapshot, _snapshot)) _indexCovers();
+    final found = _covers['${folder.sourceVolId}:${folder.path}'];
+    if (found == null || found.isEmpty) return null;
+    return [for (final e in found) e.path];
+  }
+
+  /// Applies a new choice of gallery folders and rescans.
+  void _applyGalleryRoots(List<String> roots) {
+    final scoped = widget.scopedContainer;
+    if (scoped == null) return;
+    setState(() {
+      _galleryRoots = roots;
+      _location = CategoryLocation(scoped.volId, roots.isEmpty ? _openedDir : '');
+      _initialLocation = _location;
+      _forwardStack = const [];
+      _forwardLocations = const [];
+    });
+    unawaited(_startScan());
+  }
+
+  Future<void> _pickGalleryFolders() async {
+    final scoped = widget.scopedContainer;
+    if (scoped == null || !mounted) return;
+    final api = ref.read(vaultFileIoApiProvider);
+    final CategoryDirectoryLister lister = scoped.isRawLocal
+        ? rawLocalCategoryLister(rootPath: scoped.uri, matches: (_) => false)
+        : (dir) => api.listDirectory(scoped, dir);
+    final showHidden =
+        ref.read(fileManagerToolbarSettingsProvider(null)).config.showHiddenFiles;
+    final chosen = await showGalleryFolderPicker(
+      context,
+      listDirectory: lister,
+      initial: _galleryRoots,
+      showHidden: showHidden,
+      skipDirectory:
+          scoped.isRawLocal ? skipDeviceCategoryFolder : _skipVaultMetaFolder,
+    );
+    if (chosen == null || !mounted || _sameRoots(chosen, _galleryRoots)) return;
+    await ref
+        .read(fileManagerToolbarSettingsProvider(_scopedToolbarUri).notifier)
+        .setGalleryFoldersForStorage(scoped.uri, chosen);
+    if (mounted && !_sameRoots(_galleryRoots, chosen)) _applyGalleryRoots(chosen);
   }
 
   DeviceCategoryIndexKey _deviceKey(
@@ -2494,11 +2667,9 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
         toolbarConfig: toolbarConfig,
         onToggleShowHiddenFiles: (v) {
           _updateToolbarConfig((c) => c.copyWith(showHiddenFiles: v));
-          _startScan();
         },
         onToggleShowNoMediaFolders: (v) {
           _updateToolbarConfig((c) => c.copyWith(showNoMediaFolders: v));
-          _startScan();
         },
         onToggleShowGridFileNames: (v) {
           _updateToolbarConfig((c) => c.copyWith(showGridFileNames: v));
@@ -2510,6 +2681,9 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           _updateToolbarConfig((c) => c.copyWith(showListThumbnails: v));
         },
         onOpenSettings: _openFileManagerSettings,
+        onPickGalleryFolders:
+            _scoped && _isGallery ? _pickGalleryFolders : null,
+        galleryFolderCount: _galleryRoots.length,
       ),
     };
 
@@ -2999,11 +3173,9 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
               toolbarConfig: toolbarConfig,
               onToggleShowHiddenFiles: (v) {
                 _updateToolbarConfig((c) => c.copyWith(showHiddenFiles: v));
-                _startScan();
               },
               onToggleShowNoMediaFolders: (v) {
                 _updateToolbarConfig((c) => c.copyWith(showNoMediaFolders: v));
-                _startScan();
               },
               onToggleShowGridFileNames: (v) {
                 _updateToolbarConfig((c) => c.copyWith(showGridFileNames: v));
@@ -3015,6 +3187,9 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
                 _updateToolbarConfig((c) => c.copyWith(showListThumbnails: v));
               },
               onOpenSettings: _openFileManagerSettings,
+              onPickGalleryFolders:
+                  _scoped && _isGallery ? _pickGalleryFolders : null,
+              galleryFolderCount: _galleryRoots.length,
             )
           : null;
       _chrome.setFloatingAction(widget.tabId, floatingWidget);
@@ -3279,6 +3454,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           scrollController: _scrollController,
           container: anyContainer,
           containerFor: (e) => _containerOfEntry(e) ?? anyContainer,
+          folderPreviewPaths: _folderCoverPaths,
           cacheModeFor: _cacheModeOf,
           qualityFor: _qualityOf,
           items: items,
@@ -3329,6 +3505,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           scrollController: _scrollController,
           container: anyContainer,
           containerFor: (e) => _containerOfEntry(e) ?? anyContainer,
+          folderPreviewPaths: _folderCoverPaths,
           cacheModeFor: _cacheModeOf,
           qualityFor: _qualityOf,
           items: items,
@@ -3380,6 +3557,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           scrollController: _scrollController,
           container: anyContainer,
           containerFor: (e) => _containerOfEntry(e) ?? anyContainer,
+          folderPreviewPaths: _folderCoverPaths,
           cacheModeFor: _cacheModeOf,
           qualityFor: _qualityOf,
           currentDirPath: currentDirPath,

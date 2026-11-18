@@ -59,7 +59,7 @@ final class MediaViewerSessionProvider
 }
 
 String _$mediaViewerSessionHash() =>
-    r'7a9236b098efbf6e2f4352a18db388b5aa4b34bc';
+    r'697e683deead8d2508ff594fe6b9733b45c57e2c';
 
 final class MediaViewerSessionFamily extends $Family
     with

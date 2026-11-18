@@ -13371,6 +13371,24 @@ class AppLocalizationsZh extends AppLocalizations {
   String get galleryFilterClear => '清除';
 
   @override
+  String get galleryFilterMatchAny => '任一';
+
+  @override
+  String get galleryFilterMatchAll => '全部';
+
+  @override
+  String get galleryFoldersMenu => '图库文件夹';
+
+  @override
+  String get galleryFoldersHint => '选择图库要扫描的文件夹，其子文件夹也会包含在内。未选择时将扫描整个存储空间。';
+
+  @override
+  String get galleryFoldersUseAll => '扫描全部';
+
+  @override
+  String get galleryFoldersApply => '应用';
+
+  @override
   String galleryFilterShownOfTotal(int shown, int total) {
     return '已显示 $shown / $total';
   }

@@ -14402,6 +14402,25 @@ class AppLocalizationsAr extends AppLocalizations {
   String get galleryFilterClear => 'مسح';
 
   @override
+  String get galleryFilterMatchAny => 'أي';
+
+  @override
+  String get galleryFilterMatchAll => 'الكل';
+
+  @override
+  String get galleryFoldersMenu => 'مجلدات المعرض';
+
+  @override
+  String get galleryFoldersHint =>
+      'اختر المجلدات التي يفحصها المعرض. تُضمَّن المجلدات الفرعية. وإذا لم تختر أي مجلد، يُفحص التخزين بالكامل.';
+
+  @override
+  String get galleryFoldersUseAll => 'فحص الكل';
+
+  @override
+  String get galleryFoldersApply => 'تطبيق';
+
+  @override
   String galleryFilterShownOfTotal(int shown, int total) {
     return 'عرض $shown من $total';
   }

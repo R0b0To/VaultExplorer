@@ -112,6 +112,62 @@ void main() {
       expect(set.matches(a), isFalse); // tag ok, wrong year
     });
 
+    test('match-all tags needs every selected tag, any needs one', () {
+      // a: Holiday + Food, b: holiday only.
+      var any = const GalleryFilterSet()
+          .add(const GalleryTagFilter('holiday'))
+          .add(const GalleryTagFilter('food'));
+      expect(any.matches(a), isTrue);
+      expect(any.matches(b), isTrue);
+
+      final all = any.withMatchAllTags(true);
+      expect(all.matches(a), isTrue);
+      expect(all.matches(b), isFalse); // no food tag
+      expect(all.matches(c), isFalse);
+
+      // One selected tag behaves the same either way.
+      final one = const GalleryFilterSet(
+        [GalleryTagFilter('holiday')],
+        true,
+      );
+      expect(one.matches(a), isTrue);
+      expect(one.matches(b), isTrue);
+    });
+
+    test('match-all tags leaves other kinds and exclusions alone', () {
+      var set = const GalleryFilterSet(
+        [GalleryTagFilter('holiday'), GalleryTagFilter('food')],
+        true,
+      );
+      set = set.add(const GalleryDateFilter(2022)); // a was taken in 2023
+      expect(set.matches(a), isFalse);
+      set = const GalleryFilterSet(
+        [
+          GalleryTagFilter('holiday'),
+          GalleryTagFilter('food', reversed: true),
+        ],
+        true,
+      );
+      expect(set.matches(a), isFalse); // excluded tag still removes
+      expect(set.matches(b), isTrue);
+    });
+
+    test('the match mode is carried by changes and kept by clear', () {
+      var set = const GalleryFilterSet().withMatchAllTags(true);
+      set = set.add(const GalleryTagFilter('food'));
+      expect(set.matchAllTags, isTrue);
+      set = set.remove(const GalleryTagFilter('food'));
+      expect(set.matchAllTags, isTrue);
+      set = set.add(const GalleryTagFilter('food')).clear();
+      expect(set.isEmpty, isTrue);
+      expect(set.matchAllTags, isTrue);
+      expect(
+        const GalleryFilterSet([GalleryTagFilter('x')]) ==
+            const GalleryFilterSet([GalleryTagFilter('x')], true),
+        isFalse,
+      );
+    });
+
     test('excluded filters always remove', () {
       final set = const GalleryFilterSet().add(const GalleryTypeFilter(GalleryMediaType.photo)).add(const GalleryTagFilter('food', reversed: true));
       expect(set.matches(a), isFalse);

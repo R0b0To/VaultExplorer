@@ -7106,6 +7106,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                                               },
                                               isListingTruncated:
                                                   _isListingTruncated,
+                                              isListingInProgress:
+                                                  _nav.isListingPartial,
                                               scrollController:
                                                   _browserScrollController,
                                                         archiveContext:

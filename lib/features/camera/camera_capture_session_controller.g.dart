@@ -59,7 +59,7 @@ final class CameraCaptureSessionProvider
 }
 
 String _$cameraCaptureSessionHash() =>
-    r'465de7c6058d9aa3d38e8163ecb8dac804302013';
+    r'a42dda1b5b8005d082855bd55da237bc0d9e27d9';
 
 final class CameraCaptureSessionFamily extends $Family
     with

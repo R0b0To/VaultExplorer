@@ -87,6 +87,7 @@ CategoryAggregateScanner _aggregate(List<CategoryScanTarget> targets) =>
 
 void main() {
   seedTests();
+  rootsTests();
   group('CategoryScanner', () {
     test(
       'finds matching files by path from the root, skipping hidden folders',
@@ -449,6 +450,81 @@ void main() {
 
 /// Tests added with the vault category index: a stand-in list for a source
 /// until its own scan finishes.
+void rootsTests() {
+  group('scan roots', () {
+    test('normalizeScanRoots trims, dedupes and drops nested folders', () {
+      expect(normalizeScanRoots(['DCIM/', '/DCIM/Camera', 'DCIM', 'DCIM2']),
+          ['DCIM', 'DCIM2']);
+      expect(normalizeScanRoots(['Docs', 'Docs']), ['Docs']);
+    });
+
+    test('choosing the storage root, or nothing, means everything', () {
+      expect(normalizeScanRoots(const []), isEmpty);
+      expect(normalizeScanRoots(['Docs', '']), isEmpty);
+      expect(normalizeScanRoots(['/']), isEmpty);
+    });
+
+    test('pathIsWithinScanRoots matches whole folders only', () {
+      expect(pathIsWithinScanRoots('DCIM/a.jpg', ['DCIM']), isTrue);
+      expect(pathIsWithinScanRoots('DCIM2/a.jpg', ['DCIM']), isFalse);
+      expect(pathIsWithinScanRoots('top.jpg', ['DCIM']), isFalse);
+      expect(pathIsWithinScanRoots('top.jpg', const []), isTrue);
+    });
+
+    test('scans only the chosen folder, keeping paths from the root', () async {
+      final log = <String>[];
+      final result = await _scanner(_phoneFs, log: log).scan(
+        token: CancellationToken(),
+        roots: ['DCIM/Camera'],
+      );
+      expect(result.entries.map((e) => e.name).toSet(),
+          {'DCIM/Camera/1.jpg', 'DCIM/Camera/2.jpg'});
+      expect(result.folderPaths, {'DCIM', 'DCIM/Camera'});
+      // Nothing outside the chosen folder was even listed.
+      expect(log, ['DCIM/Camera']);
+    });
+
+    test('several chosen folders are all scanned, none twice', () async {
+      final result = await _scanner(_phoneFs).scan(
+        token: CancellationToken(),
+        roots: ['DCIM', 'DCIM/Camera', 'Docs'],
+      );
+      final names = result.entries.map((e) => e.name).toList()..sort();
+      expect(names, ['DCIM/Camera/1.jpg', 'DCIM/Camera/2.jpg', 'DCIM/x.png']);
+    });
+
+    test('a cached answer for the whole source is cut down to the roots',
+        () async {
+      RawEntry seedEntry(String path) => RawEntry(
+        name: path,
+        isDir: false,
+        sizeBytes: 5,
+        modifiedSecs: 1,
+        lowercaseName: path.toLowerCase(),
+        extension: path.split('.').last,
+      );
+      CategoryAggregateSnapshot? first;
+      await _aggregate([
+        CategoryScanTarget(
+          source: _vaultA,
+          listDirectory: _disk({'': <String>[]}),
+          seed: [
+            seedEntry('Trips/a.jpg'),
+            seedEntry('Other/b.jpg'),
+            seedEntry('top.jpg'),
+          ],
+          roots: const ['Trips'],
+        ),
+      ]).scan(
+        token: CancellationToken(),
+        progressInterval: Duration.zero,
+        onProgress: (s) => first ??= s,
+      );
+      expect(first!.entries.map((e) => e.path), ['Trips/a.jpg']);
+    });
+  });
+}
+
 void seedTests() {
   group('seeded sources', () {
     RawEntry seedEntry(String path) => RawEntry(

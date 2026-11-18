@@ -114,6 +114,10 @@ class FileGridView extends StatefulWidget {
   /// entry belongs to [container], as in any ordinary folder listing.
   final MountedContainer Function(RawEntry entry)? containerFor;
 
+  /// Files already known to lie inside a folder, best cover first (see
+  /// [FolderThumbnailPreview.previewPaths]).
+  final List<String>? Function(RawEntry folder)? folderPreviewPaths;
+
   /// The thumbnail cache policy that applies to an entry, for a listing that
   /// mixes containers whose owners chose different policies (the category
   /// browser). When null every entry follows [thumbnailCacheMode].
@@ -162,6 +166,7 @@ class FileGridView extends StatefulWidget {
     this.groupByDate = false,
     this.groupBuilder,
     this.containerFor,
+    this.folderPreviewPaths,
     this.cacheModeFor,
     this.qualityFor,
   });
@@ -741,6 +746,7 @@ Widget _buildAnimatedGridView(ScrollController? controller, int total) {
               cacheMode: _cacheModeOf(entry),
               quality: _effectiveQualityOf(entry),
               iconSize: iconSize,
+              previewPaths: widget.folderPreviewPaths?.call(entry),
               child: folderIcon,
             ),
       label: entry.name,

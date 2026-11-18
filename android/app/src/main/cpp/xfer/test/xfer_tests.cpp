@@ -1,6 +1,7 @@
 // Host-side tests for the transfer helpers (hashing, split/join). No Android, no network.
 // Hash vectors were produced with Python's hashlib; the Kotlin tests of the handlers this
 // replaces on other platforms (guessFormat, algorithm names, toHex) are carried over.
+#include <algorithm>
 #include <atomic>
 #include <cstdio>
 #include <cstdlib>

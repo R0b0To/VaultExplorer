@@ -1,0 +1,29 @@
+### Gallery
+- Added per-storage gallery folder selection, allowing scans to be limited to chosen folders and their subfolders.
+- Added persistent folder selections and a "Don't ask again" option for gallery scope prompts.
+- Added "Match any" and "Match all" options when filtering by multiple tags.
+- Improved gallery scroll-position preservation when filters and scan results change.
+- Added local gallery metadata persistence alongside thumbnails when the hidden thumbnail cache is enabled.
+
+### File manager
+- Added progressive directory loading, showing initial entries while large local folders are still being read.
+- Added cancellation of obsolete directory listings when navigating between folders.
+- Added independent auto-hide settings for the bottom toolbar and breadcrumb bar.
+
+### Music
+- Improved music folder selection with multi-folder selection.
+- Added a per-storage "Don't ask again" option for music scope prompts.
+
+### Native file transfers
+- Added a native C++ volume manager for handling mounted volumes and folder-based vaults.
+- Added native cross-volume file copying with progress reporting, cancellation and cleanup on failure.
+
+### Security and reliability
+- Text and Markdown viewers now close automatically when their source vault is locked or its USB device is detached.
+- Improved archive preview lifecycle handling when the originating vault is locked.
+- Fixed archive path tracking and validation, including nested archive handling.
+- Disabled unsupported metadata editing for files inside archives.
+
+### Interface
+- Back navigation now dismisses open popup menus before navigating away from the current screen.
+- Improved gallery folder previews using media contained in nested folders.

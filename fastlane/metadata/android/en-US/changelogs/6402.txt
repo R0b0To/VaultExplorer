@@ -1,0 +1,6 @@
+• Added selectable gallery folders and saved scan scopes.
+• Added “Match any/all” tag filtering.
+• Added progressive folder loading and listing cancellation.
+• Added independent toolbar and breadcrumb auto-hide.
+• Added native volume management and cross-volume transfers.
+• Improved music scope selection, archive handling and viewer cleanup on vault lock.

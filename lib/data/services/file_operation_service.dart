@@ -2616,6 +2616,19 @@ class FileOperationService extends ChangeNotifier {
         return true;
       }
 
+      // The native vault-to-SAF path already attempted a sequential stream.
+      // Retrying it through offset-based SAF chunks is unsupported by some
+      // cloud providers and can turn their generic write failure into a false
+      // "disk full" result.
+      if (dest.isSafStorage && !src.isLocalStorage) {
+        try {
+          await _fileIoApi.deleteFile(dest, destPath);
+        } catch (_) {
+          // Best effort: the provider may have left a partial document.
+        }
+        return false;
+      }
+
       int offset = 0;
       while (offset < size) {
         if (op.cancelRequested) throw const _CancelledException();

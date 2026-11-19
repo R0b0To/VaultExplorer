@@ -372,6 +372,7 @@ private object ChannelMethods {
     const val SAF_SHARE_FILES           = "safShareFiles"
     const val SAF_GET_DOCUMENT_URI      = "safGetDocumentUri"
     const val SAF_COPY_FILE             = "safCopyFile"
+    const val SAF_COPY_VAULT_FILE       = "safCopyVaultFile"
     const val SAF_GET_REAL_PATH         = "safGetRealPath"
     const val GET_STORAGE_VOLUMES       = "getStorageVolumes"
 }
@@ -1459,6 +1460,33 @@ open class MainActivity : FlutterFragmentActivity() {
                         } catch (t: Throwable) {
                             VeLog.e("MainActivity", t) { "SAF_COPY_FILE failed: ${t.message}" }
                             false
+                        }
+                        runOnUiThread { result.success(ok) }
+                    }
+                }
+                ChannelMethods.SAF_COPY_VAULT_FILE -> {
+                    val srcVolId = call.argument<Int>("srcVolId") ?: -1
+                    val srcPath = call.argument<String>("srcPath") ?: ""
+                    val destTreeUri = Uri.parse(call.argument<String>("destTreeUri") ?: "")
+                    val destPath = call.argument<String>("destPath") ?: ""
+                    val opId = call.argument<Int>("opId") ?: 0
+                    ioExecutor.execute {
+                        val ok = try {
+                            if (srcVolId < 0 || destPath.isEmpty()) false
+                            else com.aeidolon.vaultexplorer.container.ContainerFileSystem
+                                .copyFileToSafStorage(
+                                    srcVolId,
+                                    srcPath,
+                                    destTreeUri,
+                                    destPath,
+                                    safStorageManager,
+                                    opId,
+                                )
+                        } catch (t: Throwable) {
+                            VeLog.e("MainActivity", t) { "SAF_COPY_VAULT_FILE failed: ${t.message}" }
+                            false
+                        } finally {
+                            if (opId > 0) CopyProgressBridge.flushPending(opId)
                         }
                         runOnUiThread { result.success(ok) }
                     }

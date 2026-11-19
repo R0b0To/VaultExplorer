@@ -368,7 +368,11 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     }
   }
 
-  bool get _currentFolderIsExposedAsDocumentProvider {
+  bool get _currentListingMayChangeExternally {
+    // SAF-backed added storage (including cloud providers such as Google
+    // Drive) has its own listing cache. Force a fresh provider query after
+    // returning from another app that may have changed its contents.
+    if (widget.container.isSafStorage) return true;
     if (_containerRecord?.documentProvider == true) return true;
     final currentPath = _currentDirPath;
     final exposedPaths = ref.read(
@@ -388,7 +392,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed ||
         !_initialLoadDone ||
-        !_currentFolderIsExposedAsDocumentProvider) {
+        !_currentListingMayChangeExternally) {
       return;
     }
 

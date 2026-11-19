@@ -1243,6 +1243,56 @@ class SafStorageManager(private val context: Context) {
     }
 
     /**
+     * Writes a sequential stream to a SAF document. Some cloud providers
+     * (including Google Drive) do not support the seekable `rw` descriptors
+     * required by [writeFileChunk], so vault exports to SAF must use one
+     * output stream for the entire file.
+     */
+    fun writeStreamToFile(treeUri: Uri, relativePath: String, inputStream: InputStream): Boolean {
+        val clean = normalizePath(relativePath)
+        var shouldDeletePartial = false
+        var succeeded = false
+        try {
+            val documentUri = getDocumentUri(treeUri, clean) ?: run {
+                if (!createFile(treeUri, clean)) return false
+                shouldDeletePartial = true
+                getDocumentUri(treeUri, clean) ?: return false
+            }
+
+            val outputStream = context.contentResolver.openOutputStream(documentUri, "wt")
+                ?: throw java.io.IOException("Could not open SAF destination for writing")
+            shouldDeletePartial = true
+            inputStream.use { input ->
+                outputStream.use { output ->
+                    val buffer = ByteArray(256 * 1024)
+                    try {
+                        while (true) {
+                            val count = input.read(buffer)
+                            if (count < 0) break
+                            if (count > 0) output.write(buffer, 0, count)
+                        }
+                        output.flush()
+                    } finally {
+                        buffer.fill(0)
+                    }
+                }
+            }
+            succeeded = true
+            invalidateCache(treeUri, clean)
+            return true
+        } catch (e: Exception) {
+            VeLog.e(TAG, e) { "writeStreamToFile failed for $relativePath: ${e.message}" }
+            return false
+        } finally {
+            runCatching { inputStream.close() }
+            invalidateCache(treeUri, clean)
+            if (shouldDeletePartial && !succeeded) {
+                runCatching { deleteRecursively(treeUri, clean) }
+            }
+        }
+    }
+
+    /**
      * True when both ends of a copy are the very same file on disk, however
      * they are addressed (see [getRealPath]), or the same entry of the same
      * tree for providers that have no real path. Unknown means false.

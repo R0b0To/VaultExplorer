@@ -1343,6 +1343,26 @@ class VaultFileIoApi {
     String destPath, {
     int opId = 0,
   }) async {
+    // Vault bytes must be streamed sequentially into cloud SAF providers.
+    // Their document descriptors often do not support the random-access
+    // `rw` writes used by writeFileChunk.
+    if (dest.isSafStorage && !src.isLocalStorage) {
+      try {
+        final copied = await _channel
+            .invokeMethod<bool>(ChannelMethods.safCopyVaultFile, {
+              'srcVolId': src.volId,
+              'srcPath': srcPath,
+              'destTreeUri': dest.uri,
+              'destPath': destPath,
+              'opId': opId,
+            });
+        return copied ?? false;
+      } catch (e) {
+        logSwallowed('safCopyVaultFile', e, expected: true);
+        return false;
+      }
+    }
+
     // Fast native SAF copy
     if (src.isSafStorage || dest.isSafStorage) {
       // The native copy only understands SAF trees and plain file-system

@@ -1,5 +1,6 @@
 package com.aeidolon.vaultexplorer.container
 
+import android.net.Uri
 import java.io.FileNotFoundException
 import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.PerfLog
@@ -7,6 +8,7 @@ import com.aeidolon.vaultexplorer.VeLog
 import com.aeidolon.vaultexplorer.bridge.CopyProgressBridge
 import com.aeidolon.vaultexplorer.cancellation.CopyCancellation
 import com.aeidolon.vaultexplorer.foldervault.NativeVaultSession
+import com.aeidolon.vaultexplorer.saf.SafStorageManager
 import com.aeidolon.vaultexplorer.volman.NativeVolumeManager
 
 object ContainerFileSystem {
@@ -87,6 +89,34 @@ object ContainerFileSystem {
         // 4-thread ioExecutor starvation problems (see yieldContainerCopyLocks)
         // that a single long-held lock would bring don't arise.
         return copyFileStreaming(srcVolId, srcPath, destVolId, destPath, opId)
+    }
+
+    /** Streams decrypted vault bytes directly into a sequential SAF writer. */
+    fun copyFileToSafStorage(
+        srcVolId: Int,
+        srcPath: String,
+        destTreeUri: Uri,
+        destPath: String,
+        safStorageManager: SafStorageManager,
+        opId: Int = 0,
+    ): Boolean {
+        val total = getFileSize(srcVolId, srcPath)
+        if (total < 0L) return false
+
+        val input = VaultCopyInputStream(
+            total = total,
+            readChunk = { offset, length -> readFileChunk(srcVolId, srcPath, offset, length) },
+            isCancelled = { opId > 0 && CopyCancellation.isCancelled(opId) },
+            onProgress = { bytes -> CopyProgressBridge.reportProgress(opId, bytes) },
+        )
+        return try {
+            safStorageManager.writeStreamToFile(destTreeUri, destPath, input) && input.position == total
+        } catch (e: Exception) {
+            VeLog.w("ContainerFileSystem") { "vault-to-SAF streaming copy failed: ${e.message}" }
+            false
+        } finally {
+            input.close()
+        }
     }
 
     private fun copyFileStreaming(

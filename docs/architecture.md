@@ -120,6 +120,23 @@ SAF streams, so a native port gains nothing there. The import/export *policy* (c
 Dart (`makeUniqueName`, `foldEntryName`, `kFreeSpaceSafetyMargin`) and mirrored in Kotlin, and Dart
 is the portable layer -- a third copy in C++ would add drift, not portability.
 
+**Crypto primitives** (`cpp/crypto/prims.*`). The Dart layer's one-shot crypto goes over the
+platform channel (`hmac`, `pbkdf2`, `aesGcmEncrypt/Decrypt`, `aesCbcDecrypt`): the Dart `crypto`
+package was replaced by channel calls, so without a native implementation a desktop build cannot
+produce a TOTP code or run Bitwarden's MAC check. `prims` is that implementation as portable C++ on
+the mbedtls both builds already link -- HMAC (SHA-1/256/512), PBKDF2-HMAC, AES-GCM (128/256-bit keys,
+any non-empty IV, 16-byte tag) and AES-CBC with PKCS#7 padding -- with the handlers' contracts kept
+strict (an empty HMAC key or PBKDF2 salt is refused, never defaulted; AES-192 is not offered for GCM,
+as in the existing native path). Its tests check every primitive against vectors produced by
+implementations independent of the code (`test/gen_prims_vectors.py`: Python `hmac`/`hashlib` and
+`cryptography`, with the RFC 6238 TOTP table asserted against the RFC's published values).
+Android status: only `hmac` and `aesCbcDecrypt` were still on Java's JCA, and they now go through
+`prims` (`jni/prims_bridge.cpp`, `NativePrims.kt`), native-first with the JCA code kept as the
+fallback -- the native side only ever answers with a success, and any refusal lands on the unchanged
+JCA path, which is what reports an error to Dart. `pbkdf2` and AES-GCM already ran natively
+(BoringSSL, inside `crypto_bridge.cpp` with its JNI types) and are left alone; `prims` carries
+portable equivalents of them for desktop.
+
 Both families are unified above the crypto layer by **`volId`** (an `Int`,
 `0..7`): every caller — Dart, `ContainerFileSystem`, the SAF
 `ContainerDocumentsProvider`, the automation `BroadcastReceiver` (§5.4) —
@@ -1334,7 +1351,8 @@ than take this summary on faith:
   `volman_block_test` (the block-device adapter on the real `volumes[]` table over a fake
   filesystem layer, beside real vaults; registered only where `<openssl/aes.h>` exists),
   `xfer_test` (hash known-answer vectors, part naming and sequence resolution, split / join on
-  in-memory streams and on real files),
+  in-memory streams and on real files), `prims_test` (HMAC / PBKDF2 / AES-GCM / AES-CBC against
+  independently generated vectors, input contracts, tamper detection),
   `composite_block_device_test`, `sector_batching_test`, `fs_scan_test`,
   `kdf_table_test`, `decrypted_block_cache_test`, `cryfs_block_cipher_test`,
   `utf16le_password_test`, `container_header_test`,

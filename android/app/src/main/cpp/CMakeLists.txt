@@ -526,6 +526,8 @@ add_library(
         jni/foldervault_bridge.cpp
         jni/volman_bridge.cpp
         volman/vm_block_volume.cpp
+        jni/prims_bridge.cpp
+        crypto/prims.cpp
         jni/session_bridge.cpp
         jni/container_lifecycle_bridge.cpp
         jni/filesystem_bridge.cpp
@@ -692,6 +694,8 @@ set_source_files_properties(
         jni/foldervault_bridge.cpp
         jni/volman_bridge.cpp
         volman/vm_block_volume.cpp
+        jni/prims_bridge.cpp
+        crypto/prims.cpp
         PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra"
 )
 
@@ -863,6 +867,15 @@ if(NOT ANDROID)
     target_link_libraries(volman_test volman_core foldervault_core mbedcrypto)
     list(APPEND VAULTEXPLORER_HOST_TESTS volman_test)
 
+    # Crypto primitives behind the channel's hmac / aesCbcDecrypt / ... methods (crypto/prims.cpp):
+    # HMAC, PBKDF2, AES-GCM and AES-CBC against vectors generated with independent implementations
+    # (test/gen_prims_vectors.py: Python hmac/hashlib + `cryptography`; its RFC 6238 TOTP table is
+    # asserted against the RFC), plus the strict input contracts and tamper detection.
+    add_executable(prims_test crypto/test/prims_tests.cpp crypto/prims.cpp)
+    target_include_directories(prims_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${mbedtls_SOURCE_DIR}/include)
+    target_link_libraries(prims_test mbedcrypto)
+    list(APPEND VAULTEXPLORER_HOST_TESTS prims_test)
+
     # Transfer helpers: hashing against known answers (vectors from hashlib), part naming and
     # sequence resolution, split / join on in-memory streams (part boundaries, cancel, write /
     # close / read failures) and on real files (round trips, UTF-8 names, refusing to overwrite
@@ -951,6 +964,7 @@ if(NOT ANDROID)
     add_test(NAME foldervault_test COMMAND foldervault_test)
     add_test(NAME volman_test COMMAND volman_test)
     add_test(NAME xfer_test COMMAND xfer_test)
+    add_test(NAME prims_test COMMAND prims_test)
     if(TARGET volman_block_test)
         add_test(NAME volman_block_test COMMAND volman_block_test)
     endif()

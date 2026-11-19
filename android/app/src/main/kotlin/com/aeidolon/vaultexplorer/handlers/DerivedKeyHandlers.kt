@@ -17,6 +17,7 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 import com.aeidolon.vaultexplorer.container.ContainerEngine
 import com.aeidolon.vaultexplorer.crypto.HmacUtil
+import com.aeidolon.vaultexplorer.crypto.NativePrims
 import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.NativeEngine
 import com.aeidolon.vaultexplorer.NativeOpSupport
@@ -575,6 +576,13 @@ class DerivedKeyHandlers(
 
         ioExecutor.execute {
             try {
+                // The shared native primitive first (the code a desktop build runs too). It only ever
+                // answers with a success: on any refusal -- or without the library -- the JCA path
+                // below runs unchanged, and it is what reports a bad key / padding to Dart.
+                NativePrims.aesCbcDecrypt(key, iv, ciphertext)?.let { plain ->
+                    activity.runOnUiThread { result.success(plain) }
+                    return@execute
+                }
                 val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
                 val keySpec = javax.crypto.spec.SecretKeySpec(key, "AES")
                 val ivSpec = javax.crypto.spec.IvParameterSpec(iv)
@@ -586,6 +594,14 @@ class DerivedKeyHandlers(
             }
         }
     }
+
+    /**
+     * The shared native HMAC when it accepts the input, JCA otherwise. The native side is strict about
+     * the wire name ("sha1" | "sha256" | "sha512"); anything it refuses -- or no library at all -- lands
+     * on [HmacUtil], whose behaviour (and unit tests) are unchanged.
+     */
+    private fun computeHmac(hashName: String?, algorithm: String, key: ByteArray, data: ByteArray): ByteArray =
+        (hashName?.let { NativePrims.hmac(it, key, data) }) ?: HmacUtil.compute(algorithm, key, data)
 
     /**
      * One-shot HMAC (SHA-1, SHA-256 or SHA-512) of an in-memory buffer -- used
@@ -602,7 +618,8 @@ class DerivedKeyHandlers(
     fun handleHmac(call: MethodCall, result: MethodChannel.Result) {
         val key  = call.argument<ByteArray>("key")
         val data = call.argument<ByteArray>("data")
-        val algorithm = HmacUtil.jcaAlgorithm(call.argument<String>("hash"))
+        val hashName = call.argument<String>("hash")
+        val algorithm = HmacUtil.jcaAlgorithm(hashName)
 
         if (key == null || key.isEmpty() || data == null || algorithm == null) {
             result.error("INVALID_ARGS", "key (non-empty), data and hash (sha1|sha256|sha512) required", null)
@@ -611,7 +628,7 @@ class DerivedKeyHandlers(
 
         if (data.size <= HMAC_INLINE_MAX_BYTES) {
             try {
-                result.success(HmacUtil.compute(algorithm, key, data))
+                result.success(computeHmac(hashName, algorithm, key, data))
             } catch (e: Exception) {
                 nativeOps.dispatchNativeError(e, result)
             }
@@ -620,7 +637,7 @@ class DerivedKeyHandlers(
 
         ioExecutor.execute {
             try {
-                val mac = HmacUtil.compute(algorithm, key, data)
+                val mac = computeHmac(hashName, algorithm, key, data)
                 activity.runOnUiThread { result.success(mac) }
             } catch (e: Exception) {
                 activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }

@@ -15004,4 +15004,11 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get vcToolsDetectingFormat => 'Detectando…';
+
+  @override
+  String get indexesAndThumbnailsTitle => 'Índices y miniaturas';
+
+  @override
+  String get indexesAndThumbnailsSubtitle =>
+      'Gestiona el almacenamiento de miniaturas y los índices de metadatos de la galería y de música.';
 }

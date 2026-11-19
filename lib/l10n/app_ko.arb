@@ -4135,5 +4135,7 @@
   "vcToolsContainerSectionHeader": "컨테이너",
   "vcToolsCredentialsSectionHeader": "인증 정보",
   "vcToolsVolumeOptionsSectionHeader": "볼륨 옵션",
-  "vcToolsDetectingFormat": "감지 중…"
+  "vcToolsDetectingFormat": "감지 중…",
+  "indexesAndThumbnailsTitle": "인덱스 및 썸네일",
+  "indexesAndThumbnailsSubtitle": "썸네일 저장소, 갤러리 메타데이터 및 음악 인덱스를 관리합니다."
 }

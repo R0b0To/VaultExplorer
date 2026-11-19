@@ -13927,4 +13927,10 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get vcToolsDetectingFormat => '正在检测…';
+
+  @override
+  String get indexesAndThumbnailsTitle => '索引和缩略图';
+
+  @override
+  String get indexesAndThumbnailsSubtitle => '管理缩略图存储、图库元数据和音乐索引。';
 }

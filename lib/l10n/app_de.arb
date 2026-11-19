@@ -4135,5 +4135,7 @@
   "vcToolsContainerSectionHeader": "Container",
   "vcToolsCredentialsSectionHeader": "Anmeldedaten",
   "vcToolsVolumeOptionsSectionHeader": "Volume-Optionen",
-  "vcToolsDetectingFormat": "Wird erkannt…"
+  "vcToolsDetectingFormat": "Wird erkannt…",
+  "indexesAndThumbnailsTitle": "Indizes & Miniaturansichten",
+  "indexesAndThumbnailsSubtitle": "Verwalte Miniaturansichten, Galerie-Metadaten und den Musikindex."
 }

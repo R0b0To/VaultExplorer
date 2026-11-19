@@ -1282,12 +1282,6 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                                       ThumbnailCacheMode.disabled =>
                                         mode.getLocalizedLabel(context.l10n),
                                     },
-                                    subtitle:
-                                        mode == ThumbnailCacheMode.inContainer
-                                        ? context
-                                              .l10n
-                                              .musicIndexHiddenFolderDesc
-                                        : null,
                                   ),
                                 )
                                 .toList(),

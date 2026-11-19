@@ -4135,5 +4135,7 @@
   "vcToolsContainerSectionHeader": "容器",
   "vcToolsCredentialsSectionHeader": "凭据",
   "vcToolsVolumeOptionsSectionHeader": "卷选项",
-  "vcToolsDetectingFormat": "正在检测…"
+  "vcToolsDetectingFormat": "正在检测…",
+  "indexesAndThumbnailsTitle": "索引和缩略图",
+  "indexesAndThumbnailsSubtitle": "管理缩略图存储、图库元数据和音乐索引。"
 }

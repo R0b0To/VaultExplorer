@@ -14145,4 +14145,11 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get vcToolsDetectingFormat => '検出中…';
+
+  @override
+  String get indexesAndThumbnailsTitle => 'インデックスとサムネイル';
+
+  @override
+  String get indexesAndThumbnailsSubtitle =>
+      'サムネイルの保存先、ギャラリーのメタデータ、音楽インデックスを管理します。';
 }

@@ -15088,4 +15088,11 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get vcToolsDetectingFormat => 'Détection en cours…';
+
+  @override
+  String get indexesAndThumbnailsTitle => 'Index et miniatures';
+
+  @override
+  String get indexesAndThumbnailsSubtitle =>
+      'Gérez le stockage des miniatures, les métadonnées de la galerie et l’index musical.';
 }

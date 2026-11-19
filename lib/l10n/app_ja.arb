@@ -4135,5 +4135,7 @@
   "vcToolsContainerSectionHeader": "コンテナー",
   "vcToolsCredentialsSectionHeader": "認証情報",
   "vcToolsVolumeOptionsSectionHeader": "ボリュームのオプション",
-  "vcToolsDetectingFormat": "検出中…"
+  "vcToolsDetectingFormat": "検出中…",
+  "indexesAndThumbnailsTitle": "インデックスとサムネイル",
+  "indexesAndThumbnailsSubtitle": "サムネイルの保存先、ギャラリーのメタデータ、音楽インデックスを管理します。"
 }

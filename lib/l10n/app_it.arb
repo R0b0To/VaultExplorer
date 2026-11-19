@@ -4135,5 +4135,7 @@
   "vcToolsContainerSectionHeader": "Contenitore",
   "vcToolsCredentialsSectionHeader": "Credenziali",
   "vcToolsVolumeOptionsSectionHeader": "Opzioni volume",
-  "vcToolsDetectingFormat": "Rilevamento in corso…"
+  "vcToolsDetectingFormat": "Rilevamento in corso…",
+  "indexesAndThumbnailsTitle": "Indici e miniature",
+  "indexesAndThumbnailsSubtitle": "Gestisci l’archiviazione delle miniature, i metadati della galleria e l’indice musicale."
 }

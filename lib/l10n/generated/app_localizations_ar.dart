@@ -15006,4 +15006,11 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get vcToolsDetectingFormat => 'جارٍ الكشف…';
+
+  @override
+  String get indexesAndThumbnailsTitle => 'الفهارس والصور المصغّرة';
+
+  @override
+  String get indexesAndThumbnailsSubtitle =>
+      'إدارة تخزين الصور المصغّرة وفهرس بيانات المعرض وفهرس الموسيقى.';
 }

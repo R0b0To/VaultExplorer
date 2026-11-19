@@ -15061,4 +15061,11 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get vcToolsDetectingFormat => 'Визначення…';
+
+  @override
+  String get indexesAndThumbnailsTitle => 'Індекси й мініатюри';
+
+  @override
+  String get indexesAndThumbnailsSubtitle =>
+      'Керуйте зберіганням мініатюр, метаданими галереї та музичним індексом.';
 }

@@ -4135,5 +4135,7 @@
   "vcToolsContainerSectionHeader": "الحاوية",
   "vcToolsCredentialsSectionHeader": "بيانات الاعتماد",
   "vcToolsVolumeOptionsSectionHeader": "خيارات وحدة التخزين",
-  "vcToolsDetectingFormat": "جارٍ الكشف…"
+  "vcToolsDetectingFormat": "جارٍ الكشف…",
+  "indexesAndThumbnailsTitle": "الفهارس والصور المصغّرة",
+  "indexesAndThumbnailsSubtitle": "إدارة تخزين الصور المصغّرة وفهرس بيانات المعرض وفهرس الموسيقى."
 }

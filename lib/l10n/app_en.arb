@@ -16968,5 +16968,13 @@
   "vcToolsDetectingFormat": "Detecting…",
   "@vcToolsDetectingFormat": {
     "description": "Format picker subtitle while the selected file format is being identified."
+  },
+  "indexesAndThumbnailsTitle": "Indexes & thumbnails",
+  "@indexesAndThumbnailsTitle": {
+    "description": "Settings page title and vault settings entry for thumbnail and index preferences."
+  },
+  "indexesAndThumbnailsSubtitle": "Manage thumbnail storage, gallery metadata, and music index settings.",
+  "@indexesAndThumbnailsSubtitle": {
+    "description": "Subtitle describing the thumbnail, gallery metadata index, and music index settings in the destination page."
   }
 }

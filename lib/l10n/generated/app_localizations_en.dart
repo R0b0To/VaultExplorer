@@ -14738,4 +14738,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get vcToolsDetectingFormat => 'Detecting…';
+
+  @override
+  String get indexesAndThumbnailsTitle => 'Indexes & thumbnails';
+
+  @override
+  String get indexesAndThumbnailsSubtitle =>
+      'Manage thumbnail storage, gallery metadata, and music index settings.';
 }

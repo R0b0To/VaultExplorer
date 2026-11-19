@@ -24940,6 +24940,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Detecting…'**
   String get vcToolsDetectingFormat;
+
+  /// Settings page title and vault settings entry for thumbnail and index preferences.
+  ///
+  /// In en, this message translates to:
+  /// **'Indexes & thumbnails'**
+  String get indexesAndThumbnailsTitle;
+
+  /// Subtitle describing the thumbnail, gallery metadata index, and music index settings in the destination page.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage thumbnail storage, gallery metadata, and music index settings.'**
+  String get indexesAndThumbnailsSubtitle;
 }
 
 class _AppLocalizationsDelegate

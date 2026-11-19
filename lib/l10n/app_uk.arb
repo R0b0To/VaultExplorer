@@ -4135,5 +4135,7 @@
   "vcToolsContainerSectionHeader": "Контейнер",
   "vcToolsCredentialsSectionHeader": "Облікові дані",
   "vcToolsVolumeOptionsSectionHeader": "Параметри тому",
-  "vcToolsDetectingFormat": "Визначення…"
+  "vcToolsDetectingFormat": "Визначення…",
+  "indexesAndThumbnailsTitle": "Індекси й мініатюри",
+  "indexesAndThumbnailsSubtitle": "Керуйте зберіганням мініатюр, метаданими галереї та музичним індексом."
 }

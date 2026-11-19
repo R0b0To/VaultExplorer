@@ -14146,4 +14146,11 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get vcToolsDetectingFormat => '감지 중…';
+
+  @override
+  String get indexesAndThumbnailsTitle => '인덱스 및 썸네일';
+
+  @override
+  String get indexesAndThumbnailsSubtitle =>
+      '썸네일 저장소, 갤러리 메타데이터 및 음악 인덱스를 관리합니다.';
 }

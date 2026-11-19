@@ -7,11 +7,8 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
-import 'package:vaultexplorer/core/widgets/inputs/thumbnail_settings_tiles.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
-import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
-import 'package:vaultexplorer/data/models/thumbnail_settings.dart';
 import 'package:vaultexplorer/data/models/vault_delete_after_import_mode.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
@@ -20,11 +17,10 @@ import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/automation_settings_screen.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/change_password_screen.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_config_controller.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/container_indexes_thumbnails_screen.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/cryptomator_upgrade_tile.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/pattern_pin_verify_controller.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
-import 'package:vaultexplorer/features/browser/gallery/filter/vault_gallery_meta_storage.dart';
-import 'package:vaultexplorer/features/library/controllers/library_providers.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/real_password_gate_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/vault_info_screen.dart';
 import 'package:vaultexplorer/features/sync/ui/sync_rule_editor_sheet.dart';
@@ -65,8 +61,6 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
   late final TextEditingController _passwordCtrl;
   late final TextEditingController _pimCtrl;
   bool _showPassword = false;
-  bool _clearingGalleryMetadataIndex = false;
-  bool _clearingMusicIndex = false;
 
   String? _prefillPassword;
   bool _prefillCleared = false;
@@ -103,6 +97,55 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
         .firstOrNull;
   }
 
+  Future<void> _openIndexesAndThumbnails() {
+    return Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => SkinAreaScope(
+          area: SkinArea.dashboard,
+          child: ContainerIndexesThumbnailsScreen(
+            params: _params,
+            mountedContainer: widget.mountedContainer,
+            isModified: (state) => state.isModified(
+              _passwordCtrl.text,
+              _labelCtrl.text,
+              _pimCtrl.text,
+            ),
+            canSave: (state) => state.canSave(_passwordCtrl.text),
+            onSave: () =>
+                _save(ref.read(containerConfigControllerProvider(_params))),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIndexesAndThumbnailsEntry(
+    BuildContext context,
+    TextTheme textTheme,
+    ColorScheme cs,
+  ) {
+    return SectionCard(
+      children: [
+        ListTile(
+          leading: Icon(Icons.photo_library_outlined, color: cs.primary),
+          title: Text(
+            context.l10n.indexesAndThumbnailsTitle,
+            style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          subtitle: Text(
+            context.l10n.indexesAndThumbnailsSubtitle,
+            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+          trailing: Icon(
+            Icons.chevron_right_rounded,
+            color: cs.onSurfaceVariant,
+          ),
+          onTap: _openIndexesAndThumbnails,
+        ),
+      ],
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -133,157 +176,6 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
     _passwordCtrl.dispose();
     _pimCtrl.dispose();
     super.dispose();
-  }
-
-  Future<void> _clearThumbnailCache() async {
-    final confirm = await showAppConfirmDialog(
-      context,
-      title: context.l10n.clearThumbnailCacheDialogTitle,
-      message: context.l10n.clearThumbnailCacheDialogMessage,
-      confirmLabel: context.l10n.clearCacheButton,
-      isDestructive: true,
-    );
-    if (!confirm || !mounted) return;
-
-    final result = await ref
-        .read(containerConfigControllerProvider(_params).notifier)
-        .clearThumbnailCache();
-
-    if (!mounted) return;
-    if (result.isLocked) {
-      showAppSnackBar(
-        context,
-        message: context.l10n.appCacheClearedUnlockMessage,
-        tone: AppBannerTone.warning,
-      );
-    } else if (result.appCacheCleared && result.containerCacheCleared) {
-      showAppSnackBar(
-        context,
-        message: context.l10n.allThumbnailCachesClearedMessage,
-        tone: AppBannerTone.success,
-      );
-    } else if (result.appCacheCleared) {
-      showAppSnackBar(
-        context,
-        message: context.l10n.appCacheClearedContainerFailedMessage,
-        tone: AppBannerTone.warning,
-      );
-    } else {
-      showAppSnackBar(
-        context,
-        message: context.l10n.failedToClearThumbnailCachesMessage,
-        tone: AppBannerTone.error,
-      );
-    }
-  }
-
-  Future<void> _clearGalleryMetadataIndex() async {
-    final confirmed = await showAppConfirmDialog(
-      context,
-      title: context.l10n.galleryMetadataClearConfirmTitle,
-      message: context.l10n.galleryMetadataClearConfirmMessage,
-      confirmLabel: context.l10n.clearSavedIndexButton,
-      isDestructive: true,
-    );
-    if (!confirmed || !mounted) return;
-
-    setState(() => _clearingGalleryMetadataIndex = true);
-    final container = _effectiveMounted;
-    try {
-      final result = await VaultGalleryMetaStorage.clearPersistedIndexCopies(
-        uri: widget.uri,
-        crypto: ref.read(vaultCryptoApiProvider),
-        io: ref.read(vaultFileIoApiProvider),
-        container: container,
-      );
-      if (!mounted) return;
-      if (result.appStorageCleared && result.containerStorageCleared) {
-        showAppSnackBar(
-          context,
-          message: context.l10n.galleryMetadataIndexClearedMessage,
-          tone: AppBannerTone.success,
-        );
-      } else if (result.appStorageCleared &&
-          (container == null || container.readOnly)) {
-        showAppSnackBar(
-          context,
-          message: context.l10n.appIndexClearedUnlockMessage,
-          tone: AppBannerTone.warning,
-        );
-      } else {
-        showAppSnackBar(
-          context,
-          message: context.l10n.savedIndexClearFailedMessage,
-          tone: AppBannerTone.error,
-        );
-      }
-    } catch (e) {
-      VeLog.e(
-        'ContainerConfigScreen',
-        'Gallery metadata index clear failed',
-        e,
-      );
-      if (mounted) {
-        showAppSnackBar(
-          context,
-          message: context.l10n.savedIndexClearFailedMessage,
-          tone: AppBannerTone.error,
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _clearingGalleryMetadataIndex = false);
-    }
-  }
-
-  Future<void> _clearMusicIndex() async {
-    final confirmed = await showAppConfirmDialog(
-      context,
-      title: context.l10n.musicIndexClearConfirmTitle,
-      message: context.l10n.musicIndexClearConfirmMessage,
-      confirmLabel: context.l10n.clearSavedIndexButton,
-      isDestructive: true,
-    );
-    if (!confirmed || !mounted) return;
-
-    setState(() => _clearingMusicIndex = true);
-    final container = _effectiveMounted;
-    try {
-      final result = await ref
-          .read(libraryIndexStoreProvider)
-          .deleteIndexCopies(widget.uri, container: container);
-      if (!mounted) return;
-      if (result.appStorageCleared && result.containerStorageCleared) {
-        showAppSnackBar(
-          context,
-          message: context.l10n.musicIndexClearedMessage,
-          tone: AppBannerTone.success,
-        );
-      } else if (result.appStorageCleared &&
-          (container == null || container.readOnly)) {
-        showAppSnackBar(
-          context,
-          message: context.l10n.appIndexClearedUnlockMessage,
-          tone: AppBannerTone.warning,
-        );
-      } else {
-        showAppSnackBar(
-          context,
-          message: context.l10n.savedIndexClearFailedMessage,
-          tone: AppBannerTone.error,
-        );
-      }
-    } catch (e) {
-      VeLog.e('ContainerConfigScreen', 'Music index clear failed', e);
-      if (mounted) {
-        showAppSnackBar(
-          context,
-          message: context.l10n.savedIndexClearFailedMessage,
-          tone: AppBannerTone.error,
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _clearingMusicIndex = false);
-    }
   }
 
   Future<void> _save(ContainerConfigState state) async {
@@ -590,21 +482,8 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
       state,
       textTheme,
     );
-    final thumbnailSection = _buildThumbnailSection(
+    final indexesAndThumbnailsEntry = _buildIndexesAndThumbnailsEntry(
       context,
-      state,
-      textTheme,
-      cs,
-    );
-    final galleryMetadataSection = _buildGalleryMetadataSection(
-      context,
-      state,
-      textTheme,
-      cs,
-    );
-    final musicIndexSection = _buildMusicIndexSection(
-      context,
-      state,
       textTheme,
       cs,
     );
@@ -755,11 +634,7 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                                     children: [
                                       systemSection,
                                       const SizedBox(height: 14),
-                                      thumbnailSection,
-                                      const SizedBox(height: 14),
-                                      galleryMetadataSection,
-                                      const SizedBox(height: 14),
-                                      musicIndexSection,
+                                      indexesAndThumbnailsEntry,
                                       const SizedBox(height: 14),
                                       toolsSection,
                                       const SizedBox(height: 16),
@@ -787,11 +662,7 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                         const SizedBox(height: 16),
                         systemSection,
                         const SizedBox(height: 16),
-                        thumbnailSection,
-                        const SizedBox(height: 16),
-                        galleryMetadataSection,
-                        const SizedBox(height: 16),
-                        musicIndexSection,
+                        indexesAndThumbnailsEntry,
                         const SizedBox(height: 16),
                         toolsSection,
                         const SizedBox(height: 24),
@@ -1449,296 +1320,6 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                 }
               },
             ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildThumbnailSection(
-    BuildContext context,
-    ContainerConfigState state,
-    TextTheme textTheme,
-    ColorScheme cs,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SectionHeader(context.l10n.thumbnailStorageSectionHeader),
-        SectionCard(
-          children: [
-            if (state.loadingPassword)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(16),
-                  child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                ),
-              )
-            else ...[
-              ThumbnailSettingsTiles(
-                useGlobalDefault: state.useGlobalThumbnails,
-                onUseGlobalDefaultChanged: (v) => ref
-                    .read(containerConfigControllerProvider(_params).notifier)
-                    .setUseGlobalThumbnails(v),
-                cacheMode:
-                    state.thumbnailCacheMode ??
-                    ThumbnailSettings.defaults.cacheMode,
-                quality:
-                    state.thumbnailQuality ??
-                    ThumbnailSettings.defaults.quality,
-                cacheModeLabel: context.l10n.cacheModeLabel,
-                qualityLabel: context.l10n.thumbnailQualityLabel,
-                onCacheModeChanged: (v) => ref
-                    .read(containerConfigControllerProvider(_params).notifier)
-                    .setThumbnailCacheMode(v),
-                onQualityChanged: (v) => ref
-                    .read(containerConfigControllerProvider(_params).notifier)
-                    .setThumbnailQuality(v),
-              ),
-              ListTile(
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 4,
-                ),
-                title: Text(
-                  context.l10n.clearThumbnailCacheTitle,
-                  style: textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                subtitle: Text(
-                  context.l10n.removeCachedThumbnailsSubtitle,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
-                ),
-                trailing: state.clearingCache
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Icon(
-                        Icons.chevron_right_rounded,
-                        color: cs.onSurfaceVariant,
-                      ),
-                onTap: state.clearingCache ? null : _clearThumbnailCache,
-              ),
-            ],
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildGalleryMetadataSection(
-    BuildContext context,
-    ContainerConfigState state,
-    TextTheme textTheme,
-    ColorScheme cs,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SectionHeader(context.l10n.galleryMetadataSectionHeader),
-        SectionCard(
-          children: [
-            if (state.loadingPassword)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(16),
-                  child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                ),
-              )
-            else ...[
-              SwitchListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                value: state.useGlobalGalleryMetadata,
-                onChanged: (value) => ref
-                    .read(containerConfigControllerProvider(_params).notifier)
-                    .setUseGlobalGalleryMetadata(value),
-                title: Text(
-                  context.l10n.galleryMetadataUseGlobalDefaultTitle,
-                  style: textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                subtitle: Text(
-                  context.l10n.galleryMetadataUseGlobalDefaultDesc,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
-                ),
-              ),
-              if (!state.useGlobalGalleryMetadata)
-                OptionPickerTile<ThumbnailCacheMode>(
-                  label: context.l10n.galleryMetadataIndexStorageLabel,
-                  value:
-                      state.galleryMetadataCacheMode ??
-                      ThumbnailCacheMode.inContainer,
-                  options: ThumbnailCacheMode.values
-                      .map(
-                        (mode) => SelectOption<ThumbnailCacheMode>(
-                          value: mode,
-                          label: switch (mode) {
-                            ThumbnailCacheMode.appCache =>
-                              context.l10n.galleryMetadataAppStorageOption,
-                            ThumbnailCacheMode.inContainer =>
-                              context.l10n.galleryMetadataInVaultOption,
-                            ThumbnailCacheMode.disabled =>
-                              mode.getLocalizedLabel(context.l10n),
-                          },
-                        ),
-                      )
-                      .toList(),
-                  onChanged: ref
-                      .read(containerConfigControllerProvider(_params).notifier)
-                      .setGalleryMetadataCacheMode,
-                ),
-              ListTile(
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 4,
-                ),
-                title: Text(
-                  context.l10n.galleryMetadataClearAction,
-                  style: textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                subtitle: Text(
-                  context.l10n.galleryMetadataClearConfirmMessage,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
-                ),
-                trailing: _clearingGalleryMetadataIndex
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Icon(
-                        Icons.chevron_right_rounded,
-                        color: cs.onSurfaceVariant,
-                      ),
-                onTap: _clearingGalleryMetadataIndex
-                    ? null
-                    : _clearGalleryMetadataIndex,
-              ),
-            ],
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMusicIndexSection(
-    BuildContext context,
-    ContainerConfigState state,
-    TextTheme textTheme,
-    ColorScheme cs,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SectionHeader(context.l10n.musicIndexSectionHeader),
-        SectionCard(
-          children: [
-            if (state.loadingPassword)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(16),
-                  child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                ),
-              )
-            else ...[
-              SwitchListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                value: state.useGlobalMusicIndex,
-                onChanged: (value) => ref
-                    .read(containerConfigControllerProvider(_params).notifier)
-                    .setUseGlobalMusicIndex(value),
-                title: Text(
-                  context.l10n.musicIndexUseGlobalDefaultTitle,
-                  style: textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                subtitle: Text(
-                  context.l10n.musicIndexUseGlobalDefaultDesc,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
-                ),
-              ),
-              if (!state.useGlobalMusicIndex)
-                OptionPickerTile<ThumbnailCacheMode>(
-                  label: context.l10n.musicIndexStorageLabel,
-                  value:
-                      state.musicIndexCacheMode ??
-                      ThumbnailCacheMode.inContainer,
-                  options: ThumbnailCacheMode.values
-                      .map(
-                        (mode) => SelectOption<ThumbnailCacheMode>(
-                          value: mode,
-                          label: switch (mode) {
-                            ThumbnailCacheMode.appCache =>
-                              context.l10n.musicIndexAppStorageOption,
-                            ThumbnailCacheMode.inContainer =>
-                              context.l10n.musicIndexInVaultOption,
-                            ThumbnailCacheMode.disabled =>
-                              mode.getLocalizedLabel(context.l10n),
-                          },
-                        ),
-                      )
-                      .toList(),
-                  onChanged: ref
-                      .read(containerConfigControllerProvider(_params).notifier)
-                      .setMusicIndexCacheMode,
-                ),
-              ListTile(
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 4,
-                ),
-                title: Text(
-                  context.l10n.musicIndexClearAction,
-                  style: textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                subtitle: Text(
-                  context.l10n.musicIndexClearConfirmMessage,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
-                ),
-                trailing: _clearingMusicIndex
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Icon(
-                        Icons.chevron_right_rounded,
-                        color: cs.onSurfaceVariant,
-                      ),
-                onTap: _clearingMusicIndex ? null : _clearMusicIndex,
-              ),
-            ],
           ],
         ),
       ],

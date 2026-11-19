@@ -4135,5 +4135,7 @@
   "vcToolsContainerSectionHeader": "Contentor",
   "vcToolsCredentialsSectionHeader": "Credenciais",
   "vcToolsVolumeOptionsSectionHeader": "Opções do volume",
-  "vcToolsDetectingFormat": "A detetar…"
+  "vcToolsDetectingFormat": "A detetar…",
+  "indexesAndThumbnailsTitle": "Índices e miniaturas",
+  "indexesAndThumbnailsSubtitle": "Gira o armazenamento de miniaturas, os metadados da galeria e o índice de música."
 }

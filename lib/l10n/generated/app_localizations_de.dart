@@ -14961,4 +14961,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get vcToolsDetectingFormat => 'Wird erkannt…';
+
+  @override
+  String get indexesAndThumbnailsTitle => 'Indizes & Miniaturansichten';
+
+  @override
+  String get indexesAndThumbnailsSubtitle =>
+      'Verwalte Miniaturansichten, Galerie-Metadaten und den Musikindex.';
 }

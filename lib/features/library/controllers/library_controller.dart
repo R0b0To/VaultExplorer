@@ -89,7 +89,7 @@ class LibraryController extends ChangeNotifier {
 
   /// Where the index is saved for this container.
   LibraryLocation? get location =>
-      _container == null ? null : LibraryIndexStore.locationFor(_container!);
+      _container == null ? null : _store.indexLocationFor(_container!);
 
   /// True when a saved index was found at open (the library appeared instantly).
   bool get loadedFromSaved => _loadedSaved;
@@ -124,7 +124,9 @@ class LibraryController extends ChangeNotifier {
     final saved = await _store.loadIndex(container);
     if (_stale(gen)) return;
     if (saved != null) {
-      _index = LibraryIndex([for (final t in saved) t.withSource(container.uri)]);
+      _index = LibraryIndex([
+        for (final t in saved) t.withSource(container.uri),
+      ]);
       _loadedSaved = true;
     }
     await _scan(gen, ignoreExisting: false);

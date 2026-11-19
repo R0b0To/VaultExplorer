@@ -574,7 +574,6 @@ class _CreateArchiveBottomSheetState
           obscureText: _obscurePassword,
           decoration: InputDecoration(
             labelText: context.l10n.createArchivePasswordLabel,
-            hintText: context.l10n.createArchivePasswordHintText,
             filled: true,
             fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.5),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -606,7 +605,6 @@ class _CreateArchiveBottomSheetState
             obscureText: _obscureConfirmPassword,
             decoration: InputDecoration(
               labelText: context.l10n.createArchiveConfirmPasswordLabel,
-              hintText: context.l10n.createArchiveConfirmPasswordHint,
               errorText: hasConfirmMismatch ? context.l10n.passwordsDoNotMatch : null,
               filled: true,
               fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.5),

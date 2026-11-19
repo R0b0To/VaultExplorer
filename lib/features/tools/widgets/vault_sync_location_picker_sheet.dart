@@ -309,39 +309,62 @@ class _VaultSyncLocationPickerSheetState
                 color: cs.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(12),
                 clipBehavior: Clip.antiAlias,
-                child: ListTile(
+               child: ListTile(
                   leading: Icon(syncTargetKindOf(target).icon, color: cs.primary),
                   title: Text(
                     target.displayName,
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
-                  subtitle: Text(
-                    [
-                      syncTargetKindOf(target).label(context.l10n),
-                      if (target.readOnly) context.l10n.vaultSyncReadOnlyBadge,
-                    ].join(' · '),
-                  ),
-                  trailing: target.volId == currentVolId
-                      ? Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: cs.primaryContainer,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            context.l10n.vaultSyncCurrentStorageBadge,
-                            style: textTheme.labelSmall?.copyWith(
-                              color: cs.onPrimaryContainer,
-                              fontWeight: FontWeight.bold,
+                  subtitle: Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Text(syncTargetKindOf(target).label(context.l10n)),
+                        if (target.readOnly)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: cs.errorContainer,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              context.l10n.vaultSyncReadOnlyBadge,
+                              style: textTheme.labelSmall?.copyWith(
+                                color: cs.onErrorContainer,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
-                        )
-                      : const Icon(Icons.chevron_right_rounded),
+                        if (target.volId == currentVolId)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: cs.primaryContainer,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              context.l10n.vaultSyncCurrentStorageBadge,
+                              style: textTheme.labelSmall?.copyWith(
+                                color: cs.onPrimaryContainer,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded),
                   onTap: () => _chooseStorage(target),
                 ),
               ),
@@ -426,12 +449,14 @@ class _VaultSyncLocationPickerSheetState
             );
           },
           icon: const Icon(Icons.check_rounded),
-          label: Text(
+           label: Text(
             state.currentPath.isEmpty
                 ? ctx.l10n.vaultFolderPickerConfirmRootButton
                 : ctx.l10n.vaultFolderPickerConfirmNamedButton(
                     state.currentPath.split('/').last,
                   ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         );
       },

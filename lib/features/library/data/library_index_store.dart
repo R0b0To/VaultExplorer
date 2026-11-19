@@ -5,24 +5,32 @@ import 'dart:typed_data';
 
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/features/library/index/cover_overrides_codec.dart';
 import 'package:vaultexplorer/features/library/index/library_index_codec.dart';
 import 'package:vaultexplorer/features/library/models/library_track.dart';
 import 'package:vaultexplorer/features/library/models/music_config.dart';
 
-/// Where a container's music mode files live. The rule is the same one the
-/// bookmarks use, for the same reason: titles and folder names are information
-/// about private content, so they must not end up anywhere readable.
+/// Where a container's music mode config and custom covers live. The music
+/// index has its own setting and can be disabled independently.
 enum LibraryLocation {
   /// A writable vault keeps them in its own meta folder, encrypted by the
   /// vault, travelling with it. Only readable while it is unlocked.
   inVault,
 
-  /// Phone and external storage are plain folders, and a read-only vault cannot
-  /// be written to. Their files sit in the app's private storage, AES-GCM
-  /// encrypted under the same Keystore-backed key as the thumbnail cache. No
-  /// hidden folder is ever dropped into the person's own files.
+  /// The default for plain storage and read-only vaults. Files sit in the app's
+  /// private storage, AES-GCM encrypted under the same Keystore-backed key as
+  /// the thumbnail cache.
   thisDevice,
+
+  /// Local Storage's explicitly selected hidden folder. This is not encrypted.
+  hiddenFolder,
+
+  /// The saved music index is disabled; only the in-memory scan is kept.
+  disabled,
+
+  /// The user selected container storage, but this container cannot be written.
+  readOnly,
 }
 
 /// The platform pieces the store needs, so its decisions (which location,
@@ -37,8 +45,16 @@ abstract class LibraryStorePlatform {
   /// The persistent app-cache AES-256 key.
   Future<Uint8List> cacheKey();
 
-  Future<Uint8List?> aesGcmEncrypt(Uint8List key, Uint8List iv, Uint8List plaintext);
-  Future<Uint8List?> aesGcmDecrypt(Uint8List key, Uint8List iv, Uint8List ciphertextAndTag);
+  Future<Uint8List?> aesGcmEncrypt(
+    Uint8List key,
+    Uint8List iv,
+    Uint8List plaintext,
+  );
+  Future<Uint8List?> aesGcmDecrypt(
+    Uint8List key,
+    Uint8List iv,
+    Uint8List ciphertextAndTag,
+  );
 
   /// A stable, filename-safe digest of [value].
   Future<String> digest(String value);
@@ -52,20 +68,28 @@ abstract class LibraryStorePlatform {
   Future<bool> containerFileExists(MountedContainer c, String path);
   Future<Uint8List?> readContainerFile(MountedContainer c, String path);
 
-  /// Writes [path], creating the meta folder first.
-  Future<bool> writeContainerFile(MountedContainer c, String path, Uint8List bytes);
+  /// Writes [path], creating its parent folder first.
+  Future<bool> writeContainerFile(
+    MountedContainer c,
+    String path,
+    Uint8List bytes,
+  );
   Future<void> deleteContainerFile(MountedContainer c, String path);
 }
 
-/// Saves and loads a container's music mode config and track index.
+/// Saves and loads a container's music mode config, track index and covers.
 ///
-/// Nothing here writes plaintext metadata to unencrypted storage. Anything that
-/// fails to decrypt or parse is treated as "nothing saved" so the caller just
+/// App-storage files are encrypted. A Local Storage hidden-folder index is
+/// plaintext only when the user explicitly selects that location. Anything
+/// that fails to decrypt or parse is treated as "nothing saved" so the caller
 /// rebuilds it; the index is only ever a cache of what is in the files.
 class LibraryIndexStore {
   final LibraryStorePlatform platform;
+  final Future<ThumbnailCacheMode> Function(MountedContainer container)?
+  musicIndexCacheModeFor;
+  final Map<String, ThumbnailCacheMode> _resolvedIndexModes = {};
 
-  LibraryIndexStore(this.platform);
+  LibraryIndexStore(this.platform, {this.musicIndexCacheModeFor});
 
   static const String configName = 'music.json';
   static const String indexName = 'music-index.bin';
@@ -80,11 +104,89 @@ class LibraryIndexStore {
     return LibraryLocation.inVault;
   }
 
+  /// The effective saved-index location, after applying the user's choice.
+  /// Until the first index operation resolves settings, this reports the
+  /// existing behavior for that container type.
+  LibraryLocation indexLocationFor(MountedContainer container) {
+    final mode =
+        _resolvedIndexModes[container.uri] ??
+        (container.isLocalStorage || container.readOnly
+            ? ThumbnailCacheMode.appCache
+            : ThumbnailCacheMode.inContainer);
+    return switch (mode) {
+      ThumbnailCacheMode.disabled => LibraryLocation.disabled,
+      ThumbnailCacheMode.appCache => LibraryLocation.thisDevice,
+      ThumbnailCacheMode.inContainer when container.readOnly =>
+        LibraryLocation.readOnly,
+      ThumbnailCacheMode.inContainer when container.isLocalStorage =>
+        LibraryLocation.hiddenFolder,
+      ThumbnailCacheMode.inContainer => LibraryLocation.inVault,
+    };
+  }
+
+  Future<ThumbnailCacheMode> _indexCacheMode(MountedContainer container) async {
+    final mode =
+        await musicIndexCacheModeFor?.call(container) ??
+        (container.isLocalStorage || container.readOnly
+            ? ThumbnailCacheMode.appCache
+            : ThumbnailCacheMode.inContainer);
+    _resolvedIndexModes[container.uri] = mode;
+    return mode;
+  }
+
   String _vaultPath(String name) => '${platform.metaDir}/$name';
 
+  static const String localIndexPath = '.musicindex/music-index.bin';
+
   Future<String> _devicePath(MountedContainer c, String ext) async {
+    return _devicePathForUri(c.uri, ext);
+  }
+
+  Future<String> _devicePathForUri(String uri, String ext) async {
     final root = await platform.appRoot();
-    return '$root/library/${await platform.digest(c.uri)}.$ext';
+    return '$root/library/${await platform.digest(uri)}.$ext';
+  }
+
+  Future<Uint8List?> _readIndex(
+    MountedContainer container,
+    ThumbnailCacheMode mode,
+  ) async {
+    if (mode == ThumbnailCacheMode.disabled) return null;
+    if (mode == ThumbnailCacheMode.appCache) {
+      final raw = await platform.readAppFile(
+        await _devicePath(container, 'idx'),
+      );
+      if (raw == null) return null;
+      return _decrypt(raw);
+    }
+
+    final path = container.isLocalStorage
+        ? localIndexPath
+        : _vaultPath(indexName);
+    if (!await platform.containerFileExists(container, path)) return null;
+    return platform.readContainerFile(container, path);
+  }
+
+  Future<bool> _writeIndex(
+    MountedContainer container,
+    ThumbnailCacheMode mode,
+    Uint8List bytes,
+  ) async {
+    if (mode == ThumbnailCacheMode.disabled) return true;
+    if (mode == ThumbnailCacheMode.appCache) {
+      final sealed = await _encrypt(bytes);
+      if (sealed == null) return false;
+      return platform.writeAppFile(await _devicePath(container, 'idx'), sealed);
+    }
+
+    // Respect an explicit in-container choice. A read-only vault may still
+    // supply its existing index, but must not silently write a device copy.
+    if (container.readOnly) return false;
+
+    final path = container.isLocalStorage
+        ? localIndexPath
+        : _vaultPath(indexName);
+    return platform.writeContainerFile(container, path, bytes);
   }
 
   // ── Config ───────────────────────────────────────────────────────────────
@@ -101,9 +203,14 @@ class LibraryIndexStore {
     }
   }
 
-  Future<bool> saveConfig(MountedContainer container, MusicConfig config) async {
+  Future<bool> saveConfig(
+    MountedContainer container,
+    MusicConfig config,
+  ) async {
     try {
-      final bytes = Uint8List.fromList(utf8.encode(jsonEncode(config.toJson())));
+      final bytes = Uint8List.fromList(
+        utf8.encode(jsonEncode(config.toJson())),
+      );
       return await _write(container, configName, 'cfg', bytes);
     } catch (_) {
       return false;
@@ -114,7 +221,8 @@ class LibraryIndexStore {
 
   Future<List<LibraryTrack>?> loadIndex(MountedContainer container) async {
     try {
-      final blob = await _read(container, indexName, 'idx');
+      final mode = await _indexCacheMode(container);
+      final blob = await _readIndex(container, mode);
       if (blob == null || blob.isEmpty) return null;
       return await Isolate.run(() => LibraryIndexCodec.decode(blob));
     } catch (_) {
@@ -123,10 +231,15 @@ class LibraryIndexStore {
   }
 
   /// Returns whether the index was written.
-  Future<bool> saveIndex(MountedContainer container, List<LibraryTrack> tracks) async {
+  Future<bool> saveIndex(
+    MountedContainer container,
+    List<LibraryTrack> tracks,
+  ) async {
     try {
+      final mode = await _indexCacheMode(container);
+      if (mode == ThumbnailCacheMode.disabled) return true;
       final blob = await Isolate.run(() => LibraryIndexCodec.encode(tracks));
-      return await _write(container, indexName, 'idx', blob);
+      return await _writeIndex(container, mode, blob);
     } catch (_) {
       return false;
     }
@@ -134,17 +247,39 @@ class LibraryIndexStore {
 
   /// Deletes the saved index (the config stays).
   Future<void> deleteIndex(MountedContainer container) async {
+    await deleteIndexCopies(container.uri, container: container);
+  }
+
+  /// Deletes app-storage and any in-container copies. The app-storage copy can
+  /// be cleared while the container is locked; an in-container copy needs a
+  /// mounted, writable container.
+  Future<({bool appStorageCleared, bool containerStorageCleared})>
+  deleteIndexCopies(String uri, {MountedContainer? container}) async {
+    var appStorageCleared = false;
     try {
-      switch (locationFor(container)) {
-        case LibraryLocation.thisDevice:
-          await platform.deleteAppFile(await _devicePath(container, 'idx'));
-        case LibraryLocation.inVault:
-          await platform.deleteContainerFile(container, _vaultPath(indexName));
-      }
+      await platform.deleteAppFile(await _devicePathForUri(uri, 'idx'));
+      appStorageCleared = true;
     } catch (_) {
-      // Best effort: a failed delete leaves a stale index that the next save
-      // overwrites.
+      // Best effort; the inside-container copy may still be removable.
     }
+    var containerStorageCleared = false;
+    if (container != null && !container.readOnly) {
+      final containerPath = container.isLocalStorage
+          ? localIndexPath
+          : _vaultPath(indexName);
+      try {
+        if (await platform.containerFileExists(container, containerPath)) {
+          await platform.deleteContainerFile(container, containerPath);
+        }
+        containerStorageCleared = true;
+      } catch (_) {
+        // Best effort: a failed delete leaves only an unused stale cache.
+      }
+    }
+    return (
+      appStorageCleared: appStorageCleared,
+      containerStorageCleared: containerStorageCleared,
+    );
   }
 
   // ── Covers chosen by hand ────────────────────────────────────────────────
@@ -162,18 +297,33 @@ class LibraryIndexStore {
   }
 
   /// Saves the full set of custom covers (an empty map removes the file).
-  Future<bool> saveCovers(MountedContainer container, Map<String, Uint8List> covers) async {
+  Future<bool> saveCovers(
+    MountedContainer container,
+    Map<String, Uint8List> covers,
+  ) async {
     try {
       if (covers.isEmpty) {
         switch (locationFor(container)) {
           case LibraryLocation.thisDevice:
             await platform.deleteAppFile(await _devicePath(container, 'cvr'));
           case LibraryLocation.inVault:
-            await platform.deleteContainerFile(container, _vaultPath(coversName));
+            await platform.deleteContainerFile(
+              container,
+              _vaultPath(coversName),
+            );
+          case LibraryLocation.hiddenFolder:
+          case LibraryLocation.disabled:
+          case LibraryLocation.readOnly:
+            break;
         }
         return true;
       }
-      return await _write(container, coversName, 'cvr', CoverOverridesCodec.encode(covers));
+      return await _write(
+        container,
+        coversName,
+        'cvr',
+        CoverOverridesCodec.encode(covers),
+      );
     } catch (_) {
       return false;
     }
@@ -181,7 +331,11 @@ class LibraryIndexStore {
 
   // ── Location-specific bytes ──────────────────────────────────────────────
 
-  Future<Uint8List?> _read(MountedContainer c, String vaultName, String deviceExt) async {
+  Future<Uint8List?> _read(
+    MountedContainer c,
+    String vaultName,
+    String deviceExt,
+  ) async {
     switch (locationFor(c)) {
       case LibraryLocation.inVault:
         final path = _vaultPath(vaultName);
@@ -191,6 +345,10 @@ class LibraryIndexStore {
         final raw = await platform.readAppFile(await _devicePath(c, deviceExt));
         if (raw == null) return null;
         return _decrypt(raw);
+      case LibraryLocation.hiddenFolder:
+      case LibraryLocation.disabled:
+      case LibraryLocation.readOnly:
+        return null;
     }
   }
 
@@ -207,13 +365,19 @@ class LibraryIndexStore {
         final sealed = await _encrypt(bytes);
         if (sealed == null) return false;
         return platform.writeAppFile(await _devicePath(c, deviceExt), sealed);
+      case LibraryLocation.hiddenFolder:
+      case LibraryLocation.disabled:
+      case LibraryLocation.readOnly:
+        return false;
     }
   }
 
   Future<Uint8List?> _encrypt(Uint8List plain) async {
     final key = await platform.cacheKey();
     final rng = Random.secure();
-    final iv = Uint8List.fromList(List.generate(_nonceSize, (_) => rng.nextInt(256)));
+    final iv = Uint8List.fromList(
+      List.generate(_nonceSize, (_) => rng.nextInt(256)),
+    );
     final sealed = await platform.aesGcmEncrypt(key, iv, plain);
     if (sealed == null) return null;
     return Uint8List.fromList([...iv, ...sealed]);

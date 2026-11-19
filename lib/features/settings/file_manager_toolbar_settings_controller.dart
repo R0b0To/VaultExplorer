@@ -265,6 +265,25 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
   Future<void> setDefaultThumbnailQuality(ThumbnailQuality quality) =>
       _updateConfig(state.config.copyWith(defaultThumbnailQuality: quality));
 
+  Future<void> setDefaultGalleryMetadataCacheMode(ThumbnailCacheMode mode) =>
+      _updateConfig(
+        state.config.copyWith(defaultGalleryMetadataCacheMode: mode),
+      );
+
+  Future<void> setLocalStorageGalleryMetadataCacheMode(
+    ThumbnailCacheMode mode,
+  ) => _updateConfig(
+    state.config.copyWith(localStorageGalleryMetadataCacheMode: mode),
+  );
+
+  Future<void> setDefaultMusicIndexCacheMode(ThumbnailCacheMode mode) =>
+      _updateConfig(state.config.copyWith(defaultMusicIndexCacheMode: mode));
+
+  Future<void> setLocalStorageMusicIndexCacheMode(ThumbnailCacheMode mode) =>
+      _updateConfig(
+        state.config.copyWith(localStorageMusicIndexCacheMode: mode),
+      );
+
   /// The thumbnail slot shared by Local Storage and the decoy file manager.
   Future<void> setLocalStorageThumbnailCacheMode(ThumbnailCacheMode mode) =>
       _updateConfig(
@@ -300,8 +319,10 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
     String containerUri,
     bool enabled,
   ) async {
-    final newConfig =
-        state.config.withGalleryModeForStorage(containerUri, enabled);
+    final newConfig = state.config.withGalleryModeForStorage(
+      containerUri,
+      enabled,
+    );
     await _updateConfig(newConfig);
   }
 
@@ -311,8 +332,10 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
     String containerUri,
     List<String> folders,
   ) async {
-    final newConfig =
-        state.config.withGalleryFoldersForStorage(containerUri, folders);
+    final newConfig = state.config.withGalleryFoldersForStorage(
+      containerUri,
+      folders,
+    );
     await _updateConfig(newConfig);
   }
 
@@ -320,8 +343,10 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
     String containerUri,
     bool skipped,
   ) async {
-    final newConfig =
-        state.config.withGalleryPromptSkippedForStorage(containerUri, skipped);
+    final newConfig = state.config.withGalleryPromptSkippedForStorage(
+      containerUri,
+      skipped,
+    );
     await _updateConfig(newConfig);
   }
 
@@ -329,8 +354,10 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
     String containerUri,
     bool skipped,
   ) async {
-    final newConfig =
-        state.config.withMusicPromptSkippedForStorage(containerUri, skipped);
+    final newConfig = state.config.withMusicPromptSkippedForStorage(
+      containerUri,
+      skipped,
+    );
     await _updateConfig(newConfig);
   }
 
@@ -447,7 +474,7 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
     await _updateConfig(def);
   }
 
-void applyImportedConfig(FileManagerToolbarConfig newConfig) {
+  void applyImportedConfig(FileManagerToolbarConfig newConfig) {
     ThumbnailCacheService.setVideoThumbnailSettings(
       newConfig.mediaViewerToolbarConfig.thumbnailGenerationStrategy,
       newConfig.mediaViewerToolbarConfig.thumbnailFramePosition,

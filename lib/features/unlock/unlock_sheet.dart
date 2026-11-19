@@ -1040,13 +1040,6 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
                         filled: true,
                         fillColor: cs.surfaceContainerHighest,
                         labelText: context.l10n.passwordFieldLabel,
-                        hintText: state.isFolderVault
-                            ? context.l10n.passwordHintFolderVault
-                            : state.isBitlocker
-                            ? context.l10n.passwordHintBitlocker
-                            : state.isComposite
-                            ? context.l10n.compositePasswordHint
-                            : context.l10n.passwordHintContainer,
                         prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: cs.primary),
                         suffixIcon: Row(
                           mainAxisSize: MainAxisSize.min,

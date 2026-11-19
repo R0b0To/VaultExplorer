@@ -70,8 +70,10 @@ class VaultBrowserScaffold extends ConsumerWidget {
       return PathSegment(label, e.value);
     }).toList();
 
-    final titleText = Text(
+     final titleText = Text(
       appBarTitle(context, state.selectedContainer),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
     );
 
@@ -120,23 +122,27 @@ class VaultBrowserScaffold extends ConsumerWidget {
               child: state.loading
                   ? const Center(child: CircularProgressIndicator())
                   : processed.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.folder_open_rounded,
-                                size: 48,
-                                color: cs.onSurfaceVariant.withValues(alpha: 0.5),
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                emptyMessage(context),
-                                style: textTheme.bodyMedium?.copyWith(
-                                  color: cs.onSurfaceVariant,
+                       ? Center(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.folder_open_rounded,
+                                  size: 48,
+                                  color: cs.onSurfaceVariant.withValues(alpha: 0.5),
                                 ),
-                              ),
-                            ],
+                                const SizedBox(height: 16),
+                                Text(
+                                  emptyMessage(context),
+                                  textAlign: TextAlign.center,
+                                  style: textTheme.bodyMedium?.copyWith(
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         )
                       : ListView.separated(

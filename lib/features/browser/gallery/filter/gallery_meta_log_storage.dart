@@ -40,9 +40,16 @@ abstract final class GalleryMetaSegmentNames {
     return n != null && n > 0 ? n : null;
   }
 
-  static String nameOf(int seq) => seq == 0
-      ? base
-      : '$_prefix${seq.toString().padLeft(6, '0')}$_suffix';
+  static String nameOf(int seq) =>
+      seq == 0 ? base : '$_prefix${seq.toString().padLeft(6, '0')}$_suffix';
+
+  /// Includes an interrupted atomic-write temporary file.
+  static bool isSegmentOrTemp(String name) {
+    final candidate = name.endsWith('.tmp')
+        ? name.substring(0, name.length - '.tmp'.length)
+        : name;
+    return seqOf(candidate) != null;
+  }
 }
 
 /// A [GalleryMetaStorage] that keeps the index as a log of small files (see
@@ -135,5 +142,22 @@ class GalleryMetaLogStorage implements GalleryMetaStorage {
     }
     _nextSeq[volId] = highest + 1;
     return true;
+  }
+
+  /// Removes every persisted segment for [volId]. Returns false if the source
+  /// has no available storage or any segment could not be deleted.
+  Future<bool> clearStoredIndex(int volId) async {
+    final files = _filesOf(volId);
+    if (files == null || files.readOnly) return false;
+    final names = await files.listNames();
+    if (names == null) return false;
+
+    var cleared = true;
+    for (final name in names) {
+      if (!GalleryMetaSegmentNames.isSegmentOrTemp(name)) continue;
+      if (!await files.delete(name)) cleared = false;
+    }
+    _nextSeq.remove(volId);
+    return cleared;
   }
 }

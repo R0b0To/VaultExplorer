@@ -111,15 +111,25 @@ class _MusicScopeSheetState extends State<_MusicScopeSheet> {
                 style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
               ),
               const SizedBox(height: AppSpacing.md),
-              SizedBox(
-                width: double.infinity,
-                child: SegmentedButton<bool>(
-                  segments: [
-                    ButtonSegment<bool>(value: false, label: Text(l10n.musicScopeAll)),
-                    ButtonSegment<bool>(value: true, label: Text(l10n.musicScopeChoose)),
+              RadioGroup<bool>(
+                groupValue: _choosing,
+                onChanged: (value) {
+                  if (value != null) setState(() => _choosing = value);
+                },
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    RadioListTile<bool>(
+                      value: false,
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(l10n.musicScopeAll),
+                    ),
+                    RadioListTile<bool>(
+                      value: true,
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(l10n.musicScopeChoose),
+                    ),
                   ],
-                  selected: {_choosing},
-                  onSelectionChanged: (s) => setState(() => _choosing = s.first),
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),

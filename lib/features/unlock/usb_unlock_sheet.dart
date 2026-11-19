@@ -561,9 +561,6 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
                       filled: true,
                       fillColor: cs.surfaceContainerHighest,
                       labelText: context.l10n.passwordFieldLabel,
-                      hintText: isKnownBitlocker
-                          ? context.l10n.passwordHintBitlocker
-                          : context.l10n.passwordHintContainer,
                       prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: cs.primary),
                       suffixIcon: Row(
                         mainAxisSize: MainAxisSize.min,

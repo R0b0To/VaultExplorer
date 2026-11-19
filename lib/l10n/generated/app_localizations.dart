@@ -24634,6 +24634,180 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Empty or 0 for defaults'**
   String get pimInputHint;
+
+  /// Label for the independent storage location of the gallery metadata index.
+  ///
+  /// In en, this message translates to:
+  /// **'Gallery metadata index storage'**
+  String get galleryMetadataIndexStorageLabel;
+
+  /// No description provided for @galleryMetadataUseGlobalDefaultDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow the app-wide gallery metadata index storage setting.'**
+  String get galleryMetadataUseGlobalDefaultDesc;
+
+  /// No description provided for @galleryMetadataAppStorageOption.
+  ///
+  /// In en, this message translates to:
+  /// **'App storage'**
+  String get galleryMetadataAppStorageOption;
+
+  /// No description provided for @galleryMetadataInVaultOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Inside vault'**
+  String get galleryMetadataInVaultOption;
+
+  /// No description provided for @galleryMetadataSectionHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'Gallery Metadata Index'**
+  String get galleryMetadataSectionHeader;
+
+  /// No description provided for @galleryMetadataUseGlobalDefaultTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Use app-wide gallery index setting'**
+  String get galleryMetadataUseGlobalDefaultTitle;
+
+  /// No description provided for @musicIndexSectionHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'Music Index'**
+  String get musicIndexSectionHeader;
+
+  /// No description provided for @musicIndexStorageLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Music index storage'**
+  String get musicIndexStorageLabel;
+
+  /// No description provided for @musicIndexUseGlobalDefaultTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Use app-wide music index setting'**
+  String get musicIndexUseGlobalDefaultTitle;
+
+  /// No description provided for @musicIndexUseGlobalDefaultDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow the app-wide music index storage setting.'**
+  String get musicIndexUseGlobalDefaultDesc;
+
+  /// No description provided for @musicIndexAppStorageOption.
+  ///
+  /// In en, this message translates to:
+  /// **'App storage'**
+  String get musicIndexAppStorageOption;
+
+  /// No description provided for @musicIndexInVaultOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Inside vault'**
+  String get musicIndexInVaultOption;
+
+  /// No description provided for @musicIndexHiddenFolderOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden folder'**
+  String get musicIndexHiddenFolderOption;
+
+  /// No description provided for @musicIndexHiddenFolderDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Stored in an unencrypted hidden folder in Local Storage.'**
+  String get musicIndexHiddenFolderDesc;
+
+  /// No description provided for @libraryStorageHiddenFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Index saved in an unencrypted hidden folder'**
+  String get libraryStorageHiddenFolder;
+
+  /// No description provided for @libraryStorageDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved music index is disabled; tracks are rescanned each time.'**
+  String get libraryStorageDisabled;
+
+  /// No description provided for @galleryMetadataClearAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear saved gallery index'**
+  String get galleryMetadataClearAction;
+
+  /// No description provided for @galleryMetadataClearConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear gallery metadata index?'**
+  String get galleryMetadataClearConfirmTitle;
+
+  /// No description provided for @galleryMetadataClearConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This deletes saved photo details. The index will be rebuilt as you browse the gallery.'**
+  String get galleryMetadataClearConfirmMessage;
+
+  /// No description provided for @galleryMetadataIndexClearedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Gallery metadata index cleared.'**
+  String get galleryMetadataIndexClearedMessage;
+
+  /// No description provided for @musicIndexClearAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear saved music index'**
+  String get musicIndexClearAction;
+
+  /// No description provided for @musicIndexClearConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear saved music index?'**
+  String get musicIndexClearConfirmTitle;
+
+  /// No description provided for @musicIndexClearConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This deletes saved track details. Music Mode will rebuild the index the next time it opens.'**
+  String get musicIndexClearConfirmMessage;
+
+  /// No description provided for @musicIndexClearedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Music index cleared.'**
+  String get musicIndexClearedMessage;
+
+  /// No description provided for @clearSavedIndexButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear index'**
+  String get clearSavedIndexButton;
+
+  /// No description provided for @appIndexClearedUnlockMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'App-storage copy cleared. Open the vault with write access to clear any index copy inside it.'**
+  String get appIndexClearedUnlockMessage;
+
+  /// No description provided for @savedIndexClearFailedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not clear all saved index data.'**
+  String get savedIndexClearFailedMessage;
+
+  /// No description provided for @libraryStorageReadOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Vault is read-only; the music index is not saved.'**
+  String get libraryStorageReadOnly;
+
+  /// No description provided for @clearLocalStorageThumbnailCacheMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This will delete cached thumbnails for Local Storage. They will be regenerated the next time you browse media.'**
+  String get clearLocalStorageThumbnailCacheMessage;
 }
 
 class _AppLocalizationsDelegate

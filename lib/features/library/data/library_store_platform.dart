@@ -42,16 +42,18 @@ class VaultLibraryStorePlatform implements LibraryStorePlatform {
     Uint8List key,
     Uint8List iv,
     Uint8List plaintext,
-  ) =>
-      _crypto.aesGcmEncrypt(key: key, iv: iv, plaintext: plaintext);
+  ) => _crypto.aesGcmEncrypt(key: key, iv: iv, plaintext: plaintext);
 
   @override
   Future<Uint8List?> aesGcmDecrypt(
     Uint8List key,
     Uint8List iv,
     Uint8List ciphertextAndTag,
-  ) =>
-      _crypto.aesGcmDecrypt(key: key, iv: iv, ciphertextAndTag: ciphertextAndTag);
+  ) => _crypto.aesGcmDecrypt(
+    key: key,
+    iv: iv,
+    ciphertextAndTag: ciphertextAndTag,
+  );
 
   @override
   Future<String> digest(String value) =>
@@ -104,8 +106,10 @@ class VaultLibraryStorePlatform implements LibraryStorePlatform {
     String path,
     Uint8List bytes,
   ) async {
+    final slash = path.lastIndexOf('/');
+    final parent = slash < 0 ? metaDir : path.substring(0, slash);
     // Returns false when the folder already exists; that is fine.
-    await _fileIo.createDirectory(c, metaDir);
+    await _fileIo.createDirectory(c, parent);
     return _fileIo.writeWholeFile(c, path, bytes);
   }
 

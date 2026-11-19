@@ -536,9 +536,9 @@ class _SideDetailsCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
+           Text(
                 name,
-                maxLines: 1,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: textTheme.labelLarge?.copyWith(
                   fontWeight: FontWeight.bold,
@@ -556,7 +556,7 @@ class _SideDetailsCard extends StatelessWidget {
         ),
         if (isNewer)
           Padding(
-            padding: const EdgeInsets.only(left: 8),
+            padding: const EdgeInsetsDirectional.only(start: 8),
             child: Icon(Icons.schedule_rounded, size: 16, color: cs.tertiary),
           ),
       ],

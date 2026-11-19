@@ -13,16 +13,20 @@ import 'gallery_meta_log_storage.dart';
 const _nonceSize = 12;
 const _tagSize = 16;
 
-/// Local-storage gallery metadata in the app cache.
+/// Gallery metadata index segments in app storage.
 ///
-/// Files live inside the per-container app-thumbnail cache directory, so
-/// clearing that cache or pruning the source removes this index too. Each
-/// segment is encrypted under the same Keystore-backed key as thumbnails.
+/// Files live in a dedicated per-container directory, separate from
+/// thumbnails. Each segment is encrypted with the app-cache key.
 class AppGalleryMetaFiles implements GalleryMetaFiles {
   AppGalleryMetaFiles({
     required MountedContainer container,
     required VaultCryptoApi crypto,
-  }) : _uri = container.uri,
+  }) : this.forUri(uri: container.uri, crypto: crypto);
+
+  AppGalleryMetaFiles.forUri({
+    required String uri,
+    required VaultCryptoApi crypto,
+  }) : _uri = uri,
        _crypto = crypto;
 
   final String _uri;
@@ -31,9 +35,7 @@ class AppGalleryMetaFiles implements GalleryMetaFiles {
 
   Future<Directory> _getDirectory() => _directory ??= () async {
     final root = await getApplicationSupportDirectory();
-    return Directory(
-      '${root.path}/thumbs/${md5HexOfString(_uri)}/gallery_meta',
-    );
+    return Directory('${root.path}/gallery_meta/${md5HexOfString(_uri)}');
   }();
 
   @override
@@ -114,5 +116,17 @@ class AppGalleryMetaFiles implements GalleryMetaFiles {
     } catch (_) {
       return false;
     }
+  }
+
+  /// Deletes every stored segment for this container.
+  Future<bool> clearSegments() async {
+    final names = await listNames();
+    if (names == null) return false;
+    var cleared = true;
+    for (final name in names) {
+      if (!GalleryMetaSegmentNames.isSegmentOrTemp(name)) continue;
+      if (!await delete(name)) cleared = false;
+    }
+    return cleared;
   }
 }

@@ -60,6 +60,9 @@ class MusicModeMenuButton extends StatelessWidget {
     return switch (location) {
       LibraryLocation.inVault => l10n.libraryStorageInVault,
       LibraryLocation.thisDevice => l10n.libraryStorageThisDevice,
+      LibraryLocation.hiddenFolder => l10n.libraryStorageHiddenFolder,
+      LibraryLocation.disabled => l10n.libraryStorageDisabled,
+      LibraryLocation.readOnly => l10n.libraryStorageReadOnly,
     };
   }
 

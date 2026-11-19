@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
+import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
@@ -18,14 +20,12 @@ import 'package:vaultexplorer/features/tools/widgets/vault_sync_entry_actions.da
 import 'package:vaultexplorer/features/tools/widgets/vault_sync_folder_screen.dart';
 import 'package:vaultexplorer/features/tools/widgets/vault_sync_location_picker_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/vault_sync_target_style.dart';
-import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
-import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
 enum _SyncDirectionMode { twoWay, oneWay, mirror }
 
 String _middleEllipsis(String value) {
-  const maxCodePoints = 18;
-  const prefixCodePoints = 8;
+  const maxCodePoints = 32;
+  const prefixCodePoints = 16;
   final codePoints = value.runes.toList();
   if (codePoints.length <= maxCodePoints) return value;
   const suffixCodePoints = maxCodePoints - prefixCodePoints - 1;
@@ -58,12 +58,15 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
     final result = await Navigator.push<VaultSyncSide>(
       context,
       MaterialPageRoute(
-        builder: (_) => SkinAreaScope(area: SkinArea.tools, child: VaultSyncLocationPickerSheet(
-          mountedContainers: containers,
-          showStorageChooser: true,
-          initialSide: isLeft ? state.left : state.right,
-          isLeft: isLeft,
-        )),
+        builder: (_) => SkinAreaScope(
+          area: SkinArea.tools,
+          child: VaultSyncLocationPickerSheet(
+            mountedContainers: containers,
+            showStorageChooser: true,
+            initialSide: isLeft ? state.left : state.right,
+            isLeft: isLeft,
+          ),
+        ),
       ),
     );
     if (result == null || !mounted) return;
@@ -75,7 +78,8 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
   int _pendingBytesToRight(VaultSyncState state) {
     var total = 0;
     for (final e in state.entries) {
-      if (ref.read(vaultSyncProvider.notifier).actionFor(e) == EntryAction.copyToRight) {
+      if (ref.read(vaultSyncProvider.notifier).actionFor(e) ==
+          EntryAction.copyToRight) {
         total += e.leftSizeBytes ?? 0;
       }
     }
@@ -85,7 +89,8 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
   int _pendingBytesToLeft(VaultSyncState state) {
     var total = 0;
     for (final e in state.entries) {
-      if (ref.read(vaultSyncProvider.notifier).actionFor(e) == EntryAction.copyToLeft) {
+      if (ref.read(vaultSyncProvider.notifier).actionFor(e) ==
+          EntryAction.copyToLeft) {
         total += e.rightSizeBytes ?? 0;
       }
     }
@@ -103,12 +108,18 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
     final pendingBytes = bytesToRight + bytesToLeft;
 
     final pendingTotal = state.entries
-        .where((e) => ref.read(vaultSyncProvider.notifier).actionFor(e) != EntryAction.skip)
+        .where(
+          (e) =>
+              ref.read(vaultSyncProvider.notifier).actionFor(e) !=
+              EntryAction.skip,
+        )
         .length;
 
     if (pendingTotal == 0) return;
 
-    final problems = await ref.read(vaultSyncProvider.notifier).checkAvailableSpace(
+    final problems = await ref
+        .read(vaultSyncProvider.notifier)
+        .checkAvailableSpace(
           bytesToLeft: bytesToLeft,
           bytesToRight: bytesToRight,
           l10n: context.l10n,
@@ -135,14 +146,17 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
     // Copying out of a vault leaves plain files on the other side -- say so.
     final plaintextTargets =
         ref.read(vaultSyncProvider.notifier).plaintextExportTargets();
-    var confirmMessage =
-        context.l10n.vaultSyncConfirmMessage(pendingTotal, formatBytes(pendingBytes));
+    var confirmMessage = context.l10n.vaultSyncConfirmMessage(
+      pendingTotal,
+      formatBytes(pendingBytes),
+    );
     if (plaintextTargets.isNotEmpty) {
       confirmMessage =
           '$confirmMessage\n\n${context.l10n.vaultSyncPlaintextWarning(plaintextTargets.join(', '))}';
     }
     // Deleting can't be undone, so say exactly how much will go.
-    final deleteCount = ref.read(vaultSyncProvider.notifier).pendingDeleteCount();
+    final deleteCount =
+        ref.read(vaultSyncProvider.notifier).pendingDeleteCount();
     if (deleteCount > 0) {
       confirmMessage =
           '$confirmMessage\n\n${context.l10n.vaultSyncConfirmDeletionsMessage(deleteCount)}';
@@ -183,9 +197,8 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
     );
   }
 
-  List<VaultDiffEntry> _selectedEntries(VaultSyncState state) => state.entries
-      .where((e) => state.selectedIds.contains(e.id))
-      .toList();
+  List<VaultDiffEntry> _selectedEntries(VaultSyncState state) =>
+      state.entries.where((e) => state.selectedIds.contains(e.id)).toList();
 
   void _onEntryTap(VaultSyncState state, VaultDiffEntry entry) {
     final notifier = ref.read(vaultSyncProvider.notifier);
@@ -222,7 +235,11 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(vaultSyncProvider);
     final pendingTotal = state.entries
-        .where((e) => ref.read(vaultSyncProvider.notifier).actionFor(e) != EntryAction.skip)
+        .where(
+          (e) =>
+              ref.read(vaultSyncProvider.notifier).actionFor(e) !=
+              EntryAction.skip,
+        )
         .length;
 
     final selecting = state.selectedIds.isNotEmpty;
@@ -282,7 +299,8 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
         state.progress.stage != VaultSyncScanStage.idle &&
         state.progress.stage != VaultSyncScanStage.cancelled &&
         state.entries.isNotEmpty;
-    final filtered = showResults ? _filteredEntries() : const <VaultDiffEntry>[];
+    final filtered =
+        showResults ? _filteredEntries() : const <VaultDiffEntry>[];
     final noMatches = showResults && filtered.isEmpty;
     final isLandscape = context.screen.useWideLayout;
 
@@ -332,7 +350,12 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
         }
         return Padding(
           padding: const EdgeInsets.only(bottom: 8),
-          child: _buildDiffTile(context, state, filtered[index - 1], isLandscape),
+          child: _buildDiffTile(
+            context,
+            state,
+            filtered[index - 1],
+            isLandscape,
+          ),
         );
       },
     );
@@ -340,22 +363,33 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
 
   // ── SIDE PICKERS ───────────────────────────────────────────────────────────
 
-  Widget _buildSidePickers(BuildContext context, VaultSyncState state, bool isLandscape) {
+  Widget _buildSidePickers(
+    BuildContext context,
+    VaultSyncState state,
+    bool isLandscape,
+  ) {
     final names = vaultSyncNamesOf(state.left, state.right, context.l10n);
     final sameLocationWarning = state.sidesOverlap
         ? Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
             child: Text(
               context.l10n.vaultSyncOverlapWarning,
-              style: context.typography.bodySmall?.copyWith(color: context.colors.error),
+              style: context.typography.bodySmall?.copyWith(
+                color: context.colors.error,
+              ),
             ),
           )
         : null;
 
     final swapButton = IconButton(
-      icon: Icon(isLandscape ? Icons.swap_horiz_rounded : Icons.swap_vert_rounded),
+      icon: Icon(
+        isLandscape ? Icons.swap_horiz_rounded : Icons.swap_vert_rounded,
+      ),
       tooltip: context.l10n.vaultSyncSwapTooltip,
-      onPressed: (state.left == null && state.right == null) || state.isComparing || state.isSyncing
+      onPressed:
+          (state.left == null && state.right == null) ||
+              state.isComparing ||
+              state.isSyncing
           ? null
           : () => ref.read(vaultSyncProvider.notifier).swapSides(),
     );
@@ -423,6 +457,128 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
               ? context.l10n.vaultFolderPickerRootLabel
               : side.relativePath);
 
+    final leadingIcon = Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: cs.primary.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: Icon(
+        side?.kind.icon ?? Icons.add_rounded,
+        color: cs.primary,
+        size: AppIconSize.small,
+      ),
+    );
+
+    final details = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Wrap(
+          spacing: 6,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text(
+              name,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            if (isReadOnly)
+              Tooltip(
+                message: context.l10n.vaultSyncReadOnlyTooltip,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: cs.errorContainer,
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.lock_outline_rounded,
+                        size: 11,
+                        color: cs.onErrorContainer,
+                      ),
+                      const SizedBox(width: 3),
+                      Flexible(
+                        child: Text(
+                          context.l10n.vaultSyncReadOnlyBadge,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.labelSmall?.copyWith(
+                            color: cs.onErrorContainer,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        if (side == null)
+          Text(
+            context.l10n.vaultSyncTapToSelect,
+            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          )
+        else ...[
+          Row(
+            children: [
+              Icon(
+                Icons.folder_outlined,
+                size: 13,
+                color: cs.onSurfaceVariant,
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  folder!,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          Text(
+            side.kind.label(context.l10n),
+            style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ],
+    );
+
+    final actionButton = FilledButton.tonalIcon(
+      onPressed: busy ? null : () => _pickSide(state, isLeft: isLeft),
+      icon: Icon(
+        unset ? Icons.add_rounded : Icons.edit_outlined,
+        size: 16,
+      ),
+      style: FilledButton.styleFrom(
+        visualDensity: VisualDensity.compact,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+      ),
+      label: Text(
+        unset
+            ? context.l10n.vaultSyncChooseButton
+            : context.l10n.vaultSyncChangeButton,
+      ),
+    );
+
     return Padding(
       padding: const EdgeInsets.all(8),
       child: Material(
@@ -438,111 +594,47 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
           onTap: busy ? null : () => _pickSide(state, isLeft: isLeft),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: cs.primary.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(AppRadius.md),
-                  ),
-                  child: Icon(
-                    side?.kind.icon ?? Icons.add_rounded,
-                    color: cs.primary,
-                    size: AppIconSize.small,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final textScale = MediaQuery.textScalerOf(context).scale(1.0);
+                final stackButton =
+                    constraints.maxWidth < 255 * textScale.clamp(1.0, 1.8);
+                if (stackButton) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Flexible(
-                            child: Text(
-                              name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                          if (isReadOnly) ...[
-                            const SizedBox(width: 6),
-                            Tooltip(
-                              message: context.l10n.vaultSyncReadOnlyTooltip,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: cs.errorContainer,
-                                  borderRadius: BorderRadius.circular(AppRadius.sm),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.lock_outline_rounded, size: 11, color: cs.onErrorContainer),
-                                    const SizedBox(width: 3),
-                                    Text(
-                                      context.l10n.vaultSyncReadOnlyBadge,
-                                      style: textTheme.labelSmall?.copyWith(
-                                        color: cs.onErrorContainer,
-                                        fontSize: 10,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
+                          leadingIcon,
+                          const SizedBox(width: 12),
+                          Expanded(child: details),
                         ],
                       ),
-                      const SizedBox(height: 2),
-                      if (side == null)
-                        Text(
-                          context.l10n.vaultSyncTapToSelect,
-                          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        )
-                      else ...[
-                        Row(
-                          children: [
-                            Icon(Icons.folder_outlined, size: 13, color: cs.onSurfaceVariant),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                folder!,
-                                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                        Text(
-                          side.kind.label(context.l10n),
-                          style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: AlignmentDirectional.centerEnd,
+                        child: actionButton,
+                      ),
                     ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                FilledButton.tonalIcon(
-                  onPressed: busy ? null : () => _pickSide(state, isLeft: isLeft),
-                  icon: Icon(unset ? Icons.add_rounded : Icons.edit_outlined, size: 16),
-                  style: FilledButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                  ),
-                  label: Text(
-                    unset ? context.l10n.vaultSyncChooseButton : context.l10n.vaultSyncChangeButton,
-                  ),
-                ),
-              ],
+                  );
+                }
+                return Row(
+                  children: [
+                    leadingIcon,
+                    const SizedBox(width: 12),
+                    Expanded(child: details),
+                    const SizedBox(width: 8),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: constraints.maxWidth * 0.45,
+                      ),
+                      child: actionButton,
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ),
@@ -583,11 +675,15 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
                   children: [
                     Text(
                       context.l10n.vaultSyncIntroTitle,
-                      style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                      style: textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     Text(
                       context.l10n.vaultSyncIntroSubtitle,
-                      style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                      style: textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
@@ -608,6 +704,7 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
               ),
               label: Text(
                 context.l10n.vaultSyncCompareButton,
+                textAlign: TextAlign.center,
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
@@ -640,7 +737,9 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
               Expanded(
                 child: Text(
                   context.l10n.vaultSyncComparingLabel,
-                  style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                  style: textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ],
@@ -657,12 +756,15 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
           ),
           const SizedBox(height: 12),
           Align(
-            alignment: Alignment.centerRight,
+            alignment: AlignmentDirectional.centerEnd,
             child: OutlinedButton.icon(
-              onPressed: () => ref.read(vaultSyncProvider.notifier).cancelCompare(),
+              onPressed: () =>
+                  ref.read(vaultSyncProvider.notifier).cancelCompare(),
               icon: const Icon(Icons.close_rounded, size: 16),
               label: Text(context.l10n.vaultSyncCancelCompareButton),
-              style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
+              style: OutlinedButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+              ),
             ),
           ),
         ],
@@ -723,71 +825,85 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
 
         return StatefulBuilder(
           builder: (context, setDialogState) {
+            Widget modeBadge(
+              String text, {
+              required Color backgroundColor,
+              required Color foregroundColor,
+              IconData? icon,
+            }) => Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: 3,
+              ),
+              decoration: BoxDecoration(
+                color: backgroundColor,
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (icon != null) ...[
+                    Icon(icon, size: 13, color: foregroundColor),
+                    const SizedBox(width: 4),
+                  ],
+                  Flexible(
+                    child: Text(
+                      text,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: foregroundColor,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+
             Widget modeTitle(
               IconData icon,
               String title, {
               bool destructive = false,
               bool recommended = false,
             }) => Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  icon,
-                  size: 18,
-                  color: destructive ? cs.error : cs.primary,
+                Padding(
+                  padding: const EdgeInsets.only(top: 1),
+                  child: Icon(
+                    icon,
+                    size: 18,
+                    color: destructive ? cs.error : cs.primary,
+                  ),
                 ),
                 const SizedBox(width: 8),
-                Expanded(child: Text(title)),
-                if (recommended) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: cs.primaryContainer,
-                      borderRadius: BorderRadius.circular(AppRadius.sm),
-                    ),
-                    child: Text(
-                      l10n.vaultSyncDirectionRecommendedLabel,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: cs.onPrimaryContainer,
-                        fontWeight: FontWeight.bold,
+                Expanded(
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        title,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                  ),
-                ],
-                if (destructive) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: cs.errorContainer,
-                      borderRadius: BorderRadius.circular(AppRadius.sm),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.warning_amber_rounded,
-                          size: 14,
-                          color: cs.onErrorContainer,
+                      if (recommended)
+                        modeBadge(
+                          l10n.vaultSyncDirectionRecommendedLabel,
+                          backgroundColor: cs.primaryContainer,
+                          foregroundColor: cs.onPrimaryContainer,
                         ),
-                        const SizedBox(width: 4),
-                        Text(
+                      if (destructive)
+                        modeBadge(
                           l10n.vaultSyncDirectionMirrorWarning,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: cs.onErrorContainer,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          backgroundColor: cs.errorContainer,
+                          foregroundColor: cs.onErrorContainer,
+                          icon: Icons.warning_amber_rounded,
                         ),
-                      ],
-                    ),
+                    ],
                   ),
-                ],
+                ),
               ],
             );
 
@@ -802,31 +918,46 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
               onTap: () => setDialogState(() => mode = value),
               borderRadius: BorderRadius.circular(AppRadius.md),
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Transform.translate(
-                      offset: const Offset(0, -10),
-                      child: Radio<_SyncDirectionMode>(
-                        value: value,
-                        activeColor: cs.primary,
-                      ),
+                    Radio<_SyncDirectionMode>(
+                      value: value,
+                      fillColor: WidgetStateProperty.resolveWith<Color?>((
+                        states,
+                      ) {
+                        if (states.contains(WidgetState.disabled)) return null;
+                        if (states.contains(WidgetState.selected)) {
+                          return cs.primary;
+                        }
+                        return null;
+                      }),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
                     ),
                     const SizedBox(width: 4),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          modeTitle(
-                            icon,
-                            title,
-                            destructive: destructive,
-                            recommended: recommended,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(subtitle),
-                        ],
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 5),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            modeTitle(
+                              icon,
+                              title,
+                              destructive: destructive,
+                              recommended: recommended,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              subtitle,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
@@ -837,8 +968,11 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
             Widget endpointCard(String name, String label) => Tooltip(
               message: name,
               child: Container(
-                height: MediaQuery.textScalerOf(context).scale(68),
-                padding: const EdgeInsets.symmetric(horizontal: 6),
+                constraints: const BoxConstraints(minHeight: 60),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: cs.surfaceContainerHigh,
                   borderRadius: BorderRadius.circular(AppRadius.md),
@@ -846,6 +980,7 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       _middleEllipsis(name),
@@ -853,9 +988,8 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
                         fontWeight: FontWeight.w600,
                         fontSize: 12,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.clip,
-                      softWrap: false,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 4),
@@ -864,6 +998,9 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: cs.onSurfaceVariant,
                       ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
                     ),
                   ],
                 ),
@@ -881,19 +1018,23 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
             };
 
             return Dialog(
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 24,
+              ),
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                  maxWidth: 440,
-                  maxHeight: mediaQuery.size.height * 0.82,
+                  maxWidth: 460,
+                  maxHeight: mediaQuery.size.height * 0.85,
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 20, 8, 12),
+                  padding: const EdgeInsets.fromLTRB(12, 20, 12, 14),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
                         child: Text(
                           l10n.vaultSyncDirectionLabel,
                           style: theme.textTheme.titleLarge?.copyWith(
@@ -943,11 +1084,12 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
                                 ),
                               ),
                               if (mode != _SyncDirectionMode.twoWay) ...[
+                                const SizedBox(height: 4),
                                 Padding(
                                   padding: const EdgeInsets.fromLTRB(
-                                    24,
+                                    12,
                                     8,
-                                    24,
+                                    12,
                                     8,
                                   ),
                                   child: Text(
@@ -961,63 +1103,93 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 12,
                                   ),
-                                  child: Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
-                                    children: [
-                                      Expanded(
-                                        child: endpointCard(
-                                          leftToRight
-                                              ? names.left
-                                              : names.right,
-                                          l10n.vaultSyncDirectionSourceLabel,
+                                  child: LayoutBuilder(
+                                    builder: (context, constraints) {
+                                      final textScale = MediaQuery.textScalerOf(
+                                        context,
+                                      ).scale(1.0);
+                                      final stackEndpoints =
+                                          constraints.maxWidth <
+                                          260 * textScale.clamp(1.0, 1.5);
+                                      final sourceCard = endpointCard(
+                                        leftToRight ? names.left : names.right,
+                                        l10n.vaultSyncDirectionSourceLabel,
+                                      );
+                                      final targetCard = endpointCard(
+                                        leftToRight ? names.right : names.left,
+                                        l10n.vaultSyncDirectionTargetLabel,
+                                      );
+                                      final swapButton = OutlinedButton.icon(
+                                        onPressed: () => setDialogState(
+                                          () => leftToRight = !leftToRight,
                                         ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Center(
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(
-                                              Icons.arrow_forward_rounded,
-                                              size: 18,
-                                              color: cs.primary,
+                                        icon: Icon(
+                                          stackEndpoints
+                                              ? Icons.swap_vert_rounded
+                                              : Icons.swap_horiz_rounded,
+                                          size: 16,
+                                        ),
+                                        label: Text(
+                                          l10n.vaultSyncDirectionSwapButton,
+                                          textAlign: TextAlign.center,
+                                        ),
+                                        style: OutlinedButton.styleFrom(
+                                          visualDensity: VisualDensity.compact,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 14,
+                                            vertical: 8,
+                                          ),
+                                        ),
+                                      );
+
+                                      return Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          if (stackEndpoints) ...[
+                                            sourceCard,
+                                            Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    vertical: 6,
+                                                  ),
+                                              child: Icon(
+                                                Icons.arrow_downward_rounded,
+                                                size: 20,
+                                                color: cs.primary,
+                                              ),
                                             ),
-                                            const SizedBox(height: 6),
-                                            OutlinedButton.icon(
-                                              onPressed: () => setDialogState(
-                                                () => leftToRight = !leftToRight,
-                                              ),
-                                              icon: const Icon(
-                                                Icons.swap_horiz_rounded,
-                                                size: 16,
-                                              ),
-                                              label: Text(
-                                                l10n.vaultSyncDirectionSwapButton,
-                                              ),
-                                              style: OutlinedButton.styleFrom(
-                                                visualDensity:
-                                                    VisualDensity.compact,
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                  horizontal: 8,
-                                                  vertical: 8,
-                                                ),
+                                            targetCard,
+                                          ] else
+                                            IntrinsicHeight(
+                                              child: Row(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.stretch,
+                                                children: [
+                                                  Expanded(child: sourceCard),
+                                                  Padding(
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 8,
+                                                        ),
+                                                    child: Center(
+                                                      child: Icon(
+                                                        Icons
+                                                            .arrow_forward_rounded,
+                                                        size: 20,
+                                                        color: cs.primary,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  Expanded(child: targetCard),
+                                                ],
                                               ),
                                             ),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Expanded(
-                                        child: endpointCard(
-                                          leftToRight
-                                              ? names.right
-                                              : names.left,
-                                          l10n.vaultSyncDirectionTargetLabel,
-                                        ),
-                                      ),
-                                    ],
+                                          const SizedBox(height: 10),
+                                          Center(child: swapButton),
+                                        ],
+                                      );
+                                    },
                                   ),
                                 ),
                                 const SizedBox(height: 8),
@@ -1027,15 +1199,17 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
                         ),
                       ),
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
+                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                        child: OverflowBar(
+                          alignment: MainAxisAlignment.end,
+                          overflowAlignment: OverflowBarAlignment.end,
+                          spacing: 8,
+                          overflowSpacing: 8,
                           children: [
                             TextButton(
                               onPressed: () => Navigator.pop(dialogContext),
                               child: Text(l10n.cancel),
                             ),
-                            const SizedBox(width: 8),
                             FilledButton(
                               onPressed: () => Navigator.pop(
                                 dialogContext,
@@ -1092,7 +1266,7 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
           padding: const EdgeInsets.only(top: 1),
           child: Text(
             summary,
-            maxLines: 2,
+            maxLines: 3,
             overflow: TextOverflow.ellipsis,
             style: context.typography.bodySmall?.copyWith(
               color: context.colors.onSurfaceVariant,
@@ -1107,15 +1281,29 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
 
   // ── SUMMARY & CONTROLS ─────────────────────────────────────────────────────
 
-  Widget _buildSummaryCard(BuildContext context, VaultSyncState state, bool isLandscape) {
+  Widget _buildSummaryCard(
+    BuildContext context,
+    VaultSyncState state,
+    bool isLandscape,
+  ) {
     final cs = context.colors;
     final textTheme = context.typography;
 
-    final onlyLeft = state.entries.where((e) => e.status == VaultDiffStatus.onlyLeft).length;
-    final onlyRight = state.entries.where((e) => e.status == VaultDiffStatus.onlyRight).length;
-    final leftNewer = state.entries.where((e) => e.status == VaultDiffStatus.leftNewer).length;
-    final rightNewer = state.entries.where((e) => e.status == VaultDiffStatus.rightNewer).length;
-    final conflicts = state.entries.where((e) => e.status == VaultDiffStatus.conflicted).length;
+    final onlyLeft = state.entries
+        .where((e) => e.status == VaultDiffStatus.onlyLeft)
+        .length;
+    final onlyRight = state.entries
+        .where((e) => e.status == VaultDiffStatus.onlyRight)
+        .length;
+    final leftNewer = state.entries
+        .where((e) => e.status == VaultDiffStatus.leftNewer)
+        .length;
+    final rightNewer = state.entries
+        .where((e) => e.status == VaultDiffStatus.rightNewer)
+        .length;
+    final conflicts = state.entries
+        .where((e) => e.status == VaultDiffStatus.conflicted)
+        .length;
     final names = vaultSyncNamesOf(state.left, state.right, context.l10n);
 
     return Container(
@@ -1135,7 +1323,11 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
                   color: cs.primaryContainer,
                   borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
-                child: Icon(Icons.difference_rounded, color: cs.onPrimaryContainer, size: AppIconSize.small),
+                child: Icon(
+                  Icons.difference_rounded,
+                  color: cs.onPrimaryContainer,
+                  size: AppIconSize.small,
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -1143,12 +1335,20 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      context.l10n.vaultSyncDifferencesFoundLabel(state.entries.length),
-                      style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                      context.l10n.vaultSyncDifferencesFoundLabel(
+                        state.entries.length,
+                      ),
+                      style: textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     Text(
-                      context.l10n.vaultSyncInSyncCountLabel(state.identicalCount),
-                      style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                      context.l10n.vaultSyncInSyncCountLabel(
+                        state.identicalCount,
+                      ),
+                      style: textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
@@ -1175,15 +1375,35 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
             runSpacing: 6,
             children: [
               if (onlyLeft > 0)
-                _buildTagBadge(context, context.l10n.vaultSyncBadgeOnlyIn(onlyLeft, names.left), cs.primary),
+                _buildTagBadge(
+                  context,
+                  context.l10n.vaultSyncBadgeOnlyIn(onlyLeft, names.left),
+                  cs.primary,
+                ),
               if (onlyRight > 0)
-                _buildTagBadge(context, context.l10n.vaultSyncBadgeOnlyIn(onlyRight, names.right), cs.secondary),
+                _buildTagBadge(
+                  context,
+                  context.l10n.vaultSyncBadgeOnlyIn(onlyRight, names.right),
+                  cs.secondary,
+                ),
               if (leftNewer > 0)
-                _buildTagBadge(context, context.l10n.vaultSyncBadgeNewerIn(leftNewer, names.left), cs.tertiary),
+                _buildTagBadge(
+                  context,
+                  context.l10n.vaultSyncBadgeNewerIn(leftNewer, names.left),
+                  cs.tertiary,
+                ),
               if (rightNewer > 0)
-                _buildTagBadge(context, context.l10n.vaultSyncBadgeNewerIn(rightNewer, names.right), cs.tertiary),
+                _buildTagBadge(
+                  context,
+                  context.l10n.vaultSyncBadgeNewerIn(rightNewer, names.right),
+                  cs.tertiary,
+                ),
               if (conflicts > 0)
-                _buildTagBadge(context, context.l10n.vaultSyncBadgeConflicts(conflicts), cs.error),
+                _buildTagBadge(
+                  context,
+                  context.l10n.vaultSyncBadgeConflicts(conflicts),
+                  cs.error,
+                ),
             ],
           ),
           const SizedBox(height: 10),
@@ -1202,9 +1422,13 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
       ),
       child: Text(
         label,
-        maxLines: 1,
+        maxLines: 2,
         overflow: TextOverflow.ellipsis,
-        style: context.typography.labelSmall?.copyWith(color: color, fontWeight: FontWeight.bold, fontSize: 10),
+        style: context.typography.labelSmall?.copyWith(
+          color: color,
+          fontWeight: FontWeight.bold,
+          fontSize: 10,
+        ),
       ),
     );
   }
@@ -1216,7 +1440,9 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
     String filterLabel(VaultSyncFilter f) => switch (f) {
       VaultSyncFilter.all => context.l10n.vaultSyncFilterAll,
       VaultSyncFilter.onlyLeft => context.l10n.vaultSyncFilterOnlyIn(names.left),
-      VaultSyncFilter.onlyRight => context.l10n.vaultSyncFilterOnlyIn(names.right),
+      VaultSyncFilter.onlyRight => context.l10n.vaultSyncFilterOnlyIn(
+        names.right,
+      ),
       VaultSyncFilter.newer => context.l10n.vaultSyncFilterNewer,
       VaultSyncFilter.conflicts => context.l10n.vaultSyncFilterConflicts,
       VaultSyncFilter.deletions => context.l10n.vaultSyncFilterDeletions,
@@ -1228,13 +1454,13 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
       VaultSyncSort.status => context.l10n.vaultSyncSortStatus,
     };
     final notifier = ref.read(vaultSyncProvider.notifier);
-    return SizedBox(
-      height: 44,
-      child: Row(
-        children: [
-          Expanded(
-            child: ListView(
-              scrollDirection: Axis.horizontal,
+    return Row(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(
               children: [
                 for (final f in VaultSyncFilter.values)
                   Padding(
@@ -1249,46 +1475,91 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
               ],
             ),
           ),
-          PopupMenuButton<VaultSyncSort>(
-            icon: const Icon(Icons.swap_vert_rounded),
-            tooltip: context.l10n.vaultSyncSortTooltip,
-            initialValue: state.sort,
-            onSelected: notifier.setSort,
-            itemBuilder: (_) => [
-              for (final o in VaultSyncSort.values)
-                PopupMenuItem(value: o, child: Text(sortLabel(o))),
-            ],
-          ),
-        ],
-      ),
+        ),
+        PopupMenuButton<VaultSyncSort>(
+          icon: const Icon(Icons.swap_vert_rounded),
+          tooltip: context.l10n.vaultSyncSortTooltip,
+          initialValue: state.sort,
+          onSelected: notifier.setSort,
+          itemBuilder: (_) => [
+            for (final o in VaultSyncSort.values)
+              PopupMenuItem(value: o, child: Text(sortLabel(o))),
+          ],
+        ),
+      ],
     );
   }
 
   Widget _buildStaleBanner(BuildContext context) {
     final cs = context.colors;
+    final message = Text(
+      context.l10n.vaultSyncResultsStaleMessage,
+      style: context.typography.bodySmall?.copyWith(
+        color: cs.onSecondaryContainer,
+      ),
+    );
+    final action = TextButton(
+      onPressed: () => ref.read(vaultSyncProvider.notifier).startCompare(),
+      child: Text(context.l10n.vaultSyncRecompareButton),
+    );
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: cs.secondaryContainer,
         borderRadius: BorderRadius.circular(AppRadius.md),
       ),
-      child: Row(
-        children: [
-          Icon(Icons.info_outline_rounded, size: 18, color: cs.onSecondaryContainer),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              context.l10n.vaultSyncResultsStaleMessage,
-              style: context.typography.bodySmall?.copyWith(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final textScale = MediaQuery.textScalerOf(context).scale(1.0);
+          final stackAction =
+              constraints.maxWidth < 300 * textScale.clamp(1.0, 1.8);
+          if (stackAction) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(top: 1),
+                      child: Icon(
+                        Icons.info_outline_rounded,
+                        size: 18,
+                        color: cs.onSecondaryContainer,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(child: message),
+                  ],
+                ),
+                Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: action,
+                ),
+              ],
+            );
+          }
+          return Row(
+            children: [
+              Icon(
+                Icons.info_outline_rounded,
+                size: 18,
                 color: cs.onSecondaryContainer,
               ),
-            ),
-          ),
-          TextButton(
-            onPressed: () => ref.read(vaultSyncProvider.notifier).startCompare(),
-            child: Text(context.l10n.vaultSyncRecompareButton),
-          ),
-        ],
+              const SizedBox(width: 8),
+              Expanded(child: message),
+              const SizedBox(width: 4),
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: constraints.maxWidth * 0.42,
+                ),
+                child: action,
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -1356,36 +1627,56 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
                 label: Text(context.l10n.vaultSyncActionSkip),
               ),
               PopupMenuButton<(bool, bool)>(
-                enabled: any(EntryAction.deleteLeft) || any(EntryAction.deleteRight),
+                enabled:
+                    any(EntryAction.deleteLeft) || any(EntryAction.deleteRight),
                 tooltip: context.l10n.delete,
                 onSelected: (v) => unawaited(deleteNow(l: v.$1, r: v.$2)),
                 itemBuilder: (_) => [
                   if (any(EntryAction.deleteLeft))
                     PopupMenuItem(
                       value: (true, false),
-                      child: Text(context.l10n.vaultSyncDeleteFromAction(names.left)),
+                      child: Text(
+                        context.l10n.vaultSyncDeleteFromAction(names.left),
+                      ),
                     ),
                   if (any(EntryAction.deleteRight))
                     PopupMenuItem(
                       value: (false, true),
-                      child: Text(context.l10n.vaultSyncDeleteFromAction(names.right)),
+                      child: Text(
+                        context.l10n.vaultSyncDeleteFromAction(names.right),
+                      ),
                     ),
-                  if (any(EntryAction.deleteLeft) && any(EntryAction.deleteRight))
+                  if (any(EntryAction.deleteLeft) &&
+                      any(EntryAction.deleteRight))
                     PopupMenuItem(
                       value: (true, true),
                       child: Text(context.l10n.vaultSyncDeleteFromBothAction),
                     ),
                 ],
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.delete_outline_rounded, size: 18, color: cs.error),
+                      Icon(
+                        Icons.delete_outline_rounded,
+                        size: 18,
+                        color: cs.error,
+                      ),
                       const SizedBox(width: 6),
-                      Text(
-                        context.l10n.delete,
-                        style: TextStyle(color: cs.error, fontWeight: FontWeight.w600),
+                      Flexible(
+                        child: Text(
+                          context.l10n.delete,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: cs.error,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -1460,6 +1751,7 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
           padding: const EdgeInsets.only(top: 4),
           child: Wrap(
             spacing: 6,
+            runSpacing: 4,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               _buildTagBadge(context, statusLabel, statusColor),
@@ -1498,48 +1790,70 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
         onTap: () => _onEntryTap(state, entry),
         onLongPress: () => _onEntryLongPress(entry),
         child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  entry.isDir ? Icons.folder_rounded : iconForFile(entry.name),
-                  size: 18,
-                  color: entry.isDir ? cs.secondary : colorForFile(entry.name),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              LayoutBuilder(
+                builder: (context, constraints) => Row(
+                  children: [
+                    Icon(
+                      entry.isDir ? Icons.folder_rounded : iconForFile(entry.name),
+                      size: 18,
+                      color:
+                          entry.isDir ? cs.secondary : colorForFile(entry.name),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        entry.relativePath,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: constraints.maxWidth * 0.45,
+                      ),
+                      child: _buildTagBadge(context, statusLabel, statusColor),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    entry.relativePath,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildSideDetail(
+                      context,
+                      entry,
+                      names,
+                      isLeftSide: true,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                _buildTagBadge(context, statusLabel, statusColor),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildSideDetail(context, entry, names, isLeftSide: true),
-                ),
-                SizedBox(
-                  width: 44,
-                  child: Center(child: _buildActionMenu(context, state, entry, action)),
-                ),
-                Expanded(
-                  child: _buildSideDetail(context, entry, names, isLeftSide: false),
-                ),
-              ],
-            ),
-          ],
+                  SizedBox(
+                    width: 44,
+                    child: Center(
+                      child: _buildActionMenu(context, state, entry, action),
+                    ),
+                  ),
+                  Expanded(
+                    child: _buildSideDetail(
+                      context,
+                      entry,
+                      names,
+                      isLeftSide: false,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
@@ -1551,8 +1865,11 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
     required bool isLeftSide,
   }) {
     final cs = context.colors;
-    final style = context.typography.bodySmall?.copyWith(color: cs.onSurfaceVariant);
-    final align = isLeftSide ? CrossAxisAlignment.start : CrossAxisAlignment.end;
+    final style = context.typography.bodySmall?.copyWith(
+      color: cs.onSurfaceVariant,
+    );
+    final align =
+        isLeftSide ? CrossAxisAlignment.start : CrossAxisAlignment.end;
     final textAlign = isLeftSide ? TextAlign.left : TextAlign.right;
     final name = names.of(isLeft: isLeftSide);
     final absentHere = isLeftSide
@@ -1560,7 +1877,8 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
         : entry.status == VaultDiffStatus.onlyLeft;
 
     final sizeBytes = isLeftSide ? entry.leftSizeBytes : entry.rightSizeBytes;
-    final modifiedSecs = isLeftSide ? entry.leftModifiedSecs : entry.rightModifiedSecs;
+    final modifiedSecs =
+        isLeftSide ? entry.leftModifiedSecs : entry.rightModifiedSecs;
     final onlyOnThisSide = isLeftSide
         ? entry.status == VaultDiffStatus.onlyLeft
         : entry.status == VaultDiffStatus.onlyRight;
@@ -1569,10 +1887,12 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
     if (absentHere) {
       text = '—';
     } else if (entry.isDir && onlyOnThisSide) {
-      final sizeText = sizeBytes != null && sizeBytes > 0 ? '${formatBytes(sizeBytes)} · ' : '';
+      final sizeText =
+          sizeBytes != null && sizeBytes > 0 ? '${formatBytes(sizeBytes)} · ' : '';
       text = '$sizeText${context.l10n.vaultSyncFolderOnlyInDetail(name)}';
     } else {
-      text = '${formatBytes(sizeBytes ?? 0)} · ${formatEntryDateTime(modifiedSecs ?? 0, context)}';
+      text =
+          '${formatBytes(sizeBytes ?? 0)} · ${formatEntryDateTime(modifiedSecs ?? 0, context)}';
     }
 
     return Column(
@@ -1581,14 +1901,14 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
       children: [
         Text(
           name,
-          maxLines: 1,
+          maxLines: 2,
           overflow: TextOverflow.ellipsis,
           textAlign: textAlign,
           style: style?.copyWith(fontWeight: FontWeight.w600),
         ),
         Text(
           text,
-          maxLines: 1,
+          maxLines: 2,
           overflow: TextOverflow.ellipsis,
           textAlign: textAlign,
           style: style,
@@ -1597,11 +1917,18 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
     );
   }
 
-  Widget _buildDiffDetailText(BuildContext context, VaultDiffEntry entry, VaultSyncNames names) {
-    final style = context.typography.bodySmall?.copyWith(color: context.colors.onSurfaceVariant);
+  Widget _buildDiffDetailText(
+    BuildContext context,
+    VaultDiffEntry entry,
+    VaultSyncNames names,
+  ) {
+    final style = context.typography.bodySmall?.copyWith(
+      color: context.colors.onSurfaceVariant,
+    );
     switch (entry.status) {
       case VaultDiffStatus.onlyLeft:
-        final sizeText = entry.leftSizeBytes != null && entry.leftSizeBytes! > 0
+        final sizeText =
+            entry.leftSizeBytes != null && entry.leftSizeBytes! > 0
             ? '${formatBytes(entry.leftSizeBytes!)} · '
             : '';
         return Text(
@@ -1611,7 +1938,8 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
           style: style,
         );
       case VaultDiffStatus.onlyRight:
-        final sizeText = entry.rightSizeBytes != null && entry.rightSizeBytes! > 0
+        final sizeText =
+            entry.rightSizeBytes != null && entry.rightSizeBytes! > 0
             ? '${formatBytes(entry.rightSizeBytes!)} · '
             : '';
         return Text(
@@ -1625,7 +1953,7 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
       case VaultDiffStatus.conflicted:
       case VaultDiffStatus.identical:
       case VaultDiffStatus.bothFolders:
-        // Two lines, so both full date-times fit without being cut off.
+        // Allow wrapping when localized storage names + timestamps exceed one line.
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -1633,13 +1961,13 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
             Text(
               '${names.left}  ${formatBytes(entry.leftSizeBytes ?? 0)} · ${formatEntryDateTime(entry.leftModifiedSecs ?? 0, context)}',
               style: style,
-              maxLines: 1,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
             Text(
               '${names.right}  ${formatBytes(entry.rightSizeBytes ?? 0)} · ${formatEntryDateTime(entry.rightModifiedSecs ?? 0, context)}',
               style: style,
-              maxLines: 1,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
           ],
@@ -1670,7 +1998,10 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
       EntryAction.copyToLeft => (Icons.arrow_back_rounded, cs.secondary),
       EntryAction.deleteLeft ||
       EntryAction.deleteRight => (Icons.delete_outline_rounded, cs.error),
-      EntryAction.skip => (Icons.remove_circle_outline_rounded, cs.onSurfaceVariant),
+      EntryAction.skip => (
+        Icons.remove_circle_outline_rounded,
+        cs.onSurfaceVariant,
+      ),
     };
 
     if (state.isSyncing) {
@@ -1725,65 +2056,98 @@ class _VaultSyncScreenState extends ConsumerState<VaultSyncScreen> {
   ) {
     final cs = context.colors;
     final textTheme = context.typography;
-    final pendingBytes = _pendingBytesToRight(state) + _pendingBytesToLeft(state);
-    final pendingDeletes = ref.read(vaultSyncProvider.notifier).pendingDeleteCount();
+    final pendingBytes =
+        _pendingBytesToRight(state) + _pendingBytesToLeft(state);
+    final pendingDeletes =
+        ref.read(vaultSyncProvider.notifier).pendingDeleteCount();
+
+    final summaryColumn = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          context.l10n.vaultSyncChangesQueuedLabel(pendingTotal),
+          style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        Text(
+          formatBytes(pendingBytes),
+          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+        ),
+        if (pendingDeletes > 0)
+          Text(
+            context.l10n.vaultSyncDeletionsQueuedLabel(pendingDeletes),
+            style: textTheme.bodySmall?.copyWith(
+              color: cs.error,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+      ],
+    );
+
+    final syncButton = FilledButton.icon(
+      style: FilledButton.styleFrom(
+        minimumSize: const Size(0, 44),
+        shape: const StadiumBorder(),
+      ),
+      onPressed: state.isSyncing ? null : () => _confirmAndSync(state),
+      icon: state.isSyncing
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.sync_rounded, size: 18),
+      label: Text(
+        state.isSyncing
+            ? context.l10n.vaultSyncSyncingButton
+            : context.l10n.vaultSyncSyncNowButton,
+        textAlign: TextAlign.center,
+        style: const TextStyle(fontWeight: FontWeight.bold),
+      ),
+    );
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 8),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: 8,
+      ),
       decoration: BoxDecoration(
         color: cs.surfaceContainerHigh,
-        border: Border(top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3))),
+        border: Border(
+          top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
+        ),
       ),
       child: SafeArea(
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final textScale = MediaQuery.textScalerOf(context).scale(1.0);
+            final stackBar =
+                constraints.maxWidth < 340 * textScale.clamp(1.0, 1.8);
+            if (stackBar) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    context.l10n.vaultSyncChangesQueuedLabel(pendingTotal),
-                    style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    formatBytes(pendingBytes),
-                    style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                  ),
-                  if (pendingDeletes > 0)
-                    Text(
-                      context.l10n.vaultSyncDeletionsQueuedLabel(pendingDeletes),
-                      style: textTheme.bodySmall?.copyWith(
-                        color: cs.error,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                  summaryColumn,
+                  const SizedBox(height: 8),
+                  syncButton,
                 ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            FilledButton.icon(
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(0, 44),
-                shape: const StadiumBorder(),
-              ),
-              onPressed: state.isSyncing ? null : () => _confirmAndSync(state),
-              icon: state.isSyncing
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.sync_rounded, size: 18),
-              label: Text(
-                state.isSyncing
-                    ? context.l10n.vaultSyncSyncingButton
-                    : context.l10n.vaultSyncSyncNowButton,
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
+              );
+            }
+            return Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(child: summaryColumn),
+                const SizedBox(width: 12),
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: constraints.maxWidth * 0.62,
+                  ),
+                  child: syncButton,
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

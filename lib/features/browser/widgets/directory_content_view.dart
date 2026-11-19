@@ -2519,6 +2519,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             containerUri: widget.container.isLocalStorage
                 ? null
                 : widget.container.uri,
+            container: widget.container,
           ),
         ),
       ),

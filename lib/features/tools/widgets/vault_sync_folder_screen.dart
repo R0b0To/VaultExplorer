@@ -49,11 +49,8 @@ class VaultSyncFolderScreen extends ConsumerStatefulWidget {
 }
 
 class _VaultSyncFolderScreenState extends ConsumerState<VaultSyncFolderScreen> {
-  /// Row height. Scales with the system text size so the three text lines in
-  /// a row never overflow, and stays fixed per build so the list can jump
-  /// straight to a highlighted row.
-  double _rowExtentFor(BuildContext context) =>
-      (MediaQuery.textScalerOf(context).scale(62) + 30).roundToDouble();
+  final GlobalKey _highlightKey = GlobalKey();
+  final Set<_RowIndexTrackerState> _mountedRows = {};
 
   late String _path = widget.initialPath;
   String? _highlight;
@@ -110,7 +107,7 @@ class _VaultSyncFolderScreenState extends ConsumerState<VaultSyncFolderScreen> {
     _scrollToHighlight();
   }
 
-  void _scrollToHighlight() {
+  void _scrollToHighlight({int attempt = 0}) {
     final target = _highlight;
     final listing = _listing;
     if (target == null || listing == null) return;
@@ -119,12 +116,30 @@ class _VaultSyncFolderScreenState extends ConsumerState<VaultSyncFolderScreen> {
     );
     if (index < 0) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_scroll.hasClients) return;
-      final offset = (index * _rowExtentFor(context) - 120).clamp(
+      if (!mounted || !_scroll.hasClients || attempt > 6) return;
+      final ctx = _highlightKey.currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(ctx, alignment: 0.25);
+        return;
+      }
+      if (_mountedRows.isEmpty) return;
+      var minIdx = _mountedRows.first.widget.index;
+      var maxIdx = minIdx;
+      for (final r in _mountedRows) {
+        final idx = r.widget.index;
+        if (idx < minIdx) minIdx = idx;
+        if (idx > maxIdx) maxIdx = idx;
+      }
+      final mid = (minIdx + maxIdx) / 2.0;
+      final estExtent = (MediaQuery.textScalerOf(context).scale(86) + 28)
+          .roundToDouble();
+      final targetOffset = (_scroll.offset + (index - mid) * estExtent).clamp(
         0.0,
         _scroll.position.maxScrollExtent,
       );
-      _scroll.jumpTo(offset);
+      if ((targetOffset - _scroll.offset).abs() < 1.0) return;
+      _scroll.jumpTo(targetOffset);
+      _scrollToHighlight(attempt: attempt + 1);
     });
   }
 
@@ -332,35 +347,35 @@ class _VaultSyncFolderScreenState extends ConsumerState<VaultSyncFolderScreen> {
     ],
   );
 
-  Widget _breadcrumb(BuildContext context, VaultSyncNames names) {
+   Widget _breadcrumb(BuildContext context, VaultSyncNames names) {
     final cs = context.colors;
     final textTheme = context.typography;
     final segments = _path.isEmpty ? <String>[] : _path.split('/');
-    return SizedBox(
-      height: 44,
-      child: ListView(
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 44),
+      child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        children: [
-          _crumb(context, context.l10n.vaultFolderPickerRootLabel, '', last: segments.isEmpty),
-          for (var i = 0; i < segments.length; i++) ...[
-            Icon(Icons.chevron_right_rounded, size: 18, color: cs.onSurfaceVariant),
-            _crumb(
-              context,
-              segments[i],
-              segments.sublist(0, i + 1).join('/'),
-              last: i == segments.length - 1,
-            ),
-          ],
-          const SizedBox(width: 12),
-          Center(
-            child: Text(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        child: Row(
+          children: [
+            _crumb(context, context.l10n.vaultFolderPickerRootLabel, '', last: segments.isEmpty),
+            for (var i = 0; i < segments.length; i++) ...[
+              Icon(Icons.chevron_right_rounded, size: 18, color: cs.onSurfaceVariant),
+              _crumb(
+                context,
+                segments[i],
+                segments.sublist(0, i + 1).join('/'),
+                last: i == segments.length - 1,
+              ),
+            ],
+            const SizedBox(width: 12),
+            Text(
               '${names.left}  ⇄  ${names.right}',
               style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
               maxLines: 1,
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -394,23 +409,25 @@ class _VaultSyncFolderScreenState extends ConsumerState<VaultSyncFolderScreen> {
         names.right,
       ),
     };
-    return SizedBox(
-      height: 48,
-      child: ListView(
+    return Align(
+      alignment: AlignmentDirectional.centerStart,
+      child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        children: [
-          for (final f in _ExplorerFilter.values)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: ChoiceChip(
-                label: Text(label(f)),
-                showCheckmark: false,
-                selected: _filter == f,
-                onSelected: (_) => setState(() => _filter = f),
+        child: Row(
+          children: [
+            for (final f in _ExplorerFilter.values)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ChoiceChip(
+                  label: Text(label(f)),
+                  showCheckmark: false,
+                  selected: _filter == f,
+                  onSelected: (_) => setState(() => _filter = f),
+                ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -442,16 +459,23 @@ class _VaultSyncFolderScreenState extends ConsumerState<VaultSyncFolderScreen> {
         message: context.l10n.vaultSyncExplorerEmptyMessage,
       );
     }
+   final highlightIndex = _highlight == null
+        ? -1
+        : rows.indexWhere((e) => e.relativePath == _highlight);
     return Stack(
       children: [
         ListView.builder(
           controller: _scroll,
-          itemExtent: _rowExtentFor(context),
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
           itemCount: rows.length,
-          itemBuilder: (context, i) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: _row(context, rows[i], names),
+          itemBuilder: (context, i) => _RowIndexTracker(
+            index: i,
+            registry: _mountedRows,
+            child: Padding(
+              key: i == highlightIndex ? _highlightKey : null,
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _row(context, rows[i], names),
+            ),
           ),
         ),
         if (_loading)
@@ -465,14 +489,13 @@ class _VaultSyncFolderScreenState extends ConsumerState<VaultSyncFolderScreen> {
     );
   }
 
-  Widget _row(BuildContext context, VaultDiffEntry e, VaultSyncNames names) {
+ Widget _row(BuildContext context, VaultDiffEntry e, VaultSyncNames names) {
     final cs = context.colors;
     final textTheme = context.typography;
     final selected = _selected.contains(e.id);
     final highlighted = e.relativePath == _highlight;
     final color = e.statusColor(cs);
 
-    // One line per storage: its name, then size and full date + time.
     Widget sideLine(bool isLeft) {
       final present = isLeft ? e.existsOnLeft : e.existsOnRight;
       final size = isLeft ? e.leftSizeBytes : e.rightSizeBytes;
@@ -487,29 +510,41 @@ class _VaultSyncFolderScreenState extends ConsumerState<VaultSyncFolderScreen> {
               formatEntryDateTime(secs ?? 0, context),
             ].join(' · ');
       final style = textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant);
-      return Row(
-        children: [
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 110),
-            child: Text(
-              isLeft ? names.left : names.right,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+      final sideName = isLeft ? names.left : names.right;
+
+      return Text.rich(
+        TextSpan(
+          style: style,
+          children: [
+            TextSpan(
+              text: '$sideName  ',
               style: style?.copyWith(fontWeight: FontWeight.w600),
             ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              detail,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: style,
-            ),
-          ),
-        ],
+            TextSpan(text: detail),
+          ],
+        ),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
       );
     }
+
+    final statusBadge = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+      ),
+      child: Text(
+        e.statusLabel(context.l10n, names),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: textTheme.labelSmall?.copyWith(
+          color: color,
+          fontWeight: FontWeight.bold,
+          fontSize: 10,
+        ),
+      ),
+    );
 
     return Material(
       color: selected
@@ -523,78 +558,69 @@ class _VaultSyncFolderScreenState extends ConsumerState<VaultSyncFolderScreen> {
         onTap: () => _onRowTap(e),
         onLongPress: () => _toggle(e),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(
-                selected
-                    ? Icons.check_circle_rounded
-                    : e.isDir
-                    ? Icons.folder_rounded
-                    : iconForFile(e.name),
-                color: selected
-                    ? cs.primary
-                    : e.isDir
-                    ? cs.secondary
-                    : colorForFile(e.name),
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Icon(
+                  selected
+                      ? Icons.check_circle_rounded
+                      : e.isDir
+                      ? Icons.folder_rounded
+                      : iconForFile(e.name),
+                  color: selected
+                      ? cs.primary
+                      : e.isDir
+                      ? cs.secondary
+                      : colorForFile(e.name),
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      e.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            e.name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        if (!_selecting) ...[
+                          const SizedBox(width: 4),
+                          InkWell(
+                            borderRadius: BorderRadius.circular(AppRadius.sm),
+                            onTap: () => _showSheet(e),
+                            child: Padding(
+                              padding: const EdgeInsets.all(2),
+                              child: Icon(
+                                Icons.more_horiz_rounded,
+                                size: 20,
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 4),
+                    statusBadge,
+                    const SizedBox(height: 4),
                     sideLine(true),
+                    const SizedBox(height: 2),
                     sideLine(false),
                   ],
                 ),
-              ),
-              const SizedBox(width: 8),
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Container(
-                    constraints: const BoxConstraints(maxWidth: 120),
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(AppRadius.sm),
-                    ),
-                    child: Text(
-                      e.statusLabel(context.l10n, names),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.labelSmall?.copyWith(
-                        color: color,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 10,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  if (!_selecting)
-                    InkWell(
-                      borderRadius: BorderRadius.circular(AppRadius.sm),
-                      onTap: () => _showSheet(e),
-                      child: Padding(
-                        padding: const EdgeInsets.all(2),
-                        child: Icon(
-                          Icons.more_horiz_rounded,
-                          size: 20,
-                          color: cs.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                ],
               ),
             ],
           ),
@@ -667,16 +693,20 @@ class _VaultSyncFolderScreenState extends ConsumerState<VaultSyncFolderScreen> {
                       child: Text(context.l10n.vaultSyncDeleteFromBothAction),
                     ),
                 ],
-                child: Padding(
+               child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(Icons.delete_outline_rounded, size: 18, color: cs.error),
                       const SizedBox(width: 6),
-                      Text(
-                        context.l10n.delete,
-                        style: TextStyle(color: cs.error, fontWeight: FontWeight.w600),
+                      Flexible(
+                        child: Text(
+                          context.l10n.delete,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: cs.error, fontWeight: FontWeight.w600),
+                        ),
                       ),
                     ],
                   ),
@@ -688,4 +718,45 @@ class _VaultSyncFolderScreenState extends ConsumerState<VaultSyncFolderScreen> {
       ),
     );
   }
+}
+
+class _RowIndexTracker extends StatefulWidget {
+  final int index;
+  final Set<_RowIndexTrackerState> registry;
+  final Widget child;
+
+  const _RowIndexTracker({
+    required this.index,
+    required this.registry,
+    required this.child,
+  });
+
+  @override
+  State<_RowIndexTracker> createState() => _RowIndexTrackerState();
+}
+
+class _RowIndexTrackerState extends State<_RowIndexTracker> {
+  @override
+  void initState() {
+    super.initState();
+    widget.registry.add(this);
+  }
+
+  @override
+  void didUpdateWidget(_RowIndexTracker oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.registry != widget.registry) {
+      oldWidget.registry.remove(this);
+      widget.registry.add(this);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.registry.remove(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

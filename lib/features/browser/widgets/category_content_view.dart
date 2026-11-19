@@ -194,6 +194,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
   Map<int, MountedContainer> _containers = const {};
   Map<int, CategorySource> _sources = const {};
   Map<int, ThumbnailSettings?> _thumbs = const {};
+  Map<int, ThumbnailCacheMode> _galleryMetaModes = const {};
   CancellationToken? _token;
   bool _scanning = true;
   bool _disposed = false;
@@ -1006,7 +1007,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       (volId) => _containers[volId],
       allowWrite: (volId) =>
           _metaCacheMode(volId) != ThumbnailCacheMode.disabled,
-      localCacheMode: _metaCacheMode,
+      metadataCacheMode: _metaCacheMode,
       appFilesOf: (container) =>
           AppGalleryMetaFiles(container: container, crypto: crypto),
     );
@@ -1028,8 +1029,22 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     return index;
   }
 
-  ThumbnailCacheMode _metaCacheMode(int volId) =>
-      _thumbs[volId]?.cacheMode ?? ThumbnailCacheMode.appCache;
+  ThumbnailCacheMode _metaCacheMode(int volId) {
+    final selected = _galleryMetaModes[volId];
+    if (selected != null) return selected;
+    final container = _containers[volId];
+    if (container == null) return ThumbnailCacheMode.disabled;
+    final settings = ref.read(
+      fileManagerToolbarSettingsProvider(
+        container.isLocalStorage ? null : container.uri,
+      ),
+    );
+    if (container.isLocalStorage) {
+      return settings.config.localStorageGalleryMetadataCacheMode;
+    }
+    return settings.record?.galleryMetadataCacheMode ??
+        settings.config.defaultGalleryMetadataCacheMode;
+  }
 
   /// Every move of the list. The first one holds back what would change the
   /// list under the finger; [_onScrollIdle] lets it through again once the
@@ -2657,6 +2672,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     final hasLocations = ref.watch(externalStorageLocationsProvider).isNotEmpty;
 
     final thumbs = <int, ThumbnailSettings?>{};
+    final galleryMetaModes = <int, ThumbnailCacheMode>{};
     for (final container in _containers.values) {
       final state = ref.watch(
         fileManagerToolbarSettingsProvider(
@@ -2670,8 +2686,13 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
               isLocalStorage: container.isLocalStorage,
               record: state.record,
             );
+      galleryMetaModes[container.volId] = container.isLocalStorage
+          ? state.config.localStorageGalleryMetadataCacheMode
+          : (state.record?.galleryMetadataCacheMode ??
+                state.config.defaultGalleryMetadataCacheMode);
     }
     _thumbs = thumbs;
+    _galleryMetaModes = galleryMetaModes;
 
     final items = _currentItems();
     final selection = ref.watch(fileBrowserSelectionProvider(widget.tabId));

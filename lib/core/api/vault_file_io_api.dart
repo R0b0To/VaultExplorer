@@ -34,6 +34,7 @@ class VaultFileIoApi {
   final MethodChannel _channel;
   static const LocalFileIoBackend _local = LocalFileIoBackend();
   static int _archiveWriteSequence = 0;
+  static int _replaceWriteSequence = 0;
   static const int _localSourceChunkSize = 4 * 1024 * 1024;
   const VaultFileIoApi(this._channel);
 
@@ -1610,13 +1611,11 @@ class VaultFileIoApi {
   /// Replaces [fileName] with the bytes [chunks] yields, without ever holding
   /// the whole file in memory.
   ///
-  /// This commits atomically by writing a sibling temp file, deleting the old
-  /// path, then renaming the temp file into place, so a failure part-way never
-  /// leaves a half-written file under the real name. That is correct for an
-  /// ordinary file, but deleting [fileName] when it is a symlink destroys the
-  /// link itself. Resolve the link first and commit against its final target
-  /// instead, just as opening a symlink for writing does on a normal
-  /// filesystem. This applies to Cryptomator's virtual links and the native
+  /// Writes to a sibling temp file first, then keeps the old file under a
+  /// sibling backup until the replacement is in place. If installing the new
+  /// file fails, it restores the old one. Deleting [fileName] directly would
+  /// also destroy a symlink, so resolve it first and commit against its final
+  /// target instead. This applies to Cryptomator's virtual links and native
   /// ext/NTFS links inside LUKS/VeraCrypt containers.
   Future<bool> replaceFileFromChunks(
     MountedContainer container,
@@ -1648,8 +1647,13 @@ class VaultFileIoApi {
       }
     }
 
-    final tmpPath = '$writePath.tmp';
-    await deleteFile(container, tmpPath);
+    final transactionId =
+        '${DateTime.now().microsecondsSinceEpoch}.${_replaceWriteSequence++}';
+    final parent = p.posix.dirname(writePath);
+    String sibling(String name) =>
+        parent == '.' ? name : p.posix.join(parent, name);
+    final tmpPath = sibling('.ve-$transactionId.tmp');
+    final backupPath = sibling('.ve-$transactionId.backup');
 
     var offset = 0;
     var wroteAny = false;
@@ -1684,8 +1688,33 @@ class VaultFileIoApi {
       return false;
     }
 
-    await deleteFile(container, writePath);
-    return renameFile(container, tmpPath, writePath);
+    final hadOriginal = await entryExists(container, writePath, isDir: false);
+    if (hadOriginal && !await renameFile(container, writePath, backupPath)) {
+      await deleteFile(container, tmpPath);
+      return false;
+    }
+
+    final installed = await renameFile(container, tmpPath, writePath);
+    if (!installed) {
+      final restored =
+          !hadOriginal || await renameFile(container, backupPath, writePath);
+      await deleteFile(container, tmpPath);
+      if (!restored) {
+        logSwallowed(
+          'replaceFileFromChunks.rollback',
+          StateError('Original file remains at $backupPath'),
+        );
+      }
+      return false;
+    }
+
+    if (hadOriginal && !await deleteFile(container, backupPath)) {
+      logSwallowed(
+        'replaceFileFromChunks.cleanupBackup',
+        StateError('Replacement committed; original remains at $backupPath'),
+      );
+    }
+    return true;
   }
 
   /// Returns capacity and available bytes for this storage. Raw local paths

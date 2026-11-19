@@ -194,6 +194,7 @@ class AppSettings {
   DeleteAfterImportMode deleteAfterImportMode;
   AudioRecordingQuality audioRecordingQuality;
   bool videoMuted;
+  bool motionPhotoAutoplay;
   VideoPlaybackMode videoPlaybackMode;
   bool showStorageLocationsInDrawer;
 
@@ -269,6 +270,7 @@ class AppSettings {
     this.deleteAfterImportMode = DeleteAfterImportMode.ask,
     this.audioRecordingQuality = AudioRecordingQuality.defaultQuality,
     this.videoMuted = false,
+    this.motionPhotoAutoplay = false,
     this.videoPlaybackMode = VideoPlaybackMode.playOnce,
     this.showStorageLocationsInDrawer = true,
     this.categoryShortcutsEnabled = true,
@@ -410,6 +412,7 @@ class AppSettings {
     DeleteAfterImportMode? deleteAfterImportMode,
     AudioRecordingQuality? audioRecordingQuality,
     bool? videoMuted,
+    bool? motionPhotoAutoplay,
     VideoPlaybackMode? videoPlaybackMode,
     bool? showStorageLocationsInDrawer,
     bool? categoryShortcutsEnabled,
@@ -491,6 +494,7 @@ class AppSettings {
       audioRecordingQuality:
           audioRecordingQuality ?? this.audioRecordingQuality,
       videoMuted: videoMuted ?? this.videoMuted,
+      motionPhotoAutoplay: motionPhotoAutoplay ?? this.motionPhotoAutoplay,
       videoPlaybackMode: videoPlaybackMode ?? this.videoPlaybackMode,
       showStorageLocationsInDrawer:
           showStorageLocationsInDrawer ?? this.showStorageLocationsInDrawer,
@@ -573,6 +577,7 @@ class AppSettings {
     'deleteAfterImportMode': deleteAfterImportMode.toJson(),
     'audioRecordingQuality': audioRecordingQuality.toJson(),
     'videoMuted': videoMuted,
+    'motionPhotoAutoplay': motionPhotoAutoplay,
     'videoPlaybackMode': videoPlaybackMode.name,
     'autoLockOnShareImport': autoLockOnShareImport,
     'quickActionLockMode': quickActionLockMode.toJson(),
@@ -653,6 +658,7 @@ class AppSettings {
     deleteAfterImportMode: other.deleteAfterImportMode,
     audioRecordingQuality: other.audioRecordingQuality,
     videoMuted: other.videoMuted,
+    motionPhotoAutoplay: other.motionPhotoAutoplay,
     videoPlaybackMode: other.videoPlaybackMode,
     autoLockOnShareImport: other.autoLockOnShareImport,
     quickActionLockMode: other.quickActionLockMode,
@@ -770,6 +776,7 @@ class AppSettings {
       j['audioRecordingQuality'] as String?,
     ),
     videoMuted: j['videoMuted'] as bool? ?? false,
+    motionPhotoAutoplay: j['motionPhotoAutoplay'] as bool? ?? false,
     videoPlaybackMode: VideoPlaybackMode.fromJson(
       j['videoPlaybackMode'] as String?,
     ),

@@ -24622,6 +24622,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Include folders marked with a .nomedia file, which gallery apps normally skip'**
   String get showNoMediaFoldersDesc;
+
+  /// Notice shown when an image with protected metadata is edited: only a still-image copy can be saved; the original file and embedded content are protected.
+  ///
+  /// In en, this message translates to:
+  /// **'The edited copy will be a still image. The original file, its EXIF metadata, and any embedded video remain unchanged.'**
+  String get motionPhotoCopyNote;
 }
 
 class _AppLocalizationsDelegate

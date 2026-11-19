@@ -46,7 +46,8 @@ class MetadataEdit {
   /// so a photo taken sideways is not shown sideways afterwards.
   final bool keepOrientation;
 
-  bool get isEmpty => keywords == null && takenWallClock == null && strip.isEmpty;
+  bool get isEmpty =>
+      keywords == null && takenWallClock == null && strip.isEmpty;
 }
 
 /// Plans edits to the metadata of JPEG, PNG and WebP files.
@@ -71,19 +72,28 @@ class ImageMetadataEditor {
   static bool canEdit(String fileName) {
     final dot = fileName.lastIndexOf('.');
     if (dot < 0) return false;
-    return supportedExtensions.contains(fileName.substring(dot + 1).toLowerCase());
+    return supportedExtensions.contains(
+      fileName.substring(dot + 1).toLowerCase(),
+    );
   }
 
   /// The plan for applying [edit] to [source], or null when the file would
   /// not change. Throws [MetadataEditException] when it cannot be done.
-  static Future<MetadataEditPlan?> plan(MetadataSource source, MetadataEdit edit) async {
+  static Future<MetadataEditPlan?> plan(
+    MetadataSource source,
+    MetadataEdit edit,
+  ) async {
     if (edit.isEmpty) return null;
     final s = BufferedMetadataSource(source);
     final head = await s.read(0, 12);
-    if (head.length >= 3 && head[0] == 0xFF && head[1] == 0xD8 && head[2] == 0xFF) {
+    if (head.length >= 3 &&
+        head[0] == 0xFF &&
+        head[1] == 0xD8 &&
+        head[2] == 0xFF) {
       return _planJpeg(s, edit);
     }
-    if (head.length >= 8 && _eq(head, 0, _pngSignature)) return _planPng(s, edit);
+    if (head.length >= 8 && _eq(head, 0, _pngSignature))
+      return _planPng(s, edit);
     if (head.length >= 12 && _eq(head, 0, _riff) && _eq(head, 8, _webp)) {
       return _planWebp(s, edit);
     }
@@ -95,7 +105,8 @@ class ImageMetadataEditor {
   static _Result _apply(Uint8List? tiffIn, String? xmpIn, MetadataEdit e) {
     final r = _Result(tiffIn, xmpIn);
     int? orientation;
-    if (tiffIn != null) orientation = TiffExifEditor.tryParse(tiffIn)?.orientation;
+    if (tiffIn != null)
+      orientation = TiffExifEditor.tryParse(tiffIn)?.orientation;
     if (orientation == 1) orientation = null;
 
     final exifStripped = e.strip.contains(MetadataKind.exif) && tiffIn != null;
@@ -129,7 +140,10 @@ class ImageMetadataEditor {
         }
         r.tiff = editor.bytes;
       } else {
-        r.tiff = TiffExifEditor.createMinimal(orientation: carried, exifDate: exifDate);
+        r.tiff = TiffExifEditor.createMinimal(
+          orientation: carried,
+          exifDate: exifDate,
+        );
       }
       r.exifChanged = true;
       if (r.xmp != null) {
@@ -161,10 +175,17 @@ class ImageMetadataEditor {
     return b.takeBytes();
   }
 
-  static Future<Uint8List> _payload(MetadataSource s, int start, int end) async {
+  static Future<Uint8List> _payload(
+    MetadataSource s,
+    int start,
+    int end,
+  ) async {
     final bytes = await s.read(start, end - start);
     if (bytes.length != end - start) {
-      throw const MetadataEditException(MetadataEditFailure.malformed, 'truncated');
+      throw const MetadataEditException(
+        MetadataEditFailure.malformed,
+        'truncated',
+      );
     }
     return bytes;
   }
@@ -172,8 +193,12 @@ class ImageMetadataEditor {
   // ── JPEG ─────────────────────────────────────────────────────────────────
 
   static const _exifId = [0x45, 0x78, 0x69, 0x66, 0x00, 0x00]; // Exif\0\0
-  static final List<int> _xmpId = ascii.encode('http://ns.adobe.com/xap/1.0/\u0000');
-  static final List<int> _xmpExtId = ascii.encode('http://ns.adobe.com/xmp/extension/\u0000');
+  static final List<int> _xmpId = ascii.encode(
+    'http://ns.adobe.com/xap/1.0/\u0000',
+  );
+  static final List<int> _xmpExtId = ascii.encode(
+    'http://ns.adobe.com/xmp/extension/\u0000',
+  );
   static final List<int> _iccId = ascii.encode('ICC_PROFILE\u0000');
   static final List<int> _psId = ascii.encode('Photoshop 3.0\u0000');
   static final List<int> _jfifId = ascii.encode('JFIF\u0000');
@@ -183,7 +208,10 @@ class ImageMetadataEditor {
   /// itself).
   static const int _maxJpegPayload = 65533;
 
-  static Future<MetadataEditPlan?> _planJpeg(MetadataSource s, MetadataEdit edit) async {
+  static Future<MetadataEditPlan?> _planJpeg(
+    MetadataSource s,
+    MetadataEdit edit,
+  ) async {
     // 1. The segments in front of the image data.
     final items = <_JpegItem>[];
     var o = 2;
@@ -191,7 +219,10 @@ class ImageMetadataEditor {
     while (true) {
       final head = await s.read(o, 4);
       if (head.length < 2 || head[0] != 0xFF) {
-        throw const MetadataEditException(MetadataEditFailure.malformed, 'jpeg marker');
+        throw const MetadataEditException(
+          MetadataEditFailure.malformed,
+          'jpeg marker',
+        );
       }
       final marker = head[1];
       if (marker == 0xFF) {
@@ -203,7 +234,10 @@ class ImageMetadataEditor {
         break;
       }
       if (marker == 0xD9) {
-        throw const MetadataEditException(MetadataEditFailure.malformed, 'no image data');
+        throw const MetadataEditException(
+          MetadataEditFailure.malformed,
+          'no image data',
+        );
       }
       if (marker == 0x01 || (marker >= 0xD0 && marker <= 0xD7)) {
         items.add(_JpegItem.original(marker, o, o + 2, 'other'));
@@ -211,29 +245,65 @@ class ImageMetadataEditor {
         continue;
       }
       if (head.length < 4) {
-        throw const MetadataEditException(MetadataEditFailure.malformed, 'jpeg length');
+        throw const MetadataEditException(
+          MetadataEditFailure.malformed,
+          'jpeg length',
+        );
       }
       final length = (head[2] << 8) | head[3];
       if (length < 2 || o + 2 + length > s.length) {
-        throw const MetadataEditException(MetadataEditFailure.malformed, 'jpeg segment');
+        throw const MetadataEditException(
+          MetadataEditFailure.malformed,
+          'jpeg segment',
+        );
       }
       final end = o + 2 + length;
-      items.add(_JpegItem.original(marker, o, end, await _jpegKind(s, marker, o, end)));
+      items.add(
+        _JpegItem.original(marker, o, end, await _jpegKind(s, marker, o, end)),
+      );
       o = end;
     }
 
     // 2. Current metadata blocks.
     final exifItem = items.where((i) => i.kind == 'exif').firstOrNull;
-    final xmpItem = items.where((i) => i.kind == 'xmp').firstOrNull;
+    final xmpItems = items.where((i) => i.kind == 'xmp').toList();
+    final xmpItem = xmpItems.firstOrNull;
     Uint8List? tiff;
     if (exifItem != null) {
       final p = await _payload(s, exifItem.start! + 4, exifItem.end!);
       tiff = Uint8List.sublistView(p, _exifId.length);
     }
-    String? xmp;
-    if (xmpItem != null) {
-      final p = await _payload(s, xmpItem.start! + 4, xmpItem.end!);
-      xmp = utf8.decode(Uint8List.sublistView(p, _xmpId.length), allowMalformed: true);
+    final xmpPackets = <String>[];
+    for (final item in xmpItems) {
+      final p = await _payload(s, item.start! + 4, item.end!);
+      xmpPackets.add(
+        utf8.decode(
+          Uint8List.sublistView(p, _xmpId.length),
+          allowMalformed: true,
+        ),
+      );
+    }
+    final xmp = xmpPackets.firstOrNull;
+    final isMotionPhoto = xmpPackets.any(_isMotionPhotoXmp);
+    final hasExtendedXmp = items.any((i) => i.kind == 'xmpExt');
+    final stripsMotionMetadata =
+        edit.strip.contains(MetadataKind.exif) ||
+        edit.strip.contains(MetadataKind.xmp);
+    if ((isMotionPhoto || hasExtendedXmp) && stripsMotionMetadata) {
+      throw const MetadataEditException(
+        MetadataEditFailure.motionPhotoProtected,
+      );
+    }
+    if (hasExtendedXmp &&
+        (edit.keywords != null ||
+            edit.takenWallClock != null ||
+            edit.strip.contains(MetadataKind.xmp))) {
+      // The extension GUID covers the complete XMP packet. This writer does
+      // not rebuild extended packets, so changing the standard packet could
+      // detach it and lose container metadata used by a Motion Photo.
+      throw const MetadataEditException(
+        MetadataEditFailure.extendedXmpProtected,
+      );
     }
 
     final result = _apply(tiff, xmp, edit);
@@ -293,7 +363,10 @@ class ImageMetadataEditor {
         out[at] = _JpegItem.literal(0xE1, seg, 'xmp');
       } else {
         final afterExif = out.indexWhere((i) => i.kind == 'exif');
-        out.insert(afterExif >= 0 ? afterExif + 1 : insertAfterJfif(), _JpegItem.literal(0xE1, seg, 'xmp'));
+        out.insert(
+          afterExif >= 0 ? afterExif + 1 : insertAfterJfif(),
+          _JpegItem.literal(0xE1, seg, 'xmp'),
+        );
       }
     }
     if (!changed) return null;
@@ -307,8 +380,21 @@ class ImageMetadataEditor {
     }
     final delta = newHeader - oldHeader;
     final mpfAt = out.indexWhere((i) => i.kind == 'mpf');
-    if (delta != 0 && mpfAt >= 0 && out[mpfAt].start != null) {
+    final mpfCount = out.where((i) => i.kind == 'mpf').length;
+    if (delta != 0 && mpfCount > 1) {
+      throw const MetadataEditException(
+        MetadataEditFailure.malformed,
+        'multiple MPF indexes cannot be safely shifted',
+      );
+    }
+    if (delta != 0 && mpfAt >= 0) {
       final item = out[mpfAt];
+      if (item.start == null) {
+        throw const MetadataEditException(
+          MetadataEditFailure.malformed,
+          'MPF index cannot be safely shifted',
+        );
+      }
       final payload = await _payload(s, item.start! + 4, item.end!);
       var newPos = 2;
       for (var i = 0; i < mpfAt; i++) {
@@ -320,17 +406,21 @@ class ImageMetadataEditor {
         newTiffStart: newPos + 8,
         delta: delta,
       );
-      if (patched != null) {
-        final len = patched.length + 2;
-        out[mpfAt] = _JpegItem.literal(
-          0xE2,
-          _concat([
-            [0xFF, 0xE2, len >> 8, len & 0xFF],
-            patched,
-          ]),
-          'mpf',
+      if (patched == null) {
+        throw const MetadataEditException(
+          MetadataEditFailure.malformed,
+          'MPF index cannot be safely shifted',
         );
       }
+      final len = patched.length + 2;
+      out[mpfAt] = _JpegItem.literal(
+        0xE2,
+        _concat([
+          [0xFF, 0xE2, len >> 8, len & 0xFF],
+          patched,
+        ]),
+        'mpf',
+      );
     }
 
     return MetadataEditPlan([
@@ -342,7 +432,41 @@ class ImageMetadataEditor {
 
   static final Uint8List _soi = Uint8List.fromList([0xFF, 0xD8]);
 
-  static Future<String> _jpegKind(MetadataSource s, int marker, int start, int end) async {
+  static bool _isMotionPhotoXmp(String xmp) {
+    String? property(String name) {
+      final escaped = RegExp.escape(name);
+      final attribute = RegExp(
+        r'''(?:[\w.-]+:)?''' + escaped + r'''\s*=\s*["']([^"']*)["']''',
+        caseSensitive: false,
+      ).firstMatch(xmp);
+      if (attribute != null) return attribute[1]?.trim();
+      final element = RegExp(
+        r'''<(?:[\w.-]+:)?''' +
+            escaped +
+            r'''\b[^>]*>([^<]*)</(?:[\w.-]+:)?''' +
+            escaped +
+            r'''\s*>''',
+        caseSensitive: false,
+      ).firstMatch(xmp);
+      return element?[1]?.trim();
+    }
+
+    bool affirmative(String? value) =>
+        value != null &&
+        const {'1', 'true', 'yes'}.contains(value.toLowerCase());
+
+    return affirmative(property('MotionPhoto')) ||
+        affirmative(property('MicroVideo')) ||
+        (double.tryParse(property('MicroVideoOffset') ?? '') ?? 0) > 0 ||
+        (double.tryParse(property('MotionPhotoOffset') ?? '') ?? 0) > 0;
+  }
+
+  static Future<String> _jpegKind(
+    MetadataSource s,
+    int marker,
+    int start,
+    int end,
+  ) async {
     if (marker == 0xFE) return 'comment';
     if (marker != 0xE0 && marker != 0xE1 && marker != 0xE2 && marker != 0xED) {
       return 'other';
@@ -379,10 +503,18 @@ class ImageMetadataEditor {
     final le = payload[base] == 0x49 && payload[base + 1] == 0x49;
     final be = payload[base] == 0x4D && payload[base + 1] == 0x4D;
     if (!le && !be) return null;
-    int u16(int o) => le ? payload[o] | (payload[o + 1] << 8) : (payload[o] << 8) | payload[o + 1];
+    int u16(int o) => le
+        ? payload[o] | (payload[o + 1] << 8)
+        : (payload[o] << 8) | payload[o + 1];
     int u32(int o) => le
-        ? payload[o] | (payload[o + 1] << 8) | (payload[o + 2] << 16) | (payload[o + 3] << 24)
-        : (payload[o] << 24) | (payload[o + 1] << 16) | (payload[o + 2] << 8) | payload[o + 3];
+        ? payload[o] |
+              (payload[o + 1] << 8) |
+              (payload[o + 2] << 16) |
+              (payload[o + 3] << 24)
+        : (payload[o] << 24) |
+              (payload[o + 1] << 16) |
+              (payload[o + 2] << 8) |
+              payload[o + 3];
     void put32(int o, int v) {
       if (le) {
         payload[o] = v & 0xFF;
@@ -406,18 +538,24 @@ class ImageMetadataEditor {
       if (u16(e) != 0xB002) continue; // MP Entry
       final count = u32(e + 4);
       final at = base + u32(e + 8);
-      if (count < 16 || at + count > payload.length) return null;
+      if (count < 16 || count % 16 != 0 || at + count > payload.length) {
+        return null;
+      }
       for (var k = 0; k + 16 <= count; k += 16) {
         final entry = at + k;
         final size = u32(entry + 4);
         final offset = u32(entry + 8);
         if (k == 0) {
           // The first image is the file's own: it grew with its header.
-          put32(entry + 4, size + delta);
+          final shiftedSize = size + delta;
+          if (shiftedSize < 0 || shiftedSize > 0xFFFFFFFF) return null;
+          put32(entry + 4, shiftedSize);
         } else {
           // Offsets count from the MPF header; both it and the image moved.
           final absolute = oldTiffStart + offset + delta;
-          put32(entry + 8, absolute - newTiffStart);
+          final shiftedOffset = absolute - newTiffStart;
+          if (shiftedOffset < 0 || shiftedOffset > 0xFFFFFFFF) return null;
+          put32(entry + 8, shiftedOffset);
         }
       }
       return payload;
@@ -430,7 +568,10 @@ class ImageMetadataEditor {
   static const _pngSignature = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
   static const _xmpKeyword = 'XML:com.adobe.xmp';
 
-  static Future<MetadataEditPlan?> _planPng(MetadataSource s, MetadataEdit edit) async {
+  static Future<MetadataEditPlan?> _planPng(
+    MetadataSource s,
+    MetadataEdit edit,
+  ) async {
     final chunks = <_PngChunk>[];
     var o = 8;
     while (o + 12 <= s.length) {
@@ -440,7 +581,10 @@ class ImageMetadataEditor {
       final type = String.fromCharCodes(head, 4, 8);
       final end = o + 12 + len;
       if (len < 0 || end > s.length) {
-        throw const MetadataEditException(MetadataEditFailure.malformed, 'png chunk');
+        throw const MetadataEditException(
+          MetadataEditFailure.malformed,
+          'png chunk',
+        );
       }
       var kind = 'other';
       if (type == 'eXIf') {
@@ -460,19 +604,29 @@ class ImageMetadataEditor {
       if (type == 'IEND') break;
     }
     if (chunks.isEmpty || chunks.last.type != 'IEND') {
-      throw const MetadataEditException(MetadataEditFailure.malformed, 'png end');
+      throw const MetadataEditException(
+        MetadataEditFailure.malformed,
+        'png end',
+      );
     }
 
-    final exifChunk = chunks.where((c) => c.kind == 'exif' && c.type == 'eXIf').firstOrNull;
-    final xmpChunk = chunks.where((c) => c.kind == 'xmp' && c.type == 'iTXt').firstOrNull;
+    final exifChunk = chunks
+        .where((c) => c.kind == 'exif' && c.type == 'eXIf')
+        .firstOrNull;
+    final xmpChunk = chunks
+        .where((c) => c.kind == 'xmp' && c.type == 'iTXt')
+        .firstOrNull;
     Uint8List? tiff;
     if (exifChunk != null) {
       tiff = await _payload(s, exifChunk.start + 8, exifChunk.end - 4);
-      if (tiff.length >= 6 && _eq(tiff, 0, _exifId)) tiff = Uint8List.sublistView(tiff, 6);
+      if (tiff.length >= 6 && _eq(tiff, 0, _exifId))
+        tiff = Uint8List.sublistView(tiff, 6);
     }
     String? xmp;
     if (xmpChunk != null) {
-      xmp = _pngXmpText(await _payload(s, xmpChunk.start + 8, xmpChunk.end - 4));
+      xmp = _pngXmpText(
+        await _payload(s, xmpChunk.start + 8, xmpChunk.end - 4),
+      );
     }
 
     final result = _apply(tiff, xmp, edit);
@@ -494,7 +648,9 @@ class ImageMetadataEditor {
     final newExif = result.tiff != null && result.exifChanged
         ? _pngChunk('eXIf', result.tiff!)
         : null;
-    final newXmp = result.xmp != null && result.xmpChanged ? _pngChunk('iTXt', _pngXmpData(result.xmp!)) : null;
+    final newXmp = result.xmp != null && result.xmpChanged
+        ? _pngChunk('iTXt', _pngXmpData(result.xmp!))
+        : null;
 
     for (var i = 0; i < chunks.length; i++) {
       final c = chunks[i];
@@ -542,10 +698,12 @@ class ImageMetadataEditor {
   static String _pngTextKind(String type, String keyword) {
     if (type == 'iTXt' && keyword == _xmpKeyword) return 'xmp';
     final k = keyword.toLowerCase();
-    if (k == 'raw profile type exif' || k == 'raw profile type app1') return 'exif';
+    if (k == 'raw profile type exif' || k == 'raw profile type app1')
+      return 'exif';
     if (k == 'raw profile type xmp') return 'xmp';
     if (k == 'raw profile type iptc') return 'iptc';
-    if (k == 'raw profile type icc' || k == 'raw profile type icm') return 'icc';
+    if (k == 'raw profile type icc' || k == 'raw profile type icm')
+      return 'icc';
     return 'comment';
   }
 
@@ -569,7 +727,13 @@ class ImageMetadataEditor {
 
   static Uint8List _pngXmpData(String xmp) => _concat([
     ascii.encode(_xmpKeyword),
-    [0, 0, 0, 0, 0], // end of keyword, not compressed, method, no language, no translation
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+    ], // end of keyword, not compressed, method, no language, no translation
     utf8.encode(xmp),
   ]);
 
@@ -585,7 +749,8 @@ class ImageMetadataEditor {
     ]);
   }
 
-  static int _u32be(Uint8List b, int o) => (b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3];
+  static int _u32be(Uint8List b, int o) =>
+      (b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3];
 
   static final Uint32List _crcTable = () {
     final t = Uint32List(256);
@@ -617,7 +782,10 @@ class ImageMetadataEditor {
   static const int _flagExif = 0x08;
   static const int _flagXmp = 0x04;
 
-  static Future<MetadataEditPlan?> _planWebp(MetadataSource s, MetadataEdit edit) async {
+  static Future<MetadataEditPlan?> _planWebp(
+    MetadataSource s,
+    MetadataEdit edit,
+  ) async {
     final chunks = <_WebpChunk>[];
     var o = 12;
     while (o + 8 <= s.length) {
@@ -627,27 +795,50 @@ class ImageMetadataEditor {
       final len = head[4] | (head[5] << 8) | (head[6] << 16) | (head[7] << 24);
       final end = o + 8 + len + (len & 1);
       if (o + 8 + len > s.length) {
-        throw const MetadataEditException(MetadataEditFailure.malformed, 'webp chunk');
+        throw const MetadataEditException(
+          MetadataEditFailure.malformed,
+          'webp chunk',
+        );
       }
       // Some writers leave out the pad byte of an odd-sized last chunk.
-      chunks.add(_WebpChunk(fourcc, o, len, end > s.length ? s.length : end, padMissing: end > s.length));
+      chunks.add(
+        _WebpChunk(
+          fourcc,
+          o,
+          len,
+          end > s.length ? s.length : end,
+          padMissing: end > s.length,
+        ),
+      );
       o = end;
     }
     if (chunks.isEmpty) {
-      throw const MetadataEditException(MetadataEditFailure.malformed, 'webp empty');
+      throw const MetadataEditException(
+        MetadataEditFailure.malformed,
+        'webp empty',
+      );
     }
 
     final exifChunk = chunks.where((c) => c.fourcc == 'EXIF').firstOrNull;
     final xmpChunk = chunks.where((c) => c.fourcc == 'XMP ').firstOrNull;
     Uint8List? tiff;
     if (exifChunk != null) {
-      tiff = await _payload(s, exifChunk.start + 8, exifChunk.start + 8 + exifChunk.length);
-      if (tiff.length >= 6 && _eq(tiff, 0, _exifId)) tiff = Uint8List.sublistView(tiff, 6);
+      tiff = await _payload(
+        s,
+        exifChunk.start + 8,
+        exifChunk.start + 8 + exifChunk.length,
+      );
+      if (tiff.length >= 6 && _eq(tiff, 0, _exifId))
+        tiff = Uint8List.sublistView(tiff, 6);
     }
     String? xmp;
     if (xmpChunk != null) {
       xmp = utf8.decode(
-        await _payload(s, xmpChunk.start + 8, xmpChunk.start + 8 + xmpChunk.length),
+        await _payload(
+          s,
+          xmpChunk.start + 8,
+          xmpChunk.start + 8 + xmpChunk.length,
+        ),
         allowMalformed: true,
       );
     }
@@ -658,8 +849,13 @@ class ImageMetadataEditor {
     final dropIcc = edit.strip.contains(MetadataKind.iccProfile);
     final kept = <_WebpChunk>[];
     for (final c in chunks) {
-      final drop = (c.fourcc == 'EXIF' && result.tiff == null && edit.strip.contains(MetadataKind.exif)) ||
-          (c.fourcc == 'XMP ' && result.xmp == null && edit.strip.contains(MetadataKind.xmp)) ||
+      final drop =
+          (c.fourcc == 'EXIF' &&
+              result.tiff == null &&
+              edit.strip.contains(MetadataKind.exif)) ||
+          (c.fourcc == 'XMP ' &&
+              result.xmp == null &&
+              edit.strip.contains(MetadataKind.xmp)) ||
           (c.fourcc == 'ICCP' && dropIcc);
       if (drop) {
         changed = true;
@@ -675,14 +871,21 @@ class ImageMetadataEditor {
     var canvasW = 0;
     var canvasH = 0;
     if (first.fourcc == 'VP8X') {
-      final h = await _payload(s, first.start + 8, first.start + 8 + (first.length < 10 ? 10 : first.length));
+      final h = await _payload(
+        s,
+        first.start + 8,
+        first.start + 8 + (first.length < 10 ? 10 : first.length),
+      );
       flags = h[0];
       canvasW = h[4] | (h[5] << 8) | (h[6] << 16);
       canvasH = h[7] | (h[8] << 8) | (h[9] << 16);
     } else {
       final dims = await _webpSimpleDimensions(s, first);
       if (dims == null) {
-        throw const MetadataEditException(MetadataEditFailure.malformed, 'webp size');
+        throw const MetadataEditException(
+          MetadataEditFailure.malformed,
+          'webp size',
+        );
       }
       canvasW = dims.width - 1;
       canvasH = dims.height - 1;
@@ -713,13 +916,15 @@ class ImageMetadataEditor {
       LiteralPiece(vp8x),
     ];
     for (final c in kept) {
-      if (c.fourcc == 'VP8X' || c.fourcc == 'EXIF' || c.fourcc == 'XMP ') continue;
+      if (c.fourcc == 'VP8X' || c.fourcc == 'EXIF' || c.fourcc == 'XMP ')
+        continue;
       body.add(CopyPiece(c.start, c.end));
       // Chunks added after this one must start on an even offset.
       if (c.padMissing) body.add(LiteralPiece(Uint8List.fromList([0])));
     }
     if (writeExif) body.add(LiteralPiece(_webpChunk('EXIF', result.tiff!)));
-    if (writeXmp) body.add(LiteralPiece(_webpChunk('XMP ', utf8.encode(result.xmp!))));
+    if (writeXmp)
+      body.add(LiteralPiece(_webpChunk('XMP ', utf8.encode(result.xmp!))));
 
     var bodyLength = 0;
     for (final p in body) {
@@ -758,7 +963,11 @@ class ImageMetadataEditor {
     _WebpChunk c,
   ) async {
     final d = await s.read(c.start + 8, 16);
-    if (c.fourcc == 'VP8 ' && d.length >= 10 && d[3] == 0x9D && d[4] == 0x01 && d[5] == 0x2A) {
+    if (c.fourcc == 'VP8 ' &&
+        d.length >= 10 &&
+        d[3] == 0x9D &&
+        d[4] == 0x01 &&
+        d[5] == 0x2A) {
       return (
         width: (d[6] | (d[7] << 8)) & 0x3FFF,
         height: (d[8] | (d[9] << 8)) & 0x3FFF,
@@ -786,7 +995,8 @@ class _Result {
 }
 
 class _JpegItem {
-  _JpegItem.original(this.marker, this.start, this.end, this.kind) : literalBytes = null;
+  _JpegItem.original(this.marker, this.start, this.end, this.kind)
+    : literalBytes = null;
   _JpegItem.literal(this.marker, Uint8List bytes, this.kind)
     : literalBytes = bytes,
       start = null,
@@ -800,7 +1010,9 @@ class _JpegItem {
 
   int get length => literalBytes?.length ?? (end! - start!);
 
-  EditPiece get piece => literalBytes != null ? LiteralPiece(literalBytes!) : CopyPiece(start!, end!);
+  EditPiece get piece => literalBytes != null
+      ? LiteralPiece(literalBytes!)
+      : CopyPiece(start!, end!);
 }
 
 class _PngChunk {
@@ -812,7 +1024,13 @@ class _PngChunk {
 }
 
 class _WebpChunk {
-  _WebpChunk(this.fourcc, this.start, this.length, this.end, {this.padMissing = false});
+  _WebpChunk(
+    this.fourcc,
+    this.start,
+    this.length,
+    this.end, {
+    this.padMissing = false,
+  });
   final String fourcc;
   final int start;
 

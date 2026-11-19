@@ -190,7 +190,8 @@ class MetadataEditException implements Exception {
   final String? detail;
 
   @override
-  String toString() => 'MetadataEditException($reason${detail == null ? '' : ': $detail'})';
+  String toString() =>
+      'MetadataEditException($reason${detail == null ? '' : ': $detail'})';
 }
 
 enum MetadataEditFailure {
@@ -207,4 +208,10 @@ enum MetadataEditFailure {
   /// The file's own Exif block is built in a way that cannot be changed
   /// safely.
   unreadableExif,
+
+  /// The requested edit would remove XMP/Exif required by a Motion Photo.
+  motionPhotoProtected,
+
+  /// Extended XMP cannot be safely rewritten without rebuilding its GUID.
+  extendedXmpProtected,
 }

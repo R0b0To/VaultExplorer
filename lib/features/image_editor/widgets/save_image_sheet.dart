@@ -36,6 +36,8 @@ class SaveImageSheet extends StatefulWidget {
   final List<RawEntry> existingEntries;
   final FilesystemType fsType;
   final bool caseSensitive;
+  final bool allowOverwrite;
+  final String? notice;
 
   const SaveImageSheet({
     super.key,
@@ -43,6 +45,8 @@ class SaveImageSheet extends StatefulWidget {
     required this.existingEntries,
     required this.fsType,
     required this.caseSensitive,
+    this.allowOverwrite = true,
+    this.notice,
   });
 
   static Future<SaveImageChoice?> show(
@@ -51,6 +55,8 @@ class SaveImageSheet extends StatefulWidget {
     required List<RawEntry> existingEntries,
     required FilesystemType fsType,
     required bool caseSensitive,
+    bool allowOverwrite = true,
+    String? notice,
   }) {
     return showModalBottomSheet<SaveImageChoice>(
       context: context,
@@ -60,6 +66,8 @@ class SaveImageSheet extends StatefulWidget {
         existingEntries: existingEntries,
         fsType: fsType,
         caseSensitive: caseSensitive,
+        allowOverwrite: allowOverwrite,
+        notice: notice,
       ),
     );
   }
@@ -72,10 +80,14 @@ enum _Step { choose, newFileName }
 
 class _SaveImageSheetState extends State<SaveImageSheet> {
   _Step _step = _Step.choose;
-  late final TextEditingController _nameController =
-      TextEditingController(text: widget.suggestedFileName);
+  late final TextEditingController _nameController = TextEditingController(
+    text: widget.suggestedFileName,
+  );
   List<NameValidationIssue> _issues = const [];
-  EntryConflictResult _conflict = const EntryConflictResult(EntryConflictKind.none, null);
+  EntryConflictResult _conflict = const EntryConflictResult(
+    EntryConflictKind.none,
+    null,
+  );
 
   @override
   void initState() {
@@ -114,7 +126,9 @@ class _SaveImageSheetState extends State<SaveImageSheet> {
   @override
   Widget build(BuildContext context) {
     return AppBottomSheet(
-      child: _step == _Step.choose ? _buildChooseStep(context) : _buildNameStep(context),
+      child: _step == _Step.choose
+          ? _buildChooseStep(context)
+          : _buildNameStep(context),
     );
   }
 
@@ -127,8 +141,10 @@ class _SaveImageSheetState extends State<SaveImageSheet> {
         Text(l10n.saveImageSheetTitle, style: context.typography.titleMedium),
         const SizedBox(height: 4),
         Text(
-          l10n.imageEditorPngNoteMessage,
-          style: context.typography.bodySmall?.copyWith(color: context.colors.onSurfaceVariant),
+          widget.notice ?? l10n.imageEditorPngNoteMessage,
+          style: context.typography.bodySmall?.copyWith(
+            color: context.colors.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 8),
         SheetOptionTile(
@@ -137,13 +153,14 @@ class _SaveImageSheetState extends State<SaveImageSheet> {
           subtitle: l10n.saveAsNewFileDescription,
           onTap: () => setState(() => _step = _Step.newFileName),
         ),
-        SheetOptionTile(
-          icon: Icons.save_outlined,
-          iconColor: context.colors.error,
-          title: l10n.overwriteOriginalOption,
-          subtitle: l10n.overwriteOriginalDescription,
-          onTap: () => Navigator.of(context).pop(const OverwriteOriginal()),
-        ),
+        if (widget.allowOverwrite)
+          SheetOptionTile(
+            icon: Icons.save_outlined,
+            iconColor: context.colors.error,
+            title: l10n.overwriteOriginalOption,
+            subtitle: l10n.overwriteOriginalDescription,
+            onTap: () => Navigator.of(context).pop(const OverwriteOriginal()),
+          ),
       ],
     );
   }
@@ -154,9 +171,12 @@ class _SaveImageSheetState extends State<SaveImageSheet> {
     final errorText = hasIssues
         ? _issues.first.message
         : _conflict.isConflict
-            ? _conflict.message(l10n, _nameController.text)
-            : null;
-    final canSave = !hasIssues && !_conflict.isConflict && _nameController.text.trim().isNotEmpty;
+        ? _conflict.message(l10n, _nameController.text)
+        : null;
+    final canSave =
+        !hasIssues &&
+        !_conflict.isConflict &&
+        _nameController.text.trim().isNotEmpty;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -170,7 +190,10 @@ class _SaveImageSheetState extends State<SaveImageSheet> {
               onPressed: () => setState(() => _step = _Step.choose),
             ),
             Expanded(
-              child: Text(l10n.saveAsNewFileOption, style: context.typography.titleMedium),
+              child: Text(
+                l10n.saveAsNewFileOption,
+                style: context.typography.titleMedium,
+              ),
             ),
           ],
         ),
@@ -189,7 +212,9 @@ class _SaveImageSheetState extends State<SaveImageSheet> {
                 ),
                 onSubmitted: (_) {
                   if (canSave) {
-                    Navigator.of(context).pop(SaveAsNewFile(_nameController.text));
+                    Navigator.of(
+                      context,
+                    ).pop(SaveAsNewFile(_nameController.text));
                   }
                 },
               ),
@@ -198,7 +223,9 @@ class _SaveImageSheetState extends State<SaveImageSheet> {
                 width: double.infinity,
                 child: FilledButton(
                   onPressed: canSave
-                      ? () => Navigator.of(context).pop(SaveAsNewFile(_nameController.text))
+                      ? () => Navigator.of(
+                          context,
+                        ).pop(SaveAsNewFile(_nameController.text))
                       : null,
                   child: Text(l10n.save),
                 ),

@@ -4082,5 +4082,6 @@
   "autoHideToolbarLabel": "スクロール時にツールバーを自動で隠す",
   "autoHideToolbarDesc": "下にスクロールすると下部のツールバーを非表示にし、表示スペースを広げます",
   "autoHideBreadcrumbBarLabel": "スクロール時にパンくずバーを自動で隠す",
-  "autoHideBreadcrumbBarDesc": "下にスクロールするとパスナビゲーションバーを非表示にし、表示スペースを広げます"
+  "autoHideBreadcrumbBarDesc": "下にスクロールするとパスナビゲーションバーを非表示にし、表示スペースを広げます",
+  "motionPhotoCopyNote": "編集したコピーは静止画になります。元のファイル、EXIF情報、埋め込み動画は変更されません。"
 }

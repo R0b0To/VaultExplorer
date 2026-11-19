@@ -8,7 +8,9 @@ import 'package:vaultexplorer/features/browser/metadata/metadata_source.dart';
 import 'package:vaultexplorer/features/browser/metadata/tiff_exif_editor.dart';
 
 /// Pixel data stand-in: it must come out of every edit byte for byte.
-final Uint8List _scan = Uint8List.fromList(List.generate(300, (i) => (i * 7) & 0xFF));
+final Uint8List _scan = Uint8List.fromList(
+  List.generate(300, (i) => (i * 7) & 0xFF),
+);
 
 Uint8List _seg(int marker, List<int> payload) {
   final len = payload.length + 2;
@@ -58,10 +60,179 @@ bool _listEq(List<int> a, List<int> b) {
   return true;
 }
 
-Uint8List _exifSeg(Uint8List tiff) => _seg(0xE1, [0x45, 0x78, 0x69, 0x66, 0, 0, ...tiff]);
+Uint8List _exifSeg(Uint8List tiff) =>
+    _seg(0xE1, [0x45, 0x78, 0x69, 0x66, 0, 0, ...tiff]);
 
 void main() {
   group('JPEG', () {
+    Uint8List motionPhoto({List<Uint8List> segments = const []}) {
+      const xmpId = 'http://ns.adobe.com/xap/1.0/\u0000';
+      const video = <int>[
+        0,
+        0,
+        0,
+        24,
+        0x66,
+        0x74,
+        0x79,
+        0x70,
+        0x6D,
+        0x70,
+        0x34,
+        0x32,
+        0,
+        0,
+        0,
+        0,
+        0x6D,
+        0x6F,
+        0x6F,
+        0x76,
+        0x6D,
+        0x64,
+        0x61,
+        0x74,
+      ];
+      final xmp = ascii.encode(
+        '${xmpId}<x:xmpmeta><rdf:RDF><rdf:Description '
+        'xmlns:GCamera="http://ns.google.com/photos/1.0/camera/" '
+        'GCamera:MotionPhoto="1" '
+        'GCamera:MicroVideoOffset="${video.length}"/>'
+        '</rdf:RDF></x:xmpmeta>',
+      );
+      return Uint8List.fromList([
+        ..._jpeg([...segments, _seg(0xE1, xmp)]),
+        ...video,
+      ]);
+    }
+
+    test(
+      'editing metadata preserves a Motion Photo original and video bytes',
+      () async {
+        final tiff = TiffExifEditor.createMinimal(
+          orientation: 6,
+          exifDate: '2020:01:02 03:04:05',
+        );
+        final exif = _exifSeg(tiff);
+        const video = <int>[
+          0,
+          0,
+          0,
+          24,
+          0x66,
+          0x74,
+          0x79,
+          0x70,
+          0x6D,
+          0x70,
+          0x34,
+          0x32,
+          0,
+          0,
+          0,
+          0,
+          0x6D,
+          0x6F,
+          0x6F,
+          0x76,
+          0x6D,
+          0x64,
+          0x61,
+          0x74,
+        ];
+        final original = motionPhoto(segments: [exif]);
+
+        final tagged = await _apply(
+          original,
+          const MetadataEdit(keywords: ['stage']),
+        );
+        expect(_indexOf(tagged, exif), greaterThanOrEqualTo(0));
+        expect(
+          _listEq(tagged.sublist(tagged.length - video.length), video),
+          isTrue,
+        );
+        expect((await _tags(tagged))['XMP/GCamera:MotionPhoto'], '1');
+        expect(
+          (await _tags(tagged))['XMP/GCamera:MicroVideoOffset'],
+          '${video.length}',
+        );
+
+        final dated = await _apply(
+          tagged,
+          MetadataEdit(takenWallClock: DateTime.utc(2024, 9, 19, 16, 40)),
+        );
+        final tags = await _tags(dated);
+        expect(tags['Exif/Date/Time Original'], '2024:09:19 16:40:00');
+        expect(tags['Exif IFD0/Orientation'], contains('90'));
+        expect(tags['XMP/GCamera:MotionPhoto'], '1');
+        expect(
+          _listEq(dated.sublist(dated.length - video.length), video),
+          isTrue,
+        );
+      },
+    );
+
+    test('metadata removal cannot strip Motion Photo Exif or XMP', () async {
+      final file = motionPhoto();
+      for (final kind in [MetadataKind.exif, MetadataKind.xmp]) {
+        await expectLater(
+          ImageMetadataEditor.plan(
+            MemoryMetadataSource(file),
+            MetadataEdit(strip: {kind}),
+          ),
+          throwsA(
+            isA<MetadataEditException>().having(
+              (error) => error.reason,
+              'reason',
+              MetadataEditFailure.motionPhotoProtected,
+            ),
+          ),
+        );
+      }
+    });
+
+    test('edits that rewrite extended XMP are refused', () async {
+      const extensionId = 'http://ns.adobe.com/xmp/extension/\u0000';
+      final extendedXmp = _seg(0xE1, ascii.encode('${extensionId}packet'));
+      await expectLater(
+        ImageMetadataEditor.plan(
+          MemoryMetadataSource(_jpeg([extendedXmp])),
+          const MetadataEdit(keywords: ['unsafe']),
+        ),
+        throwsA(
+          isA<MetadataEditException>().having(
+            (error) => error.reason,
+            'reason',
+            MetadataEditFailure.extendedXmpProtected,
+          ),
+        ),
+      );
+    });
+
+    test(
+      'malformed MPF indexes prevent edits that would shift the file',
+      () async {
+        final brokenMpf = _seg(0xE2, [
+          ...ascii.encode('MPF'),
+          0,
+          ...List<int>.filled(24, 0),
+        ]);
+        await expectLater(
+          ImageMetadataEditor.plan(
+            MemoryMetadataSource(_jpeg([brokenMpf])),
+            const MetadataEdit(keywords: ['safe']),
+          ),
+          throwsA(
+            isA<MetadataEditException>().having(
+              (error) => error.reason,
+              'reason',
+              MetadataEditFailure.malformed,
+            ),
+          ),
+        );
+      },
+    );
+
     test('a date is written into a file with no Exif', () async {
       final out = await _apply(
         _jpeg(),
@@ -74,7 +245,10 @@ void main() {
     });
 
     test('keywords are written, replaced and removed', () async {
-      var out = await _apply(_jpeg(), const MetadataEdit(keywords: ['sunset', 'Lake Como', 'a&b']));
+      var out = await _apply(
+        _jpeg(),
+        const MetadataEdit(keywords: ['sunset', 'Lake Como', 'a&b']),
+      );
       expect((await _tags(out))['XMP/dc:subject'], 'sunset, Lake Como, a&b');
 
       out = await _apply(out, const MetadataEdit(keywords: ['only']));
@@ -86,7 +260,10 @@ void main() {
     });
 
     test('editing a date keeps the orientation and other tags', () async {
-      final tiff = TiffExifEditor.createMinimal(orientation: 6, exifDate: '2020:01:02 03:04:05');
+      final tiff = TiffExifEditor.createMinimal(
+        orientation: 6,
+        exifDate: '2020:01:02 03:04:05',
+      );
       final out = await _apply(
         _jpeg([_exifSeg(tiff)]),
         MetadataEdit(takenWallClock: DateTime.utc(2023, 7, 14, 18, 32, 5)),
@@ -96,50 +273,79 @@ void main() {
       expect(tags['Exif IFD0/Orientation'], contains('90'));
     });
 
-    test('adding a date to Exif that has none never moves existing data', () async {
-      // An IFD0 holding a Make whose text lives after the table.
-      const make = 'SomeCamera';
-      final t = BytesBuilder()
-        ..add([0x49, 0x49, 42, 0, 8, 0, 0, 0])
-        ..add([1, 0, 0x0F, 0x01, 2, 0, make.length + 1, 0, 0, 0, 0x1A, 0, 0, 0])
-        ..add([0, 0, 0, 0])
-        ..add(ascii.encode(make))
-        ..addByte(0);
-      final original = t.takeBytes();
-      final out = await _apply(
-        _jpeg([_exifSeg(original)]),
-        MetadataEdit(takenWallClock: DateTime.utc(2000, 1, 2, 3, 4, 5)),
-      );
-      final tags = await _tags(out);
-      expect(tags['Exif IFD0/Make'], make);
-      expect(tags['Exif/Date/Time Original'], '2000:01:02 03:04:05');
-      // The text is still where it was, relative to the block.
-      final start = _indexOf(out, [0x45, 0x78, 0x69, 0x66, 0, 0]) + 6;
-      final at = _indexOf(out, ascii.encode(make));
-      expect(at - start, 0x1A);
-    });
+    test(
+      'adding a date to Exif that has none never moves existing data',
+      () async {
+        // An IFD0 holding a Make whose text lives after the table.
+        const make = 'SomeCamera';
+        final t = BytesBuilder()
+          ..add([0x49, 0x49, 42, 0, 8, 0, 0, 0])
+          ..add([
+            1,
+            0,
+            0x0F,
+            0x01,
+            2,
+            0,
+            make.length + 1,
+            0,
+            0,
+            0,
+            0x1A,
+            0,
+            0,
+            0,
+          ])
+          ..add([0, 0, 0, 0])
+          ..add(ascii.encode(make))
+          ..addByte(0);
+        final original = t.takeBytes();
+        final out = await _apply(
+          _jpeg([_exifSeg(original)]),
+          MetadataEdit(takenWallClock: DateTime.utc(2000, 1, 2, 3, 4, 5)),
+        );
+        final tags = await _tags(out);
+        expect(tags['Exif IFD0/Make'], make);
+        expect(tags['Exif/Date/Time Original'], '2000:01:02 03:04:05');
+        // The text is still where it was, relative to the block.
+        final start = _indexOf(out, [0x45, 0x78, 0x69, 0x66, 0, 0]) + 6;
+        final at = _indexOf(out, ascii.encode(make));
+        expect(at - start, 0x1A);
+      },
+    );
 
     test('stripping Exif keeps only the orientation', () async {
-      final tiff = TiffExifEditor.createMinimal(orientation: 8, exifDate: '2020:01:02 03:04:05');
+      final tiff = TiffExifEditor.createMinimal(
+        orientation: 8,
+        exifDate: '2020:01:02 03:04:05',
+      );
       final out = await _apply(
         _jpeg([_exifSeg(tiff)]),
         const MetadataEdit(strip: {MetadataKind.exif}),
       );
       final tags = await _tags(out);
-      expect(tags.keys.where((k) => k.startsWith('Exif')).toList(), ['Exif IFD0/Orientation']);
+      expect(tags.keys.where((k) => k.startsWith('Exif')).toList(), [
+        'Exif IFD0/Orientation',
+      ]);
 
       final bare = await _apply(
         _jpeg([_exifSeg(tiff)]),
         const MetadataEdit(strip: {MetadataKind.exif}, keepOrientation: false),
       );
-      expect((await _tags(bare)).keys.any((k) => k.startsWith('Exif')), isFalse);
+      expect(
+        (await _tags(bare)).keys.any((k) => k.startsWith('Exif')),
+        isFalse,
+      );
       expect(_endsWithScan(bare), isTrue);
     });
 
     test('nothing to do gives no plan', () async {
       final src = MemoryMetadataSource(_jpeg());
       expect(
-        await ImageMetadataEditor.plan(src, const MetadataEdit(strip: {MetadataKind.xmp, MetadataKind.exif})),
+        await ImageMetadataEditor.plan(
+          src,
+          const MetadataEdit(strip: {MetadataKind.xmp, MetadataKind.exif}),
+        ),
         isNull,
       );
     });
@@ -154,7 +360,8 @@ void main() {
           ..add([0, 1])
           ..add([0xB0, 0x02, 0, 7, 0, 0, 0, 32, 0, 0, 0, 0x1A])
           ..add([0, 0, 0, 0]);
-        void be32(int v) => b.add([v >> 24 & 0xFF, v >> 16 & 0xFF, v >> 8 & 0xFF, v & 0xFF]);
+        void be32(int v) =>
+            b.add([v >> 24 & 0xFF, v >> 16 & 0xFF, v >> 8 & 0xFF, v & 0xFF]);
         be32(0x20030000);
         be32(primary);
         be32(0);
@@ -176,11 +383,15 @@ void main() {
         ..add(second);
       final out = await _apply(
         file.takeBytes(),
-        MetadataEdit(takenWallClock: DateTime.utc(2024, 5, 6, 7, 8, 9), keywords: const ['one', 'two']),
+        MetadataEdit(
+          takenWallClock: DateTime.utc(2024, 5, 6, 7, 8, 9),
+          keywords: const ['one', 'two'],
+        ),
       );
       final i = _indexOf(out, ascii.encode('MPF'));
       final t = i + 4;
-      int be32At(int o) => (out[o] << 24) | (out[o + 1] << 16) | (out[o + 2] << 8) | out[o + 3];
+      int be32At(int o) =>
+          (out[o] << 24) | (out[o + 1] << 16) | (out[o + 2] << 8) | out[o + 3];
       final ifd = t + be32At(t + 4);
       final entries = t + be32At(ifd + 2 + 8);
       final size0 = be32At(entries + 4);
@@ -197,8 +408,16 @@ void main() {
       final c = ascii.encode(type);
       final crc = _crc([...c, ...data]);
       return Uint8List.fromList([
-        data.length >> 24 & 0xFF, data.length >> 16 & 0xFF, data.length >> 8 & 0xFF, data.length & 0xFF,
-        ...c, ...data, crc >> 24 & 0xFF, crc >> 16 & 0xFF, crc >> 8 & 0xFF, crc & 0xFF,
+        data.length >> 24 & 0xFF,
+        data.length >> 16 & 0xFF,
+        data.length >> 8 & 0xFF,
+        data.length & 0xFF,
+        ...c,
+        ...data,
+        crc >> 24 & 0xFF,
+        crc >> 16 & 0xFF,
+        crc >> 8 & 0xFF,
+        crc & 0xFF,
       ]);
     }
 
@@ -216,7 +435,10 @@ void main() {
     test('a date and keywords are added with valid checksums', () async {
       final out = await _apply(
         png(),
-        MetadataEdit(takenWallClock: DateTime.utc(2021, 3, 4, 5, 6, 7), keywords: const ['png tag', 'é ü']),
+        MetadataEdit(
+          takenWallClock: DateTime.utc(2021, 3, 4, 5, 6, 7),
+          keywords: const ['png tag', 'é ü'],
+        ),
       );
       final tags = await _tags(out);
       expect(tags['Exif/Date/Time Original'], '2021:03:04 05:06:07');
@@ -224,18 +446,36 @@ void main() {
       // Every chunk's CRC must match.
       var o = 8;
       while (o < out.length) {
-        final len = (out[o] << 24) | (out[o + 1] << 16) | (out[o + 2] << 8) | out[o + 3];
+        final len =
+            (out[o] << 24) |
+            (out[o + 1] << 16) |
+            (out[o + 2] << 8) |
+            out[o + 3];
         final crc = _crc(out.sublist(o + 4, o + 8 + len));
-        final stored = (out[o + 8 + len] << 24) | (out[o + 9 + len] << 16) | (out[o + 10 + len] << 8) | out[o + 11 + len];
+        final stored =
+            (out[o + 8 + len] << 24) |
+            (out[o + 9 + len] << 16) |
+            (out[o + 10 + len] << 8) |
+            out[o + 11 + len];
         expect(crc, stored);
         o += 12 + len;
       }
     });
 
     test('text chunks are removed as comments', () async {
-      final text = chunk('tEXt', [...ascii.encode('Comment'), 0, ...ascii.encode('hello')]);
-      final out = await _apply(png(extra: [text]), const MetadataEdit(strip: {MetadataKind.comment}));
-      expect((await _tags(out)).keys.any((k) => k.startsWith('PNG Text')), isFalse);
+      final text = chunk('tEXt', [
+        ...ascii.encode('Comment'),
+        0,
+        ...ascii.encode('hello'),
+      ]);
+      final out = await _apply(
+        png(extra: [text]),
+        const MetadataEdit(strip: {MetadataKind.comment}),
+      );
+      expect(
+        (await _tags(out)).keys.any((k) => k.startsWith('PNG Text')),
+        isFalse,
+      );
     });
   });
 
@@ -251,7 +491,10 @@ void main() {
       final bytes = body.takeBytes();
       return Uint8List.fromList([
         ...ascii.encode('RIFF'),
-        bytes.length & 0xFF, bytes.length >> 8 & 0xFF, 0, 0,
+        bytes.length & 0xFF,
+        bytes.length >> 8 & 0xFF,
+        0,
+        0,
         ...bytes,
       ]);
     }
@@ -270,7 +513,9 @@ void main() {
     Object? error;
     try {
       await ImageMetadataEditor.plan(
-        MemoryMetadataSource(Uint8List.fromList(ascii.encode('GIF89a-not-supported'))),
+        MemoryMetadataSource(
+          Uint8List.fromList(ascii.encode('GIF89a-not-supported')),
+        ),
         const MetadataEdit(strip: {MetadataKind.exif}),
       );
     } on MetadataEditException catch (e) {

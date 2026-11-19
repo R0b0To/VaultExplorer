@@ -16806,5 +16806,9 @@
   "showNoMediaFoldersDesc": "Include folders marked with a .nomedia file, which gallery apps normally skip",
   "@showNoMediaFoldersDesc": {
     "description": "Description for the option to include folders marked with a .nomedia file"
+  },
+  "motionPhotoCopyNote": "The edited copy will be a still image. The original file, its EXIF metadata, and any embedded video remain unchanged.",
+  "@motionPhotoCopyNote": {
+    "description": "Notice shown when an image with protected metadata is edited: only a still-image copy can be saved; the original file and embedded content are protected."
   }
 }

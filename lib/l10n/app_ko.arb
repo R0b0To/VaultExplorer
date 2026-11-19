@@ -4082,5 +4082,6 @@
   "autoHideToolbarLabel": "스크롤 시 도구 모음 자동 숨기기",
   "autoHideToolbarDesc": "아래로 스크롤할 때 하단 도구 모음을 숨겨 보기 공간을 최대화합니다",
   "autoHideBreadcrumbBarLabel": "스크롤 시 경로 표시줄 자동 숨기기",
-  "autoHideBreadcrumbBarDesc": "아래로 스크롤할 때 경로 탐색 표시줄을 숨겨 보기 공간을 최대화합니다"
+  "autoHideBreadcrumbBarDesc": "아래로 스크롤할 때 경로 탐색 표시줄을 숨겨 보기 공간을 최대화합니다",
+  "motionPhotoCopyNote": "편집된 사본은 정지 이미지로 저장됩니다. 원본 파일, EXIF 정보 및 내장 동영상은 변경되지 않습니다."
 }

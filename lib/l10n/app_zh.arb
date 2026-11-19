@@ -4082,5 +4082,6 @@
   "autoHideToolbarLabel": "滚动时自动隐藏工具栏",
   "autoHideToolbarDesc": "向下滚动时隐藏底部工具栏，以最大化查看空间",
   "autoHideBreadcrumbBarLabel": "滚动时自动隐藏路径栏",
-  "autoHideBreadcrumbBarDesc": "向下滚动时隐藏路径导航栏，以最大化查看空间"
+  "autoHideBreadcrumbBarDesc": "向下滚动时隐藏路径导航栏，以最大化查看空间",
+  "motionPhotoCopyNote": "编辑后的副本将是静态图片。原始文件、EXIF 信息和任何嵌入的视频都将保持不变。"
 }

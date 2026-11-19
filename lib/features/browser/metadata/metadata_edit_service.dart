@@ -17,6 +17,9 @@ enum MetadataEditStatus {
   /// Not a JPEG, PNG or WebP: its embedded metadata cannot be edited here.
   unsupported,
 
+  /// The requested edit could damage Motion Photo or extended XMP content.
+  protected,
+
   /// The vault is read-only.
   readOnly,
 
@@ -29,7 +32,9 @@ class MetadataEditOutcome {
   final MetadataEditStatus status;
   final MetadataEditFailure? failure;
 
-  bool get ok => status == MetadataEditStatus.changed || status == MetadataEditStatus.unchanged;
+  bool get ok =>
+      status == MetadataEditStatus.changed ||
+      status == MetadataEditStatus.unchanged;
 }
 
 /// Reads a file of a vault, phone storage or SAF location through
@@ -66,7 +71,10 @@ class MetadataEditService {
   final VaultFileIoApi _api;
 
   /// A source for reading metadata of [path], or null when it cannot be sized.
-  Future<VaultMetadataSource?> openSource(MountedContainer container, String path) async {
+  Future<VaultMetadataSource?> openSource(
+    MountedContainer container,
+    String path,
+  ) async {
     final size = await _api.getFileSize(container, path);
     if (size < 0) return null;
     return VaultMetadataSource(_api, container, path, size);
@@ -84,24 +92,33 @@ class MetadataEditService {
     int? keepModifiedSecs,
     int? newModifiedSecs,
   }) async {
-    if (container.readOnly) return const MetadataEditOutcome(MetadataEditStatus.readOnly);
+    if (container.readOnly)
+      return const MetadataEditOutcome(MetadataEditStatus.readOnly);
     if (!ImageMetadataEditor.canEdit(path)) {
       return const MetadataEditOutcome(MetadataEditStatus.unsupported);
     }
     final source = await openSource(container, path);
-    if (source == null) return const MetadataEditOutcome(MetadataEditStatus.failed);
+    if (source == null)
+      return const MetadataEditOutcome(MetadataEditStatus.failed);
     try {
       final plan = await ImageMetadataEditor.plan(source, edit);
-      if (plan == null) return const MetadataEditOutcome(MetadataEditStatus.unchanged);
-      final ok = await _api.replaceFileFromChunks(container, path, plan.stream(source));
+      if (plan == null)
+        return const MetadataEditOutcome(MetadataEditStatus.unchanged);
+      final ok = await _api.replaceFileFromChunks(
+        container,
+        path,
+        plan.stream(source),
+      );
       if (!ok) return const MetadataEditOutcome(MetadataEditStatus.failed);
     } on MetadataEditException catch (e) {
-      return MetadataEditOutcome(
-        e.reason == MetadataEditFailure.unsupportedFormat
-            ? MetadataEditStatus.unsupported
-            : MetadataEditStatus.failed,
-        e.reason,
-      );
+      final status = switch (e.reason) {
+        MetadataEditFailure.unsupportedFormat => MetadataEditStatus.unsupported,
+        MetadataEditFailure.motionPhotoProtected ||
+        MetadataEditFailure.extendedXmpProtected =>
+          MetadataEditStatus.protected,
+        _ => MetadataEditStatus.failed,
+      };
+      return MetadataEditOutcome(status, e.reason);
     } on StateError {
       return const MetadataEditOutcome(MetadataEditStatus.failed);
     }
@@ -112,7 +129,11 @@ class MetadataEditService {
 
   /// Sets only the modified time, for files whose embedded dates cannot be
   /// edited (videos, HEIC, GIF).
-  Future<bool> setModifiedTime(MountedContainer container, String path, int epochSecs) {
+  Future<bool> setModifiedTime(
+    MountedContainer container,
+    String path,
+    int epochSecs,
+  ) {
     if (container.readOnly) return Future.value(false);
     return _api.setLastModifiedTime(container, path, epochSecs);
   }

@@ -13957,4 +13957,8 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get showNoMediaFoldersDesc =>
       '갤러리 앱이 보통 건너뛰는 .nomedia 파일이 있는 폴더를 포함합니다';
+
+  @override
+  String get motionPhotoCopyNote =>
+      '편집된 사본은 정지 이미지로 저장됩니다. 원본 파일, EXIF 정보 및 내장 동영상은 변경되지 않습니다.';
 }

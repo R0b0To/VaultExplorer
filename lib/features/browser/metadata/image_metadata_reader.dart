@@ -44,6 +44,33 @@ class ImageMetadataReader {
         readableExtensions.contains(fileName.substring(dot + 1).toLowerCase());
   }
 
+  /// Whether parsed XMP identifies the file as a Google/Android Motion Photo.
+  ///
+  /// This deliberately checks the legacy MicroVideo properties as well as
+  /// the current MotionPhoto flag so editors can protect the appended video
+  /// before changing the JPEG's metadata segments.
+  static bool isMotionPhoto(Iterable<MetadataDirectory> directories) {
+    for (final directory in directories) {
+      if (directory.name.toLowerCase() != 'xmp') continue;
+      for (final tag in directory.tags) {
+        final key = tag.name.toLowerCase().split(':').last;
+        final value = tag.value.trim().toLowerCase();
+        if ((key == 'motionphoto' || key == 'microvideo') &&
+            (value == '1' || value == 'true' || value == 'yes')) {
+          return true;
+        }
+        if ((key == 'microvideooffset' || key == 'motionphotooffset') &&
+            (double.tryParse(value) ?? 0) > 0) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  static bool hasExtendedXmp(Iterable<MetadataDirectory> directories) =>
+      directories.any((directory) => directory.name == 'XMP Extension');
+
   static Future<List<MetadataDirectory>> read(MetadataSource source) async {
     final s = BufferedMetadataSource(source);
     final dirs = <MetadataDirectory>[];
@@ -135,6 +162,9 @@ class ImageMetadataReader {
   static final List<int> _xmpId = ascii.encode(
     'http://ns.adobe.com/xap/1.0/\u0000',
   );
+  static final List<int> _xmpExtId = ascii.encode(
+    'http://ns.adobe.com/xmp/extension/\u0000',
+  );
   static final List<int> _iccId = ascii.encode('ICC_PROFILE\u0000');
   static final List<int> _psId = ascii.encode('Photoshop 3.0\u0000');
   static final List<int> _jfifId = ascii.encode('JFIF\u0000');
@@ -167,6 +197,12 @@ class ImageMetadataReader {
           allowMalformed: true,
         ),
         out,
+      );
+    } else if (marker == 0xE1 && _starts(d, _xmpExtId)) {
+      out.add(
+        MetadataDirectory('XMP Extension', [
+          const MetadataTag('Extended packet', 'Present'),
+        ]),
       );
     } else if (marker == 0xE2 && _starts(d, _iccId)) {
       // Only the first chunk: the header and tag table are in it.

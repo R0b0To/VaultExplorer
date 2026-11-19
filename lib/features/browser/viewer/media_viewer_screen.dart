@@ -63,6 +63,7 @@ import 'package:vaultexplorer/features/browser/viewer/widgets/audio_equalizer_sh
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_diagnostics_sheet.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/swipe_to_dismiss_layer.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/video_scrub_fullscreen_layer.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/image_special_modes_layer.dart';
 import 'package:vaultexplorer/features/image_editor/image_editor_screen.dart';
 import 'package:vaultexplorer/features/video_editor/video_editor_screen.dart';
 import 'package:vaultexplorer/features/audio_editor/audio_editor_screen.dart';
@@ -326,6 +327,11 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   // _multiTouchLock so either source can hold the lock independently.
   bool _zoomInteractionLock = false;
   String? _zoomLockFile;
+  String? _motionPhotoActiveFile;
+  bool _motionPhotoAutoplay = false;
+  int _motionPhotoPreferenceRevision = 0;
+  String? _panoramaActiveFile;
+  int _motionPhotoActivationToken = 0;
 
   int _activeMenuCount = 0;
   late bool _wasEmpty;
@@ -1304,12 +1310,19 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
 
   Future<void> _loadConfig() async {
     final playbackModeRevision = _playbackModeInteractionRevision;
+    final motionPhotoPreferenceRevision = _motionPhotoPreferenceRevision;
     final config = await ref.read(fileManagerToolbarServiceProvider).load();
     final appSettings = await ref
         .read(appSettingsServiceProvider)
         .loadSettings();
     await _marksNotifier.ensureLoaded(widget.container);
     if (mounted) {
+      if (motionPhotoPreferenceRevision == _motionPhotoPreferenceRevision &&
+          _motionPhotoAutoplay != appSettings.motionPhotoAutoplay) {
+        setState(() {
+          _motionPhotoAutoplay = appSettings.motionPhotoAutoplay;
+        });
+      }
       final pinnedPaths = _marks.pinnedPaths;
       unawaited(
         MediaSessionBridge.setShowFileNamesInNotification(
@@ -1365,6 +1378,23 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   void _onPlaylistUpdate() {
     if (!mounted) return;
     final currentFile = _playlistController.currentFile;
+    final activeMotionPhoto = _motionPhotoActiveFile;
+    final activePanorama = _panoramaActiveFile;
+    var clearedSpecialMode = false;
+    if (activeMotionPhoto != null && activeMotionPhoto != currentFile) {
+      _motionPhotoActivationToken++;
+      _motionPhotoActiveFile = null;
+      clearedSpecialMode = true;
+      _playbackManager.pauseActive();
+    }
+    if (activePanorama != null && activePanorama != currentFile) {
+      _panoramaActiveFile = null;
+      clearedSpecialMode = true;
+    }
+    if (clearedSpecialMode) {
+      setState(() {});
+      _updateSwipePhysics();
+    }
     if (currentFile != _zoomLockFile) {
       _zoomLockFile = currentFile;
       // Neighboring items reset their zoom as they become inactive. Clear
@@ -1586,6 +1616,89 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     _syncPictureInPicture();
   }
 
+  Future<void> _setMotionPhotoMode(String fileName, bool active) async {
+    if (!mounted || _playlistController.currentFile != fileName) return;
+    if (!active) {
+      if (_motionPhotoActiveFile != fileName) return;
+      _motionPhotoActivationToken++;
+      setState(() => _motionPhotoActiveFile = null);
+      _playbackManager.pauseActive();
+      await PlaybackThrottleController.setActive(false);
+      return;
+    }
+    if (_motionPhotoActiveFile == fileName) return;
+
+    final activationToken = ++_motionPhotoActivationToken;
+    setState(() => _motionPhotoActiveFile = fileName);
+    _cancelSlideshowTimer();
+    await PlaybackThrottleController.setActive(true);
+    if (!mounted ||
+        activationToken != _motionPhotoActivationToken ||
+        _motionPhotoActiveFile != fileName ||
+        _playlistController.currentFile != fileName) {
+      return;
+    }
+    final playbackSettings = ref
+        .read(fileManagerToolbarSettingsProvider(null))
+        .config
+        .mediaViewerToolbarConfig;
+    await _playbackManager.activate(
+      fileName: fileName,
+      volId: widget.container.volId,
+      filePath: nativePlaybackPathFor(widget.container, fileName),
+      isLocalStorage: widget.container.isLocalStorage,
+      autoPlay: true,
+      playbackSpeed: 1,
+      looping: true,
+      videoDecoderMode: playbackSettings.videoDecoderMode,
+      audioDecoderMode: playbackSettings.audioDecoderMode,
+      mediaSession: false,
+    );
+    if (!mounted ||
+        activationToken != _motionPhotoActivationToken ||
+        _motionPhotoActiveFile != fileName ||
+        _playlistController.currentFile != fileName) {
+      if (_playbackManager.currentFileName == fileName) {
+        _playbackManager.pauseActive();
+      }
+    }
+  }
+
+  void _setMotionPhotoAutoplay(bool enabled) {
+    _motionPhotoPreferenceRevision++;
+    if (_motionPhotoAutoplay != enabled) {
+      setState(() => _motionPhotoAutoplay = enabled);
+    }
+    unawaited(_persistMotionPhotoAutoplay(enabled));
+  }
+
+  Future<void> _persistMotionPhotoAutoplay(bool enabled) async {
+    try {
+      await ref
+          .read(appSettingsServiceProvider)
+          .updateSettings(
+            (settings) => settings.copyWith(motionPhotoAutoplay: enabled),
+          );
+    } catch (error) {
+      VeLog.w('MediaViewer', 'Could not save motion photo preference', error);
+    }
+  }
+
+  void _setPanoramaMode(String fileName, bool active) {
+    if (!mounted) return;
+    if (active) {
+      if (_playlistController.currentFile != fileName ||
+          _panoramaActiveFile == fileName) {
+        return;
+      }
+      setState(() => _panoramaActiveFile = fileName);
+    } else {
+      if (_panoramaActiveFile != fileName) return;
+      setState(() => _panoramaActiveFile = null);
+    }
+    _updateSwipePhysics();
+  }
+
   /// Offers the video on screen to Android's picture-in-picture window (the
   /// viewer's button enters it right away through the coordinator; the
   /// "automatic" setting enters it on leaving the app), or withdraws it for
@@ -1631,6 +1744,7 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     final duration = controller.value.duration;
 
     final fileName = _playbackManager.currentFileName;
+    if (fileName != null && fileName == _motionPhotoActiveFile) return;
     if (fileName != null) {
       if (duration > Duration.zero) {
         final lastSaved =
@@ -1929,8 +2043,9 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   }
 
   // Recomputes the shared swipe-physics notifier from the lock sources:
-  // raw multi-touch (fires the instant a 2nd finger is detected), zoom/interaction
-  // state reported by the active media item, and horizontal swipe-to-seek gesture on videos.
+  // raw multi-touch (fires the instant a 2nd finger is detected), a 360 scene
+  // that owns drags, zoom/interaction state reported by the active media item,
+  // and horizontal swipe-to-seek gesture on videos.
   // When the playlist is vertical, swipe-to-seek is orthogonal to the page scroll
   // direction, so item-change gestures do not interfere with seek and stay enabled.
   void _updateSwipePhysics() {
@@ -1940,6 +2055,8 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
     final shouldLock =
         _isEditingLayout ||
         _multiTouchLock ||
+        (_panoramaActiveFile != null &&
+            _panoramaActiveFile == _playlistController.currentFile) ||
         _zoomInteractionLock ||
         _isProgrammaticScrolling ||
         swipeToSeekActive;
@@ -2273,6 +2390,8 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
 
   void _maybeWrapPlaylistSwipe(Offset start, int startIndex, Offset end) {
     if (!_isPlaylistLoopEnabled ||
+        (_panoramaActiveFile != null &&
+            _panoramaActiveFile == _playlistController.currentFile) ||
         _zoomInteractionLock ||
         _isProgrammaticScrolling) {
       return;
@@ -2323,14 +2442,14 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
   void _onScrollEnd() {
     _isSwiping = false;
     _lockedExtents.clear();
-    if (_playbackManager.currentFileNotifier.value !=
-        _playlistController.currentFile) {
+    final currentFile = _playlistController.currentFile;
+    if (_playbackManager.currentFileNotifier.value != currentFile) {
       unawaited(_activateCurrentMedia());
-    } else if (_autoPlay) {
+    } else if (_autoPlay || currentFile == _motionPhotoActiveFile) {
       _playbackManager.activeController?.play();
     }
-    final currentFile = _playlistController.currentFile;
-    if (MediaViewerConstants.isImage(currentFile)) {
+    if (MediaViewerConstants.isImage(currentFile) &&
+        currentFile != _motionPhotoActiveFile) {
       _startSlideshowTimerIfNeeded();
     }
     if (mounted) {
@@ -3875,6 +3994,32 @@ class _MediaViewerScreenState extends ConsumerState<MediaViewerScreen>
                 child: child,
               ),
             ),
+            if (isImg)
+              Positioned.fill(
+                child: ListenableBuilder(
+                  listenable: _playlistController,
+                  builder: (context, _) {
+                    if (_playlistController.currentFile != fileName) {
+                      return const SizedBox.shrink();
+                    }
+                    return ImageSpecialModesLayer(
+                      key: ValueKey('image_special_modes_$fileName'),
+                      container: widget.container,
+                      fileName: fileName,
+                      showUI: _showUI,
+                      motionPhotoActive: _motionPhotoActiveFile == fileName,
+                      motionPhotoAutoplay: _motionPhotoAutoplay,
+                      onMotionPhotoChanged: (active) =>
+                          _setMotionPhotoMode(fileName, active),
+                      onMotionPhotoAutoplayChanged: _setMotionPhotoAutoplay,
+                      onPanoramaModeChanged: (active) =>
+                          _setPanoramaMode(fileName, active),
+                      playbackManager: _playbackManager,
+                      onToggleUI: _setUIVisibility,
+                    );
+                  },
+                ),
+              ),
           ],
         );
       },

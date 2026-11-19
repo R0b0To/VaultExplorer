@@ -4,7 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_feedback.dart';
-import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart' show AppBannerTone;
+import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart'
+    show AppBannerTone;
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/gallery/filter/gallery_meta_parser.dart';
 
@@ -27,7 +28,8 @@ class MetadataEditTarget {
   final int sizeBytes;
   final int modifiedSecs;
 
-  String get name => path.contains('/') ? path.substring(path.lastIndexOf('/') + 1) : path;
+  String get name =>
+      path.contains('/') ? path.substring(path.lastIndexOf('/') + 1) : path;
 
   /// Whether tags, dates and removal can be written into the file itself.
   bool get canEditEmbedded => ImageMetadataEditor.canEdit(name);
@@ -44,7 +46,11 @@ Future<void> showMetadataEditMenu(
 }) async {
   if (targets.isEmpty) return;
   if (targets.every((t) => t.container.readOnly)) {
-    showAppSnackBar(context, message: context.l10n.metadataReadOnlyMessage, tone: AppBannerTone.warning);
+    showAppSnackBar(
+      context,
+      message: context.l10n.metadataReadOnlyMessage,
+      tone: AppBannerTone.warning,
+    );
     return;
   }
   final l10n = context.l10n;
@@ -100,7 +106,10 @@ enum _Step { changed, unchanged, skipped, failed }
 
 // ── Tags ───────────────────────────────────────────────────────────────────
 
-Future<List<String>> _readKeywords(MetadataEditService service, MetadataEditTarget t) async {
+Future<List<String>> _readKeywords(
+  MetadataEditService service,
+  MetadataEditTarget t,
+) async {
   if (!t.canEditEmbedded || t.sizeBytes <= 0) return const [];
   try {
     final source = await service.openSource(t.container, t.path);
@@ -160,7 +169,9 @@ bool _sameList(List<String> a, List<String> b) {
 _Step _stepOf(MetadataEditOutcome o) => switch (o.status) {
   MetadataEditStatus.changed => _Step.changed,
   MetadataEditStatus.unchanged => _Step.unchanged,
-  MetadataEditStatus.unsupported || MetadataEditStatus.readOnly => _Step.skipped,
+  MetadataEditStatus.unsupported ||
+  MetadataEditStatus.protected ||
+  MetadataEditStatus.readOnly => _Step.skipped,
   MetadataEditStatus.failed => _Step.failed,
 };
 
@@ -283,7 +294,11 @@ class _TagsDialogState extends State<_TagsDialog> {
                     ),
                   for (final e in shown)
                     InputChip(
-                      label: Text(multi ? '${e.tag} · ${e.files}/${widget.targets.length}' : e.tag),
+                      label: Text(
+                        multi
+                            ? '${e.tag} · ${e.files}/${widget.targets.length}'
+                            : e.tag,
+                      ),
                       onDeleted: () => setState(() => _removed.add(e.tag)),
                     ),
                 ],
@@ -298,12 +313,18 @@ class _TagsDialogState extends State<_TagsDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: Text(l10n.cancel)),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(l10n.cancel),
+        ),
         FilledButton(
           onPressed: dirty || _input.text.trim().isNotEmpty
               ? () {
                   _commitInput();
-                  Navigator.pop(context, _TagsResult(_added.toSet(), _removed.toSet()));
+                  Navigator.pop(
+                    context,
+                    _TagsResult(_added.toSet(), _removed.toSet()),
+                  );
                 }
               : null,
           child: Text(l10n.save),
@@ -318,7 +339,12 @@ class _TagsDialogState extends State<_TagsDialog> {
 enum _DateMode { set, shift, fromModified, fromName }
 
 class _DateChoice {
-  const _DateChoice(this.mode, {this.wall, this.shift, required this.alsoSetModified});
+  const _DateChoice(
+    this.mode, {
+    this.wall,
+    this.shift,
+    required this.alsoSetModified,
+  });
   final _DateMode mode;
   final DateTime? wall;
   final Duration? shift;
@@ -353,7 +379,9 @@ Future<void> _editDate(
         if (t.canEditEmbedded && t.sizeBytes > 0) {
           final source = await service.openSource(t.container, t.path);
           if (source != null) {
-            final taken = GalleryMetaParser.parse(await source.read(0, GalleryMetaParser.headerBytes)).takenWallClock;
+            final taken = GalleryMetaParser.parse(
+              await source.read(0, GalleryMetaParser.headerBytes),
+            ).takenWallClock;
             if (taken != null) base = taken;
           }
         }
@@ -368,7 +396,8 @@ Future<void> _editDate(
       final ok = await service.setModifiedTime(t.container, t.path, modified);
       return ok ? _Step.changed : _Step.failed;
     }
-    final setModified = choice.alsoSetModified && choice.mode != _DateMode.fromModified;
+    final setModified =
+        choice.alsoSetModified && choice.mode != _DateMode.fromModified;
     final outcome = await service.apply(
       t.container,
       t.path,
@@ -445,7 +474,9 @@ class _DateDialogState extends State<_DateDialog> {
       _DateMode.fromModified: l10n.dateModeFromModified,
       _DateMode.fromName: l10n.dateModeFromName,
     };
-    final matches = widget.targets.where((t) => dateFromFileName(t.name) != null).length;
+    final matches = widget.targets
+        .where((t) => dateFromFileName(t.name) != null)
+        .length;
     final canApply = switch (_mode) {
       _DateMode.fromName => matches > 0,
       _DateMode.shift => _shift != Duration.zero,
@@ -489,8 +520,14 @@ class _DateDialogState extends State<_DateDialog> {
               if (_mode == _DateMode.shift) ...[
                 SegmentedButton<bool>(
                   segments: [
-                    ButtonSegment(value: true, label: Text(l10n.dateShiftLater)),
-                    ButtonSegment(value: false, label: Text(l10n.dateShiftEarlier)),
+                    ButtonSegment(
+                      value: true,
+                      label: Text(l10n.dateShiftLater),
+                    ),
+                    ButtonSegment(
+                      value: false,
+                      label: Text(l10n.dateShiftEarlier),
+                    ),
                   ],
                   selected: {_later},
                   onSelectionChanged: (s) => setState(() => _later = s.first),
@@ -531,14 +568,23 @@ class _DateDialogState extends State<_DateDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: Text(l10n.cancel)),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(l10n.cancel),
+        ),
         FilledButton(
           onPressed: canApply
               ? () => Navigator.pop(
                   context,
                   _DateChoice(
                     _mode,
-                    wall: DateTime.utc(_date.year, _date.month, _date.day, _time.hour, _time.minute),
+                    wall: DateTime.utc(
+                      _date.year,
+                      _date.month,
+                      _date.day,
+                      _time.hour,
+                      _time.minute,
+                    ),
                     shift: _shift,
                     alsoSetModified: _alsoModified,
                   ),
@@ -560,17 +606,21 @@ Future<void> _removeMetadata(
   void Function(List<MetadataEditTarget>)? onChanged,
 ) async {
   final service = ref.read(metadataEditServiceProvider);
-  final choice = await showDialog<({Set<MetadataKind> kinds, bool keepOrientation})>(
-    context: context,
-    builder: (_) => const _StripDialog(),
-  );
+  final choice =
+      await showDialog<({Set<MetadataKind> kinds, bool keepOrientation})>(
+        context: context,
+        builder: (_) => const _StripDialog(),
+      );
   if (choice == null || !context.mounted) return;
   await _runBatch(context, targets, onChanged, (t) async {
     if (!t.canEditEmbedded) return _Step.skipped;
     final outcome = await service.apply(
       t.container,
       t.path,
-      MetadataEdit(strip: choice.kinds, keepOrientation: choice.keepOrientation),
+      MetadataEdit(
+        strip: choice.kinds,
+        keepOrientation: choice.keepOrientation,
+      ),
       keepModifiedSecs: t.modifiedSecs,
     );
     return _stepOf(outcome);
@@ -619,7 +669,9 @@ class _StripDialogState extends State<_StripDialog> {
                   contentPadding: EdgeInsets.zero,
                   title: Text(e.value),
                   value: _kinds.contains(e.key),
-                  onChanged: (v) => setState(() => v == true ? _kinds.add(e.key) : _kinds.remove(e.key)),
+                  onChanged: (v) => setState(
+                    () => v == true ? _kinds.add(e.key) : _kinds.remove(e.key),
+                  ),
                 ),
               if (_kinds.contains(MetadataKind.exif))
                 SwitchListTile(
@@ -641,11 +693,17 @@ class _StripDialogState extends State<_StripDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: Text(l10n.cancel)),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(l10n.cancel),
+        ),
         FilledButton(
           onPressed: _kinds.isEmpty
               ? null
-              : () => Navigator.pop(context, (kinds: Set.of(_kinds), keepOrientation: _keepOrientation)),
+              : () => Navigator.pop(context, (
+                  kinds: Set.of(_kinds),
+                  keepOrientation: _keepOrientation,
+                )),
           child: Text(l10n.remove),
         ),
       ],
@@ -682,7 +740,9 @@ Future<void> _runBatch(
               children: [
                 Text(dialogContext.l10n.metadataProgress(done, targets.length)),
                 const SizedBox(height: 12),
-                LinearProgressIndicator(value: targets.isEmpty ? null : done / targets.length),
+                LinearProgressIndicator(
+                  value: targets.isEmpty ? null : done / targets.length,
+                ),
               ],
             ),
           ),

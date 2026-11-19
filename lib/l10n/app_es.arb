@@ -1692,8 +1692,8 @@
   "automationTutorialLinkLabel": "Leer el tutorial completo paso a paso",
   "showHiddenFilesLabel": "Mostrar archivos ocultos",
   "showHiddenFilesDesc": "Mostrar archivos ocultos y carpetas del sistema",
-  "showNoMediaFilesLabel": "Mostrar contenido multimedia oculto por .nomedia",
-  "showNoMediaFilesDesc": "Incluir el contenido multimedia de las carpetas con un archivo .nomedia",
+  "showNoMediaFilesLabel": "Mostrar archivos .nomedia",
+  "showNoMediaFilesDesc": "Mostrar los archivos .nomedia en las listas de carpetas",
   "dontAskAgain": "No volver a preguntar",
   "deleteAfterImportLabel": "Eliminar archivos después de importar",
   "deleteAfterImportModeAsk": "Preguntar cada vez",
@@ -4079,10 +4079,9 @@
   "metadataResultFailed": "{count} fallidos",
   "showNoMediaFoldersLabel": "Mostrar carpetas .nomedia",
   "showNoMediaFoldersDesc": "Incluir las carpetas con un archivo .nomedia, que las apps de galería suelen omitir",
-  "showNoMediaFilesLabel": "Mostrar archivos .nomedia",
-  "showNoMediaFilesDesc": "Mostrar los archivos .nomedia en las listas de carpetas",
   "autoHideToolbarLabel": "Ocultar automáticamente la barra de herramientas al desplazarse",
   "autoHideToolbarDesc": "Oculta la barra de herramientas inferior al desplazarse hacia abajo para maximizar el espacio de visualización",
   "autoHideBreadcrumbBarLabel": "Ocultar automáticamente la barra de ruta al desplazarse",
-  "autoHideBreadcrumbBarDesc": "Oculta la barra de navegación de ruta al desplazarse hacia abajo para maximizar el espacio de visualización"
+  "autoHideBreadcrumbBarDesc": "Oculta la barra de navegación de ruta al desplazarse hacia abajo para maximizar el espacio de visualización",
+  "motionPhotoCopyNote": "La copia editada será una imagen fija. El archivo original, sus datos EXIF y cualquier vídeo integrado permanecerán intactos."
 }

@@ -14812,4 +14812,8 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get showNoMediaFoldersDesc =>
       'Incluir las carpetas con un archivo .nomedia, que las apps de galería suelen omitir';
+
+  @override
+  String get motionPhotoCopyNote =>
+      'La copia editada será una imagen fija. El archivo original, sus datos EXIF y cualquier vídeo integrado permanecerán intactos.';
 }

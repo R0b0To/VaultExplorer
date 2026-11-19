@@ -4082,5 +4082,6 @@
   "autoHideToolbarLabel": "Ocultar barra de ferramentas automaticamente ao rolar",
   "autoHideToolbarDesc": "Oculta a barra de ferramentas inferior ao rolar para baixo para maximizar o espaço de visualização",
   "autoHideBreadcrumbBarLabel": "Ocultar barra de caminho automaticamente ao rolar",
-  "autoHideBreadcrumbBarDesc": "Oculta a barra de navegação de caminho ao rolar para baixo para maximizar o espaço de visualização"
+  "autoHideBreadcrumbBarDesc": "Oculta a barra de navegação de caminho ao rolar para baixo para maximizar o espaço de visualização",
+  "motionPhotoCopyNote": "A cópia editada será uma imagem estática. O arquivo original, os dados EXIF e qualquer vídeo incorporado permanecerão intactos."
 }

@@ -13741,4 +13741,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get showNoMediaFoldersDesc => '包含带有 .nomedia 文件的文件夹（图库应用通常会跳过这些文件夹）';
+
+  @override
+  String get motionPhotoCopyNote => '编辑后的副本将是静态图片。原始文件、EXIF 信息和任何嵌入的视频都将保持不变。';
 }

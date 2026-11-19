@@ -14868,4 +14868,8 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get showNoMediaFoldersDesc =>
       'Включити папки з файлом .nomedia, які застосунки галереї зазвичай пропускають';
+
+  @override
+  String get motionPhotoCopyNote =>
+      'Відредагована копія буде нерухомим зображенням. Оригінальний файл, дані EXIF і будь-яке вбудоване відео залишаться незмінними.';
 }

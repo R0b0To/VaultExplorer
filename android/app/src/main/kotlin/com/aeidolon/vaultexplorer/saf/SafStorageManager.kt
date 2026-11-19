@@ -635,6 +635,46 @@ class SafStorageManager(private val context: Context) {
         }
     }
 
+    fun moveFile(treeUri: Uri, sourcePath: String, destPath: String): Boolean {
+        val source = normalizePath(sourcePath)
+        val dest = normalizePath(destPath)
+        if (source.isEmpty() || dest.isEmpty()) return false
+        if (source == dest) return true
+
+        val sourceName = source.substringAfterLast('/')
+        val destName = dest.substringAfterLast('/')
+        if (sourceName != destName) return false
+
+        val sourceParentPath = source.substringBeforeLast('/', "")
+        val destParentPath = dest.substringBeforeLast('/', "")
+        if (sourceParentPath == destParentPath) {
+            return renameFile(treeUri, source, destName)
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return false
+
+        val sourceUri = getDocumentUri(treeUri, source) ?: return false
+        val sourceParentUri = getDocumentUri(treeUri, sourceParentPath) ?: return false
+        val destParentUri = getDocumentUri(treeUri, destParentPath) ?: return false
+        return try {
+            val movedUri = DocumentsContract.moveDocument(
+                context.contentResolver,
+                sourceUri,
+                sourceParentUri,
+                destParentUri,
+            ) ?: return false
+            // Moving a directory changes paths for its cached descendants.
+            invalidateCache(treeUri)
+            runCatching {
+                pathDocumentIdCache[cacheKey(treeUri, dest)] =
+                    DocumentsContract.getDocumentId(movedUri)
+            }
+            true
+        } catch (e: Exception) {
+            VeLog.w(TAG) { "moveFile failed for " + sourcePath + ": " + e.message }
+            false
+        }
+    }
+
     fun deleteRecursively(treeUri: Uri, relativePath: String): Boolean {
         val clean = normalizePath(relativePath)
         val docId = resolveDocumentId(treeUri, clean) ?: return false

@@ -24,10 +24,10 @@ typedef GalleryHeaderParser = Future<GalleryMeta> Function(Uint8List bytes);
 /// the batch, not of the whole library, and a legacy single-file index is just
 /// a log of one segment.
 abstract interface class GalleryMetaStorage {
-  /// Whether anything of [volId] can be stored at all right now. False for a
-  /// source that never is (the phone's own storage, a read-only vault, one
-  /// whose owner turned persistent caching off): the index then does not
-  /// build batches that would only be refused.
+  /// Whether anything of [volId] can be stored at all right now. False when
+  /// the selected cache mode has no persistent destination, the source is
+  /// read-only, or its owner turned persistent caching off. The index then
+  /// does not build batches that would only be refused.
   bool persists(int volId);
 
   /// Every stored segment of [volId], oldest first. Empty when nothing is
@@ -64,8 +64,8 @@ class _Stored {
 /// Results kept in memory for the whole app session and shared by every
 /// [GalleryMetaIndex] given it, so that leaving the gallery (or toggling gallery
 /// mode, or anything else that rebuilds the view) does not throw away what was
-/// read from sources that are never saved to disk, like the phone's own
-/// storage. Nothing here is written anywhere; it is gone with the process.
+/// read from sources whose selected cache mode has no persistent store.
+/// Nothing here is written anywhere; it is gone with the process.
 class GalleryMetaMemory {
   GalleryMetaMemory();
 
@@ -191,8 +191,9 @@ String? _mergeSegments(_MergeJob job) {
 /// With a [storage] the index is loaded at the first request for a source and
 /// each batch of [saveEvery] photos is appended to it in the background, so the
 /// next session starts with everything already known and no save ever costs
-/// more than one batch. Without one it lives for the session only, which is
-/// what the phone's own storage gets: nothing is written to it.
+/// more than one batch. Without one it lives in session memory only; local
+/// storage uses encrypted app storage or its opted-in hidden folder when
+/// persistent caching is enabled.
 class GalleryMetaIndex extends ChangeNotifier {
   GalleryMetaIndex({
     required this.readHeader,
@@ -381,10 +382,9 @@ class GalleryMetaIndex extends ChangeNotifier {
   ///
   /// What is to be written is captured synchronously, so it is safe to call
   /// right before [dispose].
-  Future<void> flush() =>
-      Future.wait([
-        for (final v in {..._dirty.keys, ..._writing.keys}) _save(v),
-      ]).then((_) {});
+  Future<void> flush() => Future.wait([
+    for (final v in {..._dirty.keys, ..._writing.keys}) _save(v),
+  ]).then((_) {});
 
   /// Forgets what is known about one file, because its metadata was edited.
   ///
@@ -565,7 +565,7 @@ class GalleryMetaIndex extends ChangeNotifier {
     final st = storage;
     final paths = _dirty.remove(volId);
     final running = _writing[volId] ?? Future<void>.value();
-    // A source that cannot be saved (the phone's own storage) must not cost a
+    // A source with persistent caching disabled must not cost a
     // snapshot, an encode and a refused write for every batch.
     if (st == null || !st.persists(volId)) return running;
     if (paths == null || paths.isEmpty) return running;

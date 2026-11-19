@@ -26,6 +26,7 @@ class MediaViewerConstants {
   /// image visibly softens, without decoding at "whatever the source file
   /// happens to be."
   static const double fullResDecodeZoomHeadroom = 5.0;
+
   /// Absolute decoded-bitmap cap for a single viewer image. Screen-relative
   /// zoom headroom alone can still ask Skia for a 50+ megapixel bitmap on a
   /// high-resolution phone, which exceeds the heap budget on some devices.
@@ -85,18 +86,55 @@ class MediaViewerConstants {
     'webp',
     'avif',
     'heic',
+    'heif',
   ];
-static const List<String> videoExtensions = [
-  'mp4', 'm4v', 'webm', 'mov', 'avi', 'mkv', 'mpeg', 'mpg',
-  'flv', 'ts', 'wmv', '3gp', 'vob', 'ogv', 'divx', 'f4v', 'm2ts',
-  'qt', '3g2', 'mts', 'mpe',
-];
+  static const List<String> videoExtensions = [
+    'mp4',
+    'm4v',
+    'webm',
+    'mov',
+    'avi',
+    'mkv',
+    'mpeg',
+    'mpg',
+    'flv',
+    'ts',
+    'wmv',
+    '3gp',
+    'vob',
+    'ogv',
+    'divx',
+    'f4v',
+    'm2ts',
+    'qt',
+    '3g2',
+    'mts',
+    'mpe',
+  ];
 
-static const List<String> audioExtensions = [
-  'mp3', 'm4a', 'wav', 'flac', 'ogg', 'aac',
-  'opus', 'wma', 'ac3', 'eac3', 'm4b', 'ape', 'aiff', 'dts',
-  'aif', 'aifc', 'amr', 'awb', 'mka', 'weba', 'oga',
-];
+  static const List<String> audioExtensions = [
+    'mp3',
+    'm4a',
+    'wav',
+    'flac',
+    'ogg',
+    'aac',
+    'opus',
+    'wma',
+    'ac3',
+    'eac3',
+    'm4b',
+    'ape',
+    'aiff',
+    'dts',
+    'aif',
+    'aifc',
+    'amr',
+    'awb',
+    'mka',
+    'weba',
+    'oga',
+  ];
 
   // Looked up per file name while filtering, scanning and building cells, so
   // membership is a hash lookup instead of a scan of the list, and the

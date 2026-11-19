@@ -20,11 +20,29 @@ class MetadataDirectory {
   final List<MetadataTag> tags;
 }
 
-/// Reads every metadata tag of a JPEG, PNG or WebP file, grouped by where it
+/// Reads metadata from JPEG, PNG, WebP and HEIF files, grouped by where it
 /// is stored, for the "all metadata" view. Never throws: whatever cannot be
 /// read is left out.
 class ImageMetadataReader {
   const ImageMetadataReader._();
+
+  static const Set<String> readableExtensions = {
+    'jpg',
+    'jpeg',
+    'jpe',
+    'jfif',
+    'png',
+    'webp',
+    'heic',
+    'heif',
+    'avif',
+  };
+
+  static bool canRead(String fileName) {
+    final dot = fileName.lastIndexOf('.');
+    return dot >= 0 &&
+        readableExtensions.contains(fileName.substring(dot + 1).toLowerCase());
+  }
 
   static Future<List<MetadataDirectory>> read(MetadataSource source) async {
     final s = BufferedMetadataSource(source);
@@ -37,6 +55,9 @@ class ImageMetadataReader {
         await _readPng(s, dirs);
       } else if (head.length >= 12 && head[0] == 0x52 && head[8] == 0x57) {
         await _readWebp(s, dirs);
+      } else if (head.length >= 12 &&
+          String.fromCharCodes(head, 4, 8) == 'ftyp') {
+        await _readIsoBmff(s, dirs);
       }
     } catch (_) {
       // A damaged file shows what was read before the damage.
@@ -46,7 +67,10 @@ class ImageMetadataReader {
 
   // ── JPEG ─────────────────────────────────────────────────────────────────
 
-  static Future<void> _readJpeg(MetadataSource s, List<MetadataDirectory> dirs) async {
+  static Future<void> _readJpeg(
+    MetadataSource s,
+    List<MetadataDirectory> dirs,
+  ) async {
     var o = 2;
     final frame = <MetadataTag>[];
     final comments = <MetadataTag>[];
@@ -86,8 +110,17 @@ class ImageMetadataReader {
         }
       } else if (marker == 0xFE) {
         final d = await s.read(start, end - start);
-        comments.add(MetadataTag('JPEG Comment', utf8.decode(d, allowMalformed: true).trim()));
-      } else if (marker == 0xE0 || marker == 0xE1 || marker == 0xE2 || marker == 0xED || marker == 0xEE) {
+        comments.add(
+          MetadataTag(
+            'JPEG Comment',
+            utf8.decode(d, allowMalformed: true).trim(),
+          ),
+        );
+      } else if (marker == 0xE0 ||
+          marker == 0xE1 ||
+          marker == 0xE2 ||
+          marker == 0xED ||
+          marker == 0xEE) {
         final d = await s.read(start, end - start);
         _jpegApp(marker, d, pending);
       }
@@ -99,7 +132,9 @@ class ImageMetadataReader {
   }
 
   static final List<int> _exifId = [0x45, 0x78, 0x69, 0x66, 0, 0];
-  static final List<int> _xmpId = ascii.encode('http://ns.adobe.com/xap/1.0/\u0000');
+  static final List<int> _xmpId = ascii.encode(
+    'http://ns.adobe.com/xap/1.0/\u0000',
+  );
   static final List<int> _iccId = ascii.encode('ICC_PROFILE\u0000');
   static final List<int> _psId = ascii.encode('Photoshop 3.0\u0000');
   static final List<int> _jfifId = ascii.encode('JFIF\u0000');
@@ -107,11 +142,18 @@ class ImageMetadataReader {
 
   static void _jpegApp(int marker, Uint8List d, List<MetadataDirectory> out) {
     if (marker == 0xE0 && _starts(d, _jfifId) && d.length >= 14) {
-      const units = ['None (aspect ratio)', 'Pixels per inch', 'Pixels per centimetre'];
+      const units = [
+        'None (aspect ratio)',
+        'Pixels per inch',
+        'Pixels per centimetre',
+      ];
       out.add(
         MetadataDirectory('JFIF', [
           MetadataTag('Version', '${d[5]}.${d[6].toString().padLeft(2, '0')}'),
-          MetadataTag('Resolution Unit', d[7] < units.length ? units[d[7]] : '${d[7]}'),
+          MetadataTag(
+            'Resolution Unit',
+            d[7] < units.length ? units[d[7]] : '${d[7]}',
+          ),
           MetadataTag('X Resolution', '${(d[8] << 8) | d[9]}'),
           MetadataTag('Y Resolution', '${(d[10] << 8) | d[11]}'),
         ]),
@@ -119,7 +161,13 @@ class ImageMetadataReader {
     } else if (marker == 0xE1 && _starts(d, _exifId)) {
       _readTiff(Uint8List.sublistView(d, _exifId.length), out);
     } else if (marker == 0xE1 && _starts(d, _xmpId)) {
-      _readXmp(utf8.decode(Uint8List.sublistView(d, _xmpId.length), allowMalformed: true), out);
+      _readXmp(
+        utf8.decode(
+          Uint8List.sublistView(d, _xmpId.length),
+          allowMalformed: true,
+        ),
+        out,
+      );
     } else if (marker == 0xE2 && _starts(d, _iccId)) {
       // Only the first chunk: the header and tag table are in it.
       _readIcc(Uint8List.sublistView(d, _iccId.length + 2), out);
@@ -130,7 +178,10 @@ class ImageMetadataReader {
       out.add(
         MetadataDirectory('Adobe JPEG', [
           MetadataTag('DCT Encode Version', '${(d[5] << 8) | d[6]}'),
-          MetadataTag('Color Transform', d[11] < transform.length ? transform[d[11]] : '${d[11]}'),
+          MetadataTag(
+            'Color Transform',
+            d[11] < transform.length ? transform[d[11]] : '${d[11]}',
+          ),
         ]),
       );
     }
@@ -154,7 +205,10 @@ class ImageMetadataReader {
 
   // ── PNG ──────────────────────────────────────────────────────────────────
 
-  static Future<void> _readPng(MetadataSource s, List<MetadataDirectory> dirs) async {
+  static Future<void> _readPng(
+    MetadataSource s,
+    List<MetadataDirectory> dirs,
+  ) async {
     var o = 8;
     final text = <MetadataTag>[];
     final other = <MetadataDirectory>[];
@@ -177,7 +231,13 @@ class ImageMetadataReader {
       switch (type) {
         case 'IHDR':
           if (data.length >= 13) {
-            const colour = {0: 'Greyscale', 2: 'RGB', 3: 'Palette', 4: 'Greyscale + alpha', 6: 'RGB + alpha'};
+            const colour = {
+              0: 'Greyscale',
+              2: 'RGB',
+              3: 'Palette',
+              4: 'Greyscale + alpha',
+              6: 'RGB + alpha',
+            };
             header
               ..add(MetadataTag('Image Width', '${_be32(data, 0)}'))
               ..add(MetadataTag('Image Height', '${_be32(data, 4)}'))
@@ -197,14 +257,29 @@ class ImageMetadataReader {
           }
         case 'gAMA':
           if (data.length >= 4) {
-            other.add(MetadataDirectory('PNG Gamma', [MetadataTag('Gamma', (100000 / _be32(data, 0)).toStringAsFixed(2))]));
+            other.add(
+              MetadataDirectory('PNG Gamma', [
+                MetadataTag(
+                  'Gamma',
+                  (100000 / _be32(data, 0)).toStringAsFixed(2),
+                ),
+              ]),
+            );
           }
         case 'sRGB':
           if (data.isNotEmpty) {
-            const intents = ['Perceptual', 'Relative colorimetric', 'Saturation', 'Absolute colorimetric'];
+            const intents = [
+              'Perceptual',
+              'Relative colorimetric',
+              'Saturation',
+              'Absolute colorimetric',
+            ];
             other.add(
               MetadataDirectory('PNG sRGB', [
-                MetadataTag('Rendering Intent', data[0] < intents.length ? intents[data[0]] : '${data[0]}'),
+                MetadataTag(
+                  'Rendering Intent',
+                  data[0] < intents.length ? intents[data[0]] : '${data[0]}',
+                ),
               ]),
             );
           }
@@ -226,16 +301,30 @@ class ImageMetadataReader {
           final nul = data.indexOf(0);
           if (nul > 0 && data.length > nul + 2) {
             try {
-              final profile = Uint8List.fromList(zlib.decode(data.sublist(nul + 2)));
+              final profile = Uint8List.fromList(
+                zlib.decode(data.sublist(nul + 2)),
+              );
               _readIcc(profile, other);
             } on FormatException {
-              other.add(MetadataDirectory('ICC Profile', [MetadataTag('Profile Name', latin1.decode(data.sublist(0, nul)))]));
+              other.add(
+                MetadataDirectory('ICC Profile', [
+                  MetadataTag(
+                    'Profile Name',
+                    latin1.decode(data.sublist(0, nul)),
+                  ),
+                ]),
+              );
             }
           }
         case 'tEXt':
           final nul = data.indexOf(0);
           if (nul > 0) {
-            text.add(MetadataTag(latin1.decode(data.sublist(0, nul)), latin1.decode(data.sublist(nul + 1))));
+            text.add(
+              MetadataTag(
+                latin1.decode(data.sublist(0, nul)),
+                latin1.decode(data.sublist(nul + 1)),
+              ),
+            );
           }
         case 'zTXt':
           final nul = data.indexOf(0);
@@ -283,11 +372,15 @@ class ImageMetadataReader {
     if (text.isNotEmpty) dirs.add(MetadataDirectory('PNG Text', text));
   }
 
-  static int _be32(Uint8List b, int o) => (b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3];
+  static int _be32(Uint8List b, int o) =>
+      (b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3];
 
   // ── WebP ─────────────────────────────────────────────────────────────────
 
-  static Future<void> _readWebp(MetadataSource s, List<MetadataDirectory> dirs) async {
+  static Future<void> _readWebp(
+    MetadataSource s,
+    List<MetadataDirectory> dirs,
+  ) async {
     var o = 12;
     final info = <MetadataTag>[];
     final other = <MetadataDirectory>[];
@@ -300,8 +393,18 @@ class ImageMetadataReader {
       if (fourcc == 'VP8X' && len >= 10) {
         final d = await s.read(o + 8, 10);
         info
-          ..add(MetadataTag('Canvas Width', '${1 + (d[4] | (d[5] << 8) | (d[6] << 16))}'))
-          ..add(MetadataTag('Canvas Height', '${1 + (d[7] | (d[8] << 8) | (d[9] << 16))}'))
+          ..add(
+            MetadataTag(
+              'Canvas Width',
+              '${1 + (d[4] | (d[5] << 8) | (d[6] << 16))}',
+            ),
+          )
+          ..add(
+            MetadataTag(
+              'Canvas Height',
+              '${1 + (d[7] | (d[8] << 8) | (d[9] << 16))}',
+            ),
+          )
           ..add(MetadataTag('Animation', (d[0] & 0x02) != 0 ? 'Yes' : 'No'))
           ..add(MetadataTag('Alpha', (d[0] & 0x10) != 0 ? 'Yes' : 'No'));
       } else if (fourcc == 'EXIF' && len <= 4 * 1024 * 1024) {
@@ -309,7 +412,10 @@ class ImageMetadataReader {
         if (_starts(d, _exifId)) d = Uint8List.sublistView(d, 6);
         _readTiff(d, other);
       } else if (fourcc == 'XMP ' && len <= 4 * 1024 * 1024) {
-        _readXmp(utf8.decode(await s.read(o + 8, len), allowMalformed: true), other);
+        _readXmp(
+          utf8.decode(await s.read(o + 8, len), allowMalformed: true),
+          other,
+        );
       } else if (fourcc == 'ICCP' && len <= 4 * 1024 * 1024) {
         _readIcc(await s.read(o + 8, len), other);
       }
@@ -319,6 +425,281 @@ class ImageMetadataReader {
     dirs.addAll(other);
   }
 
+  // ── HEIF / ISO-BMFF ─────────────────────────────────────────────────────
+
+  static const int _maxHeifMetadataBytes = 8 * 1024 * 1024;
+
+  static Future<void> _readIsoBmff(
+    BufferedMetadataSource s,
+    List<MetadataDirectory> dirs,
+  ) async {
+    _BmffBox? meta;
+    for (final box in await _readBoxes(s, 0, s.length)) {
+      if (box.type == 'meta') {
+        meta = box;
+        break;
+      }
+    }
+    if (meta == null || meta.end - meta.payloadStart < 4) return;
+
+    // The MetaBox starts with version and flags before its child boxes.
+    final children = await _readBoxes(s, meta.payloadStart + 4, meta.end);
+    final iinf = children.where((box) => box.type == 'iinf').firstOrNull;
+    final iloc = children.where((box) => box.type == 'iloc').firstOrNull;
+    final idat = children.where((box) => box.type == 'idat').firstOrNull;
+    if (iinf == null || iloc == null) return;
+
+    final itemTypes = await _readHeifItemTypes(s, iinf);
+    final locations = await _readHeifItemLocations(s, iloc);
+    final other = <MetadataDirectory>[];
+
+    for (final entry in itemTypes.entries) {
+      final location = locations[entry.key];
+      if (location == null) continue;
+      final data = await _readHeifItemData(s, location, idat);
+      if (data == null || data.isEmpty) continue;
+
+      if (entry.value == 'Exif') {
+        final tiff = _heifTiff(data);
+        if (tiff != null) _readTiff(tiff, other);
+      } else if (entry.value == 'XMP') {
+        _readXmp(utf8.decode(data, allowMalformed: true), other);
+      }
+    }
+    dirs.addAll(other);
+  }
+
+  static Future<List<_BmffBox>> _readBoxes(
+    MetadataSource s,
+    int start,
+    int end,
+  ) async {
+    final boxes = <_BmffBox>[];
+    var offset = start;
+    while (offset + 8 <= end && boxes.length < 4096) {
+      final box = await _readBox(s, offset, end);
+      if (box == null || box.end <= offset) break;
+      boxes.add(box);
+      offset = box.end;
+    }
+    return boxes;
+  }
+
+  static Future<_BmffBox?> _readBox(
+    MetadataSource s,
+    int offset,
+    int parentEnd,
+  ) async {
+    if (offset < 0 || parentEnd - offset < 8) return null;
+    final head = await s.read(offset, 16);
+    if (head.length < 8) return null;
+
+    final size32 = _be32(head, 0);
+    final type = String.fromCharCodes(head, 4, 8);
+    var headerSize = 8;
+    var boxSize = size32;
+    if (size32 == 1) {
+      if (head.length < 16) return null;
+      boxSize = ByteData.sublistView(head, 8, 16).getUint64(0, Endian.big);
+      headerSize = 16;
+    } else if (size32 == 0) {
+      boxSize = parentEnd - offset;
+    }
+    if (boxSize < headerSize || boxSize > parentEnd - offset) return null;
+    return _BmffBox(type, offset + headerSize, offset + boxSize);
+  }
+
+  static Future<Map<int, String>> _readHeifItemTypes(
+    MetadataSource s,
+    _BmffBox iinf,
+  ) async {
+    final prefix = await s.read(iinf.payloadStart, 8);
+    if (prefix.length < 6) return const {};
+    final version = prefix[0];
+    final entryCount = version == 0
+        ? ((prefix[4] << 8) | prefix[5])
+        : prefix.length >= 8
+        ? _be32(prefix, 4)
+        : 0;
+    if (entryCount <= 0) return const {};
+
+    var offset = iinf.payloadStart + (version == 0 ? 6 : 8);
+    final items = <int, String>{};
+    for (var i = 0; i < entryCount && i < 10000; i++) {
+      final box = await _readBox(s, offset, iinf.end);
+      if (box == null) break;
+      offset = box.end;
+      if (box.type != 'infe') continue;
+
+      final length = math.min(4096, box.end - box.payloadStart);
+      final data = await s.read(box.payloadStart, length);
+      if (data.length < 12) continue;
+      final itemVersion = data[0];
+      final itemIdLength = switch (itemVersion) {
+        2 => 2,
+        3 => 4,
+        _ => 0,
+      };
+      if (itemIdLength == 0) continue;
+      final itemId = itemIdLength == 2
+          ? (data[4] << 8) | data[5]
+          : _be32(data, 4);
+      final typeOffset = 4 + itemIdLength + 2;
+      if (typeOffset + 4 > data.length) continue;
+      final itemType = String.fromCharCodes(data, typeOffset, typeOffset + 4);
+      if (itemType == 'Exif') {
+        items[itemId] = 'Exif';
+        continue;
+      }
+      if (itemType != 'mime') continue;
+
+      final nameStart = typeOffset + 4;
+      final nameEnd = _zeroByteAt(data, nameStart);
+      if (nameEnd < 0) continue;
+      final contentStart = nameEnd + 1;
+      final contentEnd = _zeroByteAt(data, contentStart);
+      if (contentEnd < 0) continue;
+      final contentType = latin1.decode(
+        Uint8List.sublistView(data, contentStart, contentEnd),
+      );
+      if (contentType.toLowerCase() == 'application/rdf+xml') {
+        items[itemId] = 'XMP';
+      }
+    }
+    return items;
+  }
+
+  static int _zeroByteAt(Uint8List bytes, int start) {
+    for (var i = start; i < bytes.length; i++) {
+      if (bytes[i] == 0) return i;
+    }
+    return -1;
+  }
+
+  static Future<Map<int, _HeifItemLocation>> _readHeifItemLocations(
+    MetadataSource s,
+    _BmffBox iloc,
+  ) async {
+    final length = math.min(1 << 20, iloc.end - iloc.payloadStart);
+    final data = await s.read(iloc.payloadStart, length);
+    if (data.length < 8) return const {};
+
+    final version = data[0];
+    final offsetSize = data[4] >> 4;
+    final lengthSize = data[4] & 0x0F;
+    final baseOffsetSize = data[5] >> 4;
+    final indexSize = version == 0 ? 0 : data[5] & 0x0F;
+    var cursor = 6;
+
+    int? readUnsigned(int size) {
+      if (size < 0 || size > 8 || cursor + size > data.length) return null;
+      var value = 0;
+      for (var i = 0; i < size; i++) {
+        value = (value << 8) | data[cursor++];
+      }
+      return value < 0 ? null : value;
+    }
+
+    final itemCount = readUnsigned(version < 2 ? 2 : 4);
+    if (itemCount == null || itemCount > 10000) return const {};
+    final locations = <int, _HeifItemLocation>{};
+
+    for (var i = 0; i < itemCount; i++) {
+      final itemId = readUnsigned(version < 2 ? 2 : 4);
+      if (itemId == null) break;
+      var constructionMethod = 0;
+      if (version == 1 || version == 2) {
+        final method = readUnsigned(2);
+        if (method == null) break;
+        constructionMethod = method & 0x0F;
+      }
+      final dataReferenceIndex = readUnsigned(2);
+      final baseOffset = readUnsigned(baseOffsetSize);
+      final extentCount = readUnsigned(2);
+      if (dataReferenceIndex == null ||
+          baseOffset == null ||
+          extentCount == null ||
+          extentCount > 256) {
+        break;
+      }
+
+      final extents = <_HeifExtent>[];
+      var malformed = false;
+      for (var j = 0; j < extentCount; j++) {
+        if ((version == 1 || version == 2) && indexSize > 0) {
+          if (readUnsigned(indexSize) == null) {
+            malformed = true;
+            break;
+          }
+        }
+        final extentOffset = readUnsigned(offsetSize);
+        final extentLength = readUnsigned(lengthSize);
+        if (extentOffset == null || extentLength == null) {
+          malformed = true;
+          break;
+        }
+        extents.add(_HeifExtent(extentOffset, extentLength));
+      }
+      if (malformed) break;
+      locations[itemId] = _HeifItemLocation(
+        constructionMethod: constructionMethod,
+        dataReferenceIndex: dataReferenceIndex,
+        baseOffset: baseOffset,
+        extents: extents,
+      );
+    }
+    return locations;
+  }
+
+  static Future<Uint8List?> _readHeifItemData(
+    MetadataSource s,
+    _HeifItemLocation item,
+    _BmffBox? idat,
+  ) async {
+    if (item.dataReferenceIndex != 0 ||
+        (item.constructionMethod != 0 && item.constructionMethod != 1) ||
+        item.extents.isEmpty) {
+      return null;
+    }
+    if (item.constructionMethod == 1 && idat == null) return null;
+
+    final builder = BytesBuilder(copy: false);
+    var total = 0;
+    for (final extent in item.extents) {
+      final dataStart = item.constructionMethod == 1 ? idat!.payloadStart : 0;
+      final dataEnd = item.constructionMethod == 1 ? idat!.end : s.length;
+      final start = dataStart + item.baseOffset + extent.offset;
+      if (start < dataStart || start > dataEnd) return null;
+      final length = extent.length == 0 ? dataEnd - start : extent.length;
+      if (length < 0 ||
+          start + length > dataEnd ||
+          total + length > _maxHeifMetadataBytes) {
+        return null;
+      }
+      final bytes = await s.read(start, length);
+      if (bytes.length != length) return null;
+      builder.add(bytes);
+      total += length;
+    }
+    return builder.takeBytes();
+  }
+
+  static Uint8List? _heifTiff(Uint8List item) {
+    if (item.length >= 8 &&
+        ((item[0] == 0x49 && item[1] == 0x49) ||
+            (item[0] == 0x4D && item[1] == 0x4D))) {
+      return item;
+    }
+    if (item.length < 4) return null;
+    final offset = _be32(item, 0);
+    final start = 4 + offset;
+    if (start < 4 || start + 8 > item.length) return null;
+    var tiff = Uint8List.sublistView(item, start);
+    if (_starts(tiff, _exifId)) {
+      tiff = Uint8List.sublistView(tiff, _exifId.length);
+    }
+    return tiff;
+  }
   // ── Exif / TIFF ──────────────────────────────────────────────────────────
 
   static void _readTiff(Uint8List t, List<MetadataDirectory> out) {
@@ -328,8 +709,17 @@ class ImageMetadataReader {
     final r = _Tiff(t, le);
     final visited = <int>{};
 
-    void walk(int offset, String name, String Function(int) tagName, int depth) {
-      if (depth > 4 || offset < 8 || offset + 2 > t.length || !visited.add(offset)) return;
+    void walk(
+      int offset,
+      String name,
+      String Function(int) tagName,
+      int depth,
+    ) {
+      if (depth > 4 ||
+          offset < 8 ||
+          offset + 2 > t.length ||
+          !visited.add(offset))
+        return;
       final n = r.u16(offset);
       final tags = <MetadataTag>[];
       var exif = 0;
@@ -358,12 +748,14 @@ class ImageMetadataReader {
       if (tags.isNotEmpty) out.add(MetadataDirectory(name, tags));
       if (exif != 0) walk(exif, 'Exif', ExifTagNames.exif, depth + 1);
       if (gps != 0) walk(gps, 'GPS', ExifTagNames.gps, depth + 1);
-      if (interop != 0) walk(interop, 'Interoperability', ExifTagNames.interop, depth + 1);
+      if (interop != 0)
+        walk(interop, 'Interoperability', ExifTagNames.interop, depth + 1);
       if (name == 'Exif IFD0') {
         final nextAt = offset + 2 + n * 12;
         if (nextAt + 4 <= t.length) {
           final next = r.u32(nextAt);
-          if (next != 0) walk(next, 'Exif Thumbnail', ExifTagNames.ifd0, depth + 1);
+          if (next != 0)
+            walk(next, 'Exif Thumbnail', ExifTagNames.ifd0, depth + 1);
         }
       }
     }
@@ -388,7 +780,9 @@ class ImageMetadataReader {
           break;
         }
       }
-      return utf8.decode(Uint8List.sublistView(r.t, at, end), allowMalformed: true).trim();
+      return utf8
+          .decode(Uint8List.sublistView(r.t, at, end), allowMalformed: true)
+          .trim();
     }
     if (type == 7 || type == 1) {
       if (!isGps && tag == 0x927C) return '($count bytes)';
@@ -399,13 +793,24 @@ class ImageMetadataReader {
         }
         return Uint8List.sublistView(r.t, at, at + count).join('.');
       }
-      if (tag == 0x9286) return _userComment(Uint8List.sublistView(r.t, at, at + count));
+      if (tag == 0x9286)
+        return _userComment(Uint8List.sublistView(r.t, at, at + count));
       if (tag == 0x9101) {
-        const names = {0: '-', 1: 'Y', 2: 'Cb', 3: 'Cr', 4: 'R', 5: 'G', 6: 'B'};
+        const names = {
+          0: '-',
+          1: 'Y',
+          2: 'Cb',
+          3: 'Cr',
+          4: 'R',
+          5: 'G',
+          6: 'B',
+        };
         return List.generate(count, (i) => names[r.t[at + i]] ?? '?').join(',');
       }
-      if (tag == 0xA300 && count == 1) return r.t[at] == 3 ? 'Digital Camera' : '${r.t[at]}';
-      if (tag == 0xA301 && count == 1) return r.t[at] == 1 ? 'Directly photographed' : '${r.t[at]}';
+      if (tag == 0xA300 && count == 1)
+        return r.t[at] == 3 ? 'Digital Camera' : '${r.t[at]}';
+      if (tag == 0xA301 && count == 1)
+        return r.t[at] == 1 ? 'Directly photographed' : '${r.t[at]}';
       if (count > 16) return '($count bytes)';
       if (count == 1) return _enumValue(dir, tag, r.t[at]) ?? '${r.t[at]}';
       return List.generate(count, (i) => r.t[at + i]).join(', ');
@@ -425,7 +830,10 @@ class ImageMetadataReader {
         8 => _signed(r.u16(p), 16),
         9 => _signed(r.u32(p), 32),
         5 => r.u32(p + 4) == 0 ? 0.0 : r.u32(p) / r.u32(p + 4),
-        10 => r.u32(p + 4) == 0 ? 0.0 : _signed(r.u32(p), 32) / _signed(r.u32(p + 4), 32),
+        10 =>
+          r.u32(p + 4) == 0
+              ? 0.0
+              : _signed(r.u32(p), 32) / _signed(r.u32(p + 4), 32),
         11 => _float32(r, p),
         12 => _float64(r, p),
         _ => 0,
@@ -441,8 +849,14 @@ class ImageMetadataReader {
       if (rational) return _trim(v.toDouble());
       return '${v is double ? _trim(v) : v}';
     }
-    if (isGps && (tag == 0x02 || tag == 0x04 || tag == 0x14 || tag == 0x16) && values.length >= 3) {
-      return _dms(values[0].toDouble(), values[1].toDouble(), values[2].toDouble());
+    if (isGps &&
+        (tag == 0x02 || tag == 0x04 || tag == 0x14 || tag == 0x16) &&
+        values.length >= 3) {
+      return _dms(
+        values[0].toDouble(),
+        values[1].toDouble(),
+        values[2].toDouble(),
+      );
     }
     if (isGps && tag == 0x07 && values.length >= 3) {
       String two(num v) => v.toInt().toString().padLeft(2, '0');
@@ -518,7 +932,11 @@ class ImageMetadataReader {
       case 0xA210:
         return pick(const {1: 'None', 2: 'Inches', 3: 'Centimetres'});
       case 0x0103:
-        return pick(const {1: 'Uncompressed', 6: 'JPEG (old-style)', 7: 'JPEG'});
+        return pick(const {
+          1: 'Uncompressed',
+          6: 'JPEG (old-style)',
+          7: 'JPEG',
+        });
       case 0x0106:
         return pick(const {1: 'BlackIsZero', 2: 'RGB', 6: 'YCbCr'});
       case 0x0213:
@@ -593,9 +1011,20 @@ class ImageMetadataReader {
       case 0xA403:
         return pick(const {0: 'Auto', 1: 'Manual'});
       case 0xA406:
-        return pick(const {0: 'Standard', 1: 'Landscape', 2: 'Portrait', 3: 'Night scene'});
+        return pick(const {
+          0: 'Standard',
+          1: 'Landscape',
+          2: 'Portrait',
+          3: 'Night scene',
+        });
       case 0xA407:
-        return pick(const {0: 'None', 1: 'Low gain up', 2: 'High gain up', 3: 'Low gain down', 4: 'High gain down'});
+        return pick(const {
+          0: 'None',
+          1: 'Low gain up',
+          2: 'High gain up',
+          3: 'Low gain down',
+          4: 'High gain down',
+        });
       case 0xA408:
         return pick(const {0: 'Normal', 1: 'Low', 2: 'High'});
       case 0xA409:
@@ -603,7 +1032,12 @@ class ImageMetadataReader {
       case 0xA40A:
         return pick(const {0: 'Normal', 1: 'Soft', 2: 'Hard'});
       case 0xA40C:
-        return pick(const {0: 'Unknown', 1: 'Macro', 2: 'Close view', 3: 'Distant view'});
+        return pick(const {
+          0: 'Unknown',
+          1: 'Macro',
+          2: 'Close view',
+          3: 'Distant view',
+        });
     }
     return null;
   }
@@ -611,16 +1045,28 @@ class ImageMetadataReader {
   static String _userComment(Uint8List b) {
     if (b.length <= 8) return '';
     final body = Uint8List.sublistView(b, 8);
-    return utf8.decode(body, allowMalformed: true).replaceAll('\u0000', '').trim();
+    return utf8
+        .decode(body, allowMalformed: true)
+        .replaceAll('\u0000', '')
+        .trim();
   }
 
   static String _dms(double d, double m, double s) =>
       "${d.toInt()}° ${m.toInt()}' ${s.toStringAsFixed(2)}\"";
 
-  static int _signed(int v, int bits) => v >= (1 << (bits - 1)) ? v - (1 << bits) : v;
+  static int _signed(int v, int bits) =>
+      v >= (1 << (bits - 1)) ? v - (1 << bits) : v;
 
-  static double _float32(_Tiff r, int p) => ByteData.sublistView(r.t, p, p + 4).getFloat32(0, r.little ? Endian.little : Endian.big);
-  static double _float64(_Tiff r, int p) => ByteData.sublistView(r.t, p, p + 8).getFloat64(0, r.little ? Endian.little : Endian.big);
+  static double _float32(_Tiff r, int p) => ByteData.sublistView(
+    r.t,
+    p,
+    p + 4,
+  ).getFloat32(0, r.little ? Endian.little : Endian.big);
+  static double _float64(_Tiff r, int p) => ByteData.sublistView(
+    r.t,
+    p,
+    p + 8,
+  ).getFloat64(0, r.little ? Endian.little : Endian.big);
 
   static String _trim(double v) {
     if (v == v.roundToDouble()) return v.toInt().toString();
@@ -637,7 +1083,9 @@ class ImageMetadataReader {
 
     // Properties written as attributes of rdf:Description.
     for (final d in RegExp(r'<rdf:Description\b([^>]*?)/?>').allMatches(xmp)) {
-      for (final a in RegExp(r'''([\w.\-]+:[\w.\-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')''').allMatches(d[1]!)) {
+      for (final a in RegExp(
+        r'''([\w.\-]+:[\w.\-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')''',
+      ).allMatches(d[1]!)) {
         final name = a[1]!;
         if (skip.hasMatch(name)) continue;
         tags.add(MetadataTag(name, _unescape(a[2] ?? a[3] ?? '')));
@@ -646,21 +1094,39 @@ class ImageMetadataReader {
     // Properties written as elements: simple values and rdf lists. Each
     // rdf:Description is read on its own; the pattern for "an element" must
     // not swallow the next Description.
-    final prop = RegExp(r'<((?!rdf:)[\w.\-]+:[\w.\-]+)\b[^>]*?(?:/>|>(.*?)</\1>)', dotAll: true);
-    for (final d in RegExp(r'<rdf:Description\b[^>]*?[^/]>(.*?)</rdf:Description>', dotAll: true).allMatches(xmp)) {
+    final prop = RegExp(
+      r'<((?!rdf:)[\w.\-]+:[\w.\-]+)\b[^>]*?(?:/>|>(.*?)</\1>)',
+      dotAll: true,
+    );
+    for (final d in RegExp(
+      r'<rdf:Description\b[^>]*?[^/]>(.*?)</rdf:Description>',
+      dotAll: true,
+    ).allMatches(xmp)) {
       for (final m in prop.allMatches(d[1]!)) {
         final name = m[1]!;
         final content = m[2] ?? '';
         final items = RegExp(r'<rdf:li[^>]*>(.*?)</rdf:li>', dotAll: true)
             .allMatches(content)
-            .map((l) => _unescape(l[1]!.replaceAll(RegExp(r'<[^>]+>'), '').trim()))
+            .map(
+              (l) => _unescape(l[1]!.replaceAll(RegExp(r'<[^>]+>'), '').trim()),
+            )
             .where((v) => v.isNotEmpty)
             .toList();
         final value = items.isNotEmpty
             ? items.join(', ')
-            : _unescape(content.replaceAll(RegExp(r'<[^>]+>'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim());
+            : _unescape(
+                content
+                    .replaceAll(RegExp(r'<[^>]+>'), ' ')
+                    .replaceAll(RegExp(r'\s+'), ' ')
+                    .trim(),
+              );
         if (value.isEmpty) continue;
-        tags.add(MetadataTag(name, value.length > 400 ? '${value.substring(0, 400)}…' : value));
+        tags.add(
+          MetadataTag(
+            name,
+            value.length > 400 ? '${value.substring(0, 400)}…' : value,
+          ),
+        );
       }
     }
     if (tags.isNotEmpty) out.add(MetadataDirectory('XMP', tags));
@@ -702,7 +1168,15 @@ class ImageMetadataReader {
       if (sig == 'desc') {
         final len = _be32(p, off + 8);
         if (off + 12 + len <= p.length && len > 1) {
-          tags.add(MetadataTag('Profile Description', ascii.decode(p.sublist(off + 12, off + 12 + len - 1), allowInvalid: true)));
+          tags.add(
+            MetadataTag(
+              'Profile Description',
+              ascii.decode(
+                p.sublist(off + 12, off + 12 + len - 1),
+                allowInvalid: true,
+              ),
+            ),
+          );
         }
       } else if (sig == 'mluc' && size >= 28) {
         final len = _be32(p, off + 20);
@@ -712,7 +1186,9 @@ class ImageMetadataReader {
           for (var k = 0; k + 1 < len; k += 2) {
             units.add((p[off + strOff + k] << 8) | p[off + strOff + k + 1]);
           }
-          tags.add(MetadataTag('Profile Description', String.fromCharCodes(units)));
+          tags.add(
+            MetadataTag('Profile Description', String.fromCharCodes(units)),
+          );
         }
       }
       break;
@@ -746,7 +1222,8 @@ class ImageMetadataReader {
       final size = _be32(d, p);
       final start = p + 4;
       if (start + size > d.length) break;
-      if (id == 0x0404) _readIptc(Uint8List.sublistView(d, start, start + size), out);
+      if (id == 0x0404)
+        _readIptc(Uint8List.sublistView(d, start, start + size), out);
       o = start + size + (size & 1);
     }
   }
@@ -791,13 +1268,52 @@ class ImageMetadataReader {
       if (record == 2) {
         final name = _iptcNames[dataset];
         if (name != null) {
-          tags.add(MetadataTag(name, utf8.decode(Uint8List.sublistView(d, start, start + size), allowMalformed: true).trim()));
+          tags.add(
+            MetadataTag(
+              name,
+              utf8
+                  .decode(
+                    Uint8List.sublistView(d, start, start + size),
+                    allowMalformed: true,
+                  )
+                  .trim(),
+            ),
+          );
         }
       }
       o = start + size;
     }
     if (tags.isNotEmpty) out.add(MetadataDirectory('IPTC', tags));
   }
+}
+
+class _BmffBox {
+  const _BmffBox(this.type, this.payloadStart, this.end);
+
+  final String type;
+  final int payloadStart;
+  final int end;
+}
+
+class _HeifExtent {
+  const _HeifExtent(this.offset, this.length);
+
+  final int offset;
+  final int length;
+}
+
+class _HeifItemLocation {
+  const _HeifItemLocation({
+    required this.constructionMethod,
+    required this.dataReferenceIndex,
+    required this.baseOffset,
+    required this.extents,
+  });
+
+  final int constructionMethod;
+  final int dataReferenceIndex;
+  final int baseOffset;
+  final List<_HeifExtent> extents;
 }
 
 class _Tiff {

@@ -125,14 +125,12 @@ class VaultFileIoApi {
   }) async {
     if (fileNames.isEmpty) return false;
     if (_isSaf(container)) {
-      final result = await _channel.invokeMethod<bool>(
-        ChannelMethods.safShareFiles,
-        {
-          'treeUri': container.uri,
-          'filePaths': fileNames,
-          if (directoryPaths.isNotEmpty) 'directoryPaths': directoryPaths,
-        },
-      );
+      final result = await _channel
+          .invokeMethod<bool>(ChannelMethods.safShareFiles, {
+            'treeUri': container.uri,
+            'filePaths': fileNames,
+            if (directoryPaths.isNotEmpty) 'directoryPaths': directoryPaths,
+          });
       return result ?? false;
     }
     final result = await _channel.invokeMethod<bool>(ChannelMethods.shareFile, {
@@ -522,8 +520,7 @@ class VaultFileIoApi {
             'targetSize': targetSize,
             'isLocalStorage': true,
             'strategy':
-                strategy ??
-                ThumbnailCacheService.videoThumbnailStrategy.name,
+                strategy ?? ThumbnailCacheService.videoThumbnailStrategy.name,
             'framePosition':
                 framePosition ??
                 ThumbnailCacheService.videoThumbnailFramePosition,
@@ -554,8 +551,7 @@ class VaultFileIoApi {
             'targetSize': targetSize,
             'isLocalStorage': true,
             'strategy':
-                strategy ??
-                ThumbnailCacheService.videoThumbnailStrategy.name,
+                strategy ?? ThumbnailCacheService.videoThumbnailStrategy.name,
             'framePosition':
                 framePosition ??
                 ThumbnailCacheService.videoThumbnailFramePosition,
@@ -623,14 +619,12 @@ class VaultFileIoApi {
   ) async {
     if (fileNames.isEmpty) return const [];
     try {
-      final result = await _channel.invokeMethod<Object?>(
-        ChannelMethods.probeImageDimensions,
-        {
-          'filePath': container.uri,
-          'fileNames': fileNames,
-          'isLocalStorage': container.isLocalStorage,
-        },
-      );
+      final result = await _channel
+          .invokeMethod<Object?>(ChannelMethods.probeImageDimensions, {
+            'filePath': container.uri,
+            'fileNames': fileNames,
+            'isLocalStorage': container.isLocalStorage,
+          });
       if (result is! List || result.length < fileNames.length * 2) {
         return List.filled(fileNames.length, null);
       }
@@ -807,7 +801,8 @@ class VaultFileIoApi {
     final entries = await listDirectory(container, dirPath, refresh: refresh);
     if (entries == null) return entries;
     final perfT0 = PerfTrace.begin();
-    final links = await (linksInFlight ?? listVaultSymlinks(container, dirPath));
+    final links =
+        await (linksInFlight ?? listVaultSymlinks(container, dirPath));
     PerfTrace.end('io.list.vault.symlinks_wait', perfT0, slowMs: 100);
     if (links.isEmpty) return entries;
     final merged = List<String>.of(entries);
@@ -839,7 +834,7 @@ class VaultFileIoApi {
         refresh: refresh,
       );
       PerfTrace.end('io.list.local', localT0, slowMs: 150);
-    // The repository returns an UnmodifiableListView replaced on refresh,
+      // The repository returns an UnmodifiableListView replaced on refresh,
       // avoiding a 40k-element array copy on the UI thread.
       return ParsedDirectoryListing(entries, preSortedByNameAsc: true);
     }
@@ -944,7 +939,10 @@ class VaultFileIoApi {
   }
 
   /// Where the link at [path] points (never followed), or null if it is not a readable link.
-  Future<String?> readVaultSymlink(MountedContainer container, String path) async {
+  Future<String?> readVaultSymlink(
+    MountedContainer container,
+    String path,
+  ) async {
     if (_isSaf(container) ||
         container.isLocalStorage ||
         !mayHaveVaultSymbolicLinks(container)) {
@@ -973,10 +971,10 @@ class VaultFileIoApi {
         !mayHaveVaultSymbolicLinks(container)) {
       return Future<String?>.value(null);
     }
-    return _channel.invokeMethod<String>(
-      ChannelMethods.readVaultSymlink,
-      {'filePath': container.uri, 'path': path},
-    );
+    return _channel.invokeMethod<String>(ChannelMethods.readVaultSymlink, {
+      'filePath': container.uri,
+      'path': path,
+    });
   }
 
   /// Where [path] really is: every link in it is followed, whether it sits in the middle of the path or (with
@@ -1017,10 +1015,10 @@ class VaultFileIoApi {
       }
       final String? target;
       try {
-        target = await readVaultSymlinkStrict(container, [
-          ...resolved,
-          segment,
-        ].join('/'));
+        target = await readVaultSymlinkStrict(
+          container,
+          [...resolved, segment].join('/'),
+        );
       } catch (_) {
         return null;
       }
@@ -1087,7 +1085,10 @@ class VaultFileIoApi {
 
   /// How many entries of [dirPath] exist on disk but are not listed (sync-conflict copies, names that no
   /// longer decrypt). -1 when unknown (not a Cryptomator vault, or the call failed).
-  Future<int> hiddenEntryCount(MountedContainer container, String dirPath) async {
+  Future<int> hiddenEntryCount(
+    MountedContainer container,
+    String dirPath,
+  ) async {
     if (_isSaf(container) || container.isLocalStorage) return -1;
     try {
       return await _channel.invokeMethod<int>(
@@ -1194,6 +1195,26 @@ class VaultFileIoApi {
       {'filePath': container.uri, 'oldPath': oldPath, 'newPath': newPath},
     );
     return result ?? false;
+  }
+
+  /// Moves an entry to another folder in the same SAF tree. Returns false
+  /// when the document provider cannot move it, so callers can copy and delete.
+  Future<bool> moveSafEntry(
+    MountedContainer container,
+    String oldPath,
+    String newPath,
+  ) async {
+    if (!_isSaf(container)) return false;
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        ChannelMethods.safMoveFile,
+        {'treeUri': container.uri, 'sourcePath': oldPath, 'destPath': newPath},
+      );
+      return result ?? false;
+    } catch (e) {
+      logSwallowed('safMoveFile', e, expected: true);
+      return false;
+    }
   }
 
   /// Unlike every other method in this class, this one used to skip the
@@ -1308,12 +1329,13 @@ class VaultFileIoApi {
   ]) async {
     if (!container.isLocalStorage) return null;
     try {
-      return await _channel.invokeMethod<String>(ChannelMethods.safGetRealPath, {
-        'treeUri': container.isSafStorage ? container.uri : null,
-        'path': container.isSafStorage
-            ? path
-            : _local.resolve(container.uri, path),
-      });
+      return await _channel
+          .invokeMethod<String>(ChannelMethods.safGetRealPath, {
+            'treeUri': container.isSafStorage ? container.uri : null,
+            'path': container.isSafStorage
+                ? path
+                : _local.resolve(container.uri, path),
+          });
     } catch (e) {
       logSwallowed('getRealPath', e, expected: true);
       return null;
@@ -1725,14 +1747,12 @@ class VaultFileIoApi {
     MountedContainer container,
     String targetPath,
   ) async {
-    final result = await _channel.invokeMapMethod<String, dynamic>(
-      ChannelMethods.pickImportFiles,
-      {
-        'filePath': container.uri,
-        'targetPath': targetPath,
-        'caseSensitive': namesAreCaseSensitive(container),
-      },
-    );
+    final result = await _channel
+        .invokeMapMethod<String, dynamic>(ChannelMethods.pickImportFiles, {
+          'filePath': container.uri,
+          'targetPath': targetPath,
+          'caseSensitive': namesAreCaseSensitive(container),
+        });
     return _importPickResultFromChannel(result);
   }
 
@@ -1743,14 +1763,12 @@ class VaultFileIoApi {
     MountedContainer container,
     String targetPath,
   ) async {
-    final result = await _channel.invokeMapMethod<String, dynamic>(
-      ChannelMethods.pickImportFolder,
-      {
-        'filePath': container.uri,
-        'targetPath': targetPath,
-        'caseSensitive': namesAreCaseSensitive(container),
-      },
-    );
+    final result = await _channel
+        .invokeMapMethod<String, dynamic>(ChannelMethods.pickImportFolder, {
+          'filePath': container.uri,
+          'targetPath': targetPath,
+          'caseSensitive': namesAreCaseSensitive(container),
+        });
     return _importPickResultFromChannel(result);
   }
 
@@ -1991,14 +2009,12 @@ class VaultFileIoApi {
     String targetPath,
   ) async {
     try {
-      final result = await _channel.invokeMapMethod<String, dynamic>(
-        ChannelMethods.prepareShareImport,
-        {
-          'filePath': container.uri,
-          'targetPath': targetPath,
-          'caseSensitive': namesAreCaseSensitive(container),
-        },
-      );
+      final result = await _channel
+          .invokeMapMethod<String, dynamic>(ChannelMethods.prepareShareImport, {
+            'filePath': container.uri,
+            'targetPath': targetPath,
+            'caseSensitive': namesAreCaseSensitive(container),
+          });
       return _importPickResultFromChannel(result);
     } catch (e) {
       logSwallowed('prepareShareImport', e);

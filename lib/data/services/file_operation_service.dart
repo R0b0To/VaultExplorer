@@ -115,7 +115,9 @@ class FileOperationService extends ChangeNotifier {
   }
 
   void _publishVolumeContentChanged(FileOperation op, int volId) {
-    _volumeContentChanged.notify(VolumeContentChange(volId: volId, opId: op.id));
+    _volumeContentChanged.notify(
+      VolumeContentChange(volId: volId, opId: op.id),
+    );
   }
 
   /// A copy or move has stopped (finished, failed or cancelled). It changed the
@@ -856,8 +858,10 @@ class FileOperationService extends ChangeNotifier {
   /// ".jpg" for "a.jpg", ".tar.gz" for "a.tar.gz", "" when there is none. A
   /// leading dot alone (".bashrc") is a name, not an extension.
   static String _extensionOf(String fileName) {
-    final compound = RegExp(r'\.tar\.[^./\\\s]+$', caseSensitive: false)
-        .firstMatch(fileName);
+    final compound = RegExp(
+      r'\.tar\.[^./\\\s]+$',
+      caseSensitive: false,
+    ).firstMatch(fileName);
     if (compound != null && compound.start > 0) return compound.group(0)!;
     final dot = fileName.lastIndexOf('.');
     if (dot <= 0 || dot == fileName.length - 1) return '';
@@ -988,7 +992,9 @@ class FileOperationService extends ChangeNotifier {
         }
         if (added == 0) {
           srcPaths.add(
-            source.isRawLocal ? p.join(source.uri, containerPath) : containerPath,
+            source.isRawLocal
+                ? p.join(source.uri, containerPath)
+                : containerPath,
           );
           entryNames.add('$archivePath/');
           modifiedSecs.add(folderModifiedSecs);
@@ -1034,7 +1040,9 @@ class FileOperationService extends ChangeNotifier {
           RawEntry.parseAll(rawSiblings ?? const []).map((e) => e.name),
         );
         if (clash != null) {
-          op._setError(op.l10n.failedToArchiveGeneric('"$clash" already exists'));
+          op._setError(
+            op.l10n.failedToArchiveGeneric('"$clash" already exists'),
+          );
           op._setStatus(FileOperationStatus.failed);
           return;
         }
@@ -1050,9 +1058,7 @@ class FileOperationService extends ChangeNotifier {
         srcUri: source.isLocalStorage ? source.uri : source.uri,
         destUri: dest.isLocalStorage ? dest.uri : dest.uri,
         destVaultPath: destVaultPath,
-        destFilePath: dest.isRawLocal
-            ? p.join(dest.uri, destVaultPath)
-            : null,
+        destFilePath: dest.isRawLocal ? p.join(dest.uri, destVaultPath) : null,
         passphrase: passphrase,
         encryptFilenames: encryptFilenames,
         compressionLevel: compressionLevel.level,
@@ -1427,12 +1433,21 @@ class FileOperationService extends ChangeNotifier {
 
       bool needsRealCopy(ClipboardItem item) {
         if (!(op.isCut && src.volId == dest.volId)) return true;
+        final targetPath = op.destDirPath.isEmpty
+            ? item.name
+            : op.destDirPath + '/' + item.name;
+        if (_requiresSafMove(src, item.path, dest, targetPath)) {
+          final name = fold(item.name);
+          return item.isDir &&
+              existingNames.contains(name) &&
+              existingDirs.contains(name) &&
+              conflictPlan[name] == ConflictResolution.overwrite;
+        }
         if (!item.isDir) return false;
         if (!existingNames.contains(fold(item.name))) return false;
         if (!existingDirs.contains(fold(item.name))) return false;
         final resolution =
-            conflictPlan[fold(item.name)] ??
-            ConflictResolution.keepBoth;
+            conflictPlan[fold(item.name)] ?? ConflictResolution.keepBoth;
         return resolution == ConflictResolution.overwrite;
       }
 
@@ -1539,8 +1554,7 @@ class FileOperationService extends ChangeNotifier {
         bool destIsDir = false;
         if (existingNames.contains(fold(fileName))) {
           final resolution =
-              conflictPlan[fold(fileName)] ??
-              ConflictResolution.keepBoth;
+              conflictPlan[fold(fileName)] ?? ConflictResolution.keepBoth;
           destIsDir = existingDirs.contains(fold(fileName));
 
           switch (resolution) {
@@ -1678,8 +1692,50 @@ class FileOperationService extends ChangeNotifier {
                     : op.l10n.fileOpCopyingName(r.item.name),
               );
               bool ok = false;
-              if (op.isCut && src.volId == dest.volId && !r.mergeOverwrite) {
+              final safMoveAcrossFolders =
+                  op.isCut &&
+                  src.volId == dest.volId &&
+                  !r.mergeOverwrite &&
+                  _requiresSafMove(src, r.item.path, dest, r.destPath);
+              if (op.isCut &&
+                  src.volId == dest.volId &&
+                  !r.mergeOverwrite &&
+                  !safMoveAcrossFolders) {
                 ok = await _fileIoApi.renameFile(src, r.item.path, r.destPath);
+                if (!ok) {
+                  op._recordItemResult(
+                    idx,
+                    FileItemResult.failed,
+                    errorMessage: op.l10n.fileOpMoveFailed,
+                  );
+                } else {
+                  op._recordItemResult(idx, FileItemResult.success);
+                }
+              } else if (safMoveAcrossFolders) {
+                ok = await _fileIoApi.moveSafEntry(
+                  src,
+                  r.item.path,
+                  r.destPath,
+                );
+                if (!ok) {
+                  ok = await _copyEntry(
+                    src,
+                    dest,
+                    r.item.path,
+                    r.destPath,
+                    r.item.isDir,
+                    createdDestPaths,
+                    op,
+                    r.item.modifiedSecs,
+                  );
+                  if (ok) {
+                    ok = await _deleteEntryRecursive(
+                      src,
+                      r.item.path,
+                      r.item.isDir,
+                    );
+                  }
+                }
                 if (!ok) {
                   op._recordItemResult(
                     idx,
@@ -2039,8 +2095,30 @@ class FileOperationService extends ChangeNotifier {
   Future<String?> _physicalPath(MountedContainer c, String relPath) async {
     final root = await _physicalRoot(c);
     if (root == null) return null;
-    final rel = relPath.replaceAll('\\', '/').split('/').where((s) => s.isNotEmpty);
+    final rel = relPath
+        .replaceAll('\\', '/')
+        .split('/')
+        .where((s) => s.isNotEmpty);
     return rel.isEmpty ? root : p.joinAll([root, ...rel]);
+  }
+
+  /// SAF rename only changes an entry's leaf name. Moving it between folders
+  /// needs DocumentsContract.moveDocument, with copy-and-delete as fallback.
+  bool _requiresSafMove(
+    MountedContainer src,
+    String srcPath,
+    MountedContainer dest,
+    String destPath,
+  ) {
+    if (!src.isSafStorage || !dest.isSafStorage || src.uri != dest.uri) {
+      return false;
+    }
+    String parentOf(String path) {
+      final parent = p.posix.dirname(path);
+      return parent == '.' ? '' : parent;
+    }
+
+    return parentOf(srcPath) != parentOf(destPath);
   }
 
   /// True when ([a], [aPath]) and ([b], [bPath]) are the same entry.
@@ -2059,7 +2137,8 @@ class FileOperationService extends ChangeNotifier {
     // twice). The same Dart-side rule the check used before.
     if (a.volId == b.volId && aPath == bPath) return true;
     if (a.isSafStorage && b.isSafStorage && a.uri == b.uri) {
-      String clean(String s) => p.posix.normalize(s).replaceAll(RegExp(r'^/+|/+$'), '');
+      String clean(String s) =>
+          p.posix.normalize(s).replaceAll(RegExp(r'^/+|/+$'), '');
       return clean(aPath) == clean(bPath);
     }
     return false;

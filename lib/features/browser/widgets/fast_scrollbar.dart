@@ -21,12 +21,25 @@ class FastScrollbarDragNotification extends Notification {
   final bool dragging;
 }
 
+/// A gallery section shown on the fast-scroll timeline.
+class FastScrollSection {
+  const FastScrollSection({required this.offset, required this.label});
+
+  /// Scroll offset where this section starts.
+  final double offset;
+  final String label;
+}
+
 /// A Material-style fast scroller inspired by MaterialFiles (AndroidFastScroll).
 class FastScrollbar extends StatefulWidget {
   final ScrollController controller;
   final Widget child;
   final List<RawEntry>? items;
   final SortBy? sortBy;
+
+  /// Builds timeline markers from the current gallery layout when dragging
+  /// starts. Offsets are in the scrollable's content coordinates.
+  final List<FastScrollSection> Function()? sectionsBuilder;
   final EdgeInsets padding;
   final double touchWidth;
   final Axis axis;
@@ -52,6 +65,7 @@ class FastScrollbar extends StatefulWidget {
     required this.child,
     this.items,
     this.sortBy,
+    this.sectionsBuilder,
     this.padding = EdgeInsets.zero,
     this.touchWidth = 28.0,
     this.axis = Axis.vertical,
@@ -70,6 +84,13 @@ class _PopupBadge {
   const _PopupBadge({this.icon, this.text});
 }
 
+class _VisibleSectionMarker {
+  const _VisibleSectionMarker({required this.section, required this.centerY});
+
+  final FastScrollSection section;
+  final double centerY;
+}
+
 class _FastScrollbarState extends State<FastScrollbar>
     with SingleTickerProviderStateMixin {
   late final AnimationController _fadeController;
@@ -79,6 +100,7 @@ class _FastScrollbarState extends State<FastScrollbar>
   bool _isDragging = false;
   double _scrollFraction = 0.0;
   _PopupBadge? _popupBadge;
+  List<FastScrollSection> _dragSections = const [];
   double _dragTouchOffsetInThumb = 0.0;
   final GlobalKey _trackKey = GlobalKey();
 
@@ -306,7 +328,27 @@ void _onControllerChange() {
     return localizations.formatShortDate(dt);
   }
 
+  FastScrollSection? _sectionAt(double fraction) {
+    if (_dragSections.isEmpty) return null;
+    final position = widget.controller.hasClients
+        ? widget.controller.position
+        : null;
+    final extent = _dragMaxExtent ?? position?.maxScrollExtent ?? 0.0;
+    if (extent <= 0) return _dragSections.first;
+    final offset =
+        fraction * extent + (position?.viewportDimension ?? 0.0) / 2;
+    var active = _dragSections.first;
+    for (final section in _dragSections) {
+      if (section.offset > offset) break;
+      active = section;
+    }
+    return active;
+  }
+
   _PopupBadge? _computePopupBadge(double fraction) {
+    final section = _sectionAt(fraction);
+    if (section != null) return _PopupBadge(text: section.label);
+
     final items = widget.items;
     if (items == null || items.isEmpty) return null;
 
@@ -381,6 +423,11 @@ void _onControllerChange() {
     _autoHideTimer?.cancel();
     _dragMaxExtent = widget.controller.position.maxScrollExtent;
     _dragSmoothedExtent = _dragMaxExtent;
+    try {
+      _dragSections = widget.sectionsBuilder?.call() ?? const [];
+    } catch (_) {
+      _dragSections = const [];
+    }
     _isDragging = true;
     _notifyDragState(true);
     _fadeController.value = 1.0;
@@ -507,6 +554,43 @@ void _onControllerChange() {
     }
   }
 
+  List<_VisibleSectionMarker> _visibleSectionMarkers({
+    required double leadingInset,
+    required double trackExtent,
+    required double thumbStart,
+    required double thumbExtent,
+  }) {
+    final maxScrollExtent = _dragMaxExtent;
+    if (maxScrollExtent == null ||
+        maxScrollExtent <= 0 ||
+        _dragSections.length < 2 ||
+        trackExtent < 120.0) {
+      return const [];
+    }
+
+    final contentExtent =
+        maxScrollExtent + widget.controller.position.viewportDimension;
+    if (contentExtent <= 0) return const [];
+
+    final minGap = (trackExtent / 14).clamp(28.0, 64.0).toDouble();
+    final thumbCenter = thumbStart + thumbExtent / 2;
+    final markers = <_VisibleSectionMarker>[];
+    var lastCenterY = double.negativeInfinity;
+    for (final section in _dragSections) {
+      final fraction = (section.offset / contentExtent)
+          .clamp(0.0, 1.0)
+          .toDouble();
+      final centerY = leadingInset + fraction * trackExtent;
+      if ((centerY - thumbCenter).abs() < 36.0 ||
+          centerY - lastCenterY < minGap) {
+        continue;
+      }
+      markers.add(_VisibleSectionMarker(section: section, centerY: centerY));
+      lastCenterY = centerY;
+    }
+    return markers;
+  }
+
   void _handleDragEnd(DragEndDetails details) {
     if (!_isDragging) return;
     _isDragging = false;
@@ -514,6 +598,7 @@ void _onControllerChange() {
     _dragSmoothedExtent = null;
     _notifyDragState(false);
     _popupBadge = null;
+    _dragSections = const [];
     _startAutoHideTimer();
     _notifyOverlay();
   }
@@ -525,6 +610,7 @@ void _onControllerChange() {
     _dragSmoothedExtent = null;
     _notifyDragState(false);
     _popupBadge = null;
+    _dragSections = const [];
     _startAutoHideTimer();
     _notifyOverlay();
   }
@@ -601,6 +687,15 @@ void _onControllerChange() {
                     final travelDistance = trackExtent - thumbExtent;
                     final thumbStart =
                         leadingInset + (_scrollFraction * travelDistance);
+                    final sectionMarkers =
+                        isVertical && _isDragging && trackExtent >= 120.0
+                        ? _visibleSectionMarkers(
+                            leadingInset: leadingInset,
+                            trackExtent: trackExtent,
+                            thumbStart: thumbStart,
+                            thumbExtent: thumbExtent,
+                          )
+                        : const <_VisibleSectionMarker>[];
 
                     return Stack(
                       key: _trackKey,
@@ -695,6 +790,45 @@ void _onControllerChange() {
                         ),
                       ),
 
+                    // Group locations along the track while the handle is held.
+                    for (final marker in sectionMarkers)
+                      Positioned(
+                        right: widget.touchWidth + 8.0,
+                        top: (marker.centerY - 11.0)
+                            .clamp(leadingInset, leadingInset + trackExtent - 22.0)
+                            .toDouble(),
+                        child: IgnorePointer(
+                          child: Container(
+                            constraints: const BoxConstraints(maxWidth: 128.0),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 9.0,
+                              vertical: 3.0,
+                            ),
+                            decoration: BoxDecoration(
+                              color: cs.surface.withValues(alpha: 0.88),
+                              borderRadius: BorderRadius.circular(14.0),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.18),
+                                  blurRadius: 4.0,
+                                  offset: const Offset(0, 1),
+                                ),
+                              ],
+                            ),
+                            child: Text(
+                              marker.section.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(
+                                    color: cs.onSurface,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                            ),
+                          ),
+                        ),
+                      ),
+
                     // Section popup bubble (vertical lists only)
                     if (isVertical &&
                         canScroll &&
@@ -711,6 +845,7 @@ void _onControllerChange() {
                           child: Container(
                             constraints: const BoxConstraints(
                               minWidth: 54,
+                              maxWidth: 220,
                               minHeight: 44,
                             ),
                             padding: const EdgeInsets.symmetric(
@@ -743,13 +878,17 @@ void _onControllerChange() {
                                     _popupBadge!.text != null)
                                   const SizedBox(width: 6),
                                 if (_popupBadge!.text != null)
-                                  Text(
-                                    _popupBadge!.text!,
-                                    style: TextStyle(
-                                      color: cs.onPrimaryContainer,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 0.5,
+                                  Flexible(
+                                    child: Text(
+                                      _popupBadge!.text!,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: cs.onPrimaryContainer,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 0.5,
+                                      ),
                                     ),
                                   ),
                               ],

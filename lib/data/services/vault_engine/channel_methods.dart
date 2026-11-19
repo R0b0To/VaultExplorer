@@ -308,6 +308,7 @@ abstract final class ChannelMethods {
   static const String safCreateFile = 'safCreateFile';
   static const String safCreateDirectory = 'safCreateDirectory';
   static const String safRenameFile = 'safRenameFile';
+  static const String safMoveFile = 'safMoveFile';
   static const String safDeleteFile = 'safDeleteFile';
   static const String safGetSpaceInfo = 'safGetSpaceInfo';
   static const String safGetThumbnail = 'safGetThumbnail';

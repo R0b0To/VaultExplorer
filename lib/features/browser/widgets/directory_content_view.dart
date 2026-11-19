@@ -368,6 +368,40 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     }
   }
 
+  bool get _currentFolderIsExposedAsDocumentProvider {
+    if (_containerRecord?.documentProvider == true) return true;
+    final currentPath = _currentDirPath;
+    final exposedPaths = ref.read(
+      fileBrowserDocProviderProvider(widget.container.volId),
+    );
+    return exposedPaths.any(
+      (exposedPath) =>
+          _isPathWithin(currentPath, exposedPath) ||
+          _isPathWithin(exposedPath, currentPath),
+    );
+  }
+
+  bool _isPathWithin(String path, String ancestor) =>
+      ancestor.isEmpty || path == ancestor || path.startsWith('$ancestor/');
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed ||
+        !_initialLoadDone ||
+        !_currentFolderIsExposedAsDocumentProvider) {
+      return;
+    }
+
+    final nav = ref.read(fileBrowserNavigationProvider(_stateKey));
+    if (nav.pathStack.isEmpty || nav.archiveContext != null) return;
+    if (!_isVisibleTab) {
+      _navNotifier.markNeedsRefresh();
+      return;
+    }
+
+    FolderThumbnailPreview.clearSessionCache();
+    unawaited(_loadDirectoryContents(nav.currentDirPath, refresh: true));
+  }
   FileBrowserNavigationState get _nav =>
       ref.watch(fileBrowserNavigationProvider(_stateKey));
   FileBrowserNavigation get _navNotifier =>
@@ -2673,6 +2707,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   bool handleStartBackGesture(PredictiveBackEvent backEvent) {
     if (!_isOwnRouteCurrent) return false;
     if (backEvent.isButtonEvent) return false;
+    // A menu is open: leave the gesture unclaimed so it reaches the menu's
+    // PopScope and closes it instead of previewing a folder change.
+    if (OpenMenuBackGuard.hasOpenMenu) return false;
     // "Predictive back animations" off: leave the gesture unclaimed so it takes
     // the same path as a back-button press -- on commit the PopScope in
     // build() calls _onSystemBack(), and a cancel does nothing. Only the start

@@ -18,7 +18,6 @@ import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/features/audio_editor/audio_edit_providers.dart';
-import 'package:vaultexplorer/features/browser/metadata/image_metadata_editor.dart';
 import 'package:vaultexplorer/features/browser/metadata/image_metadata_reader.dart';
 import 'package:vaultexplorer/features/browser/metadata/metadata_edit_service.dart';
 import 'package:vaultexplorer/features/browser/viewer/audio_metadata_parser.dart';
@@ -117,7 +116,10 @@ class FileInfo extends _$FileInfo {
       // of it than an image header. A failed read just means no tags.
       ParsedAudioMetadata? audioTags;
       if (!entry.isDir && isAud) {
-        final readLen = min(entry.sizeBytes, AudioMetadataParser.headerReadBytes);
+        final readLen = min(
+          entry.sizeBytes,
+          AudioMetadataParser.headerReadBytes,
+        );
         if (readLen > 0) {
           try {
             final audioHeader = await ref
@@ -153,6 +155,7 @@ class FileInfo extends _$FileInfo {
                 filePath: nativePath,
                 isLocalStorage: container.isLocalStorage,
                 includeKeyframes: false,
+                includeDateMetadata: true,
               );
         } catch (_) {
           // Keep ordinary file properties available if this video cannot be
@@ -181,18 +184,25 @@ class FileInfo extends _$FileInfo {
 
       // Every tag the image carries, not only the camera ones above.
       List<MetadataDirectory>? allMetadata;
-      if (!entry.isDir && ImageMetadataEditor.canEdit(entry.name) && entry.sizeBytes > 0) {
+      if (!entry.isDir &&
+          ImageMetadataReader.canRead(entry.name) &&
+          entry.sizeBytes > 0) {
         // Sized afresh: the entry's size is stale after a metadata edit.
         final source = await MetadataEditService(
           ref.read(vaultFileIoApiProvider),
         ).openSource(container, fullPath);
-        if (source != null) allMetadata = await ImageMetadataReader.read(source);
+        if (source != null)
+          allMetadata = await ImageMetadataReader.read(source);
       }
+
+      final detailedMetadata = allMetadata == null
+          ? parsed
+          : MetadataParser.enrichFromExif(parsed, allMetadata);
 
       if (!ref.mounted) return;
       state = state.copyWith(
         allMetadata: allMetadata,
-        metadata: parsed,
+        metadata: detailedMetadata,
         videoMetadata: videoMetadata,
         audioMetadata: audioMetadata,
         audioTags: audioTags,

@@ -384,6 +384,17 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
                                       ),
                                     ),
                                   ),
+                                if (videoMetadata.creationDate
+                                        ?.trim()
+                                        .isNotEmpty ==
+                                    true)
+                                  _buildInfoTile(
+                                    context,
+                                    context.l10n.dateTakenLabel,
+                                    _formatVideoCreationDate(
+                                      videoMetadata.creationDate!,
+                                    ),
+                                  ),
                                 if (videoMetadata.hasVideo &&
                                     videoMetadata.width > 0 &&
                                     videoMetadata.height > 0)
@@ -632,7 +643,11 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
                               ],
                             ),
                           ],
-                          if (!widget.entry.isDir && !widget.container.readOnly && ImageMetadataEditor.canEdit(widget.entry.name)) ...[
+                          if (!widget.entry.isDir &&
+                              !widget.container.readOnly &&
+                              ImageMetadataEditor.canEdit(
+                                widget.entry.name,
+                              )) ...[
                             const SizedBox(height: 16),
                             OutlinedButton.icon(
                               icon: const Icon(Icons.sell_outlined),
@@ -650,12 +665,19 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
                                 ],
                                 // Read the file's metadata again to show what changed.
                                 onChanged: (_) => ref
-                                    .read(fileInfoProvider(widget.container.volId, _fullPath).notifier)
+                                    .read(
+                                      fileInfoProvider(
+                                        widget.container.volId,
+                                        _fullPath,
+                                      ).notifier,
+                                    )
                                     .load(widget.container, widget.entry),
                               ),
                             ),
                           ],
-                          for (final dir in controllerState.allMetadata ?? const <MetadataDirectory>[]) ...[
+                          for (final dir
+                              in controllerState.allMetadata ??
+                                  const <MetadataDirectory>[]) ...[
                             const SizedBox(height: 16),
                             _buildSectionTitle(context, dir.name),
                             AppCard.rows(
@@ -748,6 +770,13 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
         ),
       ),
     );
+  }
+
+  String _formatVideoCreationDate(String value) {
+    final trimmed = value.trim();
+    final parsed = DateTime.tryParse(trimmed);
+    if (parsed == null) return trimmed;
+    return DateFormat('yyyy-MM-dd HH:mm:ss').format(parsed.toLocal());
   }
 
   String _formatBitrate(int bitsPerSecond) {
@@ -971,6 +1000,73 @@ class MetadataParser {
     return const ParsedMetadata();
   }
 
+  static ParsedMetadata enrichFromExif(
+    ParsedMetadata base,
+    List<MetadataDirectory> directories,
+  ) {
+    String? tag(String name) {
+      for (final directory in directories) {
+        for (final value in directory.tags) {
+          if (value.name == name && value.value.isNotEmpty) return value.value;
+        }
+      }
+      return null;
+    }
+
+    final make = tag('Make');
+    final model = tag('Model');
+    final camera =
+        base.cameraModel ??
+        (make == null
+            ? model
+            : model == null
+            ? make
+            : model.toLowerCase().contains(make.toLowerCase())
+            ? model
+            : make + ' ' + model);
+    final latitude = tag('GPS Latitude');
+    final longitude = tag('GPS Longitude');
+    final latitudeRef = tag('GPS Latitude Ref');
+    final longitudeRef = tag('GPS Longitude Ref');
+    final gps =
+        base.gpsCoordinates ??
+        (latitude == null || longitude == null
+            ? null
+            : (latitudeRef == null ? latitude : latitudeRef + ' ' + latitude) +
+                  ', ' +
+                  (longitudeRef == null
+                      ? longitude
+                      : longitudeRef + ' ' + longitude));
+
+    return ParsedMetadata(
+      width: base.width,
+      height: base.height,
+      mimeType: base.mimeType,
+      cameraModel: camera,
+      lensModel: base.lensModel ?? tag('Lens Model'),
+      dateTaken:
+          base.dateTaken ??
+          tag('Date/Time Original') ??
+          tag('Date/Time Digitized') ??
+          tag('Date/Time'),
+      exposureTime: base.exposureTime ?? tag('Exposure Time'),
+      fNumber:
+          base.fNumber ?? tag('F-Number')?.replaceFirst(RegExp(r'^f/'), ''),
+      iso: base.iso ?? tag('ISO Speed Ratings') ?? tag('ISO Speed'),
+      focalLength: base.focalLength ?? tag('Focal Length'),
+      flash: base.flash ?? tag('Flash'),
+      software: base.software ?? tag('Software'),
+      gpsCoordinates: gps,
+      bitDepth: base.bitDepth,
+      colorMode: base.colorMode,
+      hasAlpha: base.hasAlpha,
+      isAnimated: base.isAnimated,
+      orientation: base.orientation ?? tag('Orientation'),
+      density: base.density,
+      encoding: base.encoding,
+    );
+  }
+
   static String? _sniffKind(Uint8List b) {
     if (b.length >= 3 && b[0] == 0xFF && b[1] == 0xD8 && b[2] == 0xFF) {
       return 'jpeg';
@@ -1002,7 +1098,10 @@ class MetadataParser {
     if (lower.endsWith('.png')) return 'png';
     if (lower.endsWith('.gif')) return 'gif';
     if (lower.endsWith('.webp')) return 'webp';
-    if (lower.endsWith('.avif') || lower.endsWith('.heic')) return 'bmff';
+    if (lower.endsWith('.avif') ||
+        lower.endsWith('.heic') ||
+        lower.endsWith('.heif'))
+      return 'bmff';
     return null;
   }
 
@@ -1126,7 +1225,9 @@ class MetadataParser {
       isAnimated: false,
       orientation: _orientationName(int.tryParse(orientationRaw ?? '')),
       density: _densityString(xResolution, resolutionUnit),
-      encoding: width != null ? (progressive ? 'Progressive' : 'Baseline') : null,
+      encoding: width != null
+          ? (progressive ? 'Progressive' : 'Baseline')
+          : null,
     );
   }
 
@@ -1275,7 +1376,10 @@ class MetadataParser {
       return const ParsedMetadata();
     }
     int u32(int o) =>
-        (bytes[o] << 24) | (bytes[o + 1] << 16) | (bytes[o + 2] << 8) | bytes[o + 3];
+        (bytes[o] << 24) |
+        (bytes[o + 1] << 16) |
+        (bytes[o + 2] << 8) |
+        bytes[o + 3];
 
     final w = u32(16);
     final h = u32(20);
@@ -1411,7 +1515,10 @@ class MetadataParser {
       return const ParsedMetadata();
     }
     int u32le(int o) =>
-        bytes[o] | (bytes[o + 1] << 8) | (bytes[o + 2] << 16) | (bytes[o + 3] << 24);
+        bytes[o] |
+        (bytes[o + 1] << 8) |
+        (bytes[o + 2] << 16) |
+        (bytes[o + 3] << 24);
 
     final fourcc = String.fromCharCodes(bytes.sublist(12, 16));
     int? w;
@@ -1484,7 +1591,10 @@ class MetadataParser {
       return const ParsedMetadata();
     }
     int u32(int o) =>
-        (bytes[o] << 24) | (bytes[o + 1] << 16) | (bytes[o + 2] << 8) | bytes[o + 3];
+        (bytes[o] << 24) |
+        (bytes[o + 1] << 16) |
+        (bytes[o + 2] << 8) |
+        bytes[o + 3];
 
     final ftypEnd = min(bytes.length, max(16, u32(0)));
     final brands = String.fromCharCodes(bytes.sublist(8, ftypEnd));

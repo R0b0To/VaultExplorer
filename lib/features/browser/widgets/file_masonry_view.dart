@@ -1373,7 +1373,29 @@ void _hydrateFromIndex() {
     );
   }
 
-   Widget _buildScrollView(ScrollController? controller) {
+  List<FastScrollSection> _fastScrollSections(BuildContext context) {
+    final groups = _groups;
+    final model = _host.current;
+    if (groups == null || model == null || model.childCount == 0) {
+      return const [];
+    }
+
+    final sections = <FastScrollSection>[];
+    String? previousLabel;
+    for (var i = 0; i < groups.length; i++) {
+      final child = model.sectionFirstChild[i];
+      if (child >= model.childCount) continue;
+      final label = formatGalleryScrollGroupLabel(groups[i], context);
+      if (label == previousLabel) continue;
+      sections.add(
+        FastScrollSection(offset: model.tops[child], label: label),
+      );
+      previousLabel = label;
+    }
+    return sections;
+  }
+
+  Widget _buildScrollView(ScrollController? controller) {
     return AnimatedBuilder(
       animation: _morphController,
       builder: (context, child) {
@@ -1448,6 +1470,9 @@ void _hydrateFromIndex() {
                 onDragStateChanged: _onHandleDragChanged,
                 items: widget.items,
                 sortBy: widget.sortBy,
+                sectionsBuilder: widget.groupByDate
+                    ? () => _fastScrollSections(context)
+                    : null,
                 padding: EdgeInsets.only(
                   top: 12,
                   bottom: widget.bottomClearance,

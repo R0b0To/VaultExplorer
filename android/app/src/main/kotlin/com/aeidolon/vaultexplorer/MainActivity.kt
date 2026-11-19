@@ -363,6 +363,7 @@ private object ChannelMethods {
     const val SAF_CREATE_FILE           = "safCreateFile"
     const val SAF_CREATE_DIRECTORY      = "safCreateDirectory"
     const val SAF_RENAME_FILE           = "safRenameFile"
+    const val SAF_MOVE_FILE             = "safMoveFile"
     const val SAF_DELETE_FILE           = "safDeleteFile"
     const val SAF_GET_SPACE_INFO        = "safGetSpaceInfo"
     const val SAF_GET_THUMBNAIL         = "safGetThumbnail"
@@ -1379,6 +1380,15 @@ open class MainActivity : FlutterFragmentActivity() {
                     val newName = call.argument<String>("newName") ?: ""
                     ioExecutor.execute {
                         val ok = safStorageManager.renameFile(treeUri, filePath, newName)
+                        runOnUiThread { result.success(ok) }
+                    }
+                }
+                ChannelMethods.SAF_MOVE_FILE -> {
+                    val treeUri = Uri.parse(call.argument<String>("treeUri") ?: "")
+                    val sourcePath = call.argument<String>("sourcePath") ?: ""
+                    val destPath = call.argument<String>("destPath") ?: ""
+                    ioExecutor.execute {
+                        val ok = safStorageManager.moveFile(treeUri, sourcePath, destPath)
                         runOnUiThread { result.success(ok) }
                     }
                 }

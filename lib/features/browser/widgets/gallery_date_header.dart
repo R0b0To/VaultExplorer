@@ -44,6 +44,18 @@ List<DateGroup<RawEntry>> computeDateGroups(
   return result;
 }
 
+String formatGalleryScrollGroupLabel(
+  DateGroup<RawEntry> group,
+  BuildContext context,
+) {
+  final label = group.label?.trim();
+  if (label != null && label.isNotEmpty) return label;
+  final date = group.date;
+  if (date == null) return context.l10n.dateEarlier;
+  final locale = Localizations.localeOf(context).toString();
+  return DateFormat.yMMM(locale).format(date);
+}
+
 String formatDateGroupHeader(DateTime? date, BuildContext context) {
   if (date == null) {
     return context.l10n.dateEarlier;

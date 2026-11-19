@@ -293,6 +293,26 @@ class FileListViewState extends State<FileListView> {
     );
   }
 
+  List<FastScrollSection> _fastScrollSections(BuildContext context) {
+    final groups = _groupsFor(widget.items).groups;
+    final model = _groupHost.current;
+    if (model == null || model.childCount == 0) return const [];
+
+    final sections = <FastScrollSection>[];
+    String? previousLabel;
+    for (var i = 0; i < groups.length; i++) {
+      final child = model.sectionFirstChild[i];
+      if (child >= model.childCount) continue;
+      final label = formatGalleryScrollGroupLabel(groups[i], context);
+      if (label == previousLabel) continue;
+      sections.add(
+        FastScrollSection(offset: model.tops[child], label: label),
+      );
+      previousLabel = label;
+    }
+    return sections;
+  }
+
   /// Height of a date header at [zoom] (the list scales its text with the
   /// zoom below the context this is computed from).
   double _headerExtentFor(double zoom) => galleryDateHeaderExtent(
@@ -731,6 +751,9 @@ class FileListViewState extends State<FileListView> {
                         controller: widget.scrollController!,
                         items: widget.items,
                         sortBy: widget.sortBy,
+                        sectionsBuilder: widget.groupByDate
+                            ? () => _fastScrollSections(context)
+                            : null,
                         padding: EdgeInsets.only(
                           top: 0,
                           bottom: widget.bottomClearance,

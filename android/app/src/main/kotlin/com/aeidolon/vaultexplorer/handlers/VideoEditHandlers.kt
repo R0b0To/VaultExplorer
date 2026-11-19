@@ -2,6 +2,7 @@ package com.aeidolon.vaultexplorer.handlers
 
 import android.content.Context
 import android.media.MediaExtractor
+import android.media.MediaMetadataRetriever
 import android.os.PowerManager
 import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.SecureFileWipe
@@ -71,6 +72,7 @@ class VideoEditHandlers(
         val filePath = call.argument<String>("filePath")
         val isLocal = call.argument<Boolean>("isLocalStorage") ?: false
         val includeKeyframes = call.argument<Boolean>("includeKeyframes") ?: true
+        val includeDateMetadata = call.argument<Boolean>("includeDateMetadata") ?: false
         if (volId == null || filePath.isNullOrEmpty()) {
             result.error("INVALID_ARGS", "volId and filePath are required", null)
             return
@@ -82,7 +84,27 @@ class VideoEditHandlers(
                     extractorFactory(volId, filePath, isLocal),
                     includeKeyframes = includeKeyframes,
                 )
+                val creationDate = if (includeDateMetadata) {
+                    runCatching {
+                        val retriever = MediaMetadataRetriever()
+                        try {
+                            if (isLocal) {
+                                retriever.setDataSource(filePath)
+                            } else {
+                                retriever.setDataSource(
+                                    ContainerMediaDataSource(activity, filePath, filePath, volId),
+                                )
+                            }
+                            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DATE)
+                        } finally {
+                            runCatching { retriever.release() }
+                        }
+                    }.getOrNull()
+                } else {
+                    null
+                }
                 val map = hashMapOf<String, Any?>(
+                    "creationDate" to creationDate,
                     "durationUs" to probe.durationUs,
                     "width" to probe.width,
                     "height" to probe.height,

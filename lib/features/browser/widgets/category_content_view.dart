@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:path/path.dart' as p;
+import 'package:vaultexplorer/features/browser/gallery/filter/app_gallery_meta_files.dart';
 import 'package:vaultexplorer/features/browser/gallery/filter/vault_gallery_meta_storage.dart';
 import 'package:vaultexplorer/features/browser/metadata/metadata_edit_ui.dart';
 import 'package:vaultexplorer/core/api/vault_engine_events.dart';
@@ -62,6 +63,7 @@ import 'package:vaultexplorer/features/browser/gallery/filter/gallery_filters.da
 import 'package:vaultexplorer/features/browser/gallery/filter/gallery_grouping.dart';
 import 'package:vaultexplorer/features/browser/gallery/filter/gallery_meta.dart';
 import 'package:vaultexplorer/features/browser/gallery/filter/gallery_meta_index.dart';
+import 'package:vaultexplorer/features/browser/gallery/filter/gallery_meta_memory_provider.dart';
 import 'package:vaultexplorer/features/browser/gallery/filter/gallery_places.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/models/browser_back_policy.dart';
@@ -114,10 +116,8 @@ import 'package:vaultexplorer/features/sync/domain/sync_ignore_matcher.dart'
     show kVaultMetaDir;
 import 'package:vaultexplorer/core/widgets/menus/back_dismissible_menu_anchor.dart';
 
-typedef CategoryShowInFolderCallback = void Function(
-  MountedContainer container,
-  String path,
-);
+typedef CategoryShowInFolderCallback =
+    void Function(MountedContainer container, String path);
 
 class _CategorySourceBundle {
   _CategorySourceBundle(this.container, this.source);
@@ -127,10 +127,7 @@ class _CategorySourceBundle {
 }
 
 class _CategoryPathStep {
-  const _CategoryPathStep({
-    required this.segment,
-    required this.location,
-  });
+  const _CategoryPathStep({required this.segment, required this.location});
 
   final PathSegment segment;
   final CategoryLocation location;
@@ -166,7 +163,7 @@ class CategoryContentView extends ConsumerStatefulWidget {
   final CategoryShowInFolderCallback? onShowInFolder;
   final MountedContainer? Function(int volId)? resolveContainer;
   final void Function(String? filter, [String? destinationDir])?
-      onScopedFilterChanged;
+  onScopedFilterChanged;
 
   @override
   ConsumerState<CategoryContentView> createState() =>
@@ -232,6 +229,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
   // taken, place, tags...), and the cache keys of the filtered listing.
   final GalleryFilterController _galleryFilter = GalleryFilterController();
   GalleryMetaIndex? _metaIndex;
+  final Set<int> _metaStoredLoadedSources = {};
   GalleryFilterSet? _itemsFilters;
   GalleryGroupBy? _itemsGroupBy;
   int _itemsMetaRevision = -1;
@@ -256,6 +254,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
   String get _categoryKey => widget.category.storageKey;
   bool get _scoped => widget.scopedContainer != null;
   bool get _isGallery => widget.category == FileCategory.gallery;
+
   /// Which toolbar-settings provider holds this storage's per-storage state
   /// (phone storage shares the global one).
   String? get _scopedToolbarUri {
@@ -310,7 +309,8 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     } else {
       _location = CategoryLocation.top;
       final settings = ref.read(appSettingsControllerProvider).settings;
-      _folderMode = !_isGallery &&
+      _folderMode =
+          !_isGallery &&
           settings.categoryFolderStructure.contains(_categoryKey);
     }
     _initialLocation = _location;
@@ -513,8 +513,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     // vault mounted) leaves the list on screen until the result is in: blanking
     // it first loses the scroll position. A scan of something else (another
     // source or folder choice, hidden files shown) starts from nothing.
-    final keep =
-        (deep || keepResults) && _snapshot.entries.isNotEmpty;
+    final keep = (deep || keepResults) && _snapshot.entries.isNotEmpty;
     _deferredSnapshot = null;
 
     setState(() {
@@ -543,7 +542,9 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       await Future.wait([
         for (final b in bundles)
           if (b.source.isVault)
-            _loadIndexSeed(api, b.container, showHidden, showNoMedia).then((seed) {
+            _loadIndexSeed(api, b.container, showHidden, showNoMedia).then((
+              seed,
+            ) {
               if (seed != null) seeds[b.source.volId] = seed;
             }),
       ]);
@@ -668,8 +669,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       var dir = e.parentPath;
       while (true) {
         final list = index.putIfAbsent('${e.sourceVolId}:$dir', () => []);
-        if (list.length < _coversPerFolder ||
-            _coverOrder(e, list.last) < 0) {
+        if (list.length < _coversPerFolder || _coverOrder(e, list.last) < 0) {
           var at = list.length;
           while (at > 0 && _coverOrder(e, list[at - 1]) < 0) {
             at--;
@@ -702,7 +702,10 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     if (scoped == null) return;
     setState(() {
       _galleryRoots = roots;
-      _location = CategoryLocation(scoped.volId, roots.isEmpty ? _openedDir : '');
+      _location = CategoryLocation(
+        scoped.volId,
+        roots.isEmpty ? _openedDir : '',
+      );
       _initialLocation = _location;
       _forwardStack = const [];
       _forwardLocations = const [];
@@ -714,11 +717,13 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     final scoped = widget.scopedContainer;
     if (scoped == null || !mounted) return;
     final fileIo = ref.read(vaultFileIoApiProvider);
-    final toolbarSettings =
-        ref.read(fileManagerToolbarSettingsProvider(_scopedToolbarUri));
+    final toolbarSettings = ref.read(
+      fileManagerToolbarSettingsProvider(_scopedToolbarUri),
+    );
     final showHidden = toolbarSettings.config.showHiddenFiles;
-    final isSkipped =
-        toolbarSettings.config.isGalleryPromptSkippedForStorage(scoped.uri);
+    final isSkipped = toolbarSettings.config.isGalleryPromptSkippedForStorage(
+      scoped.uri,
+    );
     final chosen = await showGalleryScopeSheet(
       context,
       container: scoped,
@@ -728,8 +733,9 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       turningOn: false,
       preferChoosing: false,
       showHidden: showHidden,
-      skipDirectory:
-          scoped.isRawLocal ? skipDeviceCategoryFolder : _skipVaultMetaFolder,
+      skipDirectory: scoped.isRawLocal
+          ? skipDeviceCategoryFolder
+          : _skipVaultMetaFolder,
     );
     if (chosen == null || !mounted) return;
     final notifier = ref.read(
@@ -875,6 +881,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       _forwardStack = const [];
       _forwardLocations = const [];
     });
+    _metaStoredLoadedSources.remove(volId);
     _metaIndex?.forget(volId);
   }
 
@@ -883,7 +890,10 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     List<MountedContainer> next,
   ) {
     if (_disposed) return;
-    final prevIds = {if (previous != null) for (final v in previous) v.volId};
+    final prevIds = {
+      if (previous != null)
+        for (final v in previous) v.volId,
+    };
     final nextIds = {for (final v in next) v.volId};
     if (nextIds.any((id) => !prevIds.contains(id))) {
       unawaited(_startScan(keepResults: true));
@@ -955,15 +965,16 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     // Sections other than "none" need each section to be one run of the list.
     List<DateGroup<RawEntry>>? groups;
     if (gallery && groupBy != GalleryGroupBy.none) {
-      final arranged =
-          _galleryGrouper(groupBy).arrangeWithGroups<CategoryEntry>(list);
+      final arranged = _galleryGrouper(
+        groupBy,
+      ).arrangeWithGroups<CategoryEntry>(list);
       list = arranged.items;
       groups = arranged.groups;
     }
     _itemsGroups = groups;
 
     if (gallery && !identical(_itemsSnapshot, _snapshot)) {
-      _scheduleMetaIndexing();
+      _scheduleMetaIndexing(delay: groupBy.isDate ? Duration.zero : null);
     }
     if (gallery && (filters.isNotEmpty || _query.trim().isNotEmpty)) {
       _scheduleMetaWanted();
@@ -989,26 +1000,27 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
 
   GalleryMetaIndex _createMetaIndex() {
     final io = ref.read(vaultFileIoApiProvider);
+    final crypto = ref.read(vaultCryptoApiProvider);
+    final storage = VaultGalleryMetaStorage(
+      io,
+      (volId) => _containers[volId],
+      allowWrite: (volId) =>
+          _metaCacheMode(volId) != ThumbnailCacheMode.disabled,
+      localCacheMode: _metaCacheMode,
+      appFilesOf: (container) =>
+          AppGalleryMetaFiles(container: container, crypto: crypto),
+    );
     final index = GalleryMetaIndex(
       readHeader: (volId, path, length) async {
         final container = _containers[volId];
         if (container == null) return null;
         return io.readFileChunk(container, path, 0, length);
       },
-      storage: VaultGalleryMetaStorage(
-        io,
-        (volId) => _containers[volId],
-        allowWrite: (volId) => _metaCacheMode(volId) != ThumbnailCacheMode.disabled,
-        // Phone storage keeps its index next to the thumbnails, but only when
-        // the thumbnails go to the hidden folder there.
-        keepInHiddenFolder: (volId) =>
-            _metaCacheMode(volId) == ThumbnailCacheMode.inContainer,
-      ),
-      // What was read from a source that is never saved to disk (phone storage
-      // without the hidden folder) outlives the gallery view, so opening the
-      // gallery again in this session does not read every photo again.
-      memory: GalleryMetaMemory.app,
-      retain: (volId) => _containers[volId]?.isLocalStorage ?? false,
+      storage: storage,
+      // Sources without writable persistent metadata keep their parsed index
+      // for this app session. Vault entries are cleared on lock.
+      memory: ref.read(galleryMetaMemoryProvider),
+      retain: (volId) => !storage.persists(volId),
       notifyEvery: const Duration(seconds: 1),
     );
     index.addListener(_onMetaIndexChanged);
@@ -1056,6 +1068,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
   void _onGalleryFilterChanged() {
     if (!mounted || _disposed) return;
     final g = _galleryFilter.groupBy;
+    if (g.isDate) _scheduleMetaIndexing(delay: Duration.zero);
     if (_galleryFilter.hasFilters ||
         g == GalleryGroupBy.place ||
         g == GalleryGroupBy.camera) {
@@ -1064,13 +1077,17 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     setState(() {});
   }
 
-  /// Reading the details of every photo costs a read per file, so it only
-  /// starts once something needs them: the filter was opened, a filter or a
-  /// grouping by place or camera is on, or a search is typed.
+  /// Reading the details of every photo costs a read per file, so full filter
+  /// metadata is only requested when the filter is opened, a filter or search
+  /// is active, or grouping by place or camera is on. Date groups separately
+  /// request indexing so their order can use capture dates instead of file
+  /// modification times.
   void _markMetaWanted() {
     if (_metaWanted) return;
     _metaWanted = true;
-    _scheduleMetaIndexing();
+    _scheduleMetaIndexing(
+      delay: _galleryFilter.groupBy.isDate ? Duration.zero : null,
+    );
     unawaited(_loadPlaces());
   }
 
@@ -1100,9 +1117,12 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     });
   }
 
-  void _scheduleMetaIndexing() {
+  void _scheduleMetaIndexing({Duration? delay}) {
     _metaTimer?.cancel();
-    _metaTimer = Timer(const Duration(milliseconds: 400), _startMetaIndexing);
+    _metaTimer = Timer(
+      delay ?? const Duration(milliseconds: 400),
+      _startMetaIndexing,
+    );
   }
 
   void _startMetaIndexing() {
@@ -1114,14 +1134,36 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       _scheduleMetaIndexing();
       return;
     }
+    unawaited(_loadMetaIndex());
+  }
+
+  Future<void> _loadMetaIndex() async {
     final meta = _meta;
     final entries = _snapshot.entries;
-    unawaited(meta.loadStored({for (final e in entries) e.sourceVolId}));
-    if (!_metaWanted) return;
+    final sourceIds = {for (final e in entries) e.sourceVolId};
+
+    // Restore saved capture dates before displaying a date-grouped gallery, so
+    // a cold launch does not first paint the same files in modified-time order.
+    await meta.loadStored(sourceIds);
+    if (_disposed || !mounted) return;
+
+    final newSources = sourceIds.difference(_metaStoredLoadedSources);
+    _metaStoredLoadedSources.addAll(sourceIds);
+    if (newSources.isNotEmpty) setState(() {});
+
+    // Date-grouped gallery sections use the camera's capture date when one is
+    // available. Index those dates on entry instead of waiting for the filter
+    // sheet to request metadata; until then the listing only knows file mtimes.
+    if (!_metaWanted && !_galleryFilter.groupBy.isDate) return;
     final requests = <GalleryIndexRequest>[
       for (final e in entries)
         if (!e.isDir)
-          GalleryIndexRequest(e.sourceVolId, e.path, e.sizeBytes, e.modifiedSecs),
+          GalleryIndexRequest(
+            e.sourceVolId,
+            e.path,
+            e.sizeBytes,
+            e.modifiedSecs,
+          ),
     ]..sort((a, b) => b.mtime.compareTo(a.mtime)); // newest first
     unawaited(meta.ensure(requests));
   }
@@ -1173,7 +1215,10 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
   );
 
   List<GalleryFilterSubject> _gallerySubjects() => [
-    for (final e in flatCategoryListing(_snapshot, location: _effectiveLocation))
+    for (final e in flatCategoryListing(
+      _snapshot,
+      location: _effectiveLocation,
+    ))
       _subjectOf(e),
   ];
 
@@ -1241,16 +1286,16 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     if (_isGallery) {
       _exitScopedCategory();
     } else {
-      widget.onScopedFilterChanged?.call(
-        'gallery',
-        _effectiveLocation.dirPath,
-      );
+      widget.onScopedFilterChanged?.call('gallery', _effectiveLocation.dirPath);
     }
   }
 
-  void _handleScopedGalleryBackAtRoot() {
+  /// What back means at the root of a scoped gallery. Shared by the back
+  /// handler and by [PopScope.canPop], so what the system is told can never
+  /// drift from what actually happens.
+  BrowserBackAction _resolveScopedGalleryRootBack() {
     final settings = ref.read(appSettingsControllerProvider).settings;
-    final action = resolveBrowserBack(
+    return resolveBrowserBack(
       selectionMode: false,
       searchActive: false,
       atRoot: true,
@@ -1258,6 +1303,10 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       hostsHome: widget.workspaceConfig.includeDashboardTab,
       tabsEnabled: settings.useBrowserTabs,
     );
+  }
+
+  void _handleScopedGalleryBackAtRoot() {
+    final action = _resolveScopedGalleryRootBack();
     switch (action) {
       case BrowserBackAction.returnHome:
         final tabs = ref.read(
@@ -1319,8 +1368,8 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     final newPathSteps = _buildPathSteps(newLocation);
     final newFatPath = newPathSteps.last.segment.fatPath;
 
-    final followsForward = _forwardStack.isNotEmpty &&
-        _forwardStack.first.fatPath == newFatPath;
+    final followsForward =
+        _forwardStack.isNotEmpty && _forwardStack.first.fatPath == newFatPath;
 
     setState(() {
       _location = newLocation;
@@ -1345,10 +1394,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
 
     setState(() {
       _location = targetStep.location;
-      _forwardStack = [
-        ...removedSteps.map((s) => s.segment),
-        ..._forwardStack,
-      ];
+      _forwardStack = [...removedSteps.map((s) => s.segment), ..._forwardStack];
       _forwardLocations = [
         ...removedSteps.map((s) => s.location),
         ..._forwardLocations,
@@ -1398,7 +1444,10 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
         .read(appSettingsControllerProvider.notifier)
         .updateSettings(
           (s) => s.copyWith(
-            categoryLayouts: {...s.categoryLayouts, _categoryKey: mode.toJson()},
+            categoryLayouts: {
+              ...s.categoryLayouts,
+              _categoryKey: mode.toJson(),
+            },
           ),
         );
   }
@@ -1629,8 +1678,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           _scrollController.jumpTo(restoredOffset);
         }
       });
-    } else if (lastViewedFile != entry.path &&
-        _scrollController.hasClients) {
+    } else if (lastViewedFile != entry.path && _scrollController.hasClients) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || !_scrollController.hasClients) return;
         if (ModalRoute.of(context)?.isCurrent == false) return;
@@ -1656,15 +1704,15 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
 
     switch (_layout) {
       case BrowserLayoutMode.masonry:
-        final live =
-            _masonryKey.currentState?.geometriesForGlobalIndices(targets);
+        final live = _masonryKey.currentState?.geometriesForGlobalIndices(
+          targets,
+        );
         if (live != null && live.isNotEmpty) {
           result.addAll(live);
         }
         break;
       case BrowserLayoutMode.grid:
-        final live =
-            _gridKey.currentState?.geometriesForGlobalIndices(targets);
+        final live = _gridKey.currentState?.geometriesForGlobalIndices(targets);
         if (live != null && live.isNotEmpty) {
           result.addAll(live);
         }
@@ -1672,8 +1720,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       case BrowserLayoutMode.list:
       case BrowserLayoutMode.detailed:
       case BrowserLayoutMode.compact:
-        final live =
-            _listKey.currentState?.geometriesForGlobalIndices(targets);
+        final live = _listKey.currentState?.geometriesForGlobalIndices(targets);
         if (live != null && live.isNotEmpty) {
           result.addAll(live);
         }
@@ -1766,12 +1813,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
 
     if (targetIndex == -1) return;
 
-    _ensureTilesVisible(
-      items,
-      {targetIndex},
-      animate: false,
-      center: false,
-    );
+    _ensureTilesVisible(items, {targetIndex}, animate: false, center: false);
   }
 
   Future<void> _openWithApp(
@@ -1832,7 +1874,9 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
         : widget.primaryLocalContainer != null &&
               !widget.primaryLocalContainer!.readOnly
         ? widget.primaryLocalContainer
-        : _containers.values.where((candidate) => !candidate.readOnly).firstOrNull;
+        : _containers.values
+              .where((candidate) => !candidate.readOnly)
+              .firstOrNull;
     if (container == null) {
       if (writableFolderTab != null) {
         ref
@@ -1893,14 +1937,10 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           pin: enabled,
         );
       } else {
-        await notifier.toggleBookmarks(
-          container,
-          [
-            for (final entry in group.value)
-              VaultBookmark(entry.path, isDir: entry.isDir),
-          ],
-          bookmark: enabled,
-        );
+        await notifier.toggleBookmarks(container, [
+          for (final entry in group.value)
+            VaultBookmark(entry.path, isDir: entry.isDir),
+        ], bookmark: enabled);
       }
     }
     if (!mounted) return;
@@ -1937,21 +1977,26 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           if (e.isDir) e.path,
       ];
       final ok = container.isRawLocal
-          ? await ref.read(vaultLocalShareApiProvider).shareLocalFiles(
-              [for (final path in paths) p.join(container.uri, path)],
-              directoryPaths: [
-                for (final path in directoryPaths) p.join(container.uri, path),
-              ],
-            )
-          : await ref.read(vaultFileIoApiProvider).shareFiles(
-              container,
-              paths,
-              directoryPaths: directoryPaths,
-              skipExtensions: [
-                for (final type in VaultItemType.values)
-                  type.name.toLowerCase(),
-              ],
-            );
+          ? await ref
+                .read(vaultLocalShareApiProvider)
+                .shareLocalFiles(
+                  [for (final path in paths) p.join(container.uri, path)],
+                  directoryPaths: [
+                    for (final path in directoryPaths)
+                      p.join(container.uri, path),
+                  ],
+                )
+          : await ref
+                .read(vaultFileIoApiProvider)
+                .shareFiles(
+                  container,
+                  paths,
+                  directoryPaths: directoryPaths,
+                  skipExtensions: [
+                    for (final type in VaultItemType.values)
+                      type.name.toLowerCase(),
+                  ],
+                );
       if (!ok && mounted) {
         _notify(context.l10n.couldNotShareFiles, error: true);
       }
@@ -2036,10 +2081,9 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
                 if (status.result == FileItemResult.success)
                   (group.key, status.item.path),
             };
-            ref.read(crossContainerClipboardProvider.notifier).removeDeletedPaths(
-              group.key,
-              removed.map((e) => e.$2),
-            );
+            ref
+                .read(crossContainerClipboardProvider.notifier)
+                .removeDeletedPaths(group.key, removed.map((e) => e.$2));
             setState(() => _snapshot = _snapshot.withoutPaths(removed));
           }
 
@@ -2070,16 +2114,10 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     final op = opService.enqueueExport(
       source: source,
       items: items,
-      performExport: (opId) => ref
-          .read(vaultFileIoApiProvider)
-          .exportSelectedToFolder(
-            source,
-            [
-              for (final item in items)
-                {'path': item.path, 'isDir': item.isDir},
-            ],
-            opId: opId,
-          ),
+      performExport: (opId) =>
+          ref.read(vaultFileIoApiProvider).exportSelectedToFolder(source, [
+            for (final item in items) {'path': item.path, 'isDir': item.isDir},
+          ], opId: opId),
       l10n: context.l10n,
     );
     void listener() {
@@ -2317,10 +2355,8 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => ImageEditorScreen(
-          container: container,
-          filePath: entry.path,
-        ),
+        builder: (_) =>
+            ImageEditorScreen(container: container, filePath: entry.path),
       ),
     );
     if (!mounted) return;
@@ -2369,12 +2405,11 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
   void _showFileInfo(CategoryEntry entry) {
     final container = _containers[entry.sourceVolId];
     if (container == null) return;
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => FileInfoSheet(
+    unawaited(
+      FileInfoSheet.show(
+        context,
         container: container,
-        entry: entry,
+        entry: entry.renamedForView(entry.baseName),
         currentDirPath: entry.parentPath,
       ),
     );
@@ -2443,9 +2478,10 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
         .config;
     final thumbSettings = _thumbs[entry.sourceVolId];
     final isImg = !entry.isDir && MediaViewerConstants.isImage(entry.baseName);
+    final actionEntry = entry.renamedForView(entry.baseName);
     FileItemActionsSheet.show(
       context,
-      entry: entry,
+      entry: actionEntry,
       container: container,
       currentDirPath: entry.parentPath,
       isReadOnly: container.readOnly,
@@ -2467,7 +2503,9 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
         if (c != null) unawaited(_openWithApp(c, entry));
       },
       onShare: () => _share([entry]),
-      onEditImage: (isImg && !container.readOnly) ? () => _editImage(entry) : null,
+      onEditImage: (isImg && !container.readOnly)
+          ? () => _editImage(entry)
+          : null,
       onEditMetadata: entry.isDir ? null : () => _editMetadata([entry]),
       onCopyPath: () => _copyPath(entry),
       onGoToLocation: widget.onShowInFolder != null
@@ -2498,8 +2536,8 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     final rootLabel = _scoped
         ? widget.scopedContainer!.displayName
         : (effectiveL10n != null
-            ? widget.category.label(effectiveL10n)
-            : widget.category.storageKey);
+              ? widget.category.label(effectiveL10n)
+              : widget.category.storageKey);
 
     final steps = <_CategoryPathStep>[
       _CategoryPathStep(
@@ -2643,9 +2681,8 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
         .where((entry) => !entry.isSourceRoot)
         .toList(growable: false);
     final marksBySource = <int, VaultMarks>{};
-    for (final volId in selectedForMarks
-        .map((entry) => entry.sourceVolId)
-        .toSet()) {
+    for (final volId
+        in selectedForMarks.map((entry) => entry.sourceVolId).toSet()) {
       marksBySource[volId] = ref.watch(fileBrowserPinsBookmarksProvider(volId));
       final container = _containers[volId];
       if (container != null) {
@@ -2680,9 +2717,8 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
         layoutMode: _layout,
         onLayoutModeChanged: _setLayout,
         gridAspectRatio: toolbarConfig.gridAspectRatio,
-        onGridAspectRatioChanged: (ratio) => _updateToolbarConfig(
-          (c) => c.copyWith(gridAspectRatio: ratio),
-        ),
+        onGridAspectRatioChanged: (ratio) =>
+            _updateToolbarConfig((c) => c.copyWith(gridAspectRatio: ratio)),
       ),
       FileManagerAction.sort: (context) => SortMenuButton(
         sortBy: _sortBy,
@@ -2703,37 +2739,36 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           : _scoped
           ? FilterMenuButton(
               currentFilter: widget.category.filterKey,
-              onFilterChanged: (filter) =>
-                  widget.onScopedFilterChanged?.call(
-                    filter,
-                    _effectiveLocation.dirPath,
-                  ),
+              onFilterChanged: (filter) => widget.onScopedFilterChanged?.call(
+                filter,
+                _effectiveLocation.dirPath,
+              ),
               hideVaultOnlyActions: widget.scopedContainer!.isLocalStorage,
             )
           : PopupMenuButton<CategorySourceFilter>(
-            icon: const Icon(Icons.storage_rounded),
-            tooltip: l10n.categorySourceTooltip,
-            onSelected: _setSource,
-            itemBuilder: (context) => [
-              _sourceItem(CategorySourceFilter.all, l10n.categorySourceAll),
-              if (widget.primaryLocalContainer != null || hasLocations)
-                _sourceItem(
-                  CategorySourceFilter.device,
-                  l10n.localStorageCardTitle,
-                ),
-              if (mountedVaults.isNotEmpty)
-                _sourceItem(
-                  CategorySourceFilter.vaults,
-                  l10n.vaultsSectionTitle,
-                ),
-              for (final vault in mountedVaults)
-                _sourceItem(
-                  CategorySourceFilter.vault(vault.volId),
-                  vault.displayName,
-                  indent: true,
-                ),
-            ],
-          ),
+              icon: const Icon(Icons.storage_rounded),
+              tooltip: l10n.categorySourceTooltip,
+              onSelected: _setSource,
+              itemBuilder: (context) => [
+                _sourceItem(CategorySourceFilter.all, l10n.categorySourceAll),
+                if (widget.primaryLocalContainer != null || hasLocations)
+                  _sourceItem(
+                    CategorySourceFilter.device,
+                    l10n.localStorageCardTitle,
+                  ),
+                if (mountedVaults.isNotEmpty)
+                  _sourceItem(
+                    CategorySourceFilter.vaults,
+                    l10n.vaultsSectionTitle,
+                  ),
+                for (final vault in mountedVaults)
+                  _sourceItem(
+                    CategorySourceFilter.vault(vault.volId),
+                    vault.displayName,
+                    indent: true,
+                  ),
+              ],
+            ),
       FileManagerAction.playMedia: (context) => IconButton(
         icon: const Icon(Icons.play_circle_outline_rounded),
         tooltip: l10n.playMediaHereTooltip,
@@ -2767,8 +2802,9 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           _updateToolbarConfig((c) => c.copyWith(showListThumbnails: v));
         },
         onOpenSettings: _openFileManagerSettings,
-        onPickGalleryFolders:
-            _scoped && _isGallery ? _pickGalleryFolders : null,
+        onPickGalleryFolders: _scoped && _isGallery
+            ? _pickGalleryFolders
+            : null,
         galleryFolderCount: _galleryRoots.length,
       ),
     };
@@ -2826,7 +2862,8 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       final appBarTheme = Theme.of(context).appBarTheme;
       final cs = Theme.of(context).colorScheme;
       final l10n = context.l10n;
-      final titleStyle = Theme.of(context).textTheme.titleMedium?.copyWith(
+      final titleStyle =
+          Theme.of(context).textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.bold,
             color: cs.onSurface,
           ) ??
@@ -2839,7 +2876,10 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
             final fullScreenDrawer = FullScreenDragDrawerScope.maybeOf(ctx);
             final scaffold = Scaffold.maybeOf(ctx);
             return IconButton(
-              icon: Icon(Icons.menu_rounded, color: appBarTheme.foregroundColor),
+              icon: Icon(
+                Icons.menu_rounded,
+                color: appBarTheme.foregroundColor,
+              ),
               tooltip: ctx.l10n.storageLocationsTitle,
               onPressed: () {
                 if (fullScreenDrawer != null) {
@@ -2859,11 +2899,8 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
             LayoutBuilder(
               builder: (context, constraints) {
                 final reservedSpace = 22.0 + 12.0;
-                final availableWidth =
-                    (constraints.maxWidth - reservedSpace).clamp(
-                  60.0,
-                  2000.0,
-                );
+                final availableWidth = (constraints.maxWidth - reservedSpace)
+                    .clamp(60.0, 2000.0);
                 final displayTitle = _buildLeftTruncatedPath(
                   widget.category.label(l10n),
                   pathStack,
@@ -2913,12 +2950,12 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
                         final isRoot = i == 0;
                         final IconData icon = isRoot
                             ? (_scoped
-                                ? Icons.home_rounded
-                                : widget.category.icon)
+                                  ? Icons.home_rounded
+                                  : widget.category.icon)
                             : (i == 1 &&
-                                    _snapshot.contributingSources.length > 1
-                                ? Icons.storage_rounded
-                                : Icons.folder_rounded);
+                                      _snapshot.contributingSources.length > 1
+                                  ? Icons.storage_rounded
+                                  : Icons.folder_rounded);
                         final Color iconColor = isRoot
                             ? cs.primary
                             : cs.secondary;
@@ -2953,9 +2990,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
                         leadingIcon: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            SizedBox(
-                              width: (pathStack.length + f - 1) * 12.0,
-                            ),
+                            SizedBox(width: (pathStack.length + f - 1) * 12.0),
                             Icon(
                               Icons.folder_rounded,
                               size: 18,
@@ -2968,13 +3003,10 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
                         child: Text(
                           _forwardStack[f].label,
                           style: TextStyle(
-                            color: cs.onSurfaceVariant.withValues(
-                              alpha: 0.7,
-                            ),
+                            color: cs.onSurfaceVariant.withValues(alpha: 0.7),
                           ),
                         ),
                       ),
-
                   ],
                 );
               },
@@ -3026,8 +3058,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
         );
       }
       final l10n = context.l10n;
-      final selectedList =
-          selection.items.whereType<CategoryEntry>().toList();
+      final selectedList = selection.items.whereType<CategoryEntry>().toList();
       final single = selectedList.length == 1 ? selectedList.single : null;
       final firstSelected = selectedList.isEmpty ? null : selectedList.first;
       final realSelected = selectedList
@@ -3152,7 +3183,8 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
         onDecrypt: () => unawaited(
           _runCategoryCrypto(selectedList, CryptoDirection.decrypt),
         ),
-        showEditImageOption: single != null &&
+        showEditImageOption:
+            single != null &&
             !single.isDir &&
             MediaViewerConstants.isImage(single.baseName) &&
             !(_containers[single.sourceVolId]?.readOnly ?? true),
@@ -3207,12 +3239,12 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
               ),
             )
           : (!isLandscape && showActionBar
-              ? FileManagerActionBar(
-                  axis: Axis.horizontal,
-                  actions: visibleActions,
-                  builders: actionBuilders,
-                )
-              : null);
+                ? FileManagerActionBar(
+                    axis: Axis.horizontal,
+                    actions: visibleActions,
+                    builders: actionBuilders,
+                  )
+                : null);
       // A stable slot, not the freshly built bar: see [ChromeBarSlot].
       _chrome.setBottomBar(
         widget.tabId,
@@ -3283,8 +3315,9 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
                 _updateToolbarConfig((c) => c.copyWith(showListThumbnails: v));
               },
               onOpenSettings: _openFileManagerSettings,
-              onPickGalleryFolders:
-                  _scoped && _isGallery ? _pickGalleryFolders : null,
+              onPickGalleryFolders: _scoped && _isGallery
+                  ? _pickGalleryFolders
+                  : null,
               galleryFolderCount: _galleryRoots.length,
             )
           : null;
@@ -3301,9 +3334,21 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
         widget.workspaceConfig,
       ).select((tab) => tab?.tabId == widget.tabId),
     );
+    // Mask mode (app root): at the root of a scoped gallery the first back
+    // arms the exit, and the second must be handed to the system. Nothing
+    // lies beneath this route, so Navigator.pop() is a no-op there and the
+    // app would never leave.
+    final bool galleryRootMayLeave =
+        _scoped &&
+        _isGallery &&
+        _exitArmed &&
+        _resolveScopedGalleryRootBack() == BrowserBackAction.leave;
     final canPop =
         !isActiveTabForBack ||
-        (!isSelecting && !_searchActive && !_canGoUp && !_scoped);
+        (!isSelecting &&
+            !_searchActive &&
+            !_canGoUp &&
+            (!_scoped || galleryRootMayLeave));
 
     return PopScope(
       canPop: canPop,
@@ -3327,53 +3372,61 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
         children: [
           Positioned.fill(
             child: Column(
-        children: [
-          if (_scanning) const LinearProgressIndicator(minHeight: 2),
-          if (_snapshot.limitReached && !_scanning)
-            Container(
-              width: double.infinity,
-              color: Theme.of(context).colorScheme.errorContainer,
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Text(
-                  l10n.categoryScanLimitReached,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onErrorContainer,
+              children: [
+                if (_scanning) const LinearProgressIndicator(minHeight: 2),
+                if (_snapshot.limitReached && !_scanning)
+                  Container(
+                    width: double.infinity,
+                    color: Theme.of(context).colorScheme.errorContainer,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      child: Text(
+                        l10n.categoryScanLimitReached,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onErrorContainer,
+                        ),
+                      ),
+                    ),
+                  ),
+                Expanded(
+                  child: AutoHideScrollHost(
+                    enabled: toolbarConfig.autoHideBreadcrumbBar,
+                    resetKey: location,
+                    bar:
+                        (toolbarConfig.showBreadcrumbBar &&
+                            (_folderMode || _scoped))
+                        ? BreadcrumbBar(
+                            stack: _buildPathStack(location, l10n),
+                            onTap: _onJumpTo,
+                            forwardStack: _forwardStack,
+                            onForwardTap: _onForwardTo,
+                          )
+                        : null,
+                    child: Column(
+                      children: [
+                        if (_isGallery && !_folderMode)
+                          GalleryFilterBar(
+                            controller: _galleryFilter,
+                            index: _meta,
+                            shown: items.length,
+                            total: _itemsUnfilteredCount,
+                            onOpen: _openGalleryFilter,
+                          ),
+                        Expanded(
+                          child: _buildBody(
+                            items,
+                            toolbarConfig,
+                            mountedVaults,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ),
-          Expanded(
-            child: AutoHideScrollHost(
-              enabled: toolbarConfig.autoHideBreadcrumbBar,
-              resetKey: location,
-              bar: (toolbarConfig.showBreadcrumbBar && (_folderMode || _scoped))
-                  ? BreadcrumbBar(
-                      stack: _buildPathStack(location, l10n),
-                      onTap: _onJumpTo,
-                      forwardStack: _forwardStack,
-                      onForwardTap: _onForwardTo,
-                    )
-                  : null,
-              child: Column(
-                children: [
-                  if (_isGallery && !_folderMode)
-                    GalleryFilterBar(
-                      controller: _galleryFilter,
-                      index: _meta,
-                      shown: items.length,
-                      total: _itemsUnfilteredCount,
-                      onOpen: _openGalleryFilter,
-                    ),
-                  Expanded(
-                    child: _buildBody(items, toolbarConfig, mountedVaults),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
+              ],
             ),
           ),
           // Same docked search bar as the file manager's folder view.
@@ -3421,6 +3474,16 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
         ),
       ),
     );
+  }
+
+  bool get _galleryStoredDateIndexReady {
+    if (!_isGallery || _folderMode || !_galleryFilter.groupBy.isDate) {
+      return true;
+    }
+    final sourceIds = {
+      for (final entry in _snapshot.entries) entry.sourceVolId,
+    };
+    return _metaStoredLoadedSources.containsAll(sourceIds);
   }
 
   Widget _buildBody(
@@ -3473,6 +3536,10 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       );
     }
 
+    if (!_galleryStoredDateIndexReady) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     final anyContainer =
         _containers[items.first.sourceVolId] ?? _containers.values.first;
     final scoped = widget.scopedContainer;
@@ -3511,8 +3578,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
         .setSelectedItems(_filesOnly(set));
 
     // Drag-and-drop: enable drag unless all containers are read-only.
-    final enableDrag =
-        _containers.values.any((c) => !c.readOnly);
+    final enableDrag = _containers.values.any((c) => !c.readOnly);
 
     Future<void> onFileDrop(
       BrowserItemDragData data,
@@ -3524,7 +3590,9 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       final isMove = mode == BrowserDropMode.move;
       if (destination.readOnly || (isMove && data.source.readOnly)) {
         _notify(
-          isMove ? context.l10n.readOnlyCantMove : context.l10n.readOnlyCantPaste,
+          isMove
+              ? context.l10n.readOnlyCantMove
+              : context.l10n.readOnlyCantPaste,
           error: true,
         );
         return;
@@ -3614,13 +3682,14 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           bottomClearance: searchClearance,
           sortBy: _sortBy,
           anchorOnItemsChange: _isGallery && !_folderMode,
-          groupByDate: _isGallery &&
+          groupByDate:
+              _isGallery &&
               !_folderMode &&
               _galleryFilter.groupBy != GalleryGroupBy.none,
           groupBuilder: _isGallery && !_folderMode
               ? (entries) => identical(entries, _items) && _itemsGroups != null
-                  ? _itemsGroups!
-                  : _galleryGrouper(_galleryFilter.groupBy).call(entries)
+                    ? _itemsGroups!
+                    : _galleryGrouper(_galleryFilter.groupBy).call(entries)
               : null,
         );
       case BrowserLayoutMode.masonry:
@@ -3665,13 +3734,14 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           bottomClearance: searchClearance,
           sortBy: _sortBy,
           anchorOnItemsChange: _isGallery && !_folderMode,
-          groupByDate: _isGallery &&
+          groupByDate:
+              _isGallery &&
               !_folderMode &&
               _galleryFilter.groupBy != GalleryGroupBy.none,
           groupBuilder: _isGallery && !_folderMode
               ? (entries) => identical(entries, _items) && _itemsGroups != null
-                  ? _itemsGroups!
-                  : _galleryGrouper(_galleryFilter.groupBy).call(entries)
+                    ? _itemsGroups!
+                    : _galleryGrouper(_galleryFilter.groupBy).call(entries)
               : null,
         );
       case BrowserLayoutMode.list:
@@ -3713,13 +3783,14 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
           bottomClearance: searchClearance,
           sortBy: _sortBy,
           anchorOnItemsChange: _isGallery && !_folderMode,
-          groupByDate: _isGallery &&
+          groupByDate:
+              _isGallery &&
               !_folderMode &&
               _galleryFilter.groupBy != GalleryGroupBy.none,
           groupBuilder: _isGallery && !_folderMode
               ? (entries) => identical(entries, _items) && _itemsGroups != null
-                  ? _itemsGroups!
-                  : _galleryGrouper(_galleryFilter.groupBy).call(entries)
+                    ? _itemsGroups!
+                    : _galleryGrouper(_galleryFilter.groupBy).call(entries)
               : null,
           largeThumbnail: _isGallery,
         );

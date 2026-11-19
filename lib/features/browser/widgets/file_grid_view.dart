@@ -583,6 +583,26 @@ Widget _buildAnimatedGridView(ScrollController? controller, int total) {
     return _groups = GalleryGroupIndex<RawEntry>(items, (widget.groupBuilder ?? computeDateGroups)(items));
   }
 
+  List<FastScrollSection> _fastScrollSections(BuildContext context) {
+    final groups = _groupsFor(widget.items).groups;
+    final model = _groupHost.current;
+    if (model == null || model.childCount == 0) return const [];
+
+    final sections = <FastScrollSection>[];
+    String? previousLabel;
+    for (var i = 0; i < groups.length; i++) {
+      final child = model.sectionFirstChild[i];
+      if (child >= model.childCount) continue;
+      final label = formatGalleryScrollGroupLabel(groups[i], context);
+      if (label == previousLabel) continue;
+      sections.add(
+        FastScrollSection(offset: model.tops[child], label: label),
+      );
+      previousLabel = label;
+    }
+    return sections;
+  }
+
   void _syncGroupHost(GalleryGroupIndex<RawEntry> groups, double aspect, double headerExtent) {
     final key =
         '${identityHashCode(groups)}|$_crossAxisCount|${widget.spacing}|$aspect|$headerExtent';
@@ -729,6 +749,9 @@ Widget _buildAnimatedGridView(ScrollController? controller, int total) {
                     controller: widget.scrollController!,
                     items: widget.items,
                     sortBy: widget.sortBy,
+                    sectionsBuilder: widget.groupByDate
+                        ? () => _fastScrollSections(context)
+                        : null,
                     padding: EdgeInsets.only(
                       top: 12,
                       bottom: widget.bottomClearance,

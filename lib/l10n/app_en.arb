@@ -16846,5 +16846,127 @@
   "appIndexClearedUnlockMessage": "App-storage copy cleared. Open the vault with write access to clear any index copy inside it.",
   "savedIndexClearFailedMessage": "Could not clear all saved index data.",
   "libraryStorageReadOnly": "Vault is read-only; the music index is not saved.",
-  "clearLocalStorageThumbnailCacheMessage": "This will delete cached thumbnails for Local Storage. They will be regenerated the next time you browse media."
+  "clearLocalStorageThumbnailCacheMessage": "This will delete cached thumbnails for Local Storage. They will be regenerated the next time you browse media.",
+  "vcToolsDetectedFormat": "Detected: {format}",
+  "@vcToolsDetectedFormat": {
+    "description": "Format name identified while probing the selected container.",
+    "placeholders": {
+      "format": {
+        "description": "Detected container format name.",
+        "type": "String"
+      }
+    }
+  },
+  "vcToolsUnencryptedDetected": "Looks unencrypted; this tool needs an encrypted container",
+  "@vcToolsUnencryptedDetected": {
+    "description": "Shown when the selected file appears to be an unencrypted disk image."
+  },
+  "vcToolsAssumingVeraCrypt": "Not detected automatically; assuming VeraCrypt",
+  "@vcToolsAssumingVeraCrypt": {
+    "description": "Shown when the selected encrypted file format cannot be identified and VeraCrypt is assumed."
+  },
+  "vcToolsManualFormat": "Set manually",
+  "@vcToolsManualFormat": {
+    "description": "Format picker subtitle after the user selects a format manually."
+  },
+  "vcToolsExpandInsufficientSpaceForSize": "Not enough free space on the device for this size.",
+  "@vcToolsExpandInsufficientSpaceForSize": {
+    "description": "Error shown when the requested container size exceeds the device free space."
+  },
+  "vcToolsNewSizePreview": "New size: {size}",
+  "@vcToolsNewSizePreview": {
+    "description": "Live preview of the resulting container size.",
+    "placeholders": {
+      "size": {
+        "description": "Formatted resulting container size.",
+        "type": "String"
+      }
+    }
+  },
+  "vcToolsNewSizePreviewWithAdded": "New size: {size} (+{added})",
+  "@vcToolsNewSizePreviewWithAdded": {
+    "description": "Live preview of resulting container size and the amount being added.",
+    "placeholders": {
+      "size": {
+        "description": "Formatted resulting container size.",
+        "type": "String"
+      },
+      "added": {
+        "description": "Formatted size being added.",
+        "type": "String"
+      }
+    }
+  },
+  "vcToolsFileSize": "File size",
+  "@vcToolsFileSize": {
+    "description": "Size label for BitLocker disk image/container files."
+  },
+  "vcToolsCurrentSize": "Current size",
+  "@vcToolsCurrentSize": {
+    "description": "Size label for the selected encrypted volume before expansion."
+  },
+  "vcToolsFreeOnDevice": "Free on device: {size}",
+  "@vcToolsFreeOnDevice": {
+    "description": "Shows free storage space on the device containing the selected file.",
+    "placeholders": {
+      "size": {
+        "description": "Formatted free space.",
+        "type": "String"
+      }
+    }
+  },
+  "vcToolsSetExactTotalInstead": "Set exact total size instead",
+  "@vcToolsSetExactTotalInstead": {
+    "description": "Switch label to enter the final total size instead of an amount to add."
+  },
+  "vcToolsBitLockerDiskImageSizeHint": "For a disk image (VHD/VHDX), enter the new total virtual disk size, not the file size.",
+  "@vcToolsBitLockerDiskImageSizeHint": {
+    "description": "Guidance for entering a BitLocker disk image size."
+  },
+  "vcToolsNewTotalSize": "New total size",
+  "@vcToolsNewTotalSize": {
+    "description": "Input label for the target total size after expansion."
+  },
+  "vcToolsAddSize": "Add",
+  "@vcToolsAddSize": {
+    "description": "Input label for the amount of space to add to a volume."
+  },
+  "vcToolsQuickAddGiB": "+{amount} GiB",
+  "@vcToolsQuickAddGiB": {
+    "description": "Quick action for adding a preset amount of space.",
+    "placeholders": {
+      "amount": {
+        "description": "Number of gibibytes to add.",
+        "type": "String"
+      }
+    }
+  },
+  "vcToolsDoubleSize": "Double",
+  "@vcToolsDoubleSize": {
+    "description": "Quick action to double the current volume size."
+  },
+  "vcToolsSizeMustExceedCurrent": "The new size must be larger than the current size.",
+  "@vcToolsSizeMustExceedCurrent": {
+    "description": "Validation message when the requested total size does not exceed the current size."
+  },
+  "vcToolsInsufficientFreeSpace": "Not enough free space on the device.",
+  "@vcToolsInsufficientFreeSpace": {
+    "description": "Shown under the size preview when the requested expansion exceeds device free space."
+  },
+  "vcToolsContainerSectionHeader": "Container",
+  "@vcToolsContainerSectionHeader": {
+    "description": "Section heading for selecting a container file."
+  },
+  "vcToolsCredentialsSectionHeader": "Credentials",
+  "@vcToolsCredentialsSectionHeader": {
+    "description": "Section heading for the selected volume credentials."
+  },
+  "vcToolsVolumeOptionsSectionHeader": "Volume options",
+  "@vcToolsVolumeOptionsSectionHeader": {
+    "description": "Section heading for container expansion settings."
+  },
+  "vcToolsDetectingFormat": "Detecting…",
+  "@vcToolsDetectingFormat": {
+    "description": "Format picker subtitle while the selected file format is being identified."
+  }
 }

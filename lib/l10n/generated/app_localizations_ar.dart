@@ -14923,4 +14923,87 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get clearLocalStorageThumbnailCacheMessage =>
       'This will delete cached thumbnails for Local Storage. They will be regenerated the next time you browse media.';
+
+  @override
+  String vcToolsDetectedFormat(String format) {
+    return 'تم اكتشاف: $format';
+  }
+
+  @override
+  String get vcToolsUnencryptedDetected =>
+      'يبدو أن الملف غير مشفر؛ تتطلب هذه الأداة حاوية مشفرة';
+
+  @override
+  String get vcToolsAssumingVeraCrypt =>
+      'تعذر اكتشاف التنسيق تلقائيًا؛ سيتم افتراض VeraCrypt';
+
+  @override
+  String get vcToolsManualFormat => 'تعيين يدويًا';
+
+  @override
+  String get vcToolsExpandInsufficientSpaceForSize =>
+      'لا توجد مساحة خالية كافية على الجهاز لهذا الحجم.';
+
+  @override
+  String vcToolsNewSizePreview(String size) {
+    return 'الحجم الجديد: $size';
+  }
+
+  @override
+  String vcToolsNewSizePreviewWithAdded(String size, String added) {
+    return 'الحجم الجديد: $size (+$added)';
+  }
+
+  @override
+  String get vcToolsFileSize => 'حجم الملف';
+
+  @override
+  String get vcToolsCurrentSize => 'الحجم الحالي';
+
+  @override
+  String vcToolsFreeOnDevice(String size) {
+    return 'المساحة الخالية على الجهاز: $size';
+  }
+
+  @override
+  String get vcToolsSetExactTotalInstead =>
+      'تعيين الحجم الإجمالي المحدد بدلًا من ذلك';
+
+  @override
+  String get vcToolsBitLockerDiskImageSizeHint =>
+      'لصورة قرص (VHD/VHDX)، أدخل الحجم الإجمالي الجديد للقرص الافتراضي، وليس حجم الملف.';
+
+  @override
+  String get vcToolsNewTotalSize => 'الحجم الإجمالي الجديد';
+
+  @override
+  String get vcToolsAddSize => 'إضافة';
+
+  @override
+  String vcToolsQuickAddGiB(String amount) {
+    return '+$amount GiB';
+  }
+
+  @override
+  String get vcToolsDoubleSize => 'مضاعفة';
+
+  @override
+  String get vcToolsSizeMustExceedCurrent =>
+      'يجب أن يكون الحجم الجديد أكبر من الحجم الحالي.';
+
+  @override
+  String get vcToolsInsufficientFreeSpace =>
+      'لا توجد مساحة خالية كافية على الجهاز.';
+
+  @override
+  String get vcToolsContainerSectionHeader => 'الحاوية';
+
+  @override
+  String get vcToolsCredentialsSectionHeader => 'بيانات الاعتماد';
+
+  @override
+  String get vcToolsVolumeOptionsSectionHeader => 'خيارات وحدة التخزين';
+
+  @override
+  String get vcToolsDetectingFormat => 'جارٍ الكشف…';
 }

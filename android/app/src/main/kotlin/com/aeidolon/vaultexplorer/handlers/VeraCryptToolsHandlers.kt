@@ -1,6 +1,7 @@
 package com.aeidolon.vaultexplorer.handlers
 
 import android.net.Uri
+import android.system.Os
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.ExecutorService
@@ -17,6 +18,34 @@ class VeraCryptToolsHandlers(
     private val ioExecutor: ExecutorService,
     private val nativeOps: NativeOpSupport,
 ) {
+    /**
+     * Current size of the picked container file and the free space on the storage holding it, so the expand screen
+     * can show what the new size is relative to. freeBytes is null when the file system can't report it.
+     */
+    fun handleGetContainerSizeInfo(call: MethodCall, result: MethodChannel.Result) {
+        val uri = call.argument<String>("uri")
+        if (uri.isNullOrEmpty()) {
+            result.error("INVALID_ARGS", "uri is required", null)
+            return
+        }
+        ioExecutor.execute {
+            try {
+                val pfd = activity.contentResolver.openFileDescriptor(Uri.parse(uri), "r")
+                    ?: throw Exception("Could not open file descriptor")
+                val info = pfd.use {
+                    val free = runCatching {
+                        val st = Os.fstatvfs(it.fileDescriptor)
+                        st.f_bavail * st.f_frsize
+                    }.getOrNull()
+                    mapOf("sizeBytes" to it.statSize, "freeBytes" to free)
+                }
+                activity.runOnUiThread { result.success(info) }
+            } catch (e: Exception) {
+                activity.runOnUiThread { result.error("IO_ERROR", e.message, null) }
+            }
+        }
+    }
+
     fun handleExpandContainer(call: MethodCall, result: MethodChannel.Result) {
         val uri = call.argument<String>("uri")
         val password = call.argument<String>("password") ?: ""

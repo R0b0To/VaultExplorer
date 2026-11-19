@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
@@ -11,10 +13,14 @@ import 'package:vaultexplorer/core/widgets/layout/section_card.dart';
 import 'package:vaultexplorer/core/widgets/crypto_forms/keyfiles_picker.dart';
 import 'package:vaultexplorer/core/widgets/inputs/option_picker_tile.dart';
 import 'package:vaultexplorer/core/widgets/inputs/utf8_byte_limit_formatter.dart';
+import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
 
 /// The desktop-VeraCrypt volume operations that work on an existing container.
-enum VeraCryptVolumeTool { expand, expandLuks, expandBitLocker, addHidden }
+enum VeraCryptVolumeTool { expand, addHidden }
+
+/// Which encryption layer the expand tool is working on. Auto-detected from the picked file, user-overridable.
+enum _ExpandFormat { veracrypt, luks, bitlocker }
 
 class VeraCryptVolumeToolsScreen extends ConsumerStatefulWidget {
   const VeraCryptVolumeToolsScreen({super.key, required this.tool});
@@ -36,12 +42,19 @@ class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeTool
   bool _pickingKeyfiles = false;
   bool _showPassword = false;
 
-  // expand
+  // expand: [_sizeCtrl] is the amount to add, or the new total when [_exact] is on (or growing by isn't possible).
   final _sizeCtrl = TextEditingController();
-  // BitLocker volumes are normally only partly pre-filled ("used space only"), so filling the added range with
-  // encrypted zeros is opt-in there; the other formats keep it on by default.
-  late bool _initFree = widget.tool != VeraCryptVolumeTool.expandBitLocker;
+  bool _unitGiB = true;
+  bool _exact = false;
+  int? _currentBytes;
+  int? _freeBytes;
+  bool _sizeLoading = false;
+  // BitLocker volumes are normally only partly pre-filled, so this flips to off for them in [_setFormat].
+  bool _initFree = true;
   bool _growFs = true;
+  _ExpandFormat _format = _ExpandFormat.veracrypt;
+  bool _probing = false;
+  String? _formatHint;
 
   // hidden volume
   HiddenHostInfo? _host;
@@ -73,8 +86,38 @@ class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeTool
   }
 
   bool get _isExpand => widget.tool != VeraCryptVolumeTool.addHidden;
-  bool get _isLuksExpand => widget.tool == VeraCryptVolumeTool.expandLuks;
-  bool get _isBitLockerExpand => widget.tool == VeraCryptVolumeTool.expandBitLocker;
+  bool get _isLuksExpand => _isExpand && _format == _ExpandFormat.luks;
+  bool get _isBitLockerExpand => _isExpand && _format == _ExpandFormat.bitlocker;
+
+  // A BitLocker target may be a dynamic VHD/VHDX whose file size isn't its virtual disk size, so growing by an amount
+  // from the file size would be wrong there: that format always takes the exact new total.
+  bool get _canGrowBy => _currentBytes != null && !_isBitLockerExpand;
+  bool get _exactMode => !_canGrowBy || _exact;
+
+  int? get _amountBytes {
+    final v = double.tryParse(_sizeCtrl.text.trim().replaceAll(',', '.'));
+    if (v == null || v <= 0) return null;
+    return (v * (_unitGiB ? 1073741824 : 1048576)).round();
+  }
+
+  /// The new total size the native side will apply (it rounds down to 4096).
+  int? get _targetBytes {
+    final a = _amountBytes;
+    if (a == null) return null;
+    final total = _exactMode ? a : (_currentBytes ?? 0) + a;
+    return (total ~/ 4096) * 4096;
+  }
+
+  /// Bytes added to the container, or null when it can't be told (size unknown or no amount entered).
+  int? get _addedBytes {
+    final t = _targetBytes, c = _currentBytes;
+    return (t == null || c == null) ? null : t - c;
+  }
+
+  bool get _tooLarge {
+    final added = _addedBytes, free = _freeBytes;
+    return added != null && free != null && added > free;
+  }
 
   int _pimOf(TextEditingController c) => int.tryParse(c.text.trim()) ?? 0;
 
@@ -111,6 +154,87 @@ class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeTool
       _host = null;
       _error = null;
       _status = null;
+      _currentBytes = null;
+      _freeBytes = null;
+      _exact = false;
+      _sizeCtrl.clear();
+    });
+    if (_isExpand) {
+      unawaited(_detectFormat(picked.uri));
+      unawaited(_loadSizeInfo(picked.uri));
+    }
+  }
+
+  Future<void> _loadSizeInfo(String uri) async {
+    setState(() => _sizeLoading = true);
+    ContainerSizeInfo? info;
+    try {
+      info = await _api.getContainerSizeInfo(uri);
+    } catch (_) {
+      // Unknown size: the screen falls back to asking for the exact new total.
+    }
+    if (!mounted || _target?.uri != uri) return;
+    setState(() {
+      _sizeLoading = false;
+      _currentBytes = (info != null && info.sizeBytes > 0) ? info.sizeBytes : null;
+      // Some providers report 0 for "can't tell"; treat that as unknown rather than blocking the expand.
+      _freeBytes = (info?.freeBytes != null && info!.freeBytes! > 0) ? info.freeBytes : null;
+    });
+  }
+
+  void _setAmountBytes(int bytes) {
+    final inGiB = bytes >= 1073741824;
+    final value = bytes / (inGiB ? 1073741824 : 1048576);
+    setState(() {
+      _unitGiB = inGiB;
+      _sizeCtrl.text = value.toStringAsFixed(2).replaceFirst(RegExp(r'\.?0+$'), '');
+      _error = null;
+      _status = null;
+    });
+  }
+
+  Future<void> _detectFormat(String uri) async {
+    final l10n = context.l10n;
+    setState(() {
+      _probing = true;
+      _formatHint = null;
+    });
+    var wire = 'unknown';
+    try {
+      wire = await ref.read(vaultLifecycleApiProvider).probeContainerFormat(uri);
+    } catch (_) {}
+    if (!mounted || _target?.uri != uri) return;
+    final f = ContainerFormat.fromWire(wire);
+    setState(() => _probing = false);
+    if (f.isLuks) {
+      _setFormat(_ExpandFormat.luks, hint: l10n.vcToolsDetectedFormat(f.label));
+    } else if (f.isBitlocker) {
+      _setFormat(_ExpandFormat.bitlocker, hint: l10n.vcToolsDetectedFormat('BitLocker'));
+    } else if (f.isPlain) {
+      _setFormat(_ExpandFormat.veracrypt, hint: l10n.vcToolsUnencryptedDetected);
+    } else {
+      // VeraCrypt headers are indistinguishable from random data, so "unknown" is the normal VeraCrypt result.
+      _setFormat(_ExpandFormat.veracrypt, hint: l10n.vcToolsAssumingVeraCrypt);
+    }
+  }
+
+  void _setFormat(_ExpandFormat f, {String? hint}) {
+    setState(() {
+      // "Add" and "new total" mean different things, so a typed amount doesn't carry across that switch.
+      if ((f == _ExpandFormat.bitlocker) != (_format == _ExpandFormat.bitlocker)) _sizeCtrl.clear();
+      _format = f;
+      _formatHint = hint ?? context.l10n.vcToolsManualFormat;
+      _initFree = f != _ExpandFormat.bitlocker;
+      _error = null;
+      _status = null;
+      if (f == _ExpandFormat.bitlocker) {
+        // Password or recovery key only: drop credentials this format can't use so they can't pass validation silently.
+        _keyfiles = const [];
+        _pimCtrl.clear();
+      } else if (f == _ExpandFormat.luks) {
+        _pimCtrl.clear();
+        if (_keyfiles.length > 1) _keyfiles = _keyfiles.take(1).toList();
+      }
     });
   }
 
@@ -178,9 +302,14 @@ class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeTool
 
   Future<void> _expand() async {
     if (!_validateCommon()) return;
-    final newSize = _bytesFromMiB(_sizeCtrl);
-    if (newSize == null) {
+    final newSize = _targetBytes;
+    final current = _currentBytes;
+    if (newSize == null || (current != null && newSize <= current)) {
       setState(() => _error = context.l10n.vcToolsInvalidSize);
+      return;
+    }
+    if (_tooLarge) {
+      setState(() => _error = context.l10n.vcToolsExpandInsufficientSpaceForSize);
       return;
     }
     final doneText = context.l10n.vcToolsExpandDone;
@@ -213,7 +342,11 @@ class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeTool
             );
       if (!mounted) return;
       final fsText = _fsResultText(fs.result);
-      setState(() => _status = fsText.isEmpty ? doneText : '$doneText\n$fsText');
+      setState(() {
+        _status = fsText.isEmpty ? doneText : '$doneText\n$fsText';
+        _sizeCtrl.clear();
+      });
+      unawaited(_loadSizeInfo(_target!.uri));
     });
   }
 
@@ -298,6 +431,130 @@ class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeTool
 
   String _mib(int bytes) => '${(bytes / 1048576).toStringAsFixed(1)} MiB';
 
+  String _fmtSize(int bytes) => bytes >= 1073741824
+      ? '${(bytes / 1073741824).toStringAsFixed(2)} GiB'
+      : _mib(bytes);
+
+  Widget _amountField({required String label}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: TextField(
+        controller: _sizeCtrl,
+        enabled: !_busy,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+        onChanged: (_) => setState(() {}),
+        decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
+      ),
+    );
+  }
+
+  /// Current size, the amount to add (or exact total), unit, quick amounts and a live "new size" line.
+  List<Widget> _sizeSection(BuildContext context) {
+    final l10n = context.l10n;
+    final cs = context.colors;
+    final current = _currentBytes;
+    final target = _targetBytes;
+    final added = _addedBytes;
+    final over = _tooLarge;
+    final invalid = target != null && current != null && target <= current;
+
+    final preview = target == null
+        ? null
+        : (added != null && added > 0)
+            ? l10n.vcToolsNewSizePreviewWithAdded(_fmtSize(target), _fmtSize(added))
+            : l10n.vcToolsNewSizePreview(_fmtSize(target));
+
+    return [
+      ListTile(
+        leading: Icon(Icons.straighten_rounded, color: cs.primary),
+        title: Text(_isBitLockerExpand ? l10n.vcToolsFileSize : l10n.vcToolsCurrentSize),
+        subtitle: _freeBytes != null ? Text(l10n.vcToolsFreeOnDevice(_fmtSize(_freeBytes!))) : null,
+        trailing: _sizeLoading
+            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+            : Text(current != null ? _fmtSize(current) : l10n.unknownValue,
+                style: context.typography.titleMedium),
+      ),
+      if (_canGrowBy)
+        SwitchListTile(
+          value: _exact,
+          onChanged: _busy
+              ? null
+              : (v) => setState(() {
+                    _exact = v;
+                    _sizeCtrl.clear();
+                  }),
+          title: Text(l10n.vcToolsSetExactTotalInstead),
+        ),
+      if (_isBitLockerExpand && current != null)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+          child: Text(
+            l10n.vcToolsBitLockerDiskImageSizeHint,
+            style: context.typography.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+        ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: _amountField(label: _exactMode ? l10n.vcToolsNewTotalSize : l10n.vcToolsAddSize)),
+            const SizedBox(width: 12),
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment(value: false, label: Text('MiB')),
+                  ButtonSegment(value: true, label: Text('GiB')),
+                ],
+                selected: {_unitGiB},
+                showSelectedIcon: false,
+                onSelectionChanged: _busy ? null : (s) => setState(() => _unitGiB = s.first),
+              ),
+            ),
+          ],
+        ),
+      ),
+      if (!_exactMode && current != null)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              for (final gib in const [1, 5, 10])
+                ActionChip(
+                  label: Text(l10n.vcToolsQuickAddGiB(gib.toString())),
+                  onPressed: _busy ? null : () => _setAmountBytes(gib * 1073741824),
+                ),
+              ActionChip(
+                label: Text(l10n.vcToolsDoubleSize),
+                onPressed: _busy ? null : () => _setAmountBytes(current),
+              ),
+            ],
+          ),
+        ),
+      if (preview != null)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+          child: Text(
+            invalid
+                ? l10n.vcToolsSizeMustExceedCurrent
+                : over
+                    ? '$preview\n${l10n.vcToolsInsufficientFreeSpace}'
+                    : preview,
+            style: context.typography.bodyMedium?.copyWith(
+              color: (invalid || over) ? cs.error : cs.primary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        )
+     
+       
+    ];
+  }
+
   Widget _passwordField({
     required TextEditingController controller,
     required String label,
@@ -364,11 +621,7 @@ class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeTool
     final l10n = context.l10n;
     final cs = context.colors;
     final isWide = context.screen.useWideLayout;
-    final title = _isBitLockerExpand
-        ? l10n.toolExpandBitLockerVolumeTitle
-        : _isLuksExpand
-            ? l10n.toolExpandLuksVolumeTitle
-            : (_isExpand ? l10n.toolExpandVolumeTitle : l10n.toolHiddenInExistingTitle);
+    final title = _isExpand ? l10n.vcToolsExpandAction : l10n.toolHiddenInExistingTitle;
     final host = _host;
     final hiddenReady = host != null && host.maxHiddenBytes > 0;
 
@@ -419,7 +672,7 @@ class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeTool
                           ),
                         ),
                         const SizedBox(height: 20),
-                        const SectionHeader('Container'),
+                        SectionHeader(l10n.vcToolsContainerSectionHeader),
                         SectionCard(children: [
                           ListTile(
                             onTap: _busy ? null : _pickContainer,
@@ -429,7 +682,25 @@ class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeTool
                             trailing: Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
                           ),
                         ]),
-                        const SectionHeader('Credentials'),
+                        if (_isExpand && _target != null) ...[
+                          const SizedBox(height: 8),
+                          SectionCard(children: [
+                            OptionPickerTile<_ExpandFormat>(
+                              label: l10n.formatLabel,
+                              value: _format,
+                              prefixIcon: Icons.lock_outline_rounded,
+                              subtitle: _probing ? l10n.vcToolsDetectingFormat : _formatHint,
+                              options: const [
+                                SelectOption<_ExpandFormat>(value: _ExpandFormat.veracrypt, label: 'VeraCrypt'),
+                                SelectOption<_ExpandFormat>(value: _ExpandFormat.luks, label: 'LUKS (LUKS1 / LUKS2)'),
+                                SelectOption<_ExpandFormat>(value: _ExpandFormat.bitlocker, label: 'BitLocker'),
+                              ],
+                              onChanged: _setFormat,
+                              enabled: !_busy && !_probing,
+                            ),
+                          ]),
+                        ],
+                        SectionHeader(l10n.vcToolsCredentialsSectionHeader),
                         SectionCard(children: [
                           Padding(padding: EdgeInsets.fromLTRB(16, 12, 16, _isBitLockerExpand ? 12 : 4),
                             child: _passwordField(
@@ -456,10 +727,9 @@ class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeTool
                         ]),
                         const SizedBox(height: 8),
                         if (_isExpand) ...[
-                          const SectionHeader('Volume options'),
+                          SectionHeader(l10n.vcToolsVolumeOptionsSectionHeader),
                           SectionCard(children: [
-                            Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                              child: _numberField(controller: _sizeCtrl, label: l10n.vcToolsNewSizeLabel)),
+                            ..._sizeSection(context),
                             SwitchListTile(
                               value: _initFree,
                               onChanged: _busy ? null : (v) => setState(() => _initFree = v),
@@ -511,7 +781,7 @@ class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeTool
                             ),
                           ],
                           if (hiddenReady) ...[
-                            const SectionHeader('Hidden volume'),
+                            SectionHeader(l10n.hiddenVolumeHeader),
                             SectionCard(children: [
                               Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
                                 child: _numberField(controller: _hiddenSizeCtrl, label: l10n.vcToolsHiddenSizeLabel)),

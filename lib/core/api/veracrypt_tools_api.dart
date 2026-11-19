@@ -18,6 +18,9 @@ class VeraCryptToolsException implements Exception {
 /// Free space at the end of a standard volume, as measured for a hidden volume.
 typedef HiddenHostInfo = ({int fsKind, int clusterSize, int maxHiddenBytes});
 
+/// Size of a container file and free space on the storage that holds it ([freeBytes] is null when unknown).
+typedef ContainerSizeInfo = ({int sizeBytes, int? freeBytes});
+
 /// What happened to the file system inside a volume after an expand / grow request (Kotlin: fsStatusName).
 enum FileSystemGrowResult {
   grown,
@@ -73,6 +76,19 @@ class VeraCryptToolsApi {
         .cast<Map<Object?, Object?>>()
         .map((m) => (uri: m['uri'] as String, displayName: m['displayName'] as String))
         .toList();
+  }
+
+  /// Current size of the container file at [uri] and the free space on the storage holding it.
+  Future<ContainerSizeInfo> getContainerSizeInfo(String uri) async {
+    try {
+      final raw = await _channel.invokeMapMethod<String, Object?>(ChannelMethods.getContainerSizeInfo, {'uri': uri});
+      return (
+        sizeBytes: (raw?['sizeBytes'] as num?)?.toInt() ?? 0,
+        freeBytes: (raw?['freeBytes'] as num?)?.toInt(),
+      );
+    } on PlatformException catch (e) {
+      throw VeraCryptToolsException(e.code, e.message ?? e.code);
+    }
   }
 
   /// Grows a standard VeraCrypt file container to [newSizeBytes] and, with [growFileSystem], the file system inside

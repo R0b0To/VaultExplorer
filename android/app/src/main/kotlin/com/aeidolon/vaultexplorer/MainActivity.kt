@@ -293,6 +293,7 @@ private object ChannelMethods {
     const val REPAIR_FOLDER_VAULT = "repairFolderVault"
     const val EXPORT_CONTAINER_HEADER = "exportContainerHeader"
     const val RESTORE_CONTAINER_HEADER_REGION = "restoreContainerHeaderRegion"
+    const val GET_CONTAINER_SIZE_INFO = "getContainerSizeInfo"
     const val EXPAND_VERACRYPT_CONTAINER = "expandVeraCryptContainer"
     const val EXPAND_LUKS_CONTAINER = "expandLuksContainer"
     const val GROW_VERACRYPT_FILE_SYSTEM = "growVeraCryptFileSystem"
@@ -1563,6 +1564,7 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.BOOK_COVER -> bookReaderHandlers.handleBookCover(call, result)
                 ChannelMethods.BOOK_CLOSE -> bookReaderHandlers.handleBookClose(call, result)
                 ChannelMethods.EXPORT_CONTAINER_HEADER -> headerBackupHandlers.handleExportContainerHeader(call, result)
+                ChannelMethods.GET_CONTAINER_SIZE_INFO -> veraCryptToolsHandlers.handleGetContainerSizeInfo(call, result)
                 ChannelMethods.EXPAND_VERACRYPT_CONTAINER -> veraCryptToolsHandlers.handleExpandContainer(call, result)
                 ChannelMethods.EXPAND_LUKS_CONTAINER -> veraCryptToolsHandlers.handleExpandLuksContainer(call, result)
                 ChannelMethods.GROW_VERACRYPT_FILE_SYSTEM -> veraCryptToolsHandlers.handleGrowFileSystem(call, result)

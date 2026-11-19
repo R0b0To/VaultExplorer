@@ -14878,4 +14878,87 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get clearLocalStorageThumbnailCacheMessage =>
       'This will delete cached thumbnails for Local Storage. They will be regenerated the next time you browse media.';
+
+  @override
+  String vcToolsDetectedFormat(String format) {
+    return 'Erkannt: $format';
+  }
+
+  @override
+  String get vcToolsUnencryptedDetected =>
+      'Sieht unverschlüsselt aus; dieses Tool benötigt einen verschlüsselten Container';
+
+  @override
+  String get vcToolsAssumingVeraCrypt =>
+      'Automatisch nicht erkannt; VeraCrypt wird angenommen';
+
+  @override
+  String get vcToolsManualFormat => 'Manuell festlegen';
+
+  @override
+  String get vcToolsExpandInsufficientSpaceForSize =>
+      'Nicht genügend freier Speicherplatz auf dem Gerät für diese Größe.';
+
+  @override
+  String vcToolsNewSizePreview(String size) {
+    return 'Neue Größe: $size';
+  }
+
+  @override
+  String vcToolsNewSizePreviewWithAdded(String size, String added) {
+    return 'Neue Größe: $size (+$added)';
+  }
+
+  @override
+  String get vcToolsFileSize => 'Dateigröße';
+
+  @override
+  String get vcToolsCurrentSize => 'Aktuelle Größe';
+
+  @override
+  String vcToolsFreeOnDevice(String size) {
+    return 'Auf dem Gerät verfügbar: $size';
+  }
+
+  @override
+  String get vcToolsSetExactTotalInstead =>
+      'Stattdessen exakte Gesamtgröße festlegen';
+
+  @override
+  String get vcToolsBitLockerDiskImageSizeHint =>
+      'Geben Sie bei einem Datenträgerabbild (VHD/VHDX) die neue virtuelle Gesamtdatenträgergröße ein, nicht die Dateigröße.';
+
+  @override
+  String get vcToolsNewTotalSize => 'Neue Gesamtgröße';
+
+  @override
+  String get vcToolsAddSize => 'Hinzufügen';
+
+  @override
+  String vcToolsQuickAddGiB(String amount) {
+    return '+$amount GiB';
+  }
+
+  @override
+  String get vcToolsDoubleSize => 'Verdoppeln';
+
+  @override
+  String get vcToolsSizeMustExceedCurrent =>
+      'Die neue Größe muss größer als die aktuelle Größe sein.';
+
+  @override
+  String get vcToolsInsufficientFreeSpace =>
+      'Nicht genügend freier Speicherplatz auf dem Gerät.';
+
+  @override
+  String get vcToolsContainerSectionHeader => 'Container';
+
+  @override
+  String get vcToolsCredentialsSectionHeader => 'Anmeldedaten';
+
+  @override
+  String get vcToolsVolumeOptionsSectionHeader => 'Volume-Optionen';
+
+  @override
+  String get vcToolsDetectingFormat => 'Wird erkannt…';
 }

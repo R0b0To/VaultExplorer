@@ -14067,4 +14067,82 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get clearLocalStorageThumbnailCacheMessage =>
       'This will delete cached thumbnails for Local Storage. They will be regenerated the next time you browse media.';
+
+  @override
+  String vcToolsDetectedFormat(String format) {
+    return '検出された形式: $format';
+  }
+
+  @override
+  String get vcToolsUnencryptedDetected => '暗号化されていないようです。このツールには暗号化コンテナーが必要です';
+
+  @override
+  String get vcToolsAssumingVeraCrypt => '自動検出できません。VeraCrypt として扱います';
+
+  @override
+  String get vcToolsManualFormat => '手動で設定';
+
+  @override
+  String get vcToolsExpandInsufficientSpaceForSize =>
+      'このサイズに必要な空き容量がデバイスにありません。';
+
+  @override
+  String vcToolsNewSizePreview(String size) {
+    return '新しいサイズ: $size';
+  }
+
+  @override
+  String vcToolsNewSizePreviewWithAdded(String size, String added) {
+    return '新しいサイズ: $size（+$added）';
+  }
+
+  @override
+  String get vcToolsFileSize => 'ファイルサイズ';
+
+  @override
+  String get vcToolsCurrentSize => '現在のサイズ';
+
+  @override
+  String vcToolsFreeOnDevice(String size) {
+    return 'デバイスの空き容量: $size';
+  }
+
+  @override
+  String get vcToolsSetExactTotalInstead => '代わりに合計サイズを指定';
+
+  @override
+  String get vcToolsBitLockerDiskImageSizeHint =>
+      'ディスクイメージ（VHD/VHDX）の場合は、ファイルサイズではなく仮想ディスクの新しい合計サイズを入力してください。';
+
+  @override
+  String get vcToolsNewTotalSize => '新しい合計サイズ';
+
+  @override
+  String get vcToolsAddSize => '追加するサイズ';
+
+  @override
+  String vcToolsQuickAddGiB(String amount) {
+    return '+$amount GiB';
+  }
+
+  @override
+  String get vcToolsDoubleSize => '2 倍にする';
+
+  @override
+  String get vcToolsSizeMustExceedCurrent => '新しいサイズは現在のサイズより大きくしてください。';
+
+  @override
+  String get vcToolsInsufficientFreeSpace => 'デバイスの空き容量が不足しています。';
+
+  @override
+  String get vcToolsContainerSectionHeader => 'コンテナー';
+
+  @override
+  String get vcToolsCredentialsSectionHeader => '認証情報';
+
+  @override
+  String get vcToolsVolumeOptionsSectionHeader => 'ボリュームのオプション';
+
+  @override
+  String get vcToolsDetectingFormat => '検出中…';
 }

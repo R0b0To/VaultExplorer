@@ -24808,6 +24808,138 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This will delete cached thumbnails for Local Storage. They will be regenerated the next time you browse media.'**
   String get clearLocalStorageThumbnailCacheMessage;
+
+  /// Format name identified while probing the selected container.
+  ///
+  /// In en, this message translates to:
+  /// **'Detected: {format}'**
+  String vcToolsDetectedFormat(String format);
+
+  /// Shown when the selected file appears to be an unencrypted disk image.
+  ///
+  /// In en, this message translates to:
+  /// **'Looks unencrypted; this tool needs an encrypted container'**
+  String get vcToolsUnencryptedDetected;
+
+  /// Shown when the selected encrypted file format cannot be identified and VeraCrypt is assumed.
+  ///
+  /// In en, this message translates to:
+  /// **'Not detected automatically; assuming VeraCrypt'**
+  String get vcToolsAssumingVeraCrypt;
+
+  /// Format picker subtitle after the user selects a format manually.
+  ///
+  /// In en, this message translates to:
+  /// **'Set manually'**
+  String get vcToolsManualFormat;
+
+  /// Error shown when the requested container size exceeds the device free space.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough free space on the device for this size.'**
+  String get vcToolsExpandInsufficientSpaceForSize;
+
+  /// Live preview of the resulting container size.
+  ///
+  /// In en, this message translates to:
+  /// **'New size: {size}'**
+  String vcToolsNewSizePreview(String size);
+
+  /// Live preview of resulting container size and the amount being added.
+  ///
+  /// In en, this message translates to:
+  /// **'New size: {size} (+{added})'**
+  String vcToolsNewSizePreviewWithAdded(String size, String added);
+
+  /// Size label for BitLocker disk image/container files.
+  ///
+  /// In en, this message translates to:
+  /// **'File size'**
+  String get vcToolsFileSize;
+
+  /// Size label for the selected encrypted volume before expansion.
+  ///
+  /// In en, this message translates to:
+  /// **'Current size'**
+  String get vcToolsCurrentSize;
+
+  /// Shows free storage space on the device containing the selected file.
+  ///
+  /// In en, this message translates to:
+  /// **'Free on device: {size}'**
+  String vcToolsFreeOnDevice(String size);
+
+  /// Switch label to enter the final total size instead of an amount to add.
+  ///
+  /// In en, this message translates to:
+  /// **'Set exact total size instead'**
+  String get vcToolsSetExactTotalInstead;
+
+  /// Guidance for entering a BitLocker disk image size.
+  ///
+  /// In en, this message translates to:
+  /// **'For a disk image (VHD/VHDX), enter the new total virtual disk size, not the file size.'**
+  String get vcToolsBitLockerDiskImageSizeHint;
+
+  /// Input label for the target total size after expansion.
+  ///
+  /// In en, this message translates to:
+  /// **'New total size'**
+  String get vcToolsNewTotalSize;
+
+  /// Input label for the amount of space to add to a volume.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get vcToolsAddSize;
+
+  /// Quick action for adding a preset amount of space.
+  ///
+  /// In en, this message translates to:
+  /// **'+{amount} GiB'**
+  String vcToolsQuickAddGiB(String amount);
+
+  /// Quick action to double the current volume size.
+  ///
+  /// In en, this message translates to:
+  /// **'Double'**
+  String get vcToolsDoubleSize;
+
+  /// Validation message when the requested total size does not exceed the current size.
+  ///
+  /// In en, this message translates to:
+  /// **'The new size must be larger than the current size.'**
+  String get vcToolsSizeMustExceedCurrent;
+
+  /// Shown under the size preview when the requested expansion exceeds device free space.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough free space on the device.'**
+  String get vcToolsInsufficientFreeSpace;
+
+  /// Section heading for selecting a container file.
+  ///
+  /// In en, this message translates to:
+  /// **'Container'**
+  String get vcToolsContainerSectionHeader;
+
+  /// Section heading for the selected volume credentials.
+  ///
+  /// In en, this message translates to:
+  /// **'Credentials'**
+  String get vcToolsCredentialsSectionHeader;
+
+  /// Section heading for container expansion settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Volume options'**
+  String get vcToolsVolumeOptionsSectionHeader;
+
+  /// Format picker subtitle while the selected file format is being identified.
+  ///
+  /// In en, this message translates to:
+  /// **'Detecting…'**
+  String get vcToolsDetectingFormat;
 }
 
 class _AppLocalizationsDelegate

@@ -14978,4 +14978,87 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get clearLocalStorageThumbnailCacheMessage =>
       'This will delete cached thumbnails for Local Storage. They will be regenerated the next time you browse media.';
+
+  @override
+  String vcToolsDetectedFormat(String format) {
+    return 'Виявлено: $format';
+  }
+
+  @override
+  String get vcToolsUnencryptedDetected =>
+      'Схоже, файл не зашифровано; для цього інструмента потрібен зашифрований контейнер';
+
+  @override
+  String get vcToolsAssumingVeraCrypt =>
+      'Формат не визначено автоматично; припускаємо VeraCrypt';
+
+  @override
+  String get vcToolsManualFormat => 'Установити вручну';
+
+  @override
+  String get vcToolsExpandInsufficientSpaceForSize =>
+      'На пристрої недостатньо вільного місця для такого розміру.';
+
+  @override
+  String vcToolsNewSizePreview(String size) {
+    return 'Новий розмір: $size';
+  }
+
+  @override
+  String vcToolsNewSizePreviewWithAdded(String size, String added) {
+    return 'Новий розмір: $size (+$added)';
+  }
+
+  @override
+  String get vcToolsFileSize => 'Розмір файла';
+
+  @override
+  String get vcToolsCurrentSize => 'Поточний розмір';
+
+  @override
+  String vcToolsFreeOnDevice(String size) {
+    return 'Вільне місце на пристрої: $size';
+  }
+
+  @override
+  String get vcToolsSetExactTotalInstead =>
+      'Натомість указати точний загальний розмір';
+
+  @override
+  String get vcToolsBitLockerDiskImageSizeHint =>
+      'Для образу диска (VHD/VHDX) введіть новий загальний розмір віртуального диска, а не розмір файла.';
+
+  @override
+  String get vcToolsNewTotalSize => 'Новий загальний розмір';
+
+  @override
+  String get vcToolsAddSize => 'Додати';
+
+  @override
+  String vcToolsQuickAddGiB(String amount) {
+    return '+$amount GiB';
+  }
+
+  @override
+  String get vcToolsDoubleSize => 'Подвоїти';
+
+  @override
+  String get vcToolsSizeMustExceedCurrent =>
+      'Новий розмір має бути більшим за поточний.';
+
+  @override
+  String get vcToolsInsufficientFreeSpace =>
+      'На пристрої недостатньо вільного місця.';
+
+  @override
+  String get vcToolsContainerSectionHeader => 'Контейнер';
+
+  @override
+  String get vcToolsCredentialsSectionHeader => 'Облікові дані';
+
+  @override
+  String get vcToolsVolumeOptionsSectionHeader => 'Параметри тому';
+
+  @override
+  String get vcToolsDetectingFormat => 'Визначення…';
 }

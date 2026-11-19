@@ -245,6 +245,7 @@ abstract final class ChannelMethods {
   // Header Backup tool.
   static const exportContainerHeader = 'exportContainerHeader';
   static const restoreContainerHeaderRegion = 'restoreContainerHeaderRegion';
+  static const getContainerSizeInfo = 'getContainerSizeInfo';
   static const expandVeraCryptContainer = 'expandVeraCryptContainer';
   static const expandLuksContainer = 'expandLuksContainer';
   static const growVeraCryptFileSystem = 'growVeraCryptFileSystem';

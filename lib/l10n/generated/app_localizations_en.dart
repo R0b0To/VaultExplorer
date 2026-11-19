@@ -14656,4 +14656,86 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get clearLocalStorageThumbnailCacheMessage =>
       'This will delete cached thumbnails for Local Storage. They will be regenerated the next time you browse media.';
+
+  @override
+  String vcToolsDetectedFormat(String format) {
+    return 'Detected: $format';
+  }
+
+  @override
+  String get vcToolsUnencryptedDetected =>
+      'Looks unencrypted; this tool needs an encrypted container';
+
+  @override
+  String get vcToolsAssumingVeraCrypt =>
+      'Not detected automatically; assuming VeraCrypt';
+
+  @override
+  String get vcToolsManualFormat => 'Set manually';
+
+  @override
+  String get vcToolsExpandInsufficientSpaceForSize =>
+      'Not enough free space on the device for this size.';
+
+  @override
+  String vcToolsNewSizePreview(String size) {
+    return 'New size: $size';
+  }
+
+  @override
+  String vcToolsNewSizePreviewWithAdded(String size, String added) {
+    return 'New size: $size (+$added)';
+  }
+
+  @override
+  String get vcToolsFileSize => 'File size';
+
+  @override
+  String get vcToolsCurrentSize => 'Current size';
+
+  @override
+  String vcToolsFreeOnDevice(String size) {
+    return 'Free on device: $size';
+  }
+
+  @override
+  String get vcToolsSetExactTotalInstead => 'Set exact total size instead';
+
+  @override
+  String get vcToolsBitLockerDiskImageSizeHint =>
+      'For a disk image (VHD/VHDX), enter the new total virtual disk size, not the file size.';
+
+  @override
+  String get vcToolsNewTotalSize => 'New total size';
+
+  @override
+  String get vcToolsAddSize => 'Add';
+
+  @override
+  String vcToolsQuickAddGiB(String amount) {
+    return '+$amount GiB';
+  }
+
+  @override
+  String get vcToolsDoubleSize => 'Double';
+
+  @override
+  String get vcToolsSizeMustExceedCurrent =>
+      'The new size must be larger than the current size.';
+
+  @override
+  String get vcToolsInsufficientFreeSpace =>
+      'Not enough free space on the device.';
+
+  @override
+  String get vcToolsContainerSectionHeader => 'Container';
+
+  @override
+  String get vcToolsCredentialsSectionHeader => 'Credentials';
+
+  @override
+  String get vcToolsVolumeOptionsSectionHeader => 'Volume options';
+
+  @override
+  String get vcToolsDetectingFormat => 'Detecting…';
 }

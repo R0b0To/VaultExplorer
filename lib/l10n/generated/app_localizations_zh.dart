@@ -13850,4 +13850,81 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get clearLocalStorageThumbnailCacheMessage =>
       'This will delete cached thumbnails for Local Storage. They will be regenerated the next time you browse media.';
+
+  @override
+  String vcToolsDetectedFormat(String format) {
+    return '已检测到：$format';
+  }
+
+  @override
+  String get vcToolsUnencryptedDetected => '此文件似乎未加密；此工具需要加密容器';
+
+  @override
+  String get vcToolsAssumingVeraCrypt => '无法自动检测，暂按 VeraCrypt 处理';
+
+  @override
+  String get vcToolsManualFormat => '手动设置';
+
+  @override
+  String get vcToolsExpandInsufficientSpaceForSize => '设备上没有足够的可用空间来满足此大小。';
+
+  @override
+  String vcToolsNewSizePreview(String size) {
+    return '新大小：$size';
+  }
+
+  @override
+  String vcToolsNewSizePreviewWithAdded(String size, String added) {
+    return '新大小：$size（+$added）';
+  }
+
+  @override
+  String get vcToolsFileSize => '文件大小';
+
+  @override
+  String get vcToolsCurrentSize => '当前大小';
+
+  @override
+  String vcToolsFreeOnDevice(String size) {
+    return '设备可用空间：$size';
+  }
+
+  @override
+  String get vcToolsSetExactTotalInstead => '改为设置精确的总大小';
+
+  @override
+  String get vcToolsBitLockerDiskImageSizeHint =>
+      '对于磁盘映像（VHD/VHDX），请输入新的虚拟磁盘总大小，而不是文件大小。';
+
+  @override
+  String get vcToolsNewTotalSize => '新的总大小';
+
+  @override
+  String get vcToolsAddSize => '增加大小';
+
+  @override
+  String vcToolsQuickAddGiB(String amount) {
+    return '+$amount GiB';
+  }
+
+  @override
+  String get vcToolsDoubleSize => '加倍';
+
+  @override
+  String get vcToolsSizeMustExceedCurrent => '新大小必须大于当前大小。';
+
+  @override
+  String get vcToolsInsufficientFreeSpace => '设备上的可用空间不足。';
+
+  @override
+  String get vcToolsContainerSectionHeader => '容器';
+
+  @override
+  String get vcToolsCredentialsSectionHeader => '凭据';
+
+  @override
+  String get vcToolsVolumeOptionsSectionHeader => '卷选项';
+
+  @override
+  String get vcToolsDetectingFormat => '正在检测…';
 }

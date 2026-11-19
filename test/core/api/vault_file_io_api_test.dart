@@ -647,15 +647,29 @@ void main() {
     });
 
     test(
-      'copyFile does not hand a vault path to the native SAF copy',
+      'copyFile streams a vault source through the native SAF writer',
       () async {
         mockChannel((call) => true);
 
-        // The native copy would treat the vault's URI as a file path; reporting
-        // "not handled" lets the caller stream the file in chunks instead.
+        // SAF-to-vault stays on the caller's fallback path. A vault-to-SAF
+        // copy uses the dedicated sequential writer rather than passing the
+        // vault URI as a filesystem path to the generic SAF copy method.
         expect(await api.copyFile(saf, 'a.txt', container, 'a.txt'), isFalse);
-        expect(await api.copyFile(container, 'a.txt', saf, 'a.txt'), isFalse);
         expect(calls, isEmpty);
+
+        expect(
+          await api.copyFile(container, 'a.txt', saf, 'Docs/a.txt'),
+          isTrue,
+        );
+        expect(calls, hasLength(1));
+        expect(calls.single.method, 'safCopyVaultFile');
+        expect(calls.single.arguments, {
+          'srcVolId': container.volId,
+          'srcPath': 'a.txt',
+          'destTreeUri': saf.uri,
+          'destPath': 'Docs/a.txt',
+          'opId': 0,
+        });
       },
     );
 

@@ -195,6 +195,22 @@ FileManagerToolbarConfig _customToolbar() {
       ThumbnailCacheMode.values,
       d.defaultThumbnailCacheMode,
     ),
+    defaultGalleryMetadataCacheMode: _other(
+      ThumbnailCacheMode.values,
+      d.defaultGalleryMetadataCacheMode,
+    ),
+    localStorageGalleryMetadataCacheMode: _other(
+      ThumbnailCacheMode.values,
+      d.localStorageGalleryMetadataCacheMode,
+    ),
+    defaultMusicIndexCacheMode: _other(
+      ThumbnailCacheMode.values,
+      d.defaultMusicIndexCacheMode,
+    ),
+    localStorageMusicIndexCacheMode: _other(
+      ThumbnailCacheMode.values,
+      d.localStorageMusicIndexCacheMode,
+    ),
     defaultThumbnailQuality: const ThumbnailQuality(quality: 60, size: 240),
     localStorageThumbnailCacheMode: _other(
       ThumbnailCacheMode.values,

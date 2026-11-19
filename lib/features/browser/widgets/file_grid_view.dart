@@ -258,6 +258,7 @@ class FileGridViewState extends State<FileGridView>
   /// The groups the host was last laid out from: when a new list replaces
   /// them, what was at the top of the screen is looked up in the new groups.
   GalleryGroupIndex<RawEntry>? _hostGroups;
+  String? _groupHostDirPath;
 
   // Animation controller for clearly visible column morph transition
   late final AnimationController _morphController;
@@ -316,6 +317,7 @@ class FileGridViewState extends State<FileGridView>
     if (oldWidget.items != widget.items) {
       _entryIndexMap.clear();
       if (widget.anchorOnItemsChange &&
+          oldWidget.currentDirPath == widget.currentDirPath &&
           !widget.groupByDate &&
           !oldWidget.groupByDate) {
         _keepPlainAnchor(oldWidget.items);
@@ -612,10 +614,12 @@ Widget _buildAnimatedGridView(ScrollController? controller, int total) {
     // screen now, while the host still holds the layout the person is seeing.
     final previous = _hostGroups;
     final held = widget.anchorOnItemsChange &&
+            _groupHostDirPath == widget.currentDirPath &&
             previous != null &&
             !identical(previous, groups)
         ? _groupHost.captureTopItem()
         : null;
+    _groupHostDirPath = widget.currentDirPath;
     _hostGroups = groups;
     _groupHost
       ..columnCount = _crossAxisCount

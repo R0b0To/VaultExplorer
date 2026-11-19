@@ -19,6 +19,7 @@ import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/utils/bounded_semaphore.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/listener_registry.dart';
+import 'package:vaultexplorer/core/utils/perf_trace.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/data/models/archive_models.dart';
@@ -147,15 +148,15 @@ class FileOperation extends ChangeNotifier {
   int get transferredBytes => (isImport || isExport)
       ? _importTransferredBytes
       : isArchiveCreate
-          ? _archiveBytesWritten
-          : _transferredBytes;
+      ? _archiveBytesWritten
+      : _transferredBytes;
 
   int _totalBytes = 0;
   int get totalBytes => (isImport || isExport)
       ? _importTotalBytes
       : isArchiveCreate
-          ? _archiveTotalBytes
-          : _totalBytes;
+      ? _archiveTotalBytes
+      : _totalBytes;
 
   int _archiveBytesWritten = 0;
   int get archiveBytesWritten => _archiveBytesWritten;
@@ -191,7 +192,11 @@ class FileOperation extends ChangeNotifier {
     if (_status == FileOperationStatus.pending ||
         _status == FileOperationStatus.running) {
       _cancelRequested = true;
-      if (isImport || isExport || isArchiveCreate || isArchiveExtract || !isDelete) {
+      if (isImport ||
+          isExport ||
+          isArchiveCreate ||
+          isArchiveExtract ||
+          !isDelete) {
         final cancelNativeOperation = _cancelNativeOperation;
         if (cancelNativeOperation != null) {
           unawaited(cancelNativeOperation(id, isImport, isExport));

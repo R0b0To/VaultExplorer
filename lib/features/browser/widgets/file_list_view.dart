@@ -247,6 +247,7 @@ class FileListViewState extends State<FileListView> {
 
   /// The groups the host was last laid out from (see the grid view).
   GalleryGroupIndex<RawEntry>? _hostGroups;
+  String? _groupHostDirPath;
 
   // Grouped pinch zoom keeps the child under the viewport centre in place.
   int _anchorChild = -1;
@@ -336,10 +337,12 @@ class FileListViewState extends State<FileListView> {
     // while the host still holds the layout the person is seeing.
     final previous = _hostGroups;
     final held = widget.anchorOnItemsChange &&
+            _groupHostDirPath == widget.currentDirPath &&
             previous != null &&
             !identical(previous, groups)
         ? _groupHost.captureTopItem()
         : null;
+    _groupHostDirPath = widget.currentDirPath;
     _hostGroups = groups;
     _groupHost
       ..rowExtent = itemExtent
@@ -385,6 +388,7 @@ class FileListViewState extends State<FileListView> {
     if (oldWidget.items != widget.items) {
       _entryIndexMap.clear();
       if (widget.anchorOnItemsChange &&
+          oldWidget.currentDirPath == widget.currentDirPath &&
           !widget.groupByDate &&
           !oldWidget.groupByDate) {
         _keepPlainAnchor(oldWidget.items);

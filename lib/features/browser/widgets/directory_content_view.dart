@@ -402,6 +402,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     FolderThumbnailPreview.clearSessionCache();
     unawaited(_loadDirectoryContents(nav.currentDirPath, refresh: true));
   }
+
   FileBrowserNavigationState get _nav =>
       ref.watch(fileBrowserNavigationProvider(_stateKey));
   FileBrowserNavigation get _navNotifier =>
@@ -437,9 +438,13 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   BrowserLayoutMode get _layoutMode => _nav.layoutMode;
   String? get _currentFilter => _nav.currentFilter;
   ArchiveContext? get _archiveContext => _nav.archiveContext;
- bool get _isContainerLocked => _nav.isContainerLocked;
-  final ValueNotifier<double?> _backGestureProgress = ValueNotifier<double?>(null);
-  final ValueNotifier<bool> _backGestureShowPreview = ValueNotifier<bool>(false);
+  bool get _isContainerLocked => _nav.isContainerLocked;
+  final ValueNotifier<double?> _backGestureProgress = ValueNotifier<double?>(
+    null,
+  );
+  final ValueNotifier<bool> _backGestureShowPreview = ValueNotifier<bool>(
+    false,
+  );
   List<RawEntry>? _cachedPreviewSource;
   String? _cachedPreviewDirPath;
   SortBy? _cachedPreviewSortBy;
@@ -492,8 +497,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   ScrollController _browserScrollController = ScrollController();
   final GlobalKey<FileMasonryViewState> _masonryKey =
       GlobalKey<FileMasonryViewState>();
-  final GlobalKey<FileGridViewState> _gridKey =
-      GlobalKey<FileGridViewState>();
+  final GlobalKey<FileGridViewState> _gridKey = GlobalKey<FileGridViewState>();
   // Not final: replaced on every folder change, see
   // [_resetBrowserScrollController].
   GlobalKey<FileListViewState> _listKey = GlobalKey<FileListViewState>();
@@ -1011,7 +1015,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     WidgetsBinding.instance.removeObserver(this);
     _opReloadTimer?.cancel();
     _exitArmTimer?.cancel();
-     _opSvc.removeListener(_onOperationsChanged);
+    _opSvc.removeListener(_onOperationsChanged);
     _opSvc.removeVolumeContentChangedListener(_onVolumeContentChanged);
     _backGestureProgress.dispose();
     _backGestureShowPreview.dispose();
@@ -1076,8 +1080,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       case BrowserLayoutMode.list:
       case BrowserLayoutMode.compact:
       case BrowserLayoutMode.detailed:
-        final liveList =
-            _listKey.currentState?.geometriesForGlobalIndices(targets);
+        final liveList = _listKey.currentState?.geometriesForGlobalIndices(
+          targets,
+        );
         if (liveList != null && liveList.isNotEmpty) {
           result.addAll(liveList);
           break;
@@ -1104,8 +1109,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         break;
 
       case BrowserLayoutMode.grid:
-        final liveGrid =
-            _gridKey.currentState?.geometriesForGlobalIndices(targets);
+        final liveGrid = _gridKey.currentState?.geometriesForGlobalIndices(
+          targets,
+        );
         if (liveGrid != null && liveGrid.isNotEmpty) {
           result.addAll(liveGrid);
           break;
@@ -1135,8 +1141,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         break;
 
       case BrowserLayoutMode.masonry:
-        final liveGeometries =
-            _masonryKey.currentState?.geometriesForGlobalIndices(targets);
+        final liveGeometries = _masonryKey.currentState
+            ?.geometriesForGlobalIndices(targets);
         if (liveGeometries != null && liveGeometries.isNotEmpty) {
           result.addAll(liveGeometries);
           break;
@@ -1144,10 +1150,11 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
 
         final minCols = isLandscape ? 2 : 1;
         final maxCols = isLandscape ? 6 : 3;
-        final columns = (isLandscape
-                ? _toolbarConfig.masonryColumnsLandscape
-                : _toolbarConfig.masonryColumnsPortrait)
-            .clamp(minCols, maxCols);
+        final columns =
+            (isLandscape
+                    ? _toolbarConfig.masonryColumnsLandscape
+                    : _toolbarConfig.masonryColumnsPortrait)
+                .clamp(minCols, maxCols);
         final availableWidth = math.max(1.0, viewportWidth - 20.0);
         final spec = GalleryLayoutSpec(
           crossExtent: availableWidth,
@@ -1473,7 +1480,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
           currentDirPath: _currentDirPath,
         );
       },
-      onEditMetadata: entry.isDir || entry.isPlaceholder || _archiveContext != null
+      onEditMetadata:
+          entry.isDir || entry.isPlaceholder || _archiveContext != null
           ? null
           : () => _editMetadata([entry]),
       onExtract: canExtract
@@ -2389,11 +2397,13 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     final enable = !_isGalleryMode;
 
     if (enable) {
-      final isSkipped =
-          _toolbarConfig.isGalleryPromptSkippedForStorage(widget.container.uri);
+      final isSkipped = _toolbarConfig.isGalleryPromptSkippedForStorage(
+        widget.container.uri,
+      );
       if (!isSkipped) {
-        final initial =
-            _toolbarConfig.galleryFoldersForStorage(widget.container.uri);
+        final initial = _toolbarConfig.galleryFoldersForStorage(
+          widget.container.uri,
+        );
         final fileIo = ref.read(vaultFileIoApiProvider);
         final showHidden = _toolbarConfig.showHiddenFiles;
         final chosen = await showGalleryScopeSheet(
@@ -2435,10 +2445,12 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   }
 
   Future<void> _editGalleryFolders() async {
-    final isSkipped =
-        _toolbarConfig.isGalleryPromptSkippedForStorage(widget.container.uri);
-    final initial =
-        _toolbarConfig.galleryFoldersForStorage(widget.container.uri);
+    final isSkipped = _toolbarConfig.isGalleryPromptSkippedForStorage(
+      widget.container.uri,
+    );
+    final initial = _toolbarConfig.galleryFoldersForStorage(
+      widget.container.uri,
+    );
     final fileIo = ref.read(vaultFileIoApiProvider);
     final showHidden = _toolbarConfig.showHiddenFiles;
     final chosen = await showGalleryScopeSheet(
@@ -2553,7 +2565,11 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     try {
       final raw = await ref
           .read(vaultFileIoApiProvider)
-          .listDirectoryForBrowser(widget.container, bookmark.parentPath, refresh: true);
+          .listDirectoryForBrowser(
+            widget.container,
+            bookmark.parentPath,
+            refresh: true,
+          );
       if (raw == null) return false;
       return RawEntry.parseAll(
         raw,
@@ -2725,7 +2741,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     final parentPath = targetSegment?.fatPath ?? '';
     final parentLayoutMode = _getLayoutModeForFolder(parentPath);
 
-      final started = _navNotifier.startBackGesture(
+    final started = _navNotifier.startBackGesture(
       backEvent.progress,
       layoutMode: parentLayoutMode,
     );
@@ -2794,18 +2810,19 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         _cachedSortedPreviewItems != null) {
       return _cachedSortedPreviewItems;
     }
-    final sorted = List<RawEntry>.of(
-      rawItems.where((item) => showHidden || !isHiddenEntryName(item.name)),
-    )..sort(
-        (ea, eb) => compareBrowserEntries(
-          ea,
-          eb,
-          currentDirPath: previewDirPath,
-          pinnedPaths: _pinnedPaths,
-          sortBy: previewSort.sortBy,
-          sortAscending: previewSort.sortAscending,
-        ),
-      );
+    final sorted =
+        List<RawEntry>.of(
+          rawItems.where((item) => showHidden || !isHiddenEntryName(item.name)),
+        )..sort(
+          (ea, eb) => compareBrowserEntries(
+            ea,
+            eb,
+            currentDirPath: previewDirPath,
+            pinnedPaths: _pinnedPaths,
+            sortBy: previewSort.sortBy,
+            sortAscending: previewSort.sortAscending,
+          ),
+        );
     _cachedPreviewSource = rawItems;
     _cachedPreviewDirPath = previewDirPath;
     _cachedPreviewSortBy = previewSort.sortBy;
@@ -3031,7 +3048,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       final resolved = p.posix.normalize(
         p.posix.join(p.posix.dirname(currentPath), target),
       );
-      if (resolved == '..' || resolved.startsWith('../') ||
+      if (resolved == '..' ||
+          resolved.startsWith('../') ||
           p.posix.isAbsolute(resolved)) {
         return entry.name;
       }
@@ -3504,27 +3522,26 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       barrierColor: Colors.transparent,
       transitionDuration: Duration.zero,
       reverseTransitionDuration: const Duration(milliseconds: 250),
-      pageBuilder: (context, animation, secondaryAnimation) =>
-          MediaViewerScreen(
-            container: container ?? widget.container,
-            mediaFiles: mediaFiles,
-            initialIndex: initialIndex,
-            startingFolder: isArchivePreview ? '' : _currentDirPath,
-            thumbnailQuality: _resolvedThumbnailQuality,
-            thumbnailCacheMode: isArchivePreview
-                ? ThumbnailCacheMode.disabled
-                : _resolvedThumbnailCacheMode,
-            mediaFilter: _currentFilter,
-            sortBy: sortBy,
-            sortAscending: sortAscending,
-            pinnedPaths: _pinnedPaths,
-            onCurrentFileChanged: isArchivePreview
-                ? null
-                : (newFile) {
-                    // Intentionally avoid scrolling background directory during swipe
-                  },
-            isArchivePreview: isArchivePreview,
-          ),
+      pageBuilder: (context, animation, secondaryAnimation) => MediaViewerScreen(
+        container: container ?? widget.container,
+        mediaFiles: mediaFiles,
+        initialIndex: initialIndex,
+        startingFolder: isArchivePreview ? '' : _currentDirPath,
+        thumbnailQuality: _resolvedThumbnailQuality,
+        thumbnailCacheMode: isArchivePreview
+            ? ThumbnailCacheMode.disabled
+            : _resolvedThumbnailCacheMode,
+        mediaFilter: _currentFilter,
+        sortBy: sortBy,
+        sortAscending: sortAscending,
+        pinnedPaths: _pinnedPaths,
+        onCurrentFileChanged: isArchivePreview
+            ? null
+            : (newFile) {
+                // Intentionally avoid scrolling background directory during swipe
+              },
+        isArchivePreview: isArchivePreview,
+      ),
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
         return FadeTransition(
           opacity: CurvedAnimation(
@@ -3614,9 +3631,12 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       int foundIdx = -1;
       for (final item in displayedListing.items) {
         if (item.isDir || !_isSupportedMedia(item.name)) continue;
-        final itemPath = (_searchActive && _isDeepSearch && item.name.contains('/'))
+        final itemPath =
+            (_searchActive && _isDeepSearch && item.name.contains('/'))
             ? item.name
-            : (_currentDirPath.isEmpty ? item.name : '$_currentDirPath/${item.name}');
+            : (_currentDirPath.isEmpty
+                  ? item.name
+                  : '$_currentDirPath/${item.name}');
         if (itemPath == fullPath) {
           foundIdx = resolvedMedia.length;
         }
@@ -4709,26 +4729,28 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
 
     final survivingGroups = <int, List<ClipboardItem>>{};
     final missingPathsByVol = <int, List<String>>{};
+    PerfTrace.count('paste.widget.items', clip.items.length);
+    PerfTrace.count('paste.widget.source_groups', groups.length);
+    final sourceValidationT0 = PerfTrace.begin();
     for (final group in groups.entries) {
       final groupVolId = group.key;
       final groupIsCross = groupVolId != widget.container.volId;
       final groupSrc = !groupIsCross
           ? widget.container
           : (groupVolId == srcVolId
-              ? srcContainer
-              : widget.resolveContainer?.call(groupVolId));
+                ? srcContainer
+                : widget.resolveContainer?.call(groupVolId));
       if (groupSrc == null) {
         survivingGroups[groupVolId] = group.value;
         continue;
       }
       final surviving = <ClipboardItem>[];
-      for (final item in group.value) {
-        final exists = await fileIoApi.entryExists(
-          groupSrc,
-          item.path,
-          isDir: item.isDir,
-        );
-        if (exists) {
+      final sourceExists = await fileIoApi.entryExistsBatch(groupSrc, [
+        for (final item in group.value) (path: item.path, isDir: item.isDir),
+      ]);
+      for (var index = 0; index < group.value.length; index++) {
+        final item = group.value[index];
+        if (sourceExists[index]) {
           surviving.add(item);
         } else {
           missingPathsByVol.putIfAbsent(groupVolId, () => []).add(item.path);
@@ -4738,6 +4760,11 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         survivingGroups[groupVolId] = surviving;
       }
     }
+    PerfTrace.end(
+      'paste.widget.source_validation',
+      sourceValidationT0,
+      slowMs: 250,
+    );
     for (final entry in missingPathsByVol.entries) {
       ref
           .read(crossContainerClipboardProvider.notifier)
@@ -4782,6 +4809,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
             items: List<ClipboardItem>.from(group.value),
             isCut: isCut,
             isCrossContainer: groupIsCross,
+            sourceItemsValidated: true,
             resolveConflicts: (conflicts) async {
               if (!mounted) return null;
               return ConflictResolutionSheet.show(
@@ -5677,7 +5705,6 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     }
   }
 
-
   Future<void> _extractArchive() async {
     if (_archiveContext == null) return;
     if (_isReadOnly) {
@@ -6095,52 +6122,52 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
           child: ListenableBuilder(
             listenable: musicEntry,
             builder: (context, _) => FileManagerMoreMenuButton(
-            actions: moreActions,
-            searchActive: _searchActive,
-            onToggleSearch: () => _searchNotifier.toggleActive(),
-            sortBy: sortBy,
-            sortAscending: sortAscending,
-            onSortChanged: _onSortChanged,
-            currentFilter: _currentFilter,
-            onFilterChanged: _onFilterChosen,
-            hideVaultOnlyActions: widget.container.isLocalStorage,
-            layoutMode: _layoutMode,
-            onLayoutModeChanged: _onLayoutModeChanged,
-            gridAspectRatio: _toolbarConfig.getGridAspectRatioForFolder(
-              widget.container.uri,
-              _currentDirPath,
-            ),
-            onGridAspectRatioChanged: _onGridAspectRatioChanged,
-            canPlayMedia: canPlayMedia,
-            onPlayMedia: _startMediaViewerFromCurrentLocation,
+              actions: moreActions,
+              searchActive: _searchActive,
+              onToggleSearch: () => _searchNotifier.toggleActive(),
+              sortBy: sortBy,
+              sortAscending: sortAscending,
+              onSortChanged: _onSortChanged,
+              currentFilter: _currentFilter,
+              onFilterChanged: _onFilterChosen,
+              hideVaultOnlyActions: widget.container.isLocalStorage,
+              layoutMode: _layoutMode,
+              onLayoutModeChanged: _onLayoutModeChanged,
+              gridAspectRatio: _toolbarConfig.getGridAspectRatioForFolder(
+                widget.container.uri,
+                _currentDirPath,
+              ),
+              onGridAspectRatioChanged: _onGridAspectRatioChanged,
+              canPlayMedia: canPlayMedia,
+              onPlayMedia: _startMediaViewerFromCurrentLocation,
               musicModeActive: musicEntry.config.enabled,
               onToggleMusicMode: () =>
                   unawaited(toggleMusicMode(context, ref, musicEntry)),
-            isGalleryMode: _isGalleryMode,
-            onToggleGallery: () => unawaited(_toggleGalleryMode()),
-            onPickGalleryFolders: () => unawaited(_editGalleryFolders()),
-            galleryFolderCount: _toolbarConfig
-                .galleryFoldersForStorage(widget.container.uri)
-                .length,
-            toolbarConfig: _toolbarConfig,
-            onToggleShowHiddenFiles: (v) => _updateToolbarConfigField(
-              (c) => c.copyWith(showHiddenFiles: v),
+              isGalleryMode: _isGalleryMode,
+              onToggleGallery: () => unawaited(_toggleGalleryMode()),
+              onPickGalleryFolders: () => unawaited(_editGalleryFolders()),
+              galleryFolderCount: _toolbarConfig
+                  .galleryFoldersForStorage(widget.container.uri)
+                  .length,
+              toolbarConfig: _toolbarConfig,
+              onToggleShowHiddenFiles: (v) => _updateToolbarConfigField(
+                (c) => c.copyWith(showHiddenFiles: v),
+              ),
+              onToggleShowNoMediaFolders: (v) => _updateToolbarConfigField(
+                (c) => c.copyWith(showNoMediaFolders: v),
+              ),
+              onToggleShowGridFileNames: (v) => _updateToolbarConfigField(
+                (c) => c.copyWith(showGridFileNames: v),
+              ),
+              onToggleShowFileExtensions: (v) => _updateToolbarConfigField(
+                (c) => c.copyWith(showFileExtensions: v),
+              ),
+              onToggleShowListThumbnails: (v) => _updateToolbarConfigField(
+                (c) => c.copyWith(showListThumbnails: v),
+              ),
+              onOpenSettings: _openFileManagerSettings,
             ),
-            onToggleShowNoMediaFolders: (v) => _updateToolbarConfigField(
-              (c) => c.copyWith(showNoMediaFolders: v),
-            ),
-            onToggleShowGridFileNames: (v) => _updateToolbarConfigField(
-              (c) => c.copyWith(showGridFileNames: v),
-            ),
-            onToggleShowFileExtensions: (v) => _updateToolbarConfigField(
-              (c) => c.copyWith(showFileExtensions: v),
-            ),
-            onToggleShowListThumbnails: (v) => _updateToolbarConfigField(
-              (c) => c.copyWith(showListThumbnails: v),
-            ),
-            onOpenSettings: _openFileManagerSettings,
           ),
-        ),
         ),
       );
     }
@@ -6235,7 +6262,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     final effectiveToolbarUri = widget.container.isLocalStorage
         ? null
         : widget.container.uri;
-   ref.listen<FileManagerToolbarSettingsState>(
+    ref.listen<FileManagerToolbarSettingsState>(
       fileManagerToolbarSettingsProvider(effectiveToolbarUri),
       (previous, next) {
         if (next.loading) return;
@@ -6299,7 +6326,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     // The folder being swiped back to is shown in the sort it will be landed in
     // (see [_navigateUp]), not the sort of the folder being left, which may
     // have been changed since.
-     final previewSort = _backGesturePreviewDirPath != null
+    final previewSort = _backGesturePreviewDirPath != null
         ? _getSortStateForFolder(previewDirPath)
         : (sortBy: sortBy, sortAscending: sortAscending);
     final sortedPreviewItems = _getSortedBackPreviewItems(
@@ -6359,13 +6386,16 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         ? ref.read(aggregatedTabsSelectionProvider(workspace))
         : null;
 
-    final selectedTabs = <({
-      TabId tabId,
-      MountedContainer container,
-      String currentDirPath,
-      bool insideArchive,
-      Set<RawEntry> items,
-    })>[];
+    final selectedTabs =
+        <
+          ({
+            TabId tabId,
+            MountedContainer container,
+            String currentDirPath,
+            bool insideArchive,
+            Set<RawEntry> items,
+          })
+        >[];
 
     for (final tab in _workspaceTabs) {
       if (tab.isDashboard) continue;
@@ -6389,7 +6419,12 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       final mqData = context.getInheritedWidgetOfExactType<MediaQuery>()?.data;
       final mq = mqData == null
           ? (Size.zero, EdgeInsets.zero, EdgeInsets.zero, Orientation.portrait)
-          : (mqData.size, mqData.padding, mqData.viewInsets, mqData.orientation);
+          : (
+              mqData.size,
+              mqData.padding,
+              mqData.viewInsets,
+              mqData.orientation,
+            );
       // Compare colorScheme identity rather than ThemeData (ThemeData.localize
       // allocates a fresh wrapper on every Theme.of call).
       final themeScheme = Theme.of(context).colorScheme;
@@ -6456,11 +6491,14 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     final selectionInTopBar =
         hasAnySelection && !_toolbarConfig.bottomSelectionBar;
 
-    final appBarSelectionCount = aggregateSelection?.count ??
+    final appBarSelectionCount =
+        aggregateSelection?.count ??
         selectedTabs.fold<int>(0, (sum, t) => sum + t.items.length);
-    final appBarSelectionHasReadOnlySource =
-        selectedTabs.any((t) => t.container.readOnly);
-    final appBarSelectedTotalBytes = aggregateSelection?.bytes ??
+    final appBarSelectionHasReadOnlySource = selectedTabs.any(
+      (t) => t.container.readOnly,
+    );
+    final appBarSelectedTotalBytes =
+        aggregateSelection?.bytes ??
         (hasAnySelection ? _allSelectedTotalBytes : 0);
     final appBarHasPendingFolderSizes =
         aggregateSelection?.hasPendingFolderSizes ??
@@ -6468,17 +6506,20 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
 
     final allSelectionInOneTab =
         selectedTabs.length == 1 && selectedTabs.first.tabId == _stateKey;
-    final allSelectionOutsideArchives =
-        selectedTabs.every((t) => !t.insideArchive);
+    final allSelectionOutsideArchives = selectedTabs.every(
+      (t) => !t.insideArchive,
+    );
     final selectedInOneContainer =
         selectedTabs.map((t) => t.container.volId).toSet().length == 1;
-    final singleSelectionInCurrentTab = allSelectionInOneTab &&
+    final singleSelectionInCurrentTab =
+        allSelectionInOneTab &&
         selectedTabs.first.items.length == 1 &&
         !selectedTabs.first.insideArchive;
     final hideVaultOnlyActionsForSelection =
         selectedTabs.isNotEmpty &&
         selectedTabs.every((t) => t.container.isLocalStorage);
-    final canExtractCurrentSelection = allSelectionInOneTab &&
+    final canExtractCurrentSelection =
+        allSelectionInOneTab &&
         (selectedTabs.first.insideArchive ||
             selectedTabs.first.items.length == 1);
 
@@ -6508,12 +6549,15 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
       );
     }
 
-    final hasAnyPins = _pinnedPaths.isNotEmpty ||
+    final hasAnyPins =
+        _pinnedPaths.isNotEmpty ||
         appBarPinsByVolId.values.any((s) => s.isNotEmpty);
-    final hasAnyBookmarks = _bookmarkPaths.isNotEmpty ||
+    final hasAnyBookmarks =
+        _bookmarkPaths.isNotEmpty ||
         appBarBookmarksByVolId.values.any((l) => l.isNotEmpty);
-    final currentBookmarksSet =
-        _bookmarkPaths.isNotEmpty ? _bookmarkPaths.toSet() : const <String>{};
+    final currentBookmarksSet = _bookmarkPaths.isNotEmpty
+        ? _bookmarkPaths.toSet()
+        : const <String>{};
 
     bool appBarIsFolderMounted(RawEntry entry) => isFolderMounted(
       entry,
@@ -6539,8 +6583,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     bool appBarIsBookmarked(RawEntry entry) {
       if (!hasAnyBookmarks) return false;
       if (allSelectionInOneTab || selectedTabs.isEmpty) {
-        return currentBookmarksSet
-            .contains(fullPathOf(entry, appBarCurrentDirPath));
+        return currentBookmarksSet.contains(
+          fullPathOf(entry, appBarCurrentDirPath),
+        );
       }
       for (final t in selectedTabs) {
         if (t.items.contains(entry)) {
@@ -6590,7 +6635,7 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     final baseBottomOffset =
         16.0 + (!isLandscape && showBookmarkBar ? 0.0 : bottomSystemInset);
 
-   final bool hasClipboardFab =
+    final bool hasClipboardFab =
         _isActiveTab &&
         !selectionBarVisible &&
         !_searchActive &&
@@ -6925,9 +6970,8 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
                 unawaited(editMusicFolders(context, ref, _music)),
           )
         : null;
-    final Widget? embeddedBottomBar = selectionBottomBar ??
-        musicModeBottomBar ??
-        browserBottomBar;
+    final Widget? embeddedBottomBar =
+        selectionBottomBar ?? musicModeBottomBar ?? browserBottomBar;
     if (_isActiveTab) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || !_isActiveTab) return;
@@ -7082,342 +7126,371 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
 
                                       Expanded(
                                         child: Stack(
-                                        children: [
-                                          KeyedSubtree(
-                                            key: ValueKey(_currentDirPath),
-                                                child: DragTarget<BrowserItemDragData>(
-                                                  onWillAcceptWithDetails:
-                                                      (details) =>
-                                                      _archiveContext == null &&
-                                                      details.data.canDropInto(
+                                          children: [
+                                            KeyedSubtree(
+                                              key: ValueKey(_currentDirPath),
+                                              child: DragTarget<BrowserItemDragData>(
+                                                onWillAcceptWithDetails:
+                                                    (details) =>
+                                                        _archiveContext ==
+                                                            null &&
+                                                        details.data
+                                                            .canDropInto(
+                                                              widget.container,
+                                                              _currentDirPath,
+                                                            ),
+                                                onAcceptWithDetails:
+                                                    (details) => unawaited(
+                                                      handleBrowserItemDrop(
+                                                        context,
+                                                        details,
                                                         widget.container,
-                                                                _currentDirPath,
-                                                              ),
-                                              onAcceptWithDetails: (details) =>
-                                                  unawaited(
-                                                        handleBrowserItemDrop(
-                                                          context,
-                                                          details,
-                                                          widget.container,
-                                                          _currentDirPath,
-                                                        ),
+                                                        _currentDirPath,
                                                       ),
-                                              builder: (context, candidates, rejected) => _paneDropChrome(
-                                                        context,
-                                                        hover:
-                                                            candidates.isNotEmpty &&
-                                                            !widget.container.readOnly,
-                                                        locked: dragLocked,
-                                                        body: buildBrowserBody(
-                                              context,
-                                              filteredItems,
-                                              isLoading: _isLoading,
-                                                  currentItems: _currentItems,
-                                              atRoot: _atRoot,
-                                              onNavigateUp: _atRoot
-                                                  ? null
-                                                  : _navigateUp,
-                                                  searchQuery: _searchQuery,
-                                              layoutMode: _layoutMode,
-                                                  container: widget.container,
-                                                        currentDirPath:
-                                                            _currentDirPath,
-                                              thumbnailCacheMode:
-                                                  _resolvedThumbnailCacheMode,
-                                              thumbnailQuality:
-                                                  _resolvedThumbnailQuality,
-                                                  toolbarConfig: _toolbarConfig,
-                                                        isSelectionMode:
-                                                            isSelectionMode,
-                                                  selectedItems: selectedItems,
-                                                  searchActive: _searchActive,
-                                              bottomClearance:
-                                                  baseBottomContentClearance +
-                                                  (_searchActive
-                                                      ? MediaQuery.viewInsetsOf(
-                                                          context,
-                                                        ).bottom
-                                                      : 0.0),
-                                              mountedDocProviderFolders:
-                                                  _mountedDocProviderFolders,
-                                                        isFolderMounted:
-                                                            _isFolderMounted,
-                                              isPinned: _isPinned,
-                                              isBookmark: _isBookmark,
-                                                        isFolderSynced:
-                                                            _isFolderSynced,
-                                              onDirTap: _handleDirTap,
-                                                  onFileTap: _handleFileTap,
-                                              onItemLongPress:
-                                                  _handleItemLongPress,
-                                                  onIconTap: _handleIconTap,
-                                              onItemMoreTap:
-                                                  _showItemActionsSheet,
-                                              onSelectionChanged:
-                                                  setSelectedItems,
-                                                        enableFileDrag:
-                                                            !widget
+                                                    ),
+                                                builder: (context, candidates, rejected) => _paneDropChrome(
+                                                  context,
+                                                  hover:
+                                                      candidates.isNotEmpty &&
+                                                      !widget
+                                                          .container
+                                                          .readOnly,
+                                                  locked: dragLocked,
+                                                  body: buildBrowserBody(
+                                                    context,
+                                                    filteredItems,
+                                                    isLoading: _isLoading,
+                                                    currentItems: _currentItems,
+                                                    atRoot: _atRoot,
+                                                    onNavigateUp: _atRoot
+                                                        ? null
+                                                        : _navigateUp,
+                                                    searchQuery: _searchQuery,
+                                                    layoutMode: _layoutMode,
+                                                    container: widget.container,
+                                                    currentDirPath:
+                                                        _currentDirPath,
+                                                    thumbnailCacheMode:
+                                                        _resolvedThumbnailCacheMode,
+                                                    thumbnailQuality:
+                                                        _resolvedThumbnailQuality,
+                                                    toolbarConfig:
+                                                        _toolbarConfig,
+                                                    isSelectionMode:
+                                                        isSelectionMode,
+                                                    selectedItems:
+                                                        selectedItems,
+                                                    searchActive: _searchActive,
+                                                    bottomClearance:
+                                                        baseBottomContentClearance +
+                                                        (_searchActive
+                                                            ? MediaQuery.viewInsetsOf(
+                                                                context,
+                                                              ).bottom
+                                                            : 0.0),
+                                                    mountedDocProviderFolders:
+                                                        _mountedDocProviderFolders,
+                                                    isFolderMounted:
+                                                        _isFolderMounted,
+                                                    isPinned: _isPinned,
+                                                    isBookmark: _isBookmark,
+                                                    isFolderSynced:
+                                                        _isFolderSynced,
+                                                    onDirTap: _handleDirTap,
+                                                    onFileTap: _handleFileTap,
+                                                    onItemLongPress:
+                                                        _handleItemLongPress,
+                                                    onIconTap: _handleIconTap,
+                                                    onItemMoreTap:
+                                                        _showItemActionsSheet,
+                                                    onSelectionChanged:
+                                                        setSelectedItems,
+                                                    enableFileDrag:
+                                                        !widget
+                                                            .container
+                                                            .readOnly &&
+                                                        _archiveContext ==
+                                                            null &&
+                                                        !_isDeepSearch,
+                                                    onFileDrop:
+                                                        _handleBrowserItemDrop,
+                                                    onGridColumnCountChanged: (count) {
+                                                      _toolbarConfig =
+                                                          isLandscape
+                                                          ? _toolbarConfig.copyWith(
+                                                              gridColumnsLandscape:
+                                                                  count,
+                                                            )
+                                                          : _toolbarConfig.copyWith(
+                                                              gridColumnsPortrait:
+                                                                  count,
+                                                            );
+                                                      _toolbarSvc.save(
+                                                        _toolbarConfig,
+                                                      );
+                                                      final effectiveToolbarUri =
+                                                          widget
+                                                              .container
+                                                              .isLocalStorage
+                                                          ? null
+                                                          : widget
                                                                 .container
-                                                                .readOnly &&
-                                                      _archiveContext == null &&
-                                                            !_isDeepSearch,
-                                                        onFileDrop:
-                                                            _handleBrowserItemDrop,
-                                              onGridColumnCountChanged: (count) {
-                                                    _toolbarConfig = isLandscape
-                                                        ? _toolbarConfig.copyWith(
-                                                        gridColumnsLandscape:
-                                                            count,
-                                                      )
-                                                        : _toolbarConfig.copyWith(
-                                                        gridColumnsPortrait:
-                                                            count,
+                                                                .uri;
+                                                      ref
+                                                          .read(
+                                                            fileManagerToolbarSettingsProvider(
+                                                              effectiveToolbarUri,
+                                                            ).notifier,
+                                                          )
+                                                          .applyImportedConfig(
+                                                            _toolbarConfig,
+                                                          );
+                                                    },
+                                                    onMasonryColumnCountChanged: (count) {
+                                                      _toolbarConfig =
+                                                          isLandscape
+                                                          ? _toolbarConfig.copyWith(
+                                                              masonryColumnsLandscape:
+                                                                  count,
+                                                            )
+                                                          : _toolbarConfig.copyWith(
+                                                              masonryColumnsPortrait:
+                                                                  count,
+                                                            );
+                                                      _toolbarSvc.save(
+                                                        _toolbarConfig,
                                                       );
-                                                _toolbarSvc.save(
-                                                  _toolbarConfig,
-                                                );
-                                                final effectiveToolbarUri =
-                                                    widget
-                                                        .container
-                                                        .isLocalStorage
-                                                    ? null
-                                                        : widget.container.uri;
-                                                ref
-                                                    .read(
-                                                      fileManagerToolbarSettingsProvider(
-                                                        effectiveToolbarUri,
-                                                      ).notifier,
-                                                    )
-                                                    .applyImportedConfig(
-                                                      _toolbarConfig,
-                                                    );
-                                              },
-                                              onMasonryColumnCountChanged: (count) {
-                                                    _toolbarConfig = isLandscape
-                                                        ? _toolbarConfig.copyWith(
-                                                        masonryColumnsLandscape:
-                                                            count,
-                                                      )
-                                                        : _toolbarConfig.copyWith(
-                                                        masonryColumnsPortrait:
-                                                            count,
+                                                      final effectiveToolbarUri =
+                                                          widget
+                                                              .container
+                                                              .isLocalStorage
+                                                          ? null
+                                                          : widget
+                                                                .container
+                                                                .uri;
+                                                      ref
+                                                          .read(
+                                                            fileManagerToolbarSettingsProvider(
+                                                              effectiveToolbarUri,
+                                                            ).notifier,
+                                                          )
+                                                          .applyImportedConfig(
+                                                            _toolbarConfig,
+                                                          );
+                                                    },
+                                                    onListZoomLevelChanged: (newZoom) {
+                                                      setState(() {
+                                                        _toolbarConfig =
+                                                            _toolbarConfig
+                                                                .copyWith(
+                                                                  listZoomLevel:
+                                                                      newZoom,
+                                                                );
+                                                      });
+                                                      _toolbarSvc.save(
+                                                        _toolbarConfig,
                                                       );
-                                                _toolbarSvc.save(
-                                                  _toolbarConfig,
-                                                );
-                                                final effectiveToolbarUri =
-                                                    widget
-                                                        .container
-                                                        .isLocalStorage
-                                                    ? null
-                                                        : widget.container.uri;
-                                                ref
-                                                    .read(
-                                                      fileManagerToolbarSettingsProvider(
-                                                        effectiveToolbarUri,
-                                                      ).notifier,
-                                                    )
-                                                    .applyImportedConfig(
-                                                      _toolbarConfig,
-                                                    );
-                                              },
-                                              onListZoomLevelChanged: (newZoom) {
-                                                setState(() {
-                                                  _toolbarConfig =
-                                                                _toolbarConfig
-                                                                    .copyWith(
-                                                                      listZoomLevel:
-                                                                          newZoom,
+                                                      final effectiveToolbarUri =
+                                                          widget
+                                                              .container
+                                                              .isLocalStorage
+                                                          ? null
+                                                          : widget
+                                                                .container
+                                                                .uri;
+                                                      ref
+                                                          .read(
+                                                            fileManagerToolbarSettingsProvider(
+                                                              effectiveToolbarUri,
+                                                            ).notifier,
+                                                          )
+                                                          .applyImportedConfig(
+                                                            _toolbarConfig,
+                                                          );
+                                                    },
+                                                    onRefresh: () {
+                                                      FolderThumbnailPreview.clearSessionCache();
+                                                      return _loadDirectoryContents(
+                                                        _currentDirPath,
+                                                        refresh: true,
                                                       );
-                                                });
-                                                _toolbarSvc.save(
-                                                  _toolbarConfig,
-                                                );
-                                                final effectiveToolbarUri =
-                                                    widget
-                                                        .container
-                                                        .isLocalStorage
-                                                    ? null
-                                                        : widget.container.uri;
-                                                ref
-                                                    .read(
-                                                      fileManagerToolbarSettingsProvider(
-                                                        effectiveToolbarUri,
-                                                      ).notifier,
-                                                    )
-                                                    .applyImportedConfig(
-                                                      _toolbarConfig,
-                                                    );
-                                              },
-                                              onRefresh: () {
-                                                FolderThumbnailPreview.clearSessionCache();
-                                                return _loadDirectoryContents(
-                                                  _currentDirPath,
-                                                  refresh: true,
-                                                );
-                                              },
-                                              isListingTruncated:
-                                                  _isListingTruncated,
-                                              isListingInProgress:
-                                                  _nav.isListingPartial,
-                                              scrollController:
-                                                  _browserScrollController,
-                                                        archiveContext:
-                                                            _archiveContext,
-                                              archiveRootPath:
-                                                  _archiveRootPathForSearch,
-                                              sortBy: sortBy,
-                                              masonryKey: _masonryKey,
-                                              gridKey: _gridKey,
-                                              listKey: _listKey,
-                                            ),
-                                          ),
-                                          ),
+                                                    },
+                                                    isListingTruncated:
+                                                        _isListingTruncated,
+                                                    isListingInProgress:
+                                                        _nav.isListingPartial,
+                                                    scrollController:
+                                                        _browserScrollController,
+                                                    archiveContext:
+                                                        _archiveContext,
+                                                    archiveRootPath:
+                                                        _archiveRootPathForSearch,
+                                                    sortBy: sortBy,
+                                                    masonryKey: _masonryKey,
+                                                    gridKey: _gridKey,
+                                                    listKey: _listKey,
+                                                  ),
+                                                ),
                                               ),
-                                          if (sortedPreviewItems != null)
-                                            Positioned.fill(
-                                              child: IgnorePointer(
-                                                child: Stack(
-                                                  fit: StackFit.expand,
-                                                  children: [
-                                                    ValueListenableBuilder<bool>(
-                                                      valueListenable:
-                                                          _backGestureShowPreview,
-                                                      builder: (
-                                                        context,
-                                                        showPreview,
-                                                        _,
-                                                      ) {
-                                                        if (!showPreview) {
-                                                          return const SizedBox.shrink();
-                                                        }
-                                                        return Stack(
-                                                          fit: StackFit.expand,
-                                                          children: [
-                                                            ColoredBox(
+                                            ),
+                                            if (sortedPreviewItems != null)
+                                              Positioned.fill(
+                                                child: IgnorePointer(
+                                                  child: Stack(
+                                                    fit: StackFit.expand,
+                                                    children: [
+                                                      ValueListenableBuilder<
+                                                        bool
+                                                      >(
+                                                        valueListenable:
+                                                            _backGestureShowPreview,
+                                                        builder:
+                                                            (
+                                                              context,
+                                                              showPreview,
+                                                              _,
+                                                            ) {
+                                                              if (!showPreview) {
+                                                                return const SizedBox.shrink();
+                                                              }
+                                                              return Stack(
+                                                                fit: StackFit
+                                                                    .expand,
+                                                                children: [
+                                                                  ColoredBox(
+                                                                    color: Theme.of(
+                                                                      context,
+                                                                    ).scaffoldBackgroundColor,
+                                                                  ),
+                                                                  buildBrowserBody(
+                                                                    context,
+                                                                    sortedPreviewItems,
+                                                                    isLoading:
+                                                                        false,
+                                                                    currentItems:
+                                                                        sortedPreviewItems,
+                                                                    atRoot:
+                                                                        _backGesturePreviewAtRoot,
+                                                                    onNavigateUp:
+                                                                        null,
+                                                                    searchQuery:
+                                                                        '',
+                                                                    layoutMode:
+                                                                        _backGesturePreviewLayoutMode ??
+                                                                        _layoutMode,
+                                                                    container:
+                                                                        widget
+                                                                            .container,
+                                                                    currentDirPath:
+                                                                        previewDirPath,
+                                                                    thumbnailCacheMode:
+                                                                        _resolvedThumbnailCacheMode,
+                                                                    thumbnailQuality:
+                                                                        _resolvedThumbnailQuality,
+                                                                    toolbarConfig:
+                                                                        _toolbarConfig,
+                                                                    isSelectionMode:
+                                                                        false,
+                                                                    selectedItems:
+                                                                        const {},
+                                                                    searchActive:
+                                                                        false,
+                                                                    bottomClearance:
+                                                                        baseBottomContentClearance,
+                                                                    mountedDocProviderFolders:
+                                                                        _mountedDocProviderFolders,
+                                                                    isFolderMounted:
+                                                                        (
+                                                                          e,
+                                                                        ) => isFolderMounted(
+                                                                          e,
+                                                                          previewDirPath,
+                                                                          _mountedDocProviderFolders,
+                                                                        ),
+                                                                    isPinned: (e) =>
+                                                                        isPinned(
+                                                                          e,
+                                                                          previewDirPath,
+                                                                          _pinnedPaths,
+                                                                        ),
+                                                                    isBookmark:
+                                                                        (
+                                                                          e,
+                                                                        ) => isBookmark(
+                                                                          e,
+                                                                          previewDirPath,
+                                                                          _bookmarkPaths,
+                                                                        ),
+                                                                    isFolderSynced:
+                                                                        _isFolderSynced,
+                                                                    onDirTap:
+                                                                        (_) {},
+                                                                    onFileTap:
+                                                                        (_) {},
+                                                                    onItemLongPress:
+                                                                        (_) {},
+                                                                    onIconTap:
+                                                                        (_) {},
+                                                                    onItemMoreTap:
+                                                                        (_) {},
+                                                                    onGridColumnCountChanged:
+                                                                        (_) {},
+                                                                    onMasonryColumnCountChanged:
+                                                                        (_) {},
+                                                                    onListZoomLevelChanged:
+                                                                        (_) {},
+                                                                    onRefresh:
+                                                                        () async {},
+                                                                    isListingTruncated:
+                                                                        false,
+                                                                    scrollController:
+                                                                        _backGesturePreviewScrollController,
+                                                                    archiveContext:
+                                                                        previewArchiveContext,
+                                                                    archiveRootPath:
+                                                                        previewArchiveRootPath,
+                                                                    sortBy: previewSort
+                                                                        .sortBy,
+                                                                  ),
+                                                                ],
+                                                              );
+                                                            },
+                                                      ),
+                                                      ValueListenableBuilder<
+                                                        double?
+                                                      >(
+                                                        valueListenable:
+                                                            _backGestureProgress,
+                                                        builder: (context, progress, _) {
+                                                          if (progress ==
+                                                              null) {
+                                                            return const SizedBox.shrink();
+                                                          }
+                                                          return Opacity(
+                                                            opacity:
+                                                                _fadeScrimOpacity(
+                                                                  progress,
+                                                                ),
+                                                            child: ColoredBox(
                                                               color: Theme.of(
                                                                 context,
                                                               ).scaffoldBackgroundColor,
                                                             ),
-                                                            buildBrowserBody(
-                                                              context,
-                                                              sortedPreviewItems,
-                                                              isLoading: false,
-                                                              currentItems:
-                                                                  sortedPreviewItems,
-                                                              atRoot:
-                                                                  _backGesturePreviewAtRoot,
-                                                              onNavigateUp: null,
-                                                              searchQuery: '',
-                                                              layoutMode:
-                                                                  _backGesturePreviewLayoutMode ??
-                                                                  _layoutMode,
-                                                              container:
-                                                                  widget.container,
-                                                              currentDirPath:
-                                                                  previewDirPath,
-                                                              thumbnailCacheMode:
-                                                                  _resolvedThumbnailCacheMode,
-                                                              thumbnailQuality:
-                                                                  _resolvedThumbnailQuality,
-                                                              toolbarConfig:
-                                                                  _toolbarConfig,
-                                                              isSelectionMode:
-                                                                  false,
-                                                              selectedItems:
-                                                                  const {},
-                                                              searchActive: false,
-                                                              bottomClearance:
-                                                                  baseBottomContentClearance,
-                                                              mountedDocProviderFolders:
-                                                                  _mountedDocProviderFolders,
-                                                              isFolderMounted: (e) =>
-                                                                  isFolderMounted(
-                                                                    e,
-                                                                    previewDirPath,
-                                                                    _mountedDocProviderFolders,
-                                                                  ),
-                                                              isPinned: (e) =>
-                                                                  isPinned(
-                                                                    e,
-                                                                    previewDirPath,
-                                                                    _pinnedPaths,
-                                                                  ),
-                                                              isBookmark: (e) =>
-                                                                  isBookmark(
-                                                                    e,
-                                                                    previewDirPath,
-                                                                    _bookmarkPaths,
-                                                                  ),
-                                                              isFolderSynced:
-                                                                  _isFolderSynced,
-                                                              onDirTap: (_) {},
-                                                              onFileTap: (_) {},
-                                                              onItemLongPress:
-                                                                  (_) {},
-                                                              onIconTap: (_) {},
-                                                              onItemMoreTap:
-                                                                  (_) {},
-                                                              onGridColumnCountChanged:
-                                                                  (_) {},
-                                                              onMasonryColumnCountChanged:
-                                                                  (_) {},
-                                                              onListZoomLevelChanged:
-                                                                  (_) {},
-                                                              onRefresh:
-                                                                  () async {},
-                                                              isListingTruncated:
-                                                                  false,
-                                                              scrollController:
-                                                                  _backGesturePreviewScrollController,
-                                                              archiveContext:
-                                                                  previewArchiveContext,
-                                                              archiveRootPath:
-                                                                  previewArchiveRootPath,
-                                                              sortBy:
-                                                                  previewSort
-                                                                      .sortBy,
-                                                            ),
-                                                          ],
-                                                        );
-                                                      },
-                                                    ),
-                                                    ValueListenableBuilder<double?>(
-                                                      valueListenable:
-                                                          _backGestureProgress,
-                                                      builder: (
-                                                        context,
-                                                        progress,
-                                                        _,
-                                                      ) {
-                                                        if (progress == null) {
-                                                          return const SizedBox.shrink();
-                                                        }
-                                                        return Opacity(
-                                                          opacity:
-                                                              _fadeScrimOpacity(
-                                                                progress,
-                                                              ),
-                                                          child: ColoredBox(
-                                                            color: Theme.of(
-                                                              context,
-                                                            ).scaffoldBackgroundColor,
-                                                          ),
-                                                        );
-                                                      },
-                                                    ),
-                                                  ],
+                                                          );
+                                                        },
+                                                      ),
+                                                    ],
+                                                  ),
                                                 ),
                                               ),
-                                            ),
-                                        ],
+                                          ],
+                                        ),
                                       ),
-                                    ),
-                                      ],
-                                    ),
+                                    ],
                                   ),
                                 ),
-                              ],
+                              ),
+                            ],
                           ),
                           AnimatedPositioned(
                             duration: AppMotion.short2,

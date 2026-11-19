@@ -1394,6 +1394,16 @@ class FileOperationService extends ChangeNotifier {
     MountedContainer dest,
     ConflictPlan conflictPlan,
   ) async {
+    final runnerT0 = PerfTrace.begin();
+    PerfTrace.count('transfer.backend.vault_api');
+    PerfTrace.count('transfer.items', op.items.length);
+    var firstWritePending = true;
+    void markFirstWrite() {
+      if (!firstWritePending) return;
+      firstWritePending = false;
+      PerfTrace.end('transfer.time_to_first_write', runnerT0, slowMs: 500);
+    }
+
     op._setStatus(FileOperationStatus.running);
 
     void onCopyProgress(CopyProgress p) {
@@ -1409,11 +1419,15 @@ class FileOperationService extends ChangeNotifier {
     _beginBatches(guardedVolIds);
     var nativeBatchStarted = false;
     try {
+      final batchWriteT0 = PerfTrace.begin();
       await _fileIoApi.beginBatchWrite(dest);
+      PerfTrace.end('transfer.begin_batch_write', batchWriteT0, slowMs: 250);
       nativeBatchStarted = true;
       op._setActivity(op.l10n.fileOpResolvingConflicts);
+      final destListT0 = PerfTrace.begin();
       final existingRaw =
           await _fileIoApi.listDirectory(dest, op.destDirPath) ?? [];
+      PerfTrace.end('transfer.runner_dest_list', destListT0, slowMs: 250);
       if (op.cancelRequested) throw const _CancelledException();
 
       // Names are compared the way the destination's policy says (see
@@ -1453,13 +1467,17 @@ class FileOperationService extends ChangeNotifier {
 
       op._setActivity(op.l10n.fileOpCheckingSpace);
       int requiredBytes = 0;
+      final measureSizeT0 = PerfTrace.begin();
       for (final item in op.items) {
         if (!needsRealCopy(item)) continue;
         requiredBytes += await measureItemBytes(src, item);
         if (op.cancelRequested) throw const _CancelledException();
       }
+      PerfTrace.end('transfer.measure_source_size', measureSizeT0, slowMs: 500);
       op._setTotalBytes(requiredBytes);
+      final freeSpaceT0 = PerfTrace.begin();
       final spaceInfo = await _fileIoApi.getSpaceInfo(dest);
+      PerfTrace.end('transfer.free_space_check', freeSpaceT0, slowMs: 250);
       final freeBytes =
           (spaceInfo != null && spaceInfo.length > 1 && spaceInfo[1] >= 0)
           ? spaceInfo[1]
@@ -1499,6 +1517,7 @@ class FileOperationService extends ChangeNotifier {
       final claimedDestLeaves = <String>{};
 
       final linkNamesByDir = <String, Set<String>>{};
+      final resolveDestinationsT0 = PerfTrace.begin();
       for (final item in op.items) {
         // A move inside one container renames the link itself and keeps its
         // name; every other transfer writes the target's content as a new
@@ -1638,11 +1657,47 @@ class FileOperationService extends ChangeNotifier {
           destIsDir: destIsDir,
         ));
       }
+      PerfTrace.end(
+        'transfer.resolve_destinations',
+        resolveDestinationsT0,
+        slowMs: 500,
+      );
 
       for (int i = 0; i < resolved.length; i++) {
         op._setResolvedDestName(i, resolved[i].destPath.split('/').last);
       }
       notifyListeners();
+
+      if (op.cancelRequested) throw const _CancelledException();
+      final sourceCheckT0 = PerfTrace.begin();
+      final sourceCheckIndices = <int>[];
+      final sourceCheckEntries = <({String path, bool isDir})>[];
+      for (var index = 0; index < resolved.length; index++) {
+        if (resolved[index].skip) continue;
+        sourceCheckIndices.add(index);
+        sourceCheckEntries.add((
+          path: resolved[index].item.path,
+          isDir: resolved[index].item.isDir,
+        ));
+      }
+      final sourceCheckErrors = <int, Object>{};
+      final sourceChecks = await _fileIoApi.entryExistsBatch(
+        src,
+        sourceCheckEntries,
+        onError: (checkIndex, error) {
+          sourceCheckErrors[sourceCheckIndices[checkIndex]] = error;
+        },
+      );
+      final sourceExistsByIndex = List<bool>.filled(resolved.length, false);
+      for (
+        var checkIndex = 0;
+        checkIndex < sourceCheckIndices.length;
+        checkIndex++
+      ) {
+        sourceExistsByIndex[sourceCheckIndices[checkIndex]] =
+            sourceChecks[checkIndex];
+      }
+      PerfTrace.end('transfer.source_exists', sourceCheckT0, slowMs: 250);
 
       final semaphore = BoundedSemaphore(_maxConcurrentItems);
       final createdDestPaths = <String>[];
@@ -1665,20 +1720,18 @@ class FileOperationService extends ChangeNotifier {
                 return;
               }
 
-              final srcExists = await _fileIoApi.entryExists(
-                src,
-                r.item.path,
-                isDir: r.item.isDir,
-              );
-              if (!srcExists) {
+              if (!sourceExistsByIndex[idx]) {
                 op._recordItemResult(
                   idx,
                   FileItemResult.failed,
-                  errorMessage: op.l10n.bookmarkTargetMissing,
+                  errorMessage:
+                      sourceCheckErrors[idx]?.toString() ??
+                      op.l10n.bookmarkTargetMissing,
                 );
                 return;
               }
 
+              markFirstWrite();
               if (r.overwrite &&
                   op.isCut &&
                   src.volId == dest.volId &&
@@ -1879,6 +1932,16 @@ class FileOperationService extends ChangeNotifier {
     MountedContainer dest,
     ConflictPlan conflictPlan,
   ) async {
+    final runnerT0 = PerfTrace.begin();
+    PerfTrace.count('transfer.backend.local');
+    PerfTrace.count('transfer.items', op.items.length);
+    var firstWritePending = true;
+    void markFirstWrite() {
+      if (!firstWritePending) return;
+      firstWritePending = false;
+      PerfTrace.end('transfer.time_to_first_write', runnerT0, slowMs: 500);
+    }
+
     op._setStatus(FileOperationStatus.running);
     final guardedVolIds = <int>{
       if (!source.isLocalStorage) source.volId,
@@ -1887,11 +1950,13 @@ class FileOperationService extends ChangeNotifier {
     _beginBatches(guardedVolIds);
     try {
       op._setActivity(op.l10n.fileOpResolvingConflicts);
+      final destListT0 = PerfTrace.begin();
       final destDirAbs = _resolveLocal(dest.uri, op.destDirPath);
       final destDir = Directory(destDirAbs);
       final existingEntities = await destDir.exists()
           ? await destDir.list(followLinks: false).toList()
           : const <FileSystemEntity>[];
+      PerfTrace.end('transfer.local_dest_list', destListT0, slowMs: 250);
       final existingNames = <String>{};
       final existingDirs = <String>{};
       for (final entity in existingEntities) {
@@ -2021,6 +2086,7 @@ class FileOperationService extends ChangeNotifier {
           continue;
         }
 
+        markFirstWrite();
         if (r.overwrite) {
           await _deleteLocalRecursive(r.destPath);
         }

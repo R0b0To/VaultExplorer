@@ -267,6 +267,89 @@ class VaultFileIoApi {
     return await getFileSize(container, path) >= 0;
   }
 
+  /// Checks several entries while listing each vault file's parent directory
+  /// only once. SAF and local-storage entries retain their existing probes.
+  Future<List<bool>> entryExistsBatch(
+    MountedContainer container,
+    List<({String path, bool isDir})> entries, {
+    void Function(int index, Object error)? onError,
+  }) async {
+    if (entries.isEmpty) return const <bool>[];
+
+    if (_isSaf(container) || container.isLocalStorage) {
+      final results = <bool>[];
+      for (var index = 0; index < entries.length; index++) {
+        final entry = entries[index];
+        try {
+          results.add(
+            await entryExists(container, entry.path, isDir: entry.isDir),
+          );
+        } catch (error) {
+          if (onError == null) rethrow;
+          onError(index, error);
+          results.add(false);
+        }
+      }
+      return results;
+    }
+
+    final results = List<bool>.filled(entries.length, false);
+    final filesByParent = <String, List<int>>{};
+    for (var index = 0; index < entries.length; index++) {
+      final entry = entries[index];
+      if (entry.isDir) {
+        results[index] = await canListDirectory(container, entry.path);
+        continue;
+      }
+      final parent = p.posix.dirname(entry.path);
+      final parentDir = (parent == '.' || parent == '/') ? '' : parent;
+      filesByParent.putIfAbsent(parentDir, () => <int>[]).add(index);
+    }
+
+    if (filesByParent.isEmpty) return results;
+    final caseSensitive = namesAreCaseSensitive(container);
+    for (final group in filesByParent.entries) {
+      List<String>? rawList;
+      try {
+        rawList = await listDirectoryForBrowser(container, group.key);
+      } catch (_) {
+        rawList = null;
+      }
+      if (rawList == null) {
+        for (final index in group.value) {
+          try {
+            results[index] =
+                await getFileSize(container, entries[index].path) >= 0;
+          } catch (error) {
+            if (onError == null) rethrow;
+            onError(index, error);
+          }
+        }
+        continue;
+      }
+
+      final names = <String>{};
+      for (final raw in rawList) {
+        if (raw.startsWith('System:')) continue;
+        final RawEntry entry;
+        try {
+          entry = RawEntry.parse(raw);
+        } on FormatException {
+          continue;
+        }
+        if (entry.isDir) continue;
+        names.add(caseSensitive ? entry.name : entry.name.toLowerCase());
+      }
+      for (final index in group.value) {
+        final name = p.posix.basename(entries[index].path);
+        results[index] = names.contains(
+          caseSensitive ? name : name.toLowerCase(),
+        );
+      }
+    }
+    return results;
+  }
+
   Future<int> getMediaFileSize(
     MountedContainer container,
     String fileName,

@@ -202,7 +202,9 @@ class _VeraCryptVolumeToolsScreenState extends ConsumerState<VeraCryptVolumeTool
     var wire = 'unknown';
     try {
       wire = await ref.read(vaultLifecycleApiProvider).probeContainerFormat(uri);
-    } catch (_) {}
+    } catch (e) {
+      logSwallowed('probeContainerFormat', e, expected: true);
+    }
     if (!mounted || _target?.uri != uri) return;
     final f = ContainerFormat.fromWire(wire);
     setState(() => _probing = false);

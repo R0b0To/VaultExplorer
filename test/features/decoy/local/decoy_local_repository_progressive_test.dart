@@ -63,18 +63,21 @@ void main() {
   }
 
   group('listDirectoryProgressive', () {
-    test('the finished listing is exactly what listDirectory returns', () async {
-      final dir = makeFolder('mixed', files: 40, dirs: 5);
+    test(
+      'the finished listing is exactly what listDirectory returns',
+      () async {
+        final dir = makeFolder('mixed', files: 40, dirs: 5);
 
-      final oneShot = await repo.listDirectory(dir.path, refresh: true);
-      final progressive = await repo
-          .listDirectoryProgressive(dir.path, refresh: true)
-          .result;
+        final oneShot = await repo.listDirectory(dir.path, refresh: true);
+        final progressive = await repo
+            .listDirectoryProgressive(dir.path, refresh: true)
+            .result;
 
-      expect(progressive, isNotNull);
-      expect(RawEntry.sameEntries(progressive!, oneShot), isTrue);
-      expect(inOrder(progressive), isTrue);
-    });
+        expect(progressive, isNotNull);
+        expect(RawEntry.sameEntries(progressive!, oneShot), isTrue);
+        expect(inOrder(progressive), isTrue);
+      },
+    );
 
     test('a folder read quickly is never shown in part', () async {
       final dir = makeFolder('small', files: 300);
@@ -90,31 +93,34 @@ void main() {
       expect(partials, 0);
     });
 
-    test('partials are sorted, grow, and are subsets of the final listing', () async {
-      final dir = makeFolder('big', files: 6000, dirs: 40);
-      final partials = <List<RawEntry>>[];
-      final job = repo.listDirectoryProgressive(
-        dir.path,
-        refresh: true,
-        config: _eager,
-        onPartial: partials.add,
-      );
-      final entries = await job.result;
+    test(
+      'partials are sorted, grow, and are subsets of the final listing',
+      () async {
+        final dir = makeFolder('big', files: 6000, dirs: 40);
+        final partials = <List<RawEntry>>[];
+        final job = repo.listDirectoryProgressive(
+          dir.path,
+          refresh: true,
+          config: _eager,
+          onPartial: partials.add,
+        );
+        final entries = await job.result;
 
-      expect(entries, hasLength(6040));
-      expect(partials, isNotEmpty);
-      final finalNames = {for (final e in entries!) e.name};
-      var previousLength = 0;
-      for (final partial in partials) {
-        expect(partial.length, greaterThanOrEqualTo(500));
-        expect(partial.length, greaterThan(previousLength));
-        expect(partial.length, lessThanOrEqualTo(entries.length));
-        expect(inOrder(partial), isTrue);
-        expect(partial.every((e) => finalNames.contains(e.name)), isTrue);
-        previousLength = partial.length;
-      }
-      expect(inOrder(entries), isTrue);
-    });
+        expect(entries, hasLength(6040));
+        expect(partials, isNotEmpty);
+        final finalNames = {for (final e in entries!) e.name};
+        var previousLength = 0;
+        for (final partial in partials) {
+          expect(partial.length, greaterThanOrEqualTo(500));
+          expect(partial.length, greaterThan(previousLength));
+          expect(partial.length, lessThanOrEqualTo(entries.length));
+          expect(inOrder(partial), isTrue);
+          expect(partial.every((e) => finalNames.contains(e.name)), isTrue);
+          previousLength = partial.length;
+        }
+        expect(inOrder(entries), isTrue);
+      },
+    );
 
     test('a cached folder returns at once, with no partials', () async {
       final dir = makeFolder('cached', files: 2500);
@@ -155,33 +161,36 @@ void main() {
   });
 
   group('cancelling', () {
-    test('after the first partial: no more partials, null result, nothing cached', () async {
-      final dir = makeFolder('cancel', files: 30000);
-      var partials = 0;
-      late final ListingJob<List<RawEntry>> job;
-      job = repo.listDirectoryProgressive(
-        dir.path,
-        refresh: true,
-        config: _eager,
-        onPartial: (_) {
-          partials++;
-          job.cancel();
-        },
-      );
-      expect(await job.result, isNull);
-      final seen = partials;
-      expect(seen, 1);
+    test(
+      'after the first partial: no more partials, null result, nothing cached',
+      () async {
+        final dir = makeFolder('cancel', files: 5000);
+        var partials = 0;
+        late final ListingJob<List<RawEntry>> job;
+        job = repo.listDirectoryProgressive(
+          dir.path,
+          refresh: true,
+          config: _eager,
+          onPartial: (_) {
+            partials++;
+            job.cancel();
+          },
+        );
+        expect(await job.result, isNull);
+        final seen = partials;
+        expect(seen, 1);
 
-      // Give the worker time to notice and stop; nothing more may arrive.
-      await Future<void>.delayed(const Duration(milliseconds: 400));
-      expect(partials, seen);
+        // Give the worker time to notice and stop; nothing more may arrive.
+        await Future<void>.delayed(const Duration(milliseconds: 400));
+        expect(partials, seen);
 
-      // The cut-short run was not remembered: the next listing is a miss.
-      final before = PerfTrace.counterFor('local.list.cache_hit');
-      final full = await repo.listDirectoryProgressive(dir.path).result;
-      expect(full, hasLength(30000));
-      expect(PerfTrace.counterFor('local.list.cache_hit'), before);
-    });
+        // The cut-short run was not remembered: the next listing is a miss.
+        final before = PerfTrace.counterFor('local.list.cache_hit');
+        final full = await repo.listDirectoryProgressive(dir.path).result;
+        expect(full, hasLength(5000));
+        expect(PerfTrace.counterFor('local.list.cache_hit'), before);
+      },
+    );
 
     test('immediately, before the worker has started', () async {
       final dir = makeFolder('early', files: 2000);

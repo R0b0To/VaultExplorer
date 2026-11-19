@@ -90,7 +90,9 @@ class _GalleryScopeSheetState extends State<_GalleryScopeSheet> {
       ),
     );
     if (picked == null || picked.isEmpty || !mounted) return;
-    setState(() => _folders = List.of(normalizeScanRoots([..._folders, ...picked])));
+    setState(
+      () => _folders = List.of(normalizeScanRoots([..._folders, ...picked])),
+    );
   }
 
   @override
@@ -101,7 +103,9 @@ class _GalleryScopeSheetState extends State<_GalleryScopeSheet> {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(context).bottom,
+        ),
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.lg,
@@ -120,21 +124,25 @@ class _GalleryScopeSheetState extends State<_GalleryScopeSheet> {
                 style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
               ),
               const SizedBox(height: AppSpacing.md),
-              SizedBox(
-                width: double.infinity,
-                child: SegmentedButton<bool>(
-                  segments: [
-                    ButtonSegment<bool>(
+              RadioGroup<bool>(
+                groupValue: _choosing,
+                onChanged: (value) {
+                  if (value != null) setState(() => _choosing = value);
+                },
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    RadioListTile<bool>(
                       value: false,
-                      label: Text(l10n.musicScopeAll),
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(l10n.musicScopeAll),
                     ),
-                    ButtonSegment<bool>(
+                    RadioListTile<bool>(
                       value: true,
-                      label: Text(l10n.musicScopeChoose),
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(l10n.musicScopeChoose),
                     ),
                   ],
-                  selected: {_choosing},
-                  onSelectionChanged: (s) => setState(() => _choosing = s.first),
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),
@@ -146,24 +154,34 @@ class _GalleryScopeSheetState extends State<_GalleryScopeSheet> {
               else ...[
                 if (_folders.isEmpty)
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.sm,
+                    ),
                     child: Text(
                       l10n.musicScopeNoFolders,
-                      style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                      style: text.bodyMedium?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
                     ),
                   ),
                 for (final f in _folders)
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.folder_outlined),
-                    title: Text(f, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    title: Text(
+                      f,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     trailing: IconButton(
                       tooltip: l10n.musicScopeRemoveFolder,
                       icon: const Icon(Icons.close_rounded),
-                      onPressed: () => setState(() => _folders = [
-                            for (final x in _folders)
-                              if (x != f) x,
-                          ]),
+                      onPressed: () => setState(
+                        () => _folders = [
+                          for (final x in _folders)
+                            if (x != f) x,
+                        ],
+                      ),
                     ),
                   ),
                 Align(
@@ -194,10 +212,7 @@ class _GalleryScopeSheetState extends State<_GalleryScopeSheet> {
                       ),
                       const SizedBox(width: AppSpacing.sm),
                       Expanded(
-                        child: Text(
-                          l10n.dontAskAgain,
-                          style: text.bodyMedium,
-                        ),
+                        child: Text(l10n.dontAskAgain, style: text.bodyMedium),
                       ),
                     ],
                   ),
@@ -215,13 +230,13 @@ class _GalleryScopeSheetState extends State<_GalleryScopeSheet> {
                   FilledButton(
                     onPressed: _canConfirm
                         ? () => Navigator.of(context).pop(
-                              ScopeSheetResult(
-                                folders: _choosing
-                                    ? normalizeScanRoots(_folders)
-                                    : <String>[],
-                                dontAskAgain: _dontAskAgain,
-                              ),
-                            )
+                            ScopeSheetResult(
+                              folders: _choosing
+                                  ? normalizeScanRoots(_folders)
+                                  : <String>[],
+                              dontAskAgain: _dontAskAgain,
+                            ),
+                          )
                         : null,
                     child: Text(
                       widget.turningOn ? l10n.musicScopeStart : l10n.save,
@@ -366,144 +381,146 @@ class _GalleryFolderPickerState extends State<_GalleryFolderPicker> {
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : _dirs.isEmpty
-                ? Center(
-                    child: Text(
-                      _failed
-                          ? l10n.libraryIncompleteNote
-                          : l10n.musicScopePickerEmpty,
-                      textAlign: TextAlign.center,
-                    ),
-                  )
-                : ListView.builder(
-                    itemCount: _dirs.length,
-                    itemBuilder: (context, i) {
-                      final dir = _dirs[i];
-                      final isSelected = _selected.contains(dir);
-                      final cs = Theme.of(context).colorScheme;
-                      final skin = FileManagerSkinScope.of(context);
-                      final folderIcon = skin.folderIcon;
-                      final iconColor = skin.folderIconColor(cs);
-                      final iconBackground =
-                          cs.secondaryContainer.withValues(alpha: 0.4);
+            ? Center(
+                child: Text(
+                  _failed
+                      ? l10n.libraryIncompleteNote
+                      : l10n.musicScopePickerEmpty,
+                  textAlign: TextAlign.center,
+                ),
+              )
+            : ListView.builder(
+                itemCount: _dirs.length,
+                itemBuilder: (context, i) {
+                  final dir = _dirs[i];
+                  final isSelected = _selected.contains(dir);
+                  final cs = Theme.of(context).colorScheme;
+                  final skin = FileManagerSkinScope.of(context);
+                  final folderIcon = skin.folderIcon;
+                  final iconColor = skin.folderIconColor(cs);
+                  final iconBackground = cs.secondaryContainer.withValues(
+                    alpha: 0.4,
+                  );
 
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.sm,
-                          vertical: 1,
-                        ),
-                        child: ListTile(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppRadius.md),
-                          ),
-                          selected: isSelected,
-                          selectedTileColor:
-                              TileSelectionStyle.selectedBackground(cs),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.md,
-                            vertical: 2,
-                          ),
-                          leading: GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTap: () {
-                              setState(() {
-                                if (isSelected) {
-                                  _selected.remove(dir);
-                                } else {
-                                  _selected.add(dir);
-                                }
-                              });
-                            },
-                            child: Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? cs.primaryContainer
-                                    : iconBackground,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Icon(
-                                folderIcon,
-                                size: 22,
-                                color: isSelected ? cs.primary : iconColor,
-                              ),
-                            ),
-                          ),
-                          title: Text(
-                            dir,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontWeight: TileSelectionStyle.titleWeight,
-                            ),
-                          ),
-                          trailing: SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: Center(
-                              child: inSelectionMode
-                                  ? TileSelectionIndicator(selected: isSelected)
-                                  : Icon(
-                                      Icons.chevron_right_rounded,
-                                      color: cs.onSurfaceVariant,
-                                      size: 20,
-                                    ),
-                            ),
-                          ),
-                          onTap: () {
-                            if (inSelectionMode) {
-                              setState(() {
-                                if (isSelected) {
-                                  _selected.remove(dir);
-                                } else {
-                                  _selected.add(dir);
-                                }
-                              });
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.sm,
+                      vertical: 1,
+                    ),
+                    child: ListTile(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
+                      selected: isSelected,
+                      selectedTileColor: TileSelectionStyle.selectedBackground(
+                        cs,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md,
+                        vertical: 2,
+                      ),
+                      leading: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () {
+                          setState(() {
+                            if (isSelected) {
+                              _selected.remove(dir);
                             } else {
-                              _load(_join(dir));
+                              _selected.add(dir);
                             }
-                          },
-                          onLongPress: () {
-                            setState(() {
-                              if (isSelected) {
-                                _selected.remove(dir);
-                              } else {
-                                _selected.add(dir);
-                              }
-                            });
-                          },
+                          });
+                        },
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? cs.primaryContainer
+                                : iconBackground,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            folderIcon,
+                            size: 22,
+                            color: isSelected ? cs.primary : iconColor,
+                          ),
                         ),
-                      );
-                    },
-                  ),
+                      ),
+                      title: Text(
+                        dir,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: TileSelectionStyle.titleWeight,
+                        ),
+                      ),
+                      trailing: SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: Center(
+                          child: inSelectionMode
+                              ? TileSelectionIndicator(selected: isSelected)
+                              : Icon(
+                                  Icons.chevron_right_rounded,
+                                  color: cs.onSurfaceVariant,
+                                  size: 20,
+                                ),
+                        ),
+                      ),
+                      onTap: () {
+                        if (inSelectionMode) {
+                          setState(() {
+                            if (isSelected) {
+                              _selected.remove(dir);
+                            } else {
+                              _selected.add(dir);
+                            }
+                          });
+                        } else {
+                          _load(_join(dir));
+                        }
+                      },
+                      onLongPress: () {
+                        setState(() {
+                          if (isSelected) {
+                            _selected.remove(dir);
+                          } else {
+                            _selected.add(dir);
+                          }
+                        });
+                      },
+                    ),
+                  );
+                },
+              ),
         bottomNavigationBar: inSelectionMode
             ? SafeArea(
                 top: false,
                 child: Padding(
                   padding: const EdgeInsets.all(AppSpacing.md),
                   child: FilledButton.icon(
-                    onPressed: () => Navigator.of(context).pop<List<String>>(
-                      _selected.map(_join).toList(),
-                    ),
+                    onPressed: () => Navigator.of(
+                      context,
+                    ).pop<List<String>>(_selected.map(_join).toList()),
                     icon: const Icon(Icons.add_rounded),
                     label: Text('${l10n.add} (${_selected.length})'),
                   ),
                 ),
               )
             : _path.isEmpty
-                ? null
-                : SafeArea(
-                    top: false,
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      child: FilledButton.icon(
-                        onPressed: () =>
-                            Navigator.of(context).pop<List<String>>([_path]),
-                        icon: const Icon(Icons.add_rounded),
-                        label: Text(l10n.musicScopePickerAdd),
-                      ),
-                    ),
+            ? null
+            : SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  child: FilledButton.icon(
+                    onPressed: () =>
+                        Navigator.of(context).pop<List<String>>([_path]),
+                    icon: const Icon(Icons.add_rounded),
+                    label: Text(l10n.musicScopePickerAdd),
                   ),
+                ),
+              ),
       ),
     );
   }

@@ -1,0 +1,6 @@
+• Local-storage gallery scans now reuse saved metadata indexes.
+• HEIC images show detailed info and portrait HEIC photos fit correctly in the viewer.
+• Added Motion Photo playback with a saved autoplay preference.
+• Added interactive 360° photo viewing; navigation swipes pause in 360 mode.
+• Motion Photo edits save a still copy; the original, EXIF, and embedded video stay unchanged.
+• Added gallery scroll section markers and clearer folder-scope choices.

@@ -79,6 +79,7 @@ AppSettings _customSettings() => AppSettings(
   deleteAfterImportMode: DeleteAfterImportMode.delete,
   audioRecordingQuality: AudioRecordingQuality.high,
   videoMuted: true,
+  motionPhotoAutoplay: true,
   videoPlaybackMode: VideoPlaybackMode.loop,
   categoryIndexInVaults: false,
   autoLockOnShareImport: false,
@@ -285,8 +286,10 @@ void main() {
       final configurationKeys = _customSettings().configurationToJson().keys;
       final interfaceKeys = _customSettings().interfaceToJson().keys;
 
-      expect(configurationKeys.toSet().intersection(interfaceKeys.toSet()),
-          isEmpty);
+      expect(
+        configurationKeys.toSet().intersection(interfaceKeys.toSet()),
+        isEmpty,
+      );
       // Spot-check the ones people most expect to travel with their skin.
       for (final key in [
         'themeMode',
@@ -330,10 +333,7 @@ void main() {
 
       final merged = base.withInterfaceFrom(_customViewer());
 
-      expect(
-        merged.interfaceToJson(),
-        _customViewer().interfaceToJson(),
-      );
+      expect(merged.interfaceToJson(), _customViewer().interfaceToJson());
       expect(merged.behaviorToJson(), base.behaviorToJson());
     });
 
@@ -344,10 +344,7 @@ void main() {
 
       final merged = base.withBehaviorFrom(_customViewer());
 
-      expect(
-        merged.behaviorToJson(),
-        _customViewer().behaviorToJson(),
-      );
+      expect(merged.behaviorToJson(), _customViewer().behaviorToJson());
       expect(merged.interfaceToJson(), base.interfaceToJson());
     });
   });
@@ -386,7 +383,10 @@ void main() {
     test('neither export contains per-folder layout memory', () {
       final custom = _customToolbar();
 
-      for (final export in [custom.interfaceToJson(), custom.behaviorToJson()]) {
+      for (final export in [
+        custom.interfaceToJson(),
+        custom.behaviorToJson(),
+      ]) {
         for (final key in FileManagerToolbarConfig.perFolderKeys) {
           expect(export.containsKey(key), isFalse, reason: key);
         }
@@ -434,9 +434,7 @@ void main() {
               gridSpacing: 2,
               folderSortModes: {'d:/x': 'date'},
               mediaViewerToolbarConfig: const MediaViewerToolbarConfig()
-                  .copyWith(
-                showProgressBar: false,
-              ),
+                  .copyWith(showProgressBar: false),
             )
             .toJson(),
       );

@@ -396,12 +396,31 @@ class VaultPickerHandlers(
             }
 
             val takeFlags = (data.flags and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION))
+            val persistableFlagOffered =
+                (data.flags and Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION) != 0
+            var takeError: String? = null
             try {
                 activity.contentResolver.takePersistableUriPermission(uri, takeFlags)
             } catch (e: Exception) {
+                takeError = e.javaClass.simpleName
                 try {
                     activity.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                } catch (_: Exception) {}
+                    takeError = null
+                } catch (fallbackError: Exception) {
+                    takeError = fallbackError.javaClass.simpleName
+                }
+            }
+            val persistedPermissions = activity.contentResolver.persistedUriPermissions
+            val exactPersistedGrant = persistedPermissions
+                .firstOrNull { it.uri == uri || it.uri.toString() == uri.toString() }
+            VeLog.w("VaultPickerHandlers") {
+                "pickExtractFolder grant: authority=${uri.authority}, persistableFlagOffered=$persistableFlagOffered, " +
+                    "offeredRead=${(takeFlags and Intent.FLAG_GRANT_READ_URI_PERMISSION) != 0}, " +
+                    "offeredWrite=${(takeFlags and Intent.FLAG_GRANT_WRITE_URI_PERMISSION) != 0}, " +
+                    "exactPersistedRead=${exactPersistedGrant?.isReadPermission == true}, " +
+                    "exactPersistedWrite=${exactPersistedGrant?.isWritePermission == true}, " +
+                    "sameAuthorityGrantCount=${persistedPermissions.count { it.uri.authority == uri.authority }}, " +
+                    "takeError=${takeError ?: "none"}"
             }
             ioExecutor.execute {
                 var path = UriToPath.getRawPath(activity, uri)
@@ -436,7 +455,10 @@ class VaultPickerHandlers(
                     name = if (uri.authority == "com.google.android.apps.docs.storage") "Google Drive" else "Cloud Storage"
                 }
 
-                VeLog.i("VaultPickerHandlers") { "pickExtractFolder: uri=$uri, resolvedPath=$path, displayName=$name" }
+                VeLog.i("VaultPickerHandlers") {
+                    "pickExtractFolder resolved: authority=${uri.authority}, " +
+                        "pathResolved=${!path.isNullOrEmpty()}, displayNamePresent=${!name.isNullOrEmpty()}"
+                }
 
                 activity.runOnUiThread {
                     res.success(mapOf("path" to path, "displayName" to name, "treeUri" to uri.toString()))

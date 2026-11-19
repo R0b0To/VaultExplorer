@@ -14774,4 +14774,7 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get motionPhotoCopyNote =>
       'A cópia editada será uma imagem estática. O arquivo original, os dados EXIF e qualquer vídeo incorporado permanecerão intactos.';
+
+  @override
+  String get pimInputHint => 'Vazio ou 0 para o padrão';
 }

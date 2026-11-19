@@ -41,7 +41,7 @@ class _PimInputFieldState extends State<PimInputField> {
           filled: true,
           fillColor: cs.surfaceContainerHighest,
           labelText: context.l10n.pimOptionalLabel,
-          hintText: '0',
+          hintText: context.l10n.pimInputHint,
           prefixIcon: Icon(
             Icons.pin_outlined,
             size: AppIconSize.standard,

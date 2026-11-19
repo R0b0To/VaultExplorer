@@ -13961,4 +13961,7 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get motionPhotoCopyNote =>
       '편집된 사본은 정지 이미지로 저장됩니다. 원본 파일, EXIF 정보 및 내장 동영상은 변경되지 않습니다.';
+
+  @override
+  String get pimInputHint => '비우거나 0을 입력하면 기본값';
 }

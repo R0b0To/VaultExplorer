@@ -13961,4 +13961,7 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get motionPhotoCopyNote =>
       '編集したコピーは静止画になります。元のファイル、EXIF情報、埋め込み動画は変更されません。';
+
+  @override
+  String get pimInputHint => '空欄または0で既定値';
 }

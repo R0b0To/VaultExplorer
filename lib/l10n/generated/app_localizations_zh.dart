@@ -13744,4 +13744,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get motionPhotoCopyNote => '编辑后的副本将是静态图片。原始文件、EXIF 信息和任何嵌入的视频都将保持不变。';
+
+  @override
+  String get pimInputHint => '留空或输入 0 使用默认值';
 }

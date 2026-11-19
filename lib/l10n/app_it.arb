@@ -4083,5 +4083,6 @@
   "autoHideToolbarDesc": "Nasconde la barra degli strumenti inferiore scorrendo verso il basso per massimizzare lo spazio di visualizzazione",
   "autoHideBreadcrumbBarLabel": "Nascondi automaticamente la barra del percorso allo scorrimento",
   "autoHideBreadcrumbBarDesc": "Nasconde la barra di navigazione del percorso scorrendo verso il basso per massimizzare lo spazio di visualizzazione",
-  "motionPhotoCopyNote": "La copia modificata sarà un’immagine statica. Il file originale, i dati EXIF e qualsiasi video incorporato resteranno invariati."
+  "motionPhotoCopyNote": "La copia modificata sarà un’immagine statica. Il file originale, i dati EXIF e qualsiasi video incorporato resteranno invariati.",
+  "pimInputHint": "Vuoto o 0 per il valore predefinito"
 }

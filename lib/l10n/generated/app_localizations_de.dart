@@ -14772,4 +14772,7 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get motionPhotoCopyNote =>
       'Die bearbeitete Kopie ist ein Standbild. Die Originaldatei, ihre EXIF-Daten und eingebettete Videos bleiben unverändert.';
+
+  @override
+  String get pimInputHint => 'Leer lassen oder 0 für Standard';
 }

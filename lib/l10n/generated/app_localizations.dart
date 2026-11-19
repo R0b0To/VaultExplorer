@@ -24628,6 +24628,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The edited copy will be a still image. The original file, its EXIF metadata, and any embedded video remain unchanged.'**
   String get motionPhotoCopyNote;
+
+  /// Hint shown in the PIM input before the user types a value; leaving it empty or entering 0 uses the default PIM.
+  ///
+  /// In en, this message translates to:
+  /// **'Empty or 0 for defaults'**
+  String get pimInputHint;
 }
 
 class _AppLocalizationsDelegate

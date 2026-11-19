@@ -14872,4 +14872,7 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get motionPhotoCopyNote =>
       'Відредагована копія буде нерухомим зображенням. Оригінальний файл, дані EXIF і будь-яке вбудоване відео залишаться незмінними.';
+
+  @override
+  String get pimInputHint => 'Порожньо або 0 за замовчуванням';
 }

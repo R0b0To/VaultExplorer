@@ -161,7 +161,10 @@ class ExternalStorageLocationsNotifier extends Notifier<List<ExternalStorageLoca
   /// For raw filesystem paths, verifies that the directory exists on disk.
   Future<bool> isAccessible(ExternalStorageLocation loc) async {
     final uri = loc.resolvedUri;
-    if (uri.isEmpty) return false;
+    if (uri.isEmpty) {
+      VeLog.w('ExternalStorage', 'isAccessible failed: resolved URI is empty');
+      return false;
+    }
     if (uri.startsWith('content://')) {
       final channel = ref.read(vaultEngineChannelProvider);
       try {
@@ -169,16 +172,29 @@ class ExternalStorageLocationsNotifier extends Notifier<List<ExternalStorageLoca
           ChannelMethods.safCheckTreeAccess,
           {'treeUri': uri},
         );
-        return accessible ?? false;
+        final result = accessible ?? false;
+        VeLog.d(
+          'ExternalStorage',
+          'SAF access probe ${VeLog.censorUri(uri)} returned $result',
+        );
+        return result;
       } catch (e) {
-        VeLog.w('ExternalStorage', 'isAccessible check failed for ${loc.displayName}', e);
+        VeLog.w(
+          'ExternalStorage',
+          'SAF access probe failed for ${VeLog.censorUri(uri)} (${e.runtimeType})',
+        );
         return false;
       }
     } else {
       try {
-        return Directory(uri).existsSync();
+        final exists = Directory(uri).existsSync();
+        VeLog.d('ExternalStorage', 'Raw path access probe returned $exists');
+        return exists;
       } catch (e) {
-        VeLog.w('ExternalStorage', 'Directory exists check failed for ${loc.displayName}', e);
+        VeLog.w(
+          'ExternalStorage',
+          'Raw path access probe failed (${e.runtimeType})',
+        );
         return false;
       }
     }

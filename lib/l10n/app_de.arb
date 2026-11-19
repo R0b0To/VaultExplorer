@@ -4083,5 +4083,6 @@
   "autoHideToolbarDesc": "Untere Symbolleiste beim Herunterscrollen ausblenden, um den Anzeigebereich zu maximieren",
   "autoHideBreadcrumbBarLabel": "Breadcrumb-Leiste beim Scrollen automatisch ausblenden",
   "autoHideBreadcrumbBarDesc": "Pfadnavigationsleiste beim Herunterscrollen ausblenden, um den Anzeigebereich zu maximieren",
-  "motionPhotoCopyNote": "Die bearbeitete Kopie ist ein Standbild. Die Originaldatei, ihre EXIF-Daten und eingebettete Videos bleiben unverändert."
+  "motionPhotoCopyNote": "Die bearbeitete Kopie ist ein Standbild. Die Originaldatei, ihre EXIF-Daten und eingebettete Videos bleiben unverändert.",
+  "pimInputHint": "Leer lassen oder 0 für Standard"
 }

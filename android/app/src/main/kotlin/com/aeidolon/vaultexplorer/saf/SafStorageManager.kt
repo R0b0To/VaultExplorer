@@ -123,7 +123,10 @@ class SafStorageManager(private val context: Context) {
                     DocumentsContract.getDocumentId(treeUri)
                 }
             } catch (e: Exception) {
-                VeLog.w(TAG) { "Failed to get tree document ID for $treeUri: ${e.message}" }
+                VeLog.w(TAG) {
+                    "Failed to get document ID: authority=${treeUri.authority}, " +
+                        "exception=${e.javaClass.simpleName}"
+                }
                 null
             }
         }
@@ -250,28 +253,93 @@ class SafStorageManager(private val context: Context) {
      * which silently return null/empty for an inaccessible tree).
      */
     fun isTreeAccessible(treeUri: Uri): Boolean {
+        var stage = "read_persisted_grants"
         return try {
             val decodedTarget = runCatching { Uri.decode(treeUri.toString()) }.getOrNull() ?: treeUri.toString()
-            val hasGrant = context.contentResolver.persistedUriPermissions.any { perm ->
-                if (!perm.isReadPermission) return@any false
-                if (perm.uri == treeUri || perm.uri.toString() == treeUri.toString()) return@any true
+            val persistedPermissions = context.contentResolver.persistedUriPermissions
+            val matchingReadGrants = persistedPermissions.filter { perm ->
+                if (!perm.isReadPermission) return@filter false
+                if (perm.uri == treeUri || perm.uri.toString() == treeUri.toString()) return@filter true
                 val decodedPerm = runCatching { Uri.decode(perm.uri.toString()) }.getOrNull() ?: perm.uri.toString()
                 decodedPerm == decodedTarget || (
                     perm.uri.authority == treeUri.authority &&
                     decodedTarget.startsWith(decodedPerm)
                 )
             }
-            if (!hasGrant) return false
+            val exactReadGrant = persistedPermissions.any { perm ->
+                perm.isReadPermission && (perm.uri == treeUri || perm.uri.toString() == treeUri.toString())
+            }
+            val authorityReadGrantCount = persistedPermissions.count {
+                it.isReadPermission && it.uri.authority == treeUri.authority
+            }
+            val hasGrant = matchingReadGrants.isNotEmpty()
+            VeLog.w(TAG) {
+                "Tree access probe: authority=${treeUri.authority}, hasReadGrant=$hasGrant, " +
+                    "exactReadGrant=$exactReadGrant, authorityReadGrantCount=$authorityReadGrantCount"
+            }
+            if (!hasGrant) {
+                VeLog.w(TAG) {
+                    "Tree access probe unavailable: authority=${treeUri.authority}, " +
+                        "reason=no_matching_persisted_read_grant"
+                }
+                return false
+            }
 
             if (DocumentsContract.isTreeUri(treeUri)) {
-                val rootDocId = resolveDocumentId(treeUri, "") ?: return false
+                stage = "resolve_tree_root_document_id"
+                val rootDocId = resolveDocumentId(treeUri, "")
+                if (rootDocId == null) {
+                    VeLog.w(TAG) {
+                        "Tree access probe unavailable: authority=${treeUri.authority}, " +
+                            "reason=root_document_id_unresolved"
+                    }
+                    return false
+                }
                 val docUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, rootDocId)
-                documentExists(docUri)
+                stage = "query_tree_root_document"
+                documentExistsForAccessProbe(docUri, treeUri.authority.orEmpty())
             } else {
-                documentExists(treeUri)
+                stage = "query_document"
+                documentExistsForAccessProbe(treeUri, treeUri.authority.orEmpty())
             }
         } catch (e: Exception) {
-            VeLog.w(TAG) { "isTreeAccessible check failed for $treeUri: ${e.message}" }
+            VeLog.w(TAG) {
+                "Tree access probe threw: authority=${treeUri.authority}, stage=$stage, " +
+                    "exception=${e.javaClass.simpleName}"
+            }
+            false
+        }
+    }
+
+    /** Same root-document probe as [documentExists], with diagnostic outcomes for saved locations. */
+    private fun documentExistsForAccessProbe(uri: Uri, authority: String): Boolean {
+        return try {
+            val cursor = context.contentResolver.query(
+                uri,
+                arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID),
+                null,
+                null,
+                null,
+            )
+            if (cursor == null) {
+                VeLog.w(TAG) {
+                    "Tree access probe root query returned null cursor: authority=$authority"
+                }
+                false
+            } else {
+                cursor.use {
+                    val hasRow = it.moveToFirst()
+                    VeLog.w(TAG) {
+                        "Tree access probe root query: authority=$authority, returnedRow=$hasRow"
+                    }
+                    hasRow
+                }
+            }
+        } catch (e: Exception) {
+            VeLog.w(TAG) {
+                "Tree access probe root query threw: authority=$authority, " +
+                    "exception=${e.javaClass.simpleName}"
+            }
             false
         }
     }

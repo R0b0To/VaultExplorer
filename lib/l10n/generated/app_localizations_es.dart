@@ -14816,4 +14816,7 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get motionPhotoCopyNote =>
       'La copia editada será una imagen fija. El archivo original, sus datos EXIF y cualquier vídeo integrado permanecerán intactos.';
+
+  @override
+  String get pimInputHint => 'Vacío o 0 para el valor predeterminado';
 }

@@ -4083,5 +4083,6 @@
   "autoHideToolbarDesc": "Oculta la barra de herramientas inferior al desplazarse hacia abajo para maximizar el espacio de visualización",
   "autoHideBreadcrumbBarLabel": "Ocultar automáticamente la barra de ruta al desplazarse",
   "autoHideBreadcrumbBarDesc": "Oculta la barra de navegación de ruta al desplazarse hacia abajo para maximizar el espacio de visualización",
-  "motionPhotoCopyNote": "La copia editada será una imagen fija. El archivo original, sus datos EXIF y cualquier vídeo integrado permanecerán intactos."
+  "motionPhotoCopyNote": "La copia editada será una imagen fija. El archivo original, sus datos EXIF y cualquier vídeo integrado permanecerán intactos.",
+  "pimInputHint": "Vacío o 0 para el valor predeterminado"
 }

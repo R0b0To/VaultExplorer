@@ -4083,5 +4083,6 @@
   "autoHideToolbarDesc": "Masquer la barre d'outils inférieure lors du défilement vers le bas pour maximiser l'espace d'affichage",
   "autoHideBreadcrumbBarLabel": "Masquer automatiquement le fil d'Ariane au défilement",
   "autoHideBreadcrumbBarDesc": "Masquer la barre de navigation du chemin lors du défilement vers le bas pour maximiser l'espace d'affichage",
-  "motionPhotoCopyNote": "La copie modifiée sera une image fixe. Le fichier d’origine, ses données EXIF et toute vidéo intégrée resteront intacts."
+  "motionPhotoCopyNote": "La copie modifiée sera une image fixe. Le fichier d’origine, ses données EXIF et toute vidéo intégrée resteront intacts.",
+  "pimInputHint": "Vide ou 0 pour la valeur par défaut"
 }

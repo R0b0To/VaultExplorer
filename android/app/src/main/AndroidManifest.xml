@@ -386,5 +386,8 @@
         </intent>
         <package android:name="info.guardianproject.ripple" />
         <package android:name="dev.msfjarvis.wasted" />
+        <intent>
+            <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
+        </intent>
     </queries>
 </manifest>

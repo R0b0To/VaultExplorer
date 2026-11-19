@@ -93,8 +93,8 @@ class _LogcatScreenState extends ConsumerState<LogcatScreen> {
         localPosition.dy > renderBox.size.height - 8) {
       return null;
     }
-    final index =
-        ((localPosition.dy - 8 + _scrollCtrl.offset) / _logRowExtent).floor();
+    final index = ((localPosition.dy - 8 + _scrollCtrl.offset) / _logRowExtent)
+        .floor();
     if (index < 0 || index >= _visibleLineCount) return null;
     return index;
   }
@@ -263,19 +263,17 @@ class _LogcatScreenState extends ConsumerState<LogcatScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1A1A1A),
-        foregroundColor: Colors.white,
+        backgroundColor: cs.surfaceContainerHigh,
+        foregroundColor: cs.onSurface,
         title: _isSearching
             ? TextField(
                 controller: _searchCtrl,
                 autofocus: true,
-                style: const TextStyle(color: Colors.white, fontSize: 14),
+                style: TextStyle(color: cs.onSurface, fontSize: 14),
                 cursorColor: cs.primary,
                 decoration: InputDecoration(
                   hintText: context.l10n.logcatSearchHint,
-                  hintStyle: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.5),
-                  ),
+                  hintStyle: TextStyle(color: cs.onSurfaceVariant),
                   border: InputBorder.none,
                 ),
                 onChanged: (val) {
@@ -290,9 +288,9 @@ class _LogcatScreenState extends ConsumerState<LogcatScreen> {
               )
             : Text(
                 context.l10n.logcatTitle,
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  color: cs.onSurface,
                 ),
               ),
         actions: [
@@ -300,7 +298,9 @@ class _LogcatScreenState extends ConsumerState<LogcatScreen> {
             icon: Icon(
               _isSearching ? Icons.close_rounded : Icons.search_rounded,
             ),
-            tooltip: _isSearching ? context.l10n.closeSearchTooltip : context.l10n.search,
+            tooltip: _isSearching
+                ? context.l10n.closeSearchTooltip
+                : context.l10n.search,
             onPressed: () {
               setState(() {
                 if (_isSearching) {
@@ -407,8 +407,8 @@ class _LogcatScreenState extends ConsumerState<LogcatScreen> {
             ),
       floatingActionButton: _userScrolledUp
           ? FloatingActionButton.small(
-              backgroundColor: const Color(0xFF2C2C2C),
-              foregroundColor: Colors.white,
+              backgroundColor: cs.surfaceContainerHighest,
+              foregroundColor: cs.onSurface,
               tooltip: context.l10n.logcatScrollToBottomTooltip,
               onPressed: () => _scrollToBottom(),
               child: const Icon(Icons.arrow_downward_rounded),
@@ -427,7 +427,7 @@ class _LogcatScreenState extends ConsumerState<LogcatScreen> {
     }
 
     return Container(
-      color: const Color(0xFF141414),
+      color: cs.surfaceContainerLow,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: Row(
         children: [
@@ -435,13 +435,13 @@ class _LogcatScreenState extends ConsumerState<LogcatScreen> {
             label: Text(context.l10n.logcatFilterAppOnly),
             selected: logState.filterMode == LogFilterMode.appOnly,
             selectedColor: cs.primary.withValues(alpha: 0.25),
-            backgroundColor: const Color(0xFF222222),
+            backgroundColor: cs.surfaceContainerHigh,
             labelStyle: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
               color: logState.filterMode == LogFilterMode.appOnly
                   ? cs.primary
-                  : Colors.white70,
+                  : cs.onSurfaceVariant,
             ),
             side: BorderSide(
               color: logState.filterMode == LogFilterMode.appOnly
@@ -457,13 +457,13 @@ class _LogcatScreenState extends ConsumerState<LogcatScreen> {
             label: Text(context.l10n.logcatFilterAll),
             selected: logState.filterMode == LogFilterMode.all,
             selectedColor: cs.primary.withValues(alpha: 0.25),
-            backgroundColor: const Color(0xFF222222),
+            backgroundColor: cs.surfaceContainerHigh,
             labelStyle: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
               color: logState.filterMode == LogFilterMode.all
                   ? cs.primary
-                  : Colors.white70,
+                  : cs.onSurfaceVariant,
             ),
             side: BorderSide(
               color: logState.filterMode == LogFilterMode.all
@@ -479,7 +479,7 @@ class _LogcatScreenState extends ConsumerState<LogcatScreen> {
             context.l10n.logcatLinesCount(count),
             style: TextStyle(
               fontSize: 11,
-              color: Colors.white.withValues(alpha: 0.4),
+              color: cs.onSurfaceVariant.withValues(alpha: 0.7),
             ),
           ),
         ],
@@ -493,8 +493,7 @@ class _LogcatScreenState extends ConsumerState<LogcatScreen> {
       0,
       (longest, line) => line.length > longest ? line.length : longest,
     );
-    final contentWidth =
-        longestLineLength * _fontSize + horizontalPadding + 40;
+    final contentWidth = longestLineLength * _fontSize + horizontalPadding + 40;
     _logRowExtent = (_fontSize * 1.55 + 8).clamp(32.0, 64.0).roundToDouble();
     _visibleLineCount = lines.length;
 
@@ -536,10 +535,10 @@ class _LogcatScreenState extends ConsumerState<LogcatScreen> {
                     return Container(
                       height: _logRowExtent,
                       color: isSelected
-                          ? Theme.of(context).colorScheme.primary.withValues(
-                              alpha: 0.16,
-                            )
-                      : null,
+                          ? Theme.of(
+                              context,
+                            ).colorScheme.primary.withValues(alpha: 0.16)
+                          : null,
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [

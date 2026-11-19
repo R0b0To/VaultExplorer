@@ -1138,6 +1138,9 @@ open class MainActivity : FlutterFragmentActivity() {
             when (call.method) {
                 ChannelMethods.SET_DEBUG_LOGGING -> {
                     VeLog.enabled = call.argument<Boolean>("enabled") == true
+                    VeLog.w("MainActivity") {
+                        "Debug logging native gate enabled=${VeLog.enabled}"
+                    }
                     result.success(null)
                 }
                 ChannelMethods.SET_SECURE_SCREEN -> systemHandlers.handleSetSecureScreen(call, result)
@@ -1309,6 +1312,9 @@ open class MainActivity : FlutterFragmentActivity() {
                 }
                 ChannelMethods.SAF_CHECK_TREE_ACCESS -> {
                     val treeUri = Uri.parse(call.argument<String>("treeUri") ?: "")
+                    VeLog.w("MainActivity") {
+                        "safCheckTreeAccess dispatched: authority=${treeUri.authority}"
+                    }
                     ioExecutor.execute {
                         val accessible = safStorageManager.isTreeAccessible(treeUri)
                         runOnUiThread { result.success(accessible) }

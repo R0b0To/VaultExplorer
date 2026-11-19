@@ -14550,4 +14550,7 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get motionPhotoCopyNote =>
       'The edited copy will be a still image. The original file, its EXIF metadata, and any embedded video remain unchanged.';
+
+  @override
+  String get pimInputHint => 'Empty or 0 for defaults';
 }

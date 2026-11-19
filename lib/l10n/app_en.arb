@@ -16810,5 +16810,9 @@
   "motionPhotoCopyNote": "The edited copy will be a still image. The original file, its EXIF metadata, and any embedded video remain unchanged.",
   "@motionPhotoCopyNote": {
     "description": "Notice shown when an image with protected metadata is edited: only a still-image copy can be saved; the original file and embedded content are protected."
+  },
+  "pimInputHint": "Empty or 0 for defaults",
+  "@pimInputHint": {
+    "description": "Hint shown in the PIM input before the user types a value; leaving it empty or entering 0 uses the default PIM."
   }
 }

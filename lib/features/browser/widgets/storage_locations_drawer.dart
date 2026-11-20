@@ -115,26 +115,28 @@ class StorageLocationsDrawer extends ConsumerWidget {
       ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       items: [
-        PopupMenuItem(
-          value: 'rename',
-          child: Row(
-            children: [
-              Icon(Icons.edit_outlined, size: 20, color: cs.onSurface),
-              const SizedBox(width: 12),
-              Text(context.l10n.rename),
-            ],
+        if (!loc.isSystemVolume)
+          PopupMenuItem(
+            value: 'rename',
+            child: Row(
+              children: [
+                Icon(Icons.edit_outlined, size: 20, color: cs.onSurface),
+                const SizedBox(width: 12),
+                Text(context.l10n.rename),
+              ],
+            ),
           ),
-        ),
-        PopupMenuItem(
-          value: 'remove',
-          child: Row(
-            children: [
-              Icon(Icons.delete_outline_rounded, size: 20, color: cs.error),
-              const SizedBox(width: 12),
-              Text(context.l10n.remove, style: TextStyle(color: cs.error)),
-            ],
+        if (!loc.isSystemVolume)
+          PopupMenuItem(
+            value: 'remove',
+            child: Row(
+              children: [
+                Icon(Icons.delete_outline_rounded, size: 20, color: cs.error),
+                const SizedBox(width: 12),
+                Text(context.l10n.remove, style: TextStyle(color: cs.error)),
+              ],
+            ),
           ),
-        ),
       ],
     ).then((action) {
       if (action == 'rename') {
@@ -189,8 +191,17 @@ class StorageLocationsDrawer extends ConsumerWidget {
                         final isCurrent = activeVolId == loc.volId;
                         return GestureDetector(
                           behavior: HitTestBehavior.opaque,
-                          onSecondaryTapDown: (details) =>
-                              _showLocationContextMenu(context, ref, loc, details.globalPosition),
+                          // System-discovered volumes have no context actions,
+                          // so don't leave a long-press/secondary-tap gesture
+                          // that opens an empty menu.
+                          onSecondaryTapDown: loc.isSystemVolume
+                              ? null
+                              : (details) => _showLocationContextMenu(
+                                  context,
+                                  ref,
+                                  loc,
+                                  details.globalPosition,
+                                ),
                           child: ListTile(
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
                             selected: isCurrent,
@@ -207,13 +218,24 @@ class StorageLocationsDrawer extends ConsumerWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            onLongPress: () {
-                              final box = tileContext.findRenderObject() as RenderBox?;
-                              final pos = box != null
-                                  ? box.localToGlobal(box.size.center(Offset.zero))
-                                  : Offset.zero;
-                              _showLocationContextMenu(context, ref, loc, pos);
-                            },
+                            onLongPress: loc.isSystemVolume
+                                ? null
+                                : () {
+                                    final box =
+                                        tileContext.findRenderObject()
+                                            as RenderBox?;
+                                    final pos = box != null
+                                        ? box.localToGlobal(
+                                            box.size.center(Offset.zero),
+                                          )
+                                        : Offset.zero;
+                                    _showLocationContextMenu(
+                                      context,
+                                      ref,
+                                      loc,
+                                      pos,
+                                    );
+                                  },
                             onTap: () async {
                               if (isCurrent) {
                                 Navigator.pop(context);

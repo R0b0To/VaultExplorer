@@ -328,6 +328,15 @@ class _MainShellState extends ConsumerState<MainShell>
     if (!_quickCaptureColdStart) {
       lockController.handleAppLifecycleState(state);
     }
+    // Re-scan physical storage volumes (SD card / USB) when the app comes
+    // back to the foreground: a volume inserted while backgrounded is then
+    // picked up without a full restart. Only user-added locations are
+    // persisted, so the reload can't lose them.
+    if (state == AppLifecycleState.resumed) {
+      ref
+          .read(externalStorageLocationsProvider.notifier)
+          .refreshSystemVolumes();
+    }
   }
 
   void _configureSessionLock() {
@@ -603,9 +612,10 @@ class _MainShellState extends ConsumerState<MainShell>
   Future<void> _openLocalStorageFromDrawer({
     int? currentVolId,
     BrowserTabs? workspaceActions,
+    MountedContainer? external,
   }) async {
     final primary = _primaryLocalStorageContainer;
-    if (primary != null) {
+    if (primary != null && external == null) {
       _openBrowser(primary);
       return;
     }
@@ -622,8 +632,24 @@ class _MainShellState extends ConsumerState<MainShell>
         dashboard = _dashboardKey.currentState;
       }
     }
-    await dashboard?.openLocalStorage(currentVolId: currentVolId);
+    await dashboard?.openLocalStorage(
+      currentVolId: currentVolId,
+      external: external,
+    );
   }
+
+  /// Same as [_openLocalStorageFromDrawer], but for an external raw-path
+  /// storage (SD card / USB): brings the Dashboard up first if needed, then
+  /// opens the volume through its all-files-access permission flow.
+  Future<void> _openExternalStorageFromDrawer(
+    MountedContainer externalContainer, {
+    BrowserTabs? workspaceActions,
+  }) =>
+      _openLocalStorageFromDrawer(
+        currentVolId: externalContainer.volId,
+        workspaceActions: workspaceActions,
+        external: externalContainer,
+      );
 
   void _openVaultFromDrawer(VaultListItem item) {
     switch (item) {
@@ -968,6 +994,12 @@ class _MainShellState extends ConsumerState<MainShell>
         onOpenLocalStorage: () => unawaited(
           _openLocalStorageFromDrawer(
             currentVolId: currentVolId,
+            workspaceActions: workspaceActions,
+          ),
+        ),
+        onOpenExternalStorage: (externalContainer) => unawaited(
+          _openExternalStorageFromDrawer(
+            externalContainer,
             workspaceActions: workspaceActions,
           ),
         ),

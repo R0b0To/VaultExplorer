@@ -35,6 +35,11 @@ class AppNavigationDrawer extends ConsumerWidget {
   final MountedContainer? primaryLocalContainer;
   final ValueListenable<MountedContainer?>? localStorageNotifier;
   final VoidCallback? onOpenLocalStorage;
+  /// Opens an external raw-path storage (SD card / USB volume) through the
+  /// all-files-access permission flow, mirroring [onOpenLocalStorage] for
+  /// the primary internal storage. When null, external tiles fall back to
+  /// [onSelectContainer] (direct open, no permission prompt).
+  final ValueChanged<MountedContainer>? onOpenExternalStorage;
   final int selectedTabIndex;
   final ValueChanged<int>? onSelectTab;
   final ValueChanged<MountedContainer>? onSelectContainer;
@@ -55,6 +60,7 @@ class AppNavigationDrawer extends ConsumerWidget {
     this.primaryLocalContainer,
     this.localStorageNotifier,
     this.onOpenLocalStorage,
+    this.onOpenExternalStorage,
     this.selectedTabIndex = 0,
     this.onSelectTab,
     this.onSelectContainer,
@@ -196,26 +202,31 @@ class AppNavigationDrawer extends ConsumerWidget {
               ],
             ),
           ),
-        PopupMenuItem(
-          value: 'rename',
-          child: Row(
-            children: [
-              Icon(Icons.edit_outlined, size: 20, color: cs.onSurface),
-              const SizedBox(width: 12),
-              Text(context.l10n.rename),
-            ],
+        // System-discovered volumes (SD card, USB) are neither renameable
+        // nor removable: they're re-derived from StorageManager on every
+        // refresh, so rename/remove would either no-op or come back.
+        if (!loc.isSystemVolume)
+          PopupMenuItem(
+            value: 'rename',
+            child: Row(
+              children: [
+                Icon(Icons.edit_outlined, size: 20, color: cs.onSurface),
+                const SizedBox(width: 12),
+                Text(context.l10n.rename),
+              ],
+            ),
           ),
-        ),
-        PopupMenuItem(
-          value: 'remove',
-          child: Row(
-            children: [
-              Icon(Icons.delete_outline_rounded, size: 20, color: cs.error),
-              const SizedBox(width: 12),
-              Text(context.l10n.remove, style: TextStyle(color: cs.error)),
-            ],
+        if (!loc.isSystemVolume)
+          PopupMenuItem(
+            value: 'remove',
+            child: Row(
+              children: [
+                Icon(Icons.delete_outline_rounded, size: 20, color: cs.error),
+                const SizedBox(width: 12),
+                Text(context.l10n.remove, style: TextStyle(color: cs.error)),
+              ],
+            ),
           ),
-        ),
       ],
     ).then((action) {
       if (action == 'new_tab') {
@@ -846,6 +857,22 @@ class AppNavigationDrawer extends ConsumerWidget {
                                   Navigator.pop(context);
                                   return;
                                 }
+                                final container = buildExternalStorageContainer(
+                                  rootPath: loc.resolvedUri,
+                                  displayName: loc.displayName,
+                                  volId: loc.volId,
+                                );
+                                // Raw-path volumes (SD card / USB) go
+                                // through the all-files-access flow, like
+                                // the primary Local Storage tile does; a
+                                // missing grant would otherwise just be
+                                // reported as "unavailable" below.
+                                if (!loc.resolvedUri.startsWith('content://') &&
+                                    onOpenExternalStorage != null) {
+                                  Navigator.pop(context);
+                                  onOpenExternalStorage!(container);
+                                  return;
+                                }
                                 final isAccessible = await ref
                                     .read(
                                       externalStorageLocationsProvider.notifier,
@@ -865,13 +892,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                                   return;
                                 }
                                 Navigator.pop(context);
-                                onSelectContainer?.call(
-                                  buildExternalStorageContainer(
-                                    rootPath: loc.resolvedUri,
-                                    displayName: loc.displayName,
-                                    volId: loc.volId,
-                                  ),
-                                );
+                                onSelectContainer?.call(container);
                               },
                             ),
                           );

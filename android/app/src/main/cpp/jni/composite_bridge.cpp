@@ -190,7 +190,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_createCompositeContainerNative(
         return JNI_FALSE;
     }
 
-    const char* nativePass = env->GetStringUTFChars(password, nullptr);
+    const char* nativePass = vcGetPasswordUtf8(env, password);
     const char* nativeFS = env->GetStringUTFChars(fileSystem, nullptr);
     const char* nativeOpId = operationId ? env->GetStringUTFChars(operationId, nullptr) : nullptr;
     std::vector<int> kf = extractKeyfileFds(env, keyfileFds);
@@ -201,7 +201,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_createCompositeContainerNative(
         nativeOpId ? nativeOpId : ""
     );
 
-    env->ReleaseStringUTFChars(password, nativePass);
+    vcReleasePasswordUtf8(nativePass);
     env->ReleaseStringUTFChars(fileSystem, nativeFS);
     if (operationId && nativeOpId) env->ReleaseStringUTFChars(operationId, nativeOpId);
 
@@ -285,7 +285,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_unlockCompositeContainerNative(
         return buildCompositeUnlockResultMap(env, false, "NO_EXTENTS_DETECTED");
     }
 
-    const char* nativePass = env->GetStringUTFChars(password, nullptr);
+    const char* nativePass = vcGetPasswordUtf8(env, password);
     size_t passLen = nativePass ? std::strlen(nativePass) : 0;
     std::vector<int> kf = extractKeyfileFds(env, keyfileFds);
 
@@ -297,7 +297,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_unlockCompositeContainerNative(
         readOnly == JNI_TRUE
     );
 
-    env->ReleaseStringUTFChars(password, nativePass);
+    vcReleasePasswordUtf8(nativePass);
     if (!unlockResult.success) {
         LOGI("unlockCompositeContainerNative: prepareCompositeSession failed for volId=%d code=%s",
              volId, unlockResult.errorCode.c_str());

@@ -47,6 +47,13 @@ class UnlockSheet extends ConsumerStatefulWidget {
 }
 
 class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingObserver {
+  /// Autofill hint for the vault password field. A single shared `const`
+  /// list on purpose: a fresh `[AutofillHints.password]` literal in `build`
+  /// would be a different object on every rebuild (and this sheet rebuilds on
+  /// every keystroke), which makes the field look like its autofill
+  /// configuration changed each time.
+  static const List<String> _kPasswordAutofillHints = <String>[AutofillHints.password];
+
   late final TextEditingController _passwordCtrl;
   final _pimCtrl = TextEditingController();
   final _hiddenPasswordCtrl = TextEditingController();
@@ -270,10 +277,18 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
         ),
         body: GestureDetector(
           behavior: HitTestBehavior.opaque,
-          child: SafeArea(
-            child: wideLayout
-                ? _buildWideLayout(context, state, credState, cs, textTheme)
-                : _buildPortraitLayout(context, state, credState, cs, textTheme),
+          // One group for the whole sheet, hoisted above the layout switch and
+          // the credential-state switch so it is never rebuilt into a
+          // different shape while the person is typing. `cancel` (not the
+          // default `commit`) so closing the sheet never makes the password
+          // manager offer to save the vault password.
+          child: AutofillGroup(
+            onDisposeAction: AutofillContextAction.cancel,
+            child: SafeArea(
+              child: wideLayout
+                  ? _buildWideLayout(context, state, credState, cs, textTheme)
+                  : _buildPortraitLayout(context, state, credState, cs, textTheme),
+            ),
           ),
         ),
       ),
@@ -1004,6 +1019,7 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
                     padding: const EdgeInsets.all(12),
                     child: TextField(
                       controller: _passwordCtrl,
+                      autofillHints: _kPasswordAutofillHints,
                       enabled: canConfigure,
                       // Stay obscured — and block text selection, so the real
                       // characters can't be copied out either — while
@@ -1024,13 +1040,6 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
                         filled: true,
                         fillColor: cs.surfaceContainerHighest,
                         labelText: context.l10n.passwordFieldLabel,
-                        hintText: state.isFolderVault
-                            ? context.l10n.passwordHintFolderVault
-                            : state.isBitlocker
-                            ? context.l10n.passwordHintBitlocker
-                            : state.isComposite
-                            ? context.l10n.compositePasswordHint
-                            : context.l10n.passwordHintContainer,
                         prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: cs.primary),
                         suffixIcon: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -1162,6 +1171,17 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
       if (supportsHiddenVolumeProtection) ...[
         SwitchListTile(
           contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+          value: state.useBackupHeader,
+          onChanged: canConfigure ? notifier.setUseBackupHeader : null,
+          title: Text(context.l10n.useBackupHeaderToggleTitle),
+          subtitle: Text(
+            context.l10n.useBackupHeaderToggleSubtitle,
+            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+          secondary: Icon(Icons.history_rounded, color: cs.primary, size: 22),
+        ),
+        SwitchListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12),
           value: state.protectHiddenVolume && !state.readOnly,
           onChanged: canConfigure && !state.readOnly ? notifier.setProtectHiddenVolume : null,
           title: Text(context.l10n.protectHiddenVolumeToggleTitle),
@@ -1178,6 +1198,10 @@ class _UnlockSheetState extends ConsumerState<UnlockSheet> with WidgetsBindingOb
             padding: const EdgeInsets.all(12),
             child: TextField(
               controller: _hiddenPasswordCtrl,
+              // Deliberately not autofilled: it is a different secret from the
+              // field above, and a password manager would offer the same
+              // saved login for both.
+              autofillHints: null,
               obscureText: _hiddenObscure,
               autocorrect: false,
               enableSuggestions: false,

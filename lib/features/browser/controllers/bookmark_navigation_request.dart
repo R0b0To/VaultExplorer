@@ -19,11 +19,15 @@ class BookmarkNavigationRequest {
 
   final int volId;
   final VaultBookmark bookmark;
+
+  /// Optional tile to scroll into view and pulse after folder navigation.
+  final String? revealName;
   final DateTime requestedAt;
 
   BookmarkNavigationRequest({
     required this.volId,
     required this.bookmark,
+    this.revealName,
     DateTime? requestedAt,
   }) : requestedAt = requestedAt ?? DateTime.now();
 
@@ -34,8 +38,16 @@ class BookmarkNavigationRequests extends Notifier<BookmarkNavigationRequest?> {
   @override
   BookmarkNavigationRequest? build() => null;
 
-  void request(int volId, VaultBookmark bookmark) {
-    state = BookmarkNavigationRequest(volId: volId, bookmark: bookmark);
+  void request(
+    int volId,
+    VaultBookmark bookmark, {
+    String? revealName,
+  }) {
+    state = BookmarkNavigationRequest(
+      volId: volId,
+      bookmark: bookmark,
+      revealName: revealName,
+    );
   }
 
   /// Hands the pending request to the browser of [volId] and clears it.

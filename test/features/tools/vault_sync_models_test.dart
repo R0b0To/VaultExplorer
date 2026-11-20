@@ -115,4 +115,57 @@ void main() {
       );
     });
   });
+
+  group('vaultSyncNamesFor', () {
+    MountedContainer named(int volId, String name) => MountedContainer(
+      uri: 'file:///vault$volId.hc',
+      displayName: name,
+      volId: volId,
+      rootFiles: const [],
+      mountedAt: DateTime(2026, 1, 1),
+      totalSpace: 1000,
+      freeSpace: 500,
+      containerFormat: 'veracrypt',
+    );
+
+    VaultSyncNames names(VaultSyncSide? l, VaultSyncSide? r) =>
+        vaultSyncNamesFor(l, r, leftFallback: 'first?', rightFallback: 'second?');
+
+    test('uses each storage\'s own name when they differ', () {
+      final n = names(
+        VaultSyncSide(container: named(1, 'Photos'), relativePath: ''),
+        VaultSyncSide(container: named(2, 'Backup'), relativePath: 'x/y'),
+      );
+      expect(n.left, 'Photos');
+      expect(n.right, 'Backup');
+      expect(n.of(isLeft: true), 'Photos');
+      expect(n.of(isLeft: false), 'Backup');
+    });
+
+    test('a side that is not chosen yet shows its fallback', () {
+      final only = VaultSyncSide(container: named(1, 'Photos'), relativePath: '');
+      expect(names(only, null).left, 'Photos');
+      expect(names(only, null).right, 'second?');
+      expect(names(null, only).left, 'first?');
+      expect(names(null, null).right, 'second?');
+    });
+
+    test('two folders of one storage are told apart by folder', () {
+      final vault = named(1, 'Photos');
+      final n = names(
+        VaultSyncSide(container: vault, relativePath: ''),
+        VaultSyncSide(container: vault, relativePath: 'Backup'),
+      );
+      expect(n.left, isNot(n.right));
+      expect(n.right, contains('Backup'));
+    });
+
+    test('same-named storages and same-named folders still differ', () {
+      final n = names(
+        VaultSyncSide(container: named(1, 'Vault'), relativePath: ''),
+        VaultSyncSide(container: named(2, 'Vault'), relativePath: ''),
+      );
+      expect(n.left, isNot(n.right));
+    });
+  });
 }

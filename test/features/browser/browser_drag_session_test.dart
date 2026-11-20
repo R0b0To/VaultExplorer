@@ -37,6 +37,78 @@ BrowserItemDragData _data({
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  group('entries to drag', () {
+    test('is the dragged tile plus the selected items that are in the list', () {
+      final a = RawEntry(name: 'a', isDir: false, sizeBytes: 1, modifiedSecs: 1);
+      final b = RawEntry(name: 'b', isDir: false, sizeBytes: 1, modifiedSecs: 1);
+      final c = RawEntry(name: 'c', isDir: false, sizeBytes: 1, modifiedSecs: 1);
+      final gone = RawEntry(name: 'gone', isDir: false, sizeBytes: 1, modifiedSecs: 1);
+
+      expect(browserEntriesToDrag(a, {b, gone}, [a, b, c]), {a, b});
+      expect(browserEntriesToDrag(c, <RawEntry>{}, [a, b, c]), {c});
+      expect(browserEntriesToDrag(a, {a, b, c}, [a, b, c]), {a, b, c});
+    });
+
+    test('select-all on thousands of items is instant', () {
+      final items = [
+        for (var i = 0; i < 5000; i++)
+          RawEntry(name: 'IMG_$i.jpg', isDir: false, sizeBytes: i, modifiedSecs: i),
+      ];
+      final selected = items.toSet();
+      final sw = Stopwatch()..start();
+      // What every visible tile used to do on every rebuild.
+      for (var tile = 0; tile < 60; tile++) {
+        browserEntriesToDrag(items[tile], selected, items);
+      }
+      sw.stop();
+      expect(sw.elapsedMilliseconds, lessThan(1500));
+    });
+  });
+
+  group('lazy entries', () {
+    test('are not worked out until something asks, and only once', () {
+      var calls = 0;
+      final data = BrowserItemDragData.lazy(
+        source: _volume(1),
+        sourceDirectory: '',
+        entries: () {
+          calls++;
+          return {_file};
+        },
+        onDrop: (_, _, _, _) async {},
+      );
+
+      expect(calls, 0, reason: 'building a tile must not cost anything');
+      expect(data.entries, {_file});
+      expect(data.entries, {_file});
+      expect(calls, 1);
+    });
+
+    test('the lazy set cannot be changed by a drop target', () {
+      final data = BrowserItemDragData.lazy(
+        source: _volume(1),
+        sourceDirectory: '',
+        entries: () => {_file},
+        onDrop: (_, _, _, _) async {},
+      );
+
+      expect(() => data.entries.add(_folder), throwsUnsupportedError);
+    });
+
+    test('drop rules work the same on lazy data', () {
+      final data = BrowserItemDragData.lazy(
+        source: _volume(1),
+        sourceDirectory: 'photos',
+        entries: () => {_folder},
+        onDrop: (_, _, _, _) async {},
+      );
+
+      // A folder cannot be dropped into itself.
+      expect(data.canCopyInto(_volume(1), 'photos/docs'), isFalse);
+      expect(data.canCopyInto(_volume(1), 'photos'), isTrue);
+    });
+  });
+
   group('drop rules', () {
     test('dropping into the folder the items came from can only copy', () {
       final vault = _volume(1);

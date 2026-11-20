@@ -50,6 +50,12 @@ class MediaPrefetchController {
   final ThumbnailCacheMode _cacheMode;
   final Set<String> _prefetchingFullRes = {};
 
+  /// Called whenever prefetching learns a file's aspect ratio that was not
+  /// known before (a video thumbnail made or read back, not only the image
+  /// header sniff of [preloadAspectRatios]). The viewer coalesces these into a
+  /// single layout pass, so it is safe to call often.
+  void Function()? onRatioLearned;
+
   MediaPrefetchController({
     required this.container,
     required VaultFileIoApi fileIoApi,
@@ -120,9 +126,10 @@ class MediaPrefetchController {
   /// (decode + downscale + re-encode), so this is safe to run over an
   /// entire long playlist rather than just the current neighbor window.
   ///
-  /// Scoped to images: video dimensions aren't recoverable from a raw
-  /// byte prefix the way an image's header is, so videos keep learning
-  /// their ratio the existing way (actually being viewed/thumbnailed).
+  /// Images are measured from a byte prefix. Video dimensions aren't
+  /// recoverable that way, so a video is measured only from a thumbnail that
+  /// is already cached (see the video branch below); the rest learn their
+  /// ratio when [prefetchThumbnail] makes theirs, or when they are played.
   ///
   /// Visits [playlist] in order of proximity to [startIndex] (the index
   /// the viewer actually opened on, or is currently at) rather than
@@ -147,13 +154,43 @@ class MediaPrefetchController {
     required bool Function() isStillWanted,
     required void Function() onRatioLearned,
     int startIndex = 0,
+    int maxPreloadCount = 60,
   }) async {
     if (_cacheMode == ThumbnailCacheMode.disabled) return;
-    for (final index in _expandingIndexOrder(startIndex, playlist.length)) {
+    for (final index in _expandingIndexOrder(startIndex, playlist.length, maxPreloadCount)) {
       if (!isStillWanted()) return;
       final fileName = playlist[index];
-      if (!MediaViewerConstants.isImage(fileName)) continue;
       if (MediaAspectRatioCache.get(container, fileName) != null) continue;
+      if (MediaViewerConstants.isVideo(fileName)) {
+        // A video's size is not in its first bytes, and making a thumbnail
+        // for every video in a long playlist would be far too heavy. A
+        // thumbnail that is already cached knows its source size, so read
+        // that; the rest are learned as they are prefetched or played.
+        try {
+          final cached = await _thumbnailCache.fetchWithSize(
+            container: container,
+            filePath: fileName,
+            mode: _cacheMode,
+            quality: _quality,
+          );
+          if (cached != null && cached.$1.isNotEmpty) {
+            _learnRatio(
+              fileName,
+              width: cached.$2,
+              height: cached.$3,
+              bytes: cached.$1,
+            );
+          }
+        } catch (e) {
+          VeLog.w(
+            'MediaPrefetchController',
+            'Video ratio preload failed for ${VeLog.censorName(fileName)}',
+            e,
+          );
+        }
+        continue;
+      }
+      if (!MediaViewerConstants.isImage(fileName)) continue;
       try {
         final header = await _fileIoApi.readFileChunk(
           container,
@@ -177,23 +214,44 @@ class MediaPrefetchController {
     }
   }
 
-  /// Every index in `[0, length)` exactly once, nearest-to-[startIndex]
+  /// Up to [maxCount] indices in `[0, length)`, nearest-to-[startIndex]
   /// first (0, +1, -1, +2, -2, ... relative to a [startIndex] clamped into
   /// range), alternating outward in both directions and simply omitting
   /// whichever side has run off the end once it does.
-  static List<int> _expandingIndexOrder(int startIndex, int length) {
-    if (length <= 0) return const [];
+  static List<int> _expandingIndexOrder(int startIndex, int length, [int maxCount = 60]) {
+    if (length <= 0 || maxCount <= 0) return const [];
+    final targetCount = length < maxCount ? length : maxCount;
     final start = startIndex.clamp(0, length - 1);
     final order = <int>[start];
     var offset = 1;
-    while (order.length < length) {
+    while (order.length < targetCount && (start + offset < length || start - offset >= 0)) {
       final forward = start + offset;
       final backward = start - offset;
       if (forward < length) order.add(forward);
-      if (backward >= 0) order.add(backward);
+      if (order.length < targetCount && backward >= 0) order.add(backward);
       offset++;
     }
     return order;
+  }
+
+  /// Records [fileName]'s ratio from a thumbnail's known size, or from the
+  /// thumbnail's own JPEG header when no size is on record, and tells the
+  /// viewer when that taught it something. A thumbnail keeps the source's
+  /// proportions, so this is the video's true shape.
+  void _learnRatio(String fileName, {int? width, int? height, Uint8List? bytes}) {
+    if (MediaAspectRatioCache.get(container, fileName) != null) return;
+    var w = width;
+    var h = height;
+    if ((w == null || h == null || w <= 0 || h <= 0) &&
+        bytes != null &&
+        bytes.isNotEmpty) {
+      final dims = extractImageDimensionsFromBytes(bytes);
+      w = dims?.$1;
+      h = dims?.$2;
+    }
+    if (w == null || h == null || w <= 0 || h <= 0) return;
+    MediaAspectRatioCache.put(container, fileName, w, h);
+    onRatioLearned?.call();
   }
 
   /// Also called directly for the item currently being built (not just its
@@ -203,7 +261,20 @@ class MediaPrefetchController {
     final isVid = MediaViewerConstants.isVideo(fileName);
     if (!isImg && !isVid) return;
 
-    if (_thumbnailCache.peekMemory(container, fileName, _quality) != null) {
+    final inMemory = _thumbnailCache.peekMemoryWithSize(
+      container,
+      fileName,
+      _quality,
+    );
+    if (inMemory != null) {
+      if (isVid) {
+        _learnRatio(
+          fileName,
+          width: inMemory.$2,
+          height: inMemory.$3,
+          bytes: inMemory.$1,
+        );
+      }
       return;
     }
 
@@ -216,6 +287,7 @@ class MediaPrefetchController {
       );
       if (cached != null && cached.isNotEmpty) {
         _thumbnailCache.cacheInMemory(container, fileName, cached, _quality);
+        if (isVid) _learnRatio(fileName, bytes: cached);
         return;
       }
     }
@@ -309,7 +381,11 @@ class MediaPrefetchController {
   }
 
   Future<Uint8List> _fetchVideoThumbnailForPrefetch(String fileName) async {
-    return VideoThumbnailFetcher.fetch(
+    // The "WithSize" variant, so the video's true shape is learned while its
+    // thumbnail is made. Without it a portrait video that has never been
+    // played keeps the viewer's 16:9 guess (a small box with empty space
+    // around it) until its player initialises.
+    return VideoThumbnailFetcher.fetchWithSize(
       _thumbnailCache,
       _fileIoApi,
       container,
@@ -317,6 +393,8 @@ class MediaPrefetchController {
       mode: _cacheMode,
       quality: _quality,
       targetSize: MediaViewerConstants.thumbnailTargetSize,
+      onSizeKnown: (w, h) => _learnRatio(fileName, width: w, height: h),
+      onUnknownSize: (bytes) async => _learnRatio(fileName, bytes: bytes),
     );
   }
 

@@ -1215,9 +1215,36 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         emitTracksChanged()
     }
 
+    /**
+     * True when [error] means the container could not be parsed. Only that
+     * kind of failure can be helped by the lenient extractor flags; decoder,
+     * audio-sink and I/O failures (a truncated or undecryptable vault file, a
+     * codec that died) cannot, and re-preparing after them just spins a new
+     * codec up against the same bad bytes.
+     */
+    private fun isContainerParseError(error: PlaybackException): Boolean {
+        if (error.errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED ||
+            error.errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED
+        ) {
+            return true
+        }
+        var cause: Throwable? = error.cause
+        while (cause != null) {
+            if (cause is androidx.media3.common.ParserException) return true
+            cause = cause.cause
+        }
+        return false
+    }
+
     override fun onPlayerError(error: PlaybackException) {
         val p = player
-        if (!isFallbackMode && p != null && currentFilePath.isNotEmpty()) {
+        // One lenient retry per item, and only for container parse errors.
+        // After a failed retry (isFallbackMode stays set until the next
+        // initialize) the error is final: nothing is re-prepared, so the
+        // codecs stay torn down and the viewer gets the error UI.
+        if (!isFallbackMode && p != null && currentFilePath.isNotEmpty() &&
+            isContainerParseError(error)
+        ) {
             VeLog.w(TAG) { "Primary extractor failed on $currentFilePath (${error.errorCodeName}: ${error.message}). Retrying with lenient fallback extractor..." }
             isFallbackMode = true
             val wasPlaying = p.playWhenReady
@@ -1239,9 +1266,14 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         }
 
         VeLog.e(TAG, error) { "Player error: ${error.errorCodeName}: ${error.message}" }
+        val message = if (isContainerParseError(error)) {
+            "This file is damaged or incomplete and can't be played."
+        } else {
+            error.message ?: "Unknown playback error"
+        }
         emitEvent("error", mapOf(
             "code" to error.errorCode,
-            "message" to (error.message ?: "Unknown playback error"),
+            "message" to message,
         ))
     }
 

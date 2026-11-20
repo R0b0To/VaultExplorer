@@ -70,6 +70,26 @@ void main() {
     });
   });
 
+  group('supportsVaultSymbolicLinks', () {
+    test('only Cryptomator and ext/NTFS disk images expose link creation', () {
+      expect(
+        supportsVaultSymbolicLinks(
+          _container(volId: 10, format: ContainerFormat.cryptomator.wire),
+        ),
+        isTrue,
+      );
+      VolumeFilesystemRegistry.record(1, FilesystemType.ext);
+      VolumeFilesystemRegistry.record(2, FilesystemType.ntfs);
+      VolumeFilesystemRegistry.record(3, FilesystemType.exfat);
+      VolumeFilesystemRegistry.record(4, FilesystemType.fat32);
+      expect(supportsVaultSymbolicLinks(_container(volId: 1)), isTrue);
+      expect(supportsVaultSymbolicLinks(_container(volId: 2)), isTrue);
+      expect(supportsVaultSymbolicLinks(_container(volId: 3)), isFalse);
+      expect(supportsVaultSymbolicLinks(_container(volId: 4)), isFalse);
+      expect(supportsVaultSymbolicLinks(_container(volId: 99)), isFalse);
+    });
+  });
+
   group('isDestinationCaseSensitive', () {
     test('ext volume is case-sensitive; FAT/exFAT/NTFS are not', () {
       VolumeFilesystemRegistry.record(1, FilesystemType.ext);

@@ -121,6 +121,7 @@ Future<Uint8List> _fetchApkIconByManualParse({
         ? await ArchiveService.openLocal(
             pathOrUri: p.join(container.uri, filePath),
             archiveName: p.basename(filePath),
+            archivePathInContainer: filePath,
           )
         : await ArchiveService.open(
             container: container,

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
@@ -10,6 +12,7 @@ import 'package:vaultexplorer/core/widgets/inputs/auto_lock_duration_options.dar
         kImmediateAutoLockDuration,
         kInheritAutoLockDuration,
         kScreenLockOnlyAutoLockDuration;
+import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
@@ -65,17 +68,30 @@ class ContainerConfigState {
   final int autoCloseMins;
   final bool documentProvider;
   final bool alwaysOpenReadOnly;
+
+  /// Cryptomator only: keep `.bkup` copies of the key files on a read-write unlock. Lives in Kotlin, not in
+  /// the [ContainerRecord] (see [VaultLifecycleApi.getCryptomatorKeyFileBackup]); ignored for other formats.
+  final bool backupKeyFiles;
+
+  /// Cryptomator only: what the vault folder looks like without a password (drives the upgrade row). Not part
+  /// of [isModified]; nothing here is saved.
+  final CryptomatorVaultFormat cryptomatorFormat;
+
   /// This vault's own thumbnail settings -- what the vault uses when
   /// [useGlobalThumbnails] is off. Prefilled with the app-wide default while
   /// the vault follows it, so turning the switch off changes nothing until
   /// the person picks something.
   final ThumbnailCacheMode? thumbnailCacheMode;
   final ThumbnailQuality? thumbnailQuality;
+  final ThumbnailCacheMode? galleryMetadataCacheMode;
+  final ThumbnailCacheMode? musicIndexCacheMode;
 
   /// True while the vault has no thumbnail settings of its own and follows
   /// the app-wide default ("Use global default"). Saved as both thumbnail
   /// fields being null on the [ContainerRecord].
   final bool useGlobalThumbnails;
+  final bool useGlobalGalleryMetadata;
+  final bool useGlobalMusicIndex;
   final bool cacheDerivedKey;
   final VaultDeleteAfterImportMode vaultDeleteAfterImportMode;
   final DeleteAfterImportMode globalDeleteAfterImportMode;
@@ -119,11 +135,16 @@ class ContainerConfigState {
   final ThumbnailCacheMode? initialThumbnailCacheMode;
   final ThumbnailQuality? initialThumbnailQuality;
   final bool initialUseGlobalThumbnails;
+  final ThumbnailCacheMode? initialGalleryMetadataCacheMode;
+  final bool initialUseGlobalGalleryMetadata;
+  final ThumbnailCacheMode? initialMusicIndexCacheMode;
+  final bool initialUseGlobalMusicIndex;
   final bool? initialCacheDerivedKey;
   final VaultDeleteAfterImportMode initialVaultDeleteAfterImportMode;
   final String? initialPatternHash;
   final String? initialPinHash;
   final List<KeyfileRef> initialKeyfiles;
+  final bool initialBackupKeyFiles;
 
   const ContainerConfigState({
     required this.label,
@@ -131,9 +152,15 @@ class ContainerConfigState {
     required this.autoCloseMins,
     required this.documentProvider,
     this.alwaysOpenReadOnly = false,
+    this.backupKeyFiles = true,
+    this.cryptomatorFormat = CryptomatorVaultFormat.unknown,
     this.thumbnailCacheMode,
     this.thumbnailQuality,
     this.useGlobalThumbnails = true,
+    this.galleryMetadataCacheMode,
+    this.useGlobalGalleryMetadata = true,
+    this.musicIndexCacheMode,
+    this.useGlobalMusicIndex = true,
     required this.cacheDerivedKey,
     this.vaultDeleteAfterImportMode = VaultDeleteAfterImportMode.inherit,
     this.globalDeleteAfterImportMode = DeleteAfterImportMode.ask,
@@ -165,11 +192,16 @@ class ContainerConfigState {
     this.initialThumbnailCacheMode,
     this.initialThumbnailQuality,
     this.initialUseGlobalThumbnails = true,
+    this.initialGalleryMetadataCacheMode,
+    this.initialUseGlobalGalleryMetadata = true,
+    this.initialMusicIndexCacheMode,
+    this.initialUseGlobalMusicIndex = true,
     this.initialCacheDerivedKey,
     this.initialVaultDeleteAfterImportMode = VaultDeleteAfterImportMode.inherit,
     this.initialPatternHash,
     this.initialPinHash,
     this.initialKeyfiles = const [],
+    this.initialBackupKeyFiles = true,
   });
 
   bool get wasPasswordless =>
@@ -206,12 +238,25 @@ class ContainerConfigState {
     if (autoCloseMins != initialAutoCloseMins) return true;
     if (documentProvider != initialDocumentProvider) return true;
     if (alwaysOpenReadOnly != initialAlwaysOpenReadOnly) return true;
+    if (backupKeyFiles != initialBackupKeyFiles) return true;
     if (useGlobalThumbnails != initialUseGlobalThumbnails) return true;
     // While following the global default the vault's own values are not
     // stored, so editing them (or not) is not a change.
     if (!useGlobalThumbnails) {
       if (thumbnailCacheMode != initialThumbnailCacheMode) return true;
       if (thumbnailQuality != initialThumbnailQuality) return true;
+    }
+    if (useGlobalGalleryMetadata != initialUseGlobalGalleryMetadata) {
+      return true;
+    }
+    if (!useGlobalGalleryMetadata &&
+        galleryMetadataCacheMode != initialGalleryMetadataCacheMode) {
+      return true;
+    }
+    if (useGlobalMusicIndex != initialUseGlobalMusicIndex) return true;
+    if (!useGlobalMusicIndex &&
+        musicIndexCacheMode != initialMusicIndexCacheMode) {
+      return true;
     }
     if (cacheDerivedKey != initialCacheDerivedKey) return true;
     if (vaultDeleteAfterImportMode != initialVaultDeleteAfterImportMode) {
@@ -260,9 +305,15 @@ class ContainerConfigState {
     int? autoCloseMins,
     bool? documentProvider,
     bool? alwaysOpenReadOnly,
+    bool? backupKeyFiles,
+    CryptomatorVaultFormat? cryptomatorFormat,
     ThumbnailCacheMode? thumbnailCacheMode,
     ThumbnailQuality? thumbnailQuality,
     bool? useGlobalThumbnails,
+    ThumbnailCacheMode? galleryMetadataCacheMode,
+    bool? useGlobalGalleryMetadata,
+    ThumbnailCacheMode? musicIndexCacheMode,
+    bool? useGlobalMusicIndex,
     bool? cacheDerivedKey,
     VaultDeleteAfterImportMode? vaultDeleteAfterImportMode,
     DeleteAfterImportMode? globalDeleteAfterImportMode,
@@ -290,7 +341,12 @@ class ContainerConfigState {
     ThumbnailCacheMode? initialThumbnailCacheMode,
     ThumbnailQuality? initialThumbnailQuality,
     bool? initialUseGlobalThumbnails,
+    ThumbnailCacheMode? initialGalleryMetadataCacheMode,
+    bool? initialUseGlobalGalleryMetadata,
+    ThumbnailCacheMode? initialMusicIndexCacheMode,
+    bool? initialUseGlobalMusicIndex,
     bool? initialAlwaysOpenReadOnly,
+    bool? initialBackupKeyFiles,
     bool? initialCacheDerivedKey,
     VaultDeleteAfterImportMode? initialVaultDeleteAfterImportMode,
     String? initialPatternHash,
@@ -301,9 +357,17 @@ class ContainerConfigState {
     autoCloseMins: autoCloseMins ?? this.autoCloseMins,
     documentProvider: documentProvider ?? this.documentProvider,
     alwaysOpenReadOnly: alwaysOpenReadOnly ?? this.alwaysOpenReadOnly,
+    backupKeyFiles: backupKeyFiles ?? this.backupKeyFiles,
+    cryptomatorFormat: cryptomatorFormat ?? this.cryptomatorFormat,
     thumbnailCacheMode: thumbnailCacheMode ?? this.thumbnailCacheMode,
     thumbnailQuality: thumbnailQuality ?? this.thumbnailQuality,
     useGlobalThumbnails: useGlobalThumbnails ?? this.useGlobalThumbnails,
+    galleryMetadataCacheMode:
+        galleryMetadataCacheMode ?? this.galleryMetadataCacheMode,
+    useGlobalGalleryMetadata:
+        useGlobalGalleryMetadata ?? this.useGlobalGalleryMetadata,
+    musicIndexCacheMode: musicIndexCacheMode ?? this.musicIndexCacheMode,
+    useGlobalMusicIndex: useGlobalMusicIndex ?? this.useGlobalMusicIndex,
     cacheDerivedKey: cacheDerivedKey ?? this.cacheDerivedKey,
     vaultDeleteAfterImportMode:
         vaultDeleteAfterImportMode ?? this.vaultDeleteAfterImportMode,
@@ -343,6 +407,14 @@ class ContainerConfigState {
         initialThumbnailQuality ?? this.initialThumbnailQuality,
     initialUseGlobalThumbnails:
         initialUseGlobalThumbnails ?? this.initialUseGlobalThumbnails,
+    initialGalleryMetadataCacheMode:
+        initialGalleryMetadataCacheMode ?? this.initialGalleryMetadataCacheMode,
+    initialUseGlobalGalleryMetadata:
+        initialUseGlobalGalleryMetadata ?? this.initialUseGlobalGalleryMetadata,
+    initialMusicIndexCacheMode:
+        initialMusicIndexCacheMode ?? this.initialMusicIndexCacheMode,
+    initialUseGlobalMusicIndex:
+        initialUseGlobalMusicIndex ?? this.initialUseGlobalMusicIndex,
     initialCacheDerivedKey:
         initialCacheDerivedKey ?? this.initialCacheDerivedKey,
     initialVaultDeleteAfterImportMode:
@@ -351,6 +423,7 @@ class ContainerConfigState {
     initialPatternHash: initialPatternHash ?? this.initialPatternHash,
     initialPinHash: initialPinHash ?? this.initialPinHash,
     initialKeyfiles: initialKeyfiles,
+    initialBackupKeyFiles: initialBackupKeyFiles ?? this.initialBackupKeyFiles,
   );
 }
 
@@ -369,6 +442,7 @@ class ContainerConfigController extends _$ContainerConfigController {
       settingsLocked: false,
       isMounted: false,
       initialLabel: initialLabel,
+      initialCacheDerivedKey: false,
       initialUnlockMethod: ContainerUnlockMethod.password,
       initialAutoCloseMins: kInheritAutoLockDuration,
       initialDocumentProvider: false,
@@ -419,6 +493,10 @@ class ContainerConfigController extends _$ContainerConfigController {
       alwaysOpenReadOnly: rec?.alwaysOpenReadOnly ?? false,
       thumbnailCacheMode: rec?.thumbnailCacheMode,
       thumbnailQuality: rec?.thumbnailQuality,
+      galleryMetadataCacheMode: rec?.galleryMetadataCacheMode,
+      useGlobalGalleryMetadata: rec?.followsGlobalGalleryMetadata ?? true,
+      musicIndexCacheMode: rec?.musicIndexCacheMode,
+      useGlobalMusicIndex: rec?.followsGlobalMusicIndex ?? true,
       // A vault that is being added, or one that was never given settings of
       // its own, follows the app-wide default.
       useGlobalThumbnails: rec?.followsGlobalThumbnails ?? true,
@@ -446,6 +524,11 @@ class ContainerConfigController extends _$ContainerConfigController {
       initialThumbnailCacheMode: rec?.thumbnailCacheMode,
       initialThumbnailQuality: rec?.thumbnailQuality,
       initialUseGlobalThumbnails: rec?.followsGlobalThumbnails ?? true,
+      initialGalleryMetadataCacheMode: rec?.galleryMetadataCacheMode,
+      initialUseGlobalGalleryMetadata:
+          rec?.followsGlobalGalleryMetadata ?? true,
+      initialMusicIndexCacheMode: rec?.musicIndexCacheMode,
+      initialUseGlobalMusicIndex: rec?.followsGlobalMusicIndex ?? true,
       initialCacheDerivedKey: initialCacheDerivedKey,
       initialVaultDeleteAfterImportMode:
           rec?.vaultDeleteAfterImportMode ?? VaultDeleteAfterImportMode.inherit,
@@ -490,11 +573,12 @@ class ContainerConfigController extends _$ContainerConfigController {
       tempPim ??= await ref
           .read(appSecureStorageProvider)
           .read(key: pimStorageKey(params.uri));
-      tempKeyfiles = (await ref
-              .read(containerRepositoryProvider)
-              .getTempKeyfiles(params.uri))
-          .map((k) => (uri: k['uri']!, displayName: k['name']!))
-          .toList();
+      tempKeyfiles =
+          (await ref
+                  .read(containerRepositoryProvider)
+                  .getTempKeyfiles(params.uri))
+              .map((k) => (uri: k['uri']!, displayName: k['name']!))
+              .toList();
     } catch (e) {
       VeLog.w('ContainerConfigController', 'Temp credentials read failed', e);
     }
@@ -517,6 +601,8 @@ class ContainerConfigController extends _$ContainerConfigController {
 
     ThumbnailCacheMode? thumbMode = state.thumbnailCacheMode;
     ThumbnailQuality? thumbQuality = state.thumbnailQuality;
+    var galleryMetadataMode = state.galleryMetadataCacheMode;
+    var musicIndexMode = state.musicIndexCacheMode;
     bool derivedKey = state.cacheDerivedKey;
     var globalDeleteAfterImportMode = state.globalDeleteAfterImportMode;
 
@@ -536,10 +622,14 @@ class ContainerConfigController extends _$ContainerConfigController {
           .load();
       thumbMode ??= toolbarConfig.defaultThumbnailCacheMode;
       thumbQuality ??= toolbarConfig.defaultThumbnailQuality;
+      galleryMetadataMode ??= toolbarConfig.defaultGalleryMetadataCacheMode;
+      musicIndexMode ??= toolbarConfig.defaultMusicIndexCacheMode;
     } catch (e) {
       VeLog.w('ContainerConfigController', 'Toolbar config load failed', e);
       thumbMode ??= ThumbnailSettings.defaults.cacheMode;
       thumbQuality ??= ThumbnailSettings.defaults.quality;
+      galleryMetadataMode ??= ThumbnailCacheMode.inContainer;
+      musicIndexMode ??= ThumbnailCacheMode.inContainer;
     }
     if (!ref.mounted) return;
 
@@ -553,6 +643,18 @@ class ContainerConfigController extends _$ContainerConfigController {
       }
     } catch (e) {
       VeLog.w('ContainerConfigController', 'Settings load failed', e);
+    }
+    if (!ref.mounted) return;
+
+    // Cryptomator only. Unreadable counts as the default (on), like the API call itself.
+    bool backupKeyFiles = true;
+    final isCryptomator = ContainerFormat.isCryptomatorWire(
+      params.containerFormat,
+    );
+    if (isCryptomator) {
+      backupKeyFiles = await ref
+          .read(vaultLifecycleApiProvider)
+          .getCryptomatorKeyFileBackup(params.uri);
     }
     if (!ref.mounted) return;
 
@@ -586,11 +688,17 @@ class ContainerConfigController extends _$ContainerConfigController {
       biometricAvailable: biometricAvailable,
       thumbnailCacheMode: thumbMode,
       thumbnailQuality: thumbQuality,
+      galleryMetadataCacheMode: galleryMetadataMode,
+      musicIndexCacheMode: musicIndexMode,
       cacheDerivedKey: derivedKey,
       derivedKeyExpiresAt: derivedKeyExpiresAt,
       initialThumbnailCacheMode: thumbMode,
       initialThumbnailQuality: thumbQuality,
+      initialGalleryMetadataCacheMode: galleryMetadataMode,
+      initialMusicIndexCacheMode: musicIndexMode,
       initialCacheDerivedKey: state.initialCacheDerivedKey ?? derivedKey,
+      backupKeyFiles: isCryptomator ? backupKeyFiles : null,
+      initialBackupKeyFiles: isCryptomator ? backupKeyFiles : null,
       globalDeleteAfterImportMode: globalDeleteAfterImportMode,
       patternHash: patternHash,
       initialPatternHash: patternHash,
@@ -598,6 +706,8 @@ class ContainerConfigController extends _$ContainerConfigController {
       initialPinHash: pinHash,
       loadingPassword: false,
     );
+    // After the sheet is usable: the probe reads vault files (possibly through SAF), so it must not delay it.
+    if (isCryptomator) unawaited(refreshCryptomatorFormat());
   }
 
   void setLabel(String label) => state = state._copy(label: label);
@@ -623,11 +733,36 @@ class ContainerConfigController extends _$ContainerConfigController {
   void setAlwaysOpenReadOnly(bool val) =>
       state = state._copy(alwaysOpenReadOnly: val);
 
+  void setBackupKeyFiles(bool val) => state = state._copy(backupKeyFiles: val);
+
+  /// (Re-)reads the Cryptomator vault's format from its files, for the upgrade row. Cheap, read-only and
+  /// safe on an unlocked vault. Never throws; no-op for other formats.
+  Future<void> refreshCryptomatorFormat() async {
+    if (!ContainerFormat.isCryptomatorWire(params.containerFormat)) return;
+    final format = await ref
+        .read(vaultLifecycleApiProvider)
+        .probeCryptomatorVault(params.uri);
+    if (!ref.mounted) return;
+    state = state._copy(cryptomatorFormat: format);
+  }
+
   void setThumbnailCacheMode(ThumbnailCacheMode mode) =>
       state = state._copy(thumbnailCacheMode: mode);
 
   void setThumbnailQuality(ThumbnailQuality quality) =>
       state = state._copy(thumbnailQuality: quality);
+
+  void setGalleryMetadataCacheMode(ThumbnailCacheMode mode) =>
+      state = state._copy(galleryMetadataCacheMode: mode);
+
+  void setUseGlobalGalleryMetadata(bool value) =>
+      state = state._copy(useGlobalGalleryMetadata: value);
+
+  void setMusicIndexCacheMode(ThumbnailCacheMode mode) =>
+      state = state._copy(musicIndexCacheMode: mode);
+
+  void setUseGlobalMusicIndex(bool value) =>
+      state = state._copy(useGlobalMusicIndex: value);
 
   /// Turning this off keeps the values already in the state (the app-wide
   /// default's, filled in on load), so the vault's effective settings do not
@@ -780,7 +915,9 @@ class ContainerConfigController extends _$ContainerConfigController {
         existingRecord?.unlockMethod == ContainerUnlockMethod.biometrics;
     final isBiometrics = state.unlockMethod == ContainerUnlockMethod.biometrics;
     final guard = ref.read(biometricEnrollmentGuardProvider);
-    if (isBiometrics && !wasBiometrics && !await guard.enableVault(params.uri)) {
+    if (isBiometrics &&
+        !wasBiometrics &&
+        !await guard.enableVault(params.uri)) {
       if (ref.mounted) state = state._copy(saving: false);
       return null;
     }
@@ -804,7 +941,9 @@ class ContainerConfigController extends _$ContainerConfigController {
             .delete(key: pimStorageKey(params.uri));
       }
     } else if (!needsPassword) {
-      await ref.read(appSecureStorageProvider).delete(key: pimStorageKey(params.uri));
+      await ref
+          .read(appSecureStorageProvider)
+          .delete(key: pimStorageKey(params.uri));
     }
 
     final record = ContainerRecord(
@@ -839,6 +978,12 @@ class ContainerConfigController extends _$ContainerConfigController {
       thumbnailQuality: state.useGlobalThumbnails
           ? null
           : (state.thumbnailQuality ?? ThumbnailSettings.defaults.quality),
+      galleryMetadataCacheMode: state.useGlobalGalleryMetadata
+          ? null
+          : (state.galleryMetadataCacheMode ?? ThumbnailCacheMode.inContainer),
+      musicIndexCacheMode: state.useGlobalMusicIndex
+          ? null
+          : (state.musicIndexCacheMode ?? ThumbnailCacheMode.inContainer),
       cacheDerivedKey: state.cacheDerivedKey,
       vaultDeleteAfterImportMode: state.vaultDeleteAfterImportMode,
       pendingPassword: shouldSavePassword ? passwordText : null,
@@ -862,6 +1007,19 @@ class ContainerConfigController extends _$ContainerConfigController {
     await ref.read(containerRepositoryProvider).save(record);
     if (wasBiometrics && !isBiometrics) await guard.forgetVault(params.uri);
     await _applyDerivedKeyLifetime();
+    // Cryptomator only, and only when the switch actually moved. Kotlin owns the value (it applies at the
+    // next unlock, whichever caller does it), so it is not part of the record above.
+    final backupChanged =
+        ContainerFormat.isCryptomatorWire(params.containerFormat) &&
+        state.backupKeyFiles != state.initialBackupKeyFiles;
+    if (backupChanged) {
+      final saved = await ref
+          .read(vaultLifecycleApiProvider)
+          .setCryptomatorKeyFileBackup(params.uri, state.backupKeyFiles);
+      if (saved && ref.mounted) {
+        state = state._copy(initialBackupKeyFiles: state.backupKeyFiles);
+      }
+    }
     if (!ref.mounted) return record;
     if (!state.isMounted && !state.cacheDerivedKey) {
       try {

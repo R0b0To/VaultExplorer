@@ -115,7 +115,9 @@ class FileOperationService extends ChangeNotifier {
   }
 
   void _publishVolumeContentChanged(FileOperation op, int volId) {
-    _volumeContentChanged.notify(VolumeContentChange(volId: volId, opId: op.id));
+    _volumeContentChanged.notify(
+      VolumeContentChange(volId: volId, opId: op.id),
+    );
   }
 
   /// A copy or move has stopped (finished, failed or cancelled). It changed the
@@ -829,6 +831,87 @@ class FileOperationService extends ChangeNotifier {
     return '$fileName-${DateTime.now().millisecondsSinceEpoch}';
   }
 
+  // ── Copy name of a symbolic link ──────────────────────────────────────────
+
+  /// The name a *copy* of the symbolic link called [linkName] should get,
+  /// given that the link points at a file called [targetName].
+  ///
+  /// Copying a link copies the file it points at, not the link, but the copy
+  /// used to keep the link's own name. A link's name is arbitrary -- it often
+  /// has no extension ("Holiday") or a different one -- so the copy landed in
+  /// the new place as a file nothing could open. The copy keeps the link's
+  /// name and gains the target's extension unless it already ends with it:
+  /// "Holiday" -> "Holiday.jpg", "Holiday.JPG" stays as it is.
+  ///
+  /// A target with no extension leaves the name alone.
+  static String nameWithTargetExtension(String linkName, String targetName) {
+    final ext = _extensionOf(targetName);
+    if (ext.isEmpty) return linkName;
+    // Already ends with the target's last extension: a name like "backup.gz"
+    // for a ".tar.gz" target is left as the person named it.
+    final lastDot = targetName.lastIndexOf('.');
+    final last = targetName.substring(lastDot).toLowerCase();
+    if (linkName.toLowerCase().endsWith(last)) return linkName;
+    return '$linkName$ext';
+  }
+
+  /// ".jpg" for "a.jpg", ".tar.gz" for "a.tar.gz", "" when there is none. A
+  /// leading dot alone (".bashrc") is a name, not an extension.
+  static String _extensionOf(String fileName) {
+    final compound = RegExp(
+      r'\.tar\.[^./\\\s]+$',
+      caseSensitive: false,
+    ).firstMatch(fileName);
+    if (compound != null && compound.start > 0) return compound.group(0)!;
+    final dot = fileName.lastIndexOf('.');
+    if (dot <= 0 || dot == fileName.length - 1) return '';
+    return fileName.substring(dot);
+  }
+
+  /// The name to give the copy of [item] made from [src]. Only a symbolic link
+  /// to a file is renamed (see [nameWithTargetExtension]); everything else,
+  /// and any link that cannot be resolved inside its container, keeps its
+  /// name. A failed lookup is never a reason to fail the copy.
+  ///
+  /// [linkNamesByDir] holds each folder's file-link names, read once per
+  /// folder (one call) so a large paste does not ask the container about
+  /// every file; the caller shares one map across the items of a paste.
+  Future<String> _copyNameFor(
+    MountedContainer src,
+    ClipboardItem item,
+    Map<String, Set<String>> linkNamesByDir,
+  ) async {
+    final name = item.name;
+    if (item.isDir || !mayHaveVaultSymbolicLinks(src)) return name;
+    try {
+      final parent = p.posix.dirname(item.path);
+      final dir = parent == '.' ? '' : parent;
+      var linkNames = linkNamesByDir[dir];
+      if (linkNames == null) {
+        final links = await _fileIoApi.listVaultSymlinks(src, dir);
+        linkNames = {
+          for (final link in links)
+            if (!link.isDir) link.name,
+        };
+        linkNamesByDir[dir] = linkNames;
+      }
+      if (!linkNames.contains(name)) return name;
+      final target = await _fileIoApi.resolveVaultSymlinkTargetPath(
+        src,
+        item.path,
+      );
+      if (target == null) return name; // a link we cannot follow
+      return nameWithTargetExtension(name, p.posix.basename(target));
+    } catch (e) {
+      VeLog.w(
+        'FileOperationService',
+        'link target lookup failed for ${VeLog.censorName(name)}; copy keeps its name',
+        e,
+      );
+      return name;
+    }
+  }
+
   // ── Operation runner: Archive Create ──────────────────────────────────────
 
   Future<void> _runArchiveCreate(
@@ -871,16 +954,30 @@ class FileOperationService extends ChangeNotifier {
       final modifiedSecs = <int>[];
       int totalInputBytes = 0;
 
-      Future<void> collect(String containerPath, String archivePath) async {
+      // Returns how many entries the folder put into the archive. A folder that
+      // ends up with none is an empty folder: it goes in as an entry of its own
+      // (a name with a trailing '/', which the native side reads as "folder"),
+      // otherwise it would vanish from the archive, and archiving only empty
+      // folders would produce nothing at all.
+      Future<int> collect(
+        String containerPath,
+        String archivePath,
+        int folderModifiedSecs,
+      ) async {
         if (op.cancelRequested) throw const _CancelledException();
         final rawList = await _fileIoApi.listDirectory(source, containerPath);
         final children = RawEntry.parseAll(rawList ?? const []);
+        var added = 0;
         for (final child in children) {
           if (child.name.startsWith('System:')) continue;
           final childContainerPath = '$containerPath/${child.name}';
           final childArchivePath = '$archivePath/${child.name}';
           if (child.isDir) {
-            await collect(childContainerPath, childArchivePath);
+            added += await collect(
+              childContainerPath,
+              childArchivePath,
+              child.modifiedSecs,
+            );
           } else {
             srcPaths.add(
               source.isRawLocal
@@ -890,14 +987,26 @@ class FileOperationService extends ChangeNotifier {
             entryNames.add(childArchivePath);
             modifiedSecs.add(child.modifiedSecs);
             totalInputBytes += child.sizeBytes;
+            added++;
           }
         }
+        if (added == 0) {
+          srcPaths.add(
+            source.isRawLocal
+                ? p.join(source.uri, containerPath)
+                : containerPath,
+          );
+          entryNames.add('$archivePath/');
+          modifiedSecs.add(folderModifiedSecs);
+          added++;
+        }
+        return added;
       }
 
       for (final item in items) {
         if (op.cancelRequested) throw const _CancelledException();
         if (item.isDir) {
-          await collect(item.path, item.name);
+          await collect(item.path, item.name, item.modifiedSecs);
         } else {
           srcPaths.add(
             source.isRawLocal ? p.join(source.uri, item.path) : item.path,
@@ -910,8 +1019,10 @@ class FileOperationService extends ChangeNotifier {
 
       if (op.cancelRequested) throw const _CancelledException();
 
+      // Never finish silently without an archive: the person pasted one.
       if (srcPaths.isEmpty) {
-        op._setStatus(FileOperationStatus.completed);
+        op._setError(op.l10n.failedToArchiveGeneric('Nothing to archive'));
+        op._setStatus(FileOperationStatus.failed);
         return;
       }
 
@@ -929,7 +1040,9 @@ class FileOperationService extends ChangeNotifier {
           RawEntry.parseAll(rawSiblings ?? const []).map((e) => e.name),
         );
         if (clash != null) {
-          op._setError(op.l10n.failedToArchiveGeneric('"$clash" already exists'));
+          op._setError(
+            op.l10n.failedToArchiveGeneric('"$clash" already exists'),
+          );
           op._setStatus(FileOperationStatus.failed);
           return;
         }
@@ -945,9 +1058,7 @@ class FileOperationService extends ChangeNotifier {
         srcUri: source.isLocalStorage ? source.uri : source.uri,
         destUri: dest.isLocalStorage ? dest.uri : dest.uri,
         destVaultPath: destVaultPath,
-        destFilePath: dest.isRawLocal
-            ? p.join(dest.uri, destVaultPath)
-            : null,
+        destFilePath: dest.isRawLocal ? p.join(dest.uri, destVaultPath) : null,
         passphrase: passphrase,
         encryptFilenames: encryptFilenames,
         compressionLevel: compressionLevel.level,
@@ -1283,6 +1394,16 @@ class FileOperationService extends ChangeNotifier {
     MountedContainer dest,
     ConflictPlan conflictPlan,
   ) async {
+    final runnerT0 = PerfTrace.begin();
+    PerfTrace.count('transfer.backend.vault_api');
+    PerfTrace.count('transfer.items', op.items.length);
+    var firstWritePending = true;
+    void markFirstWrite() {
+      if (!firstWritePending) return;
+      firstWritePending = false;
+      PerfTrace.end('transfer.time_to_first_write', runnerT0, slowMs: 500);
+    }
+
     op._setStatus(FileOperationStatus.running);
 
     void onCopyProgress(CopyProgress p) {
@@ -1298,11 +1419,15 @@ class FileOperationService extends ChangeNotifier {
     _beginBatches(guardedVolIds);
     var nativeBatchStarted = false;
     try {
+      final batchWriteT0 = PerfTrace.begin();
       await _fileIoApi.beginBatchWrite(dest);
+      PerfTrace.end('transfer.begin_batch_write', batchWriteT0, slowMs: 250);
       nativeBatchStarted = true;
       op._setActivity(op.l10n.fileOpResolvingConflicts);
+      final destListT0 = PerfTrace.begin();
       final existingRaw =
           await _fileIoApi.listDirectory(dest, op.destDirPath) ?? [];
+      PerfTrace.end('transfer.runner_dest_list', destListT0, slowMs: 250);
       if (op.cancelRequested) throw const _CancelledException();
 
       // Names are compared the way the destination's policy says (see
@@ -1322,24 +1447,37 @@ class FileOperationService extends ChangeNotifier {
 
       bool needsRealCopy(ClipboardItem item) {
         if (!(op.isCut && src.volId == dest.volId)) return true;
+        final targetPath = op.destDirPath.isEmpty
+            ? item.name
+            : op.destDirPath + '/' + item.name;
+        if (_requiresSafMove(src, item.path, dest, targetPath)) {
+          final name = fold(item.name);
+          return item.isDir &&
+              existingNames.contains(name) &&
+              existingDirs.contains(name) &&
+              conflictPlan[name] == ConflictResolution.overwrite;
+        }
         if (!item.isDir) return false;
         if (!existingNames.contains(fold(item.name))) return false;
         if (!existingDirs.contains(fold(item.name))) return false;
         final resolution =
-            conflictPlan[fold(item.name)] ??
-            ConflictResolution.keepBoth;
+            conflictPlan[fold(item.name)] ?? ConflictResolution.keepBoth;
         return resolution == ConflictResolution.overwrite;
       }
 
       op._setActivity(op.l10n.fileOpCheckingSpace);
       int requiredBytes = 0;
+      final measureSizeT0 = PerfTrace.begin();
       for (final item in op.items) {
         if (!needsRealCopy(item)) continue;
         requiredBytes += await measureItemBytes(src, item);
         if (op.cancelRequested) throw const _CancelledException();
       }
+      PerfTrace.end('transfer.measure_source_size', measureSizeT0, slowMs: 500);
       op._setTotalBytes(requiredBytes);
+      final freeSpaceT0 = PerfTrace.begin();
       final spaceInfo = await _fileIoApi.getSpaceInfo(dest);
+      PerfTrace.end('transfer.free_space_check', freeSpaceT0, slowMs: 250);
       final freeBytes =
           (spaceInfo != null && spaceInfo.length > 1 && spaceInfo[1] >= 0)
           ? spaceInfo[1]
@@ -1364,6 +1502,8 @@ class FileOperationService extends ChangeNotifier {
               String destPath,
               bool skip,
               bool mergeOverwrite,
+              bool overwrite,
+              bool destIsDir,
             })
           >[];
 
@@ -1376,8 +1516,15 @@ class FileOperationService extends ChangeNotifier {
       final destCaseSensitive = isDestinationCaseSensitive(dest);
       final claimedDestLeaves = <String>{};
 
+      final linkNamesByDir = <String, Set<String>>{};
+      final resolveDestinationsT0 = PerfTrace.begin();
       for (final item in op.items) {
-        final fileName = item.name;
+        // A move inside one container renames the link itself and keeps its
+        // name; every other transfer writes the target's content as a new
+        // file, which needs the target's extension (see [_copyNameFor]).
+        final fileName = (op.isCut && src.volId == dest.volId)
+            ? item.name
+            : await _copyNameFor(src, item, linkNamesByDir);
         String destPath = op.destDirPath.isEmpty
             ? fileName
             : '${op.destDirPath}/$fileName';
@@ -1403,6 +1550,8 @@ class FileOperationService extends ChangeNotifier {
             destPath: destPath,
             skip: true,
             mergeOverwrite: false,
+            overwrite: false,
+            destIsDir: false,
           ));
           continue;
         }
@@ -1413,16 +1562,19 @@ class FileOperationService extends ChangeNotifier {
             destPath: destPath,
             skip: true,
             mergeOverwrite: false,
+            overwrite: false,
+            destIsDir: false,
           ));
           continue;
         }
 
         bool mergeOverwrite = false;
+        bool overwrite = false;
+        bool destIsDir = false;
         if (existingNames.contains(fold(fileName))) {
           final resolution =
-              conflictPlan[fold(fileName)] ??
-              ConflictResolution.keepBoth;
-          final destIsDir = existingDirs.contains(fold(fileName));
+              conflictPlan[fold(fileName)] ?? ConflictResolution.keepBoth;
+          destIsDir = existingDirs.contains(fold(fileName));
 
           switch (resolution) {
             case ConflictResolution.skip:
@@ -1431,6 +1583,8 @@ class FileOperationService extends ChangeNotifier {
                 destPath: destPath,
                 skip: true,
                 mergeOverwrite: false,
+                overwrite: false,
+                destIsDir: destIsDir,
               ));
               continue;
             case ConflictResolution.overwrite:
@@ -1448,13 +1602,15 @@ class FileOperationService extends ChangeNotifier {
                   destPath: destPath,
                   skip: true,
                   mergeOverwrite: false,
+                  overwrite: false,
+                  destIsDir: destIsDir,
                 ));
                 continue;
               }
               if (op.isCut && item.isDir && destIsDir) {
                 mergeOverwrite = true;
-              } else if (op.isCut) {
-                await _deleteEntryRecursive(dest, destPath, destIsDir);
+              } else {
+                overwrite = true;
               }
             case ConflictResolution.keepBoth:
               final unique = makeUniqueName(
@@ -1497,13 +1653,51 @@ class FileOperationService extends ChangeNotifier {
           destPath: destPath,
           skip: false,
           mergeOverwrite: mergeOverwrite,
+          overwrite: overwrite,
+          destIsDir: destIsDir,
         ));
       }
+      PerfTrace.end(
+        'transfer.resolve_destinations',
+        resolveDestinationsT0,
+        slowMs: 500,
+      );
 
       for (int i = 0; i < resolved.length; i++) {
         op._setResolvedDestName(i, resolved[i].destPath.split('/').last);
       }
       notifyListeners();
+
+      if (op.cancelRequested) throw const _CancelledException();
+      final sourceCheckT0 = PerfTrace.begin();
+      final sourceCheckIndices = <int>[];
+      final sourceCheckEntries = <({String path, bool isDir})>[];
+      for (var index = 0; index < resolved.length; index++) {
+        if (resolved[index].skip) continue;
+        sourceCheckIndices.add(index);
+        sourceCheckEntries.add((
+          path: resolved[index].item.path,
+          isDir: resolved[index].item.isDir,
+        ));
+      }
+      final sourceCheckErrors = <int, Object>{};
+      final sourceChecks = await _fileIoApi.entryExistsBatch(
+        src,
+        sourceCheckEntries,
+        onError: (checkIndex, error) {
+          sourceCheckErrors[sourceCheckIndices[checkIndex]] = error;
+        },
+      );
+      final sourceExistsByIndex = List<bool>.filled(resolved.length, false);
+      for (
+        var checkIndex = 0;
+        checkIndex < sourceCheckIndices.length;
+        checkIndex++
+      ) {
+        sourceExistsByIndex[sourceCheckIndices[checkIndex]] =
+            sourceChecks[checkIndex];
+      }
+      PerfTrace.end('transfer.source_exists', sourceCheckT0, slowMs: 250);
 
       final semaphore = BoundedSemaphore(_maxConcurrentItems);
       final createdDestPaths = <String>[];
@@ -1526,14 +1720,75 @@ class FileOperationService extends ChangeNotifier {
                 return;
               }
 
+              if (!sourceExistsByIndex[idx]) {
+                op._recordItemResult(
+                  idx,
+                  FileItemResult.failed,
+                  errorMessage:
+                      sourceCheckErrors[idx]?.toString() ??
+                      op.l10n.bookmarkTargetMissing,
+                );
+                return;
+              }
+
+              markFirstWrite();
+              if (r.overwrite &&
+                  op.isCut &&
+                  src.volId == dest.volId &&
+                  !r.mergeOverwrite) {
+                await _deleteEntryRecursive(dest, r.destPath, r.destIsDir);
+              }
+
               op._setActivity(
                 op.isCut
                     ? op.l10n.fileOpMovingName(r.item.name)
                     : op.l10n.fileOpCopyingName(r.item.name),
               );
               bool ok = false;
-              if (op.isCut && src.volId == dest.volId && !r.mergeOverwrite) {
+              final safMoveAcrossFolders =
+                  op.isCut &&
+                  src.volId == dest.volId &&
+                  !r.mergeOverwrite &&
+                  _requiresSafMove(src, r.item.path, dest, r.destPath);
+              if (op.isCut &&
+                  src.volId == dest.volId &&
+                  !r.mergeOverwrite &&
+                  !safMoveAcrossFolders) {
                 ok = await _fileIoApi.renameFile(src, r.item.path, r.destPath);
+                if (!ok) {
+                  op._recordItemResult(
+                    idx,
+                    FileItemResult.failed,
+                    errorMessage: op.l10n.fileOpMoveFailed,
+                  );
+                } else {
+                  op._recordItemResult(idx, FileItemResult.success);
+                }
+              } else if (safMoveAcrossFolders) {
+                ok = await _fileIoApi.moveSafEntry(
+                  src,
+                  r.item.path,
+                  r.destPath,
+                );
+                if (!ok) {
+                  ok = await _copyEntry(
+                    src,
+                    dest,
+                    r.item.path,
+                    r.destPath,
+                    r.item.isDir,
+                    createdDestPaths,
+                    op,
+                    r.item.modifiedSecs,
+                  );
+                  if (ok) {
+                    ok = await _deleteEntryRecursive(
+                      src,
+                      r.item.path,
+                      r.item.isDir,
+                    );
+                  }
+                }
                 if (!ok) {
                   op._recordItemResult(
                     idx,
@@ -1677,6 +1932,16 @@ class FileOperationService extends ChangeNotifier {
     MountedContainer dest,
     ConflictPlan conflictPlan,
   ) async {
+    final runnerT0 = PerfTrace.begin();
+    PerfTrace.count('transfer.backend.local');
+    PerfTrace.count('transfer.items', op.items.length);
+    var firstWritePending = true;
+    void markFirstWrite() {
+      if (!firstWritePending) return;
+      firstWritePending = false;
+      PerfTrace.end('transfer.time_to_first_write', runnerT0, slowMs: 500);
+    }
+
     op._setStatus(FileOperationStatus.running);
     final guardedVolIds = <int>{
       if (!source.isLocalStorage) source.volId,
@@ -1685,11 +1950,13 @@ class FileOperationService extends ChangeNotifier {
     _beginBatches(guardedVolIds);
     try {
       op._setActivity(op.l10n.fileOpResolvingConflicts);
+      final destListT0 = PerfTrace.begin();
       final destDirAbs = _resolveLocal(dest.uri, op.destDirPath);
       final destDir = Directory(destDirAbs);
       final existingEntities = await destDir.exists()
           ? await destDir.list(followLinks: false).toList()
           : const <FileSystemEntity>[];
+      PerfTrace.end('transfer.local_dest_list', destListT0, slowMs: 250);
       final existingNames = <String>{};
       final existingDirs = <String>{};
       for (final entity in existingEntities) {
@@ -1702,7 +1969,13 @@ class FileOperationService extends ChangeNotifier {
 
       final resolved =
           <
-            ({ClipboardItem item, String srcPath, String destPath, bool skip})
+            ({
+              ClipboardItem item,
+              String srcPath,
+              String destPath,
+              bool skip,
+              bool overwrite,
+            })
           >[];
       for (final item in op.items) {
         final fileName = item.name;
@@ -1719,6 +1992,7 @@ class FileOperationService extends ChangeNotifier {
             srcPath: srcPath,
             destPath: destPath,
             skip: true,
+            overwrite: false,
           ));
           continue;
         }
@@ -1728,10 +2002,12 @@ class FileOperationService extends ChangeNotifier {
             srcPath: srcPath,
             destPath: destPath,
             skip: true,
+            overwrite: false,
           ));
           continue;
         }
 
+        var overwrite = false;
         if (existingNames.contains(fileName.toLowerCase())) {
           final resolution =
               conflictPlan[fileName.toLowerCase()] ??
@@ -1743,6 +2019,7 @@ class FileOperationService extends ChangeNotifier {
                 srcPath: srcPath,
                 destPath: destPath,
                 skip: true,
+                overwrite: false,
               ));
               continue;
             case ConflictResolution.overwrite:
@@ -1756,10 +2033,11 @@ class FileOperationService extends ChangeNotifier {
                   srcPath: srcPath,
                   destPath: destPath,
                   skip: true,
+                  overwrite: false,
                 ));
                 continue;
               }
-              await _deleteLocalRecursive(destPath);
+              overwrite = true;
             case ConflictResolution.keepBoth:
               final unique = makeUniqueName(fileName, existingNames);
               existingNames.add(unique.toLowerCase());
@@ -1771,6 +2049,7 @@ class FileOperationService extends ChangeNotifier {
           srcPath: srcPath,
           destPath: destPath,
           skip: false,
+          overwrite: overwrite,
         ));
       }
 
@@ -1793,6 +2072,25 @@ class FileOperationService extends ChangeNotifier {
           op._recordItemResult(i, FileItemResult.skipped);
           continue;
         }
+
+        // Verify source existence before modifying destination!
+        final srcExists = r.item.isDir
+            ? await Directory(r.srcPath).exists()
+            : await File(r.srcPath).exists();
+        if (!srcExists) {
+          op._recordItemResult(
+            i,
+            FileItemResult.failed,
+            errorMessage: op.l10n.bookmarkTargetMissing,
+          );
+          continue;
+        }
+
+        markFirstWrite();
+        if (r.overwrite) {
+          await _deleteLocalRecursive(r.destPath);
+        }
+
         op._setActivity(
           op.isCut
               ? op.l10n.fileOpMovingName(r.item.name)
@@ -1863,8 +2161,30 @@ class FileOperationService extends ChangeNotifier {
   Future<String?> _physicalPath(MountedContainer c, String relPath) async {
     final root = await _physicalRoot(c);
     if (root == null) return null;
-    final rel = relPath.replaceAll('\\', '/').split('/').where((s) => s.isNotEmpty);
+    final rel = relPath
+        .replaceAll('\\', '/')
+        .split('/')
+        .where((s) => s.isNotEmpty);
     return rel.isEmpty ? root : p.joinAll([root, ...rel]);
+  }
+
+  /// SAF rename only changes an entry's leaf name. Moving it between folders
+  /// needs DocumentsContract.moveDocument, with copy-and-delete as fallback.
+  bool _requiresSafMove(
+    MountedContainer src,
+    String srcPath,
+    MountedContainer dest,
+    String destPath,
+  ) {
+    if (!src.isSafStorage || !dest.isSafStorage || src.uri != dest.uri) {
+      return false;
+    }
+    String parentOf(String path) {
+      final parent = p.posix.dirname(path);
+      return parent == '.' ? '' : parent;
+    }
+
+    return parentOf(srcPath) != parentOf(destPath);
   }
 
   /// True when ([a], [aPath]) and ([b], [bPath]) are the same entry.
@@ -1883,7 +2203,8 @@ class FileOperationService extends ChangeNotifier {
     // twice). The same Dart-side rule the check used before.
     if (a.volId == b.volId && aPath == bPath) return true;
     if (a.isSafStorage && b.isSafStorage && a.uri == b.uri) {
-      String clean(String s) => p.posix.normalize(s).replaceAll(RegExp(r'^/+|/+$'), '');
+      String clean(String s) =>
+          p.posix.normalize(s).replaceAll(RegExp(r'^/+|/+$'), '');
       return clean(aPath) == clean(bPath);
     }
     return false;
@@ -2090,7 +2411,8 @@ class FileOperationService extends ChangeNotifier {
       );
     }
 
-    final children = await _fileIoApi.listDirectory(src, srcPath) ?? [];
+    final children = await _fileIoApi.listDirectory(src, srcPath);
+    if (children == null) return false;
     await _fileIoApi.createDirectory(dest, destPath);
     createdDestPaths.add(destPath);
     if (modifiedSecs > 0) {
@@ -2202,6 +2524,14 @@ class FileOperationService extends ChangeNotifier {
     try {
       final size = await _fileIoApi.getFileSize(src, srcPath);
       if (size < 0) return false;
+      if (size == 0) {
+        final srcExists = await _fileIoApi.entryExists(
+          src,
+          srcPath,
+          isDir: false,
+        );
+        if (!srcExists) return false;
+      }
 
       // Last line of defence, right in front of the delete below: if the
       // destination is the source (same real file reached through two
@@ -2284,6 +2614,19 @@ class FileOperationService extends ChangeNotifier {
           }
         }
         return true;
+      }
+
+      // The native vault-to-SAF path already attempted a sequential stream.
+      // Retrying it through offset-based SAF chunks is unsupported by some
+      // cloud providers and can turn their generic write failure into a false
+      // "disk full" result.
+      if (dest.isSafStorage && !src.isLocalStorage) {
+        try {
+          await _fileIoApi.deleteFile(dest, destPath);
+        } catch (_) {
+          // Best effort: the provider may have left a partial document.
+        }
+        return false;
       }
 
       int offset = 0;

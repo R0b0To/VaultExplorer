@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/external_storage_locations_provider.dart';
@@ -8,20 +9,42 @@ import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/external_storage_location.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
+import 'package:vaultexplorer/features/browser/models/file_category.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/drawer_categories_section.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_screen.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
+
+/// Prompts for All Files Access when a raw-path volume (SD card / USB) is
+/// selected without permission granted.
+Future<bool> _ensureAllFilesAccess(BuildContext context, WidgetRef ref) async {
+  final lifecycle = ref.read(vaultLifecycleApiProvider);
+  if (await lifecycle.hasAllFilesAccess()) return true;
+  if (!context.mounted) return false;
+  final shouldRequest = await showAppConfirmDialog(
+    context,
+    title: context.l10n.localStoragePermissionTitle,
+    message: context.l10n.filesPermissionMessage,
+    confirmLabel: context.l10n.localStorageGrantAccess,
+  );
+  if (shouldRequest) {
+    await lifecycle.requestAllFilesAccess(openSettings: true);
+  }
+  return false;
+}
 
 class StorageLocationsDrawer extends ConsumerWidget {
   final int activeVolId;
   final MountedContainer? primaryLocalContainer;
   final ValueChanged<MountedContainer> onSelected;
+  final ValueChanged<FileCategory>? onOpenCategory;
 
   const StorageLocationsDrawer({
     super.key,
     required this.activeVolId,
     required this.primaryLocalContainer,
     required this.onSelected,
+    this.onOpenCategory,
   });
 
   IconData _iconForStorage(String path) {
@@ -111,28 +134,31 @@ class StorageLocationsDrawer extends ConsumerWidget {
       ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       items: [
-        PopupMenuItem(
-          value: 'rename',
-          child: Row(
-            children: [
-              Icon(Icons.edit_outlined, size: 20, color: cs.onSurface),
-              const SizedBox(width: 12),
-              Text(context.l10n.rename),
-            ],
+        if (!loc.isSystemVolume)
+          PopupMenuItem(
+            value: 'rename',
+            child: Row(
+              children: [
+                Icon(Icons.edit_outlined, size: 20, color: cs.onSurface),
+                const SizedBox(width: 12),
+                Text(context.l10n.rename),
+              ],
+            ),
           ),
-        ),
-        PopupMenuItem(
-          value: 'remove',
-          child: Row(
-            children: [
-              Icon(Icons.delete_outline_rounded, size: 20, color: cs.error),
-              const SizedBox(width: 12),
-              Text(context.l10n.remove, style: TextStyle(color: cs.error)),
-            ],
+        if (!loc.isSystemVolume)
+          PopupMenuItem(
+            value: 'remove',
+            child: Row(
+              children: [
+                Icon(Icons.delete_outline_rounded, size: 20, color: cs.error),
+                const SizedBox(width: 12),
+                Text(context.l10n.remove, style: TextStyle(color: cs.error)),
+              ],
+            ),
           ),
-        ),
       ],
     ).then((action) {
+      if (!context.mounted) return;
       if (action == 'rename') {
         _promptRename(context, ref, loc);
       } else if (action == 'remove') {
@@ -185,8 +211,17 @@ class StorageLocationsDrawer extends ConsumerWidget {
                         final isCurrent = activeVolId == loc.volId;
                         return GestureDetector(
                           behavior: HitTestBehavior.opaque,
-                          onSecondaryTapDown: (details) =>
-                              _showLocationContextMenu(context, ref, loc, details.globalPosition),
+                          // System-discovered volumes have no context actions,
+                          // so don't leave a long-press/secondary-tap gesture
+                          // that opens an empty menu.
+                          onSecondaryTapDown: loc.isSystemVolume
+                              ? null
+                              : (details) => _showLocationContextMenu(
+                                  context,
+                                  ref,
+                                  loc,
+                                  details.globalPosition,
+                                ),
                           child: ListTile(
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
                             selected: isCurrent,
@@ -203,18 +238,36 @@ class StorageLocationsDrawer extends ConsumerWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            onLongPress: () {
-                              final box = tileContext.findRenderObject() as RenderBox?;
-                              final pos = box != null
-                                  ? box.localToGlobal(box.size.center(Offset.zero))
-                                  : Offset.zero;
-                              _showLocationContextMenu(context, ref, loc, pos);
-                            },
+                            onLongPress: loc.isSystemVolume
+                                ? null
+                                : () {
+                                    final box =
+                                        tileContext.findRenderObject()
+                                            as RenderBox?;
+                                    final pos = box != null
+                                        ? box.localToGlobal(
+                                            box.size.center(Offset.zero),
+                                          )
+                                        : Offset.zero;
+                                    _showLocationContextMenu(
+                                      context,
+                                      ref,
+                                      loc,
+                                      pos,
+                                    );
+                                  },
                             onTap: () async {
                               if (isCurrent) {
                                 Navigator.pop(context);
                                 return;
                               }
+                              // SAF locations carry their own persisted grant; only raw
+                              // paths (auto-discovered SD card / USB) need file access.
+                              if (!loc.resolvedUri.startsWith('content://') &&
+                                  !await _ensureAllFilesAccess(context, ref)) {
+                                return;
+                              }
+                              if (!context.mounted) return;
                               final isAccessible = await ref
                                   .read(externalStorageLocationsProvider.notifier)
                                   .isAccessible(loc);
@@ -282,6 +335,19 @@ class StorageLocationsDrawer extends ConsumerWidget {
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 1),
                     child: Divider(),
+                  ),
+
+                  // Category shortcuts: the same ones the real drawer has, over
+                  // phone storage and storage locations only.
+                  DrawerCategoriesSection(
+                    primaryLocalContainer: primary,
+                    currentVolId: activeVolId,
+                    onOpenLocalStorage: primary == null
+                        ? null
+                        : () => onSelected(primary),
+                    onSelectContainer: onSelected,
+                    onOpenCategory: onOpenCategory,
+                    includeVaults: false,
                   ),
 
                   // Decoy Settings (Only shows File Manager / Interface settings, no vault security)

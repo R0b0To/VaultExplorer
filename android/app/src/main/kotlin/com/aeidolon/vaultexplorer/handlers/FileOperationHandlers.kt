@@ -54,7 +54,7 @@ class FileOperationHandlers(
             result.error("INVALID_ARGS", "fileName required", null)
             return
         }
-        nativeOps.runNativeOp(call.argument<String>("filePath"), result, executor = queryExecutor) { volId ->
+        nativeOps.runNativeOp(call.argument<String>("filePath"), result, executor = queryExecutor, label = "getFileSize") { volId ->
             ContainerFileSystem.getFileSize(volId, fileName)
         }
     }
@@ -78,7 +78,7 @@ class FileOperationHandlers(
             result.error("INVALID_ARGS", "length must be between 1 and $MAX_CHUNK_BYTES bytes", null)
             return
         }
-        nativeOps.runNativeOp(call.argument<String>("filePath"), result) { volId ->
+        nativeOps.runNativeOp(call.argument<String>("filePath"), result, label = "readFileChunk") { volId ->
             ContainerFileSystem.readFileChunk(volId, fileName, offset, length)
         }
     }
@@ -114,11 +114,38 @@ class FileOperationHandlers(
     fun handleListDirectory(call: MethodCall, result: MethodChannel.Result) {
         val dirPath = call.argument<String>("dirPath") ?: ""
         val refresh = call.argument<Boolean>("refresh") ?: false
-        nativeOps.runNativeOp(call.argument<String>("filePath"), result, executor = queryExecutor) { volId ->
+        nativeOps.runNativeOp(call.argument<String>("filePath"), result, executor = queryExecutor, label = "listDirectory") { volId ->
             if (refresh) {
                 ContainerFileSystem.invalidateCache(volId, dirPath)
             }
             ContainerFileSystem.listDirectory(volId, dirPath)?.toList()
+        }
+    }
+
+    // Symlinks (Cryptomator and ext/NTFS disk images) plus the hidden-entry
+    // count (Cryptomator only). Read-only queries, same executor as listing.
+    fun handleListVaultSymlinks(call: MethodCall, result: MethodChannel.Result) {
+        val dirPath = call.argument<String>("dirPath") ?: ""
+        nativeOps.runNativeOp(call.argument<String>("filePath"), result, executor = queryExecutor, label = "listSymlinks") { volId ->
+            ContainerFileSystem.listSymlinks(volId, dirPath).toList()
+        }
+    }
+
+    fun handleReadVaultSymlink(call: MethodCall, result: MethodChannel.Result) {
+        val path = call.argument<String>("path")
+        if (path == null) {
+            result.error("INVALID_ARGS", "path required", null)
+            return
+        }
+        nativeOps.runNativeOp(call.argument<String>("filePath"), result, executor = queryExecutor) { volId ->
+            ContainerFileSystem.readSymlink(volId, path)   // null: not a (readable) symlink
+        }
+    }
+
+    fun handleGetHiddenEntryCount(call: MethodCall, result: MethodChannel.Result) {
+        val dirPath = call.argument<String>("dirPath") ?: ""
+        nativeOps.runNativeOp(call.argument<String>("filePath"), result, executor = queryExecutor) { volId ->
+            ContainerFileSystem.hiddenEntryCount(volId, dirPath)
         }
     }
 
@@ -130,6 +157,19 @@ class FileOperationHandlers(
         }
         nativeOps.runNativeOp(call.argument<String>("filePath"), result) { volId ->
             ContainerFileSystem.createDirectory(volId, dirPath)
+        }
+    }
+
+    /** Creates a symbolic link inside a Cryptomator vault. [target] is stored exactly as given. */
+    fun handleCreateVaultSymlink(call: MethodCall, result: MethodChannel.Result) {
+        val path = call.argument<String>("path")
+        val target = call.argument<String>("target")
+        if (path == null || target == null) {
+            result.error("INVALID_ARGS", "path and target required", null)
+            return
+        }
+        nativeOps.runNativeOp(call.argument<String>("filePath"), result) { volId ->
+            ContainerFileSystem.createSymlink(volId, path, target)
         }
     }
 

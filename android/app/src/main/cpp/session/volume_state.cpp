@@ -5,8 +5,10 @@
 
 VolumeState volumes[FF_VOLUMES];
 std::mutex slotAllocMutex;
+std::mutex volumeLifecycleMutex;
 
 void VolumeState::reset() {
+    ++sessionEpoch;   // never cleared below: it tells later holders that the session they knew is over
     bitlockerCloseVolume(*this);
 
     if (plainImage) {
@@ -46,6 +48,7 @@ void VolumeState::reset() {
     containerFormat = ContainerFormat::kVeraCrypt;
     luksSectorSize = 512;
     luksGenericCascade.initialized = false;
+    luksCipherWipe(luksCipher);
     isCompositeSource = false;
     composite.reset();
 

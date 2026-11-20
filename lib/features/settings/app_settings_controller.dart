@@ -196,7 +196,15 @@ class AppSettingsController extends _$AppSettingsController {
   ) async {
     final updated = updater(state.settings);
     final languageChanged = updated.languageCode != state.settings.languageCode;
+    final debugLoggingChanged =
+        updated.debugLoggingEnabled != state.settings.debugLoggingEnabled;
     state = state._copy(settings: updated);
+    if (debugLoggingChanged) {
+      VeLog.enabled = updated.debugLoggingEnabled;
+      await ref
+          .read(vaultFileIoApiProvider)
+          .setDebugLogging(updated.debugLoggingEnabled);
+    }
     if (languageChanged) {
       await ref
           .read(vaultLifecycleApiProvider)

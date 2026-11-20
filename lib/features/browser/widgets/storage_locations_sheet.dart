@@ -151,20 +151,23 @@ class StorageLocationsSheet extends ConsumerWidget {
                   children: [
                     if (activeVolId == loc.volId)
                       Icon(Icons.check_circle_rounded, color: cs.primary),
-                    PopupMenuButton<String>(
-                      icon: Icon(Icons.more_vert_rounded, color: cs.onSurfaceVariant),
-                      onSelected: (action) {
-                        if (action == 'rename') {
-                          _promptRename(context, ref, loc);
-                        } else if (action == 'remove') {
-                          _confirmRemove(context, ref, loc);
-                        }
-                      },
-                      itemBuilder: (_) => [
-                        PopupMenuItem(value: 'rename', child: Text(context.l10n.rename)),
-                        PopupMenuItem(value: 'remove', child: Text(context.l10n.remove)),
-                      ],
-                    ),
+                    // System-discovered volumes have no context actions: hide
+                    // the overflow button instead of showing an empty menu.
+                    if (!loc.isSystemVolume)
+                      PopupMenuButton<String>(
+                        icon: Icon(Icons.more_vert_rounded, color: cs.onSurfaceVariant),
+                        onSelected: (action) {
+                          if (action == 'rename') {
+                            _promptRename(context, ref, loc);
+                          } else if (action == 'remove') {
+                            _confirmRemove(context, ref, loc);
+                          }
+                        },
+                        itemBuilder: (_) => [
+                          PopupMenuItem(value: 'rename', child: Text(context.l10n.rename)),
+                          PopupMenuItem(value: 'remove', child: Text(context.l10n.remove)),
+                        ],
+                      ),
                   ],
                 ),
                 onTap: () {

@@ -36,6 +36,7 @@ class NativeOpSupport(
         uriString: String?,
         result: MethodChannel.Result,
         executor: ExecutorService = ioExecutor,
+        label: String? = null,
         block: (volId: Int) -> T,
     ) {
         if (uriString == null) {
@@ -47,9 +48,19 @@ class NativeOpSupport(
             result.error("NOT_MOUNTED", "Container not mounted", null)
             return
         }
+        // With a [label], PerfLog reports how long the op waited for a free
+        // thread on [executor] ("native.<label>.queue_wait") and how long it
+        // then ran ("native.<label>.run"). Both are 0-cost when logging is off.
+        val enqueuedAt = if (label != null) PerfLog.begin() else 0L
         executor.execute {
             try {
+                var runStart = 0L
+                if (enqueuedAt != 0L) {
+                    PerfLog.end("native.$label.queue_wait", enqueuedAt)
+                    runStart = PerfLog.begin()
+                }
                 val value = block(volId)
+                if (runStart != 0L) PerfLog.end("native.$label.run", runStart)
                 activity.runOnUiThread { result.success(value) }
             } catch (e: Exception) {
                 activity.runOnUiThread { dispatchNativeError(e, result) }

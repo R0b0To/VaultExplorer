@@ -2337,6 +2337,14 @@ class AppLocalizationsUk extends AppLocalizations {
   String get gocryptfsCipherLabel => 'Шифр вмісту';
 
   @override
+  String get gocryptfsNamesRandomIvOption =>
+      'Випадковий для кожної папки (за замовчуванням)';
+
+  @override
+  String get gocryptfsNamesDeterministicOption =>
+      'Детермінований (для синхронізованих папок)';
+
+  @override
   String get cryfsCipherLabel => 'Шифр вмісту';
 
   @override
@@ -2499,6 +2507,166 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get selectContainerFileOrFolder => 'Виберіть файл або папку';
+
+  @override
+  String get useBackupHeaderToggleTitle =>
+      'Використовувати резервний заголовок';
+
+  @override
+  String get useBackupHeaderToggleSubtitle =>
+      'Відкрити з резервною копією заголовка, збереженою в кінці тому. Використовуйте, якщо основний заголовок пошкоджено.';
+
+  @override
+  String get keepCurrentOption => 'Зберегти поточний';
+
+  @override
+  String get toolExpandVolumeTitle => 'Розширити том VeraCrypt';
+
+  @override
+  String get toolExpandVolumeSubtitle =>
+      'Збільшити стандартний том, як у десктопній утиліті розширення томів';
+
+  @override
+  String get toolExpandLuksVolumeTitle => 'Розширити контейнер LUKS';
+
+  @override
+  String get toolExpandLuksVolumeSubtitle =>
+      'Збільшення контейнерів LUKS1 та LUKS2, включно з метаданими LUKS2 фіксованого розміру';
+
+  @override
+  String get luksToolsExpandNote =>
+      'Спочатку створіть резервну копію контейнера. Підтримуються LUKS1 та LUKS2. Файлові системи NTFS та ext2/3/4 можна розширювати безпосередньо (FAT та exFAT не підтримуються). Додане місце можна ініціалізувати зашифрованими нулями. Файл ключа замінює пароль, якщо використовується.';
+
+  @override
+  String get toolExpandBitLockerVolumeTitle => 'Розширити контейнер BitLocker';
+
+  @override
+  String get toolExpandBitLockerVolumeSubtitle =>
+      'Збільшує файл тому BitLocker або образ VHD/VHDX і розширює файлову систему NTFS';
+
+  @override
+  String get bitlockerToolsExpandNote =>
+      'Спершу створіть резервну копію контейнера. Ця дія переписує метадані BitLocker, щоб зашифрований том охоплював додане місце, тож перевірте результат на копії, перш ніж покладатися на нього. Працює з повністю зашифрованими томами BitLocker із Windows 7 або новішої — як необроблений файл тому, так і всередині фіксованого чи динамічного VHD або VHDX. Для образу диска введіть новий загальний розмір диска: віртуальний диск і його останній розділ (MBR або GPT) також збільшуються, тому розділ BitLocker має бути останнім. BitLocker To Go і томи із шифруванням під час запису (лише використаний простір) не підтримуються. NTFS можна розширити на місці (FAT і exFAT — ні). Додане місце за бажанням можна заповнити зашифрованими нулями. Розблокуйте паролем або 48-значним ключем відновлення.';
+
+  @override
+  String get bitlockerToolsPasswordLabel => 'Пароль або ключ відновлення';
+
+  @override
+  String get toolHiddenInExistingTitle => 'Додати прихований том';
+
+  @override
+  String get toolHiddenInExistingSubtitle =>
+      'Створити прихований том усередині наявного стандартного тому';
+
+  @override
+  String get vcToolsPickContainer => 'Вибрати контейнер';
+
+  @override
+  String get vcToolsNoContainer => 'Контейнер не вибрано';
+
+  @override
+  String get vcToolsPasswordLabel => 'Пароль тому';
+
+  @override
+  String get vcToolsPimLabel => 'PIM (необов’язково)';
+
+  @override
+  String get vcToolsNewSizeLabel => 'Новий розмір контейнера (МіБ)';
+
+  @override
+  String get vcToolsInitFreeSpace => 'Ініціалізувати новий простір';
+
+  @override
+  String get vcToolsInitFreeSpaceHint =>
+      'Заповнює доданий простір даними, зашифрованими ключем тому, щоб його не можна було відрізнити від решти. Вимкніть для швидкого розширення.';
+
+  @override
+  String get vcToolsExpandAction => 'Розширити том';
+
+  @override
+  String get vcToolsExpandNote =>
+      'Спочатку збільшується контейнер. Потім файлову систему всередині розширюють на додатковий простір, якщо це можливо без повторного форматування (NTFS, ext2/3/4). FAT і exFAT не можна розширити на місці; їхній додатковий простір залишається нерозподіленим. Спершу створіть резервну копію тому.';
+
+  @override
+  String get vcToolsExpandDone => 'Том розширено';
+
+  @override
+  String get vcToolsGrowFsToggle => 'Також розширити файлову систему';
+
+  @override
+  String get vcToolsGrowFsToggleHint =>
+      'Дає томам NTFS і ext2/3/4 змогу одразу використовувати додатковий простір без повторного форматування.';
+
+  @override
+  String get vcToolsGrowFsOnlyAction => 'Лише розширити файлову систему';
+
+  @override
+  String get vcToolsFsGrown =>
+      'Файлову систему розширено: додатковий простір готовий до використання.';
+
+  @override
+  String get vcToolsFsAlreadyFills => 'Файлова система вже займає весь том.';
+
+  @override
+  String get vcToolsFsUnsupported =>
+      'Цю файлову систему не можна розширити на місці (FAT і exFAT не можна). Додатковий простір залишиться нерозподіленим, доки том не буде відформатовано повторно; спершу збережіть його файли.';
+
+  @override
+  String get vcToolsFsBusy =>
+      'У томі все ще відкриті файли. Закрийте їх, заблокуйте том і повторіть спробу «Лише збільшити файлову систему».';
+
+  @override
+  String get vcToolsFsNeedsCheck =>
+      'Файлову систему позначено як таку, що потребує перевірки. Запустіть «Перевірити й виправити» для тому, а потім скористайтеся «Лише розширити файлову систему».';
+
+  @override
+  String get vcToolsFsFailed =>
+      'Не вдалося розширити файлову систему. Сам том збільшено; запустіть «Перевірити й виправити» перед використанням.';
+
+  @override
+  String get vcToolsAnalyzeAction => 'Перевірити вільне місце';
+
+  @override
+  String get vcToolsMaxHidden => 'Максимально можливий прихований том';
+
+  @override
+  String get vcToolsNoRoom =>
+      'Немає місця для прихованого тому: кінець зовнішнього тому використовується.';
+
+  @override
+  String get vcToolsHiddenSizeLabel => 'Розмір прихованого тому (МіБ)';
+
+  @override
+  String get vcToolsHiddenPasswordLabel => 'Пароль прихованого тому';
+
+  @override
+  String get vcToolsHiddenConfirmLabel => 'Підтвердьте пароль прихованого тому';
+
+  @override
+  String get vcToolsHiddenFsLabel => 'Файлова система прихованого тому';
+
+  @override
+  String get vcToolsQuickFormat => 'Швидке форматування';
+
+  @override
+  String get vcToolsCreateHiddenAction => 'Створити прихований том';
+
+  @override
+  String get vcToolsHiddenDone => 'Прихований том створено';
+
+  @override
+  String get vcToolsHiddenNote =>
+      'Прихований том займає вільне місце в кінці зовнішнього тому. Надалі монтуйте зовнішній том із захистом прихованого тому щоразу, коли записуєте на нього, інакше прихований том може бути перезаписано.';
+
+  @override
+  String get vcToolsPasswordsDiffer => 'Паролі не збігаються.';
+
+  @override
+  String get vcToolsInvalidSize => 'Введіть коректний розмір.';
+
+  @override
+  String get vcToolsCredentialsRequired =>
+      'Введіть пароль тому або додайте файл ключа.';
 
   @override
   String get readOnlyModeLabel => 'Режим лише для читання';
@@ -3733,6 +3901,27 @@ class AppLocalizationsUk extends AppLocalizations {
   String get layoutModeGalleryGrid => 'Галерея (сітка)';
 
   @override
+  String get galleryModeAction => 'Галерея';
+
+  @override
+  String get galleryModeTooltip => 'Режим галереї';
+
+  @override
+  String get optionsAction => 'Параметри';
+
+  @override
+  String get optionsActionTooltip => 'Параметри';
+
+  @override
+  String get dateToday => 'Сьогодні';
+
+  @override
+  String get dateYesterday => 'Вчора';
+
+  @override
+  String get dateEarlier => 'Раніше';
+
+  @override
   String get readOnlyCantDeleteTooltip => 'Лише читання — видалення неможливе';
 
   @override
@@ -4437,6 +4626,303 @@ class AppLocalizationsUk extends AppLocalizations {
   String get playMediaAction => 'Відтворити';
 
   @override
+  String get libraryTabAlbums => 'Альбоми';
+
+  @override
+  String get libraryTabArtists => 'Виконавці';
+
+  @override
+  String get libraryTabGenres => 'Жанри';
+
+  @override
+  String get libraryTabTracks => 'Треки';
+
+  @override
+  String get libraryTabFolders => 'Папки';
+
+  @override
+  String get nowPlayingQueue => 'Черга відтворення';
+
+  @override
+  String get nowPlayingShuffle => 'Перемішати';
+
+  @override
+  String get nowPlayingRepeatOff => 'Повторення вимкнено';
+
+  @override
+  String get nowPlayingRepeatAll => 'Повторювати все';
+
+  @override
+  String get nowPlayingRepeatOne => 'Повторювати цей трек';
+
+  @override
+  String get nowPlayingOpenViewer => 'Відкрити в медіаплеєрі';
+
+  @override
+  String get nowPlayingCollapse => 'Згорнути плеєр';
+
+  @override
+  String libraryFolderCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count папок',
+      one: '1 папка',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get librarySearchHint => 'Пошук музики';
+
+  @override
+  String libraryScanListing(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'наразі $count аудіофайлів',
+      one: 'наразі 1 аудіофайл',
+    );
+    return 'Перегляд папок... $_temp0';
+  }
+
+  @override
+  String libraryScanReading(int read, int total) {
+    return 'Зчитування тегів... $read із $total';
+  }
+
+  @override
+  String get libraryScanStop => 'Зупинити';
+
+  @override
+  String get libraryEmptyTitle => 'Музику не знайдено';
+
+  @override
+  String get libraryEmptyMessage =>
+      'У цьому сховищі немає аудіофайлів або вони знаходяться в папках, які не вдалося прочитати.';
+
+  @override
+  String get libraryNoResults => 'Нічого не відповідає вашому запиту';
+
+  @override
+  String get libraryUnknownArtist => 'Невідомий виконавець';
+
+  @override
+  String get libraryUnknownAlbum => 'Невідомий альбом';
+
+  @override
+  String get libraryUnknownGenre => 'Невідомий жанр';
+
+  @override
+  String get libraryVariousArtists => 'Різні виконавці';
+
+  @override
+  String libraryTrackCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count треків',
+      one: '1 трек',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String libraryAlbumCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count альбомів',
+      one: '1 альбом',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get libraryPlayAll => 'Відтворити';
+
+  @override
+  String get libraryShuffleAll => 'Перемішати';
+
+  @override
+  String get libraryMenuRescan => 'Перевірити зміни';
+
+  @override
+  String get libraryMenuRebuild => 'Перечитати всі теги';
+
+  @override
+  String get libraryMenuDeleteSaved => 'Видалити збережений індекс';
+
+  @override
+  String get libraryMenuDeleteSavedDone => 'Збережений індекс видалено';
+
+  @override
+  String get libraryIncompleteNote =>
+      'Деякі папки не вдалося прочитати, тому файли, які могли бути видалені, все ще відображаються.';
+
+  @override
+  String libraryReadFailuresNote(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count файлів не вдалося прочитати',
+      one: '1 файл не вдалося прочитати',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get libraryArtistAlbumsHeader => 'Альбоми';
+
+  @override
+  String get libraryArtistTracksHeader => 'Треки';
+
+  @override
+  String get librarySortTooltip => 'Сортування';
+
+  @override
+  String get librarySortTitle => 'Назва';
+
+  @override
+  String get librarySortArtist => 'Виконавець';
+
+  @override
+  String get librarySortAlbum => 'Альбом';
+
+  @override
+  String get librarySortYear => 'Рік';
+
+  @override
+  String get librarySortRecentlyAdded => 'Нещодавно додані';
+
+  @override
+  String get librarySortName => 'Ім\'я';
+
+  @override
+  String get librarySortTrackCount => 'Кількість треків';
+
+  @override
+  String get librarySortLength => 'Тривалість';
+
+  @override
+  String get librarySortReverse => 'Зворотний порядок';
+
+  @override
+  String get musicModeAction => 'Музичний режим';
+
+  @override
+  String get musicModeFiles => 'Файли';
+
+  @override
+  String get musicModeMenuFolders => 'Музичні папки';
+
+  @override
+  String get musicModeMenuTurnOff => 'Вимкнути музичний режим';
+
+  @override
+  String get libraryStorageInVault =>
+      'Індекс збережено всередині цього сховища';
+
+  @override
+  String get libraryStorageThisDevice =>
+      'Індекс збережено в зашифрованому вигляді на цьому пристрої';
+
+  @override
+  String get musicScopeTitle => 'Музичний режим';
+
+  @override
+  String get musicScopeMessage => 'Виберіть, що має включати музичний режим.';
+
+  @override
+  String get musicScopeAll => 'Усе в цьому розташуванні';
+
+  @override
+  String get musicScopeAllHint =>
+      'Перевіряє кожну папку. Працює повільніше у великих каталогах.';
+
+  @override
+  String get musicScopeChoose => 'Лише деякі папки';
+
+  @override
+  String get musicScopeAddFolder => 'Додати папку';
+
+  @override
+  String get musicScopeNoFolders => 'Папки ще не вибрано';
+
+  @override
+  String get musicScopeStart => 'Почати';
+
+  @override
+  String get musicScopePickerAdd => 'Додати цю папку';
+
+  @override
+  String get musicScopePickerEmpty => 'Тут немає підпапок';
+
+  @override
+  String get musicScopePickerRoot => 'Верхній рівень';
+
+  @override
+  String get musicScopeRemoveFolder => 'Видалити папку';
+
+  @override
+  String libraryArtistCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count виконавців',
+      one: '1 виконавець',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String libraryGenreCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count жанрів',
+      one: '1 жанр',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String musicPlayPartialNote(num count, String source) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count треків',
+      one: '1 треку',
+    );
+    return 'Відтворення $_temp0 із $source. Решта треків списку знаходиться в інших місцях.';
+  }
+
+  @override
+  String get musicCoverChoose => 'Вибрати обкладинку';
+
+  @override
+  String get musicCoverRemove => 'Видалити власну обкладинку';
+
+  @override
+  String get musicCoverFailed =>
+      'Не вдалося використати це зображення як обкладинку';
+
+  @override
+  String get musicMiniPrevious => 'Попередній';
+
+  @override
+  String get musicMiniNext => 'Наступний';
+
+  @override
+  String get musicMiniPlay => 'Відтворити';
+
+  @override
+  String get musicMiniPause => 'Пауза';
+
+  @override
+  String get musicMiniStop => 'Зупинити відтворення';
+
+  @override
   String containerSpaceSummary(String free, String total) {
     return '$free вільно / $total';
   }
@@ -4796,7 +5282,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get toolStorageAnalyzerSubtitle =>
-      'Візуалізація зайнятого простору у відкритому сховищі';
+      'Перегляньте, що займає місце в локальному сховищі або відкритому сховищі.';
 
   @override
   String get toolDuplicateFinderTitle => 'Пошук дублікатів файлів';
@@ -5439,7 +5925,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get storageAnalyzerNoTargetsMessage =>
-      'Спочатку відкрийте сховище, а потім поверніться сюди для перегляду аналітики.';
+      'Відкрийте локальне сховище або підключіть сховище, а потім поверніться сюди, щоб переглянути використання місця.';
 
   @override
   String storageAnalyzerUsedOfTotal(String used, String total) {
@@ -5480,6 +5966,178 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get storageCategoryOther => 'Інше';
+
+  @override
+  String get storageAnalyzerTabMap => 'Карта';
+
+  @override
+  String get storageAnalyzerTabFolders => 'Папки';
+
+  @override
+  String get storageAnalyzerTabTypes => 'Типи';
+
+  @override
+  String get storageAnalyzerTabCleanup => 'Очищення';
+
+  @override
+  String storageAnalyzerFreeSpace(String free) {
+    return '$free вільно';
+  }
+
+  @override
+  String storageAnalyzerFileCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count файлів',
+      few: '$count файли',
+      one: '1 файл',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageAnalyzerItemCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count елементів',
+      few: '$count елементи',
+      one: '1 елемент',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageAnalyzerContentSize(String size) {
+    return 'Вміст сховища: $size';
+  }
+
+  @override
+  String storageAnalyzerScanProgress(String files, String size) {
+    return 'Файлів: $files · $size на цей час';
+  }
+
+  @override
+  String get storageAnalyzerPartialNotice =>
+      'Деякі папки не вдалося прочитати повністю, тому підсумкові значення можуть бути меншими за реальні.';
+
+  @override
+  String get storageAnalyzerStaleNotice =>
+      'Цей том було змінено після сканування.';
+
+  @override
+  String get storageAnalyzerUpOneLevel => 'На один рівень вгору';
+
+  @override
+  String get storageAnalyzerEmptyFolder => 'Ця папка порожня.';
+
+  @override
+  String storageAnalyzerSmallerItems(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count менших елементів',
+      few: '$count менші елементи',
+      one: '1 менший елемент',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get storageAnalyzerMapHint =>
+      'Торкніться папки, щоб відкрити її. Натисніть і утримуйте для вибору.';
+
+  @override
+  String get storageAnalyzerSortFiles => 'Кількість файлів';
+
+  @override
+  String get storageAnalyzerAllTypes => 'Усі типи';
+
+  @override
+  String storageAnalyzerLargestOfType(String type) {
+    return 'Найбільші файли · $type';
+  }
+
+  @override
+  String get storageAnalyzerCleanupHeader => 'Пропозиції';
+
+  @override
+  String get storageAnalyzerCleanupLarge => 'Великі файли';
+
+  @override
+  String get storageAnalyzerCleanupStale => 'Не змінювалися понад рік';
+
+  @override
+  String get storageAnalyzerCleanupTemp => 'Тимчасові та непотрібні файли';
+
+  @override
+  String get storageAnalyzerCleanupEmpty => 'Порожні папки';
+
+  @override
+  String get storageAnalyzerCleanupReview => 'Переглянути';
+
+  @override
+  String get storageAnalyzerCleanupNothing =>
+      'Немає очевидних елементів для очищення. Цей том виглядає охайним.';
+
+  @override
+  String get storageAnalyzerBiggestFiles => 'Найбільші файли';
+
+  @override
+  String get storageAnalyzerBiggestFilesSubtitle =>
+      'Переглянути найбільші файли на цьому томі';
+
+  @override
+  String get storageAnalyzerAllSuggestions => 'Усі пропозиції';
+
+  @override
+  String storageAnalyzerSelectedSummary(int count, String size) {
+    return 'Вибрано $count · $size';
+  }
+
+  @override
+  String storageAnalyzerDeleteFilesMessage(String size) {
+    return 'Вибрані елементи буде назавжди видалено з цього сховища, звільнивши $size. Цю дію неможливо скасувати.';
+  }
+
+  @override
+  String storageAnalyzerDeleteFoldersMessage(String files, String size) {
+    return 'Вибрані елементи буде назавжди видалено ($files файлів, включно з усім вмістом вибраних папок), звільнивши $size. Цю дію неможливо скасувати.';
+  }
+
+  @override
+  String storageAnalyzerDeleteDone(String size) {
+    return 'Звільнено $size';
+  }
+
+  @override
+  String storageAnalyzerDeletePartial(
+    String deleted,
+    String failed,
+    String size,
+  ) {
+    return 'Видалено $deleted, але не вдалося видалити $failed. Звільнено $size.';
+  }
+
+  @override
+  String get storageAnalyzerDeleteNone => 'Нічого не було видалено.';
+
+  @override
+  String get storageAnalyzerDeleteError =>
+      'Не вдалося видалити вибрані елементи.';
+
+  @override
+  String get storageAnalyzerRescanFolder => 'Повторно сканувати цю папку';
+
+  @override
+  String get storageAnalyzerSelectAction => 'Вибрати';
+
+  @override
+  String get storageAnalyzerSelectAllHere => 'Вибрати все в цій папці';
+
+  @override
+  String get storageAnalyzerOpenFolder => 'Відкрити папку';
 
   @override
   String get keyfilePassphraseGeneratorTitle =>
@@ -5937,18 +6595,17 @@ class AppLocalizationsUk extends AppLocalizations {
   String get vaultSyncTapToSelect => 'Торкніться, щоб вибрати сховище та папку';
 
   @override
-  String get vaultSyncSwapTooltip => 'Поміняти місцями Ліве і Праве';
+  String get vaultSyncSwapTooltip => 'Поміняти місцями два сховища';
 
   @override
-  String get vaultSyncSameLocationWarning =>
-      'Ліва і права папки мають відрізнятися.';
+  String get vaultSyncSameLocationWarning => 'Ці дві папки мають відрізнятися.';
 
   @override
   String get vaultSyncIntroTitle => 'Порівняння двох сховищ';
 
   @override
   String get vaultSyncIntroSubtitle =>
-      'Виберіть Ліве і Праве сховище (або дві папки в одному сховищі), щоб побачити відсутні, змінені чи новіші файли з кожного боку.';
+      'Виберіть дві папки (у сховищі, у пам\'яті пристрою чи в провайдера документів, як-от SD-карта або хмарний диск), щоб побачити відсутні, змінені чи новіші файли в кожній.';
 
   @override
   String get vaultSyncCompareButton => 'Порівняти';
@@ -6021,11 +6678,11 @@ class AppLocalizationsUk extends AppLocalizations {
   String get vaultSyncDirectionLabel => 'Напрямок синхронізації';
 
   @override
-  String get vaultSyncDirectionTwoWay => 'Двосторонній (рекомендовано)';
+  String get vaultSyncDirectionTwoWay => 'Двосторонній';
 
   @override
   String get vaultSyncDirectionTwoWaySubtitle =>
-      'Копіює кожен файл на ту сторону, де він відсутній або застарілий';
+      'Копіює відсутні файли й новіші версії на інший бік.';
 
   @override
   String get vaultSyncDirectionLeftToRight => 'Зліва → Справа (в один бік)';
@@ -6122,7 +6779,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get vaultSyncOverlapWarning =>
-      'Ліва та права папки не можуть бути однаковими або вкладеними одна в одну.';
+      'Ці дві папки не можуть бути однаковими або вкладеними одна в одну.';
 
   @override
   String vaultSyncPlaintextWarning(Object targets) {
@@ -6377,6 +7034,13 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get showHiddenFilesDesc =>
       'Відображати файли з крапкою на початку та системні папки';
+
+  @override
+  String get showNoMediaFilesLabel => 'Показувати файли .nomedia';
+
+  @override
+  String get showNoMediaFilesDesc =>
+      'Показувати файли .nomedia у списках папок';
 
   @override
   String get dontAskAgain => 'Більше не запитувати';
@@ -7969,6 +8633,22 @@ class AppLocalizationsUk extends AppLocalizations {
       'Приховувати верхню панель під час прокручування вниз, щоб збільшити простір перегляду';
 
   @override
+  String get autoHideToolbarLabel =>
+      'Автоматично ховати панель інструментів під час прокручування';
+
+  @override
+  String get autoHideToolbarDesc =>
+      'Ховати нижню панель інструментів під час прокручування вниз, щоб збільшити простір перегляду';
+
+  @override
+  String get autoHideBreadcrumbBarLabel =>
+      'Автоматично ховати панель шляху під час прокручування';
+
+  @override
+  String get autoHideBreadcrumbBarDesc =>
+      'Ховати панель навігації шляхом під час прокручування вниз, щоб збільшити простір перегляду';
+
+  @override
   String get useFabForToolbarLabel => 'Плавуча кнопка для панелі інструментів';
 
   @override
@@ -8199,7 +8879,7 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get statusBadgeSubtitle =>
-      'Показує таймер слайд-шоу або індикатор статичного фото';
+      'Показує зворотний відлік слайд-шоу під час його відтворення';
 
   @override
   String get topBarActionsHeader => 'Дії верхньої панелі';
@@ -12549,6 +13229,17 @@ class AppLocalizationsUk extends AppLocalizations {
       'Переміщує панель програми з верхньої частини екрана донизу, щоб її було легше діставати великим пальцем.';
 
   @override
+  String get sectionNavigation => 'Навігація';
+
+  @override
+  String get predictiveBackAnimationsLabel =>
+      'Анімації прогнозованого жесту «Назад»';
+
+  @override
+  String get predictiveBackAnimationsDesc =>
+      'Показувати інтерактивні попередні перегляди й анімації під час переходу назад.';
+
+  @override
   String get selectByIconLabel => 'Вибір дотиком до значка';
 
   @override
@@ -13353,4 +14044,1036 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get comicReaderCarouselScrubberSubtitle =>
       'Показувати мініатюри сторінок над повзунком';
+
+  @override
+  String get vaultSyncBrowseAllButton => 'Переглянути всі елементи';
+
+  @override
+  String get vaultSyncExplorerTitle => 'Переглянути обидва сховища';
+
+  @override
+  String get vaultSyncExplorerEmptyTitle => 'Нічого показувати';
+
+  @override
+  String get vaultSyncExplorerEmptyMessage =>
+      'У цій папці немає елементів, що відповідають фільтру.';
+
+  @override
+  String get vaultSyncExplorerLoadFailedTitle =>
+      'Не вдалося прочитати цю папку';
+
+  @override
+  String get vaultSyncExplorerLoadFailedMessage =>
+      'Не вдалося отримати список одного з двох сховищ. Спробуйте ще раз і переконайтеся, що обидва розблоковані та підключені.';
+
+  @override
+  String get vaultSyncFilterAll => 'Усі';
+
+  @override
+  String get vaultSyncFilterDifferences => 'Відмінності';
+
+  @override
+  String get vaultSyncFilterNewer => 'Новіша копія';
+
+  @override
+  String get vaultSyncFilterConflicts => 'Потребує перегляду';
+
+  @override
+  String get vaultSyncFilterDeletions => 'Видалення';
+
+  @override
+  String get vaultSyncFilterNoMatchesMessage =>
+      'Жоден елемент не відповідає фільтру.';
+
+  @override
+  String get vaultSyncSortTooltip => 'Сортувати';
+
+  @override
+  String get vaultSyncSortPath => 'Шлях';
+
+  @override
+  String get vaultSyncSortSize => 'Найбільші першими';
+
+  @override
+  String get vaultSyncSortModified => 'Найновіші першими';
+
+  @override
+  String get vaultSyncSortStatus => 'Статус';
+
+  @override
+  String get vaultSyncStatusInSync => 'Синхронізовано';
+
+  @override
+  String get vaultSyncStatusFolder => 'Папка';
+
+  @override
+  String vaultSyncDeletionsQueuedLabel(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count видалення',
+      many: '$count видалень',
+      few: '$count видалення',
+      one: '$count видалення',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String vaultSyncConfirmDeletionsMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count елемента буде видалено назавжди. Цю дію не можна скасувати.',
+      many:
+          '$count елементів буде видалено назавжди. Цю дію не можна скасувати.',
+      few: '$count елементи буде видалено назавжди. Цю дію не можна скасувати.',
+      one: '$count елемент буде видалено назавжди. Цю дію не можна скасувати.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get vaultSyncResultsStaleMessage =>
+      'Після видалення результати можуть бути застарілими. Порівняйте знову, щоб оновити лічильники.';
+
+  @override
+  String vaultSyncSelectedCount(num count) {
+    return 'Вибрано: $count';
+  }
+
+  @override
+  String get vaultSyncOpenAction => 'Відкрити';
+
+  @override
+  String vaultSyncOpenCopyAction(String side) {
+    return 'Відкрити копію в $side';
+  }
+
+  @override
+  String get vaultSyncOpenFolderAction => 'Відкрити папку';
+
+  @override
+  String get vaultSyncOpenFolderSubtitle => 'Переглянути вміст в обох сховищах';
+
+  @override
+  String get vaultSyncShowInFolderAction => 'Показати в папці';
+
+  @override
+  String get vaultSyncShowInFolderSubtitle =>
+      'Побачити поруч з іншими елементами в обох сховищах';
+
+  @override
+  String get vaultSyncDeleteFromBothAction => 'Видалити з обох сховищ';
+
+  @override
+  String vaultSyncDeleteBothSidesLabel(String left, String right) {
+    return '$left і $right';
+  }
+
+  @override
+  String vaultSyncDeleteConfirmMessage(String where) {
+    return 'Ці елементи буде остаточно видалено з $where, включно з усім вмістом папок. Цю дію не можна скасувати.';
+  }
+
+  @override
+  String vaultSyncDeleteDoneMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Видалено $count елемента',
+      many: 'Видалено $count елементів',
+      few: 'Видалено $count елементи',
+      one: 'Видалено $count елемент',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String vaultSyncDeletePartialMessage(int deleted, int failed) {
+    return 'Видалено: $deleted, але не вдалося видалити: $failed';
+  }
+
+  @override
+  String get vaultSyncCopyDoneMessage => 'Скопійовано';
+
+  @override
+  String get vaultSyncCopyFailedMessage =>
+      'Деякі елементи не вдалося скопіювати. Подробиці дивіться у списку передавань.';
+
+  @override
+  String vaultSyncOpenFailedMessage(String name) {
+    return 'Не вдалося відкрити $name';
+  }
+
+  @override
+  String get vaultSyncDetailsNotOnThisSide => 'Немає в цьому сховищі';
+
+  @override
+  String get vaultSyncDetailsFolder => 'Папка';
+
+  @override
+  String vaultSyncStatusOnlyIn(String storage) {
+    return 'Лише в $storage';
+  }
+
+  @override
+  String vaultSyncStatusNewerIn(String storage) {
+    return 'Новіше в $storage';
+  }
+
+  @override
+  String vaultSyncBadgeOnlyIn(int count, String storage) {
+    return '$count лише в $storage';
+  }
+
+  @override
+  String vaultSyncBadgeNewerIn(int count, String storage) {
+    return '$count новіших в $storage';
+  }
+
+  @override
+  String vaultSyncFolderOnlyInDetail(String storage) {
+    return 'Папка — лише в $storage';
+  }
+
+  @override
+  String get vaultSyncDirectionOneWay => 'Одностороннє копіювання';
+
+  @override
+  String get vaultSyncDirectionOneWaySubtitle =>
+      'Копіює нові й оновлені файли у вказаному напрямку; джерело не змінюється.';
+
+  @override
+  String get vaultSyncDirectionMirror => 'Дзеркальна синхронізація';
+
+  @override
+  String get vaultSyncDirectionMirrorSubtitle =>
+      'Замінює ціль точною копією; елементи, що є лише в цілі, видаляються.';
+
+  @override
+  String vaultSyncActionCopyTo(String storage) {
+    return 'Копіювати → $storage';
+  }
+
+  @override
+  String vaultSyncCopyNowToAction(String storage) {
+    return 'Скопіювати в $storage зараз';
+  }
+
+  @override
+  String vaultSyncDeleteFromAction(String storage) {
+    return 'Видалити з $storage';
+  }
+
+  @override
+  String vaultSyncPlanDeleteFrom(String storage) {
+    return 'Видалити з $storage під час синхронізації';
+  }
+
+  @override
+  String vaultSyncFilterOnlyIn(String storage) {
+    return 'Лише в $storage';
+  }
+
+  @override
+  String get vaultSyncChooseFirstStorage => 'Виберіть перше сховище';
+
+  @override
+  String get vaultSyncChooseSecondStorage => 'Виберіть друге сховище';
+
+  @override
+  String get vaultSyncChangeButton => 'Змінити';
+
+  @override
+  String get vaultSyncChooseButton => 'Вибрати';
+
+  @override
+  String get vaultSyncChooseStorageTitle => 'Виберіть сховище';
+
+  @override
+  String get vaultSyncChooseStorageHint =>
+      'Спершу виберіть сховище, а потім папку в ньому для порівняння.';
+
+  @override
+  String get vaultSyncCurrentStorageBadge => 'Поточне';
+
+  @override
+  String get vaultSyncChangeStorageTooltip => 'Змінити сховище';
+
+  @override
+  String vaultSyncPickFolderTitle(String storage) {
+    return 'Папка в $storage';
+  }
+
+  @override
+  String get vaultSyncDirectionSectionTitle => 'Напрямок';
+
+  @override
+  String get vaultSyncDirectionMirrorWarning => 'Видаляє файли';
+
+  @override
+  String get vaultSyncDirectionSourceLabel => 'Джерело';
+
+  @override
+  String get vaultSyncDirectionTargetLabel => 'Ціль';
+
+  @override
+  String get vaultSyncDirectionSwapButton => 'Поміняти місцями';
+
+  @override
+  String get vaultSyncDirectionRecommendedLabel => 'Рекомендовано';
+
+  @override
+  String get categoriesSectionTitle => 'Категорії';
+
+  @override
+  String get manageCategoriesTooltip => 'Керування категоріями';
+
+  @override
+  String get categoryShortcutsTitle => 'Ярлики категорій';
+
+  @override
+  String get categoryShortcutsEnable => 'Показувати ярлики категорій';
+
+  @override
+  String get categoryShortcutsEnableSubtitle =>
+      'Зображення, відео, аудіо та документи з усіх ваших сховищ у бічному меню';
+
+  @override
+  String get categoryShortcutsRestore => 'Відновити типові ярлики';
+
+  @override
+  String get categorySourceAll => 'Усі сховища';
+
+  @override
+  String get categorySourceTooltip => 'Вибрати джерело';
+
+  @override
+  String get categoryFolderStructure => 'Показувати вихідну структуру папок';
+
+  @override
+  String categoryScanning(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Сканування… перевірено $count папки',
+      many: 'Сканування… перевірено $count папок',
+      few: 'Сканування… перевірено $count папки',
+      one: 'Сканування… перевірено $count папку',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get categoryEmpty => 'У цій категорії нічого не знайдено';
+
+  @override
+  String get categoryNoVaultsUnlocked => 'Жоден сейф не розблоковано';
+
+  @override
+  String get categoryScanLimitReached =>
+      'Результати можуть бути неповними — сканування досягло ліміту.';
+
+  @override
+  String get categoryShareOneSource =>
+      'Щоб поділитися файлами, вибирайте їх лише з одного сховища за раз.';
+
+  @override
+  String categoryClipboardReady(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count файлу готово до вставлення',
+      many: '$count файлів готові до вставлення',
+      few: '$count файли готові до вставлення',
+      one: '$count файл готовий до вставлення',
+    );
+    return '$_temp0 — відкрийте папку, щоб вставити';
+  }
+
+  @override
+  String get categoryIndexInVaultsTitle =>
+      'Зберігати індекс категорій у сейфах';
+
+  @override
+  String get categoryIndexInVaultsSubtitle =>
+      'Зберігається зашифрованим усередині кожного сейфа в його папці конфігурації під час відкриття категорії, щоб наступного разу файли з’являлися миттєво. На телефоні нічого не зберігається.';
+
+  @override
+  String get categoryIndexClear => 'Очистити індекси категорій';
+
+  @override
+  String get categoryIndexClearSubtitle =>
+      'Видаляє індекс із кожного розблокованого сейфа';
+
+  @override
+  String get categoryIndexCleared => 'Індекси категорій очищено';
+
+  @override
+  String get lockFlushRefusedTitle => 'Не вдалося записати на пристрій';
+
+  @override
+  String lockFlushRefusedMessage(String name) {
+    return 'Контейнер $name не заблоковано, бо пристрій не прийняв останні зміни. Вони й досі очікують у застосунку. Перевірте з’єднання й повторіть спробу або заблокуйте все одно та відкиньте зміни.';
+  }
+
+  @override
+  String get lockAnywayButton => 'Усе одно заблокувати';
+
+  @override
+  String vaultListingSymbolicLinkCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '# символічного посилання',
+      many: '# символічних посилань',
+      few: '# символічні посилання',
+      one: '# символічне посилання',
+      zero: 'Символічних посилань немає',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String vaultListingHiddenEntryCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '# запису не показано',
+      many: '# записів не показано',
+      few: '# записи не показано',
+      one: '# запис не показано',
+      zero: 'Немає прихованих записів',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get vaultListingDetails => 'Деталі';
+
+  @override
+  String get vaultListingSymbolicLinksTitle => 'Ярлики';
+
+  @override
+  String get vaultListingSymbolicLinksNote =>
+      'Торкніться ярлика, щоб відкрити його ціль. Відносні цілі залишаються в межах цього сховища; абсолютні або пошкоджені посилання відкрити неможливо.';
+
+  @override
+  String get vaultListingHiddenEntriesTitle => 'Записи, які не показано';
+
+  @override
+  String get vaultListingHiddenEntriesBody =>
+      'Ці записи є у сховищі, але їх не вдалося показати у списку. Найчастіше це стається, коли застосунок синхронізації створює конфліктні копії (наприклад, \"name (1)\") або передавання ще не завершилося. Конфліктні копії можна вирішити за допомогою Cryptomator на комп’ютері. Тут нічого не змінено й не видалено.';
+
+  @override
+  String get vaultListingTargetUnreadable => '(не вдалося прочитати ціль)';
+
+  @override
+  String get vaultListingLinkTargetCopied => 'Ціль посилання скопійовано';
+
+  @override
+  String get galleryFilterTooltip => 'Фільтр';
+
+  @override
+  String get galleryFilterMenuOpen => 'Фільтр…';
+
+  @override
+  String get galleryFilterClearAll => 'Скинути фільтри';
+
+  @override
+  String get galleryFilterClear => 'Скинути';
+
+  @override
+  String get galleryFilterMatchAny => 'Будь-який';
+
+  @override
+  String get galleryFilterMatchAll => 'Усі';
+
+  @override
+  String get galleryFoldersMenu => 'Папки галереї';
+
+  @override
+  String get galleryFoldersHint =>
+      'Виберіть папки, які сканує галерея. Вкладені папки включено. Якщо нічого не вибрано, сканується все сховище.';
+
+  @override
+  String get galleryFoldersUseAll => 'Сканувати все';
+
+  @override
+  String get galleryFoldersApply => 'Застосувати';
+
+  @override
+  String galleryFilterShownOfTotal(int shown, int total) {
+    return 'Показано $shown із $total';
+  }
+
+  @override
+  String galleryFilterTotal(int count) {
+    return 'Усього: $count';
+  }
+
+  @override
+  String galleryFilterIndexing(int done, int total) {
+    return 'Читання відомостей про фото: $done із $total. Теги, місця й камери з’являються поступово.';
+  }
+
+  @override
+  String get galleryFilterSearchHint => 'Шукати теги, місця, камери, теки…';
+
+  @override
+  String get galleryFilterTapHint =>
+      'Торкніться, щоб показати лише це; утримуйте, щоб приховати.';
+
+  @override
+  String get galleryFilterGroupBy => 'Групувати за';
+
+  @override
+  String galleryFilterShowAll(int count) {
+    return 'Усі ($count)';
+  }
+
+  @override
+  String get galleryFilterShowFewer => 'Менше';
+
+  @override
+  String get galleryGroupNone => 'Немає';
+
+  @override
+  String get galleryGroupDay => 'День';
+
+  @override
+  String get galleryGroupMonth => 'Місяць';
+
+  @override
+  String get galleryGroupYear => 'Рік';
+
+  @override
+  String get galleryGroupFolder => 'Тека';
+
+  @override
+  String get galleryGroupType => 'Тип';
+
+  @override
+  String get galleryGroupPlace => 'Місце';
+
+  @override
+  String get galleryGroupCamera => 'Камера';
+
+  @override
+  String get galleryFilterSectionType => 'Тип';
+
+  @override
+  String get galleryFilterSectionDate => 'Дата';
+
+  @override
+  String get galleryFilterSectionTags => 'Теги';
+
+  @override
+  String get galleryFilterSectionPlaces => 'Місця';
+
+  @override
+  String get galleryFilterSectionCameras => 'Камери';
+
+  @override
+  String get galleryFilterSectionOrientation => 'Орієнтація';
+
+  @override
+  String get galleryFilterSectionRating => 'Оцінка';
+
+  @override
+  String get galleryFilterSectionSize => 'Розмір файлу';
+
+  @override
+  String get galleryFilterSectionFolders => 'Теки';
+
+  @override
+  String get galleryFilterSectionMissing => 'Відсутнє';
+
+  @override
+  String get galleryTypePhotos => 'Фото';
+
+  @override
+  String get galleryTypeVideos => 'Відео';
+
+  @override
+  String get galleryTypeAnimated => 'Анімовані';
+
+  @override
+  String get galleryOrientationLandscape => 'Альбомна';
+
+  @override
+  String get galleryOrientationPortrait => 'Портретна';
+
+  @override
+  String get galleryOrientationSquare => 'Квадратна';
+
+  @override
+  String get gallerySizeSmall => 'Менше ніж 1 МБ';
+
+  @override
+  String get gallerySizeMedium => '1 – 10 МБ';
+
+  @override
+  String get gallerySizeLarge => 'Понад 10 МБ';
+
+  @override
+  String get galleryMissingLocation => 'Без місця';
+
+  @override
+  String get galleryMissingTags => 'Без тегів';
+
+  @override
+  String get galleryMissingCamera => 'Без даних про камеру';
+
+  @override
+  String get galleryMissingDateTaken => 'Без дати зйомки';
+
+  @override
+  String galleryPlaceHintCity(int km) {
+    return 'Найближче місто в межах $km км';
+  }
+
+  @override
+  String galleryPlaceHintCoordinates(int km) {
+    return 'Немає міст у межах $km км: згруповано за координатами';
+  }
+
+  @override
+  String get cryptomatorBackupKeyFilesTitle =>
+      'Резервне копіювання файлів ключів під час розблокування';
+
+  @override
+  String get cryptomatorBackupKeyFilesSubtitle =>
+      'Зберігає копію masterkey.cryptomator і vault.cryptomator поруч з оригіналами, як Cryptomator на комп’ютері. Діє з наступного розблокування. Сеанси лише для читання нічого не записують.';
+
+  @override
+  String get cryptomatorUpgradeTitle => 'Оновити формат сховища';
+
+  @override
+  String get cryptomatorUpgradeSubtitle =>
+      'Це сховище використовує старіший формат 7.';
+
+  @override
+  String get cryptomatorUpgradeLockFirst =>
+      'Заблокуйте сховище, щоб оновити його';
+
+  @override
+  String get cryptomatorUpgradeWarning =>
+      'Оновлення змінює формат цього сховища на 8. Це не можна скасувати, і версії Cryptomator, старіші за 1.6, більше не зможуть відкрити це сховище.\n\nКопія поточного файлу ключа зберігається як masterkey.cryptomator.<id>.bkup. Якщо інший застосунок синхронізує це сховище, спершу дочекайтеся завершення синхронізації.';
+
+  @override
+  String get cryptomatorUpgradeConfirm => 'Я розумію, що це не можна скасувати';
+
+  @override
+  String get cryptomatorUpgradeAction => 'Оновити';
+
+  @override
+  String get cryptomatorUpgradedMessage => 'Сховище оновлено до формату 8';
+
+  @override
+  String get cryptomatorUpgradeUnlockedError => 'Спершу заблокуйте сховище';
+
+  @override
+  String get cryptomatorConfigMissingWarning =>
+      'Файл vault.cryptomator відсутній. Якщо інший застосунок синхронізує це сховище, дочекайтеся завершення й спробуйте ще раз. Не оновлюйте.';
+
+  @override
+  String get cryptomatorUpgradeFailedMessage => 'Не вдалося оновити сховище';
+
+  @override
+  String get newSymbolicLinkTitle => 'Нове символічне посилання';
+
+  @override
+  String get symbolicLinkNameHint => 'Назва посилання';
+
+  @override
+  String get symbolicLinkTargetHint => 'Вказує на';
+
+  @override
+  String get symbolicLinkTargetHelper =>
+      'Зберігається точно так, як введено. Під час відкриття відносні цілі визначаються в межах цього сховища; абсолютні цілі не переходять за посиланням.';
+
+  @override
+  String get symbolicLinkTargetTooLong =>
+      'Ціль задовга (максимум 32 767 байтів)';
+
+  @override
+  String get symbolicLinkTargetInvalid =>
+      'Ціль не може містити нульовий символ';
+
+  @override
+  String get symbolicLinkNameTaken =>
+      'Файл, папка або посилання з такою назвою вже існує';
+
+  @override
+  String get deleteSymbolicLinkTitle => 'Видалити символічне посилання?';
+
+  @override
+  String deleteSymbolicLinkMessage(String name) {
+    return 'Видалити посилання «$name»? Видаляється лише посилання; те, на що воно вказує, не чіпається.';
+  }
+
+  @override
+  String get symbolicLinkRenameTitle => 'Перейменувати символічне посилання';
+
+  @override
+  String get symbolicLinkBrowseTarget => 'Переглянути сховище';
+
+  @override
+  String get symbolicLinkSelectTargetTitle => 'Вибрати ціль ярлика';
+
+  @override
+  String get symbolicLinkSelectThisFolder => 'Вибрати цю папку';
+
+  @override
+  String get symbolicLinkPickerLoadError => 'Не вдалося завантажити цю папку';
+
+  @override
+  String get shortcutBadge => 'Ярлик';
+
+  @override
+  String get emptyFolder => 'Ця папка порожня';
+
+  @override
+  String get symbolicLinkTargetHelperRelative =>
+      'Використовуйте відносний шлях у межах цього контейнера. Ціль може ще не існувати; перейменування або видалення посилання не змінює ціль.';
+
+  @override
+  String get symbolicLinkTargetOutsideVault =>
+      'Ціль має бути відносним шляхом у межах цього контейнера.';
+
+  @override
+  String get symbolicLinkPickerUnresolvable =>
+      'Звідси не вдається створити відносну ціль. Введіть ціль вручну.';
+
+  @override
+  String get editMetadataAction => 'Редагувати метадані';
+
+  @override
+  String get editTagsAction => 'Редагувати теги';
+
+  @override
+  String get editDateTimeAction => 'Редагувати дату й час';
+
+  @override
+  String get removeMetadataAction => 'Видалити метадані';
+
+  @override
+  String get metadataFormatsNote =>
+      'Теги, дати та видалення записуються в зображення JPEG, PNG і WebP. Інші файли отримують лише нову дату змінення.';
+
+  @override
+  String get metadataReadOnlyMessage => 'Це сховище лише для читання';
+
+  @override
+  String get tagsAddHint => 'Додайте теги, розділені комами';
+
+  @override
+  String get tagsNoneYet => 'Тегів ще немає';
+
+  @override
+  String get dateModeSet => 'Встановити';
+
+  @override
+  String get dateModeShift => 'Зсунути';
+
+  @override
+  String get dateModeFromModified => 'З дати змінення';
+
+  @override
+  String get dateModeFromName => 'З імені файлу';
+
+  @override
+  String get dateShiftLater => 'Пізніше';
+
+  @override
+  String get dateShiftEarlier => 'Раніше';
+
+  @override
+  String get dateDaysLabel => 'Дні';
+
+  @override
+  String get dateHoursLabel => 'Години';
+
+  @override
+  String get dateMinutesLabel => 'Хвилини';
+
+  @override
+  String get dateAlsoSetModified => 'Також встановити дату змінення файлу';
+
+  @override
+  String dateFromNameMatches(int matched, int total) {
+    return '$matched із $total імен файлів містять дату';
+  }
+
+  @override
+  String get stripExifLabel => 'Exif (камера, дата, місце)';
+
+  @override
+  String get stripXmpLabel => 'XMP (теги, оцінка, дані редагування)';
+
+  @override
+  String get stripIptcLabel => 'IPTC / Photoshop (підписи, авторство)';
+
+  @override
+  String get stripCommentsLabel => 'Коментарі';
+
+  @override
+  String get stripIccLabel => 'Профіль кольору (може змінити кольори)';
+
+  @override
+  String get stripKeepOrientationLabel => 'Зберегти орієнтацію';
+
+  @override
+  String get stripKeepOrientationDesc =>
+      'Без цього фото, зняті боком, можуть відображатися повернутими';
+
+  @override
+  String get stripWarning => 'Це перезаписує файли й не може бути скасоване.';
+
+  @override
+  String metadataProgress(int done, int total) {
+    return 'Оновлення $done з $total';
+  }
+
+  @override
+  String metadataResultUpdated(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Оновлено файлів: $count',
+      one: 'Оновлено 1 файл',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get metadataResultUnchanged => 'Нічого змінювати';
+
+  @override
+  String metadataResultSkipped(int count) {
+    return 'Пропущено: $count (не підтримується)';
+  }
+
+  @override
+  String metadataResultFailed(int count) {
+    return 'Не вдалося: $count';
+  }
+
+  @override
+  String get showNoMediaFoldersLabel => 'Показувати папки .nomedia';
+
+  @override
+  String get showNoMediaFoldersDesc =>
+      'Включити папки з файлом .nomedia, які застосунки галереї зазвичай пропускають';
+
+  @override
+  String get motionPhotoCopyNote =>
+      'Відредагована копія буде нерухомим зображенням. Оригінальний файл, дані EXIF і будь-яке вбудоване відео залишаться незмінними.';
+
+  @override
+  String get pimInputHint => 'Порожньо або 0 за замовчуванням';
+
+  @override
+  String get galleryMetadataIndexStorageLabel =>
+      'Gallery metadata index storage';
+
+  @override
+  String get galleryMetadataUseGlobalDefaultDesc =>
+      'Follow the app-wide gallery metadata index storage setting.';
+
+  @override
+  String get galleryMetadataAppStorageOption => 'App storage';
+
+  @override
+  String get galleryMetadataInVaultOption => 'Inside vault';
+
+  @override
+  String get galleryMetadataSectionHeader => 'Gallery Metadata Index';
+
+  @override
+  String get galleryMetadataUseGlobalDefaultTitle =>
+      'Use app-wide gallery index setting';
+
+  @override
+  String get musicIndexSectionHeader => 'Music Index';
+
+  @override
+  String get musicIndexStorageLabel => 'Music index storage';
+
+  @override
+  String get musicIndexUseGlobalDefaultTitle =>
+      'Use app-wide music index setting';
+
+  @override
+  String get musicIndexUseGlobalDefaultDesc =>
+      'Follow the app-wide music index storage setting.';
+
+  @override
+  String get musicIndexAppStorageOption => 'App storage';
+
+  @override
+  String get musicIndexInVaultOption => 'Inside vault';
+
+  @override
+  String get musicIndexHiddenFolderOption => 'Hidden folder';
+
+  @override
+  String get musicIndexHiddenFolderDesc =>
+      'Stored in an unencrypted hidden folder in Local Storage.';
+
+  @override
+  String get libraryStorageHiddenFolder =>
+      'Index saved in an unencrypted hidden folder';
+
+  @override
+  String get libraryStorageDisabled =>
+      'Saved music index is disabled; tracks are rescanned each time.';
+
+  @override
+  String get galleryMetadataClearAction => 'Clear saved gallery index';
+
+  @override
+  String get galleryMetadataClearConfirmTitle =>
+      'Clear gallery metadata index?';
+
+  @override
+  String get galleryMetadataClearConfirmMessage =>
+      'This deletes saved photo details. The index will be rebuilt as you browse the gallery.';
+
+  @override
+  String get galleryMetadataIndexClearedMessage =>
+      'Gallery metadata index cleared.';
+
+  @override
+  String get musicIndexClearAction => 'Clear saved music index';
+
+  @override
+  String get musicIndexClearConfirmTitle => 'Clear saved music index?';
+
+  @override
+  String get musicIndexClearConfirmMessage =>
+      'This deletes saved track details. Music Mode will rebuild the index the next time it opens.';
+
+  @override
+  String get musicIndexClearedMessage => 'Music index cleared.';
+
+  @override
+  String get clearSavedIndexButton => 'Clear index';
+
+  @override
+  String get appIndexClearedUnlockMessage =>
+      'App-storage copy cleared. Open the vault with write access to clear any index copy inside it.';
+
+  @override
+  String get savedIndexClearFailedMessage =>
+      'Could not clear all saved index data.';
+
+  @override
+  String get libraryStorageReadOnly =>
+      'Vault is read-only; the music index is not saved.';
+
+  @override
+  String get clearLocalStorageThumbnailCacheMessage =>
+      'This will delete cached thumbnails for Local Storage. They will be regenerated the next time you browse media.';
+
+  @override
+  String vcToolsDetectedFormat(String format) {
+    return 'Виявлено: $format';
+  }
+
+  @override
+  String get vcToolsUnencryptedDetected =>
+      'Схоже, файл не зашифровано; для цього інструмента потрібен зашифрований контейнер';
+
+  @override
+  String get vcToolsAssumingVeraCrypt =>
+      'Формат не визначено автоматично; припускаємо VeraCrypt';
+
+  @override
+  String get vcToolsManualFormat => 'Установити вручну';
+
+  @override
+  String get vcToolsExpandInsufficientSpaceForSize =>
+      'На пристрої недостатньо вільного місця для такого розміру.';
+
+  @override
+  String vcToolsNewSizePreview(String size) {
+    return 'Новий розмір: $size';
+  }
+
+  @override
+  String vcToolsNewSizePreviewWithAdded(String size, String added) {
+    return 'Новий розмір: $size (+$added)';
+  }
+
+  @override
+  String get vcToolsFileSize => 'Розмір файла';
+
+  @override
+  String get vcToolsCurrentSize => 'Поточний розмір';
+
+  @override
+  String vcToolsFreeOnDevice(String size) {
+    return 'Вільне місце на пристрої: $size';
+  }
+
+  @override
+  String get vcToolsSetExactTotalInstead =>
+      'Натомість указати точний загальний розмір';
+
+  @override
+  String get vcToolsBitLockerDiskImageSizeHint =>
+      'Для образу диска (VHD/VHDX) введіть новий загальний розмір віртуального диска, а не розмір файла.';
+
+  @override
+  String get vcToolsNewTotalSize => 'Новий загальний розмір';
+
+  @override
+  String get vcToolsAddSize => 'Додати';
+
+  @override
+  String vcToolsQuickAddGiB(String amount) {
+    return '+$amount GiB';
+  }
+
+  @override
+  String get vcToolsDoubleSize => 'Подвоїти';
+
+  @override
+  String get vcToolsSizeMustExceedCurrent =>
+      'Новий розмір має бути більшим за поточний.';
+
+  @override
+  String get vcToolsInsufficientFreeSpace =>
+      'На пристрої недостатньо вільного місця.';
+
+  @override
+  String get vcToolsContainerSectionHeader => 'Контейнер';
+
+  @override
+  String get vcToolsCredentialsSectionHeader => 'Облікові дані';
+
+  @override
+  String get vcToolsVolumeOptionsSectionHeader => 'Параметри тому';
+
+  @override
+  String get vcToolsDetectingFormat => 'Визначення…';
+
+  @override
+  String get indexesAndThumbnailsTitle => 'Індекси й мініатюри';
+
+  @override
+  String get indexesAndThumbnailsSubtitle =>
+      'Керуйте зберіганням мініатюр, метаданими галереї та музичним індексом.';
+
+  @override
+  String get resetFileManagerSettingsTitle =>
+      'Скинути налаштування файлового менеджера?';
+
+  @override
+  String get resetFileManagerSettingsMessage =>
+      'Усі параметри на цьому екрані повернуться до значень за замовчуванням, зокрема налаштування вкладок, розмітки, панелі інструментів, сітки, мініатюр, засобу перегляду та оформлення. Ваші файли, закладки та вибір для окремих папок не змінюються.';
 }

@@ -103,6 +103,14 @@ class FileManagerToolbarService {
     return _cache!;
   }
 
+  /// Drops the cached music mode hint for a storage that was removed from the
+  /// app, so no entry for it lingers on the device.
+  Future<void> forgetMusicModeHint(String containerUri) async {
+    final config = await load();
+    if (!config.isMusicModeHintedForStorage(containerUri)) return;
+    await save(config.withMusicModeHintForStorage(containerUri, false));
+  }
+
   Future<void> save(FileManagerToolbarConfig config) async {
     _cache = config;
     try {

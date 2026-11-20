@@ -1,10 +1,15 @@
 package com.aeidolon.vaultexplorer.container
 
+import android.net.Uri
 import java.io.FileNotFoundException
 import com.aeidolon.vaultexplorer.MainActivity
+import com.aeidolon.vaultexplorer.PerfLog
 import com.aeidolon.vaultexplorer.VeLog
 import com.aeidolon.vaultexplorer.bridge.CopyProgressBridge
 import com.aeidolon.vaultexplorer.cancellation.CopyCancellation
+import com.aeidolon.vaultexplorer.foldervault.NativeVaultSession
+import com.aeidolon.vaultexplorer.saf.SafStorageManager
+import com.aeidolon.vaultexplorer.volman.NativeVolumeManager
 
 object ContainerFileSystem {
 
@@ -12,7 +17,11 @@ object ContainerFileSystem {
 
     inline fun <T> withReadLock(volId: Int, block: () -> T): T {
         val lock = ContainerSessionRegistry.locks[volId].readLock()
+        // How long this caller sat waiting for the volume's lock (behind a
+        // writer, or behind a writer queued ahead of it on the fair lock).
+        val waitStart = PerfLog.begin()
         lock.lock()
+        PerfLog.end("fs.read_lock_wait", waitStart)
         try {
             return block()
         } finally {
@@ -22,7 +31,9 @@ object ContainerFileSystem {
 
     inline fun <T> withWriteLock(volId: Int, block: () -> T): T {
         val lock = ContainerSessionRegistry.locks[volId].writeLock()
+        val waitStart = PerfLog.begin()
         lock.lock()
+        PerfLog.end("fs.write_lock_wait", waitStart)
         try {
             return block()
         } finally {
@@ -80,6 +91,34 @@ object ContainerFileSystem {
         return copyFileStreaming(srcVolId, srcPath, destVolId, destPath, opId)
     }
 
+    /** Streams decrypted vault bytes directly into a sequential SAF writer. */
+    fun copyFileToSafStorage(
+        srcVolId: Int,
+        srcPath: String,
+        destTreeUri: Uri,
+        destPath: String,
+        safStorageManager: SafStorageManager,
+        opId: Int = 0,
+    ): Boolean {
+        val total = getFileSize(srcVolId, srcPath)
+        if (total < 0L) return false
+
+        val input = VaultCopyInputStream(
+            total = total,
+            readChunk = { offset, length -> readFileChunk(srcVolId, srcPath, offset, length) },
+            isCancelled = { opId > 0 && CopyCancellation.isCancelled(opId) },
+            onProgress = { bytes -> CopyProgressBridge.reportProgress(opId, bytes) },
+        )
+        return try {
+            safStorageManager.writeStreamToFile(destTreeUri, destPath, input) && input.position == total
+        } catch (e: Exception) {
+            VeLog.w("ContainerFileSystem") { "vault-to-SAF streaming copy failed: ${e.message}" }
+            false
+        } finally {
+            input.close()
+        }
+    }
+
     private fun copyFileStreaming(
         srcVolId: Int, srcPath: String, destVolId: Int, destPath: String, opId: Int,
     ): Boolean {
@@ -91,6 +130,16 @@ object ContainerFileSystem {
             return ContainerEngine.copyFileViaBackend(srcVolId, srcPath, destVolId, destPath, opId,
                 extract = { path, dest -> extractFileLocked(srcVolId, path, dest, opId) },
                 writeBack = { path, source -> writeBackFile(destVolId, path, source, opId) })
+        }
+
+        // The native volume manager (cpp/volman) does this whole transfer in one call: chunks go from
+        // the source to the destination in C++ memory, with the same progress, cancellation and
+        // "delete what this attempt created" behaviour as the loop below. Only when a side cannot be
+        // handed to it (library without the manager, volume not attachable) does the Kotlin loop run.
+        when (copyViaNativeManager(srcVolId, srcPath, destVolId, destPath, opId)) {
+            NativeVolumeManager.COPY_OK -> return true
+            NativeVolumeManager.COPY_FAILED, NativeVolumeManager.COPY_CANCELLED -> return false
+            else -> Unit
         }
 
         val input = VaultCopyInputStream(
@@ -126,6 +175,49 @@ object ContainerFileSystem {
         } catch (_: Exception) {
         }
         return false
+    }
+
+    /**
+     * [NativeVolumeManager.COPY_NOT_ATTACHED] when the native manager cannot take part (not available,
+     * or a side cannot be attached); otherwise the native copy's own result. Attaching is lazy and the
+     * native side drops slots whose container was locked, so there is no lifecycle to keep in sync.
+     */
+    private fun copyViaNativeManager(
+        srcVolId: Int, srcPath: String, destVolId: Int, destPath: String, opId: Int,
+    ): Int {
+        if (!NativeVolumeManager.isAvailable) return NativeVolumeManager.COPY_NOT_ATTACHED
+        val attached = try {
+            attachToNativeManager(srcVolId) && attachToNativeManager(destVolId)
+        } catch (e: Exception) {
+            VeLog.w("ContainerFileSystem") { "native volume manager attach failed: ${e.message}" }
+            false
+        } catch (_: UnsatisfiedLinkError) {
+            false
+        }
+        if (!attached) return NativeVolumeManager.COPY_NOT_ATTACHED
+        // Past this point the copy may have started: an exception is a failed copy, never a reason to
+        // run the Kotlin loop over it a second time (progress would be reported twice).
+        return try {
+            NativeVolumeManager.nativeCopyFile(srcVolId, srcPath, destVolId, destPath, opId)
+        } catch (e: Exception) {
+            VeLog.w("ContainerFileSystem") { "native copy failed: ${e.message}" }
+            NativeVolumeManager.COPY_FAILED
+        }
+    }
+
+    /**
+     * Makes sure native manager slot [volId] holds the volume this session is: the shared folder-vault
+     * session, or the engine's block-device volume. The tag names the session, so a slot that still
+     * belongs to another live session is never taken over (false -> the caller keeps its own path).
+     */
+    private fun attachToNativeManager(volId: Int): Boolean {
+        val backend = VaultBackendRegistry.get(volId)
+        if (backend != null) {
+            val handle = (backend as? NativeVaultSession)?.nativeHandle() ?: return false
+            return handle != 0L && NativeVolumeManager.nativeAttachFolderVault(volId, handle, "fv:$handle")
+        }
+        val session = ContainerSessionRegistry.activeSessions[volId] ?: return false
+        return NativeVolumeManager.nativeAttachBlock(volId, "blk:${session.uri}")
     }
 
     /** Disk-image destinations take the file as offset-addressed chunks. */
@@ -196,6 +288,15 @@ fun endBatchDelete(volId: Int) {
     fun listDirectory(volId: Int, dirPath: String): Array<String>? =
         withReadLock(volId) { ContainerEngine.listDirectory(dirPath, volId) }
 
+    fun listSymlinks(volId: Int, dirPath: String): Array<String> =
+        withReadLock(volId) { ContainerEngine.listSymlinks(dirPath, volId) }
+
+    fun readSymlink(volId: Int, path: String): String? =
+        withReadLock(volId) { ContainerEngine.readSymlink(path, volId) }
+
+    fun hiddenEntryCount(volId: Int, dirPath: String): Int =
+        withReadLock(volId) { ContainerEngine.hiddenEntryCount(dirPath, volId) }
+
     fun invalidateCache(volId: Int, dirPath: String = "") {
         withWriteLock(volId) { ContainerEngine.invalidateCache(dirPath, volId) }
     }
@@ -205,6 +306,12 @@ fun endBatchDelete(volId: Int) {
     fun createDirectory(volId: Int, dirPath: String): Boolean {
         requireSession(volId)
         return withWriteLock(volId) { ContainerEngine.createDirectory(dirPath, volId) }
+    }
+
+    /** Creates a symbolic link (Cryptomator vaults). Never follows or reads [target]; see ContainerEngine.createSymlink. */
+    fun createSymlink(volId: Int, path: String, target: String): Boolean {
+        requireSession(volId)
+        return withWriteLock(volId) { ContainerEngine.createSymlink(path, target, volId) }
     }
 
     fun renameFile(volId: Int, oldPath: String, newPath: String): Boolean {
@@ -324,6 +431,14 @@ fun endBatchDelete(volId: Int) {
             readBufferPool.set(tmp)
         }
         val bytesRead = readStream(volId, streamPtr, offset, tmp, length)
+        // A count the caller's buffer cannot hold means the native read
+        // misreported; copying it would overrun `out`, so treat it as a failed
+        // read instead of corrupting memory or throwing mid-playback.
+        if (bytesRead > length || bytesRead > tmp.size || bufferOffset < 0 ||
+            (bytesRead > 0 && bufferOffset + bytesRead > out.size)
+        ) {
+            return -1
+        }
         if (bytesRead > 0) {
             System.arraycopy(tmp, 0, out, bufferOffset, bytesRead)
         }

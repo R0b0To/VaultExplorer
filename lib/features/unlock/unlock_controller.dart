@@ -79,6 +79,7 @@ class UnlockState {
   final bool checkingContainer;
   final bool remember;
   final bool readOnly;
+  final bool useBackupHeader;
   final bool hasAllStorageAccess;
   final String? error;
   final int cipherId;
@@ -170,6 +171,7 @@ class UnlockState {
     this.checkingContainer = false,
     this.remember = false,
     this.readOnly = false,
+    this.useBackupHeader = false,
     this.hasAllStorageAccess = false,
     this.error,
     this.cipherId = 255,
@@ -212,6 +214,7 @@ class UnlockState {
     bool? checkingContainer,
     bool? remember,
     bool? readOnly,
+    bool? useBackupHeader,
     bool? hasAllStorageAccess,
     String? error,
     bool clearError = false,
@@ -256,6 +259,7 @@ class UnlockState {
     checkingContainer: checkingContainer ?? this.checkingContainer,
     remember: remember ?? this.remember,
     readOnly: readOnly ?? this.readOnly,
+    useBackupHeader: useBackupHeader ?? this.useBackupHeader,
     hasAllStorageAccess: hasAllStorageAccess ?? this.hasAllStorageAccess,
     error: clearError ? null : (error ?? this.error),
     cipherId: cipherId ?? this.cipherId,
@@ -569,6 +573,8 @@ class UnlockController extends _$UnlockController {
     readOnly: val,
     protectHiddenVolume: val ? false : state.protectHiddenVolume,
   );
+
+  void setUseBackupHeader(bool val) => state = state._copy(useBackupHeader: val);
 
   void setRemember(bool val) => state = state._copy(remember: val);
 
@@ -1864,6 +1870,7 @@ class UnlockController extends _$UnlockController {
               cacheDerivedKey: shouldCacheDerivedKey,
               keyfilePaths: effectiveKeyfiles,
               readOnly: state.readOnly,
+              useBackupHeader: state.useBackupHeader,
               protectHiddenVolume: state.protectHiddenVolume,
               hiddenVolumePassword: hiddenPasswordText,
               hiddenVolumePim: hiddenPim,
@@ -1885,6 +1892,7 @@ class UnlockController extends _$UnlockController {
                 cacheDerivedKey: shouldCacheDerivedKey,
                 keyfilePaths: effectiveKeyfiles,
                 readOnly: state.readOnly,
+                useBackupHeader: state.useBackupHeader,
                 protectHiddenVolume: state.protectHiddenVolume,
                 hiddenVolumePassword: hiddenPasswordText,
                 hiddenVolumePim: hiddenPim,
@@ -1933,6 +1941,7 @@ class UnlockController extends _$UnlockController {
             cacheDerivedKey: shouldCacheDerivedKey,
             keyfilePaths: retryKeyfiles,
             readOnly: state.readOnly,
+            useBackupHeader: state.useBackupHeader,
             protectHiddenVolume: state.protectHiddenVolume,
             hiddenVolumePassword: hiddenPasswordText,
             hiddenVolumePim: hiddenPim,

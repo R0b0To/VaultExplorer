@@ -142,7 +142,9 @@ FileOpenAction decideFileOpenAction({
   if (ext == 'epub') return const OpenInEpubReader();
   if (kComicExtensions.contains(ext)) return const OpenInComicReader();
   if (ext == 'html' || ext == 'htm') return const OpenInHtmlViewer();
-  if (ext == 'md' || ext == 'markdown') return const OpenInEditor();
+  if (ext == 'txt' || ext == 'md' || ext == 'markdown') {
+    return const OpenInEditor();
+  }
   if (ext == 'apk') return const ShowApkOpenChooser();
   return const ShowOpenWithDialog();
 }

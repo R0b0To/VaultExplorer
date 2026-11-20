@@ -18,21 +18,26 @@ import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
 import 'package:vaultexplorer/data/models/tab_swipe_gestures.dart';
 import 'package:vaultexplorer/data/models/external_storage_location.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/models/vault_marks.dart';
+import 'package:vaultexplorer/features/browser/controllers/bookmark_navigation_request.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_search_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_chrome_hub.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_drag_session.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
 import 'package:vaultexplorer/features/browser/models/browser_viewport_options.dart';
+import 'package:vaultexplorer/features/browser/models/file_category_presentation.dart';
 import 'package:vaultexplorer/features/browser/models/tab_id.dart';
 import 'package:vaultexplorer/features/browser/widgets/adaptive_browser_app_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_app_bar_factory.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_new_tab_sheet.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_tab_strip.dart';
+import 'package:vaultexplorer/features/browser/widgets/category_content_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/directory_content_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/fast_scrollbar.dart';
 import 'package:vaultexplorer/features/browser/widgets/gated_page_scroll_physics.dart';
 import 'package:vaultexplorer/features/browser/widgets/settle_touch_page_controller.dart';
+import 'package:vaultexplorer/features/library/widgets/music_mode_host.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 
@@ -130,6 +135,16 @@ class BrowserTabsShell extends ConsumerStatefulWidget {
   /// [primaryLocalContainer] and back at the root leaves the app.
   final bool appRoot;
 
+  /// A workspace that already exists and should be shown again instead of
+  /// starting an empty one -- the tabs the person left open when this shell
+  /// was last torn down (see `BrowserSessionStore`). The tab list and every
+  /// tab's own location and sort are still held by their providers, so this
+  /// shell simply picks them up where they were; search and selection start
+  /// empty again.
+  /// When the workspace's state is gone by the time it is read, the provider
+  /// rebuilds it from the config's initial data, i.e. a fresh session.
+  final BrowserTabsConfig? restoredWorkspace;
+
   const BrowserTabsShell({
     super.key,
     this.initialContainer,
@@ -147,6 +162,7 @@ class BrowserTabsShell extends ConsumerStatefulWidget {
     this.onDuplicate,
     this.viewportOptions = const BrowserViewportOptions(),
     this.appRoot = false,
+    this.restoredWorkspace,
   });
 
   @override
@@ -187,6 +203,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   late final ProviderSubscription<BrowserChromeHub> _chromeSubscription;
   late final AnimationController _appBarVisibilityController;
   late final AnimationController _tabBarVisibilityController;
+  late final AnimationController _toolbarVisibilityController;
 
   /// Fades the pages back in after the tabs loop, so wrapping from one end to
   /// the other reads as a transition rather than a jump.
@@ -196,12 +213,17 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     end: 1.0,
   ).animate(_loopTransitionController);
   final Map<TabId, GlobalKey> _directoryViewKeys = {};
+  // A tab's music mode lives in its host's entry, so the host keeps its element
+  // (like the directory view inside it) when the tab changes panes.
+  final Map<TabId, GlobalKey> _musicHostKeys = {};
+  final Map<TabId, GlobalKey> _categoryViewKeys = {};
   final Map<TabId, GlobalKey> _dashboardViewKeys = {};
   bool _popScheduled = false;
   bool _drawerOpenOrDragging = false;
   bool _edgeDrawerGestureActive = false;
   bool _restoreAppBarScheduled = false;
   bool _restoreTabBarScheduled = false;
+  bool _restoreToolbarScheduled = false;
   bool _newTabPromptScheduled = false;
   bool _loopScheduled = false;
 
@@ -296,11 +318,13 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
   @override
   void initState() {
     super.initState();
-    _workspace = BrowserTabsConfig.create(
-      initialContainer: widget.initialContainer,
-      includeDashboardTab: widget.includeDashboardTab,
-      appRoot: widget.appRoot,
-    );
+    _workspace =
+        widget.restoredWorkspace ??
+        BrowserTabsConfig.create(
+          initialContainer: widget.initialContainer,
+          includeDashboardTab: widget.includeDashboardTab,
+          appRoot: widget.appRoot,
+        );
     final initialState = ref.read(browserTabsProvider(_workspace));
     // Pages keep taking touches while a swipe is still settling, so a vertical
     // scroll can start right after changing tabs instead of waiting for the
@@ -318,6 +342,11 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       value: 1.0,
     );
     _tabBarVisibilityController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+      value: 1.0,
+    );
+    _toolbarVisibilityController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 220),
       value: 1.0,
@@ -347,6 +376,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     _chromeSubscription.close();
     _appBarVisibilityController.dispose();
     _tabBarVisibilityController.dispose();
+    _toolbarVisibilityController.dispose();
     _loopTransitionController.dispose();
     _dropPane.dispose();
     super.dispose();
@@ -400,6 +430,8 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
 
     final liveTabIds = next.tabs.map((tab) => tab.tabId).toSet();
     _directoryViewKeys.removeWhere((id, _) => !liveTabIds.contains(id));
+    _musicHostKeys.removeWhere((id, _) => !liveTabIds.contains(id));
+    _categoryViewKeys.removeWhere((id, _) => !liveTabIds.contains(id));
     _dashboardViewKeys.removeWhere((id, _) => !liveTabIds.contains(id));
     if (next.tabs.isEmpty && !_popScheduled) {
       _popScheduled = true;
@@ -518,9 +550,71 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
             const SizedBox.expand(),
       );
     }
+    if (tab.isCategory) {
+      return SkinAreaScope(
+        area: SkinArea.files,
+        child: CategoryContentView(
+          key: _categoryViewKeys.putIfAbsent(tab.tabId, GlobalKey.new),
+          tabId: tab.tabId,
+          category: tab.category!,
+          workspaceConfig: _workspace,
+          primaryLocalContainer:
+              tab.primaryLocalContainer ?? widget.primaryLocalContainer(),
+          includeVaults: tab.includeVaults,
+          resolveContainer: widget.resolveContainer,
+          onShowInFolder: (container, path) {
+            final slash = path.lastIndexOf('/');
+            final dir = path.contains('/')
+                ? path.substring(0, slash)
+                : '';
+            final revealName = slash < 0 ? path : path.substring(slash + 1);
+            final currentTabs =
+                ref.read(browserTabsProvider(_workspace)).tabs;
+            final existingTab = currentTabs
+                .where(
+                  (t) =>
+                      !t.isCategory &&
+                      !t.isDashboard &&
+                      t.volId == container.volId,
+                )
+                .firstOrNull;
+            if (existingTab != null) {
+              _workspaceActions.activate(existingTab.tabId);
+              ref
+                  .read(bookmarkNavigationRequestsProvider.notifier)
+                  .request(
+                  container.volId,
+                  VaultBookmark(dir, isDir: true),
+                  revealName: revealName,
+                );
+            } else {
+              final tabId = _workspaceActions.openTab(
+                container,
+                initialPath: dir.isEmpty ? null : dir,
+              );
+              if (tabId == null) {
+                _showLimitReached();
+              } else {
+                ref
+                    .read(bookmarkNavigationRequestsProvider.notifier)
+                    .request(
+                      container.volId,
+                      VaultBookmark(dir, isDir: true),
+                      revealName: revealName,
+                    );
+              }
+            }
+          },
+        ),
+      );
+    }
     return SkinAreaScope(
       area: SkinArea.files,
-      child: DirectoryContentView(
+      child: MusicModeHost(
+        key: _musicHostKeys.putIfAbsent(tab.tabId, GlobalKey.new),
+        container: tab.container!,
+        tabId: tab.tabId,
+        child: DirectoryContentView(
         key: _directoryViewKeys.putIfAbsent(tab.tabId, GlobalKey.new),
         container: tab.container!,
         tabId: tab.tabId,
@@ -535,7 +629,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
         onUserActivity: isActive
             ? widget.userActivityFor?.call(tab.volId!)
             : null,
-      ),
+      )),
     );
   }
 
@@ -551,6 +645,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     required bool swipeEnabled,
     required bool autoHideAppBar,
     required bool autoHideTabBar,
+    required bool autoHideToolbar,
     bool dividerAfter = false,
   }) {
     final isActive = shownTabId == activeTabId;
@@ -575,6 +670,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                               notification,
                               enabled: autoHideAppBar,
                               autoHideTabBar: autoHideTabBar,
+                              autoHideToolbar: autoHideToolbar,
                               // The pane being touched drives the bars even
                               // before it has been given focus.
                               active: isActive || _touchedPane == pane,
@@ -711,6 +807,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     ScrollNotification notification, {
     required bool enabled,
     required bool autoHideTabBar,
+    required bool autoHideToolbar,
     required bool active,
   }) {
     if (notification.metrics.axis == Axis.horizontal) {
@@ -740,6 +837,12 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       notification,
       enabled: autoHideTabBar,
       barHeight: kBrowserTabStripHeight,
+    );
+    _updateChromeVisibilityFromScroll(
+      _toolbarVisibilityController,
+      notification,
+      enabled: autoHideToolbar,
+      barHeight: kToolbarHeight,
     );
     return false;
   }
@@ -904,6 +1007,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     for (final controller in [
       _appBarVisibilityController,
       _tabBarVisibilityController,
+      _toolbarVisibilityController,
     ]) {
       final value = controller.value;
       final double? target = atTop
@@ -1140,6 +1244,11 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
     }
     final active = _workspaceState.activeTab;
     if (active == null) return;
+    // Don't offer a picker whose every choice would fail.
+    if (_workspaceState.atLimit) {
+      _showLimitReached();
+      return;
+    }
     // Respect this shell's workspace boundary. In decoy mode this callback
     // intentionally returns no vaults, even if the engine still has sessions
     // left over from an earlier normal-mode run.
@@ -1262,6 +1371,11 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
         toolbarSettingsUri,
       ).select((settings) => settings.config.autoHideTabBar),
     );
+    final autoHideToolbar = ref.watch(
+      fileManagerToolbarSettingsProvider(
+        toolbarSettingsUri,
+      ).select((settings) => settings.config.autoHideToolbar),
+    );
     if (!autoHideAppBar &&
         _appBarVisibilityController.value != 1.0 &&
         !_restoreAppBarScheduled) {
@@ -1278,6 +1392,15 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _restoreTabBarScheduled = false;
         if (mounted) _tabBarVisibilityController.value = 1.0;
+      });
+    }
+    if (!autoHideToolbar &&
+        _toolbarVisibilityController.value != 1.0 &&
+        !_restoreToolbarScheduled) {
+      _restoreToolbarScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _restoreToolbarScheduled = false;
+        if (mounted) _toolbarVisibilityController.value = 1.0;
       });
     }
     final selectionHasItems = ref.watch(
@@ -1335,7 +1458,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
         : tabs.where((tab) => tab.pane == TabPane.primary).toList();
     final drawerPaneShownId = !dualPaneForTabStrip
         ? activeTabId
-        : paneTabIds!.$1;
+        : paneTabIds.$1;
     final isFirstTab =
         drawerPaneTabs.isNotEmpty &&
         drawerPaneTabs.first.tabId == drawerPaneShownId;
@@ -1436,7 +1559,9 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       workspaceConfig: _workspace,
       appBarListenable: _chrome.appBar,
       fallback: BrowserAppBarFallback(
-        title: activeTab?.container?.displayName ?? '',
+        title: activeTab?.isCategory == true
+            ? activeTab!.category!.label(context.l10n)
+            : activeTab?.container?.displayName ?? '',
         showBackButton: widget.viewportOptions.showBackButton,
         preferBackButton: !tabsEnabled,
         onBackPressed: tabsEnabled ? null : _handleBackToDashboard,
@@ -1465,14 +1590,8 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
       ),
     );
     final Widget tabStripSlot = stripSlotFor(strip);
-    final Widget bottomBarSlot = ValueListenableBuilder<Widget?>(
-      valueListenable: _chrome.bottomBar,
-      builder: (context, bottomBar, _) => bottomBar ?? const SizedBox.shrink(),
-    );
 
-    final shell = Scaffold(
-      resizeToAvoidBottomInset: false,
-      body: Stack(
+    final Widget shellBody = Stack(
         fit: StackFit.expand,
         children: [
           SafeArea(
@@ -1508,7 +1627,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                         }
 
                         if (dualPane) {
-                          final ids = paneTabIds!;
+                          final ids = paneTabIds;
                           final firstId = ids.$1!;
                           final secondId = ids.$2!;
                           final firstTab = tabs.firstWhere(
@@ -1540,6 +1659,7 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                                 swipeEnabled: swipeEnabled,
                                 autoHideAppBar: autoHideAppBar,
                                 autoHideTabBar: autoHideTabBar,
+                                autoHideToolbar: autoHideToolbar,
                                 dividerAfter: true,
                               ),
                               _buildDualPaneViewport(
@@ -1557,25 +1677,14 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                                 swipeEnabled: swipeEnabled,
                                 autoHideAppBar: autoHideAppBar,
                                 autoHideTabBar: autoHideTabBar,
+                                autoHideToolbar: autoHideToolbar,
                               ),
                             ],
                           );
                         }
 
                         _publishVisibleTabs(const <TabId>{});
-                        // Only the pager gets the larger touch slop; every page
-                        // keeps the platform's own, so lists inside a tab scroll
-                        // as usual.
-                        final pageMedia = MediaQuery.of(context);
-                        final pagerMedia = pageMedia.copyWith(
-                          gestureSettings: DeviceGestureSettings(
-                            touchSlop:
-                                (pageMedia.gestureSettings.touchSlop ??
-                                    kTouchSlop) *
-                                _tabPagerSlopFactor,
-                          ),
-                        );
-                        return Listener(
+                         return Listener(
                           behavior: HitTestBehavior.translucent,
                           onPointerDown: _onBrowserPointerDown,
                           onPointerMove: _onBrowserPointerMove,
@@ -1587,12 +1696,16 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                                   notification,
                                   enabled: autoHideAppBar,
                                   autoHideTabBar: autoHideTabBar,
+                                  autoHideToolbar: autoHideToolbar,
                                   active: activeTabId != null,
                                 ),
                             child: FadeTransition(
                               opacity: _loopFade,
-                              child: MediaQuery(
-                                data: pagerMedia,
+                              // Only the pager gets the larger touch slop; every page
+                              // keeps the platform's own, and isolating MediaQuery here
+                              // prevents keyboard animations from rebuilding all tabs.
+                              child: _ScaledTouchSlopMediaQuery(
+                                slopFactor: _tabPagerSlopFactor,
                                 child: PageView.builder(
                                   controller: _pageController,
                                   // The larger slop would otherwise swallow the
@@ -1637,12 +1750,11 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                                       key: ValueKey<TabId>(tab.tabId),
                                       controller: _pageController,
                                       index: index,
-                                      child: MediaQuery(
-                                        data: pageMedia,
-                                        child: _buildTabContent(
-                                          tab,
-                                          isActive: pageIsActive,
-                                        ),
+                                      restoreTouchSlopFactor:
+                                          _tabPagerSlopFactor,
+                                      child: _buildTabContent(
+                                        tab,
+                                        isActive: pageIsActive,
                                       ),
                                     );
                                   },
@@ -1669,32 +1781,58 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
               ),
             ),
         ],
-      ),
-      floatingActionButton: ValueListenableBuilder<Widget?>(
+      );
+
+    final shell = ValueListenableBuilder<Widget?>(
+      valueListenable: _chrome.bottomBar,
+      child: shellBody,
+      builder: (context, rawBottomBar, bodyChild) {
+        // Wrap the bottom bar in an auto-hide animation when enabled.
+        final Widget? bottomBar = rawBottomBar == null
+            ? null
+            : autoHideToolbar
+                ? ClipRect(
+                    child: AnimatedBuilder(
+                      animation: _toolbarVisibilityController,
+                      builder: (context, child) => Align(
+                        alignment: Alignment.topCenter,
+                        heightFactor: _toolbarVisibilityController.value,
+                        child: child,
+                      ),
+                      child: rawBottomBar,
+                    ),
+                  )
+                : rawBottomBar;
+        return Scaffold(
+        resizeToAvoidBottomInset: false,
+        body: bodyChild,
+        floatingActionButton: ValueListenableBuilder<Widget?>(
         valueListenable: _chrome.floatingAction,
         builder: (context, action, _) => action ?? const SizedBox.shrink(),
       ),
-      bottomNavigationBar: appBarAtBottom
-          ? Padding(
-              // Scaffold lets the keyboard cover its bottom bar, and the app
-              // bar holds the search field, so it rides above the keyboard.
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.viewInsetsOf(context).bottom,
-              ),
-              child: Column(
+       bottomNavigationBar: appBarAtBottom
+          ? Builder(
+              builder: (bottomContext) => Padding(
+                // Scaffold lets the keyboard cover its bottom bar, and the app
+                // bar holds the search field, so it rides above the keyboard.
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.viewInsetsOf(bottomContext).bottom,
+                ),
+                child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // The app bar goes under this slot, at the screen's edge, and
                   // so takes over the system navigation inset it would pad for.
-                  MediaQuery.removeViewInsets(
-                    context: context,
-                    removeBottom: true,
-                    child: MediaQuery.removePadding(
+                  if (bottomBar != null)
+                    MediaQuery.removeViewInsets(
                       context: context,
                       removeBottom: true,
-                      child: bottomBarSlot,
+                      child: MediaQuery.removePadding(
+                        context: context,
+                        removeBottom: true,
+                        child: bottomBar,
+                      ),
                     ),
-                  ),
                   _BottomAppBarSlot(
                     workspaceConfig: _workspace,
                     visibility: _appBarVisibilityController,
@@ -1710,8 +1848,11 @@ class _BrowserTabsShellState extends ConsumerState<BrowserTabsShell>
                   ),
                 ],
               ),
+            ),
             )
-          : bottomBarSlot,
+          : bottomBar,
+      );
+      },
     );
 
     // Must wrap the whole screen: the system-bar probe points sit *behind* the
@@ -2005,15 +2146,66 @@ class _BottomAppBarSlot extends ConsumerWidget {
 /// the page's position in the viewport rather than the active tab: during a
 /// swipe both the leaving and the entering page are partly visible, and both
 /// must keep painting their thumbnails until the leaving one is fully gone.
+class _ScaledTouchSlopMediaQuery extends StatelessWidget {
+  const _ScaledTouchSlopMediaQuery({
+    required this.slopFactor,
+    required this.child,
+  });
+
+  final double slopFactor;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final data = MediaQuery.of(context);
+    final originalSlop = data.gestureSettings.touchSlop ?? kTouchSlop;
+    return MediaQuery(
+      data: data.copyWith(
+        gestureSettings: DeviceGestureSettings(
+          touchSlop: originalSlop * slopFactor,
+        ),
+      ),
+      child: child,
+    );
+  }
+}
+
+class _RestoredTouchSlopMediaQuery extends StatelessWidget {
+  const _RestoredTouchSlopMediaQuery({
+    required this.slopFactor,
+    required this.child,
+  });
+
+  final double slopFactor;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final data = MediaQuery.of(context);
+    final scaledSlop =
+        data.gestureSettings.touchSlop ?? (kTouchSlop * slopFactor);
+    return MediaQuery(
+      data: data.copyWith(
+        gestureSettings: DeviceGestureSettings(
+          touchSlop: scaledSlop / slopFactor,
+        ),
+      ),
+      child: child,
+    );
+  }
+}
+
 class _BrowserTabPage extends StatefulWidget {
   final PageController controller;
   final int index;
+  final double restoreTouchSlopFactor;
   final Widget child;
 
   const _BrowserTabPage({
     super.key,
     required this.controller,
     required this.index,
+    this.restoreTouchSlopFactor = 1.0,
     required this.child,
   });
 
@@ -2097,7 +2289,12 @@ class _BrowserTabPageState extends State<_BrowserTabPage>
       child: Material(
         type: MaterialType.transparency,
         clipBehavior: Clip.hardEdge,
-        child: widget.child,
+        child: widget.restoreTouchSlopFactor == 1.0
+            ? widget.child
+            : _RestoredTouchSlopMediaQuery(
+                slopFactor: widget.restoreTouchSlopFactor,
+                child: widget.child,
+              ),
       ),
     );
   }
@@ -2232,19 +2429,11 @@ class _PaneTabPagerState extends State<_PaneTabPager> {
 
   @override
   Widget build(BuildContext context) {
-    final pageMedia = MediaQuery.of(context);
-    final pagerMedia = pageMedia.copyWith(
-      gestureSettings: DeviceGestureSettings(
-        touchSlop:
-            (pageMedia.gestureSettings.touchSlop ?? kTouchSlop) *
-            widget.slopFactor,
-      ),
-    );
     final tabs = widget.tabs;
     return FadeTransition(
       opacity: widget.fade,
-      child: MediaQuery(
-        data: pagerMedia,
+      child: _ScaledTouchSlopMediaQuery(
+        slopFactor: widget.slopFactor,
         child: PageView.builder(
           controller: _controller,
           dragStartBehavior: DragStartBehavior.down,
@@ -2269,10 +2458,8 @@ class _PaneTabPagerState extends State<_PaneTabPager> {
               key: ValueKey<TabId>(tab.tabId),
               controller: _controller,
               index: index,
-              child: MediaQuery(
-                data: pageMedia,
-                child: widget.pageBuilder(tab),
-              ),
+              restoreTouchSlopFactor: widget.slopFactor,
+              child: widget.pageBuilder(tab),
             );
           },
         ),

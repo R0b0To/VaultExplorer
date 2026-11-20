@@ -545,6 +545,25 @@ void main() {
       expect(secureStorage.data.containsKey(pimStorageKey(shortUri)), isFalse);
       expect(await repo.getPim(shortUri), isNull);
     });
+
+    test('remove tells the platform layer to forget the vault\'s open options', () async {
+      final cleared = <String>[];
+      repo.clearVaultOpenPreferences = (uri) async => cleared.add(uri);
+      await repo.save(ContainerRecord(uri: shortUri, label: 'Vault', containerFormat: 'cryptomator'));
+
+      await repo.remove(shortUri);
+
+      expect(cleared, [shortUri]);
+    });
+
+    test('remove still completes when forgetting the open options fails', () async {
+      repo.clearVaultOpenPreferences = (uri) async => throw StateError('channel down');
+      await repo.save(ContainerRecord(uri: shortUri, label: 'Vault', containerFormat: 'cryptomator'));
+
+      await repo.remove(shortUri);
+
+      expect((await repo.loadAll()).containsKey(shortUri), isFalse);
+    });
   });
 
   group('Temp keyfiles of the current manual unlock', () {

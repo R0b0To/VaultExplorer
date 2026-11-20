@@ -34,12 +34,16 @@ file(COPY ${DISLOCKER_PATCHES}/dislocker.c DESTINATION ${DISLOCKER_SRC})
 file(COPY ${DISLOCKER_PATCHES}/sectors.c   DESTINATION ${DISLOCKER_SRC}/inouts)
 file(COPY ${DISLOCKER_PATCHES}/virtual_io.c DESTINATION ${DISLOCKER_SRC})
 file(COPY ${DISLOCKER_PATCHES}/encoding.c  DESTINATION ${DISLOCKER_SRC}/ntfs)
+# App-only addition (not a patch of an upstream file): lets bitlocker_backend.cpp
+# read the unlocked VMK -- see vmk_export.h.
+file(COPY ${DISLOCKER_PATCHES}/vmk_export.c DESTINATION ${DISLOCKER_SRC})
 
 # Headers go into the include tree so #include "dislocker/..." resolves.
 file(COPY ${DISLOCKER_PATCHES}/common.h      DESTINATION ${DISLOCKER_INC}/dislocker)
 file(COPY ${DISLOCKER_PATCHES}/config.h      DESTINATION ${DISLOCKER_INC}/dislocker)
 file(COPY ${DISLOCKER_PATCHES}/config.priv.h DESTINATION ${DISLOCKER_INC}/dislocker)
 file(COPY ${DISLOCKER_PATCHES}/virtual_io.h  DESTINATION ${DISLOCKER_INC}/dislocker)
+file(COPY ${DISLOCKER_PATCHES}/vmk_export.h  DESTINATION ${DISLOCKER_INC}/dislocker)
 
 # ── Patch metadata.c to support negative virtual fds ─────────────────────
 file(READ ${DISLOCKER_SRC}/metadata/metadata.c METADATA_C)
@@ -53,6 +57,7 @@ set(DISLOCKER_LIB_SOURCES
     ${DISLOCKER_SRC}/common.c
     ${DISLOCKER_SRC}/config.c
     ${DISLOCKER_SRC}/virtual_io.c
+    ${DISLOCKER_SRC}/vmk_export.c
     ${DISLOCKER_SRC}/xstd/xstdio.c
     ${DISLOCKER_SRC}/xstd/xstdlib.c
     ${DISLOCKER_SRC}/metadata/datums.c

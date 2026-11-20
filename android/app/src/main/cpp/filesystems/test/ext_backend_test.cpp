@@ -23,6 +23,7 @@
 // NOT covered here: the NTFS backend (needs the ntfs-3g tree and an NTFS image
 // maker) and FAT. See docs/architecture.md section 5.3 for the shared contract.
 #include <algorithm>
+#include <csignal>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -30,6 +31,11 @@
 #include <string>
 #include <vector>
 
+#include <fcntl.h>
+#include <sys/resource.h>
+#include <unistd.h>
+
+#include "backing_flush.h"
 #include "diskio.h"
 #include "filesystems/ext_backend.h"
 #include "session/volume_state.h"
@@ -55,6 +61,7 @@ DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT count) {
 }
 
 #include "fs_test_support.h"
+#include "usb_test_support.h"
 
 static const bool g_haveFsck = commandExists("e2fsck");
 static const bool g_haveMkfs = commandExists("mkfs.ext4");
@@ -89,6 +96,31 @@ struct Vol {
         path = g_tmp + "/vol" + std::to_string(id) + ".img";
         const std::string cmd = "rm -f '" + path + "'; truncate -s " + std::to_string(mib) + "M '" + path + "'";
         if (std::system(cmd.c_str()) != 0) return false;
+        attach();
+        return formatExtVolume(id, variant) && mount();
+    }
+    // New image full of noise, formatted by the product's formatExtVolume(). This is what a
+    // container that was not quick-formatted looks like from the filesystem's side: unused
+    // space decrypts to garbage, so nothing may be assumed zero. (format() above starts from
+    // zeros, which hides every "forgot to initialize it" bug.)
+    bool formatOverNoise(const char* variant, uint64_t mib, uint32_t seed) {
+        closeFs();
+        path = g_tmp + "/vol" + std::to_string(id) + ".img";
+        FILE* f = fopen(path.c_str(), "wb");
+        if (!f) return false;
+        const size_t chunk = 1u << 20;
+        for (uint64_t i = 0; i < mib; ++i) {
+            const Bytes noise = pseudoRandom(chunk, seed + static_cast<uint32_t>(i));
+            if (fwrite(noise.data(), 1, noise.size(), f) != noise.size()) { fclose(f); return false; }
+        }
+        fclose(f);
+        attach();
+        return formatExtVolume(id, variant) && mount();
+    }
+    // Format the image that is already attached, in place: a volume that holds an old
+    // filesystem (reformat), as opposed to a fresh one.
+    bool reformat(const char* variant) {
+        closeFs();
         attach();
         return formatExtVolume(id, variant) && mount();
     }
@@ -204,6 +236,49 @@ static void test_format_variants_pass_fsck() {
         CHECK(list(0, "").size() == 1 && has(0, "", "lost+found"));
         const std::string what = std::string("format ") + c.variant + " " + std::to_string(c.mib) + "MiB";
         v.fsckClean(what.c_str());
+    }
+}
+
+static void test_format_over_stale_payload_passes_fsck() {
+    // Regression: on a container whose free space decrypts to noise, inode 8 had a stale
+    // nonzero i_blocks, ext2fs_add_journal_inode3() failed with EEXIST (unchecked), and the
+    // volume was left advertising a journal that did not exist -> "Superblock has an
+    // invalid journal (inode 0)", unmountable on desktop Linux. ext2 only looked fine: its
+    // inode tables were just as dirty ("bad block inode looks invalid").
+    struct Case { const char* variant; uint64_t mib; const char* expectLabel; };
+    const Case cases[] = {{"ext2", 8, "ext2"},   {"ext2", 64, "ext2"}, {"ext3", 8, "ext2"},
+                          {"ext3", 64, "ext3"},  {"ext4", 8, "ext4"},  {"ext4", 64, "ext4"},
+                          {"ext4", 200, "ext4"}};  // 200 MiB = two block groups
+    uint32_t seed = 1000;
+    for (const auto& c : cases) {
+        Vol v;
+        CHECK(v.formatOverNoise(c.variant, c.mib, seed += 977));
+        CHECK_EQ(extGetFilesystemLabel(0), std::string(c.expectLabel));
+        CHECK(list(0, "").size() == 1 && has(0, "", "lost+found"));
+        CHECK(extCreateDirectory(0, "/after"));
+        CHECK(putFile(0, "/after/f.bin", pseudoRandom(100000, 9)));
+        CHECK(getFile(0, "/after/f.bin") == pseudoRandom(100000, 9));
+        const std::string what = std::string("format over noise ") + c.variant + " " + std::to_string(c.mib) + "MiB";
+        v.fsckClean(what.c_str());
+    }
+}
+
+static void test_reformat_over_existing_filesystem_passes_fsck() {
+    // Re-formatting leaves the previous journal inode (nonzero i_blocks) in place, the same
+    // failure as above reached by a different road (e.g. formatting a used USB partition).
+    const char* variants[] = {"ext4", "ext3", "ext2", "ext4"};
+    Vol v;
+    CHECK(v.format("ext4", 64));
+    CHECK(extCreateDirectory(0, "/old"));
+    CHECK(putFile(0, "/old/data.bin", pseudoRandom(400000, 3)));
+    for (const char* variant : variants) {
+        CHECK(v.reformat(variant));
+        CHECK(list(0, "").size() == 1 && has(0, "", "lost+found"));   // old contents are gone
+        CHECK(!has(0, "", "old"));
+        const std::string what = std::string("reformat as ") + variant;
+        v.fsckClean(what.c_str());
+        CHECK(extCreateDirectory(0, "/old"));
+        CHECK(putFile(0, "/old/data.bin", pseudoRandom(400000, 3)));
     }
 }
 
@@ -558,6 +633,86 @@ static void test_streams_read_ranges() {
     v.fsckClean("streams");
 }
 
+static void test_native_symlinks_follow_and_manage_link_identity() {
+    Vol v;
+    CHECK(v.format("ext4", 16));
+    const Bytes payload = pseudoRandom(4096, 177);
+    CHECK(putFile(0, "/target.bin", payload));
+    CHECK(extCreateSymlink(0, "/file-link", "target.bin"));
+    std::string target;
+    CHECK(extReadSymlink(0, "/file-link", target));
+    CHECK_EQ(target, "target.bin");
+    std::vector<std::string> links;
+    extListSymlinks(0, "/", links);
+    CHECK_EQ(links.size(), 1u);
+    CHECK(links[0].rfind("L|", 0) == 0);
+    CHECK(links[0].find("|file-link") != std::string::npos);
+    CHECK(!has(0, "", "file-link")); // symlinks stay out of normal file scans
+    CHECK(getFile(0, "/file-link") == payload); // ordinary reads follow the target
+    CHECK_EQ(extGetFileSize(0, "/file-link"), static_cast<int64_t>(payload.size()));
+
+    // Rename and delete operate on the link inode, never the target.
+    CHECK(extRenameFile(0, "/file-link", "/renamed-link"));
+    CHECK(extReadSymlink(0, "/renamed-link", target));
+    CHECK_EQ(target, "target.bin");
+    CHECK(extDeleteFile(0, "/renamed-link"));
+    CHECK(getFile(0, "/target.bin") == payload);
+
+    CHECK(extCreateDirectory(0, "/subdir"));
+    CHECK(putFile(0, "/subdir/inside.txt", Bytes{'o','k'}));
+    CHECK(extCreateSymlink(0, "/dir-link", "subdir"));
+    links.clear();
+    extListSymlinks(0, "/", links);
+    CHECK(std::any_of(links.begin(), links.end(), [](const std::string& s) {
+        return s.rfind("LD|", 0) == 0 && s.find("|dir-link") != std::string::npos;
+    }));
+    std::vector<std::string> throughLink;
+    extListDirectory(0, "/dir-link", throughLink);
+    CHECK_EQ(throughLink.size(), 1u);
+    CHECK(throughLink[0].find("inside.txt") != std::string::npos);
+    CHECK(extDeleteFile(0, "/dir-link"));
+    CHECK(getFile(0, "/subdir/inside.txt") == Bytes({'o','k'}));
+
+    // Broken links remain visible and are not mistaken for regular files.
+    const std::string longTarget = std::string(90, 'x') + "/missing-long-target";
+    CHECK(extCreateSymlink(0, "/long-link", longTarget));
+    CHECK(extReadSymlink(0, "/long-link", target));
+    CHECK_EQ(target, longTarget); // exercises the non-inline symlink data blocks
+
+    CHECK(extCreateSymlink(0, "/broken", "missing-target"));
+    links.clear();
+    extListSymlinks(0, "/", links);
+    CHECK(std::any_of(links.begin(), links.end(), [](const std::string& s) {
+        return s.find("|broken") != std::string::npos;
+    }));
+    CHECK_EQ(extGetFileSize(0, "/broken"), -1);
+
+    // Relative targets are confined to the volume root.
+    CHECK(!extCreateSymlink(0, "/escape", "../../outside"));
+    CHECK(extCreateDirectory(0, "/subdir/nested"));
+    CHECK(extCreateSymlink(0, "/subdir/nested/up", "../../target.bin"));
+    CHECK(getFile(0, "/subdir/nested/up") == payload);
+
+    // "Inside the volume" is judged from where the link PHYSICALLY lives, not from the path it was reached by.
+    // A folder link makes a path shallower or deeper than it reads; both directions must be handled.
+    CHECK(extCreateSymlink(0, "/up", "."));                                          // a folder link back to the root
+    CHECK(!extCreateSymlink(0, "/up/up/up/esc", "../../../x"));                      // reads 3 deep, is 0 deep: would leave the volume
+    CHECK(!extCreateSymlink(0, "/up/esc", "../x"));
+    CHECK(extCreateSymlink(0, "/up/up/stay", "x"));                                  // staying inside is still fine
+    CHECK(extCreateSymlink(0, "/deep-link", "subdir/nested"));                       // reads 1 deep, is 2 deep
+    CHECK(extCreateSymlink(0, "/deep-link/up2", "../../target.bin"));                // legitimate: lands on /target.bin
+    CHECK(getFile(0, "/deep-link/up2") == payload);
+    CHECK(!extCreateSymlink(0, "/deep-link/up3", "../../../target.bin"));            // one too many from the real depth
+    CHECK(extDeleteFile(0, "/up"));
+    CHECK(extDeleteFile(0, "/deep-link"));
+
+    // A cycle is refused by the filesystem path resolver instead of hanging.
+    CHECK(extCreateSymlink(0, "/loop-a", "loop-b"));
+    CHECK(extCreateSymlink(0, "/loop-b", "loop-a"));
+    CHECK_EQ(extGetFileSize(0, "/loop-a"), -1);
+    v.fsckClean("native symlinks");
+}
+
 static void test_read_only_mount_changes_nothing() {
     Vol v;
     CHECK(v.format("ext4", 16));
@@ -585,6 +740,296 @@ static void test_read_only_mount_changes_nothing() {
     v.fsckClean("read-only session");
 }
 
+// ---- USB write-back -----------------------------------------------------------------
+// With a USB source, the filesystem's writes sit in volumes[].usbCache until they are
+// flushed. extIoFlush used to return success without flushing, so libext2fs believed its
+// metadata was durable while it was still pending. These pin that libext2fs's own flush
+// request (io_channel_flush -> extIoFlush) reaches the device, and that a device failure
+// comes back as an error with the bytes still pending for a retry.
+static void test_usb_io_flush_reaches_the_device() {
+    Vol v;
+    CHECK(v.format("ext4", 8));
+    VolumeState& vs = volumes[0];
+    g_usbDevice[0].reset(8u << 20);
+    vs.isUsbSource = true;
+
+    const uint64_t kFirst = 4096 * 5, kSecond = 4096 * 9, kThird = 4096 * 13;
+    const Bytes first(512, 0xA7), second(512, 0x5C), third(512, 0x3E);
+
+    // Healthy device: pending bytes are written and the device barrier is issued.
+    CHECK(vs.usbCache.write(0, kFirst, first.data(), first.size()));
+    CHECK_EQ(g_usbDevice[0].media[kFirst], 0);   // only pending in the cache so far
+    const int syncsBefore = g_usbDevice[0].syncCalls;
+    CHECK_EQ(io_channel_flush(vs.extFs->io), 0);
+    CHECK_EQ(g_usbDevice[0].media[kFirst], 0xA7);
+    CHECK(g_usbDevice[0].syncCalls > syncsBefore);
+
+    // Device refuses the data: the flush reports it and the bytes stay pending...
+    CHECK(vs.usbCache.write(0, kSecond, second.data(), second.size()));
+    g_usbDevice[0].refuseWrites = true;
+    CHECK(io_channel_flush(vs.extFs->io) != 0);
+    CHECK_EQ(g_usbDevice[0].media[kSecond], 0);
+    // ...so a retry after the device recovers persists them.
+    g_usbDevice[0].refuseWrites = false;
+    CHECK_EQ(io_channel_flush(vs.extFs->io), 0);
+    CHECK_EQ(g_usbDevice[0].media[kSecond], 0x5C);
+
+    // Data written but the device-level barrier fails: still an error, not success.
+    CHECK(vs.usbCache.write(0, kThird, third.data(), third.size()));
+    g_usbDevice[0].refuseSync = true;
+    CHECK(io_channel_flush(vs.extFs->io) != 0);
+    g_usbDevice[0].refuseSync = false;
+    CHECK_EQ(io_channel_flush(vs.extFs->io), 0);
+    CHECK_EQ(g_usbDevice[0].media[kThird], 0x3E);
+
+    vs.isUsbSource = false;
+    vs.usbCache.clear();
+}
+
+// Every mutating operation ends in ext2fs_flush(), and on a USB source that reaches the device barrier
+// through extIoFlush. The operations used to ignore ext2fs_flush()'s result and report success, so a
+// refused barrier looked exactly like a durable write to the caller. They must now report the failure
+// (the in-memory change stays in place; the point is that the caller is not told it is safe on the device).
+static void test_mutations_report_a_failed_usb_flush() {
+    Vol v;
+    CHECK(v.format("ext4", 16));
+    VolumeState& vs = volumes[0];
+    g_usbDevice[0].reset(16u << 20);
+    vs.isUsbSource = true;
+    CHECK(extCreateDirectory(0, "/d"));
+    CHECK(putFile(0, "/seed", pseudoRandom(3000, 5)));
+    CHECK(putFile(0, "/victim", pseudoRandom(100, 6)));
+
+    g_usbDevice[0].refuseSync = true;
+    const int syncsBefore = g_usbDevice[0].syncCalls;
+    CHECK(!putFile(0, "/w", pseudoRandom(100, 7)));                    // extWriteFileChunk
+    CHECK(!extCreateDirectory(0, "/e"));                               // extCreateDirectory
+    CHECK(!extRenameFile(0, "/seed", "/seed2"));                       // extRenameFile
+    CHECK(!extSetLastModifiedTime(0, "/seed2", 1600000000));           // extSetLastModifiedTime
+    CHECK(!extCopyFile(0, "/seed2", 0, "/seed-copy"));                 // extCopyFile
+    CHECK(!extDeleteFile(0, "/victim"));                               // extDeleteFile
+    CHECK(g_usbDevice[0].syncCalls > syncsBefore);                     // the barrier was really attempted
+
+    // Device recovered: the same kinds of operation succeed again.
+    g_usbDevice[0].refuseSync = false;
+    CHECK(putFile(0, "/ok", pseudoRandom(100, 8)));
+    CHECK(extCreateDirectory(0, "/ok-dir"));
+    CHECK(extRenameFile(0, "/ok", "/ok2"));
+    CHECK(extSetLastModifiedTime(0, "/ok2", 1600000000));
+    CHECK(extCopyFile(0, "/ok2", 0, "/ok-copy"));
+    CHECK(extDeleteFile(0, "/ok-copy"));
+
+    vs.isUsbSource = false;
+    vs.usbCache.clear();
+    v.fsckClean("failed USB flush");
+}
+// Locking tears the filesystem down. extFlushForLock() is the non-consuming first half (a failure must
+// leave the volume untouched and usable) and extUnmount() the consuming second half (a failure must be
+// reported, and with keepOnFailure the still-valid filesystem must stay in volumes[].extFs for a retry,
+// because libext2fs' ext2fs_close() returns before freeing it on error). Both used to ignore every
+// libext2fs result, so a failed flush became an ordinary successful lock.
+static void test_lock_flush_and_unmount_report_failures_and_keep_state() {
+    Vol v;
+    CHECK(v.format("ext4", 16));
+    VolumeState& vs = volumes[0];
+    g_usbDevice[0].reset(16u << 20);
+    vs.isUsbSource = true;
+    const Bytes data = pseudoRandom(5000, 31);
+    CHECK(putFile(0, "/f", data));
+    CHECK(extFlushForLock(0));                        // healthy device
+
+    // Device barrier refused: the flush reports it and nothing was torn down.
+    g_usbDevice[0].refuseSync = true;
+    CHECK(!extFlushForLock(0));
+    CHECK(vs.extFs != nullptr);
+    CHECK(getFile(0, "/f") == data);                  // the volume is still fully usable
+
+    // A stream is open when the lock arrives. keepOnFailure: refused, filesystem kept, retry possible.
+    CHECK(extOpenStream(0, "/f") != nullptr);
+    CHECK_EQ(vs.openExtStreams.size(), static_cast<size_t>(1));
+    CHECK(!extUnmount(0, true));
+    CHECK(vs.extFs != nullptr);
+    g_usbDevice[0].refuseSync = false;                // device recovered: the same call now succeeds
+    CHECK(extUnmount(0, true));
+    CHECK(vs.extFs == nullptr);
+    CHECK(vs.openExtStreams.empty());
+
+    // Without keepOnFailure (every other caller) the filesystem is always released, failure or not.
+    CHECK(v.mount());
+    g_usbDevice[0].refuseSync = true;
+    CHECK(!extUnmount(0, false));
+    CHECK(vs.extFs == nullptr);
+    g_usbDevice[0].refuseSync = false;
+
+    // A read-only mount has nothing to flush and must never be written.
+    vs.isUsbSource = false;
+    vs.usbCache.clear();
+    volumes[0].readOnly = true;
+    CHECK(v.mount());
+    CHECK(extFlushForLock(0));
+    CHECK(extUnmount(0, true));
+    volumes[0].readOnly = false;
+
+    CHECK(v.mount());
+    CHECK(getFile(0, "/f") == data);
+    v.fsckClean("lock flush/unmount");
+}
+// flushVolumeBacking() is the one definition of "everything below the filesystem is durable" shared by
+// FatFs' CTRL_SYNC, ntfsSync and the lock path. The USB cache and the fd write-behind buffer both keep
+// acknowledged bytes after a failed flush -- but VolumeState::reset() drops them, so a caller that
+// ignored the result and then reset lost data. Real UsbBlockCache / FdWriteBuffer here; the failing
+// "device" is the fake USB device and an RLIMIT_FSIZE ceiling (EFBIG) on a real fd.
+static void test_backing_flush_reports_failures_and_keeps_the_bytes() {
+    VolumeState& vs = volumes[0];
+    const Bytes px(512, 0x42);
+
+    // USB: a refused barrier is reported, the bytes stay pending, a retry persists them.
+    g_usbDevice[0].reset(1u << 20);
+    vs.isUsbSource = true;
+    CHECK(vs.usbCache.write(0, 4096, px.data(), px.size()));
+    g_usbDevice[0].refuseSync = true;
+    CHECK(!flushVolumeBacking(vs, 0));
+    g_usbDevice[0].refuseSync = false;
+    CHECK(flushVolumeBacking(vs, 0));
+    CHECK_EQ(g_usbDevice[0].media[4096], 0x42);
+    vs.isUsbSource = false;
+    vs.usbCache.clear();
+
+    // fd write-behind: a failed flush is reported (the old ntfsSync/unmountVolume dropped this result),
+    // the buffer keeps the bytes, and a retry after the failure clears persists them.
+    char path[] = "/tmp/ve_backing_flushXXXXXX";
+    const int fd = mkstemp(path);
+    CHECK(fd >= 0);
+    if (fd < 0) return;
+    unlink(path);
+    vs.fd = fd;
+    CHECK(vs.fdWriteBuffer.write(fd, 4096, px.data(), px.size()));
+    std::signal(SIGXFSZ, SIG_IGN);
+    struct rlimit saved;
+    getrlimit(RLIMIT_FSIZE, &saved);
+    struct rlimit tight = {1024, saved.rlim_max};
+    setrlimit(RLIMIT_FSIZE, &tight);
+    CHECK(!flushVolumeBacking(vs, 0));
+    setrlimit(RLIMIT_FSIZE, &saved);
+    CHECK(flushVolumeBacking(vs, 0));
+    unsigned char b = 0;
+    CHECK_EQ(pread(fd, &b, 1, 4096), 1);
+    CHECK_EQ(b, 0x42);
+    vs.fdWriteBuffer.reset();
+    vs.fd = -1;
+    close(fd);
+
+    CHECK(flushVolumeBacking(vs, 0));   // no backing store to flush: nothing to report
+}
+
+// ---- Growing the file system after the container was expanded ------------------------
+// Extends the image file by [addMiB] (zeros, or random bytes to mimic a quick expand whose new area
+// decrypts to garbage), re-reads the device size, then runs the production grow.
+static bool extendImage(Vol& v, uint64_t addMiB, bool garbage) {
+    VolumeState& vs = volumes[v.id];
+    if (vs.extFs) { ext2fs_flush(vs.extFs); }
+    fflush(g_images[v.id]);
+    fseeko(g_images[v.id], 0, SEEK_END);
+    const uint64_t old = static_cast<uint64_t>(ftello(g_images[v.id]));
+    const std::string cmd = "truncate -s " + std::to_string(old + addMiB * 1048576) + " '" + v.path + "'";
+    if (std::system(cmd.c_str()) != 0) return false;
+    if (garbage) {
+        const Bytes noise = pseudoRandom(1048576, 99);
+        for (uint64_t i = 0; i < addMiB; ++i) {
+            fseeko(g_images[v.id], static_cast<off_t>(old + i * 1048576), SEEK_SET);
+            fwrite(noise.data(), 1, noise.size(), g_images[v.id]);
+        }
+        fflush(g_images[v.id]);
+    }
+    fseeko(g_images[v.id], 0, SEEK_END);
+    vs.dataAreaLengthBytes = static_cast<uint64_t>(ftello(g_images[v.id]));
+    return true;
+}
+
+static void growAndVerify(Vol& v, uint64_t addMiB, bool garbage, const char* what, bool fillFirst) {
+    std::vector<std::pair<std::string, Bytes>> files;
+    for (int i = 0; i < 6; ++i) {
+        files.push_back({"/f" + std::to_string(i), pseudoRandom(150000 + i * 40000, 7 + i)});
+        CHECK(putFile(v.id, files.back().first, files.back().second));
+    }
+    CHECK(extCreateDirectory(v.id, "/dir"));
+    CHECK(putFile(v.id, "/dir/inner", pseudoRandom(70000, 5)));
+    if (fillFirst) {   // fill the fs until a write fails: the usual reason to expand
+        for (int i = 0; i < 4000; ++i) {
+            if (!putFile(v.id, "/fill" + std::to_string(i), pseudoRandom(262144, 100 + i))) break;
+        }
+        CHECK(freeBytes(v.id) < 1048576);
+    }
+    const uint64_t totalBefore = [&] { uint64_t t = 0, f = 0; extGetSpaceInfo(v.id, t, f); return t; }();
+    CHECK(v.fsckClean(what));
+    CHECK(extendImage(v, addMiB, garbage));
+    CHECK(extGrowToFit(v.id) == FsGrowStatus::kGrown);
+    uint64_t totalAfter = 0, freeAfter = 0;
+    extGetSpaceInfo(v.id, totalAfter, freeAfter);
+    CHECK(totalAfter >= totalBefore + (addMiB - 2) * 1048576);
+    CHECK(freeAfter >= (addMiB - 4) * 1048576 / 2);
+    for (const auto& f : files) CHECK(getFile(v.id, f.first) == f.second);
+    CHECK(getFile(v.id, "/dir/inner") == pseudoRandom(70000, 5));
+    CHECK(v.fsckClean((std::string(what) + " after grow").c_str()));
+    // The new space is really usable, to the last megabyte.
+    CHECK(putFile(v.id, "/big_after_grow", pseudoRandom(static_cast<size_t>((addMiB / 2) * 1048576), 3)));
+    CHECK(getFile(v.id, "/big_after_grow") == pseudoRandom(static_cast<size_t>((addMiB / 2) * 1048576), 3));
+    CHECK(extGrowToFit(v.id) == FsGrowStatus::kAlreadyFills);
+    CHECK(v.fsckClean((std::string(what) + " after use").c_str()));
+}
+
+static void test_grow_variants_pass_fsck() {
+    struct Case { const char* variant; uint64_t mib; uint64_t add; bool garbage; bool full; };
+    const Case cases[] = {{"ext2", 16, 40, false, false}, {"ext3", 64, 100, false, false},
+                          {"ext4", 16, 40, true, false},  {"ext4", 32, 700, false, false},
+                          {"ext4", 16, 64, true, true},   {"ext2", 16, 64, false, true}};
+    for (const auto& c : cases) {
+        Vol v;
+        CHECK(v.format(c.variant, c.mib));
+        const std::string what = std::string("grow ") + c.variant + " " + std::to_string(c.mib) + "+" + std::to_string(c.add);
+        growAndVerify(v, c.add, c.garbage, what.c_str(), c.full);
+    }
+}
+
+static void test_grow_images_made_by_system_mkfs() {
+    if (!g_haveMkfs) { ++g_skips; std::printf("    SKIP (mkfs.ext4 not on PATH)\n"); return; }
+    struct Case { const char* tool; const char* opts; uint64_t mib; uint64_t add; };
+    const Case cases[] = {{"mkfs.ext4", "-b 4096", 32, 200},
+                          {"mkfs.ext4", "-b 1024", 16, 120},
+                          {"mkfs.ext4", "-b 4096 -O ^resize_inode", 32, 300},   // GDT blocks must move
+                          {"mkfs.ext4", "-b 1024 -O ^resize_inode -E lazy_itable_init=1", 8, 300},
+                          {"mkfs.ext4", "-b 4096 -O ^flex_bg,^resize_inode", 32, 400},
+                          {"mkfs.ext4", "-b 4096 -O 64bit,metadata_csum", 32, 200},
+                          {"mkfs.ext3", "-b 4096", 32, 150},
+                          {"mkfs.ext2", "-b 2048", 16, 90}};
+    for (const auto& c : cases) {
+        Vol v;
+        CHECK(v.mkfs(c.tool, c.opts, c.mib));
+        const std::string what = std::string("grow ") + c.tool + " " + c.opts;
+        growAndVerify(v, c.add, true, what.c_str(), false);
+    }
+}
+
+static void test_grow_refusals() {
+    Vol v;
+    CHECK(v.format("ext4", 16));
+    CHECK(extGrowToFit(v.id) == FsGrowStatus::kAlreadyFills);
+    CHECK(putFile(v.id, "/a", pseudoRandom(5000, 1)));
+    void* stream = extOpenStream(v.id, "/a");
+    CHECK(stream != nullptr);
+    CHECK(extendImage(v, 8, false));
+    CHECK(extGrowToFit(v.id) == FsGrowStatus::kBusy);     // an open stream pins the handle
+    extCloseStream(v.id, stream);
+    volumes[v.id].extFs->super->s_state &= ~EXT2_VALID_FS;
+    CHECK(extGrowToFit(v.id) == FsGrowStatus::kNeedsCheck);
+    volumes[v.id].extFs->super->s_state |= EXT2_VALID_FS;
+    volumes[v.id].readOnly = true;
+    CHECK(extGrowToFit(v.id) == FsGrowStatus::kFailed);
+    volumes[v.id].readOnly = false;
+    CHECK(extGrowToFit(v.id) == FsGrowStatus::kGrown);
+    CHECK(v.fsckClean("refusals then grow"));
+}
+
 // ---- Runner -------------------------------------------------------------------------
 static void closeAllVolumes() {
     for (int i = 0; i < FF_VOLUMES; ++i) {
@@ -600,6 +1045,8 @@ int main() {
     if (!g_haveFsck) std::printf("NOTE: e2fsck not found; filesystem-consistency checks will be skipped.\n");
     const TestCase tests[] = {
         T(test_format_variants_pass_fsck),
+        T(test_format_over_stale_payload_passes_fsck),
+        T(test_reformat_over_existing_filesystem_passes_fsck),
         T(test_mounts_images_made_by_system_mkfs),
         T(test_mkdir_rules),
         T(test_names_wire_format_and_limits),
@@ -617,6 +1064,14 @@ int main() {
         T(test_copy_between_and_within_volumes),
         T(test_streams_read_ranges),
         T(test_read_only_mount_changes_nothing),
+        T(test_native_symlinks_follow_and_manage_link_identity),
+        T(test_usb_io_flush_reaches_the_device),
+        T(test_mutations_report_a_failed_usb_flush),
+        T(test_lock_flush_and_unmount_report_failures_and_keep_state),
+        T(test_backing_flush_reports_failures_and_keeps_the_bytes),
+        T(test_grow_variants_pass_fsck),
+        T(test_grow_images_made_by_system_mkfs),
+        T(test_grow_refusals),
     };
     return runTests("ext_backend", tests, sizeof(tests) / sizeof(tests[0]), closeAllVolumes);
 }

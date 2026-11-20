@@ -1,15 +1,11 @@
 package com.aeidolon.vaultexplorer.container
 
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.ImageFormat
-import android.graphics.Rect
-import android.graphics.YuvImage
 import android.media.MediaCodec
 import android.media.MediaCodecList
 import android.media.MediaExtractor
 import android.os.Build
-import java.io.ByteArrayOutputStream
+import android.os.Process
 import java.util.concurrent.Executors
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.locks.ReentrantLock
@@ -96,14 +92,23 @@ object VideoThumbnailCoordinator {
      *  `MainActivity.resizeExecutorPools()` — only the ownership of the
      *  pool moved here, not the sizing policy. */
     val imageExecutor: ThreadPoolExecutor =
-        Executors.newFixedThreadPool(2) as ThreadPoolExecutor
+        Executors.newFixedThreadPool(3) as ThreadPoolExecutor
 
-    /** Bounded pool for video thumbnail decode work from the **in-app**
-     *  pipeline only. Single-threaded by default — video frame extraction
-     *  is the expensive, decoder-contending case, so it stays
-     *  intentionally narrow. */
+     /** Bounded pool for video thumbnail decode work from the **in-app**
+     *  pipeline only. Resized per device capability by
+     *  `MainActivity.resizeExecutorPools()`. */
     val videoExecutor: ThreadPoolExecutor =
         Executors.newFixedThreadPool(1) as ThreadPoolExecutor
+
+    /** Low-priority single-thread pool for background image dimension header
+     *  probes (`probeImageDimensions`), keeping them off [imageExecutor] so
+     *  visible thumbnails never wait behind a batch probe. */
+    val probeExecutor: ThreadPoolExecutor = Executors.newFixedThreadPool(1) { runnable ->
+        Thread({
+            Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND)
+            runnable.run()
+        }, "ve-img-probe").apply { isDaemon = true }
+    } as ThreadPoolExecutor
 
     /** Bounded pool for image thumbnail decode work from the **SAF**
      *  pipeline only (other installed apps browsing an exposed vault
@@ -161,8 +166,13 @@ object VideoThumbnailCoordinator {
      * normal MediaCodec.createByCodecName calls, which defeats the point
      * of asking for a *reliable* software path.
      */
+   private val swDecoderCache = java.util.concurrent.ConcurrentHashMap<String, String>()
+
     fun findSoftwareDecoderName(mimeType: String): String? {
+        val key = mimeType.lowercase()
+        swDecoderCache[key]?.let { return it.ifEmpty { null } }
         try {
+            var found: String? = null
             val codecList = MediaCodecList(MediaCodecList.REGULAR_CODECS)
             for (info in codecList.codecInfos) {
                 if (info.isEncoder) continue
@@ -177,13 +187,17 @@ object VideoThumbnailCoordinator {
                 if (!matches) continue
                 val name = info.name
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && info.isSoftwareOnly) {
-                    return name
+                    found = name
+                    break
                 }
                 if (name.startsWith("c2.android.", ignoreCase = true) ||
                     name.startsWith("OMX.google.", ignoreCase = true)) {
-                    return name
+                    found = name
+                    break
                 }
             }
+            swDecoderCache[key] = found ?: ""
+            return found
         } catch (e: Exception) {
             VeLog.w(TAG) { "Error listing software decoders: ${e.message}" }
         }
@@ -385,59 +399,71 @@ object VideoThumbnailCoordinator {
      * seekbar -- can drive the same extractor/codec pair this way without
      * a second, drifting copy of the drain loop.
      */
-    fun decodeSoftwareFrameAt(
+   fun decodeSoftwareFrameAt(
         extractor: MediaExtractor,
         codec: MediaCodec,
         seekTimeUs: Long,
+        targetSize: Int = 0,
     ): Bitmap? {
         extractor.seekTo(seekTimeUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
         codec.flush()
 
         val info = MediaCodec.BufferInfo()
         var inputDone = false
+        var outputEos = false
         var outputFrame: Bitmap? = null
-        val timeoutUs = 10_000L
-        // 30 attempts (~300ms) was too tight for slower software decoders
-        // to reliably yield a first frame; 100 (~1s worst case) gives
-        // real headroom without risking a multi-second stall. See the
-        // matching note on the original call site in ThumbnailHandlers
-        // for why this budget is kept bounded rather than raised further.
-        val maxAttempts = 100
-        var attempts = 0
+        val startNs = System.nanoTime()
+        val deadlineNs = startNs + 1_200_000_000L
 
-        while (outputFrame == null && attempts < maxAttempts) {
-            attempts++
+        while (outputFrame == null && !outputEos && System.nanoTime() < deadlineNs) {
+            var fedAny = false
             if (!inputDone) {
-                val inputIndex = codec.dequeueInputBuffer(timeoutUs)
-                if (inputIndex >= 0) {
-                    val inputBuffer = codec.getInputBuffer(inputIndex)
-                    if (inputBuffer != null) {
-                        val sampleSize = extractor.readSampleData(inputBuffer, 0)
-                        if (sampleSize < 0) {
-                            codec.queueInputBuffer(inputIndex, 0, 0, 0L, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
-                            inputDone = true
-                        } else {
-                            val presentationTimeUs = extractor.sampleTime
-                            codec.queueInputBuffer(inputIndex, 0, sampleSize, presentationTimeUs, 0)
-                            extractor.advance()
-                        }
+                var feeds = 0
+                while (feeds < 8) {
+                    val inputIndex = codec.dequeueInputBuffer(0L)
+                    if (inputIndex < 0) break
+                    val inputBuffer = codec.getInputBuffer(inputIndex) ?: break
+                    val sampleSize = extractor.readSampleData(inputBuffer, 0)
+                    if (sampleSize < 0) {
+                        codec.queueInputBuffer(inputIndex, 0, 0, 0L, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+                        inputDone = true
+                        fedAny = true
+                        break
+                    } else {
+                        val presentationTimeUs = extractor.sampleTime
+                        codec.queueInputBuffer(inputIndex, 0, sampleSize, presentationTimeUs, 0)
+                        extractor.advance()
+                        fedAny = true
+                        feeds++
                     }
                 }
             }
 
-            val outputIndex = codec.dequeueOutputBuffer(info, timeoutUs)
-            if (outputIndex >= 0) {
-                if ((info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+            // Poll output without blocking while packets are still flowing into
+            // the codec; only wait (5ms) once input buffers are full or EOS was sent.
+            var waitUs = if (fedAny && !inputDone) 0L else 5_000L
+            while (true) {
+                val outputIndex = codec.dequeueOutputBuffer(info, waitUs)
+                waitUs = 0L
+                if (outputIndex >= 0) {
+                    val isEos = (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0
+                    if (info.size > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                        val image = codec.getOutputImage(outputIndex)
+                        if (image != null) {
+                            outputFrame = yuv420ToBitmap(image, targetSize)
+                            image.close()
+                        }
+                    }
+                    codec.releaseOutputBuffer(outputIndex, false)
+                    if (isEos) outputEos = true
+                    if (outputFrame != null || outputEos) break
+                } else if (outputIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED ||
+                    outputIndex == MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED
+                ) {
+                    continue
+                } else {
                     break
                 }
-                if (info.size > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                    val image = codec.getOutputImage(outputIndex)
-                    if (image != null) {
-                        outputFrame = yuv420ToBitmap(image)
-                        image.close()
-                    }
-                }
-                codec.releaseOutputBuffer(outputIndex, false)
             }
         }
         return outputFrame
@@ -576,97 +602,102 @@ object VideoThumbnailCoordinator {
         }
     }
 
-    /** Converts a YUV_420_888 [android.media.Image] (the output format of
-     *  an explicit software [MediaCodec] decoder) to a [Bitmap] via an
-     *  intermediate NV21 buffer + JPEG round-trip -- there's no direct
-     *  YUV-to-Bitmap constructor in the framework. Shared with
-     *  `ThumbnailHandlers` for the same reason as [decodeSoftwareFrameAt]. */
-    fun yuv420ToBitmap(image: android.media.Image): Bitmap {
-        val width = image.width
-        val height = image.height
+   /** Converts a YUV_420_888 [android.media.Image] directly to an ARGB
+     *  [Bitmap], subsampling by an integer stride when [targetSize] > 0 so a
+     *  4K/1080p software-decoded frame does not convert and JPEG-roundtrip
+     *  millions of pixels only to throw 95% of them away in `scaledToFit`. */
+    fun yuv420ToBitmap(image: android.media.Image, targetSize: Int = 0): Bitmap {
+        val srcW = image.width
+        val srcH = image.height
         val planes = image.planes
 
         val yPlane = planes[0]
         val uPlane = planes[1]
         val vPlane = planes[2]
 
-        val yBuffer = yPlane.buffer
-        val uBuffer = uPlane.buffer
-        val vBuffer = vPlane.buffer
+        val yBuf = yPlane.buffer.duplicate()
+        val uBuf = uPlane.buffer.duplicate()
+        val vBuf = vPlane.buffer.duplicate()
 
         val yRowStride = yPlane.rowStride
-        val uvRowStride = uPlane.rowStride
-        val uvPixelStride = uPlane.pixelStride
+        val yPixelStride = yPlane.pixelStride
+        val uRowStride = uPlane.rowStride
+        val uPixelStride = uPlane.pixelStride
+        val vRowStride = vPlane.rowStride
+        val vPixelStride = vPlane.pixelStride
 
-        // Ceiling division: 4:2:0 chroma planes still exist for odd
-        // width/height (e.g. a cropped or user-generated source), just
-        // rounded up by one sample. width/2, height/2 (floor) would
-        // under-size the NV21 buffer and silently drop the last chroma
-        // row/column for such videos.
-        val chromaWidth = (width + 1) / 2
-        val chromaHeight = (height + 1) / 2
-        // NV21 requires exactly width * height Y bytes followed by
-        // 2 * chromaWidth * chromaHeight interleaved V and U bytes.
-        val nv21 = ByteArray(width * height + chromaWidth * chromaHeight * 2)
-
-        // 1. Copy Y plane, stripping row padding if yRowStride > width
-        var nvIndex = 0
-        if (yRowStride == width) {
-            yBuffer.get(nv21, 0, width * height)
-            nvIndex = width * height
-        } else {
-            val yRow = ByteArray(yRowStride)
-            for (row in 0 until height) {
-                val toRead = minOf(yRowStride, yBuffer.remaining())
-                if (toRead <= 0) break
-                yBuffer.get(yRow, 0, toRead)
-                val copyLen = minOf(width, toRead)
-                System.arraycopy(yRow, 0, nv21, nvIndex, copyLen)
-                nvIndex += width
+        var step = 1
+        if (targetSize > 0) {
+            val maxSrc = maxOf(srcW, srcH)
+            while (maxSrc / (step + 1) >= targetSize) {
+                step++
             }
         }
 
-        // 2. Interleave V and U planes into NV21 format (V0, U0, V1, U1...)
-        val vRow = ByteArray(uvRowStride)
-        val uRow = ByteArray(uvRowStride)
+        val outW = maxOf(1, srcW / step)
+        val outH = maxOf(1, srcH / step)
+        val pixels = IntArray(outW * outH)
 
-        for (row in 0 until chromaHeight) {
-            val vPos = row * uvRowStride
-            val uPos = row * uvRowStride
+        val yRow = ByteArray(yRowStride)
+        val uRow = ByteArray(uRowStride)
+        val vRow = ByteArray(vRowStride)
+        val yLimit = yBuf.limit()
+        val uLimit = uBuf.limit()
+        val vLimit = vBuf.limit()
 
-            if (vPos < vBuffer.capacity() && uPos < uBuffer.capacity()) {
-                vBuffer.position(vPos)
-                uBuffer.position(uPos)
+        var lastUvY = -1
+        var uRead = 0
+        var vRead = 0
+        var outIdx = 0
 
-                val vRead = minOf(uvRowStride, vBuffer.remaining())
-                val uRead = minOf(uvRowStride, uBuffer.remaining())
+        for (outY in 0 until outH) {
+            val sy = outY * step
+            val yPos = sy * yRowStride
+            val yRead = if (yPos in 0 until yLimit) {
+                yBuf.position(yPos)
+                val n = minOf(yRowStride, yLimit - yPos)
+                yBuf.get(yRow, 0, n)
+                n
+            } else 0
 
-                if (vRead > 0 && uRead > 0) {
-                    vBuffer.get(vRow, 0, vRead)
-                    uBuffer.get(uRow, 0, uRead)
+            val uvY = sy ushr 1
+            if (uvY != lastUvY) {
+                lastUvY = uvY
+                val uPos = uvY * uRowStride
+                uRead = if (uPos in 0 until uLimit) {
+                    uBuf.position(uPos)
+                    val n = minOf(uRowStride, uLimit - uPos)
+                    uBuf.get(uRow, 0, n)
+                    n
+                } else 0
+                val vPos = uvY * vRowStride
+                vRead = if (vPos in 0 until vLimit) {
+                    vBuf.position(vPos)
+                    val n = minOf(vRowStride, vLimit - vPos)
+                    vBuf.get(vRow, 0, n)
+                    n
+                } else 0
+            }
 
-                    for (col in 0 until chromaWidth) {
-                        val vIdx = col * uvPixelStride
-                        val uIdx = col * uvPixelStride
-                        if (vIdx < vRead && uIdx < uRead && nvIndex + 1 < nv21.size) {
-                            nv21[nvIndex++] = vRow[vIdx]
-                            nv21[nvIndex++] = uRow[uIdx]
-                        }
-                    }
-                }
+            var sx = 0
+            for (outX in 0 until outW) {
+                val yi = sx * yPixelStride
+                val yVal = if (yi < yRead) yRow[yi].toInt() and 0xFF else 0
+                val uvX = sx ushr 1
+                val ui = uvX * uPixelStride
+                val vi = uvX * vPixelStride
+                val uVal = (if (ui < uRead) uRow[ui].toInt() and 0xFF else 128) - 128
+                val vVal = (if (vi < vRead) vRow[vi].toInt() and 0xFF else 128) - 128
+
+                val r = (yVal + ((359 * vVal) shr 8)).coerceIn(0, 255)
+                val g = (yVal - ((88 * uVal + 183 * vVal) shr 8)).coerceIn(0, 255)
+                val b = (yVal + ((454 * uVal) shr 8)).coerceIn(0, 255)
+
+                pixels[outIdx++] = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
+                sx += step
             }
         }
 
-        val yuvImage = YuvImage(
-            nv21,
-            ImageFormat.NV21,
-            width,
-            height,
-            null
-        )
-        val out = ByteArrayOutputStream()
-        yuvImage.compressToJpeg(Rect(0, 0, width, height), 90, out)
-        val jpegBytes = out.toByteArray()
-        return BitmapFactory.decodeByteArray(jpegBytes, 0, jpegBytes.size)
+        return Bitmap.createBitmap(pixels, outW, outH, Bitmap.Config.ARGB_8888)
     }
 }

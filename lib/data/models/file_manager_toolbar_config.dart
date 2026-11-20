@@ -18,22 +18,22 @@ enum FileDetailColumn {
   type;
 
   String get label => switch (this) {
-        FileDetailColumn.date => 'Date',
-        FileDetailColumn.size => 'Size',
-        FileDetailColumn.type => 'Type',
-      };
+    FileDetailColumn.date => 'Date',
+    FileDetailColumn.size => 'Size',
+    FileDetailColumn.type => 'Type',
+  };
 
   String getLocalizedLabel(AppLocalizations l10n) => switch (this) {
-        FileDetailColumn.date => l10n.sortFieldDate,
-        FileDetailColumn.size => l10n.sortFieldSize,
-        FileDetailColumn.type => l10n.sortFieldType,
-      };
+    FileDetailColumn.date => l10n.sortFieldDate,
+    FileDetailColumn.size => l10n.sortFieldSize,
+    FileDetailColumn.type => l10n.sortFieldType,
+  };
 
   IconData get icon => switch (this) {
-        FileDetailColumn.date => Icons.schedule_rounded,
-        FileDetailColumn.size => Icons.data_usage_rounded,
-        FileDetailColumn.type => Icons.category_outlined,
-      };
+    FileDetailColumn.date => Icons.schedule_rounded,
+    FileDetailColumn.size => Icons.data_usage_rounded,
+    FileDetailColumn.type => Icons.category_outlined,
+  };
 
   String toJson() => name;
 
@@ -46,12 +46,66 @@ enum FileDetailColumn {
 }
 
 class FileManagerToolbarConfig {
+  /// Grouped by what the buttons do: find / create, shape the current list
+  /// (view mode, sort, filter), switch what the screen is showing (gallery,
+  /// music, play media -- the mode switches sit side by side), and the
+  /// overflow menu last, as on every Android toolbar.
+  static const List<FileManagerAction> defaultActionOrder = [
+    FileManagerAction.search,
+    FileManagerAction.add,
+    FileManagerAction.viewToggle,
+    FileManagerAction.sort,
+    FileManagerAction.filter,
+    FileManagerAction.gallery,
+    FileManagerAction.musicMode,
+    FileManagerAction.playMedia,
+    FileManagerAction.options,
+  ];
+
+  /// Default orders shipped before [defaultActionOrder] was regrouped. A saved
+  /// order that is exactly one of these was never rearranged by the user, so
+  /// it moves to the current default; any other saved order is kept as is.
+  static const List<List<FileManagerAction>> _previousDefaultOrders = [
+    [
+      FileManagerAction.search,
+      FileManagerAction.add,
+      FileManagerAction.gallery,
+      FileManagerAction.viewToggle,
+      FileManagerAction.sort,
+      FileManagerAction.filter,
+      FileManagerAction.options,
+    ],
+    [
+      FileManagerAction.search,
+      FileManagerAction.add,
+      FileManagerAction.gallery,
+      FileManagerAction.viewToggle,
+      FileManagerAction.sort,
+      FileManagerAction.filter,
+      FileManagerAction.options,
+      FileManagerAction.playMedia,
+      FileManagerAction.musicMode,
+    ],
+  ];
+
+  static bool _sameOrder(List<FileManagerAction> a, List<FileManagerAction> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
   final List<FileManagerAction> order;
   final Set<FileManagerAction> hidden;
   final bool showBreadcrumbBar;
   final bool showStatsBar;
   final bool showBookmarkBar;
   final bool showHiddenFiles;
+
+  /// Whether gallery and category views include folders that hold a
+  /// `.nomedia` file (the marker that asks gallery apps to ignore a folder).
+  final bool showNoMediaFolders;
   final bool showMediaCarousel;
   final bool autoStartPlaylistMode;
   final bool rememberPerFolderLayout;
@@ -62,11 +116,32 @@ class FileManagerToolbarConfig {
   final bool resetSizeOnLayoutChange;
   final bool autoHideAppBar;
   final bool autoHideTabBar;
+  final bool autoHideToolbar;
+  final bool autoHideBreadcrumbBar;
   final bool useFabForToolbar;
   final bool bottomSelectionBar;
   final Map<String, String> folderLayoutModes;
   final Map<String, String> folderGridAspectRatios;
   final Map<String, String> folderSortModes;
+
+  /// URIs of storages (vaults, local storage, external drives) that currently
+  /// have gallery mode active.
+  final Set<String> galleryModeStorageUris;
+
+  /// The folders each storage's gallery scans, by storage URI: paths from the
+  /// storage root, subfolders included. A storage with no entry (or an empty
+  /// list) is scanned whole. Kept on this device like the other per-storage
+  /// state, and not exported.
+  final Map<String, List<String>> galleryFoldersByStorage;
+  final Set<String> skipGalleryPromptStorageUris;
+  final Set<String> skipMusicPromptStorageUris;
+
+  /// URIs of storages whose music mode was on the last time it was read from
+  /// the storage itself. Only a hint kept on this device so a vault can open
+  /// straight into the right view before its own saved setting (the source of
+  /// truth, stored inside the vault) has been read; it holds no folders or
+  /// other content, and is corrected as soon as the real setting is known.
+  final Set<String> musicModeStorageUris;
 
   /// URIs of vaults or storage locations whose bookmark groups are collapsed
   /// in the navigation drawer. This is device-local UI state; bookmark data
@@ -77,8 +152,8 @@ class FileManagerToolbarConfig {
   final Set<FileDetailColumn> hiddenDetailColumns;
 
   /// Order and visibility of the actions in the item actions sheet and the
-  /// selection bar's overflow menu. Always holds every [FileItemAction]
-  /// exactly once (see [fromJson]).
+  /// selection bar. Always holds every [FileItemAction] exactly once (see
+  /// [fromJson]).
   final List<FileItemAction> itemActionsOrder;
   final Set<FileItemAction> hiddenItemActions;
 
@@ -117,10 +192,23 @@ class FileManagerToolbarConfig {
   final int masonryColumnsPortrait;
   final int masonryColumnsLandscape;
   final PlaylistTransitionEffect playlistTransitionEffect;
+
   /// The app-wide thumbnail default: what every vault that has no thumbnail
   /// settings of its own ("Use global default") uses.
   final ThumbnailCacheMode defaultThumbnailCacheMode;
   final ThumbnailQuality defaultThumbnailQuality;
+
+  /// Independent storage choice for the gallery metadata index in vaults.
+  final ThumbnailCacheMode defaultGalleryMetadataCacheMode;
+
+  /// Local Storage and decoy file manager gallery metadata index storage.
+  final ThumbnailCacheMode localStorageGalleryMetadataCacheMode;
+
+  /// The app-wide music-index storage choice for vaults without an override.
+  final ThumbnailCacheMode defaultMusicIndexCacheMode;
+
+  /// Music-index storage for Local Storage and the decoy file manager.
+  final ThumbnailCacheMode localStorageMusicIndexCacheMode;
 
   /// The thumbnail settings shared by Local Storage and the decoy file
   /// manager. Deliberately a slot of its own rather than a fallback to the
@@ -140,17 +228,25 @@ class FileManagerToolbarConfig {
     this.showStatsBar = true,
     this.showBookmarkBar = false,
     this.showHiddenFiles = false,
+    this.showNoMediaFolders = false,
     this.showMediaCarousel = true,
     this.autoStartPlaylistMode = true,
     this.rememberPerFolderLayout = true,
     this.resetSizeOnLayoutChange = true,
     this.autoHideAppBar = false,
     this.autoHideTabBar = false,
+    this.autoHideToolbar = false,
+    this.autoHideBreadcrumbBar = false,
     this.useFabForToolbar = false,
     this.bottomSelectionBar = false,
     this.folderLayoutModes = const {},
     this.folderGridAspectRatios = const {},
     this.folderSortModes = const {},
+    this.galleryModeStorageUris = const {},
+    this.galleryFoldersByStorage = const {},
+    this.skipGalleryPromptStorageUris = const {},
+    this.skipMusicPromptStorageUris = const {},
+    this.musicModeStorageUris = const {},
     this.collapsedBookmarkGroupUris = const {},
     this.detailColumnsOrder = const [
       FileDetailColumn.date,
@@ -178,6 +274,10 @@ class FileManagerToolbarConfig {
     this.playlistTransitionEffect = PlaylistTransitionEffect.slide,
     this.defaultThumbnailCacheMode = ThumbnailCacheMode.disabled,
     this.defaultThumbnailQuality = ThumbnailQuality.defaultAutoQuality,
+    this.defaultGalleryMetadataCacheMode = ThumbnailCacheMode.inContainer,
+    this.localStorageGalleryMetadataCacheMode = ThumbnailCacheMode.disabled,
+    this.defaultMusicIndexCacheMode = ThumbnailCacheMode.inContainer,
+    this.localStorageMusicIndexCacheMode = ThumbnailCacheMode.appCache,
     this.localStorageThumbnailCacheMode = ThumbnailCacheMode.disabled,
     this.localStorageThumbnailQuality = ThumbnailQuality.defaultAutoQuality,
     this.mediaViewerToolbarConfig = const MediaViewerToolbarConfig(),
@@ -185,73 +285,78 @@ class FileManagerToolbarConfig {
   });
 
   factory FileManagerToolbarConfig.defaults() => const FileManagerToolbarConfig(
-        order: [
-          FileManagerAction.search,
-          FileManagerAction.add,
-          FileManagerAction.viewToggle,
-          FileManagerAction.sort,
-          FileManagerAction.filter,
-          FileManagerAction.playMedia,
-        ],
-        hidden: {},
-        showBreadcrumbBar: true,
-        showStatsBar: true,
-        showBookmarkBar: false,
-        showHiddenFiles: false,
-        showMediaCarousel: true,
-        autoStartPlaylistMode: true,
-        rememberPerFolderLayout: true,
-        resetSizeOnLayoutChange: true,
-        autoHideAppBar: false,
-        autoHideTabBar: false,
-        useFabForToolbar: false,
-        bottomSelectionBar: false,
-        folderLayoutModes: {},
-        folderGridAspectRatios: {},
-        folderSortModes: {},
-        detailColumnsOrder: [
-          FileDetailColumn.date,
-          FileDetailColumn.size,
-          FileDetailColumn.type,
-        ],
-        hiddenDetailColumns: {FileDetailColumn.type},
-        itemActionsOrder: FileItemAction.values,
-        hiddenItemActions: {},
-        quickItemActions: FileItemAction.defaultQuickActions,
-        showGridFileNames: true,
-        gridAspectRatio: GridAspectRatio.square,
-        gridCornerStyle: GridCornerStyle.rounded,
-        gridSpacing: defaultGridSpacing,
-        showListThumbnails: true,
-        showItemActionsMenu: true,
-        selectByIcon: true,
-        showFileExtensions: true,
-        longFileNameDisplayMode: LongFileNameDisplayMode.ellipsizeEnd,
-        listZoomLevel: 1.0,
-        gridColumnsPortrait: 3,
-        gridColumnsLandscape: 5,
-        masonryColumnsPortrait: 2,
-        masonryColumnsLandscape: 4,
-        playlistTransitionEffect: PlaylistTransitionEffect.slide,
-        defaultThumbnailCacheMode: ThumbnailCacheMode.disabled,
-        defaultThumbnailQuality: ThumbnailQuality.defaultAutoQuality,
-        localStorageThumbnailCacheMode: ThumbnailCacheMode.disabled,
-        localStorageThumbnailQuality: ThumbnailQuality.defaultAutoQuality,
-        mediaViewerToolbarConfig: const MediaViewerToolbarConfig(),
-        skin: FileManagerSkin.classic,
-      );
+    order: defaultActionOrder,
+    hidden: {FileManagerAction.playMedia},
+    showBreadcrumbBar: true,
+    showStatsBar: true,
+    showBookmarkBar: false,
+    showHiddenFiles: false,
+    showNoMediaFolders: false,
+    showMediaCarousel: true,
+    autoStartPlaylistMode: true,
+    rememberPerFolderLayout: true,
+    resetSizeOnLayoutChange: true,
+    autoHideAppBar: false,
+    autoHideTabBar: false,
+    autoHideToolbar: false,
+    autoHideBreadcrumbBar: false,
+    useFabForToolbar: false,
+    bottomSelectionBar: false,
+    folderLayoutModes: {},
+    folderGridAspectRatios: {},
+    folderSortModes: {},
+    galleryModeStorageUris: {},
+    galleryFoldersByStorage: {},
+    skipGalleryPromptStorageUris: {},
+    skipMusicPromptStorageUris: {},
+    musicModeStorageUris: {},
+    detailColumnsOrder: [
+      FileDetailColumn.date,
+      FileDetailColumn.size,
+      FileDetailColumn.type,
+    ],
+    hiddenDetailColumns: {FileDetailColumn.type},
+    itemActionsOrder: FileItemAction.values,
+    hiddenItemActions: {},
+    quickItemActions: FileItemAction.defaultQuickActions,
+    showGridFileNames: true,
+    gridAspectRatio: GridAspectRatio.square,
+    gridCornerStyle: GridCornerStyle.rounded,
+    gridSpacing: defaultGridSpacing,
+    showListThumbnails: true,
+    showItemActionsMenu: true,
+    selectByIcon: true,
+    showFileExtensions: true,
+    longFileNameDisplayMode: LongFileNameDisplayMode.ellipsizeEnd,
+    listZoomLevel: 1.0,
+    gridColumnsPortrait: 3,
+    gridColumnsLandscape: 5,
+    masonryColumnsPortrait: 2,
+    masonryColumnsLandscape: 4,
+    playlistTransitionEffect: PlaylistTransitionEffect.slide,
+    defaultThumbnailCacheMode: ThumbnailCacheMode.disabled,
+    defaultThumbnailQuality: ThumbnailQuality.defaultAutoQuality,
+    defaultGalleryMetadataCacheMode: ThumbnailCacheMode.inContainer,
+    localStorageGalleryMetadataCacheMode: ThumbnailCacheMode.disabled,
+    defaultMusicIndexCacheMode: ThumbnailCacheMode.inContainer,
+    localStorageMusicIndexCacheMode: ThumbnailCacheMode.appCache,
+    localStorageThumbnailCacheMode: ThumbnailCacheMode.disabled,
+    localStorageThumbnailQuality: ThumbnailQuality.defaultAutoQuality,
+    mediaViewerToolbarConfig: MediaViewerToolbarConfig(),
+    skin: FileManagerSkin.classic,
+  );
 
   /// [defaultThumbnailCacheMode] + [defaultThumbnailQuality] as one value.
   ThumbnailSettings get defaultThumbnails => ThumbnailSettings(
-        cacheMode: defaultThumbnailCacheMode,
-        quality: defaultThumbnailQuality,
-      );
+    cacheMode: defaultThumbnailCacheMode,
+    quality: defaultThumbnailQuality,
+  );
 
   /// The Local Storage / decoy slot as one value.
   ThumbnailSettings get localStorageThumbnails => ThumbnailSettings(
-        cacheMode: localStorageThumbnailCacheMode,
-        quality: localStorageThumbnailQuality,
-      );
+    cacheMode: localStorageThumbnailCacheMode,
+    quality: localStorageThumbnailQuality,
+  );
 
   List<FileManagerAction> get visible =>
       order.where((a) => !hidden.contains(a)).toList(growable: false);
@@ -291,7 +396,9 @@ class FileManagerToolbarConfig {
       '$containerUri:$dirPath';
 
   GridAspectRatio getGridAspectRatioForFolder(
-      String containerUri, String dirPath) {
+    String containerUri,
+    String dirPath,
+  ) {
     if (rememberPerFolderLayout) {
       final saved = folderGridAspectRatios[folderKey(containerUri, dirPath)];
       if (saved != null) {
@@ -311,6 +418,102 @@ class FileManagerToolbarConfig {
     return folderSortModes[folderKey(containerUri, dirPath)];
   }
 
+  bool isGalleryModeForStorage(String containerUri) =>
+      galleryModeStorageUris.contains(containerUri);
+
+  FileManagerToolbarConfig withGalleryModeForStorage(
+    String containerUri,
+    bool enabled,
+  ) {
+    final next = Set<String>.from(galleryModeStorageUris);
+    if (enabled) {
+      next.add(containerUri);
+    } else {
+      next.remove(containerUri);
+    }
+    return copyWith(galleryModeStorageUris: next);
+  }
+
+  /// The folders [containerUri]'s gallery is limited to; empty when it scans
+  /// the whole storage.
+  List<String> galleryFoldersForStorage(String containerUri) =>
+      galleryFoldersByStorage[containerUri] ?? const <String>[];
+
+  /// [folders] replaces the choice for [containerUri]; an empty list goes back
+  /// to scanning the whole storage and leaves no entry behind.
+  FileManagerToolbarConfig withGalleryFoldersForStorage(
+    String containerUri,
+    List<String> folders,
+  ) {
+    final next = Map<String, List<String>>.from(galleryFoldersByStorage);
+    if (folders.isEmpty) {
+      next.remove(containerUri);
+    } else {
+      next[containerUri] = List<String>.unmodifiable(folders);
+    }
+    return copyWith(galleryFoldersByStorage: next);
+  }
+
+  /// Whether the gallery mode prompt was dismissed with "Don't ask again" for
+  /// [containerUri].
+  bool isGalleryPromptSkippedForStorage(String containerUri) =>
+      skipGalleryPromptStorageUris.contains(containerUri);
+
+  FileManagerToolbarConfig withGalleryPromptSkippedForStorage(
+    String containerUri,
+    bool skipped,
+  ) {
+    if (skipped == skipGalleryPromptStorageUris.contains(containerUri)) {
+      return this;
+    }
+    final next = Set<String>.from(skipGalleryPromptStorageUris);
+    if (skipped) {
+      next.add(containerUri);
+    } else {
+      next.remove(containerUri);
+    }
+    return copyWith(skipGalleryPromptStorageUris: next);
+  }
+
+  /// Whether the music mode prompt was dismissed with "Don't ask again" for
+  /// [containerUri].
+  bool isMusicPromptSkippedForStorage(String containerUri) =>
+      skipMusicPromptStorageUris.contains(containerUri);
+
+  FileManagerToolbarConfig withMusicPromptSkippedForStorage(
+    String containerUri,
+    bool skipped,
+  ) {
+    if (skipped == skipMusicPromptStorageUris.contains(containerUri)) {
+      return this;
+    }
+    final next = Set<String>.from(skipMusicPromptStorageUris);
+    if (skipped) {
+      next.add(containerUri);
+    } else {
+      next.remove(containerUri);
+    }
+    return copyWith(skipMusicPromptStorageUris: next);
+  }
+
+  /// Whether the music mode hint says it is on for [containerUri].
+  bool isMusicModeHintedForStorage(String containerUri) =>
+      musicModeStorageUris.contains(containerUri);
+
+  FileManagerToolbarConfig withMusicModeHintForStorage(
+    String containerUri,
+    bool enabled,
+  ) {
+    if (enabled == musicModeStorageUris.contains(containerUri)) return this;
+    final next = Set<String>.from(musicModeStorageUris);
+    if (enabled) {
+      next.add(containerUri);
+    } else {
+      next.remove(containerUri);
+    }
+    return copyWith(musicModeStorageUris: next);
+  }
+
   FileManagerToolbarConfig copyWith({
     List<FileManagerAction>? order,
     Set<FileManagerAction>? hidden,
@@ -318,17 +521,25 @@ class FileManagerToolbarConfig {
     bool? showStatsBar,
     bool? showBookmarkBar,
     bool? showHiddenFiles,
+    bool? showNoMediaFolders,
     bool? showMediaCarousel,
     bool? autoStartPlaylistMode,
     bool? rememberPerFolderLayout,
     bool? resetSizeOnLayoutChange,
     bool? autoHideAppBar,
     bool? autoHideTabBar,
+    bool? autoHideToolbar,
+    bool? autoHideBreadcrumbBar,
     bool? useFabForToolbar,
     bool? bottomSelectionBar,
     Map<String, String>? folderLayoutModes,
     Map<String, String>? folderGridAspectRatios,
     Map<String, String>? folderSortModes,
+    Set<String>? galleryModeStorageUris,
+    Map<String, List<String>>? galleryFoldersByStorage,
+    Set<String>? skipGalleryPromptStorageUris,
+    Set<String>? skipMusicPromptStorageUris,
+    Set<String>? musicModeStorageUris,
     Set<String>? collapsedBookmarkGroupUris,
     List<FileDetailColumn>? detailColumnsOrder,
     Set<FileDetailColumn>? hiddenDetailColumns,
@@ -352,73 +563,97 @@ class FileManagerToolbarConfig {
     PlaylistTransitionEffect? playlistTransitionEffect,
     ThumbnailCacheMode? defaultThumbnailCacheMode,
     ThumbnailQuality? defaultThumbnailQuality,
+    ThumbnailCacheMode? defaultGalleryMetadataCacheMode,
+    ThumbnailCacheMode? localStorageGalleryMetadataCacheMode,
+    ThumbnailCacheMode? defaultMusicIndexCacheMode,
+    ThumbnailCacheMode? localStorageMusicIndexCacheMode,
     ThumbnailCacheMode? localStorageThumbnailCacheMode,
     ThumbnailQuality? localStorageThumbnailQuality,
     MediaViewerToolbarConfig? mediaViewerToolbarConfig,
     FileManagerSkin? skin,
-  }) =>
-      FileManagerToolbarConfig(
-        order: order ?? this.order,
-        hidden: hidden ?? this.hidden,
-        showBreadcrumbBar: showBreadcrumbBar ?? this.showBreadcrumbBar,
-        showStatsBar: showStatsBar ?? this.showStatsBar,
-        showBookmarkBar: showBookmarkBar ?? this.showBookmarkBar,
-        showHiddenFiles: showHiddenFiles ?? this.showHiddenFiles,
-        showMediaCarousel: showMediaCarousel ?? this.showMediaCarousel,
-        autoStartPlaylistMode:
-            autoStartPlaylistMode ?? this.autoStartPlaylistMode,
-        rememberPerFolderLayout:
-            rememberPerFolderLayout ?? this.rememberPerFolderLayout,
-        resetSizeOnLayoutChange:
-            resetSizeOnLayoutChange ?? this.resetSizeOnLayoutChange,
-        autoHideAppBar: autoHideAppBar ?? this.autoHideAppBar,
-        autoHideTabBar: autoHideTabBar ?? this.autoHideTabBar,
-        useFabForToolbar: useFabForToolbar ?? this.useFabForToolbar,
-        bottomSelectionBar: bottomSelectionBar ?? this.bottomSelectionBar,
-        folderLayoutModes: folderLayoutModes ?? this.folderLayoutModes,
-        folderGridAspectRatios:
-            folderGridAspectRatios ?? this.folderGridAspectRatios,
-        folderSortModes: folderSortModes ?? this.folderSortModes,
-        collapsedBookmarkGroupUris:
-            collapsedBookmarkGroupUris ?? this.collapsedBookmarkGroupUris,
-        detailColumnsOrder: detailColumnsOrder ?? this.detailColumnsOrder,
-        hiddenDetailColumns: hiddenDetailColumns ?? this.hiddenDetailColumns,
-        itemActionsOrder: itemActionsOrder ?? this.itemActionsOrder,
-        hiddenItemActions: hiddenItemActions ?? this.hiddenItemActions,
-        quickItemActions: quickItemActions ?? this.quickItemActions,
-        showGridFileNames: showGridFileNames ?? this.showGridFileNames,
-        gridAspectRatio: gridAspectRatio ?? this.gridAspectRatio,
-        gridCornerStyle: gridCornerStyle ?? this.gridCornerStyle,
-        gridSpacing: (gridSpacing ?? this.gridSpacing)
-            .clamp(minGridSpacing, maxGridSpacing),
-        showListThumbnails: showListThumbnails ?? this.showListThumbnails,
-        showItemActionsMenu: showItemActionsMenu ?? this.showItemActionsMenu,
-        selectByIcon: selectByIcon ?? this.selectByIcon,
-        showFileExtensions: showFileExtensions ?? this.showFileExtensions,
-        longFileNameDisplayMode:
-            longFileNameDisplayMode ?? this.longFileNameDisplayMode,
-        listZoomLevel: listZoomLevel ?? this.listZoomLevel,
-        gridColumnsPortrait: gridColumnsPortrait ?? this.gridColumnsPortrait,
-        gridColumnsLandscape:
-            gridColumnsLandscape ?? this.gridColumnsLandscape,
-        masonryColumnsPortrait:
-            masonryColumnsPortrait ?? this.masonryColumnsPortrait,
-        masonryColumnsLandscape:
-            masonryColumnsLandscape ?? this.masonryColumnsLandscape,
-        playlistTransitionEffect:
-            playlistTransitionEffect ?? this.playlistTransitionEffect,
-        defaultThumbnailCacheMode:
-            defaultThumbnailCacheMode ?? this.defaultThumbnailCacheMode,
-        defaultThumbnailQuality:
-            defaultThumbnailQuality ?? this.defaultThumbnailQuality,
-        localStorageThumbnailCacheMode: localStorageThumbnailCacheMode ??
-            this.localStorageThumbnailCacheMode,
-        localStorageThumbnailQuality:
-            localStorageThumbnailQuality ?? this.localStorageThumbnailQuality,
-        mediaViewerToolbarConfig:
-            mediaViewerToolbarConfig ?? this.mediaViewerToolbarConfig,
-        skin: skin ?? this.skin,
-      );
+  }) => FileManagerToolbarConfig(
+    order: order ?? this.order,
+    hidden: hidden ?? this.hidden,
+    showBreadcrumbBar: showBreadcrumbBar ?? this.showBreadcrumbBar,
+    showStatsBar: showStatsBar ?? this.showStatsBar,
+    showBookmarkBar: showBookmarkBar ?? this.showBookmarkBar,
+    showHiddenFiles: showHiddenFiles ?? this.showHiddenFiles,
+    showNoMediaFolders: showNoMediaFolders ?? this.showNoMediaFolders,
+    showMediaCarousel: showMediaCarousel ?? this.showMediaCarousel,
+    autoStartPlaylistMode: autoStartPlaylistMode ?? this.autoStartPlaylistMode,
+    rememberPerFolderLayout:
+        rememberPerFolderLayout ?? this.rememberPerFolderLayout,
+    resetSizeOnLayoutChange:
+        resetSizeOnLayoutChange ?? this.resetSizeOnLayoutChange,
+    autoHideAppBar: autoHideAppBar ?? this.autoHideAppBar,
+    autoHideTabBar: autoHideTabBar ?? this.autoHideTabBar,
+    autoHideToolbar: autoHideToolbar ?? this.autoHideToolbar,
+    autoHideBreadcrumbBar: autoHideBreadcrumbBar ?? this.autoHideBreadcrumbBar,
+    useFabForToolbar: useFabForToolbar ?? this.useFabForToolbar,
+    bottomSelectionBar: bottomSelectionBar ?? this.bottomSelectionBar,
+    folderLayoutModes: folderLayoutModes ?? this.folderLayoutModes,
+    folderGridAspectRatios:
+        folderGridAspectRatios ?? this.folderGridAspectRatios,
+    folderSortModes: folderSortModes ?? this.folderSortModes,
+    galleryModeStorageUris:
+        galleryModeStorageUris ?? this.galleryModeStorageUris,
+    galleryFoldersByStorage:
+        galleryFoldersByStorage ?? this.galleryFoldersByStorage,
+    skipGalleryPromptStorageUris:
+        skipGalleryPromptStorageUris ?? this.skipGalleryPromptStorageUris,
+    skipMusicPromptStorageUris:
+        skipMusicPromptStorageUris ?? this.skipMusicPromptStorageUris,
+    musicModeStorageUris: musicModeStorageUris ?? this.musicModeStorageUris,
+    collapsedBookmarkGroupUris:
+        collapsedBookmarkGroupUris ?? this.collapsedBookmarkGroupUris,
+    detailColumnsOrder: detailColumnsOrder ?? this.detailColumnsOrder,
+    hiddenDetailColumns: hiddenDetailColumns ?? this.hiddenDetailColumns,
+    itemActionsOrder: itemActionsOrder ?? this.itemActionsOrder,
+    hiddenItemActions: hiddenItemActions ?? this.hiddenItemActions,
+    quickItemActions: quickItemActions ?? this.quickItemActions,
+    showGridFileNames: showGridFileNames ?? this.showGridFileNames,
+    gridAspectRatio: gridAspectRatio ?? this.gridAspectRatio,
+    gridCornerStyle: gridCornerStyle ?? this.gridCornerStyle,
+    gridSpacing: (gridSpacing ?? this.gridSpacing).clamp(
+      minGridSpacing,
+      maxGridSpacing,
+    ),
+    showListThumbnails: showListThumbnails ?? this.showListThumbnails,
+    showItemActionsMenu: showItemActionsMenu ?? this.showItemActionsMenu,
+    selectByIcon: selectByIcon ?? this.selectByIcon,
+    showFileExtensions: showFileExtensions ?? this.showFileExtensions,
+    longFileNameDisplayMode:
+        longFileNameDisplayMode ?? this.longFileNameDisplayMode,
+    listZoomLevel: listZoomLevel ?? this.listZoomLevel,
+    gridColumnsPortrait: gridColumnsPortrait ?? this.gridColumnsPortrait,
+    gridColumnsLandscape: gridColumnsLandscape ?? this.gridColumnsLandscape,
+    masonryColumnsPortrait:
+        masonryColumnsPortrait ?? this.masonryColumnsPortrait,
+    masonryColumnsLandscape:
+        masonryColumnsLandscape ?? this.masonryColumnsLandscape,
+    playlistTransitionEffect:
+        playlistTransitionEffect ?? this.playlistTransitionEffect,
+    defaultThumbnailCacheMode:
+        defaultThumbnailCacheMode ?? this.defaultThumbnailCacheMode,
+    defaultThumbnailQuality:
+        defaultThumbnailQuality ?? this.defaultThumbnailQuality,
+    defaultGalleryMetadataCacheMode:
+        defaultGalleryMetadataCacheMode ?? this.defaultGalleryMetadataCacheMode,
+    localStorageGalleryMetadataCacheMode:
+        localStorageGalleryMetadataCacheMode ??
+        this.localStorageGalleryMetadataCacheMode,
+    defaultMusicIndexCacheMode:
+        defaultMusicIndexCacheMode ?? this.defaultMusicIndexCacheMode,
+    localStorageMusicIndexCacheMode:
+        localStorageMusicIndexCacheMode ?? this.localStorageMusicIndexCacheMode,
+    localStorageThumbnailCacheMode:
+        localStorageThumbnailCacheMode ?? this.localStorageThumbnailCacheMode,
+    localStorageThumbnailQuality:
+        localStorageThumbnailQuality ?? this.localStorageThumbnailQuality,
+    mediaViewerToolbarConfig:
+        mediaViewerToolbarConfig ?? this.mediaViewerToolbarConfig,
+    skin: skin ?? this.skin,
+  );
 
   // -- Which export each field belongs to -------------------------------------
   //
@@ -437,6 +672,8 @@ class FileManagerToolbarConfig {
     'showMediaCarousel',
     'autoHideAppBar',
     'autoHideTabBar',
+    'autoHideToolbar',
+    'autoHideBreadcrumbBar',
     'useFabForToolbar',
     'bottomSelectionBar',
     'detailColumnsOrder',
@@ -466,12 +703,17 @@ class FileManagerToolbarConfig {
   /// layout half travels in its `interface` section.
   static const Set<String> behaviorKeys = {
     'showHiddenFiles',
+    'showNoMediaFolders',
     'selectByIcon',
     'autoStartPlaylistMode',
     'rememberPerFolderLayout',
     'resetSizeOnLayoutChange',
     'defaultThumbnailCacheMode',
     'defaultThumbnailQuality',
+    'defaultGalleryMetadataCacheMode',
+    'localStorageGalleryMetadataCacheMode',
+    'defaultMusicIndexCacheMode',
+    'localStorageMusicIndexCacheMode',
     'localStorageThumbnailCacheMode',
     'localStorageThumbnailQuality',
   };
@@ -484,6 +726,11 @@ class FileManagerToolbarConfig {
     'folderLayoutModes',
     'folderGridAspectRatios',
     'folderSortModes',
+    'galleryModeStorageUris',
+    'galleryFoldersByStorage',
+    'skipGalleryPromptStorageUris',
+    'skipMusicPromptStorageUris',
+    'musicModeStorageUris',
     'collapsedBookmarkGroupUris',
   };
 
@@ -530,55 +777,65 @@ class FileManagerToolbarConfig {
       });
 
   Map<String, dynamic> toJson() => {
-        'order': order.map((a) => a.toJson()).toList(),
-        'hidden': hidden.map((a) => a.toJson()).toList(),
-        'showBreadcrumbBar': showBreadcrumbBar,
-        'showStatsBar': showStatsBar,
-        'showBookmarkBar': showBookmarkBar,
-        'showHiddenFiles': showHiddenFiles,
-        'showMediaCarousel': showMediaCarousel,
-        'autoStartPlaylistMode': autoStartPlaylistMode,
-        'rememberPerFolderLayout': rememberPerFolderLayout,
-        'resetSizeOnLayoutChange': resetSizeOnLayoutChange,
-        'autoHideAppBar': autoHideAppBar,
-        'autoHideTabBar': autoHideTabBar,
-        'useFabForToolbar': useFabForToolbar,
-        'bottomSelectionBar': bottomSelectionBar,
-        'folderLayoutModes': folderLayoutModes,
-        'folderGridAspectRatios': folderGridAspectRatios,
-        'folderSortModes': folderSortModes,
-        'collapsedBookmarkGroupUris': collapsedBookmarkGroupUris.toList()
-          ..sort(),
-        'detailColumnsOrder':
-            detailColumnsOrder.map((c) => c.toJson()).toList(),
-        'hiddenDetailColumns':
-            hiddenDetailColumns.map((c) => c.toJson()).toList(),
-        'itemActionsOrder': itemActionsOrder.map((a) => a.toJson()).toList(),
-        'hiddenItemActions':
-            hiddenItemActions.map((a) => a.toJson()).toList(),
-        'quickItemActions': quickItemActions.map((a) => a.toJson()).toList(),
-        'showGridFileNames': showGridFileNames,
-        'gridAspectRatio': gridAspectRatio.toJson(),
-        'gridCornerStyle': gridCornerStyle.toJson(),
-        'gridSpacing': gridSpacing,
-        'showListThumbnails': showListThumbnails,
-        'showItemActionsMenu': showItemActionsMenu,
-        'selectByIcon': selectByIcon,
-        'showFileExtensions': showFileExtensions,
-        'longFileNameDisplayMode': longFileNameDisplayMode.toJson(),
-        'listZoomLevel': listZoomLevel,
-        'gridColumnsPortrait': gridColumnsPortrait,
-        'gridColumnsLandscape': gridColumnsLandscape,
-        'masonryColumnsPortrait': masonryColumnsPortrait,
-        'masonryColumnsLandscape': masonryColumnsLandscape,
-        'playlistTransitionEffect': playlistTransitionEffect.toJson(),
-        'defaultThumbnailCacheMode': defaultThumbnailCacheMode.toJson(),
-        'defaultThumbnailQuality': defaultThumbnailQuality.toJson(),
-        'localStorageThumbnailCacheMode': localStorageThumbnailCacheMode.toJson(),
-        'localStorageThumbnailQuality': localStorageThumbnailQuality.toJson(),
-        'mediaViewerToolbarConfig': mediaViewerToolbarConfig.toJson(),
-        'skin': skin.toJson(),
-      };
+    'order': order.map((a) => a.toJson()).toList(),
+    'hidden': hidden.map((a) => a.toJson()).toList(),
+    'showBreadcrumbBar': showBreadcrumbBar,
+    'showStatsBar': showStatsBar,
+    'showBookmarkBar': showBookmarkBar,
+    'showHiddenFiles': showHiddenFiles,
+    'showNoMediaFolders': showNoMediaFolders,
+    'showMediaCarousel': showMediaCarousel,
+    'autoStartPlaylistMode': autoStartPlaylistMode,
+    'rememberPerFolderLayout': rememberPerFolderLayout,
+    'resetSizeOnLayoutChange': resetSizeOnLayoutChange,
+    'autoHideAppBar': autoHideAppBar,
+    'autoHideTabBar': autoHideTabBar,
+    'autoHideToolbar': autoHideToolbar,
+    'autoHideBreadcrumbBar': autoHideBreadcrumbBar,
+    'useFabForToolbar': useFabForToolbar,
+    'bottomSelectionBar': bottomSelectionBar,
+    'folderLayoutModes': folderLayoutModes,
+    'folderGridAspectRatios': folderGridAspectRatios,
+    'folderSortModes': folderSortModes,
+    'galleryModeStorageUris': galleryModeStorageUris.toList()..sort(),
+    'galleryFoldersByStorage': galleryFoldersByStorage,
+    'skipGalleryPromptStorageUris': skipGalleryPromptStorageUris.toList()
+      ..sort(),
+    'skipMusicPromptStorageUris': skipMusicPromptStorageUris.toList()..sort(),
+    'musicModeStorageUris': musicModeStorageUris.toList()..sort(),
+    'collapsedBookmarkGroupUris': collapsedBookmarkGroupUris.toList()..sort(),
+    'detailColumnsOrder': detailColumnsOrder.map((c) => c.toJson()).toList(),
+    'hiddenDetailColumns': hiddenDetailColumns.map((c) => c.toJson()).toList(),
+    'itemActionsOrder': itemActionsOrder.map((a) => a.toJson()).toList(),
+    'hiddenItemActions': hiddenItemActions.map((a) => a.toJson()).toList(),
+    'quickItemActions': quickItemActions.map((a) => a.toJson()).toList(),
+    'showGridFileNames': showGridFileNames,
+    'gridAspectRatio': gridAspectRatio.toJson(),
+    'gridCornerStyle': gridCornerStyle.toJson(),
+    'gridSpacing': gridSpacing,
+    'showListThumbnails': showListThumbnails,
+    'showItemActionsMenu': showItemActionsMenu,
+    'selectByIcon': selectByIcon,
+    'showFileExtensions': showFileExtensions,
+    'longFileNameDisplayMode': longFileNameDisplayMode.toJson(),
+    'listZoomLevel': listZoomLevel,
+    'gridColumnsPortrait': gridColumnsPortrait,
+    'gridColumnsLandscape': gridColumnsLandscape,
+    'masonryColumnsPortrait': masonryColumnsPortrait,
+    'masonryColumnsLandscape': masonryColumnsLandscape,
+    'playlistTransitionEffect': playlistTransitionEffect.toJson(),
+    'defaultThumbnailCacheMode': defaultThumbnailCacheMode.toJson(),
+    'defaultThumbnailQuality': defaultThumbnailQuality.toJson(),
+    'defaultGalleryMetadataCacheMode': defaultGalleryMetadataCacheMode.toJson(),
+    'localStorageGalleryMetadataCacheMode': localStorageGalleryMetadataCacheMode
+        .toJson(),
+    'defaultMusicIndexCacheMode': defaultMusicIndexCacheMode.toJson(),
+    'localStorageMusicIndexCacheMode': localStorageMusicIndexCacheMode.toJson(),
+    'localStorageThumbnailCacheMode': localStorageThumbnailCacheMode.toJson(),
+    'localStorageThumbnailQuality': localStorageThumbnailQuality.toJson(),
+    'mediaViewerToolbarConfig': mediaViewerToolbarConfig.toJson(),
+    'skin': skin.toJson(),
+  };
 
   factory FileManagerToolbarConfig.fromJson(Map<String, dynamic>? j) {
     if (j == null) return FileManagerToolbarConfig.defaults();
@@ -586,13 +843,28 @@ class FileManagerToolbarConfig {
         .map((v) => FileManagerAction.fromJson(v as String?))
         .whereType<FileManagerAction>()
         .toList();
-    for (final a in FileManagerAction.values) {
+    final actionsInSavedOrder = rawOrder.toSet();
+    final neverRearranged = _previousDefaultOrders.any(
+      (old) => _sameOrder(old, rawOrder),
+    );
+    if (neverRearranged) {
+      rawOrder
+        ..clear()
+        ..addAll(defaultActionOrder);
+    }
+    for (final a in defaultActionOrder) {
       if (!rawOrder.contains(a)) rawOrder.add(a);
     }
     final hidden = (j['hidden'] as List<dynamic>? ?? [])
         .map((v) => FileManagerAction.fromJson(v as String?))
         .whereType<FileManagerAction>()
         .toSet();
+    // Older configs predate the media-play action. Keep it available in the
+    // toolbar settings, but don't crowd the default bar with a newly appended
+    // button unless it was already part of the saved order.
+    if (!actionsInSavedOrder.contains(FileManagerAction.playMedia)) {
+      hidden.add(FileManagerAction.playMedia);
+    }
     final rawDetailColumns = (j['detailColumnsOrder'] as List<dynamic>? ?? [])
         .map((v) => FileDetailColumn.fromJson(v as String?))
         .whereType<FileDetailColumn>()
@@ -602,9 +874,9 @@ class FileManagerToolbarConfig {
     }
     final hiddenDetailColumns = j.containsKey('hiddenDetailColumns')
         ? (j['hiddenDetailColumns'] as List<dynamic>? ?? [])
-            .map((v) => FileDetailColumn.fromJson(v as String?))
-            .whereType<FileDetailColumn>()
-            .toSet()
+              .map((v) => FileDetailColumn.fromJson(v as String?))
+              .whereType<FileDetailColumn>()
+              .toSet()
         : const {FileDetailColumn.type};
     // Unknown names are dropped, duplicates collapsed, and any action the
     // stored list lacks (a config from before the action existed) is
@@ -635,25 +907,58 @@ class FileManagerToolbarConfig {
               .toSet();
     final rawFolderLayoutModes =
         (j['folderLayoutModes'] as Map<String, dynamic>?)?.map(
-              (k, v) => MapEntry(k, v as String),
-            ) ??
-            const <String, String>{};
+          (k, v) => MapEntry(k, v as String),
+        ) ??
+        const <String, String>{};
     final rawFolderGridAspectRatios =
         (j['folderGridAspectRatios'] as Map<String, dynamic>?)?.map(
-              (k, v) => MapEntry(k, v as String),
-            ) ??
-            const <String, String>{};
+          (k, v) => MapEntry(k, v as String),
+        ) ??
+        const <String, String>{};
     final rawFolderSortModes =
         (j['folderSortModes'] as Map<String, dynamic>?)?.map(
-              (k, v) => MapEntry(k, v as String),
-            ) ??
-            const <String, String>{};
+          (k, v) => MapEntry(k, v as String),
+        ) ??
+        const <String, String>{};
     final collapsedBookmarkGroupUris =
         (j['collapsedBookmarkGroupUris'] as List<dynamic>? ?? const [])
             .whereType<String>()
             .where((uri) => uri.isNotEmpty)
             .toSet();
-    final defaultThumbnailCacheMode = ThumbnailCacheMode.fromJson(
+    final galleryModeStorageUris =
+        (j['galleryModeStorageUris'] as List<dynamic>? ?? const [])
+            .whereType<String>()
+            .where((uri) => uri.isNotEmpty)
+            .toSet();
+    final galleryFoldersByStorage = <String, List<String>>{};
+    final rawGalleryFolders = j['galleryFoldersByStorage'];
+    if (rawGalleryFolders is Map) {
+      rawGalleryFolders.forEach((uri, folders) {
+        if (uri is! String || uri.isEmpty || folders is! List) return;
+        final cleaned = [
+          for (final f in folders)
+            if (f is String && f.isNotEmpty) f,
+        ];
+        if (cleaned.isNotEmpty) galleryFoldersByStorage[uri] = cleaned;
+      });
+    }
+    final musicModeStorageUris =
+        (j['musicModeStorageUris'] as List<dynamic>? ?? const [])
+            .whereType<String>()
+            .where((uri) => uri.isNotEmpty)
+            .toSet();
+    final skipGalleryPromptStorageUris =
+        (j['skipGalleryPromptStorageUris'] as List<dynamic>? ?? const [])
+            .whereType<String>()
+            .where((uri) => uri.isNotEmpty)
+            .toSet();
+    final skipMusicPromptStorageUris =
+        (j['skipMusicPromptStorageUris'] as List<dynamic>? ?? const [])
+            .whereType<String>()
+            .where((uri) => uri.isNotEmpty)
+            .toSet();
+    final defaultThumbnailCacheMode =
+        ThumbnailCacheMode.fromJson(
           j['defaultThumbnailCacheMode'] as String?,
         ) ??
         ThumbnailCacheMode.disabled;
@@ -664,19 +969,42 @@ class FileManagerToolbarConfig {
     // used the app-wide default for it, so an absent slot is seeded from the
     // default's value: upgrading changes nothing about how Local Storage
     // looks, and from then on the two are independent.
-    final localStorageThumbnailCacheMode = j.containsKey(
-          'localStorageThumbnailCacheMode',
-        )
+    final localStorageThumbnailCacheMode =
+        j.containsKey('localStorageThumbnailCacheMode')
         ? (ThumbnailCacheMode.fromJson(
-              j['localStorageThumbnailCacheMode'] as String?,
-            ) ??
-            defaultThumbnailCacheMode)
+                j['localStorageThumbnailCacheMode'] as String?,
+              ) ??
+              defaultThumbnailCacheMode)
         : defaultThumbnailCacheMode;
     final localStorageThumbnailQuality =
         j.containsKey('localStorageThumbnailQuality')
-            ? ThumbnailQuality.fromJson(j['localStorageThumbnailQuality'])
-            : defaultThumbnailQuality;
-    final longFileNameDisplayMode = LongFileNameDisplayMode.fromJson(
+        ? ThumbnailQuality.fromJson(j['localStorageThumbnailQuality'])
+        : defaultThumbnailQuality;
+    // Vault gallery metadata has always been stored inside the vault. Older
+    // Local Storage configs followed the thumbnail destination, so preserve
+    // that choice until the two settings are changed independently.
+    final defaultGalleryMetadataCacheMode =
+        ThumbnailCacheMode.fromJson(
+          j['defaultGalleryMetadataCacheMode'] as String?,
+        ) ??
+        ThumbnailCacheMode.inContainer;
+    final localStorageGalleryMetadataCacheMode =
+        ThumbnailCacheMode.fromJson(
+          j['localStorageGalleryMetadataCacheMode'] as String?,
+        ) ??
+        localStorageThumbnailCacheMode;
+    final defaultMusicIndexCacheMode =
+        ThumbnailCacheMode.fromJson(
+          j['defaultMusicIndexCacheMode'] as String?,
+        ) ??
+        ThumbnailCacheMode.inContainer;
+    final localStorageMusicIndexCacheMode =
+        ThumbnailCacheMode.fromJson(
+          j['localStorageMusicIndexCacheMode'] as String?,
+        ) ??
+        ThumbnailCacheMode.appCache;
+    final longFileNameDisplayMode =
+        LongFileNameDisplayMode.fromJson(
           j['longFileNameDisplayMode'] as String?,
         ) ??
         LongFileNameDisplayMode.ellipsizeEnd;
@@ -693,17 +1021,25 @@ class FileManagerToolbarConfig {
       showStatsBar: j['showStatsBar'] as bool? ?? true,
       showBookmarkBar: j['showBookmarkBar'] as bool? ?? false,
       showHiddenFiles: j['showHiddenFiles'] as bool? ?? false,
+      showNoMediaFolders: j['showNoMediaFolders'] as bool? ?? false,
       showMediaCarousel: j['showMediaCarousel'] as bool? ?? true,
       autoStartPlaylistMode: j['autoStartPlaylistMode'] as bool? ?? true,
       rememberPerFolderLayout: j['rememberPerFolderLayout'] as bool? ?? true,
       resetSizeOnLayoutChange: j['resetSizeOnLayoutChange'] as bool? ?? true,
       autoHideAppBar: j['autoHideAppBar'] as bool? ?? false,
       autoHideTabBar: j['autoHideTabBar'] as bool? ?? false,
+      autoHideToolbar: j['autoHideToolbar'] as bool? ?? false,
+      autoHideBreadcrumbBar: j['autoHideBreadcrumbBar'] as bool? ?? false,
       useFabForToolbar: j['useFabForToolbar'] as bool? ?? false,
       bottomSelectionBar: j['bottomSelectionBar'] as bool? ?? false,
       folderLayoutModes: rawFolderLayoutModes,
       folderGridAspectRatios: rawFolderGridAspectRatios,
       folderSortModes: rawFolderSortModes,
+      galleryModeStorageUris: galleryModeStorageUris,
+      galleryFoldersByStorage: galleryFoldersByStorage,
+      skipGalleryPromptStorageUris: skipGalleryPromptStorageUris,
+      skipMusicPromptStorageUris: skipMusicPromptStorageUris,
+      musicModeStorageUris: musicModeStorageUris,
       collapsedBookmarkGroupUris: collapsedBookmarkGroupUris,
       detailColumnsOrder: rawDetailColumns.isEmpty
           ? const [
@@ -717,12 +1053,14 @@ class FileManagerToolbarConfig {
       hiddenItemActions: hiddenItemActions,
       quickItemActions: quickItemActions,
       showGridFileNames: j['showGridFileNames'] as bool? ?? true,
-      gridAspectRatio:
-          GridAspectRatio.fromJson(j['gridAspectRatio'] as String?),
+      gridAspectRatio: GridAspectRatio.fromJson(
+        j['gridAspectRatio'] as String?,
+      ),
       // Absent in configs saved before these options existed -> the
       // original look (rounded, 8px gaps).
-      gridCornerStyle:
-          GridCornerStyle.fromJson(j['gridCornerStyle'] as String?),
+      gridCornerStyle: GridCornerStyle.fromJson(
+        j['gridCornerStyle'] as String?,
+      ),
       gridSpacing: ((j['gridSpacing'] as num?)?.toInt() ?? defaultGridSpacing)
           .clamp(minGridSpacing, maxGridSpacing),
       showListThumbnails: j['showListThumbnails'] as bool? ?? true,
@@ -744,6 +1082,11 @@ class FileManagerToolbarConfig {
       ),
       defaultThumbnailCacheMode: defaultThumbnailCacheMode,
       defaultThumbnailQuality: defaultThumbnailQuality,
+      defaultGalleryMetadataCacheMode: defaultGalleryMetadataCacheMode,
+      localStorageGalleryMetadataCacheMode:
+          localStorageGalleryMetadataCacheMode,
+      defaultMusicIndexCacheMode: defaultMusicIndexCacheMode,
+      localStorageMusicIndexCacheMode: localStorageMusicIndexCacheMode,
       localStorageThumbnailCacheMode: localStorageThumbnailCacheMode,
       localStorageThumbnailQuality: localStorageThumbnailQuality,
       mediaViewerToolbarConfig: mediaViewerConfig,

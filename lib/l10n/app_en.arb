@@ -3010,6 +3010,14 @@
   "@gocryptfsCipherLabel": {
     "description": "Label above the AES-256-GCM/XChaCha20-Poly1305 cipher picker shown when creating a new gocryptfs vault"
   },
+  "gocryptfsNamesRandomIvOption": "Random per folder (default)",
+  "@gocryptfsNamesRandomIvOption": {
+    "description": "Option in the gocryptfs filename picker when creating a vault: every folder gets its own random gocryptfs.diriv (the gocryptfs default)"
+  },
+  "gocryptfsNamesDeterministicOption": "Deterministic (for synced folders)",
+  "@gocryptfsNamesDeterministicOption": {
+    "description": "Option in the gocryptfs filename picker when creating a vault: gocryptfs -deterministic-names. No gocryptfs.diriv files, so devices that create the same folder offline produce identical ciphertext"
+  },
   "cryfsCipherLabel": "Content Cipher",
   "@cryfsCipherLabel": {
     "description": "Label above the XChaCha20-Poly1305/AES-256-GCM cipher picker shown when creating a new CryFS vault"
@@ -3215,6 +3223,194 @@
   "selectContainerFileOrFolder": "Select File or Folder",
   "@selectContainerFileOrFolder": {
     "description": "Label for picking a container file or folder"
+  },
+  "useBackupHeaderToggleTitle": "Use backup header",
+  "@useBackupHeaderToggleTitle": {
+    "description": "Unlock option: open the volume using the backup header embedded at its end"
+  },
+  "useBackupHeaderToggleSubtitle": "Open with the backup copy of the header stored at the end of the volume. Use it if the main header is damaged.",
+  "@useBackupHeaderToggleSubtitle": {
+    "description": "Explains the Use backup header unlock option"
+  },
+  "keepCurrentOption": "Keep current",
+  "@keepCurrentOption": {
+    "description": "Picker choice that leaves a setting unchanged (e.g. keep the header PRF when changing a password)"
+  },
+  "toolExpandVolumeTitle": "Expand VeraCrypt volume",
+  "@toolExpandVolumeTitle": {
+    "description": "Tools row: enlarge a standard VeraCrypt volume"
+  },
+  "toolExpandVolumeSubtitle": "Make a standard volume larger, like the desktop Volume Expander",
+  "@toolExpandVolumeSubtitle": {
+    "description": "Tools row subtitle for volume expansion"
+  },
+  "toolExpandLuksVolumeTitle": "Expand LUKS container",
+  "@toolExpandLuksVolumeTitle": {
+    "description": "Tools row: enlarge a LUKS1 or LUKS2 file container"
+  },
+  "toolExpandLuksVolumeSubtitle": "Grow LUKS1 and LUKS2 containers, including fixed-size LUKS2 metadata",
+  "@toolExpandLuksVolumeSubtitle": {
+    "description": "Tools row subtitle for LUKS container expansion"
+  },
+  "luksToolsExpandNote": "Back up the container first. Supports LUKS1 and LUKS2. NTFS and ext2/3/4 filesystems can be expanded in place (FAT and exFAT cannot). The added space can be initialized with encrypted zeros. A keyfile replaces the password if used.",
+  "@luksToolsExpandNote": {
+    "description": "Explains LUKS container expansion behavior and supported in-place filesystem growth"
+  },
+  "toolExpandBitLockerVolumeTitle": "Expand BitLocker container",
+  "@toolExpandBitLockerVolumeTitle": {
+    "description": "Tools row: enlarge a raw BitLocker volume file"
+  },
+  "toolExpandBitLockerVolumeSubtitle": "Grow a BitLocker volume file or VHD/VHDX image and extend its NTFS file system",
+  "@toolExpandBitLockerVolumeSubtitle": {
+    "description": "Tools row subtitle for BitLocker container expansion"
+  },
+  "bitlockerToolsExpandNote": "Back up the container first. This rewrites BitLocker's metadata so the encrypted volume covers the added space, so check the result on a copy before relying on it. Works on fully encrypted BitLocker volumes from Windows 7 or later, either as a raw volume file or inside a fixed or dynamic VHD or VHDX. For a disk image enter the new total disk size: the virtual disk and its last partition (MBR or GPT) are enlarged too, so the BitLocker partition must be the last one. BitLocker To Go and encrypt-on-write (used-space-only) volumes are not supported. NTFS can be expanded in place (FAT and exFAT cannot). The added space can optionally be filled with encrypted zeros. Unlock with the password or the 48-digit recovery key.",
+  "@bitlockerToolsExpandNote": {
+    "description": "Explains BitLocker container expansion: what is supported, what is rewritten, and the backup advice"
+  },
+  "bitlockerToolsPasswordLabel": "Password or recovery key",
+  "@bitlockerToolsPasswordLabel": {
+    "description": "Credential field label for BitLocker tools: a password or the 48-digit recovery key"
+  },
+  "toolHiddenInExistingTitle": "Add hidden volume",
+  "@toolHiddenInExistingTitle": {
+    "description": "Tools row: create a hidden volume inside an existing volume"
+  },
+  "toolHiddenInExistingSubtitle": "Create a hidden volume inside an existing standard volume",
+  "@toolHiddenInExistingSubtitle": {
+    "description": "Tools row subtitle for direct-mode hidden volume creation"
+  },
+  "vcToolsPickContainer": "Choose container",
+  "@vcToolsPickContainer": {
+    "description": "Button: pick the container file"
+  },
+  "vcToolsNoContainer": "No container selected",
+  "@vcToolsNoContainer": {
+    "description": "Shown before a container is picked"
+  },
+  "vcToolsPasswordLabel": "Volume password",
+  "@vcToolsPasswordLabel": {
+    "description": "Password field of the existing volume"
+  },
+  "vcToolsPimLabel": "PIM (optional)",
+  "@vcToolsPimLabel": {
+    "description": "PIM field"
+  },
+  "vcToolsNewSizeLabel": "New container size (MiB)",
+  "@vcToolsNewSizeLabel": {
+    "description": "Target size of the container after expansion, in MiB"
+  },
+  "vcToolsInitFreeSpace": "Initialize new space",
+  "@vcToolsInitFreeSpace": {
+    "description": "Switch: fill the added space with encrypted data"
+  },
+  "vcToolsInitFreeSpaceHint": "Fills the added space with data encrypted under the volume key so it cannot be told apart from the rest. Turn off for a quick expand.",
+  "@vcToolsInitFreeSpaceHint": {
+    "description": "Explains the initialize new space switch"
+  },
+  "vcToolsExpandAction": "Expand volume",
+  "@vcToolsExpandAction": {
+    "description": "Button: run the expansion"
+  },
+  "vcToolsExpandNote": "The container is enlarged first. Then the file system inside is grown into the added space where that is possible without reformatting (NTFS, ext2/3/4). FAT and exFAT cannot be grown in place; their added space stays unallocated. Back up the volume first.",
+  "@vcToolsExpandNote": {
+    "description": "Note about volume expansion"
+  },
+  "vcToolsExpandDone": "Volume expanded",
+  "@vcToolsExpandDone": {
+    "description": "Success message after expansion"
+  },
+  "vcToolsGrowFsToggle": "Also grow the file system",
+  "@vcToolsGrowFsToggle": {
+    "description": "Switch: also grow the file system inside the volume after expanding it"
+  },
+  "vcToolsGrowFsToggleHint": "Lets NTFS and ext2/3/4 volumes use the added space right away, without reformatting.",
+  "@vcToolsGrowFsToggleHint": {
+    "description": "Explains the grow file system switch"
+  },
+  "vcToolsGrowFsOnlyAction": "Only grow the file system",
+  "@vcToolsGrowFsOnlyAction": {
+    "description": "Button: grow only the file system of a volume that was expanded earlier"
+  },
+  "vcToolsFsGrown": "File system grown: the added space is ready to use.",
+  "@vcToolsFsGrown": {
+    "description": "Result: the file system was grown into the added space"
+  },
+  "vcToolsFsAlreadyFills": "The file system already fills the volume.",
+  "@vcToolsFsAlreadyFills": {
+    "description": "Result: the file system already fills the volume"
+  },
+  "vcToolsFsUnsupported": "This file system cannot be grown in place (FAT and exFAT cannot). The added space stays unallocated until the volume is reformatted; back up its files first.",
+  "@vcToolsFsUnsupported": {
+    "description": "Result: this file system (FAT/exFAT) cannot be grown in place"
+  },
+  "vcToolsFsBusy": "Files are still open in the volume. Close them, lock the volume, then retry “Only grow the file system”.",
+  "@vcToolsFsBusy": {
+    "description": "Result: file system growth could not run because files remain open"
+  },
+  "vcToolsFsNeedsCheck": "The file system is marked as needing a check. Run Check & Repair on the volume, then use “Only grow the file system”.",
+  "@vcToolsFsNeedsCheck": {
+    "description": "Result: the file system is dirty and must be checked before it can be grown"
+  },
+  "vcToolsFsFailed": "The file system could not be grown. The volume itself is expanded; run Check & Repair on it before using it.",
+  "@vcToolsFsFailed": {
+    "description": "Result: growing the file system failed"
+  },
+  "vcToolsAnalyzeAction": "Check free space",
+  "@vcToolsAnalyzeAction": {
+    "description": "Button: analyze the outer volume for hidden volume space"
+  },
+  "vcToolsMaxHidden": "Largest possible hidden volume",
+  "@vcToolsMaxHidden": {
+    "description": "Label before the maximum hidden volume size"
+  },
+  "vcToolsNoRoom": "There is no room for a hidden volume: the end of the outer volume is in use.",
+  "@vcToolsNoRoom": {
+    "description": "Shown when the outer volume has no free space at its end"
+  },
+  "vcToolsHiddenSizeLabel": "Hidden volume size (MiB)",
+  "@vcToolsHiddenSizeLabel": {
+    "description": "Size of the hidden volume in MiB"
+  },
+  "vcToolsHiddenPasswordLabel": "Hidden volume password",
+  "@vcToolsHiddenPasswordLabel": {
+    "description": "Password for the new hidden volume"
+  },
+  "vcToolsHiddenConfirmLabel": "Confirm hidden volume password",
+  "@vcToolsHiddenConfirmLabel": {
+    "description": "Confirmation of the hidden volume password"
+  },
+  "vcToolsHiddenFsLabel": "Hidden volume file system",
+  "@vcToolsHiddenFsLabel": {
+    "description": "File system of the hidden volume"
+  },
+  "vcToolsQuickFormat": "Quick format",
+  "@vcToolsQuickFormat": {
+    "description": "Switch: skip wiping the hidden volume area"
+  },
+  "vcToolsCreateHiddenAction": "Create hidden volume",
+  "@vcToolsCreateHiddenAction": {
+    "description": "Button: create the hidden volume"
+  },
+  "vcToolsHiddenDone": "Hidden volume created",
+  "@vcToolsHiddenDone": {
+    "description": "Success message after creating the hidden volume"
+  },
+  "vcToolsHiddenNote": "The hidden volume takes the free space at the end of the outer volume. Afterwards, mount the outer volume with hidden volume protection whenever you write to it, or the hidden volume can be overwritten.",
+  "@vcToolsHiddenNote": {
+    "description": "Warning about hidden volumes"
+  },
+  "vcToolsPasswordsDiffer": "The passwords do not match.",
+  "@vcToolsPasswordsDiffer": {
+    "description": "Hidden volume password confirmation mismatch"
+  },
+  "vcToolsInvalidSize": "Enter a valid size.",
+  "@vcToolsInvalidSize": {
+    "description": "Invalid size input"
+  },
+  "vcToolsCredentialsRequired": "Enter the volume password or add a keyfile.",
+  "@vcToolsCredentialsRequired": {
+    "description": "No credentials given"
   },
   "readOnlyModeLabel": "Read-only mode",
   "@readOnlyModeLabel": {
@@ -4798,6 +4994,34 @@
   "@layoutModeGalleryGrid": {
     "description": "Layout mode option: gallery grid view"
   },
+  "galleryModeAction": "Gallery",
+  "@galleryModeAction": {
+    "description": "Label for gallery mode toolbar action"
+  },
+  "galleryModeTooltip": "Gallery mode",
+  "@galleryModeTooltip": {
+    "description": "Tooltip for gallery mode toolbar action"
+  },
+  "optionsAction": "Options",
+  "@optionsAction": {
+    "description": "Label for options overflow toolbar action"
+  },
+  "optionsActionTooltip": "Options",
+  "@optionsActionTooltip": {
+    "description": "Tooltip for options overflow toolbar action"
+  },
+  "dateToday": "Today",
+  "@dateToday": {
+    "description": "Section header for files modified today"
+  },
+  "dateYesterday": "Yesterday",
+  "@dateYesterday": {
+    "description": "Section header for files modified yesterday"
+  },
+  "dateEarlier": "Earlier",
+  "@dateEarlier": {
+    "description": "Section header for files modified earlier or with unknown date"
+  },
   "readOnlyCantDeleteTooltip": "Read-only — can't delete",
   "@readOnlyCantDeleteTooltip": {
     "description": "Tooltip for the delete action when the container is read-only"
@@ -5695,6 +5919,357 @@
   "@playMediaAction": {
     "description": "Label for play media toolbar action"
   },
+  "libraryTabAlbums": "Albums",
+  "@libraryTabAlbums": {
+    "description": "Music library tab label"
+  },
+  "libraryTabArtists": "Artists",
+  "@libraryTabArtists": {
+    "description": "Music library tab label"
+  },
+  "libraryTabGenres": "Genres",
+  "@libraryTabGenres": {
+    "description": "Music library tab label"
+  },
+  "libraryTabTracks": "Tracks",
+  "@libraryTabTracks": {
+    "description": "Music library tab label"
+  },
+  "libraryTabFolders": "Folders",
+  "@libraryTabFolders": {
+    "description": "Music library tab label"
+  },
+  "nowPlayingQueue": "Queue",
+  "@nowPlayingQueue": {
+    "description": "Tooltip and title of the music player's play queue"
+  },
+  "nowPlayingShuffle": "Shuffle",
+  "@nowPlayingShuffle": {
+    "description": "Tooltip of the shuffle toggle in the music player"
+  },
+  "nowPlayingRepeatOff": "Repeat off",
+  "@nowPlayingRepeatOff": {
+    "description": "Tooltip of the repeat button when repeat is off"
+  },
+  "nowPlayingRepeatAll": "Repeat all",
+  "@nowPlayingRepeatAll": {
+    "description": "Tooltip of the repeat button when the whole queue repeats"
+  },
+  "nowPlayingRepeatOne": "Repeat this track",
+  "@nowPlayingRepeatOne": {
+    "description": "Tooltip of the repeat button when the current track repeats"
+  },
+  "nowPlayingOpenViewer": "Open in media player",
+  "@nowPlayingOpenViewer": {
+    "description": "Menu entry of the music player that opens the full media player (equalizer, A-B loop, more)"
+  },
+  "nowPlayingCollapse": "Minimize player",
+  "@nowPlayingCollapse": {
+    "description": "Tooltip of the button that collapses the music player to the mini player"
+  },
+  "libraryFolderCount": "{count, plural, =1{1 folder} other{{count} folders}}",
+  "@libraryFolderCount": {
+    "description": "Number of folders that contain music",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "librarySearchHint": "Search music",
+  "@librarySearchHint": {
+    "description": "Hint text of the music library search field"
+  },
+  "libraryScanListing": "Looking through folders... {count, plural, =1{1 audio file so far} other{{count} audio files so far}}",
+  "@libraryScanListing": {
+    "description": "Progress text while the music library walks the vault folders; count is audio files found so far",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "libraryScanReading": "Reading tags... {read} of {total}",
+  "@libraryScanReading": {
+    "description": "Progress text while the music library reads audio tags; read and total are file counts",
+    "placeholders": {
+      "read": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "libraryScanStop": "Stop",
+  "@libraryScanStop": {
+    "description": "Button that stops the music library scan"
+  },
+  "libraryEmptyTitle": "No music found",
+  "@libraryEmptyTitle": {
+    "description": "Music library empty state title when the vault has no audio files"
+  },
+  "libraryEmptyMessage": "This vault has no audio files, or they are in folders that could not be read.",
+  "@libraryEmptyMessage": {
+    "description": "Music library empty state message when the vault has no audio files"
+  },
+  "libraryNoResults": "Nothing matches your search",
+  "@libraryNoResults": {
+    "description": "Music library message when a search has no matches"
+  },
+  "libraryUnknownArtist": "Unknown artist",
+  "@libraryUnknownArtist": {
+    "description": "Label for tracks with no artist tag"
+  },
+  "libraryUnknownAlbum": "Unknown album",
+  "@libraryUnknownAlbum": {
+    "description": "Label for tracks with no album tag or folder name"
+  },
+  "libraryUnknownGenre": "Unknown genre",
+  "@libraryUnknownGenre": {
+    "description": "Label for tracks with no genre tag"
+  },
+  "libraryVariousArtists": "Various artists",
+  "@libraryVariousArtists": {
+    "description": "Label for an album whose tracks are by different artists"
+  },
+  "libraryTrackCount": "{count, plural, =1{1 track} other{{count} tracks}}",
+  "@libraryTrackCount": {
+    "description": "Number of tracks",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "libraryAlbumCount": "{count, plural, =1{1 album} other{{count} albums}}",
+  "@libraryAlbumCount": {
+    "description": "Number of albums",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "libraryPlayAll": "Play",
+  "@libraryPlayAll": {
+    "description": "Music library button that plays a list from the start"
+  },
+  "libraryShuffleAll": "Shuffle",
+  "@libraryShuffleAll": {
+    "description": "Music library button that plays a list in random order"
+  },
+  "libraryMenuRescan": "Scan for changes",
+  "@libraryMenuRescan": {
+    "description": "Music library menu item that looks for new, changed and deleted files"
+  },
+  "libraryMenuRebuild": "Re-read all tags",
+  "@libraryMenuRebuild": {
+    "description": "Music library menu item that re-reads the tags of every file"
+  },
+  "libraryMenuDeleteSaved": "Delete saved index",
+  "@libraryMenuDeleteSaved": {
+    "description": "Music library menu item that deletes the saved index"
+  },
+  "libraryMenuDeleteSavedDone": "Saved index deleted",
+  "@libraryMenuDeleteSavedDone": {
+    "description": "Snackbar after the saved music library index was deleted"
+  },
+  "libraryIncompleteNote": "Some folders could not be read, so files that may have been removed are still listed.",
+  "@libraryIncompleteNote": {
+    "description": "Music library note shown when the last scan could not read every folder"
+  },
+  "libraryReadFailuresNote": "{count, plural, =1{1 file could not be read} other{{count} files could not be read}}",
+  "@libraryReadFailuresNote": {
+    "description": "Music library note: number of files whose tags could not be read",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "libraryArtistAlbumsHeader": "Albums",
+  "@libraryArtistAlbumsHeader": {
+    "description": "Heading above an artist's albums"
+  },
+  "libraryArtistTracksHeader": "Tracks",
+  "@libraryArtistTracksHeader": {
+    "description": "Heading above a list of tracks"
+  },
+  "librarySortTooltip": "Sort",
+  "@librarySortTooltip": {
+    "description": "Tooltip of the music library sort button"
+  },
+  "librarySortTitle": "Title",
+  "@librarySortTitle": {
+    "description": "Music library sort option"
+  },
+  "librarySortArtist": "Artist",
+  "@librarySortArtist": {
+    "description": "Music library sort option"
+  },
+  "librarySortAlbum": "Album",
+  "@librarySortAlbum": {
+    "description": "Music library sort option"
+  },
+  "librarySortYear": "Year",
+  "@librarySortYear": {
+    "description": "Music library sort option"
+  },
+  "librarySortRecentlyAdded": "Recently added",
+  "@librarySortRecentlyAdded": {
+    "description": "Music library sort option: newest files first"
+  },
+  "librarySortName": "Name",
+  "@librarySortName": {
+    "description": "Music library sort option for artists"
+  },
+  "librarySortTrackCount": "Number of tracks",
+  "@librarySortTrackCount": {
+    "description": "Music library sort option for artists"
+  },
+  "librarySortLength": "Length",
+  "@librarySortLength": {
+    "description": "Music library sort option: track duration"
+  },
+  "librarySortReverse": "Reverse order",
+  "@librarySortReverse": {
+    "description": "Music library sort option that reverses the current order"
+  },
+  "musicModeAction": "Music mode",
+  "@musicModeAction": {
+    "description": "File manager toolbar action that turns music mode on or off for this location"
+  },
+  "musicModeFiles": "Files",
+  "@musicModeFiles": {
+    "description": "Music mode bar: the normal file listing"
+  },
+  "musicModeMenuFolders": "Music folders",
+  "@musicModeMenuFolders": {
+    "description": "Music mode menu item that changes which folders are included"
+  },
+  "musicModeMenuTurnOff": "Turn off music mode",
+  "@musicModeMenuTurnOff": {
+    "description": "Music mode menu item that turns the mode off"
+  },
+  "libraryStorageInVault": "Index saved inside this vault",
+  "@libraryStorageInVault": {
+    "description": "Music mode note: the index is stored in the vault itself"
+  },
+  "libraryStorageThisDevice": "Index saved encrypted on this device",
+  "@libraryStorageThisDevice": {
+    "description": "Music mode note: the index is stored encrypted in app storage"
+  },
+  "musicScopeTitle": "Music mode",
+  "@musicScopeTitle": {
+    "description": "Title of the sheet where music mode folders are chosen"
+  },
+  "musicScopeMessage": "Choose what music mode should include.",
+  "@musicScopeMessage": {
+    "description": "Message in the music mode folders sheet"
+  },
+  "musicScopeAll": "Everything in this location",
+  "@musicScopeAll": {
+    "description": "Option: index the whole location"
+  },
+  "musicScopeAllHint": "Looks through every folder. Slower on large locations.",
+  "@musicScopeAllHint": {
+    "description": "Hint under the whole-location option"
+  },
+  "musicScopeChoose": "Only some folders",
+  "@musicScopeChoose": {
+    "description": "Option: index only chosen folders"
+  },
+  "musicScopeAddFolder": "Add a folder",
+  "@musicScopeAddFolder": {
+    "description": "Button that opens the folder picker"
+  },
+  "musicScopeNoFolders": "No folders chosen yet",
+  "@musicScopeNoFolders": {
+    "description": "Shown when only-some-folders is selected but none are chosen"
+  },
+  "musicScopeStart": "Start",
+  "@musicScopeStart": {
+    "description": "Button that turns music mode on with the chosen folders"
+  },
+  "musicScopePickerAdd": "Add this folder",
+  "@musicScopePickerAdd": {
+    "description": "Button that adds the folder being viewed"
+  },
+  "musicScopePickerEmpty": "No subfolders here",
+  "@musicScopePickerEmpty": {
+    "description": "Folder picker empty state"
+  },
+  "musicScopePickerRoot": "Top level",
+  "@musicScopePickerRoot": {
+    "description": "Folder picker name for the root of a location"
+  },
+  "musicScopeRemoveFolder": "Remove folder",
+  "@musicScopeRemoveFolder": {
+    "description": "Tooltip of the button that removes a chosen folder"
+  },
+  "libraryArtistCount": "{count, plural, =1{1 artist} other{{count} artists}}",
+  "@libraryArtistCount": {
+    "description": "Number of artists",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "libraryGenreCount": "{count, plural, =1{1 genre} other{{count} genres}}",
+  "@libraryGenreCount": {
+    "description": "Number of genres",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "musicPlayPartialNote": "Playing {count, plural, =1{1 track} other{{count} tracks}} from {source}. The rest of this list is in other locations.",
+  "@musicPlayPartialNote": {
+    "description": "Shown when a mixed list is played: only the tracks in one location can play together",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      },
+      "source": {
+        "type": "String"
+      }
+    }
+  },
+  "musicCoverChoose": "Choose a cover image",
+  "@musicCoverChoose": {
+    "description": "Menu item that picks an image from the location's files as an album or artist cover"
+  },
+  "musicCoverRemove": "Remove custom cover",
+  "@musicCoverRemove": {
+    "description": "Menu item that removes a cover chosen by hand"
+  },
+  "musicCoverFailed": "That image could not be used as a cover",
+  "@musicCoverFailed": {
+    "description": "Snackbar when the chosen image could not be read or decoded"
+  },
+  "musicMiniPrevious": "Previous",
+  "@musicMiniPrevious": {
+    "description": "Tooltip of the mini player previous-track button"
+  },
+  "musicMiniNext": "Next",
+  "@musicMiniNext": {
+    "description": "Tooltip of the mini player next-track button"
+  },
+  "musicMiniPlay": "Play",
+  "@musicMiniPlay": {
+    "description": "Tooltip of the mini player play button"
+  },
+  "musicMiniPause": "Pause",
+  "@musicMiniPause": {
+    "description": "Tooltip of the mini player pause button"
+  },
+  "musicMiniStop": "Stop playback",
+  "@musicMiniStop": {
+    "description": "Tooltip of the mini player button that stops the music"
+  },
   "containerSpaceSummary": "{free} free / {total}",
   "@containerSpaceSummary": {
     "description": "Storage space summary shown on mounted container card",
@@ -6040,10 +6615,35 @@
   "bookmarkSelectedAction": "Bookmark selected",
   "unbookmarkSelectedAction": "Unbookmark selected",
   "bookmarkedCount": "{count, plural, =1{Bookmarked 1 item} other{Bookmarked {count} items}}",
+  "@bookmarkedCount": {
+    "description": "Confirmation message showing how many items were bookmarked",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
   "unbookmarkedCount": "{count, plural, =1{Unbookmarked 1 item} other{Unbookmarked {count} items}}",
+  "@unbookmarkedCount": {
+    "description": "Confirmation message showing how many items were unbookmarked",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
   "showBookmarkBarLabel": "Show Bookmark Bar",
+  "@showBookmarkBarLabel": {
+    "description": "Label for the setting that shows the bookmark bar"
+  },
   "showBookmarkBarDesc": "Display bookmarked items in a bookmark bar or sidebar",
+  "@showBookmarkBarDesc": {
+    "description": "Description for the setting that shows the bookmark bar"
+  },
   "bookmarkBarSectionHeader": "Bookmark Bar",
+  "@bookmarkBarSectionHeader": {
+    "description": "Heading of the bookmark bar section"
+  },
   "noBookmarksYet": "No items bookmarked yet",
   "reorderBookmarksTitle": "Rearrange Bookmarks",
   "reorderBookmarksDesc": "Drag items to reorder them in the bookmark bar",
@@ -6111,7 +6711,7 @@
   "@toolStorageAnalyzerTitle": {
     "description": "Tool card title for the Storage Analyzer"
   },
-  "toolStorageAnalyzerSubtitle": "See what's taking up space in a mounted vault",
+  "toolStorageAnalyzerSubtitle": "See what's taking up space in Local Storage or a mounted vault",
   "@toolStorageAnalyzerSubtitle": {
     "description": "Tool card subtitle for the Storage Analyzer"
   },
@@ -6776,7 +7376,7 @@
   "@storageAnalyzerNoTargetsTitle": {
     "description": "Empty state title when no volumes are mounted"
   },
-  "storageAnalyzerNoTargetsMessage": "Mount a vault first, then come back here to see its storage breakdown.",
+  "storageAnalyzerNoTargetsMessage": "Open Local Storage or mount a vault first, then come back here to see its storage breakdown.",
   "@storageAnalyzerNoTargetsMessage": {
     "description": "Empty state message when no volumes are mounted"
   },
@@ -6840,6 +7440,237 @@
   "storageCategoryOther": "Other",
   "@storageCategoryOther": {
     "description": "Storage Analyzer file-type category: everything not otherwise classified"
+  },
+  "storageAnalyzerTabMap": "Map",
+  "@storageAnalyzerTabMap": {
+    "description": "Storage Analyzer tab: treemap of the current folder"
+  },
+  "storageAnalyzerTabFolders": "Folders",
+  "@storageAnalyzerTabFolders": {
+    "description": "Storage Analyzer tab: sortable list of the current folder"
+  },
+  "storageAnalyzerTabTypes": "Types",
+  "@storageAnalyzerTabTypes": {
+    "description": "Storage Analyzer tab: usage grouped by file type"
+  },
+  "storageAnalyzerTabCleanup": "Cleanup",
+  "@storageAnalyzerTabCleanup": {
+    "description": "Storage Analyzer tab: suggestions for freeing space"
+  },
+  "storageAnalyzerFreeSpace": "{free} free",
+  "@storageAnalyzerFreeSpace": {
+    "description": "Free space on the volume, shown beside the capacity gauge",
+    "placeholders": {
+      "free": {
+        "type": "String"
+      }
+    }
+  },
+  "storageAnalyzerFileCount": "{count, plural, =1{1 file} other{{count} files}}",
+  "@storageAnalyzerFileCount": {
+    "description": "Number of files in a folder or selection",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "storageAnalyzerItemCount": "{count, plural, =1{1 item} other{{count} items}}",
+  "@storageAnalyzerItemCount": {
+    "description": "Number of items in a cleanup suggestion",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "storageAnalyzerContentSize": "Vault content: {size}",
+  "@storageAnalyzerContentSize": {
+    "description": "Total size of the files found, shown when the volume capacity is unknown",
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "storageAnalyzerScanProgress": "{files} files · {size} so far",
+  "@storageAnalyzerScanProgress": {
+    "description": "Live tally while the volume is being scanned",
+    "placeholders": {
+      "files": {
+        "type": "String"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "storageAnalyzerPartialNotice": "Some folders couldn't be fully read, so totals may be lower than the real figures.",
+  "@storageAnalyzerPartialNotice": {
+    "description": "Banner shown when some folders could not be listed completely during a scan"
+  },
+  "storageAnalyzerStaleNotice": "This volume has changed since it was scanned.",
+  "@storageAnalyzerStaleNotice": {
+    "description": "Banner shown when the volume was modified elsewhere after the scan"
+  },
+  "storageAnalyzerUpOneLevel": "Up one level",
+  "@storageAnalyzerUpOneLevel": {
+    "description": "Tooltip for the button that goes to the parent folder"
+  },
+  "storageAnalyzerEmptyFolder": "This folder is empty.",
+  "@storageAnalyzerEmptyFolder": {
+    "description": "Shown when the folder being viewed has no content"
+  },
+  "storageAnalyzerSmallerItems": "{count, plural, =1{1 smaller item} other{{count} smaller items}}",
+  "@storageAnalyzerSmallerItems": {
+    "description": "Label of the treemap tile that groups many items too small to draw",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "storageAnalyzerMapHint": "Tap a folder to open it. Press and hold to select.",
+  "@storageAnalyzerMapHint": {
+    "description": "Hint below the storage treemap"
+  },
+  "storageAnalyzerSortFiles": "File count",
+  "@storageAnalyzerSortFiles": {
+    "description": "Sort option: folders with the most files first"
+  },
+  "storageAnalyzerAllTypes": "All types",
+  "@storageAnalyzerAllTypes": {
+    "description": "Button that clears the file-type filter"
+  },
+  "storageAnalyzerLargestOfType": "Largest files · {type}",
+  "@storageAnalyzerLargestOfType": {
+    "description": "Header above the biggest files of one file type",
+    "placeholders": {
+      "type": {
+        "type": "String"
+      }
+    }
+  },
+  "storageAnalyzerCleanupHeader": "Suggestions",
+  "@storageAnalyzerCleanupHeader": {
+    "description": "Section header for cleanup suggestions"
+  },
+  "storageAnalyzerCleanupLarge": "Large files",
+  "@storageAnalyzerCleanupLarge": {
+    "description": "Cleanup suggestion title: the biggest files"
+  },
+  "storageAnalyzerCleanupStale": "Not modified in over a year",
+  "@storageAnalyzerCleanupStale": {
+    "description": "Cleanup suggestion title: files nobody has touched for a year"
+  },
+  "storageAnalyzerCleanupTemp": "Temporary and junk files",
+  "@storageAnalyzerCleanupTemp": {
+    "description": "Cleanup suggestion title: leftover download, backup and cache files"
+  },
+  "storageAnalyzerCleanupEmpty": "Empty folders",
+  "@storageAnalyzerCleanupEmpty": {
+    "description": "Cleanup suggestion title: folders with nothing in them"
+  },
+  "storageAnalyzerCleanupReview": "Review",
+  "@storageAnalyzerCleanupReview": {
+    "description": "Button that opens a cleanup suggestion for review"
+  },
+  "storageAnalyzerCleanupNothing": "Nothing obvious to clean up. This volume looks tidy.",
+  "@storageAnalyzerCleanupNothing": {
+    "description": "Shown when there are no cleanup suggestions"
+  },
+  "storageAnalyzerBiggestFiles": "Biggest files",
+  "@storageAnalyzerBiggestFiles": {
+    "description": "Card title that opens a list of the largest files"
+  },
+  "storageAnalyzerBiggestFilesSubtitle": "Browse the largest files on this volume",
+  "@storageAnalyzerBiggestFilesSubtitle": {
+    "description": "Card subtitle for the biggest-files list"
+  },
+  "storageAnalyzerAllSuggestions": "All suggestions",
+  "@storageAnalyzerAllSuggestions": {
+    "description": "Button that returns from a reviewed suggestion to the list of suggestions"
+  },
+  "storageAnalyzerSelectedSummary": "{count} selected · {size}",
+  "@storageAnalyzerSelectedSummary": {
+    "description": "Selection bar: how many items are selected and how much space they use",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "storageAnalyzerDeleteFilesMessage": "This permanently deletes the selected items from this storage and frees {size}. It can't be undone.",
+  "@storageAnalyzerDeleteFilesMessage": {
+    "description": "Confirmation text for deleting files from the Storage Analyzer",
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "storageAnalyzerDeleteFoldersMessage": "This permanently deletes the selected items ({files} files, including everything inside selected folders) and frees {size}. It can't be undone.",
+  "@storageAnalyzerDeleteFoldersMessage": {
+    "description": "Confirmation text for deleting a selection that includes folders",
+    "placeholders": {
+      "files": {
+        "type": "String"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "storageAnalyzerDeleteDone": "Freed {size}",
+  "@storageAnalyzerDeleteDone": {
+    "description": "Snackbar after a successful delete from the Storage Analyzer",
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "storageAnalyzerDeletePartial": "Deleted {deleted}, but {failed} couldn't be deleted. Freed {size}.",
+  "@storageAnalyzerDeletePartial": {
+    "description": "Snackbar when only some of the selected items could be deleted",
+    "placeholders": {
+      "deleted": {
+        "type": "String"
+      },
+      "failed": {
+        "type": "String"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "storageAnalyzerDeleteNone": "Nothing was deleted.",
+  "@storageAnalyzerDeleteNone": {
+    "description": "Snackbar when none of the selected items could be deleted"
+  },
+  "storageAnalyzerDeleteError": "Couldn't delete the selected items.",
+  "@storageAnalyzerDeleteError": {
+    "description": "Snackbar when a delete from the Storage Analyzer failed unexpectedly"
+  },
+  "storageAnalyzerRescanFolder": "Rescan this folder",
+  "@storageAnalyzerRescanFolder": {
+    "description": "Action: rescan only the folder being acted on"
+  },
+  "storageAnalyzerSelectAction": "Select",
+  "@storageAnalyzerSelectAction": {
+    "description": "Action that starts selecting items in the Storage Analyzer"
+  },
+  "storageAnalyzerSelectAllHere": "Select all in this folder",
+  "@storageAnalyzerSelectAllHere": {
+    "description": "Action: tick every item in the folder being viewed"
+  },
+  "storageAnalyzerOpenFolder": "Open folder",
+  "@storageAnalyzerOpenFolder": {
+    "description": "Action: drill into a folder in the Storage Analyzer"
   },
   "keyfilePassphraseGeneratorTitle": "Keyfile & Passphrase Generator",
   "@keyfilePassphraseGeneratorTitle": {
@@ -7432,21 +8263,21 @@
   "@vaultSyncTapToSelect": {
     "description": "Placeholder subtitle shown on a Vault Sync side picker before a location is chosen"
   },
-  "vaultSyncSwapTooltip": "Swap Left and Right",
+  "vaultSyncSwapTooltip": "Swap the two storages",
   "@vaultSyncSwapTooltip": {
-    "description": "Tooltip for the button that swaps the Left and Right sides in Vault Sync"
+    "description": "Tooltip of the swap button in Vault Sync"
   },
-  "vaultSyncSameLocationWarning": "Left and Right must be different folders.",
+  "vaultSyncSameLocationWarning": "The two folders must be different.",
   "@vaultSyncSameLocationWarning": {
-    "description": "Warning shown when Left and Right are set to the exact same vault and folder"
+    "description": "Warning in Vault Sync when both storages point at the same folder"
   },
   "vaultSyncIntroTitle": "Compare Two Folders",
   "@vaultSyncIntroTitle": {
     "description": "Title of the idle-state intro card in Vault Sync before a comparison has run"
   },
-  "vaultSyncIntroSubtitle": "Pick a Left and Right folder — in a vault, on device storage or on a document provider such as an SD card or cloud drive — to see what's missing, modified, or newer on each side.",
+  "vaultSyncIntroSubtitle": "Pick two folders — in a vault, on device storage or on a document provider such as an SD card or cloud drive — to see what's missing, modified, or newer in each.",
   "@vaultSyncIntroSubtitle": {
-    "description": "Subtitle of the idle-state intro card in Vault Sync before a comparison has run"
+    "description": "Intro text on the Vault Sync tool"
   },
   "vaultSyncCompareButton": "Compare",
   "@vaultSyncCompareButton": {
@@ -7544,11 +8375,11 @@
   "@vaultSyncDirectionLabel": {
     "description": "Label for the sync direction option picker"
   },
-  "vaultSyncDirectionTwoWay": "Two-way (recommended)",
+  "vaultSyncDirectionTwoWay": "Two-way",
   "@vaultSyncDirectionTwoWay": {
     "description": "Sync direction option: copy newer/missing files in both directions"
   },
-  "vaultSyncDirectionTwoWaySubtitle": "Copies each file to whichever side is missing it or has an older copy",
+  "vaultSyncDirectionTwoWaySubtitle": "Copies missing files and newer versions to the other side.",
   "@vaultSyncDirectionTwoWaySubtitle": {
     "description": "Explanation of the two-way sync direction option"
   },
@@ -7671,9 +8502,9 @@
       "side": {}
     }
   },
-  "vaultSyncOverlapWarning": "Left and Right must not be the same folder or nested inside each other.",
+  "vaultSyncOverlapWarning": "The two folders must not be the same or nested inside each other.",
   "@vaultSyncOverlapWarning": {
-    "description": "Shown on the Vault Sync screen when the two chosen folders are identical or one contains the other"
+    "description": "Warning in Vault Sync when the two folders overlap"
   },
   "vaultSyncPlaintextWarning": "Files copied out of a vault to {targets} will be stored unencrypted.",
   "@vaultSyncPlaintextWarning": {
@@ -7974,6 +8805,14 @@
   "showHiddenFilesDesc": "Display dotfiles and system folders",
   "@showHiddenFilesDesc": {
     "description": "Toggle description for showing hidden files and folders"
+  },
+  "showNoMediaFilesLabel": "Show .nomedia files",
+  "@showNoMediaFilesLabel": {
+    "description": "Label for toggle option to display .nomedia files"
+  },
+  "showNoMediaFilesDesc": "Display .nomedia files in folder listings",
+  "@showNoMediaFilesDesc": {
+    "description": "Description explaining that .nomedia files will be shown in folder listings"
   },
   "dontAskAgain": "Don't ask again",
   "@dontAskAgain": {
@@ -9802,7 +10641,10 @@
   },
   "repairFolderVaultIssuesCount": "{count, plural, =1{1 issue found} other{{count} issues found}}",
   "@repairFolderVaultIssuesCount": {
-    "description": "Pluralized issue count in folder vault report"
+    "description": "Pluralized issue count in folder vault report",
+    "placeholders": {
+      "count": {}
+    }
   },
   "repairFolderVaultStructureOnlySuffix": " (structure only -- run a deep scan for a full content check)",
   "@repairFolderVaultStructureOnlySuffix": {
@@ -9814,7 +10656,12 @@
   },
   "repairFolderVaultSummary": "Repair summary: {fixed} fixed, {recovered} recovered to /LOST+FOUND, {removed} cleaned up.",
   "@repairFolderVaultSummary": {
-    "description": "Summary of repairs performed on a folder vault"
+    "description": "Summary of repairs performed on a folder vault",
+    "placeholders": {
+      "fixed": {},
+      "recovered": {},
+      "removed": {}
+    }
   },
   "repairAndRecoverVaultButton": "Repair & Recover Vault",
   "@repairAndRecoverVaultButton": {
@@ -9826,7 +10673,10 @@
   },
   "panicPurgeCompletedMessage": "Panic purge completed ({count} locked).",
   "@panicPurgeCompletedMessage": {
-    "description": "Snackbar shown after panic purge finishes"
+    "description": "Snackbar shown after panic purge finishes",
+    "placeholders": {
+      "count": {}
+    }
   },
   "usbPermissionRequiredError": "USB permission required",
   "@usbPermissionRequiredError": {
@@ -9838,7 +10688,10 @@
   },
   "logcatLinesCount": "{count, plural, =1{1 line} other{{count} lines}}",
   "@logcatLinesCount": {
-    "description": "Line counter badge in logcat screen"
+    "description": "Line counter badge in logcat screen",
+    "placeholders": {
+      "count": {}
+    }
   },
   "compositeSpaceTooSmallError": "Allocatable space is too small (minimum 300 KB required)",
   "@compositeSpaceTooSmallError": {
@@ -9955,6 +10808,22 @@
   "autoHideAppBarDesc": "Hide the top bar when scrolling down to maximize viewing space",
   "@autoHideAppBarDesc": {
     "description": "Description explaining that the top app bar hides when scrolling down"
+  },
+  "autoHideToolbarLabel": "Auto-hide toolbar on scroll",
+  "@autoHideToolbarLabel": {
+    "description": "Label for toggle option to auto-hide the bottom toolbar when scrolling down"
+  },
+  "autoHideToolbarDesc": "Hide the bottom toolbar when scrolling down to maximize viewing space",
+  "@autoHideToolbarDesc": {
+    "description": "Description explaining that the bottom toolbar hides when scrolling down"
+  },
+  "autoHideBreadcrumbBarLabel": "Auto-hide breadcrumb bar on scroll",
+  "@autoHideBreadcrumbBarLabel": {
+    "description": "Label for toggle option to auto-hide the path navigation bar when scrolling down"
+  },
+  "autoHideBreadcrumbBarDesc": "Hide the path navigation bar when scrolling down to maximize viewing space",
+  "@autoHideBreadcrumbBarDesc": {
+    "description": "Description explaining that the breadcrumb bar hides when scrolling down"
   },
   "useFabForToolbarLabel": "Use floating button for toolbar",
   "@useFabForToolbarLabel": {
@@ -10184,7 +11053,7 @@
   "@statusBadgeTitle": {
     "description": "Switch title for status badge visibility"
   },
-  "statusBadgeSubtitle": "Shows slideshow timer or static photo indicator",
+  "statusBadgeSubtitle": "Shows the slideshow countdown while a slideshow is playing",
   "@statusBadgeSubtitle": {
     "description": "Subtitle explaining status badge details"
   },
@@ -11409,22 +12278,73 @@
     "description": "Title for action customizer dialog"
   },
   "actionUndo": "Undo",
+  "@actionUndo": {
+    "description": "Label for the editor undo action"
+  },
   "actionRedo": "Redo",
+  "@actionRedo": {
+    "description": "Label for the editor redo action"
+  },
   "actionCursorLeft": "Move Cursor Left",
+  "@actionCursorLeft": {
+    "description": "Label for moving the text cursor left in the editor"
+  },
   "actionCursorRight": "Move Cursor Right",
+  "@actionCursorRight": {
+    "description": "Label for moving the text cursor right in the editor"
+  },
   "actionSelectWord": "Select Word",
+  "@actionSelectWord": {
+    "description": "Label for selecting the current word in the editor"
+  },
   "actionCopy": "Copy",
+  "@actionCopy": {
+    "description": "Label for copying the selection in the editor"
+  },
   "actionCut": "Cut",
+  "@actionCut": {
+    "description": "Label for cutting the selection in the editor"
+  },
   "actionPaste": "Paste",
+  "@actionPaste": {
+    "description": "Label for pasting clipboard content in the editor"
+  },
   "actionFind": "Find & Replace",
+  "@actionFind": {
+    "description": "Label for opening find and replace in the editor"
+  },
   "actionWordWrap": "Word Wrap",
+  "@actionWordWrap": {
+    "description": "Label for toggling word wrap in the editor"
+  },
   "actionGoToLine": "Go to Line",
+  "@actionGoToLine": {
+    "description": "Label for jumping to a specific line in the editor"
+  },
   "actionGoToStart": "Go to Start",
+  "@actionGoToStart": {
+    "description": "Label for moving the cursor to the start of the document"
+  },
   "actionGoToEnd": "Go to End",
+  "@actionGoToEnd": {
+    "description": "Label for moving the cursor to the end of the document"
+  },
   "actionIndent": "Indent",
+  "@actionIndent": {
+    "description": "Label for indenting the selected code or text"
+  },
   "actionOutdent": "Outdent",
+  "@actionOutdent": {
+    "description": "Label for outdenting the selected code or text"
+  },
   "actionFormat": "Format Code",
+  "@actionFormat": {
+    "description": "Label for formatting the code in the editor"
+  },
   "actionReadOnly": "Toggle Read-Only",
+  "@actionReadOnly": {
+    "description": "Label for toggling read-only mode in the editor"
+  },
   "screenLockOnlyAutoLockOption": "Screen Lock Only",
   "@screenLockOnlyAutoLockOption": {
     "description": "Option meaning auto-lock reacts only to the screen turning off, not to plain app backgrounding; also reused as the dashboard auto-lock badge label for this mode"
@@ -12613,6 +13533,9 @@
   "textEditorDefaultFromTheme": "Default (from theme)",
   "skinFileManager": "File manager",
   "skinFolderAndFileGlyphsTilesAndLabelColors": "Folder and file glyphs, tiles, and label colors.",
+  "@skinFolderAndFileGlyphsTilesAndLabelColors": {
+    "description": "Description of the file manager skin settings for folder and file glyphs, tiles, and label colors."
+  },
   "skinDetailsTextColor": "Details text color",
   "skinUseTheAppSSupportingTextColor": "Use the app’s supporting text color",
   "skinCustomColor": "Custom color",
@@ -12682,19 +13605,61 @@
   "skinIconColorForItem": "{item} icon color",
   "skinNameColorForItem": "{item} name color",
   "skinFileIconColorSettingDescription": "This color is controlled by the icon color setting in the file manager section.",
+  "@skinFileIconColorSettingDescription": {
+    "description": "Explanation that the file icon color is configured in the file manager settings."
+  },
   "skinFileNameColorSettingDescription": "This color is controlled by the name color setting in the file manager section.",
+  "@skinFileNameColorSettingDescription": {
+    "description": "Explanation that the file name color is configured in the file manager settings."
+  },
   "skinExportedSingle": "Skin exported.",
+  "@skinExportedSingle": {
+    "description": "Confirmation shown after exporting a single skin."
+  },
   "skinExportedMultiple": "Skins exported.",
+  "@skinExportedMultiple": {
+    "description": "Confirmation shown after exporting multiple skins."
+  },
   "skinExportSkinsOnly": "Skins only",
+  "@skinExportSkinsOnly": {
+    "description": "Option to export only skins, without interface settings."
+  },
   "skinExportSkinsOnlySubtitle": "Colors and icon styles. Safe to share.",
+  "@skinExportSkinsOnlySubtitle": {
+    "description": "Subtitle describing the shareable skins-only export."
+  },
   "skinExportSkinsAndInterface": "Skins and interface",
+  "@skinExportSkinsAndInterface": {
+    "description": "Option to export skins together with interface settings."
+  },
   "skinExportSkinsAndInterfaceSubtitle": "Also saves theme mode, toolbar and grid layout, editor appearance and media viewer layout. For your own backups.",
+  "@skinExportSkinsAndInterfaceSubtitle": {
+    "description": "Subtitle describing the interface settings included in a personal backup export."
+  },
   "skinAppearanceExported": "Skins and interface exported.",
+  "@skinAppearanceExported": {
+    "description": "Confirmation shown after exporting skins and interface settings."
+  },
   "skinImportInterfaceTitle": "Apply interface settings?",
+  "@skinImportInterfaceTitle": {
+    "description": "Title of the prompt asking whether to apply imported interface settings."
+  },
   "skinImportInterfaceMessage": "This file also contains interface settings. Applying them replaces your current theme mode, toolbar and grid layout, editor appearance and media viewer layout.",
+  "@skinImportInterfaceMessage": {
+    "description": "Prompt explaining which current interface settings will be replaced by an import."
+  },
   "skinImportInterfaceApply": "Apply",
+  "@skinImportInterfaceApply": {
+    "description": "Button to apply interface settings included in an imported file."
+  },
   "skinImportInterfaceSkip": "Skins only",
+  "@skinImportInterfaceSkip": {
+    "description": "Button to import skins without applying interface settings."
+  },
   "skinInterfaceApplied": "Interface settings applied.",
+  "@skinInterfaceApplied": {
+    "description": "Confirmation shown after applying imported interface settings."
+  },
   "@skinImportSucceeded": {
     "description": "Confirmation shown after importing one or more app skins.",
     "placeholders": {
@@ -12768,23 +13733,77 @@
     "description": "Snackbar shown when the system app settings page could not be opened from the automation battery hint card"
   },
   "skinPreviewMountedVaultName": "Personal vault",
+  "@skinPreviewMountedVaultName": {
+    "description": "Label for a mounted vault in the skin preview"
+  },
   "skinPreviewVaultName": "Vault title",
+  "@skinPreviewVaultName": {
+    "description": "Label for a vault title in the skin preview"
+  },
   "skinMainTextColorAlsoColorsRegularMenuItems": "Vault titles and regular menu actions share the app main text color.",
+  "@skinMainTextColorAlsoColorsRegularMenuItems": {
+    "description": "Text explaining that the main text color also affects regular menu actions in the skin preview"
+  },
   "skinStatusBannerExamples": "Status banners",
+  "@skinStatusBannerExamples": {
+    "description": "Section heading for status banner examples in the skin preview"
+  },
   "skinSuccessBanner": "Success banner",
+  "@skinSuccessBanner": {
+    "description": "Label for the success banner example in the skin preview"
+  },
   "skinWarningBanner": "Warning banner",
+  "@skinWarningBanner": {
+    "description": "Label for the warning banner example in the skin preview"
+  },
   "skinErrorBanner": "Error banner",
+  "@skinErrorBanner": {
+    "description": "Label for the error banner example in the skin preview"
+  },
   "skinSuccessBannerUsesSuccessContainer": "The banner fill and message use success colors.",
+  "@skinSuccessBannerUsesSuccessContainer": {
+    "description": "Explanation that success banners use success container colors in the skin preview"
+  },
   "skinWarningBannerUsesWarningContainer": "The banner fill and message use warning colors.",
+  "@skinWarningBannerUsesWarningContainer": {
+    "description": "Explanation that warning banners use warning container colors in the skin preview"
+  },
   "skinErrorBannerUsesErrorContainer": "The banner fill and message use error colors.",
+  "@skinErrorBannerUsesErrorContainer": {
+    "description": "Explanation that error banners use error container colors in the skin preview"
+  },
   "skinPreviewChangesSaved": "Changes saved",
+  "@skinPreviewChangesSaved": {
+    "description": "Status message shown in the skin preview after saving changes"
+  },
   "skinPreviewStorageAlmostFull": "Storage is almost full",
+  "@skinPreviewStorageAlmostFull": {
+    "description": "Status message shown in the skin preview when storage is nearly full"
+  },
   "skinPreviewCouldNotUnlockVault": "Could not unlock the vault",
+  "@skinPreviewCouldNotUnlockVault": {
+    "description": "Status message shown in the skin preview when a vault could not be unlocked"
+  },
   "skinSurfaceAndBorderExamples": "Surfaces and borders",
+  "@skinSurfaceAndBorderExamples": {
+    "description": "Section heading for surfaces and borders examples in the skin preview"
+  },
   "skinFileRowDetailsColor": "File row details color",
+  "@skinFileRowDetailsColor": {
+    "description": "Label for the file row details color in the skin preview"
+  },
   "skinFileActionOverflowIconColor": "File row action icon color",
+  "@skinFileActionOverflowIconColor": {
+    "description": "Label for the file row action overflow icon color in the skin preview"
+  },
   "skinMatchingElementsHighlightTogether": "Other preview elements with the same color are highlighted too.",
+  "@skinMatchingElementsHighlightTogether": {
+    "description": "Text explaining that matching preview elements are highlighted together in the skin preview"
+  },
   "skinStatusBannerTextColor": "The banner text uses this color.",
+  "@skinStatusBannerTextColor": {
+    "description": "Text explaining that the banner text color is controlled by the selected color in the skin preview"
+  },
   "apkOpenPackageInstaller": "Package installer",
   "@apkOpenPackageInstaller": {
     "description": "Choice label in the APK open dialog (and the file-associations list in settings): hand the .apk to the Android package installer"
@@ -12996,19 +14015,61 @@
     "description": "Custom skin color used behind the text editor sidebar and More Actions menu"
   },
   "skinEditorPanelBackgroundDescription": "Shared background for the editor sidebar and More Actions menus.",
+  "@skinEditorPanelBackgroundDescription": {
+    "description": "Description of the shared background color used by the editor sidebar and More Actions menus"
+  },
   "skinFollowAppSkin": "Follow app skin",
+  "@skinFollowAppSkin": {
+    "description": "Setting that makes the file manager follow the selected app skin"
+  },
   "fileSkinFollowAppSkinDescription": "File and folder styling follows the selected app skin.",
+  "@fileSkinFollowAppSkinDescription": {
+    "description": "Explains that file and folder styling follows the selected app skin"
+  },
   "fileSkinUseIndependentStylesDescription": "These options set the File Manager’s own style. If it follows App Skin, changing a preset or style below turns off Follow app skin.",
+  "@fileSkinUseIndependentStylesDescription": {
+    "description": "Explains how choosing file manager styles affects the Follow app skin setting"
+  },
   "fileSkinManagedByAppSkinTitle": "File manager is following the app skin",
+  "@fileSkinManagedByAppSkinTitle": {
+    "description": "Title shown when the file manager follows the app skin"
+  },
   "fileSkinManagedByAppSkinDescription": "The preview uses the active App Skin. Changing a preset or style below saves an independent file manager skin and turns off Follow app skin.",
+  "@fileSkinManagedByAppSkinDescription": {
+    "description": "Explains that the preview follows the active app skin and how changing styles creates an independent file manager skin"
+  },
   "skinFileManagerIndependentTitle": "File manager uses an independent skin",
+  "@skinFileManagerIndependentTitle": {
+    "description": "Title shown when the file manager uses an independent skin"
+  },
   "skinFileManagerIndependentDescription": "Changes to file and folder styles in this App Skin will not appear in File Manager while it uses its own skin. Turn on Follow app skin to apply this App Skin there.",
+  "@skinFileManagerIndependentDescription": {
+    "description": "Explains that app skin changes do not affect the file manager while it uses an independent skin"
+  },
   "skinChooseOrCreateSkin": "Choose or create a skin",
+  "@skinChooseOrCreateSkin": {
+    "description": "Action to select an existing skin or create a new one"
+  },
   "skinSkinShortcutCustomDescription": "Edit app-wide colors and shared tokens. Component overrides stay on this page.",
+  "@skinSkinShortcutCustomDescription": {
+    "description": "Explains the scope of editing app-wide colors and shared tokens"
+  },
   "skinSkinShortcutPresetDescription": "Browse built-in skins or create a custom skin from this look.",
+  "@skinSkinShortcutPresetDescription": {
+    "description": "Explains the option to browse built-in skins or create a custom skin"
+  },
   "textEditorUseIndependentAppearanceDescription": "Choose an independent editor background and syntax theme below.",
+  "@textEditorUseIndependentAppearanceDescription": {
+    "description": "Instruction to choose an editor background and syntax theme independent of the app skin"
+  },
   "fileSkinComponentStyling": "Component styling",
+  "@fileSkinComponentStyling": {
+    "description": "Heading for file manager component styling options"
+  },
   "textEditorStyling": "Editor styling",
+  "@textEditorStyling": {
+    "description": "Heading for text editor styling options"
+  },
   "audioFilePropertiesSectionHeader": "AUDIO",
   "@audioFilePropertiesSectionHeader": {
     "description": "Section header for technical properties of an audio file"
@@ -14037,6 +15098,18 @@
   "@appBarAtBottomDesc": {
     "description": "Explains the setting that moves the app bar to the bottom of the screen."
   },
+  "sectionNavigation": "Navigation",
+  "@sectionNavigation": {
+    "description": "Settings section header on the Appearance & Interface page that groups navigation-related options."
+  },
+  "predictiveBackAnimationsLabel": "Predictive back animations",
+  "@predictiveBackAnimationsLabel": {
+    "description": "Setting title for the switch that turns the in-app predictive back animations on or off."
+  },
+  "predictiveBackAnimationsDesc": "Show interactive previews and animations when navigating backwards.",
+  "@predictiveBackAnimationsDesc": {
+    "description": "Explains the predictive back animations setting. It only affects the in-app transitions, not the Android system back animations."
+  },
   "selectByIconLabel": "Select by tapping the icon",
   "@selectByIconLabel": {
     "description": "Setting title for selecting files and folders by tapping their icon in list view."
@@ -14665,5 +15738,1251 @@
   "comicReaderCarouselScrubberSubtitle": "Show page thumbnails above the scrubber",
   "@comicReaderCarouselScrubberSubtitle": {
     "description": "Subtitle for the comic reader switch that shows the page thumbnail carousel"
+  },
+  "vaultSyncBrowseAllButton": "Browse all items",
+  "@vaultSyncBrowseAllButton": {
+    "description": "Button in Vault Sync that opens the folder explorer showing every item in both storages"
+  },
+  "vaultSyncExplorerTitle": "Browse both storages",
+  "@vaultSyncExplorerTitle": {
+    "description": "Title of the Vault Sync folder explorer screen"
+  },
+  "vaultSyncExplorerEmptyTitle": "Nothing to show",
+  "@vaultSyncExplorerEmptyTitle": {
+    "description": "Empty state title in the Vault Sync folder explorer"
+  },
+  "vaultSyncExplorerEmptyMessage": "No items match this filter in this folder.",
+  "@vaultSyncExplorerEmptyMessage": {
+    "description": "Empty state message in the Vault Sync folder explorer"
+  },
+  "vaultSyncExplorerLoadFailedTitle": "Couldn't read this folder",
+  "@vaultSyncExplorerLoadFailedTitle": {
+    "description": "Error title when the Vault Sync folder explorer cannot list a folder"
+  },
+  "vaultSyncExplorerLoadFailedMessage": "One of the two storages couldn't be listed. Try again, and make sure both are still unlocked and connected.",
+  "@vaultSyncExplorerLoadFailedMessage": {
+    "description": "Error message when the Vault Sync folder explorer cannot list a folder"
+  },
+  "vaultSyncFilterAll": "All",
+  "@vaultSyncFilterAll": {
+    "description": "Vault Sync filter chip: show every difference"
+  },
+  "vaultSyncFilterDifferences": "Differences",
+  "@vaultSyncFilterDifferences": {
+    "description": "Vault Sync folder explorer filter chip: hide items that are already in sync"
+  },
+  "vaultSyncFilterNewer": "Newer copy",
+  "@vaultSyncFilterNewer": {
+    "description": "Vault Sync filter chip: files present in both storages where one copy is newer"
+  },
+  "vaultSyncFilterConflicts": "Needs review",
+  "@vaultSyncFilterConflicts": {
+    "description": "Vault Sync filter chip: conflicting items that need a decision"
+  },
+  "vaultSyncFilterDeletions": "Deletions",
+  "@vaultSyncFilterDeletions": {
+    "description": "Vault Sync filter chip: items the current plan will delete"
+  },
+  "vaultSyncFilterNoMatchesMessage": "No items match this filter.",
+  "@vaultSyncFilterNoMatchesMessage": {
+    "description": "Empty state message when a Vault Sync filter hides every result"
+  },
+  "vaultSyncSortTooltip": "Sort",
+  "@vaultSyncSortTooltip": {
+    "description": "Tooltip of the Vault Sync sort button"
+  },
+  "vaultSyncSortPath": "Path",
+  "@vaultSyncSortPath": {
+    "description": "Vault Sync sort option: by path"
+  },
+  "vaultSyncSortSize": "Largest first",
+  "@vaultSyncSortSize": {
+    "description": "Vault Sync sort option: by size, largest first"
+  },
+  "vaultSyncSortModified": "Newest first",
+  "@vaultSyncSortModified": {
+    "description": "Vault Sync sort option: by modified time, newest first"
+  },
+  "vaultSyncSortStatus": "Status",
+  "@vaultSyncSortStatus": {
+    "description": "Vault Sync sort option: grouped by status"
+  },
+  "vaultSyncStatusInSync": "In sync",
+  "@vaultSyncStatusInSync": {
+    "description": "Badge for a file that is identical in both storages in the Vault Sync folder explorer"
+  },
+  "vaultSyncStatusFolder": "Folder",
+  "@vaultSyncStatusFolder": {
+    "description": "Badge for a folder present in both storages in the Vault Sync folder explorer"
+  },
+  "vaultSyncDeletionsQueuedLabel": "{count, plural, =1{1 deletion} other{{count} deletions}}",
+  "@vaultSyncDeletionsQueuedLabel": {
+    "description": "Bottom bar line in Vault Sync showing how many items the sync will delete",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "vaultSyncConfirmDeletionsMessage": "{count, plural, =1{1 item will be permanently deleted. This can't be undone.} other{{count} items will be permanently deleted. This can't be undone.}}",
+  "@vaultSyncConfirmDeletionsMessage": {
+    "description": "Extra paragraph in the Vault Sync confirmation dialog when the sync deletes items",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "vaultSyncResultsStaleMessage": "Results may be out of date after deleting. Compare again to refresh the counts.",
+  "@vaultSyncResultsStaleMessage": {
+    "description": "Banner in Vault Sync shown after a delete that the comparison cannot account for"
+  },
+  "vaultSyncSelectedCount": "{count} selected",
+  "@vaultSyncSelectedCount": {
+    "description": "App bar title in Vault Sync selection mode",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "vaultSyncOpenAction": "Open",
+  "@vaultSyncOpenAction": {
+    "description": "Entry sheet action in Vault Sync: open the file"
+  },
+  "vaultSyncOpenCopyAction": "Open copy in {side}",
+  "@vaultSyncOpenCopyAction": {
+    "description": "Entry sheet action in Vault Sync: open the copy that lives in one storage. {side} is the storage name",
+    "placeholders": {
+      "side": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultSyncOpenFolderAction": "Open folder",
+  "@vaultSyncOpenFolderAction": {
+    "description": "Entry sheet action in Vault Sync: browse inside the folder"
+  },
+  "vaultSyncOpenFolderSubtitle": "Browse what's inside, in both storages",
+  "@vaultSyncOpenFolderSubtitle": {
+    "description": "Subtitle of the open-folder action in the Vault Sync entry sheet"
+  },
+  "vaultSyncShowInFolderAction": "Show in folder",
+  "@vaultSyncShowInFolderAction": {
+    "description": "Entry sheet action in Vault Sync: open the folder that contains the item"
+  },
+  "vaultSyncShowInFolderSubtitle": "See it next to its neighbours in both storages",
+  "@vaultSyncShowInFolderSubtitle": {
+    "description": "Subtitle of the show-in-folder action in the Vault Sync entry sheet"
+  },
+  "vaultSyncDeleteFromBothAction": "Delete from both storages",
+  "@vaultSyncDeleteFromBothAction": {
+    "description": "Delete the item from both compared storages immediately"
+  },
+  "vaultSyncDeleteBothSidesLabel": "{left} and {right}",
+  "@vaultSyncDeleteBothSidesLabel": {
+    "description": "Names both compared storages in the Vault Sync delete confirmation",
+    "placeholders": {
+      "left": {
+        "type": "String"
+      },
+      "right": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultSyncDeleteConfirmMessage": "These items will be permanently deleted from {where}, including everything inside any folder. This can't be undone.",
+  "@vaultSyncDeleteConfirmMessage": {
+    "description": "Body of the Vault Sync delete confirmation dialog. {where} is one or two storage names",
+    "placeholders": {
+      "where": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultSyncDeleteDoneMessage": "{count, plural, =1{Deleted 1 item} other{Deleted {count} items}}",
+  "@vaultSyncDeleteDoneMessage": {
+    "description": "Snackbar after a successful delete in Vault Sync",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "vaultSyncDeletePartialMessage": "Deleted {deleted}, but {failed} couldn't be deleted",
+  "@vaultSyncDeletePartialMessage": {
+    "description": "Snackbar after a delete in Vault Sync where some items failed",
+    "placeholders": {
+      "deleted": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
+  "vaultSyncCopyDoneMessage": "Copied",
+  "@vaultSyncCopyDoneMessage": {
+    "description": "Snackbar after an immediate copy in Vault Sync succeeded"
+  },
+  "vaultSyncCopyFailedMessage": "Some items couldn't be copied. Check the transfer list for details.",
+  "@vaultSyncCopyFailedMessage": {
+    "description": "Snackbar after an immediate copy in Vault Sync failed"
+  },
+  "vaultSyncOpenFailedMessage": "Couldn't open {name}",
+  "@vaultSyncOpenFailedMessage": {
+    "description": "Snackbar when a file cannot be opened from Vault Sync",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultSyncDetailsNotOnThisSide": "Not in this storage",
+  "@vaultSyncDetailsNotOnThisSide": {
+    "description": "Entry sheet detail in Vault Sync for a storage that does not hold the item"
+  },
+  "vaultSyncDetailsFolder": "Folder",
+  "@vaultSyncDetailsFolder": {
+    "description": "Entry sheet detail in Vault Sync for a folder (no size)"
+  },
+  "vaultSyncStatusOnlyIn": "Only in {storage}",
+  "@vaultSyncStatusOnlyIn": {
+    "description": "Status badge: the item exists only in the named storage",
+    "placeholders": {
+      "storage": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultSyncStatusNewerIn": "Newer in {storage}",
+  "@vaultSyncStatusNewerIn": {
+    "description": "Status badge: the copy in the named storage is newer",
+    "placeholders": {
+      "storage": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultSyncBadgeOnlyIn": "{count} only in {storage}",
+  "@vaultSyncBadgeOnlyIn": {
+    "description": "Summary badge: how many items exist only in the named storage",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "storage": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultSyncBadgeNewerIn": "{count} newer in {storage}",
+  "@vaultSyncBadgeNewerIn": {
+    "description": "Summary badge: how many items are newer in the named storage",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "storage": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultSyncFolderOnlyInDetail": "Folder — only in {storage}",
+  "@vaultSyncFolderOnlyInDetail": {
+    "description": "Detail line for a folder that exists only in the named storage",
+    "placeholders": {
+      "storage": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultSyncDirectionOneWay": "One-way copy",
+  "@vaultSyncDirectionOneWay": {
+    "description": "One-way copy mode label; the user chooses the source and destination separately."
+  },
+  "vaultSyncDirectionOneWaySubtitle": "Copies new and updated files in the direction shown; the source is unchanged.",
+  "@vaultSyncDirectionOneWaySubtitle": {
+    "description": "Concise explanation of one-way sync; the option title names both storages."
+  },
+  "vaultSyncDirectionMirror": "Mirror sync",
+  "@vaultSyncDirectionMirror": {
+    "description": "Mirror sync mode label; the user chooses the source and destination separately."
+  },
+  "vaultSyncDirectionMirrorSubtitle": "Replaces the destination with an exact copy; destination-only items are deleted.",
+  "@vaultSyncDirectionMirrorSubtitle": {
+    "description": "Concise explanation of mirror sync and its deletion behavior; the option title names both storages."
+  },
+  "vaultSyncActionCopyTo": "Copy → {storage}",
+  "@vaultSyncActionCopyTo": {
+    "description": "Plan menu item and button: copy the item into the named storage",
+    "placeholders": {
+      "storage": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultSyncCopyNowToAction": "Copy to {storage} now",
+  "@vaultSyncCopyNowToAction": {
+    "description": "Entry sheet action in Vault Sync: copy the item into the named storage immediately",
+    "placeholders": {
+      "storage": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultSyncDeleteFromAction": "Delete from {storage}",
+  "@vaultSyncDeleteFromAction": {
+    "description": "Delete the item from the named storage immediately",
+    "placeholders": {
+      "storage": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultSyncPlanDeleteFrom": "Delete from {storage} when syncing",
+  "@vaultSyncPlanDeleteFrom": {
+    "description": "Plan menu item: delete the item from the named storage during the next sync",
+    "placeholders": {
+      "storage": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultSyncFilterOnlyIn": "Only in {storage}",
+  "@vaultSyncFilterOnlyIn": {
+    "description": "Vault Sync filter chip: items present only in the named storage",
+    "placeholders": {
+      "storage": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultSyncChooseFirstStorage": "Choose the first storage",
+  "@vaultSyncChooseFirstStorage": {
+    "description": "Title of the first storage card before a storage has been picked"
+  },
+  "vaultSyncChooseSecondStorage": "Choose the second storage",
+  "@vaultSyncChooseSecondStorage": {
+    "description": "Title of the second storage card before a storage has been picked"
+  },
+  "vaultSyncChangeButton": "Change",
+  "@vaultSyncChangeButton": {
+    "description": "Button on a storage card in Vault Sync that changes the chosen storage"
+  },
+  "vaultSyncChooseButton": "Choose",
+  "@vaultSyncChooseButton": {
+    "description": "Button on an empty storage card in Vault Sync that picks a storage"
+  },
+  "vaultSyncChooseStorageTitle": "Choose a storage",
+  "@vaultSyncChooseStorageTitle": {
+    "description": "Title of the screen listing the storages that can be compared"
+  },
+  "vaultSyncChooseStorageHint": "Pick a storage first, then the folder inside it to compare.",
+  "@vaultSyncChooseStorageHint": {
+    "description": "Hint above the list of storages in the Vault Sync storage chooser"
+  },
+  "vaultSyncCurrentStorageBadge": "Current",
+  "@vaultSyncCurrentStorageBadge": {
+    "description": "Badge marking the storage that is already in use in the Vault Sync storage chooser"
+  },
+  "vaultSyncChangeStorageTooltip": "Change storage",
+  "@vaultSyncChangeStorageTooltip": {
+    "description": "Tooltip of the button that returns from the folder picker to the storage list"
+  },
+  "vaultSyncPickFolderTitle": "Folder in {storage}",
+  "@vaultSyncPickFolderTitle": {
+    "description": "Title of the Vault Sync folder picker. {storage} is the storage name",
+    "placeholders": {
+      "storage": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultSyncDirectionSectionTitle": "Direction",
+  "@vaultSyncDirectionSectionTitle": {
+    "description": "Heading above the source and destination choices in the sync direction dialog."
+  },
+  "vaultSyncDirectionMirrorWarning": "Deletes files",
+  "@vaultSyncDirectionMirrorWarning": {
+    "description": "Warning badge on mirror mode because extra destination files are deleted."
+  },
+  "vaultSyncDirectionSourceLabel": "Source",
+  "@vaultSyncDirectionSourceLabel": {
+    "description": "Label for the storage that is copied from in one-way or mirror sync."
+  },
+  "vaultSyncDirectionTargetLabel": "Target",
+  "@vaultSyncDirectionTargetLabel": {
+    "description": "Label for the storage that receives changes in one-way or mirror sync."
+  },
+  "vaultSyncDirectionSwapButton": "Swap",
+  "@vaultSyncDirectionSwapButton": {
+    "description": "Button label for reversing source and target in the direction selector."
+  },
+  "vaultSyncDirectionRecommendedLabel": "Recommended",
+  "@vaultSyncDirectionRecommendedLabel": {
+    "description": "Badge that marks two-way sync as the recommended mode."
+  },
+  "categoriesSectionTitle": "Categories",
+  "@categoriesSectionTitle": {
+    "description": "Navigation drawer section title for the Images / Videos / Audio / Documents shortcuts"
+  },
+  "manageCategoriesTooltip": "Manage categories",
+  "@manageCategoriesTooltip": {
+    "description": "Tooltip of the drawer button that opens the category shortcut settings"
+  },
+  "categoryShortcutsTitle": "Category shortcuts",
+  "@categoryShortcutsTitle": {
+    "description": "Settings section title and sheet title for choosing which category shortcuts the drawer shows"
+  },
+  "categoryShortcutsEnable": "Show category shortcuts",
+  "@categoryShortcutsEnable": {
+    "description": "Settings switch: show the category shortcuts in the navigation drawer"
+  },
+  "categoryShortcutsEnableSubtitle": "Images, videos, audio and documents from all your storage, in the drawer",
+  "@categoryShortcutsEnableSubtitle": {
+    "description": "Subtitle of the switch that shows the category shortcuts in the drawer"
+  },
+  "categoryShortcutsRestore": "Restore default shortcuts",
+  "@categoryShortcutsRestore": {
+    "description": "Settings action: show all four category shortcuts again in their default order"
+  },
+  "categorySourceAll": "All storage",
+  "@categorySourceAll": {
+    "description": "Category browser source choice: local storage, storage locations and unlocked vaults together"
+  },
+  "categorySourceTooltip": "Choose source",
+  "@categorySourceTooltip": {
+    "description": "Tooltip of the category browser's source selector button"
+  },
+  "categoryFolderStructure": "Display original folder structure",
+  "@categoryFolderStructure": {
+    "description": "Category browser menu switch: browse the matching files grouped in their original folders instead of one flat list"
+  },
+  "categoryScanning": "{count, plural, =1{Scanning… 1 folder checked} other{Scanning… {count} folders checked}}",
+  "@categoryScanning": {
+    "description": "Category browser progress line while it looks through folders for matching files",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "categoryEmpty": "Nothing found in this category",
+  "@categoryEmpty": {
+    "description": "Category browser empty state when no matching file was found"
+  },
+  "categoryNoVaultsUnlocked": "No vault is unlocked",
+  "@categoryNoVaultsUnlocked": {
+    "description": "Category browser empty state when only vaults are selected but none is unlocked"
+  },
+  "categoryScanLimitReached": "Results may be incomplete — the scan stopped at its limit.",
+  "@categoryScanLimitReached": {
+    "description": "Notice in the category browser when the scan stopped at its folder or file limit"
+  },
+  "categoryShareOneSource": "Choose files from one storage at a time to share them.",
+  "@categoryShareOneSource": {
+    "description": "Message when sharing selected category files that live in more than one storage"
+  },
+  "categoryClipboardReady": "{count, plural, =1{1 file ready to paste} other{{count} files ready to paste}} — open a folder to paste",
+  "@categoryClipboardReady": {
+    "description": "Message after copying or cutting files in the category browser",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "categoryIndexInVaultsTitle": "Keep category index in vaults",
+  "@categoryIndexInVaultsTitle": {
+    "description": "Settings switch: keep an index of category files inside each vault"
+  },
+  "categoryIndexInVaultsSubtitle": "Saved encrypted inside each vault, in its configuration folder, when you open a category, so its files appear instantly next time. Nothing is saved on your phone.",
+  "@categoryIndexInVaultsSubtitle": {
+    "description": "Subtitle of the switch that keeps the category index inside vaults"
+  },
+  "categoryIndexClear": "Clear category indexes",
+  "@categoryIndexClear": {
+    "description": "Settings action that removes the category index from the unlocked vaults"
+  },
+  "categoryIndexClearSubtitle": "Removes the index from every unlocked vault",
+  "@categoryIndexClearSubtitle": {
+    "description": "Subtitle of the action that clears the category indexes"
+  },
+  "categoryIndexCleared": "Category indexes cleared",
+  "@categoryIndexCleared": {
+    "description": "Snackbar shown after the category indexes were cleared"
+  },
+  "lockFlushRefusedTitle": "Couldn't write to the device",
+  "@lockFlushRefusedTitle": {
+    "description": "Dialog title shown when locking a container is refused because a USB device did not accept the last buffered changes"
+  },
+  "lockFlushRefusedMessage": "{name} wasn't locked because the device didn't accept the latest changes. They're still waiting in the app. Check the connection and retry, or lock anyway and discard them.",
+  "@lockFlushRefusedMessage": {
+    "description": "Dialog body explaining that the container was left open; offers retry or lock anyway (which discards the unwritten changes)",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "lockAnywayButton": "Lock anyway",
+  "@lockAnywayButton": {
+    "description": "Destructive dialog button that locks a container even though the device refused the last changes, discarding them"
+  },
+  "vaultListingSymbolicLinkCount": "{count, plural, =0 {0 symbolic links} one {1 symbolic link} other {{count} symbolic links}}",
+  "@vaultListingSymbolicLinkCount": {
+    "description": "Count of symbolic links found in the current vault folder",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "vaultListingHiddenEntryCount": "{count, plural, =0 {0 entries are not shown} one {1 entry is not shown} other {{count} entries are not shown}}",
+  "@vaultListingHiddenEntryCount": {
+    "description": "Count of vault entries that could not be listed in the current folder",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "vaultListingDetails": "Details",
+  "@vaultListingDetails": {
+    "description": "Action label that opens details about symbolic links and hidden entries"
+  },
+  "vaultListingSymbolicLinksTitle": "Shortcuts",
+  "@vaultListingSymbolicLinksTitle": {
+    "description": "Heading for the symbolic links section in vault listing details"
+  },
+  "vaultListingSymbolicLinksNote": "Shortcuts open their targets when tapped. Relative targets stay inside this vault; absolute or broken targets cannot be opened.",
+  "@vaultListingSymbolicLinksNote": {
+    "description": "Explains that shortcut entries open relative targets within the vault and reject absolute or broken targets"
+  },
+  "vaultListingHiddenEntriesTitle": "Entries that are not shown",
+  "@vaultListingHiddenEntriesTitle": {
+    "description": "Heading for vault entries that could not be listed in the current folder"
+  },
+  "vaultListingHiddenEntriesBody": "These entries exist in the vault but could not be listed. This most often happens when a sync app creates conflict copies (for example, \"name (1)\") or an upload has not finished. Cryptomator on a computer can resolve conflict copies. Nothing here has been changed or deleted.",
+  "@vaultListingHiddenEntriesBody": {
+    "description": "Explains common reasons entries are not listed and how conflict copies can be resolved"
+  },
+  "vaultListingTargetUnreadable": "(target unreadable)",
+  "@vaultListingTargetUnreadable": {
+    "description": "Placeholder shown when a symbolic link target cannot be read"
+  },
+  "vaultListingLinkTargetCopied": "Link target copied",
+  "@vaultListingLinkTargetCopied": {
+    "description": "Confirmation shown after copying a symbolic link target"
+  },
+  "galleryFilterTooltip": "Filter",
+  "@galleryFilterTooltip": {
+    "description": "Tooltip of the gallery filter button in the app bar"
+  },
+  "galleryFilterMenuOpen": "Filter…",
+  "@galleryFilterMenuOpen": {
+    "description": "Menu entry that opens the gallery filter sheet"
+  },
+  "galleryFilterClearAll": "Clear filters",
+  "@galleryFilterClearAll": {
+    "description": "Menu entry that removes every gallery filter"
+  },
+  "galleryFilterClear": "Clear",
+  "@galleryFilterClear": {
+    "description": "Button that removes every gallery filter (filter sheet and filter bar)"
+  },
+  "galleryFilterMatchAny": "Match any",
+  "@galleryFilterMatchAny": {
+    "description": "Segment under the gallery filter's Tags header: a photo needs at least one of the selected tags"
+  },
+  "galleryFilterMatchAll": "Match all",
+  "@galleryFilterMatchAll": {
+    "description": "Segment under the gallery filter's Tags header: a photo needs every selected tag"
+  },
+  "galleryFoldersMenu": "Gallery folders",
+  "@galleryFoldersMenu": {
+    "description": "Options-menu entry and title of the sheet where the gallery's folders are chosen"
+  },
+  "galleryFoldersHint": "Choose which folders the gallery scans. Subfolders are included. With none chosen, the whole storage is scanned.",
+  "@galleryFoldersHint": {
+    "description": "Explains the gallery folder picker: subfolders are included and choosing none scans the whole storage"
+  },
+  "galleryFoldersUseAll": "Scan everything",
+  "@galleryFoldersUseAll": {
+    "description": "Button in the gallery folder picker that clears the choice so the whole storage is scanned"
+  },
+  "galleryFoldersApply": "Apply",
+  "@galleryFoldersApply": {
+    "description": "Button in the gallery folder picker that applies the chosen folders"
+  },
+  "galleryFilterShownOfTotal": "{shown} of {total} shown",
+  "@galleryFilterShownOfTotal": {
+    "description": "Header of the gallery filter sheet when filters are applied: how many items are left out of the total",
+    "placeholders": {
+      "shown": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "galleryFilterTotal": "Total: {count}",
+  "@galleryFilterTotal": {
+    "description": "Header of the gallery filter sheet when no filter is applied: number of items",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "galleryFilterIndexing": "Reading photo details: {done} of {total}. Tags, places and cameras appear as it goes.",
+  "@galleryFilterIndexing": {
+    "description": "Progress note in the gallery filter sheet while photo metadata (EXIF, tags, GPS) is read in the background",
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "galleryFilterSearchHint": "Search tags, places, cameras, folders…",
+  "@galleryFilterSearchHint": {
+    "description": "Hint of the search field in the gallery filter sheet"
+  },
+  "galleryFilterTapHint": "Tap to show only, long-press to hide.",
+  "@galleryFilterTapHint": {
+    "description": "Usage hint in the gallery filter sheet: tapping a chip shows only matching items, long-pressing excludes them"
+  },
+  "galleryFilterGroupBy": "Group by",
+  "@galleryFilterGroupBy": {
+    "description": "Title of the section choosing how the gallery is divided into sections"
+  },
+  "galleryFilterShowAll": "All {count}",
+  "@galleryFilterShowAll": {
+    "description": "Chip that expands a long list of filter chips; count is the total number of chips",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "galleryFilterShowFewer": "Fewer",
+  "@galleryFilterShowFewer": {
+    "description": "Chip that collapses an expanded list of filter chips"
+  },
+  "galleryGroupNone": "None",
+  "@galleryGroupNone": {
+    "description": "Gallery grouping option: no sections"
+  },
+  "galleryGroupDay": "Day",
+  "@galleryGroupDay": {
+    "description": "Gallery grouping option: one section per day"
+  },
+  "galleryGroupMonth": "Month",
+  "@galleryGroupMonth": {
+    "description": "Gallery grouping option: one section per month"
+  },
+  "galleryGroupYear": "Year",
+  "@galleryGroupYear": {
+    "description": "Gallery grouping option: one section per year"
+  },
+  "galleryGroupFolder": "Folder",
+  "@galleryGroupFolder": {
+    "description": "Gallery grouping option: one section per folder"
+  },
+  "galleryGroupType": "Type",
+  "@galleryGroupType": {
+    "description": "Gallery grouping option: one section per media type (photos, videos...)"
+  },
+  "galleryGroupPlace": "Place",
+  "@galleryGroupPlace": {
+    "description": "Gallery grouping option: one section per place (city)"
+  },
+  "galleryGroupCamera": "Camera",
+  "@galleryGroupCamera": {
+    "description": "Gallery grouping option: one section per camera model"
+  },
+  "galleryFilterSectionType": "Type",
+  "@galleryFilterSectionType": {
+    "description": "Gallery filter sheet section title: media type"
+  },
+  "galleryFilterSectionDate": "Date",
+  "@galleryFilterSectionDate": {
+    "description": "Gallery filter sheet section title: year and month"
+  },
+  "galleryFilterSectionTags": "Tags",
+  "@galleryFilterSectionTags": {
+    "description": "Gallery filter sheet section title: photo tags (keywords)"
+  },
+  "galleryFilterSectionPlaces": "Places",
+  "@galleryFilterSectionPlaces": {
+    "description": "Gallery filter sheet section title: places (cities) photos were taken in"
+  },
+  "galleryFilterSectionCameras": "Cameras",
+  "@galleryFilterSectionCameras": {
+    "description": "Gallery filter sheet section title: camera models"
+  },
+  "galleryFilterSectionOrientation": "Orientation",
+  "@galleryFilterSectionOrientation": {
+    "description": "Gallery filter sheet section title: landscape, portrait, square"
+  },
+  "galleryFilterSectionRating": "Rating",
+  "@galleryFilterSectionRating": {
+    "description": "Gallery filter sheet section title: star rating"
+  },
+  "galleryFilterSectionSize": "File size",
+  "@galleryFilterSectionSize": {
+    "description": "Gallery filter sheet section title: file size ranges"
+  },
+  "galleryFilterSectionFolders": "Folders",
+  "@galleryFilterSectionFolders": {
+    "description": "Gallery filter sheet section title: folders"
+  },
+  "galleryFilterSectionMissing": "Missing",
+  "@galleryFilterSectionMissing": {
+    "description": "Gallery filter sheet section title: items that lack some information (no location, no tags...)"
+  },
+  "galleryTypePhotos": "Photos",
+  "@galleryTypePhotos": {
+    "description": "Gallery filter: still images"
+  },
+  "galleryTypeVideos": "Videos",
+  "@galleryTypeVideos": {
+    "description": "Gallery filter: videos"
+  },
+  "galleryTypeAnimated": "Animated",
+  "@galleryTypeAnimated": {
+    "description": "Gallery filter: animated images such as GIF"
+  },
+  "galleryOrientationLandscape": "Landscape",
+  "@galleryOrientationLandscape": {
+    "description": "Gallery filter: images wider than tall"
+  },
+  "galleryOrientationPortrait": "Portrait",
+  "@galleryOrientationPortrait": {
+    "description": "Gallery filter: images taller than wide"
+  },
+  "galleryOrientationSquare": "Square",
+  "@galleryOrientationSquare": {
+    "description": "Gallery filter: images as wide as tall"
+  },
+  "gallerySizeSmall": "Under 1 MB",
+  "@gallerySizeSmall": {
+    "description": "Gallery filter: files smaller than one megabyte"
+  },
+  "gallerySizeMedium": "1 – 10 MB",
+  "@gallerySizeMedium": {
+    "description": "Gallery filter: files between one and ten megabytes"
+  },
+  "gallerySizeLarge": "Over 10 MB",
+  "@gallerySizeLarge": {
+    "description": "Gallery filter: files larger than ten megabytes"
+  },
+  "galleryMissingLocation": "No location",
+  "@galleryMissingLocation": {
+    "description": "Gallery filter and group name: photos without a GPS position"
+  },
+  "galleryMissingTags": "No tags",
+  "@galleryMissingTags": {
+    "description": "Gallery filter: photos without tags"
+  },
+  "galleryMissingCamera": "No camera info",
+  "@galleryMissingCamera": {
+    "description": "Gallery filter and group name: photos without camera information"
+  },
+  "galleryMissingDateTaken": "No date taken",
+  "@galleryMissingDateTaken": {
+    "description": "Gallery filter: photos without a capture date in their metadata"
+  },
+  "galleryPlaceHintCity": "Nearest city, within {km} km",
+  "@galleryPlaceHintCity": {
+    "description": "Tooltip of a place chip that is a city; km is the search radius",
+    "placeholders": {
+      "km": {
+        "type": "int"
+      }
+    }
+  },
+  "galleryPlaceHintCoordinates": "No city within {km} km: grouped by coordinates",
+  "@galleryPlaceHintCoordinates": {
+    "description": "Tooltip of a place chip that is raw coordinates because no city is close; km is the search radius",
+    "placeholders": {
+      "km": {
+        "type": "int"
+      }
+    }
+  },
+  "cryptomatorBackupKeyFilesTitle": "Back up key files when unlocking",
+  "@cryptomatorBackupKeyFilesTitle": {
+    "description": "Title of the switch in a Cryptomator vault's settings that controls whether key-file backups are written when the vault is unlocked"
+  },
+  "cryptomatorBackupKeyFilesSubtitle": "Keeps a copy of masterkey.cryptomator and vault.cryptomator next to the originals, like Cryptomator on desktop. Applies from the next unlock. Read-only sessions never write.",
+  "@cryptomatorBackupKeyFilesSubtitle": {
+    "description": "Subtitle of the Cryptomator key-file backup switch: what is copied, that it applies from the next unlock, and that read-only sessions never write"
+  },
+  "cryptomatorUpgradeTitle": "Upgrade vault format",
+  "@cryptomatorUpgradeTitle": {
+    "description": "Title of the settings row (and screen) that upgrades a Cryptomator vault from the older format 7 to format 8"
+  },
+  "cryptomatorUpgradeSubtitle": "This vault uses the older format 7.",
+  "@cryptomatorUpgradeSubtitle": {
+    "description": "Subtitle of the upgrade row for a vault that is still Cryptomator format 7"
+  },
+  "cryptomatorUpgradeLockFirst": "Lock the vault to upgrade it",
+  "@cryptomatorUpgradeLockFirst": {
+    "description": "Subtitle of the disabled upgrade row while the vault is unlocked"
+  },
+  "cryptomatorUpgradeWarning": "Upgrading changes this vault to format 8. It cannot be undone, and Cryptomator versions older than 1.6 will no longer be able to open the vault afterwards.\n\nA copy of the current key file is kept as masterkey.cryptomator.<id>.bkup. If another app syncs this vault, let it finish syncing first.",
+  "@cryptomatorUpgradeWarning": {
+    "description": "Warning on the Cryptomator format upgrade screen: what changes, that it is one-way, that older Cryptomator cannot open the vault, where the key-file copy goes, and that sync must finish first"
+  },
+  "cryptomatorUpgradeConfirm": "I understand this can't be undone",
+  "@cryptomatorUpgradeConfirm": {
+    "description": "Checkbox on the Cryptomator upgrade screen the user must tick before the upgrade button works"
+  },
+  "cryptomatorUpgradeAction": "Upgrade",
+  "@cryptomatorUpgradeAction": {
+    "description": "Button that runs the Cryptomator vault format upgrade"
+  },
+  "cryptomatorUpgradedMessage": "Vault upgraded to format 8",
+  "@cryptomatorUpgradedMessage": {
+    "description": "Snackbar shown after a Cryptomator vault was upgraded to format 8"
+  },
+  "cryptomatorUpgradeUnlockedError": "Lock the vault first",
+  "@cryptomatorUpgradeUnlockedError": {
+    "description": "Error shown when the format upgrade is refused because the vault is unlocked"
+  },
+  "cryptomatorConfigMissingWarning": "vault.cryptomator is missing. If another app syncs this vault, wait for it to finish, then try again. Do not upgrade.",
+  "@cryptomatorConfigMissingWarning": {
+    "description": "Warning row for a Cryptomator vault whose vault.cryptomator is missing (usually not synced yet); the user must wait and must not upgrade"
+  },
+  "cryptomatorUpgradeFailedMessage": "Could not upgrade the vault",
+  "@cryptomatorUpgradeFailedMessage": {
+    "description": "Generic error when the Cryptomator format upgrade fails without a more specific message"
+  },
+  "newSymbolicLinkTitle": "New symbolic link",
+  "@newSymbolicLinkTitle": {
+    "description": "Menu entry and dialog title for creating a symbolic link in a Cryptomator vault"
+  },
+  "symbolicLinkNameHint": "Link name",
+  "@symbolicLinkNameHint": {
+    "description": "Hint of the name field when creating or renaming a symbolic link"
+  },
+  "symbolicLinkTargetHint": "Points to",
+  "@symbolicLinkTargetHint": {
+    "description": "Hint of the field where the user types what a new symbolic link points to"
+  },
+  "symbolicLinkTargetHelper": "Stored exactly as written. Relative targets are resolved inside this vault when opened; absolute targets are not followed.",
+  "@symbolicLinkTargetHelper": {
+    "description": "Helper text under the symbolic link target field: relative targets are resolved within the vault; absolute targets are not followed"
+  },
+  "symbolicLinkTargetTooLong": "Target is too long (maximum 32,767 bytes)",
+  "@symbolicLinkTargetTooLong": {
+    "description": "Error under the symbolic link target field when it exceeds the 32,767-byte limit"
+  },
+  "symbolicLinkTargetInvalid": "Target can't contain a null character",
+  "@symbolicLinkTargetInvalid": {
+    "description": "Error under the symbolic link target field when it contains a null character"
+  },
+  "symbolicLinkNameTaken": "A file, folder or link with this name already exists",
+  "@symbolicLinkNameTaken": {
+    "description": "Error when the chosen symbolic link name is already used by a file, folder or another link"
+  },
+  "deleteSymbolicLinkTitle": "Delete symbolic link?",
+  "@deleteSymbolicLinkTitle": {
+    "description": "Title of the confirmation dialog for deleting a symbolic link"
+  },
+  "deleteSymbolicLinkMessage": "Delete the link \"{name}\"? Only the link is removed; what it points to is not touched.",
+  "@deleteSymbolicLinkMessage": {
+    "description": "Body of the confirmation dialog for deleting a symbolic link; says only the link is removed, not what it points to",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "symbolicLinkRenameTitle": "Rename symbolic link",
+  "@symbolicLinkRenameTitle": {
+    "description": "Title of the dialog for renaming a symbolic link"
+  },
+  "symbolicLinkBrowseTarget": "Browse vault",
+  "symbolicLinkSelectTargetTitle": "Choose shortcut target",
+  "symbolicLinkSelectThisFolder": "Select this folder",
+  "symbolicLinkPickerLoadError": "Couldn't load this folder",
+  "shortcutBadge": "Shortcut",
+  "emptyFolder": "This folder is empty",
+  "@symbolicLinkBrowseTarget": {
+    "description": "Tooltip for the button that opens the vault target picker when creating a symbolic link"
+  },
+  "@symbolicLinkSelectTargetTitle": {
+    "description": "Title of the in-vault file and folder picker for a symbolic link target"
+  },
+  "@symbolicLinkSelectThisFolder": {
+    "description": "Button to choose the currently displayed folder as a symbolic link target"
+  },
+  "@symbolicLinkPickerLoadError": {
+    "description": "Message shown when the symbolic-link target picker cannot load a folder"
+  },
+  "@shortcutBadge": {
+    "description": "Label identifying a symbolic link as a shortcut in the target picker"
+  },
+  "@emptyFolder": {
+    "description": "Message shown when the current folder has no entries"
+  },
+  "symbolicLinkTargetHelperRelative": "Use a relative path inside this container. The target may be missing; renaming or deleting the link does not change the target.",
+  "@symbolicLinkTargetHelperRelative": {
+    "description": "Helper text under the symbolic link target field for native LUKS/VeraCrypt filesystems"
+  },
+  "symbolicLinkTargetOutsideVault": "Target must be a relative path that stays inside this container.",
+  "@symbolicLinkTargetOutsideVault": {
+    "description": "Error under the symbolic link target field when a native target is absolute or escapes the container root"
+  },
+  "symbolicLinkPickerUnresolvable": "Can't build a relative target from here. Type the target instead.",
+  "@symbolicLinkPickerUnresolvable": {
+    "description": "Shown when the symbolic link target picker cannot build a relative target, e.g. because a folder link on the way cannot be followed safely; the user types the target instead"
+  },
+  "editMetadataAction": "Edit metadata",
+  "@editMetadataAction": {
+    "description": "Action to edit a file's metadata"
+  },
+  "editTagsAction": "Edit tags",
+  "@editTagsAction": {
+    "description": "Action to edit a file's tags"
+  },
+  "editDateTimeAction": "Edit date & time",
+  "@editDateTimeAction": {
+    "description": "Action to edit a file's date and time metadata"
+  },
+  "removeMetadataAction": "Remove metadata",
+  "@removeMetadataAction": {
+    "description": "Action to remove metadata from files"
+  },
+  "metadataFormatsNote": "Tags, dates and removal are written into JPEG, PNG and WebP images, and dates into HEIC photos. Other files only get a new modified date.",
+  "@metadataFormatsNote": {
+    "description": "Note explaining which file formats support metadata changes"
+  },
+  "metadataReadOnlyMessage": "This vault is read-only",
+  "@metadataReadOnlyMessage": {
+    "description": "Message shown when metadata cannot be changed because the vault is read-only"
+  },
+  "tagsAddHint": "Add tags, separated by commas",
+  "@tagsAddHint": {
+    "description": "Hint in the tag editor explaining how to enter tags"
+  },
+  "tagsNoneYet": "No tags yet",
+  "@tagsNoneYet": {
+    "description": "Message shown when a file has no tags"
+  },
+  "dateModeSet": "Set",
+  "@dateModeSet": {
+    "description": "Option to set a file's date and time to a specific value"
+  },
+  "dateModeShift": "Shift",
+  "@dateModeShift": {
+    "description": "Option to shift a file's date and time earlier or later"
+  },
+  "dateModeFromModified": "From modified date",
+  "@dateModeFromModified": {
+    "description": "Option to use a file's modified date as its date and time"
+  },
+  "dateModeFromName": "From file name",
+  "@dateModeFromName": {
+    "description": "Option to extract a date and time from the file name"
+  },
+  "dateShiftLater": "Later",
+  "@dateShiftLater": {
+    "description": "Direction option for shifting a file's date and time later"
+  },
+  "dateShiftEarlier": "Earlier",
+  "@dateShiftEarlier": {
+    "description": "Direction option for shifting a file's date and time earlier"
+  },
+  "dateDaysLabel": "Days",
+  "@dateDaysLabel": {
+    "description": "Label for the number of days in a date and time shift"
+  },
+  "dateHoursLabel": "Hours",
+  "@dateHoursLabel": {
+    "description": "Label for the number of hours in a date and time shift"
+  },
+  "dateMinutesLabel": "Minutes",
+  "@dateMinutesLabel": {
+    "description": "Label for the number of minutes in a date and time shift"
+  },
+  "dateAlsoSetModified": "Also set the file's modified date",
+  "@dateAlsoSetModified": {
+    "description": "Option to also update the file's modified date when changing its date and time metadata"
+  },
+  "dateFromNameMatches": "{matched} of {total} file names contain a date",
+  "@dateFromNameMatches": {
+    "placeholders": {
+      "matched": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "stripExifLabel": "Exif (camera, date, location)",
+  "@stripExifLabel": {
+    "description": "Label for the option to strip EXIF image metadata"
+  },
+  "stripXmpLabel": "XMP (tags, rating, edit data)",
+  "@stripXmpLabel": {
+    "description": "Label for the option to strip XMP image metadata"
+  },
+  "stripIptcLabel": "IPTC / Photoshop (captions, credits)",
+  "@stripIptcLabel": {
+    "description": "Label for the option to strip IPTC / Photoshop image metadata"
+  },
+  "stripCommentsLabel": "Comments",
+  "@stripCommentsLabel": {
+    "description": "Label for the option to strip image comments metadata"
+  },
+  "stripIccLabel": "Colour profile (may change colours)",
+  "@stripIccLabel": {
+    "description": "Label for the option to strip ICC colour profile metadata"
+  },
+  "stripKeepOrientationLabel": "Keep orientation",
+  "@stripKeepOrientationLabel": {
+    "description": "Label for the option to preserve image orientation when stripping metadata"
+  },
+  "stripKeepOrientationDesc": "Without it, photos taken sideways may show rotated",
+  "@stripKeepOrientationDesc": {
+    "description": "Description for the option to preserve image orientation when stripping metadata"
+  },
+  "stripWarning": "This rewrites the files and cannot be undone.",
+  "@stripWarning": {
+    "description": "Warning shown before rewriting files while stripping metadata"
+  },
+  "metadataProgress": "Updating {done} of {total}",
+  "@metadataProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "metadataResultUpdated": "{count, plural, =1{1 file updated} other{{count} files updated}}",
+  "@metadataResultUpdated": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "metadataResultUnchanged": "Nothing needed changing",
+  "@metadataResultUnchanged": {
+    "description": "Message shown when metadata cleanup found no files needing changes"
+  },
+  "metadataResultSkipped": "{count} skipped (not supported)",
+  "@metadataResultSkipped": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "metadataResultFailed": "{count} failed",
+  "@metadataResultFailed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "showNoMediaFoldersLabel": "Show .nomedia folders",
+  "@showNoMediaFoldersLabel": {
+    "description": "Label for the option to show folders marked with a .nomedia file"
+  },
+  "showNoMediaFoldersDesc": "Include folders marked with a .nomedia file, which gallery apps normally skip",
+  "@showNoMediaFoldersDesc": {
+    "description": "Description for the option to include folders marked with a .nomedia file"
+  },
+  "motionPhotoCopyNote": "The edited copy will be a still image. The original file, its EXIF metadata, and any embedded video remain unchanged.",
+  "@motionPhotoCopyNote": {
+    "description": "Notice shown when an image with protected metadata is edited: only a still-image copy can be saved; the original file and embedded content are protected."
+  },
+  "pimInputHint": "Empty or 0 for defaults",
+  "@pimInputHint": {
+    "description": "Hint shown in the PIM input before the user types a value; leaving it empty or entering 0 uses the default PIM."
+  },
+  "galleryMetadataIndexStorageLabel": "Gallery metadata index storage",
+  "@galleryMetadataIndexStorageLabel": {
+    "description": "Label for the independent storage location of the gallery metadata index."
+  },
+  "galleryMetadataUseGlobalDefaultDesc": "Follow the app-wide gallery metadata index storage setting.",
+  "galleryMetadataAppStorageOption": "App storage",
+  "galleryMetadataInVaultOption": "Inside vault",
+  "galleryMetadataSectionHeader": "Gallery Metadata Index",
+  "galleryMetadataUseGlobalDefaultTitle": "Use app-wide gallery index setting",
+  "musicIndexSectionHeader": "Music Index",
+  "musicIndexStorageLabel": "Music index storage",
+  "musicIndexUseGlobalDefaultTitle": "Use app-wide music index setting",
+  "musicIndexUseGlobalDefaultDesc": "Follow the app-wide music index storage setting.",
+  "musicIndexAppStorageOption": "App storage",
+  "musicIndexInVaultOption": "Inside vault",
+  "musicIndexHiddenFolderOption": "Hidden folder",
+  "musicIndexHiddenFolderDesc": "Stored in an unencrypted hidden folder in Local Storage.",
+  "libraryStorageHiddenFolder": "Index saved in an unencrypted hidden folder",
+  "libraryStorageDisabled": "Saved music index is disabled; tracks are rescanned each time.",
+  "galleryMetadataClearAction": "Clear saved gallery index",
+  "galleryMetadataClearConfirmTitle": "Clear gallery metadata index?",
+  "galleryMetadataClearConfirmMessage": "This deletes saved photo details. The index will be rebuilt as you browse the gallery.",
+  "galleryMetadataIndexClearedMessage": "Gallery metadata index cleared.",
+  "musicIndexClearAction": "Clear saved music index",
+  "musicIndexClearConfirmTitle": "Clear saved music index?",
+  "musicIndexClearConfirmMessage": "This deletes saved track details. Music Mode will rebuild the index the next time it opens.",
+  "musicIndexClearedMessage": "Music index cleared.",
+  "clearSavedIndexButton": "Clear index",
+  "appIndexClearedUnlockMessage": "App-storage copy cleared. Open the vault with write access to clear any index copy inside it.",
+  "savedIndexClearFailedMessage": "Could not clear all saved index data.",
+  "libraryStorageReadOnly": "Vault is read-only; the music index is not saved.",
+  "clearLocalStorageThumbnailCacheMessage": "This will delete cached thumbnails for Local Storage. They will be regenerated the next time you browse media.",
+  "vcToolsDetectedFormat": "Detected: {format}",
+  "@vcToolsDetectedFormat": {
+    "description": "Format name identified while probing the selected container.",
+    "placeholders": {
+      "format": {
+        "description": "Detected container format name.",
+        "type": "String"
+      }
+    }
+  },
+  "vcToolsUnencryptedDetected": "Looks unencrypted; this tool needs an encrypted container",
+  "@vcToolsUnencryptedDetected": {
+    "description": "Shown when the selected file appears to be an unencrypted disk image."
+  },
+  "vcToolsAssumingVeraCrypt": "Not detected automatically; assuming VeraCrypt",
+  "@vcToolsAssumingVeraCrypt": {
+    "description": "Shown when the selected encrypted file format cannot be identified and VeraCrypt is assumed."
+  },
+  "vcToolsManualFormat": "Set manually",
+  "@vcToolsManualFormat": {
+    "description": "Format picker subtitle after the user selects a format manually."
+  },
+  "vcToolsExpandInsufficientSpaceForSize": "Not enough free space on the device for this size.",
+  "@vcToolsExpandInsufficientSpaceForSize": {
+    "description": "Error shown when the requested container size exceeds the device free space."
+  },
+  "vcToolsNewSizePreview": "New size: {size}",
+  "@vcToolsNewSizePreview": {
+    "description": "Live preview of the resulting container size.",
+    "placeholders": {
+      "size": {
+        "description": "Formatted resulting container size.",
+        "type": "String"
+      }
+    }
+  },
+  "vcToolsNewSizePreviewWithAdded": "New size: {size} (+{added})",
+  "@vcToolsNewSizePreviewWithAdded": {
+    "description": "Live preview of resulting container size and the amount being added.",
+    "placeholders": {
+      "size": {
+        "description": "Formatted resulting container size.",
+        "type": "String"
+      },
+      "added": {
+        "description": "Formatted size being added.",
+        "type": "String"
+      }
+    }
+  },
+  "vcToolsFileSize": "File size",
+  "@vcToolsFileSize": {
+    "description": "Size label for BitLocker disk image/container files."
+  },
+  "vcToolsCurrentSize": "Current size",
+  "@vcToolsCurrentSize": {
+    "description": "Size label for the selected encrypted volume before expansion."
+  },
+  "vcToolsFreeOnDevice": "Free on device: {size}",
+  "@vcToolsFreeOnDevice": {
+    "description": "Shows free storage space on the device containing the selected file.",
+    "placeholders": {
+      "size": {
+        "description": "Formatted free space.",
+        "type": "String"
+      }
+    }
+  },
+  "vcToolsSetExactTotalInstead": "Set exact total size instead",
+  "@vcToolsSetExactTotalInstead": {
+    "description": "Switch label to enter the final total size instead of an amount to add."
+  },
+  "vcToolsBitLockerDiskImageSizeHint": "For a disk image (VHD/VHDX), enter the new total virtual disk size, not the file size.",
+  "@vcToolsBitLockerDiskImageSizeHint": {
+    "description": "Guidance for entering a BitLocker disk image size."
+  },
+  "vcToolsNewTotalSize": "New total size",
+  "@vcToolsNewTotalSize": {
+    "description": "Input label for the target total size after expansion."
+  },
+  "vcToolsAddSize": "Add",
+  "@vcToolsAddSize": {
+    "description": "Input label for the amount of space to add to a volume."
+  },
+  "vcToolsQuickAddGiB": "+{amount} GiB",
+  "@vcToolsQuickAddGiB": {
+    "description": "Quick action for adding a preset amount of space.",
+    "placeholders": {
+      "amount": {
+        "description": "Number of gibibytes to add.",
+        "type": "String"
+      }
+    }
+  },
+  "vcToolsDoubleSize": "Double",
+  "@vcToolsDoubleSize": {
+    "description": "Quick action to double the current volume size."
+  },
+  "vcToolsSizeMustExceedCurrent": "The new size must be larger than the current size.",
+  "@vcToolsSizeMustExceedCurrent": {
+    "description": "Validation message when the requested total size does not exceed the current size."
+  },
+  "vcToolsInsufficientFreeSpace": "Not enough free space on the device.",
+  "@vcToolsInsufficientFreeSpace": {
+    "description": "Shown under the size preview when the requested expansion exceeds device free space."
+  },
+  "vcToolsContainerSectionHeader": "Container",
+  "@vcToolsContainerSectionHeader": {
+    "description": "Section heading for selecting a container file."
+  },
+  "vcToolsCredentialsSectionHeader": "Credentials",
+  "@vcToolsCredentialsSectionHeader": {
+    "description": "Section heading for the selected volume credentials."
+  },
+  "vcToolsVolumeOptionsSectionHeader": "Volume options",
+  "@vcToolsVolumeOptionsSectionHeader": {
+    "description": "Section heading for container expansion settings."
+  },
+  "vcToolsDetectingFormat": "Detecting…",
+  "@vcToolsDetectingFormat": {
+    "description": "Format picker subtitle while the selected file format is being identified."
+  },
+  "indexesAndThumbnailsTitle": "Indexes & thumbnails",
+  "@indexesAndThumbnailsTitle": {
+    "description": "Settings page title and vault settings entry for thumbnail and index preferences."
+  },
+  "indexesAndThumbnailsSubtitle": "Manage thumbnail storage, gallery metadata, and music index settings.",
+  "@indexesAndThumbnailsSubtitle": {
+    "description": "Subtitle describing the thumbnail, gallery metadata index, and music index settings in the destination page."
+  },
+  "resetFileManagerSettingsTitle": "Reset file manager settings?",
+  "@resetFileManagerSettingsTitle": {
+    "description": "Title of the confirmation dialog for resetting file manager settings"
+  },
+  "resetFileManagerSettingsMessage": "This puts every option on this screen back to its default, including tabs, layout, toolbar, grid, thumbnail, viewer and skin settings. Your files, bookmarks and per-folder choices are not changed.",
+  "@resetFileManagerSettingsMessage": {
+    "description": "Body of the confirmation dialog for resetting file manager settings"
   }
 }

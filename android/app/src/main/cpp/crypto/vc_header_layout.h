@@ -19,6 +19,20 @@ static constexpr size_t HEADER_MASTER_KEYDATA_OFFSET           = 256;
 static constexpr size_t MASTER_KEYDATA_SIZE                    = 256;
 
 
+// Stamped into every header this app writes -- upstream's VOLUME_HEADER_VERSION
+// and TC_VOLUME_MIN_REQUIRED_PROGRAM_VERSION (Common/Volumes.h).
+static constexpr uint16_t VC_HEADER_FORMAT_VERSION = 0x0005;
+static constexpr uint16_t VC_MIN_PROGRAM_VERSION   = 0x010b;
+
+// Acceptance limits mirrored from upstream VeraCrypt (VolumeHeader.cpp,
+// Common/Tcdefs.h and VolumePassword::MaxSize).
+static constexpr unsigned VC_MIN_HEADER_FORMAT_VERSION = 1;
+static constexpr unsigned VC_PROGRAM_VERSION           = 0x0126;
+static constexpr uint32_t VC_MIN_SECTOR_SIZE           = 512;
+static constexpr uint32_t VC_MAX_SECTOR_SIZE           = 4096;
+static constexpr uint32_t VC_ENCRYPTION_DATA_UNIT_SIZE = 512;
+static constexpr size_t   VC_MAX_PASSWORD_BYTES        = 128;
+
 static constexpr uint64_t TC_VOLUME_HEADER_SIZE          = 64ULL * 1024;              // 65536
 static constexpr uint64_t TC_VOLUME_HEADER_GROUP_SIZE    = 2 * TC_VOLUME_HEADER_SIZE; // 131072
 static constexpr uint64_t TC_VOLUME_DATA_OFFSET          = TC_VOLUME_HEADER_GROUP_SIZE;
@@ -36,6 +50,8 @@ static constexpr uint64_t SCAN_BATCH            = 64;
 static constexpr uint64_t SCAN_SECTORS          = 2048;
 
 static constexpr int VC_KEY_OFFSET_MASTER        = VC_BODY_OFFSET(HEADER_MASTER_KEYDATA_OFFSET);          // 192
+static constexpr int VC_HDR_OFF_VERSION          = VC_BODY_OFFSET(TC_HEADER_OFFSET_VERSION);               // 4
+static constexpr int VC_HDR_OFF_REQUIRED_VERSION = VC_BODY_OFFSET(TC_HEADER_OFFSET_REQUIRED_VERSION);      // 6
 static constexpr int VC_HDR_OFF_KEY_CRC          = VC_BODY_OFFSET(TC_HEADER_OFFSET_KEY_AREA_CRC);          // 8
 static constexpr int VC_HDR_OFF_HIDDEN_VOL_SIZE  = VC_BODY_OFFSET(TC_HEADER_OFFSET_HIDDEN_VOLUME_SIZE);    // 28
 static constexpr int VC_HDR_OFF_VOLUME_SIZE      = VC_BODY_OFFSET(TC_HEADER_OFFSET_VOLUME_SIZE);           // 36

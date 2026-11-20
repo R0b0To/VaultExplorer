@@ -39,7 +39,20 @@ class VaultMedia3DataSource(
         transferInitializing(dataSpec)
 
         val nativeSize = ContainerFileSystem.getFileSize(volId, filePath)
+        // A vault entry that reports no bytes is empty or unreadable (failed
+        // header/decrypt); handing it to the extractors only produces a
+        // "malformed content" error further down. Fail here, before any
+        // codec is created.
+        if (nativeSize == 0L) {
+            throw java.io.IOException("Vault file is empty or unreadable: $filePath (volId=$volId)")
+        }
         fileSize = if (nativeSize > 0) nativeSize else C.LENGTH_UNSET.toLong()
+
+        // Per the DataSource contract a position past the end is an error,
+        // not an empty stream.
+        if (fileSize != C.LENGTH_UNSET.toLong() && dataSpec.position > fileSize) {
+            throw DataSourceException(PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE)
+        }
 
         streamPtr = ContainerFileSystem.openStream(volId, filePath)
         if (streamPtr == 0L) {
@@ -47,18 +60,16 @@ class VaultMedia3DataSource(
         }
 
         readPosition = dataSpec.position
-
-        // Handle seeking beyond EOF gracefully so corrupted/truncated files don't crash playback
-        if (fileSize != C.LENGTH_UNSET.toLong() && readPosition >= fileSize) {
-            bytesRemaining = 0L
-        } else {
-            bytesRemaining = if (dataSpec.length != C.LENGTH_UNSET.toLong()) {
-                dataSpec.length
-            } else if (fileSize != C.LENGTH_UNSET.toLong()) {
-                fileSize - readPosition
+        bytesRemaining = if (dataSpec.length != C.LENGTH_UNSET.toLong()) {
+            if (fileSize != C.LENGTH_UNSET.toLong()) {
+                minOf(dataSpec.length, fileSize - readPosition)
             } else {
-                C.LENGTH_UNSET.toLong()
+                dataSpec.length
             }
+        } else if (fileSize != C.LENGTH_UNSET.toLong()) {
+            fileSize - readPosition
+        } else {
+            C.LENGTH_UNSET.toLong()
         }
 
         bufferOffset = -1L
@@ -118,7 +129,19 @@ class VaultMedia3DataSource(
             }
         }
 
-        if (bytesCopied <= 0) return C.RESULT_END_OF_INPUT
+        if (bytesCopied <= 0) {
+            // Bytes were promised (bytesRemaining > 0) but the native read gave
+            // none: a truncated container or a block that failed to decrypt.
+            // Reporting a clean end of input here made the extractor see a
+            // stream that "finished before preparation" (contentIsMalformed)
+            // and feed garbage on to the codecs, so surface it as an I/O error.
+            if (bytesRemaining > 0L) {
+                throw java.io.IOException(
+                    "Vault stream ended early at $readPosition of $fileSize bytes: $filePath (volId=$volId)"
+                )
+            }
+            return C.RESULT_END_OF_INPUT
+        }
 
         readPosition += bytesCopied
         if (bytesRemaining != C.LENGTH_UNSET.toLong()) {

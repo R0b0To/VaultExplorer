@@ -58,7 +58,7 @@ final class BrowserTabsProvider
   }
 }
 
-String _$browserTabsHash() => r'233c04390f4208fd075d608d0ce2352519ccd35d';
+String _$browserTabsHash() => r'25db879ef362ec65de501ab0f742b4b97b7c9a04';
 
 final class BrowserTabsFamily extends $Family
     with

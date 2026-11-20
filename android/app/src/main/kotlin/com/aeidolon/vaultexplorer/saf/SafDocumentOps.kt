@@ -7,6 +7,8 @@ import android.provider.DocumentsContract
 import androidx.documentfile.provider.CachedDocumentFile
 import androidx.documentfile.provider.DocumentFile
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.concurrent.ConcurrentHashMap
 import com.aeidolon.vaultexplorer.VeLog
 
@@ -419,8 +421,18 @@ class SafDocumentOps(
             val stagingTmp = File(rawFile.parentFile, rawFile.name + ".writing")
             try {
                 stagingTmp.writeBytes(bytes)
-                if (!stagingTmp.renameTo(rawFile)) {
-                    throw SafIOException("writeWhole: could not finalize write to ${rawFile.absolutePath} (staging rename failed)")
+                try {
+                    Files.move(
+                        stagingTmp.toPath(),
+                        rawFile.toPath(),
+                        StandardCopyOption.ATOMIC_MOVE,
+                        StandardCopyOption.REPLACE_EXISTING,
+                    )
+                } catch (e: Exception) {
+                    throw SafIOException(
+                        "writeWhole: could not finalize write to ${rawFile.absolutePath} (staging rename failed)",
+                        e,
+                    )
                 }
             } finally {
                 stagingTmp.delete() // no-op once the rename above has already moved it into place

@@ -55,6 +55,7 @@ import com.aeidolon.vaultexplorer.handlers.ImportExportHandlers
 import com.aeidolon.vaultexplorer.handlers.LogExportHandlers
 import com.aeidolon.vaultexplorer.handlers.RepairHandlers
 import com.aeidolon.vaultexplorer.handlers.HeaderBackupHandlers
+import com.aeidolon.vaultexplorer.handlers.VeraCryptToolsHandlers
 import com.aeidolon.vaultexplorer.handlers.SecureStorageHandlers
 import com.aeidolon.vaultexplorer.handlers.SingleFileCryptoHandlers
 import com.aeidolon.vaultexplorer.handlers.SplitContainerMountHandlers
@@ -67,6 +68,7 @@ import com.aeidolon.vaultexplorer.handlers.VaultPickerHandlers
 import com.aeidolon.vaultexplorer.handlers.VaultUnlockHandlers
 import com.aeidolon.vaultexplorer.handlers.AudioEditHandlers
 import com.aeidolon.vaultexplorer.handlers.VideoEditHandlers
+import com.aeidolon.vaultexplorer.handlers.CategoryIndexHandlers
 import com.aeidolon.vaultexplorer.handlers.LocalFileHandlers
 import com.aeidolon.vaultexplorer.handlers.ShareIntentHandlers
 import com.aeidolon.vaultexplorer.handlers.PanicSettingsHandlers
@@ -140,7 +142,11 @@ private object ChannelMethods {
     const val GET_SPACE_INFO            = "getSpaceInfo"
     const val GET_VAULT_INFO            = "getVaultInfo"
     const val LIST_DIRECTORY            = "listDirectory"
+    const val LIST_VAULT_SYMLINKS       = "listVaultSymlinks"
+    const val READ_VAULT_SYMLINK        = "readVaultSymlink"
+    const val GET_HIDDEN_ENTRY_COUNT    = "getHiddenEntryCount"
     const val CREATE_DIRECTORY          = "createDirectory"
+    const val CREATE_VAULT_SYMLINK      = "createVaultSymlink"
     const val RENAME_FILE               = "renameFile"
     const val COPY_FILE                 = "copyFile"
     const val CANCEL_COPY               = "cancelCopy"
@@ -152,6 +158,7 @@ private object ChannelMethods {
     const val GET_VIDEO_THUMBNAIL       = "getVideoThumbnail"
     const val GET_IMAGE_THUMBNAIL       = "getImageThumbnail"
     const val GET_IMAGE_THUMBNAIL_WITH_SIZE = "getImageThumbnailWithSize"
+    const val PROBE_IMAGE_DIMENSIONS    = "probeImageDimensions"
     const val GET_VIDEO_THUMBNAIL_WITH_SIZE = "getVideoThumbnailWithSize"
     const val GET_APK_ICON              = "getApkIcon"
     const val ENCODE_IMAGE              = "encodeImage"
@@ -219,6 +226,11 @@ private object ChannelMethods {
     const val UNLOCK_CRYPTOMATOR_VAULT  = "unlockCryptomatorVault"
     const val CREATE_CRYPTOMATOR_VAULT  = "createCryptomatorVault"
     const val CHANGE_CRYPTOMATOR_VAULT_PASSWORD = "changeCryptomatorVaultPassword"
+    const val MIGRATE_CRYPTOMATOR_VAULT = "migrateCryptomatorVault"
+    const val PROBE_CRYPTOMATOR_VAULT = "probeCryptomatorVault"
+    const val GET_CRYPTOMATOR_KEY_FILE_BACKUP = "getCryptomatorKeyFileBackup"
+    const val SET_CRYPTOMATOR_KEY_FILE_BACKUP = "setCryptomatorKeyFileBackup"
+    const val CLEAR_VAULT_OPEN_PREFERENCES = "clearVaultOpenPreferences"
     const val PICK_GOCRYPTFS_VAULT      = "pickGocryptfsVault"
     const val UNLOCK_GOCRYPTFS_VAULT    = "unlockGocryptfsVault"
     const val CREATE_GOCRYPTFS_VAULT    = "createGocryptfsVault"
@@ -281,10 +293,20 @@ private object ChannelMethods {
     const val REPAIR_FOLDER_VAULT = "repairFolderVault"
     const val EXPORT_CONTAINER_HEADER = "exportContainerHeader"
     const val RESTORE_CONTAINER_HEADER_REGION = "restoreContainerHeaderRegion"
+    const val GET_CONTAINER_SIZE_INFO = "getContainerSizeInfo"
+    const val EXPAND_VERACRYPT_CONTAINER = "expandVeraCryptContainer"
+    const val EXPAND_LUKS_CONTAINER = "expandLuksContainer"
+    const val GROW_VERACRYPT_FILE_SYSTEM = "growVeraCryptFileSystem"
+    const val GROW_LUKS_FILE_SYSTEM = "growLuksFileSystem"
+    const val EXPAND_BITLOCKER_CONTAINER = "expandBitLockerContainer"
+    const val GROW_BITLOCKER_FILE_SYSTEM = "growBitLockerFileSystem"
+    const val ANALYZE_HIDDEN_VOLUME_HOST = "analyzeHiddenVolumeHost"
+    const val CREATE_HIDDEN_VOLUME_IN_EXISTING = "createHiddenVolumeInExisting"
     const val RESOLVE_FOLDER_VAULT_CONFIG_FILE = "resolveFolderVaultConfigFile"
     const val RESTORE_FOLDER_VAULT_CONFIG = "restoreFolderVaultConfig"
     const val OPEN_LOCAL_FILE_WITH_APP = "openLocalFileWithApp"
     const val SHARE_LOCAL_FILE = "shareLocalFile"
+    const val QUERY_CATEGORY_INDEX = "queryCategoryIndex"
     const val ARCHIVE_SCAN_VAULT = "archiveScanVault"
     const val ARCHIVE_EXTRACT_VAULT_ENTRY = "archiveExtractVaultEntry"
     const val ARCHIVE_EXTRACT_VAULT_ALL = "archiveExtractVaultAll"
@@ -342,6 +364,7 @@ private object ChannelMethods {
     const val SAF_CREATE_FILE           = "safCreateFile"
     const val SAF_CREATE_DIRECTORY      = "safCreateDirectory"
     const val SAF_RENAME_FILE           = "safRenameFile"
+    const val SAF_MOVE_FILE             = "safMoveFile"
     const val SAF_DELETE_FILE           = "safDeleteFile"
     const val SAF_GET_SPACE_INFO        = "safGetSpaceInfo"
     const val SAF_GET_THUMBNAIL         = "safGetThumbnail"
@@ -349,6 +372,7 @@ private object ChannelMethods {
     const val SAF_SHARE_FILES           = "safShareFiles"
     const val SAF_GET_DOCUMENT_URI      = "safGetDocumentUri"
     const val SAF_COPY_FILE             = "safCopyFile"
+    const val SAF_COPY_VAULT_FILE       = "safCopyVaultFile"
     const val SAF_GET_REAL_PATH         = "safGetRealPath"
     const val GET_STORAGE_VOLUMES       = "getStorageVolumes"
 }
@@ -379,6 +403,7 @@ open class MainActivity : FlutterFragmentActivity() {
     private var screenOffReceiver: BroadcastReceiver? = null
     private var pendingOpenMediaPlayer = false
     private var vaultCameraPlugin: com.aeidolon.vaultexplorer.camera.VaultCameraPlugin? = null
+    private var viewerOrientationPlugin: com.aeidolon.vaultexplorer.viewer.ViewerOrientationPlugin? = null
     private var vaultAudioCapturePlugin: com.aeidolon.vaultexplorer.audiocapture.VaultAudioCapturePlugin? = null
     private var quickCaptureScratchpadPlugin: com.aeidolon.vaultexplorer.camera.QuickCaptureScratchpadPlugin? = null
     private val privacyCurtain = PrivacyCurtain(this)
@@ -401,6 +426,7 @@ open class MainActivity : FlutterFragmentActivity() {
     private val fileOperationHandlers = FileOperationHandlers(nativeOps, fullResExecutor)
     private val systemHandlers = SystemPermissionHandlers(this)
     private val localFileHandlers = LocalFileHandlers(this, ioExecutor)
+    private val categoryIndexHandlers = CategoryIndexHandlers(this, ioExecutor)
     private val shareIntentHandlers = ShareIntentHandlers(this, ioExecutor)
     private val backgroundServiceHandlers = BackgroundServiceHandlers(this)
     private val scheduledSyncHandlers by lazy(LazyThreadSafetyMode.NONE) {
@@ -413,6 +439,7 @@ open class MainActivity : FlutterFragmentActivity() {
     private val automationSettingsHandlers = AutomationSettingsHandlers(this)
     private val repairHandlers = RepairHandlers(this, ioExecutor)
     private val headerBackupHandlers = HeaderBackupHandlers(this, ioExecutor, nativeOps)
+    private val veraCryptToolsHandlers = VeraCryptToolsHandlers(this, ioExecutor, nativeOps)
     private val pdfViewerHandlers = com.aeidolon.vaultexplorer.pdf.PdfViewerHandlers(this, pdfExecutor)
     private val archiveHandlers = com.aeidolon.vaultexplorer.handlers.ArchiveHandlers(this, ioExecutor, nativeOps)
     private val bookReaderHandlers = com.aeidolon.vaultexplorer.handlers.BookReaderHandlers(
@@ -470,8 +497,13 @@ open class MainActivity : FlutterFragmentActivity() {
             com.aeidolon.vaultexplorer.camera.QuickCaptureScratchpadPlugin.sweepOrphanedScratchpads(applicationContext)
             SecureFileWipe.sweepOrphanedFiles(
                 cacheDir,
-                listOf("thumb_", "export_", "archive_browse_", "ve_copy_", "vc_import_"),
-                isInUse = com.aeidolon.vaultexplorer.container.ContainerEngine::isActiveCopyTempFile,
+                // arch_scan_: plaintext archive extracted for an in-vault scan; a SIGKILL
+                // mid-scan skips the scan's own finally-block wipe.
+                listOf("thumb_", "export_", "archive_browse_", "ve_copy_", "vc_import_", "arch_scan_"),
+                isInUse = { file ->
+                    com.aeidolon.vaultexplorer.container.ContainerEngine.isActiveCopyTempFile(file) ||
+                        com.aeidolon.vaultexplorer.handlers.ArchiveHandlers.isActiveScanTempFile(file)
+                },
             )
             com.aeidolon.vaultexplorer.saf.MirrorSyncCoordinator.sweepOrphanedMirrors(applicationContext)
             QuickCaptureShortcuts.refreshDynamicShortcut(applicationContext)
@@ -614,6 +646,8 @@ open class MainActivity : FlutterFragmentActivity() {
         screenOffReceiver?.let { unregisterReceiver(it) }
         vaultCameraPlugin?.disposeAll()
         vaultCameraPlugin = null
+        viewerOrientationPlugin?.dispose()
+        viewerOrientationPlugin = null
         vaultAudioCapturePlugin?.dispose()
         vaultAudioCapturePlugin = null
         // Any recording those plugins owned has just ended. Dart can no longer
@@ -661,7 +695,12 @@ open class MainActivity : FlutterFragmentActivity() {
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) systemHandlers.sanitizeClipboard()
+        if (hasFocus) {
+            systemHandlers.sanitizeClipboard()
+            if (systemHandlers.userWantsSecureScreen) {
+                privacyCurtain.armPendingReveal()
+            }
+        }
     }
 
     private fun resizeExecutorPools() {
@@ -736,6 +775,7 @@ open class MainActivity : FlutterFragmentActivity() {
         resizeExecutorPools()
         nativePlayerManager.setTextureRegistry(flutterEngine.renderer)
         vaultCameraPlugin = com.aeidolon.vaultexplorer.camera.VaultCameraPlugin(this, flutterEngine.dartExecutor.binaryMessenger, flutterEngine.renderer)
+        viewerOrientationPlugin = com.aeidolon.vaultexplorer.viewer.ViewerOrientationPlugin(this, flutterEngine.dartExecutor.binaryMessenger)
         vaultAudioCapturePlugin = com.aeidolon.vaultexplorer.audiocapture.VaultAudioCapturePlugin(this, flutterEngine.dartExecutor.binaryMessenger)
         quickCaptureScratchpadPlugin = com.aeidolon.vaultexplorer.camera.QuickCaptureScratchpadPlugin(this, flutterEngine.dartExecutor.binaryMessenger)
 
@@ -1104,11 +1144,14 @@ open class MainActivity : FlutterFragmentActivity() {
             when (call.method) {
                 ChannelMethods.SET_DEBUG_LOGGING -> {
                     VeLog.enabled = call.argument<Boolean>("enabled") == true
+                    VeLog.w("MainActivity") {
+                        "Debug logging native gate enabled=${VeLog.enabled}"
+                    }
                     result.success(null)
                 }
                 ChannelMethods.SET_SECURE_SCREEN -> systemHandlers.handleSetSecureScreen(call, result)
                 ChannelMethods.SET_RECENTS_SNAPSHOT_BLOCKED -> systemHandlers.handleSetRecentsSnapshotBlocked(call, result)
-                ChannelMethods.NOTIFY_RESUMED_FRAME_PAINTED -> { privacyCurtain.reveal(); result.success(true) }
+                ChannelMethods.NOTIFY_RESUMED_FRAME_PAINTED -> { privacyCurtain.onResumedFramePainted(); result.success(true) }
                 ChannelMethods.SET_SENSITIVE_CLIPBOARD_TEXT -> systemHandlers.handleSetSensitiveClipboardText(call, result)
                 ChannelMethods.CLEAR_SENSITIVE_CLIPBOARD_TEXT -> systemHandlers.handleClearSensitiveClipboardText(call, result)
                 ChannelMethods.HAS_ALL_FILES_ACCESS -> systemHandlers.handleHasAllFilesAccess(call, result)
@@ -1124,6 +1167,7 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.OPEN_LOCAL_FILE_WITH_APP -> localFileHandlers.handleOpenLocalFileWithApp(call, result)
                 ChannelMethods.GET_LOCAL_FILE_URI -> localFileHandlers.handleGetLocalFileUri(call, result)
                 ChannelMethods.SHARE_LOCAL_FILE -> localFileHandlers.handleShareLocalFile(call, result)
+                ChannelMethods.QUERY_CATEGORY_INDEX -> categoryIndexHandlers.handleQueryCategoryIndex(call, result)
                 ChannelMethods.LIST_USB_DEVICES -> usbHandlers.handleListUsbDevices(call, result)
                 ChannelMethods.REQUEST_USB_PERMISSION -> usbHandlers.handleRequestUsbPermission(call, result)
                 ChannelMethods.UNLOCK_USB_CONTAINER -> usbHandlers.handleUnlockUsbContainer(call, result)
@@ -1147,6 +1191,11 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.UNLOCK_CRYFS_VAULT -> vaultUnlockHandlers.handleUnlockCryfsVault(call, result)
                 ChannelMethods.CREATE_CRYPTOMATOR_VAULT -> vaultCreationHandlers.handleCreateCryptomatorVault(call, result)
                 ChannelMethods.CHANGE_CRYPTOMATOR_VAULT_PASSWORD -> vaultUnlockHandlers.handleChangeCryptomatorVaultPassword(call, result)
+                ChannelMethods.MIGRATE_CRYPTOMATOR_VAULT -> vaultUnlockHandlers.handleMigrateCryptomatorVault(call, result)
+                ChannelMethods.PROBE_CRYPTOMATOR_VAULT -> vaultUnlockHandlers.handleProbeCryptomatorVault(call, result)
+                ChannelMethods.GET_CRYPTOMATOR_KEY_FILE_BACKUP -> vaultUnlockHandlers.handleGetCryptomatorKeyFileBackup(call, result)
+                ChannelMethods.SET_CRYPTOMATOR_KEY_FILE_BACKUP -> vaultUnlockHandlers.handleSetCryptomatorKeyFileBackup(call, result)
+                ChannelMethods.CLEAR_VAULT_OPEN_PREFERENCES -> vaultUnlockHandlers.handleClearVaultOpenPreferences(call, result)
                 ChannelMethods.CREATE_GOCRYPTFS_VAULT -> vaultCreationHandlers.handleCreateGocryptfsVault(call, result)
                 ChannelMethods.CHANGE_GOCRYPTFS_VAULT_PASSWORD -> vaultUnlockHandlers.handleChangeGocryptfsVaultPassword(call, result)
                 ChannelMethods.IS_GOCRYPTFS_VAULT -> vaultUnlockHandlers.handleIsGocryptfsVault(call, result)
@@ -1201,6 +1250,7 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.GET_VIDEO_THUMBNAIL -> thumbnailHandlers.handleGetVideoThumbnail(call, result)
                 ChannelMethods.GET_IMAGE_THUMBNAIL -> thumbnailHandlers.handleGetImageThumbnail(call, result)
                 ChannelMethods.GET_IMAGE_THUMBNAIL_WITH_SIZE -> thumbnailHandlers.handleGetImageThumbnailWithSize(call, result)
+                ChannelMethods.PROBE_IMAGE_DIMENSIONS -> thumbnailHandlers.handleProbeImageDimensions(call, result)
                 ChannelMethods.GET_VIDEO_THUMBNAIL_WITH_SIZE -> thumbnailHandlers.handleGetVideoThumbnailWithSize(call, result)
                 ChannelMethods.GET_APK_ICON -> thumbnailHandlers.handleGetApkIcon(call, result)
                 ChannelMethods.ENCODE_IMAGE -> thumbnailHandlers.handleEncodeImage(call, result)
@@ -1244,7 +1294,11 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.GET_MEDIA_FILE_SIZE -> fileOperationHandlers.handleGetMediaFileSize(call, result)
                 ChannelMethods.READ_MEDIA_FILE_CHUNK -> fileOperationHandlers.handleReadMediaFileChunk(call, result)
                 ChannelMethods.LIST_DIRECTORY -> fileOperationHandlers.handleListDirectory(call, result)
+                ChannelMethods.LIST_VAULT_SYMLINKS -> fileOperationHandlers.handleListVaultSymlinks(call, result)
+                ChannelMethods.READ_VAULT_SYMLINK -> fileOperationHandlers.handleReadVaultSymlink(call, result)
+                ChannelMethods.GET_HIDDEN_ENTRY_COUNT -> fileOperationHandlers.handleGetHiddenEntryCount(call, result)
                 ChannelMethods.CREATE_DIRECTORY -> fileOperationHandlers.handleCreateDirectory(call, result)
+                ChannelMethods.CREATE_VAULT_SYMLINK -> fileOperationHandlers.handleCreateVaultSymlink(call, result)
                 ChannelMethods.RENAME_FILE -> fileOperationHandlers.handleRenameFile(call, result)
                 ChannelMethods.COPY_FILE -> fileOperationHandlers.handleCopyFile(call, result)
                 ChannelMethods.CANCEL_COPY -> fileOperationHandlers.handleCancelCopy(call, result)
@@ -1258,19 +1312,15 @@ open class MainActivity : FlutterFragmentActivity() {
                     val refresh = call.argument<Boolean>("refresh") ?: false
                     ioExecutor.execute {
                         val entries = safStorageManager.listDirectory(treeUri, dirPath, refresh)
-                        val list = entries.map { entry ->
-                            mapOf(
-                                "name" to entry.name,
-                                "isDir" to entry.isDir,
-                                "size" to entry.size,
-                                "lastModified" to entry.lastModified
-                            )
-                        }
+                        val list = entries.map { it.toWire() }
                         runOnUiThread { result.success(list) }
                     }
                 }
                 ChannelMethods.SAF_CHECK_TREE_ACCESS -> {
                     val treeUri = Uri.parse(call.argument<String>("treeUri") ?: "")
+                    VeLog.w("MainActivity") {
+                        "safCheckTreeAccess dispatched: authority=${treeUri.authority}"
+                    }
                     ioExecutor.execute {
                         val accessible = safStorageManager.isTreeAccessible(treeUri)
                         runOnUiThread { result.success(accessible) }
@@ -1345,6 +1395,15 @@ open class MainActivity : FlutterFragmentActivity() {
                         runOnUiThread { result.success(ok) }
                     }
                 }
+                ChannelMethods.SAF_MOVE_FILE -> {
+                    val treeUri = Uri.parse(call.argument<String>("treeUri") ?: "")
+                    val sourcePath = call.argument<String>("sourcePath") ?: ""
+                    val destPath = call.argument<String>("destPath") ?: ""
+                    ioExecutor.execute {
+                        val ok = safStorageManager.moveFile(treeUri, sourcePath, destPath)
+                        runOnUiThread { result.success(ok) }
+                    }
+                }
                 ChannelMethods.SAF_DELETE_FILE -> {
                     val treeUri = Uri.parse(call.argument<String>("treeUri") ?: "")
                     val filePath = call.argument<String>("filePath") ?: ""
@@ -1409,6 +1468,33 @@ open class MainActivity : FlutterFragmentActivity() {
                         runOnUiThread { result.success(ok) }
                     }
                 }
+                ChannelMethods.SAF_COPY_VAULT_FILE -> {
+                    val srcVolId = call.argument<Int>("srcVolId") ?: -1
+                    val srcPath = call.argument<String>("srcPath") ?: ""
+                    val destTreeUri = Uri.parse(call.argument<String>("destTreeUri") ?: "")
+                    val destPath = call.argument<String>("destPath") ?: ""
+                    val opId = call.argument<Int>("opId") ?: 0
+                    ioExecutor.execute {
+                        val ok = try {
+                            if (srcVolId < 0 || destPath.isEmpty()) false
+                            else com.aeidolon.vaultexplorer.container.ContainerFileSystem
+                                .copyFileToSafStorage(
+                                    srcVolId,
+                                    srcPath,
+                                    destTreeUri,
+                                    destPath,
+                                    safStorageManager,
+                                    opId,
+                                )
+                        } catch (t: Throwable) {
+                            VeLog.e("MainActivity", t) { "SAF_COPY_VAULT_FILE failed: ${t.message}" }
+                            false
+                        } finally {
+                            if (opId > 0) CopyProgressBridge.flushPending(opId)
+                        }
+                        runOnUiThread { result.success(ok) }
+                    }
+                }
                 ChannelMethods.SAF_GET_REAL_PATH -> {
                     val treeUri = call.argument<String>("treeUri")?.let { Uri.parse(it) }
                     val path = call.argument<String>("path") ?: ""
@@ -1423,7 +1509,11 @@ open class MainActivity : FlutterFragmentActivity() {
                 }
                 ChannelMethods.GET_STORAGE_VOLUMES -> {
                     ioExecutor.execute {
-                        val volumes = safStorageManager.getStorageVolumes()
+                        val volumes = try {
+                            safStorageManager.getStorageVolumes()
+                        } catch (_: Throwable) {
+                            emptyList<Map<String, Any?>>()
+                        }
                         runOnUiThread { result.success(volumes) }
                     }
                 }
@@ -1510,6 +1600,15 @@ open class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.BOOK_COVER -> bookReaderHandlers.handleBookCover(call, result)
                 ChannelMethods.BOOK_CLOSE -> bookReaderHandlers.handleBookClose(call, result)
                 ChannelMethods.EXPORT_CONTAINER_HEADER -> headerBackupHandlers.handleExportContainerHeader(call, result)
+                ChannelMethods.GET_CONTAINER_SIZE_INFO -> veraCryptToolsHandlers.handleGetContainerSizeInfo(call, result)
+                ChannelMethods.EXPAND_VERACRYPT_CONTAINER -> veraCryptToolsHandlers.handleExpandContainer(call, result)
+                ChannelMethods.EXPAND_LUKS_CONTAINER -> veraCryptToolsHandlers.handleExpandLuksContainer(call, result)
+                ChannelMethods.GROW_VERACRYPT_FILE_SYSTEM -> veraCryptToolsHandlers.handleGrowFileSystem(call, result)
+                ChannelMethods.GROW_LUKS_FILE_SYSTEM -> veraCryptToolsHandlers.handleGrowLuksFileSystem(call, result)
+                ChannelMethods.EXPAND_BITLOCKER_CONTAINER -> veraCryptToolsHandlers.handleExpandBitLockerContainer(call, result)
+                ChannelMethods.GROW_BITLOCKER_FILE_SYSTEM -> veraCryptToolsHandlers.handleGrowBitLockerFileSystem(call, result)
+                ChannelMethods.ANALYZE_HIDDEN_VOLUME_HOST -> veraCryptToolsHandlers.handleAnalyzeHiddenHost(call, result)
+                ChannelMethods.CREATE_HIDDEN_VOLUME_IN_EXISTING -> veraCryptToolsHandlers.handleCreateHiddenInExisting(call, result)
                 ChannelMethods.RESTORE_CONTAINER_HEADER_REGION ->
                     headerBackupHandlers.handleRestoreContainerHeaderRegion(call, result)
                 ChannelMethods.RESOLVE_FOLDER_VAULT_CONFIG_FILE ->

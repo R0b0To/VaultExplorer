@@ -745,8 +745,8 @@ class MirrorSyncCoordinator(
         // exists because the writer that produces `mirrored`'s bytes and
         // this push can be arbitrarily separated in time and thread (a
         // batched import defers its content push to endBatchWrite; a
-        // background raw-I/O write for cryfs goes through
-        // CryfsBlockStore's own executor), with no completion handoff
+        // background raw-I/O write for cryfs goes through the native
+        // block store's own worker pool), with no completion handoff
         // between them beyond "some earlier call finished". A stat
         // observed here can legitimately still be racing a not-yet-visible
         // write on some devices/filesystems; retrying a few times over a

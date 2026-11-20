@@ -107,8 +107,13 @@ enum ContainerUnlockMethod {
 }
 
 @Riverpod(keepAlive: true)
-ContainerRepository containerRepository(Ref ref) =>
-    ContainerRepository.withCryptoApi(ref.watch(vaultCryptoApiProvider));
+ContainerRepository containerRepository(
+  Ref ref,
+) => ContainerRepository.withCryptoApi(ref.watch(vaultCryptoApiProvider))
+  // Read lazily: only needed when a vault is removed, and it keeps this provider
+  // independent of the lifecycle API's own dependencies.
+  ..clearVaultOpenPreferences = (uri) =>
+      ref.read(vaultLifecycleApiProvider).clearVaultOpenPreferences(uri);
 
 /// The string the platform layer uses to key a container's cached derived key.
 ///
@@ -146,15 +151,15 @@ class ContainerRepository {
   ContainerRepository.withCryptoApi(
     VaultCryptoApi cryptoApi, [
     AppSecureStorage? secure,
-  ]) : this._(
-         cryptoApi.clearDerivedKey,
-         cryptoApi.deleteBiometricKey,
-         secure,
-       );
+  ]) : this._(cryptoApi.clearDerivedKey, cryptoApi.deleteBiometricKey, secure);
 
   final Future<bool> Function(String filePath, {bool removeExpiry})
   _clearDerivedKey;
   final Future<bool> Function(String id) _deleteBiometricKey;
+
+  /// Tells the platform layer to forget per-vault open options it keeps itself (today: the Cryptomator
+  /// key-file backup switch) once a vault is removed. Best effort; unset in tests and non-Android contexts.
+  Future<void> Function(String uri)? clearVaultOpenPreferences;
   final AppSecureStorage _secure;
   Map<String, ContainerRecord>? _cache;
 
@@ -395,6 +400,11 @@ class ContainerRepository {
     } catch (e) {
       _logSwallowed('remove/deleteBiometricKey', e);
     }
+    try {
+      await clearVaultOpenPreferences?.call(uri);
+    } catch (e) {
+      _logSwallowed('remove/clearVaultOpenPreferences', e);
+    }
     await _persist();
   }
 
@@ -414,7 +424,8 @@ class ContainerRepository {
   Future<ContainerRecord?> revertBiometricsToPassword(String uri) async {
     await _ensureLoaded();
     final record = _cache![uri];
-    if (record == null || record.unlockMethod != ContainerUnlockMethod.biometrics) {
+    if (record == null ||
+        record.unlockMethod != ContainerUnlockMethod.biometrics) {
       return record;
     }
     final reverted = record.copyWith(
@@ -868,13 +879,11 @@ class ContainerRepository {
         // for just those means the remembered-password (`vc2_pw_`) and
         // pattern/PIN-hash entries are never decrypted or handed to Dart on
         // cold start.
-        secureData = await _secure.readAllWithPrefixes(
-          const [
-            'vc2_docfolders_',
-            'vc2_keyfiles_',
-            'vc2_composite_carriers_',
-          ],
-        );
+        secureData = await _secure.readAllWithPrefixes(const [
+          'vc2_docfolders_',
+          'vc2_keyfiles_',
+          'vc2_composite_carriers_',
+        ]);
       } catch (e) {
         VeLog.w(
           _kLogTag,
@@ -1055,8 +1064,11 @@ class ContainerRecord {
   final List<DocumentProviderFolder> documentProviderFolders;
   final ThumbnailCacheMode? thumbnailCacheMode;
   final ThumbnailQuality? thumbnailQuality;
+  final ThumbnailCacheMode? galleryMetadataCacheMode;
+  final ThumbnailCacheMode? musicIndexCacheMode;
   final bool cacheDerivedKey;
   final VaultDeleteAfterImportMode vaultDeleteAfterImportMode;
+
   /// Persistent default used to initialize the read-only choice on each
   /// unlock. The unlock screen's current read-only toggle is session-only.
   final bool alwaysOpenReadOnly;
@@ -1088,6 +1100,8 @@ class ContainerRecord {
     this.documentProviderFolders = const [],
     this.thumbnailCacheMode,
     this.thumbnailQuality,
+    this.galleryMetadataCacheMode,
+    this.musicIndexCacheMode,
     this.alwaysOpenReadOnly = false,
     this.cacheDerivedKey = false,
     this.vaultDeleteAfterImportMode = VaultDeleteAfterImportMode.inherit,
@@ -1128,6 +1142,12 @@ class ContainerRecord {
   bool get followsGlobalThumbnails =>
       thumbnailCacheMode == null && thumbnailQuality == null;
 
+  /// True when this vault follows the app-wide gallery metadata index choice.
+  bool get followsGlobalGalleryMetadata => galleryMetadataCacheMode == null;
+
+  /// True when this vault follows the app-wide music-index storage choice.
+  bool get followsGlobalMusicIndex => musicIndexCacheMode == null;
+
   /// This vault's own thumbnail settings, or null when it follows the
   /// app-wide default. [global] only fills in a half that an older record
   /// never stored (a record can predate [thumbnailQuality]), so such a vault
@@ -1152,6 +1172,8 @@ class ContainerRecord {
     List<DocumentProviderFolder>? documentProviderFolders,
     Object? thumbnailCacheMode = _keep,
     Object? thumbnailQuality = _keep,
+    Object? galleryMetadataCacheMode = _keep,
+    Object? musicIndexCacheMode = _keep,
     bool? cacheDerivedKey,
     VaultDeleteAfterImportMode? vaultDeleteAfterImportMode,
     bool? alwaysOpenReadOnly,
@@ -1183,6 +1205,12 @@ class ContainerRecord {
       thumbnailQuality: thumbnailQuality == _keep
           ? this.thumbnailQuality
           : thumbnailQuality as ThumbnailQuality?,
+      galleryMetadataCacheMode: galleryMetadataCacheMode == _keep
+          ? this.galleryMetadataCacheMode
+          : galleryMetadataCacheMode as ThumbnailCacheMode?,
+      musicIndexCacheMode: musicIndexCacheMode == _keep
+          ? this.musicIndexCacheMode
+          : musicIndexCacheMode as ThumbnailCacheMode?,
       cacheDerivedKey: cacheDerivedKey ?? this.cacheDerivedKey,
       vaultDeleteAfterImportMode:
           vaultDeleteAfterImportMode ?? this.vaultDeleteAfterImportMode,
@@ -1212,6 +1240,10 @@ class ContainerRecord {
       'thumbnailCacheMode': thumbnailCacheMode!.toJson(),
     if (thumbnailQuality != null)
       'thumbnailQuality': thumbnailQuality!.toJson(),
+    if (galleryMetadataCacheMode != null)
+      'galleryMetadataCacheMode': galleryMetadataCacheMode!.toJson(),
+    if (musicIndexCacheMode != null)
+      'musicIndexCacheMode': musicIndexCacheMode!.toJson(),
     'cacheDerivedKey': cacheDerivedKey,
     'vaultDeleteAfterImportMode': vaultDeleteAfterImportMode.toJson(),
     'alwaysOpenReadOnly': alwaysOpenReadOnly,
@@ -1248,6 +1280,14 @@ class ContainerRecord {
           : null,
       thumbnailQuality: j.containsKey('thumbnailQuality')
           ? ThumbnailQuality.fromJson(j['thumbnailQuality'])
+          : null,
+      galleryMetadataCacheMode: j.containsKey('galleryMetadataCacheMode')
+          ? ThumbnailCacheMode.fromJson(
+              j['galleryMetadataCacheMode'] as String?,
+            )
+          : null,
+      musicIndexCacheMode: j.containsKey('musicIndexCacheMode')
+          ? ThumbnailCacheMode.fromJson(j['musicIndexCacheMode'] as String?)
           : null,
       cacheDerivedKey: j['cacheDerivedKey'] as bool? ?? false,
       vaultDeleteAfterImportMode: VaultDeleteAfterImportMode.fromJson(

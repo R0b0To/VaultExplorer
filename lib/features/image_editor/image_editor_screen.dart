@@ -30,6 +30,8 @@ import 'package:vaultexplorer/data/services/full_res_image_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/features/browser/viewer/models/viewer_adjustments.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/color_adjust_filter.dart';
+import 'package:vaultexplorer/features/browser/metadata/image_metadata_reader.dart';
+import 'package:vaultexplorer/features/browser/metadata/metadata_source.dart';
 import 'package:vaultexplorer/features/image_editor/image_output_format.dart';
 import 'package:vaultexplorer/features/image_editor/models/edit_annotation.dart';
 import 'package:vaultexplorer/features/image_editor/widgets/annotation_layer.dart';
@@ -111,6 +113,7 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
   bool _containerLocked = false;
 
   Uint8List? _originalBytes;
+  bool _mustPreserveOriginal = false;
 
   /// Pixel count of the picture as first decoded from [_originalBytes]. Lets
   /// a save tell how much a crop shrank the image so the file can shrink with
@@ -432,10 +435,17 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
         );
         return;
       }
+      final metadata = await ImageMetadataReader.read(
+        MemoryMetadataSource(bytes),
+      );
+      final mustPreserveOriginal =
+          ImageMetadataReader.isMotionPhoto(metadata) ||
+          ImageMetadataReader.hasExtendedXmp(metadata);
       final image = await _decodeImage(bytes);
       if (!mounted) return;
       setState(() {
         _originalBytes = bytes;
+        _mustPreserveOriginal = mustPreserveOriginal;
         _originalPixelCount = image.width * image.height;
         _workingImage = image;
       });
@@ -1650,6 +1660,8 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
         existingEntries: existingEntries,
         fsType: fsType,
         caseSensitive: caseSensitive,
+        allowOverwrite: !_mustPreserveOriginal,
+        notice: _mustPreserveOriginal ? context.l10n.motionPhotoCopyNote : null,
       );
       if (choice == null || !mounted) {
         _documentController.setSaving(false);
@@ -1731,6 +1743,25 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
     String filePath,
     Uint8List bytes,
   ) async {
+    if (_mustPreserveOriginal) {
+      _documentController.setSaving(false);
+      showAppSnackBar(
+        context,
+        message: context.l10n.motionPhotoCopyNote,
+        tone: AppBannerTone.warning,
+      );
+      return;
+    }
+    // Resolve before committing. If link metadata cannot be read safely,
+    // writeWholeFile will also refuse the write; do not save successfully and
+    // only then fail while trying to discover the cache key to invalidate.
+    final targetPath =
+        await _fileIoApi.resolveVaultSymlinkTargetPath(
+          container,
+          filePath,
+          strict: true,
+        ) ??
+        filePath;
     final ok = await _fileIoApi.writeWholeFile(container, filePath, bytes);
     if (!mounted) return;
     if (!ok) {
@@ -1746,16 +1777,26 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen>
     }
     _overwroteOriginal = true;
     FullResImageCache.invalidate(container, filePath);
-    await ref
-        .read(thumbnailCacheServiceProvider)
-        .invalidate(
-          container,
-          filePath,
-          qualities: {
-            widget.thumbnailQuality,
-            ThumbnailQuality.defaultQuality,
-          }.toList(),
-        );
+    // The editor is opened with the shortcut path so the native file API can
+    // follow it. Thumbnail widgets, however, are keyed by the resolved target
+    // path. Invalidate that path too (and the link path for any older cache
+    // entries) or the tile can keep showing the pre-edit preview.
+    if (targetPath != filePath) {
+      FullResImageCache.invalidate(container, targetPath);
+    }
+    final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
+    final qualities = {
+      widget.thumbnailQuality,
+      ThumbnailQuality.defaultQuality,
+    }.toList();
+    await thumbnailCache.invalidate(container, filePath, qualities: qualities);
+    if (targetPath != filePath) {
+      await thumbnailCache.invalidate(
+        container,
+        targetPath,
+        qualities: qualities,
+      );
+    }
     if (!mounted) return;
     _documentController.saved();
     showAppSnackBar(

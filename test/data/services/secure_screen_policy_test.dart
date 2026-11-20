@@ -66,4 +66,23 @@ void main() {
     expect(fake.secureScreenValue, isNotNull);
     expect(fake.recentsSnapshotBlockedValue, isNotNull);
   });
+
+  test('disableForDecoy is ignored while the vault is revealed', () async {
+    policy.beginRevealedVault();
+    await policy.apply(preference: true);
+    await policy.disableForDecoy();
+
+    expect(fake.secureScreenValue, isTrue);
+    expect(fake.recentsSnapshotBlockedValue, isTrue);
+  });
+
+  test('endRevealedVault drops protections again', () async {
+    policy.beginRevealedVault();
+    await policy.apply(preference: true);
+    await policy.endRevealedVault();
+
+    expect(policy.isVaultRevealed, isFalse);
+    expect(fake.secureScreenValue, isFalse);
+    expect(fake.recentsSnapshotBlockedValue, isFalse);
+  });
 }

@@ -5,6 +5,7 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_selection_controller.dart';
 import 'package:vaultexplorer/features/browser/models/browser_tab_origin.dart';
+import 'package:vaultexplorer/features/browser/models/file_category.dart';
 import 'package:vaultexplorer/features/browser/models/tab_id.dart';
 
 MountedContainer _container(int volId, [String? name]) => MountedContainer(
@@ -992,6 +993,65 @@ void main() {
       expect(reopened, isNotNull);
       expect(w.state.tabs, hasLength(1));
       expect(w.state.activeTabId, reopened);
+    });
+  });
+
+  group('category tabs', () {
+    test('opens a category tab and activates it', () {
+      final w = workspace(1);
+      final catId = w.tabs.openCategoryTab(FileCategory.images);
+      expect(catId, isNotNull);
+      expect(w.state.tabs, hasLength(2));
+      expect(w.active, catId);
+      final tab = w.state.activeTab!;
+      expect(tab.isCategory, isTrue);
+      expect(tab.isDashboard, isFalse);
+      expect(tab.category, FileCategory.images);
+      expect(tab.volId, isNull);
+    });
+
+    test(
+      'reopening the same category tab activates it instead of duplicating',
+      () {
+        final w = workspace(1);
+        final first = w.tabs.openCategoryTab(FileCategory.images)!;
+        final second = w.tabs.openTab(_container(2))!;
+        expect(w.active, second);
+
+        final reactivated = w.tabs.openCategoryTab(FileCategory.images);
+        expect(reactivated, first);
+        expect(w.active, first);
+        expect(w.state.tabs, hasLength(3));
+      },
+    );
+
+    test('opening different categories creates distinct tabs', () {
+      final w = workspace(1);
+      final img = w.tabs.openCategoryTab(FileCategory.images)!;
+      final vid = w.tabs.openCategoryTab(FileCategory.videos)!;
+      expect(img, isNot(vid));
+      expect(w.state.tabs, hasLength(3));
+      expect(w.state.tabs.where((t) => t.isCategory), hasLength(2));
+    });
+
+    test('closing a vault by volId does not close category tabs', () {
+      final w = workspace(1);
+      final catId = w.tabs.openCategoryTab(FileCategory.images)!;
+      expect(w.state.tabs, hasLength(2));
+      w.tabs.closeByVolId(1);
+      expect(w.state.tabs, hasLength(1));
+      expect(w.state.tabs.single.tabId, catId);
+    });
+
+    test('respects tab cap for category tabs', () {
+      final w = workspace(1);
+      for (var i = 2; i <= kMaxBrowserTabs; i++) {
+        expect(w.tabs.openTab(_container(i)), isNotNull);
+      }
+      expect(w.state.tabs, hasLength(kMaxBrowserTabs));
+      final catId = w.tabs.openCategoryTab(FileCategory.images);
+      expect(catId, isNull);
+      expect(w.state.tabs, hasLength(kMaxBrowserTabs));
     });
   });
 }

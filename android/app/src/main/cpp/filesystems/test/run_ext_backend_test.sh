@@ -1,22 +1,118 @@
 #!/bin/sh
 # Builds and runs ext_backend_test.cpp on the host. See the header of that file
-# for what it covers. Needs: g++, libext2fs-dev (headers + libext2fs/libcom_err),
-# libssl-dev and libmbedtls-dev (headers only -- volume_state.h pulls in the
-# crypto types), and, for the consistency checks, e2fsprogs (e2fsck, mkfs.ext*).
-#   Debian/Ubuntu: apt-get install g++ libext2fs-dev e2fsprogs libssl-dev libmbedtls-dev
+# for what it covers.
+#
+# What gets built, mirroring CMakeLists.txt so the test exercises the same code:
+#   - e2fsprogs at the commit CMakeLists.txt pins (cloned from GitHub into a cache directory the
+#     first time; set E2FSPROGS_SRC to use an existing checkout instead): the same libext2fs file
+#     set, generated headers and compile definitions as the Android build, plus the resize2fs
+#     engine (resize/resize2fs.c, resize/extent.c) and filesystems/ext_resize_glue.c that
+#     extGrowToFit() uses;
+#   - filesystems/ext_backend.cpp itself.
+# Needs: g++, gcc, git (+ network the first time), python3, libssl-dev and libmbedtls-dev
+# (headers only -- volume_state.h pulls in the crypto types), and, for the consistency checks,
+# e2fsprogs (e2fsck, mkfs.ext*).
+#   Debian/Ubuntu: apt-get install g++ git python3 e2fsprogs libssl-dev libmbedtls-dev
 #
 # Everything else the backend includes that isn't in this repo (FatFs's ff.h and
 # diskio.h, ntfs-3g's volume.h, jni.h, android/log.h) is replaced by the
 # minimal declarations in host_stubs/.
 set -eu
 HERE=$(cd "$(dirname "$0")" && pwd)
-CPP=$(cd "$HERE/.." && pwd)/..
-CPP=$(cd "$CPP" && pwd)
+CPP=$(cd "$HERE/../.." && pwd)
+CMAKE="$CPP/CMakeLists.txt"
+
+SHA=$(awk '/^ +e2fsprogs$/{f=1} f && /GIT_TAG/{print $2; exit}' "$CMAKE")
+[ -n "$SHA" ] || { echo "could not read the e2fsprogs GIT_TAG from $CMAKE" >&2; exit 2; }
+CACHE="${EXT_TEST_CACHE:-${TMPDIR:-/tmp}/vaultexplorer-ext-host-cache}/$SHA"
+SRC="${E2FSPROGS_SRC:-$CACHE/src}"
+mkdir -p "$CACHE"
+
+if [ ! -f "$SRC/lib/ext2fs/ext2fs.h" ]; then
+    echo "fetching e2fsprogs $SHA ..."
+    rm -rf "$SRC"; mkdir -p "$SRC"
+    git -C "$SRC" init -q
+    git -C "$SRC" remote add origin https://github.com/tytso/e2fsprogs.git
+    git -C "$SRC" fetch -q --depth 1 origin "$SHA"
+    git -C "$SRC" checkout -q FETCH_HEAD
+fi
+
+# config.h: CMakeLists.txt compiles e2fsprogs against the config.h it writes for ntfs-3g (step 3b).
+sed -n '/^set(CONFIG_H_CONTENT "/,/^")$/p' "$CMAKE" | sed '1d;$d' > "$CACHE/config.h"
+[ -s "$CACHE/config.h" ] || { echo "could not extract config.h from $CMAKE" >&2; exit 2; }
+
+GEN="$CACHE/gen"
+LIB="$CACHE/libe2fs_host.a"
+if [ ! -f "$LIB" ] || [ "$CMAKE" -nt "$LIB" ] || [ "$CPP/filesystems/ext_resize_glue.c" -nt "$LIB" ]; then
+    echo "building e2fsprogs subset ..."
+    rm -rf "$GEN" "$CACHE/obj"; mkdir -p "$GEN/ext2fs" "$GEN/uuid" "$CACHE/obj"
+    E="$SRC/lib/ext2fs"
+    # Generated headers: the same substitutions CMakeLists.txt performs (step 3a).
+    sed -e 's/@ASM_TYPES_HEADER@//' -e 's/@PUBLIC_CONFIG_HEADER@//' -e 's/@SIZEOF_INT@/4/' \
+        -e 's/@SIZEOF_SHORT@/2/' -e "s/@SIZEOF_LONG@/$(getconf LONG_BIT | awk '{print $1/8}')/" \
+        -e 's/@SIZEOF_LONG_LONG@/8/' "$E/ext2_types.h.in" > "$GEN/ext2fs/ext2_types.h"
+    sed -e 's/@UUID_.*@//' "$SRC/lib/uuid/uuid.h.in" > "$GEN/uuid/uuid.h"
+    sed -e 's#@datadir@#/usr/share#' -e 's#@root_sysconfdir@#/etc#' "$SRC/lib/dirpaths.h.in" > "$GEN/dirpaths.h"
+    python3 - "$E/ext2_err.et.in" "$GEN" <<'PY'
+import re, sys
+t = open(sys.argv[1]).read()
+gen = sys.argv[2]
+h = "/* Generated */\n#include <et/com_err.h>\n"
+for i, n in enumerate(re.findall(r'ec[ \t]+([A-Z0-9_]+),', t)):
+    h += "#define %s (%dL)\n" % (n, 2133571328 + i)
+h += ("extern const struct error_table et_ext2_error_table;\nvoid initialize_ext2_error_table(void);\n"
+      "void initialize_ext2_error_table_r(struct et_list **list);\n#define ERROR_TABLE_BASE_ext2 (2133571328L)\n"
+      "#define init_ext2_err_tbl initialize_ext2_error_table\n#define ext2_err_base ERROR_TABLE_BASE_ext2\n")
+open(gen + "/ext2fs/ext2_err.h", "w").write(h)
+open(gen + "/ext2_err.c", "w").write('''#include <stdlib.h>
+#include <et/com_err.h>
+static const char * const text[] = { "e2fsprogs ext2/ext3/ext4 error", 0 };
+struct et_list { struct et_list *next; const struct error_table *table; };
+extern struct et_list *_et_list;
+const struct error_table et_ext2_error_table = { text, 2133571328L, 1 };
+static struct et_list link = { 0, 0 };
+void initialize_ext2_error_table_r(struct et_list **list) {
+    struct et_list *et, **end;
+    for (end = list, et = *list; et; end = &et->next, et = et->next)
+        if (et->table->msgs == text) return;
+    et = (struct et_list *) malloc(sizeof(*et));
+    if (!et) { if (link.table) return; et = &link; }
+    et->table = &et_ext2_error_table; et->next = 0; *end = et;
+}
+void initialize_ext2_error_table(void) { initialize_ext2_error_table_r(&_et_list); }
+''')
+PY
+    cat > "$GEN/crc32c_table.h" <<'TBL'
+/* Generated by VaultExplorer's Android CMake build. */
+static const uint32_t crc32table_be[1][256] = {{ 0 }};
+static const uint32_t crc32ctable_le[1][256] = {{ 0 }};
+TBL
+    DEFS=$(echo "-DHAVE_CONFIG_H -DHAVE_SYS_TYPES_H -DHAVE_SYS_STAT_H -DHAVE_UNISTD_H -DHAVE_STDLIB_H -DHAVE_STRING_H
+          -DHAVE_ERRNO_H -DHAVE_INTTYPES_H -DHAVE_SNPRINTF -DHAVE_STRCASECMP -DHAVE_STRDUP -DHAVE_STRNLEN
+          -DHAVE_PREAD -DHAVE_PWRITE -DHAVE_PREAD64 -DHAVE_PWRITE64 -DHAVE_LINUX_TYPES_H -DHAVE_SYS_TIME_H
+          -DHAVE_GETPAGESIZE -DCRC_LE_BITS=1 -DCRC_BE_BITS=1 -DDISABLE_BACKTRACE -D_GNU_SOURCE" | tr '\n' ' ')
+    # crc32c_table.h is generated next to the sources, as CMakeLists.txt does.
+    cp "$GEN/crc32c_table.h" "$E/crc32c_table.h"
+    INC="-I$CACHE -I$GEN -I$SRC/lib -I$SRC/lib/et -I$SRC/lib/uuid -I$E -I$SRC/resize"
+    {
+        ls "$E"/*.c | grep -v -E '/(tst_|test_io|tdbtool|bmove|brel_ma|irel_ma|dosio|nt_io|windows_io|write_bb_file|imager|flushb|unix_io|finddev|getsize|getsectsize|qcow2|sparse_io|undo_io|read_bb_file|tdb|gen_crc32ctable)'
+        echo "$GEN/ext2_err.c"
+        for f in error_message et_name init_et com_err com_right; do echo "$SRC/lib/et/$f.c"; done
+        for f in clear compare copy gen_uuid isnull pack parse unpack unparse uuid_time; do echo "$SRC/lib/uuid/$f.c"; done
+        echo "$SRC/resize/resize2fs.c"; echo "$SRC/resize/extent.c"; echo "$CPP/filesystems/ext_resize_glue.c"
+    } > "$CACHE/sources.txt"
+    xargs -P "$(nproc 2>/dev/null || echo 2)" -I{} sh -c \
+        'gcc -c -w -std=gnu17 -O1 '"$DEFS $INC"' "$1" -o "'"$CACHE"'/obj/$(echo "$1" | md5sum | cut -c1-12)_$(basename "$1" .c).o"' _ {} < "$CACHE/sources.txt"
+    rm -f "$LIB"; ar rcs "$LIB" "$CACHE"/obj/*.o
+fi
+
 OUT="${TMPDIR:-/tmp}/ext_backend_test.$$"
 trap 'rm -f "$OUT"' EXIT
-${CXX:-g++} -std=c++17 -O1 -g -Wall -Wno-unused-result \
+# Note the order: e2fsprogs' own include dirs come first so its ext2fs.h wins over any system copy.
+${CXX:-g++} -std=c++17 -O1 -g -Wall -Wno-unused-result -D_GNU_SOURCE \
+    -I "$CACHE" -I "$GEN" -I "$SRC/lib" -I "$SRC/lib/ext2fs" \
     -I "$HERE/host_stubs" -I "$CPP" -I "$CPP/filesystems" -I "$CPP/containers" \
     -I "$CPP/session" -I "$CPP/io" -I "$CPP/crypto" -I "$CPP/Common" -I "$CPP/jni" \
     "$HERE/ext_backend_test.cpp" "$CPP/filesystems/ext_backend.cpp" \
-    -lext2fs -lcom_err -o "$OUT"
+    "$LIB" -o "$OUT"
 "$OUT"

@@ -1,0 +1,58 @@
+# Release Notes
+
+### New Features & UI Enhancements
+* **Gallery Mode:** Added a dedicated Gallery View toggle in the toolbar for faster media browsing.
+* **Toolbar Quick Menu:** Added a quick-actions menu directly in the main toolbar for common operations.
+* **Category Filters in Side Drawer:** Added convenient shortcut filters for **Videos, Images, Audio, and Documents** in the navigation drawer to aggregate files across different storage locations (can be reordered or removed in settings).
+* **Session Persistence in Mask Mode:** Returning to Mask Mode now retains open tabs and active vault sessions instead of discarding them.
+* **Predictive Back Navigation:** Added a setting in App Settings to enable/disable system predictive back animations.
+* **UI Bug Fix:** Fixed an alignment issue where folders without thumbnails rendered off-center.
+
+---
+
+### Tools & File Management
+* **Revamped Storage Analyzer:** Completely overhauled the analyzer with interactive results—easily inspect what is consuming storage and delete files/folders directly from the report view.
+* **Revamped Sync Tool:** Overhauled the sync utility with advanced controls, enhanced transfer visibility, and finer sync options.
+* **Archive Empty Folders:** Fixed an issue where creating an archive containing only empty folders would fail.
+
+---
+
+### Core Architecture: Native Folder Vault Engine
+* **High-Performance C++ Core:** 
+  * Migrated the engines for **gocryptfs**, **Cryptomator (formats 7 & 8)**, and **CryFS** from Kotlin to a unified, platform-neutral native C++ core (`foldervault`).
+  * Drastically reduces JVM memory usage, eliminates garbage collection stutter during large transfers, and enforces consistent POSIX filesystem semantics across all vault types.
+  * Added a standalone CLI tool (`fvcli`) for testing and desktop targets.
+* **Spec Compliance & Compatibility:**
+  * **CryFS:** Block files are now written in uppercase hexadecimal matching official CryFS specifications (fixing issues on case-sensitive storage). Existing lowercase block vaults remain fully supported.
+  * **Cryptomator:** Corrected `dirid.c9r` generation to record the directory's own ID rather than its parent's ID, matching official Cryptomator specifications.
+  * Verified interoperability with official upstream implementations (gocryptfs 2.4.0, Cryptomator CLI 0.6.2, CryFS 0.11.4).
+* **Filesystem Atomicity & Resilience:**
+  * Canceled or failed transfers now clean up cleanly instead of leaving truncated or orphaned files on backing storage.
+  * Implemented atomic rename-over-write semantics, eliminating duplicate directory entries in CryFS.
+  * Deleting directories in Cryptomator now properly prunes underlying backing folders.
+  * Eliminated redundant integrity-log fsyncs on brand-new CryFS blocks.
+
+---
+
+### Critical Data Integrity Fixes (VeraCrypt)
+* **Fixed Password Change Offset:** Resolved a critical bug where changing a VeraCrypt password wrote the backup header inside the active data payload (offset $V - 3A$ instead of $V - A$), corrupting 512 bytes of user data and leaving the real backup header with stale credentials.
+* **Corrected Hidden Volume Protection Range:** Fixed an off-by-128 KiB calculation in hidden volume protection arming. Protection now covers the exact decoded boundary of the hidden volume, preventing outer-volume writes from corrupting the hidden volume's boot sector and allocation tables.
+* **Restored Plausible Deniability:** Newly created containers now fill both primary and backup 128 KiB header areas with cryptographically secure pseudorandom bytes, preventing detection of hidden volumes via uninitialized zero-byte slots.
+
+> ⚠️ **Important Notice for VeraCrypt Users:** If you changed the password of a VeraCrypt container using version 1.40.0 or earlier, we strongly recommend changing the password again in this release to ensure the backup header is properly relocated to the correct sector.
+
+---
+
+### Storage & USB Driver Improvements
+* **Cache Coherency:** Fixed an issue where USB read-ahead caching served stale data after adjacent writes.
+* **Write Ordering:** Resolved a race condition where overlapping sector writes between metadata and data streams could violate last-write-wins ordering on flush.
+* **Write Retry Durability:** Transient USB flush failures no longer discard pending write buffers, ensuring data can be successfully retried.
+* **Sync Error Propagation:** Synchronous USB flush/sync failures now correctly bubble up through filesystem sync (`CTRL_SYNC`) and unmount paths.
+
+---
+
+### Security & Native Hardening
+* Fixed a 16-byte native heap overflow vulnerability in the BoringSSL XChaCha20-Poly1305 failure path.
+* Fixed undefined behavior caused by null pointer arguments in AES-SIV `memcpy` routines.
+
+SHA256 Signature: `0bde9d3b0ee3f56617d02632c843b1629bf0b2faa4560dff5d26f651dc325f19`

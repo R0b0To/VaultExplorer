@@ -18,6 +18,9 @@ class VideoProbe {
   final int? audioSampleRate;
   final int? audioChannels;
 
+  /// The embedded media creation date when the platform can read one.
+  final String? creationDate;
+
   /// Sync-sample times of the video track, ascending, in microseconds.
   final List<int> keyframesUs;
 
@@ -48,6 +51,7 @@ class VideoProbe {
     this.frameRate,
     this.audioSampleRate,
     this.audioChannels,
+    this.creationDate,
     required this.keyframesUs,
     required this.keyframesComplete,
     required this.outputExtension,
@@ -69,6 +73,7 @@ class VideoProbe {
     frameRate: (m['frameRate'] as num?)?.toDouble(),
     audioSampleRate: (m['audioSampleRate'] as num?)?.toInt(),
     audioChannels: (m['audioChannels'] as num?)?.toInt(),
+    creationDate: m['creationDate'] as String?,
     keyframesUs: [
       for (final k in (m['keyframesUs'] as List<Object?>? ?? const []))
         (k as num).toInt(),
@@ -116,6 +121,7 @@ class VaultVideoEditApi {
     required String filePath,
     required bool isLocalStorage,
     bool includeKeyframes = true,
+    bool includeDateMetadata = false,
   }) async {
     try {
       final raw = await _channel
@@ -124,6 +130,7 @@ class VaultVideoEditApi {
             'filePath': filePath,
             'isLocalStorage': isLocalStorage,
             'includeKeyframes': includeKeyframes,
+            'includeDateMetadata': includeDateMetadata,
           });
       if (raw == null) {
         throw const VideoEditException('PROBE_FAILED', 'No response');

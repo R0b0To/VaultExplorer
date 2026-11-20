@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart' show AutofillContextAction;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
@@ -550,20 +551,24 @@ class _SingleFileCryptoSheetState extends ConsumerState<SingleFileCryptoSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        TextField(
-          controller: _passwordCtrl,
-          obscureText: _obscure,
-          enabled: !state.busy,
-          autofillHints: null,
-          textInputAction: TextInputAction.done,
-          onSubmitted: (_) => _run(),
-          decoration: InputDecoration(
-            isDense: isCompact,
-            labelText: context.l10n.passwordFieldLabel,
-            prefixIcon: Icon(Icons.key_rounded, size: 20, color: cs.primary),
-            suffixIcon: PasswordVisibilityToggle(
-              obscured: _obscure,
-              onToggle: () => setState(() => _obscure = !_obscure),
+        AutofillGroup(
+          onDisposeAction: AutofillContextAction.cancel,
+          child: TextField(
+            controller: _passwordCtrl,
+            obscureText: _obscure,
+            enabled: !state.busy,
+            // Encrypting means choosing a new passphrase, not entering a saved one.
+            autofillHints: isEncrypt ? null : const <String>[AutofillHints.password],
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _run(),
+            decoration: InputDecoration(
+              isDense: isCompact,
+              labelText: context.l10n.passwordFieldLabel,
+              prefixIcon: Icon(Icons.key_rounded, size: 20, color: cs.primary),
+              suffixIcon: PasswordVisibilityToggle(
+                obscured: _obscure,
+                onToggle: () => setState(() => _obscure = !_obscure),
+              ),
             ),
           ),
         ),

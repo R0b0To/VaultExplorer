@@ -146,12 +146,41 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(fatfs)
 
 # 3. Download Tuxera NTFS-3G (NTFS Filesystem Engine)
+#
+# Patched with filesystems/patches/ntfs-3g-lookup-by-mbsname.patch. Without it,
+# anything touching a reparse point fails on volumes mounted via
+# ntfs_device_mount() (no lookup cache): ntfs_create_symlink() returns NULL with
+# EINVAL, i.e. symbolic links cannot be created on NTFS. The full explanation is
+# in filesystems/patches/apply_ntfs3g_patches.cmake. The script is idempotent
+# and fails configure if the patch stops applying (e.g. after a version bump).
+#
+# The patch files are configure dependencies so an incremental build (Ninja, as
+# used by Gradle) notices an edited patch instead of keeping the old tree.
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/filesystems/patches/ntfs-3g-lookup-by-mbsname.patch"
+    "${CMAKE_CURRENT_SOURCE_DIR}/filesystems/patches/apply_ntfs3g_patches.cmake")
 FetchContent_Declare(
         ntfs3g
         GIT_REPOSITORY https://github.com/tuxera/ntfs-3g.git
         GIT_TAG        d327833ec1d5eb1358b6f2c37139f10a3460944d
+        PATCH_COMMAND  ${CMAKE_COMMAND}
+                       -DPATCH_FILE=${CMAKE_CURRENT_SOURCE_DIR}/filesystems/patches/ntfs-3g-lookup-by-mbsname.patch
+                       -P ${CMAKE_CURRENT_SOURCE_DIR}/filesystems/patches/apply_ntfs3g_patches.cmake
 )
 FetchContent_MakeAvailable(ntfs3g)
+
+# Re-apply when the patch changes, even inside an existing .cxx build tree
+# (PATCH_COMMAND only runs when the dependency is first populated).
+execute_process(
+    COMMAND ${CMAKE_COMMAND}
+            -DPATCH_FILE=${CMAKE_CURRENT_SOURCE_DIR}/filesystems/patches/ntfs-3g-lookup-by-mbsname.patch
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/filesystems/patches/apply_ntfs3g_patches.cmake
+    WORKING_DIRECTORY ${ntfs3g_SOURCE_DIR}
+    RESULT_VARIABLE ntfs3g_patch_res
+)
+if(NOT ntfs3g_patch_res EQUAL 0)
+    message(FATAL_ERROR "Failed to patch ntfs-3g sources")
+endif()
 
 # 3a. e2fsprogs/libext2fs
 FetchContent_Declare(
@@ -248,8 +277,14 @@ add_library(e2fs_uuid STATIC
         ${E2FS_SRC_DIR}/lib/uuid/unpack.c
         ${E2FS_SRC_DIR}/lib/uuid/unparse.c
         ${E2FS_SRC_DIR}/lib/uuid/uuid_time.c)
+# resize2fs's engine (resize_fs): grows an ext2/3/4 file system in place -- see extGrowToFit in
+# filesystems/ext_backend.cpp. Only resize2fs.c and extent.c are used; resource_track.c (sbrk/getrusage
+# statistics) is replaced by the no-op glue, and main.c/online.c/sim_progress.c are CLI-only.
 add_library(e2fs_ext2fs STATIC ${E2FS_EXT2FS_SOURCES}
-        ${E2FS_GENERATED_DIR}/ext2_err.c)
+        ${E2FS_GENERATED_DIR}/ext2_err.c
+        ${E2FS_SRC_DIR}/resize/resize2fs.c
+        ${E2FS_SRC_DIR}/resize/extent.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/filesystems/ext_resize_glue.c)
 foreach(E2FS_TARGET e2fs_com_err e2fs_uuid e2fs_ext2fs)
     target_include_directories(${E2FS_TARGET} PRIVATE
             ${CMAKE_CURRENT_BINARY_DIR} ${E2FS_GENERATED_DIR}
@@ -263,6 +298,7 @@ foreach(E2FS_TARGET e2fs_com_err e2fs_uuid e2fs_ext2fs)
             HAVE_LINUX_TYPES_H HAVE_SYS_TIME_H HAVE_GETPAGESIZE
             CRC_LE_BITS=1 CRC_BE_BITS=1 DISABLE_BACKTRACE _GNU_SOURCE)
 endforeach()
+target_include_directories(e2fs_ext2fs PRIVATE ${E2FS_SRC_DIR}/resize)
 target_link_libraries(e2fs_ext2fs PRIVATE e2fs_com_err e2fs_uuid)
 
 # 3e. cJSON
@@ -434,17 +470,103 @@ set(NTFS3G_MKNTFS_SOURCE ${ntfs3g_SOURCE_DIR}/ntfsprogs/mkntfs.c)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/filesystems/mkntfs_embedded.c.in ${MKNTFS_EMBEDDED_SOURCE} @ONLY)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/filesystems/mkntfs_embedded.c.in)
 
+# Folder-vault core (gocryptfs / Cryptomator / CryFS): platform-neutral C++ with
+# no JNI/Android dependency -- the Android app reaches it through
+# jni/foldervault_bridge.cpp, a desktop build can link it as-is (see
+# foldervault/fv_vault.h). The shared primitives it builds on (scrypt, EME,
+# AES-SIV, XChaCha20, the CryFS block cipher) stay in crypto/ and are linked in
+# by the final target, so they are deliberately not listed here.
+add_library(foldervault_core STATIC
+        foldervault/fv_common.cpp
+        foldervault/fv_crypto.cpp
+        foldervault/fv_storage.cpp
+        foldervault/fv_engine.cpp
+        foldervault/fv_json.cpp
+        foldervault/fv_gocryptfs.cpp
+        foldervault/fv_gocryptfs_vault.cpp
+        foldervault/fv_cryptomator.cpp
+        foldervault/fv_cryptomator_vault.cpp
+        foldervault/fv_cryfs.cpp
+        foldervault/fv_cryfs_vault.cpp
+        foldervault/fv_check.cpp
+        foldervault/fv_formats.cpp
+        foldervault/fv_check_gocryptfs.cpp
+        foldervault/fv_check_cryptomator.cpp
+        foldervault/fv_check_cryfs.cpp)
+set_target_properties(foldervault_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_compile_features(foldervault_core PUBLIC cxx_std_20)
+target_compile_options(foldervault_core PRIVATE -Wall -Wextra)
+# 32-bit ABIs (armeabi-v7a, x86) have a 32-bit off_t unless this is defined. Without it, files >= 2 GiB are
+# invisible in directory listings (fstatat -> EOVERFLOW) and cannot be read. The vaultexplorer target already
+# sets it, but this library is a separate target. No header exposes off_t, so PRIVATE is safe.
+target_compile_definitions(foldervault_core PRIVATE _FILE_OFFSET_BITS=64)
+target_include_directories(foldervault_core PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${mbedtls_SOURCE_DIR}/include)
+target_link_libraries(foldervault_core PUBLIC mbedcrypto)
+if(ANDROID)
+    # Bulk AEAD through BoringSSL's EVP (what the app used before the move to
+    # C++; ARMv8 AES+PMULL) and the user-entropy mixing for creation flows.
+    target_compile_definitions(foldervault_core PRIVATE FV_AEAD_EVP=1 FV_USE_USERENTROPY=1)
+    target_link_libraries(foldervault_core PUBLIC crypto)
+endif()
+
+# Transfer helpers: content hashing (MD5 / SHA-1 / SHA-256 / SHA-512, several in one pass)
+# and splitting / joining files into numbered parts, on abstract byte sources and sinks.
+# Platform-neutral C++ like foldervault_core and volman_core -- no JNI, Android or Flutter
+# types. xfer_core is pure (it only needs mbedtls and is what volman_core links); xfer_host
+# adds the std::filesystem front end a desktop program calls directly, and is left out of the
+# default build so the Android library does not compile code it never uses.
+add_library(xfer_core STATIC
+        xfer/xfer_hash.cpp
+        xfer/xfer_split.cpp)
+set_target_properties(xfer_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_compile_features(xfer_core PUBLIC cxx_std_20)
+target_compile_options(xfer_core PRIVATE $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall> $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wextra>)
+target_include_directories(xfer_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${mbedtls_SOURCE_DIR}/include)
+target_link_libraries(xfer_core PUBLIC mbedcrypto)
+
+add_library(xfer_host STATIC EXCLUDE_FROM_ALL xfer/xfer_host.cpp)
+set_target_properties(xfer_host PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_compile_options(xfer_host PRIVATE $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall> $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wextra>)
+target_link_libraries(xfer_host PUBLIC xfer_core)
+
+# Volume manager: the slot table of unlocked volumes and every operation addressed
+# by slot (listing, I/O, read streams, copy between any two volumes), over one
+# vm::Volume interface. Platform-neutral C++ like foldervault_core -- no JNI, Android
+# or Flutter types -- so the Android JNI layer and a desktop front-end sit on the
+# same calls (see volman/vm_manager.h). Folder vaults plug in through vm_foldervault;
+# block-device volumes through volman/vm_block_volume.cpp, which needs the engine
+# (volumes[], fs_ops.h) and is therefore compiled into the engine target below, not here.
+add_library(volman_core STATIC
+        volman/vm_manager.cpp
+        volman/vm_foldervault.cpp
+        volman/vm_xfer.cpp)
+set_target_properties(volman_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_compile_features(volman_core PUBLIC cxx_std_20)
+target_compile_options(volman_core PRIVATE $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall> $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wextra>)
+target_include_directories(volman_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(volman_core PUBLIC foldervault_core xfer_core)
+
 # 4. Build target
 set(VE_ENGINE_SOURCES
         io/virtual_block_device.cpp
         jni/jni_bridge_common.cpp
         jni/crypto_bridge.cpp
+        jni/foldervault_bridge.cpp
+        jni/volman_bridge.cpp
+        volman/vm_block_volume.cpp
+        jni/prims_bridge.cpp
+        crypto/prims.cpp
         jni/session_bridge.cpp
         jni/container_lifecycle_bridge.cpp
         jni/filesystem_bridge.cpp
         session/session_prepare.cpp
         session/bitlocker_backend.cpp
         containers/container_create.cpp
+        containers/container_expand_bitlocker.cpp
+        containers/bl_disk_expand.cpp
+        containers/vdisk.cpp
         containers/vhdx_image.cpp
         containers/vhd_image.cpp
         jni/jni_runtime.cpp
@@ -475,8 +597,9 @@ set(VE_ENGINE_SOURCES
         crypto/cascade.cpp
         crypto/kdf_table.cpp
         crypto/luks_header.cpp
+        crypto/luks_cipher.cpp
         crypto/scrypt.cpp
-        crypto/cryfs_block_cipher.cpp
+        crypto/cryfs_block_cipher.cpp crypto/cryfs_legacy_ciphers.cpp
         crypto/single_file_crypto.cpp
         crypto/user_entropy.cpp
         crypto/xchacha20poly1305.cpp
@@ -629,7 +752,9 @@ target_link_libraries(
         dislocker_lib
         ${VE_AVIF_LIBS}
         ${ARCHIVE_ENGINE_LIBRARY}
-        ${VE_ZXING_LIB})
+        ${VE_ZXING_LIB}
+        foldervault_core
+        volman_core)
 
 if(VAULTEXPLORER_DESKTOP)
     find_package(Threads REQUIRED)
@@ -666,14 +791,17 @@ if(VAULTEXPLORER_DESKTOP)
     target_include_directories(ve_smoke_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ffi)
     target_link_libraries(ve_smoke_test vaultexplorer)
 endif()
-
-
 set_source_files_properties(
-        crypto/cryfs_block_cipher.cpp
+        crypto/cryfs_block_cipher.cpp crypto/cryfs_legacy_ciphers.cpp
         crypto/eme.cpp
         crypto/siv.cpp
         crypto/xchacha20poly1305.cpp
         jni/crypto_bridge.cpp
+        jni/foldervault_bridge.cpp
+        jni/volman_bridge.cpp
+        volman/vm_block_volume.cpp
+        jni/prims_bridge.cpp
+        crypto/prims.cpp
         PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra"
 )
 
@@ -695,9 +823,31 @@ if(NOT ANDROID)
     add_executable(kdf_table_test crypto/test/kdf_table_test.cpp crypto/kdf_table.cpp)
     add_executable(decrypted_block_cache_test io/test/decrypted_block_cache_test.cpp)
     add_executable(fd_write_buffer_test io/test/fd_write_buffer_test.cpp)
+    # UsbBlockCache coherence (write ordering across the two streams, read-ahead
+    # invalidation, failed-flush retry). Header-only class; jni_callbacks.h only
+    # declares JNI globals, so the stub <jni.h> from the ext backend host test
+    # is enough and no JDK is needed.
+    add_executable(usb_block_cache_test io/test/usb_block_cache_test.cpp)
+    target_include_directories(usb_block_cache_test PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/filesystems/test/host_stubs
+            ${CMAKE_CURRENT_SOURCE_DIR}/jni)
+    # Header-area arithmetic (backup header offsets, hidden-volume protected range).
+    add_executable(vc_geometry_test containers/test/vc_geometry_test.cpp)
+    # Random fill of the reserved header areas (hidden-volume deniability).
+    add_executable(vc_header_areas_test containers/test/vc_header_areas_test.cpp)
+    # Free-space fill: uses stand-in crypto headers, which must win over the real
+    # crypto/ ones on the include path (hence BEFORE).
+    add_executable(vc_free_space_fill_test containers/test/vc_free_space_fill_test.cpp)
+    target_include_directories(vc_free_space_fill_test BEFORE PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/containers/test/host_stubs)
+    # Lock ordering policy, driven with the real UsbBlockCache (stub <jni.h> as above).
+    add_executable(lock_policy_test session/test/lock_policy_test.cpp)
+    target_include_directories(lock_policy_test PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/filesystems/test/host_stubs
+            ${CMAKE_CURRENT_SOURCE_DIR}/jni)
     add_executable(cryfs_block_cipher_test
             test/cryfs_block_cipher_test.cpp
-            crypto/cryfs_block_cipher.cpp
+            crypto/cryfs_block_cipher.cpp crypto/cryfs_legacy_ciphers.cpp
             crypto/xchacha20poly1305.cpp)
     target_include_directories(cryfs_block_cipher_test PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}
@@ -738,6 +888,30 @@ if(NOT ANDROID)
             containers/test/container_header_test.cpp
             containers/container_header.cpp)
     add_executable(container_utils_crc32_test containers/test/container_utils_crc32_test.cpp)
+    # BitLocker expand core (containers/bl_expand.h): synthetic FVE metadata, rewrite + re-seal checks.
+    add_executable(bl_expand_test containers/test/bl_expand_test.cpp)
+    target_include_directories(bl_expand_test PRIVATE ${mbedtls_SOURCE_DIR}/include)
+    target_link_libraries(bl_expand_test mbedcrypto)
+    list(APPEND VAULTEXPLORER_HOST_TESTS bl_expand_test)
+    add_test(NAME bl_expand_test COMMAND bl_expand_test)
+    # Disk-image expansion: partition tables (MBR/GPT, in memory) and the legacy-VHD half of the virtual-disk growth
+    # (synthetic images). The VHDX growth and the real-BitLocker-in-VHD/VHDX checks are shell scripts that need qemu-img
+    # (containers/test/*_qemu_check.sh) and are not part of ctest.
+    add_executable(disk_partition_test containers/test/disk_partition_test.cpp)
+    target_include_directories(disk_partition_test PRIVATE ${mbedtls_SOURCE_DIR}/include)
+    target_link_libraries(disk_partition_test mbedcrypto)
+    list(APPEND VAULTEXPLORER_HOST_TESTS disk_partition_test)
+    add_test(NAME disk_partition_test COMMAND disk_partition_test)
+    add_executable(vdisk_vhd_test
+            containers/test/vdisk_vhd_test.cpp
+            containers/vdisk.cpp
+            containers/vhd_image.cpp
+            containers/vhdx_image.cpp)
+    target_include_directories(vdisk_vhd_test PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/filesystems/test/host_stubs
+            ${CMAKE_CURRENT_SOURCE_DIR}/containers)
+    list(APPEND VAULTEXPLORER_HOST_TESTS vdisk_vhd_test)
+    add_test(NAME vdisk_vhd_test COMMAND vdisk_vhd_test)
     add_executable(chunked_block_device_test
             containers/test/chunked_block_device_test.cpp
             containers/chunked_block_device.cpp)
@@ -771,6 +945,81 @@ if(NOT ANDROID)
     target_link_libraries(archive_split_test ${ARCHIVE_ENGINE_LIBRARY})
     list(APPEND VAULTEXPLORER_HOST_TESTS archive_split_test)
 
+    # Folder-vault core: known-answer vectors, per-format scenarios, tamper /
+    # rollback / legacy-name handling and thread stress. The interop scripts in
+    # foldervault/test/interop additionally drive `fvcli` against the real
+    # gocryptfs, Cryptomator and CryFS binaries (not part of ctest: they need
+    # those programs and FUSE).
+    set(FV_CRYPTO_SOURCES
+            crypto/eme.cpp crypto/siv.cpp crypto/scrypt.cpp
+            crypto/xchacha20poly1305.cpp crypto/cryfs_block_cipher.cpp crypto/cryfs_legacy_ciphers.cpp)
+    add_executable(foldervault_test foldervault/test/fv_tests.cpp ${FV_CRYPTO_SOURCES})
+    target_link_libraries(foldervault_test foldervault_core mbedcrypto)
+    # The gocryptfs known-answer vectors are located via an absolute path baked in
+    # here, not via __FILE__: the global -ffile-prefix-map above rewrites
+    # CMAKE_SOURCE_DIR to /source_tree inside __FILE__, so deriving the path from it
+    # points at a directory that doesn't exist on the host (FV_VECTORS still overrides).
+    target_compile_definitions(foldervault_test PRIVATE
+            FV_VECTORS_DIR="${CMAKE_CURRENT_LIST_DIR}/foldervault/test/vectors/gocryptfs")
+    add_executable(fvcli foldervault/test/fvcli.cpp ${FV_CRYPTO_SOURCES})
+    target_link_libraries(fvcli foldervault_core mbedcrypto)
+    list(APPEND VAULTEXPLORER_HOST_TESTS foldervault_test)
+
+    # Volume manager: slots, streams, copy and close semantics on an in-memory
+    # volume, plus real gocryptfs / Cryptomator / CryFS vaults behind the same
+    # manager (copies between every pair of formats, cancellation, close while
+    # calls are in flight).
+    add_executable(volman_test volman/test/vm_tests.cpp ${FV_CRYPTO_SOURCES})
+    target_link_libraries(volman_test volman_core foldervault_core mbedcrypto)
+    list(APPEND VAULTEXPLORER_HOST_TESTS volman_test)
+
+    # Crypto primitives behind the channel's hmac / aesCbcDecrypt / ... methods (crypto/prims.cpp):
+    # HMAC, PBKDF2, AES-GCM and AES-CBC against vectors generated with independent implementations
+    # (test/gen_prims_vectors.py: Python hmac/hashlib + `cryptography`; its RFC 6238 TOTP table is
+    # asserted against the RFC), plus the strict input contracts and tamper detection.
+    add_executable(prims_test crypto/test/prims_tests.cpp crypto/prims.cpp)
+    target_include_directories(prims_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${mbedtls_SOURCE_DIR}/include)
+    target_link_libraries(prims_test mbedcrypto)
+    list(APPEND VAULTEXPLORER_HOST_TESTS prims_test)
+
+    # Transfer helpers: hashing against known answers (vectors from hashlib), part naming and
+    # sequence resolution, split / join on in-memory streams (part boundaries, cancel, write /
+    # close / read failures) and on real files (round trips, UTF-8 names, refusing to overwrite
+    # a part).
+    add_executable(xfer_test xfer/test/xfer_tests.cpp)
+    target_link_libraries(xfer_test xfer_host xfer_core)
+    list(APPEND VAULTEXPLORER_HOST_TESTS xfer_test)
+
+    # BlockVolume (volman/vm_block_volume.cpp) on the real VolumeState table, with an
+    # in-memory fake of the filesystem layer underneath (the fsXxx() functions) and real
+    # gocryptfs / Cryptomator vaults beside it in one VolumeManager: refusal on a locked or
+    # read-only volume, end-of-file vs failure, streams, a container locked (and another
+    # unlocked into the same slot) behind the manager's back, close() draining.
+    # volume_state.h pulls in crypto/cipher_shim.h (<openssl/aes.h>), so this test is only
+    # registered where those headers exist (libssl-dev); the stub <jni.h> is enough.
+    find_path(VM_OPENSSL_INCLUDE_DIR openssl/aes.h)
+    if(VM_OPENSSL_INCLUDE_DIR)
+        add_executable(volman_block_test
+                volman/test/vm_block_tests.cpp volman/vm_block_volume.cpp ${FV_CRYPTO_SOURCES})
+        # volman/test/ntfs_stub comes first: its volume.h adds ntfs-3g's min()/max() macros to the
+        # stub, so a bare std::min in a TU that sees volume_state.h fails here as it does in the Android build.
+        target_include_directories(volman_block_test PRIVATE
+                ${CMAKE_CURRENT_SOURCE_DIR}/volman/test/ntfs_stub
+                ${CMAKE_CURRENT_SOURCE_DIR}/filesystems/test/host_stubs
+                ${CMAKE_CURRENT_SOURCE_DIR}/session
+                ${CMAKE_CURRENT_SOURCE_DIR}/io
+                ${CMAKE_CURRENT_SOURCE_DIR}/filesystems
+                ${CMAKE_CURRENT_SOURCE_DIR}/containers
+                ${CMAKE_CURRENT_SOURCE_DIR}/crypto
+                ${CMAKE_CURRENT_SOURCE_DIR}/jni
+                ${CMAKE_CURRENT_SOURCE_DIR}/archive
+                ${CMAKE_CURRENT_SOURCE_DIR}/Common
+                ${mbedtls_SOURCE_DIR}/include
+                ${VM_OPENSSL_INCLUDE_DIR})
+        target_link_libraries(volman_block_test volman_core foldervault_core mbedcrypto)
+        list(APPEND VAULTEXPLORER_HOST_TESTS volman_block_test)
+    endif()
+
     set(VAULTEXPLORER_HOST_TESTS
             sector_batching_test
             fs_scan_test
@@ -778,6 +1027,11 @@ if(NOT ANDROID)
             kdf_table_test
             decrypted_block_cache_test
             fd_write_buffer_test
+            usb_block_cache_test
+            vc_geometry_test
+            vc_header_areas_test
+            vc_free_space_fill_test
+            lock_policy_test
             cryfs_block_cipher_test
             user_entropy_test
             utf16le_password_test
@@ -796,6 +1050,8 @@ if(NOT ANDROID)
         endif()
     endforeach()
 
+    add_custom_target(host_tests DEPENDS ${VAULTEXPLORER_HOST_TESTS})
+
     enable_testing()
     add_test(NAME sector_batching_test COMMAND sector_batching_test)
     add_test(NAME fs_scan_test COMMAND fs_scan_test)
@@ -803,9 +1059,21 @@ if(NOT ANDROID)
     add_test(NAME kdf_table_test COMMAND kdf_table_test)
     add_test(NAME decrypted_block_cache_test COMMAND decrypted_block_cache_test)
     add_test(NAME fd_write_buffer_test COMMAND fd_write_buffer_test)
+    add_test(NAME usb_block_cache_test COMMAND usb_block_cache_test)
+    add_test(NAME vc_geometry_test COMMAND vc_geometry_test)
+    add_test(NAME vc_header_areas_test COMMAND vc_header_areas_test)
+    add_test(NAME vc_free_space_fill_test COMMAND vc_free_space_fill_test)
+    add_test(NAME lock_policy_test COMMAND lock_policy_test)
     add_test(NAME cryfs_block_cipher_test COMMAND cryfs_block_cipher_test)
     add_test(NAME user_entropy_test COMMAND user_entropy_test)
     add_test(NAME utf16le_password_test COMMAND utf16le_password_test)
+    add_test(NAME foldervault_test COMMAND foldervault_test)
+    add_test(NAME volman_test COMMAND volman_test)
+    add_test(NAME xfer_test COMMAND xfer_test)
+    add_test(NAME prims_test COMMAND prims_test)
+    if(TARGET volman_block_test)
+        add_test(NAME volman_block_test COMMAND volman_block_test)
+    endif()
     add_test(NAME container_header_test COMMAND container_header_test)
     add_test(NAME container_utils_crc32_test COMMAND container_utils_crc32_test)
     add_test(NAME chunked_block_device_test COMMAND chunked_block_device_test)

@@ -10,6 +10,7 @@ import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/external_storage_locations_provider.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_feedback.dart';
 import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart';
+import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
@@ -23,8 +24,10 @@ import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/viewer/background_playback/background_playback_host.dart';
 import 'package:vaultexplorer/features/browser/browser_tabs_host.dart';
+import 'package:vaultexplorer/features/browser/controllers/browser_session_store.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
 import 'package:vaultexplorer/features/browser/models/browser_tab_origin.dart';
+import 'package:vaultexplorer/features/browser/models/file_category.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_new_tab_sheet.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_screen.dart';
@@ -38,6 +41,7 @@ import 'package:vaultexplorer/features/camera/quick_capture_screen.dart';
 import 'package:vaultexplorer/features/tools/tools_screen.dart';
 import 'package:vaultexplorer/features/unlock/unlock_sheet.dart';
 import 'package:vaultexplorer/features/unlock/usb_unlock_sheet.dart';
+import 'package:vaultexplorer/core/widgets/menus/back_dismissible_menu_anchor.dart';
 
 const _kLogTag = 'MainShell';
 
@@ -64,8 +68,13 @@ class _MainShellState extends ConsumerState<MainShell>
   final ValueNotifier<List<MountedContainer>> _mountedNotifier = ValueNotifier(
     const [],
   );
+  final ValueNotifier<MountedContainer?> _localStorageNotifier = ValueNotifier(
+    null,
+  );
   final GlobalKey<VaultDashboardState> _dashboardKey =
       GlobalKey<VaultDashboardState>();
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  bool _scaffoldDrawerOpen = false;
   MountedContainer? _cachedLocalStorageContainer;
 
   MountedContainer? get _primaryLocalStorageContainer {
@@ -80,6 +89,12 @@ class _MainShellState extends ConsumerState<MainShell>
     if (dashboard != null) {
       _cachedLocalStorageContainer = dashboard.localStorageContainer;
     }
+  }
+
+  void _onScaffoldDrawerChanged(bool isOpen) {
+    if (!mounted || _scaffoldDrawerOpen == isOpen) return;
+    OpenDrawerBackGuard.setDrawerOpen(this, isOpen);
+    setState(() => _scaffoldDrawerOpen = isOpen);
   }
 
   // Cached synchronously while the widget is mounted
@@ -125,6 +140,12 @@ class _MainShellState extends ConsumerState<MainShell>
   Timer? _exitArmTimer;
   BrowserTabsConfig? _browserWorkspace;
 
+  /// The tabs the person left open the last time this vault was revealed from
+  /// Mask Mode, picked up again so they resume where they were instead of
+  /// starting from an empty Home. Null for a normal launch, and when nothing
+  /// is left to resume. See [BrowserSessionStore].
+  BrowserTabsConfig? _restoredBrowserWorkspace;
+
   BrowserTabsState? get _browserWorkspaceState {
     final workspace = _browserWorkspace;
     return workspace == null ? null : ref.read(browserTabsProvider(workspace));
@@ -146,6 +167,11 @@ class _MainShellState extends ConsumerState<MainShell>
     // Cached so asynchronous lock callbacks stay safe after this widget is
     // unmounted.
     _container = ProviderScope.containerOf(context, listen: false);
+    if (widget.returnToDecoyOnBackground) {
+      _restoredBrowserWorkspace = _container
+          .read(browserSessionStoreProvider)
+          .resumable();
+    }
     _quickCaptureColdStart = ref.read(pendingQuickCaptureLaunchProvider).take();
     if (!_quickCaptureColdStart) {
       // The Settings tab used to be the thing that created -- and so started
@@ -157,6 +183,11 @@ class _MainShellState extends ConsumerState<MainShell>
       _configureSessionLock();
     }
     final policy = _secureScreenPolicy; // Eagerly evaluate while mounted
+    // Revealed from Mask Mode: the persisted mode is still `decoy`, so mark
+    // the vault as visible or later "decoy -> disable FLAG_SECURE" syncs
+    // (dashboard load, mount changes, app-lock enforcement) would strip the
+    // screenshot block the user asked for.
+    if (widget.returnToDecoyOnBackground) policy.beginRevealedVault();
     ref.read(appSettingsServiceProvider).loadSettings().then((settings) {
       policy.apply(preference: settings.blockScreenshots);
     });
@@ -302,6 +333,15 @@ class _MainShellState extends ConsumerState<MainShell>
     if (!_quickCaptureColdStart) {
       lockController.handleAppLifecycleState(state);
     }
+    // Re-scan physical storage volumes (SD card / USB) when the app comes
+    // back to the foreground: a volume inserted while backgrounded is then
+    // picked up without a full restart. Only user-added locations are
+    // persisted, so the reload can't lose them.
+    if (state == AppLifecycleState.resumed) {
+      ref
+          .read(externalStorageLocationsProvider.notifier)
+          .refreshSystemVolumes();
+    }
   }
 
   void _configureSessionLock() {
@@ -423,20 +463,26 @@ class _MainShellState extends ConsumerState<MainShell>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    OpenDrawerBackGuard.setDrawerOpen(this, false);
     _exitArmTimer?.cancel();
     _mountedNotifier.dispose();
+    _localStorageNotifier.dispose();
     _vaultEngineEvents.removeIncomingShareRequestListener(
       _onIncomingShareRequest,
     );
     _vaultEngineEvents.removeQuickCaptureRequestedListener(
       _onQuickCaptureRequested,
     );
-    disguiseModeApi.getMode().then((mode) {
-      if (mode == DisguiseMode.decoy) {
-        // Safe: calling the cached service directly without using `ref`
-        _secureScreenPolicy.disableForDecoy();
-      }
-    });
+    if (widget.returnToDecoyOnBackground) {
+      // Safe: calling the cached service directly without using `ref`
+      unawaited(_secureScreenPolicy.endRevealedVault());
+    } else {
+      disguiseModeApi.getMode().then((mode) {
+        if (mode == DisguiseMode.decoy) {
+          _secureScreenPolicy.disableForDecoy();
+        }
+      });
+    }
     super.dispose();
   }
 
@@ -542,6 +588,29 @@ class _MainShellState extends ConsumerState<MainShell>
     });
   }
 
+  void _openCategoryTab(FileCategory category) {
+    _cacheDashboardLocalStorageContainer();
+    final actions = _browserWorkspaceActions;
+    if (actions == null) return;
+    final tabId = actions.openCategoryTab(
+      category,
+      primaryLocalContainer: _primaryLocalStorageContainer,
+      includeVaults: true,
+    );
+    if (tabId == null && mounted) {
+      showAppSnackBar(
+        context,
+        message: context.l10n.browserTabLimitReached(kMaxBrowserTabs),
+        tone: AppBannerTone.warning,
+      );
+      return;
+    }
+    setState(() {
+      _index = 0;
+      _builtTabs.add(0);
+    });
+  }
+
   /// Drawer "Local storage" tap. With all-files access this opens the
   /// container directly. Without it there is no container, and the tap used
   /// to do nothing; the grant prompt has to be shown instead. That flow lives
@@ -552,9 +621,10 @@ class _MainShellState extends ConsumerState<MainShell>
   Future<void> _openLocalStorageFromDrawer({
     int? currentVolId,
     BrowserTabs? workspaceActions,
+    MountedContainer? external,
   }) async {
     final primary = _primaryLocalStorageContainer;
-    if (primary != null) {
+    if (primary != null && external == null) {
       _openBrowser(primary);
       return;
     }
@@ -571,8 +641,24 @@ class _MainShellState extends ConsumerState<MainShell>
         dashboard = _dashboardKey.currentState;
       }
     }
-    await dashboard?.openLocalStorage(currentVolId: currentVolId);
+    await dashboard?.openLocalStorage(
+      currentVolId: currentVolId,
+      external: external,
+    );
   }
+
+  /// Same as [_openLocalStorageFromDrawer], but for an external raw-path
+  /// storage (SD card / USB): brings the Dashboard up first if needed, then
+  /// opens the volume through its all-files-access permission flow.
+  Future<void> _openExternalStorageFromDrawer(
+    MountedContainer externalContainer, {
+    BrowserTabs? workspaceActions,
+  }) =>
+      _openLocalStorageFromDrawer(
+        currentVolId: externalContainer.volId,
+        workspaceActions: workspaceActions,
+        external: externalContainer,
+      );
 
   void _openVaultFromDrawer(VaultListItem item) {
     switch (item) {
@@ -681,6 +767,12 @@ class _MainShellState extends ConsumerState<MainShell>
 
   void _onBrowserWorkspaceChanged(BrowserTabsConfig? workspace) {
     _browserWorkspace = workspace;
+    if (workspace != null && widget.returnToDecoyOnBackground) {
+      // Revealed from Mask Mode: keep these tabs alive for when the app goes
+      // back to the decoy, so the next reveal resumes them. Nothing to do on
+      // the null call from dispose -- the store simply keeps holding them.
+      _container.read(browserSessionStoreProvider).hold(_container, workspace);
+    }
     final pending = _browserInitialContainer;
     if (workspace != null && pending != null) {
       _browserInitialContainer = null;
@@ -702,6 +794,11 @@ class _MainShellState extends ConsumerState<MainShell>
     }
     final actions = _browserWorkspaceActions;
     if (actions == null) return;
+    // Don't offer a picker whose every choice would fail.
+    if (_browserWorkspaceState?.atLimit ?? false) {
+      _showBrowserTabLimit();
+      return;
+    }
     _cacheDashboardLocalStorageContainer();
     final choice = await BrowserNewTabSheet.show(
       context,
@@ -740,6 +837,19 @@ class _MainShellState extends ConsumerState<MainShell>
     if (actions == null) return;
     if (tab.isDashboard) {
       actions.openDashboardTab();
+      return;
+    }
+    if (tab.isCategory) {
+      if (actions.openCategoryTab(
+            tab.category!,
+            primaryLocalContainer: tab.primaryLocalContainer,
+            includeVaults: tab.includeVaults,
+          ) ==
+          null) {
+        _showBrowserTabLimit();
+        return;
+      }
+      setState(() => _index = 0);
       return;
     }
     if (container == null) return;
@@ -807,6 +917,7 @@ class _MainShellState extends ConsumerState<MainShell>
       child: VaultDashboard(
         key: backPreviewOnly ? null : _dashboardKey,
         mountedNotifier: backPreviewOnly ? null : _mountedNotifier,
+        localStorageNotifier: backPreviewOnly ? null : _localStorageNotifier,
         onNavigateTab: _onTabTap,
         workspaceConfig: backPreviewOnly ? null : workspaceConfig,
         backPreviewOnly: backPreviewOnly,
@@ -829,7 +940,9 @@ class _MainShellState extends ConsumerState<MainShell>
             area: SkinArea.tools,
             child: ToolsScreen(
               mountedContainers: _mountedNotifier,
+              localStorageContainer: _localStorageNotifier,
               onNavigateTab: _onTabTap,
+              onOpenInBrowser: _openBrowser,
             ),
           )
         else
@@ -869,6 +982,7 @@ class _MainShellState extends ConsumerState<MainShell>
       return AppNavigationDrawer(
         currentVolId: currentVolId,
         primaryLocalContainer: _primaryLocalStorageContainer,
+        localStorageNotifier: _localStorageNotifier,
         onOpenInNewTab: workspaceActions == null || !tabsEnabled
             ? null
             : (container) {
@@ -892,7 +1006,14 @@ class _MainShellState extends ConsumerState<MainShell>
             workspaceActions: workspaceActions,
           ),
         ),
+        onOpenExternalStorage: (externalContainer) => unawaited(
+          _openExternalStorageFromDrawer(
+            externalContainer,
+            workspaceActions: workspaceActions,
+          ),
+        ),
         onUnlockVault: _openVaultFromDrawer,
+        onOpenCategory: _openCategoryTab,
         onAddVault: () {
           _onTabTap(0);
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -920,6 +1041,7 @@ class _MainShellState extends ConsumerState<MainShell>
                 buildDrawer(currentVolId: volId, workspace: workspace),
             closeRouteWhenEmpty: false,
             includeDashboardTab: true,
+            restoredWorkspace: _restoredBrowserWorkspace,
             homeBuilder:
                 ({
                   required workspace,
@@ -948,6 +1070,8 @@ class _MainShellState extends ConsumerState<MainShell>
     );
 
     final Widget scaffold = Scaffold(
+      key: _scaffoldKey,
+      onDrawerChanged: _onScaffoldDrawerChanged,
       resizeToAvoidBottomInset: !browserContentVisible,
       // Tools and Settings have no horizontal pager, so let a drawer drag
       // start anywhere in their content, too.
@@ -982,9 +1106,26 @@ class _MainShellState extends ConsumerState<MainShell>
       // exit hint. The decoy is the one that asks for the second back before
       // the app is left (see the app-root back handling in
       // DirectoryContentView).
-      canPop: atHome && (_exitArmed || widget.returnToDecoyOnBackground),
+      canPop:
+          atHome &&
+          !_scaffoldDrawerOpen &&
+          !OpenDrawerBackGuard.hasOpenDrawer &&
+          (_exitArmed || widget.returnToDecoyOnBackground),
       onPopInvokedWithResult: (bool didPop, Object? result) {
         if (didPop) return;
+        // A menu is open: this press closes it (BackDismissibleMenuAnchor).
+        if (OpenMenuBackGuard.hasOpenMenu) return;
+        if (_scaffoldDrawerOpen) {
+          scheduleMicrotask(() {
+            if (mounted && _scaffoldDrawerOpen) {
+              _scaffoldKey.currentState?.closeDrawer();
+            }
+          });
+          return;
+        }
+        // BrowserTabsHost closes its drawer after all route back handlers have
+        // observed this press.
+        if (OpenDrawerBackGuard.hasOpenDrawer) return;
         // The focused folder tab handles back itself.
         if (browserContentVisible && !dashboardLocationIsActive) return;
         if (atHome) {

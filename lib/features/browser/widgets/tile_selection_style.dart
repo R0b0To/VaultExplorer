@@ -81,6 +81,7 @@ class FileRowShell extends StatelessWidget {
   /// APK's launcher icon, which already carries its own shape, background
   /// and padding as designed by whoever shipped the app.
   final bool customLeadingIsIcon;
+  final bool largeThumbnail;
 
   const FileRowShell({
     super.key,
@@ -105,6 +106,7 @@ class FileRowShell extends StatelessWidget {
     this.iconBadge,
     this.customLeading,
     this.customLeadingIsIcon = false,
+    this.largeThumbnail = false,
   });
 
   static double _columnBaseWidth(FileDetailColumn col) => switch (col) {
@@ -270,11 +272,15 @@ class FileRowShell extends StatelessWidget {
     final effectiveTrailing = trailing;
 
     // Clamp zoom-scaled icon and spinner sizes so high zoom levels don't overwhelm the row.
-    final leadingSize =
-        ((isCompact ? 32.0 : 44.0) * zoomLevel).clamp(24.0, 64.0);
+    final leadingSize = largeThumbnail
+        ? (isCompact
+            ? (54.0 * zoomLevel).clamp(36.0, 80.0)
+            : (58.0 * zoomLevel).clamp(40.0, 88.0))
+        : ((isCompact ? 32.0 : 44.0) * zoomLevel).clamp(24.0, 64.0);
     final iconActionSize = (AppIconSize.action * zoomLevel).clamp(16.0, 36.0);
-    final spinnerSize =
-        ((isCompact ? 16.0 : 20.0) * zoomLevel).clamp(12.0, 28.0);
+    final spinnerSize = largeThumbnail
+        ? (24.0 * zoomLevel).clamp(16.0, 36.0)
+        : ((isCompact ? 16.0 : 20.0) * zoomLevel).clamp(12.0, 28.0);
 
     Widget row = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 1),
@@ -291,7 +297,10 @@ class FileRowShell extends StatelessWidget {
               : null,
           padding: EdgeInsets.symmetric(
             horizontal: 12,
-            vertical: (isCompact ? 4 : 10) * zoomLevel,
+            vertical: (largeThumbnail
+                    ? (isCompact ? 6 : 8)
+                    : (isCompact ? 4 : 10)) *
+                zoomLevel,
           ),
           child: LayoutBuilder(
             builder: (context, constraints) {

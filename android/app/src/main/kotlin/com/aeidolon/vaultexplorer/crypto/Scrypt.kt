@@ -32,6 +32,30 @@ object Scrypt {
         return pureScrypt(passphrase, salt, costParam, blockSize, p, keyLengthBytes)
     }
 
+    /**
+     * Same result as [scrypt], for the parameters official CryFS writes (up to 1 GiB of scrypt memory): the native
+     * implementation keeps at most 256 MiB in RAM and recomputes the rest. It never falls back to the pure-JVM
+     * implementation for large parameters, which would try to allocate the whole array on the Android heap.
+     *
+     * @throws UnsupportedOperationException if the parameters cannot be handled safely on this device.
+     */
+    fun scryptLowMem(passphrase: ByteArray, salt: ByteArray, costParam: Int, blockSize: Int, keyLengthBytes: Int, p: Int): ByteArray {
+        if (NativeEngine.isLoaded) {
+            NativeEngine.scryptLowMemNative(passphrase, salt, costParam, blockSize, p, keyLengthBytes)?.let { return it }
+            throw UnsupportedOperationException(
+                "This vault's scrypt settings (N=$costParam, r=$blockSize, p=$p) are not supported or need more memory than is available on this device."
+            )
+        }
+        if (128L * blockSize * costParam > PURE_JVM_MAX_V_BYTES) {
+            throw UnsupportedOperationException(
+                "This vault's scrypt settings (N=$costParam, r=$blockSize, p=$p) need the native library, which is not available."
+            )
+        }
+        return pureScrypt(passphrase, salt, costParam, blockSize, p, keyLengthBytes)
+    }
+
+    private const val PURE_JVM_MAX_V_BYTES = 64L * 1024 * 1024
+
     // -----------------------------------------------------------------------
     //  Pure-JVM scrypt implementation (RFC 7914)
     // -----------------------------------------------------------------------

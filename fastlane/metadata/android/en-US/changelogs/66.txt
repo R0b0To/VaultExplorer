@@ -1,0 +1,18 @@
+### Vault settings
+- Added per-vault and Local Storage options for thumbnail caches, gallery metadata indexes, and music indexes, with actions to clear saved data.
+- Grouped per-vault controls in a new **Indexes & thumbnails** page.
+
+### Container tools
+- Combined VeraCrypt, LUKS, and BitLocker expansion in one format-aware tool, with size previews, free-space checks, and quick size controls.
+- Translated the volume expansion interface across supported languages.
+
+### File manager & sync
+- Improved Vault Sync comparisons with clearer source and target summaries, difference filters, per-item actions, and queued change counts.
+- Reduced repeated storage-provider checks during transfers and improved scroll-position retention when files or layouts change.
+
+### Reliability
+- Improved Android document-provider access checks and diagnostics.
+- Added native HMAC and AES-CBC primitives with platform fallback.
+- Removed redundant password hints and clarified the PIM default.
+
+SHA256 Signature: `0bde9d3b0ee3f56617d02632c843b1629bf0b2faa4560dff5d26f651dc325f19`

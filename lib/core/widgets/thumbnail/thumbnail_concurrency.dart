@@ -15,7 +15,7 @@ void unawaited(Future<void> future) {
 class ThumbnailConcurrency {
   ThumbnailConcurrency._();
 
-  static final imageLimiter = PriorityTaskQueue(2);
+  static final imageLimiter = PriorityTaskQueue(3);
   static final videoLimiter = PriorityTaskQueue(1);
 
   static var inFlightThumbnails = LruCache<String, Future<Uint8List>>(160);

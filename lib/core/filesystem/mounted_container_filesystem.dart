@@ -37,6 +37,28 @@ FilesystemType? detectedFilesystemType(MountedContainer container) {
   return VolumeFilesystemRegistry.lookup(container.volId);
 }
 
+/// Whether this format can expose a symlink listing query. Native disk-image
+/// backends safely return an empty list for FAT/exFAT; this deliberately does
+/// not depend on the asynchronous filesystem registry, so browser listing
+/// cannot miss links during the first frame after a volume is mounted.
+bool mayHaveVaultSymbolicLinks(MountedContainer container) =>
+    container.format.isCryptomator ||
+    container.format.isLuks ||
+    container.format.isVeraCrypt;
+
+/// Whether this mounted vault/container can create genuine symbolic links.
+/// Cryptomator uses its encrypted virtual entry format. Native LUKS and
+/// VeraCrypt containers can use the filesystem's own link support: ext2/3/4
+/// and NTFS support symlinks, while FAT32 and exFAT do not. The container
+/// encryption format alone is not enough to decide this; the mounted
+/// filesystem must have been identified.
+bool supportsVaultSymbolicLinks(MountedContainer container) {
+  if (container.format.isCryptomator) return true;
+  if (!container.format.isLuks && !container.format.isVeraCrypt) return false;
+  final fs = detectedFilesystemType(container);
+  return fs == FilesystemType.ext || fs == FilesystemType.ntfs;
+}
+
 /// Resolves which [FilesystemType] a given [MountedContainer]'s names
 /// should be validated against. See docs/architecture.md ADR-002 (§ item 2).
 ///

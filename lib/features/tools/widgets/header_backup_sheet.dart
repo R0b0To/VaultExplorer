@@ -96,7 +96,7 @@ class _HeaderBackupSheetState extends ConsumerState<HeaderBackupSheet> {
 
   String _suggestedFileName(HeaderBackupFile backup) {
     final base = backup.sourceName.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
-    return '$base.${backup.format}.vxhdrbkp';
+    return backup.format == 'veracrypt' ? '$base.vchdr' : '$base.${backup.format}.vxhdrbkp';
   }
 
   @override

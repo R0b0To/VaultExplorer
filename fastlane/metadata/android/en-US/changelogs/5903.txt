@@ -1,0 +1,8 @@
+• Added book and comic cover thumbnail support
+• Added support for gocryptfs AES-SIV vaults
+• Added ability to open nested archives
+• Redesigned audio and editor UI in landscape mode
+• Fixed empty space in audio export UI
+• Fixed Markdown jittering when scrolling with handle
+• Improved error handling for write failures
+• Minor UI/UX improvements across various screens

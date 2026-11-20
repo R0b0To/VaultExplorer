@@ -7,11 +7,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/api/vault_book_api.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
+import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/theme/file_manager_skin_scope.dart';
 import 'package:vaultexplorer/core/utils/file_display_name.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
+import 'package:vaultexplorer/core/utils/perf_trace.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';
@@ -22,6 +24,11 @@ import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/video_thumbnail_fetcher.dart';
+import 'package:vaultexplorer/features/browser/services/category_aggregate_scan.dart';
+import 'package:vaultexplorer/features/browser/gallery/gallery_anchor.dart';
+import 'package:vaultexplorer/features/browser/gallery/gallery_group_index.dart';
+import 'package:vaultexplorer/features/browser/gallery/gallery_layout.dart';
+import 'package:vaultexplorer/features/browser/gallery/gallery_sliver.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/widgets/apk_icon_support.dart';
@@ -30,9 +37,24 @@ import 'package:vaultexplorer/features/browser/widgets/book_cover_support.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_item_drag.dart';
 import 'package:vaultexplorer/features/browser/widgets/fast_scrollbar.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_thumbnail_preview.dart';
+import 'package:vaultexplorer/features/browser/widgets/gallery_date_header.dart';
 import 'package:vaultexplorer/features/browser/widgets/grid_card_shell.dart';
 import 'package:vaultexplorer/features/browser/widgets/hold_range_select_container.dart';
+import 'package:vaultexplorer/features/browser/widgets/shortcut_target_preview.dart';
 import 'package:vaultexplorer/features/browser/widgets/thumbnail_raw_fallback.dart';
+
+Widget _transparentHeroShuttle(
+  BuildContext flightContext,
+  Animation<double> animation,
+  HeroFlightDirection flightDirection,
+  BuildContext fromHeroContext,
+  BuildContext toHeroContext,
+) {
+  final hero = (flightDirection == HeroFlightDirection.push
+      ? toHeroContext.widget
+      : fromHeroContext.widget) as Hero;
+  return Material(type: MaterialType.transparency, child: hero.child);
+}
 
 class FileGridView extends StatefulWidget {
   final MountedContainer container;
@@ -78,6 +100,39 @@ class FileGridView extends StatefulWidget {
   final ArchiveContext? archiveContext;
   final String? archiveRootPath;
   final SortBy? sortBy;
+  final bool groupByDate;
+
+  /// Keep what is at the top of the screen where it is when [items] changes
+  /// under the person (the gallery's filter results come in, a rescan ends),
+  /// instead of leaving the scroll offset as it was while the content moves.
+  final bool anchorOnItemsChange;
+
+  /// Builds the sections when [groupByDate] is on. Null keeps the day
+  /// sections ([computeDateGroups]); the gallery filter passes its own to
+  /// group by month, folder, place, camera...
+  ///
+  /// The list handed over is already arranged so that each section is one run
+  /// of it, and a new builder only takes effect with a new [items] list.
+  final List<DateGroup<RawEntry>> Function(List<RawEntry> items)? groupBuilder;
+
+  /// Resolves the container an entry lives in, for a listing that gathers
+  /// files from several containers (the category browser). When null every
+  /// entry belongs to [container], as in any ordinary folder listing.
+  final MountedContainer Function(RawEntry entry)? containerFor;
+
+  /// Files already known to lie inside a folder, best cover first (see
+  /// [FolderThumbnailPreview.previewPaths]).
+  final List<String>? Function(RawEntry folder)? folderPreviewPaths;
+
+  /// The thumbnail cache policy that applies to an entry, for a listing that
+  /// mixes containers whose owners chose different policies (the category
+  /// browser). When null every entry follows [thumbnailCacheMode].
+  final ThumbnailCacheMode Function(RawEntry entry)? cacheModeFor;
+
+  /// The thumbnail quality that applies to an entry, for a listing that
+  /// mixes containers whose owners chose different qualities (the category
+  /// browser). When null every entry follows [thumbnailQuality].
+  final ThumbnailQuality Function(RawEntry entry)? qualityFor;
 
   const FileGridView({
     super.key,
@@ -114,32 +169,105 @@ class FileGridView extends StatefulWidget {
     this.archiveContext,
     this.archiveRootPath,
     this.sortBy,
+    this.groupByDate = false,
+    this.anchorOnItemsChange = false,
+    this.groupBuilder,
+    this.containerFor,
+    this.folderPreviewPaths,
+    this.cacheModeFor,
+    this.qualityFor,
   });
 
   @override
-  State<FileGridView> createState() => _FileGridViewState();
+  State<FileGridView> createState() => FileGridViewState();
 }
 
-class _FileGridViewState extends State<FileGridView>
+class FileGridViewState extends State<FileGridView>
     with SingleTickerProviderStateMixin {
+  /// Returns the geometries (top offset and height) in scroll-content coordinates
+  /// for the items at [globalIndices] in `widget.items`.
+  Map<int, ({double top, double height})> geometriesForGlobalIndices(
+    Set<int> globalIndices,
+  ) {
+    final result = <int, ({double top, double height})>{};
+    if (globalIndices.isEmpty) return result;
+
+    if (widget.groupByDate) {
+      final groups = _groupsFor(widget.items);
+      final aspect = _getAspectRatio(_crossAxisCount);
+      final headerExtent = galleryDateHeaderExtent(context);
+      _syncGroupHost(
+        groups,
+        aspect.isFinite && aspect > 0 ? aspect : 1.0,
+        headerExtent,
+      );
+      final width = _getViewportWidth(context) - 20.0;
+      final model = _groupHost.current ?? _groupHost.buildCandidate(width);
+      if (model.childCount > 0) {
+        for (var c = 0; c < model.childCount; c++) {
+          final local = groups.childLocal[c];
+          if (local >= 0) {
+            final g = groups.childGroup[c];
+            final gIdx = groups.groups[g].globalIndices[local];
+            if (globalIndices.contains(gIdx)) {
+              result[gIdx] = (
+                top: model.tops[c],
+                height: model.heights[c],
+              );
+            }
+          }
+        }
+      }
+      return result;
+    }
+
+    final tileHeight = _getTileHeight(_crossAxisCount);
+    final rowHeight = tileHeight + widget.spacing;
+    for (final index in globalIndices) {
+      if (index < 0 || index >= widget.items.length) continue;
+      final row = index ~/ _crossAxisCount;
+      result[index] = (
+        top: 12.0 + (row * rowHeight),
+        height: tileHeight,
+      );
+    }
+    return result;
+  }
+  MountedContainer _containerOf(RawEntry entry) =>
+      widget.containerFor?.call(entry) ?? widget.container;
+
+  ThumbnailCacheMode _cacheModeOf(RawEntry entry) =>
+      widget.cacheModeFor?.call(entry) ?? widget.thumbnailCacheMode;
+
   Orientation? _lastOrientation;
   late int _crossAxisCount;
   double? _viewportWidth;
   double _baselineScale = 1.0;
-  final Map<Key, int> _keyIndexMap = {};
+  final Map<RawEntry, int> _entryIndexMap = {};
+  ThumbnailQuality? _resolvedDefaultQuality;
 
   int? _anchorItemIndex;
+
+  // The date-grouped layout: one sliver for every day (see GallerySliverGrid).
+  final GalleryLayoutHost _groupHost = GalleryLayoutHost(
+    flow: GalleryFlow.columns,
+  );
+  GalleryGroupIndex<RawEntry>? _groups;
+  String _groupHostKey = '';
+
+  /// The groups the host was last laid out from: when a new list replaces
+  /// them, what was at the top of the screen is looked up in the new groups.
+  GalleryGroupIndex<RawEntry>? _hostGroups;
+  String? _groupHostDirPath;
 
   // Animation controller for clearly visible column morph transition
   late final AnimationController _morphController;
   late Animation<double> _scaleAnimation;
-  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
     _crossAxisCount = widget.initialColumns;
-    _updateKeyIndexMap();
 
     _morphController = AnimationController(
       vsync: this,
@@ -155,17 +283,22 @@ class _FileGridViewState extends State<FileGridView>
     super.dispose();
   }
 
-  void _updateKeyIndexMap() {
-    _keyIndexMap.clear();
-    for (int i = 0; i < widget.items.length; i++) {
-      _keyIndexMap[ValueKey(widget.items[i])] = i;
+  int? _findChildIndex(Key key) {
+    if (key is ValueKey<RawEntry>) {
+      if (_entryIndexMap.isEmpty && widget.items.isNotEmpty) {
+        for (int i = 0; i < widget.items.length; i++) {
+          _entryIndexMap[widget.items[i]] = i;
+        }
+      }
+      return _entryIndexMap[key.value];
     }
+    return null;
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final orientation = MediaQuery.of(context).orientation;
+    final orientation = MediaQuery.orientationOf(context);
     if (_lastOrientation != orientation) {
       _crossAxisCount = widget.initialColumns.clamp(_minColumns, _maxColumns);
       _lastOrientation = orientation;
@@ -182,15 +315,45 @@ class _FileGridViewState extends State<FileGridView>
       }
     }
     if (oldWidget.items != widget.items) {
-      _updateKeyIndexMap();
+      _entryIndexMap.clear();
+      if (widget.anchorOnItemsChange &&
+          oldWidget.currentDirPath == widget.currentDirPath &&
+          !widget.groupByDate &&
+          !oldWidget.groupByDate) {
+        _keepPlainAnchor(oldWidget.items);
+      }
     }
+  }
+
+  /// The plain (not sectioned) grid: every row is the same height, so where
+  /// the entry that was first on screen now is follows from its index. The
+  /// offset is corrected before this frame is laid out (no frame shows the
+  /// content shifted). The sectioned grid does the same through its layout
+  /// host, see [_syncGroupHost].
+  void _keepPlainAnchor(List<RawEntry> previous) {
+    final controller = widget.scrollController;
+    if (controller == null || !controller.hasClients) return;
+    final position = controller.position;
+    if (!position.hasPixels) return;
+    final target = uniformAnchorOffset<RawEntry>(
+      previous: previous,
+      next: widget.items,
+      keyOf: galleryAnchorKey,
+      offset: position.pixels,
+      rowExtent: _getTileHeight(_crossAxisCount) + widget.spacing,
+      columns: _crossAxisCount,
+      topPadding: 12.0,
+    );
+    if (target == null) return;
+    final delta = target - position.pixels;
+    if (delta.abs() > 0.5) position.correctBy(delta);
   }
 
   int get _minColumns => 1;
 
   int get _maxColumns {
     final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+        MediaQuery.orientationOf(context) == Orientation.landscape;
     return isLandscape ? 7 : 4;
   }
 
@@ -218,16 +381,27 @@ class _FileGridViewState extends State<FileGridView>
     return tileWidth / totalHeight;
   }
 
+ ThumbnailQuality _resolveDefaultQuality() {
+    final q = widget.thumbnailQuality;
+    if (!q.auto) return q;
+    return q.resolveForCell(
+      logicalWidth: _getTileWidth(_crossAxisCount, context),
+      devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+    );
+  }
+
   /// The thumbnail quality to request for the current grid. For an auto
   /// quality this is derived from the real pixel width of a cell (same
   /// geometry as the grid delegate below), so fewer columns => sharper
   /// thumbnails, matching how Fossify Gallery sizes them.
-  ThumbnailQuality get _effectiveQuality {
-    final q = widget.thumbnailQuality;
+  ThumbnailQuality _effectiveQualityOf(RawEntry entry) {
+    if (widget.qualityFor == null) {
+      return _resolvedDefaultQuality ??= _resolveDefaultQuality();
+    }
+    final q = widget.qualityFor!.call(entry);
     if (!q.auto) return q;
-    final tileWidth = _getTileWidth(_crossAxisCount, context);
     return q.resolveForCell(
-      logicalWidth: tileWidth,
+      logicalWidth: _getTileWidth(_crossAxisCount, context),
       devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
     );
   }
@@ -266,6 +440,12 @@ class _FileGridViewState extends State<FileGridView>
     final oldColumns = _crossAxisCount;
     final isZoomIn = newColumns < oldColumns;
 
+    // Grouped mode keeps whatever is at the top of the screen in place through
+    // the sliver's own layout pass; the row-estimate jump below is for the
+    // plain grid.
+    final groupedAnchor = widget.groupByDate
+        ? _groupHost.captureTopAnchor()
+        : null;
     setState(() {
       _crossAxisCount = newColumns;
       _baselineScale = newBaseline;
@@ -278,6 +458,11 @@ class _FileGridViewState extends State<FileGridView>
       CurvedAnimation(parent: _morphController, curve: Curves.easeOutCubic),
     );
     _morphController.forward(from: 0.0);
+
+    if (widget.groupByDate) {
+      _groupHost.pendingAnchor = groupedAnchor;
+      return;
+    }
 
     final controller = widget.scrollController;
     final anchor = _anchorItemIndex;
@@ -327,20 +512,40 @@ class _FileGridViewState extends State<FileGridView>
   }
 
   bool _onScrollNotification(ScrollNotification notification) {
-    if (notification is ScrollUpdateNotification) {
-      final delta = notification.scrollDelta?.abs() ?? 0.0;
-      if (delta > 25.0) {
-        ThumbnailConcurrency.imageLimiter.cancelTier(TaskPriority.visible);
-        ThumbnailConcurrency.videoLimiter.cancelTier(TaskPriority.visible);
-      }
-    }
+    // Disposed tiles already drop their queued request; cancelling the whole
+    // visible tier also cancelled tiles still on screen (see masonry view).
     return false;
   }
 
-  Widget _buildAnimatedGridView(ScrollController? controller, int total) {
+  Widget _buildItem(BuildContext context, RawEntry entry, int index) {
+    return HoldSelectableItem(
+      key: ValueKey(entry),
+      index: index,
+      entry: entry,
+      child: BrowserItemDragItem(
+        entry: entry,
+        container: _containerOf(entry),
+        currentDirectory: widget.currentDirPath,
+        visibleItems: widget.items,
+        selectedItems: widget.selectedItems,
+        isSelectionMode: widget.isSelectionMode,
+        enabled: widget.enableFileDrag && widget.archiveContext == null,
+        onItemLongPress: widget.onItemLongPress,
+        onDrop: widget.onFileDrop,
+        child: entry.isDir
+            ? _buildDirCell(context, entry)
+            : _buildFileCell(context, entry),
+      ),
+    );
+  }
+
+Widget _buildAnimatedGridView(ScrollController? controller, int total) {
     return AnimatedBuilder(
       animation: _morphController,
       builder: (context, child) {
+        if (_morphController.isCompleted && _scaleAnimation.value == 1.0) {
+          return child!;
+        }
         return ClipRect(
           child: Transform.scale(
             scale: _scaleAnimation.value,
@@ -349,11 +554,15 @@ class _FileGridViewState extends State<FileGridView>
           ),
         );
       },
-      child: GridView.builder(
+ child: GridView.builder(
         controller: controller,
-        physics:
+        cacheExtent: MediaQuery.sizeOf(context).height * 0.4,        physics:
             const AlwaysScrollableScrollPhysics(), // Native scroll physics that cannot freeze
-        findChildIndexCallback: (Key key) => _keyIndexMap[key],
+        findChildIndexCallback: _findChildIndex,
+        // No tile asks to be kept alive. The default wraps every one in an
+        // extra widget that only exists to listen for that (the date-grouped
+        // grid, masonry and list builders already switch it off).
+        addAutomaticKeepAlives: false,
         padding: EdgeInsets.fromLTRB(10, 12, 10, widget.bottomClearance),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: _crossAxisCount,
@@ -364,32 +573,152 @@ class _FileGridViewState extends State<FileGridView>
         itemCount: total,
         itemBuilder: (context, index) {
           final entry = widget.items[index];
-          return HoldSelectableItem(
-            key: ValueKey(entry),
-            index: index,
-            entry: entry,
-            child: BrowserItemDragItem(
-              entry: entry,
-              container: widget.container,
-              currentDirectory: widget.currentDirPath,
-              visibleItems: widget.items,
-              selectedItems: widget.selectedItems,
-              isSelectionMode: widget.isSelectionMode,
-              enabled: widget.enableFileDrag && widget.archiveContext == null,
-              onItemLongPress: widget.onItemLongPress,
-              onDrop: widget.onFileDrop,
-              child: entry.isDir
-                  ? _buildDirCell(context, entry)
-                  : _buildFileCell(context, entry),
-            ),
-          );
+          return _buildItem(context, entry, index);
         },
       ),
     );
   }
 
-  @override
+  GalleryGroupIndex<RawEntry> _groupsFor(List<RawEntry> items) {
+    final cached = _groups;
+    if (cached != null && identical(cached.source, items)) return cached;
+    return _groups = GalleryGroupIndex<RawEntry>(items, (widget.groupBuilder ?? computeDateGroups)(items));
+  }
+
+  List<FastScrollSection> _fastScrollSections(BuildContext context) {
+    final groups = _groupsFor(widget.items).groups;
+    final model = _groupHost.current;
+    if (model == null || model.childCount == 0) return const [];
+
+    final sections = <FastScrollSection>[];
+    String? previousLabel;
+    for (var i = 0; i < groups.length; i++) {
+      final child = model.sectionFirstChild[i];
+      if (child >= model.childCount) continue;
+      final label = formatGalleryScrollGroupLabel(groups[i], context);
+      if (label == previousLabel) continue;
+      sections.add(
+        FastScrollSection(offset: model.tops[child], label: label),
+      );
+      previousLabel = label;
+    }
+    return sections;
+  }
+
+  void _syncGroupHost(GalleryGroupIndex<RawEntry> groups, double aspect, double headerExtent) {
+    final key =
+        '${identityHashCode(groups)}|$_crossAxisCount|${widget.spacing}|$aspect|$headerExtent';
+    if (key == _groupHostKey) return;
+    _groupHostKey = key;
+    // A new list (not a new zoom or width): note what is at the top of the
+    // screen now, while the host still holds the layout the person is seeing.
+    final previous = _hostGroups;
+    final held = widget.anchorOnItemsChange &&
+            _groupHostDirPath == widget.currentDirPath &&
+            previous != null &&
+            !identical(previous, groups)
+        ? _groupHost.captureTopItem()
+        : null;
+    _groupHostDirPath = widget.currentDirPath;
+    _hostGroups = groups;
+    _groupHost
+      ..columnCount = _crossAxisCount
+      ..spacing = widget.spacing
+      ..sectionGap = 12.0
+      ..sections = [
+        for (final g in groups.groups)
+          GallerySection(itemCount: g.items.length, headerExtent: headerExtent),
+      ]
+      ..ratioOf = ((_) => aspect)
+      ..footerOf = null
+      ..invalidate();
+    if (held == null) return;
+    final carried = carryGroupAnchor<RawEntry>(
+      GalleryAnchor(child: held.child, viewportOffset: held.viewportOffset),
+      previous!,
+      groups,
+      galleryAnchorKey,
+    );
+    final model = _groupHost.prepareModel();
+    if (carried == null || model == null) return;
+    _groupHost.adoptAnchored(model, carried.child, carried.viewportOffset);
+  }
+
+  Widget _buildDateGroupedGridView(ScrollController? controller) {
+    final groups = _groupsFor(widget.items);
+    final aspect = _getAspectRatio(_crossAxisCount);
+    _syncGroupHost(
+      groups,
+      aspect.isFinite && aspect > 0 ? aspect : 1.0,
+      galleryDateHeaderExtent(context),
+    );
+
+    return AnimatedBuilder(
+      animation: _morphController,
+      builder: (context, child) {
+        if (_morphController.isCompleted && _scaleAnimation.value == 1.0) {
+          return child!;
+        }
+        return ClipRect(
+          child: Transform.scale(
+            scale: _scaleAnimation.value,
+            alignment: Alignment.center,
+            child: child,
+          ),
+        );
+      },
+      child: CustomScrollView(
+        controller: controller,
+        cacheExtent: MediaQuery.sizeOf(context).height * 0.4,
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverPadding(
+            // The last day's gap is not part of the sliver's extent.
+            padding: EdgeInsets.fromLTRB(10, 0, 10, widget.bottomClearance + 12),
+            // One sliver for every day, headers included: a sliver per day
+            // makes the viewport lay out (and build a tile in) every one of
+            // them on every scrolled frame.
+            sliver: GallerySliverGrid(
+              host: _groupHost,
+              delegate: SliverChildBuilderDelegate(
+                (context, child) {
+                  final g = groups.childGroup[child];
+                  final local = groups.childLocal[child];
+                  final group = groups.groups[g];
+                  if (local < 0) {
+                    return Align(
+                      key: ValueKey('gallery_header:$g'),
+                      alignment: Alignment.topLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: GalleryDateHeader(
+                          title: group.label ?? formatDateGroupHeader(group.date, context),
+                          count: group.items.length,
+                          horizontalPadding: 6,
+                        ),
+                      ),
+                    );
+                  }
+                  return _buildItem(
+                    context,
+                    group.items[local],
+                    group.globalIndices[local],
+                  );
+                },
+                childCount: groups.childCount,
+                addAutomaticKeepAlives: false,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+   @override
   Widget build(BuildContext context) {
+    PerfTrace.count('ui.grid.build');
+    PerfTrace.gauge('ui.grid.cols', _crossAxisCount);
     final total = widget.items.length;
 
     return LayoutBuilder(
@@ -397,7 +726,11 @@ class _FileGridViewState extends State<FileGridView>
         _viewportWidth = constraints.maxWidth.isFinite
             ? constraints.maxWidth
             : null;
-
+        if (widget.qualityFor == null) {
+          final resolved = _resolveDefaultQuality();
+          _resolvedDefaultQuality = resolved;
+          PerfTrace.gauge('thumb.grid.target_px', resolved.scaledSize(180));
+        }
         return HoldRangeSelectContainer(
           items: widget.items,
           selectedItems: widget.selectedItems,
@@ -413,19 +746,26 @@ class _FileGridViewState extends State<FileGridView>
           child: NotificationListener<ScrollNotification>(
             onNotification: _onScrollNotification,
             child: widget.scrollController == null
-                ? _buildAnimatedGridView(null, total)
+                ? (widget.groupByDate
+                    ? _buildDateGroupedGridView(null)
+                    : _buildAnimatedGridView(null, total))
                 : FastScrollbar(
                     controller: widget.scrollController!,
                     items: widget.items,
                     sortBy: widget.sortBy,
+                    sectionsBuilder: widget.groupByDate
+                        ? () => _fastScrollSections(context)
+                        : null,
                     padding: EdgeInsets.only(
                       top: 12,
                       bottom: widget.bottomClearance,
                     ),
-                    child: _buildAnimatedGridView(
-                      widget.scrollController,
-                      total,
-                    ),
+                    child: widget.groupByDate
+                        ? _buildDateGroupedGridView(widget.scrollController)
+                        : _buildAnimatedGridView(
+                            widget.scrollController,
+                            total,
+                          ),
                   ),
           ),
         );
@@ -436,9 +776,11 @@ class _FileGridViewState extends State<FileGridView>
   Widget _buildDirCell(BuildContext context, RawEntry entry) {
     final isSelected = widget.selectedItems.contains(entry);
     final cs = Theme.of(context).colorScheme;
-    final fullPath = widget.currentDirPath.isEmpty
-        ? entry.name
-        : '${widget.currentDirPath}/${entry.name}';
+    final fullPath = entry is CategoryEntry
+        ? entry.path
+        : (widget.currentDirPath.isEmpty
+            ? entry.name
+            : '${widget.currentDirPath}/${entry.name}');
     final isMounted = widget.mountedFolderPaths.contains(fullPath);
 
     final iconSize = GridCardUtils.calculateIconSize(
@@ -456,6 +798,7 @@ class _FileGridViewState extends State<FileGridView>
 
     return GridCardShell(
       cornerRadius: widget.cornerRadius,
+      compactFooter: _getTileWidth(_crossAxisCount, context) < 100,
       cardColor: GridCardUtils.folderCardColor(cs, isMounted: false),
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
@@ -464,6 +807,7 @@ class _FileGridViewState extends State<FileGridView>
       longFileNameMode: widget.longFileNameMode,
       isPinned: widget.isPinned?.call(entry) ?? false,
       isBookmark: widget.isBookmark?.call(entry) ?? false,
+      isShortcut: entry.isSymlink,
       isDocumentProviderMounted: isMounted,
       isSynced: widget.isFolderSynced?.call(entry) ?? false,
       isPlaceholder: entry.isPlaceholder,
@@ -480,12 +824,15 @@ class _FileGridViewState extends State<FileGridView>
       preview: entry.isPlaceholder
           ? Center(child: folderIcon)
           : FolderThumbnailPreview(
-              key: ValueKey('folder_preview:${widget.container.uri}:$fullPath'),
-              container: widget.container,
+              key: ValueKey(
+                'folder_preview:${_containerOf(entry).uri}:$fullPath',
+              ),
+              container: _containerOf(entry),
               folderPath: fullPath,
-              cacheMode: widget.thumbnailCacheMode,
-              quality: _effectiveQuality,
+              cacheMode: _cacheModeOf(entry),
+              quality: _effectiveQualityOf(entry),
               iconSize: iconSize,
+              previewPaths: widget.folderPreviewPaths?.call(entry),
               child: folderIcon,
             ),
       label: entry.name,
@@ -496,22 +843,20 @@ class _FileGridViewState extends State<FileGridView>
   Widget _buildFileCell(BuildContext context, RawEntry entry) {
     final cs = Theme.of(context).colorScheme;
     final cleanName = entry.name;
-    final fullPath = widget.currentDirPath.isEmpty
-        ? cleanName
-        : '${widget.currentDirPath}/$cleanName';
+    final fullPath = entry is CategoryEntry
+        ? entry.path
+        : (widget.currentDirPath.isEmpty
+            ? cleanName
+            : '${widget.currentDirPath}/$cleanName');
     final isSelected = widget.selectedItems.contains(entry);
-    String displayName = cleanName;
-    final ext = cleanName.split('.').last;
+   String displayName = cleanName;
+    final dot = cleanName.lastIndexOf('.');
+    final ext = dot < 0 ? cleanName : cleanName.substring(dot + 1);
     final skin = FileManagerSkinScope.of(context);
-    final vaultIcon = vaultIconForExt(ext);
-    if (vaultIcon != null) {
-      final nameParts = cleanName.split('.');
-      if (nameParts.length > 1) {
-        nameParts.removeLast();
-        displayName = nameParts.join('.');
-      }
-    }
-    final query = widget.searchQuery;
+    final vaultIcon = entry.isSymlink ? null : vaultIconForExt(ext);
+    if (vaultIcon != null && dot > 0) {
+      displayName = cleanName.substring(0, dot);
+    }    final query = widget.searchQuery;
     if (!widget.showFileExtensions && (query == null || query.isEmpty)) {
       displayName = stripFileExtension(cleanName);
     }
@@ -535,7 +880,85 @@ class _FileGridViewState extends State<FileGridView>
       viewportWidth: _getViewportWidth(context),
     );
 
-    if (vaultIcon != null) {
+    if (entry.isSymlink &&
+        mayHaveVaultSymbolicLinks(_containerOf(entry)) &&
+        widget.archiveContext == null) {
+      final targetContainer = _containerOf(entry);
+      previewWidget = ShortcutTargetPreview(
+        container: targetContainer,
+        linkPath: fullPath,
+        fallback: Center(
+          child: Icon(
+            skin.fileIcon(cleanName),
+            size: iconSize,
+            color: skin.fileIconColor(cs, cleanName),
+          ),
+        ),
+        builder: (context, targetPath, targetName) {
+          final targetIcon = skin.fileIcon(targetName);
+          final targetColor = skin.fileIconColor(cs, targetName);
+          if (MediaViewerConstants.isImage(targetName)) {
+            return Hero(
+              tag: 'media_hero_${targetContainer.volId}_$fullPath',
+              createRectTween: (begin, end) =>
+                  MaterialRectArcTween(begin: begin, end: end),
+              flightShuttleBuilder: _transparentHeroShuttle,
+              child: _EncryptedImageGridThumb(
+                container: targetContainer,
+                filePath: targetPath,
+                cacheMode: _cacheModeOf(entry),
+                quality: _effectiveQualityOf(entry),
+              ),
+            );
+          }
+          if (MediaViewerConstants.isVideo(targetName)) {
+            return Hero(
+              tag: 'media_hero_${targetContainer.volId}_$fullPath',
+              createRectTween: (begin, end) =>
+                  MaterialRectArcTween(begin: begin, end: end),
+              flightShuttleBuilder: _transparentHeroShuttle,
+              child: _VideoThumb(
+                container: targetContainer,
+                filePath: targetPath,
+                cacheMode: _cacheModeOf(entry),
+                quality: _effectiveQualityOf(entry),
+              ),
+            );
+          }
+          if (isApkFile(targetName)) {
+            return Center(
+              child: SizedBox(
+                width: iconSize,
+                height: iconSize,
+                child: _ApkIconGridThumb(
+                  container: targetContainer,
+                  filePath: targetPath,
+                  cacheMode: _cacheModeOf(entry),
+                  quality: _effectiveQualityOf(entry),
+                  fallbackIcon: targetIcon,
+                  fallbackColor: targetColor,
+                  fallbackIconSize: iconSize,
+                ),
+              ),
+            );
+          }
+          if (isBookWithCover(targetName)) {
+            return _BookCoverGridThumb(
+              container: targetContainer,
+              filePath: targetPath,
+              cacheMode: _cacheModeOf(entry),
+              quality: _effectiveQualityOf(entry),
+              fallbackIcon: targetIcon,
+              fallbackColor: targetColor,
+              fallbackIconSize: iconSize,
+            );
+          }
+          return Center(
+            child: Icon(targetIcon, size: iconSize, color: targetColor),
+          );
+        },
+      );
+    } else if (vaultIcon != null) {
       previewWidget = Center(
         child: Icon(
           skin.fileIcon(cleanName),
@@ -545,32 +968,32 @@ class _FileGridViewState extends State<FileGridView>
       );
     } else if (isImg) {
       previewWidget = Hero(
-        tag: 'media_hero_${widget.container.volId}_$fullPath',
-        child: Material(
-          type: MaterialType.transparency,
-          child: _EncryptedImageGridThumb(
-            container: widget.container,
-            filePath: fullPath,
-            cacheMode: widget.thumbnailCacheMode,
-            quality: _effectiveQuality,
-            archiveContext: widget.archiveContext,
-            archiveRootPath: widget.archiveRootPath,
-          ),
+        tag: 'media_hero_${_containerOf(entry).volId}_$fullPath',
+        createRectTween: (begin, end) =>
+            MaterialRectArcTween(begin: begin, end: end),
+        flightShuttleBuilder: _transparentHeroShuttle,
+        child: _EncryptedImageGridThumb(
+          container: _containerOf(entry),
+          filePath: fullPath,
+          cacheMode: _cacheModeOf(entry),
+          quality: _effectiveQualityOf(entry),
+          archiveContext: widget.archiveContext,
+          archiveRootPath: widget.archiveRootPath,
         ),
       );
     } else if (isVid) {
       previewWidget = Hero(
-        tag: 'media_hero_${widget.container.volId}_$fullPath',
-        child: Material(
-          type: MaterialType.transparency,
-          child: _VideoThumb(
-            container: widget.container,
-            filePath: fullPath,
-            cacheMode: widget.thumbnailCacheMode,
-            quality: _effectiveQuality,
-            archiveContext: widget.archiveContext,
-            archiveRootPath: widget.archiveRootPath,
-          ),
+        tag: 'media_hero_${_containerOf(entry).volId}_$fullPath',
+        createRectTween: (begin, end) =>
+            MaterialRectArcTween(begin: begin, end: end),
+        flightShuttleBuilder: _transparentHeroShuttle,
+        child: _VideoThumb(
+          container: _containerOf(entry),
+          filePath: fullPath,
+          cacheMode: _cacheModeOf(entry),
+          quality: _effectiveQualityOf(entry),
+          archiveContext: widget.archiveContext,
+          archiveRootPath: widget.archiveRootPath,
         ),
       );
     } else if (isApk && widget.archiveContext == null) {
@@ -579,10 +1002,10 @@ class _FileGridViewState extends State<FileGridView>
           width: iconSize,
           height: iconSize,
           child: _ApkIconGridThumb(
-            container: widget.container,
+            container: _containerOf(entry),
             filePath: fullPath,
-            cacheMode: widget.thumbnailCacheMode,
-            quality: _effectiveQuality,
+            cacheMode: _cacheModeOf(entry),
+            quality: _effectiveQualityOf(entry),
             fallbackIcon: skin.fileIcon(cleanName),
             fallbackColor: skin.fileIconColor(cs, cleanName),
             fallbackIconSize: iconSize,
@@ -593,10 +1016,10 @@ class _FileGridViewState extends State<FileGridView>
       // Same restriction as the APK above: a book nested inside an open
       // archive has no container/local path for the native side to open.
       previewWidget = _BookCoverGridThumb(
-        container: widget.container,
+        container: _containerOf(entry),
         filePath: fullPath,
-        cacheMode: widget.thumbnailCacheMode,
-        quality: _effectiveQuality,
+        cacheMode: _cacheModeOf(entry),
+        quality: _effectiveQualityOf(entry),
         fallbackIcon: skin.fileIcon(cleanName),
         fallbackColor: skin.fileIconColor(cs, cleanName),
         fallbackIconSize: iconSize,
@@ -611,8 +1034,9 @@ class _FileGridViewState extends State<FileGridView>
       );
     }
 
-    return GridCardShell(
+   return GridCardShell(
       cornerRadius: widget.cornerRadius,
+      compactFooter: _getTileWidth(_crossAxisCount, context) < 100,
       cardColor: GridCardUtils.folderCardColor(cs, isMounted: false),
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
@@ -620,6 +1044,7 @@ class _FileGridViewState extends State<FileGridView>
       longFileNameMode: widget.longFileNameMode,
       isPinned: widget.isPinned?.call(entry) ?? false,
       isBookmark: widget.isBookmark?.call(entry) ?? false,
+      isShortcut: entry.isSymlink,
       isPlaceholder: entry.isPlaceholder,
       onTap: entry.isPlaceholder ? () {} : () => widget.onFileTap(entry),
       // Selection is owned by HoldRangeSelectContainer's hold recognizer
@@ -655,7 +1080,7 @@ class _EncryptedImageGridThumb extends ConsumerWidget {
     this.archiveRootPath,
   });
 
-  static Future<Uint8List> _fetch(
+ static Future<Uint8List> _fetch(
     ThumbnailCacheService thumbnailCache,
     VaultFileIoApi fileIoApi,
     MountedContainer container,
@@ -663,8 +1088,9 @@ class _EncryptedImageGridThumb extends ConsumerWidget {
     ThumbnailCacheMode mode,
     ThumbnailQuality quality,
     ArchiveContext? archiveContext,
-    String? archiveRootPath,
-  ) async {
+    String? archiveRootPath, {
+    bool skipCache = false,
+  }) async {
     if (archiveContext != null && archiveRootPath != null) {
       final bytes = await fetchArchiveEntryForThumbnail(
         archiveContext: archiveContext,
@@ -677,7 +1103,7 @@ class _EncryptedImageGridThumb extends ConsumerWidget {
       thumbnailCache.cacheInMemory(container, path, bytes, quality);
       return bytes;
     }
-    if (mode != ThumbnailCacheMode.disabled) {
+    if (!skipCache && mode != ThumbnailCacheMode.disabled) {
       final cached = await thumbnailCache.fetch(
         container: container,
         filePath: path,
@@ -719,6 +1145,8 @@ class _EncryptedImageGridThumb extends ConsumerWidget {
     final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
     final fileIoApi = ref.read(vaultFileIoApiProvider);
     final cs = Theme.of(context).colorScheme;
+    final hasDiskCache =
+        archiveContext == null && cacheMode != ThumbnailCacheMode.disabled;
 
     return AsyncThumbnail(
       key: ValueKey('img:$filePath'),
@@ -736,29 +1164,30 @@ class _EncryptedImageGridThumb extends ConsumerWidget {
         quality,
         archiveContext,
         archiveRootPath,
+        skipCache: hasDiskCache,
       ),
-      debounce: const Duration(milliseconds: 100),
+      debounce: const Duration(milliseconds: 30),
       syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
+      cacheLookup: hasDiskCache
+          ? () => thumbnailCache.fetch(
+                container: container,
+                filePath: filePath,
+                mode: cacheMode,
+                quality: quality,
+              )
+          : null,
       cacheHeight: quality.scaledSize(180),
       imageBuilder: (context, bytes, cacheHeight) => Image.memory(
         bytes,
         fit: BoxFit.cover,
+        filterQuality: FilterQuality.low,
         cacheHeight: cacheHeight,
         errorBuilder: (_, _, _) => _errorPlaceholder(cs),
       ),
       loadingBuilder: (context) => Container(
         color: cs.surfaceContainerLow,
-        child: Center(
-          child: SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(
-              strokeWidth: 1.5,
-              color: cs.primary.withValues(alpha: 0.6),
-            ),
-          ),
+        child: const SizedBox.expand(),
         ),
-      ),
       errorBuilder: (context) => _errorPlaceholder(cs),
     );
   }
@@ -800,8 +1229,9 @@ class _VideoThumb extends ConsumerWidget {
     ThumbnailCacheMode mode,
     ThumbnailQuality quality,
     ArchiveContext? archiveContext,
-    String? archiveRootPath,
-  ) => VideoThumbnailFetcher.fetch(
+    String? archiveRootPath, {
+    bool checkCache = true,
+  }) => VideoThumbnailFetcher.fetch(
     thumbnailCache,
     fileIoApi,
     container,
@@ -811,6 +1241,7 @@ class _VideoThumb extends ConsumerWidget {
     targetSize: quality.scaledSize(180),
     archiveContext: archiveContext,
     archiveRootPath: archiveRootPath,
+    checkCache: checkCache,
   );
 
   @override
@@ -818,6 +1249,8 @@ class _VideoThumb extends ConsumerWidget {
     final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
     final fileIoApi = ref.read(vaultFileIoApiProvider);
     final cs = Theme.of(context).colorScheme;
+    final hasDiskCache =
+        archiveContext == null && cacheMode != ThumbnailCacheMode.disabled;
 
     return Stack(
       fit: StackFit.expand,
@@ -838,30 +1271,31 @@ class _VideoThumb extends ConsumerWidget {
             quality,
             archiveContext,
             archiveRootPath,
+            checkCache: !hasDiskCache,
           ),
-          debounce: const Duration(milliseconds: 150),
+          debounce: const Duration(milliseconds: 60),
           syncLookup: () =>
               thumbnailCache.peekMemory(container, filePath, quality),
+          cacheLookup: hasDiskCache
+              ? () => thumbnailCache.fetch(
+                    container: container,
+                    filePath: filePath,
+                    mode: cacheMode,
+                    quality: quality,
+                  )
+              : null,
           cacheHeight: quality.scaledSize(180),
           imageBuilder: (context, bytes, cacheHeight) => Image.memory(
             bytes,
             fit: BoxFit.cover,
+            filterQuality: FilterQuality.low,
             cacheHeight: cacheHeight,
             errorBuilder: (_, _, _) => _errorPlaceholder(cs),
           ),
           loadingBuilder: (context) => Container(
             color: cs.surfaceContainerLow,
-            child: Center(
-              child: SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 1.5,
-                  color: cs.primary.withValues(alpha: 0.6),
-                ),
-              ),
+            child: const SizedBox.expand(),
             ),
-          ),
           errorBuilder: (context) => _errorPlaceholder(cs),
         ),
         Align(
@@ -962,25 +1396,25 @@ class _ApkIconGridThumb extends ConsumerWidget {
       quality: quality,
       fetchFn: (c, p) =>
           _fetch(thumbnailCache, fileIoApi, c, p, cacheMode, quality),
-      debounce: const Duration(milliseconds: 100),
+     debounce: const Duration(milliseconds: 30),
       syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
+      cacheLookup: cacheMode != ThumbnailCacheMode.disabled
+          ? () => thumbnailCache.fetch(
+                container: container,
+                filePath: filePath,
+                mode: cacheMode,
+                quality: quality,
+              )
+          : null,
       cacheHeight: quality.scaledSize(180),
       imageBuilder: (context, bytes, cacheHeight) => Image.memory(
         bytes,
         fit: BoxFit.contain,
+        filterQuality: FilterQuality.low,
         cacheHeight: cacheHeight,
         errorBuilder: (_, _, _) => _fallbackWidget(),
       ),
-      loadingBuilder: (context) => Center(
-        child: SizedBox(
-          width: 18,
-          height: 18,
-          child: CircularProgressIndicator(
-            strokeWidth: 1.5,
-            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.6),
-          ),
-        ),
-      ),
+      loadingBuilder: (context) => const SizedBox.expand(),
       errorBuilder: (context) => _fallbackWidget(),
     );
   }
@@ -1037,19 +1471,27 @@ class _BookCoverGridThumb extends ConsumerWidget {
         mode: cacheMode,
         quality: quality,
       )).bytes,
-      debounce: const Duration(milliseconds: 100),
+      debounce: const Duration(milliseconds: 30),
       syncLookup: () => thumbnailCache.peekMemory(container, filePath, quality),
       cacheHeight: quality.scaledSize(180),
       // Covers are portrait and the cell is usually squarer: anchor to the top,
       // where the title is, so a crop trims the bottom rather than the middle.
+      cacheLookup: cacheMode != ThumbnailCacheMode.disabled
+          ? () => thumbnailCache.fetch(
+                container: container,
+                filePath: filePath,
+                mode: cacheMode,
+                quality: quality,
+              )
+          : null,
       imageBuilder: (context, bytes, cacheHeight) => Image.memory(
         bytes,
         fit: BoxFit.cover,
+        filterQuality: FilterQuality.low,
         alignment: Alignment.topCenter,
         cacheHeight: cacheHeight,
         errorBuilder: (_, _, _) => _fallbackWidget(),
-      ),
-      loadingBuilder: (context) => _fallbackWidget(),
+      ),      loadingBuilder: (context) => _fallbackWidget(),
       errorBuilder: (context) => _fallbackWidget(),
     );
   }
@@ -1058,3 +1500,4 @@ class _BookCoverGridThumb extends ConsumerWidget {
     child: Icon(fallbackIcon, size: fallbackIconSize, color: fallbackColor),
   );
 }
+

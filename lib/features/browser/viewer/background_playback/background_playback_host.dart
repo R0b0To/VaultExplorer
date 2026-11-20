@@ -49,6 +49,7 @@ class BackgroundPlaybackSession {
     required this.sortBy,
     required this.sortAscending,
     required this.pinnedPaths,
+    this.libraryPlayback = false,
     this.pipWindow = false,
     this.floatingPlayer = false,
   });
@@ -81,6 +82,10 @@ class BackgroundPlaybackSession {
   final SortBy sortBy;
   final bool sortAscending;
   final Set<String>? pinnedPaths;
+
+  /// True when this session was started from the music library. The library
+  /// can then switch tracks in place without replacing its mini player.
+  final bool libraryPlayback;
 }
 
 /// A video taking off for the floating player: the viewer announces it as a
@@ -112,6 +117,10 @@ class FloatingPlayerExit {
 
   const FloatingPlayerExit({required this.playbackManager, required this.from});
 }
+
+/// How the in-app music controls repeat: nothing, the whole queue, or the
+/// current track. Applies to sessions started from the music library only.
+enum PlaybackRepeat { off, all, one }
 
 /// Keeps media playing after the media viewer has been closed.
 ///
@@ -173,6 +182,7 @@ class BackgroundPlaybackHost {
   Rect? Function()? _floatingRect;
 
   bool _audioOnly = false;
+  Timer? _activeSessionTransitionTimer;
 
   /// Whether the floating player is in "audio only": the video is neither
   /// decoded nor drawn, the sound carries on through its media notification,
@@ -186,6 +196,33 @@ class BackgroundPlaybackHost {
   /// listen to must not be touched.
   final ValueNotifier<BackgroundPlaybackSession?> floatingSession =
       ValueNotifier<BackgroundPlaybackSession?>(null);
+
+  /// The session that owns playback right now, whatever its kind: audio kept
+  /// playing after its viewer closed, a floating player, a PiP window. Null
+  /// while a viewer owns playback. In-app controls (the music mini player)
+  /// follow this. Published from a microtask, like [floatingSession].
+  final ValueNotifier<BackgroundPlaybackSession?> activeSession =
+      ValueNotifier<BackgroundPlaybackSession?>(null);
+
+  /// Repeat mode of the music controls (see [PlaybackRepeat]). Kept between
+  /// sessions, like the shuffle and repeat buttons of any music player.
+  final ValueNotifier<PlaybackRepeat> repeat = ValueNotifier<PlaybackRepeat>(
+    PlaybackRepeat.off,
+  );
+
+  /// Whether playback is running, for the play / pause buttons of the music
+  /// controls. Unlike the player's own flag it does not flip while the next or
+  /// previous track is loading: the new player starts out not playing, and
+  /// showing that would make the button blink on every skip.
+  final ValueNotifier<bool> playing = ValueNotifier<bool>(false);
+
+  /// While a track is loading after a skip, "not playing" reports are ignored
+  /// until it really plays (or this moment passes).
+  int _holdPlayingUntilMs = 0;
+
+  /// Whether the library queue was shuffled with [toggleLibraryShuffle].
+  final ValueNotifier<bool> libraryShuffled = ValueNotifier<bool>(false);
+  List<String>? _unshuffledQueue;
 
   StreamSubscription<MediaSessionAction>? _actionSubscription;
   StreamSubscription<String>? _windowSubscription;
@@ -206,6 +243,115 @@ class BackgroundPlaybackHost {
 
   /// The running session, if any.
   BackgroundPlaybackSession? get session => _session;
+
+  /// Keeps the mini-player source available underneath a library viewer while
+  /// its closing route transition returns playback to the background host.
+  void previewMiniPlayerTransition(BackgroundPlaybackSession session) {
+    _activeSessionTransitionTimer?.cancel();
+    activeSession.value = session;
+    _activeSessionTransitionTimer = Timer(
+      const Duration(milliseconds: 500),
+      () {
+        _activeSessionTransitionTimer = null;
+        if (identical(activeSession.value, session) &&
+            !identical(_session, session)) {
+          activeSession.value = _session;
+        }
+      },
+    );
+  }
+
+  /// Starts a selected library track in the current library session without
+  /// tearing down and recreating the mini player. Returns false if the active
+  /// session belongs to another source or wasn't started from the library.
+  bool playLibrarySelection({
+    required MountedContainer container,
+    required List<String> paths,
+    required int index,
+  }) {
+    final session = _session;
+    if (session == null ||
+        !session.libraryPlayback ||
+        session.container.uri != container.uri ||
+        session.container.volId != container.volId ||
+        session.floatingPlayer ||
+        session.pipWindow ||
+        paths.isEmpty) {
+      return false;
+    }
+
+    final targetIndex = index.clamp(0, paths.length - 1).toInt();
+    final targetPath = paths[targetIndex];
+    // Selecting the current row should not restart playback, even if the
+    // player is still preparing or currently paused.
+    if (session.playlist.currentFile == targetPath) return true;
+
+    _unshuffledQueue = null;
+    libraryShuffled.value = false;
+    session.playlist.replaceLibraryQueue(paths, index: targetIndex);
+    unawaited(_playIndex(session, targetIndex));
+    return true;
+  }
+
+  /// Pauses or resumes the running player, for the music controls. The shown
+  /// state flips at once, and a skip that is still loading no longer overrides
+  /// it.
+  Future<void> togglePlayback() async {
+    final controller = _tickController;
+    if (controller == null || controller.isDisposed) return;
+    final wasPlaying = playing.value;
+    _holdPlayingUntilMs = 0;
+    playing.value = !wasPlaying;
+    try {
+      if (wasPlaying) {
+        await controller.pause();
+      } else {
+        await controller.play();
+      }
+    } catch (e) {
+      VeLog.w(_kTag, 'Could not toggle playback', e);
+    }
+  }
+
+  /// Jumps to [index] of the current library queue without replacing it, as
+  /// a tap on a row of the queue list does. False when there is no library
+  /// session or the index is out of range.
+  bool playQueueIndex(int index) {
+    final session = _session;
+    if (session == null || !session.libraryPlayback) return false;
+    final count = session.playlist.playlist.length;
+    if (index < 0 || index >= count) return false;
+    if (index == session.playlist.currentIndex) return true;
+    unawaited(_playIndex(session, index));
+    return true;
+  }
+
+  /// Shuffles the rest of the library queue (the current track stays first),
+  /// or puts the queue back in the order it had before. The track that is
+  /// playing keeps playing either way.
+  void toggleLibraryShuffle() {
+    final session = _session;
+    if (session == null || !session.libraryPlayback) return;
+    final playlist = session.playlist;
+    final current = playlist.currentFile;
+    if (current.isEmpty) return;
+    if (!libraryShuffled.value) {
+      _unshuffledQueue = List<String>.of(playlist.playlist);
+      final rest = List<String>.of(playlist.playlist)
+        ..remove(current)
+        ..shuffle();
+      playlist.replaceLibraryQueue(<String>[current, ...rest], index: 0);
+      libraryShuffled.value = true;
+    } else {
+      final original = _unshuffledQueue;
+      _unshuffledQueue = null;
+      libraryShuffled.value = false;
+      if (original == null || original.isEmpty) return;
+      final at = original.indexOf(current);
+      playlist.replaceLibraryQueue(original, index: at < 0 ? 0 : at);
+    }
+    _syncNavigation(session);
+  }
 
   /// Brings the full viewer back on the running session. Without a root to do
   /// it, there is nothing to show the video in, so playback ends.
@@ -332,11 +478,27 @@ class BackgroundPlaybackHost {
     });
   }
 
-  void _publishFloatingSession() {
+  void _publishFloatingSession({
+    BackgroundPlaybackSession? retainedMiniPlayer,
+    Duration retainMiniPlayerFor = Duration.zero,
+  }) {
     scheduleMicrotask(() {
       final current = _session;
       final next = current != null && current.floatingPlayer ? current : null;
       if (!identical(floatingSession.value, next)) floatingSession.value = next;
+      _activeSessionTransitionTimer?.cancel();
+      _activeSessionTransitionTimer = null;
+      final active = retainedMiniPlayer ?? current;
+      if (!identical(activeSession.value, active)) activeSession.value = active;
+      if (retainedMiniPlayer != null && retainMiniPlayerFor > Duration.zero) {
+        _activeSessionTransitionTimer = Timer(retainMiniPlayerFor, () {
+          _activeSessionTransitionTimer = null;
+          if (identical(activeSession.value, retainedMiniPlayer) &&
+              !identical(_session, retainedMiniPlayer)) {
+            activeSession.value = _session;
+          }
+        });
+      }
     });
   }
 
@@ -413,7 +575,18 @@ class BackgroundPlaybackHost {
     }
     _detach(session);
     _session = null;
-    _publishFloatingSession();
+    if (session.libraryPlayback &&
+        !session.floatingPlayer &&
+        !session.pipWindow) {
+      // Keep the mini player's cover in the source route long enough for the
+      // expanding viewer's Hero transition to capture and fly it forward.
+      _publishFloatingSession(
+        retainedMiniPlayer: session,
+        retainMiniPlayerFor: const Duration(milliseconds: 420),
+      );
+    } else {
+      _publishFloatingSession();
+    }
     _publishFloatingExit();
     // The viewer shows the video again: the window has nothing left to do.
     _closePipWindow();
@@ -444,6 +617,13 @@ class BackgroundPlaybackHost {
 
   Future<void> _teardown(BackgroundPlaybackSession session) async {
     // The player is released below, which ends it natively too.
+    _unshuffledQueue = null;
+    // Listeners are widgets; this may run while the tree is being torn down.
+    _holdPlayingUntilMs = 0;
+    scheduleMicrotask(() {
+      libraryShuffled.value = false;
+      playing.value = false;
+    });
     _audioOnly = false;
     _publishAudioOnly();
     _detach(session);
@@ -610,6 +790,19 @@ class BackgroundPlaybackHost {
     );
   }
 
+  void _publishPlaying(NativeVideoValue value) {
+    var isPlaying = value.isPlaying;
+    if (isPlaying) {
+      _holdPlayingUntilMs = 0;
+    } else if (!value.isInitialized ||
+        DateTime.now().millisecondsSinceEpoch < _holdPlayingUntilMs) {
+      // Still loading what was just skipped to: keep showing "playing".
+      if (playing.value) return;
+      isPlaying = false;
+    }
+    if (playing.value != isPlaying) playing.value = isPlaying;
+  }
+
   void _onTick() {
     final session = _session;
     final controller = _tickController;
@@ -620,6 +813,7 @@ class BackgroundPlaybackHost {
       unawaited(closeAndWait());
       return;
     }
+    _publishPlaying(value);
     _reportPlaying(session, value.isPlaying);
     if (!value.isInitialized) return;
 
@@ -652,7 +846,8 @@ class BackgroundPlaybackHost {
     }
     if (duration <= Duration.zero) return;
 
-    if (session.playbackMode == VideoPlaybackMode.loop) {
+    if (session.playbackMode == VideoPlaybackMode.loop ||
+        (session.libraryPlayback && repeat.value == PlaybackRepeat.one)) {
       if (value.isPlaying && position >= duration) {
         unawaited(controller.seekTo(Duration.zero));
         unawaited(controller.play());
@@ -733,7 +928,8 @@ class BackgroundPlaybackHost {
     final playlist = session.playlist;
     final count = playlist.playlist.length;
     if (count <= 1) return null;
-    final loop = _config(session).loopPlaylist;
+    final loop = _config(session).loopPlaylist ||
+        (session.libraryPlayback && repeat.value == PlaybackRepeat.all);
     var index = playlist.currentIndex;
     for (var i = 0; i < count - 1; i++) {
       var candidate = index + direction;
@@ -778,6 +974,9 @@ class BackgroundPlaybackHost {
         ),
       );
     }
+    // Skipping always plays the new track, so the buttons keep saying so.
+    _holdPlayingUntilMs = DateTime.now().millisecondsSinceEpoch + 4000;
+    if (!playing.value) playing.value = true;
     session.playlist.updateIndex(index);
     final file = session.playlist.currentFile;
     final config = _config(session);

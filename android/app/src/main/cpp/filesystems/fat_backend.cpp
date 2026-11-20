@@ -201,17 +201,17 @@ bool fatListDirectory(int volumeId, const std::string& pathSuffix, std::vector<s
     return true;
 }
 
-uint64_t fatGetFileSize(int volumeId, const std::string& path) {
+int64_t fatGetFileSize(int volumeId, const std::string& path) {
     ensureFatFsValid(volumeId);
     FIL f;
-    uint64_t size = 0;
+    int64_t size = -1;
     std::string fatPath = std::string(drivePaths[volumeId]) + "/" + path;
     FRESULT fr = f_open(&f, fatPath.c_str(), FA_READ);
     if (fatRemountForRetry(volumeId, fr)) {
         fr = f_open(&f, fatPath.c_str(), FA_READ);
     }
     if (fr == FR_OK) {
-        size = static_cast<uint64_t>(f_size(&f));
+        size = static_cast<int64_t>(f_size(&f));
         f_close(&f);
     } else {
         noteFatError(volumeId, fr);
@@ -535,6 +535,23 @@ std::string fatGetFilesystemLabel(int volumeId) {
         case FS_EXFAT: return "exFAT";
         default:       return std::string();
     }
+}
+
+FsGrowStatus fatGrowToFit(int volumeId) {
+    const FATFS& fs = volumes[volumeId].fatfs;
+    if (fs.fs_type == 0) return FsGrowStatus::kFailed;
+    // End of the cluster area, in sectors from the start of the volume (FatFs mounts these volumes with no
+    // partition table: volbase == 0).
+    const uint64_t fsEnd = static_cast<uint64_t>(fs.database) +
+                           static_cast<uint64_t>(fs.csize) * (static_cast<uint64_t>(fs.n_fatent) - 2);
+    const uint32_t sectorSize = volumes[volumeId].luksSectorSize >= 512 ? volumes[volumeId].luksSectorSize : 512;
+    const uint64_t deviceSectors = volumes[volumeId].dataAreaLengthBytes / sectorSize;
+    // Not growable in place: the FAT (and for exFAT the allocation bitmap's position) is sized for the
+    // cluster count at format time and sits in front of the data, so more clusters means moving every file.
+    // A sliver of leftover space (partial cluster, alignment) is not worth reporting.
+    constexpr uint64_t kUnusedSliverBytes = 1024 * 1024;
+    return (deviceSectors > fsEnd && (deviceSectors - fsEnd) * sectorSize >= kUnusedSliverBytes)
+               ? FsGrowStatus::kUnsupported : FsGrowStatus::kAlreadyFills;
 }
 
 void* fatOpenStream(int volumeId, const std::string& path) {

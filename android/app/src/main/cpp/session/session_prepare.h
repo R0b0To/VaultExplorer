@@ -33,13 +33,15 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen,
                     int pim, int volId, bool forceDerive, int cipherId, int hashId,
                     const unsigned char* preservedKey = nullptr, size_t preservedKeyLen = 0,
                     const int* keyfileFds = nullptr, int keyfileCount = 0,
-                    bool readOnly = false);
+                    bool readOnly = false,
+                    bool useBackupHeader = false);
 
 bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pim, int volId,
                        int cipherId, int hashId, const unsigned char* preservedKey = nullptr,
                        size_t preservedKeyLen = 0, int64_t partitionOffsetHint = -1,
                        const int* keyfileFds = nullptr, int keyfileCount = 0,
-                       bool readOnly = false);
+                       bool readOnly = false,
+                       bool useBackupHeader = false, int64_t deviceSizeBytes = -1);
 
 // Cheap, read-only pre-check for the unlock UI: does [fd] contain a VHD/
 // VHDX whole-disk image with a recognized plain (unencrypted) filesystem
@@ -57,7 +59,8 @@ bool enableHiddenVolumeProtection(
     int volId,
     const unsigned char* hiddenPassword, size_t hiddenPasswordLen,
     int hiddenPim, int hiddenCipherId, int hiddenHashId,
-    const int* hiddenKeyfileFds = nullptr, int hiddenKeyfileCount = 0);
+    const int* hiddenKeyfileFds = nullptr, int hiddenKeyfileCount = 0,
+    bool useBackupHeader = false);
 
 void clearUnlockCancellation(int volId);
 void requestUnlockCancellation(int volId);

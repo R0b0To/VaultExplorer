@@ -6,16 +6,21 @@ import com.aeidolon.vaultexplorer.handlers.ImportExportHandlers
  * Shared encode/decode for the directory-entry wire format described in
  * docs/architecture.md §5.3 (ADR-003).
  *
- * Wire layout: "<F|D>|<sizeBytes>|<mtimeUnixSecs>|<name>"
+ * Wire layout: "<F|D|L|LD>|<sizeBytes>|<mtimeUnixSecs>|<name>"
  *   - Field 1 is an explicit type tag ('F'/'D'), never inferred from the
- *     name.
+ *     name. 'L'/'LD' (a symbolic link; LD marks a directory target) is only
+ *     ever produced by the dedicated listSymlinks call, never by a normal
+ *     directory listing -- [parse] therefore refuses it, so a consumer that
+ *     does not know about links can never mistake one for a file.
  *   - Field 4 (name) is *everything after the third '|'* -- parsing must
  *     split on the first three '|' only and take the remainder verbatim,
  *     so a name that itself contains '|' (legal on ext2/3/4) round-trips
  *     exactly instead of corrupting size/mtime for that entry.
  *
- * Every producer on the Kotlin side (CryfsSession, CryptomatorSession,
- * GocryptfsSession) encodes through [encode]; every consumer
+ * Folder-vault producers on the Kotlin side (CryfsSession, CryptomatorSession,
+ * GocryptfsSession) encode through [encode]; native disk-image symlink entries
+ * are encoded by the C++ filesystem backends and returned only by listSymlinks.
+ * Every consumer
  * (ContainerDocumentsProvider, ImportExportHandlers) decodes through
  * [parse] instead of hand-rolling `startsWith("[DIR] ")` /
  * `substringBefore("|")` the way this code used to -- that pattern is
@@ -44,6 +49,7 @@ object DirEntryWire {
         if (thirdSep < 0) return null
 
         val typeTag = raw.substring(0, firstSep)
+        if (typeTag == "L") return null   // a link is neither a file nor a folder; see the class doc
         val sizeStr = raw.substring(firstSep + 1, secondSep)
         val mtimeStr = raw.substring(secondSep + 1, thirdSep)
         val name = raw.substring(thirdSep + 1)

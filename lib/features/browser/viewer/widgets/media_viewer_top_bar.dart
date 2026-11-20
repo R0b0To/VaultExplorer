@@ -9,6 +9,7 @@ import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_action_button.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_action_glyph.dart';
+import 'package:vaultexplorer/core/widgets/menus/back_dismissible_menu_anchor.dart';
 
 enum _MoreMenuSelection { customizeControls }
 
@@ -293,7 +294,7 @@ class MediaViewerTopBar extends StatelessWidget {
         isPlaylist && folderScope == 'Current Folder Only';
     final isAllSelected = isPlaylist && folderScope == 'All';
 
-    return MenuAnchor(
+    return BackDismissibleMenuAnchor(
       onOpen: onMenuOpened,
       onClose: onMenuClosed,
       builder: (ctx, controller, child) => MediaViewerActionButton(

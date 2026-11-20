@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -17,6 +18,7 @@ import 'package:vaultexplorer/core/widgets/container_format_icon.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_name_label.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/auto_lock_indicator.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/lock_flush_prompt.dart';
 import 'package:vaultexplorer/features/settings/long_file_name_display_provider.dart';
 
 const _kLogTag = 'ContainerCard';
@@ -447,11 +449,16 @@ class _LockButtonState extends ConsumerState<_LockButton> {
       );
     });
     try {
-      final locked = await ref
-          .read(vaultLifecycleApiProvider)
-          .lockContainer(widget.container.uri);
-      if (!locked) {
-        if (mounted) {
+      final result = await lockWithFlushPrompt(
+        context: context,
+        lifecycle: ref.read(vaultLifecycleApiProvider),
+        uri: widget.container.uri,
+        displayName: widget.container.displayName,
+      );
+      if (result != LockResult.locked) {
+        // A refused flush was already explained by the retry / lock-anyway dialog,
+        // and the person chose to keep the container open.
+        if (mounted && result != LockResult.flushRefused) {
           showAppSnackBar(
             context,
             message: context.l10n.operationInProgressWaitMessage,

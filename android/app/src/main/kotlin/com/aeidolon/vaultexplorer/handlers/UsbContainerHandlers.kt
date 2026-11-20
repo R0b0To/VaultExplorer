@@ -264,6 +264,7 @@ class UsbContainerHandlers(
                         hiddenPassword = if (args.protectHiddenVolume) args.hiddenPassword ?: "" else null,
                         hiddenPim = args.hiddenPim, hiddenCipherId = args.hiddenCipherId,
                         hiddenHashId = args.hiddenHashId, hiddenKeyfileFds = hiddenKeyfileFds,
+                        useBackupHeader = args.useBackupHeader,
                     )
                 }
 
@@ -435,7 +436,7 @@ class UsbContainerHandlers(
                         call.argument<Number>("hashId")?.toInt() ?: 255,
                         hiddenCipherId, hiddenHashId,
                         keyfileFds, hiddenKeyfileFds, quickFormat,
-                        deviceSectorCount = msd.sectorCount, operationId = operationId,
+                        deviceSectorCount = msd.sectorCount, deviceSectorSize = msd.sectorSize, operationId = operationId,
                         userEntropy = userEntropy,
                     )
                 } else {
@@ -448,7 +449,7 @@ class UsbContainerHandlers(
                         call.argument<Number>("cipherId")?.toInt() ?: 255,
                         call.argument<Number>("hashId")?.toInt() ?: 255,
                         keyfileFds, quickFormat,
-                        deviceSectorCount = msd.sectorCount, operationId = operationId,
+                        deviceSectorCount = msd.sectorCount, deviceSectorSize = msd.sectorSize, operationId = operationId,
                         userEntropy = userEntropy,
                     )
                 }
@@ -562,8 +563,10 @@ class UsbContainerHandlers(
         ioExecutor.execute {
             UsbBlockBridge.unregister(volId)
             try {
+                // The device is gone, so its unwritten data can't be saved any more:
+                // this is the one lock that must discard rather than retry.
                 ContainerSessionRegistry.locks[volId].writeLock().withLock {
-                    ContainerEngine.lock(volId)
+                    ContainerEngine.lock(volId, force = true)
                 }
             } catch (e: Exception) {
                 VeLog.w("VaultExplorer_C++") { "lockNative on USB detach failed for volId=$volId: ${e.message}" }

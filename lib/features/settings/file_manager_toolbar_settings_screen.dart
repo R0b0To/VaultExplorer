@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
@@ -11,6 +13,9 @@ import 'package:vaultexplorer/core/widgets/inputs/slider_setting_tile.dart';
 import 'package:vaultexplorer/core/widgets/inputs/thumbnail_settings_tiles.dart';
 import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
+import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
+import 'package:vaultexplorer/features/decoy/local/decoy_local_repository.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_pins_bookmarks_controller.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_toolbar_settings_screen.dart';
@@ -19,6 +24,8 @@ import 'package:vaultexplorer/features/settings/file_manager_skin_screen.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/widgets/tab_swipe_gestures_section.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
+import 'package:vaultexplorer/features/browser/gallery/filter/vault_gallery_meta_storage.dart';
+import 'package:vaultexplorer/features/library/controllers/library_providers.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
 
@@ -29,9 +36,8 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
   /// its "reset all vaults" action live in App settings), so the decoy file
   /// manager can open this same screen without exposing anything about vaults.
 
-
-  /// The vault whose bookmarks this screen offers to rearrange. Null for the
-  /// app-wide settings page, where there is no single vault.
+  /// The current container, for bookmark and Local Storage cache actions.
+  /// Null for the app-wide settings page.
   final MountedContainer? container;
 
   const FileManagerToolbarSettingsScreen({
@@ -56,6 +62,166 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
       case BrowserLayoutMode.masonry:
         return l10n.layoutModeMasonry;
     }
+  }
+
+  Future<MountedContainer> _resolvePrimaryLocalStorageContainer(
+    BuildContext context,
+  ) async {
+    if (container?.isPrimaryLocalStorage == true) return container!;
+    final root = await const DecoyLocalRepository().primaryRoot();
+    return buildLocalStorageContainer(
+      rootPath: root.path,
+      displayName: context.l10n.localStorageCardTitle,
+    );
+  }
+
+  Future<void> _clearLocalThumbnailCache(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: context.l10n.clearThumbnailCacheDialogTitle,
+      message: context.l10n.clearLocalStorageThumbnailCacheMessage,
+      confirmLabel: context.l10n.clearCacheButton,
+      isDestructive: true,
+    );
+    if (!confirmed || !context.mounted) return;
+
+    try {
+      final localContainer = await _resolvePrimaryLocalStorageContainer(
+        context,
+      );
+      if (!context.mounted) return;
+      final cache = ref.read(thumbnailCacheServiceProvider);
+      await cache.clearAppCacheForUri(localContainer.uri);
+      await cache.clearInContainerCache(localContainer);
+      if (!context.mounted) return;
+      showAppSnackBar(
+        context,
+        message: context.l10n.allThumbnailCachesClearedMessage,
+        tone: AppBannerTone.success,
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      showAppSnackBar(
+        context,
+        message: context.l10n.appCacheClearedContainerFailedMessage,
+        tone: AppBannerTone.warning,
+      );
+    }
+  }
+
+  Future<void> _clearLocalGalleryIndex(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: context.l10n.galleryMetadataClearConfirmTitle,
+      message: context.l10n.galleryMetadataClearConfirmMessage,
+      confirmLabel: context.l10n.clearSavedIndexButton,
+      isDestructive: true,
+    );
+    if (!confirmed || !context.mounted) return;
+
+    try {
+      final localContainer = await _resolvePrimaryLocalStorageContainer(
+        context,
+      );
+      if (!context.mounted) return;
+      final result = await VaultGalleryMetaStorage.clearPersistedIndexCopies(
+        uri: localContainer.uri,
+        crypto: ref.read(vaultCryptoApiProvider),
+        io: ref.read(vaultFileIoApiProvider),
+        container: localContainer,
+      );
+      if (!context.mounted) return;
+      if (result.appStorageCleared && result.containerStorageCleared) {
+        showAppSnackBar(
+          context,
+          message: context.l10n.galleryMetadataIndexClearedMessage,
+          tone: AppBannerTone.success,
+        );
+      } else {
+        showAppSnackBar(
+          context,
+          message: context.l10n.savedIndexClearFailedMessage,
+          tone: AppBannerTone.error,
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        showAppSnackBar(
+          context,
+          message: context.l10n.savedIndexClearFailedMessage,
+          tone: AppBannerTone.error,
+        );
+      }
+    }
+  }
+
+  Future<void> _clearLocalMusicIndex(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: context.l10n.musicIndexClearConfirmTitle,
+      message: context.l10n.musicIndexClearConfirmMessage,
+      confirmLabel: context.l10n.clearSavedIndexButton,
+      isDestructive: true,
+    );
+    if (!confirmed || !context.mounted) return;
+
+    try {
+      final localContainer = await _resolvePrimaryLocalStorageContainer(
+        context,
+      );
+      if (!context.mounted) return;
+      final result = await ref
+          .read(libraryIndexStoreProvider)
+          .deleteIndexCopies(localContainer.uri, container: localContainer);
+      if (!context.mounted) return;
+      if (result.appStorageCleared && result.containerStorageCleared) {
+        showAppSnackBar(
+          context,
+          message: context.l10n.musicIndexClearedMessage,
+          tone: AppBannerTone.success,
+        );
+      } else {
+        showAppSnackBar(
+          context,
+          message: context.l10n.savedIndexClearFailedMessage,
+          tone: AppBannerTone.error,
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        showAppSnackBar(
+          context,
+          message: context.l10n.savedIndexClearFailedMessage,
+          tone: AppBannerTone.error,
+        );
+      }
+    }
+  }
+
+  Future<void> _confirmResetToDefaults(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: context.l10n.resetFileManagerSettingsTitle,
+      message: context.l10n.resetFileManagerSettingsMessage,
+      confirmLabel: context.l10n.reset,
+      isDestructive: true,
+    );
+    if (!confirmed || !context.mounted) return;
+    await ref
+        .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+        .resetToDefaults();
   }
 
   @override
@@ -96,9 +262,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.restart_alt_rounded),
             tooltip: context.l10n.resetToDefaultsTooltip,
-            onPressed: () => ref
-                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
-                .resetToDefaults(),
+            onPressed: () => _confirmResetToDefaults(context, ref),
           ),
           const SizedBox(width: 4),
         ],
@@ -206,8 +370,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                               ),
                             ),
                             subtitle: Text(
-                              context.l10n
-                                  .textEditorAutoHideTabBarDescription,
+                              context.l10n.textEditorAutoHideTabBarDescription,
                               style: textTheme.bodySmall?.copyWith(
                                 color: cs.onSurfaceVariant,
                               ),
@@ -288,6 +451,64 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                             ),
                             secondary: Icon(
                               Icons.vertical_align_top_rounded,
+                              color: cs.primary,
+                            ),
+                          ),
+                          SwitchListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
+                            value: state.config.autoHideToolbar,
+                            onChanged: (v) => ref
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
+                                .setAutoHideToolbar(v),
+                            title: Text(
+                              context.l10n.autoHideToolbarLabel,
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              context.l10n.autoHideToolbarDesc,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                            secondary: Icon(
+                              Icons.view_agenda_outlined,
+                              color: cs.primary,
+                            ),
+                          ),
+                          SwitchListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
+                            value: state.config.autoHideBreadcrumbBar,
+                            onChanged: (v) => ref
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
+                                .setAutoHideBreadcrumbBar(v),
+                            title: Text(
+                              context.l10n.autoHideBreadcrumbBarLabel,
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              context.l10n.autoHideBreadcrumbBarDesc,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                            secondary: Icon(
+                              Icons.navigation_rounded,
                               color: cs.primary,
                             ),
                           ),
@@ -475,6 +696,35 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                             ),
                             secondary: Icon(
                               Icons.visibility_outlined,
+                              color: cs.primary,
+                            ),
+                          ),
+                          SwitchListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
+                            value: state.config.showNoMediaFolders,
+                            onChanged: (v) => ref
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
+                                .setShowNoMediaFolders(v),
+                            title: Text(
+                              context.l10n.showNoMediaFoldersLabel,
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              context.l10n.showNoMediaFoldersDesc,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                            secondary: Icon(
+                              Icons.folder_off_outlined,
                               color: cs.primary,
                             ),
                           ),
@@ -973,6 +1223,137 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
                                 )
                                 .setLocalStorageThumbnailQuality(v),
                           ),
+                          ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 4,
+                            ),
+                            title: Text(
+                              context.l10n.clearThumbnailCacheTitle,
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              context.l10n.removeCachedThumbnailsSubtitle,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                            trailing: Icon(
+                              Icons.chevron_right_rounded,
+                              color: cs.onSurfaceVariant,
+                            ),
+                            onTap: () =>
+                                _clearLocalThumbnailCache(context, ref),
+                          ),
+                          OptionPickerTile<ThumbnailCacheMode>(
+                            label:
+                                context.l10n.galleryMetadataIndexStorageLabel,
+                            value: state
+                                .config
+                                .localStorageGalleryMetadataCacheMode,
+                            options: ThumbnailCacheMode.values
+                                .map(
+                                  (mode) => SelectOption<ThumbnailCacheMode>(
+                                    value: mode,
+                                    label: switch (mode) {
+                                      ThumbnailCacheMode.appCache =>
+                                        context
+                                            .l10n
+                                            .galleryMetadataAppStorageOption,
+                                      ThumbnailCacheMode.inContainer =>
+                                        context
+                                            .l10n
+                                            .thumbnailCacheHiddenFolderLabel,
+                                      ThumbnailCacheMode.disabled =>
+                                        mode.getLocalizedLabel(context.l10n),
+                                    },
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (mode) => ref
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
+                                .setLocalStorageGalleryMetadataCacheMode(mode),
+                          ),
+                          OptionPickerTile<ThumbnailCacheMode>(
+                            label: context.l10n.musicIndexStorageLabel,
+                            value: state.config.localStorageMusicIndexCacheMode,
+                            options: ThumbnailCacheMode.values
+                                .map(
+                                  (mode) => SelectOption<ThumbnailCacheMode>(
+                                    value: mode,
+                                    label: switch (mode) {
+                                      ThumbnailCacheMode.appCache =>
+                                        context.l10n.musicIndexAppStorageOption,
+                                      ThumbnailCacheMode.inContainer =>
+                                        context
+                                            .l10n
+                                            .musicIndexHiddenFolderOption,
+                                      ThumbnailCacheMode.disabled =>
+                                        mode.getLocalizedLabel(context.l10n),
+                                    },
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (mode) => ref
+                                .read(
+                                  fileManagerToolbarSettingsProvider(
+                                    containerUri,
+                                  ).notifier,
+                                )
+                                .setLocalStorageMusicIndexCacheMode(mode),
+                          ),
+                          ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 4,
+                            ),
+                            title: Text(
+                              context.l10n.galleryMetadataClearAction,
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              context.l10n.galleryMetadataClearConfirmMessage,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                            trailing: Icon(
+                              Icons.chevron_right_rounded,
+                              color: cs.onSurfaceVariant,
+                            ),
+                            onTap: () => _clearLocalGalleryIndex(context, ref),
+                          ),
+                          ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 4,
+                            ),
+                            title: Text(
+                              context.l10n.musicIndexClearAction,
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              context.l10n.musicIndexClearConfirmMessage,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                            trailing: Icon(
+                              Icons.chevron_right_rounded,
+                              color: cs.onSurfaceVariant,
+                            ),
+                            onTap: () => _clearLocalMusicIndex(context, ref),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 16),
@@ -1401,7 +1782,9 @@ class _FileManagerBookmarksScreenState
     Future.microtask(() {
       if (!mounted) return;
       ref
-          .read(fileBrowserPinsBookmarksProvider(widget.container.volId).notifier)
+          .read(
+            fileBrowserPinsBookmarksProvider(widget.container.volId).notifier,
+          )
           .ensureLoaded(widget.container);
     });
   }
@@ -1460,8 +1843,8 @@ class _FileManagerBookmarksScreenState
                     ),
                     buildDefaultDragHandles: false,
                     itemCount: bookmarks.length,
-                    onReorderItem: (oldIndex, newIndex) =>
-                        notifier.reorderBookmarks(container, oldIndex, newIndex),
+                    onReorderItem: (oldIndex, newIndex) => notifier
+                        .reorderBookmarks(container, oldIndex, newIndex),
                     itemBuilder: (context, i) {
                       final bookmark = bookmarks[i];
                       final name = bookmark.name;

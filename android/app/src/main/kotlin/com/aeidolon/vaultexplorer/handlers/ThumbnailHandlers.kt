@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
+import android.graphics.ImageDecoder
 import android.graphics.ImageFormat
 import android.graphics.Matrix
 import android.graphics.Rect
@@ -50,6 +51,7 @@ import com.aeidolon.vaultexplorer.JpegDcPreview
 import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.MimeTypeHelper
 import com.aeidolon.vaultexplorer.NativeOpSupport
+import com.aeidolon.vaultexplorer.PerfLog
 import com.aeidolon.vaultexplorer.VeLog
 
 class ThumbnailHandlers(
@@ -245,6 +247,7 @@ class ThumbnailHandlers(
             var player: ExoPlayer? = null
             var surface: Surface? = null
             var surfaceTexture: SurfaceTexture? = null
+            var released = false
 
             try {
                 surfaceTexture = SurfaceTexture(10)
@@ -252,6 +255,15 @@ class ThumbnailHandlers(
                 surface = Surface(surfaceTexture)
 
                 player = ExoPlayer.Builder(activity).build()
+                // A frame grab needs the video track only. Leaving audio and
+                // text enabled spun up audio codecs (and their buffers) for
+                // files whose audio stream is the corrupt part, which is how a
+                // failed thumbnail could take the native decoder down with it.
+                player.trackSelectionParameters = player.trackSelectionParameters
+                    .buildUpon()
+                    .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, true)
+                    .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+                    .build()
                 player.setVideoSurface(surface)
 
                 val dataSourceFactory: DataSource.Factory = if (isLocalStorage) {
@@ -266,20 +278,46 @@ class ThumbnailHandlers(
 
                             override fun addTransferListener(transferListener: TransferListener) {}
 
+                            private var remaining: Long = C.LENGTH_UNSET.toLong()
+
                             override fun open(dataSpec: DataSpec): Long {
                                 openUri = dataSpec.uri
                                 currentPosition = dataSpec.position
                                 val totalSize = mediaDataSource.size
-                                if (totalSize <= 0) return C.LENGTH_UNSET.toLong()
-                                return totalSize - currentPosition
+                                if (totalSize <= 0) {
+                                    remaining = C.LENGTH_UNSET.toLong()
+                                    return C.LENGTH_UNSET.toLong()
+                                }
+                                if (currentPosition > totalSize) {
+                                    throw androidx.media3.datasource.DataSourceException(
+                                        PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE
+                                    )
+                                }
+                                remaining = totalSize - currentPosition
+                                return remaining
                             }
 
                             override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
                                 if (length == 0) return 0
-                                val bytesRead = mediaDataSource.readAt(currentPosition, buffer, offset, length)
-                                if (bytesRead > 0) {
-                                    currentPosition += bytesRead
+                                if (remaining == 0L) return C.RESULT_END_OF_INPUT
+                                val request = if (remaining > 0L) {
+                                    minOf(length.toLong(), remaining).toInt()
+                                } else {
+                                    length
                                 }
+                                val bytesRead = mediaDataSource.readAt(currentPosition, buffer, offset, request)
+                                if (bytesRead <= 0) {
+                                    // Promised bytes that never arrive are a truncated
+                                    // or undecryptable file, not a clean end of input.
+                                    if (remaining > 0L) {
+                                        throw java.io.IOException(
+                                            "Vault stream ended early at $currentPosition: $fileName"
+                                        )
+                                    }
+                                    return C.RESULT_END_OF_INPUT
+                                }
+                                currentPosition += bytesRead
+                                if (remaining > 0L) remaining -= bytesRead
                                 return bytesRead
                             }
 
@@ -327,6 +365,13 @@ class ThumbnailHandlers(
                  * this can retry at most once.
                  */
                 fun capturePixelCopy(allowBlankRetry: Boolean) {
+                    // The 4s budget below releases the player and surface; a
+                    // delayed capture that fires afterwards would hit a dead
+                    // Surface (PixelCopy throws) on the main thread.
+                    if (released || surface?.isValid != true) {
+                        latch.countDown()
+                        return
+                    }
                     val bitmap = Bitmap.createBitmap(dstW, dstH, Bitmap.Config.ARGB_8888)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                         PixelCopy.request(
@@ -402,8 +447,11 @@ class ThumbnailHandlers(
                         capturePixelCopy(allowBlankRetry = true)
                     }
 
-                    override fun onPlayerError(error: PlaybackException) {
-                        VeLog.w(TAG) { "ExoPlayer thumbnail extraction error: ${error.message}" }
+                   override fun onPlayerError(error: PlaybackException) {
+                        val ext = fileName.substringAfterLast('.', "").lowercase()
+                        VeLog.i("VE_PERF") {
+                            "[native] thumb.vid.exo_err ext=$ext code=${error.errorCodeName} msg=${error.message} cause=${error.cause?.javaClass?.simpleName}:${error.cause?.message}"
+                        }
                         latch.countDown()
                     }
                 })
@@ -420,6 +468,7 @@ class ThumbnailHandlers(
                 Thread {
                     latch.await(4, TimeUnit.SECONDS)
                     activity.runOnUiThread {
+                        released = true
                         runCatching {
                             player?.release()
                             surface?.release()
@@ -453,6 +502,7 @@ class ThumbnailHandlers(
         val bytes: ByteArray,
         val sourceWidth: Int,
         val sourceHeight: Int,
+        val pathTag: String = "",
     )
 
     /**
@@ -465,6 +515,12 @@ class ThumbnailHandlers(
      * instances, thumbnails (e.g. for the carousel) can extract safely while
      * ExoPlayer plays a 4K video on the hardware decoder.
      */
+     private data class RawVideoFrame(
+        val bitmap: Bitmap,
+        val srcWidth: Int,
+        val srcHeight: Int,
+    )
+
     private fun extractVideoFrame(
         uriString: String,
         fileName: String,
@@ -479,48 +535,229 @@ class ThumbnailHandlers(
     ): VideoFrameResult? {
         if (isPlaybackActive) {
             VeLog.d(TAG) { "Playback active: attempting software MediaCodec frame extraction (len=${fileName.length})" }
+            val swStart = PerfLog.begin()
             val swResult = extractVideoFrameSoftware(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile, explicitTimeUs, strategy, framePosition)
-            if (swResult != null) return swResult
+            PerfLog.end("thumb.vid.sw_codec", swStart)
+            if (swResult != null) return swResult.copy(pathTag = "playback_sw")
             VeLog.d(TAG) { "Software extraction unavailable or failed while playing (len=${fileName.length})" }
             return null
         }
 
-        videoDecoderLock.lock()
-        try {
-            if (isPlaybackActive) {
-                return extractVideoFrameSoftware(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile, explicitTimeUs, strategy, framePosition)
+       var triedSwFirst = false
+        var swMs = 0L
+        val swTrace = SwTrace()
+        if (fileName.endsWith(".webm", ignoreCase = true)) {
+            triedSwFirst = true
+            val swT0 = System.nanoTime()
+            val swStart = PerfLog.begin()
+            val swResult = extractVideoFrameSoftware(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile, explicitTimeUs, strategy, framePosition, swTrace)
+            PerfLog.end("thumb.vid.sw_codec", swStart)
+            swMs = (System.nanoTime() - swT0) / 1_000_000L
+            if (swResult != null) {
+                return swResult.copy(pathTag = "webm_sw(${swTrace.summary()},total=${swMs}ms)")
             }
-            return extractVideoFrameInner(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile, explicitTimeUs, strategy, framePosition)
+        }
+
+        var rawFrame: RawVideoFrame? = null
+        var codecResourceHit = false
+        var playbackStartedWhileWaiting = false
+        var retrReason = "ok"
+        var lockWaitMs = 0L
+        var retrMs = 0L
+
+       val retrTrace = RetrTrace()
+        val lockT0 = System.nanoTime()
+        val lockStart = PerfLog.begin()
+      val gotImmediateLock = if (triedSwFirst) {
+            videoDecoderLock.lock()
+            true
+        } else {
+            // Wait up to 100ms for hardware decoder lock before falling back to
+            // CPU software decoding, preventing catastrophic lock contention and 680ms SW decodes.
+            try {
+                videoDecoderLock.tryLock(100L, TimeUnit.MILLISECONDS)
+            } catch (_: InterruptedException) {
+                false
+            }
+        }
+        PerfLog.end("thumb.vid.lock_wait", lockStart)
+        lockWaitMs = (System.nanoTime() - lockT0) / 1_000_000L
+        if (gotImmediateLock) {
+            try {
+                if (isPlaybackActive) {
+                    playbackStartedWhileWaiting = true
+                    retrReason = "playback"
+                } else {
+                    val retrT0 = System.nanoTime()
+                    try {
+                        rawFrame = extractRetrieverRawFrame(
+                            uriString, fileName, volId, targetSize, isLocalStorage, localFile, explicitTimeUs, strategy, framePosition, retrTrace,
+                        )
+                        if (rawFrame == null) retrReason = "null"
+                    } catch (e: Exception) {
+                        if (isCodecResourceError(e)) {
+                            codecResourceHit = true
+                            retrReason = "codec_err"
+                            VeLog.w(TAG) { "Primary frame extraction hit codec resource limit, retrying at ${FALLBACK_TARGET_SIZE}p: ${e.message}" }
+                            val fallbackResult = extractFrameFallback(uriString, fileName, volId, quality, isLocalStorage, localFile)
+                            if (fallbackResult != null) {
+                                retrMs = (System.nanoTime() - retrT0) / 1_000_000L
+                                return fallbackResult.copy(pathTag = "fallback(lock=${lockWaitMs}ms,retr=${retrMs}ms,${retrTrace.summary()})")
+                            }
+                        } else {
+                            retrReason = "err:${e.javaClass.simpleName}"
+                            VeLog.w(TAG) { "Native retriever failed (len=${fileName.length}): ${e.message}" }
+                        }
+                    } finally {
+                        retrMs = (System.nanoTime() - retrT0) / 1_000_000L
+                    }
+                }
+            } finally {
+                videoDecoderLock.unlock()
+            }
+        } else {
+            retrReason = "lock_busy"
+        }
+
+        // Compress outside videoDecoderLock so the next video can acquire the HW decoder immediately.
+        if (rawFrame != null) {
+            return compressFrame(
+                rawFrame.bitmap,
+                targetSize,
+                quality,
+                overrideSourceWidth = if (rawFrame.srcWidth > 0) rawFrame.srcWidth else null,
+                overrideSourceHeight = if (rawFrame.srcHeight > 0) rawFrame.srcHeight else null,
+            ).copy(pathTag = "retr(lock=${lockWaitMs}ms,retr=${retrMs}ms,${retrTrace.summary()})")
+        }
+
+        // Software MediaCodec path (c2.android.* / OMX.google.*): handles 4K VP9/AV1
+        // and busy HW lock overflow in parallel across CPU cores without blocking on videoDecoderLock.
+       if (!triedSwFirst) {
+            triedSwFirst = true
+            val swT0 = System.nanoTime()
+            val swStart = PerfLog.begin()
+            val swResult = extractVideoFrameSoftware(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile, explicitTimeUs, strategy, framePosition, swTrace)
+            PerfLog.end("thumb.vid.sw_codec", swStart)
+            swMs = (System.nanoTime() - swT0) / 1_000_000L
+            if (swResult != null) {
+                return swResult.copy(pathTag = "retr_$retrReason->sw(lock=${lockWaitMs}ms,retr=${retrMs}ms,${retrTrace.summary()},${swTrace.summary()},sw=${swMs}ms)")
+            }
+        }
+
+        if (playbackStartedWhileWaiting || isPlaybackActive || codecResourceHit) {
+            return null
+        }
+
+        if (retrReason == "lock_busy") {
+            val lock2T0 = System.nanoTime()
+            val lock2Start = PerfLog.begin()
+            videoDecoderLock.lock()
+            PerfLog.end("thumb.vid.lock_wait", lock2Start)
+            lockWaitMs += (System.nanoTime() - lock2T0) / 1_000_000L
+            try {
+                if (isPlaybackActive) {
+                    playbackStartedWhileWaiting = true
+                    retrReason = "playback"
+                } else {
+                    val retrT0 = System.nanoTime()
+                    try {
+                        rawFrame = extractRetrieverRawFrame(
+                            uriString, fileName, volId, targetSize, isLocalStorage, localFile, explicitTimeUs, strategy, framePosition, retrTrace,
+                        )
+                        if (rawFrame == null) retrReason = "null"
+                    } catch (e: Exception) {
+                        if (isCodecResourceError(e)) {
+                            codecResourceHit = true
+                            retrReason = "codec_err"
+                            val fallbackResult = extractFrameFallback(uriString, fileName, volId, quality, isLocalStorage, localFile)
+                            if (fallbackResult != null) {
+                                retrMs = (System.nanoTime() - retrT0) / 1_000_000L
+                                return fallbackResult.copy(pathTag = "fallback(lock=${lockWaitMs}ms,retr=${retrMs}ms,${retrTrace.summary()})")
+                            }
+                        } else {
+                            retrReason = "err:${e.javaClass.simpleName}"
+                        }
+                    } finally {
+                        retrMs = (System.nanoTime() - retrT0) / 1_000_000L
+                    }
+                }
+            } finally {
+                videoDecoderLock.unlock()
+            }
+            if (rawFrame != null) {
+                return compressFrame(
+                    rawFrame.bitmap,
+                    targetSize,
+                    quality,
+                    overrideSourceWidth = if (rawFrame.srcWidth > 0) rawFrame.srcWidth else null,
+                    overrideSourceHeight = if (rawFrame.srcHeight > 0) rawFrame.srcHeight else null,
+                ).copy(pathTag = "sw_null->retr(lock=${lockWaitMs}ms,retr=${retrMs}ms,${retrTrace.summary()},sw=${swMs}ms)")
+            }
+            if (playbackStartedWhileWaiting || isPlaybackActive || codecResourceHit) {
+                return null
+            }
+        }
+
+        // Final fallback: ExoPlayer (for containers MediaMetadataRetriever/MediaExtractor don't demux).
+        val exoLockStart = PerfLog.begin()
+        videoDecoderLock.lock()
+        PerfLog.end("thumb.vid.lock_wait", exoLockStart)
+        return try {
+            if (isPlaybackActive) {
+                null
+            } else {
+                val exoStart = PerfLog.begin()
+                val exoResult = extractVideoFrameExoPlayer(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile, explicitTimeUs, strategy, framePosition)
+                PerfLog.end("thumb.vid.exoplayer", exoStart)
+                exoResult?.copy(pathTag = "retr_$retrReason->exo(lock=${lockWaitMs}ms,retr=${retrMs}ms,sw=${swMs}ms)")
+            }
         } finally {
             videoDecoderLock.unlock()
         }
     }
 
+  private class RetrTrace {
+        var dsMs: Long = 0L
+        var c1Ms: Long = 0L
+        var c2Ms: Long = 0L
+        var c3Ms: Long = 0L
+        var hit: String = "none"
+        fun summary(): String = "ds=${dsMs}ms,c1=${c1Ms}ms,c2=${c2Ms}ms,c3=${c3Ms}ms,hit=$hit"
+    }
 
+    private class SwTrace {
+        var dsMs: Long = 0L
+        var cfgMs: Long = 0L
+        var decMs: Long = 0L
+        var blankMs: Long = 0L
+        var rotMs: Long = 0L
+        fun summary(): String = "ds=${dsMs}ms,cfg=${cfgMs}ms,dec=${decMs}ms,blk=${blankMs}ms,rot=${rotMs}ms"
+    }
 
-
-    /** Does the actual extraction work while the caller holds [videoDecoderLock]. */
-    private fun extractVideoFrameInner(
+    /** Runs [MediaMetadataRetriever] while the caller holds [videoDecoderLock]. */
+    private fun extractRetrieverRawFrame(
         uriString: String,
         fileName: String,
         volId: Int,
         targetSize: Int,
-        quality: Int,
         isLocalStorage: Boolean = false,
         localFile: java.io.File? = null,
         explicitTimeUs: Long? = null,
         strategy: String = "hybrid",
         framePosition: Double = 0.12,
-    ): VideoFrameResult? {
+        trace: RetrTrace? = null,
+    ): RawVideoFrame? {
         var retriever: MediaMetadataRetriever? = null
         try {
             retriever = MediaMetadataRetriever()
+            val dsT0 = System.nanoTime()
             if (isLocalStorage && localFile != null) {
                 retriever.setDataSource(localFile.absolutePath)
             } else {
                 val dataSource = ContainerMediaDataSource(activity, uriString, fileName, volId)
                 retriever.setDataSource(dataSource)
             }
+            trace?.dsMs = (System.nanoTime() - dsT0) / 1_000_000L
 
             val durationMs = retriever
                 .extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
@@ -539,50 +776,29 @@ class ThumbnailHandlers(
             val srcWidth = if (rot == 90 || rot == 270) metaH ?: 0 else metaW ?: 0
             val srcHeight = if (rot == 90 || rot == 270) metaW ?: 0 else metaH ?: 0
 
-            var frame = tryExtractFrame(retriever, timeUs, targetSize)
-            if (explicitTimeUs == null && strategy == "hybrid" &&
-                (frame == null || VideoThumbnailCoordinator.isLikelyBlankFrame(frame))
+              val retrStart = PerfLog.begin()
+            var frame = tryExtractFrame(retriever, timeUs, targetSize, trace)
+            PerfLog.end("thumb.vid.retriever", retrStart)
+
+            // Only retry alternate timestamps when the retriever decoded a real
+            // (but blank) frame; if it returned null, let software/ExoPlayer handle it
+            // instead of burning 9 more failing retriever calls.
+            if (frame != null && explicitTimeUs == null && strategy == "hybrid" &&
+                VideoThumbnailCoordinator.isLikelyBlankFrame(frame)
             ) {
+                val blankStart = PerfLog.begin()
                 val alternate = tryAlternateFrameIfBlank(retriever, durationMs, targetSize, framePosition)
+                PerfLog.end("thumb.vid.blank_retry", blankStart)
                 if (alternate != null) {
-                    frame?.recycle()
+                    frame.recycle()
                     frame = alternate
                 }
             }
-            if (frame != null) {
-                return compressFrame(
-                    frame,
-                    targetSize,
-                    quality,
-                    overrideSourceWidth = if (srcWidth > 0) srcWidth else null,
-                    overrideSourceHeight = if (srcHeight > 0) srcHeight else null,
-                )
-            }
-            // If tryExtractFrame returned null, attempt ExoPlayer fallback
-            return extractVideoFrameExoPlayer(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile, explicitTimeUs, strategy, framePosition)
-        } catch (e: Exception) {
-            runCatching { retriever?.release() }
-            retriever = null
-
-            // 1. If hardware decoder capacity is full, retry at 180p native fallback
-            if (isCodecResourceError(e)) {
-                VeLog.w(TAG) { "Primary frame extraction hit codec resource limit, retrying at ${FALLBACK_TARGET_SIZE}p: ${e.message}" }
-                val fallbackResult = extractFrameFallback(uriString, fileName, volId, quality, isLocalStorage, localFile)
-                if (fallbackResult != null) return fallbackResult
-            }
-
-            // 2. Try software MediaCodec extraction first (does not contend with HW decoder)
-            val swResult = extractVideoFrameSoftware(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile, explicitTimeUs, strategy, framePosition)
-            if (swResult != null) return swResult
-
-            // 3. For unsupported formats (like .flv, .wmv, .webm), fall back to ExoPlayer
-            VeLog.w(TAG) { "Native retriever failed for $fileName (${e.message}), falling back to ExoPlayer" }
-            return extractVideoFrameExoPlayer(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile, explicitTimeUs, strategy, framePosition)
+            return frame?.let { RawVideoFrame(it, srcWidth, srcHeight) }
         } finally {
             runCatching { retriever?.release() }
         }
     }
-
 
     /**
      * Attempts frame extraction at [FALLBACK_TARGET_SIZE] with a fresh
@@ -633,22 +849,43 @@ class ThumbnailHandlers(
         }
     }
 
-    /** Attempts [getScaledFrameAtTime] with [OPTION_PREVIOUS_SYNC] and RGB_565 for speed. */
+   /** Attempts [getScaledFrameAtTime] with [OPTION_PREVIOUS_SYNC] and RGB_565 for speed. */
     private fun tryExtractFrame(
         retriever: MediaMetadataRetriever,
         timeUs: Long,
         size: Int,
+        trace: RetrTrace? = null,
     ): Bitmap? {
         val option = MediaMetadataRetriever.OPTION_PREVIOUS_SYNC
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val params = MediaMetadataRetriever.BitmapParams().apply {
                 preferredConfig = Bitmap.Config.RGB_565
             }
-            runCatching {
+           val t1 = System.nanoTime()
+            var threw = false
+            val f1 = try {
                 retriever.getScaledFrameAtTime(timeUs, option, size, size, params)
-            }.getOrNull()
-                ?: runCatching { retriever.getScaledFrameAtTime(timeUs, option, size, size) }.getOrNull()
-                ?: retriever.getFrameAtTime(timeUs, option)
+            } catch (_: Throwable) {
+                threw = true
+                null
+            }
+            if (trace != null && trace.hit == "none") trace.c1Ms = (System.nanoTime() - t1) / 1_000_000L
+            if (f1 != null) {
+                if (trace != null && trace.hit == "none") trace.hit = "c1"
+                return f1
+            }
+            if (!threw) {
+                if (trace != null && trace.hit == "none") trace.hit = "null"
+                return null
+            }
+
+            val t3 = System.nanoTime()
+            val f3 = runCatching { retriever.getFrameAtTime(timeUs, option) }.getOrNull()
+            if (trace != null && trace.hit == "none") {
+                trace.c3Ms = (System.nanoTime() - t3) / 1_000_000L
+                trace.hit = if (f3 != null) "c3" else "null"
+            }
+            f3
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             runCatching {
                 retriever.getScaledFrameAtTime(
@@ -713,14 +950,13 @@ class ThumbnailHandlers(
         val sourceWidth = overrideSourceWidth ?: frame.width
         val sourceHeight = overrideSourceHeight ?: frame.height
         val scaledFrame = scaledToFit(frame, targetSize)
-        val stream = ByteArrayOutputStream()
+        val stream = ByteArrayOutputStream(32768)
         scaledFrame.compress(Bitmap.CompressFormat.JPEG, quality.coerceIn(1, 100), stream)
         val bytes = stream.toByteArray()
         if (scaledFrame != frame) scaledFrame.recycle()
         frame.recycle()
         return VideoFrameResult(bytes, sourceWidth, sourceHeight)
     }
-
     // ── Public handlers ─────────────────────────────────────────────────────
 
     /** Shared body for [handleGetVideoThumbnail] and
@@ -748,7 +984,9 @@ class ThumbnailHandlers(
             return
         }
 
+        val enqueuedAt = PerfLog.begin()
         videoExecutor.execute {
+            PerfLog.end("thumb.vid.queue_wait", enqueuedAt)
             try {
                 // Guarded on isLocalStorage, not just the URI scheme: for a
                 // mounted vault container, `filePath`/uriString is the
@@ -816,8 +1054,19 @@ class ThumbnailHandlers(
                     return@execute
                 }
 
-                val quality = call.argument<Int>("quality") ?: 60
+                 val quality = call.argument<Int>("quality") ?: 60
+                val runStart = PerfLog.begin()
                 val frameResult = extractVideoFrame(uriString, fileName, volId, targetSize, quality, isLocalStorage, localFile, explicitTimeUs, strategy, framePosition)
+                PerfLog.end("thumb.vid.run", runStart)
+                if (runStart != 0L) {
+                    val elapsedMs = (System.nanoTime() - runStart) / 1_000_000L
+                    if (elapsedMs >= 500L || frameResult == null) {
+                        val ext = fileName.substringAfterLast('.', "").lowercase()
+                        VeLog.i("VE_PERF") {
+                            "[native] SLOW thumb.vid ext=$ext ok=${frameResult != null} path=${frameResult?.pathTag ?: "fail"} size=${frameResult?.sourceWidth ?: 0}x${frameResult?.sourceHeight ?: 0} ${elapsedMs}ms"
+                        }
+                    }
+                }
 
                 if (frameResult != null) {
                     activity.runOnUiThread { result.success(onFrame(frameResult)) }
@@ -903,25 +1152,560 @@ class ThumbnailHandlers(
         return rotated
     }
 
+   /**
+     * Peeks the first 32 bytes of [stream] (must support mark/reset, e.g.
+     * [BufferedInputStream]) and returns false when the format cannot hold
+     * EXIF orientation (simple WebP or VP8X without the 0x08 EXIF flag, GIF,
+     * BMP, PNG). Avoids letting [ExifInterface] scan megabytes of pixel data
+     * to EOF and blow the stream's mark limit.
+     */
+    private data class ExifSniff(
+        val mightHaveExif: Boolean,
+        val isAnimWebp: Boolean = false,
+        val hasWebpExifBit: Boolean = false,
+    )
+
+    private class StreamReadStats {
+        var bytesRead: Long = 0L
+        var readCalls: Int = 0
+        var readNanos: Long = 0L
+    }
+
+    private class TimedInputStream(
+        inner: java.io.InputStream,
+        private val stats: StreamReadStats,
+    ) : java.io.FilterInputStream(inner) {
+        override fun read(): Int {
+            val t0 = System.nanoTime()
+            val b = super.read()
+            stats.readNanos += System.nanoTime() - t0
+            stats.readCalls++
+            if (b >= 0) stats.bytesRead++
+            return b
+        }
+
+        override fun read(b: ByteArray, off: Int, len: Int): Int {
+            val t0 = System.nanoTime()
+            val n = super.read(b, off, len)
+            stats.readNanos += System.nanoTime() - t0
+            stats.readCalls++
+            if (n > 0) stats.bytesRead += n
+            return n
+        }
+
+        override fun skip(n: Long): Long {
+            val t0 = System.nanoTime()
+            val skipped = super.skip(n)
+            stats.readNanos += System.nanoTime() - t0
+            stats.readCalls++
+            return skipped
+        }
+    }
+
+    private fun sniffExif(stream: BufferedInputStream): ExifSniff {
+        stream.mark(32)
+        val header = ByteArray(32)
+        var read = 0
+        while (read < header.size) {
+            val n = stream.read(header, read, header.size - read)
+            if (n <= 0) break
+            read += n
+        }
+        stream.reset()
+        if (read < 12) return ExifSniff(mightHaveExif = true)
+
+        // GIF / BMP never have EXIF orientation.
+        if (header[0] == 'G'.code.toByte() && header[1] == 'I'.code.toByte() &&
+            header[2] == 'F'.code.toByte() && header[3] == '8'.code.toByte()
+        ) return ExifSniff(mightHaveExif = false)
+        if (header[0] == 'B'.code.toByte() && header[1] == 'M'.code.toByte()) {
+            return ExifSniff(mightHaveExif = false)
+        }
+
+        // RIFF WebP: EXIF only exists in extended VP8X when flag bit 0x08 is set.
+        if (header[0] == 'R'.code.toByte() && header[1] == 'I'.code.toByte() &&
+            header[2] == 'F'.code.toByte() && header[3] == 'F'.code.toByte() &&
+            header[8] == 'W'.code.toByte() && header[9] == 'E'.code.toByte() &&
+            header[10] == 'B'.code.toByte() && header[11] == 'P'.code.toByte()
+        ) {
+            val isVp8x = read >= 21 &&
+                header[12] == 'V'.code.toByte() && header[13] == 'P'.code.toByte() &&
+                header[14] == '8'.code.toByte() && header[15] == 'X'.code.toByte()
+            if (!isVp8x) return ExifSniff(mightHaveExif = false)
+            val flags = header[20].toInt()
+            val hasExif = (flags and 0x08) != 0
+            val isAnim = (flags and 0x02) != 0
+            return ExifSniff(mightHaveExif = hasExif, isAnimWebp = isAnim, hasWebpExifBit = hasExif)
+        }
+
+        // PNG: ExifInterface scans through IDAT to EOF when no eXIf chunk exists.
+        if (header[0] == 0x89.toByte() && header[1] == 0x50.toByte() &&
+            header[2] == 0x4E.toByte() && header[3] == 0x47.toByte() &&
+            header[4] == 0x0D.toByte() && header[5] == 0x0A.toByte() &&
+            header[6] == 0x1A.toByte() && header[7] == 0x0A.toByte()
+        ) return ExifSniff(mightHaveExif = false)
+
+        return ExifSniff(mightHaveExif = true)
+    }
+
+    private fun mightHaveExif(stream: BufferedInputStream): Boolean =
+        sniffExif(stream).mightHaveExif
+
+    private fun readFully(stream: java.io.InputStream, buf: ByteArray, len: Int): Boolean {
+        var offset = 0
+        while (offset < len) {
+            val n = stream.read(buf, offset, len - offset)
+            if (n <= 0) return false
+            offset += n
+        }
+        return true
+    }
+
+    /**
+     * Reads only up to the end of the first `ANMF` frame of an animated WebP
+     * and patches the RIFF length + VP8X trailing-metadata flags so
+     * [BitmapFactory] decodes Frame 1 from memory without draining all
+     * remaining frames from a slow/encrypted stream. Returns null on any
+     * unexpected layout so the caller falls back to streaming decode.
+     */
+    private fun readAnimatedWebpFirstFrame(
+        stream: java.io.InputStream,
+        maxBytes: Int = 2 * 1024 * 1024,
+    ): ByteArray? {
+        val fileHeader = ByteArray(12)
+        if (!readFully(stream, fileHeader, 12)) return null
+        if (fileHeader[0] != 'R'.code.toByte() || fileHeader[1] != 'I'.code.toByte() ||
+            fileHeader[2] != 'F'.code.toByte() || fileHeader[3] != 'F'.code.toByte() ||
+            fileHeader[8] != 'W'.code.toByte() || fileHeader[9] != 'E'.code.toByte() ||
+            fileHeader[10] != 'B'.code.toByte() || fileHeader[11] != 'P'.code.toByte()
+        ) return null
+
+        val out = ByteArrayOutputStream(262144)
+        out.write(fileHeader)
+
+        val chunkHeader = ByteArray(8)
+        val scratch = ByteArray(65536)
+        var vp8xPayloadOffset = -1
+        var seenExif = false
+        var seenXmp = false
+        var foundFirstFrame = false
+
+        while (out.size() < maxBytes) {
+            if (!readFully(stream, chunkHeader, 8)) break
+            val c0 = chunkHeader[0].toInt() and 0xFF
+            val c1 = chunkHeader[1].toInt() and 0xFF
+            val c2 = chunkHeader[2].toInt() and 0xFF
+            val c3 = chunkHeader[3].toInt() and 0xFF
+            val chunkSize = (chunkHeader[4].toLong() and 0xFFL) or
+                ((chunkHeader[5].toLong() and 0xFFL) shl 8) or
+                ((chunkHeader[6].toLong() and 0xFFL) shl 16) or
+                ((chunkHeader[7].toLong() and 0xFFL) shl 24)
+            if (chunkSize < 0L || out.size().toLong() + 8L + chunkSize > maxBytes.toLong()) {
+                return null
+            }
+
+            val isVp8x = c0 == 'V'.code && c1 == 'P'.code && c2 == '8'.code && c3 == 'X'.code
+            val isExif = c0 == 'E'.code && c1 == 'X'.code && c2 == 'I'.code && c3 == 'F'.code
+            val isXmp  = c0 == 'X'.code && c1 == 'M'.code && c2 == 'P'.code && c3 == ' '.code
+            val isAnmf = c0 == 'A'.code && c1 == 'N'.code && c2 == 'M'.code && c3 == 'F'.code
+
+            if (isVp8x && chunkSize == 10L && vp8xPayloadOffset < 0) {
+                vp8xPayloadOffset = out.size() + 8
+            }
+            if (isExif) seenExif = true
+            if (isXmp) seenXmp = true
+
+            out.write(chunkHeader)
+            var remaining = chunkSize.toInt()
+            while (remaining > 0) {
+                val n = stream.read(scratch, 0, minOf(scratch.size, remaining))
+                if (n <= 0) return null
+                out.write(scratch, 0, n)
+                remaining -= n
+            }
+            if ((chunkSize.toInt() and 1) != 0) {
+                val pad = stream.read()
+                out.write(if (pad >= 0) pad else 0)
+            }
+            if (isAnmf) {
+                foundFirstFrame = true
+                break
+            }
+        }
+
+        if (!foundFirstFrame) return null
+        val bytes = out.toByteArray()
+        val riffSize = bytes.size - 8
+        bytes[4] = (riffSize and 0xFF).toByte()
+        bytes[5] = ((riffSize ushr 8) and 0xFF).toByte()
+        bytes[6] = ((riffSize ushr 16) and 0xFF).toByte()
+        bytes[7] = ((riffSize ushr 24) and 0xFF).toByte()
+        if (vp8xPayloadOffset >= 0 && vp8xPayloadOffset < bytes.size) {
+            var flags = bytes[vp8xPayloadOffset].toInt()
+            if (!seenExif) flags = flags and 0x08.inv()
+            if (!seenXmp) flags = flags and 0x04.inv()
+            bytes[vp8xPayloadOffset] = flags.toByte()
+        }
+        return bytes
+    }
+
     /** Opens the stream [extractImageThumbnail] reads from: a plain
      *  [java.io.FileInputStream] for real on-disk files ([isLocalStorage],
      *  mirroring [extractVideoFrameSoftware]'s `isLocalStorage && localFile
      *  != null` bypass), or the usual decrypting [ContainerInputStream]
      *  otherwise. Always wrapped in the same 64 KB [BufferedInputStream]
      *  either way, since callers rely on mark()/reset() being available. */
+    private fun openRawImageInputStream(
+        uriString: String,
+        fileName: String,
+        volId: Int,
+        isLocalStorage: Boolean,
+        localFile: java.io.File?,
+    ): java.io.InputStream = if (isLocalStorage && localFile != null) {
+        java.io.FileInputStream(localFile)
+    } else {
+        ContainerInputStream(activity, uriString, fileName, volId).apply { mark(0) }
+    }
+
+    private fun imageBufferSize(isLocalStorage: Boolean, localFile: java.io.File?): Int = 65536
+
     private fun openImageInputStream(
         uriString: String,
         fileName: String,
         volId: Int,
         isLocalStorage: Boolean,
         localFile: java.io.File?,
+        stats: StreamReadStats? = null,
     ): BufferedInputStream {
-        val raw: java.io.InputStream = if (isLocalStorage && localFile != null) {
-            java.io.FileInputStream(localFile)
-        } else {
-            ContainerInputStream(activity, uriString, fileName, volId)
+        val raw = openRawImageInputStream(uriString, fileName, volId, isLocalStorage, localFile)
+        val tracked = if (stats != null) TimedInputStream(raw, stats) else raw
+        return BufferedInputStream(tracked, imageBufferSize(isLocalStorage, localFile))
+    }
+
+    private fun readExactOrEof(stream: java.io.InputStream, buf: ByteArray, len: Int): Boolean {
+        var off = 0
+        while (off < len) {
+            val n = stream.read(buf, off, len - off)
+            if (n <= 0) return false
+            off += n
         }
-        return BufferedInputStream(raw, 65536)
+        return true
+    }
+
+    private fun skipExact(stream: java.io.InputStream, bytes: Long): Boolean {
+        var remaining = bytes
+        while (remaining > 0L) {
+            val skipped = stream.skip(remaining)
+            if (skipped > 0L) {
+                remaining -= skipped
+                continue
+            }
+            if (stream.read() < 0) return false
+            remaining--
+        }
+        return true
+    }
+
+    /** Walks RIFF WebP chunks on an unmarked [stream] using `skip()` so pixel
+     *  chunks (`VP8 `, `VP8L`, `ANMF`) are skipped without decryption, then
+     *  hands only the `EXIF` chunk to [ExifInterface] inside a minimal RIFF
+     *  WebP wrapper. */
+    private fun readWebpExifOrientation(stream: java.io.InputStream): Int {
+        val riffHeader = ByteArray(12)
+        if (!readExactOrEof(stream, riffHeader, 12)) return ExifInterface.ORIENTATION_NORMAL
+        if (riffHeader[0] != 'R'.code.toByte() || riffHeader[1] != 'I'.code.toByte() ||
+            riffHeader[2] != 'F'.code.toByte() || riffHeader[3] != 'F'.code.toByte() ||
+            riffHeader[8] != 'W'.code.toByte() || riffHeader[9] != 'E'.code.toByte() ||
+            riffHeader[10] != 'B'.code.toByte() || riffHeader[11] != 'P'.code.toByte()
+        ) return ExifInterface.ORIENTATION_NORMAL
+
+        val chunkHeader = ByteArray(8)
+        while (readExactOrEof(stream, chunkHeader, 8)) {
+            val chunkSize = (chunkHeader[4].toLong() and 0xFFL) or
+                ((chunkHeader[5].toLong() and 0xFFL) shl 8) or
+                ((chunkHeader[6].toLong() and 0xFFL) shl 16) or
+                ((chunkHeader[7].toLong() and 0xFFL) shl 24)
+            if (chunkSize < 0L || chunkSize > 256L * 1024L * 1024L) break
+
+            val isExif = chunkHeader[0] == 'E'.code.toByte() &&
+                chunkHeader[1] == 'X'.code.toByte() &&
+                chunkHeader[2] == 'I'.code.toByte() &&
+                chunkHeader[3] == 'F'.code.toByte()
+            if (isExif) {
+                if (chunkSize < 8L || chunkSize > 512L * 1024L) {
+                    return ExifInterface.ORIENTATION_NORMAL
+                }
+                val payloadLen = chunkSize.toInt()
+                val paddedLen = payloadLen + (payloadLen and 1)
+                val wrapper = ByteArray(20 + paddedLen)
+                val riffPayloadLen = 12 + paddedLen
+                wrapper[0] = 'R'.code.toByte(); wrapper[1] = 'I'.code.toByte()
+                wrapper[2] = 'F'.code.toByte(); wrapper[3] = 'F'.code.toByte()
+                wrapper[4] = (riffPayloadLen and 0xFF).toByte()
+                wrapper[5] = ((riffPayloadLen ushr 8) and 0xFF).toByte()
+                wrapper[6] = ((riffPayloadLen ushr 16) and 0xFF).toByte()
+                wrapper[7] = ((riffPayloadLen ushr 24) and 0xFF).toByte()
+                wrapper[8] = 'W'.code.toByte(); wrapper[9] = 'E'.code.toByte()
+                wrapper[10] = 'B'.code.toByte(); wrapper[11] = 'P'.code.toByte()
+                System.arraycopy(chunkHeader, 0, wrapper, 12, 8)
+                var read = 0
+                while (read < payloadLen) {
+                    val n = stream.read(wrapper, 20 + read, payloadLen - read)
+                    if (n <= 0) return ExifInterface.ORIENTATION_NORMAL
+                    read += n
+                }
+                return runCatching {
+                    ExifInterface(java.io.ByteArrayInputStream(wrapper)).getAttributeInt(
+                        ExifInterface.TAG_ORIENTATION,
+                        ExifInterface.ORIENTATION_NORMAL,
+                    )
+                }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
+            }
+
+            if (!skipExact(stream, chunkSize + (chunkSize and 1L))) break
+        }
+        return ExifInterface.ORIENTATION_NORMAL
+    }
+
+    /**
+     * Fast-path EXIF orientation reader for JPEGs.
+     * Scans the APP1 segment in the first 16 KB of [stream] (must support mark/reset)
+     * and extracts the TIFF IFD0 orientation tag (0x0112) without invoking
+     * [ExifInterface] or scanning through megabytes of pixel data.
+     * Returns null if not a JPEG, if APP1 is absent or beyond 16 KB, or if parsing fails.
+     */
+    private fun readJpegExifOrientation(stream: BufferedInputStream): Int? {
+        val peekLimit = 16 * 1024
+        stream.mark(peekLimit)
+        val buf = ByteArray(peekLimit)
+        var totalRead = 0
+        while (totalRead < buf.size) {
+            val n = stream.read(buf, totalRead, buf.size - totalRead)
+            if (n <= 0) break
+            totalRead += n
+        }
+        try {
+            stream.reset()
+        } catch (_: Exception) {
+            return null
+        }
+        if (totalRead < 4) return null
+        if ((buf[0].toInt() and 0xFF) != 0xFF || (buf[1].toInt() and 0xFF) != 0xD8) {
+            return null
+        }
+
+        var pos = 2
+        while (pos + 4 <= totalRead) {
+            if ((buf[pos].toInt() and 0xFF) != 0xFF) return null
+            while (pos < totalRead && (buf[pos].toInt() and 0xFF) == 0xFF) {
+                pos++
+            }
+            if (pos >= totalRead) return null
+            val marker = buf[pos++].toInt() and 0xFF
+            if (marker == 0xDA || marker == 0xD9) return null
+
+            if (pos + 2 > totalRead) return null
+            val segLen = ((buf[pos].toInt() and 0xFF) shl 8) or (buf[pos + 1].toInt() and 0xFF)
+            pos += 2
+            val payloadLen = segLen - 2
+            if (payloadLen < 0) return null
+
+            if (marker == 0xE1) {
+                if (payloadLen >= 14 && pos + payloadLen <= totalRead) {
+                    if (buf[pos] == 'E'.code.toByte() &&
+                        buf[pos + 1] == 'x'.code.toByte() &&
+                        buf[pos + 2] == 'i'.code.toByte() &&
+                        buf[pos + 3] == 'f'.code.toByte() &&
+                        buf[pos + 4] == 0.toByte() &&
+                        buf[pos + 5] == 0.toByte()
+                    ) {
+                        val tiff = pos + 6
+                        val tiffLen = payloadLen - 6
+                        if (tiffLen >= 8) {
+                            val isLE = buf[tiff] == 'I'.code.toByte() && buf[tiff + 1] == 'I'.code.toByte()
+                            val isBE = buf[tiff] == 'M'.code.toByte() && buf[tiff + 1] == 'M'.code.toByte()
+                            if (isLE || isBE) {
+                                val magic = if (isLE) {
+                                    (buf[tiff + 2].toInt() and 0xFF) or ((buf[tiff + 3].toInt() and 0xFF) shl 8)
+                                } else {
+                                    ((buf[tiff + 2].toInt() and 0xFF) shl 8) or (buf[tiff + 3].toInt() and 0xFF)
+                                }
+                                if (magic == 42) {
+                                    val ifd0Offset = if (isLE) {
+                                        (buf[tiff + 4].toLong() and 0xFFL) or
+                                            ((buf[tiff + 5].toLong() and 0xFFL) shl 8) or
+                                            ((buf[tiff + 6].toLong() and 0xFFL) shl 16) or
+                                            ((buf[tiff + 7].toLong() and 0xFFL) shl 24)
+                                    } else {
+                                        ((buf[tiff + 4].toLong() and 0xFFL) shl 24) or
+                                            ((buf[tiff + 5].toLong() and 0xFFL) shl 16) or
+                                            ((buf[tiff + 6].toLong() and 0xFFL) shl 8) or
+                                            (buf[tiff + 7].toLong() and 0xFFL)
+                                    }
+                                    val ifd0 = tiff + ifd0Offset.toInt()
+                                    if (ifd0 >= tiff && ifd0 + 2 <= pos + payloadLen) {
+                                        val count = if (isLE) {
+                                            (buf[ifd0].toInt() and 0xFF) or ((buf[ifd0 + 1].toInt() and 0xFF) shl 8)
+                                        } else {
+                                            ((buf[ifd0].toInt() and 0xFF) shl 8) or (buf[ifd0 + 1].toInt() and 0xFF)
+                                        }
+                                        var entryPos = ifd0 + 2
+                                        for (i in 0 until count) {
+                                            if (entryPos + 12 > pos + payloadLen) break
+                                            val tag = if (isLE) {
+                                                (buf[entryPos].toInt() and 0xFF) or ((buf[entryPos + 1].toInt() and 0xFF) shl 8)
+                                            } else {
+                                                ((buf[entryPos].toInt() and 0xFF) shl 8) or (buf[entryPos + 1].toInt() and 0xFF)
+                                            }
+                                            if (tag == 0x0112) {
+                                                val orientation = if (isLE) {
+                                                    (buf[entryPos + 8].toInt() and 0xFF) or ((buf[entryPos + 9].toInt() and 0xFF) shl 8)
+                                                } else {
+                                                    ((buf[entryPos + 8].toInt() and 0xFF) shl 8) or (buf[entryPos + 9].toInt() and 0xFF)
+                                                }
+                                                if (orientation in 1..8) {
+                                                    return orientation
+                                                }
+                                            }
+                                            entryPos += 12
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            pos += payloadLen
+        }
+        return null
+    }
+
+    /** Single-pass native scaling + EXIF orientation via API 28+ [ImageDecoder]
+     *  for local files. Returns null if [ImageDecoder] cannot handle the format
+     *  so the caller falls back to [BitmapFactory]. */
+    private fun tryLocalImageDecoder(
+        uriString: String,
+        fileName: String,
+        localFile: java.io.File,
+        targetSize: Int,
+        quality: Int,
+        preserveAlpha: Boolean,
+    ): ImageThumbnailOutcome? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return null
+        var rawWidth = 0
+        var rawHeight = 0
+        var permit: ImageDecodeGuard.Permit? = null
+        var refused: ImageDecodeGuard.RefusedException? = null
+        var headerCache: ByteArray? = null
+        var headerMs = 0L
+        var guardMs = 0L
+
+        val decodeT0 = PerfLog.begin()
+        val localWallT0 = if (VeLog.enabled) System.nanoTime() else 0L
+        val decoded: Bitmap = try {
+            val source = ImageDecoder.createSource(localFile)
+            ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+                rawWidth = info.size.width
+                rawHeight = info.size.height
+                if (rawWidth <= 0 || rawHeight <= 0) {
+                    throw java.io.IOException("Failed to read image bounds")
+                }
+                val worstCaseBytes = rawWidth.toLong() * rawHeight.toLong() *
+                    ImageDecodeGuard.WORST_CASE_BYTES_PER_PIXEL
+                if (worstCaseBytes >= ImageDecodeGuard.HEAVY_ESTIMATE_BYTES) {
+                    val hdrT0 = if (localWallT0 != 0L) System.nanoTime() else 0L
+                    headerCache = readImageHeader(uriString, fileName, -1, true, localFile)
+                    if (hdrT0 != 0L) headerMs = (System.nanoTime() - hdrT0) / 1_000_000L
+                }
+                val guardStart = PerfLog.begin()
+                val guardT0 = if (localWallT0 != 0L) System.nanoTime() else 0L
+                try {
+                    permit = ImageDecodeGuard.admit(activity, rawWidth, rawHeight, headerCache)
+                } catch (e: ImageDecodeGuard.RefusedException) {
+                    refused = e
+                    throw e
+                } finally {
+                    PerfLog.end("thumb.img.guard", guardStart)
+                    if (guardT0 != 0L) guardMs = (System.nanoTime() - guardT0) / 1_000_000L
+                }
+                decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                if (!preserveAlpha) {
+                    decoder.setMemorySizePolicy(ImageDecoder.MEMORY_POLICY_LOW_RAM)
+                }
+                val maxDim = maxOf(rawWidth, rawHeight)
+                if (maxDim > targetSize) {
+                    val scale = targetSize.toFloat() / maxDim
+                    val dstW = (rawWidth * scale).toInt().coerceAtLeast(1)
+                    val dstH = (rawHeight * scale).toInt().coerceAtLeast(1)
+                    decoder.setTargetSize(dstW, dstH)
+                }
+            }
+        } catch (t: Throwable) {
+            PerfLog.end("thumb.img.decode", decodeT0)
+            val refEx = refused ?: (t as? ImageDecodeGuard.RefusedException)
+            if (refEx != null) {
+                VeLog.w(TAG) { "Not fully decoding ${rawWidth}x$rawHeight image: ${refEx.message}" }
+                val dcPreview = decodeProgressiveJpegDcPreview(
+                    headerCache, targetSize, uriString, fileName, -1, true, localFile,
+                )
+                if (dcPreview != null) {
+                    val orientation = runCatching {
+                        ExifInterface(localFile).getAttributeInt(
+                            ExifInterface.TAG_ORIENTATION,
+                            ExifInterface.ORIENTATION_NORMAL,
+                        )
+                    }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
+                    return finishThumbnail(
+                        dcPreview, orientation, rawWidth, rawHeight, targetSize, quality, preserveAlpha,
+                    )
+                }
+                return ImageThumbnailOutcome.Failure(
+                    refEx.code,
+                    refEx.message ?: "Image is too large to decode",
+                )
+            }
+            if (t is OutOfMemoryError) {
+                return ImageThumbnailOutcome.Failure(
+                    ImageDecodeGuard.CODE_OUT_OF_MEMORY,
+                    "Not enough memory to decode image",
+                )
+            }
+            return null
+        } finally {
+            permit?.close()
+        }
+        PerfLog.end("thumb.img.decode", decodeT0)
+
+        return try {
+            val encodeStart = PerfLog.begin()
+            val stream = ByteArrayOutputStream(32768)
+            val format = if (preserveAlpha) {
+                Bitmap.CompressFormat.WEBP
+            } else {
+                Bitmap.CompressFormat.JPEG
+            }
+            decoded.compress(format, quality.coerceIn(1, 100), stream)
+            PerfLog.end("thumb.img.encode", encodeStart)
+            decoded.recycle()
+            val outBytes = stream.toByteArray()
+            if (localWallT0 != 0L) {
+                val totalLocalMs = (System.nanoTime() - localWallT0) / 1_000_000L
+                if (totalLocalMs >= 150L) {
+                    val ext = fileName.substringAfterLast('.', "").lowercase()
+                    VeLog.i("VE_PERF") {
+                        "[native] SLOW thumb.img.local ext=$ext target=$targetSize src=${rawWidth}x$rawHeight hdr=${headerMs}ms guard=${guardMs}ms total=${totalLocalMs}ms"
+                    }
+                }
+            }
+            ImageThumbnailOutcome.Success(outBytes, rawWidth, rawHeight)
+        } catch (e: OutOfMemoryError) {
+            decoded.recycle()
+            ImageThumbnailOutcome.Failure(
+                ImageDecodeGuard.CODE_OUT_OF_MEMORY,
+                "Not enough memory to decode image",
+            )
+        }
     }
 
     /** First [ImageDecodeGuard.HEADER_SNIFF_BYTES] of the image, from a stream
@@ -980,51 +1764,90 @@ class ThumbnailHandlers(
         localFile: java.io.File? = null,
         preserveAlpha: Boolean = false,
     ): ImageThumbnailOutcome {
-        // Read EXIF orientation from its own stream, before the bounds pass
-        // below -- ExifInterface consumes/seeks the stream it's given, so it
-        // needs a fresh one just like the bounds and decode passes each get
-        // their own (ContainerInputStream is cheap to reopen; see its doc
-        // comment). Camera phones almost universally store portrait photos
-        // as landscape sensor data plus this tag -- BitmapFactory below
+        // One stream serves the EXIF read, the bounds pass and the decode.
+        // The EXIF read used to get a stream of its own, because ExifInterface
+        // consumes whatever it is given; but that meant every thumbnail opened
+        // the file twice (a size query, a lock acquisition, and decrypting the
+        // file's first blocks all over again) and that read was measured at
+        // ~4.9 ms of a ~24 ms thumbnail. The stream is a BufferedInputStream,
+        // so it is rewound with reset() afterwards, exactly as it already is
+        // between the bounds and decode passes below.
+        //
+        // If the rewind fails (ExifInterface read past the mark limit, e.g. a
+        // PNG whose eXIf chunk follows its pixel data, or a large HEIF), a
+        // fresh stream is opened: the same cost as before, never a wrong
+        // result.
+         if (isLocalStorage && localFile != null) {
+            tryLocalImageDecoder(
+                uriString, fileName, localFile, targetSize, quality, preserveAlpha,
+            )?.let { return it }
+        }
+
+       val streamStats = StreamReadStats()
+        val streamBufSize = imageBufferSize(isLocalStorage, localFile)
+        val rawStream = openRawImageInputStream(uriString, fileName, volId, isLocalStorage, localFile)
+        var inputStream = BufferedInputStream(TimedInputStream(rawStream, streamStats), streamBufSize)
+        val exifMarkLimit = 128 * 1024
+        val boundsMarkLimit = streamBufSize
+
+        // Camera phones almost universally store portrait photos as landscape
+        // sensor data plus an EXIF orientation tag -- BitmapFactory below
         // knows nothing about it and decodes the raw (landscape) pixels, so
         // skipping this step is exactly what left thumbnails sideways while
         // the full-res viewer (decoded by Flutter/Skia, which *does* apply
         // EXIF orientation for JPEG) looked correct.
-        val exifOrientation = openImageInputStream(uriString, fileName, volId, isLocalStorage, localFile)
-            .use { stream ->
-                runCatching {
-                    ExifInterface(stream).getAttributeInt(
+        val exifStart = PerfLog.begin()
+        var exifResetFailed = false
+        val exifSniff = sniffExif(inputStream)
+        val exifOrientation = if (exifSniff.hasWebpExifBit) {
+            if (rawStream is ContainerInputStream) {
+                rawStream.reset()
+                val orientation = readWebpExifOrientation(TimedInputStream(rawStream, streamStats))
+                rawStream.reset()
+                inputStream = BufferedInputStream(TimedInputStream(rawStream, streamStats), streamBufSize)
+                orientation
+            } else {
+                inputStream.close()
+                val orientation = openRawImageInputStream(uriString, fileName, volId, isLocalStorage, localFile).use { s ->
+                    readWebpExifOrientation(TimedInputStream(s, streamStats))
+                }
+                inputStream = openImageInputStream(uriString, fileName, volId, isLocalStorage, localFile, streamStats)
+                orientation
+            }
+        } else if (exifSniff.mightHaveExif) {
+            val fastJpegOrientation = readJpegExifOrientation(inputStream)
+            if (fastJpegOrientation != null) {
+                fastJpegOrientation
+            } else {
+                inputStream.mark(exifMarkLimit)
+                val orientation = runCatching {
+                    ExifInterface(inputStream).getAttributeInt(
                         ExifInterface.TAG_ORIENTATION,
                         ExifInterface.ORIENTATION_NORMAL,
                     )
                 }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
+                try {
+                    inputStream.reset()
+                } catch (e: Exception) {
+                    exifResetFailed = true
+                    inputStream.close()
+                    inputStream = openImageInputStream(uriString, fileName, volId, isLocalStorage, localFile, streamStats)
+                }
+                orientation
             }
+        } else {
+            ExifInterface.ORIENTATION_NORMAL
+        }
+        val exifEndNs = if (exifStart != 0L) System.nanoTime() else 0L
+        val afterExifBytes = streamStats.bytesRead
+        val afterExifIoNs = streamStats.readNanos
+        PerfLog.end("thumb.img.exif", exifStart)
+        inputStream.mark(boundsMarkLimit)
 
-        var inputStream = openImageInputStream(uriString, fileName, volId, isLocalStorage, localFile)
-        // Reuse this single stream across the bounds and decode passes via
-        // mark()/reset() instead of opening a third ContainerInputStream
-        // from byte 0 (the EXIF read above already gets its own -- see that
-        // block's comment for why that one stays separate). Previously the
-        // bounds and decode passes here each opened their own stream, which
-        // meant every image thumbnail paid for an extra
-        // ContainerFileSystem.getFileSize() call, an extra per-volume lock
-        // acquisition on backends that don't skip it (native block-device,
-        // CryFS), and re-decrypted whatever small prefix the bounds-only
-        // pass had already read. BufferedInputStream is what makes reset()
-        // actually free here: the decode pass re-reads that prefix from its
-        // own buffer instead of calling back into ContainerInputStream, and
-        // only pulls fresh decrypted bytes once it reads past what the
-        // bounds pass consumed.
-        //
-        // Falls back to the old separate-stream approach if reset() fails
-        // for any reason (e.g. a decoder that consumes more than markLimit
-        // while sniffing format) -- correctness always wins over the
-        // optimization.
-        val markLimit = 1024 * 1024
-        inputStream.mark(markLimit)
-
+        val boundsStart = PerfLog.begin()
         val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeStream(inputStream, null, options)
+        PerfLog.end("thumb.img.bounds", boundsStart)
 
         // outWidth/outHeight are the raw decoded frame's bounds, i.e.
         // *before* EXIF rotation -- this is what extractImageThumbnail has
@@ -1057,6 +1880,7 @@ class ThumbnailHandlers(
         } else {
             null
         }
+        val guardStart = PerfLog.begin()
         val permit = try {
             ImageDecodeGuard.admit(activity, rawWidth, rawHeight, header)
         } catch (e: ImageDecodeGuard.RefusedException) {
@@ -1077,6 +1901,8 @@ class ThumbnailHandlers(
             return ImageThumbnailOutcome.Failure(e.code, e.message ?: "Image is too large to decode")
         }
 
+        PerfLog.end("thumb.img.guard", guardStart)
+
         try {
             val inSampleSize = calculateInSampleSize(rawWidth, rawHeight, targetSize)
             fun decodeOptionsFor(sampleSize: Int) = BitmapFactory.Options().apply {
@@ -1092,34 +1918,99 @@ class ThumbnailHandlers(
                 inputStream.reset()
             } catch (e: Exception) {
                 inputStream.close()
-                inputStream = openImageInputStream(uriString, fileName, volId, isLocalStorage, localFile)
+                inputStream = openImageInputStream(uriString, fileName, volId, isLocalStorage, localFile, streamStats)
             }
 
-            val decodedBitmap: Bitmap? = try {
-                BitmapFactory.decodeStream(inputStream, null, decodeOptionsFor(inSampleSize))
-            } catch (e: OutOfMemoryError) {
-                // One coarser retry (half the linear resolution) before giving
-                // up; a fresh stream is needed since this one is mid-decode.
-                VeLog.w(TAG) { "OOM decoding ${rawWidth}x$rawHeight at sample $inSampleSize; retrying coarser" }
-                inputStream.close()
-                System.gc()
-                val retryStream = openImageInputStream(uriString, fileName, volId, isLocalStorage, localFile)
-                try {
-                    BitmapFactory.decodeStream(retryStream, null, decodeOptionsFor(inSampleSize * 2))
-                } finally {
-                    retryStream.close()
-                }
-            } finally {
-                inputStream.close()
+            val beforeDecodeBytes = streamStats.bytesRead
+            val beforeDecodeCalls = streamStats.readCalls
+            val beforeDecodeIoNs = streamStats.readNanos
+            val decodeT0 = if (exifStart != 0L) System.nanoTime() else 0L
+          val decodeStart = PerfLog.begin()
+            val firstFrameBytes = if (exifSniff.isAnimWebp) {
+                readAnimatedWebpFirstFrame(inputStream)
+            } else {
+                null
             }
+            val decodedBitmap: Bitmap? = if (firstFrameBytes != null) {
+                inputStream.close()
+                try {
+                    BitmapFactory.decodeByteArray(
+                        firstFrameBytes,
+                        0,
+                        firstFrameBytes.size,
+                        decodeOptionsFor(inSampleSize),
+                    )
+                } catch (e: OutOfMemoryError) {
+                    VeLog.w(TAG) { "OOM decoding ${rawWidth}x$rawHeight at sample $inSampleSize; retrying coarser" }
+                    System.gc()
+                    BitmapFactory.decodeByteArray(
+                        firstFrameBytes,
+                        0,
+                        firstFrameBytes.size,
+                        decodeOptionsFor(inSampleSize * 2),
+                    )
+                } ?: run {
+                    val fallbackStream = openImageInputStream(uriString, fileName, volId, isLocalStorage, localFile, streamStats)
+                    try {
+                        BitmapFactory.decodeStream(fallbackStream, null, decodeOptionsFor(inSampleSize))
+                    } finally {
+                        fallbackStream.close()
+                    }
+                }
+            } else {
+                if (exifSniff.isAnimWebp) {
+                    inputStream.close()
+                    inputStream = openImageInputStream(uriString, fileName, volId, isLocalStorage, localFile, streamStats)
+                }
+                try {
+                    BitmapFactory.decodeStream(inputStream, null, decodeOptionsFor(inSampleSize))
+                } catch (e: OutOfMemoryError) {
+                    // One coarser retry (half the linear resolution) before giving
+                    // up; a fresh stream is needed since this one is mid-decode.
+                    VeLog.w(TAG) { "OOM decoding ${rawWidth}x$rawHeight at sample $inSampleSize; retrying coarser" }
+                    inputStream.close()
+                    System.gc()
+                    val retryStream = openImageInputStream(uriString, fileName, volId, isLocalStorage, localFile, streamStats)
+                    try {
+                        BitmapFactory.decodeStream(retryStream, null, decodeOptionsFor(inSampleSize * 2))
+                    } finally {
+                        retryStream.close()
+                    }
+                } finally {
+                    inputStream.close()
+                }
+            }
+            PerfLog.end("thumb.img.decode", decodeStart)
+            val decodeT1 = if (exifStart != 0L) System.nanoTime() else 0L
 
             if (decodedBitmap == null) {
                 return ImageThumbnailOutcome.Failure("DECODE_FAILED", "Failed to decode image bytes")
             }
 
-            return finishThumbnail(
+            val outcome = finishThumbnail(
                 decodedBitmap, exifOrientation, rawWidth, rawHeight, targetSize, quality, preserveAlpha,
             )
+             if (exifStart != 0L) {
+                val totalMs = (System.nanoTime() - exifStart) / 1_000_000L
+                val exifMs = (exifEndNs - exifStart) / 1_000_000L
+                if (exifMs >= 50L || totalMs >= 200L || exifResetFailed) {
+                    val ext = fileName.substringAfterLast('.', "").lowercase()
+                    val decodeTotalMs = (decodeT1 - decodeT0) / 1_000_000L
+                    val decodeIoMs = (streamStats.readNanos - beforeDecodeIoNs) / 1_000_000L
+                    val decodeCpuMs = (decodeTotalMs - decodeIoMs).coerceAtLeast(0L)
+                    val decodeBytes = streamStats.bytesRead - beforeDecodeBytes
+                    val decodeCalls = streamStats.readCalls - beforeDecodeCalls
+                    val exifIoMs = afterExifIoNs / 1_000_000L
+                    val totalIoMs = streamStats.readNanos / 1_000_000L
+                    VeLog.i("VE_PERF") {
+                        "[native] SLOW thumb.img ext=$ext target=$targetSize src=${rawWidth}x$rawHeight " +
+                            "sample=$inSampleSize exif=${exifMs}ms(io=${exifIoMs}ms,${afterExifBytes}B,might=${exifSniff.mightHaveExif},anim=${exifSniff.isAnimWebp},exifBit=${exifSniff.hasWebpExifBit}) " +
+                            "decode=${decodeTotalMs}ms(io=${decodeIoMs}ms,cpu=${decodeCpuMs}ms,${decodeBytes}B/${decodeCalls}c) " +
+                            "ioTotal=${totalIoMs}ms/${streamStats.bytesRead}B/${streamStats.readCalls}c resetFailed=$exifResetFailed total=${totalMs}ms"
+                    }
+                }
+            }
+            return outcome
         } catch (e: OutOfMemoryError) {
             // OutOfMemoryError is an Error, not an Exception: without this it
             // sails past every `catch (e: Exception)` up the stack and kills
@@ -1155,19 +2046,39 @@ class ThumbnailHandlers(
         val width = if (isSideways) rawHeight else rawWidth
         val height = if (isSideways) rawWidth else rawHeight
 
-        return try {
-            val rawBitmap = applyExifOrientation(decoded, orientationMatrix)
+       return try {
+            val scaleStart = PerfLog.begin()
+            val srcW = decoded.width
+            val srcH = decoded.height
+            val maxDim = maxOf(srcW, srcH)
+            val needsScale = maxDim > targetSize && maxDim > 0
+            val scale = if (needsScale) targetSize.toFloat() / maxDim else 1f
+            val scaledBitmap = if (needsScale && (srcW * scale < 1f || srcH * scale < 1f)) {
+                val fitted = scaledToFit(decoded, targetSize)
+                if (fitted != decoded) decoded.recycle()
+                applyExifOrientation(fitted, orientationMatrix)
+            } else {
+                val combined = Matrix(orientationMatrix)
+                if (needsScale) combined.preScale(scale, scale)
+                if (combined.isIdentity) {
+                    decoded
+                } else {
+                    Bitmap.createBitmap(decoded, 0, 0, srcW, srcH, combined, true).also {
+                        if (it != decoded) decoded.recycle()
+                    }
+                }
+            }
+            PerfLog.end("thumb.img.orient_scale", scaleStart)
 
-            val scaledBitmap = scaledToFit(rawBitmap, targetSize)
-            if (scaledBitmap != rawBitmap) rawBitmap.recycle()
-
-            val stream = ByteArrayOutputStream()
+            val stream = ByteArrayOutputStream(32768)
             val format = if (preserveAlpha) {
                 Bitmap.CompressFormat.WEBP
             } else {
                 Bitmap.CompressFormat.JPEG
             }
+            val encodeStart = PerfLog.begin()
             scaledBitmap.compress(format, quality.coerceIn(1, 100), stream)
+            PerfLog.end("thumb.img.encode", encodeStart)
             val bytes = stream.toByteArray()
             scaledBitmap.recycle()
 
@@ -1226,7 +2137,14 @@ class ThumbnailHandlers(
             return
         }
 
+        val sentAtMs = call.argument<Number>("sentAtMs")?.toLong() ?: 0L
+        val channelHopMs = if (VeLog.enabled && sentAtMs > 0L) {
+            (System.currentTimeMillis() - sentAtMs).coerceAtLeast(0L)
+        } else 0L
+        val wallStartNs = if (VeLog.enabled) System.nanoTime() else 0L
+        val enqueuedAt = PerfLog.begin()
         imageExecutor.execute {
+            PerfLog.end("thumb.img.queue_wait", enqueuedAt)
             try {
                 // Same isLocalStorage guard as runVideoThumbnail above, and
                 // for the identical reason: uriString is the *container's*
@@ -1275,7 +2193,9 @@ class ThumbnailHandlers(
                         }
                 }
 
-                when (val outcome = extractImageThumbnail(
+                val preRunMs = if (wallStartNs != 0L) (System.nanoTime() - wallStartNs) / 1_000_000L else 0L
+                val runStart = PerfLog.begin()
+                val extracted = extractImageThumbnail(
                     uriString,
                     fileName,
                     volId,
@@ -1284,9 +2204,25 @@ class ThumbnailHandlers(
                     isLocalStorage,
                     localFile,
                     preserveAlpha,
-                )) {
+                )
+                PerfLog.end("thumb.img.run", runStart)
+                val postStartNs = if (wallStartNs != 0L) System.nanoTime() else 0L
+                val runMs = if (wallStartNs != 0L) (postStartNs - wallStartNs) / 1_000_000L - preRunMs else 0L
+                when (val outcome = extracted) {
                     is ImageThumbnailOutcome.Success ->
-                        activity.runOnUiThread { result.success(onSuccess(outcome)) }
+                        activity.runOnUiThread {
+                            if (postStartNs != 0L) {
+                                val totalMs = (System.nanoTime() - wallStartNs) / 1_000_000L
+                                if (totalMs >= 250L || channelHopMs >= 100L) {
+                                    val uiDelayMs = (System.nanoTime() - postStartNs) / 1_000_000L
+                                    val ext = fileName.substringAfterLast('.', "").lowercase()
+                                    VeLog.i("VE_PERF") {
+                                        "[native] SLOW thumb.img.wall ext=$ext local=$isLocalStorage target=$targetSize hop=${channelHopMs}ms pre=${preRunMs}ms run=${runMs}ms ui=${uiDelayMs}ms total=${totalMs}ms"
+                                    }
+                                }
+                            }
+                            result.success(onSuccess(outcome))
+                        }
                     is ImageThumbnailOutcome.Failure ->
                         activity.runOnUiThread { result.error(outcome.code, outcome.message, null) }
                 }
@@ -1330,6 +2266,118 @@ class ThumbnailHandlers(
         }
     }
 
+    /**
+     * Header-only dimension probe for a *batch* of images, so the gallery can
+     * lay a folder out with the right tile shapes before a single thumbnail
+     * has been decoded.
+     *
+     * Reads only what [BitmapFactory]'s bounds pass and [ExifInterface] need
+     * (a few KB per file, decrypted on the fly) -- no pixel decode, no
+     * thumbnail, nothing cached or written anywhere. The result is
+     * `[w0, h0, w1, h1, ...]`, one pair per requested name in the same order,
+     * with `0, 0` for a file whose size could not be read (not an image this
+     * device can parse, unreadable, or SAF-backed browsing, which has no
+     * stream to open from here). Sizes are the *upright* ones: swapped when
+     * the EXIF orientation turns the image sideways, exactly as
+     * [finishThumbnail] reports them, so a tile is never laid out sideways.
+     *
+     * One executor task per batch (the caller sends modest batches and keeps
+     * at most one in flight) so a large folder cannot flood [imageExecutor]
+     * ahead of the thumbnail requests that are actually on screen.
+     */
+    fun handleProbeImageDimensions(call: MethodCall, result: MethodChannel.Result) {
+        val uriString = call.argument<String>("filePath")
+        val fileNames = call.argument<List<String>>("fileNames")
+        val isLocalStorage = call.argument<Boolean>("isLocalStorage") ?: false
+
+        if (uriString == null || fileNames == null) {
+            result.error("INVALID_ARGS", "filePath and fileNames required", null)
+            return
+        }
+
+       VideoThumbnailCoordinator.probeExecutor.execute {
+            try {
+                val out = IntArray(fileNames.size * 2)
+                val safBacked = isLocalStorage && uriString.startsWith("content://")
+                var volId = -1
+                if (!isLocalStorage) {
+                    volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
+                        ?: run {
+                            activity.runOnUiThread { result.error("NOT_MOUNTED", "Container not mounted", null) }
+                            return@execute
+                        }
+                }
+                if (!safBacked) {
+                    for ((i, fileName) in fileNames.withIndex()) {
+                        var localFile: java.io.File? = null
+                        if (isLocalStorage) {
+                            val file = if (fileName.startsWith("/")) java.io.File(fileName) else java.io.File(uriString, fileName)
+                            if (!file.exists()) continue
+                            localFile = file
+                        }
+                        val dims = probeImageDimensions(uriString, fileName, volId, isLocalStorage, localFile)
+                        if (dims != null) {
+                            out[i * 2] = dims.first
+                            out[i * 2 + 1] = dims.second
+                        }
+                    }
+                }
+                activity.runOnUiThread { result.success(out) }
+            } catch (e: Exception) {
+                activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
+            }
+        }
+    }
+
+    /** Upright (width, height) of one image from its headers, or null. Blocking. */
+    private fun probeImageDimensions(
+        uriString: String,
+        fileName: String,
+        volId: Int,
+        isLocalStorage: Boolean,
+        localFile: java.io.File?,
+    ): Pair<Int, Int>? {
+        return try {
+            var stream = openImageInputStream(uriString, fileName, volId, isLocalStorage, localFile)
+            val markLimit = 1024 * 1024
+            val exifOrientation = if (mightHaveExif(stream)) {
+                val fastJpegOrientation = readJpegExifOrientation(stream)
+                if (fastJpegOrientation != null) {
+                    fastJpegOrientation
+                } else {
+                    stream.mark(markLimit)
+                    val orientation = runCatching {
+                        ExifInterface(stream).getAttributeInt(
+                            ExifInterface.TAG_ORIENTATION,
+                            ExifInterface.ORIENTATION_NORMAL,
+                        )
+                    }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
+                    try {
+                        stream.reset()
+                    } catch (e: Exception) {
+                        stream.close()
+                        stream = openImageInputStream(uriString, fileName, volId, isLocalStorage, localFile)
+                    }
+                    orientation
+                }
+            } else {
+                ExifInterface.ORIENTATION_NORMAL
+            }
+            val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            stream.use { BitmapFactory.decodeStream(it, null, options) }
+            val rawWidth = options.outWidth
+            val rawHeight = options.outHeight
+            if (rawWidth <= 0 || rawHeight <= 0) return null
+            val isSideways = exifOrientation == ExifInterface.ORIENTATION_ROTATE_90 ||
+                exifOrientation == ExifInterface.ORIENTATION_ROTATE_270 ||
+                exifOrientation == ExifInterface.ORIENTATION_TRANSPOSE ||
+                exifOrientation == ExifInterface.ORIENTATION_TRANSVERSE
+            if (isSideways) Pair(rawHeight, rawWidth) else Pair(rawWidth, rawHeight)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     /** A thumbnail made by [thumbnailFromImageBytes]; sizes are the *source* image's. */
     class BytesThumbnail(val bytes: ByteArray, val sourceWidth: Int, val sourceHeight: Int)
 
@@ -1361,6 +2409,8 @@ class ThumbnailHandlers(
      * @throws BytesThumbnailException
      */
     fun thumbnailFromImageBytes(data: ByteArray, targetSize: Int, quality: Int): BytesThumbnail {
+        val bytesStart = PerfLog.begin()
+        try {
         val exifOrientation = runCatching {
             ExifInterface(java.io.ByteArrayInputStream(data))
                 .getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
@@ -1438,6 +2488,9 @@ class ThumbnailHandlers(
         } finally {
             permit.close()
         }
+        } finally {
+            PerfLog.end("thumb.bytes.run", bytesStart)
+        }
     }
 
     /**
@@ -1502,7 +2555,10 @@ class ThumbnailHandlers(
             return
         }
 
+        val apkEnqueuedAt = PerfLog.begin()
         imageExecutor.execute {
+            PerfLog.end("thumb.apk.queue_wait", apkEnqueuedAt)
+            val apkStart = PerfLog.begin()
             var pfd: ParcelFileDescriptor? = null
             try {
                 val archiveFilePath: String
@@ -1576,6 +2632,7 @@ class ThumbnailHandlers(
                 VeLog.w(TAG) { "handleGetApkIcon failed for $fileName: ${e.message}" }
                 activity.runOnUiThread { result.error("APK_ICON_FAILED", e.message, null) }
             } finally {
+                PerfLog.end("thumb.apk.run", apkStart)
                 try {
                     pfd?.close()
                 } catch (e: Exception) {
@@ -1707,7 +2764,10 @@ class ThumbnailHandlers(
         extractor: MediaExtractor,
         codec: MediaCodec,
         seekTimeUs: Long,
-    ): Bitmap? = VideoThumbnailCoordinator.decodeSoftwareFrameAt(extractor, codec, seekTimeUs)
+        targetSize: Int = 0,
+    ): Bitmap? = VideoThumbnailCoordinator.decodeSoftwareFrameAt(
+        extractor, codec, seekTimeUs, targetSize,
+    )
 
     /**
      * Attempts frame extraction using an explicit Software-Only [MediaCodec]
@@ -1719,7 +2779,7 @@ class ThumbnailHandlers(
      * thumbnails to be extracted safely while ExoPlayer is actively playing
      * 4K videos on the GPU/HW decoder.
      */
-    private fun extractVideoFrameSoftware(
+     private fun extractVideoFrameSoftware(
         uriString: String,
         fileName: String,
         volId: Int,
@@ -1730,11 +2790,14 @@ class ThumbnailHandlers(
         explicitTimeUs: Long? = null,
         strategy: String = "hybrid",
         framePosition: Double = 0.12,
+        trace: SwTrace? = null,
     ): VideoFrameResult? {
         var extractor: MediaExtractor? = null
         var codec: MediaCodec? = null
         try {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return null
+            val swDsT0 = System.nanoTime()
+            val swDsStart = PerfLog.begin()
             extractor = MediaExtractor()
             if (isLocalStorage && localFile != null) {
                 extractor.setDataSource(localFile.absolutePath)
@@ -1742,6 +2805,8 @@ class ThumbnailHandlers(
                 val dataSource = ContainerMediaDataSource(activity, uriString, fileName, volId)
                 extractor.setDataSource(dataSource)
             }
+            PerfLog.end("thumb.vid.sw_ds", swDsStart)
+            trace?.dsMs = (System.nanoTime() - swDsT0) / 1_000_000L
 
             var videoTrackIndex = -1
             var format: MediaFormat? = null
@@ -1770,10 +2835,21 @@ class ThumbnailHandlers(
             val durationUs = if (format.containsKey(MediaFormat.KEY_DURATION)) {
                 format.getLong(MediaFormat.KEY_DURATION)
             } else 10_000_000L
+            val rotation = if (format.containsKey(MediaFormat.KEY_ROTATION)) {
+                format.getInteger(MediaFormat.KEY_ROTATION)
+            } else 0
+            val fmtW = if (format.containsKey(MediaFormat.KEY_WIDTH)) format.getInteger(MediaFormat.KEY_WIDTH) else 0
+            val fmtH = if (format.containsKey(MediaFormat.KEY_HEIGHT)) format.getInteger(MediaFormat.KEY_HEIGHT) else 0
+            val srcWidth = if (rotation == 90 || rotation == 270) fmtH else fmtW
+            val srcHeight = if (rotation == 90 || rotation == 270) fmtW else fmtH
 
+            val swCfgT0 = System.nanoTime()
+            val swCfgStart = PerfLog.begin()
             codec = MediaCodec.createByCodecName(swCodecName)
             codec.configure(format, null, null, 0)
             codec.start()
+            PerfLog.end("thumb.vid.sw_cfg", swCfgStart)
+            trace?.cfgMs = (System.nanoTime() - swCfgT0) / 1_000_000L
 
             val ext = extractor
             val dec = codec
@@ -1783,15 +2859,21 @@ class ThumbnailHandlers(
                 "frameAtPercentage" -> (durationUs * framePosition.coerceIn(0.05, 0.90)).toLong()
                 else -> 0L
             }
-            var outputFrame = decodeSoftwareFrameAt(ext, dec, seekTimeUs)
+            val swDecT0 = System.nanoTime()
+            val swDecStart = PerfLog.begin()
+            var outputFrame = decodeSoftwareFrameAt(ext, dec, seekTimeUs, targetSize)
+            PerfLog.end("thumb.vid.sw_dec", swDecStart)
+            trace?.decMs = (System.nanoTime() - swDecT0) / 1_000_000L
             if (strategy == "hybrid" && explicitTimeUs == null &&
                 (outputFrame == null || VideoThumbnailCoordinator.isLikelyBlankFrame(outputFrame))
             ) {
+                val swBlankT0 = System.nanoTime()
+                val swBlankStart = PerfLog.begin()
                 val fractions = (listOf(framePosition.coerceIn(0.05, 0.90)) + VideoThumbnailCoordinator.BLANK_FRAME_RETRY_FRACTIONS.toList()).distinct()
                 for (fraction in fractions) {
                     val candidateUs = (durationUs * fraction).toLong()
                     if (candidateUs <= seekTimeUs) continue
-                    val candidate = runCatching { decodeSoftwareFrameAt(ext, dec, candidateUs) }.getOrNull()
+                    val candidate = runCatching { decodeSoftwareFrameAt(ext, dec, candidateUs, targetSize) }.getOrNull()
                         ?: continue
                     if (!VideoThumbnailCoordinator.isLikelyBlankFrame(candidate)) {
                         outputFrame?.recycle()
@@ -1800,11 +2882,22 @@ class ThumbnailHandlers(
                     }
                     candidate.recycle()
                 }
+                PerfLog.end("thumb.vid.sw_blank_retry", swBlankStart)
+                trace?.blankMs = (System.nanoTime() - swBlankT0) / 1_000_000L
             }
 
             if (outputFrame != null) {
-                return compressFrame(outputFrame, targetSize, quality)
-            }
+                val swRotT0 = System.nanoTime()
+                val res = compressFrame(
+                    rotatedUpright(outputFrame, rotation),
+                    targetSize,
+                    quality,
+                    overrideSourceWidth = if (srcWidth > 0) srcWidth else null,
+                    overrideSourceHeight = if (srcHeight > 0) srcHeight else null,
+                )
+                trace?.rotMs = (System.nanoTime() - swRotT0) / 1_000_000L
+                return res
+            }   
             return null
         } catch (e: Exception) {
             VeLog.w(TAG) { "Software MediaCodec extraction failed (len=${fileName.length}): ${e.message}" }
@@ -1816,6 +2909,17 @@ class ThumbnailHandlers(
             }
             runCatching { extractor?.release() }
         }
+    }
+
+    /** [src] turned by [degrees] clockwise (0/90/180/270), recycling [src]
+     *  when a rotated copy is made. A multiple of 360 returns [src] as is. */
+    private fun rotatedUpright(src: Bitmap, degrees: Int): Bitmap {
+        val d = ((degrees % 360) + 360) % 360
+        if (d == 0) return src
+        val matrix = Matrix().apply { postRotate(d.toFloat()) }
+        val rotated = Bitmap.createBitmap(src, 0, 0, src.width, src.height, matrix, true)
+        if (rotated != src) src.recycle()
+        return rotated
     }
 
     private fun findSoftwareDecoderName(mimeType: String): String? =

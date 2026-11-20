@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "copy_progress_callback.h"
+#include "fs_grow.h"
 
 uint64_t recursiveFatFolderSize(int volumeId, const std::string& path);
 
@@ -12,7 +13,7 @@ uint64_t recursiveFatFolderSize(int volumeId, const std::string& path);
 // not mounted, read failing part-way) -- `results` must then not be trusted or
 // cached. A directory that simply doesn't exist lists as empty and returns true.
 bool fatListDirectory(int volumeId, const std::string& pathSuffix, std::vector<std::string>& results);
-uint64_t fatGetFileSize(int volumeId, const std::string& path);
+int64_t fatGetFileSize(int volumeId, const std::string& path);
 bool fatReadFileChunk(int volumeId, const std::string& path, uint64_t offset, size_t length, std::vector<uint8_t>& outBuffer);
 bool fatWriteFileChunk(int volumeId, const std::string& path, uint64_t offset, const uint8_t* data, size_t length);
 bool fatWriteBackFile(int volumeId, const std::string& targetPath, const std::string& sourceHostPath,
@@ -30,3 +31,7 @@ std::string fatGetFilesystemLabel(int volumeId);
 void* fatOpenStream(int volumeId, const std::string& path);
 int32_t fatReadStream(int volumeId, void* handle, uint64_t offset, uint8_t* dest, size_t length);
 void fatCloseStream(int volumeId, void* handle);
+
+// FAT/exFAT can't be grown in place (see fat_backend.cpp): reports kUnsupported when the volume has at least
+// 1 MiB of space beyond the end of the file system, kAlreadyFills otherwise.
+FsGrowStatus fatGrowToFit(int volumeId);

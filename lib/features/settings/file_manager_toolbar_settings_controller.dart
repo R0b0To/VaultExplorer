@@ -22,6 +22,8 @@ import 'package:vaultexplorer/data/models/video_aspect_ratio_mode.dart';
 import 'package:vaultexplorer/core/theme/app_skin_settings_provider.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
+import 'package:vaultexplorer/data/services/app_settings_service.dart';
+import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 
 part 'file_manager_toolbar_settings_controller.g.dart';
 
@@ -144,6 +146,7 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
         folderLayoutModes: currentServiceConfig.folderLayoutModes,
         folderGridAspectRatios: currentServiceConfig.folderGridAspectRatios,
         folderSortModes: currentServiceConfig.folderSortModes,
+        musicModeStorageUris: currentServiceConfig.musicModeStorageUris,
       );
       await service.save(preservedConfig);
 
@@ -172,11 +175,20 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
   Future<void> setAutoHideTabBar(bool val) =>
       _updateConfig(state.config.copyWith(autoHideTabBar: val));
 
+  Future<void> setAutoHideToolbar(bool val) =>
+      _updateConfig(state.config.copyWith(autoHideToolbar: val));
+
+  Future<void> setAutoHideBreadcrumbBar(bool val) =>
+      _updateConfig(state.config.copyWith(autoHideBreadcrumbBar: val));
+
   Future<void> setUseFabForToolbar(bool val) =>
       _updateConfig(state.config.copyWith(useFabForToolbar: val));
 
   Future<void> setShowHiddenFiles(bool val) =>
       _updateConfig(state.config.copyWith(showHiddenFiles: val));
+
+  Future<void> setShowNoMediaFolders(bool val) =>
+      _updateConfig(state.config.copyWith(showNoMediaFolders: val));
 
   Future<void> setShowBreadcrumbBar(bool val) =>
       _updateConfig(state.config.copyWith(showBreadcrumbBar: val));
@@ -255,6 +267,25 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
   Future<void> setDefaultThumbnailQuality(ThumbnailQuality quality) =>
       _updateConfig(state.config.copyWith(defaultThumbnailQuality: quality));
 
+  Future<void> setDefaultGalleryMetadataCacheMode(ThumbnailCacheMode mode) =>
+      _updateConfig(
+        state.config.copyWith(defaultGalleryMetadataCacheMode: mode),
+      );
+
+  Future<void> setLocalStorageGalleryMetadataCacheMode(
+    ThumbnailCacheMode mode,
+  ) => _updateConfig(
+    state.config.copyWith(localStorageGalleryMetadataCacheMode: mode),
+  );
+
+  Future<void> setDefaultMusicIndexCacheMode(ThumbnailCacheMode mode) =>
+      _updateConfig(state.config.copyWith(defaultMusicIndexCacheMode: mode));
+
+  Future<void> setLocalStorageMusicIndexCacheMode(ThumbnailCacheMode mode) =>
+      _updateConfig(
+        state.config.copyWith(localStorageMusicIndexCacheMode: mode),
+      );
+
   /// The thumbnail slot shared by Local Storage and the decoy file manager.
   Future<void> setLocalStorageThumbnailCacheMode(ThumbnailCacheMode mode) =>
       _updateConfig(
@@ -284,6 +315,52 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
       }
     }
     return changed;
+  }
+
+  Future<void> setGalleryModeForStorage(
+    String containerUri,
+    bool enabled,
+  ) async {
+    final newConfig = state.config.withGalleryModeForStorage(
+      containerUri,
+      enabled,
+    );
+    await _updateConfig(newConfig);
+  }
+
+  /// Limits [containerUri]'s gallery to [folders] (paths from the storage
+  /// root, subfolders included); an empty list scans the whole storage.
+  Future<void> setGalleryFoldersForStorage(
+    String containerUri,
+    List<String> folders,
+  ) async {
+    final newConfig = state.config.withGalleryFoldersForStorage(
+      containerUri,
+      folders,
+    );
+    await _updateConfig(newConfig);
+  }
+
+  Future<void> setGalleryPromptSkippedForStorage(
+    String containerUri,
+    bool skipped,
+  ) async {
+    final newConfig = state.config.withGalleryPromptSkippedForStorage(
+      containerUri,
+      skipped,
+    );
+    await _updateConfig(newConfig);
+  }
+
+  Future<void> setMusicPromptSkippedForStorage(
+    String containerUri,
+    bool skipped,
+  ) async {
+    final newConfig = state.config.withMusicPromptSkippedForStorage(
+      containerUri,
+      skipped,
+    );
+    await _updateConfig(newConfig);
   }
 
   Future<void> reorderActions(int oldIndex, int newIndex) async {
@@ -394,12 +471,52 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
     ),
   );
 
+  /// Puts every option on the file manager settings screen back to its
+  /// default. Per-storage state that is not an option on that screen (gallery
+  /// and music mode choices, skipped prompts, per-folder overrides) and the
+  /// app-wide vault thumbnail defaults are kept as they are.
+  ///
+  /// The app-level options the screen also shows (tabs, dual pane, app bar
+  /// position, default layout, tab swipe gestures) live in app settings, so
+  /// they are reset there too.
   Future<void> resetToDefaults() async {
     final def = FileManagerToolbarConfig.defaults();
-    await _updateConfig(def);
+    final cur = state.config;
+    final next = def.copyWith(
+      folderLayoutModes: cur.folderLayoutModes,
+      folderGridAspectRatios: cur.folderGridAspectRatios,
+      folderSortModes: cur.folderSortModes,
+      galleryModeStorageUris: cur.galleryModeStorageUris,
+      galleryFoldersByStorage: cur.galleryFoldersByStorage,
+      skipGalleryPromptStorageUris: cur.skipGalleryPromptStorageUris,
+      skipMusicPromptStorageUris: cur.skipMusicPromptStorageUris,
+      musicModeStorageUris: cur.musicModeStorageUris,
+      defaultThumbnailCacheMode: cur.defaultThumbnailCacheMode,
+      defaultThumbnailQuality: cur.defaultThumbnailQuality,
+      defaultGalleryMetadataCacheMode: cur.defaultGalleryMetadataCacheMode,
+      defaultMusicIndexCacheMode: cur.defaultMusicIndexCacheMode,
+    );
+    ThumbnailCacheService.setVideoThumbnailSettings(
+      next.mediaViewerToolbarConfig.thumbnailGenerationStrategy,
+      next.mediaViewerToolbarConfig.thumbnailFramePosition,
+    );
+    await _updateConfig(next);
+    if (!ref.mounted) return;
+    final defaults = AppSettings();
+    await ref
+        .read(appSettingsControllerProvider.notifier)
+        .updateSettings(
+          (s) => s.copyWith(
+            defaultLayoutMode: defaults.defaultLayoutMode,
+            useBrowserTabs: defaults.useBrowserTabs,
+            useDualPaneBrowsing: defaults.useDualPaneBrowsing,
+            tabSwipeGestures: defaults.tabSwipeGestures,
+            appBarAtBottom: defaults.appBarAtBottom,
+          ),
+        );
   }
 
-void applyImportedConfig(FileManagerToolbarConfig newConfig) {
+  void applyImportedConfig(FileManagerToolbarConfig newConfig) {
     ThumbnailCacheService.setVideoThumbnailSettings(
       newConfig.mediaViewerToolbarConfig.thumbnailGenerationStrategy,
       newConfig.mediaViewerToolbarConfig.thumbnailFramePosition,

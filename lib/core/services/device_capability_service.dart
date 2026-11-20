@@ -1,3 +1,4 @@
+import 'package:flutter/painting.dart' show PaintingBinding;
 import 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart';
 import 'package:vaultexplorer/core/api/vault_lifecycle_api.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
@@ -12,6 +13,11 @@ class DeviceCapabilityService {
 
   static bool _initialized = false;
 
+  /// The tier native reported (`LOW`, `MEDIUM` or `HIGH`), or null until
+  /// [init] has finished (or if the lookup failed and defaults stayed in use).
+  /// Only read for diagnostics.
+  static String? detectedTier;
+
   /// Queries native device capability profile once at startup and resizes Dart-side
   /// cache/concurrency structures accordingly. Safe to call multiple times (no-ops if already done).
   static Future<void> init(VaultLifecycleApi lifecycleApi) async {
@@ -21,38 +27,45 @@ class DeviceCapabilityService {
     try {
       final profile = await lifecycleApi.getDeviceCapabilityProfile();
       final tier = profile.tier;
-
+      detectedTier = tier.toUpperCase();
 
       switch (tier.toUpperCase()) {
         case 'LOW':
           ThumbnailConcurrency.resizeForDevice(
-            imageConcurrency: 1,
+            imageConcurrency: 2,
             videoConcurrency: 1,
             inFlightCapacity: 80,
           );
           ThumbnailCacheService.resizeMemoryBudget(12 * 1024 * 1024); // 12 MB
           FullResImageCache.resize(60 * 1024 * 1024); // 60 MB
+          PaintingBinding.instance.imageCache.maximumSizeBytes =
+              64 * 1024 * 1024;
           break;
 
-        case 'HIGH':
+          case 'HIGH':
           ThumbnailConcurrency.resizeForDevice(
-            imageConcurrency: 3,
+            imageConcurrency: 6,
             videoConcurrency: 2,
             inFlightCapacity: 240,
           );
-          ThumbnailCacheService.resizeMemoryBudget(48 * 1024 * 1024); // 48 MB
+          ThumbnailCacheService.resizeMemoryBudget(64 * 1024 * 1024); // 64 MB
           FullResImageCache.resize(300 * 1024 * 1024); // 300 MB
+          PaintingBinding.instance.imageCache.maximumSizeBytes =
+              256 * 1024 * 1024;
+          PaintingBinding.instance.imageCache.maximumSize = 1500;
           break;
 
         case 'MEDIUM':
         default:
           ThumbnailConcurrency.resizeForDevice(
-            imageConcurrency: 2,
-            videoConcurrency: 1,
+            imageConcurrency: 4,
+            videoConcurrency: 2,
             inFlightCapacity: 160,
           );
-          ThumbnailCacheService.resizeMemoryBudget(24 * 1024 * 1024); // 24 MB
+          ThumbnailCacheService.resizeMemoryBudget(40 * 1024 * 1024); // 40 MB
           FullResImageCache.resize(150 * 1024 * 1024); // 150 MB
+          PaintingBinding.instance.imageCache.maximumSizeBytes =
+              128 * 1024 * 1024;
           break;
       }
     } catch (e) {

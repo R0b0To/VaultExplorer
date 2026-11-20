@@ -1,0 +1,20 @@
+diff --git a/libntfs-3g/dir.c b/libntfs-3g/dir.c
+index 5cab5c5..dddc465 100644
+--- a/libntfs-3g/dir.c
++++ b/libntfs-3g/dir.c
+@@ -583,8 +583,13 @@ u64 ntfs_inode_lookup_by_mbsname(ntfs_inode *dir_ni, const char *name)
+ 		} else
+ #endif
+ 			{
+-				/* Generate unicode name. */
+-			uname_len = ntfs_mbstoucs(cached_name, &uname);
++				/*
++				 * Generate unicode name. cached_name is NULL on a
++				 * case sensitive volume (the default for a volume
++				 * mounted with ntfs_device_mount()), so use const_name,
++				 * which is either the upper-cased or the original name.
++				 */
++			uname_len = ntfs_mbstoucs(const_name, &uname);
+ 			if (uname_len >= 0)
+ 				inum = ntfs_inode_lookup_by_name(dir_ni,
+ 						uname, uname_len);

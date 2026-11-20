@@ -42,13 +42,15 @@ void main() {
       final first = await repo.listDirectory(tempDir.path);
       expect(first.length, 3);
 
-      // Create another file on disk that wouldn't be in the cache
-      await File('${tempDir.path}/file2.txt').writeAsString('second file');
-
       // Without refresh, cached result is returned
       final cached = await repo.listDirectory(tempDir.path);
       expect(cached.length, 3);
       expect(cached, same(first));
+
+      // When a file is created on disk, directory modification time changes and updates listing
+      await File('${tempDir.path}/file2.txt').writeAsString('second file');
+      final afterAdd = await repo.listDirectory(tempDir.path);
+      expect(afterAdd.length, 4);
 
       // With refresh: true, cache is bypassed and updated
       final refreshed = await repo.listDirectory(tempDir.path, refresh: true);

@@ -9,6 +9,7 @@ import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.NativeEngine
 import com.aeidolon.vaultexplorer.NativeOpSupport
 import com.aeidolon.vaultexplorer.container.ContainerFormat
+import com.aeidolon.vaultexplorer.foldervault.NativeFolderVault
 import com.aeidolon.vaultexplorer.saf.SafDocumentOps
 
 /**
@@ -49,12 +50,11 @@ class HeaderBackupHandlers(
     private val ioExecutor: ExecutorService,
     private val nativeOps: NativeOpSupport,
 ) {
-    private val folderVaultConfigFileNames = mapOf(
-        "gocryptfs" to "gocryptfs.conf",
-        "cryfs" to "cryfs.config",
-        "cryptomator" to "masterkey.cryptomator",
-        "directory_vault" to "masterkey.cryptomator",
-    )
+    /** The folder-vault format a wire name denotes ([NativeFolderVault.GOCRYPTFS] ...), or null. */
+    private fun folderVaultFormat(wire: String): Int? = NativeFolderVault.formatFromWire(wire).takeIf { it >= 0 }
+
+    /** The config file a folder vault of [format] keeps in its root -- known to the native core only. */
+    private fun folderVaultConfigFileName(format: Int): String? = NativeFolderVault.configFileName(format).ifEmpty { null }
 
     private fun containerFormatOrdinalForWire(wire: String): Int? = when (wire) {
         "veracrypt" -> 0
@@ -219,8 +219,9 @@ class HeaderBackupHandlers(
             result.error("INVALID_ARGS", "uri and format are required", null)
             return
         }
-        val fileName = folderVaultConfigFileNames[format]
-        if (fileName == null) {
+        val folderFormat = folderVaultFormat(format)
+        val fileName = folderFormat?.let { folderVaultConfigFileName(it) }
+        if (folderFormat == null || fileName == null) {
             result.error("UNSUPPORTED_FORMAT", "Unknown folder vault format: $format", null)
             return
         }
@@ -262,40 +263,17 @@ class HeaderBackupHandlers(
             result.error("INVALID_ARGS", "uri, format, and bytes are required", null)
             return
         }
-        val fileName = folderVaultConfigFileNames[format]
-        if (fileName == null) {
+        val folderFormat = folderVaultFormat(format)
+        val fileName = folderFormat?.let { folderVaultConfigFileName(it) }
+        if (folderFormat == null || fileName == null) {
             result.error("UNSUPPORTED_FORMAT", "Unknown folder vault format: $format", null)
             return
         }
 
         ioExecutor.execute {
             try {
-                val invalidReason: String? = when (format) {
-                    "gocryptfs" -> try {
-                        com.aeidolon.vaultexplorer.gocryptfs.GocryptfsConfig.parse(bytes)
-                        null
-                    } catch (e: Exception) {
-                        e.message ?: "Malformed gocryptfs.conf"
-                    }
-                    "cryptomator", "directory_vault" -> try {
-                        com.aeidolon.vaultexplorer.cryptomator.CryptomatorMasterkeyFile.parse(bytes)
-                        null
-                    } catch (e: Exception) {
-                        e.message ?: "Malformed masterkey.cryptomator"
-                    }
-                    "cryfs" -> {
-                        // cryfs.config's outer envelope is itself password-encrypted
-                        // (see CryfsConfigFile.kt), so this can't fully parse it
-                        // without a password -- just check the cleartext prefix
-                        // every genuine cryfs.config starts with, plus its fixed
-                        // total size.
-                        val prefix = "cryfs.config;1;scrypt".toByteArray(Charsets.US_ASCII)
-                        val looksGenuine = bytes.size >= 1024 &&
-                            bytes.copyOfRange(0, prefix.size).contentEquals(prefix)
-                        if (looksGenuine) null else "Doesn't look like a genuine cryfs.config."
-                    }
-                    else -> "Unknown folder vault format: $format"
-                }
+                // Password-free structural check by the native core (cpp/foldervault/fv_formats.h).
+                val invalidReason: String? = NativeFolderVault.validateConfig(folderFormat, bytes)
                 if (invalidReason != null) {
                     activity.runOnUiThread { result.error("BACKUP_INVALID", invalidReason, null) }
                     return@execute

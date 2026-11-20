@@ -12,6 +12,18 @@
 // - Coalesces data clusters into uninterrupted 128 KB bursts.
 // - Buffers FAT table/directory metadata updates separately so they never break the data burst.
 // - Provides 64 KB read-ahead for fast folder browsing and smooth video playback.
+//
+// Coherence invariants (see io/test/usb_block_cache_test.cpp):
+//  1. The two write streams never overlap each other. A new write that only
+//     partly overlaps a buffered stream drains that stream first; one fully
+//     inside a buffered stream is merged in place. Flush order between the
+//     streams therefore cannot reorder two writes to the same sector.
+//  2. A read-ahead chunk is dropped whenever any write reaches the device
+//     over it (directWrite), including write-back of a buffered stream, so a
+//     chunk filled while a write was still pending is never served after that
+//     write has drained.
+//  3. A stream is only forgotten after the device accepted it. A failed flush
+//     keeps the bytes pending so a later flush retries them.
 class UsbBlockCache {
 public:
     static constexpr size_t SECTOR_SIZE         = 512;
@@ -95,6 +107,25 @@ public:
             return directWrite(volId, byteOffset, inBuf, byteCount);
         }
 
+        // Keep the streams disjoint (invariant 1). A write wholly inside a
+        // buffered stream replaces those bytes in place; one that only
+        // partly overlaps a stream drains it first, so the data lands on the
+        // device in write order whichever stream the new bytes go to.
+        if (dataStream_.contains(sector, count)) {
+            dataStream_.updateInPlace(sector, count, inBuf);
+            return true;
+        }
+        if (metaStream_.contains(sector, count)) {
+            metaStream_.updateInPlace(sector, count, inBuf);
+            return true;
+        }
+        if (dataStream_.overlaps(sector, count)) {
+            if (!flushStreamLocked(volId, dataStream_)) return false;
+        }
+        if (metaStream_.overlaps(sector, count)) {
+            if (!flushStreamLocked(volId, metaStream_)) return false;
+        }
+
         // 2. Extends current data stream: append without flushing
         if (dataStream_.canAppend(sector, count)) {
             dataStream_.append(sector, count, inBuf);
@@ -107,10 +138,6 @@ public:
         // 3. Small metadata write (<= 4 sectors / 2 KB): route to metaStream_
         // so it never breaks the contiguous dataStream_
         if (count <= 4) {
-            if (metaStream_.contains(sector, count)) {
-                metaStream_.updateInPlace(sector, count, inBuf);
-                return true;
-            }
             if (metaStream_.canAppend(sector, count)) {
                 metaStream_.append(sector, count, inBuf);
                 if (metaStream_.count == metaStream_.maxSectors) {
@@ -217,10 +244,16 @@ private:
             s.reset();
             return true;
         }
-        uint32_t count = s.count;
-        uint64_t sector = s.startSector;
+        // Only forget the stream once the device accepted it. These bytes
+        // were already acknowledged to the caller by write(); resetting
+        // first turned one transient write failure into silent data loss
+        // (the retry found nothing pending and reported success).
+        if (!directWrite(volId, s.startSector * SECTOR_SIZE, s.data.data(),
+                         static_cast<size_t>(s.count) * SECTOR_SIZE)) {
+            return false;
+        }
         s.reset();
-        return directWrite(volId, sector * SECTOR_SIZE, s.data.data(), count * SECTOR_SIZE);
+        return true;
     }
 
     ReadChunk* findReadChunkLocked(uint64_t aligned) {
@@ -263,6 +296,11 @@ private:
 
     bool directWrite(int volId, uint64_t off, const unsigned char* src, size_t len) {
         if (len % SECTOR_SIZE != 0 || off % SECTOR_SIZE != 0) return false;
+        // Single choke point for every write that reaches the device: any
+        // read-ahead chunk covering these sectors may hold their old content
+        // (it can have been filled while this write was still buffered), so
+        // drop it whether or not the device write succeeds.
+        invalidateReadCacheLocked(off, len);
         return usbWriteSectors(volId, off / SECTOR_SIZE, static_cast<uint32_t>(len / SECTOR_SIZE), src);
     }
 };

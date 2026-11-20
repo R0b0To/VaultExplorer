@@ -1,0 +1,6 @@
+• Native C++ core for gocryptfs, Cryptomator & CryFS
+• Critical VeraCrypt fixes: backup header offset & hidden volume range
+• Fixed USB OTG cache corruption & write-loss bugs
+• Overhauled Sync & Storage Analyzer (interactive cleanup)
+• Added Gallery mode, quick menu & media category filters
+• Fixed archiving empty folders, session tabs & security patches

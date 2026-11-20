@@ -57,3 +57,11 @@ void cascadeEncryptSector(const CascadeContext& ctx, uint64_t sectorNumber,
                            const unsigned char in[512], unsigned char out[512]);
 void cascadeDecryptSector(const CascadeContext& ctx, uint64_t sectorNumber,
                            const unsigned char in[512], unsigned char out[512]);
+
+// LUKS XTS data unit helper. Unlike VeraCrypt's fixed 512-byte units, LUKS2
+// may use 512..4096-byte sector sizes. [sectorNumber] is the 512-byte-based
+// plain64 tweak value used by the mounted-volume path; [dataLen] is one LUKS
+// data unit and must be a multiple of 16. Only single-cipher LUKS contexts
+// are accepted. Returns false for invalid geometry/context.
+bool cascadeCryptLuksXtsUnit(const CascadeContext& ctx, bool encrypt, uint64_t sectorNumber,
+                             size_t dataLen, const unsigned char* in, unsigned char* out);

@@ -1,8 +1,8 @@
-import 'package:flutter/foundation.dart';
+import 'package:meta/meta.dart';
 
 /// Canonical parser for the directory-entry wire format produced by every
 /// backend (`fat_backend.cpp`, `ntfs_backend.cpp`, `ext_backend.cpp`,
-/// `CryfsSession.kt`, `CryptomatorSession.kt`, `GocryptfsSession.kt`,
+/// `foldervault_bridge.cpp` (gocryptfs / Cryptomator / CryFS),
 /// `archive_context.dart`) — see docs/architecture.md §5.3 and ADR-003.
 ///
 /// Wire layout — an explicit type tag, then three more fields, joined by
@@ -10,8 +10,10 @@ import 'package:flutter/foundation.dart';
 ///
 ///   "F|sizeBytes|unixSecs|name"   (file)
 ///   "D|0|unixSecs|name"           (directory)
+///   "L|targetBytes|unixSecs|name" (symbolic link to a file / broken link)
+///   "LD|0|unixSecs|name"          (symbolic link to a directory)
 ///
-/// The type is a real field (`F`/`D`), never inferred from the name — and
+/// The type is a real field (`F`, `D`, `L` or `LD`), never inferred from the name — and
 /// the name is *everything after the third `|`*, not "up to the next `|`",
 /// so a name that itself contains `|` (legal on ext2/3/4) round-trips
 /// exactly instead of corrupting the fields after it. Previously this used
@@ -31,6 +33,10 @@ class RawEntry {
   final String name;
   final bool isDir;
 
+  /// True when this entry is a symbolic link. The entry keeps
+  /// its link path for rename/delete, while content access follows its target.
+  final bool isSymlink;
+
   /// Byte size of the file.  Always 0 for directories; call [getFolderSize]
   /// for the real recursive total.
   final int sizeBytes;
@@ -47,6 +53,7 @@ class RawEntry {
   const RawEntry({
     required this.name,
     required this.isDir,
+    this.isSymlink = false,
     required this.sizeBytes,
     required this.modifiedSecs,
     this.isPlaceholder = false,
@@ -56,8 +63,35 @@ class RawEntry {
         _extension = extension;
 
   String get lowercaseName => _lowercaseName ?? name.toLowerCase();
-  String get extension =>
-      _extension ?? (name.contains('.') ? name.split('.').last.toLowerCase() : '');
+  String get extension => _extension ?? _extensionOf(name, lowerCase: true);
+
+  /// The part of [name] after its last `.` (empty when there is no dot).
+  ///
+  /// Same result as `name.contains('.') ? name.split('.').last : ''`, without
+  /// building a list of every dot-separated piece for each entry: a listing
+  /// of a few thousand files used to allocate that list once per file.
+  static String _extensionOf(String name, {required bool lowerCase}) {
+    final dot = name.lastIndexOf('.');
+    if (dot < 0) return '';
+    final ext = name.substring(dot + 1);
+    return lowerCase ? ext.toLowerCase() : ext;
+  }
+
+  /// Parses `raw[start, end)` as a non-negative decimal, or returns -1 when it
+  /// is empty, too long to be sure of, or holds anything but digits (the
+  /// caller then falls back to `int.tryParse`, so odd input behaves exactly as
+  /// before). Avoids allocating a substring per numeric field.
+  static int _parseDigits(String raw, int start, int end) {
+    final len = end - start;
+    if (len <= 0 || len > 18) return -1;
+    var value = 0;
+    for (var i = start; i < end; i++) {
+      final digit = raw.codeUnitAt(i) - 0x30;
+      if (digit < 0 || digit > 9) return -1;
+      value = value * 10 + digit;
+    }
+    return value;
+  }
 
   /// Parses one entry from the directory-listing wire format described
   /// above. The type tag is read as an explicit field, and the name is
@@ -79,20 +113,42 @@ class RawEntry {
       );
     }
 
-    final typeTag = raw.substring(0, firstSep);
-    final sizeStr = raw.substring(firstSep + 1, secondSep);
-    final mtimeStr = raw.substring(secondSep + 1, thirdSep);
+    // Type tag: "F", "D", "L" or "LD". Read from the code units rather than
+    // slicing a one/two character substring out of every line.
+    var isDir = false;
+    var isSymlink = false;
+    if (firstSep == 1) {
+      final tag = raw.codeUnitAt(0);
+      isDir = tag == 0x44; // D
+      isSymlink = tag == 0x4C; // L
+    } else if (firstSep == 2 &&
+        raw.codeUnitAt(0) == 0x4C && // L
+        raw.codeUnitAt(1) == 0x44) {
+      // D
+      isDir = true;
+      isSymlink = true;
+    }
+
+    var size = _parseDigits(raw, firstSep + 1, secondSep);
+    if (size < 0) {
+      size = int.tryParse(raw.substring(firstSep + 1, secondSep)) ?? 0;
+    }
+    var mtime = _parseDigits(raw, secondSep + 1, thirdSep);
+    if (mtime < 0) {
+      mtime = int.tryParse(raw.substring(secondSep + 1, thirdSep)) ?? 0;
+    }
+
     final name = raw.substring(thirdSep + 1);
     final lower = name.toLowerCase();
-    final ext = lower.contains('.') ? lower.split('.').last : '';
 
     return RawEntry(
       name: name,
-      isDir: typeTag == 'D',
-      sizeBytes: int.tryParse(sizeStr) ?? 0,
-      modifiedSecs: int.tryParse(mtimeStr) ?? 0,
+      isDir: isDir,
+      isSymlink: isSymlink,
+      sizeBytes: size,
+      modifiedSecs: mtime,
       lowercaseName: lower,
-      extension: ext,
+      extension: _extensionOf(lower, lowerCase: false),
     );
   }
 
@@ -104,10 +160,29 @@ class RawEntry {
   /// loop: every hand-written `if (raw.startsWith('System:')) continue`
   /// guard is one omission away from [RawEntry.parse] throwing a
   /// [FormatException] on a sentinel line it was never meant to see.
-  static List<RawEntry> parseAll(Iterable<String> rawList) => rawList
-      .where((raw) => !raw.startsWith('System:'))
-      .map(RawEntry.parse)
-      .toList();
+  static List<RawEntry> parseAll(Iterable<String> rawList) {
+    final out = <RawEntry>[];
+    for (final raw in rawList) {
+      if (raw.startsWith('System:')) continue;
+      out.add(RawEntry.parse(raw));
+    }
+    return out;
+  }
+
+  /// True when [a] and [b] hold equal entries in the same order.
+  ///
+  /// A listing that is refreshed in the background usually comes back
+  /// unchanged; callers use this to keep the list instance they already have,
+  /// so everything keyed on that instance (sorted/filtered views, layout)
+  /// stays valid instead of being rebuilt for identical content.
+  static bool sameEntries(List<RawEntry> a, List<RawEntry> b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
 
   /// Reconstructs the canonical wire string.
   ///
@@ -116,7 +191,8 @@ class RawEntry {
   /// that still expects the wire format. Most in-app state (like
   /// [FileBrowserSelectionState.items]) holds [RawEntry] values directly and
   /// has no need to round-trip through this.
-  String get raw => '${isDir ? 'D' : 'F'}|$sizeBytes|$modifiedSecs|$name';
+  String get raw =>
+      '${isSymlink ? (isDir ? 'LD' : 'L') : isDir ? 'D' : 'F'}|$sizeBytes|$modifiedSecs|$name';
 
   /// This entry under a different [newName] (deep-search results, whose name
   /// is the path relative to the folder searched from).
@@ -130,13 +206,12 @@ class RawEntry {
   RawEntry withName(String newName) => RawEntry(
     name: newName,
     isDir: isDir,
+    isSymlink: isSymlink,
     sizeBytes: sizeBytes,
     modifiedSecs: modifiedSecs,
     isPlaceholder: isPlaceholder,
     lowercaseName: newName.toLowerCase(),
-    extension: newName.contains('.')
-        ? newName.split('.').last.toLowerCase()
-        : '',
+    extension: _extensionOf(newName, lowerCase: true),
   );
 
   /// Modification date/time, or null when the FAT timestamp is absent.
@@ -157,15 +232,56 @@ class RawEntry {
       other is RawEntry &&
           other.name == name &&
           other.isDir == isDir &&
+          other.isSymlink == isSymlink &&
           other.sizeBytes == sizeBytes &&
           other.modifiedSecs == modifiedSecs &&
           other.isPlaceholder == isPlaceholder;
 
   @override
-  int get hashCode => Object.hash(name, isDir, sizeBytes, modifiedSecs, isPlaceholder);
+  int get hashCode => Object.hash(name, isDir, isSymlink, sizeBytes, modifiedSecs, isPlaceholder);
 
   @override
   String toString() =>
       'RawEntry(${isDir ? "DIR" : "FILE"} $name, '
       '${sizeBytes}B, ts=$modifiedSecs${isPlaceholder ? ", placeholder" : ""})';
+}
+
+/// A directory listing already parsed into [RawEntry] values, plus whether
+/// native had to cut it short.
+///
+/// What the interactive browser actually wants from a listing. Producing this
+/// directly lets sources that already hold [RawEntry] values (plain device
+/// storage) skip formatting every entry into a wire string just so it can be
+/// parsed straight back, and parses the wire form and looks for the
+/// `System:TRUNCATED` marker in a single pass for the sources that don't.
+class ParsedDirectoryListing {
+  const ParsedDirectoryListing(
+    this.entries, {
+    this.truncated = false,
+    this.preSortedByNameAsc = false,
+  });
+
+  /// Parses wire-format lines (see [RawEntry.parse]); `System:*` sentinel
+  /// lines are dropped, and `System:TRUNCATED` sets [truncated].
+  factory ParsedDirectoryListing.fromWire(Iterable<String> rawList) {
+    final out = <RawEntry>[];
+    var truncated = false;
+    for (final raw in rawList) {
+      if (raw.startsWith('System:')) {
+        if (raw == 'System:TRUNCATED') truncated = true;
+        continue;
+      }
+      out.add(RawEntry.parse(raw));
+    }
+    return ParsedDirectoryListing(out, truncated: truncated);
+  }
+
+  final List<RawEntry> entries;
+
+  /// True when the folder has more children than native was willing to list.
+  final bool truncated;
+
+  /// True when [entries] are already partitioned (dirs first) and sorted by
+  /// [naturalCompare] on `lowercaseName` ascending.
+  final bool preSortedByNameAsc;
 }

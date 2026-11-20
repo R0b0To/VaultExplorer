@@ -3,6 +3,7 @@ import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
+import 'package:vaultexplorer/core/utils/perf_trace.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/clipboard_item.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
@@ -66,10 +67,38 @@ class FileBrowserOperationsController {
     required List<ClipboardItem> items,
     required bool isCut,
     required bool isCrossContainer,
-    required Future<ConflictPlan?> Function(List<ConflictEntry> conflicts) resolveConflicts,
+    bool sourceItemsValidated = false,
+    required Future<ConflictPlan?> Function(List<ConflictEntry> conflicts)
+    resolveConflicts,
     required AppLocalizations l10n,
   }) async {
-    final existingRaw = await _fileIoApi.listDirectory(destContainer, destDirPath) ?? [];
+    final preEnqueueT0 = PerfTrace.begin();
+    PerfTrace.count('paste.controller.items', items.length);
+    final validItems = <ClipboardItem>[];
+    final sourceCheckT0 = PerfTrace.begin();
+    if (sourceItemsValidated) {
+      validItems.addAll(items);
+      PerfTrace.count('paste.controller.source_check_reused');
+    } else {
+      final sourceExists = await _fileIoApi.entryExistsBatch(srcContainer, [
+        for (final item in items) (path: item.path, isDir: item.isDir),
+      ]);
+      for (var index = 0; index < items.length; index++) {
+        if (sourceExists[index]) validItems.add(items[index]);
+      }
+    }
+    PerfTrace.end('paste.controller.source_check', sourceCheckT0, slowMs: 250);
+    PerfTrace.count('paste.controller.valid_items', validItems.length);
+    if (validItems.isEmpty) {
+      PerfTrace.count('paste.controller.no_valid_items');
+      PerfTrace.end('paste.controller.pre_enqueue', preEnqueueT0, slowMs: 1000);
+      return null;
+    }
+
+    final destListT0 = PerfTrace.begin();
+    final existingRaw =
+        await _fileIoApi.listDirectory(destContainer, destDirPath) ?? [];
+    PerfTrace.end('paste.controller.dest_list', destListT0, slowMs: 250);
     final caseSensitive = namesAreCaseSensitive(destContainer);
     final existingNames = <String>{};
     final existingDirs = <String>{};
@@ -80,8 +109,9 @@ class FileBrowserOperationsController {
       existingNames.add(key);
       if (e.isDir) existingDirs.add(key);
     }
+    final conflictScanT0 = PerfTrace.begin();
     final conflicts = detectPasteConflicts(
-      items: items,
+      items: validItems,
       existingNamesLower: existingNames,
       existingDirsLower: existingDirs,
       isCrossContainer: isCrossContainer,
@@ -89,10 +119,30 @@ class FileBrowserOperationsController {
       currentDirPath: destDirPath,
       caseSensitive: caseSensitive,
     );
+    PerfTrace.end(
+      'paste.controller.conflict_scan',
+      conflictScanT0,
+      slowMs: 100,
+    );
+    PerfTrace.count('paste.controller.conflicts', conflicts.length);
     ConflictPlan conflictPlan = const {};
     if (conflicts.isNotEmpty) {
+      final conflictSheetT0 = PerfTrace.begin();
       final result = await resolveConflicts(conflicts);
-      if (result == null) return null;
+      PerfTrace.end(
+        'paste.controller.conflict_sheet',
+        conflictSheetT0,
+        slowMs: 500,
+      );
+      if (result == null) {
+        PerfTrace.count('paste.controller.conflict_cancelled');
+        PerfTrace.end(
+          'paste.controller.pre_enqueue',
+          preEnqueueT0,
+          slowMs: 1000,
+        );
+        return null;
+      }
       conflictPlan = result;
     }
     // enqueueLocalTransfer takes a raw dart:io shortcut -- it resolves
@@ -101,13 +151,14 @@ class FileBrowserOperationsController {
     // If either side is a SAF Document Provider (content://), route through
     // the general runner to use VaultFileIoApi.
     final bothAreRawLocal = destContainer.isRawLocal && srcContainer.isRawLocal;
-    return bothAreRawLocal
+    final enqueueT0 = PerfTrace.begin();
+    final op = bothAreRawLocal
         ? _opSvc.enqueueLocalTransfer(
             isCut: isCut,
             source: srcContainer,
             dest: destContainer,
             destDirPath: destDirPath,
-            items: items,
+            items: validItems,
             conflictPlan: conflictPlan,
             l10n: l10n,
           )
@@ -116,9 +167,12 @@ class FileBrowserOperationsController {
             source: srcContainer,
             dest: destContainer,
             destDirPath: destDirPath,
-            items: items,
+            items: validItems,
             conflictPlan: conflictPlan,
             l10n: l10n,
           );
+    PerfTrace.end('paste.controller.enqueue', enqueueT0, slowMs: 100);
+    PerfTrace.end('paste.controller.pre_enqueue', preEnqueueT0, slowMs: 1000);
+    return op;
   }
 }

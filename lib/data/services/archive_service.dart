@@ -196,6 +196,7 @@ class ArchiveService {
   static Future<ArchiveContext> openLocal({
     required String pathOrUri,
     required String archiveName,
+    String? archivePathInContainer,
     int pathStackEntryIndex = 0,
     String? passphrase,
     ArchiveContext? parent,
@@ -217,7 +218,7 @@ class ArchiveService {
     }
 
     return ArchiveContext.fromScanResult(
-      archivePathInContainer: archiveName,
+      archivePathInContainer: archivePathInContainer ?? archiveName,
       indexResult: result,
       pathStackEntryIndex: pathStackEntryIndex,
       api: _archive,

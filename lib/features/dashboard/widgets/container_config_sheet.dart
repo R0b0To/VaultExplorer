@@ -2,14 +2,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/api/vault_engine_types.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/utils/responsive.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
-import 'package:vaultexplorer/core/widgets/inputs/thumbnail_settings_tiles.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
-import 'package:vaultexplorer/data/models/thumbnail_settings.dart';
 import 'package:vaultexplorer/data/models/vault_delete_after_import_mode.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
@@ -18,6 +17,8 @@ import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/automation_settings_screen.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/change_password_screen.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_config_controller.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/container_indexes_thumbnails_screen.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/cryptomator_upgrade_tile.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/pattern_pin_verify_controller.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/real_password_gate_controller.dart';
@@ -96,6 +97,55 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
         .firstOrNull;
   }
 
+  Future<void> _openIndexesAndThumbnails() {
+    return Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => SkinAreaScope(
+          area: SkinArea.dashboard,
+          child: ContainerIndexesThumbnailsScreen(
+            params: _params,
+            mountedContainer: widget.mountedContainer,
+            isModified: (state) => state.isModified(
+              _passwordCtrl.text,
+              _labelCtrl.text,
+              _pimCtrl.text,
+            ),
+            canSave: (state) => state.canSave(_passwordCtrl.text),
+            onSave: () =>
+                _save(ref.read(containerConfigControllerProvider(_params))),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIndexesAndThumbnailsEntry(
+    BuildContext context,
+    TextTheme textTheme,
+    ColorScheme cs,
+  ) {
+    return SectionCard(
+      children: [
+        ListTile(
+          leading: Icon(Icons.photo_library_outlined, color: cs.primary),
+          title: Text(
+            context.l10n.indexesAndThumbnailsTitle,
+            style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          subtitle: Text(
+            context.l10n.indexesAndThumbnailsSubtitle,
+            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+          trailing: Icon(
+            Icons.chevron_right_rounded,
+            color: cs.onSurfaceVariant,
+          ),
+          onTap: _openIndexesAndThumbnails,
+        ),
+      ],
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -126,48 +176,6 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
     _passwordCtrl.dispose();
     _pimCtrl.dispose();
     super.dispose();
-  }
-
-  Future<void> _clearThumbnailCache() async {
-    final confirm = await showAppConfirmDialog(
-      context,
-      title: context.l10n.clearThumbnailCacheDialogTitle,
-      message: context.l10n.clearThumbnailCacheDialogMessage,
-      confirmLabel: context.l10n.clearCacheButton,
-      isDestructive: true,
-    );
-    if (!confirm || !mounted) return;
-
-    final result = await ref
-        .read(containerConfigControllerProvider(_params).notifier)
-        .clearThumbnailCache();
-
-    if (!mounted) return;
-    if (result.isLocked) {
-      showAppSnackBar(
-        context,
-        message: context.l10n.appCacheClearedUnlockMessage,
-        tone: AppBannerTone.warning,
-      );
-    } else if (result.appCacheCleared && result.containerCacheCleared) {
-      showAppSnackBar(
-        context,
-        message: context.l10n.allThumbnailCachesClearedMessage,
-        tone: AppBannerTone.success,
-      );
-    } else if (result.appCacheCleared) {
-      showAppSnackBar(
-        context,
-        message: context.l10n.appCacheClearedContainerFailedMessage,
-        tone: AppBannerTone.warning,
-      );
-    } else {
-      showAppSnackBar(
-        context,
-        message: context.l10n.failedToClearThumbnailCachesMessage,
-        tone: AppBannerTone.error,
-      );
-    }
   }
 
   Future<void> _save(ContainerConfigState state) async {
@@ -474,9 +482,8 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
       state,
       textTheme,
     );
-    final thumbnailSection = _buildThumbnailSection(
+    final indexesAndThumbnailsEntry = _buildIndexesAndThumbnailsEntry(
       context,
-      state,
       textTheme,
       cs,
     );
@@ -627,7 +634,7 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                                     children: [
                                       systemSection,
                                       const SizedBox(height: 14),
-                                      thumbnailSection,
+                                      indexesAndThumbnailsEntry,
                                       const SizedBox(height: 14),
                                       toolsSection,
                                       const SizedBox(height: 16),
@@ -655,7 +662,7 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                         const SizedBox(height: 16),
                         systemSection,
                         const SizedBox(height: 16),
-                        thumbnailSection,
+                        indexesAndThumbnailsEntry,
                         const SizedBox(height: 16),
                         toolsSection,
                         const SizedBox(height: 24),
@@ -856,76 +863,81 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      TextField(
-                        controller: _passwordCtrl,
-                        obscureText: _revealLocked ? true : !_showPassword,
-                        enableInteractiveSelection: !_revealLocked,
-                        autofillHints: null,
-                        onChanged: (val) {
-                          if (val.isEmpty) _prefillCleared = true;
-                          setState(() {});
-                        },
-                        decoration: InputDecoration(
-                          filled: true,
-                          fillColor: cs.surfaceContainerHighest,
-                          labelText:
-                              context.l10n.containerPasswordOptionalLabel,
-                          prefixIcon: const Icon(
-                            Icons.lock_outline_rounded,
-                            size: 20,
-                          ),
-                          suffixIcon: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (_passwordPrefilled)
-                                Padding(
-                                  padding: const EdgeInsets.only(right: 4),
-                                  child: Tooltip(
-                                    message:
-                                        context.l10n.usingSavedPasswordTooltip,
-                                    child: Icon(
-                                      Icons.bookmark_rounded,
-                                      size: 20,
-                                      color: cs.primary,
+                      AutofillGroup(
+                        onDisposeAction: AutofillContextAction.cancel,
+                        child: TextField(
+                          controller: _passwordCtrl,
+                          obscureText: _revealLocked ? true : !_showPassword,
+                          enableInteractiveSelection: !_revealLocked,
+                          autofillHints: const <String>[AutofillHints.password],
+                          onChanged: (val) {
+                            if (val.isEmpty) _prefillCleared = true;
+                            setState(() {});
+                          },
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: cs.surfaceContainerHighest,
+                            labelText:
+                                context.l10n.containerPasswordOptionalLabel,
+                            prefixIcon: const Icon(
+                              Icons.lock_outline_rounded,
+                              size: 20,
+                            ),
+                            suffixIcon: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (_passwordPrefilled)
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 4),
+                                    child: Tooltip(
+                                      message: context
+                                          .l10n
+                                          .usingSavedPasswordTooltip,
+                                      child: Icon(
+                                        Icons.bookmark_rounded,
+                                        size: 20,
+                                        color: cs.primary,
+                                      ),
                                     ),
                                   ),
-                                ),
-                              PasswordVisibilityToggle(
-                                obscured: _revealLocked ? true : !_showPassword,
-                                enabled: !_revealLocked,
-                                onToggle: () => setState(
-                                  () => _showPassword = !_showPassword,
-                                ),
-                              ),
-                              if (widget.existingRecord != null &&
-                                  widget.existingRecord!.unlockMethod !=
-                                      ContainerUnlockMethod.password)
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.close_rounded,
-                                    size: 20,
+                                PasswordVisibilityToggle(
+                                  obscured: _revealLocked
+                                      ? true
+                                      : !_showPassword,
+                                  enabled: !_revealLocked,
+                                  onToggle: () => setState(
+                                    () => _showPassword = !_showPassword,
                                   ),
-                                  tooltip: context
-                                      .l10n
-                                      .cancelUpdatingPasswordTooltip,
-                                  onPressed: () {
-                                    ref
-                                        .read(
-                                          containerConfigControllerProvider(
-                                            _params,
-                                          ).notifier,
-                                        )
-                                        .setChangePassword(false);
-                                    _passwordCtrl.clear();
-                                    _prefillCleared = true;
-                                  },
                                 ),
-                            ],
-                          ),
-                          hintText: context.l10n.passwordHintContainer,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(18),
-                            borderSide: BorderSide.none,
+                                if (widget.existingRecord != null &&
+                                    widget.existingRecord!.unlockMethod !=
+                                        ContainerUnlockMethod.password)
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.close_rounded,
+                                      size: 20,
+                                    ),
+                                    tooltip: context
+                                        .l10n
+                                        .cancelUpdatingPasswordTooltip,
+                                    onPressed: () {
+                                      ref
+                                          .read(
+                                            containerConfigControllerProvider(
+                                              _params,
+                                            ).notifier,
+                                          )
+                                          .setChangePassword(false);
+                                      _passwordCtrl.clear();
+                                      _prefillCleared = true;
+                                    },
+                                  ),
+                              ],
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(18),
+                              borderSide: BorderSide.none,
+                            ),
                           ),
                         ),
                       ),
@@ -1076,12 +1088,15 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                     final result = await Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => SkinAreaScope(area: SkinArea.dashboard, child: ChangePasswordScreen(
-                          uri: widget.uri,
-                          initialCipherId: widget.existingRecord!.cipherId,
-                          initialHashId: widget.existingRecord!.hashId,
-                          containerFormat: fmt ?? 'veracrypt',
-                        )),
+                        builder: (_) => SkinAreaScope(
+                          area: SkinArea.dashboard,
+                          child: ChangePasswordScreen(
+                            uri: widget.uri,
+                            initialCipherId: widget.existingRecord!.cipherId,
+                            initialHashId: widget.existingRecord!.hashId,
+                            containerFormat: fmt ?? 'veracrypt',
+                          ),
+                        ),
                       ),
                     );
                     if (result is List<KeyfileRef> && mounted) {
@@ -1094,6 +1109,15 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                   }
                 },
               ),
+              if (_isCryptomator)
+                CryptomatorUpgradeTile(
+                  uri: widget.uri,
+                  format: state.cryptomatorFormat,
+                  vaultIsUnlocked: widget.mountedContainer != null,
+                  onUpgraded: () => ref
+                      .read(containerConfigControllerProvider(_params).notifier)
+                      .refreshCryptomatorFormat(),
+                ),
             ],
           ],
         ),
@@ -1217,6 +1241,27 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
                   .setAlwaysOpenReadOnly(value),
               secondary: const Icon(Icons.visibility_outlined),
             ),
+            if (_isCryptomator)
+              SwitchListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                title: Text(
+                  context.l10n.cryptomatorBackupKeyFilesTitle,
+                  style: textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: Text(
+                  context.l10n.cryptomatorBackupKeyFilesSubtitle,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+                value: state.backupKeyFiles,
+                onChanged: (value) => ref
+                    .read(containerConfigControllerProvider(_params).notifier)
+                    .setBackupKeyFiles(value),
+                secondary: const Icon(Icons.history_rounded),
+              ),
             SwitchListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 16),
               title: Text(
@@ -1281,85 +1326,6 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
     );
   }
 
-  Widget _buildThumbnailSection(
-    BuildContext context,
-    ContainerConfigState state,
-    TextTheme textTheme,
-    ColorScheme cs,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SectionHeader(context.l10n.thumbnailStorageSectionHeader),
-        SectionCard(
-          children: [
-            if (state.loadingPassword)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(16),
-                  child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                ),
-              )
-            else ...[
-              ThumbnailSettingsTiles(
-                useGlobalDefault: state.useGlobalThumbnails,
-                onUseGlobalDefaultChanged: (v) => ref
-                    .read(containerConfigControllerProvider(_params).notifier)
-                    .setUseGlobalThumbnails(v),
-                cacheMode:
-                    state.thumbnailCacheMode ??
-                    ThumbnailSettings.defaults.cacheMode,
-                quality:
-                    state.thumbnailQuality ?? ThumbnailSettings.defaults.quality,
-                cacheModeLabel: context.l10n.cacheModeLabel,
-                qualityLabel: context.l10n.thumbnailQualityLabel,
-                onCacheModeChanged: (v) => ref
-                    .read(containerConfigControllerProvider(_params).notifier)
-                    .setThumbnailCacheMode(v),
-                onQualityChanged: (v) => ref
-                    .read(containerConfigControllerProvider(_params).notifier)
-                    .setThumbnailQuality(v),
-              ),
-              ListTile(
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 4,
-                ),
-                title: Text(
-                  context.l10n.clearThumbnailCacheTitle,
-                  style: textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                subtitle: Text(
-                  context.l10n.removeCachedThumbnailsSubtitle,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
-                ),
-                trailing: state.clearingCache
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Icon(
-                        Icons.chevron_right_rounded,
-                        color: cs.onSurfaceVariant,
-                      ),
-                onTap: state.clearingCache ? null : _clearThumbnailCache,
-              ),
-            ],
-          ],
-        ),
-      ],
-    );
-  }
-
   Widget _buildToolsSection(
     BuildContext context,
     ColorScheme cs,
@@ -1396,10 +1362,13 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => SkinAreaScope(area: SkinArea.dashboard, child: VaultInfoScreen(
-                    uri: widget.uri,
-                    containerFormat: _containerFormat,
-                  )),
+                  builder: (_) => SkinAreaScope(
+                    area: SkinArea.dashboard,
+                    child: VaultInfoScreen(
+                      uri: widget.uri,
+                      containerFormat: _containerFormat,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -1428,10 +1397,13 @@ class _ContainerConfigScreenState extends ConsumerState<ContainerConfigScreen> {
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => SkinAreaScope(area: SkinArea.settings, child: AutomationSettingsScreen(
-                    uri: widget.uri,
-                    containerFormat: _containerFormat,
-                  )),
+                  builder: (_) => SkinAreaScope(
+                    area: SkinArea.settings,
+                    child: AutomationSettingsScreen(
+                      uri: widget.uri,
+                      containerFormat: _containerFormat,
+                    ),
+                  ),
                 ),
               ),
             ),

@@ -65,6 +65,7 @@ class UsbUnlockState {
   final bool requestingPermission;
   final bool loading;
   final bool readOnly;
+  final bool useBackupHeader;
   final bool remember;
   final String? error;
   final int cipherId;
@@ -116,6 +117,7 @@ class UsbUnlockState {
     this.requestingPermission = false,
     this.loading = false,
     this.readOnly = false,
+    this.useBackupHeader = false,
     this.remember = false,
     this.error,
     this.cipherId = 255,
@@ -153,6 +155,7 @@ class UsbUnlockState {
     bool? requestingPermission,
     bool? loading,
     bool? readOnly,
+    bool? useBackupHeader,
     bool? remember,
     String? error,
     bool clearError = false,
@@ -191,6 +194,7 @@ class UsbUnlockState {
     requestingPermission: requestingPermission ?? this.requestingPermission,
     loading: loading ?? this.loading,
     readOnly: readOnly ?? this.readOnly,
+    useBackupHeader: useBackupHeader ?? this.useBackupHeader,
     remember: remember ?? this.remember,
     error: clearError ? null : (error ?? this.error),
     cipherId: cipherId ?? this.cipherId,
@@ -399,6 +403,8 @@ void selectDevice(UsbDeviceInfo device) {
       clearError: true,
     );
   }
+
+  void setUseBackupHeader(bool val) => state = state._copy(useBackupHeader: val);
 
   void setReadOnly(bool val) => state = state._copy(readOnly: val);
 
@@ -863,6 +869,7 @@ void selectDevice(UsbDeviceInfo device) {
               cacheDerivedKey: shouldCacheDerivedKey,
               keyfilePaths: effectiveKeyfiles,
               readOnly: state.readOnly,
+              useBackupHeader: state.useBackupHeader,
               protectHiddenVolume: state.protectHiddenVolume,
               hiddenVolumePassword: hiddenPasswordText,
               hiddenVolumePim: hiddenPim,
@@ -884,6 +891,7 @@ void selectDevice(UsbDeviceInfo device) {
                 cacheDerivedKey: shouldCacheDerivedKey,
                 keyfilePaths: effectiveKeyfiles,
                 readOnly: state.readOnly,
+                useBackupHeader: state.useBackupHeader,
                 protectHiddenVolume: state.protectHiddenVolume,
                 hiddenVolumePassword: hiddenPasswordText,
                 hiddenVolumePim: hiddenPim,
@@ -931,6 +939,7 @@ void selectDevice(UsbDeviceInfo device) {
             cacheDerivedKey: shouldCacheDerivedKey,
             keyfilePaths: retryKeyfiles,
             readOnly: state.readOnly,
+            useBackupHeader: state.useBackupHeader,
             protectHiddenVolume: state.protectHiddenVolume,
             hiddenVolumePassword: hiddenPasswordText,
             hiddenVolumePim: hiddenPim,

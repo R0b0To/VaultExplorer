@@ -62,7 +62,7 @@ final class VaultEngineChannelProvider
 }
 
 String _$vaultEngineChannelHash() =>
-    r'5239103770ea2a3d4314ad6514b69365042ab20f';
+    r'9f01229dd84a506c9e11689372de9fa5dd3b87c3';
 
 /// Cross-cutting native-event listener registries + the method-call
 /// dispatch that used to live as static state directly on VaultExplorerApi.

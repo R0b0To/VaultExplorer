@@ -105,6 +105,11 @@ enum MediaViewerAction {
       };
 
   bool isApplicable({required bool isImage, required bool isAudio, required bool isPlaylistMode}) {
+    // The thumbnail carousel browses the playlist; with a single file there is
+    // nothing to browse and the button would do nothing.
+    if (this == MediaViewerAction.thumbnailCarousel && !isPlaylistMode) {
+      return false;
+    }
     if (isImage) {
       if (this == MediaViewerAction.mute ||
           this == MediaViewerAction.playbackSpeed ||

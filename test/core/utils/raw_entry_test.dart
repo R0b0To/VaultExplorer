@@ -13,10 +13,25 @@ void main() {
 
     test('an unrecognized type tag is treated as not-a-directory (file)',
         () {
-      // Only 'D' means directory; anything else is a file, per isDir:
-      // typeTag == 'D'.
+      // Ordinary directory entries use 'D'; shortcut directories use 'LD'.
       final entry = RawEntry.parse('X|1|1|weird.tag');
       expect(entry.isDir, isFalse);
+    });
+  });
+
+  group('RawEntry.parse — symbolic links', () {
+    test('parses a file shortcut and preserves its link type in raw form', () {
+      final entry = RawEntry.parse('L|14|1690000000|notes-link');
+      expect(entry.isSymlink, isTrue);
+      expect(entry.isDir, isFalse);
+      expect(entry.raw, 'L|14|1690000000|notes-link');
+    });
+
+    test('parses a directory shortcut as a directory and preserves its type', () {
+      final entry = RawEntry.parse('LD|0|1690000000|docs-link');
+      expect(entry.isSymlink, isTrue);
+      expect(entry.isDir, isTrue);
+      expect(entry.raw, 'LD|0|1690000000|docs-link');
     });
   });
 
@@ -277,6 +292,108 @@ void main() {
         expect(renamed.extension, plain.extension, reason: name);
         expect(renamed, plain, reason: name);
       }
+    });
+  });
+
+  group('RawEntry.parse — edge cases of the field parsing', () {
+    test('type tag is read exactly: F, D, L and LD only', () {
+      expect(RawEntry.parse('F|1|2|x').isDir, isFalse);
+      expect(RawEntry.parse('D|0|2|x').isDir, isTrue);
+      final link = RawEntry.parse('L|9|2|x');
+      expect(link.isSymlink, isTrue);
+      expect(link.isDir, isFalse);
+      final dirLink = RawEntry.parse('LD|0|2|x');
+      expect(dirLink.isSymlink, isTrue);
+      expect(dirLink.isDir, isTrue);
+      // Anything else is a plain file, as before.
+      for (final tag in ['', 'X', 'd', 'DL', 'LDD']) {
+        final e = RawEntry.parse('$tag|1|2|x');
+        expect(e.isDir, isFalse, reason: 'tag "$tag"');
+        expect(e.isSymlink, isFalse, reason: 'tag "$tag"');
+      }
+    });
+
+    test('numeric fields tolerate what int.tryParse tolerates, else are 0', () {
+      expect(RawEntry.parse('F|007|0012|x').sizeBytes, 7);
+      expect(RawEntry.parse('F|007|0012|x').modifiedSecs, 12);
+      expect(RawEntry.parse('F|-5|-9|x').sizeBytes, -5);
+      expect(RawEntry.parse('F|+7|2|x').sizeBytes, 7);
+      expect(RawEntry.parse('F||2|x').sizeBytes, 0);
+      expect(RawEntry.parse('F|abc|2|x').sizeBytes, 0);
+      // More digits than the fast path trusts still parse correctly.
+      expect(RawEntry.parse('F|${'0' * 25}5|2|x').sizeBytes, 5);
+      expect(RawEntry.parse('F|9007199254740993|2|x').sizeBytes, 9007199254740993);
+    });
+
+    test('extension is what follows the last dot, lowercased', () {
+      expect(RawEntry.parse('F|1|2|a.b.C').extension, 'c');
+      expect(RawEntry.parse('F|1|2|.hidden').extension, 'hidden');
+      expect(RawEntry.parse('F|1|2|trailing.').extension, '');
+      expect(RawEntry.parse('F|1|2|noext').extension, '');
+      expect(
+        const RawEntry(name: 'X.JPG', isDir: false, sizeBytes: 0, modifiedSecs: 0)
+            .extension,
+        'jpg',
+      );
+      expect(
+        const RawEntry(name: 'x.a', isDir: false, sizeBytes: 0, modifiedSecs: 0)
+            .withName('Deep/Path.TXT')
+            .extension,
+        'txt',
+      );
+    });
+  });
+
+  group('RawEntry.sameEntries', () {
+    List<RawEntry> list() => [
+      RawEntry.parse('F|1|1|a'),
+      RawEntry.parse('D|0|1|b'),
+    ];
+
+    test('equal content in the same order is the same', () {
+      expect(RawEntry.sameEntries(list(), list()), isTrue);
+    });
+
+    test('the very same instance is the same', () {
+      final l = list();
+      expect(RawEntry.sameEntries(l, l), isTrue);
+    });
+
+    test('a changed size, a different length or a different order is not', () {
+      expect(
+        RawEntry.sameEntries(list(), [list()[0], RawEntry.parse('D|0|2|b')]),
+        isFalse,
+      );
+      expect(RawEntry.sameEntries(list(), [list()[0]]), isFalse);
+      expect(RawEntry.sameEntries(list(), list().reversed.toList()), isFalse);
+    });
+
+    test('two empty lists are the same', () {
+      expect(RawEntry.sameEntries(<RawEntry>[], <RawEntry>[]), isTrue);
+    });
+  });
+
+  group('ParsedDirectoryListing.fromWire', () {
+    test('parses entries and drops System: sentinel lines', () {
+      final listing = ParsedDirectoryListing.fromWire(
+        ['F|1|1|a', 'System:SOMETHING', 'D|0|1|b'],
+      );
+      expect(listing.entries.map((e) => e.name), ['a', 'b']);
+      expect(listing.truncated, isFalse);
+    });
+
+    test('System:TRUNCATED sets the truncated flag and is not an entry', () {
+      final listing = ParsedDirectoryListing.fromWire(
+        ['F|1|1|a', 'System:TRUNCATED'],
+      );
+      expect(listing.entries, hasLength(1));
+      expect(listing.truncated, isTrue);
+    });
+
+    test('an empty listing is empty and not truncated', () {
+      final listing = ParsedDirectoryListing.fromWire(const <String>[]);
+      expect(listing.entries, isEmpty);
+      expect(listing.truncated, isFalse);
     });
   });
 }

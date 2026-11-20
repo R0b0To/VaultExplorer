@@ -1,0 +1,1186 @@
+import 'dart:math' as math;
+import 'dart:typed_data';
+
+import 'package:vaultexplorer/core/utils/perf_trace.dart';
+
+/// Pure-Dart geometry engine behind the gallery (masonry/mosaic) views.
+///
+/// Nothing in this file touches Flutter: it turns "N items with aspect ratios,
+/// split into sections with optional headers" into the exact rectangle of every
+/// child, so the sliver that consumes it ([GallerySliverGrid]) never has to
+/// measure a child to learn where the next one goes. That is what keeps a jump
+/// to the middle of a 40,000-item folder (the fast-scroll handle does exactly
+/// that) down to a binary search, and what makes the scroll extent exact rather
+/// than an estimate that changes while you drag.
+///
+/// The design follows mosaic view (one
+/// pre-computed layout for every section, a single lazily-built sliver instead
+/// of one grid per section, justified rows), written for this app's needs:
+/// tiles carry a caption footer, ratios arrive late, and the same engine also
+/// drives the column ("Pinterest") flow and the uniform grid.
+///
+/// **Child index space.** A section with a header contributes one header child
+/// followed by its items; a section without one contributes only its items.
+/// Item indices are *display* indices (the concatenation of every section's
+/// items). [GalleryLayoutModel.itemOfChild] / [GalleryLayoutModel.childOfItem]
+/// translate between the two.
+enum GalleryFlow {
+  /// Justified rows ("mosaic"): every tile in a row has the same height and a
+  /// width proportional to its aspect ratio, so rows fill the full width and no
+  /// image is cropped.
+  rows,
+
+  /// Fixed number of equal-width columns, each tile as tall as its ratio says,
+  /// every tile going into the currently shortest column. With a constant
+  /// ratio this is a plain uniform grid.
+  columns,
+
+  /// One full-width row per item, every row [GalleryLayoutSpec.rowExtent]
+  /// tall. This is what the list layouts need: the geometry of a grouped list
+  /// is as exact (and as cheap to look up) as that of a grid, so the whole list
+  /// is one sliver instead of one per group.
+  list,
+}
+
+/// A run of items under an optional header.
+class GallerySection {
+  const GallerySection({required this.itemCount, this.headerExtent = 0});
+
+  final int itemCount;
+
+  /// Height of the header child. Zero (or less) means "no header child".
+  final double headerExtent;
+
+  bool get hasHeader => headerExtent > 0;
+}
+
+/// Width/height of the media area of item [item]. Must be finite and > 0.
+typedef GalleryRatioOf = double Function(int item);
+
+/// Height of the caption footer drawn under item [item]'s media area when the
+/// tile is [tileWidth] wide. Zero for a tile without a caption.
+typedef GalleryFooterOf = double Function(int item, double tileWidth);
+
+class GalleryLayoutSpec {
+  const GalleryLayoutSpec({
+    required this.crossExtent,
+    required this.spacing,
+    required this.flow,
+    required this.columnCount,
+    this.minTileWidth = 56.0,
+    this.maxRowHeightFactor = 2.2,
+    this.lastRowHeightFactor = 1.35,
+    this.sectionGap = 0.0,
+    this.rowExtent = 0.0,
+    this.directRatios,
+    this.constantFooter,
+    this.directKinds,
+    this.iconFooter,
+  }) : assert(columnCount > 0);
+
+  /// Width available to the sliver.
+  final double crossExtent;
+
+  /// Gap between tiles, in both axes.
+  final double spacing;
+  final GalleryFlow flow;
+
+  /// [GalleryFlow.columns]: the exact number of columns.
+  /// [GalleryFlow.rows]: the zoom level; a row aims for the height a cell has
+  /// in a [columnCount]-column grid, so switching layouts keeps the same scale.
+  final int columnCount;
+
+  /// [GalleryFlow.rows]: a row is closed rather than made so crowded that its
+  /// narrowest tile drops below this width (the caption has to fit).
+  final double minTileWidth;
+
+  /// [GalleryFlow.rows]: a row that would be taller than the target by this
+  /// factor keeps taking items instead (a lone portrait photo does not get a
+  /// row of its own that is three screens tall).
+  final double maxRowHeightFactor;
+
+  /// [GalleryFlow.rows]: the last, incomplete row of a section is not stretched
+  /// to the full width; it is capped at this multiple of the target height and
+  /// left-aligned.
+  final double lastRowHeightFactor;
+
+  /// Space after the last tile of every section.
+  final double sectionGap;
+
+ /// [GalleryFlow.list]: the height of every row.
+  final double rowExtent;
+
+ /// Optional fast-path backing arrays used to avoid per-item closure dispatch
+  /// in large directories.
+  final Float32List? directRatios;
+  final double? constantFooter;
+  final Uint8List? directKinds;
+  final double? iconFooter;
+
+  double get targetExtent =>
+      math.max(1.0, (crossExtent - (columnCount - 1) * spacing) / columnCount);
+}
+
+/// The result of laying out a gallery: one rectangle per child, plus the
+/// queries a sliver needs.
+///
+/// Every array is indexed by child index. `tops` is non-decreasing in the child
+/// index for every flow (rows are laid out top to bottom, and a column-flow
+/// tile always goes into the shortest column, whose height never decreases);
+/// `bottoms` are *not* monotonic in the column flow, which is why the
+/// leading-edge query goes through [prefixMaxBottom].
+class GalleryLayoutModel {
+  GalleryLayoutModel._({
+    required this.crossExtent,
+    required this.childCount,
+    required this.itemCount,
+    required this.maxExtent,
+    required this.tops,
+    required this.heights,
+    required this.lefts,
+    required this.widths,
+    required this.prefixMaxBottom,
+    required this.itemOfChild,
+    required this.sectionOfChild,
+    required this.childOfItem,
+    required this.sectionFirstChild,
+  });
+
+  /// An empty layout (no children).
+  factory GalleryLayoutModel.empty(double crossExtent) => GalleryLayoutModel._(
+    crossExtent: crossExtent,
+    childCount: 0,
+    itemCount: 0,
+    maxExtent: 0,
+    tops: Float64List(0),
+    heights: Float64List(0),
+    lefts: Float64List(0),
+    widths: Float64List(0),
+    prefixMaxBottom: Float64List(0),
+    itemOfChild: Int32List(0),
+    sectionOfChild: Int32List(0),
+    childOfItem: Int32List(0),
+    sectionFirstChild: Int32List(1),
+  );
+
+  final double crossExtent;
+  final int childCount;
+  final int itemCount;
+
+  /// Total main-axis extent (exact).
+  final double maxExtent;
+
+  final Float64List tops;
+  final Float64List heights;
+
+  /// Offset from the *start* edge of the cross axis (left in LTR).
+  final Float64List lefts;
+  final Float64List widths;
+
+  /// `prefixMaxBottom[c]` = the largest bottom edge among children `0..c`.
+  final Float64List prefixMaxBottom;
+
+  /// Display index of the item at child `c`, or -1 for a header.
+  final Int32List itemOfChild;
+  final Int32List sectionOfChild;
+
+  /// Child index of display item `i`.
+  final Int32List childOfItem;
+
+  /// `sectionFirstChild[s]` = first child of section `s`; has one extra entry
+  /// (== [childCount]).
+  final Int32List sectionFirstChild;
+
+  bool isHeader(int child) => itemOfChild[child] < 0;
+
+  double bottomOf(int child) => tops[child] + heights[child];
+
+  /// Smallest child whose bottom edge is below [offset] (i.e. not yet scrolled
+  /// past), clamped to a valid index.
+  int minChildForOffset(double offset) {
+    if (childCount == 0) return 0;
+    var lo = 0;
+    var hi = childCount;
+    while (lo < hi) {
+      final mid = (lo + hi) >> 1;
+      if (prefixMaxBottom[mid] > offset) {
+        hi = mid;
+      } else {
+        lo = mid + 1;
+      }
+    }
+    return lo >= childCount ? childCount - 1 : lo;
+  }
+
+  /// Largest child whose top edge is above [offset], clamped to a valid index.
+  int maxChildForOffset(double offset) {
+    if (childCount == 0) return 0;
+    var lo = 0;
+    var hi = childCount;
+    while (lo < hi) {
+      final mid = (lo + hi) >> 1;
+      if (tops[mid] >= offset) {
+        hi = mid;
+      } else {
+        lo = mid + 1;
+      }
+    }
+    return math.max(0, math.min(childCount - 1, lo - 1));
+  }
+
+  /// First index in `startChild..childCount` at which this layout and [other]
+  /// differ, or `childCount` if they are identical. Requires the same child
+  /// count; otherwise everything counts as changed (0).
+  int firstChangedChild(GalleryLayoutModel other, {int startChild = 0}) {
+    if (other.childCount != childCount) return 0;
+    const eps = 0.01;
+    final start = math.max(0, startChild);
+    for (var c = start; c < childCount; c++) {
+      if ((tops[c] - other.tops[c]).abs() > eps ||
+          (heights[c] - other.heights[c]).abs() > eps ||
+          (lefts[c] - other.lefts[c]).abs() > eps ||
+          (widths[c] - other.widths[c]).abs() > eps) {
+        return c;
+      }
+    }
+    return childCount;
+  }
+
+  /// Computes the layout.
+  ///
+  /// O(items); the only per-item work is [ratioOf] and [footerOf]. Both should
+  /// be array reads -- this runs again whenever a ratio is learned or the zoom
+  /// changes.
+  static GalleryLayoutModel compute({
+    required List<GallerySection> sections,
+    required GalleryLayoutSpec spec,
+    required GalleryRatioOf ratioOf,
+    GalleryFooterOf? footerOf,
+  }) => _compute(
+    sections: sections,
+    spec: spec,
+    ratioOf: ratioOf,
+    footerOf: footerOf,
+    previous: null,
+    fromChild: 0,
+  );
+
+  /// Recomputes the layout from child [fromChild] on, keeping every child
+  /// before it *exactly* where [previous] had it.
+  ///
+  /// This is what lets the gallery apply a freshly learned size while the user
+  /// is flinging through it: nothing at or above the top of the screen moves
+  /// (so the scroll offset needs no correction, which a fling would overwrite
+  /// anyway), and everything on screen is up to date at once. Tiles above the
+  /// screen are merely out of date until [GalleryLayoutHost.reflow] is allowed
+  /// to recompute everything.
+  ///
+  /// [previous] must come from the same [sections] and the same spec (only the
+  /// ratios and footers may differ), otherwise this is a full [compute]. In the
+  /// rows flow [fromChild] is moved back to the start of its row.
+  static GalleryLayoutModel recomputeFrom({
+    required GalleryLayoutModel previous,
+    required int fromChild,
+    required List<GallerySection> sections,
+    required GalleryLayoutSpec spec,
+    required GalleryRatioOf ratioOf,
+    GalleryFooterOf? footerOf,
+  }) {
+    if (fromChild <= 0 ||
+        fromChild >= previous.childCount ||
+        previous.crossExtent != spec.crossExtent) {
+      return compute(
+        sections: sections,
+        spec: spec,
+        ratioOf: ratioOf,
+        footerOf: footerOf,
+      );
+    }
+    final from = spec.flow == GalleryFlow.rows
+        ? previous.firstChildOfRowContaining(fromChild)
+        : fromChild;
+    return _compute(
+      sections: sections,
+      spec: spec,
+      ratioOf: ratioOf,
+      footerOf: footerOf,
+      previous: previous,
+      fromChild: from,
+    );
+  }
+
+  /// First child of the row [child] is in (rows flow): the first child with the
+  /// same top. Headers are rows of their own.
+  int firstChildOfRowContaining(int child) {
+    final top = tops[child];
+    var lo = 0;
+    var hi = child;
+    while (lo < hi) {
+      final mid = (lo + hi) >> 1;
+      if (tops[mid] >= top) {
+        hi = mid;
+      } else {
+        lo = mid + 1;
+      }
+    }
+    return lo;
+  }
+
+ static GalleryLayoutModel _compute({
+    required List<GallerySection> sections,
+    required GalleryLayoutSpec spec,
+    required GalleryRatioOf ratioOf,
+    required GalleryFooterOf? footerOf,
+    required GalleryLayoutModel? previous,
+    required int fromChild,
+  }) {
+    final perfT0 = PerfTrace.begin();
+    var itemCount = 0;
+    var headerCount = 0;
+    for (final s in sections) {
+      itemCount += s.itemCount;
+      if (s.hasHeader) headerCount++;
+    }
+    final childCount = itemCount + headerCount;
+    if (childCount == 0) return GalleryLayoutModel.empty(spec.crossExtent);
+    if (previous != null && previous.childCount != childCount) {
+      // Not the same sections after all: nothing to keep.
+      return _compute(
+        sections: sections,
+        spec: spec,
+        ratioOf: ratioOf,
+        footerOf: footerOf,
+        previous: null,
+        fromChild: 0,
+      );
+    }
+
+     final reuseIndices =
+        previous != null &&
+        previous.childCount == childCount &&
+        previous.itemCount == itemCount &&
+        previous.sectionFirstChild.length == sections.length + 1;
+    final allocT0 = PerfTrace.begin();
+    final tops = Float64List(childCount);
+    final heights = Float64List(childCount);
+    final lefts = Float64List(childCount);
+    final widths = Float64List(childCount);
+    final itemOfChild = reuseIndices
+        ? previous.itemOfChild
+        : Int32List(childCount);
+    final sectionOfChild = reuseIndices
+        ? previous.sectionOfChild
+        : Int32List(childCount);
+    final childOfItem = reuseIndices
+        ? previous.childOfItem
+        : Int32List(itemCount);
+    final sectionFirstChild = reuseIndices
+        ? previous.sectionFirstChild
+        : Int32List(sections.length + 1);
+
+    void keepFromPrevious(int start, int end) {
+      if (previous == null || end <= start) return;
+      tops.setRange(start, end, previous.tops, start);
+      heights.setRange(start, end, previous.heights, start);
+      lefts.setRange(start, end, previous.lefts, start);
+      widths.setRange(start, end, previous.widths, start);
+    }
+
+    final w = spec.crossExtent;
+    var cursor = 0.0;
+    var child = 0;
+    var item = 0;
+
+   for (var si = 0; si < sections.length; si++) {
+      final section = sections[si];
+      if (!reuseIndices) sectionFirstChild[si] = child;
+      final sectionChildCount =
+          (section.hasHeader ? 1 : 0) + section.itemCount;
+      if (sectionChildCount == 0) continue;
+      final sectionEndChild = child + sectionChildCount;
+
+      // Index maps do not depend on geometry.
+      final firstItemChild = child + (section.hasHeader ? 1 : 0);
+      if (!reuseIndices) {
+        var c = child;
+        if (section.hasHeader) {
+          itemOfChild[c] = -1;
+          sectionOfChild[c] = si;
+          c++;
+        }
+        for (var k = 0; k < section.itemCount; k++) {
+          itemOfChild[firstItemChild + k] = item + k;
+          sectionOfChild[firstItemChild + k] = si;
+          childOfItem[item + k] = firstItemChild + k;
+        }
+      }
+
+      if (previous != null && sectionEndChild <= fromChild) {
+        // The whole section is in the frozen prefix.
+        keepFromPrevious(child, sectionEndChild);
+        cursor = previous.prefixMaxBottom[sectionEndChild - 1] + spec.sectionGap;
+        child = sectionEndChild;
+        item += section.itemCount;
+        continue;
+      }
+
+      if (section.hasHeader) {
+        if (previous != null && fromChild > child) {
+          keepFromPrevious(child, child + 1);
+          cursor = tops[child] + heights[child];
+        } else {
+          tops[child] = cursor;
+          heights[child] = section.headerExtent;
+          lefts[child] = 0;
+          widths[child] = w;
+          cursor += section.headerExtent;
+        }
+      }
+
+      if (section.itemCount > 0) {
+        // Resume in the middle of the section when the frozen prefix ends in it.
+        final resume =
+            previous != null &&
+            fromChild > firstItemChild &&
+            fromChild < sectionEndChild;
+        final skipped = resume ? fromChild - firstItemChild : 0;
+        if (resume) keepFromPrevious(firstItemChild, fromChild);
+        final sectionEnd = switch (spec.flow) {
+          GalleryFlow.rows => _layoutRows(
+            spec: spec,
+            firstItem: item + skipped,
+            itemCount: section.itemCount - skipped,
+            firstChild: firstItemChild + skipped,
+            startOffset: resume ? previous.tops[fromChild] : cursor,
+            ratioOf: ratioOf,
+            footerOf: footerOf,
+            tops: tops,
+            heights: heights,
+            lefts: lefts,
+            widths: widths,
+          ),
+          GalleryFlow.columns => _layoutColumns(
+            spec: spec,
+            firstItem: item + skipped,
+            itemCount: section.itemCount - skipped,
+            firstChild: firstItemChild + skipped,
+            startOffset: cursor,
+            initialBottoms: resume
+                ? _columnBottomsOfPrefix(
+                    spec: spec,
+                    sectionStart: cursor,
+                    firstChild: firstItemChild,
+                    endChild: fromChild,
+                    tops: tops,
+                    heights: heights,
+                    lefts: lefts,
+                  )
+                : null,
+            ratioOf: ratioOf,
+            footerOf: footerOf,
+            tops: tops,
+            heights: heights,
+            lefts: lefts,
+            widths: widths,
+          ),
+          GalleryFlow.list => _layoutList(
+            spec: spec,
+            itemCount: section.itemCount - skipped,
+            firstChild: firstItemChild + skipped,
+            startOffset: resume ? previous.tops[fromChild] : cursor,
+            tops: tops,
+            heights: heights,
+            lefts: lefts,
+            widths: widths,
+          ),
+        };
+        cursor = sectionEnd;
+      }
+      child = sectionEndChild;
+      item += section.itemCount;
+      cursor += spec.sectionGap;
+    }
+    if (!reuseIndices) sectionFirstChild[sections.length] = childCount;
+
+   final prefixMaxBottom = Float64List(childCount);
+    var running = 0.0;
+    var startPrefix = 0;
+    if (previous != null && fromChild > 0 && fromChild <= childCount) {
+      prefixMaxBottom.setRange(0, fromChild, previous.prefixMaxBottom, 0);
+      running = prefixMaxBottom[fromChild - 1];
+      startPrefix = fromChild;
+    }
+    for (var c = startPrefix; c < childCount; c++) {
+      running = math.max(running, tops[c] + heights[c]);
+      prefixMaxBottom[c] = running;
+    }
+
+   final model = GalleryLayoutModel._(
+      crossExtent: w,
+      childCount: childCount,
+      itemCount: itemCount,
+      // Not `cursor`: that includes the trailing section gap, and a sliver that
+      // has reached its end reports the bottom of its last child instead, so
+      // the two would disagree by the gap.
+      maxExtent: running,
+      tops: tops,
+      heights: heights,
+      lefts: lefts,
+      widths: widths,
+      prefixMaxBottom: prefixMaxBottom,
+      itemOfChild: itemOfChild,
+      sectionOfChild: sectionOfChild,
+      childOfItem: childOfItem,
+      sectionFirstChild: sectionFirstChild,
+    );
+    final loopDoneT0 = PerfTrace.begin();
+    PerfTrace.end('ui.masonry.layout_compute', perfT0, slowMs: 16);
+    if (perfT0 != 0 && (loopDoneT0 - perfT0) >= 16000) {
+      PerfTrace.sink(
+        'SLOW layout_compute_detail flow=${spec.flow.name} children=$childCount '
+        'sections=${sections.length} from=$fromChild reuse=$reuseIndices '
+        'alloc=${allocT0 - perfT0}us body=${loopDoneT0 - allocT0}us',
+      );
+    }
+    return model;
+  }
+
+  /// Column bottoms after the tiles `firstChild..endChild` of a section, read
+  /// from their (already copied) geometry.
+  static Float64List _columnBottomsOfPrefix({
+    required GalleryLayoutSpec spec,
+    required double sectionStart,
+    required int firstChild,
+    required int endChild,
+    required Float64List tops,
+    required Float64List heights,
+    required Float64List lefts,
+  }) {
+    final cols = spec.columnCount;
+    final bottoms = Float64List(cols)..fillRange(0, cols, sectionStart);
+    final stride = spec.targetExtent + spec.spacing;
+    for (var c = firstChild; c < endChild; c++) {
+      final column = math.max(0, math.min(cols - 1, (lefts[c] / stride).round()));
+      final bottom = tops[c] + heights[c] + spec.spacing;
+      if (bottom > bottoms[column]) bottoms[column] = bottom;
+    }
+    return bottoms;
+  }
+
+   static double _emitRow(
+    double w,
+    double s,
+    double target,
+    double lastRowHeightFactor,
+    int firstItem,
+    int firstChild,
+    int rowFirst,
+    int n,
+    double ratioSum,
+    double cursor,
+    bool last,
+    bool useDirect,
+    Float32List? directRatios,
+    GalleryRatioOf ratioOf,
+    double? constantFooter,
+    bool useDirectKinds,
+    Uint8List? directKinds,
+    double iconFooter,
+    GalleryFooterOf? footerOf,
+    Float64List tops,
+    Float64List heights,
+    Float64List lefts,
+    Float64List widths,
+  ) {
+    if (n == 0) return cursor;
+    final avail = w - (n - 1) * s;
+    final natural = avail / ratioSum;
+    final capped = last && natural > target * lastRowHeightFactor;
+    final h = capped ? target * lastRowHeightFactor : natural;
+    final stretch = !capped;
+
+    var footer = 0.0;
+    if (constantFooter != null) {
+      footer = constantFooter;
+    } else if (useDirectKinds) {
+      for (var k = 0; k < n; k++) {
+        if (directKinds![firstItem + rowFirst + k] == 0) {
+          footer = iconFooter;
+          break;
+        }
+      }
+    } else if (footerOf != null) {
+      for (var k = 0; k < n; k++) {
+        final i = firstItem + rowFirst + k;
+        final r = useDirect ? directRatios![i] : ratioOf(i);
+        footer = math.max(footer, footerOf(i, h * r));
+      }
+    }
+    final rowH = h + footer;
+
+    var left = 0.0;
+    for (var k = 0; k < n; k++) {
+      final i = firstItem + rowFirst + k;
+      final c = firstChild + rowFirst + k;
+      final r = useDirect ? directRatios![i] : ratioOf(i);
+      var tileW = h * r;
+      if (stretch && k == n - 1) tileW = w - left;
+      tops[c] = cursor;
+      heights[c] = rowH;
+      lefts[c] = left;
+      widths[c] = tileW;
+      left += tileW + s;
+    }
+    return cursor + rowH + s;
+  }
+
+  /// Justified rows for one section. Returns the section's end offset (the
+  /// bottom edge of its last row, without trailing spacing).
+  static double _layoutRows({
+    required GalleryLayoutSpec spec,
+    required int firstItem,
+    required int itemCount,
+    required int firstChild,
+    required double startOffset,
+    required GalleryRatioOf ratioOf,
+    required GalleryFooterOf? footerOf,
+    required Float64List tops,
+    required Float64List heights,
+    required Float64List lefts,
+    required Float64List widths,
+  }) {
+    final w = spec.crossExtent;
+    final s = spec.spacing;
+    final target = spec.targetExtent;
+    final maxH = target * spec.maxRowHeightFactor;
+    final lastFactor = spec.lastRowHeightFactor;
+    final minW = math.min(spec.minTileWidth, target);
+    final directRatios = spec.directRatios;
+    final useDirect =
+        directRatios != null && directRatios.length >= firstItem + itemCount;
+    final constantFooter = spec.constantFooter;
+    final directKinds = spec.directKinds;
+    final iconFooter = spec.iconFooter;
+    final useDirectKinds =
+        constantFooter == null &&
+        iconFooter != null &&
+        directKinds != null &&
+        directKinds.length >= firstItem + itemCount;
+
+    var cursor = startOffset;
+    var rowFirst = 0;
+    var n = 0;
+    var ratioSum = 0.0;
+    var minRatio = double.infinity;
+
+    for (var k = 0; k < itemCount; k++) {
+      final r = useDirect
+          ? directRatios[firstItem + k]
+          : ratioOf(firstItem + k);
+      if (n > 0) {
+        final nextN = n + 1;
+        final nextSum = ratioSum + r;
+        final nextAvail = w - (nextN - 1) * s;
+        final nextH = nextAvail / nextSum;
+        final nextMinW = nextH * math.min(minRatio, r);
+        final currentH = (w - (n - 1) * s) / ratioSum;
+        if (currentH <= maxH) {
+          if (nextMinW < minW ||
+              (nextH < target && currentH - target < target - nextH)) {
+            cursor = _emitRow(
+              w,
+              s,
+              target,
+              lastFactor,
+              firstItem,
+              firstChild,
+              rowFirst,
+              n,
+              ratioSum,
+              cursor,
+              false,
+              useDirect,
+              directRatios,
+              ratioOf,
+              constantFooter,
+              useDirectKinds,
+              directKinds,
+              iconFooter ?? 0.0,
+              footerOf,
+              tops,
+              heights,
+              lefts,
+              widths,
+            );
+            rowFirst += n;
+            n = 0;
+            ratioSum = 0.0;
+            minRatio = double.infinity;
+          }
+        }
+      }
+      n++;
+      ratioSum += r;
+      if (r < minRatio) minRatio = r;
+    }
+    cursor = _emitRow(
+      w,
+      s,
+      target,
+      lastFactor,
+      firstItem,
+      firstChild,
+      rowFirst,
+      n,
+      ratioSum,
+      cursor,
+      true,
+      useDirect,
+      directRatios,
+      ratioOf,
+      constantFooter,
+      useDirectKinds,
+      directKinds,
+      iconFooter ?? 0.0,
+      footerOf,
+      tops,
+      heights,
+      lefts,
+      widths,
+    );
+    return cursor - s;
+  }
+
+  /// One full-width row per item. Returns the section's end offset (the bottom
+  /// edge of its last row, without trailing spacing).
+  static double _layoutList({
+    required GalleryLayoutSpec spec,
+    required int itemCount,
+    required int firstChild,
+    required double startOffset,
+    required Float64List tops,
+    required Float64List heights,
+    required Float64List lefts,
+    required Float64List widths,
+  }) {
+    final h = spec.rowExtent.isFinite && spec.rowExtent > 0 ? spec.rowExtent : 0.0;
+    final s = spec.spacing;
+    var cursor = startOffset;
+    for (var k = 0; k < itemCount; k++) {
+      final c = firstChild + k;
+      tops[c] = cursor;
+      heights[c] = h;
+      lefts[c] = 0;
+      widths[c] = spec.crossExtent;
+      cursor += h + s;
+    }
+    return itemCount == 0 ? startOffset : cursor - s;
+  }
+
+  /// Shortest-column-first placement for one section. Returns the section's end
+  /// offset (the bottom of its tallest column, without trailing spacing).
+  static double _layoutColumns({
+    required GalleryLayoutSpec spec,
+    required int firstItem,
+    required int itemCount,
+    required int firstChild,
+    required double startOffset,
+    Float64List? initialBottoms,
+    required GalleryRatioOf ratioOf,
+    required GalleryFooterOf? footerOf,
+    required Float64List tops,
+    required Float64List heights,
+    required Float64List lefts,
+    required Float64List widths,
+  }) {
+    final cols = spec.columnCount;
+    final s = spec.spacing;
+    final tileW = spec.targetExtent;
+    final colBottom =
+        initialBottoms ?? (Float64List(cols)..fillRange(0, cols, startOffset));
+
+    final directRatios = spec.directRatios;
+    final constantFooter = spec.constantFooter;
+    if (directRatios != null &&
+        constantFooter != null &&
+        directRatios.length >= firstItem + itemCount) {
+      for (var k = 0; k < itemCount; k++) {
+        final i = firstItem + k;
+        var column = 0;
+        var shortest = colBottom[0];
+        for (var c = 1; c < cols; c++) {
+          if (colBottom[c] < shortest) {
+            shortest = colBottom[c];
+            column = c;
+          }
+        }
+        var h = tileW / directRatios[i] + constantFooter;
+        if (!h.isFinite || h < 0) h = 0;
+        final c = firstChild + k;
+        tops[c] = shortest;
+        heights[c] = h;
+        lefts[c] = column * (tileW + s);
+        widths[c] = tileW;
+        colBottom[column] = shortest + h + s;
+      }
+    } else {
+      for (var k = 0; k < itemCount; k++) {
+        final i = firstItem + k;
+        var column = 0;
+        var shortest = colBottom[0];
+        for (var c = 1; c < cols; c++) {
+          if (colBottom[c] < shortest) {
+            shortest = colBottom[c];
+            column = c;
+          }
+        }
+        var h = tileW / ratioOf(i) + (footerOf?.call(i, tileW) ?? 0.0);
+        if (!h.isFinite || h < 0) h = 0;
+        final c = firstChild + k;
+        tops[c] = shortest;
+        heights[c] = h;
+        lefts[c] = column * (tileW + s);
+        widths[c] = tileW;
+        colBottom[column] = shortest + h + s;
+      }
+    }
+    var tallest = startOffset;
+    for (final b in colBottom) {
+      if (b > tallest) tallest = b;
+    }
+    return tallest - s;
+  }
+}
+
+/// What [GalleryLayoutHost.reflow] did.
+enum GalleryReflowResult {
+  /// The recomputed layout is identical; nothing to rebuild.
+  unchanged,
+
+  /// The new layout was adopted; the view must rebuild.
+  applied,
+}
+
+/// Keeps one child at the same place on screen across a relayout.
+class GalleryAnchor {
+  const GalleryAnchor({required this.child, required this.viewportOffset});
+
+  /// Child index (stable across ratio and zoom changes: the child index space
+  /// only depends on the sections).
+  final int child;
+
+  /// Where the child's top edge was relative to the sliver's scroll offset.
+  final double viewportOffset;
+}
+
+/// Owns the inputs of a gallery layout and caches the model computed from
+/// them, so the sliver can ask for it on every layout pass for free.
+///
+/// Flutter calls `SliverGridDelegate.getLayout` on *every* scrolled frame, so
+/// [modelFor] must be O(1) unless something that moves tiles has changed:
+/// that is what [invalidate] and the crossExtent comparison are for.
+class GalleryLayoutHost {
+  GalleryLayoutHost({
+    this.flow = GalleryFlow.rows,
+    this.columnCount = 3,
+    this.spacing = 8.0,
+    this.sectionGap = 0.0,
+    this.minTileWidth = 56.0,
+    this.rowExtent = 0.0,
+  });
+
+  GalleryFlow flow;
+  int columnCount;
+  double spacing;
+  double sectionGap;
+  double minTileWidth;
+
+  /// [GalleryFlow.list]: the height of every row.
+  double rowExtent;
+
+  List<GallerySection> sections = const [];
+  GalleryRatioOf ratioOf = _unitRatio;
+  GalleryFooterOf? footerOf;
+  Float32List? directRatios;
+  Uint8List? directKinds;
+  double Function(double tileWidth)? constantFooterFor;
+  double Function(double tileWidth)? iconFooterFor;
+
+  /// Bumped whenever the model changes; widgets pass it to the delegate so
+  /// `shouldRelayout` can tell.
+  int revision = 0;
+
+  /// Set when the next layout pass should keep this child where it is; consumed
+  /// (cleared) by the sliver.
+  GalleryAnchor? pendingAnchor;
+
+  /// Written by the sliver on every layout pass (sliver coordinates).
+  double sliverScrollOffset = 0;
+  double viewportExtent = 0;
+  double sliverCrossExtent = 0;
+
+  GalleryLayoutModel? _model;
+  bool _dirty = true;
+  final List<void Function()> _layoutListeners = <void Function()>[];
+
+  void addLayoutListener(void Function() listener) {
+    _layoutListeners.add(listener);
+  }
+
+  void removeLayoutListener(void Function() listener) {
+    _layoutListeners.remove(listener);
+  }
+
+  void _notifyLayoutListeners() {
+    if (_layoutListeners.isEmpty) return;
+    for (final listener in List<void Function()>.of(_layoutListeners)) {
+      listener();
+    }
+  }
+
+  static double _unitRatio(int _) => 1.0;
+
+  /// The model most recently adopted (null before the first layout).
+  GalleryLayoutModel? get current => _model;
+
+  static const int _kNoDirtyItem = 0x7fffffff;
+  int _staleFromItem = _kNoDirtyItem;
+
+  /// Something that moves tiles changed: recompute on next [modelFor].
+  void invalidate() {
+    _dirty = true;
+    _staleFromItem = _kNoDirtyItem;
+    hasStalePrefix = false;
+    revision++;
+  }
+
+  GalleryLayoutSpec _specFor(double crossExtent) {
+    final target = math.max(
+      1.0,
+      (crossExtent - (columnCount - 1) * spacing) / columnCount,
+    );
+    return GalleryLayoutSpec(
+      crossExtent: crossExtent,
+      spacing: spacing,
+      flow: flow,
+      columnCount: columnCount,
+      minTileWidth: minTileWidth,
+      sectionGap: sectionGap,
+      rowExtent: rowExtent,
+    directRatios: directRatios,
+      constantFooter: constantFooterFor?.call(target),
+      directKinds: directKinds,
+      iconFooter: iconFooterFor?.call(target),
+    );
+  }
+
+  /// Builds a model from the current inputs without adopting it.
+  GalleryLayoutModel buildCandidate(double crossExtent) =>
+      GalleryLayoutModel.compute(
+        sections: sections,
+        spec: _specFor(crossExtent),
+        ratioOf: ratioOf,
+        footerOf: footerOf,
+      );
+
+  /// Makes [model] the layout in use and asks for a relayout, optionally
+  /// keeping [anchor] in place.
+  void adopt(GalleryLayoutModel model, {GalleryAnchor? anchor}) {
+    _model = model;
+    _dirty = false;
+    pendingAnchor = anchor;
+    revision++;
+    _notifyLayoutListeners();
+  }
+
+  /// Makes [model] current without a relayout (nothing moved).
+  void adoptQuietly(GalleryLayoutModel model) {
+    _model = model;
+    _dirty = false;
+  }
+
+  /// True while the layout above the top of the screen is known to be out of
+  /// date (a [reflow] with `freezeAboveViewport` adopted a partial update).
+  /// The view should call [reflow] again, without freezing, once it can.
+  bool hasStalePrefix = false;
+
+  /// Recomputes the layout after ratios changed and adopts it. Never defers:
+  /// whatever is on screen is correct as soon as this returns.
+  ///
+  /// * [freezeAboveViewport] (the user is scrolling): everything from the top
+  ///   row on screen downwards is recomputed, everything above it keeps its
+  ///   exact old position. Nothing the user can see moves *vertically*, so no
+  ///   scroll correction is needed (and none would survive a fling: the
+  ///   ballistic simulation writes an absolute offset on every tick). Tiles
+  ///   that are on screen change shape the moment their size is known. The
+  ///   rows above are merely stale -- [hasStalePrefix] -- until the next
+  ///   unfrozen reflow, which the view runs as soon as it is idle; and if the
+  ///   user scrolls back up, the top row moves up with them, so the rows they
+  ///   are looking at are refreshed by the very next reflow.
+  /// * Otherwise (idle): everything is recomputed. When that moves anything
+  ///   above the bottom of the screen it is adopted with an anchor on the tile
+  ///   at the top of the screen, which the sliver turns into a same-pass scroll
+  ///   correction.
+  GalleryReflowResult reflow({
+    required double crossExtent,
+    bool freezeAboveViewport = false,
+    int dirtyFromItem = 0,
+  }) {
+    final old = _model;
+    final fromItem = math.max(0, math.min(dirtyFromItem, _staleFromItem));
+    if (old == null ||
+        old.childCount == 0 ||
+        old.crossExtent != crossExtent) {
+      adopt(buildCandidate(crossExtent));
+      _staleFromItem = _kNoDirtyItem;
+      hasStalePrefix = false;
+      return GalleryReflowResult.applied;
+    }
+    if (fromItem >= old.itemCount) {
+      hasStalePrefix = false;
+      return GalleryReflowResult.unchanged;
+    }
+
+    final dirtyChild = old.childOfItem[fromItem];
+    GalleryLayoutModel next;
+    var frozen = false;
+    var staleFrom = _kNoDirtyItem;
+    var recomputedFrom = dirtyChild;
+    if (freezeAboveViewport) {
+      final top = old.minChildForOffset(sliverScrollOffset);
+      final viewportFrom = old.firstChildOfRowContaining(top);
+      if (dirtyChild >= viewportFrom) {
+        next = GalleryLayoutModel.recomputeFrom(
+          previous: old,
+          fromChild: dirtyChild,
+          sections: sections,
+          spec: _specFor(crossExtent),
+          ratioOf: ratioOf,
+          footerOf: footerOf,
+        );
+      } else if (viewportFrom > 0) {
+        next = GalleryLayoutModel.recomputeFrom(
+          previous: old,
+          fromChild: viewportFrom,
+          sections: sections,
+          spec: _specFor(crossExtent),
+          ratioOf: ratioOf,
+          footerOf: footerOf,
+        );
+        frozen = true;
+        staleFrom = fromItem;
+        recomputedFrom = viewportFrom;
+      } else {
+        next = buildCandidate(crossExtent);
+        recomputedFrom = 0;
+      }
+    } else {
+      next = GalleryLayoutModel.recomputeFrom(
+        previous: old,
+        fromChild: dirtyChild,
+        sections: sections,
+        spec: _specFor(crossExtent),
+        ratioOf: ratioOf,
+        footerOf: footerOf,
+      );
+    }
+
+    final firstChanged = old.firstChangedChild(
+      next,
+      startChild: recomputedFrom,
+    );
+    if (firstChanged >= next.childCount) {
+      adoptQuietly(next);
+      // An unfrozen pass that found nothing to change has made the prefix
+      // current; a frozen one never looked at it, so a size that changed above
+      // the screen shows up here as "nothing changed" and is still pending.
+      _staleFromItem = staleFrom;
+      hasStalePrefix = frozen;
+      return GalleryReflowResult.unchanged;
+    }
+    final viewportEnd = sliverScrollOffset + viewportExtent;
+    final movesVisible = old.tops[firstChanged] < viewportEnd;
+    // A frozen update never moves anything above the top row, so it needs no
+    // anchor; an idle one anchors the top of the screen.
+    final anchor = (!frozen && movesVisible) ? captureTopAnchor() : null;
+    adopt(next, anchor: anchor);
+    _staleFromItem = staleFrom;
+    hasStalePrefix = frozen;
+    return GalleryReflowResult.applied;
+  }
+
+  /// The model for [crossExtent], recomputed only when stale.
+  GalleryLayoutModel modelFor(double crossExtent) {
+    final cached = _model;
+    if (cached != null && !_dirty && cached.crossExtent == crossExtent) {
+      return cached;
+    }
+    final model = buildCandidate(crossExtent);
+    _model = model;
+    _dirty = false;
+    return model;
+  }
+
+  /// The anchor that keeps whatever is at the top of the screen in place.
+  GalleryAnchor? captureTopAnchor() {
+    final m = _model;
+    if (m == null || m.childCount == 0) return null;
+    final c = m.minChildForOffset(sliverScrollOffset);
+    return GalleryAnchor(child: c, viewportOffset: m.tops[c] - sliverScrollOffset);
+  }
+
+  /// The item nearest the top of the screen (headers skipped): the child that
+  /// draws it, its item index, and where its top edge is relative to the
+  /// scroll offset. Null before the first layout and at the very top of the
+  /// list, where there is nothing to hold in place and what is added above
+  /// simply shows.
+  ///
+  /// This is the first half of keeping the view still when the *list* changes
+  /// (a filter result came in, a rescan finished): the caller finds the same
+  /// entry in the new list, builds the new model with [prepareModel], and hands
+  /// the entry's new child to [adoptAnchored].
+  ({int child, int item, double viewportOffset})? captureTopItem() {
+    final m = _model;
+    if (m == null || m.childCount == 0 || sliverScrollOffset <= 0.5) {
+      return null;
+    }
+    var c = m.minChildForOffset(sliverScrollOffset);
+    while (c < m.childCount && m.isHeader(c)) {
+      c++;
+    }
+    if (c >= m.childCount) return null;
+    return (
+      child: c,
+      item: m.itemOfChild[c],
+      viewportOffset: m.tops[c] - sliverScrollOffset,
+    );
+  }
+
+  /// The layout of the current sections at the width of the last layout pass,
+  /// built now. Null while nothing has been laid out yet (the width is not
+  /// known), in which case there is no scroll position to keep either.
+  GalleryLayoutModel? prepareModel() =>
+      sliverCrossExtent > 0 ? buildCandidate(sliverCrossExtent) : null;
+
+  /// Makes [model] (from [prepareModel]) the layout in use, and has the next
+  /// layout pass correct the scroll offset so [child] sits [viewportOffset]
+  /// below the top of the screen. The correction happens inside that pass, so
+  /// no frame is painted with the content shifted.
+  void adoptAnchored(
+    GalleryLayoutModel model,
+    int child,
+    double viewportOffset,
+  ) {
+    adoptQuietly(model);
+    pendingAnchor = GalleryAnchor(child: child, viewportOffset: viewportOffset);
+  }
+
+  /// The anchor that keeps whatever is at [offsetInViewport] (e.g. the pinch's
+  /// focal point) at that same place on screen.
+  GalleryAnchor? captureAnchorAt(double offsetInViewport) {
+    final m = _model;
+    if (m == null || m.childCount == 0) return null;
+    final c = m.minChildForOffset(sliverScrollOffset + offsetInViewport);
+    return GalleryAnchor(child: c, viewportOffset: m.tops[c] - sliverScrollOffset);
+  }
+}

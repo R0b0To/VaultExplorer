@@ -17,6 +17,8 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:path/path.dart' as p;
+import 'package:vaultexplorer/core/utils/listing_job.dart';
+import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/features/decoy/local/decoy_local_repository.dart';
 
 class LocalFileIoBackend {
@@ -36,6 +38,21 @@ class LocalFileIoBackend {
   String resolve(String rootPath, String relativePath) =>
       _resolve(rootPath, relativePath);
 
+  Future<bool> entryExists(
+    String rootPath,
+    String relativePath, {
+    required bool isDir,
+  }) async {
+    try {
+      final path = _resolve(rootPath, relativePath);
+      return isDir
+          ? await Directory(path).exists()
+          : await File(path).exists();
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<bool> canListDirectory(String rootPath, String dirPath) async {
     try {
       final directory = Directory(_resolve(rootPath, dirPath));
@@ -52,11 +69,44 @@ class LocalFileIoBackend {
     String dirPath, {
     bool refresh = false,
   }) async {
-    final entries = await _repo.listDirectory(
-      _resolve(rootPath, dirPath),
+    final entries = await listDirectoryEntries(
+      rootPath,
+      dirPath,
       refresh: refresh,
     );
     return entries.map((e) => e.raw).toList();
+  }
+
+  /// The same listing as [listDirectory], as the [RawEntry] values the
+  /// repository already produced -- for callers (the interactive browser)
+  /// that want entries, not wire strings, so nothing is formatted only to be
+  /// parsed straight back.
+  Future<List<RawEntry>> listDirectoryEntries(
+    String rootPath,
+    String dirPath, {
+    bool refresh = false,
+  }) {
+    return _repo.listDirectory(
+      _resolve(rootPath, dirPath),
+      refresh: refresh,
+    );
+  }
+
+  /// [listDirectoryEntries] for a folder that may be huge: while it is still
+  /// being read, [onPartial] receives growing name-sorted snapshots, and the
+  /// returned job completes with the finished listing. See
+  /// [DecoyLocalRepository.listDirectoryProgressive].
+  ListingJob<List<RawEntry>> listDirectoryProgressive(
+    String rootPath,
+    String dirPath, {
+    bool refresh = false,
+    void Function(List<RawEntry> partial)? onPartial,
+  }) {
+    return _repo.listDirectoryProgressive(
+      _resolve(rootPath, dirPath),
+      refresh: refresh,
+      onPartial: onPartial,
+    );
   }
 
   Future<bool> decryptFile(
@@ -86,8 +136,8 @@ class LocalFileIoBackend {
       if (!await srcFile.exists()) return false;
       final destFile = File(_resolve(rootPath, fileName));
       await destFile.parent.create(recursive: true);
-      await srcFile.copy(destFile.path);
-      DecoyLocalRepository.clearCache();
+         await srcFile.copy(destFile.path);
+      DecoyLocalRepository.invalidatePathAndParent(destFile.path);
       return true;
     } catch (_) {
       return false;
@@ -147,10 +197,9 @@ class LocalFileIoBackend {
       await raf.setPosition(offset);
       await raf.writeFrom(data);
       await raf.flush();
-      if (offset == 0) {
-        DecoyLocalRepository.clearCache();
-      }
-      return true;
+       if (offset == 0) {
+        DecoyLocalRepository.invalidatePathAndParent(file.path);
+      }      return true;
     } catch (_) {
       return false;
     } finally {
@@ -164,9 +213,8 @@ class LocalFileIoBackend {
       if (await FileSystemEntity.type(path) != FileSystemEntityType.notFound) {
         return false;
       }
-      await Directory(path).create(recursive: false);
-      DecoyLocalRepository.clearCache();
-      return true;
+        await Directory(path).create(recursive: false);
+      DecoyLocalRepository.invalidatePathAndParent(path);      return true;
     } catch (_) {
       return false;
     }
@@ -189,8 +237,8 @@ class LocalFileIoBackend {
       } else {
         await File(from).rename(to);
       }
-      DecoyLocalRepository.clearCache();
-      return true;
+      DecoyLocalRepository.invalidatePathAndParent(from);
+      DecoyLocalRepository.invalidatePathAndParent(to);      return true;
     } catch (_) {
       return false;
     }
@@ -199,7 +247,6 @@ class LocalFileIoBackend {
   Future<bool> deleteFile(String rootPath, String fileName) async {
     try {
       await _repo.delete(_resolve(rootPath, fileName));
-      DecoyLocalRepository.clearCache();
       return true;
     } catch (_) {
       return false;

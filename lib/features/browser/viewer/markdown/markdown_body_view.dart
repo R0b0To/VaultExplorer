@@ -9,6 +9,7 @@ import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/viewer/markdown/markdown_ast.dart';
 import 'package:vaultexplorer/features/browser/viewer/markdown/markdown_image_cache.dart';
+import 'package:vaultexplorer/features/browser/viewer/markdown/markdown_link_syntax.dart';
 import 'package:vaultexplorer/features/browser/viewer/markdown/markdown_parser.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/markdown_image.dart';
 
@@ -134,7 +135,7 @@ class MarkdownBodyViewState extends ConsumerState<MarkdownBodyView> {
   void _handleLink(String url) {
     if (url.startsWith('#')) {
       final rawTarget = url.substring(1).trim();
-      final decodedTarget = Uri.decodeComponent(rawTarget).toLowerCase();
+      final decodedTarget = decodeLinkPath(rawTarget).toLowerCase();
 
       if (decodedTarget.isEmpty || decodedTarget == 'top') {
         if (_scrollController.hasClients) {
@@ -188,7 +189,7 @@ class MarkdownBodyViewState extends ConsumerState<MarkdownBodyView> {
         }
       }
     }
-    widget.onLinkTap(url);
+    widget.onLinkTap(normalizeLinkUri(url));
   }
 
   GlobalKey? _resolveHeadingKey(String target) {
@@ -745,6 +746,9 @@ class MarkdownBodyViewState extends ConsumerState<MarkdownBodyView> {
       );
     }
     if (block is MdList) {
+      final markerWidth = block.ordered
+          ? _orderedMarkerWidth(context, block, _orderedMarkerStyle(textTheme, cs))
+          : 0.0;
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Column(
@@ -759,6 +763,7 @@ class MarkdownBodyViewState extends ConsumerState<MarkdownBodyView> {
                 textTheme,
                 cs,
                 depth: depth,
+                orderedMarkerWidth: markerWidth,
               ),
           ],
         ),
@@ -773,6 +778,31 @@ class MarkdownBodyViewState extends ConsumerState<MarkdownBodyView> {
     return const SizedBox.shrink();
   }
 
+  static const double _orderedMarkerGap = 6;
+
+  TextStyle? _orderedMarkerStyle(TextTheme textTheme, ColorScheme cs) =>
+      textTheme.bodyMedium?.copyWith(
+        color: cs.onSurfaceVariant,
+        fontWeight: FontWeight.w600,
+      );
+
+  /// Width of the "N." marker column. Sized for the list's largest number so
+  /// numbers of any length (e.g. a list starting at 100) are never clipped,
+  /// and every item's text stays aligned. Never narrower than the old 24.
+  double _orderedMarkerWidth(BuildContext context, MdList list, TextStyle? style) {
+    final last = list.startNumber + list.items.length - 1;
+    final digits = last.toString().length;
+    final painter = TextPainter(
+      text: TextSpan(text: '${'8' * digits}.', style: style),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      maxLines: 1,
+    )..layout();
+    final width = painter.width + _orderedMarkerGap;
+    painter.dispose();
+    return width < 24 ? 24 : width;
+  }
+
   Widget _buildListItem(
     BuildContext context,
     MdList list,
@@ -781,6 +811,7 @@ class MarkdownBodyViewState extends ConsumerState<MarkdownBodyView> {
     TextTheme textTheme,
     ColorScheme cs, {
     required int depth,
+    required double orderedMarkerWidth,
   }) {
     Widget markerWidget;
 
@@ -806,16 +837,15 @@ class MarkdownBodyViewState extends ConsumerState<MarkdownBodyView> {
       );
     } else if (list.ordered) {
       markerWidget = Container(
-        width: 24,
+        width: orderedMarkerWidth,
         height: 22,
         alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 6),
+        padding: const EdgeInsets.only(right: _orderedMarkerGap),
         child: Text(
           '${list.startNumber + index}.',
-          style: textTheme.bodyMedium?.copyWith(
-            color: cs.onSurfaceVariant,
-            fontWeight: FontWeight.w600,
-          ),
+          maxLines: 1,
+          softWrap: false,
+          style: _orderedMarkerStyle(textTheme, cs),
         ),
       );
     } else {
@@ -986,9 +1016,12 @@ class MarkdownBodyViewState extends ConsumerState<MarkdownBodyView> {
   }
 
   static String _resolveVaultPath(String currentFilePath, String reference) {
-    if (p.isAbsolute(reference)) return p.normalize(reference);
+    // Destinations are percent-encoded Markdown (`my%20image.png`); the vault
+    // path is the decoded file name.
+    final path = decodeLinkPath(reference);
+    if (p.isAbsolute(path)) return p.normalize(path);
     final dir = p.dirname(currentFilePath);
-    return p.normalize(p.join(dir, reference));
+    return p.normalize(p.join(dir, path));
   }
 
   TextStyle _headingStyle(TextTheme textTheme, int level) {

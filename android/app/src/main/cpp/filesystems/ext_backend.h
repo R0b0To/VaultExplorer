@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "copy_progress_callback.h"
+#include "fs_grow.h"
 
 extern "C" {
 #include <ext2fs/ext2fs.h>
@@ -49,6 +50,9 @@ uint64_t recursiveExtFolderSize(int volumeId, const std::string& path);
 bool mountExtVolume(int volumeId);
 bool formatExtVolume(int volumeId, const char* variant);
 bool ensureExtBitmapsLoaded(int volumeId);
+// Grows the mounted ext2/3/4 file system to fill the volume (volumes[volumeId].dataAreaLengthBytes) using
+// e2fsprogs' resize_fs(), then remounts it. No data is relocated beyond what resize2fs itself does.
+FsGrowStatus extGrowToFit(int volumeId);
 // "ext2"/"ext3"/"ext4" from the mounted superblock's feature flags -- see
 // ext_backend.cpp for the detection heuristic (same one blkid uses).
 // Empty if the volume isn't actually mounted.
@@ -61,6 +65,20 @@ std::string extGetFilesystemLabel(int volumeId);
 // even needed. [volumeId]'s ext2_filsys must already be mounted (VolumeState::extFs).
 bool extIsDirty(int volumeId);
 bool extClearDirtyState(int volumeId);
+
+// Locking a volume (jni/session_bridge.cpp lockVolumeLocked, io/virtual_block_device.cpp
+// unmountVolume). Both return true only when every step succeeded, so a filesystem-level failure
+// is never reported as an ordinary successful lock.
+//  - extFlushForLock: writes out every open stream's buffered data and the filesystem metadata.
+//    Nothing is closed or freed, so on failure the volume is exactly as usable as before and the
+//    call can be repeated. No-op for a read-only mount.
+//  - extUnmount: closes the open streams, flushes and closes the filesystem. libext2fs frees a
+//    file handle even when closing it fails, but ext2fs_close() returns BEFORE freeing the
+//    filesystem when its final flush or bitmap write fails, so with [keepOnFailure] the failed
+//    filesystem stays in VolumeState::extFs and the unmount can be retried. Without it extFs is
+//    always cleared (the pre-existing behaviour every other caller relies on).
+bool extFlushForLock(int volumeId);
+bool extUnmount(int volumeId, bool keepOnFailure);
 // A conservative directory-entry pass for Check & Repair. It removes only
 // entries whose inode cannot be read or whose metadata is impossible for this
 // volume; it never guesses at inode/block ownership.
@@ -88,7 +106,10 @@ bool extReclaimOrphanedInodes(int volumeId);
 // from what used to be inline `else if (v.fsType == FS_EXT) { ... }`
 // branches in jni/filesystem_bridge.cpp.
 void extListDirectory(int volumeId, const std::string& pathSuffix, std::vector<std::string>& results);
-uint64_t extGetFileSize(int volumeId, const std::string& path);
+void extListSymlinks(int volumeId, const std::string& pathSuffix, std::vector<std::string>& results);
+bool extReadSymlink(int volumeId, const std::string& path, std::string& outTarget);
+bool extCreateSymlink(int volumeId, const std::string& path, const std::string& target);
+int64_t extGetFileSize(int volumeId, const std::string& path);
 bool extReadFileChunk(int volumeId, const std::string& path, uint64_t offset, size_t length, std::vector<uint8_t>& outBuffer);
 bool extWriteFileChunk(int volumeId, const std::string& path, uint64_t offset, const uint8_t* data, size_t length);
 bool extWriteBackFile(int volumeId, const std::string& targetPath, const std::string& sourceHostPath,

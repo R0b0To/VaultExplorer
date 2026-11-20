@@ -14,6 +14,7 @@ import 'package:vaultexplorer/features/browser/viewer/video_scrub_preview_contro
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_player_widget.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_action_button.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/video_scrub_progress_bar.dart';
+import 'package:vaultexplorer/features/library/widgets/audio_waveform_seek_bar.dart';
 
 class MediaViewerBottomControls extends StatelessWidget {
   final PlaylistController playlistController;
@@ -240,24 +241,48 @@ class MediaViewerBottomControls extends StatelessWidget {
           if (!isImage && toolbarConfig.showProgressBar) ...[
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-              child: VideoScrubProgressBar(
-                playbackManager: playbackManager,
-                videoProgressNotifier: videoProgressNotifier,
-                abLoopNotifier: abLoopNotifier,
-                onShowUIChanged: onShowUIChanged,
-                onStartHideTimer: onStartHideTimer,
-                previewStyle: toolbarConfig.scrubPreviewStyle,
-                previewHost: scrubPreviewHost,
-              ),
+              // Music gets its waveform as the timeline; the ordinary slider is
+              // the fallback while it loads, for very long files and for files
+              // that cannot be decoded.
+              child: isAudio
+                  ? AudioWaveformSeekBar(
+                      playbackManager: playbackManager,
+                      videoProgressNotifier: videoProgressNotifier,
+                      abLoopNotifier: abLoopNotifier,
+                      onShowUIChanged: onShowUIChanged,
+                      onStartHideTimer: onStartHideTimer,
+                      fallback: _scrubBar(),
+                    )
+                  : _scrubBar(),
             ),
             const SizedBox(height: AppSpacing.xs),
           ],
-          if (pinned.isNotEmpty || (isImage && toolbarConfig.showStatusBadge))
+          if (pinned.isNotEmpty || _showSlideshowChip(pinned))
             _buildTransparentDock(context, cs, pinned),
         ],
       ),
     );
   }
+
+  Widget _scrubBar() => VideoScrubProgressBar(
+        playbackManager: playbackManager,
+        videoProgressNotifier: videoProgressNotifier,
+        abLoopNotifier: abLoopNotifier,
+        onShowUIChanged: onShowUIChanged,
+        onStartHideTimer: onStartHideTimer,
+        previewStyle: toolbarConfig.scrubPreviewStyle,
+        previewHost: scrubPreviewHost,
+      );
+
+  /// The slideshow countdown pill is shown only while a slideshow is running:
+  /// a static photo needs no indicator (the play state is already visible) and
+  /// the delay is still reachable from Advanced settings.
+  bool _showSlideshowChip(List<MediaViewerAction> pinned) =>
+      isImage &&
+      isPlaylistMode &&
+      autoAdvance &&
+      toolbarConfig.showStatusBadge &&
+      !pinned.contains(MediaViewerAction.slideshowDelay);
 
   Widget _buildTransparentDock(
     BuildContext context,
@@ -273,10 +298,7 @@ class MediaViewerBottomControls extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (isImage &&
-                isPlaylistMode &&
-                toolbarConfig.showStatusBadge &&
-                !pinned.contains(MediaViewerAction.slideshowDelay)) ...[
+            if (_showSlideshowChip(pinned)) ...[
               _SlideshowStatusChip(
                 autoAdvance: autoAdvance,
                 slideshowDelaySeconds: slideshowDelaySeconds,

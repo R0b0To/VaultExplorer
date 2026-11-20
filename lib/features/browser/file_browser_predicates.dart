@@ -156,6 +156,9 @@ bool matchesFilter(String fileName, String? currentFilter) {
       return MediaViewerConstants.isImage(fileName);
     case 'video':
       return MediaViewerConstants.isVideo(fileName);
+    case 'gallery':
+      return MediaViewerConstants.isImage(fileName) ||
+          MediaViewerConstants.isVideo(fileName);
     case 'audio':
       return MediaViewerConstants.isAudio(fileName);
     case 'document':

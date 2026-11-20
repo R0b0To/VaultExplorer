@@ -67,12 +67,16 @@ struct Luks2SegmentInfo {
     uint64_t offset = 0;       // data area byte offset
     uint64_t sectorSize = 512;
     uint32_t keySize = 0;      // key size in bytes
-    // "iv_tweak": added to the sector counter used for the XTS tweak. The
-    // counter itself starts at 0 at the FIRST sector of this segment (i.e.
-    // it's relative to `offset`, not the start of the file) and increments
-    // once per `sectorSize` bytes. Default 0 for a freshly-formatted
-    // container; only nonzero after certain reencryption operations.
+    // LUKS2 `iv_tweak` is an offset in 512-byte sectors, matching dm-crypt's
+    // `iv_offset`. The data-unit sector number advances by sectorSize/512
+    // between XTS data units. Default 0 for a freshly-formatted container.
     uint64_t ivTweak = 0;
+    bool isCryptSegment = false;
+    bool hasIntegrity = false;
+    bool hasFlags = false;
+    bool hasMandatoryRequirements = false;
+    uint64_t sizeBytes = 0;      // LUKS2 segment size; 0 when `dynamic`
+    bool dynamicSize = true;     // true for LUKS1 and LUKS2 `size: dynamic`
 };
 
 struct LuksVolumeInfo {
@@ -82,9 +86,26 @@ struct LuksVolumeInfo {
     uint32_t keyBytes = 0;     // master key size in bytes
     uint64_t dataOffsetBytes = 0;
     uint64_t dataSectorSize = 512;
+    // LUKS2 segment geometry. LUKS1 has no size field and is always dynamic.
+    // When dynamicSize is false, dataSizeBytes is the segment's declared byte length.
+    uint64_t dataSizeBytes = 0;
+    bool dynamicSize = true;
+    uint32_t dataSegmentCount = 1;
+    bool dataIsCryptSegment = true; // LUKS1 payload is always a crypt segment.
     // LUKS2 segment "iv_tweak" (always 0 for LUKS1). See Luks2SegmentInfo::ivTweak.
     uint64_t ivTweak = 0;
+    bool dataHasIntegrity = false;
+    bool dataSegmentHasFlags = false;
+    bool hasMandatoryRequirements = false;
     std::vector<uint8_t> masterKey;
+};
+
+// Header probe distinguishes an unrelated file from a LUKS file whose
+// cleartext header is malformed. It performs no password derivation.
+enum class LuksHeaderProbeResult : int {
+    kValid = 0,
+    kNotLuks = 1,
+    kInvalidHeader = 2,
 };
 
 // Check if the header starts with LUKS magic bytes
@@ -92,6 +113,9 @@ bool isLuksContainer(const uint8_t* header, size_t len);
 
 using LuksByteReader = std::function<bool(uint64_t offset, void* outData, size_t len)>;
 using LuksByteWriter = std::function<bool(uint64_t offset, const void* data, size_t len)>;
+using LuksByteSync = std::function<bool()>;
+
+LuksHeaderProbeResult luksProbeHeader(const LuksByteReader& reader);
 
 bool luksRecoverMasterKey(const LuksByteReader& reader,
                           const uint8_t* password,
@@ -198,6 +222,25 @@ bool luks2RestoreHeaderFromBackup(const LuksByteReader& reader, const LuksByteWr
 // parsing. false if the header doesn't parse (bad magic, an implausible
 // hdrSize, unparseable JSON, or a missing/malformed segment offset).
 bool luks2DataSegmentOffset(const LuksByteReader& reader, uint64_t& outOffset);
+
+// LUKS2 container expansion metadata update. This deliberately supports only
+// the conventional single-crypt-segment layout with 16 KiB metadata copies
+// and SHA-256 checksums. At least one copy must verify; when the copies are
+// split across sequence IDs after an interrupted update, the newest valid
+// copy is used and both are repaired on the next successful resize. It
+// preserves every JSON field except the segment's `size` and increments
+// seqid. It commits the stale/invalid copy first, keeping the selected source
+// copy intact until the new metadata is durable. Returns false for unsupported
+// or inconsistent metadata. [outDataOffset], [outOldDataSize],
+// [outIvTweak], [outWasDynamic] and [outNeedsMetadataRepair] describe the
+// verified segment and whether a split/invalid metadata copy must be repaired.
+bool luks2ValidateResize(const LuksByteReader& reader, uint64_t oldFileSize,
+                         uint64_t newFileSize, uint64_t& outDataOffset,
+                         uint64_t& outOldDataSize, uint64_t& outIvTweak,
+                         bool& outWasDynamic, bool& outNeedsMetadataRepair);
+bool luks2ResizeSegmentMetadata(const LuksByteReader& reader, const LuksByteWriter& writer,
+                                uint64_t oldFileSize, uint64_t newFileSize,
+                                const LuksByteSync& sync = nullptr);
 
 // ── Container creation ──────────────────────────────────────────────────
 

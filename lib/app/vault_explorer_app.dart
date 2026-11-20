@@ -16,6 +16,8 @@ import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/theme/predictive_back_preference.dart';
+import 'package:vaultexplorer/core/utils/perf_trace.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
@@ -30,11 +32,82 @@ final ValueNotifier<ThemeMode> appThemeModeNotifier = ValueNotifier(
 final ValueNotifier<bool> appUseDynamicColorNotifier = ValueNotifier(false);
 final ValueNotifier<Locale?> appLocaleNotifier = ValueNotifier(null);
 
-class VaultExplorerApp extends ConsumerWidget {
+class VaultExplorerApp extends ConsumerStatefulWidget {
   const VaultExplorerApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<VaultExplorerApp> createState() => _VaultExplorerAppState();
+}
+
+class _VaultExplorerAppState extends ConsumerState<VaultExplorerApp> {
+  Object? _lightThemeKey;
+  ThemeData? _cachedLightTheme;
+  Object? _darkThemeKey;
+  ThemeData? _cachedDarkTheme;
+
+  ThemeData _lightThemeFor({
+    required ColorScheme? dynamicScheme,
+    required AppSkinPreset skinPreset,
+    required dynamic customSkin,
+    required dynamic manualFileManagerSkin,
+    required bool fileManagerFollowsAppSkin,
+    required bool editorFollowsAppSkin,
+  }) {
+    final key = (
+      dynamicScheme,
+      skinPreset,
+      customSkin,
+      manualFileManagerSkin,
+      fileManagerFollowsAppSkin,
+      editorFollowsAppSkin,
+    );
+    if (_cachedLightTheme != null && _lightThemeKey == key) {
+      return _cachedLightTheme!;
+    }
+    _lightThemeKey = key;
+    return _cachedLightTheme = buildLightTheme(
+      dynamicScheme: dynamicScheme,
+      appSkin: skinPreset,
+      customAppSkin: customSkin,
+      manualFileManagerSkin: manualFileManagerSkin,
+      fileManagerFollowsAppSkin: fileManagerFollowsAppSkin,
+      editorFollowsAppSkin: editorFollowsAppSkin,
+    );
+  }
+
+  ThemeData _darkThemeFor({
+    required ColorScheme? dynamicScheme,
+    required AppSkinPreset skinPreset,
+    required dynamic customSkin,
+    required dynamic manualFileManagerSkin,
+    required bool fileManagerFollowsAppSkin,
+    required bool editorFollowsAppSkin,
+  }) {
+    final key = (
+      dynamicScheme,
+      skinPreset,
+      customSkin,
+      manualFileManagerSkin,
+      fileManagerFollowsAppSkin,
+      editorFollowsAppSkin,
+    );
+    if (_cachedDarkTheme != null && _darkThemeKey == key) {
+      return _cachedDarkTheme!;
+    }
+    _darkThemeKey = key;
+    return _cachedDarkTheme = buildDarkTheme(
+      dynamicScheme: dynamicScheme,
+      appSkin: skinPreset,
+      customAppSkin: customSkin,
+      manualFileManagerSkin: manualFileManagerSkin,
+      fileManagerFollowsAppSkin: fileManagerFollowsAppSkin,
+      editorFollowsAppSkin: editorFollowsAppSkin,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    PerfTrace.count('ui.app.build');
     final appSkin = ref.watch(appSkinSettingsProvider);
     // While a skin is being edited the whole app is drawn from the live draft
     // (always as a custom skin), so every change shows on every page at once.
@@ -61,19 +134,19 @@ class VaultExplorerApp extends ConsumerWidget {
                     return MaterialApp(
                       navigatorKey: appNavigatorKey,
                       debugShowCheckedModeBanner: false,
-                      theme: buildLightTheme(
+                      theme: _lightThemeFor(
                         dynamicScheme: useDynamic ? lightDynamic : null,
-                        appSkin: skinPreset,
-                        customAppSkin: customSkin,
+                        skinPreset: skinPreset,
+                        customSkin: customSkin,
                         manualFileManagerSkin: appSkin.fileManagerSkin,
                         fileManagerFollowsAppSkin:
                             appSkin.fileManagerFollowsAppSkin,
                         editorFollowsAppSkin: appSkin.editorFollowsAppSkin,
                       ),
-                      darkTheme: buildDarkTheme(
+                      darkTheme: _darkThemeFor(
                         dynamicScheme: useDynamic ? darkDynamic : null,
-                        appSkin: skinPreset,
-                        customAppSkin: customSkin,
+                        skinPreset: skinPreset,
+                        customSkin: customSkin,
                         manualFileManagerSkin: appSkin.fileManagerSkin,
                         fileManagerFollowsAppSkin:
                             appSkin.fileManagerFollowsAppSkin,
@@ -191,6 +264,7 @@ class _DisguiseModeGateState extends ConsumerState<_DisguiseModeGate> {
         : null;
     appThemeModeNotifier.value = settings.themeMode;
     appUseDynamicColorNotifier.value = settings.useDynamicColor;
+    appPredictiveBackNotifier.value = settings.predictiveBackAnimations;
 
     await ref
         .read(appSkinSettingsProvider.notifier)

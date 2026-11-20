@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:ui' show Color;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/data/models/file_item_action.dart';
 import 'package:vaultexplorer/data/models/file_manager_skin.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
@@ -11,6 +12,91 @@ import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/models/thumbnail_settings.dart';
 
 void main() {
+  group('FileManagerToolbarConfig toolbar action order', () {
+    test('play media is available but hidden in the fresh-install defaults', () {
+      final defaults = FileManagerToolbarConfig.defaults();
+
+      expect(defaults.order, contains(FileManagerAction.playMedia));
+      expect(defaults.hidden, contains(FileManagerAction.playMedia));
+      expect(defaults.visible, isNot(contains(FileManagerAction.playMedia)));
+      expect(defaults.visible.last, FileManagerAction.options);
+    });
+
+    test('the mode switches sit together and the options menu is last', () {
+      final order = FileManagerToolbarConfig.defaultActionOrder;
+
+      expect(order.last, FileManagerAction.options);
+      expect(
+        order.indexOf(FileManagerAction.musicMode) -
+            order.indexOf(FileManagerAction.gallery),
+        1,
+      );
+      expect(
+        order.indexOf(FileManagerAction.viewToggle),
+        lessThan(order.indexOf(FileManagerAction.gallery)),
+      );
+    });
+
+    test('an order that is a previous default moves to the new default', () {
+      final previous = FileManagerToolbarConfig.defaults().toJson()
+        ..['order'] = [
+          FileManagerAction.search.name,
+          FileManagerAction.add.name,
+          FileManagerAction.gallery.name,
+          FileManagerAction.viewToggle.name,
+          FileManagerAction.sort.name,
+          FileManagerAction.filter.name,
+          FileManagerAction.options.name,
+          FileManagerAction.playMedia.name,
+          FileManagerAction.musicMode.name,
+        ];
+      final restored = FileManagerToolbarConfig.fromJson(previous);
+
+      expect(restored.order, FileManagerToolbarConfig.defaultActionOrder);
+    });
+
+    test('an order the user rearranged is kept', () {
+      final custom = FileManagerToolbarConfig.defaults().toJson()
+        ..['order'] = [
+          FileManagerAction.add.name,
+          FileManagerAction.search.name,
+          FileManagerAction.gallery.name,
+          FileManagerAction.viewToggle.name,
+          FileManagerAction.sort.name,
+          FileManagerAction.filter.name,
+          FileManagerAction.options.name,
+          FileManagerAction.playMedia.name,
+          FileManagerAction.musicMode.name,
+        ];
+      final restored = FileManagerToolbarConfig.fromJson(custom);
+
+      expect(restored.order.take(3), [
+        FileManagerAction.add,
+        FileManagerAction.search,
+        FileManagerAction.gallery,
+      ]);
+    });
+
+    test('legacy orders gain the mode action and hide newly added play media', () {
+      final legacy = FileManagerToolbarConfig.defaults().toJson()
+        ..['order'] = [
+          FileManagerAction.search.name,
+          FileManagerAction.add.name,
+          FileManagerAction.gallery.name,
+          FileManagerAction.viewToggle.name,
+          FileManagerAction.sort.name,
+          FileManagerAction.filter.name,
+          FileManagerAction.options.name,
+        ]
+        ..['hidden'] = <String>[];
+      final restored = FileManagerToolbarConfig.fromJson(legacy);
+
+      expect(restored.order, FileManagerToolbarConfig.defaultActionOrder);
+      expect(restored.hidden, contains(FileManagerAction.playMedia));
+      expect(restored.visible.last, FileManagerAction.options);
+    });
+  });
+
   group('FileManagerToolbarConfig autoStartPlaylistMode', () {
     test('defaults to false in defaults() factory', () {
       final config = FileManagerToolbarConfig.defaults();
@@ -491,6 +577,167 @@ void main() {
       expect(reset.showHiddenFiles, isTrue);
       expect(reset.resetSizeOnLayoutChange, isFalse);
       expect(reset.folderLayoutModes, {'c:/a': 'grid'});
+    });
+  });
+
+  group('FileManagerToolbarConfig showNoMediaFolders', () {
+    test('defaults to false in defaults() factory and constructor', () {
+      expect(FileManagerToolbarConfig.defaults().showNoMediaFolders, isFalse);
+      expect(
+        const FileManagerToolbarConfig(order: [], hidden: {}).showNoMediaFolders,
+        isFalse,
+      );
+    });
+
+    test('copyWith updates showNoMediaFolders', () {
+      final config = FileManagerToolbarConfig.defaults()
+          .copyWith(showNoMediaFolders: true);
+      expect(config.showNoMediaFolders, isTrue);
+    });
+
+    test('round-trips through JSON', () {
+      final json = FileManagerToolbarConfig.defaults()
+          .copyWith(showNoMediaFolders: true)
+          .toJson();
+      expect(json['showNoMediaFolders'], isTrue);
+      expect(
+        FileManagerToolbarConfig.fromJson(json).showNoMediaFolders,
+        isTrue,
+      );
+    });
+
+    test('fromJson falls back to false when key is missing', () {
+      final config = FileManagerToolbarConfig.fromJson(
+        <String, dynamic>{'showBreadcrumbBar': true},
+      );
+      expect(config.showNoMediaFolders, isFalse);
+    });
+  });
+  group('FileManagerToolbarConfig galleryFoldersByStorage', () {
+    test('is empty by default, so a gallery scans its whole storage', () {
+      final config = FileManagerToolbarConfig.defaults();
+      expect(config.galleryFoldersForStorage('vault://a'), isEmpty);
+    });
+
+    test('stores folders per storage and an empty list clears the choice', () {
+      var config = FileManagerToolbarConfig.defaults()
+          .withGalleryFoldersForStorage('vault://a', ['DCIM', 'Trips/2024'])
+          .withGalleryFoldersForStorage('vault://b', ['Pics']);
+      expect(config.galleryFoldersForStorage('vault://a'),
+          ['DCIM', 'Trips/2024']);
+      expect(config.galleryFoldersForStorage('vault://b'), ['Pics']);
+
+      config = config.withGalleryFoldersForStorage('vault://a', const []);
+      expect(config.galleryFoldersForStorage('vault://a'), isEmpty);
+      expect(config.galleryFoldersByStorage.containsKey('vault://a'), isFalse);
+      expect(config.galleryFoldersForStorage('vault://b'), ['Pics']);
+    });
+
+    test('survives a JSON round trip and ignores malformed entries', () {
+      final config = FileManagerToolbarConfig.defaults()
+          .withGalleryFoldersForStorage('vault://a', ['DCIM']);
+      final decoded = FileManagerToolbarConfig.fromJson(
+        jsonDecode(jsonEncode(config.toJson())) as Map<String, dynamic>,
+      );
+      expect(decoded.galleryFoldersForStorage('vault://a'), ['DCIM']);
+
+      final json = jsonDecode(jsonEncode(config.toJson())) as Map<String, dynamic>;
+      json['galleryFoldersByStorage'] = {
+        'vault://ok': ['A', '', 3],
+        'vault://bad': 'nope',
+        'vault://empty': <String>[],
+      };
+      final lenient = FileManagerToolbarConfig.fromJson(json);
+      expect(lenient.galleryFoldersForStorage('vault://ok'), ['A']);
+      expect(lenient.galleryFoldersForStorage('vault://bad'), isEmpty);
+      expect(lenient.galleryFoldersForStorage('vault://empty'), isEmpty);
+    });
+  });
+
+  group('FileManagerToolbarConfig prompt skipping', () {
+    test('defaults to empty sets', () {
+      final config = FileManagerToolbarConfig.defaults();
+      expect(config.skipGalleryPromptStorageUris, isEmpty);
+      expect(config.skipMusicPromptStorageUris, isEmpty);
+      expect(config.isGalleryPromptSkippedForStorage('vault://a'), isFalse);
+      expect(config.isMusicPromptSkippedForStorage('vault://a'), isFalse);
+    });
+
+    test('withGalleryPromptSkippedForStorage adds and removes', () {
+      var config = FileManagerToolbarConfig.defaults();
+      config = config.withGalleryPromptSkippedForStorage('vault://a', true);
+      expect(config.isGalleryPromptSkippedForStorage('vault://a'), isTrue);
+      expect(config.isGalleryPromptSkippedForStorage('vault://b'), isFalse);
+
+      config = config.withGalleryPromptSkippedForStorage('vault://a', false);
+      expect(config.isGalleryPromptSkippedForStorage('vault://a'), isFalse);
+    });
+
+    test('withMusicPromptSkippedForStorage adds and removes', () {
+      var config = FileManagerToolbarConfig.defaults();
+      config = config.withMusicPromptSkippedForStorage('vault://a', true);
+      expect(config.isMusicPromptSkippedForStorage('vault://a'), isTrue);
+      expect(config.isMusicPromptSkippedForStorage('vault://b'), isFalse);
+
+      config = config.withMusicPromptSkippedForStorage('vault://a', false);
+      expect(config.isMusicPromptSkippedForStorage('vault://a'), isFalse);
+    });
+
+    test('survives JSON round trip', () {
+      final config = FileManagerToolbarConfig.defaults()
+          .withGalleryPromptSkippedForStorage('vault://gallery', true)
+          .withMusicPromptSkippedForStorage('vault://music', true);
+      final decoded = FileManagerToolbarConfig.fromJson(
+        jsonDecode(jsonEncode(config.toJson())) as Map<String, dynamic>,
+      );
+      expect(decoded.isGalleryPromptSkippedForStorage('vault://gallery'), isTrue);
+      expect(decoded.isGalleryPromptSkippedForStorage('vault://other'), isFalse);
+      expect(decoded.isMusicPromptSkippedForStorage('vault://music'), isTrue);
+      expect(decoded.isMusicPromptSkippedForStorage('vault://other'), isFalse);
+    });
+  });
+
+  group('FileManagerToolbarConfig auto-hide toolbar and breadcrumb bar', () {
+    test('default to false in defaults() and constructor', () {
+      final config = FileManagerToolbarConfig.defaults();
+      expect(config.autoHideToolbar, isFalse);
+      expect(config.autoHideBreadcrumbBar, isFalse);
+      const ctorConfig = FileManagerToolbarConfig(order: [], hidden: {});
+      expect(ctorConfig.autoHideToolbar, isFalse);
+      expect(ctorConfig.autoHideBreadcrumbBar, isFalse);
+    });
+
+    test('copyWith updates autoHideToolbar and autoHideBreadcrumbBar', () {
+      final config = FileManagerToolbarConfig.defaults().copyWith(
+        autoHideToolbar: true,
+        autoHideBreadcrumbBar: true,
+      );
+      expect(config.autoHideToolbar, isTrue);
+      expect(config.autoHideBreadcrumbBar, isTrue);
+    });
+
+    test('survives JSON round trip', () {
+      final config = FileManagerToolbarConfig.defaults().copyWith(
+        autoHideToolbar: true,
+        autoHideBreadcrumbBar: true,
+      );
+      final json = config.toJson();
+      expect(json['autoHideToolbar'], isTrue);
+      expect(json['autoHideBreadcrumbBar'], isTrue);
+
+      final decoded = FileManagerToolbarConfig.fromJson(
+        jsonDecode(jsonEncode(json)) as Map<String, dynamic>,
+      );
+      expect(decoded.autoHideToolbar, isTrue);
+      expect(decoded.autoHideBreadcrumbBar, isTrue);
+    });
+
+    test('fromJson falls back to false when keys are missing', () {
+      final decoded = FileManagerToolbarConfig.fromJson(
+        <String, dynamic>{'showBreadcrumbBar': true},
+      );
+      expect(decoded.autoHideToolbar, isFalse);
+      expect(decoded.autoHideBreadcrumbBar, isFalse);
     });
   });
 }

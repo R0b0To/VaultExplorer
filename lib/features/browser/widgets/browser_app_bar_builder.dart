@@ -20,6 +20,7 @@ import 'package:vaultexplorer/features/browser/widgets/selection_app_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/selection_app_bar_wide.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
+import 'package:vaultexplorer/core/widgets/menus/back_dismissible_menu_anchor.dart';
 
 PreferredSizeWidget buildBrowserAppBar(
   BuildContext context, {
@@ -59,6 +60,8 @@ PreferredSizeWidget buildBrowserAppBar(
   required bool Function(RawEntry entry) isFolderMounted,
   required bool Function(RawEntry entry) isPinned,
   required bool Function(RawEntry entry) isBookmark,
+  bool hasAnyPins = true,
+  bool hasAnyBookmarks = true,
   required VoidCallback onExitSelectionMode,
   required VoidCallback onSelectAll,
   required VoidCallback onCopy,
@@ -94,6 +97,7 @@ PreferredSizeWidget buildBrowserAppBar(
   onShowFolderDocumentProviderSheet,
   required Future<void> Function(RawEntry entry) onToggleFolderDocumentProvider,
   void Function(RawEntry entry)? onSyncSettings,
+  void Function(List<RawEntry> entries)? onEditMetadata,
   VoidCallback? onSyncRoot,
   required Future<void> Function(String fileName, String fullPath) onEditImage,
   required Future<void> Function(String fullPath) onEditVideo,
@@ -139,15 +143,19 @@ PreferredSizeWidget buildBrowserAppBar(
                   ? selectedItems.first.name.split('.').last.toLowerCase()
                   : ''),
         );
-    final showPinOption =
-        allowPinBookmarkActions && selectedItems.any((item) => !isPinned(item));
-    final showUnpinOption =
-        allowPinBookmarkActions && selectedItems.any((item) => isPinned(item));
-    final showBookmarkOption =
-        allowPinBookmarkActions &&
-        selectedItems.any((item) => !isBookmark(item));
-    final showUnbookmarkOption =
-        allowPinBookmarkActions &&
+    final showPinOption = allowPinBookmarkActions &&
+        (!hasAnyPins
+            ? selectedItems.isNotEmpty
+            : selectedItems.any((item) => !isPinned(item)));
+    final showUnpinOption = allowPinBookmarkActions &&
+        hasAnyPins &&
+        selectedItems.any((item) => isPinned(item));
+    final showBookmarkOption = allowPinBookmarkActions &&
+        (!hasAnyBookmarks
+            ? selectedItems.isNotEmpty
+            : selectedItems.any((item) => !isBookmark(item)));
+    final showUnbookmarkOption = allowPinBookmarkActions &&
+        hasAnyBookmarks &&
         selectedItems.any((item) => isBookmark(item));
     final showEncryptOption = selectedItems.any(
       (item) => !item.isDir && !isAppEncryptedFileName(item.name),
@@ -305,6 +313,15 @@ PreferredSizeWidget buildBrowserAppBar(
       await onEditAudio?.call(path);
     }
 
+    // Tags, dates and metadata removal apply to files only, and cannot
+    // be run on virtual entries inside an archive.
+    final editMetadata = onEditMetadata != null &&
+            !isInsideArchive &&
+            selectedItems.isNotEmpty &&
+            selectedItems.every((e) => !e.isDir)
+        ? () => onEditMetadata(selectedItems.toList())
+        : null;
+
     void doSyncSettings() {
       final entry = selectedItems.first;
       onExitSelectionMode();
@@ -355,6 +372,7 @@ PreferredSizeWidget buildBrowserAppBar(
         onToggleDocumentProvider: doToggleDocProvider,
         onSyncSettings: doSyncSettings,
         onFileInfo: doShowFileInfo,
+        onEditMetadata: editMetadata,
         onGoToLocation: goToLocation,
         onCopyPath: copyPath,
         showEditImageOption: showEditImageOption,
@@ -364,6 +382,7 @@ PreferredSizeWidget buildBrowserAppBar(
         showEditAudioOption: showEditAudioOption,
         onEditAudio: doEditAudio,
         itemActionOrder: toolbarConfig.itemActionsOrder,
+        quickItemActions: toolbarConfig.quickItemActions,
         hiddenItemActions: toolbarConfig.hiddenItemActions,
       );
     }
@@ -404,6 +423,7 @@ PreferredSizeWidget buildBrowserAppBar(
       showShareOption: showShareOption,
       onShare: onShare,
       onToggleDocumentProvider: doToggleDocProvider,
+      onEditMetadata: editMetadata,
       onSyncSettings: doSyncSettings,
       onPin: () => onTogglePin(pin: true),
       onUnpin: () => onTogglePin(pin: false),
@@ -421,6 +441,7 @@ PreferredSizeWidget buildBrowserAppBar(
       showEditAudioOption: showEditAudioOption,
       onEditAudio: doEditAudio,
       itemActionOrder: toolbarConfig.itemActionsOrder,
+      quickItemActions: toolbarConfig.quickItemActions,
       hiddenItemActions: toolbarConfig.hiddenItemActions,
     );
   }
@@ -463,7 +484,7 @@ PreferredSizeWidget buildBrowserAppBar(
     );
   }
 
-  String _buildLeftTruncatedPath(
+  String buildLeftTruncatedPath(
     String rootName,
     List<PathSegment> stack,
     double maxWidth,
@@ -563,13 +584,13 @@ PreferredSizeWidget buildBrowserAppBar(
           60.0,
           2000.0,
         );
-        final displayTitle = _buildLeftTruncatedPath(
+        final displayTitle = buildLeftTruncatedPath(
           container.displayName,
           pathStack,
           availableWidth,
           style,
         );
-        return MenuAnchor(
+        return BackDismissibleMenuAnchor(
           builder: (ctx, controller, child) => InkWell(
             borderRadius: BorderRadius.circular(8),
             onTap: () {

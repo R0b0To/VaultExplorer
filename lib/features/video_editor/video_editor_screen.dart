@@ -23,6 +23,8 @@ import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart'
     show AppBannerTone, InlineBanner;
 import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
+import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
@@ -655,13 +657,60 @@ class _VideoEditorScreenState extends ConsumerState<VideoEditorScreen>
       outputCount: outputCount,
     );
 
-    // If replaceOriginal was chosen and export succeeded, replace the original file
+    // If replaceOriginal was chosen and export succeeded, replace the original
+    // content. When the editor was opened through a symlink, replace its final
+    // target rather than deleting the shortcut itself.
     if (choice.replaceOriginal && result != null && relativePaths.isNotEmpty) {
       try {
         final fileIo = ref.read(vaultFileIoApiProvider);
         final cutPath = relativePaths.first;
-        await fileIo.deleteFile(container, widget.filePath);
-        await fileIo.renameFile(container, cutPath, _fileName);
+        final linkTarget = await fileIo.readVaultSymlinkStrict(
+          container,
+          widget.filePath,
+        );
+        var replacePath = widget.filePath;
+        if (linkTarget != null) {
+          final resolved = await fileIo.resolveVaultSymlinkTargetPath(
+            container,
+            widget.filePath,
+            strict: true,
+          );
+          if (resolved == null) {
+            throw StateError(
+              'Cannot safely replace the target of this symbolic link.',
+            );
+          }
+          replacePath = resolved;
+        }
+
+        final deleted = await fileIo.deleteFile(container, replacePath);
+        if (!deleted) {
+          throw StateError('Could not remove the previous video content.');
+        }
+        final renamed = await fileIo.renameFile(
+          container,
+          cutPath,
+          replacePath,
+        );
+        if (!renamed) {
+          throw StateError('Could not move the edited video into place.');
+        }
+
+        // Invalidate by target path: shortcut thumbnails are cached against
+        // the resolved target, not the shortcut's display path. The cache
+        // service also signals mounted thumbnail loaders to fetch fresh bytes.
+        final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
+        await thumbnailCache.invalidate(
+          container,
+          replacePath,
+          qualities: const [ThumbnailQuality.defaultQuality],
+        );
+        if (replacePath != widget.filePath) {
+          await thumbnailCache.invalidate(container, widget.filePath);
+        }
+        ref
+            .read(fileOperationServiceProvider)
+            .notifyVolumeContentChanged(container.volId);
         _toast(l10n.videoEditorSaved(1), tone: AppBannerTone.success);
       } catch (e) {
         VeLog.w(_tag, 'Failed to replace original file with cut', e);

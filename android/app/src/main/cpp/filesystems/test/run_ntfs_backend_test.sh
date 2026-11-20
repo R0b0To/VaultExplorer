@@ -5,6 +5,7 @@
 # What gets built, mirroring CMakeLists.txt so the test exercises the same code:
 #   - ntfs-3g at the commit CMakeLists.txt pins (cloned from GitHub into a cache
 #     directory the first time; set NTFS3G_SRC to use an existing checkout instead),
+#     with the same filesystems/patches/*.patch applied that CMakeLists.txt applies,
 #     compiled with the config.h CMakeLists.txt generates and the same file list;
 #   - the app's embedded mkntfs, from filesystems/mkntfs_embedded.c.in;
 #   - filesystems/ntfs_backend.cpp itself.
@@ -35,6 +36,19 @@ if [ ! -f "$SRC/libntfs-3g/volume.c" ]; then
     git -C "$SRC" checkout -q FETCH_HEAD
 fi
 
+# The patch CMakeLists.txt applies to the fetched tree (filesystems/patches/). Same rule as
+# apply_ntfs3g_patches.cmake: skip if already applied, otherwise start from stock sources and
+# apply. A changed tree invalidates the cached library built below.
+PATCH="$CPP/filesystems/patches/ntfs-3g-lookup-by-mbsname.patch"
+if git -C "$SRC" apply --check --reverse "$PATCH" >/dev/null 2>&1; then
+    :
+else
+    git -C "$SRC" checkout -q -- libntfs-3g
+    git -C "$SRC" apply --whitespace=nowarn "$PATCH" || { echo "patch does not apply: $PATCH" >&2; exit 2; }
+    echo "applied $(basename "$PATCH")"
+    rm -f "$CACHE/libntfs3g_host.a"
+fi
+
 # config.h: the very text CMakeLists.txt writes (step 3b).
 sed -n '/^set(CONFIG_H_CONTENT "/,/^")$/p' "$CMAKE" | sed '1d;$d' > "$CACHE/config.h"
 [ -s "$CACHE/config.h" ] || { echo "could not extract config.h from $CMAKE" >&2; exit 2; }
@@ -48,7 +62,7 @@ CFLAGS="-w -std=gnu17 -O1 -DHAVE_CONFIG_H -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -
 CINC="-I $CACHE -I $SRC/include -I $SRC/include/ntfs-3g -I $SRC/ntfsprogs"
 
 LIB="$CACHE/libntfs3g_host.a"
-if [ ! -f "$LIB" ] || [ "$CMAKE" -nt "$LIB" ]; then
+if [ ! -f "$LIB" ] || [ "$CMAKE" -nt "$LIB" ] || [ "$PATCH" -nt "$LIB" ]; then
     echo "building ntfs-3g ..."
     rm -rf "$CACHE/obj"; mkdir -p "$CACHE/obj"
     {

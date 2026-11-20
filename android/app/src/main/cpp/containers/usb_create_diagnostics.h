@@ -27,6 +27,7 @@ enum class UsbCreatePhase {
     kFillData = 6,           // zero-filling / random-filling the data area
     kFormatFilesystem = 7,   // running the FAT/ext/NTFS/exFAT formatter
     kComplete = 8,           // fully succeeded
+    kFlushDevice = 9,        // final flush / hardware cache sync after the volume was written
 };
 
 inline const char* usbCreatePhaseName(UsbCreatePhase phase) {
@@ -40,6 +41,7 @@ inline const char* usbCreatePhaseName(UsbCreatePhase phase) {
         case UsbCreatePhase::kFillData: return "FILL_DATA";
         case UsbCreatePhase::kFormatFilesystem: return "FORMAT_FILESYSTEM";
         case UsbCreatePhase::kComplete: return "COMPLETE";
+        case UsbCreatePhase::kFlushDevice: return "FLUSH_DEVICE";
     }
     return "UNKNOWN";
 }

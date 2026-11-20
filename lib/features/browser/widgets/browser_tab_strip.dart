@@ -12,6 +12,7 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_navigation_controller.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_selection_controller.dart';
+import 'package:vaultexplorer/features/browser/models/file_category_presentation.dart';
 import 'package:vaultexplorer/features/browser/models/tab_id.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_item_drag.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
@@ -498,7 +499,9 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
                         child: DragTarget<BrowserItemDragData>(
                           onWillAcceptWithDetails: (details) {
                             final destination = tab.container;
-                            if (destination == null || tab.isDashboard) {
+                            if (destination == null ||
+                                tab.isDashboard ||
+                                tab.isCategory) {
                               return false;
                             }
                             final navigation = ref.read(
@@ -521,7 +524,11 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
                           onAcceptWithDetails: (details) {
                             _cancelFileDropTabActivation(tab.tabId);
                             final destination = tab.container;
-                            if (destination == null || tab.isDashboard) return;
+                            if (destination == null ||
+                                tab.isDashboard ||
+                                tab.isCategory) {
+                              return;
+                            }
                             actions.activate(tab.tabId);
                             final navigation = ref.read(
                               fileBrowserNavigationProvider(tab.tabId),
@@ -604,6 +611,8 @@ class _TabItem extends ConsumerWidget {
     // from rebuilding on every directory-listing or selection change.
     final folderLabel = tab.isDashboard
         ? null
+        : tab.isCategory
+        ? tab.category!.label(context.l10n)
         : ref.watch(
             fileBrowserNavigationProvider(tab.tabId).select(
               (s) => s.pathStack.length <= 1 ? null : s.pathStack.last.label,
@@ -618,12 +627,16 @@ class _TabItem extends ConsumerWidget {
               tab.tabId,
             ).select((s) => s.items.length),
           );
-    final name = tab.container?.displayName ?? context.l10n.dashboardNavLabel;
+    final name = tab.isCategory
+        ? tab.category!.label(context.l10n)
+        : tab.container?.displayName ?? context.l10n.dashboardNavLabel;
     final label = folderLabel ?? name;
     final fg = active ? cs.onSurface : cs.onSurfaceVariant;
 
     return Tooltip(
-      message: folderLabel == null ? name : '$name / $folderLabel',
+      message: tab.isCategory
+          ? tab.category!.label(context.l10n)
+          : (folderLabel == null ? name : '$name / $folderLabel'),
       // Long-press belongs to ReorderableDelayedDragStartListener above this
       // tab. Letting Tooltip use its default long-press trigger consumes the
       // gesture and shows the label instead of starting a drag.
@@ -661,6 +674,14 @@ class _TabItem extends ConsumerWidget {
                       ),
                     ),
                   ),
+                if (tab.isCategory) ...[
+                  Icon(
+                    tab.category!.icon,
+                    size: 15,
+                    color: active ? cs.primary : fg,
+                  ),
+                  const SizedBox(width: 5),
+                ],
                 Flexible(
                   child: Text(
                     label,

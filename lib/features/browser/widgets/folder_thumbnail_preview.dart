@@ -23,8 +23,13 @@ class FolderThumbnailPreview extends ConsumerStatefulWidget {
   final double? iconSize;
   final double? previewSize;
 
+  /// Files already known to be inside the folder (at any depth), best first.
+  /// When given, the cover comes from these and the folder is not listed.
+  final List<String>? previewPaths;
+
   static const int maxScan = 30;
   static const Duration scanDebounce = Duration(milliseconds: 350);
+  static final PriorityTaskQueue _scanLimiter = PriorityTaskQueue(2);
 
   // Caches only positive hits so newly populated folders can be scanned
   static final Map<String, Uint8List> _sessionCache = {};
@@ -44,6 +49,7 @@ class FolderThumbnailPreview extends ConsumerStatefulWidget {
     required this.child,
     this.iconSize,
     this.previewSize,
+    this.previewPaths,
   });
 
   @override
@@ -135,63 +141,98 @@ class _FolderThumbnailPreviewState
     FolderThumbnailPreview._sessionCache[key] = bytes;
   }
 
-  Future<void> _scan() async {
+ Future<void> _scan() async {
     if (!_tickerEnabled) return;
     final token = ++_token;
     final fileIoApi = ref.read(vaultFileIoApiProvider);
     final thumbnailCache = ref.read(thumbnailCacheServiceProvider);
 
-    List<String>? raw;
-    try {
-      raw = await fileIoApi.listDirectory(widget.container, widget.folderPath);
-    } catch (_) {
-      raw = null;
-    }
-    if (!mounted ||
-        !_tickerEnabled ||
-        token != _token ||
-        raw == null ||
-        raw.isEmpty) {
-      return;
-    }
-
+    final scanCompleter = Completer<void>();
+    var scanAcquired = false;
     final candidates = <String>[];
-    for (final line in raw) {
-      if (line.startsWith('System:')) continue;
-      final RawEntry entry;
-      try {
-        entry = RawEntry.parse(line);
-      } catch (_) {
-        continue;
-      }
-      if (entry.isDir || entry.isPlaceholder) continue;
-      if (!MediaViewerConstants.isImage(entry.name) &&
-          !MediaViewerConstants.isVideo(entry.name)) {
-        continue;
-      }
-      candidates.add(
-        widget.folderPath.isEmpty
-            ? entry.name
-            : '${widget.folderPath}/${entry.name}',
-      );
-      if (candidates.length >= FolderThumbnailPreview.maxScan) break;
-    }
-
-    if (candidates.isEmpty) return;
-
-    // 1. Check if any candidate has a pre-cached thumbnail
     Uint8List? hit;
-    for (final path in candidates) {
-      final bytes = await thumbnailCache.fetch(
-        container: widget.container,
-        filePath: path,
-        mode: widget.cacheMode,
-        quality: widget.quality,
+      try {
+      await FolderThumbnailPreview._scanLimiter.acquire(
+        scanCompleter,
+        priority: TaskPriority.background,
       );
+      scanAcquired = true;
       if (!mounted || !_tickerEnabled || token != _token) return;
-      if (bytes != null && bytes.isNotEmpty) {
-        hit = bytes;
-        break;
+
+      final known = widget.previewPaths;
+      if (known != null && known.isNotEmpty) {
+        // The scan already found what is inside, at any depth.
+        candidates.addAll(known.take(FolderThumbnailPreview.maxScan));
+      } else {
+        final listing = await () async {
+          try {
+            return await fileIoApi.listDirectoryEntriesForBrowser(
+              widget.container,
+              widget.folderPath,
+            );
+          } catch (_) {
+            return null;
+          }
+        }();
+        final entries = listing?.entries;
+        if (!mounted ||
+            !_tickerEnabled ||
+            token != _token ||
+            entries == null ||
+            entries.isEmpty) {
+          return;
+        }
+
+        for (final entry in entries) {
+          if (entry.isDir || entry.isPlaceholder || entry.isSymlink) continue;
+          if (!MediaViewerConstants.isImage(entry.name) &&
+              !MediaViewerConstants.isVideo(entry.name)) {
+            continue;
+          }
+          candidates.add(
+            widget.folderPath.isEmpty
+                ? entry.name
+                : '${widget.folderPath}/${entry.name}',
+          );
+          if (candidates.length >= FolderThumbnailPreview.maxScan) break;
+        }
+      }
+
+      if (candidates.isEmpty) return;
+
+      // 1a. Check in-memory cache synchronously across all candidates first to
+      // avoid sequential disk reads when a later entry is already resident.
+      for (final path in candidates) {
+        final mem = thumbnailCache.peekMemory(
+          widget.container,
+          path,
+          widget.quality,
+        );
+        if (mem != null && mem.isNotEmpty) {
+          hit = mem;
+          break;
+        }
+      }
+
+      // 1b. Fall back to disk/in-container cache if none were in memory.
+      if (hit == null) {
+        for (final path in candidates) {
+          final bytes = await thumbnailCache.fetch(
+            container: widget.container,
+            filePath: path,
+            mode: widget.cacheMode,
+            quality: widget.quality,
+          );
+          if (!mounted || !_tickerEnabled || token != _token) return;
+          if (bytes != null && bytes.isNotEmpty) {
+            hit = bytes;
+            break;
+          }
+        }
+      }
+    } finally {
+      if (scanAcquired) {
+        FolderThumbnailPreview._scanLimiter.release(scanCompleter);
       }
     }
 
@@ -277,13 +318,23 @@ class _FolderThumbnailPreviewState
   @override
   Widget build(BuildContext context) {
     _tickerEnabled = TickerMode.valuesOf(context).enabled;
-    final showPreview =
-        _tickerEnabled && widget.cacheMode != ThumbnailCacheMode.disabled;
+    final bytes = _previewBytes;
+
+    // The collage layout (folder icon pushed to the top-left corner, with the
+    // thumbnail badge overlapping its bottom-right) only makes sense once
+    // there is a thumbnail to show. A folder with no thumbnail -- nothing
+    // cached yet, no image/video inside, or still scanning -- keeps the plain
+    // folder icon, centered in its slot exactly like any other folder, rather
+    // than being laid out as if it had a badge that never appears.
+    final hasPreview =
+        _tickerEnabled &&
+        widget.cacheMode != ThumbnailCacheMode.disabled &&
+        bytes != null;
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final requestedIconSize = _resolvedIconSize;
-        final requestedBadgeSize = showPreview
+        final requestedBadgeSize = hasPreview
             ? widget.previewSize ?? requestedIconSize * 0.8
             : 0.0;
         final requestedExtent = math.max(
@@ -309,40 +360,48 @@ class _FolderThumbnailPreviewState
           child: FittedBox(fit: BoxFit.contain, child: widget.child),
         );
 
-        if (!showPreview) return Center(child: fittedIcon);
-
-        final bytes = _previewBytes;
-        return Center(
-          child: SizedBox(
-            width: contentExtent,
-            height: contentExtent,
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Positioned(
-                  left: 0,
-                  top: 0,
-                  width: iconSize,
-                  height: iconSize,
-                  child: fittedIcon,
-                ),
-                Positioned(
-                  left: iconSize * 0.5,
-                  top: iconSize * 0.5,
-                  width: badgeSize,
-                  height: badgeSize,
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 180),
-                    switchInCurve: Curves.easeOut,
-                    switchOutCurve: Curves.easeIn,
-                    child: bytes != null
-                        ? _buildBadge(context, bytes, badgeSize)
-                        : const SizedBox.shrink(key: ValueKey('empty_badge')),
+        final Widget content;
+        if (!hasPreview) {
+          content = Center(
+            key: const ValueKey('folder_plain_icon'),
+            child: fittedIcon,
+          );
+        } else {
+          content = Center(
+            key: const ValueKey('folder_collage'),
+            child: SizedBox(
+              width: contentExtent,
+              height: contentExtent,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    width: iconSize,
+                    height: iconSize,
+                    child: fittedIcon,
                   ),
-                ),
-              ],
+                  Positioned(
+                    left: iconSize * 0.5,
+                    top: iconSize * 0.5,
+                    width: badgeSize,
+                    height: badgeSize,
+                    child: _buildBadge(context, bytes!, badgeSize),
+                  ),
+                ],
+              ),
             ),
-          ),
+          );
+        }
+
+        // Cross-fade when a thumbnail turns up for a folder that was showing
+        // the plain icon, instead of snapping to the collage layout.
+        return AnimatedSwitcher(
+          duration: const Duration(milliseconds: 180),
+          switchInCurve: Curves.easeOut,
+          switchOutCurve: Curves.easeIn,
+          child: content,
         );
       },
     );

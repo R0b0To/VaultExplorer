@@ -60,7 +60,7 @@ final class ImageEditorAnnotationsProvider
 }
 
 String _$imageEditorAnnotationsHash() =>
-    r'72e6fba2e205d2d5b877b7da1b39e74c5da01f3e';
+    r'2bc7b8f4efe0da6f353d40e344ae52d4538be645';
 
 final class ImageEditorAnnotationsFamily extends $Family
     with

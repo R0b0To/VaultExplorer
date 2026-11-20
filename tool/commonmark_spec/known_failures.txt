@@ -1,0 +1,90 @@
+# CommonMark 0.31.2 examples the viewer parser intentionally does not match.
+# Format: <example number> <category>  <why>. Run tool/commonmark_spec/run.dart;
+# it fails only for failures NOT listed here, and reports listed ones that now pass.
+#
+# raw-html                    a native viewer cannot render HTML; tags are shown as text,
+#                             comments are hidden, <hr> is a rule, <b>/<u>/<a>... still format
+# legacy-spaced-destination   [a](my file.png) keeps working for notes the old editor wrote
+# bare-url-linking            app extension (plain URLs are clickable)
+# comments-hidden             HTML comments are invisible
+
+21 raw-html  raw HTML is shown as text, not rendered
+25 entity-subset  &ngE; is not in the curated named-entity table
+31 raw-html  raw HTML is shown as text, not rendered
+41 legacy-spaced-destination  disappears with kAcceptLegacySpacedDestinations=false
+148 raw-html  raw HTML is shown as text, not rendered
+149 raw-html  raw HTML is shown as text, not rendered
+150 raw-html  raw HTML is shown as text, not rendered
+151 raw-html  raw HTML is shown as text, not rendered
+152 raw-html  raw HTML is shown as text, not rendered
+153 raw-html  raw HTML is shown as text, not rendered
+154 raw-html  raw HTML is shown as text, not rendered
+155 raw-html  raw HTML is shown as text, not rendered
+156 raw-html  raw HTML is shown as text, not rendered
+157 raw-html  raw HTML is shown as text, not rendered
+158 raw-html  raw HTML is shown as text, not rendered
+159 raw-html  raw HTML is shown as text, not rendered
+160 raw-html  raw HTML is shown as text, not rendered
+161 raw-html  raw HTML is shown as text, not rendered
+162 raw-html  raw HTML is shown as text, not rendered
+163 raw-html  raw HTML is shown as text, not rendered
+164 raw-html  raw HTML is shown as text, not rendered
+165 raw-html  raw HTML is shown as text, not rendered
+166 raw-html  raw HTML is shown as text, not rendered
+167 raw-html  raw HTML is shown as text, not rendered
+169 raw-html  raw HTML is shown as text, not rendered
+170 raw-html  raw HTML is shown as text, not rendered
+171 raw-html  raw HTML is shown as text, not rendered
+172 raw-html  raw HTML is shown as text, not rendered
+173 raw-html  raw HTML is shown as text, not rendered
+174 raw-html  raw HTML is shown as text, not rendered
+175 raw-html  raw HTML is shown as text, not rendered
+176 raw-html  raw HTML is shown as text, not rendered
+177 raw-html  raw HTML is shown as text, not rendered
+178 raw-html  raw HTML is shown as text, not rendered
+179 raw-html  raw HTML is shown as text, not rendered
+180 raw-html  raw HTML is shown as text, not rendered
+181 raw-html  raw HTML is shown as text, not rendered
+182 raw-html  raw HTML is shown as text, not rendered
+183 raw-html  raw HTML is shown as text, not rendered
+184 raw-html  raw HTML is shown as text, not rendered
+185 raw-html  raw HTML is shown as text, not rendered
+186 raw-html  raw HTML is shown as text, not rendered
+187 raw-html  raw HTML is shown as text, not rendered
+188 raw-html  raw HTML is shown as text, not rendered
+189 raw-html  raw HTML is shown as text, not rendered
+190 raw-html  raw HTML is shown as text, not rendered
+191 raw-html  raw HTML is shown as text, not rendered
+201 raw-html  raw HTML is shown as text, not rendered
+308 comments-hidden  HTML comments are invisible in the viewer
+309 comments-hidden  HTML comments are invisible in the viewer
+344 raw-html  raw HTML is shown as text, not rendered
+475 raw-html  raw HTML is shown as text, not rendered
+476 raw-html  raw HTML is shown as text, not rendered
+477 raw-html  raw HTML is shown as text, not rendered
+488 legacy-spaced-destination  disappears with kAcceptLegacySpacedDestinations=false
+491 raw-html  raw HTML is shown as text, not rendered
+494 raw-html  raw HTML is shown as text, not rendered
+508 legacy-spaced-destination  disappears with kAcceptLegacySpacedDestinations=false
+524 raw-html  raw HTML is shown as text, not rendered
+536 raw-html  raw HTML is shown as text, not rendered
+540 unicode-case-fold  Dart toLowerCase does not fold U+1E9E to ss
+568 legacy-spaced-destination  disappears with kAcceptLegacySpacedDestinations=false
+602 bare-url-linking  extension: plain http(s) URLs become links
+608 bare-url-linking  extension: plain http(s) URLs become links
+611 bare-url-linking  extension: plain http(s) URLs become links
+613 raw-html  raw HTML is shown as text, not rendered
+614 raw-html  raw HTML is shown as text, not rendered
+615 raw-html  raw HTML is shown as text, not rendered
+616 raw-html  raw HTML is shown as text, not rendered
+617 raw-html  raw HTML is shown as text, not rendered
+623 raw-html  raw HTML is shown as text, not rendered
+625 raw-html  raw HTML is shown as text, not rendered
+626 raw-html  raw HTML is shown as text, not rendered
+627 raw-html  raw HTML is shown as text, not rendered
+628 raw-html  raw HTML is shown as text, not rendered
+629 raw-html  raw HTML is shown as text, not rendered
+630 raw-html  raw HTML is shown as text, not rendered
+631 raw-html  raw HTML is shown as text, not rendered
+642 raw-html  raw HTML is shown as text, not rendered
+643 raw-html  raw HTML is shown as text, not rendered

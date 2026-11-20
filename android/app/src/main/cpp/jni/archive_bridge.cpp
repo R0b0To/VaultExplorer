@@ -889,6 +889,19 @@ static ArchiveCompressionMethod toCompressionMethod(jint code) {
     }
 }
 
+// A caller keeps an empty folder in an archive by sending an entry name with a
+// trailing '/'. The folder's own path is never opened or measured. libarchive
+// gets the name without the slash: its ZIP and TAR writers add it themselves,
+// while the 7z writer stores names exactly as given.
+static bool hasDirectoryMarker(const std::string& entryName) {
+    return !entryName.empty() && entryName.back() == '/';
+}
+
+static std::string withoutDirectoryMarker(std::string entryName) {
+    while (entryName.size() > 1 && entryName.back() == '/') entryName.pop_back();
+    return entryName;
+}
+
 // ── Create Archive: In-Vault Files -> Local File Descriptor ────────────
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_archiveCreateVaultToFdNative(
@@ -945,10 +958,15 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveCreateVaultToFdNative(
         }
 
         for (jsize i = 0; i < count; i++) {
+            entries[i].modTimeEpochSeconds = sourceModifiedSecs[i];
+            if (hasDirectoryMarker(inArchivePaths[i])) {
+                entries[i].pathInArchive = withoutDirectoryMarker(inArchivePaths[i]);
+                entries[i].isDirectory = true;
+                continue;
+            }
             entries[i].pathInArchive = inArchivePaths[i];
             entries[i].uncompressedSize = fsGetFileSize(srcVolId, vPaths[i]);
             entries[i].isDirectory = false;
-            entries[i].modTimeEpochSeconds = sourceModifiedSecs[i];
 
             void* stream = fsOpenStream(srcVolId, vPaths[i]);
             openStreams[i] = stream;
@@ -1051,10 +1069,15 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveCreateVaultToVaultNative(
         }
 
         for (jsize i = 0; i < count; i++) {
+            entries[i].modTimeEpochSeconds = sourceModifiedSecs[i];
+            if (hasDirectoryMarker(inArchivePaths[i])) {
+                entries[i].pathInArchive = withoutDirectoryMarker(inArchivePaths[i]);
+                entries[i].isDirectory = true;
+                continue;
+            }
             entries[i].pathInArchive = inArchivePaths[i];
             entries[i].uncompressedSize = fsGetFileSize(srcVolId, vPaths[i]);
             entries[i].isDirectory = false;
-            entries[i].modTimeEpochSeconds = sourceModifiedSecs[i];
 
             void* stream = fsOpenStream(srcVolId, vPaths[i]);
             openStreams[i] = stream;
@@ -1140,6 +1163,12 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveCreateLocalToFdNative(
     std::vector<uint64_t> readOffsets(count, 0);
 
     for (jsize i = 0; i < count; i++) {
+        if (hasDirectoryMarker(inArchivePaths[i])) {
+            entries[i].pathInArchive = withoutDirectoryMarker(inArchivePaths[i]);
+            entries[i].isDirectory = true;
+            entries[i].modTimeEpochSeconds = sourceModifiedSecs[i];
+            continue;
+        }
         entries[i].pathInArchive = inArchivePaths[i];
 
         struct stat st;
@@ -1426,6 +1455,7 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveCreateSplitNative(
         if (!ensureMounted(srcVolId)) return JNI_FALSE;
         for (jsize i = 0; i < count; ++i) {
             lazy[i].path = sources[i];
+            if (hasDirectoryMarker(inArchivePaths[i])) continue;
             lazy[i].size = fsGetFileSize(srcVolId, sources[i]);
         }
     } else {
@@ -1439,10 +1469,15 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_archiveCreateSplitNative(
         }
     }
     for (jsize i = 0; i < count; ++i) {
+        entries[i].modTimeEpochSeconds = sourceModifiedSecs[i];
+        if (hasDirectoryMarker(inArchivePaths[i])) {
+            entries[i].pathInArchive = withoutDirectoryMarker(inArchivePaths[i]);
+            entries[i].isDirectory = true;
+            continue;
+        }
         entries[i].pathInArchive = inArchivePaths[i];
         entries[i].isDirectory = false;
         entries[i].uncompressedSize = lazy[i].size;
-        entries[i].modTimeEpochSeconds = sourceModifiedSecs[i];
         entries[i].readData = [&lazy, srcVolId, i](uint8_t* dest, size_t length) -> int64_t {
             LazySource& s = lazy[i];
             if (s.finished) return 0;

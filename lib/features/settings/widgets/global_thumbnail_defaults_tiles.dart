@@ -4,6 +4,7 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/inputs/thumbnail_settings_tiles.dart';
+import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_controller.dart';
 
@@ -14,8 +15,8 @@ final vaultThumbnailOverrideCountProvider = FutureProvider.autoDispose<int>(
   (ref) => ref.read(containerRepositoryProvider).countThumbnailOverrides(),
 );
 
-/// The app-wide thumbnail default -- the value every vault set to "Use global
-/// default" follows -- plus the action that puts every vault back on it.
+/// The app-wide thumbnail, gallery-index and music-index defaults, plus the
+/// action that puts every vault's thumbnail settings back on their default.
 ///
 /// Only App settings shows this. Local Storage and the decoy file manager
 /// never read the default: they have their own slot, edited in File manager
@@ -68,6 +69,48 @@ class GlobalThumbnailDefaultsTiles extends ConsumerWidget {
           qualityLabel: context.l10n.thumbnailQualityDefaultLabel,
           onCacheModeChanged: notifier.setDefaultThumbnailCacheMode,
           onQualityChanged: notifier.setDefaultThumbnailQuality,
+        ),
+        OptionPickerTile<ThumbnailCacheMode>(
+          label: context.l10n.galleryMetadataIndexStorageLabel,
+          value: config.defaultGalleryMetadataCacheMode,
+          options: ThumbnailCacheMode.values
+              .map(
+                (mode) => SelectOption<ThumbnailCacheMode>(
+                  value: mode,
+                  label: switch (mode) {
+                    ThumbnailCacheMode.appCache =>
+                      context.l10n.galleryMetadataAppStorageOption,
+                    ThumbnailCacheMode.inContainer =>
+                      context.l10n.galleryMetadataInVaultOption,
+                    ThumbnailCacheMode.disabled => mode.getLocalizedLabel(
+                      context.l10n,
+                    ),
+                  },
+                ),
+              )
+              .toList(),
+          onChanged: notifier.setDefaultGalleryMetadataCacheMode,
+        ),
+        OptionPickerTile<ThumbnailCacheMode>(
+          label: context.l10n.musicIndexStorageLabel,
+          value: config.defaultMusicIndexCacheMode,
+          options: ThumbnailCacheMode.values
+              .map(
+                (mode) => SelectOption<ThumbnailCacheMode>(
+                  value: mode,
+                  label: switch (mode) {
+                    ThumbnailCacheMode.appCache =>
+                      context.l10n.musicIndexAppStorageOption,
+                    ThumbnailCacheMode.inContainer =>
+                      context.l10n.musicIndexInVaultOption,
+                    ThumbnailCacheMode.disabled => mode.getLocalizedLabel(
+                      context.l10n,
+                    ),
+                  },
+                ),
+              )
+              .toList(),
+          onChanged: notifier.setDefaultMusicIndexCacheMode,
         ),
         if (overrides > 0)
           ListTile(

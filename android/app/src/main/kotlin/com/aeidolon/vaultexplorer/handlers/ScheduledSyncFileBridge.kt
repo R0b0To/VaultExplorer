@@ -125,14 +125,7 @@ internal class ScheduledSyncFileBridge(context: Context) : MethodChannel.MethodC
                 saf.canListDirectory(tree, path)
             }
             "safListDirectory" -> safCall(call, result) { tree, path ->
-                saf.listDirectory(tree, path, call.argument<Boolean>("refresh") == true).map { entry ->
-                    mapOf(
-                        "name" to entry.name,
-                        "isDir" to entry.isDir,
-                        "size" to entry.size,
-                        "lastModified" to entry.lastModified,
-                    )
-                }
+                saf.listDirectory(tree, path, call.argument<Boolean>("refresh") == true).map { it.toWire() }
             }
             "safGetFileSize" -> safCall(call, result) { tree, path -> saf.getFileSize(tree, path) }
             "safReadFileChunk" -> safCall(call, result) { tree, path ->

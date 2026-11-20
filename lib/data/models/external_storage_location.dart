@@ -1,4 +1,9 @@
 class ExternalStorageLocation {
+  /// Prefix of auto-discovered physical-volume entries (SD card, USB OTG).
+  /// Ephemeral: derived from StorageManager on every refresh, never
+  /// persisted, and not renameable/removable by the user.
+  static const systemVolumeIdPrefix = 'sysvol_';
+
   final String id;
   final String path;
   final String? treeUri;
@@ -62,4 +67,8 @@ class ExternalStorageLocation {
   /// app-private space, so raw [path] access to it still requires "All
   /// files access" and silently fails to list anything without it.
   String get resolvedUri => (treeUri != null && treeUri!.isNotEmpty) ? treeUri! : path;
+
+  /// True for auto-discovered physical volumes (SD card, USB OTG). These
+  /// cannot be renamed or removed from the list.
+  bool get isSystemVolume => id.startsWith(systemVolumeIdPrefix);
 }

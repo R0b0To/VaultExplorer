@@ -20,6 +20,7 @@ import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/features/browser/browser_tabs_host.dart';
+import 'package:vaultexplorer/features/browser/controllers/chrome_bar_slot.dart';
 import 'package:vaultexplorer/features/browser/models/browser_tab_origin.dart';
 import 'package:vaultexplorer/features/browser/controllers/browser_tabs_provider.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
@@ -42,11 +43,13 @@ const _kLogTag = 'VaultDashboardScreen';
 
 class VaultDashboard extends ConsumerStatefulWidget {
   final ValueNotifier<List<MountedContainer>>? mountedNotifier;
+  final ValueNotifier<MountedContainer?>? localStorageNotifier;
   final ValueChanged<int>? onNavigateTab;
   final BrowserTabsConfig? workspaceConfig;
   final bool embedded;
   final ValueChanged<Widget?>? onFloatingActionChanged;
   final ValueChanged<Widget?>? onBottomBarChanged;
+
   /// Opens [container] in the browser. Home tiles and unlock flows pass
   /// [BrowserTabOrigin.home] to record that the storage was opened here.
   final void Function(MountedContainer container, {BrowserTabOrigin origin})?
@@ -56,6 +59,7 @@ class VaultDashboard extends ConsumerStatefulWidget {
   const VaultDashboard({
     super.key,
     this.mountedNotifier,
+    this.localStorageNotifier,
     this.onNavigateTab,
     this.workspaceConfig,
     this.embedded = false,
@@ -71,6 +75,9 @@ class VaultDashboard extends ConsumerStatefulWidget {
 
 class VaultDashboardState extends ConsumerState<VaultDashboard>
     with WidgetsBindingObserver, SingleTickerProviderStateMixin {
+  // Holds this tab's bottom bar for the chrome hub. See [ChromeBarSlot].
+  final ChromeBarSlot _bottomBarSlot = ChromeBarSlot();
+
   SessionLockController get _lockController =>
       ref.read(sessionLockControllerProvider);
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
@@ -92,14 +99,22 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
   late final AnimationController _dashboardAppBarAnimController =
       AnimationController(vsync: this, duration: AppMotion.short2, value: 1.0);
   int? _pendingLocalStorageOriginVolId;
+  // When the pending permission check was started for an external storage
+  // (SD card / USB) rather than the primary local storage, this holds the
+  // container to open once the grant lands (see _openLocalStorage).
+  MountedContainer? _pendingLocalStorageOriginContainer;
   int _localStoragePermissionRequestId = 0;
   void showAddOptionsSheet() => _showAddOptionsSheet();
 
-  /// Opens Local storage, first walking the person through granting
+  /// Opens Local storage (or an external raw-path storage [external] --
+  /// SD card / USB volume), first walking the person through granting
   /// all-files access when it is missing. Exposed so the app shell's drawer
   /// can use the same flow as the dashboard's own.
-  Future<void> openLocalStorage({int? currentVolId}) =>
-      _openLocalStorage(currentVolId: currentVolId);
+  Future<void> openLocalStorage({
+    int? currentVolId,
+    MountedContainer? external,
+  }) =>
+      _openLocalStorage(currentVolId: currentVolId, external: external);
 
   void reloadDashboard() {
     ref.read(vaultDashboardControllerProvider.notifier).loadAll();
@@ -124,6 +139,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
     if (!mounted) return;
     if (!hasAccess) {
       setState(() => _localStorageContainer = null);
+      widget.localStorageNotifier?.value = null;
       return;
     }
     final displayName = context.l10n.localStorageCardTitle;
@@ -135,6 +151,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
         displayName: displayName,
       );
     });
+    widget.localStorageNotifier?.value = _localStorageContainer;
   }
 
   Future<void> _handleAppResume() async {
@@ -303,8 +320,15 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
           ? null
           : _openInNewTab,
       primaryLocalContainer: _localStorageContainer,
+      localStorageNotifier: widget.localStorageNotifier,
       onOpenLocalStorage: () =>
           unawaited(_openLocalStorage(currentVolId: currentVolId)),
+      onOpenExternalStorage: (externalContainer) => unawaited(
+        _openLocalStorage(
+          currentVolId: externalContainer.volId,
+          external: externalContainer,
+        ),
+      ),
       selectedTabIndex: 0,
       onSelectTab: widget.onNavigateTab,
       keepBrowserTabsOnNavigate:
@@ -327,6 +351,23 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
         }
       },
       onUnlockVault: openItem,
+      onOpenCategory: (category) {
+        if (workspaceActions != null) {
+          final tabId = workspaceActions.openCategoryTab(
+            category,
+            primaryLocalContainer: _localStorageContainer,
+            includeVaults: true,
+          );
+          if (tabId == null && mounted) {
+            showAppSnackBar(
+              context,
+              message: context.l10n.browserTabLimitReached(kMaxBrowserTabs),
+              tone: AppBannerTone.warning,
+            );
+          }
+          return;
+        }
+      },
       onAddVault: _showAddOptionsSheet,
     );
   }
@@ -352,53 +393,60 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
   Route<void> _buildLocalStorageRoute(MountedContainer container) =>
       _buildBrowserRoute(container);
 
-  Future<void> _openLocalStorage({int? currentVolId}) async {
+  Future<void> _openLocalStorage({
+    int? currentVolId,
+    MountedContainer? external,
+  }) async {
     if (currentVolId == kDecoyLocalVolId) return;
 
     final lifecycle = ref.read(vaultLifecycleApiProvider);
     final hasAccess = await lifecycle.hasAllFilesAccess();
     if (!mounted) return;
 
-    if (!hasAccess) {
-      final shouldRequestAccess = await showAppConfirmDialog(
-        context,
-        title: context.l10n.localStoragePermissionTitle,
-        message: context.l10n.filesPermissionMessage,
-        confirmLabel: context.l10n.localStorageGrantAccess,
-      );
-      if (!mounted) return;
-      if (!shouldRequestAccess) {
-        await _promptToHideStorageLocations();
-        return;
-      }
-
-      final sdkInt = await lifecycle.getAndroidSdkInt();
-      if (!mounted) return;
-      if (sdkInt >= 30) {
-        final requestId = ++_localStoragePermissionRequestId;
-        _pendingLocalStoragePermissionCheck = true;
-        _pendingLocalStorageOriginVolId = currentVolId;
-        final settingsOpened = await lifecycle.requestAllFilesAccess(
-          openSettings: true,
-        );
-        if (!mounted) return;
-
-        final accessGranted = await lifecycle.hasAllFilesAccess();
-        if (accessGranted || !settingsOpened) {
-          await _finishLocalStoragePermissionRequest(requestId);
-        }
-        return;
-      }
-
-      final granted = await lifecycle.requestAllFilesAccess();
-      if (!mounted) return;
-      if (!granted) {
-        await _promptToHideStorageLocations();
-        return;
-      }
+    if (hasAccess) {
+      await _navigateToLocalStorage(currentVolId, target: external);
+      return;
     }
 
-    await _navigateToLocalStorage(currentVolId);
+    final shouldRequestAccess = await showAppConfirmDialog(
+      context,
+      title: context.l10n.localStoragePermissionTitle,
+      message: context.l10n.filesPermissionMessage,
+      confirmLabel: context.l10n.localStorageGrantAccess,
+    );
+    if (!mounted) return;
+    if (!shouldRequestAccess) {
+      await _promptToHideStorageLocations();
+      return;
+    }
+
+    final sdkInt = await lifecycle.getAndroidSdkInt();
+    if (!mounted) return;
+    if (sdkInt >= 30) {
+      final requestId = ++_localStoragePermissionRequestId;
+      _pendingLocalStoragePermissionCheck = true;
+      _pendingLocalStorageOriginVolId = external?.volId ?? currentVolId;
+      _pendingLocalStorageOriginContainer = external;
+      final settingsOpened = await lifecycle.requestAllFilesAccess(
+        openSettings: true,
+      );
+      if (!mounted) return;
+
+      final accessGranted = await lifecycle.hasAllFilesAccess();
+      if (accessGranted || !settingsOpened) {
+        await _finishLocalStoragePermissionRequest(requestId);
+      }
+      return;
+    }
+
+    final granted = await lifecycle.requestAllFilesAccess();
+    if (!mounted) return;
+    if (!granted) {
+      await _promptToHideStorageLocations();
+      return;
+    }
+
+    await _navigateToLocalStorage(currentVolId, target: external);
   }
 
   Future<void> _finishLocalStoragePermissionRequest(int requestId) async {
@@ -418,11 +466,13 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
     }
 
     final originVolId = _pendingLocalStorageOriginVolId;
+    final originContainer = _pendingLocalStorageOriginContainer;
     _pendingLocalStoragePermissionCheck = false;
     _pendingLocalStorageOriginVolId = null;
+    _pendingLocalStorageOriginContainer = null;
 
     if (granted) {
-      await _navigateToLocalStorage(originVolId);
+      await _navigateToLocalStorage(originVolId, target: originContainer);
     } else {
       await _promptToHideStorageLocations();
     }
@@ -444,8 +494,11 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
         );
   }
 
-  Future<void> _navigateToLocalStorage(int? currentVolId) async {
-    var container = _localStorageContainer;
+  Future<void> _navigateToLocalStorage(
+    int? currentVolId, {
+    MountedContainer? target,
+  }) async {
+    var container = target ?? _localStorageContainer;
     if (container == null) {
       // Shouldn't normally happen -- _checkStorageAccess populates this
       // before the card is even shown -- but fall back to resolving it
@@ -457,6 +510,7 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
         displayName: context.l10n.localStorageCardTitle,
       );
       setState(() => _localStorageContainer = container);
+      widget.localStorageNotifier?.value = container;
     }
     if (widget.onOpenBrowser != null) {
       widget.onOpenBrowser!(container);
@@ -1004,8 +1058,9 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         widget.onFloatingActionChanged?.call(dashboardFloatingAction);
+        // A stable slot rather than a new widget per build: see [ChromeBarSlot].
         widget.onBottomBarChanged?.call(
-          state.showUndoBar ? dashboardBottomBar : null,
+          _bottomBarSlot.publish(state.showUndoBar ? dashboardBottomBar : null),
         );
       });
     }

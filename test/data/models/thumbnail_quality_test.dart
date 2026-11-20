@@ -38,18 +38,18 @@ void main() {
       );
     });
 
-    test('resolves to the cell pixel width (with 4:3 oversample), bucketed to 64', () {
-      // 108 logical px * 3 dpr * 4/3 = 432 px -> next multiple of 64 = 448.
+    test('resolves to the cell pixel width (with 4:3 oversample), snapped to tier', () {
+      // 108 logical px * 3 dpr * 4/3 = 432 px -> closest tier is 384.
       final r = auto.resolveForCell(logicalWidth: 108, devicePixelRatio: 3);
-      expect(r.size, 448);
+      expect(r.size, 384);
       expect(r.quality, 80);
       expect(r.auto, isTrue);
     });
 
-    test('a single full-width column asks for a near-screen-width thumbnail', () {
-      // 340 logical px * 3 dpr * 4/3 = 1360 px -> 1408.
+    test('a single full-width column asks for maxAutoSize thumbnail', () {
+      // 340 logical px * 3 dpr * 4/3 = 1360 px -> clamps to maxAutoSize (640).
       final r = auto.resolveForCell(logicalWidth: 340, devicePixelRatio: 3);
-      expect(r.size, 1408);
+      expect(r.size, ThumbnailQuality.maxAutoSize);
     });
 
     test('is clamped to [128, maxAutoSize]', () {
@@ -75,8 +75,8 @@ void main() {
     });
 
     test('scaledSize allows the auto ceiling but manual stays at 1000', () {
-      const resolved = ThumbnailQuality(size: 1408, auto: true);
-      expect(resolved.scaledSize(180), 1408);
+      const resolved = ThumbnailQuality(size: 640, auto: true);
+      expect(resolved.scaledSize(180), 640);
       const manual = ThumbnailQuality(size: 1408);
       expect(manual.scaledSize(180), 1000);
     });
@@ -95,8 +95,8 @@ void main() {
     });
 
     test('a cellSized quality may use the auto ceiling in scaledSize', () {
-      const resolved = ThumbnailQuality(size: 1408, auto: true, cellSized: true);
-      expect(resolved.scaledSize(180), 1408);
+      const resolved = ThumbnailQuality(size: 640, auto: true, cellSized: true);
+      expect(resolved.scaledSize(180), 640);
     });
 
     test('copyWith drops cellSized and it is never persisted', () {

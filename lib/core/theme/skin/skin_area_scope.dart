@@ -3,6 +3,7 @@ import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_colors.dart';
+import 'package:vaultexplorer/core/utils/perf_trace.dart';
 
 /// Gives a page its own colors.
 ///
@@ -61,6 +62,7 @@ class _SkinAreaScopeState extends State<SkinAreaScope> {
 
   @override
   Widget build(BuildContext context) {
+    PerfTrace.count('ui.skin_scope.build');
     final marker = _SkinAreaMarker.maybeOf(context);
     // Always derive from the shared theme, never from an enclosing page.
     final base = widget.baseTheme ?? marker?.baseTheme ?? Theme.of(context);
@@ -71,6 +73,9 @@ class _SkinAreaScopeState extends State<SkinAreaScope> {
     if (_scoped == null ||
         !identical(_builtFrom, base) ||
         _builtColors != colors) {
+      if (PerfTrace.enabled) {
+        PerfTrace.count('ui.skin_scope.recompute.${widget.area.name}');
+      }
       _scoped = buildSkinAreaTheme(base, colors);
       _builtFrom = base;
       _builtColors = colors;
@@ -78,7 +83,10 @@ class _SkinAreaScopeState extends State<SkinAreaScope> {
     return _SkinAreaMarker(
       colors: colors,
       baseTheme: base,
-      child: Theme(data: _scoped!, child: widget.child),
+      child: Theme(
+        data: _scoped!,
+        child: widget.child,
+      ),
     );
   }
 }

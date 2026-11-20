@@ -8,8 +8,10 @@ import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/features/browser/viewer/close_on_container_lock.dart';
 import 'package:vaultexplorer/features/browser/viewer/markdown/markdown_body_view.dart';
 import 'package:vaultexplorer/features/browser/viewer/markdown/markdown_image_picker_dialog.dart';
+import 'package:vaultexplorer/features/browser/viewer/markdown/markdown_link_syntax.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_controller.dart';
 
 class SearchableTextEditingController extends TextEditingController {
@@ -96,7 +98,11 @@ class MarkdownViewerScreen extends ConsumerStatefulWidget {
       _MarkdownViewerScreenState();
 }
 
-class _MarkdownViewerScreenState extends ConsumerState<MarkdownViewerScreen> {
+class _MarkdownViewerScreenState extends ConsumerState<MarkdownViewerScreen>
+    with CloseOnContainerLock<MarkdownViewerScreen> {
+  @override
+  int get watchedVolId => widget.container.volId;
+
   final SearchableTextEditingController _textController =
       SearchableTextEditingController();
   late final UndoHistoryController _undoController;
@@ -140,6 +146,7 @@ class _MarkdownViewerScreenState extends ConsumerState<MarkdownViewerScreen> {
     _undoController = UndoHistoryController();
     _textController.addListener(_onTextChanged);
     _searchController.addListener(_onSearchChanged);
+    startClosingOnContainerLock();
     Future.microtask(_loadFile);
   }
 
@@ -160,6 +167,7 @@ class _MarkdownViewerScreenState extends ConsumerState<MarkdownViewerScreen> {
 
   @override
   void dispose() {
+    stopClosingOnContainerLock();
     _autosaveTimer?.cancel();
     _textController.removeListener(_onTextChanged);
     _searchController.removeListener(_onSearchChanged);
@@ -458,7 +466,10 @@ class _MarkdownViewerScreenState extends ConsumerState<MarkdownViewerScreen> {
     );
     final text = _textController.text;
     final selection = _textController.selection;
-    final template = '![$selectedImage]($relativePath)';
+    final template = markdownImageTemplate(
+      alt: selectedImage,
+      path: relativePath,
+    );
 
     if (!selection.isValid || selection.baseOffset < 0) {
       _textController.text = '$text\n$template\n';

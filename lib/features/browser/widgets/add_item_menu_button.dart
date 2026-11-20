@@ -4,9 +4,11 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/vault_item.dart';
 import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
+import 'package:vaultexplorer/core/widgets/menus/back_dismissible_menu_anchor.dart';
 
 /// App-bar "add item" popup button: new folder/file, camera capture, import
 /// files/folder, and the "Secure Item" submenu for each vault format.
@@ -135,7 +137,7 @@ class _AddItemMenuButtonState extends ConsumerState<AddItemMenuButton> {
             .withLockSuppression(widget.onExtractArchive),
       );
     }
-    return MenuAnchor(
+    return BackDismissibleMenuAnchor(
       builder: (context, controller, child) => _anchorButton(
         cs,
         icon: Icons.add_rounded,
@@ -186,6 +188,25 @@ class _AddItemMenuButtonState extends ConsumerState<AddItemMenuButton> {
             );
           },
         ),
+        // Cryptomator stores encrypted virtual links; ext/NTFS disk-image
+        // filesystems store native links. FAT/exFAT and unknown filesystems
+        // deliberately do not expose this action.
+        if (!widget.hideImportAndSecureItemActions &&
+            supportsVaultSymbolicLinks(widget.container))
+          MenuItemButton(
+            leadingIcon: Icon(Icons.add_link, color: cs.primary),
+            child: Text(context.l10n.newSymbolicLinkTitle),
+            onPressed: () {
+              BrowserDialogs.showCreateSymlink(
+                context,
+                container: widget.container,
+                currentDirPath: widget.currentDirPath,
+                existingEntries: widget.currentItems,
+                onSuccess: () {},
+                readOnly: widget.isReadOnly,
+              );
+            },
+          ),
         MenuItemButton(
           leadingIcon: Icon(Icons.photo_camera_outlined, color: cs.primary),
           // The callback awaits the camera route. Holding lock suppression

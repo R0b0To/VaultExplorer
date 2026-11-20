@@ -27,9 +27,16 @@ int iterationsForHash(HashId hash, int clampedPim) {
     return 500000; // conservative fallback, should be unreachable
 }
 
+// Upstream's MAX_PIM_VALUE (Common/Password.h): the largest PIM for which the
+// PBKDF2 formula 15000 + PIM * 1000 still fits a positive 32-bit int. The old
+// ceiling of 2000 silently turned any larger PIM into 2000, so a volume made
+// with e.g. PIM 5000 could never be unlocked here (and a volume created here
+// with PIM 5000 would not open anywhere else).
+static constexpr int kMaxPim = 2147468;
+
 int clampPim(int pim) {
     if (pim < 0) return 0;
-    if (pim > 2000) return 2000;
+    if (pim > kMaxPim) return kMaxPim;
     return pim;
 }
 

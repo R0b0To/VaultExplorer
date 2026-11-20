@@ -28,15 +28,24 @@ void main() {
   final calls = <MethodCall>[];
   Object? nextResult;
   Object? nextError;
+  final symlinkTargets =
+      <
+        String,
+        String
+      >{}; // path -> what readVaultSymlink answers (absent: not a link)
 
   setUp(() {
     calls.clear();
     nextResult = null;
     nextError = null;
+    symlinkTargets.clear();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
           calls.add(call);
           if (nextError != null) throw nextError!;
+          if (call.method == 'readVaultSymlink') {
+            return symlinkTargets[(call.arguments as Map)['path']];
+          }
           return nextResult;
         });
   });
@@ -156,6 +165,44 @@ void main() {
     });
   });
 
+  group('symbolic-link path resolution', () {
+    test('follows chained relative links inside the container', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            calls.add(call);
+            if (call.method != 'readVaultSymlink') return null;
+            return switch (call.arguments['path']) {
+              'links/shortcut' => '../nested/next',
+              'nested/next' => '../media/photo.jpg',
+              _ => null,
+            };
+          });
+
+      final resolved = await api.resolveVaultSymlinkTargetPath(
+        container,
+        'links/shortcut',
+      );
+
+      expect(resolved, 'media/photo.jpg');
+    });
+
+    test('refuses links that escape the container root', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            calls.add(call);
+            if (call.method == 'readVaultSymlink') return '../outside.txt';
+            return null;
+          });
+
+      final resolved = await api.resolveVaultSymlinkTargetPath(
+        container,
+        'shortcut',
+      );
+
+      expect(resolved, isNull);
+    });
+  });
+
   group('whole-file writes', () {
     test('createEmptyFile commits through the injected channel', () async {
       nextResult = true;
@@ -177,6 +224,16 @@ void main() {
       'writeWholeFile commits its temporary file through the same API',
       () async {
         nextResult = true;
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (call) async {
+              calls.add(call);
+              if (call.method == 'readVaultSymlink') return null;
+              if (call.method == 'listVaultSymlinks' ||
+                  call.method == 'listDirectory') {
+                return <Object?>[];
+              }
+              return nextResult;
+            });
 
         final ok = await api.writeWholeFile(
           container,
@@ -186,16 +243,77 @@ void main() {
 
         expect(ok, isTrue);
         expect(calls.map((call) => call.method), [
-          'deleteFile',
+          'readVaultSymlink',
           'writeFileChunk',
           'finishWrite',
-          'deleteFile',
+          'listVaultSymlinks',
+          'listDirectory',
           'renameFile',
         ]);
-        expect(calls[2].arguments, {
-          'volId': container.volId,
-          'path': 'notes.txt.tmp',
-        });
+        final temporaryPath = calls[1].arguments['fileName'] as String;
+        expect(temporaryPath, startsWith('.ve-'));
+        expect(temporaryPath, endsWith('.tmp'));
+        expect(calls[1].arguments['offset'], 0);
+        expect(calls.last.arguments['oldPath'], temporaryPath);
+        expect(calls.last.arguments['newPath'], 'notes.txt');
+      },
+    );
+
+    test('does not replace a link when its no-follow probe fails', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            calls.add(call);
+            throw PlatformException(code: 'IO_ERROR');
+          });
+
+      final ok = await api.writeWholeFile(
+        container,
+        'shortcut.txt',
+        Uint8List(0),
+      );
+
+      expect(ok, isFalse);
+      expect(calls.map((call) => call.method), ['readVaultSymlink']);
+    });
+
+    test(
+      'editing through a symlink preserves the link and replaces its target',
+      () async {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (call) async {
+              calls.add(call);
+              if (call.method == 'readVaultSymlink') {
+                final path = call.arguments['path'] as String;
+                return path == 'shortcut.txt' ? 'docs/original.txt' : null;
+              }
+              if (call.method == 'listVaultSymlinks' ||
+                  call.method == 'listDirectory') {
+                return <Object?>[];
+              }
+              return true;
+            });
+
+        final ok = await api.writeWholeFile(
+          container,
+          'shortcut.txt',
+          Uint8List(0),
+        );
+
+        expect(ok, isTrue);
+        final writeCall = calls.singleWhere(
+          (c) => c.method == 'writeFileChunk',
+        );
+        final temporaryPath = writeCall.arguments['fileName'] as String;
+        expect(temporaryPath, startsWith('docs/.ve-'));
+        expect(temporaryPath, endsWith('.tmp'));
+        final deletePaths = calls
+            .where((c) => c.method == 'deleteFile')
+            .map((c) => c.arguments['fileName'] as String)
+            .toList();
+        expect(deletePaths, isNot(contains('shortcut.txt')));
+        final renameCall = calls.singleWhere((c) => c.method == 'renameFile');
+        expect(renameCall.arguments['oldPath'], temporaryPath);
+        expect(renameCall.arguments['newPath'], 'docs/original.txt');
       },
     );
   });
@@ -300,18 +418,21 @@ void main() {
       expect(calls.single.arguments['maxBytes'], 0);
     });
 
-    test('returns null instead of throwing when the native encoder fails', () async {
-      nextError = PlatformException(code: 'ENCODE_FAILED');
+    test(
+      'returns null instead of throwing when the native encoder fails',
+      () async {
+        nextError = PlatformException(code: 'ENCODE_FAILED');
 
-      final result = await api.encodeImage(
-        rgba: Uint8List(4),
-        width: 1,
-        height: 1,
-        format: 'jpeg',
-      );
+        final result = await api.encodeImage(
+          rgba: Uint8List(4),
+          width: 1,
+          height: 1,
+          format: 'jpeg',
+        );
 
-      expect(result, isNull);
-    });
+        expect(result, isNull);
+      },
+    );
   });
 
   group('shareFiles', () {
@@ -326,12 +447,15 @@ void main() {
       expect(calls.single.arguments['fileNames'], ['photo.jpg', 'notes.txt']);
     });
 
-    test('returns false without calling the channel when fileNames is empty', () async {
-      final ok = await api.shareFiles(container, []);
+    test(
+      'returns false without calling the channel when fileNames is empty',
+      () async {
+        final ok = await api.shareFiles(container, []);
 
-      expect(ok, isFalse);
-      expect(calls, isEmpty);
-    });
+        expect(ok, isFalse);
+        expect(calls, isEmpty);
+      },
+    );
 
     test('returns false when the platform result is null', () async {
       nextResult = null;
@@ -344,56 +468,74 @@ void main() {
     test('a plain file share sends no folder arguments', () async {
       nextResult = true;
 
-      await api.shareFiles(container, ['photo.jpg'], skipExtensions: ['password']);
+      await api.shareFiles(
+        container,
+        ['photo.jpg'],
+        skipExtensions: ['password'],
+      );
 
       expect(calls.single.arguments.containsKey('directoryPaths'), isFalse);
       expect(calls.single.arguments.containsKey('skipExtensions'), isFalse);
     });
 
-    test('names which entries are folders and what to leave out of them', () async {
-      nextResult = true;
+    test(
+      'names which entries are folders and what to leave out of them',
+      () async {
+        nextResult = true;
 
-      final ok = await api.shareFiles(
-        container,
-        ['Trips', 'notes.txt'],
-        directoryPaths: ['Trips'],
-        skipExtensions: ['password', 'securenote'],
-      );
+        final ok = await api.shareFiles(
+          container,
+          ['Trips', 'notes.txt'],
+          directoryPaths: ['Trips'],
+          skipExtensions: ['password', 'securenote'],
+        );
 
-      expect(ok, isTrue);
-      expect(calls.single.method, 'shareFile');
-      expect(calls.single.arguments['fileNames'], ['Trips', 'notes.txt']);
-      expect(calls.single.arguments['directoryPaths'], ['Trips']);
-      expect(calls.single.arguments['skipExtensions'], ['password', 'securenote']);
-    });
+        expect(ok, isTrue);
+        expect(calls.single.method, 'shareFile');
+        expect(calls.single.arguments['fileNames'], ['Trips', 'notes.txt']);
+        expect(calls.single.arguments['directoryPaths'], ['Trips']);
+        expect(calls.single.arguments['skipExtensions'], [
+          'password',
+          'securenote',
+        ]);
+      },
+    );
 
-    test('shares SAF folders through the SAF channel with the folder named', () async {
-      final saf = buildExternalStorageContainer(
-        rootPath: 'content://com.android.externalstorage.documents/tree/1234-ABCD%3A',
-        displayName: 'SD card',
-        volId: -100,
-      );
-      nextResult = true;
+    test(
+      'shares SAF folders through the SAF channel with the folder named',
+      () async {
+        final saf = buildExternalStorageContainer(
+          rootPath:
+              'content://com.android.externalstorage.documents/tree/1234-ABCD%3A',
+          displayName: 'SD card',
+          volId: -100,
+        );
+        nextResult = true;
 
-      final ok = await api.shareFiles(
-        saf,
-        ['DCIM/Camera', 'notes.txt'],
-        directoryPaths: ['DCIM/Camera'],
-        skipExtensions: ['password'],
-      );
+        final ok = await api.shareFiles(
+          saf,
+          ['DCIM/Camera', 'notes.txt'],
+          directoryPaths: ['DCIM/Camera'],
+          skipExtensions: ['password'],
+        );
 
-      expect(ok, isTrue);
-      expect(calls.single.method, 'safShareFiles');
-      expect(calls.single.arguments['treeUri'], saf.uri);
-      expect(calls.single.arguments['filePaths'], ['DCIM/Camera', 'notes.txt']);
-      expect(calls.single.arguments['directoryPaths'], ['DCIM/Camera']);
-      // Item Vault entries only exist inside vault containers.
-      expect(calls.single.arguments.containsKey('skipExtensions'), isFalse);
-    });
+        expect(ok, isTrue);
+        expect(calls.single.method, 'safShareFiles');
+        expect(calls.single.arguments['treeUri'], saf.uri);
+        expect(calls.single.arguments['filePaths'], [
+          'DCIM/Camera',
+          'notes.txt',
+        ]);
+        expect(calls.single.arguments['directoryPaths'], ['DCIM/Camera']);
+        // Item Vault entries only exist inside vault containers.
+        expect(calls.single.arguments.containsKey('skipExtensions'), isFalse);
+      },
+    );
 
     test('a plain SAF file share sends no folder arguments', () async {
       final saf = buildExternalStorageContainer(
-        rootPath: 'content://com.android.externalstorage.documents/tree/1234-ABCD%3A',
+        rootPath:
+            'content://com.android.externalstorage.documents/tree/1234-ABCD%3A',
         displayName: 'SD card',
         volId: -100,
       );
@@ -449,10 +591,10 @@ void main() {
     );
   });
 
-
   group('SAF (document provider) storage', () {
     final saf = buildExternalStorageContainer(
-      rootPath: 'content://com.android.externalstorage.documents/tree/1234-ABCD%3A',
+      rootPath:
+          'content://com.android.externalstorage.documents/tree/1234-ABCD%3A',
       displayName: 'SD card',
       volId: -100,
     );
@@ -468,6 +610,18 @@ void main() {
             return handler(call);
           });
     }
+
+    test('entryExists on a SAF file asks the SAF provider, not the local '
+        'filesystem (regression: files in added storage locations looked '
+        'missing)', () async {
+      mockChannel((call) => call.method == 'safGetFileSize' ? 1234 : null);
+      expect(await api.entryExists(saf, 'Docs/a.txt', isDir: false), isTrue);
+      expect(calls.single.method, 'safGetFileSize');
+
+      calls.clear();
+      mockChannel((call) => call.method == 'safGetFileSize' ? -1 : null);
+      expect(await api.entryExists(saf, 'Docs/a.txt', isDir: false), isFalse);
+    });
 
     test('getFolderSize sums a SAF tree instead of reporting 0', () async {
       final listings = <String, List<Map<String, Object>>>{
@@ -492,15 +646,32 @@ void main() {
       expect(await api.getFolderSize(saf, 'sub'), 30);
     });
 
-    test('copyFile does not hand a vault path to the native SAF copy', () async {
-      mockChannel((call) => true);
+    test(
+      'copyFile streams a vault source through the native SAF writer',
+      () async {
+        mockChannel((call) => true);
 
-      // The native copy would treat the vault's URI as a file path; reporting
-      // "not handled" lets the caller stream the file in chunks instead.
-      expect(await api.copyFile(saf, 'a.txt', container, 'a.txt'), isFalse);
-      expect(await api.copyFile(container, 'a.txt', saf, 'a.txt'), isFalse);
-      expect(calls, isEmpty);
-    });
+        // SAF-to-vault stays on the caller's fallback path. A vault-to-SAF
+        // copy uses the dedicated sequential writer rather than passing the
+        // vault URI as a filesystem path to the generic SAF copy method.
+        expect(await api.copyFile(saf, 'a.txt', container, 'a.txt'), isFalse);
+        expect(calls, isEmpty);
+
+        expect(
+          await api.copyFile(container, 'a.txt', saf, 'Docs/a.txt'),
+          isTrue,
+        );
+        expect(calls, hasLength(1));
+        expect(calls.single.method, 'safCopyVaultFile');
+        expect(calls.single.arguments, {
+          'srcVolId': container.volId,
+          'srcPath': 'a.txt',
+          'destTreeUri': saf.uri,
+          'destPath': 'Docs/a.txt',
+          'opId': 0,
+        });
+      },
+    );
 
     test('copyFile uses the native SAF copy against plain local storage or '
         'another SAF tree', () async {
@@ -512,5 +683,268 @@ void main() {
       expect(calls.map((c) => c.method), everyElement('safCopyFile'));
       expect(calls, hasLength(3));
     });
+  });
+
+  group('entryExists', () {
+    void mockVault({
+      List<String>? listing,
+      Map<String, List<String>?>? listingsByDir,
+      int fileSize = -1,
+    }) {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            calls.add(call);
+            if (call.method == 'getFileSize') return fileSize;
+            if (call.method == 'listDirectory') {
+              if (listingsByDir != null) {
+                return listingsByDir[(call.arguments as Map)['dirPath']];
+              }
+              return listing;
+            }
+            return null;
+          });
+    }
+
+    test('reports true for a file found in its parent listing without '
+        'probing getFileSize', () async {
+      // getFileSize on a mirrored/cloud folder vault pulls the whole file and
+      // can fail (-1) for a file that is plainly there: it must not be asked.
+      mockVault(listing: ['F|1024|0|file.txt'], fileSize: -1);
+      final exists = await api.entryExists(container, 'file.txt', isDir: false);
+      expect(exists, isTrue);
+      expect(calls.map((c) => c.method), isNot(contains('getFileSize')));
+    });
+
+    test('reports true for a 0-byte file found in the listing', () async {
+      mockVault(listing: ['F|0|0|file.txt']);
+      expect(
+        await api.entryExists(container, 'file.txt', isDir: false),
+        isTrue,
+      );
+    });
+
+    test('looks the file up in its own parent directory', () async {
+      mockVault(
+        listingsByDir: {
+          'docs/inner': ['F|5|0|a.txt'],
+          '': ['F|5|0|other.txt'],
+        },
+      );
+      expect(
+        await api.entryExists(container, 'docs/inner/a.txt', isDir: false),
+        isTrue,
+      );
+      final listed = calls.where((c) => c.method == 'listDirectory').single;
+      expect((listed.arguments as Map)['dirPath'], 'docs/inner');
+    });
+
+    test(
+      'reports false when the listing succeeds but lacks the file',
+      () async {
+        mockVault(listing: ['F|100|0|other.txt', 'D|0|0|file.txt']);
+        expect(
+          await api.entryExists(container, 'file.txt', isDir: false),
+          isFalse,
+        );
+      },
+    );
+
+    test(
+      'falls back to getFileSize only when the listing itself fails',
+      () async {
+        mockVault(listing: null, fileSize: 42);
+        expect(
+          await api.entryExists(container, 'file.txt', isDir: false),
+          isTrue,
+        );
+        mockVault(listing: null, fileSize: -1);
+        expect(
+          await api.entryExists(container, 'file.txt', isDir: false),
+          isFalse,
+        );
+      },
+    );
+
+    test('reports true for existing directory via listDirectory', () async {
+      nextResult = <String>[];
+      final exists = await api.entryExists(container, 'my_folder', isDir: true);
+      expect(exists, isTrue);
+      expect(calls.single.method, 'listDirectory');
+    });
+
+    test(
+      'reports false for missing directory when listDirectory returns null',
+      () async {
+        nextResult = null;
+        final exists = await api.entryExists(
+          container,
+          'my_folder',
+          isDir: true,
+        );
+        expect(exists, isFalse);
+        expect(calls.single.method, 'listDirectory');
+      },
+    );
+  });
+
+  group('createVaultSymlink', () {
+    MountedContainer containerWith({required int volId, required String uri}) =>
+        MountedContainer(
+          uri: uri,
+          displayName: 'Vault',
+          volId: volId,
+          rootFiles: const [],
+          mountedAt: DateTime(2026, 1, 1),
+          totalSpace: 1,
+          freeSpace: 1,
+          containerFormat: 'cryptomator',
+        );
+
+    // Add this line to shadow the outer container for this group:
+    final container = containerWith(volId: 1, uri: 'content://test-container');
+
+    test('sends filePath, path and target exactly as given', () async {
+      nextResult = true;
+      final ok = await api.createVaultSymlink(
+        container,
+        'docs/ünï link',
+        '../Ziel ☃/x',
+      );
+      expect(ok, isTrue);
+      expect(calls.single.method, 'createVaultSymlink');
+      expect(calls.single.arguments, {
+        'filePath': 'content://test-container',
+        'path': 'docs/ünï link',
+        'target': '../Ziel ☃/x',
+      });
+    });
+
+    test('an engine refusal (false or null) is false', () async {
+      nextResult = false;
+      expect(await api.createVaultSymlink(container, 'ln', 't'), isFalse);
+      nextResult = null;
+      expect(await api.createVaultSymlink(container, 'ln', 't'), isFalse);
+    });
+
+    test('channel failures are not swallowed (like createDirectory)', () async {
+      nextError = PlatformException(code: 'ERR');
+      await expectLater(
+        api.createVaultSymlink(container, 'ln', 't'),
+        throwsA(isA<PlatformException>()),
+      );
+    });
+
+    test(
+      'SAF and local-storage containers answer false without asking the platform',
+      () async {
+        nextResult = true;
+        final saf = containerWith(volId: -3, uri: 'content://tree/x');
+        final local = containerWith(volId: -4, uri: 'file:///storage/x');
+        expect(await api.createVaultSymlink(saf, 'ln', 't'), isFalse);
+        expect(await api.createVaultSymlink(local, 'ln', 't'), isFalse);
+        expect(calls, isEmpty);
+      },
+    );
+  });
+
+  group('resolveVaultPhysicalPath', () {
+    MountedContainer cryptomator() => MountedContainer(
+      uri: 'content://test-container',
+      displayName: 'Vault',
+      volId: 1,
+      rootFiles: const [],
+      mountedAt: DateTime(2026, 1, 1),
+      totalSpace: 1,
+      freeSpace: 1,
+      containerFormat: 'cryptomator',
+    );
+
+    Future<String?> resolve(String path, {bool followLast = true}) => api
+        .resolveVaultPhysicalPath(cryptomator(), path, followLast: followLast);
+
+    test(
+      'a path without links comes back as it is, with dots dropped',
+      () async {
+        expect(await resolve('a/b/c'), 'a/b/c');
+        expect(await resolve('./a//b/./c/'), 'a/b/c');
+        expect(await resolve(''), '');
+      },
+    );
+
+    test(
+      'a link in the middle of the path is followed from its own folder',
+      () async {
+        symlinkTargets['dl'] = 'x/y';
+        expect(await resolve('dl/file.txt'), 'x/y/file.txt');
+        symlinkTargets['docs/up'] =
+            '../other'; // relative to docs/, not to the root
+        expect(await resolve('docs/up/f'), 'other/f');
+      },
+    );
+
+    test('the last name is followed only when asked to', () async {
+      symlinkTargets['ln'] = 'real';
+      expect(await resolve('ln'), 'real');
+      expect(await resolve('ln', followLast: false), 'ln');
+      expect(await resolve('ln/', followLast: false), 'ln');
+      expect(
+        await resolve('ln/f', followLast: false),
+        'real/f',
+      ); // a middle link is always followed
+    });
+
+    test('chains and ".." after a link use the real location', () async {
+      symlinkTargets['a'] = 'b';
+      symlinkTargets['b'] = 'deep/er';
+      expect(await resolve('a/f'), 'deep/er/f');
+      expect(
+        await resolve('a/../g'),
+        'deep/g',
+      ); // ".." leaves the REAL folder, not the displayed one
+    });
+
+    test(
+      'fails closed: unsafe, unreadable or endless links give null',
+      () async {
+        expect(await resolve('../x'), isNull); // above the root
+        symlinkTargets['abs'] = '/etc';
+        expect(await resolve('abs/x'), isNull); // absolute
+        symlinkTargets['win'] = 'C:\\Users';
+        expect(await resolve('win/x'), isNull); // backslashes
+        symlinkTargets['d/up'] = '../../x';
+        expect(
+          await resolve('d/up/f'),
+          isNull,
+        ); // climbs past the root from depth 1
+        symlinkTargets['loopa'] = 'loopb';
+        symlinkTargets['loopb'] = 'loopa';
+        expect(await resolve('loopa/f'), isNull); // a cycle
+        for (var i = 0; i < 45; i++) {
+          symlinkTargets['h$i'] = 'h${i + 1}';
+        }
+        expect(await resolve('h0/f'), isNull); // more than 40 hops
+        symlinkTargets['empty'] = '';
+        expect(await resolve('empty/x'), isNull);
+      },
+    );
+
+    test(
+      'a channel failure while reading a link is null, not a guess',
+      () async {
+        nextError = PlatformException(code: 'ERR');
+        expect(await resolve('a/b'), isNull);
+      },
+    );
+
+    test(
+      'a container that cannot hold links is answered without asking the platform',
+      () async {
+        expect(
+          await api.resolveVaultPhysicalPath(container, 'a/./b/../c'),
+          'a/c',
+        );
+        expect(calls, isEmpty);
+      },
+    );
   });
 }

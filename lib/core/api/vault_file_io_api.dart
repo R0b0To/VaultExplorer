@@ -3,11 +3,17 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
+import 'package:path/path.dart' as p;
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
+import 'package:vaultexplorer/core/services/thumbnail_refresh_signal.dart';
+import 'package:vaultexplorer/core/services/thumbnail_stamp_registry.dart';
 import 'package:vaultexplorer/core/utils/image_preview_exception.dart';
+import 'package:vaultexplorer/core/utils/listing_job.dart';
+import 'package:vaultexplorer/core/utils/perf_trace.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
+import 'package:vaultexplorer/core/utils/vault_symlink.dart';
 import 'package:vaultexplorer/data/models/clipboard_item.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_with_size.dart';
@@ -30,6 +36,7 @@ class VaultFileIoApi {
   final MethodChannel _channel;
   static const LocalFileIoBackend _local = LocalFileIoBackend();
   static int _archiveWriteSequence = 0;
+  static int _replaceWriteSequence = 0;
   static const int _localSourceChunkSize = 4 * 1024 * 1024;
   const VaultFileIoApi(this._channel);
 
@@ -121,14 +128,12 @@ class VaultFileIoApi {
   }) async {
     if (fileNames.isEmpty) return false;
     if (_isSaf(container)) {
-      final result = await _channel.invokeMethod<bool>(
-        ChannelMethods.safShareFiles,
-        {
-          'treeUri': container.uri,
-          'filePaths': fileNames,
-          if (directoryPaths.isNotEmpty) 'directoryPaths': directoryPaths,
-        },
-      );
+      final result = await _channel
+          .invokeMethod<bool>(ChannelMethods.safShareFiles, {
+            'treeUri': container.uri,
+            'filePaths': fileNames,
+            if (directoryPaths.isNotEmpty) 'directoryPaths': directoryPaths,
+          });
       return result ?? false;
     }
     final result = await _channel.invokeMethod<bool>(ChannelMethods.shareFile, {
@@ -202,7 +207,149 @@ class VaultFileIoApi {
       ChannelMethods.getFileSize,
       {'filePath': container.uri, 'fileName': fileName},
     );
-    return result ?? 0;
+    return result ?? -1;
+  }
+
+  /// Returns whether an entry (file or folder) exists at [path] within [container].
+  Future<bool> entryExists(
+    MountedContainer container,
+    String path, {
+    required bool isDir,
+  }) async {
+    if (isDir) {
+      return canListDirectory(container, path);
+    }
+    // SAF must be tested BEFORE isLocalStorage: added storage locations are
+    // volId < 0 too, and their uri is a content:// tree, not a filesystem path,
+    // so File(uri/path).exists() is always false and every file looked missing.
+    if (_isSaf(container)) {
+      final size = await getFileSize(container, path);
+      return size >= 0;
+    }
+    if (container.isLocalStorage) {
+      return _local.entryExists(container.uri, path, isDir: false);
+    }
+    // Vault file. Deliberately NOT a getFileSize probe: on folder vaults whose
+    // storage is mirrored from a remote/cloud provider, the native getFileSize
+    // runs ensureContentReady, i.e. it pulls the WHOLE file just to answer
+    // "does it exist", and any pull failure/timeout comes back as -1 -- which
+    // callers read as "source missing" (bookmarkTargetMissing) for files that
+    // are plainly there. Directories never hit this because they are checked
+    // through a listing. The parent listing is metadata-only and is the same
+    // data the browser showed the user, so use it for files too.
+    final parentDir = p.posix.dirname(path);
+    final dirToQuery = (parentDir == '.' || parentDir == '/') ? '' : parentDir;
+    final targetName = p.posix.basename(path);
+    final caseSensitive = namesAreCaseSensitive(container);
+    List<String>? rawList;
+    try {
+      rawList = await listDirectoryForBrowser(container, dirToQuery);
+    } catch (_) {
+      rawList = null;
+    }
+    if (rawList != null) {
+      for (final raw in rawList) {
+        if (raw.startsWith('System:')) continue;
+        final RawEntry e;
+        try {
+          e = RawEntry.parse(raw);
+        } on FormatException {
+          continue;
+        }
+        if (e.isDir) continue;
+        final matches = caseSensitive
+            ? e.name == targetName
+            : e.name.toLowerCase() == targetName.toLowerCase();
+        if (matches) return true;
+      }
+      return false;
+    }
+    // The listing itself failed, so it says nothing about the file. Only now
+    // fall back to the size probe.
+    return await getFileSize(container, path) >= 0;
+  }
+
+  /// Checks several entries while listing each vault file's parent directory
+  /// only once. SAF and local-storage entries retain their existing probes.
+  Future<List<bool>> entryExistsBatch(
+    MountedContainer container,
+    List<({String path, bool isDir})> entries, {
+    void Function(int index, Object error)? onError,
+  }) async {
+    if (entries.isEmpty) return const <bool>[];
+
+    if (_isSaf(container) || container.isLocalStorage) {
+      final results = <bool>[];
+      for (var index = 0; index < entries.length; index++) {
+        final entry = entries[index];
+        try {
+          results.add(
+            await entryExists(container, entry.path, isDir: entry.isDir),
+          );
+        } catch (error) {
+          if (onError == null) rethrow;
+          onError(index, error);
+          results.add(false);
+        }
+      }
+      return results;
+    }
+
+    final results = List<bool>.filled(entries.length, false);
+    final filesByParent = <String, List<int>>{};
+    for (var index = 0; index < entries.length; index++) {
+      final entry = entries[index];
+      if (entry.isDir) {
+        results[index] = await canListDirectory(container, entry.path);
+        continue;
+      }
+      final parent = p.posix.dirname(entry.path);
+      final parentDir = (parent == '.' || parent == '/') ? '' : parent;
+      filesByParent.putIfAbsent(parentDir, () => <int>[]).add(index);
+    }
+
+    if (filesByParent.isEmpty) return results;
+    final caseSensitive = namesAreCaseSensitive(container);
+    for (final group in filesByParent.entries) {
+      List<String>? rawList;
+      try {
+        rawList = await listDirectoryForBrowser(container, group.key);
+      } catch (_) {
+        rawList = null;
+      }
+      if (rawList == null) {
+        for (final index in group.value) {
+          try {
+            results[index] =
+                await getFileSize(container, entries[index].path) >= 0;
+          } catch (error) {
+            if (onError == null) rethrow;
+            onError(index, error);
+          }
+        }
+        continue;
+      }
+
+      final names = <String>{};
+      for (final raw in rawList) {
+        if (raw.startsWith('System:')) continue;
+        final RawEntry entry;
+        try {
+          entry = RawEntry.parse(raw);
+        } on FormatException {
+          continue;
+        }
+        if (entry.isDir) continue;
+        names.add(caseSensitive ? entry.name : entry.name.toLowerCase());
+      }
+      for (final index in group.value) {
+        final name = p.posix.basename(entries[index].path);
+        results[index] = names.contains(
+          caseSensitive ? name : name.toLowerCase(),
+        );
+      }
+    }
+    return results;
   }
 
   Future<int> getMediaFileSize(
@@ -372,8 +519,12 @@ class VaultFileIoApi {
     int quality = 70,
     bool preserveAlpha = false,
   }) async {
+    final sentAtMs = PerfTrace.enabled
+        ? DateTime.now().millisecondsSinceEpoch
+        : 0;
+    final t0 = PerfTrace.begin();
     try {
-      return await _channel
+      final bytes = await _channel
           .invokeMethod<Uint8List>(ChannelMethods.getImageThumbnail, {
             'filePath': container.uri,
             'fileName': fileName,
@@ -381,7 +532,17 @@ class VaultFileIoApi {
             'quality': quality,
             'preserveAlpha': preserveAlpha,
             'isLocalStorage': container.isLocalStorage,
+            if (sentAtMs != 0) 'sentAtMs': sentAtMs,
           });
+      if (t0 != 0) {
+        final done = PerfTrace.begin();
+        if (done - t0 >= 250000) {
+          final dot = fileName.lastIndexOf('.');
+          final ext = dot < 0 ? '' : fileName.substring(dot + 1).toLowerCase();
+          PerfTrace.sink('SLOW thumb.channel_img ext=$ext us=${done - t0}');
+        }
+      }
+      return bytes;
     } on PlatformException catch (e) {
       switch (e.code) {
         case 'IMAGE_TOO_LARGE':
@@ -445,8 +606,7 @@ class VaultFileIoApi {
             'targetSize': targetSize,
             'isLocalStorage': true,
             'strategy':
-                strategy ??
-                ThumbnailCacheService.videoThumbnailStrategy.name,
+                strategy ?? ThumbnailCacheService.videoThumbnailStrategy.name,
             'framePosition':
                 framePosition ??
                 ThumbnailCacheService.videoThumbnailFramePosition,
@@ -477,8 +637,7 @@ class VaultFileIoApi {
             'targetSize': targetSize,
             'isLocalStorage': true,
             'strategy':
-                strategy ??
-                ThumbnailCacheService.videoThumbnailStrategy.name,
+                strategy ?? ThumbnailCacheService.videoThumbnailStrategy.name,
             'framePosition':
                 framePosition ??
                 ThumbnailCacheService.videoThumbnailFramePosition,
@@ -529,6 +688,46 @@ class VaultFileIoApi {
     } catch (e) {
       logSwallowed('getImageThumbnailWithSize', e, expected: true);
       return null;
+    }
+  }
+
+  /// Upright pixel size of each of [fileNames] (paths inside [container]) from
+  /// the image headers alone -- no thumbnail is decoded or cached. One entry
+  /// per requested name, in order; null where the size could not be read (not
+  /// an image the device can parse, unreadable, SAF-backed browsing).
+  ///
+  /// This is what lets the gallery lay a folder out with the right tile shapes
+  /// before any thumbnail exists. Keep batches modest: the native side runs one
+  /// batch as a single task on the thumbnail executor.
+  Future<List<({int width, int height})?>> probeImageDimensions(
+    MountedContainer container,
+    List<String> fileNames,
+  ) async {
+    if (fileNames.isEmpty) return const [];
+    try {
+      final result = await _channel
+          .invokeMethod<Object?>(ChannelMethods.probeImageDimensions, {
+            'filePath': container.uri,
+            'fileNames': fileNames,
+            'isLocalStorage': container.isLocalStorage,
+          });
+      if (result is! List || result.length < fileNames.length * 2) {
+        return List.filled(fileNames.length, null);
+      }
+      return [
+        for (var i = 0; i < fileNames.length; i++)
+          () {
+            final w = result[i * 2];
+            final h = result[i * 2 + 1];
+            if (w is int && h is int && w > 0 && h > 0) {
+              return (width: w, height: h);
+            }
+            return null;
+          }(),
+      ];
+    } catch (e) {
+      logSwallowed('probeImageDimensions', e, expected: true);
+      return List.filled(fileNames.length, null);
     }
   }
 
@@ -601,7 +800,39 @@ class VaultFileIoApi {
     }
   }
 
+  /// Every listing passes through here, so this is where each file's size and
+  /// modified time are noted for the thumbnail cache (see
+  /// [ThumbnailStampRegistry]). Tiles, category and gallery views all get their
+  /// files from a listing, so a thumbnail is always looked up after its file's
+  /// stamp was recorded.
   Future<List<String>?> listDirectory(
+    MountedContainer container,
+    String dirPath, {
+    bool refresh = false,
+  }) async {
+    final raw = await _listDirectoryRaw(container, dirPath, refresh: refresh);
+    if (raw != null && raw.isNotEmpty) {
+      _noteChangedFiles(
+        container,
+        ThumbnailStampRegistry.recordWire(container.uri, dirPath, raw),
+      );
+    }
+    return raw;
+  }
+
+  /// A file whose size or modified time differs from what the last listing
+  /// reported has new content: tell live thumbnail tiles to fetch it again
+  /// (the cache itself already treats the new stamp as a miss). Bounded, so
+  /// a folder where everything changed at once cannot flood the listeners.
+  void _noteChangedFiles(MountedContainer container, List<String> changed) {
+    const maxSignals = 256;
+    final n = changed.length < maxSignals ? changed.length : maxSignals;
+    for (var i = 0; i < n; i++) {
+      ThumbnailRefreshSignal.invalidate(container, changed[i]);
+    }
+  }
+
+  Future<List<String>?> _listDirectoryRaw(
     MountedContainer container,
     String dirPath, {
     bool refresh = false,
@@ -614,16 +845,23 @@ class VaultFileIoApi {
 
     if (isSaf) {
       try {
+        final safT0 = PerfTrace.begin();
         final rawList = await _channel.invokeMethod(
           ChannelMethods.safListDirectory,
           {'treeUri': container.uri, 'dirPath': dirPath, 'refresh': refresh},
         );
+        PerfTrace.end('io.list.saf.channel', safT0, slowMs: 150);
         VeLog.d(
           'VaultFileIoApi',
           'safListDirectory response item count: ${rawList?.length}',
         );
         if (rawList == null) return const [];
-        final items = (rawList as List).map((it) {
+        final list = rawList as List;
+        if (list.isEmpty) return const [];
+        if (list.first is String) {
+          return list.cast<String>();
+        }
+        final items = list.map((it) {
           final m = it as Map;
           final name = m['name'] as String? ?? '';
           final isDir = m['isDir'] as bool? ?? false;
@@ -645,11 +883,353 @@ class VaultFileIoApi {
     if (container.isLocalStorage) {
       return _local.listDirectory(container.uri, dirPath, refresh: refresh);
     }
+    final perfT0 = PerfTrace.begin();
     final result = await _channel.invokeMethod<List<Object?>>(
       ChannelMethods.listDirectory,
       {'filePath': container.uri, 'dirPath': dirPath, 'refresh': refresh},
     );
+    PerfTrace.end('io.list.vault.channel', perfT0, slowMs: 150);
     return result?.cast<String>();
+  }
+
+  /// Directory entries for the interactive browser. Unlike [listDirectory],
+  /// this merges supported symbolic links into the visible listing. It is not
+  /// used by scanners, sync or export code, which must keep links as separate
+  /// nodes and must not recurse through them.
+  Future<List<String>?> listDirectoryForBrowser(
+    MountedContainer container,
+    String dirPath, {
+    bool refresh = false,
+  }) async {
+    if (!mayHaveVaultSymbolicLinks(container)) {
+      return listDirectory(container, dirPath, refresh: refresh);
+    }
+
+    // The symlink lookup does not depend on the listing, so start both at
+    // once instead of paying a second channel round trip (and a second
+    // executor hop) after the first one returns. [listVaultSymlinks] never
+    // throws, so a failing listing cannot leave an unhandled error behind.
+    //
+    // A refresh is the exception: that listing first drops the native
+    // directory cache (under the volume's write lock), and the symlink read
+    // should see the state after that, so it stays sequential.
+    final Future<List<VaultSymlink>>? linksInFlight = refresh
+        ? null
+        : listVaultSymlinks(container, dirPath);
+    final entries = await listDirectory(container, dirPath, refresh: refresh);
+    if (entries == null) return entries;
+    final perfT0 = PerfTrace.begin();
+    final links =
+        await (linksInFlight ?? listVaultSymlinks(container, dirPath));
+    PerfTrace.end('io.list.vault.symlinks_wait', perfT0, slowMs: 100);
+    if (links.isEmpty) return entries;
+    final merged = List<String>.of(entries);
+    for (final link in links) {
+      final isDirectory = link.isDir;
+      merged.add(
+        '${isDirectory ? 'LD' : 'L'}|${isDirectory ? 0 : link.targetBytes}|${link.modifiedSecs}|${link.name}',
+      );
+    }
+    return merged;
+  }
+
+  /// [listDirectoryForBrowser], already parsed into entries.
+  ///
+  /// Plain device storage hands back the entries it already built, so it skips
+  /// formatting each one into a wire string and parsing it again; every other
+  /// source is parsed here in one pass that also notes `System:TRUNCATED`.
+  /// Null means the listing failed (same as [listDirectoryForBrowser]).
+  Future<ParsedDirectoryListing?> listDirectoryEntriesForBrowser(
+    MountedContainer container,
+    String dirPath, {
+    bool refresh = false,
+  }) async {
+    if (!_isSaf(container) && container.isLocalStorage) {
+      final localT0 = PerfTrace.begin();
+      final entries = await _local.listDirectoryEntries(
+        container.uri,
+        dirPath,
+        refresh: refresh,
+      );
+      PerfTrace.end('io.list.local', localT0, slowMs: 150);
+      _noteChangedFiles(
+        container,
+        ThumbnailStampRegistry.recordEntries(container.uri, dirPath, entries),
+      );
+      // The repository returns an UnmodifiableListView replaced on refresh,
+      // avoiding a 40k-element array copy on the UI thread.
+      return ParsedDirectoryListing(entries, preSortedByNameAsc: true);
+    }
+    final raw = await listDirectoryForBrowser(
+      container,
+      dirPath,
+      refresh: refresh,
+    );
+    if (raw == null) return null;
+    final perfT0 = PerfTrace.begin();
+    final listing = ParsedDirectoryListing.fromWire(raw);
+    PerfTrace.end('io.list.parse', perfT0, slowMs: 30);
+    return listing;
+  }
+
+  /// [listDirectoryEntriesForBrowser] as a job the caller can abandon, with
+  /// progress for folders that take long to read.
+  ///
+  /// Plain device storage reads big folders slowly (Android's storage layer
+  /// costs about 0.1 ms per entry, so 40,000 files take several seconds), so
+  /// there [onPartial] receives a few growing, name-sorted snapshots while the
+  /// folder is still being read, and the job's result is the finished listing.
+  /// Every other source is a single native call that cannot be interrupted or
+  /// reported on part-way: its job just completes with the listing, and
+  /// [onPartial] is never called. Null means the listing failed or the job was
+  /// cancelled; the caller tells them apart by whether it still wanted it.
+  ListingJob<ParsedDirectoryListing> startDirectoryListingForBrowser(
+    MountedContainer container,
+    String dirPath, {
+    bool refresh = false,
+    void Function(List<RawEntry> partial)? onPartial,
+  }) {
+    if (!_isSaf(container) && container.isLocalStorage) {
+      final localT0 = PerfTrace.begin();
+      return _local
+          .listDirectoryProgressive(
+            container.uri,
+            dirPath,
+            refresh: refresh,
+            onPartial: onPartial,
+          )
+          // The worker already pre-sorted in natural-name order; the repository
+          // list is unmodifiable and the browser only ever reads it.
+          .map((entries) {
+            PerfTrace.end('io.list.local', localT0, slowMs: 150);
+            _noteChangedFiles(
+              container,
+              ThumbnailStampRegistry.recordEntries(
+                container.uri,
+                dirPath,
+                entries,
+              ),
+            );
+            return ParsedDirectoryListing(entries, preSortedByNameAsc: true);
+          });
+    }
+    return ListingJob<ParsedDirectoryListing>.uninterruptible(
+      listDirectoryEntriesForBrowser(container, dirPath, refresh: refresh),
+    );
+  }
+
+  /// The symbolic links of one folder in a supported vault/container.
+  /// Deliberately separate from [listDirectory] so generic scanners, sync and
+  /// export never mistake link targets for regular file content.
+  Future<List<VaultSymlink>> listVaultSymlinks(
+    MountedContainer container,
+    String dirPath,
+  ) async {
+    if (_isSaf(container) ||
+        container.isLocalStorage ||
+        !mayHaveVaultSymbolicLinks(container)) {
+      return const [];
+    }
+    try {
+      final result = await _channel.invokeMethod<List<Object?>>(
+        ChannelMethods.listVaultSymlinks,
+        {'filePath': container.uri, 'dirPath': dirPath},
+      );
+      return (result ?? const <Object?>[])
+          .whereType<String>()
+          .map(VaultSymlink.tryParse)
+          .whereType<VaultSymlink>()
+          .toList(growable: false);
+    } catch (e) {
+      logSwallowed('listVaultSymlinks', e, expected: true);
+      return const [];
+    }
+  }
+
+  /// Creates a symbolic link at [path] pointing to [target] in a supported
+  /// vault/container. Cryptomator keeps its encrypted target representation;
+  /// native ext/NTFS targets must be relative and remain inside the container.
+  /// Unsupported filesystems, SAF and local storage return false without a
+  /// platform call. Like [createDirectory], channel failures are not swallowed.
+  Future<bool> createVaultSymlink(
+    MountedContainer container,
+    String path,
+    String target,
+  ) async {
+    if (_isSaf(container) ||
+        container.isLocalStorage ||
+        !supportsVaultSymbolicLinks(container)) {
+      return false;
+    }
+    final result = await _channel.invokeMethod<bool>(
+      ChannelMethods.createVaultSymlink,
+      {'filePath': container.uri, 'path': path, 'target': target},
+    );
+    return result ?? false;
+  }
+
+  /// Where the link at [path] points (never followed), or null if it is not a readable link.
+  Future<String?> readVaultSymlink(
+    MountedContainer container,
+    String path,
+  ) async {
+    if (_isSaf(container) ||
+        container.isLocalStorage ||
+        !mayHaveVaultSymbolicLinks(container)) {
+      return null;
+    }
+    try {
+      return await _channel.invokeMethod<String>(
+        ChannelMethods.readVaultSymlink,
+        {'filePath': container.uri, 'path': path},
+      );
+    } catch (e) {
+      logSwallowed('readVaultSymlink', e, expected: true);
+      return null;
+    }
+  }
+
+  /// Same no-follow query as [readVaultSymlink], but preserves channel errors.
+  /// Atomic writes use this form so an unreadable link is never mistaken for
+  /// an ordinary file and accidentally replaced.
+  Future<String?> readVaultSymlinkStrict(
+    MountedContainer container,
+    String path,
+  ) {
+    if (_isSaf(container) ||
+        container.isLocalStorage ||
+        !mayHaveVaultSymbolicLinks(container)) {
+      return Future<String?>.value(null);
+    }
+    return _channel.invokeMethod<String>(ChannelMethods.readVaultSymlink, {
+      'filePath': container.uri,
+      'path': path,
+    });
+  }
+
+  /// Where [path] really is: every link in it is followed, whether it sits in the middle of the path or (with
+  /// [followLast]) is its last name, so the result is a chain of ordinary folders. A relative link target is
+  /// applied from the folder the link physically lives in, so a target built from the path as the browser shows
+  /// it (which may pass through a folder link of a different depth) can point somewhere else, or past the
+  /// container root; this gives the path to build it from.
+  ///
+  /// Fails closed: null when the answer is not certain: an absolute, empty or Windows-style target, a `..` that
+  /// would leave the container, a loop or a chain over 40 hops, or a link that cannot be read. (The native
+  /// engines resolve some of those differently, e.g. Cryptomator clamps `..` at the root, so null here only
+  /// means "do not build a target from this".) Containers that cannot hold links are answered without asking
+  /// the platform anything.
+  Future<String?> resolveVaultPhysicalPath(
+    MountedContainer container,
+    String path, {
+    bool followLast = true,
+  }) async {
+    final canHaveLinks =
+        !_isSaf(container) &&
+        !container.isLocalStorage &&
+        supportsVaultSymbolicLinks(container);
+    final pending = path.split('/').where((s) => s.isNotEmpty).toList();
+    final resolved = <String>[];
+    var hops = 0;
+    while (pending.isNotEmpty) {
+      final segment = pending.removeAt(0);
+      if (segment == '.') continue;
+      if (segment == '..') {
+        if (resolved.isEmpty) return null;
+        resolved.removeLast();
+        continue;
+      }
+      final isLast = pending.every((s) => s == '.');
+      if (!canHaveLinks || (isLast && !followLast)) {
+        resolved.add(segment);
+        continue;
+      }
+      final String? target;
+      try {
+        target = await readVaultSymlinkStrict(
+          container,
+          [...resolved, segment].join('/'),
+        );
+      } catch (_) {
+        return null;
+      }
+      if (target == null) {
+        resolved.add(segment);
+        continue;
+      }
+      if (++hops > 40) return null;
+      if (target.isEmpty ||
+          target.startsWith('/') ||
+          target.contains('\\') ||
+          target.contains('\u0000')) {
+        return null;
+      }
+      // Relative to the link's own parent folder, which is exactly [resolved] right now.
+      pending.insertAll(0, target.split('/').where((s) => s.isNotEmpty));
+    }
+    return resolved.join('/');
+  }
+
+  /// Resolves [path] through any chain of symbolic links and returns the final
+  /// container-relative target path. Returns null when [path] is not a link,
+  /// a link is unreadable, a target is absolute/outside the container, or a
+  /// loop/overlong chain is encountered. A dangling final target is returned
+  /// after at least one link was followed, matching normal open-with-create
+  /// semantics (the caller may create that target if its parent exists).
+  Future<String?> resolveVaultSymlinkTargetPath(
+    MountedContainer container,
+    String path, {
+    String? firstTarget,
+    bool strict = false,
+  }) async {
+    var currentPath = p.posix.normalize(path);
+    final visited = <String>{};
+    var followedLink = false;
+
+    for (var hop = 0; hop < 40; hop++) {
+      if (!visited.add(currentPath)) return null;
+      final String? target;
+      if (hop == 0 && firstTarget != null) {
+        target = firstTarget;
+      } else if (strict) {
+        target = await readVaultSymlinkStrict(container, currentPath);
+      } else {
+        target = await readVaultSymlink(container, currentPath);
+      }
+      if (target == null || target.isEmpty) {
+        return followedLink ? currentPath : null;
+      }
+      followedLink = true;
+      if (p.posix.isAbsolute(target)) return null;
+      final resolved = p.posix.normalize(
+        p.posix.join(p.posix.dirname(currentPath), target),
+      );
+      if (resolved == '..' ||
+          resolved.startsWith('../') ||
+          p.posix.isAbsolute(resolved)) {
+        return null;
+      }
+      currentPath = resolved;
+    }
+    return null;
+  }
+
+  /// How many entries of [dirPath] exist on disk but are not listed (sync-conflict copies, names that no
+  /// longer decrypt). -1 when unknown (not a Cryptomator vault, or the call failed).
+  Future<int> hiddenEntryCount(
+    MountedContainer container,
+    String dirPath,
+  ) async {
+    if (_isSaf(container) || container.isLocalStorage) return -1;
+    try {
+      return await _channel.invokeMethod<int>(
+            ChannelMethods.getHiddenEntryCount,
+            {'filePath': container.uri, 'dirPath': dirPath},
+          ) ??
+          -1;
+    } catch (e) {
+      logSwallowed('getHiddenEntryCount', e, expected: true);
+      return -1;
+    }
   }
 
   /// Strict readability probe used by scheduled sync before an empty
@@ -747,6 +1327,26 @@ class VaultFileIoApi {
     return result ?? false;
   }
 
+  /// Moves an entry to another folder in the same SAF tree. Returns false
+  /// when the document provider cannot move it, so callers can copy and delete.
+  Future<bool> moveSafEntry(
+    MountedContainer container,
+    String oldPath,
+    String newPath,
+  ) async {
+    if (!_isSaf(container)) return false;
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        ChannelMethods.safMoveFile,
+        {'treeUri': container.uri, 'sourcePath': oldPath, 'destPath': newPath},
+      );
+      return result ?? false;
+    } catch (e) {
+      logSwallowed('safMoveFile', e, expected: true);
+      return false;
+    }
+  }
+
   /// Unlike every other method in this class, this one used to skip the
   /// `isLocalStorage` check entirely and always hit the native channel --
   /// which has no session for Local Storage's sentinel volId, so the call
@@ -789,6 +1389,26 @@ class VaultFileIoApi {
     String destPath, {
     int opId = 0,
   }) async {
+    // Vault bytes must be streamed sequentially into cloud SAF providers.
+    // Their document descriptors often do not support the random-access
+    // `rw` writes used by writeFileChunk.
+    if (dest.isSafStorage && !src.isLocalStorage) {
+      try {
+        final copied = await _channel
+            .invokeMethod<bool>(ChannelMethods.safCopyVaultFile, {
+              'srcVolId': src.volId,
+              'srcPath': srcPath,
+              'destTreeUri': dest.uri,
+              'destPath': destPath,
+              'opId': opId,
+            });
+        return copied ?? false;
+      } catch (e) {
+        logSwallowed('safCopyVaultFile', e, expected: true);
+        return false;
+      }
+    }
+
     // Fast native SAF copy
     if (src.isSafStorage || dest.isSafStorage) {
       // The native copy only understands SAF trees and plain file-system
@@ -859,12 +1479,13 @@ class VaultFileIoApi {
   ]) async {
     if (!container.isLocalStorage) return null;
     try {
-      return await _channel.invokeMethod<String>(ChannelMethods.safGetRealPath, {
-        'treeUri': container.isSafStorage ? container.uri : null,
-        'path': container.isSafStorage
-            ? path
-            : _local.resolve(container.uri, path),
-      });
+      return await _channel
+          .invokeMethod<String>(ChannelMethods.safGetRealPath, {
+            'treeUri': container.isSafStorage ? container.uri : null,
+            'path': container.isSafStorage
+                ? path
+                : _local.resolve(container.uri, path),
+          });
     } catch (e) {
       logSwallowed('getRealPath', e, expected: true);
       return null;
@@ -1120,24 +1741,95 @@ class VaultFileIoApi {
     MountedContainer container,
     String fileName,
     Uint8List bytes,
-  ) async {
-    final tmpPath = '$fileName.tmp';
-    await deleteFile(container, tmpPath);
+  ) {
+    Stream<Uint8List> chunks() async* {
+      var offset = 0;
+      do {
+        final remaining = bytes.length - offset;
+        final len = remaining > _wholeFileChunkSize
+            ? _wholeFileChunkSize
+            : remaining;
+        yield Uint8List.sublistView(bytes, offset, offset + len);
+        offset += len;
+      } while (offset < bytes.length);
+    }
 
-    var offset = 0;
-    do {
-      final remaining = bytes.length - offset;
-      final len = remaining > _wholeFileChunkSize
-          ? _wholeFileChunkSize
-          : remaining;
-      final chunk = Uint8List.sublistView(bytes, offset, offset + len);
-      final ok = await writeFileChunk(container, tmpPath, offset, chunk);
-      if (!ok) {
-        await deleteFile(container, tmpPath);
+    return replaceFileFromChunks(container, fileName, chunks());
+  }
+
+  /// Replaces [fileName] with the bytes [chunks] yields, without ever holding
+  /// the whole file in memory.
+  ///
+  /// Writes to a sibling temp file first, then keeps the old file under a
+  /// sibling backup until the replacement is in place. If installing the new
+  /// file fails, it restores the old one. Deleting [fileName] directly would
+  /// also destroy a symlink, so resolve it first and commit against its final
+  /// target instead. This applies to Cryptomator's virtual links and native
+  /// ext/NTFS links inside LUKS/VeraCrypt containers.
+  Future<bool> replaceFileFromChunks(
+    MountedContainer container,
+    String fileName,
+    Stream<Uint8List> chunks,
+  ) async {
+    var writePath = fileName;
+    if (mayHaveVaultSymbolicLinks(container)) {
+      try {
+        final firstTarget = await readVaultSymlinkStrict(container, fileName);
+        if (firstTarget != null) {
+          final resolved = await resolveVaultSymlinkTargetPath(
+            container,
+            fileName,
+            firstTarget: firstTarget,
+            strict: true,
+          );
+          // Never fall back to replacing the link when it is broken in an
+          // unsafe way (absolute target, escape, unreadable chain or loop).
+          if (resolved == null) return false;
+          writePath = resolved;
+        }
+      } catch (e) {
+        // If the no-follow probe itself failed, do not risk deleting a link
+        // that we could not identify. The caller can retry after the I/O
+        // error is resolved.
+        logSwallowed('replaceFileFromChunks.resolveSymlink', e, expected: true);
         return false;
       }
-      offset += len;
-    } while (offset < bytes.length);
+    }
+
+    final transactionId =
+        '${DateTime.now().microsecondsSinceEpoch}.${_replaceWriteSequence++}';
+    final parent = p.posix.dirname(writePath);
+    String sibling(String name) =>
+        parent == '.' ? name : p.posix.join(parent, name);
+    final tmpPath = sibling('.ve-$transactionId.tmp');
+    final backupPath = sibling('.ve-$transactionId.backup');
+
+    var offset = 0;
+    var wroteAny = false;
+    try {
+      await for (final chunk in chunks) {
+        if (chunk.isEmpty && wroteAny) continue;
+        final ok = await writeFileChunk(container, tmpPath, offset, chunk);
+        if (!ok) {
+          await deleteFile(container, tmpPath);
+          return false;
+        }
+        wroteAny = true;
+        offset += chunk.length;
+      }
+      if (!wroteAny) {
+        // An empty file still has to be created.
+        final ok = await writeFileChunk(container, tmpPath, 0, Uint8List(0));
+        if (!ok) {
+          await deleteFile(container, tmpPath);
+          return false;
+        }
+      }
+    } catch (e) {
+      await deleteFile(container, tmpPath);
+      logSwallowed('replaceFileFromChunks.stream', e);
+      return false;
+    }
 
     final finished = await finishWrite(container, tmpPath);
     if (!finished) {
@@ -1145,15 +1837,38 @@ class VaultFileIoApi {
       return false;
     }
 
-    await deleteFile(container, fileName);
-    return renameFile(container, tmpPath, fileName);
+    final hadOriginal = await entryExists(container, writePath, isDir: false);
+    if (hadOriginal && !await renameFile(container, writePath, backupPath)) {
+      await deleteFile(container, tmpPath);
+      return false;
+    }
+
+    final installed = await renameFile(container, tmpPath, writePath);
+    if (!installed) {
+      final restored =
+          !hadOriginal || await renameFile(container, backupPath, writePath);
+      await deleteFile(container, tmpPath);
+      if (!restored) {
+        logSwallowed(
+          'replaceFileFromChunks.rollback',
+          StateError('Original file remains at $backupPath'),
+        );
+      }
+      return false;
+    }
+
+    if (hadOriginal && !await deleteFile(container, backupPath)) {
+      logSwallowed(
+        'replaceFileFromChunks.cleanupBackup',
+        StateError('Replacement committed; original remains at $backupPath'),
+      );
+    }
+    return true;
   }
 
-  /// No local-storage branch: `dart:io` has no cross-platform way to read
-  /// a volume's free/total space, so callers get `null` for real device
-  /// storage the same as they would for any other unavailable stat -- the
-  /// stats bar already handles a `null` result by simply not showing a
-  /// free-space figure.
+  /// Returns capacity and available bytes for this storage. Raw local paths
+  /// use the native SAF space query with a file URI so Android can read the
+  /// backing filesystem's StatFs values.
   Future<List<int>?> getSpaceInfo(MountedContainer container) async {
     if (_isSaf(container)) {
       final res = await _channel.invokeMethod<List<Object?>>(
@@ -1162,7 +1877,13 @@ class VaultFileIoApi {
       );
       return res?.cast<int>();
     }
-    if (container.isLocalStorage) return null;
+    if (container.isLocalStorage) {
+      final res = await _channel.invokeMethod<List<Object?>>(
+        ChannelMethods.safGetSpaceInfo,
+        {'treeUri': Uri.file(container.uri).toString()},
+      );
+      return res?.cast<int>();
+    }
     final result = await _channel.invokeMethod<List<Object?>>(
       ChannelMethods.getSpaceInfo,
       {'filePath': container.uri},
@@ -1204,14 +1925,12 @@ class VaultFileIoApi {
     MountedContainer container,
     String targetPath,
   ) async {
-    final result = await _channel.invokeMapMethod<String, dynamic>(
-      ChannelMethods.pickImportFiles,
-      {
-        'filePath': container.uri,
-        'targetPath': targetPath,
-        'caseSensitive': namesAreCaseSensitive(container),
-      },
-    );
+    final result = await _channel
+        .invokeMapMethod<String, dynamic>(ChannelMethods.pickImportFiles, {
+          'filePath': container.uri,
+          'targetPath': targetPath,
+          'caseSensitive': namesAreCaseSensitive(container),
+        });
     return _importPickResultFromChannel(result);
   }
 
@@ -1222,14 +1941,12 @@ class VaultFileIoApi {
     MountedContainer container,
     String targetPath,
   ) async {
-    final result = await _channel.invokeMapMethod<String, dynamic>(
-      ChannelMethods.pickImportFolder,
-      {
-        'filePath': container.uri,
-        'targetPath': targetPath,
-        'caseSensitive': namesAreCaseSensitive(container),
-      },
-    );
+    final result = await _channel
+        .invokeMapMethod<String, dynamic>(ChannelMethods.pickImportFolder, {
+          'filePath': container.uri,
+          'targetPath': targetPath,
+          'caseSensitive': namesAreCaseSensitive(container),
+        });
     return _importPickResultFromChannel(result);
   }
 
@@ -1470,14 +2187,12 @@ class VaultFileIoApi {
     String targetPath,
   ) async {
     try {
-      final result = await _channel.invokeMapMethod<String, dynamic>(
-        ChannelMethods.prepareShareImport,
-        {
-          'filePath': container.uri,
-          'targetPath': targetPath,
-          'caseSensitive': namesAreCaseSensitive(container),
-        },
-      );
+      final result = await _channel
+          .invokeMapMethod<String, dynamic>(ChannelMethods.prepareShareImport, {
+            'filePath': container.uri,
+            'targetPath': targetPath,
+            'caseSensitive': namesAreCaseSensitive(container),
+          });
       return _importPickResultFromChannel(result);
     } catch (e) {
       logSwallowed('prepareShareImport', e);

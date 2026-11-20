@@ -2155,6 +2155,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get gocryptfsCipherLabel => '内容加密算法';
 
   @override
+  String get gocryptfsNamesRandomIvOption => '按文件夹随机（默认）';
+
+  @override
+  String get gocryptfsNamesDeterministicOption => '确定性（适用于同步文件夹）';
+
+  @override
   String get cryfsCipherLabel => '内容加密算法';
 
   @override
@@ -2305,6 +2311,156 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get selectContainerFileOrFolder => '选择文件或文件夹';
+
+  @override
+  String get useBackupHeaderToggleTitle => '使用备份卷头';
+
+  @override
+  String get useBackupHeaderToggleSubtitle => '使用存储在卷末尾的备份卷头打开。若主卷头损坏时请使用此选项。';
+
+  @override
+  String get keepCurrentOption => '保持当前';
+
+  @override
+  String get toolExpandVolumeTitle => '扩展 VeraCrypt 卷';
+
+  @override
+  String get toolExpandVolumeSubtitle => '增大标准卷的容量，类似于桌面版卷扩展器';
+
+  @override
+  String get toolExpandLuksVolumeTitle => '扩展 LUKS 容器';
+
+  @override
+  String get toolExpandLuksVolumeSubtitle =>
+      '扩大 LUKS1 和 LUKS2 容器，包括固定大小的 LUKS2 元数据';
+
+  @override
+  String get luksToolsExpandNote =>
+      '请先备份容器。支持 LUKS1 和 LUKS2。NTFS 和 ext2/3/4 文件系统支持就地扩容（FAT 和 exFAT 不支持）。新增空间可使用加密零进行初始化。如果使用密钥文件，它将替代密码。';
+
+  @override
+  String get toolExpandBitLockerVolumeTitle => '扩展 BitLocker 容器';
+
+  @override
+  String get toolExpandBitLockerVolumeSubtitle =>
+      '扩大 BitLocker 卷文件或 VHD/VHDX 映像，并扩展其中的 NTFS 文件系统';
+
+  @override
+  String get bitlockerToolsExpandNote =>
+      '请先备份容器。此操作会重写 BitLocker 元数据，使加密卷覆盖新增空间，因此在依赖结果之前请先在副本上验证。适用于 Windows 7 或更高版本、已完全加密的 BitLocker 卷，可以是原始卷文件，也可以位于固定或动态的 VHD、VHDX 中。对于磁盘映像，请输入磁盘新的总大小：虚拟磁盘及其最后一个分区（MBR 或 GPT）也会一并扩展，因此 BitLocker 分区必须是最后一个分区。不支持 BitLocker To Go 以及写入时加密（仅已用空间）的卷。NTFS 可原地扩展（FAT 和 exFAT 不行）。可选择用加密的零填充新增空间。使用密码或 48 位恢复密钥解锁。';
+
+  @override
+  String get bitlockerToolsPasswordLabel => '密码或恢复密钥';
+
+  @override
+  String get toolHiddenInExistingTitle => '添加隐藏卷';
+
+  @override
+  String get toolHiddenInExistingSubtitle => '在现有标准卷内创建隐藏卷';
+
+  @override
+  String get vcToolsPickContainer => '选择容器';
+
+  @override
+  String get vcToolsNoContainer => '未选择容器';
+
+  @override
+  String get vcToolsPasswordLabel => '卷密码';
+
+  @override
+  String get vcToolsPimLabel => 'PIM（可选）';
+
+  @override
+  String get vcToolsNewSizeLabel => '新容器大小 (MiB)';
+
+  @override
+  String get vcToolsInitFreeSpace => '初始化新空间';
+
+  @override
+  String get vcToolsInitFreeSpaceHint =>
+      '使用卷密钥加密的数据填充新增空间，使其与其余部分无法区分。如需快速扩展请关闭。';
+
+  @override
+  String get vcToolsExpandAction => '扩展卷';
+
+  @override
+  String get vcToolsExpandNote =>
+      '首先扩大容器。然后，在无需重新格式化即可实现时（NTFS、ext2/3/4），将内部文件系统扩展到新增空间。FAT 和 exFAT 无法就地扩展，新增空间将保持未分配状态。请先备份该卷。';
+
+  @override
+  String get vcToolsExpandDone => '卷已扩展';
+
+  @override
+  String get vcToolsGrowFsToggle => '同时扩展文件系统';
+
+  @override
+  String get vcToolsGrowFsToggleHint => '让 NTFS 和 ext2/3/4 卷无需重新格式化即可立即使用新增空间。';
+
+  @override
+  String get vcToolsGrowFsOnlyAction => '仅扩展文件系统';
+
+  @override
+  String get vcToolsFsGrown => '文件系统已扩展：新增空间可以使用了。';
+
+  @override
+  String get vcToolsFsAlreadyFills => '文件系统已占满整个卷。';
+
+  @override
+  String get vcToolsFsUnsupported =>
+      '此文件系统无法就地扩展（FAT 和 exFAT 不支持）。新增空间将保持未分配，直到重新格式化该卷；请先备份其中的文件。';
+
+  @override
+  String get vcToolsFsBusy => '卷中仍有文件处于打开状态。请将其关闭、锁定卷，然后重试“仅扩展文件系统”。';
+
+  @override
+  String get vcToolsFsNeedsCheck =>
+      '文件系统被标记为需要检查。请先对该卷运行“检查与修复”，然后使用“仅扩展文件系统”。';
+
+  @override
+  String get vcToolsFsFailed => '无法扩展文件系统。卷本身已扩大；使用前请运行“检查与修复”。';
+
+  @override
+  String get vcToolsAnalyzeAction => '检查可用空间';
+
+  @override
+  String get vcToolsMaxHidden => '最大可能隐藏卷';
+
+  @override
+  String get vcToolsNoRoom => '没有空间容纳隐藏卷：外层卷末尾已被使用。';
+
+  @override
+  String get vcToolsHiddenSizeLabel => '隐藏卷大小 (MiB)';
+
+  @override
+  String get vcToolsHiddenPasswordLabel => '隐藏卷密码';
+
+  @override
+  String get vcToolsHiddenConfirmLabel => '确认隐藏卷密码';
+
+  @override
+  String get vcToolsHiddenFsLabel => '隐藏卷文件系统';
+
+  @override
+  String get vcToolsQuickFormat => '快速格式化';
+
+  @override
+  String get vcToolsCreateHiddenAction => '创建隐藏卷';
+
+  @override
+  String get vcToolsHiddenDone => '隐藏卷已创建';
+
+  @override
+  String get vcToolsHiddenNote =>
+      '隐藏卷占用外层卷末尾的可用空间。之后，每当向外层卷写入数据时，请务必启用隐藏卷保护进行挂载，否则隐藏卷可能会被覆盖。';
+
+  @override
+  String get vcToolsPasswordsDiffer => '密码不匹配。';
+
+  @override
+  String get vcToolsInvalidSize => '请输入有效的大小。';
+
+  @override
+  String get vcToolsCredentialsRequired => '请输入卷密码或添加密钥文件。';
 
   @override
   String get readOnlyModeLabel => '只读模式';
@@ -3480,6 +3636,27 @@ class AppLocalizationsZh extends AppLocalizations {
   String get layoutModeGalleryGrid => '图库网格';
 
   @override
+  String get galleryModeAction => '图库';
+
+  @override
+  String get galleryModeTooltip => '图库模式';
+
+  @override
+  String get optionsAction => '选项';
+
+  @override
+  String get optionsActionTooltip => '选项';
+
+  @override
+  String get dateToday => '今天';
+
+  @override
+  String get dateYesterday => '昨天';
+
+  @override
+  String get dateEarlier => '更早';
+
+  @override
   String get readOnlyCantDeleteTooltip => '只读——无法删除';
 
   @override
@@ -4136,6 +4313,297 @@ class AppLocalizationsZh extends AppLocalizations {
   String get playMediaAction => '播放媒体';
 
   @override
+  String get libraryTabAlbums => '专辑';
+
+  @override
+  String get libraryTabArtists => '艺术家';
+
+  @override
+  String get libraryTabGenres => '流派';
+
+  @override
+  String get libraryTabTracks => '曲目';
+
+  @override
+  String get libraryTabFolders => '文件夹';
+
+  @override
+  String get nowPlayingQueue => '播放队列';
+
+  @override
+  String get nowPlayingShuffle => '随机播放';
+
+  @override
+  String get nowPlayingRepeatOff => '关闭循环';
+
+  @override
+  String get nowPlayingRepeatAll => '全部循环';
+
+  @override
+  String get nowPlayingRepeatOne => '单曲循环';
+
+  @override
+  String get nowPlayingOpenViewer => '在媒体播放器中打开';
+
+  @override
+  String get nowPlayingCollapse => '最小化播放器';
+
+  @override
+  String libraryFolderCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 个文件夹',
+      one: '1 个文件夹',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get librarySearchHint => '搜索音乐';
+
+  @override
+  String libraryScanListing(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '已找到 $count 个音频文件',
+      one: '已找到 1 个音频文件',
+    );
+    return '正在扫描文件夹... $_temp0';
+  }
+
+  @override
+  String libraryScanReading(int read, int total) {
+    return '正在读取标签... $read / $total';
+  }
+
+  @override
+  String get libraryScanStop => '停止';
+
+  @override
+  String get libraryEmptyTitle => '未找到音乐';
+
+  @override
+  String get libraryEmptyMessage => '此保管库中没有音频文件，或文件所在的文件夹无法读取。';
+
+  @override
+  String get libraryNoResults => '没有与搜索匹配的结果';
+
+  @override
+  String get libraryUnknownArtist => '未知艺术家';
+
+  @override
+  String get libraryUnknownAlbum => '未知专辑';
+
+  @override
+  String get libraryUnknownGenre => '未知流派';
+
+  @override
+  String get libraryVariousArtists => '群星';
+
+  @override
+  String libraryTrackCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 首曲目',
+      one: '1 首曲目',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String libraryAlbumCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 张专辑',
+      one: '1 张专辑',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get libraryPlayAll => '播放';
+
+  @override
+  String get libraryShuffleAll => '随机播放';
+
+  @override
+  String get libraryMenuRescan => '扫描更改';
+
+  @override
+  String get libraryMenuRebuild => '重新读取所有标签';
+
+  @override
+  String get libraryMenuDeleteSaved => '删除已保存的索引';
+
+  @override
+  String get libraryMenuDeleteSavedDone => '已删除保存的索引';
+
+  @override
+  String get libraryIncompleteNote => '某些文件夹无法读取，因此可能已被移除的文件仍显示在列表中。';
+
+  @override
+  String libraryReadFailuresNote(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 个文件无法读取',
+      one: '1 个文件无法读取',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get libraryArtistAlbumsHeader => '专辑';
+
+  @override
+  String get libraryArtistTracksHeader => '曲目';
+
+  @override
+  String get librarySortTooltip => '排序';
+
+  @override
+  String get librarySortTitle => '标题';
+
+  @override
+  String get librarySortArtist => '艺术家';
+
+  @override
+  String get librarySortAlbum => '专辑';
+
+  @override
+  String get librarySortYear => '年份';
+
+  @override
+  String get librarySortRecentlyAdded => '最近添加';
+
+  @override
+  String get librarySortName => '名称';
+
+  @override
+  String get librarySortTrackCount => '曲目数量';
+
+  @override
+  String get librarySortLength => '时长';
+
+  @override
+  String get librarySortReverse => '倒序';
+
+  @override
+  String get musicModeAction => '音乐模式';
+
+  @override
+  String get musicModeFiles => '文件';
+
+  @override
+  String get musicModeMenuFolders => '音乐文件夹';
+
+  @override
+  String get musicModeMenuTurnOff => '关闭音乐模式';
+
+  @override
+  String get libraryStorageInVault => '索引保存在此保管库内';
+
+  @override
+  String get libraryStorageThisDevice => '索引加密保存在此设备上';
+
+  @override
+  String get musicScopeTitle => '音乐模式';
+
+  @override
+  String get musicScopeMessage => '选择音乐模式应包含的内容。';
+
+  @override
+  String get musicScopeAll => '此位置的全部内容';
+
+  @override
+  String get musicScopeAllHint => '检索所有文件夹。在大型存储位置上扫描可能较慢。';
+
+  @override
+  String get musicScopeChoose => '仅部分文件夹';
+
+  @override
+  String get musicScopeAddFolder => '添加文件夹';
+
+  @override
+  String get musicScopeNoFolders => '尚未选择文件夹';
+
+  @override
+  String get musicScopeStart => '开始';
+
+  @override
+  String get musicScopePickerAdd => '添加此文件夹';
+
+  @override
+  String get musicScopePickerEmpty => '此处没有子文件夹';
+
+  @override
+  String get musicScopePickerRoot => '顶级目录';
+
+  @override
+  String get musicScopeRemoveFolder => '移除文件夹';
+
+  @override
+  String libraryArtistCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 位艺术家',
+      one: '1 位艺术家',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String libraryGenreCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 个流派',
+      one: '1 个流派',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String musicPlayPartialNote(num count, String source) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 首曲目',
+      one: '1 首曲目',
+    );
+    return '正在播放来自 $source 的 $_temp0。此列表中的其余内容位于其他位置。';
+  }
+
+  @override
+  String get musicCoverChoose => '选择封面图片';
+
+  @override
+  String get musicCoverRemove => '移除自定义封面';
+
+  @override
+  String get musicCoverFailed => '无法将该图片用作封面';
+
+  @override
+  String get musicMiniPrevious => '上一首';
+
+  @override
+  String get musicMiniNext => '下一首';
+
+  @override
+  String get musicMiniPlay => '播放';
+
+  @override
+  String get musicMiniPause => '暂停';
+
+  @override
+  String get musicMiniStop => '停止播放';
+
+  @override
   String containerSpaceSummary(String free, String total) {
     return '$free 可用 / $total';
   }
@@ -4467,7 +4935,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get toolStorageAnalyzerTitle => '存储分析器';
 
   @override
-  String get toolStorageAnalyzerSubtitle => '查看已挂载保险库中哪些内容占用了空间';
+  String get toolStorageAnalyzerSubtitle => '查看本地存储或已挂载保险库中哪些内容占用了空间。';
 
   @override
   String get toolDuplicateFinderTitle => '重复文件查找器';
@@ -5033,7 +5501,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageAnalyzerNoTargetsTitle => '没有可分析的内容';
 
   @override
-  String get storageAnalyzerNoTargetsMessage => '请先挂载一个保险库，然后返回此处查看其存储明细。';
+  String get storageAnalyzerNoTargetsMessage =>
+      '请先打开本地存储或挂载一个保险库，然后返回此处查看存储明细。';
 
   @override
   String storageAnalyzerUsedOfTotal(String used, String total) {
@@ -5074,6 +5543,166 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get storageCategoryOther => '其他';
+
+  @override
+  String get storageAnalyzerTabMap => '分布图';
+
+  @override
+  String get storageAnalyzerTabFolders => '文件夹';
+
+  @override
+  String get storageAnalyzerTabTypes => '类型';
+
+  @override
+  String get storageAnalyzerTabCleanup => '清理';
+
+  @override
+  String storageAnalyzerFreeSpace(String free) {
+    return '剩余 $free';
+  }
+
+  @override
+  String storageAnalyzerFileCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 个文件',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageAnalyzerItemCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 个项目',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageAnalyzerContentSize(String size) {
+    return '保管库内容：$size';
+  }
+
+  @override
+  String storageAnalyzerScanProgress(String files, String size) {
+    return '已扫描 $files 个文件 · $size';
+  }
+
+  @override
+  String get storageAnalyzerPartialNotice => '部分文件夹无法完全读取，因此统计数据可能低于实际数值。';
+
+  @override
+  String get storageAnalyzerStaleNotice => '此卷在扫描后已被修改。';
+
+  @override
+  String get storageAnalyzerUpOneLevel => '返回上一级';
+
+  @override
+  String get storageAnalyzerEmptyFolder => '此文件夹为空。';
+
+  @override
+  String storageAnalyzerSmallerItems(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 个较小项目',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get storageAnalyzerMapHint => '点击文件夹以打开，长按可进行选择。';
+
+  @override
+  String get storageAnalyzerSortFiles => '文件数量';
+
+  @override
+  String get storageAnalyzerAllTypes => '所有类型';
+
+  @override
+  String storageAnalyzerLargestOfType(String type) {
+    return '最大文件 · $type';
+  }
+
+  @override
+  String get storageAnalyzerCleanupHeader => '建议';
+
+  @override
+  String get storageAnalyzerCleanupLarge => '大文件';
+
+  @override
+  String get storageAnalyzerCleanupStale => '超过一年未修改';
+
+  @override
+  String get storageAnalyzerCleanupTemp => '临时文件与垃圾文件';
+
+  @override
+  String get storageAnalyzerCleanupEmpty => '空文件夹';
+
+  @override
+  String get storageAnalyzerCleanupReview => '查看';
+
+  @override
+  String get storageAnalyzerCleanupNothing => '没有需要清理的内容，此卷井井有条。';
+
+  @override
+  String get storageAnalyzerBiggestFiles => '最大的文件';
+
+  @override
+  String get storageAnalyzerBiggestFilesSubtitle => '浏览此卷中体积最大的文件';
+
+  @override
+  String get storageAnalyzerAllSuggestions => '所有建议';
+
+  @override
+  String storageAnalyzerSelectedSummary(int count, String size) {
+    return '已选 $count 项 · $size';
+  }
+
+  @override
+  String storageAnalyzerDeleteFilesMessage(String size) {
+    return '这将从此存储中永久删除所选项目并释放 $size 空间。此操作无法撤销。';
+  }
+
+  @override
+  String storageAnalyzerDeleteFoldersMessage(String files, String size) {
+    return '这将永久删除所选项目（共 $files 个文件，包括所选文件夹中的所有内容）并释放 $size 空间。此操作无法撤销。';
+  }
+
+  @override
+  String storageAnalyzerDeleteDone(String size) {
+    return '已释放 $size';
+  }
+
+  @override
+  String storageAnalyzerDeletePartial(
+    String deleted,
+    String failed,
+    String size,
+  ) {
+    return '已删除 $deleted 项，但有 $failed 项无法删除。已释放 $size。';
+  }
+
+  @override
+  String get storageAnalyzerDeleteNone => '未删除任何内容。';
+
+  @override
+  String get storageAnalyzerDeleteError => '无法删除所选项目。';
+
+  @override
+  String get storageAnalyzerRescanFolder => '重新扫描此文件夹';
+
+  @override
+  String get storageAnalyzerSelectAction => '选择';
+
+  @override
+  String get storageAnalyzerSelectAllHere => '选择此文件夹中的全部项目';
+
+  @override
+  String get storageAnalyzerOpenFolder => '打开文件夹';
 
   @override
   String get keyfilePassphraseGeneratorTitle => '密钥文件与密码短语生成器';
@@ -5516,17 +6145,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vaultSyncTapToSelect => '点击选择保险库和文件夹';
 
   @override
-  String get vaultSyncSwapTooltip => '交换左右两侧';
+  String get vaultSyncSwapTooltip => '交换两个存储';
 
   @override
-  String get vaultSyncSameLocationWarning => '左侧和右侧必须是不同的文件夹。';
+  String get vaultSyncSameLocationWarning => '这两个文件夹必须不同。';
 
   @override
   String get vaultSyncIntroTitle => '比较两个保险库';
 
   @override
   String get vaultSyncIntroSubtitle =>
-      '选择左侧和右侧的保险库（或同一保险库中的两个文件夹），以查看每一侧缺失、已修改或较新的内容。';
+      '选择两个文件夹（位于保险库、设备存储或 SD 卡、云盘等文档提供程序中），即可查看各自缺失、已修改或较新的内容。';
 
   @override
   String get vaultSyncCompareButton => '比较';
@@ -5599,10 +6228,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vaultSyncDirectionLabel => '同步方向';
 
   @override
-  String get vaultSyncDirectionTwoWay => '双向（推荐）';
+  String get vaultSyncDirectionTwoWay => '双向';
 
   @override
-  String get vaultSyncDirectionTwoWaySubtitle => '将每个文件复制到缺失该文件或副本较旧的一侧';
+  String get vaultSyncDirectionTwoWaySubtitle => '将缺失文件和较新版本复制到另一侧。';
 
   @override
   String get vaultSyncDirectionLeftToRight => '左侧 → 右侧（单向）';
@@ -5697,39 +6326,36 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get vaultSyncOverlapWarning =>
-      'Left and Right must not be the same folder or nested inside each other.';
+  String get vaultSyncOverlapWarning => '这两个文件夹不能相同，也不能互相嵌套。';
 
   @override
   String vaultSyncPlaintextWarning(Object targets) {
-    return 'Files copied out of a vault to $targets will be stored unencrypted.';
+    return '从保险库复制到$targets的文件将以未加密形式存储。';
   }
 
   @override
-  String get vaultSyncStorageSelectorLabel => 'Storage';
+  String get vaultSyncStorageSelectorLabel => '存储';
 
   @override
-  String get vaultSyncTargetKindVault => 'Encrypted vault';
+  String get vaultSyncTargetKindVault => '加密保险库';
 
   @override
-  String get vaultSyncTargetKindDevice => 'Device storage · not encrypted';
+  String get vaultSyncTargetKindDevice => '设备存储 · 未加密';
 
   @override
-  String get vaultSyncTargetKindProvider => 'Document provider · not encrypted';
+  String get vaultSyncTargetKindProvider => '文档提供程序 · 未加密';
 
   @override
-  String get vaultSyncAddStorageTooltip => 'Add storage location';
+  String get vaultSyncAddStorageTooltip => '添加存储位置';
 
   @override
-  String get vaultSyncEnableLocalStorageTooltip =>
-      'Enable Local Storage access';
+  String get vaultSyncEnableLocalStorageTooltip => '启用本地存储访问';
 
   @override
-  String get vaultSyncNoStoragesTitle => 'No storage to sync yet';
+  String get vaultSyncNoStoragesTitle => '还没有可同步的存储';
 
   @override
-  String get vaultSyncNoStoragesMessage =>
-      'Add a folder or document provider with the + button, or mount a vault.';
+  String get vaultSyncNoStoragesMessage => '使用 + 按钮添加文件夹或文档提供程序，或挂载一个保险库。';
 
   @override
   String get vaultSyncReadOnlyBadge => '只读';
@@ -5934,6 +6560,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get showHiddenFilesDesc => '显示点文件和系统文件夹';
+
+  @override
+  String get showNoMediaFilesLabel => '显示 .nomedia 文件';
+
+  @override
+  String get showNoMediaFilesDesc => '在文件夹列表中显示 .nomedia 文件';
 
   @override
   String get dontAskAgain => '不再询问';
@@ -6341,7 +6973,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get advancedRenameSeparator => '分隔符';
 
   @override
-  String get advancedRenameSeparatorHint => '_ or -';
+  String get advancedRenameSeparatorHint => '_ 或 -';
 
   @override
   String get advancedRenameLivePreview => '实时预览';
@@ -7094,7 +7726,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get triggerPanicButton => '触发恐慌';
 
   @override
-  String get sectionPanicBootTrigger => 'Wipe on Reboot';
+  String get sectionPanicBootTrigger => '重启时清除';
 
   @override
   String get panicBootTriggerLevelLabel => '重启时运行的级别';
@@ -7394,6 +8026,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get autoHideAppBarDesc => '向下滚动时隐藏顶部栏以最大化查看空间';
 
   @override
+  String get autoHideToolbarLabel => '滚动时自动隐藏工具栏';
+
+  @override
+  String get autoHideToolbarDesc => '向下滚动时隐藏底部工具栏，以最大化查看空间';
+
+  @override
+  String get autoHideBreadcrumbBarLabel => '滚动时自动隐藏路径栏';
+
+  @override
+  String get autoHideBreadcrumbBarDesc => '向下滚动时隐藏路径导航栏，以最大化查看空间';
+
+  @override
   String get useFabForToolbarLabel => '使用浮动按钮作为工具栏';
 
   @override
@@ -7600,7 +8244,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get statusBadgeTitle => '状态徽章';
 
   @override
-  String get statusBadgeSubtitle => '显示幻灯片计时器或静态照片指示器';
+  String get statusBadgeSubtitle => '幻灯片播放时显示倒计时';
 
   @override
   String get topBarActionsHeader => '顶部栏操作';
@@ -8242,57 +8886,56 @@ class AppLocalizationsZh extends AppLocalizations {
   String get cameraReviewPhotosTooltip => '查看已拍摄照片';
 
   @override
-  String get vaultItemTypeAuthenticator => 'Authenticator';
+  String get vaultItemTypeAuthenticator => '身份验证器';
 
   @override
-  String get fieldIssuer => 'Issuer';
+  String get fieldIssuer => '发行方';
 
   @override
-  String get fieldAuthenticatorAccount => 'Account';
+  String get fieldAuthenticatorAccount => '账户';
 
   @override
-  String get fieldSecretKey => 'Secret Key';
+  String get fieldSecretKey => '密钥';
 
   @override
-  String get fieldTotpAlgorithm => 'Algorithm (default: SHA1)';
+  String get fieldTotpAlgorithm => '算法（默认：SHA1）';
 
   @override
-  String get fieldTotpDigits => 'Digits (default: 6)';
+  String get fieldTotpDigits => '位数（默认：6）';
 
   @override
-  String get fieldTotpPeriod => 'Refresh Interval, seconds (default: 30)';
+  String get fieldTotpPeriod => '刷新间隔，秒（默认：30）';
 
   @override
-  String get authenticatorScreenTitle => 'Authenticator';
+  String get authenticatorScreenTitle => '身份验证器';
 
   @override
-  String get authenticatorAppBarTooltip => 'Authenticator codes';
+  String get authenticatorAppBarTooltip => '身份验证器代码';
 
   @override
-  String get authenticatorEmptyStateTitle => 'No authenticator codes yet';
+  String get authenticatorEmptyStateTitle => '暂无身份验证器代码';
 
   @override
   String get authenticatorEmptyStateMessage =>
-      'Add a TOTP secret to a password item, or create a standalone Authenticator item, in any unlocked vault to see live codes here.';
+      '在任何已解锁的保管库中向密码项目添加 TOTP 密钥，或创建独立的身份验证器项目，即可在此处查看实时代码。';
 
   @override
-  String get authenticatorNoVaultsUnlockedMessage =>
-      'Unlock a vault to see its authenticator codes here.';
+  String get authenticatorNoVaultsUnlockedMessage => '解锁保管库以在此处查看其身份验证器代码。';
 
   @override
-  String get authenticatorCodeLabel => 'Code';
+  String get authenticatorCodeLabel => '代码';
 
   @override
-  String get authenticatorInvalidSecretError => 'Invalid secret';
+  String get authenticatorInvalidSecretError => '无效的密钥';
 
   @override
-  String get authenticatorAddButtonTooltip => 'Add authenticator';
+  String get authenticatorAddButtonTooltip => '添加身份验证器';
 
   @override
-  String get authenticatorChooseVaultTitle => 'Choose a vault';
+  String get authenticatorChooseVaultTitle => '选择保管库';
 
   @override
-  String get authenticatorOpenItemTooltip => 'Open item';
+  String get authenticatorOpenItemTooltip => '打开项目';
 
   @override
   String get authenticatorNextCodeLabel => '下一个验证码';
@@ -8710,82 +9353,78 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get videoEditorEditAction => 'Edit video';
+  String get videoEditorEditAction => '编辑视频';
 
   @override
-  String get videoEditorExportAction => 'Export';
+  String get videoEditorExportAction => '导出';
 
   @override
-  String get videoEditorTimelineLabel => 'Video timeline';
+  String get videoEditorTimelineLabel => '视频时间线';
 
   @override
-  String get videoEditorSetStart => 'Set start';
+  String get videoEditorSetStart => '设置起点';
 
   @override
-  String get videoEditorSetEnd => 'Set end';
+  String get videoEditorSetEnd => '设置终点';
 
   @override
-  String get videoEditorAddSegment => 'Add';
+  String get videoEditorAddSegment => '添加';
 
   @override
-  String get videoEditorSplit => 'Split';
+  String get videoEditorSplit => '拆分';
 
   @override
-  String get videoEditorDeleteSegment => 'Delete';
+  String get videoEditorDeleteSegment => '删除';
 
   @override
-  String get videoEditorModeKeep => 'Keep';
+  String get videoEditorModeKeep => '保留';
 
   @override
-  String get videoEditorModeCutOut => 'Cut out';
+  String get videoEditorModeCutOut => '剪出';
 
   @override
-  String get videoEditorNoSegments =>
-      'No segments yet. Move the playhead and tap Add.';
+  String get videoEditorNoSegments => '暂无片段。移动播放指针并点击“添加”。';
 
   @override
   String videoEditorOutputSummary(int count, String duration) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Output: $count clips · $duration',
-      one: 'Output: 1 clip · $duration',
+      other: '输出：$count 个片段 · $duration',
     );
     return '$_temp0';
   }
 
   @override
   String videoEditorSnapNote(String start, String end) {
-    return 'Lossless cut starts on a keyframe: $start – $end';
+    return '无损剪切从关键帧开始：$start – $end';
   }
 
   @override
-  String get videoEditorBoundaryInvalid =>
-      'That would leave the segment too short.';
+  String get videoEditorBoundaryInvalid => '这会导致片段过短。';
 
   @override
-  String get videoEditorNoRoom => 'There is no room for a segment here.';
+  String get videoEditorNoRoom => '此处没有放置片段的空间。';
 
   @override
-  String get videoEditorNothingToExport => 'Nothing to export.';
+  String get videoEditorNothingToExport => '没有可导出的内容。';
 
   @override
-  String get videoEditorReadOnly =>
-      'This vault is read-only, so the edited video can\'t be saved.';
+  String get videoEditorReadOnly => '此保管库为只读模式，因此无法保存编辑后的视频。';
 
   @override
   String videoEditorLoadFailed(String message) {
-    return 'Couldn\'t open this video: $message';
+    return '无法打开此视频：$message';
   }
 
   @override
-  String get videoEditorZoomIn => 'Zoom in';
+  String get videoEditorZoomIn => '放大';
 
   @override
-  String get videoEditorZoomOut => 'Zoom out';
+  String get videoEditorZoomOut => '缩小';
 
   @override
-  String get videoEditorZoomFit => 'Fit to screen';
+  String get videoEditorZoomFit => '适应屏幕';
 
   @override
   String get videoEditorPrevFrame => '上一帧';
@@ -8794,92 +9433,87 @@ class AppLocalizationsZh extends AppLocalizations {
   String get videoEditorNextFrame => '下一帧';
 
   @override
-  String get videoEditorPrevKeyframe => 'Previous keyframe';
+  String get videoEditorPrevKeyframe => '上一个关键帧';
 
   @override
-  String get videoEditorNextKeyframe => 'Next keyframe';
+  String get videoEditorNextKeyframe => '下一个关键帧';
 
   @override
-  String get videoEditorExporting => 'Exporting video';
+  String get videoEditorExporting => '正在导出视频';
 
   @override
   String videoEditorCutting(int current, int total) {
-    return 'Cutting clip $current of $total';
+    return '正在剪辑片段 $current / $total';
   }
 
   @override
-  String get videoEditorCuttingOne => 'Cutting…';
+  String get videoEditorCuttingOne => '正在剪辑…';
 
   @override
-  String get videoEditorSaving => 'Saving…';
+  String get videoEditorSaving => '正在保存…';
 
   @override
   String videoEditorSaved(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Saved $count videos',
-      one: 'Saved 1 video',
+      other: '已保存 $count 个视频',
     );
     return '$_temp0';
   }
 
   @override
-  String get videoEditorAudioDropped =>
-      'Some audio tracks couldn\'t be copied.';
+  String get videoEditorAudioDropped => '无法复制部分音轨。';
 
   @override
   String videoEditorExportFailed(String message) {
-    return 'Export failed: $message';
+    return '导出失败：$message';
   }
 
   @override
-  String get videoEditorExportCancelled => 'Export cancelled';
+  String get videoEditorExportCancelled => '导出已取消';
 
   @override
-  String get videoEditorExportTitle => 'Export';
+  String get videoEditorExportTitle => '导出';
 
   @override
   String videoEditorExportSummary(int count, String duration) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count clips · $duration',
-      one: '1 clip · $duration',
+      other: '$count 个片段 · $duration',
     );
     return '$_temp0';
   }
 
   @override
-  String get videoEditorExportSingle => 'Save as new video';
+  String get videoEditorExportSingle => '保存为新视频';
 
   @override
-  String get videoEditorExportSingleHint => 'The original stays untouched.';
+  String get videoEditorExportSingleHint => '原始文件保持不变。';
 
   @override
-  String get videoEditorExportMerge => 'Merge into one video';
+  String get videoEditorExportMerge => '合并为一个视频';
 
   @override
-  String get videoEditorExportMergeHint =>
-      'Clips are joined in timeline order.';
+  String get videoEditorExportMergeHint => '片段按时间线顺序拼接。';
 
   @override
-  String get videoEditorExportSeparate => 'Save as separate videos';
+  String get videoEditorExportSeparate => '保存为单独的视频';
 
   @override
   String videoEditorExportSeparateHint(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count new files',
-      one: 'One new file',
+      other: '$count 个新文件',
     );
     return '$_temp0';
   }
 
   @override
   String get videoEditorLosslessNote =>
-      'Cuts are lossless, so nothing is re-encoded. Each clip starts at the nearest keyframe before your start point and ends at the next keyframe after your end point. The thin bars under the timeline show exactly what will be saved.';
+      '剪切为无损处理，不会重新编码。每个片段均从起始点前最近的关键帧开始，并在结束点后的下一个关键帧结束。时间线下方细条精确显示将要保存的内容。';
 
   @override
   String get videoEditorAnalyzing => '正在分析视频…';
@@ -9209,11 +9843,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get autoSyncSavedScheduled => '规则和每日计划已保存。';
 
   @override
-  String get autoSyncScheduledTimeTitle => 'Daily run time';
+  String get autoSyncScheduledTimeTitle => '每日运行时间';
 
   @override
   String get autoSyncScheduledTimeSubtitle =>
-      'Device local time. For a quick test, choose a time a minute or two from now; Android may run it later.';
+      '设备本地时间。如需快速测试，请选择从现在起一两分钟后的时间；Android 可能会稍后运行。';
 
   @override
   String get autoSyncExactAlarmAccessTitle => '允许每日同步使用精确闹钟？';
@@ -11586,6 +12220,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get appBarAtBottomDesc => '将应用栏从屏幕顶部移到底部，方便用拇指操作。';
 
   @override
+  String get sectionNavigation => '导航';
+
+  @override
+  String get predictiveBackAnimationsLabel => '预测性返回动画';
+
+  @override
+  String get predictiveBackAnimationsDesc => '返回上一页时显示交互式预览和动画。';
+
+  @override
   String get selectByIconLabel => '点按图标选择';
 
   @override
@@ -12324,4 +12967,977 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get comicReaderCarouselScrubberSubtitle => '在滑块上方显示页面缩略图';
+
+  @override
+  String get vaultSyncBrowseAllButton => '浏览所有项目';
+
+  @override
+  String get vaultSyncExplorerTitle => '浏览两个存储';
+
+  @override
+  String get vaultSyncExplorerEmptyTitle => '没有可显示的内容';
+
+  @override
+  String get vaultSyncExplorerEmptyMessage => '此文件夹中没有符合该筛选条件的项目。';
+
+  @override
+  String get vaultSyncExplorerLoadFailedTitle => '无法读取此文件夹';
+
+  @override
+  String get vaultSyncExplorerLoadFailedMessage =>
+      '无法列出两个存储中的一个。请重试，并确认两者仍处于解锁和连接状态。';
+
+  @override
+  String get vaultSyncFilterAll => '全部';
+
+  @override
+  String get vaultSyncFilterDifferences => '差异';
+
+  @override
+  String get vaultSyncFilterNewer => '较新的副本';
+
+  @override
+  String get vaultSyncFilterConflicts => '需审核';
+
+  @override
+  String get vaultSyncFilterDeletions => '删除';
+
+  @override
+  String get vaultSyncFilterNoMatchesMessage => '没有符合该筛选条件的项目。';
+
+  @override
+  String get vaultSyncSortTooltip => '排序';
+
+  @override
+  String get vaultSyncSortPath => '路径';
+
+  @override
+  String get vaultSyncSortSize => '从大到小';
+
+  @override
+  String get vaultSyncSortModified => '最新优先';
+
+  @override
+  String get vaultSyncSortStatus => '状态';
+
+  @override
+  String get vaultSyncStatusInSync => '已同步';
+
+  @override
+  String get vaultSyncStatusFolder => '文件夹';
+
+  @override
+  String vaultSyncDeletionsQueuedLabel(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count项删除',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String vaultSyncConfirmDeletionsMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '将永久删除$count个项目。此操作无法撤销。',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get vaultSyncResultsStaleMessage => '删除后结果可能已过期。请重新比较以刷新数量。';
+
+  @override
+  String vaultSyncSelectedCount(num count) {
+    return '已选择$count项';
+  }
+
+  @override
+  String get vaultSyncOpenAction => '打开';
+
+  @override
+  String vaultSyncOpenCopyAction(String side) {
+    return '打开$side中的副本';
+  }
+
+  @override
+  String get vaultSyncOpenFolderAction => '打开文件夹';
+
+  @override
+  String get vaultSyncOpenFolderSubtitle => '在两个存储中浏览其内容';
+
+  @override
+  String get vaultSyncShowInFolderAction => '在文件夹中显示';
+
+  @override
+  String get vaultSyncShowInFolderSubtitle => '在两个存储中与其他项目一起查看';
+
+  @override
+  String get vaultSyncDeleteFromBothAction => '从两个存储中删除';
+
+  @override
+  String vaultSyncDeleteBothSidesLabel(String left, String right) {
+    return '$left和$right';
+  }
+
+  @override
+  String vaultSyncDeleteConfirmMessage(String where) {
+    return '这些项目将从$where中永久删除，包括文件夹内的所有内容。此操作无法撤销。';
+  }
+
+  @override
+  String vaultSyncDeleteDoneMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '已删除$count个项目',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String vaultSyncDeletePartialMessage(int deleted, int failed) {
+    return '已删除$deleted个，但有$failed个无法删除';
+  }
+
+  @override
+  String get vaultSyncCopyDoneMessage => '已复制';
+
+  @override
+  String get vaultSyncCopyFailedMessage => '部分项目无法复制。详情请查看传输列表。';
+
+  @override
+  String vaultSyncOpenFailedMessage(String name) {
+    return '无法打开$name';
+  }
+
+  @override
+  String get vaultSyncDetailsNotOnThisSide => '不在此存储中';
+
+  @override
+  String get vaultSyncDetailsFolder => '文件夹';
+
+  @override
+  String vaultSyncStatusOnlyIn(String storage) {
+    return '仅在$storage中';
+  }
+
+  @override
+  String vaultSyncStatusNewerIn(String storage) {
+    return '$storage中较新';
+  }
+
+  @override
+  String vaultSyncBadgeOnlyIn(int count, String storage) {
+    return '仅在$storage中：$count个';
+  }
+
+  @override
+  String vaultSyncBadgeNewerIn(int count, String storage) {
+    return '$storage中较新：$count个';
+  }
+
+  @override
+  String vaultSyncFolderOnlyInDetail(String storage) {
+    return '文件夹 — 仅在$storage中';
+  }
+
+  @override
+  String get vaultSyncDirectionOneWay => '单向复制';
+
+  @override
+  String get vaultSyncDirectionOneWaySubtitle => '按所示方向复制新增和更新的文件；源位置不会更改。';
+
+  @override
+  String get vaultSyncDirectionMirror => '镜像同步';
+
+  @override
+  String get vaultSyncDirectionMirrorSubtitle => '将目标替换为完全副本；仅存在于目标中的项目会被删除。';
+
+  @override
+  String vaultSyncActionCopyTo(String storage) {
+    return '复制 → $storage';
+  }
+
+  @override
+  String vaultSyncCopyNowToAction(String storage) {
+    return '立即复制到$storage';
+  }
+
+  @override
+  String vaultSyncDeleteFromAction(String storage) {
+    return '从$storage删除';
+  }
+
+  @override
+  String vaultSyncPlanDeleteFrom(String storage) {
+    return '同步时从$storage删除';
+  }
+
+  @override
+  String vaultSyncFilterOnlyIn(String storage) {
+    return '仅在$storage中';
+  }
+
+  @override
+  String get vaultSyncChooseFirstStorage => '选择第一个存储';
+
+  @override
+  String get vaultSyncChooseSecondStorage => '选择第二个存储';
+
+  @override
+  String get vaultSyncChangeButton => '更改';
+
+  @override
+  String get vaultSyncChooseButton => '选择';
+
+  @override
+  String get vaultSyncChooseStorageTitle => '选择存储';
+
+  @override
+  String get vaultSyncChooseStorageHint => '请先选择一个存储，再选择其中要比较的文件夹。';
+
+  @override
+  String get vaultSyncCurrentStorageBadge => '当前';
+
+  @override
+  String get vaultSyncChangeStorageTooltip => '更改存储';
+
+  @override
+  String vaultSyncPickFolderTitle(String storage) {
+    return '$storage中的文件夹';
+  }
+
+  @override
+  String get vaultSyncDirectionSectionTitle => '方向';
+
+  @override
+  String get vaultSyncDirectionMirrorWarning => '删除文件';
+
+  @override
+  String get vaultSyncDirectionSourceLabel => '来源';
+
+  @override
+  String get vaultSyncDirectionTargetLabel => '目标';
+
+  @override
+  String get vaultSyncDirectionSwapButton => '调换';
+
+  @override
+  String get vaultSyncDirectionRecommendedLabel => '推荐';
+
+  @override
+  String get categoriesSectionTitle => '分类';
+
+  @override
+  String get manageCategoriesTooltip => '管理分类';
+
+  @override
+  String get categoryShortcutsTitle => '分类快捷方式';
+
+  @override
+  String get categoryShortcutsEnable => '显示分类快捷方式';
+
+  @override
+  String get categoryShortcutsEnableSubtitle => '在抽屉菜单中显示来自所有存储空间的图片、视频、音频和文档';
+
+  @override
+  String get categoryShortcutsRestore => '恢复默认快捷方式';
+
+  @override
+  String get categorySourceAll => '所有存储';
+
+  @override
+  String get categorySourceTooltip => '选择来源';
+
+  @override
+  String get categoryFolderStructure => '显示原始文件夹结构';
+
+  @override
+  String categoryScanning(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '正在扫描… 已检查 $count 个文件夹',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get categoryEmpty => '此分类中未找到任何内容';
+
+  @override
+  String get categoryNoVaultsUnlocked => '没有已解锁的保险库';
+
+  @override
+  String get categoryScanLimitReached => '结果可能不完整 — 扫描已达到上限。';
+
+  @override
+  String get categoryShareOneSource => '一次只能选择来自同一个存储空间的文件进行共享。';
+
+  @override
+  String categoryClipboardReady(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 个文件准备就绪',
+    );
+    return '$_temp0 — 打开文件夹以粘贴';
+  }
+
+  @override
+  String get categoryIndexInVaultsTitle => '在保险库中保留分类索引';
+
+  @override
+  String get categoryIndexInVaultsSubtitle =>
+      '打开分类时，以加密形式保存在每个保险库的配置文件夹中，以便下次立即可见文件。手机上不会保存任何内容。';
+
+  @override
+  String get categoryIndexClear => '清除分类索引';
+
+  @override
+  String get categoryIndexClearSubtitle => '从每个已解锁的保险库中移除索引';
+
+  @override
+  String get categoryIndexCleared => '已清除分类索引';
+
+  @override
+  String get lockFlushRefusedTitle => '无法写入设备';
+
+  @override
+  String lockFlushRefusedMessage(String name) {
+    return '由于设备未接受最新更改，$name 未被锁定。这些更改仍保留在应用中。请检查连接后重试，或仍然锁定并放弃这些更改。';
+  }
+
+  @override
+  String get lockAnywayButton => '仍然锁定';
+
+  @override
+  String vaultListingSymbolicLinkCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '# 个符号链接',
+      zero: '没有符号链接',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String vaultListingHiddenEntryCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '有 # 个条目未显示',
+      zero: '没有未显示的条目',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get vaultListingDetails => '详情';
+
+  @override
+  String get vaultListingSymbolicLinksTitle => '快捷方式';
+
+  @override
+  String get vaultListingSymbolicLinksNote =>
+      '点按快捷方式即可打开目标。相对目标仅在此保险库内解析；绝对路径或失效的链接无法打开。';
+
+  @override
+  String get vaultListingHiddenEntriesTitle => '未显示的条目';
+
+  @override
+  String get vaultListingHiddenEntriesBody =>
+      '这些条目存在于保险库中，但无法列出。通常是同步应用创建了冲突副本（例如“name (1)”），或上传尚未完成。可以在电脑上的 Cryptomator 中解决冲突副本。此处没有任何内容被更改或删除。';
+
+  @override
+  String get vaultListingTargetUnreadable => '（无法读取目标）';
+
+  @override
+  String get vaultListingLinkTargetCopied => '已复制链接目标';
+
+  @override
+  String get galleryFilterTooltip => '筛选';
+
+  @override
+  String get galleryFilterMenuOpen => '筛选…';
+
+  @override
+  String get galleryFilterClearAll => '清除筛选';
+
+  @override
+  String get galleryFilterClear => '清除';
+
+  @override
+  String get galleryFilterMatchAny => '任一';
+
+  @override
+  String get galleryFilterMatchAll => '全部';
+
+  @override
+  String get galleryFoldersMenu => '图库文件夹';
+
+  @override
+  String get galleryFoldersHint => '选择图库要扫描的文件夹，其子文件夹也会包含在内。未选择时将扫描整个存储空间。';
+
+  @override
+  String get galleryFoldersUseAll => '扫描全部';
+
+  @override
+  String get galleryFoldersApply => '应用';
+
+  @override
+  String galleryFilterShownOfTotal(int shown, int total) {
+    return '已显示 $shown / $total';
+  }
+
+  @override
+  String galleryFilterTotal(int count) {
+    return '共 $count 项';
+  }
+
+  @override
+  String galleryFilterIndexing(int done, int total) {
+    return '正在读取照片详情：$done / $total。标签、地点和相机会随读取进度逐步出现。';
+  }
+
+  @override
+  String get galleryFilterSearchHint => '搜索标签、地点、相机、文件夹…';
+
+  @override
+  String get galleryFilterTapHint => '点按仅显示，长按排除。';
+
+  @override
+  String get galleryFilterGroupBy => '分组方式';
+
+  @override
+  String galleryFilterShowAll(int count) {
+    return '全部（$count）';
+  }
+
+  @override
+  String get galleryFilterShowFewer => '收起';
+
+  @override
+  String get galleryGroupNone => '无';
+
+  @override
+  String get galleryGroupDay => '日';
+
+  @override
+  String get galleryGroupMonth => '月';
+
+  @override
+  String get galleryGroupYear => '年';
+
+  @override
+  String get galleryGroupFolder => '文件夹';
+
+  @override
+  String get galleryGroupType => '类型';
+
+  @override
+  String get galleryGroupPlace => '地点';
+
+  @override
+  String get galleryGroupCamera => '相机';
+
+  @override
+  String get galleryFilterSectionType => '类型';
+
+  @override
+  String get galleryFilterSectionDate => '日期';
+
+  @override
+  String get galleryFilterSectionTags => '标签';
+
+  @override
+  String get galleryFilterSectionPlaces => '地点';
+
+  @override
+  String get galleryFilterSectionCameras => '相机';
+
+  @override
+  String get galleryFilterSectionOrientation => '方向';
+
+  @override
+  String get galleryFilterSectionRating => '评分';
+
+  @override
+  String get galleryFilterSectionSize => '文件大小';
+
+  @override
+  String get galleryFilterSectionFolders => '文件夹';
+
+  @override
+  String get galleryFilterSectionMissing => '缺失';
+
+  @override
+  String get galleryTypePhotos => '照片';
+
+  @override
+  String get galleryTypeVideos => '视频';
+
+  @override
+  String get galleryTypeAnimated => '动图';
+
+  @override
+  String get galleryOrientationLandscape => '横向';
+
+  @override
+  String get galleryOrientationPortrait => '纵向';
+
+  @override
+  String get galleryOrientationSquare => '方形';
+
+  @override
+  String get gallerySizeSmall => '小于 1 MB';
+
+  @override
+  String get gallerySizeMedium => '1 – 10 MB';
+
+  @override
+  String get gallerySizeLarge => '大于 10 MB';
+
+  @override
+  String get galleryMissingLocation => '无位置信息';
+
+  @override
+  String get galleryMissingTags => '无标签';
+
+  @override
+  String get galleryMissingCamera => '无相机信息';
+
+  @override
+  String get galleryMissingDateTaken => '无拍摄日期';
+
+  @override
+  String galleryPlaceHintCity(int km) {
+    return '最近的城市（$km 公里内）';
+  }
+
+  @override
+  String galleryPlaceHintCoordinates(int km) {
+    return '$km 公里内没有城市：按坐标分组';
+  }
+
+  @override
+  String get cryptomatorBackupKeyFilesTitle => '解锁时备份密钥文件';
+
+  @override
+  String get cryptomatorBackupKeyFilesSubtitle =>
+      '与桌面版 Cryptomator 一样，在原文件旁保留 masterkey.cryptomator 和 vault.cryptomator 的副本。从下次解锁起生效。只读会话不会写入。';
+
+  @override
+  String get cryptomatorUpgradeTitle => '升级保险库格式';
+
+  @override
+  String get cryptomatorUpgradeSubtitle => '此保险库使用较旧的格式 7。';
+
+  @override
+  String get cryptomatorUpgradeLockFirst => '请先锁定保险库再升级';
+
+  @override
+  String get cryptomatorUpgradeWarning =>
+      '升级会将此保险库更改为格式 8。此操作无法撤销，之后低于 1.6 的 Cryptomator 版本将无法再打开该保险库。\n\n当前密钥文件的副本会以 masterkey.cryptomator.<id>.bkup 的名称保留。如果有其他应用正在同步此保险库，请先等待同步完成。';
+
+  @override
+  String get cryptomatorUpgradeConfirm => '我了解此操作无法撤销';
+
+  @override
+  String get cryptomatorUpgradeAction => '升级';
+
+  @override
+  String get cryptomatorUpgradedMessage => '保险库已升级到格式 8';
+
+  @override
+  String get cryptomatorUpgradeUnlockedError => '请先锁定保险库';
+
+  @override
+  String get cryptomatorConfigMissingWarning =>
+      '缺少 vault.cryptomator。如果有其他应用正在同步此保险库，请等待同步完成后再试。请勿升级。';
+
+  @override
+  String get cryptomatorUpgradeFailedMessage => '无法升级保险库';
+
+  @override
+  String get newSymbolicLinkTitle => '新建符号链接';
+
+  @override
+  String get symbolicLinkNameHint => '链接名称';
+
+  @override
+  String get symbolicLinkTargetHint => '指向';
+
+  @override
+  String get symbolicLinkTargetHelper =>
+      '目标会按输入的原样保存。打开时，相对目标会在此保险库内解析；不会跟随绝对目标。';
+
+  @override
+  String get symbolicLinkTargetTooLong => '目标过长（最多 32,767 字节）';
+
+  @override
+  String get symbolicLinkTargetInvalid => '目标不能包含空字符';
+
+  @override
+  String get symbolicLinkNameTaken => '已存在同名的文件、文件夹或链接';
+
+  @override
+  String get deleteSymbolicLinkTitle => '删除符号链接？';
+
+  @override
+  String deleteSymbolicLinkMessage(String name) {
+    return '删除链接“$name”？只会删除链接本身，不会影响它所指向的内容。';
+  }
+
+  @override
+  String get symbolicLinkRenameTitle => '重命名符号链接';
+
+  @override
+  String get symbolicLinkBrowseTarget => '浏览保险库';
+
+  @override
+  String get symbolicLinkSelectTargetTitle => '选择快捷方式目标';
+
+  @override
+  String get symbolicLinkSelectThisFolder => '选择此文件夹';
+
+  @override
+  String get symbolicLinkPickerLoadError => '无法加载此文件夹';
+
+  @override
+  String get shortcutBadge => '快捷方式';
+
+  @override
+  String get emptyFolder => '此文件夹为空';
+
+  @override
+  String get symbolicLinkTargetHelperRelative =>
+      '请使用此容器内的相对路径。目标可以暂时不存在；重命名或删除链接不会更改目标。';
+
+  @override
+  String get symbolicLinkTargetOutsideVault => '目标必须是保留在此容器内的相对路径。';
+
+  @override
+  String get symbolicLinkPickerUnresolvable => '无法从此处生成相对目标。请手动输入目标。';
+
+  @override
+  String get editMetadataAction => '编辑元数据';
+
+  @override
+  String get editTagsAction => '编辑标签';
+
+  @override
+  String get editDateTimeAction => '编辑日期和时间';
+
+  @override
+  String get removeMetadataAction => '移除元数据';
+
+  @override
+  String get metadataFormatsNote =>
+      '标签、日期和移除操作会写入 JPEG、PNG 和 WebP 图片。其他文件仅更新修改日期。';
+
+  @override
+  String get metadataReadOnlyMessage => '此保险库为只读';
+
+  @override
+  String get tagsAddHint => '添加标签，以逗号分隔';
+
+  @override
+  String get tagsNoneYet => '暂无标签';
+
+  @override
+  String get dateModeSet => '设置';
+
+  @override
+  String get dateModeShift => '偏移';
+
+  @override
+  String get dateModeFromModified => '来自修改日期';
+
+  @override
+  String get dateModeFromName => '来自文件名';
+
+  @override
+  String get dateShiftLater => '推后';
+
+  @override
+  String get dateShiftEarlier => '提前';
+
+  @override
+  String get dateDaysLabel => '天';
+
+  @override
+  String get dateHoursLabel => '小时';
+
+  @override
+  String get dateMinutesLabel => '分钟';
+
+  @override
+  String get dateAlsoSetModified => '同时设置文件的修改日期';
+
+  @override
+  String dateFromNameMatches(int matched, int total) {
+    return '$total 个文件名中有 $matched 个包含日期';
+  }
+
+  @override
+  String get stripExifLabel => 'Exif（相机、日期、位置）';
+
+  @override
+  String get stripXmpLabel => 'XMP（标签、评分、编辑数据）';
+
+  @override
+  String get stripIptcLabel => 'IPTC / Photoshop（说明、署名）';
+
+  @override
+  String get stripCommentsLabel => '注释';
+
+  @override
+  String get stripIccLabel => '色彩配置文件（可能改变颜色）';
+
+  @override
+  String get stripKeepOrientationLabel => '保留方向';
+
+  @override
+  String get stripKeepOrientationDesc => '不保留时，横向拍摄的照片可能显示为旋转状态';
+
+  @override
+  String get stripWarning => '此操作会重写文件，且无法撤销。';
+
+  @override
+  String metadataProgress(int done, int total) {
+    return '正在更新 $done/$total';
+  }
+
+  @override
+  String metadataResultUpdated(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '已更新 $count 个文件',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get metadataResultUnchanged => '无需更改';
+
+  @override
+  String metadataResultSkipped(int count) {
+    return '已跳过 $count 个（不支持）';
+  }
+
+  @override
+  String metadataResultFailed(int count) {
+    return '$count 个失败';
+  }
+
+  @override
+  String get showNoMediaFoldersLabel => '显示 .nomedia 文件夹';
+
+  @override
+  String get showNoMediaFoldersDesc => '包含带有 .nomedia 文件的文件夹（图库应用通常会跳过这些文件夹）';
+
+  @override
+  String get motionPhotoCopyNote => '编辑后的副本将是静态图片。原始文件、EXIF 信息和任何嵌入的视频都将保持不变。';
+
+  @override
+  String get pimInputHint => '留空或输入 0 使用默认值';
+
+  @override
+  String get galleryMetadataIndexStorageLabel =>
+      'Gallery metadata index storage';
+
+  @override
+  String get galleryMetadataUseGlobalDefaultDesc =>
+      'Follow the app-wide gallery metadata index storage setting.';
+
+  @override
+  String get galleryMetadataAppStorageOption => 'App storage';
+
+  @override
+  String get galleryMetadataInVaultOption => 'Inside vault';
+
+  @override
+  String get galleryMetadataSectionHeader => 'Gallery Metadata Index';
+
+  @override
+  String get galleryMetadataUseGlobalDefaultTitle =>
+      'Use app-wide gallery index setting';
+
+  @override
+  String get musicIndexSectionHeader => 'Music Index';
+
+  @override
+  String get musicIndexStorageLabel => 'Music index storage';
+
+  @override
+  String get musicIndexUseGlobalDefaultTitle =>
+      'Use app-wide music index setting';
+
+  @override
+  String get musicIndexUseGlobalDefaultDesc =>
+      'Follow the app-wide music index storage setting.';
+
+  @override
+  String get musicIndexAppStorageOption => 'App storage';
+
+  @override
+  String get musicIndexInVaultOption => 'Inside vault';
+
+  @override
+  String get musicIndexHiddenFolderOption => 'Hidden folder';
+
+  @override
+  String get musicIndexHiddenFolderDesc =>
+      'Stored in an unencrypted hidden folder in Local Storage.';
+
+  @override
+  String get libraryStorageHiddenFolder =>
+      'Index saved in an unencrypted hidden folder';
+
+  @override
+  String get libraryStorageDisabled =>
+      'Saved music index is disabled; tracks are rescanned each time.';
+
+  @override
+  String get galleryMetadataClearAction => 'Clear saved gallery index';
+
+  @override
+  String get galleryMetadataClearConfirmTitle =>
+      'Clear gallery metadata index?';
+
+  @override
+  String get galleryMetadataClearConfirmMessage =>
+      'This deletes saved photo details. The index will be rebuilt as you browse the gallery.';
+
+  @override
+  String get galleryMetadataIndexClearedMessage =>
+      'Gallery metadata index cleared.';
+
+  @override
+  String get musicIndexClearAction => 'Clear saved music index';
+
+  @override
+  String get musicIndexClearConfirmTitle => 'Clear saved music index?';
+
+  @override
+  String get musicIndexClearConfirmMessage =>
+      'This deletes saved track details. Music Mode will rebuild the index the next time it opens.';
+
+  @override
+  String get musicIndexClearedMessage => 'Music index cleared.';
+
+  @override
+  String get clearSavedIndexButton => 'Clear index';
+
+  @override
+  String get appIndexClearedUnlockMessage =>
+      'App-storage copy cleared. Open the vault with write access to clear any index copy inside it.';
+
+  @override
+  String get savedIndexClearFailedMessage =>
+      'Could not clear all saved index data.';
+
+  @override
+  String get libraryStorageReadOnly =>
+      'Vault is read-only; the music index is not saved.';
+
+  @override
+  String get clearLocalStorageThumbnailCacheMessage =>
+      'This will delete cached thumbnails for Local Storage. They will be regenerated the next time you browse media.';
+
+  @override
+  String vcToolsDetectedFormat(String format) {
+    return '已检测到：$format';
+  }
+
+  @override
+  String get vcToolsUnencryptedDetected => '此文件似乎未加密；此工具需要加密容器';
+
+  @override
+  String get vcToolsAssumingVeraCrypt => '无法自动检测，暂按 VeraCrypt 处理';
+
+  @override
+  String get vcToolsManualFormat => '手动设置';
+
+  @override
+  String get vcToolsExpandInsufficientSpaceForSize => '设备上没有足够的可用空间来满足此大小。';
+
+  @override
+  String vcToolsNewSizePreview(String size) {
+    return '新大小：$size';
+  }
+
+  @override
+  String vcToolsNewSizePreviewWithAdded(String size, String added) {
+    return '新大小：$size（+$added）';
+  }
+
+  @override
+  String get vcToolsFileSize => '文件大小';
+
+  @override
+  String get vcToolsCurrentSize => '当前大小';
+
+  @override
+  String vcToolsFreeOnDevice(String size) {
+    return '设备可用空间：$size';
+  }
+
+  @override
+  String get vcToolsSetExactTotalInstead => '改为设置精确的总大小';
+
+  @override
+  String get vcToolsBitLockerDiskImageSizeHint =>
+      '对于磁盘映像（VHD/VHDX），请输入新的虚拟磁盘总大小，而不是文件大小。';
+
+  @override
+  String get vcToolsNewTotalSize => '新的总大小';
+
+  @override
+  String get vcToolsAddSize => '增加大小';
+
+  @override
+  String vcToolsQuickAddGiB(String amount) {
+    return '+$amount GiB';
+  }
+
+  @override
+  String get vcToolsDoubleSize => '加倍';
+
+  @override
+  String get vcToolsSizeMustExceedCurrent => '新大小必须大于当前大小。';
+
+  @override
+  String get vcToolsInsufficientFreeSpace => '设备上的可用空间不足。';
+
+  @override
+  String get vcToolsContainerSectionHeader => '容器';
+
+  @override
+  String get vcToolsCredentialsSectionHeader => '凭据';
+
+  @override
+  String get vcToolsVolumeOptionsSectionHeader => '卷选项';
+
+  @override
+  String get vcToolsDetectingFormat => '正在检测…';
+
+  @override
+  String get indexesAndThumbnailsTitle => '索引和缩略图';
+
+  @override
+  String get indexesAndThumbnailsSubtitle => '管理缩略图存储、图库元数据和音乐索引。';
+
+  @override
+  String get resetFileManagerSettingsTitle => '要重置文件管理器设置吗？';
+
+  @override
+  String get resetFileManagerSettingsMessage =>
+      '此屏幕上的所有选项都将恢复为默认值，包括标签页、布局、工具栏、网格、缩略图、查看器和皮肤设置。您的文件、书签和各文件夹的单独设置不会更改。';
 }

@@ -759,9 +759,9 @@ bool _isClampingMatrix = false;
 
                     final position = _doubleTapDetails?.localPosition;
                     if (position != null && childWidth != null && childHeight != null) {
-                      final imageLeft = (viewportWidth - childWidth!) / 2;
-                      final imageTop = (viewportHeight - childHeight!) / 2;
-                      final imageRect = Rect.fromLTWH(imageLeft, imageTop, childWidth!, childHeight!);
+                      final imageLeft = (viewportWidth - childWidth) / 2;
+                      final imageTop = (viewportHeight - childHeight) / 2;
+                      final imageRect = Rect.fromLTWH(imageLeft, imageTop, childWidth, childHeight);
                       if (!imageRect.contains(position)) {
                         // In black-out area at default zoom; do not zoom in
                         return;

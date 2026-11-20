@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/rendering.dart' show RenderAbstractViewport, RenderBox;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/utils/lru_cache.dart';
+import 'package:vaultexplorer/core/utils/perf_trace.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart';
@@ -11,7 +13,7 @@ import 'async_thumbnail_controller.dart';
 
 export 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart';
 export 'async_thumbnail_controller.dart'
-    show ThumbnailFetchFn, ThumbnailSyncLookup;
+    show ThumbnailFetchFn, ThumbnailSyncLookup, ThumbnailCacheLookup;
 
 /// Generic async thumbnail loader.
 ///
@@ -33,6 +35,7 @@ class AsyncThumbnail extends ConsumerStatefulWidget {
   final ThumbnailFetchFn fetchFn;
   final Duration debounce;
   final ThumbnailSyncLookup? syncLookup;
+  final ThumbnailCacheLookup? cacheLookup;
   final int? cacheHeight;
 
   final TaskPriority priority;
@@ -50,8 +53,9 @@ class AsyncThumbnail extends ConsumerStatefulWidget {
     required this.limiter,
     required this.fetchFn,
     required this.imageBuilder,
-    this.debounce = const Duration(milliseconds: 100),
+   this.debounce = const Duration(milliseconds: 30),
     this.syncLookup,
+    this.cacheLookup,
     this.cacheHeight,
     this.priority = TaskPriority.visible,
     this.loadingBuilder,
@@ -65,12 +69,19 @@ class AsyncThumbnail extends ConsumerStatefulWidget {
 class _AsyncThumbnailState extends ConsumerState<AsyncThumbnail> {
   bool _tickerEnabled = true;
 
-  AsyncThumbnailLoaderProvider get _provider => asyncThumbnailLoaderProvider(
-    widget.container.volId,
-    widget.container.mountedAt,
-    widget.filePath,
-    widget.quality,
-  );
+  // The family key is rebuilt (an allocation plus hashing a DateTime, a path
+  // and an enum) every time it is asked for, and `build` asks for it several
+  // times. It only changes when the tile is pointed at a different file,
+  // container or quality (see [didUpdateWidget]), so keep it.
+  AsyncThumbnailLoaderProvider? _providerCache;
+
+  AsyncThumbnailLoaderProvider get _provider =>
+      _providerCache ??= asyncThumbnailLoaderProvider(
+        widget.container.volId,
+        widget.container.mountedAt,
+        widget.filePath,
+        widget.quality,
+      );
 
   @override
   void initState() {
@@ -102,6 +113,7 @@ class _AsyncThumbnailState extends ConsumerState<AsyncThumbnail> {
         oldWidget.quality != widget.quality ||
         oldWidget.container.volId != widget.container.volId ||
         oldWidget.container.mountedAt != widget.container.mountedAt) {
+      _providerCache = null;
       if (_tickerEnabled) _ensureLoaded();
     }
   }
@@ -116,13 +128,77 @@ class _AsyncThumbnailState extends ConsumerState<AsyncThumbnail> {
           cache: widget.cache,
           limiter: widget.limiter,
           syncLookup: widget.syncLookup,
-          debounce: widget.debounce,
+          cacheLookup: widget.cacheLookup,
+          debounce: _debounceFor(widget.debounce),
           priority: widget.priority,
+          priorityResolver: _resolvePriority,
         );
+  }
+
+  /// A third of what the call site asked for (30 ms becomes 10 ms), unless it
+  /// is already short.
+  ///
+  /// The short delay lets tiles that leave within a frame or two avoid joining
+  /// the queue. Viewport-aware priority keeps any remaining offscreen work
+  /// behind thumbnails that are on screen.
+  static Duration _debounceFor(Duration requested) =>
+      requested <= const Duration(milliseconds: 12)
+      ? requested
+      : Duration(microseconds: requested.inMicroseconds ~/ 3);
+
+  /// Which queue tier this tile's request waits in, decided when it is about
+  /// to join the queue (after the debounce, when the tile has been laid out).
+  ///
+  /// A tile on screen, or within a quarter of a screen of it, is
+  /// [TaskPriority.visible]. One that exists only because the grid builds
+  /// ahead of the viewport is [TaskPriority.adjacent], so thumbnails the user
+  /// is looking at are always served before ones they have not scrolled to.
+  /// Before this, every tile shared one tier, and a tile built far ahead of
+  /// the screen -- being newest -- was served *first*.
+  ///
+  /// Anything unexpected (no scrollable, not laid out, an exception) keeps the
+  /// caller's own priority, i.e. the previous behaviour.
+  TaskPriority _resolvePriority() {
+    final base = widget.priority;
+    if (base != TaskPriority.visible || !mounted) return base;
+    try {
+      final object = context.findRenderObject();
+      if (object is! RenderBox || !object.attached || !object.hasSize) {
+        return base;
+      }
+      final viewport = RenderAbstractViewport.maybeOf(object);
+      final scrollable = Scrollable.maybeOf(context);
+      if (viewport == null || scrollable == null) return base;
+      final position = scrollable.position;
+      if (!position.hasPixels || !position.hasViewportDimension) return base;
+
+      final direction = scrollable.axisDirection;
+      final vertical =
+          direction == AxisDirection.down || direction == AxisDirection.up;
+      final extent = vertical ? object.size.height : object.size.width;
+      // Scroll offset at which this tile's leading edge meets the viewport's.
+      final start = viewport.getOffsetToReveal(object, 0.0).offset;
+      final end = start + extent;
+      final margin = position.viewportDimension * 0.25;
+      final from = position.pixels - margin;
+      final to = position.pixels + position.viewportDimension + margin;
+      return (end > from && start < to)
+          ? TaskPriority.visible
+          : TaskPriority.adjacent;
+    } catch (_) {
+      return base;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final perfT0 = PerfTrace.begin();
+    final built = _buildTile(context);
+    PerfTrace.end('ui.thumb.build', perfT0);
+    return built;
+  }
+
+  Widget _buildTile(BuildContext context) {
     _tickerEnabled = TickerMode.valuesOf(context).enabled;
     if (!_tickerEnabled) {
       return widget.loadingBuilder?.call(context) ?? const SizedBox.shrink();
@@ -141,6 +217,14 @@ class _AsyncThumbnailState extends ConsumerState<AsyncThumbnail> {
     _ensureLoaded();
     final state = ref.watch(_provider);
     if (state.isLoading) {
+      // A tile re-entering the viewport gets a fresh provider instance whose
+      // state starts as "loading" until the deferred microtask in
+      // ensureLoaded runs. If the bytes are already in the memory cache,
+      // paint them now instead of flashing a placeholder for a frame.
+      final hit = widget.syncLookup?.call();
+      if (hit != null && hit.isNotEmpty) {
+        return widget.imageBuilder(context, hit, widget.cacheHeight);
+      }
       return widget.loadingBuilder?.call(context) ?? const SizedBox.shrink();
     }
     if (state.hasError || state.bytes == null || state.bytes!.isEmpty) {

@@ -21,6 +21,8 @@
 #include "filesystems/ext_backend.h"
 #include "filesystems/filesystem_paths.h"
 #include "containers/container_utils.h"
+#include "containers/vc_header_build.h"
+#include "vc_free_space_fill.h"
 #include "ff.h"
 
 #undef min
@@ -160,7 +162,10 @@ CompositeCreateResult createCompositeContainer(
 
     unsigned char mixedPassword[MAX_PASSWORD_LEN] = {0};
     ScopeZeroize mixedPasswordGuard(mixedPassword, sizeof(mixedPassword));
-    size_t mixedPasswordLen = std::min(std::strlen(password), sizeof(mixedPassword));
+    if (std::strlen(password) > VC_MAX_PASSWORD_BYTES) {
+        return {false, "PASSWORD_TOO_LONG", "Password is longer than 128 bytes (UTF-8)", 0};
+    }
+    size_t mixedPasswordLen = std::strlen(password);
     std::memcpy(mixedPassword, password, mixedPasswordLen);
 
     if (keyfileCount > 0 && keyfileFds != nullptr) {
@@ -204,8 +209,7 @@ CompositeCreateResult createCompositeContainer(
     }
 
     unsigned char body[VC_HEADER_BODY_SIZE] = {0};
-    body[0] = 'V'; body[1] = 'E'; body[2] = 'R'; body[3] = 'A';
-    body[4] = 0x00; body[5] = 0x02; body[6] = 0x01; body[7] = 0x0b;
+    vcStampHeaderPreamble(body);
 
     for (int i = 7; i >= 0; --i) body[VC_HDR_OFF_VOLUME_SIZE + (7 - i)] = (DATA_SIZE >> (i * 8)) & 0xFF;
     for (int i = 7; i >= 0; --i) body[VC_HDR_OFF_KEY_SCOPE_START + (7 - i)] = (VC_DATA_AREA_OFFSET >> (i * 8)) & 0xFF;
@@ -246,7 +250,15 @@ CompositeCreateResult createCompositeContainer(
     }
 
     mbedtls_platform_zeroize(headerKey, sizeof(headerKey));
+
+    // Backup header = separate salt + KDF run (see vc_header_build.h).
+    unsigned char backupSector[VC_FULL_HEADER_SIZE];
+    const bool backupBuilt = vcBuildFreshlySaltedHeaderSector(
+        body, createCipher, createHash, mixedPassword, mixedPasswordLen, clampPim(pim), backupSector);
     mbedtls_platform_zeroize(body, sizeof(body));
+    if (!backupBuilt) {
+        return {false, "BACKUP_HEADER_BUILD_FAILED", "Failed to generate backup header", 0};
+    }
 
     unsigned char hdrSector[VC_FULL_HEADER_SIZE];
     std::memcpy(hdrSector, salt, VC_SALT_SIZE);
@@ -257,27 +269,16 @@ CompositeCreateResult createCompositeContainer(
     }
 
     uint64_t backupOffset = VOLUME_SIZE - VC_DATA_AREA_OFFSET;
-    if (!physicalWrite(volId, backupOffset, hdrSector, VC_FULL_HEADER_SIZE)) {
+    if (!physicalWrite(volId, backupOffset, backupSector, VC_FULL_HEADER_SIZE)) {
         return {false, "BACKUP_HEADER_WRITE_FAILED", "Failed to write backup header", 0};
     }
 
     if (!quickFormat) {
-        CascadeContext dataCtx;
-        cascadeSetKeys(dataCtx, createCipher, combinedMasterKey, masterKeyLen);
-        const uint64_t START_SECTOR = VC_DATA_AREA_OFFSET / 512;
-        const uint64_t TOTAL_SECTORS = (VOLUME_SIZE - VC_DATA_AREA_OFFSET) / 512;
-        const unsigned char ZERO_SECTOR[512] = {0};
-        std::unique_ptr<unsigned char[]> batch(new unsigned char[CREATE_FILL_BATCH * 512]);
-
-        for (uint64_t s = START_SECTOR; s < TOTAL_SECTORS;) {
-            uint64_t count = std::min<uint64_t>(TOTAL_SECTORS - s, CREATE_FILL_BATCH);
-            for (uint64_t i = 0; i < count; ++i) {
-                cascadeEncryptSector(dataCtx, s + i, ZERO_SECTOR, batch.get() + i * 512);
-            }
-            if (!physicalWrite(volId, s * 512, batch.get(), count * 512)) {
-                return {false, "FILL_FAILED", "Failed zero-filling data area", 0};
-            }
-            s += count;
+        // Temporary random key for the free-space fill (see vc_free_space_fill.h).
+        if (!vcfill::fillWithRandomizedKey(
+                createCipher, masterKeyLen, VC_DATA_AREA_OFFSET / 512, DATA_SIZE / 512, CREATE_FILL_BATCH,
+                [&](uint64_t off, const unsigned char* p, size_t n) { return physicalWrite(volId, off, p, n); })) {
+            return {false, "FILL_FAILED", "Failed filling data area", 0};
         }
     }
 
@@ -486,6 +487,7 @@ CompositeUnlockResult prepareCompositeSession(
         v.cascade = candidateCascade;
         v.dataOffset = fields.encryptedAreaStart;
         v.dataAreaLengthBytes = fields.encryptedAreaLength;
+        v.luksSectorSize = fields.sectorSize;   // logical sector size from the header
         v.isHiddenVolume = fields.isHiddenVolume();
         v.fileSize = requiredBytes;
         v.matchedCipherId = static_cast<int>(matchedCipher);

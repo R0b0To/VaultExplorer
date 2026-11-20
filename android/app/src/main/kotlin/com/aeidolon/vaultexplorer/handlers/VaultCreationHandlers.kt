@@ -45,15 +45,6 @@ class VaultCreationHandlers(
         fun isMissingCredentials(password: String, keyfilePaths: List<String>?): Boolean =
             password.isEmpty() && keyfilePaths.isNullOrEmpty()
 
-        /**
-         * Valid range for a user-chosen CryFS `blockSize` (bytes), mirroring the
-         * presets offered in CreateContainerSheet (4 KiB – 4 MiB) with headroom on
-         * both ends. Floor keeps calculateVirtualBlockSize's per-block header/cipher
-         * overhead (well under 1 KiB) from ever producing a zero/negative virtual
-         * block size; ceiling just guards against an absurd single-block value.
-         */
-        const val MIN_BLOCK_SIZE_BYTES = 4 * 1024
-        const val MAX_BLOCK_SIZE_BYTES = 64 * 1024 * 1024
     }
 
     private val createContainerLock = Object()
@@ -286,16 +277,13 @@ class VaultCreationHandlers(
     fun handleCreateGocryptfsVault(call: MethodCall, result: MethodChannel.Result) {
         val uriString = call.argument<String>("filePath")
         val password = call.argument<String>("password") ?: ""
-        // 'aes-256-gcm' (default) or 'xchacha20-poly1305'; anything else
-        // (including omitted/older Dart callers) falls back to GCM so this
-        // stays backward compatible with pre-cipher-choice callers.
-        val cipherArg = call.argument<String>("cipher")
-        val cipher = if (cipherArg == "xchacha20-poly1305") {
-            com.aeidolon.vaultexplorer.gocryptfs.GocryptfsCipher.XCHACHA20_POLY1305
-        } else {
-            com.aeidolon.vaultexplorer.gocryptfs.GocryptfsCipher.AES_256_GCM
-        }
+        // 'aes-256-gcm' (default) or 'xchacha20-poly1305'. Passed through as is: the native core picks the cipher
+        // and falls back to AES-256-GCM for anything else (including omitted/older Dart callers).
+        val cipher = call.argument<String>("cipher") ?: ""
         val userEntropy = call.argument<ByteArray>("userEntropy")
+        // Both optional: callers from before these options existed omit them.
+        val deterministicNames = call.argument<Boolean>("deterministicNames") ?: false
+        val longNameMax = call.argument<Number>("longNameMax")?.toInt() ?: 0
         if (uriString == null || password.isEmpty()) {
             userEntropy?.fill(0)
             result.error("INVALID_ARGS", "filePath and password required", null)
@@ -307,7 +295,8 @@ class VaultCreationHandlers(
                 val passwordChars = password.toCharArray()
                 val createResult = try {
                     com.aeidolon.vaultexplorer.gocryptfs.GocryptfsVault.create(
-                        activity, uri, passwordChars, cipher, userEntropy = userEntropy
+                        activity, uri, passwordChars, cipher, userEntropy = userEntropy,
+                        deterministicNames = deterministicNames, longNameMax = longNameMax,
                     )
                 } finally {
                     passwordChars.fill('\u0000')
@@ -334,26 +323,12 @@ class VaultCreationHandlers(
     fun handleCreateCryfsVault(call: MethodCall, result: MethodChannel.Result) {
         val uriString = call.argument<String>("filePath")
         val password = call.argument<String>("password") ?: ""
-        // 'xchacha20-poly1305' (default) or 'aes-256-gcm'; anything else
-        // (including omitted/older Dart callers) falls back to the default so
-        // this stays backward compatible with pre-cipher-choice callers.
-        val cipherArg = call.argument<String>("cipher")
-        val cipher = if (cipherArg == "aes-256-gcm") {
-            "aes-256-gcm"
-        } else {
-            com.aeidolon.vaultexplorer.cryfs.CryfsConfigFile.DEFAULT_BLOCK_CIPHER
-        }
-        // On-disk block size in bytes, mirroring CryFS CLI's `--blocksize`. Falls back to
-        // the CryFS default for missing/older Dart callers, and clamped to a sane range so
-        // a malformed value can't produce a zero/negative virtual block size (see
-        // CryfsBlockStore.calculateVirtualBlockSize's per-block header/cipher overhead) or
-        // an absurdly large single block.
-        val blockSizeArg = call.argument<Number>("blockSize")?.toInt()
-        val blockSize = if (blockSizeArg != null && blockSizeArg in MIN_BLOCK_SIZE_BYTES..MAX_BLOCK_SIZE_BYTES) {
-            blockSizeArg
-        } else {
-            com.aeidolon.vaultexplorer.cryfs.CryfsConfigFile.DEFAULT_BLOCKSIZE
-        }
+        // 'xchacha20-poly1305' (default) or 'aes-256-gcm', and the on-disk block size in bytes (CryFS CLI's
+        // `--blocksize`). Passed through as is: the native core (fv_formats.h) falls back to its defaults for a
+        // missing or unsupported cipher and for a block size outside 4 KiB..64 MiB, so older Dart callers and
+        // malformed values cannot produce a vault that does not work.
+        val cipher = call.argument<String>("cipher") ?: ""
+        val blockSize = call.argument<Number>("blockSize")?.toInt() ?: 0
         val userEntropy = call.argument<ByteArray>("userEntropy")
         if (uriString == null || password.isEmpty()) {
             userEntropy?.fill(0)

@@ -43,6 +43,10 @@ class UsbUnlockSheet extends ConsumerStatefulWidget {
 }
 
 class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
+  /// See `_UnlockSheetState._kPasswordAutofillHints`: one shared `const` list
+  /// so rebuilds never change the field's autofill configuration.
+  static const List<String> _kPasswordAutofillHints = <String>[AutofillHints.password];
+
   late final TextEditingController _passwordCtrl;
   final _pimCtrl = TextEditingController();
   final _hiddenPasswordCtrl = TextEditingController();
@@ -194,10 +198,15 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
         ),
         body: GestureDetector(
           behavior: HitTestBehavior.opaque,
-          child: SafeArea(
-            child: wideLayout
-                ? _buildWideLayout(context, state, credState, cs, textTheme)
-                : _buildPortraitLayout(context, state, credState, cs, textTheme),
+          // One group for the whole sheet; `cancel` so closing it never makes
+          // the password manager offer to save the vault password.
+          child: AutofillGroup(
+            onDisposeAction: AutofillContextAction.cancel,
+            child: SafeArea(
+              child: wideLayout
+                  ? _buildWideLayout(context, state, credState, cs, textTheme)
+                  : _buildPortraitLayout(context, state, credState, cs, textTheme),
+            ),
           ),
         ),
       ),
@@ -535,6 +544,7 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
                   padding: const EdgeInsets.all(12),
                   child: TextField(
                     controller: _passwordCtrl,
+                    autofillHints: _kPasswordAutofillHints,
                     enabled: canConfigure,
                     obscureText: _revealLocked ? true : _obscure,
                     autocorrect: false,
@@ -551,9 +561,6 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
                       filled: true,
                       fillColor: cs.surfaceContainerHighest,
                       labelText: context.l10n.passwordFieldLabel,
-                      hintText: isKnownBitlocker
-                          ? context.l10n.passwordHintBitlocker
-                          : context.l10n.passwordHintContainer,
                       prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: cs.primary),
                       suffixIcon: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -677,6 +684,17 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
           if (supportsHiddenVolumeProtection) ...[
             SwitchListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+              value: state.useBackupHeader,
+              onChanged: canConfigure ? notifier.setUseBackupHeader : null,
+              title: Text(context.l10n.useBackupHeaderToggleTitle),
+              subtitle: Text(
+                context.l10n.useBackupHeaderToggleSubtitle,
+                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              ),
+              secondary: Icon(Icons.history_rounded, color: cs.primary, size: 22),
+            ),
+            SwitchListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
               value: state.protectHiddenVolume && !state.readOnly,
               onChanged: canConfigure && !state.readOnly ? notifier.setProtectHiddenVolume : null,
               title: Text(context.l10n.protectHiddenVolumeToggleTitle),
@@ -693,6 +711,7 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
                 padding: const EdgeInsets.all(12),
                 child: TextField(
                   controller: _hiddenPasswordCtrl,
+                  autofillHints: null, // different secret from the main password
                   obscureText: _hiddenObscure,
                   autocorrect: false,
                   enableSuggestions: false,
@@ -794,6 +813,21 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
       if (!isKnownLuks && !isKnownBitlocker) ...[
         SwitchListTile(
           contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+          value: state.useBackupHeader,
+          onChanged: canConfigure
+              ? (val) {
+                  ref.read(usbUnlockControllerProvider(_params).notifier).setUseBackupHeader(val);
+                }
+              : null,
+          title: Text(context.l10n.useBackupHeaderToggleTitle),
+          subtitle: Text(
+            context.l10n.useBackupHeaderToggleSubtitle,
+            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+          secondary: Icon(Icons.history_rounded, color: cs.primary, size: 22),
+        ),
+        SwitchListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12),
           value: state.protectHiddenVolume && !state.readOnly,
           onChanged: (canConfigure && !state.readOnly)
               ? (val) {
@@ -815,6 +849,7 @@ class _UsbUnlockSheetState extends ConsumerState<UsbUnlockSheet> {
           padding: const EdgeInsets.all(12),
           child: TextField(
             controller: _hiddenPasswordCtrl,
+            autofillHints: null, // different secret from the main password
             obscureText: _hiddenObscure,
             autocorrect: false,
             enableSuggestions: false,

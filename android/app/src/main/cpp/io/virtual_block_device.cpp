@@ -30,6 +30,7 @@
 #include "volume_state.h"
 #include "jni_callbacks.h"
 #include "block_io.h"
+#include "backing_flush.h"
 #include "filesystems/stream_handles.h"
 #include "virtual_block_device.h"
 
@@ -138,40 +139,87 @@ bool ensureMounted(int volId) {
     }
 }
 
-void unmountVolume(int volId) {
-    if (volId < 0 || volId >= MAX_VOLUMES) return;
+bool flushVolumeForLock(int volId) {
+    if (volId < 0 || volId >= MAX_VOLUMES) return true;
     auto& v = volumes[volId];
-    if (v.fsMounted) {
+    bool ok = true;
+    if (v.fsMounted && !v.readOnly) {
         if (v.fsType == VolumeState::FS_FATFS) {
-            f_mount(nullptr, drivePaths[volId], 0);
+            for (FIL* f : v.openStreams) {
+                if (f_sync(f) != FR_OK) {
+                    LOGI("flushVolumeForLock(vol=%d): f_sync failed on an open file", volId);
+                    ok = false;
+                }
+            }
+        } else if (v.fsType == VolumeState::FS_NTFS && v.ntfsVol) {
+            // Only inodes ntfs-3g itself marks dirty (the guard its own close/umount paths use):
+            // ntfs_inode_sync() also rewrites STANDARD_INFORMATION of a clean inode.
+            auto syncIfDirty = [&](ntfs_inode* ni) {
+                if (!ni || !(NInoDirty(ni) || NInoAttrListDirty(ni))) return;
+                if (ntfs_inode_sync(ni) != 0) {
+                    LOGI("flushVolumeForLock(vol=%d): ntfs_inode_sync failed (errno=%d)", volId, errno);
+                    ok = false;
+                }
+            };
+            for (NtfsStream* ns : v.openNtfsStreams) syncIfDirty(ns->inode);
+            syncIfDirty(v.ntfsVol->lcnbmp_ni);
+            syncIfDirty(v.ntfsVol->mft_ni);
+            syncIfDirty(v.ntfsVol->mftmirr_ni);
+        } else if (v.fsType == VolumeState::FS_EXT && v.extFs) {
+            if (!extFlushForLock(volId)) ok = false;
+        }
+    }
+    if (!flushVolumeBacking(v, volId)) {
+        LOGI("flushVolumeForLock(vol=%d): backing-store flush failed; buffered writes are still pending",
+             volId);
+        ok = false;
+    }
+    return ok;
+}
+
+bool unmountVolume(int volId, bool keepOnFailure) {
+    if (volId < 0 || volId >= MAX_VOLUMES) return true;
+    auto& v = volumes[volId];
+    bool durable = true;
+    if (v.fsMounted) {
+        bool keepMounted = false;
+        if (v.fsType == VolumeState::FS_FATFS) {
+            if (f_mount(nullptr, drivePaths[volId], 0) != FR_OK) {
+                LOGI("unmountVolume(vol=%d): f_mount(unregister) failed", volId);
+                durable = false;
+            }
         } else if (v.fsType == VolumeState::FS_NTFS && v.ntfsVol) {
             void* priv = v.ntfsVol->dev->d_private;
-            ntfs_umount(v.ntfsVol, FALSE);
+            // ntfs_umount() frees the volume and its device even when it reports an error (its
+            // `force` argument is ignored), so there is no state to keep on failure. What can be
+            // retried -- dirty inodes and the backing store -- is flushed by flushVolumeForLock()
+            // while the volume is still mounted.
+            if (ntfs_umount(v.ntfsVol, FALSE) != 0) {
+                LOGI("unmountVolume(vol=%d): ntfs_umount failed (errno=%d)", volId, errno);
+                durable = false;
+            }
             if (priv) delete static_cast<int*>(priv);
             v.ntfsVol = nullptr;
         } else if (v.fsType == VolumeState::FS_EXT && v.extFs) {
-            for (ExtStream* stream : v.openExtStreams) {
-                ext2fs_file_close(stream->file);
-                delete stream;
-            }
-            v.openExtStreams.clear();
-            ext2fs_flush(v.extFs);
-            ext2fs_close(v.extFs);
-            v.extFs = nullptr;
-            v.extBitmapsLoaded = false;
+            if (!extUnmount(volId, keepOnFailure)) durable = false;
+            // With keepOnFailure a filesystem libext2fs refused to close is still valid and
+            // still in extFs: leave it mounted so the lock can be retried.
+            keepMounted = (v.extFs != nullptr);
         }
-        v.fsMounted = false;
-        v.fsType = VolumeState::FS_UNKNOWN;
+        if (!keepMounted) {
+            v.fsMounted = false;
+            v.fsType = VolumeState::FS_UNKNOWN;
+        }
     }
 
-    // Flush dirty buffers and synchronize physical hardware caches
-    if (v.isUsbSource) {
-        v.usbCache.sync(volId);
-    } else if (v.isCompositeSource && v.composite) {
-        v.composite->sync();
-    } else if (v.fd >= 0) {
-        v.fdWriteBuffer.flush(v.fd);
-        fsync(v.fd);
+    // Flush dirty buffers and synchronize physical hardware caches. A failed flush leaves the
+    // acknowledged bytes pending (USB cache, fd write-behind buffer), so report it instead of
+    // swallowing it: the caller must not reset the volume (which drops them) unless it has
+    // decided to discard them.
+    if (!flushVolumeBacking(v, volId)) {
+        LOGI("unmountVolume(vol=%d): backing-store flush failed; buffered writes are still pending",
+             volId);
+        durable = false;
     }
 
     std::lock_guard<std::mutex> bufLock(v.ioBufMutex);
@@ -179,6 +227,7 @@ void unmountVolume(int volId) {
     v.ioBufSize = 0;
     std::lock_guard<std::mutex> cacheLock(v.decryptedBlockCacheMutex);
     v.decryptedBlockCache.clear();
+    return durable;
 }
 
 static unsigned char* getVolIoBuf(VolumeState& v, size_t neededBytes) {
@@ -191,10 +240,6 @@ static unsigned char* getVolIoBuf(VolumeState& v, size_t neededBytes) {
 
 extern "C" DSTATUS disk_initialize(BYTE) { return 0; }
 extern "C" DSTATUS disk_status(BYTE)     { return 0; }
-
-static void genericLuksXtsCrypt(const XtsLayerKey& layer, bool encrypt, size_t dataLen,
-                                const unsigned char tweakSeed[16],
-                                const unsigned char* in, unsigned char* out);
 
 template <typename WorkFn>
 static void parallelCryptoLoop(uint32_t count, WorkFn&& workFn) {
@@ -227,8 +272,7 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
     if (count == 0) return RES_PARERR;
 
     VolumeState& v = volumes[pdrv];
-    const bool isLuks = (v.containerFormat != ContainerFormat::kVeraCrypt);
-    const uint32_t luksUnit = (isLuks && v.luksSectorSize >= 512) ? v.luksSectorSize : 512;
+    const uint32_t luksUnit = (v.luksSectorSize >= 512) ? v.luksSectorSize : 512;
 
     if (v.containerFormat == ContainerFormat::kBitLocker) {
         const bool ok = bitlockerRead(pdrv, static_cast<uint64_t>(sector) * luksUnit,
@@ -290,7 +334,10 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
         std::unique_ptr<unsigned char[]> decryptedOut(new unsigned char[totalBytes]);
 
         if (v.containerFormat == ContainerFormat::kVeraCrypt) {
-            parallelCryptoLoop(batch.count, [&](uint32_t i) {
+            // XTS data units are always 512 bytes, also on 1024/2048/4096-byte-sector
+            // volumes (upstream: hostOffset / ENCRYPTION_DATA_UNIT_SIZE), so a logical
+            // sector is processed as luksUnit/512 consecutive data units.
+            parallelCryptoLoop(batch.count * (luksUnit / 512), [&](uint32_t i) {
                 const uint64_t phys512Sector = (startByte / 512) + i;
                 const uint64_t tweak = phys512Sector - v.partitionStartSector;
                 cascadeDecryptSector(v.cascade, tweak, encBuf + (i * 512),
@@ -300,20 +347,14 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
             parallelCryptoLoop(batch.count, [&](uint32_t i) {
                 const uint64_t phys512Sector = (startByte / 512) + i;
                 const uint64_t sectorNum = phys512Sector - v.partitionStartSector;
-                unsigned char tweakBuf[16] = {0};
-                for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorNum >> (b * 8)) & 0xFF;
-                genericLuksXtsCrypt(v.luksGenericCascade.layers[0], false, 512, tweakBuf,
-                                     encBuf + (i * 512), decryptedOut.get() + (i * 512));
+                luksCryptUnit(v, false, sectorNum, 512, encBuf + (i * 512), decryptedOut.get() + (i * 512));
             });
         } else {
             parallelCryptoLoop(batch.count, [&](uint32_t unitIdx) {
                 const uint64_t unitByteOffset = startByte + (static_cast<uint64_t>(unitIdx) * luksUnit);
                 const uint64_t phys512Sector = unitByteOffset / 512;
                 const uint64_t sectorTweak = phys512Sector - v.partitionStartSector;
-                unsigned char tweakBuf[16] = {0};
-                for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;
-                genericLuksXtsCrypt(v.luksGenericCascade.layers[0], false, luksUnit, tweakBuf,
-                                     encBuf + (unitIdx * luksUnit), decryptedOut.get() + (unitIdx * luksUnit));
+                luksCryptUnit(v, false, sectorTweak, luksUnit, encBuf + (unitIdx * luksUnit), decryptedOut.get() + (unitIdx * luksUnit));
             });
         }
 
@@ -335,8 +376,7 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
     if (count == 0) return RES_PARERR;
 
     VolumeState& v = volumes[pdrv];
-    const bool isLuks = (v.containerFormat != ContainerFormat::kVeraCrypt);
-    const uint32_t luksUnit = (isLuks && v.luksSectorSize >= 512) ? v.luksSectorSize : 512;
+    const uint32_t luksUnit = (v.luksSectorSize >= 512) ? v.luksSectorSize : 512;
 
     if (volumes[pdrv].containerFormat == ContainerFormat::kBitLocker) {
         const bool ok = bitlockerWrite(pdrv, static_cast<uint64_t>(sector) * luksUnit,
@@ -385,7 +425,10 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
         }
 
         if (v.containerFormat == ContainerFormat::kVeraCrypt) {
-            parallelCryptoLoop(batch.count, [&](uint32_t i) {
+            // XTS data units are always 512 bytes, also on 1024/2048/4096-byte-sector
+            // volumes (upstream: hostOffset / ENCRYPTION_DATA_UNIT_SIZE), so a logical
+            // sector is processed as luksUnit/512 consecutive data units.
+            parallelCryptoLoop(batch.count * (luksUnit / 512), [&](uint32_t i) {
                 const uint64_t phys512Sector = (startByte / 512) + i;
                 const uint64_t tweak = phys512Sector - v.partitionStartSector;
                 cascadeEncryptSector(v.cascade, tweak, curBuf + (i * 512), encBuf + (i * 512));
@@ -394,20 +437,14 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
             parallelCryptoLoop(batch.count, [&](uint32_t i) {
                 const uint64_t phys512Sector = (startByte / 512) + i;
                 const uint64_t sectorNum = phys512Sector - v.partitionStartSector;
-                unsigned char tweakBuf[16] = {0};
-                for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorNum >> (b * 8)) & 0xFF;
-                genericLuksXtsCrypt(v.luksGenericCascade.layers[0], true, 512, tweakBuf,
-                                     curBuf + (i * 512), encBuf + (i * 512));
+                luksCryptUnit(v, true, sectorNum, 512, curBuf + (i * 512), encBuf + (i * 512));
             });
         } else {
             parallelCryptoLoop(batch.count, [&](uint32_t unitIdx) {
                 const uint64_t unitByteOffset = startByte + (static_cast<uint64_t>(unitIdx) * luksUnit);
                 const uint64_t phys512Sector = unitByteOffset / 512;
                 const uint64_t sectorTweak = phys512Sector - v.partitionStartSector;
-                unsigned char tweakBuf[16] = {0};
-                for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;
-                genericLuksXtsCrypt(v.luksGenericCascade.layers[0], true, luksUnit, tweakBuf,
-                                     curBuf + (unitIdx * luksUnit), encBuf + (unitIdx * luksUnit));
+                luksCryptUnit(v, true, sectorTweak, luksUnit, curBuf + (unitIdx * luksUnit), encBuf + (unitIdx * luksUnit));
             });
         }
 
@@ -432,26 +469,15 @@ extern "C" DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void* buff) {
 
     switch (cmd) {
         case CTRL_SYNC:
-            if (v.isUsbSource) {
-                v.usbCache.sync(pdrv);
-            } else if (v.isCompositeSource && v.composite) {
-                v.composite->sync();
-            } else if (v.fd >= 0) {
-                // FatFs calls CTRL_SYNC from f_sync/f_close and trusts the
-                // result to mean "everything written so far is durable".
-                // A failed write-behind flush has to surface here, otherwise
-                // the file is reported closed OK while its data/size never
-                // reached the container (zero-byte or truncated files).
-                // fsync stays best-effort: some fd types reject it with
-                // EINVAL, which says nothing about the data.
-                const bool flushed = v.fdWriteBuffer.flush(v.fd);
-                const int flushErrno = errno;  // before fsync can overwrite it
-                fsync(v.fd);
-                if (!flushed) {
-                    LOGI("disk_ioctl(CTRL_SYNC): write-behind flush failed on volume %d (errno=%d)",
-                         static_cast<int>(pdrv), flushErrno);
-                    return RES_ERROR;
-                }
+            // FatFs calls CTRL_SYNC from f_sync/f_close and trusts the result to mean
+            // "everything written so far is durable". A failed USB flush/barrier, composite
+            // sync or write-behind flush has to surface here, otherwise the file is reported
+            // closed OK while its data/size never reached the container (zero-byte or
+            // truncated files). See backing_flush.h for what each backing store reports.
+            if (!flushVolumeBacking(v, pdrv)) {
+                LOGI("disk_ioctl(CTRL_SYNC): backing-store flush failed on volume %d (errno=%d)",
+                     static_cast<int>(pdrv), errno);
+                return RES_ERROR;
             }
             return RES_OK;
         case GET_SECTOR_COUNT:
@@ -486,19 +512,4 @@ extern "C" DWORD get_fattime() {
         ((t.tm_min  & 0x3F) << 5)  |
         ((t.tm_sec / 2) & 0x1F));
     return (static_cast<DWORD>(fdate) << 16) | ftime;
-}
-
-static void genericLuksXtsCrypt(const XtsLayerKey& layer, bool encrypt, size_t dataLen,
-                                 const unsigned char tweakSeed[16],
-                                 const unsigned char* in, unsigned char* out) {
-    unsigned char T[16];
-    blockCipherEncryptBlock(layer.tweakKey, tweakSeed, T);
-    for (size_t b = 0; b < dataLen / 16; b++) {
-        unsigned char tmp[16];
-        for (int j = 0; j < 16; j++) tmp[j] = in[b * 16 + j] ^ T[j];
-        if (encrypt) blockCipherEncryptBlock(layer.dataKeyEnc, tmp, tmp);
-        else         blockCipherDecryptBlock(layer.dataKeyDec, tmp, tmp);
-        for (int j = 0; j < 16; j++) out[b * 16 + j] = tmp[j] ^ T[j];
-        xtsMultiplyTweak(T);
-    }
 }

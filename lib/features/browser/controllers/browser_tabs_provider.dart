@@ -5,6 +5,7 @@ import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/controllers/file_browser_selection_controller.dart';
 import 'package:vaultexplorer/features/browser/models/browser_tab_origin.dart';
+import 'package:vaultexplorer/features/browser/models/file_category.dart';
 import 'package:vaultexplorer/features/browser/models/tab_id.dart';
 
 part 'browser_tabs_provider.g.dart';
@@ -51,6 +52,23 @@ final class FolderTab extends BrowserTabKind {
   final BrowserTabOrigin origin;
 }
 
+/// A category shortcut view (Images, Videos, Audio, Documents) gathering files
+/// from every storage.
+@immutable
+final class CategoryTab extends BrowserTabKind {
+  const CategoryTab({
+    required this.category,
+    this.primaryLocalContainer,
+    this.includeVaults = true,
+    this.origin = BrowserTabOrigin.other,
+  });
+
+  final FileCategory category;
+  final MountedContainer? primaryLocalContainer;
+  final bool includeVaults;
+  final BrowserTabOrigin origin;
+}
+
 /// A single location in a browser workspace.
 @immutable
 class BrowserTabState {
@@ -75,6 +93,20 @@ class BrowserTabState {
          origin: origin,
        );
 
+  BrowserTabState.category({
+    required this.tabId,
+    required FileCategory category,
+    MountedContainer? primaryLocalContainer,
+    bool includeVaults = true,
+    BrowserTabOrigin origin = BrowserTabOrigin.other,
+    this.pane = TabPane.primary,
+  }) : kind = CategoryTab(
+         category: category,
+         primaryLocalContainer: primaryLocalContainer,
+         includeVaults: includeVaults,
+         origin: origin,
+       );
+
   const BrowserTabState._({
     required this.tabId,
     required this.kind,
@@ -87,20 +119,40 @@ class BrowserTabState {
       : BrowserTabState._(tabId: tabId, kind: kind, pane: pane);
 
   bool get isDashboard => kind is HomeTab;
+  bool get isCategory => kind is CategoryTab;
+  FileCategory? get category => switch (kind) {
+    CategoryTab(:final category) => category,
+    _ => null,
+  };
+  bool get includeVaults => switch (kind) {
+    CategoryTab(:final includeVaults) => includeVaults,
+    _ => true,
+  };
+  MountedContainer? get primaryLocalContainer => switch (kind) {
+    CategoryTab(:final primaryLocalContainer) => primaryLocalContainer,
+    _ => null,
+  };
   MountedContainer? get container => switch (kind) {
     HomeTab() => null,
     FolderTab(:final container) => container,
+    CategoryTab(:final primaryLocalContainer) => primaryLocalContainer,
   };
   String? get initialPath => switch (kind) {
     HomeTab() => null,
     FolderTab(:final initialPath) => initialPath,
+    CategoryTab() => null,
   };
-  int? get volId => container?.volId;
+  int? get volId => switch (kind) {
+    HomeTab() => null,
+    FolderTab(:final container) => container.volId,
+    CategoryTab() => null,
+  };
 
   /// Where this tab was opened from. Home tabs have no origin of their own.
   BrowserTabOrigin get origin => switch (kind) {
     HomeTab() => BrowserTabOrigin.other,
     FolderTab(:final origin) => origin,
+    CategoryTab(:final origin) => origin,
   };
 }
 
@@ -541,6 +593,57 @@ class BrowserTabs extends _$BrowserTabs {
     );
     final current = state.activeTab;
     // The pane being left keeps showing the tab that was active in it.
+    final leftBehind = activate && current != null && current.pane != target
+        ? current.tabId
+        : null;
+    _commit(
+      state.copyWith(
+        tabs: List.unmodifiable(tabs),
+        previousTabId: activate ? state.activeTabId : state.previousTabId,
+        activeTabId: activate ? tab.tabId : state.activeTabId,
+        unfocusedPaneTabId: leftBehind,
+      ),
+    );
+    return tab.tabId;
+  }
+
+  TabId? openCategoryTab(
+    FileCategory category, {
+    MountedContainer? primaryLocalContainer,
+    bool includeVaults = true,
+    bool activate = true,
+    BrowserTabOrigin origin = BrowserTabOrigin.other,
+    TabPane? pane,
+  }) {
+    final existing = state.tabs
+        .where(
+          (tab) =>
+              tab.kind is CategoryTab &&
+              (tab.kind as CategoryTab).category == category,
+        )
+        .firstOrNull;
+    if (existing != null) {
+      if (activate) this.activate(existing.tabId);
+      return existing.tabId;
+    }
+    if (state.atLimit) return null;
+    final target = pane ?? _paneForNewTab();
+    final tab = BrowserTabState.category(
+      tabId: TabId.allocate(),
+      category: category,
+      primaryLocalContainer: primaryLocalContainer,
+      includeVaults: includeVaults,
+      origin: origin,
+      pane: target,
+    );
+    final tabs = [...state.tabs];
+    tabs.insert(
+      tabs.isEmpty
+          ? 0
+          : _insertionIndex(tabs, target, state.activeTabIdOfPane(target)),
+      tab,
+    );
+    final current = state.activeTab;
     final leftBehind = activate && current != null && current.pane != target
         ? current.tabId
         : null;

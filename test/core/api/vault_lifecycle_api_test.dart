@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vaultexplorer/core/api/vault_engine_events.dart';
+import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/api/vault_lifecycle_api.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -526,6 +527,55 @@ void main() {
       nextResult = null;
       expect(await localApi.lockContainer('content://c'), isFalse);
     });
+
+    test('lockContainerDetailed maps the native result to locked / failed', () async {
+      final localApi = VaultLifecycleApi(channel, events, ActiveRecordingRegistry());
+
+      nextResult = true;
+      expect(await localApi.lockContainerDetailed('content://c'), LockResult.locked);
+      nextResult = false;
+      expect(await localApi.lockContainerDetailed('content://c'), LockResult.failed);
+      nextResult = null;
+      expect(await localApi.lockContainerDetailed('content://c'), LockResult.failed);
+    });
+
+    test('a device that refuses the final flush is reported, not thrown', () async {
+      final localApi = VaultLifecycleApi(channel, events, ActiveRecordingRegistry());
+      nextError = PlatformException(code: 'LOCK_FLUSH_REFUSED');
+
+      expect(
+        await localApi.lockContainerDetailed('content://c'),
+        LockResult.flushRefused,
+      );
+      // The plain boolean API keeps its contract, so loops that lock several
+      // containers carry on to the next one instead of aborting.
+      expect(await localApi.lockContainer('content://c'), isFalse);
+    });
+
+    test('other native errors still propagate', () async {
+      final localApi = VaultLifecycleApi(channel, events, ActiveRecordingRegistry());
+      nextError = PlatformException(code: 'ERR');
+
+      await expectLater(
+        localApi.lockContainerDetailed('content://c'),
+        throwsA(isA<PlatformException>()),
+      );
+      await expectLater(
+        localApi.lockContainer('content://c'),
+        throwsA(isA<PlatformException>()),
+      );
+    });
+
+    test('force is sent only for the explicit lock-anyway choice', () async {
+      final localApi = VaultLifecycleApi(channel, events, ActiveRecordingRegistry());
+      nextResult = true;
+
+      await localApi.lockContainerDetailed('content://c');
+      expect(calls.last.arguments, {'filePath': 'content://c'});
+
+      await localApi.lockContainerDetailed('content://c', force: true);
+      expect(calls.last.arguments, {'filePath': 'content://c', 'force': true});
+    });
   });
 
   group('helper methods with channel-failure fallbacks', () {
@@ -613,6 +663,108 @@ void main() {
       expect(calls.single.arguments.containsKey('title'), isFalse);
       expect(calls.single.arguments.containsKey('progress'), isFalse);
       expect(calls.single.arguments['max'], 1000);
+    });
+  });
+
+  group('Cryptomator key-file backup flag', () {
+    test('getCryptomatorKeyFileBackup sends the uri and returns the stored value', () async {
+      nextResult = false;
+      final value = await api.getCryptomatorKeyFileBackup('content://vault');
+      expect(value, isFalse);
+      expect(calls.single.method, 'getCryptomatorKeyFileBackup');
+      expect(calls.single.arguments, {'uri': 'content://vault'});
+    });
+
+    test('getCryptomatorKeyFileBackup defaults to true on null and on error', () async {
+      nextResult = null;
+      expect(await api.getCryptomatorKeyFileBackup('content://vault'), isTrue);
+
+      nextError = PlatformException(code: 'ERR');
+      expect(await api.getCryptomatorKeyFileBackup('content://vault'), isTrue);
+    });
+
+    test('setCryptomatorKeyFileBackup sends uri and enabled', () async {
+      nextResult = true;
+      final ok = await api.setCryptomatorKeyFileBackup('content://vault', false);
+      expect(ok, isTrue);
+      expect(calls.single.method, 'setCryptomatorKeyFileBackup');
+      expect(calls.single.arguments, {'uri': 'content://vault', 'enabled': false});
+    });
+
+    test('setCryptomatorKeyFileBackup reports failure as false instead of throwing', () async {
+      nextError = PlatformException(code: 'ERR');
+      expect(await api.setCryptomatorKeyFileBackup('content://vault', true), isFalse);
+
+      nextError = null;
+      nextResult = null;
+      expect(await api.setCryptomatorKeyFileBackup('content://vault', true), isFalse);
+    });
+
+    test('clearVaultOpenPreferences is best effort', () async {
+      nextResult = true;
+      await api.clearVaultOpenPreferences('content://vault');
+      expect(calls.single.method, 'clearVaultOpenPreferences');
+      expect(calls.single.arguments, {'uri': 'content://vault'});
+
+      nextError = PlatformException(code: 'ERR');
+      await expectLater(api.clearVaultOpenPreferences('content://vault'), completes);
+    });
+  });
+
+  group('Cryptomator format probe and upgrade', () {
+    test('probeCryptomatorVault sends filePath and maps every native code', () async {
+      const expected = {
+        7: CryptomatorVaultFormat.legacy7,
+        8: CryptomatorVaultFormat.current,
+        -8: CryptomatorVaultFormat.configMissing,
+        6: CryptomatorVaultFormat.tooOld,
+        0: CryptomatorVaultFormat.unknown,
+      };
+      for (final entry in expected.entries) {
+        calls.clear();
+        nextResult = entry.key;
+        final format = await api.probeCryptomatorVault('content://vault');
+        expect(format, entry.value, reason: 'code ${entry.key}');
+        expect(calls.single.method, 'probeCryptomatorVault');
+        expect(calls.single.arguments, {'filePath': 'content://vault'});
+      }
+    });
+
+    test('an unexpected, null or failing probe is unknown and never offers the upgrade', () async {
+      nextResult = 9;
+      expect(await api.probeCryptomatorVault('content://vault'), CryptomatorVaultFormat.unknown);
+      nextResult = null;
+      expect(await api.probeCryptomatorVault('content://vault'), CryptomatorVaultFormat.unknown);
+      nextError = PlatformException(code: 'ERR');
+      expect(await api.probeCryptomatorVault('content://vault'), CryptomatorVaultFormat.unknown);
+    });
+
+    test('fromProbeCode only maps 7 to the migratable format', () {
+      for (var code = -20; code <= 20; code++) {
+        expect(
+          CryptomatorVaultFormat.fromProbeCode(code) == CryptomatorVaultFormat.legacy7,
+          code == 7,
+          reason: 'code $code',
+        );
+      }
+      expect(CryptomatorVaultFormat.fromProbeCode(null), CryptomatorVaultFormat.unknown);
+    });
+
+    test('migrateCryptomatorVault sends filePath and password', () async {
+      nextResult = true;
+      expect(await api.migrateCryptomatorVault('content://vault', 'pw'), isTrue);
+      expect(calls.single.method, 'migrateCryptomatorVault');
+      expect(calls.single.arguments, {'filePath': 'content://vault', 'password': 'pw'});
+    });
+
+    test('migrateCryptomatorVault does not swallow the native error codes', () async {
+      for (final code in ['AUTH_FAIL', 'VAULT_UNLOCKED', 'INVALID_VAULT']) {
+        nextError = PlatformException(code: code, message: 'msg $code');
+        await expectLater(
+          api.migrateCryptomatorVault('content://vault', 'pw'),
+          throwsA(isA<PlatformException>().having((e) => e.code, 'code', code)),
+        );
+      }
     });
   });
 }

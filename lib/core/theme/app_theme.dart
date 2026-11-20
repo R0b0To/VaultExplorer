@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/theme/app_skin_tokens.dart';
+import 'package:vaultexplorer/core/theme/predictive_back_preference.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_colors.dart';
 import 'package:vaultexplorer/data/models/app_skin_preset.dart';
@@ -77,6 +78,12 @@ abstract final class AppMotion {
 /// so any [PageTransitionsBuilder] built purely from those two animations
 /// (like [CrossfadePageTransitionsBuilder]) only animates once the gesture
 /// commits or cancels on release - there's no live preview while dragging.
+///
+/// This is the app's own predictive back, so it honours the "Predictive back
+/// animations" setting ([appPredictiveBackNotifier]): when that is off it
+/// leaves the gesture unclaimed and Flutter treats it like a 3-button back
+/// (plain pop on commit, nothing on cancel). Android's system-level Predictive
+/// Back is not involved either way.
 class _PredictiveBackForwarder extends StatefulWidget {
   const _PredictiveBackForwarder({required this.route, required this.child});
 
@@ -108,6 +115,10 @@ class _PredictiveBackForwarderState extends State<_PredictiveBackForwarder>
   @override
   bool handleStartBackGesture(PredictiveBackEvent backEvent) {
     if (backEvent.isButtonEvent || !_canHandle) return false;
+    // Only the start is gated: update/cancel/commit are only ever delivered for
+    // a gesture this observer claimed, so one already in flight always ends
+    // cleanly even if the setting flips meanwhile.
+    if (!appPredictiveBackNotifier.value) return false;
     widget.route.handleStartBackGesture(progress: 1 - backEvent.progress);
     return true;
   }
@@ -130,6 +141,10 @@ class _PredictiveBackForwarderState extends State<_PredictiveBackForwarder>
 }
 
 /// Gesture-driven in-app crossfade matching Android's SociaLite predictive back navigation.
+///
+/// The crossfade itself is the app's normal page transition and always applies;
+/// only the "follows the finger during a back gesture" part is switchable, via
+/// the "Predictive back animations" setting ([appPredictiveBackNotifier]).
 class CrossfadePageTransitionsBuilder extends PageTransitionsBuilder {
   const CrossfadePageTransitionsBuilder();
 

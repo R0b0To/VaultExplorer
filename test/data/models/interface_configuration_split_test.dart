@@ -2,11 +2,11 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:vaultexplorer/data/models/audio_recording_quality.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
 import 'package:vaultexplorer/data/models/tab_swipe_gestures.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
 import 'package:vaultexplorer/data/models/file_item_action.dart';
+import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/data/models/file_manager_skin.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/grid_aspect_ratio.dart';
@@ -79,7 +79,9 @@ AppSettings _customSettings() => AppSettings(
   deleteAfterImportMode: DeleteAfterImportMode.delete,
   audioRecordingQuality: AudioRecordingQuality.high,
   videoMuted: true,
+  motionPhotoAutoplay: true,
   videoPlaybackMode: VideoPlaybackMode.loop,
+  categoryIndexInVaults: false,
   autoLockOnShareImport: false,
   quickActionLockMode: QuickActionLockMode.alwaysLock,
   enableAuthenticator: false,
@@ -97,6 +99,12 @@ AppSettings _customSettings() => AppSettings(
   defaultFileSortAscending: false,
   containerSortMode: ContainerSortMode.nameZA,
   showStorageLocationsInDrawer: false,
+  categoryShortcutsEnabled: false,
+  categoryShortcutOrder: AppSettings().categoryShortcutOrder.reversed.toList(),
+  hiddenCategoryShortcuts: ['videos'],
+  categorySources: {'images': 'vault:3', 'audio': 'device'},
+  categoryLayouts: {'gallery': 'masonry', 'images': 'list'},
+  categoryFolderStructure: ['documents'],
   playlistScrollMode: PlaylistScrollMode.verticalPage,
   authenticatorShowNumbers: false,
   authenticatorSearchPlacement: AuthenticatorSearchPlacement.top,
@@ -105,6 +113,7 @@ AppSettings _customSettings() => AppSettings(
   editorFollowsAppSkin: false,
   editorAppearancePrefs: {'fontSize': 18.0, 'showLineNumbers': false},
   appBarAtBottom: true,
+  predictiveBackAnimations: false,
 );
 
 MediaViewerToolbarConfig _customViewer() {
@@ -137,7 +146,7 @@ FileManagerToolbarConfig _customToolbar() {
   final d = FileManagerToolbarConfig.defaults();
   return d.copyWith(
     // layout
-    order: d.order.reversed.toList(),
+    order: [FileManagerAction.playMedia, ...d.order.reversed],
     hidden: {d.order.first},
     showBreadcrumbBar: !d.showBreadcrumbBar,
     showStatsBar: !d.showStatsBar,
@@ -145,6 +154,8 @@ FileManagerToolbarConfig _customToolbar() {
     showMediaCarousel: !d.showMediaCarousel,
     autoHideAppBar: !d.autoHideAppBar,
     autoHideTabBar: !d.autoHideTabBar,
+    autoHideToolbar: !d.autoHideToolbar,
+    autoHideBreadcrumbBar: !d.autoHideBreadcrumbBar,
     showFileExtensions: !d.showFileExtensions,
     useFabForToolbar: !d.useFabForToolbar,
     bottomSelectionBar: !d.bottomSelectionBar,
@@ -175,6 +186,7 @@ FileManagerToolbarConfig _customToolbar() {
     skin: const FileManagerSkin(monospaceNames: true),
     // behavior
     showHiddenFiles: !d.showHiddenFiles,
+    showNoMediaFolders: !d.showNoMediaFolders,
     selectByIcon: !d.selectByIcon,
     autoStartPlaylistMode: !d.autoStartPlaylistMode,
     rememberPerFolderLayout: !d.rememberPerFolderLayout,
@@ -182,6 +194,22 @@ FileManagerToolbarConfig _customToolbar() {
     defaultThumbnailCacheMode: _other(
       ThumbnailCacheMode.values,
       d.defaultThumbnailCacheMode,
+    ),
+    defaultGalleryMetadataCacheMode: _other(
+      ThumbnailCacheMode.values,
+      d.defaultGalleryMetadataCacheMode,
+    ),
+    localStorageGalleryMetadataCacheMode: _other(
+      ThumbnailCacheMode.values,
+      d.localStorageGalleryMetadataCacheMode,
+    ),
+    defaultMusicIndexCacheMode: _other(
+      ThumbnailCacheMode.values,
+      d.defaultMusicIndexCacheMode,
+    ),
+    localStorageMusicIndexCacheMode: _other(
+      ThumbnailCacheMode.values,
+      d.localStorageMusicIndexCacheMode,
     ),
     defaultThumbnailQuality: const ThumbnailQuality(quality: 60, size: 240),
     localStorageThumbnailCacheMode: _other(
@@ -274,8 +302,10 @@ void main() {
       final configurationKeys = _customSettings().configurationToJson().keys;
       final interfaceKeys = _customSettings().interfaceToJson().keys;
 
-      expect(configurationKeys.toSet().intersection(interfaceKeys.toSet()),
-          isEmpty);
+      expect(
+        configurationKeys.toSet().intersection(interfaceKeys.toSet()),
+        isEmpty,
+      );
       // Spot-check the ones people most expect to travel with their skin.
       for (final key in [
         'themeMode',
@@ -284,6 +314,7 @@ void main() {
         'defaultLayoutMode',
         'containerSortMode',
         'showStorageLocationsInDrawer',
+        'predictiveBackAnimations',
         'authenticatorShowNumbers',
         'fileManagerSkin',
         'fileManagerFollowsAppSkin',
@@ -318,10 +349,7 @@ void main() {
 
       final merged = base.withInterfaceFrom(_customViewer());
 
-      expect(
-        merged.interfaceToJson(),
-        _customViewer().interfaceToJson(),
-      );
+      expect(merged.interfaceToJson(), _customViewer().interfaceToJson());
       expect(merged.behaviorToJson(), base.behaviorToJson());
     });
 
@@ -332,10 +360,7 @@ void main() {
 
       final merged = base.withBehaviorFrom(_customViewer());
 
-      expect(
-        merged.behaviorToJson(),
-        _customViewer().behaviorToJson(),
-      );
+      expect(merged.behaviorToJson(), _customViewer().behaviorToJson());
       expect(merged.interfaceToJson(), base.interfaceToJson());
     });
   });
@@ -374,7 +399,10 @@ void main() {
     test('neither export contains per-folder layout memory', () {
       final custom = _customToolbar();
 
-      for (final export in [custom.interfaceToJson(), custom.behaviorToJson()]) {
+      for (final export in [
+        custom.interfaceToJson(),
+        custom.behaviorToJson(),
+      ]) {
         for (final key in FileManagerToolbarConfig.perFolderKeys) {
           expect(export.containsKey(key), isFalse, reason: key);
         }
@@ -416,12 +444,15 @@ void main() {
     });
 
     test('withBehaviorFrom takes the behavior, keeps layout and folders', () {
-      final base = FileManagerToolbarConfig.defaults().copyWith(
-        gridSpacing: 2,
-        folderSortModes: {'d:/x': 'date'},
-        mediaViewerToolbarConfig: const MediaViewerToolbarConfig().copyWith(
-          showProgressBar: false,
-        ),
+      final base = FileManagerToolbarConfig.fromJson(
+        FileManagerToolbarConfig.defaults()
+            .copyWith(
+              gridSpacing: 2,
+              folderSortModes: {'d:/x': 'date'},
+              mediaViewerToolbarConfig: const MediaViewerToolbarConfig()
+                  .copyWith(showProgressBar: false),
+            )
+            .toJson(),
       );
 
       final merged = base.withBehaviorFrom(_customToolbar());

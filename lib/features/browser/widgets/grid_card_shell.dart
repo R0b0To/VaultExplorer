@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/utils/perf_trace.dart';
 import 'package:vaultexplorer/core/theme/file_manager_skin_scope.dart';
 import 'package:vaultexplorer/data/models/file_manager_skin.dart';
 import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
@@ -97,6 +98,7 @@ class GridCardShell extends StatelessWidget {
   final bool showMoreButton;
   final bool isPinned;
   final bool isBookmark;
+  final bool isShortcut;
   final bool isDocumentProviderMounted;
   final bool isSynced;
   final bool isPlaceholder;
@@ -113,6 +115,10 @@ class GridCardShell extends StatelessWidget {
   /// default rounded look; 0 gives square cards.
   final double cornerRadius;
 
+  /// When non-null, skips the footer [LayoutBuilder] used to detect narrow
+  /// cards (`tileWidth < 100`).
+  final bool? compactFooter;
+
   const GridCardShell({
     super.key,
     required this.preview,
@@ -128,6 +134,7 @@ class GridCardShell extends StatelessWidget {
     this.showMoreButton = true,
     this.isPinned = false,
     this.isBookmark = false,
+    this.isShortcut = false,
     this.isDocumentProviderMounted = false,
     this.isSynced = false,
     this.isPlaceholder = false,
@@ -135,10 +142,17 @@ class GridCardShell extends StatelessWidget {
     this.isFolder = false,
     this.aspectRatio,
     this.cornerRadius = 12.0,
+    this.compactFooter,
   });
-
   @override
   Widget build(BuildContext context) {
+    final perfT0 = PerfTrace.begin();
+    final built = _buildCard(context);
+    PerfTrace.end('ui.grid_card.build', perfT0);
+    return built;
+  }
+
+  Widget _buildCard(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final skin = FileManagerSkinScope.of(context);
@@ -153,15 +167,15 @@ class GridCardShell extends StatelessWidget {
     Widget previewStack = Stack(
       fit: StackFit.expand,
       children: [
-        // Keep preview paint, including folder badges, out of the name row.
-        ClipRect(child: preview),
+          // Keep preview paint, including folder badges, out of the name row.
+        if (showFileName) ClipRect(child: preview) else preview,
         if (isSelected)
           DecoratedBox(
             decoration: BoxDecoration(
               color: cs.primary.withValues(alpha: 0.12),
             ),
           ),
-        if ((isPinned || isBookmark || isDocumentProviderMounted || isSynced) && !isSelected)
+        if ((isShortcut || isPinned || isBookmark || isDocumentProviderMounted || isSynced) && !isSelected)
           Align(
             alignment: Alignment.topLeft,
             child: Padding(
@@ -175,14 +189,22 @@ class GridCardShell extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (isPinned)
+                    if (isShortcut)
+                      Icon(
+                        Icons.shortcut_rounded,
+                        size: 13,
+                        color: cs.primary,
+                      ),
+                    if (isPinned) ...[
+                      if (isShortcut) const SizedBox(width: 3),
                       Icon(
                         Icons.push_pin_rounded,
                         size: 13,
                         color: cs.primary,
                       ),
+                    ],
                     if (isBookmark) ...[
-                      if (isPinned) const SizedBox(width: 3),
+                      if (isPinned || isShortcut) const SizedBox(width: 3),
                       Icon(
                         Icons.star_rounded,
                         size: 13,
@@ -190,7 +212,7 @@ class GridCardShell extends StatelessWidget {
                       ),
                     ],
                     if (isDocumentProviderMounted) ...[
-                      if (isPinned || isBookmark) const SizedBox(width: 3),
+                      if (isPinned || isBookmark || isShortcut) const SizedBox(width: 3),
                       Icon(
                         Icons.folder_shared_rounded,
                         size: 13,
@@ -198,7 +220,7 @@ class GridCardShell extends StatelessWidget {
                       ),
                     ],
                     if (isSynced) ...[
-                      if (isPinned || isBookmark || isDocumentProviderMounted)
+                      if (isPinned || isBookmark || isShortcut || isDocumentProviderMounted)
                         const SizedBox(width: 3),
                       Icon(
                         Icons.sync_rounded,
@@ -260,41 +282,43 @@ class GridCardShell extends StatelessWidget {
       ),
     );
 
+     Widget buildMoreFooter(bool compact) {
+      final size = compact ? 24.0 : 28.0;
+      return Padding(
+        padding: EdgeInsetsDirectional.fromSTEB(
+          compact ? 8 : 10,
+          compact ? 4 : 3,
+          2,
+          compact ? 4 : 3,
+        ),
+        child: Row(
+          children: [
+            Expanded(child: Center(child: nameLabel)),
+            SizedBox(
+              width: size,
+              height: size,
+              child: moreVisible
+                  ? IconButton(
+                      padding: EdgeInsets.zero,
+                      iconSize: compact ? 18 : 20,
+                      color: cs.onSurfaceVariant,
+                      icon: const Icon(Icons.more_vert_rounded),
+                      onPressed: onMoreTap,
+                    )
+                  : null,
+            ),
+          ],
+        ),
+      );
+    }
+
     Widget footer = hasMoreSlot
-        ? LayoutBuilder(
-            builder: (context, constraints) {
-              // Dense grids have narrow cards; keep the button from eating
-              // the name.
-              final compact = constraints.maxWidth < 100;
-              final size = compact ? 24.0 : 28.0;
-              return Padding(
-                padding: EdgeInsetsDirectional.fromSTEB(
-                  compact ? 8 : 10,
-                  compact ? 4 : 3,
-                  2,
-                  compact ? 4 : 3,
-                ),
-                child: Row(
-                  children: [
-                    Expanded(child: Center(child: nameLabel)),
-                    SizedBox(
-                      width: size,
-                      height: size,
-                      child: moreVisible
-                          ? IconButton(
-                              padding: EdgeInsets.zero,
-                              iconSize: compact ? 18 : 20,
-                              color: cs.onSurfaceVariant,
-                              icon: const Icon(Icons.more_vert_rounded),
-                              onPressed: onMoreTap,
-                            )
-                          : null,
-                    ),
-                  ],
-                ),
-              );
-            },
-          )
+        ? (compactFooter != null
+            ? buildMoreFooter(compactFooter!)
+            : LayoutBuilder(
+                builder: (context, constraints) =>
+                    buildMoreFooter(constraints.maxWidth < 100),
+              ))
         : Container(
             alignment: Alignment.center,
             width: double.infinity,
@@ -335,8 +359,11 @@ class GridCardShell extends StatelessWidget {
       }
     }
 
-    Widget cell = Card(
+     Widget cell = Card(
       margin: EdgeInsets.zero,
+      elevation: 0,
+      shadowColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(cornerRadius),
@@ -350,9 +377,9 @@ class GridCardShell extends StatelessWidget {
       ),
     );
 
-    if (isPlaceholder) {
+   if (isPlaceholder) {
       cell = Opacity(opacity: 0.5, child: cell);
     }
-    return cell;
+    return RepaintBoundary(child: cell);
   }
 }

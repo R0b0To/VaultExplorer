@@ -5,6 +5,13 @@ import com.aeidolon.vaultexplorer.SecureFileWipe
 import com.aeidolon.vaultexplorer.VaultStreamRegistry
 import com.aeidolon.vaultexplorer.VeLog
 
+/**
+ * The device refused to accept buffered writes while locking a volume. Nothing was discarded:
+ * the volume stays open with its pending data, so the caller may retry or explicitly force
+ * the lock (which discards what could not be written).
+ */
+class LockFlushRefusedException(message: String) : java.io.IOException(message)
+
 object ContainerEngine {
     fun maxVolumes(): Int = try {
         val count = NativeEngine.getMaxVolumesNative()
@@ -37,9 +44,11 @@ object ContainerEngine {
         readOnly: Boolean = false,
         hiddenPassword: String? = null, hiddenPim: Int = 0, hiddenCipherId: Int = 255,
         hiddenHashId: Int = 255, hiddenKeyfileFds: IntArray? = null,
+        useBackupHeader: Boolean = false,
     ): Array<String>? = NativeEngine.unlockAndListNative(
         fd, password, pim, volId, cipherId, hashId, preservedKey, keyfileFds, readOnly,
         hiddenPassword, hiddenPim, hiddenCipherId, hiddenHashId, hiddenKeyfileFds,
+        useBackupHeader,
     )
 
     fun unlockUsb(
@@ -48,10 +57,12 @@ object ContainerEngine {
         keyfileFds: IntArray? = null, readOnly: Boolean = false,
         hiddenPassword: String? = null, hiddenPim: Int = 0, hiddenCipherId: Int = 255,
         hiddenHashId: Int = 255, hiddenKeyfileFds: IntArray? = null,
+        useBackupHeader: Boolean = false,
     ): Array<String>? = NativeEngine.unlockUsbAndListNative(
         password, pim, volId, deviceSizeBytes, cipherId, hashId, preservedKey,
         partitionOffsetHint, keyfileFds, readOnly,
         hiddenPassword, hiddenPim, hiddenCipherId, hiddenHashId, hiddenKeyfileFds,
+        useBackupHeader,
     )
 
     fun create(
@@ -74,9 +85,10 @@ object ContainerEngine {
         keyfileFds: IntArray? = null, quickFormat: Boolean = false,
         deviceSectorCount: Long = 0L, operationId: String = "",
         userEntropy: ByteArray? = null,
+        deviceSectorSize: Int = 512,
     ): Map<String, Any?>? = NativeEngine.createUsbContainerNative(
         volId, partitionScheme, password, pim, sizeBytes, fileSystem, containerFormat, cipherId, hashId,
-        keyfileFds, quickFormat, deviceSectorCount, operationId, userEntropy,
+        keyfileFds, quickFormat, deviceSectorCount, operationId, userEntropy, deviceSectorSize,
     )
 
     fun createWithHidden(
@@ -109,11 +121,12 @@ object ContainerEngine {
         quickFormat: Boolean = false,
         deviceSectorCount: Long = 0L, operationId: String = "",
         userEntropy: ByteArray? = null,
+        deviceSectorSize: Int = 512,
     ): Map<String, Any?>? = NativeEngine.createUsbContainerWithHiddenNative(
         volId, partitionScheme, outerPassword, hiddenPassword, outerPim, hiddenPim, sizeBytes,
         outerFileSystem, hiddenFileSystem, hiddenSizeBytes, outerCipherId, outerHashId,
         hiddenCipherId, hiddenHashId, outerKeyfileFds, hiddenKeyfileFds, quickFormat,
-        deviceSectorCount, operationId, userEntropy,
+        deviceSectorCount, operationId, userEntropy, deviceSectorSize,
     )
 
     fun changePassword(
@@ -121,9 +134,10 @@ object ContainerEngine {
         oldPim: Int, newPim: Int,
         cipherId: Int = 255, hashId: Int = 255,
         oldKeyfileFds: IntArray? = null, newKeyfileFds: IntArray? = null,
+        newHashId: Int = 255,
     ): Boolean = NativeEngine.changeContainerPasswordNative(
         fd, oldPassword, newPassword, oldPim, newPim, cipherId, hashId,
-        oldKeyfileFds, newKeyfileFds
+        oldKeyfileFds, newKeyfileFds, newHashId
     )
 
     fun changeLuksPassword(
@@ -133,9 +147,19 @@ object ContainerEngine {
         fd, oldPassword, newPassword, oldKeyfileFds, newKeyfileFds
     )
 
-    fun lock(volId: Int) {
+    /**
+     * Locks [volId]. A native volume whose USB device refuses the final flush throws
+     * (the session stays registered and native state is kept, so locking can be retried)
+     * instead of silently dropping acknowledged writes; [force] locks regardless.
+     */
+    fun lock(volId: Int, force: Boolean = false) {
         val session = VaultBackendRegistry.get(volId)
-        if (session != null) VaultBackendRegistry.remove(volId) else NativeEngine.lockNative(volId)
+        if (session != null) {
+            VaultBackendRegistry.remove(volId)
+        } else if (!NativeEngine.lockNative(volId, force)) {
+            throw LockFlushRefusedException(
+                "Buffered writes could not be flushed to the device; the volume was not locked")
+        }
     }
     
     fun requestUnlockCancellation(volId: Int) = NativeEngine.requestCancelUnlockNative(volId)
@@ -157,6 +181,33 @@ object ContainerEngine {
     fun invalidateCache(path: String, volId: Int) {
         VaultBackendRegistry.get(volId)?.invalidateCache(path)
     }
+
+    // Folder-vault backends handle their own encrypted link representation.
+    // Native links are intentionally exposed only for LUKS/VeraCrypt volumes;
+    // fs_ops then enables them only on ext and NTFS (not FAT/exFAT).
+    fun listSymlinks(path: String, volId: Int): Array<String> {
+        VaultBackendRegistry.get(volId)?.let { return it.listSymlinks(path) ?: emptyArray() }
+        val format = format(volId)
+        if (!format.isLuks && !format.isVeraCrypt) return emptyArray()
+        return NativeEngine.listSymlinks(path, volId) ?: emptyArray()
+    }
+
+    fun createSymlink(path: String, target: String, volId: Int): Boolean {
+        VaultBackendRegistry.get(volId)?.let { return it.createSymlink(path, target) }
+        val format = format(volId)
+        if (!format.isLuks && !format.isVeraCrypt) return false
+        return NativeEngine.createSymlink(path, target, volId)
+    }
+
+    fun readSymlink(path: String, volId: Int): String? {
+        VaultBackendRegistry.get(volId)?.let { return it.readSymlink(path) }
+        val format = format(volId)
+        if (!format.isLuks && !format.isVeraCrypt) return null
+        return NativeEngine.readSymlink(path, volId)
+    }
+
+    fun hiddenEntryCount(path: String, volId: Int): Int =
+        VaultBackendRegistry.get(volId)?.hiddenEntryCount(path) ?: -1
 
     fun createDirectory(path: String, volId: Int): Boolean {
         VaultBackendRegistry.get(volId)?.let { return it.createDirectory(path) }
@@ -403,6 +454,8 @@ object ContainerEngine {
 
 enum class ContainerFormat {
     VERACRYPT, LUKS1, LUKS2, CRYPTOMATOR, GOCRYPTFS, CRYFS, BITLOCKER, PLAIN, UNKNOWN;
+    val isLuks: Boolean get() = this == LUKS1 || this == LUKS2
+    val isVeraCrypt: Boolean get() = this == VERACRYPT
     val wireName: String get() = when (this) {
         VERACRYPT -> "veracrypt"; LUKS1 -> "luks1"; LUKS2 -> "luks2"
         CRYPTOMATOR -> "cryptomator"; GOCRYPTFS -> "gocryptfs"; CRYFS -> "cryfs"

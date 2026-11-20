@@ -60,7 +60,7 @@ final class CameraCaptureControlsProvider
 }
 
 String _$cameraCaptureControlsHash() =>
-    r'842d1cdc217ba3aedb51e4db1a1beef063e5cf00';
+    r'703d4b85c133c55cb11eacb4ad9d4be2d433501b';
 
 final class CameraCaptureControlsFamily extends $Family
     with

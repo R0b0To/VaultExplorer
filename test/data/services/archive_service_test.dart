@@ -52,6 +52,19 @@ class _FakeArchiveApi extends VaultArchiveApi {
   }
 
   @override
+  Future<ArchiveIndexResult> scanLocalArchive({
+    required String pathOrUri,
+    String? passphrase,
+  }) async {
+    return ArchiveIndexResult(
+      status: ArchiveOpenStatus.ok,
+      entries: _entries,
+      isSolid: false,
+      errorMessage: '',
+    );
+  }
+
+  @override
   Future<ArchiveEntryExtractResult> extractVaultArchiveEntry({
     required String filePath,
     required String vaultPath,
@@ -410,6 +423,38 @@ void main() {
         ),
         throwsStateError,
       );
+    });
+
+    test('openLocal preserves archivePathInContainer relative path when provided', () async {
+      final fakeApi = _FakeArchiveApi({'file.txt': Uint8List.fromList([1, 2, 3])});
+      ArchiveService.configureWithArchiveApi(
+        archiveApi: fakeApi,
+        fileIoApi: _FakeFileIoApi(),
+      );
+
+      final ctx = await ArchiveService.openLocal(
+        pathOrUri: '/storage/emulated/0/Download/test.zip',
+        archiveName: 'test.zip',
+        archivePathInContainer: 'Download/test.zip',
+      );
+
+      expect(ctx.archivePathInContainer, 'Download/test.zip');
+      expect(ctx.localPathOrUri, '/storage/emulated/0/Download/test.zip');
+    });
+
+    test('openLocal defaults archivePathInContainer to archiveName', () async {
+      final fakeApi = _FakeArchiveApi({'file.txt': Uint8List.fromList([1, 2, 3])});
+      ArchiveService.configureWithArchiveApi(
+        archiveApi: fakeApi,
+        fileIoApi: _FakeFileIoApi(),
+      );
+
+      final ctx = await ArchiveService.openLocal(
+        pathOrUri: '/storage/emulated/0/Download/test.zip',
+        archiveName: 'test.zip',
+      );
+
+      expect(ctx.archivePathInContainer, 'test.zip');
     });
   });
 }

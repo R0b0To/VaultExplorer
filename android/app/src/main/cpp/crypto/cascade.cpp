@@ -259,3 +259,25 @@ void cascadeEncryptSector(const CascadeContext& ctx, uint64_t sectorNumber,
         if (i > 0) std::memcpy(temp, out, 512);
     }
 }
+
+bool cascadeCryptLuksXtsUnit(const CascadeContext& ctx, bool encrypt, uint64_t sectorNumber,
+                             size_t dataLen, const unsigned char* in, unsigned char* out) {
+    if (!ctx.initialized || ctx.layerCount != 1 || !in || !out ||
+        dataLen < 16 || dataLen % 16 != 0) return false;
+
+    unsigned char tweakSeed[16] = {0};
+    for (int i = 0; i < 8; ++i) {
+        tweakSeed[i] = static_cast<unsigned char>((sectorNumber >> (i * 8)) & 0xFF);
+    }
+    unsigned char tweak[16];
+    blockCipherEncryptBlock(ctx.layers[0].tweakKey, tweakSeed, tweak);
+    for (size_t block = 0; block < dataLen / 16; ++block) {
+        unsigned char tmp[16];
+        for (int i = 0; i < 16; ++i) tmp[i] = in[block * 16 + i] ^ tweak[i];
+        if (encrypt) blockCipherEncryptBlock(ctx.layers[0].dataKeyEnc, tmp, tmp);
+        else blockCipherDecryptBlock(ctx.layers[0].dataKeyDec, tmp, tmp);
+        for (int i = 0; i < 16; ++i) out[block * 16 + i] = tmp[i] ^ tweak[i];
+        xtsMultiplyTweak(tweak);
+    }
+    return true;
+}

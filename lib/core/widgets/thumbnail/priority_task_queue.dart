@@ -49,6 +49,21 @@ class PriorityTaskQueue {
 
   PriorityTaskQueue(this.maxConcurrency);
 
+  /// Tasks currently holding a slot (for diagnostics).
+  int get running => _running;
+
+  /// Tasks waiting for a slot, in every tier (for diagnostics).
+  int get waiting {
+    var total = 0;
+    for (final queue in _waiting.values) {
+      total += queue.length;
+    }
+    return total;
+  }
+
+  /// Tasks waiting for a slot in [tier] (for diagnostics).
+  int waitingIn(TaskPriority tier) => _waiting[tier]?.length ?? 0;
+
   /// Requests a turn. Completes [completer]'s future once granted.
   /// [priority] defaults to [TaskPriority.visible] so existing call sites
   /// that don't yet distinguish tiers behave exactly as before.
@@ -132,8 +147,23 @@ class PriorityTaskQueue {
     _drainNext();
   }
 
+  int _nonVisibleCapFor(TaskPriority priority) {
+    if (priority == TaskPriority.background) return 1;
+    return (maxConcurrency ~/ 2).clamp(1, 4);
+  }
+
   bool _canAdmit(TaskPriority priority) {
     if (_running >= maxConcurrency) return false;
+    return _canAdmitTier(priority);
+  }
+
+  bool _canAdmitTier(TaskPriority priority) {
+    if (priority != TaskPriority.visible) {
+      if (_waiting[TaskPriority.visible]!.isNotEmpty) return false;
+      final nonVisibleRunning =
+          _running - (_runningByTier[TaskPriority.visible] ?? 0);
+      if (nonVisibleRunning >= _nonVisibleCapFor(priority)) return false;
+    }
     return _playbackGateAllows(priority);
   }
 
@@ -167,9 +197,9 @@ class PriorityTaskQueue {
   /// (visible, adjacent, background), so a waiting `visible` request is
   /// always dequeued ahead of a waiting `adjacent`/`background` one.
   /// Within a tier, the most recently queued (LIFO) request wins.
-  Completer<void>? _dequeueHighestPriority() {
+   Completer<void>? _dequeueHighestPriority() {
     for (final tier in TaskPriority.values) {
-      if (!_playbackGateAllows(tier)) continue;
+      if (!_canAdmitTier(tier)) continue;
       final q = _waiting[tier]!;
       while (q.isNotEmpty) {
         final c = q.removeLast();

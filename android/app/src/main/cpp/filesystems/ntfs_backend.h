@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "copy_progress_callback.h"
+#include "fs_grow.h"
 
 struct _ntfs_volume;
 typedef struct _ntfs_volume ntfs_volume;
@@ -21,8 +22,12 @@ ntfs_inode* createNtfsFile(ntfs_volume* volume, const std::string& path);
 
 bool listNtfsDirectory(int volumeId, const std::string& pathSuffix,
                        std::vector<std::string>& results);
+void ntfsListSymlinks(int volumeId, const std::string& pathSuffix,
+                      std::vector<std::string>& results);
+bool ntfsReadSymlink(int volumeId, const std::string& path, std::string& outTarget);
+bool ntfsCreateSymlink(int volumeId, const std::string& path, const std::string& target);
 
-uint64_t ntfsGetFileSize(int volumeId, const std::string& path);
+int64_t ntfsGetFileSize(int volumeId, const std::string& path);
 bool ntfsReadFileChunk(int volumeId, const std::string& path, uint64_t offset, size_t length, std::vector<uint8_t>& outBuffer);
 bool ntfsWriteFileChunk(int volumeId, const std::string& path, uint64_t offset, const uint8_t* data, size_t length);
 bool ntfsWriteBackFile(int volumeId, const std::string& targetPath, const std::string& sourceHostPath,
@@ -44,3 +49,8 @@ bool ntfsIsDirty(int volumeId);
 bool ntfsClearDirtyFlag(int volumeId);
 bool ntfsHasCorruptDirectoryEntries(int volumeId);
 bool ntfsRemoveCorruptDirectoryEntries(int volumeId);
+
+// Grows the mounted NTFS volume into unallocated space at the end of the volume (volumes[volumeId].
+// dataAreaLengthBytes larger than the file system), the way ntfsresize does. The caller must unmount and
+// remount afterwards (filesystems/fs_ops.cpp fsGrowToFit does).
+FsGrowStatus ntfsGrowToFit(int volumeId);

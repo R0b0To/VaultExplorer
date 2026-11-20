@@ -20,8 +20,10 @@ import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/services/text_editor_appearance_service.dart';
+import 'package:vaultexplorer/features/browser/viewer/close_on_container_lock.dart';
 import 'package:vaultexplorer/features/browser/viewer/markdown/markdown_body_view.dart';
 import 'package:vaultexplorer/features/browser/viewer/markdown/markdown_image_picker_dialog.dart';
+import 'package:vaultexplorer/features/browser/viewer/markdown/markdown_link_syntax.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_appearance_provider.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_chrome.dart';
 import 'package:vaultexplorer/features/browser/viewer/editor_text_encoding.dart';
@@ -212,7 +214,13 @@ class TextEditorScreen extends ConsumerStatefulWidget {
 }
 
 class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
-    with WidgetsBindingObserver, TickerProviderStateMixin {
+    with
+        WidgetsBindingObserver,
+        TickerProviderStateMixin,
+        CloseOnContainerLock<TextEditorScreen> {
+  @override
+  int get watchedVolId => widget.container.volId;
+
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final List<EditorTab> _tabs = [];
   int _activeTabIndex = 0;
@@ -304,6 +312,7 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
     _focusNode.addListener(_onEditorFocusChanged);
     _readOnly = widget.container.readOnly;
     WidgetsBinding.instance.addObserver(this);
+    startClosingOnContainerLock();
 
     _toolbarController = MobileSelectionToolbarController(
       builder:
@@ -583,6 +592,7 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
 
   @override
   void dispose() {
+    stopClosingOnContainerLock();
     WidgetsBinding.instance.removeObserver(this);
     _focusNode.removeListener(_onEditorFocusChanged);
     _appBarAnimationController.dispose();
@@ -1656,7 +1666,10 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
       currentTab.filePath,
       selectedImagePath,
     );
-    final template = '![$selectedImage]($relativePath)';
+    final template = markdownImageTemplate(
+      alt: selectedImage,
+      path: relativePath,
+    );
     currentTab.codeController.replaceSelection(template);
     _focusNode.requestFocus();
   }
@@ -1830,7 +1843,10 @@ class _TextEditorScreenState extends ConsumerState<TextEditorScreen>
                   fullPath,
                 );
                 Navigator.of(ctx).pop();
-                final template = '![$fileName]($relativePath)';
+                final template = markdownImageTemplate(
+                  alt: fileName,
+                  path: relativePath,
+                );
                 currentTab.codeController.replaceSelection(template);
                 _focusNode.requestFocus();
               },

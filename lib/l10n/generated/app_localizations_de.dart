@@ -2316,6 +2316,13 @@ class AppLocalizationsDe extends AppLocalizations {
   String get gocryptfsCipherLabel => 'Inhaltsverschlüsselung';
 
   @override
+  String get gocryptfsNamesRandomIvOption => 'Zufällig pro Ordner (Standard)';
+
+  @override
+  String get gocryptfsNamesDeterministicOption =>
+      'Deterministisch (für synchronisierte Ordner)';
+
+  @override
   String get cryfsCipherLabel => 'Inhaltsverschlüsselung';
 
   @override
@@ -2480,6 +2487,168 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get selectContainerFileOrFolder => 'Datei oder Ordner auswählen';
+
+  @override
+  String get useBackupHeaderToggleTitle => 'Backup-Header verwenden';
+
+  @override
+  String get useBackupHeaderToggleSubtitle =>
+      'Mit der am Ende des Volumes gespeicherten Sicherungskopie des Headers öffnen. Verwenden, wenn der Haupt-Header beschädigt ist.';
+
+  @override
+  String get keepCurrentOption => 'Aktuelle beibehalten';
+
+  @override
+  String get toolExpandVolumeTitle => 'VeraCrypt-Volume vergrößern';
+
+  @override
+  String get toolExpandVolumeSubtitle =>
+      'Ein Standard-Volume vergrößern, wie mit dem Desktop-Volume-Expander';
+
+  @override
+  String get toolExpandLuksVolumeTitle => 'LUKS-Container erweitern';
+
+  @override
+  String get toolExpandLuksVolumeSubtitle =>
+      'LUKS1- und LUKS2-Container vergrößern, einschließlich LUKS2-Metadaten fester Größe';
+
+  @override
+  String get luksToolsExpandNote =>
+      'Sichern Sie den Container zuerst. Unterstützt LUKS1 und LUKS2. NTFS- und ext2/3/4-Dateisysteme können direkt vergrößert werden (FAT und exFAT nicht). Der hinzugefügte Speicherplatz kann mit verschlüsselten Nullen initialisiert werden. Eine Schlüsseldatei ersetzt das Passwort, falls verwendet.';
+
+  @override
+  String get toolExpandBitLockerVolumeTitle => 'BitLocker-Container erweitern';
+
+  @override
+  String get toolExpandBitLockerVolumeSubtitle =>
+      'Eine BitLocker-Volumedatei oder ein VHD/VHDX-Abbild vergrößern und das NTFS-Dateisystem erweitern';
+
+  @override
+  String get bitlockerToolsExpandNote =>
+      'Sichere zuerst den Container. Dabei werden die BitLocker-Metadaten neu geschrieben, damit das verschlüsselte Volume den hinzugefügten Platz abdeckt – prüfe das Ergebnis daher an einer Kopie, bevor du dich darauf verlässt. Funktioniert mit vollständig verschlüsselten BitLocker-Volumes ab Windows 7, entweder als rohe Volumedatei oder in einer festen oder dynamischen VHD oder VHDX. Gib bei einem Datenträgerabbild die neue Gesamtgröße des Datenträgers ein: Der virtuelle Datenträger und seine letzte Partition (MBR oder GPT) werden ebenfalls vergrößert, deshalb muss die BitLocker-Partition die letzte sein. BitLocker To Go sowie Encrypt-on-Write-Volumes (nur belegter Speicherplatz) werden nicht unterstützt. NTFS lässt sich direkt erweitern (FAT und exFAT nicht). Der hinzugefügte Platz kann optional mit verschlüsselten Nullen gefüllt werden. Entsperre mit dem Passwort oder dem 48-stelligen Wiederherstellungsschlüssel.';
+
+  @override
+  String get bitlockerToolsPasswordLabel =>
+      'Passwort oder Wiederherstellungsschlüssel';
+
+  @override
+  String get toolHiddenInExistingTitle => 'Verstecktes Volume hinzufügen';
+
+  @override
+  String get toolHiddenInExistingSubtitle =>
+      'Ein verstecktes Volume in einem bestehenden Standard-Volume erstellen';
+
+  @override
+  String get vcToolsPickContainer => 'Container auswählen';
+
+  @override
+  String get vcToolsNoContainer => 'Kein Container ausgewählt';
+
+  @override
+  String get vcToolsPasswordLabel => 'Volume-Passwort';
+
+  @override
+  String get vcToolsPimLabel => 'PIM (optional)';
+
+  @override
+  String get vcToolsNewSizeLabel => 'Neue Containergröße (MiB)';
+
+  @override
+  String get vcToolsInitFreeSpace => 'Neuen Speicherbereich initialisieren';
+
+  @override
+  String get vcToolsInitFreeSpaceHint =>
+      'Füllt den hinzugefügten Speicher mit unter dem Volume-Schlüssel verschlüsselten Daten, damit er vom Rest nicht unterscheidbar ist. Deaktivieren für schnelles Vergrößern.';
+
+  @override
+  String get vcToolsExpandAction => 'Volume vergrößern';
+
+  @override
+  String get vcToolsExpandNote =>
+      'Zuerst wird der Container vergrößert. Danach wird das Dateisystem darin in den hinzugefügten Platz erweitert, sofern das ohne Neuformatierung möglich ist (NTFS, ext2/3/4). FAT und exFAT lassen sich nicht an Ort und Stelle erweitern; ihr hinzugefügter Platz bleibt unzugeordnet. Sichern Sie das Volume vorher.';
+
+  @override
+  String get vcToolsExpandDone => 'Volume vergrößert';
+
+  @override
+  String get vcToolsGrowFsToggle => 'Dateisystem ebenfalls erweitern';
+
+  @override
+  String get vcToolsGrowFsToggleHint =>
+      'Ermöglicht NTFS- und ext2/3/4-Volumes, den hinzugefügten Platz sofort ohne Neuformatierung zu nutzen.';
+
+  @override
+  String get vcToolsGrowFsOnlyAction => 'Nur Dateisystem erweitern';
+
+  @override
+  String get vcToolsFsGrown =>
+      'Dateisystem erweitert: Der hinzugefügte Platz ist nutzbar.';
+
+  @override
+  String get vcToolsFsAlreadyFills =>
+      'Das Dateisystem füllt das Volume bereits aus.';
+
+  @override
+  String get vcToolsFsUnsupported =>
+      'Dieses Dateisystem lässt sich nicht an Ort und Stelle erweitern (FAT und exFAT nicht). Der hinzugefügte Platz bleibt unzugeordnet, bis das Volume neu formatiert wird; sichern Sie vorher seine Dateien.';
+
+  @override
+  String get vcToolsFsBusy =>
+      'Dateien im Volume sind noch geöffnet. Schließen Sie diese, sperren Sie das Volume und versuchen Sie es erneut mit „Nur das Dateisystem vergrößern“.';
+
+  @override
+  String get vcToolsFsNeedsCheck =>
+      'Das Dateisystem ist als prüfbedürftig markiert. Führen Sie „Prüfen & Reparieren“ für das Volume aus und verwenden Sie dann „Nur Dateisystem erweitern“.';
+
+  @override
+  String get vcToolsFsFailed =>
+      'Das Dateisystem konnte nicht erweitert werden. Das Volume selbst wurde vergrößert; führen Sie „Prüfen & Reparieren“ aus, bevor Sie es verwenden.';
+
+  @override
+  String get vcToolsAnalyzeAction => 'Freien Speicher prüfen';
+
+  @override
+  String get vcToolsMaxHidden => 'Größtmögliches verstecktes Volume';
+
+  @override
+  String get vcToolsNoRoom =>
+      'Kein Platz für ein verstecktes Volume: Das Ende des äußeren Volumes wird verwendet.';
+
+  @override
+  String get vcToolsHiddenSizeLabel => 'Größe des versteckten Volumes (MiB)';
+
+  @override
+  String get vcToolsHiddenPasswordLabel => 'Passwort für verstecktes Volume';
+
+  @override
+  String get vcToolsHiddenConfirmLabel =>
+      'Passwort für verstecktes Volume bestätigen';
+
+  @override
+  String get vcToolsHiddenFsLabel => 'Dateisystem des versteckten Volumes';
+
+  @override
+  String get vcToolsQuickFormat => 'Schnellformatierung';
+
+  @override
+  String get vcToolsCreateHiddenAction => 'Verstecktes Volume erstellen';
+
+  @override
+  String get vcToolsHiddenDone => 'Verstecktes Volume erstellt';
+
+  @override
+  String get vcToolsHiddenNote =>
+      'Das versteckte Volume belegt den freien Speicher am Ende des äußeren Volumes. Binden Sie das äußere Volume danach stets mit Schutz für versteckte Volumes ein, wenn Sie darauf schreiben, sonst kann das versteckte Volume überschrieben werden.';
+
+  @override
+  String get vcToolsPasswordsDiffer => 'Die Passwörter stimmen nicht überein.';
+
+  @override
+  String get vcToolsInvalidSize => 'Geben Sie eine gültige Größe ein.';
+
+  @override
+  String get vcToolsCredentialsRequired =>
+      'Geben Sie das Volume-Passwort ein oder fügen Sie eine Schlüsseldatei hinzu.';
 
   @override
   String get readOnlyModeLabel => 'Schreibgeschützter Modus';
@@ -3716,6 +3885,27 @@ class AppLocalizationsDe extends AppLocalizations {
   String get layoutModeGalleryGrid => 'Galerie-Raster';
 
   @override
+  String get galleryModeAction => 'Galerie';
+
+  @override
+  String get galleryModeTooltip => 'Galeriemodus';
+
+  @override
+  String get optionsAction => 'Optionen';
+
+  @override
+  String get optionsActionTooltip => 'Optionen';
+
+  @override
+  String get dateToday => 'Heute';
+
+  @override
+  String get dateYesterday => 'Gestern';
+
+  @override
+  String get dateEarlier => 'Früher';
+
+  @override
   String get readOnlyCantDeleteTooltip =>
       'Schreibgeschützt — Löschen nicht möglich';
 
@@ -4422,6 +4612,303 @@ class AppLocalizationsDe extends AppLocalizations {
   String get playMediaAction => 'Medien abspielen';
 
   @override
+  String get libraryTabAlbums => 'Alben';
+
+  @override
+  String get libraryTabArtists => 'Künstler';
+
+  @override
+  String get libraryTabGenres => 'Genres';
+
+  @override
+  String get libraryTabTracks => 'Titel';
+
+  @override
+  String get libraryTabFolders => 'Ordner';
+
+  @override
+  String get nowPlayingQueue => 'Warteschlange';
+
+  @override
+  String get nowPlayingShuffle => 'Zufallswiedergabe';
+
+  @override
+  String get nowPlayingRepeatOff => 'Wiederholung aus';
+
+  @override
+  String get nowPlayingRepeatAll => 'Alle wiederholen';
+
+  @override
+  String get nowPlayingRepeatOne => 'Diesen Titel wiederholen';
+
+  @override
+  String get nowPlayingOpenViewer => 'Im Mediaplayer öffnen';
+
+  @override
+  String get nowPlayingCollapse => 'Player minimieren';
+
+  @override
+  String libraryFolderCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Ordner',
+      one: '1 Ordner',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get librarySearchHint => 'Musik suchen';
+
+  @override
+  String libraryScanListing(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'bisher $count Audiodateien',
+      one: 'bisher 1 Audiodatei',
+    );
+    return 'Ordner werden durchsucht... $_temp0';
+  }
+
+  @override
+  String libraryScanReading(int read, int total) {
+    return 'Tags werden gelesen... $read von $total';
+  }
+
+  @override
+  String get libraryScanStop => 'Stopp';
+
+  @override
+  String get libraryEmptyTitle => 'Keine Musik gefunden';
+
+  @override
+  String get libraryEmptyMessage =>
+      'Dieser Tresor enthält keine Audiodateien oder sie befinden sich in Ordnern, die nicht gelesen werden konnten.';
+
+  @override
+  String get libraryNoResults => 'Keine Treffer für Ihre Suche';
+
+  @override
+  String get libraryUnknownArtist => 'Unbekannter Künstler';
+
+  @override
+  String get libraryUnknownAlbum => 'Unbekanntes Album';
+
+  @override
+  String get libraryUnknownGenre => 'Unbekanntes Genre';
+
+  @override
+  String get libraryVariousArtists => 'Verschiedene Künstler';
+
+  @override
+  String libraryTrackCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Titel',
+      one: '1 Titel',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String libraryAlbumCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Alben',
+      one: '1 Album',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get libraryPlayAll => 'Wiedergabe';
+
+  @override
+  String get libraryShuffleAll => 'Zufallswiedergabe';
+
+  @override
+  String get libraryMenuRescan => 'Nach Änderungen suchen';
+
+  @override
+  String get libraryMenuRebuild => 'Alle Tags neu einlesen';
+
+  @override
+  String get libraryMenuDeleteSaved => 'Gespeicherten Index löschen';
+
+  @override
+  String get libraryMenuDeleteSavedDone => 'Gespeicherter Index gelöscht';
+
+  @override
+  String get libraryIncompleteNote =>
+      'Einige Ordner konnten nicht gelesen werden, daher werden möglicherweise entfernte Dateien weiterhin aufgelistet.';
+
+  @override
+  String libraryReadFailuresNote(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Dateien konnten nicht gelesen werden',
+      one: '1 Datei konnte nicht gelesen werden',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get libraryArtistAlbumsHeader => 'Alben';
+
+  @override
+  String get libraryArtistTracksHeader => 'Titel';
+
+  @override
+  String get librarySortTooltip => 'Sortieren';
+
+  @override
+  String get librarySortTitle => 'Titel';
+
+  @override
+  String get librarySortArtist => 'Künstler';
+
+  @override
+  String get librarySortAlbum => 'Album';
+
+  @override
+  String get librarySortYear => 'Jahr';
+
+  @override
+  String get librarySortRecentlyAdded => 'Kürzlich hinzugefügt';
+
+  @override
+  String get librarySortName => 'Name';
+
+  @override
+  String get librarySortTrackCount => 'Anzahl der Titel';
+
+  @override
+  String get librarySortLength => 'Dauer';
+
+  @override
+  String get librarySortReverse => 'Umgekehrte Reihenfolge';
+
+  @override
+  String get musicModeAction => 'Musikmodus';
+
+  @override
+  String get musicModeFiles => 'Dateien';
+
+  @override
+  String get musicModeMenuFolders => 'Musikordner';
+
+  @override
+  String get musicModeMenuTurnOff => 'Musikmodus deaktivieren';
+
+  @override
+  String get libraryStorageInVault => 'Index in diesem Tresor gespeichert';
+
+  @override
+  String get libraryStorageThisDevice =>
+      'Index verschlüsselt auf diesem Gerät gespeichert';
+
+  @override
+  String get musicScopeTitle => 'Musikmodus';
+
+  @override
+  String get musicScopeMessage =>
+      'Wählen Sie aus, was der Musikmodus enthalten soll.';
+
+  @override
+  String get musicScopeAll => 'Alles an diesem Speicherort';
+
+  @override
+  String get musicScopeAllHint =>
+      'Durchsucht alle Ordner. Bei großen Speicherorten langsamer.';
+
+  @override
+  String get musicScopeChoose => 'Nur bestimmte Ordner';
+
+  @override
+  String get musicScopeAddFolder => 'Ordner hinzufügen';
+
+  @override
+  String get musicScopeNoFolders => 'Noch keine Ordner ausgewählt';
+
+  @override
+  String get musicScopeStart => 'Starten';
+
+  @override
+  String get musicScopePickerAdd => 'Diesen Ordner hinzufügen';
+
+  @override
+  String get musicScopePickerEmpty => 'Keine Unterordner vorhanden';
+
+  @override
+  String get musicScopePickerRoot => 'Oberste Ebene';
+
+  @override
+  String get musicScopeRemoveFolder => 'Ordner entfernen';
+
+  @override
+  String libraryArtistCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Künstler',
+      one: '1 Künstler',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String libraryGenreCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Genres',
+      one: '1 Genre',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String musicPlayPartialNote(num count, String source) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Titel',
+      one: '1 Titel',
+    );
+    return '$_temp0 von $source wird abgespielt. Der Rest dieser Liste befindet sich an anderen Speicherorten.';
+  }
+
+  @override
+  String get musicCoverChoose => 'Coverbild auswählen';
+
+  @override
+  String get musicCoverRemove => 'Benutzerdefiniertes Cover entfernen';
+
+  @override
+  String get musicCoverFailed =>
+      'Dieses Bild konnte nicht als Cover verwendet werden';
+
+  @override
+  String get musicMiniPrevious => 'Vorheriger Titel';
+
+  @override
+  String get musicMiniNext => 'Nächster Titel';
+
+  @override
+  String get musicMiniPlay => 'Abspielen';
+
+  @override
+  String get musicMiniPause => 'Pause';
+
+  @override
+  String get musicMiniStop => 'Wiedergabe stoppen';
+
+  @override
   String containerSpaceSummary(String free, String total) {
     return '$free frei / $total';
   }
@@ -4775,7 +5262,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get toolStorageAnalyzerSubtitle =>
-      'Sehen Sie, was in einem eingebundenen Tresor Speicherplatz belegt';
+      'Sieh nach, was im lokalen Speicher oder in einem eingebundenen Tresor Platz belegt.';
 
   @override
   String get toolDuplicateFinderTitle => 'Duplikat-Dateisuche';
@@ -5390,7 +5877,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get storageAnalyzerNoTargetsMessage =>
-      'Binden Sie zuerst einen Tresor ein und kommen Sie dann hierher zurück, um dessen Speicherbelegung zu sehen.';
+      'Öffne zuerst den lokalen Speicher oder binde einen Tresor ein. Kehre dann hierher zurück, um die Speicherbelegung anzusehen.';
 
   @override
   String storageAnalyzerUsedOfTotal(String used, String total) {
@@ -5431,6 +5918,176 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get storageCategoryOther => 'Sonstiges';
+
+  @override
+  String get storageAnalyzerTabMap => 'Karte';
+
+  @override
+  String get storageAnalyzerTabFolders => 'Ordner';
+
+  @override
+  String get storageAnalyzerTabTypes => 'Typen';
+
+  @override
+  String get storageAnalyzerTabCleanup => 'Bereinigen';
+
+  @override
+  String storageAnalyzerFreeSpace(String free) {
+    return '$free frei';
+  }
+
+  @override
+  String storageAnalyzerFileCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Dateien',
+      one: '1 Datei',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageAnalyzerItemCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Elemente',
+      one: '1 Element',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String storageAnalyzerContentSize(String size) {
+    return 'Tresorinhalt: $size';
+  }
+
+  @override
+  String storageAnalyzerScanProgress(String files, String size) {
+    return '$files Dateien · bisher $size';
+  }
+
+  @override
+  String get storageAnalyzerPartialNotice =>
+      'Einige Ordner konnten nicht vollständig gelesen werden. Die Gesamtsummen können daher unter den tatsächlichen Werten liegen.';
+
+  @override
+  String get storageAnalyzerStaleNotice =>
+      'Dieses Volume wurde nach dem Scannen geändert.';
+
+  @override
+  String get storageAnalyzerUpOneLevel => 'Eine Ebene nach oben';
+
+  @override
+  String get storageAnalyzerEmptyFolder => 'Dieser Ordner ist leer.';
+
+  @override
+  String storageAnalyzerSmallerItems(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count kleinere Elemente',
+      one: '1 kleineres Element',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get storageAnalyzerMapHint =>
+      'Tippen Sie auf einen Ordner, um ihn zu öffnen. Zum Auswählen gedrückt halten.';
+
+  @override
+  String get storageAnalyzerSortFiles => 'Dateianzahl';
+
+  @override
+  String get storageAnalyzerAllTypes => 'Alle Typen';
+
+  @override
+  String storageAnalyzerLargestOfType(String type) {
+    return 'Größte Dateien · $type';
+  }
+
+  @override
+  String get storageAnalyzerCleanupHeader => 'Vorschläge';
+
+  @override
+  String get storageAnalyzerCleanupLarge => 'Große Dateien';
+
+  @override
+  String get storageAnalyzerCleanupStale =>
+      'Seit über einem Jahr nicht geändert';
+
+  @override
+  String get storageAnalyzerCleanupTemp => 'Temporäre und überflüssige Dateien';
+
+  @override
+  String get storageAnalyzerCleanupEmpty => 'Leere Ordner';
+
+  @override
+  String get storageAnalyzerCleanupReview => 'Prüfen';
+
+  @override
+  String get storageAnalyzerCleanupNothing =>
+      'Nichts Offensichtliches zu bereinigen. Dieses Volume sieht aufgeräumt aus.';
+
+  @override
+  String get storageAnalyzerBiggestFiles => 'Größte Dateien';
+
+  @override
+  String get storageAnalyzerBiggestFilesSubtitle =>
+      'Die größten Dateien auf diesem Volume durchsuchen';
+
+  @override
+  String get storageAnalyzerAllSuggestions => 'Alle Vorschläge';
+
+  @override
+  String storageAnalyzerSelectedSummary(int count, String size) {
+    return '$count ausgewählt · $size';
+  }
+
+  @override
+  String storageAnalyzerDeleteFilesMessage(String size) {
+    return 'Dadurch werden die ausgewählten Elemente dauerhaft aus diesem Speicher gelöscht und $size freigegeben. Das lässt sich nicht rückgängig machen.';
+  }
+
+  @override
+  String storageAnalyzerDeleteFoldersMessage(String files, String size) {
+    return 'Dadurch werden die ausgewählten Elemente dauerhaft gelöscht ($files Dateien, einschließlich aller Inhalte ausgewählter Ordner) und $size freigegeben. Das lässt sich nicht rückgängig machen.';
+  }
+
+  @override
+  String storageAnalyzerDeleteDone(String size) {
+    return '$size freigegeben';
+  }
+
+  @override
+  String storageAnalyzerDeletePartial(
+    String deleted,
+    String failed,
+    String size,
+  ) {
+    return '$deleted gelöscht, aber $failed konnten nicht gelöscht werden. $size freigegeben.';
+  }
+
+  @override
+  String get storageAnalyzerDeleteNone => 'Es wurde nichts gelöscht.';
+
+  @override
+  String get storageAnalyzerDeleteError =>
+      'Die ausgewählten Elemente konnten nicht gelöscht werden.';
+
+  @override
+  String get storageAnalyzerRescanFolder => 'Diesen Ordner erneut scannen';
+
+  @override
+  String get storageAnalyzerSelectAction => 'Auswählen';
+
+  @override
+  String get storageAnalyzerSelectAllHere => 'Alle in diesem Ordner auswählen';
+
+  @override
+  String get storageAnalyzerOpenFolder => 'Ordner öffnen';
 
   @override
   String get keyfilePassphraseGeneratorTitle =>
@@ -5890,18 +6547,18 @@ class AppLocalizationsDe extends AppLocalizations {
   String get vaultSyncTapToSelect => 'Tippen, um Tresor & Ordner auszuwählen';
 
   @override
-  String get vaultSyncSwapTooltip => 'Links und Rechts vertauschen';
+  String get vaultSyncSwapTooltip => 'Die beiden Speicher vertauschen';
 
   @override
   String get vaultSyncSameLocationWarning =>
-      'Links und Rechts müssen unterschiedliche Ordner sein.';
+      'Die beiden Ordner müssen unterschiedlich sein.';
 
   @override
   String get vaultSyncIntroTitle => 'Zwei Tresore vergleichen';
 
   @override
   String get vaultSyncIntroSubtitle =>
-      'Wählen Sie einen linken und rechten Tresor (oder zwei Ordner im selben Tresor), um zu sehen, was auf jeder Seite fehlt, geändert oder neuer ist.';
+      'Wählen Sie zwei Ordner – in einem Tresor, auf dem Gerätespeicher oder bei einem Dokumentenanbieter wie einer SD-Karte oder einem Cloud-Laufwerk –, um zu sehen, was in beiden fehlt, geändert oder neuer ist.';
 
   @override
   String get vaultSyncCompareButton => 'Vergleichen';
@@ -5974,11 +6631,11 @@ class AppLocalizationsDe extends AppLocalizations {
   String get vaultSyncDirectionLabel => 'Synchronisierungsrichtung';
 
   @override
-  String get vaultSyncDirectionTwoWay => 'Beidseitig (empfohlen)';
+  String get vaultSyncDirectionTwoWay => 'Beidseitig';
 
   @override
   String get vaultSyncDirectionTwoWaySubtitle =>
-      'Kopiert jede Datei auf die Seite, wo sie fehlt oder eine ältere Kopie vorhanden ist';
+      'Kopiert fehlende Dateien und neuere Versionen auf die andere Seite.';
 
   @override
   String get vaultSyncDirectionLeftToRight => 'Links → Rechts (einseitig)';
@@ -6075,38 +6732,41 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get vaultSyncOverlapWarning =>
-      'Left and Right must not be the same folder or nested inside each other.';
+      'Die beiden Ordner dürfen nicht identisch sein oder ineinander liegen.';
 
   @override
   String vaultSyncPlaintextWarning(Object targets) {
-    return 'Files copied out of a vault to $targets will be stored unencrypted.';
+    return 'Aus einem Tresor nach $targets kopierte Dateien werden unverschlüsselt gespeichert.';
   }
 
   @override
-  String get vaultSyncStorageSelectorLabel => 'Storage';
+  String get vaultSyncStorageSelectorLabel => 'Speicher';
 
   @override
-  String get vaultSyncTargetKindVault => 'Encrypted vault';
+  String get vaultSyncTargetKindVault => 'Verschlüsselter Tresor';
 
   @override
-  String get vaultSyncTargetKindDevice => 'Device storage · not encrypted';
+  String get vaultSyncTargetKindDevice =>
+      'Gerätespeicher · nicht verschlüsselt';
 
   @override
-  String get vaultSyncTargetKindProvider => 'Document provider · not encrypted';
+  String get vaultSyncTargetKindProvider =>
+      'Dokumentenanbieter · nicht verschlüsselt';
 
   @override
-  String get vaultSyncAddStorageTooltip => 'Add storage location';
+  String get vaultSyncAddStorageTooltip => 'Speicherort hinzufügen';
 
   @override
   String get vaultSyncEnableLocalStorageTooltip =>
-      'Enable Local Storage access';
+      'Zugriff auf lokalen Speicher aktivieren';
 
   @override
-  String get vaultSyncNoStoragesTitle => 'No storage to sync yet';
+  String get vaultSyncNoStoragesTitle =>
+      'Noch kein Speicher zum Synchronisieren';
 
   @override
   String get vaultSyncNoStoragesMessage =>
-      'Add a folder or document provider with the + button, or mount a vault.';
+      'Fügen Sie mit der +-Schaltfläche einen Ordner oder Dokumentenanbieter hinzu oder binden Sie einen Tresor ein.';
 
   @override
   String get vaultSyncReadOnlyBadge => 'Schreibgeschützt';
@@ -6329,6 +6989,13 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get showHiddenFilesDesc =>
       'Versteckte Dateien und Systemordner anzeigen';
+
+  @override
+  String get showNoMediaFilesLabel => '.nomedia-Dateien anzeigen';
+
+  @override
+  String get showNoMediaFilesDesc =>
+      '.nomedia-Dateien in Ordnerlisten anzeigen';
 
   @override
   String get dontAskAgain => 'Nicht erneut fragen';
@@ -6750,7 +7417,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get advancedRenameSeparator => 'Trennzeichen';
 
   @override
-  String get advancedRenameSeparatorHint => '_ or -';
+  String get advancedRenameSeparatorHint => '_ oder -';
 
   @override
   String get advancedRenameLivePreview => 'Live-Vorschau';
@@ -7555,7 +8222,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get triggerPanicButton => 'Panik auslösen';
 
   @override
-  String get sectionPanicBootTrigger => 'Wipe on Reboot';
+  String get sectionPanicBootTrigger => 'Beim Neustart löschen';
 
   @override
   String get panicBootTriggerLevelLabel =>
@@ -7909,6 +8576,22 @@ class AppLocalizationsDe extends AppLocalizations {
       'Obere Leiste beim Herunterscrollen ausblenden, um den Anzeigebereich zu maximieren';
 
   @override
+  String get autoHideToolbarLabel =>
+      'Symbolleiste beim Scrollen automatisch ausblenden';
+
+  @override
+  String get autoHideToolbarDesc =>
+      'Untere Symbolleiste beim Herunterscrollen ausblenden, um den Anzeigebereich zu maximieren';
+
+  @override
+  String get autoHideBreadcrumbBarLabel =>
+      'Breadcrumb-Leiste beim Scrollen automatisch ausblenden';
+
+  @override
+  String get autoHideBreadcrumbBarDesc =>
+      'Pfadnavigationsleiste beim Herunterscrollen ausblenden, um den Anzeigebereich zu maximieren';
+
+  @override
   String get useFabForToolbarLabel =>
       'Schwebende Schaltfläche für Symbolleiste';
 
@@ -8139,7 +8822,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get statusBadgeSubtitle =>
-      'Zeigt Diashow-Timer oder Indikator für statische Fotos an';
+      'Zeigt den Diashow-Countdown, solange eine Diashow läuft';
 
   @override
   String get topBarActionsHeader => 'Aktionen der oberen Leiste';
@@ -8846,54 +9529,55 @@ class AppLocalizationsDe extends AppLocalizations {
   String get vaultItemTypeAuthenticator => 'Authenticator';
 
   @override
-  String get fieldIssuer => 'Issuer';
+  String get fieldIssuer => 'Aussteller';
 
   @override
-  String get fieldAuthenticatorAccount => 'Account';
+  String get fieldAuthenticatorAccount => 'Konto';
 
   @override
-  String get fieldSecretKey => 'Secret Key';
+  String get fieldSecretKey => 'Geheimschlüssel';
 
   @override
-  String get fieldTotpAlgorithm => 'Algorithm (default: SHA1)';
+  String get fieldTotpAlgorithm => 'Algorithmus (Standard: SHA1)';
 
   @override
-  String get fieldTotpDigits => 'Digits (default: 6)';
+  String get fieldTotpDigits => 'Ziffern (Standard: 6)';
 
   @override
-  String get fieldTotpPeriod => 'Refresh Interval, seconds (default: 30)';
+  String get fieldTotpPeriod =>
+      'Aktualisierungsintervall, Sekunden (Standard: 30)';
 
   @override
   String get authenticatorScreenTitle => 'Authenticator';
 
   @override
-  String get authenticatorAppBarTooltip => 'Authenticator codes';
+  String get authenticatorAppBarTooltip => 'Authenticator-Codes';
 
   @override
-  String get authenticatorEmptyStateTitle => 'No authenticator codes yet';
+  String get authenticatorEmptyStateTitle => 'Noch keine Authenticator-Codes';
 
   @override
   String get authenticatorEmptyStateMessage =>
-      'Add a TOTP secret to a password item, or create a standalone Authenticator item, in any unlocked vault to see live codes here.';
+      'Fügen Sie einem Passworteintrag ein TOTP-Geheimnis hinzu oder erstellen Sie einen eigenständigen Authenticator-Eintrag in einem entsperrten Tresor, um hier Live-Codes zu sehen.';
 
   @override
   String get authenticatorNoVaultsUnlockedMessage =>
-      'Unlock a vault to see its authenticator codes here.';
+      'Entsperren Sie einen Tresor, um dessen Authenticator-Codes hier zu sehen.';
 
   @override
   String get authenticatorCodeLabel => 'Code';
 
   @override
-  String get authenticatorInvalidSecretError => 'Invalid secret';
+  String get authenticatorInvalidSecretError => 'Ungültiges Geheimnis';
 
   @override
-  String get authenticatorAddButtonTooltip => 'Add authenticator';
+  String get authenticatorAddButtonTooltip => 'Authenticator hinzufügen';
 
   @override
-  String get authenticatorChooseVaultTitle => 'Choose a vault';
+  String get authenticatorChooseVaultTitle => 'Tresor auswählen';
 
   @override
-  String get authenticatorOpenItemTooltip => 'Open item';
+  String get authenticatorOpenItemTooltip => 'Eintrag öffnen';
 
   @override
   String get authenticatorNextCodeLabel => 'Nächster Code';
@@ -9340,176 +10024,175 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get videoEditorEditAction => 'Edit video';
+  String get videoEditorEditAction => 'Video bearbeiten';
 
   @override
-  String get videoEditorExportAction => 'Export';
+  String get videoEditorExportAction => 'Exportieren';
 
   @override
-  String get videoEditorTimelineLabel => 'Video timeline';
+  String get videoEditorTimelineLabel => 'Video-Zeitleiste';
 
   @override
-  String get videoEditorSetStart => 'Set start';
+  String get videoEditorSetStart => 'Start festlegen';
 
   @override
-  String get videoEditorSetEnd => 'Set end';
+  String get videoEditorSetEnd => 'Ende festlegen';
 
   @override
-  String get videoEditorAddSegment => 'Add';
+  String get videoEditorAddSegment => 'Hinzufügen';
 
   @override
-  String get videoEditorSplit => 'Split';
+  String get videoEditorSplit => 'Teilen';
 
   @override
-  String get videoEditorDeleteSegment => 'Delete';
+  String get videoEditorDeleteSegment => 'Löschen';
 
   @override
-  String get videoEditorModeKeep => 'Keep';
+  String get videoEditorModeKeep => 'Behalten';
 
   @override
-  String get videoEditorModeCutOut => 'Cut out';
+  String get videoEditorModeCutOut => 'Ausschneiden';
 
   @override
   String get videoEditorNoSegments =>
-      'No segments yet. Move the playhead and tap Add.';
+      'Noch keine Segmente. Bewegen Sie den Abspielkopf und tippen Sie auf Hinzufügen.';
 
   @override
   String videoEditorOutputSummary(int count, String duration) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Output: $count clips · $duration',
-      one: 'Output: 1 clip · $duration',
+      other: 'Ausgabe: $count Clips · $duration',
+      one: 'Ausgabe: 1 Clip · $duration',
     );
     return '$_temp0';
   }
 
   @override
   String videoEditorSnapNote(String start, String end) {
-    return 'Lossless cut starts on a keyframe: $start – $end';
+    return 'Verlustfreier Schnitt beginnt an einem Keyframe: $start – $end';
   }
 
   @override
-  String get videoEditorBoundaryInvalid =>
-      'That would leave the segment too short.';
+  String get videoEditorBoundaryInvalid => 'Dadurch würde das Segment zu kurz.';
 
   @override
-  String get videoEditorNoRoom => 'There is no room for a segment here.';
+  String get videoEditorNoRoom => 'Hier ist kein Platz für ein Segment.';
 
   @override
-  String get videoEditorNothingToExport => 'Nothing to export.';
+  String get videoEditorNothingToExport => 'Nichts zu exportieren.';
 
   @override
   String get videoEditorReadOnly =>
-      'This vault is read-only, so the edited video can\'t be saved.';
+      'Dieser Tresor ist schreibgeschützt, daher kann das bearbeitete Video nicht gespeichert werden.';
 
   @override
   String videoEditorLoadFailed(String message) {
-    return 'Couldn\'t open this video: $message';
+    return 'Dieses Video konnte nicht geöffnet werden: $message';
   }
 
   @override
-  String get videoEditorZoomIn => 'Zoom in';
+  String get videoEditorZoomIn => 'Vergrößern';
 
   @override
-  String get videoEditorZoomOut => 'Zoom out';
+  String get videoEditorZoomOut => 'Verkleinern';
 
   @override
-  String get videoEditorZoomFit => 'Fit to screen';
+  String get videoEditorZoomFit => 'An Bildschirm anpassen';
 
   @override
-  String get videoEditorPrevFrame => 'Vorheriges Einzelbild';
+  String get videoEditorPrevFrame => 'Vorheriges Bild';
 
   @override
-  String get videoEditorNextFrame => 'Nächstes Einzelbild';
+  String get videoEditorNextFrame => 'Nächstes Bild';
 
   @override
-  String get videoEditorPrevKeyframe => 'Previous keyframe';
+  String get videoEditorPrevKeyframe => 'Vorheriger Keyframe';
 
   @override
-  String get videoEditorNextKeyframe => 'Next keyframe';
+  String get videoEditorNextKeyframe => 'Nächster Keyframe';
 
   @override
-  String get videoEditorExporting => 'Exporting video';
+  String get videoEditorExporting => 'Video wird exportiert';
 
   @override
   String videoEditorCutting(int current, int total) {
-    return 'Cutting clip $current of $total';
+    return 'Clip $current von $total wird geschnitten';
   }
 
   @override
-  String get videoEditorCuttingOne => 'Cutting…';
+  String get videoEditorCuttingOne => 'Wird geschnitten…';
 
   @override
-  String get videoEditorSaving => 'Saving…';
+  String get videoEditorSaving => 'Wird gespeichert…';
 
   @override
   String videoEditorSaved(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Saved $count videos',
-      one: 'Saved 1 video',
+      other: '$count Videos gespeichert',
+      one: '1 Video gespeichert',
     );
     return '$_temp0';
   }
 
   @override
   String get videoEditorAudioDropped =>
-      'Some audio tracks couldn\'t be copied.';
+      'Einige Audiospuren konnten nicht kopiert werden.';
 
   @override
   String videoEditorExportFailed(String message) {
-    return 'Export failed: $message';
+    return 'Export fehlgeschlagen: $message';
   }
 
   @override
-  String get videoEditorExportCancelled => 'Export cancelled';
+  String get videoEditorExportCancelled => 'Export abgebrochen';
 
   @override
-  String get videoEditorExportTitle => 'Export';
+  String get videoEditorExportTitle => 'Exportieren';
 
   @override
   String videoEditorExportSummary(int count, String duration) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count clips · $duration',
-      one: '1 clip · $duration',
+      other: '$count Clips · $duration',
+      one: '1 Clip · $duration',
     );
     return '$_temp0';
   }
 
   @override
-  String get videoEditorExportSingle => 'Save as new video';
+  String get videoEditorExportSingle => 'Als neues Video speichern';
 
   @override
-  String get videoEditorExportSingleHint => 'The original stays untouched.';
+  String get videoEditorExportSingleHint => 'Das Original bleibt unverändert.';
 
   @override
-  String get videoEditorExportMerge => 'Merge into one video';
+  String get videoEditorExportMerge => 'Zu einem Video zusammenführen';
 
   @override
   String get videoEditorExportMergeHint =>
-      'Clips are joined in timeline order.';
+      'Clips werden in der Reihenfolge der Zeitleiste zusammengefügt.';
 
   @override
-  String get videoEditorExportSeparate => 'Save as separate videos';
+  String get videoEditorExportSeparate => 'Als separate Videos speichern';
 
   @override
   String videoEditorExportSeparateHint(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count new files',
-      one: 'One new file',
+      other: '$count neue Dateien',
+      one: 'Eine neue Datei',
     );
     return '$_temp0';
   }
 
   @override
   String get videoEditorLosslessNote =>
-      'Cuts are lossless, so nothing is re-encoded. Each clip starts at the nearest keyframe before your start point and ends at the next keyframe after your end point. The thin bars under the timeline show exactly what will be saved.';
+      'Schnitte sind verlustfrei, es wird also nichts neu codiert. Jeder Clip beginnt am nächsten Keyframe vor Ihrem Startpunkt und endet am nächsten Keyframe nach Ihrem Endpunkt. Die dünnen Balken unter der Zeitleiste zeigen genau, was gespeichert wird.';
 
   @override
   String get videoEditorAnalyzing => 'Video wird analysiert…';
@@ -9864,11 +10547,11 @@ class AppLocalizationsDe extends AppLocalizations {
       'Regel und täglicher Zeitplan gespeichert.';
 
   @override
-  String get autoSyncScheduledTimeTitle => 'Daily run time';
+  String get autoSyncScheduledTimeTitle => 'Tägliche Ausführungszeit';
 
   @override
   String get autoSyncScheduledTimeSubtitle =>
-      'Device local time. For a quick test, choose a time a minute or two from now; Android may run it later.';
+      'Lokale Gerätezeit. Für einen schnellen Test wählen Sie eine Zeit in ein bis zwei Minuten; Android führt es möglicherweise später aus.';
 
   @override
   String get autoSyncExactAlarmAccessTitle =>
@@ -12461,6 +13144,16 @@ class AppLocalizationsDe extends AppLocalizations {
       'Verschiebt die App-Leiste vom oberen an den unteren Bildschirmrand, wo sie mit dem Daumen leichter erreichbar ist.';
 
   @override
+  String get sectionNavigation => 'Navigation';
+
+  @override
+  String get predictiveBackAnimationsLabel => 'Zurück-Vorschauanimationen';
+
+  @override
+  String get predictiveBackAnimationsDesc =>
+      'Zeigt interaktive Vorschauen und Animationen beim Zurücknavigieren.';
+
+  @override
   String get selectByIconLabel => 'Per Tippen auf das Symbol auswählen';
 
   @override
@@ -13260,4 +13953,1027 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get comicReaderCarouselScrubberSubtitle =>
       'Seitenminiaturen über dem Schieberegler anzeigen';
+
+  @override
+  String get vaultSyncBrowseAllButton => 'Alle Elemente durchsuchen';
+
+  @override
+  String get vaultSyncExplorerTitle => 'Beide Speicher durchsuchen';
+
+  @override
+  String get vaultSyncExplorerEmptyTitle => 'Nichts anzuzeigen';
+
+  @override
+  String get vaultSyncExplorerEmptyMessage =>
+      'In diesem Ordner passt kein Element zu diesem Filter.';
+
+  @override
+  String get vaultSyncExplorerLoadFailedTitle =>
+      'Dieser Ordner konnte nicht gelesen werden';
+
+  @override
+  String get vaultSyncExplorerLoadFailedMessage =>
+      'Einer der beiden Speicher konnte nicht aufgelistet werden. Versuchen Sie es erneut und stellen Sie sicher, dass beide noch entsperrt und verbunden sind.';
+
+  @override
+  String get vaultSyncFilterAll => 'Alle';
+
+  @override
+  String get vaultSyncFilterDifferences => 'Unterschiede';
+
+  @override
+  String get vaultSyncFilterNewer => 'Neuere Kopie';
+
+  @override
+  String get vaultSyncFilterConflicts => 'Überprüfung nötig';
+
+  @override
+  String get vaultSyncFilterDeletions => 'Löschungen';
+
+  @override
+  String get vaultSyncFilterNoMatchesMessage =>
+      'Kein Element passt zu diesem Filter.';
+
+  @override
+  String get vaultSyncSortTooltip => 'Sortieren';
+
+  @override
+  String get vaultSyncSortPath => 'Pfad';
+
+  @override
+  String get vaultSyncSortSize => 'Größte zuerst';
+
+  @override
+  String get vaultSyncSortModified => 'Neueste zuerst';
+
+  @override
+  String get vaultSyncSortStatus => 'Status';
+
+  @override
+  String get vaultSyncStatusInSync => 'Synchron';
+
+  @override
+  String get vaultSyncStatusFolder => 'Ordner';
+
+  @override
+  String vaultSyncDeletionsQueuedLabel(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Löschungen',
+      one: '1 Löschung',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String vaultSyncConfirmDeletionsMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count Elemente werden endgültig gelöscht. Das kann nicht rückgängig gemacht werden.',
+      one:
+          '1 Element wird endgültig gelöscht. Das kann nicht rückgängig gemacht werden.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get vaultSyncResultsStaleMessage =>
+      'Die Ergebnisse sind nach dem Löschen möglicherweise nicht mehr aktuell. Vergleichen Sie erneut, um die Zähler zu aktualisieren.';
+
+  @override
+  String vaultSyncSelectedCount(num count) {
+    return '$count ausgewählt';
+  }
+
+  @override
+  String get vaultSyncOpenAction => 'Öffnen';
+
+  @override
+  String vaultSyncOpenCopyAction(String side) {
+    return 'Kopie in $side öffnen';
+  }
+
+  @override
+  String get vaultSyncOpenFolderAction => 'Ordner öffnen';
+
+  @override
+  String get vaultSyncOpenFolderSubtitle =>
+      'Inhalt in beiden Speichern ansehen';
+
+  @override
+  String get vaultSyncShowInFolderAction => 'Im Ordner anzeigen';
+
+  @override
+  String get vaultSyncShowInFolderSubtitle =>
+      'Neben den anderen Elementen in beiden Speichern ansehen';
+
+  @override
+  String get vaultSyncDeleteFromBothAction => 'Aus beiden Speichern löschen';
+
+  @override
+  String vaultSyncDeleteBothSidesLabel(String left, String right) {
+    return '$left und $right';
+  }
+
+  @override
+  String vaultSyncDeleteConfirmMessage(String where) {
+    return 'Diese Elemente werden endgültig aus $where gelöscht, einschließlich aller Inhalte von Ordnern. Das kann nicht rückgängig gemacht werden.';
+  }
+
+  @override
+  String vaultSyncDeleteDoneMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Elemente gelöscht',
+      one: '1 Element gelöscht',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String vaultSyncDeletePartialMessage(int deleted, int failed) {
+    return '$deleted gelöscht, aber $failed konnten nicht gelöscht werden';
+  }
+
+  @override
+  String get vaultSyncCopyDoneMessage => 'Kopiert';
+
+  @override
+  String get vaultSyncCopyFailedMessage =>
+      'Einige Elemente konnten nicht kopiert werden. Details finden Sie in der Übertragungsliste.';
+
+  @override
+  String vaultSyncOpenFailedMessage(String name) {
+    return '$name konnte nicht geöffnet werden';
+  }
+
+  @override
+  String get vaultSyncDetailsNotOnThisSide => 'Nicht in diesem Speicher';
+
+  @override
+  String get vaultSyncDetailsFolder => 'Ordner';
+
+  @override
+  String vaultSyncStatusOnlyIn(String storage) {
+    return 'Nur in $storage';
+  }
+
+  @override
+  String vaultSyncStatusNewerIn(String storage) {
+    return 'Neuer in $storage';
+  }
+
+  @override
+  String vaultSyncBadgeOnlyIn(int count, String storage) {
+    return '$count nur in $storage';
+  }
+
+  @override
+  String vaultSyncBadgeNewerIn(int count, String storage) {
+    return '$count neuer in $storage';
+  }
+
+  @override
+  String vaultSyncFolderOnlyInDetail(String storage) {
+    return 'Ordner — nur in $storage';
+  }
+
+  @override
+  String get vaultSyncDirectionOneWay => 'Einwegkopie';
+
+  @override
+  String get vaultSyncDirectionOneWaySubtitle =>
+      'Kopiert neue und aktualisierte Dateien in die angezeigte Richtung; die Quelle bleibt unverändert.';
+
+  @override
+  String get vaultSyncDirectionMirror => 'Spiegelsynchronisierung';
+
+  @override
+  String get vaultSyncDirectionMirrorSubtitle =>
+      'Ersetzt das Ziel durch eine exakte Kopie; zusätzliche Elemente im Ziel werden gelöscht.';
+
+  @override
+  String vaultSyncActionCopyTo(String storage) {
+    return 'Kopieren → $storage';
+  }
+
+  @override
+  String vaultSyncCopyNowToAction(String storage) {
+    return 'Jetzt nach $storage kopieren';
+  }
+
+  @override
+  String vaultSyncDeleteFromAction(String storage) {
+    return 'Aus $storage löschen';
+  }
+
+  @override
+  String vaultSyncPlanDeleteFrom(String storage) {
+    return 'Beim Synchronisieren aus $storage löschen';
+  }
+
+  @override
+  String vaultSyncFilterOnlyIn(String storage) {
+    return 'Nur in $storage';
+  }
+
+  @override
+  String get vaultSyncChooseFirstStorage => 'Ersten Speicher wählen';
+
+  @override
+  String get vaultSyncChooseSecondStorage => 'Zweiten Speicher wählen';
+
+  @override
+  String get vaultSyncChangeButton => 'Ändern';
+
+  @override
+  String get vaultSyncChooseButton => 'Wählen';
+
+  @override
+  String get vaultSyncChooseStorageTitle => 'Speicher wählen';
+
+  @override
+  String get vaultSyncChooseStorageHint =>
+      'Wählen Sie zuerst einen Speicher und dann den Ordner darin, der verglichen werden soll.';
+
+  @override
+  String get vaultSyncCurrentStorageBadge => 'Aktuell';
+
+  @override
+  String get vaultSyncChangeStorageTooltip => 'Speicher ändern';
+
+  @override
+  String vaultSyncPickFolderTitle(String storage) {
+    return 'Ordner in $storage';
+  }
+
+  @override
+  String get vaultSyncDirectionSectionTitle => 'Richtung';
+
+  @override
+  String get vaultSyncDirectionMirrorWarning => 'Löscht Dateien';
+
+  @override
+  String get vaultSyncDirectionSourceLabel => 'Quelle';
+
+  @override
+  String get vaultSyncDirectionTargetLabel => 'Ziel';
+
+  @override
+  String get vaultSyncDirectionSwapButton => 'Tauschen';
+
+  @override
+  String get vaultSyncDirectionRecommendedLabel => 'Empfohlen';
+
+  @override
+  String get categoriesSectionTitle => 'Kategorien';
+
+  @override
+  String get manageCategoriesTooltip => 'Kategorien verwalten';
+
+  @override
+  String get categoryShortcutsTitle => 'Kategorie-Verknüpfungen';
+
+  @override
+  String get categoryShortcutsEnable => 'Kategorie-Verknüpfungen anzeigen';
+
+  @override
+  String get categoryShortcutsEnableSubtitle =>
+      'Bilder, Videos, Audio und Dokumente aus all Ihren Speichern in der Seitenleiste';
+
+  @override
+  String get categoryShortcutsRestore =>
+      'Standard-Verknüpfungen wiederherstellen';
+
+  @override
+  String get categorySourceAll => 'Alle Speicher';
+
+  @override
+  String get categorySourceTooltip => 'Quelle auswählen';
+
+  @override
+  String get categoryFolderStructure => 'Ursprüngliche Ordnerstruktur anzeigen';
+
+  @override
+  String categoryScanning(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Wird gescannt… $count Ordner überprüft',
+      one: 'Wird gescannt… 1 Ordner überprüft',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get categoryEmpty => 'Nichts in dieser Kategorie gefunden';
+
+  @override
+  String get categoryNoVaultsUnlocked => 'Kein Tresor ist entsperrt';
+
+  @override
+  String get categoryScanLimitReached =>
+      'Ergebnisse sind möglicherweise unvollständig – der Suchlauf hat das Limit erreicht.';
+
+  @override
+  String get categoryShareOneSource =>
+      'Wählen Sie Dateien aus jeweils nur einem Speicher aus, um sie zu teilen.';
+
+  @override
+  String categoryClipboardReady(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Dateien bereit zum Einfügen',
+      one: '1 Datei bereit zum Einfügen',
+    );
+    return '$_temp0 – Ordner zum Einfügen öffnen';
+  }
+
+  @override
+  String get categoryIndexInVaultsTitle =>
+      'Kategorie-Index in Tresoren speichern';
+
+  @override
+  String get categoryIndexInVaultsSubtitle =>
+      'Wird beim Öffnen einer Kategorie verschlüsselt im Konfigurationsordner des jeweiligen Tresors gespeichert, damit die Dateien beim nächsten Mal sofort erscheinen. Auf Ihrem Smartphone wird nichts gespeichert.';
+
+  @override
+  String get categoryIndexClear => 'Kategorie-Indizes löschen';
+
+  @override
+  String get categoryIndexClearSubtitle =>
+      'Entfernt den Index aus allen entsperrten Tresoren';
+
+  @override
+  String get categoryIndexCleared => 'Kategorie-Indizes gelöscht';
+
+  @override
+  String get lockFlushRefusedTitle => 'Schreiben auf das Gerät nicht möglich';
+
+  @override
+  String lockFlushRefusedMessage(String name) {
+    return '$name wurde nicht gesperrt, weil das Gerät die letzten Änderungen nicht angenommen hat. Sie warten noch in der App. Prüfen Sie die Verbindung und versuchen Sie es erneut, oder sperren Sie trotzdem und verwerfen Sie die Änderungen.';
+  }
+
+  @override
+  String get lockAnywayButton => 'Trotzdem sperren';
+
+  @override
+  String vaultListingSymbolicLinkCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count symbolische Links',
+      one: '1 symbolischer Link',
+      zero: '0 symbolische Links',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String vaultListingHiddenEntryCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Einträge werden nicht angezeigt',
+      one: '1 Eintrag wird nicht angezeigt',
+      zero: '0 Einträge werden nicht angezeigt',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get vaultListingDetails => 'Details';
+
+  @override
+  String get vaultListingSymbolicLinksTitle => 'Verknüpfungen';
+
+  @override
+  String get vaultListingSymbolicLinksNote =>
+      'Beim Antippen wird das Ziel einer Verknüpfung geöffnet. Relative Ziele bleiben in diesem Tresor; absolute oder ungültige Ziele können nicht geöffnet werden.';
+
+  @override
+  String get vaultListingHiddenEntriesTitle => 'Nicht angezeigte Einträge';
+
+  @override
+  String get vaultListingHiddenEntriesBody =>
+      'Diese Einträge sind im Tresor vorhanden, konnten aber nicht aufgelistet werden. Häufig erstellt eine Synchronisierungs-App Konfliktkopien (zum Beispiel „name (1)“) oder ein Upload ist noch nicht abgeschlossen. Konfliktkopien lassen sich mit Cryptomator auf einem Computer beheben. Hier wurde nichts geändert oder gelöscht.';
+
+  @override
+  String get vaultListingTargetUnreadable => '(Ziel nicht lesbar)';
+
+  @override
+  String get vaultListingLinkTargetCopied => 'Linkziel kopiert';
+
+  @override
+  String get galleryFilterTooltip => 'Filter';
+
+  @override
+  String get galleryFilterMenuOpen => 'Filtern…';
+
+  @override
+  String get galleryFilterClearAll => 'Filter zurücksetzen';
+
+  @override
+  String get galleryFilterClear => 'Zurücksetzen';
+
+  @override
+  String get galleryFilterMatchAny => 'Beliebige';
+
+  @override
+  String get galleryFilterMatchAll => 'Alle';
+
+  @override
+  String get galleryFoldersMenu => 'Galerie-Ordner';
+
+  @override
+  String get galleryFoldersHint =>
+      'Wähle die Ordner, die die Galerie durchsucht. Unterordner sind eingeschlossen. Ohne Auswahl wird der gesamte Speicher durchsucht.';
+
+  @override
+  String get galleryFoldersUseAll => 'Alles durchsuchen';
+
+  @override
+  String get galleryFoldersApply => 'Übernehmen';
+
+  @override
+  String galleryFilterShownOfTotal(int shown, int total) {
+    return '$shown von $total angezeigt';
+  }
+
+  @override
+  String galleryFilterTotal(int count) {
+    return 'Gesamt: $count';
+  }
+
+  @override
+  String galleryFilterIndexing(int done, int total) {
+    return 'Fotodetails werden gelesen: $done von $total. Tags, Orte und Kameras erscheinen nach und nach.';
+  }
+
+  @override
+  String get galleryFilterSearchHint => 'Tags, Orte, Kameras, Ordner suchen…';
+
+  @override
+  String get galleryFilterTapHint =>
+      'Tippen: nur diese anzeigen. Lange drücken: ausblenden.';
+
+  @override
+  String get galleryFilterGroupBy => 'Gruppieren nach';
+
+  @override
+  String galleryFilterShowAll(int count) {
+    return 'Alle $count';
+  }
+
+  @override
+  String get galleryFilterShowFewer => 'Weniger';
+
+  @override
+  String get galleryGroupNone => 'Keine';
+
+  @override
+  String get galleryGroupDay => 'Tag';
+
+  @override
+  String get galleryGroupMonth => 'Monat';
+
+  @override
+  String get galleryGroupYear => 'Jahr';
+
+  @override
+  String get galleryGroupFolder => 'Ordner';
+
+  @override
+  String get galleryGroupType => 'Typ';
+
+  @override
+  String get galleryGroupPlace => 'Ort';
+
+  @override
+  String get galleryGroupCamera => 'Kamera';
+
+  @override
+  String get galleryFilterSectionType => 'Typ';
+
+  @override
+  String get galleryFilterSectionDate => 'Datum';
+
+  @override
+  String get galleryFilterSectionTags => 'Tags';
+
+  @override
+  String get galleryFilterSectionPlaces => 'Orte';
+
+  @override
+  String get galleryFilterSectionCameras => 'Kameras';
+
+  @override
+  String get galleryFilterSectionOrientation => 'Ausrichtung';
+
+  @override
+  String get galleryFilterSectionRating => 'Bewertung';
+
+  @override
+  String get galleryFilterSectionSize => 'Dateigröße';
+
+  @override
+  String get galleryFilterSectionFolders => 'Ordner';
+
+  @override
+  String get galleryFilterSectionMissing => 'Fehlend';
+
+  @override
+  String get galleryTypePhotos => 'Fotos';
+
+  @override
+  String get galleryTypeVideos => 'Videos';
+
+  @override
+  String get galleryTypeAnimated => 'Animiert';
+
+  @override
+  String get galleryOrientationLandscape => 'Querformat';
+
+  @override
+  String get galleryOrientationPortrait => 'Hochformat';
+
+  @override
+  String get galleryOrientationSquare => 'Quadratisch';
+
+  @override
+  String get gallerySizeSmall => 'Unter 1 MB';
+
+  @override
+  String get gallerySizeMedium => '1 – 10 MB';
+
+  @override
+  String get gallerySizeLarge => 'Über 10 MB';
+
+  @override
+  String get galleryMissingLocation => 'Kein Ort';
+
+  @override
+  String get galleryMissingTags => 'Keine Tags';
+
+  @override
+  String get galleryMissingCamera => 'Keine Kamerainfo';
+
+  @override
+  String get galleryMissingDateTaken => 'Kein Aufnahmedatum';
+
+  @override
+  String galleryPlaceHintCity(int km) {
+    return 'Nächste Stadt im Umkreis von $km km';
+  }
+
+  @override
+  String galleryPlaceHintCoordinates(int km) {
+    return 'Keine Stadt im Umkreis von $km km: nach Koordinaten gruppiert';
+  }
+
+  @override
+  String get cryptomatorBackupKeyFilesTitle =>
+      'Schlüsseldateien beim Entsperren sichern';
+
+  @override
+  String get cryptomatorBackupKeyFilesSubtitle =>
+      'Legt neben den Originalen eine Kopie von masterkey.cryptomator und vault.cryptomator ab, wie Cryptomator am Computer. Gilt ab dem nächsten Entsperren. Schreibgeschützte Sitzungen schreiben nie.';
+
+  @override
+  String get cryptomatorUpgradeTitle => 'Tresorformat aktualisieren';
+
+  @override
+  String get cryptomatorUpgradeSubtitle =>
+      'Dieser Tresor verwendet das ältere Format 7.';
+
+  @override
+  String get cryptomatorUpgradeLockFirst => 'Tresor zum Aktualisieren sperren';
+
+  @override
+  String get cryptomatorUpgradeWarning =>
+      'Beim Aktualisieren wird dieser Tresor auf Format 8 umgestellt. Das lässt sich nicht rückgängig machen, und Cryptomator-Versionen vor 1.6 können den Tresor danach nicht mehr öffnen.\n\nEine Kopie der aktuellen Schlüsseldatei bleibt als masterkey.cryptomator.<id>.bkup erhalten. Wenn eine andere App diesen Tresor synchronisiert, lassen Sie die Synchronisierung zuerst abschließen.';
+
+  @override
+  String get cryptomatorUpgradeConfirm =>
+      'Mir ist klar, dass sich das nicht rückgängig machen lässt';
+
+  @override
+  String get cryptomatorUpgradeAction => 'Aktualisieren';
+
+  @override
+  String get cryptomatorUpgradedMessage => 'Tresor auf Format 8 aktualisiert';
+
+  @override
+  String get cryptomatorUpgradeUnlockedError => 'Sperren Sie zuerst den Tresor';
+
+  @override
+  String get cryptomatorConfigMissingWarning =>
+      'vault.cryptomator fehlt. Wenn eine andere App diesen Tresor synchronisiert, warten Sie, bis sie fertig ist, und versuchen Sie es dann erneut. Nicht aktualisieren.';
+
+  @override
+  String get cryptomatorUpgradeFailedMessage =>
+      'Tresor konnte nicht aktualisiert werden';
+
+  @override
+  String get newSymbolicLinkTitle => 'Neuer symbolischer Link';
+
+  @override
+  String get symbolicLinkNameHint => 'Name des Links';
+
+  @override
+  String get symbolicLinkTargetHint => 'Verweist auf';
+
+  @override
+  String get symbolicLinkTargetHelper =>
+      'Wird genau so gespeichert, wie es eingegeben wurde. Relative Ziele werden beim Öffnen innerhalb dieses Tresors aufgelöst; absolute Ziele werden nicht verfolgt.';
+
+  @override
+  String get symbolicLinkTargetTooLong =>
+      'Ziel ist zu lang (maximal 32.767 Byte)';
+
+  @override
+  String get symbolicLinkTargetInvalid =>
+      'Das Ziel darf kein Nullzeichen enthalten';
+
+  @override
+  String get symbolicLinkNameTaken =>
+      'Eine Datei, ein Ordner oder ein Link mit diesem Namen existiert bereits';
+
+  @override
+  String get deleteSymbolicLinkTitle => 'Symbolischen Link löschen?';
+
+  @override
+  String deleteSymbolicLinkMessage(String name) {
+    return 'Link „$name“ löschen? Nur der Link wird entfernt; das Ziel bleibt unberührt.';
+  }
+
+  @override
+  String get symbolicLinkRenameTitle => 'Symbolischen Link umbenennen';
+
+  @override
+  String get symbolicLinkBrowseTarget => 'Tresor durchsuchen';
+
+  @override
+  String get symbolicLinkSelectTargetTitle => 'Ziel für Verknüpfung auswählen';
+
+  @override
+  String get symbolicLinkSelectThisFolder => 'Diesen Ordner auswählen';
+
+  @override
+  String get symbolicLinkPickerLoadError =>
+      'Dieser Ordner konnte nicht geladen werden';
+
+  @override
+  String get shortcutBadge => 'Verknüpfung';
+
+  @override
+  String get emptyFolder => 'Dieser Ordner ist leer';
+
+  @override
+  String get symbolicLinkTargetHelperRelative =>
+      'Verwende einen relativen Pfad innerhalb dieses Containers. Das Ziel darf fehlen; Umbenennen oder Löschen des Links ändert das Ziel nicht.';
+
+  @override
+  String get symbolicLinkTargetOutsideVault =>
+      'Das Ziel muss ein relativer Pfad innerhalb dieses Containers sein.';
+
+  @override
+  String get symbolicLinkPickerUnresolvable =>
+      'Von hier lässt sich kein relatives Ziel bilden. Geben Sie das Ziel stattdessen ein.';
+
+  @override
+  String get editMetadataAction => 'Metadaten bearbeiten';
+
+  @override
+  String get editTagsAction => 'Tags bearbeiten';
+
+  @override
+  String get editDateTimeAction => 'Datum und Uhrzeit bearbeiten';
+
+  @override
+  String get removeMetadataAction => 'Metadaten entfernen';
+
+  @override
+  String get metadataFormatsNote =>
+      'Tags, Datum und Entfernen werden in JPEG-, PNG- und WebP-Bilder geschrieben. Andere Dateien erhalten nur ein neues Änderungsdatum.';
+
+  @override
+  String get metadataReadOnlyMessage => 'Dieser Tresor ist schreibgeschützt';
+
+  @override
+  String get tagsAddHint => 'Tags hinzufügen, durch Kommas getrennt';
+
+  @override
+  String get tagsNoneYet => 'Noch keine Tags';
+
+  @override
+  String get dateModeSet => 'Festlegen';
+
+  @override
+  String get dateModeShift => 'Verschieben';
+
+  @override
+  String get dateModeFromModified => 'Aus Änderungsdatum';
+
+  @override
+  String get dateModeFromName => 'Aus Dateiname';
+
+  @override
+  String get dateShiftLater => 'Später';
+
+  @override
+  String get dateShiftEarlier => 'Früher';
+
+  @override
+  String get dateDaysLabel => 'Tage';
+
+  @override
+  String get dateHoursLabel => 'Stunden';
+
+  @override
+  String get dateMinutesLabel => 'Minuten';
+
+  @override
+  String get dateAlsoSetModified => 'Auch das Änderungsdatum der Datei setzen';
+
+  @override
+  String dateFromNameMatches(int matched, int total) {
+    return '$matched von $total Dateinamen enthalten ein Datum';
+  }
+
+  @override
+  String get stripExifLabel => 'Exif (Kamera, Datum, Ort)';
+
+  @override
+  String get stripXmpLabel => 'XMP (Tags, Bewertung, Bearbeitungsdaten)';
+
+  @override
+  String get stripIptcLabel => 'IPTC / Photoshop (Bildunterschriften, Credits)';
+
+  @override
+  String get stripCommentsLabel => 'Kommentare';
+
+  @override
+  String get stripIccLabel => 'Farbprofil (kann Farben verändern)';
+
+  @override
+  String get stripKeepOrientationLabel => 'Ausrichtung beibehalten';
+
+  @override
+  String get stripKeepOrientationDesc =>
+      'Ohne sie können quer aufgenommene Fotos gedreht erscheinen';
+
+  @override
+  String get stripWarning =>
+      'Dies schreibt die Dateien neu und kann nicht rückgängig gemacht werden.';
+
+  @override
+  String metadataProgress(int done, int total) {
+    return '$done von $total wird aktualisiert';
+  }
+
+  @override
+  String metadataResultUpdated(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Dateien aktualisiert',
+      one: '1 Datei aktualisiert',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get metadataResultUnchanged => 'Nichts zu ändern';
+
+  @override
+  String metadataResultSkipped(int count) {
+    return '$count übersprungen (nicht unterstützt)';
+  }
+
+  @override
+  String metadataResultFailed(int count) {
+    return '$count fehlgeschlagen';
+  }
+
+  @override
+  String get showNoMediaFoldersLabel => '.nomedia-Ordner anzeigen';
+
+  @override
+  String get showNoMediaFoldersDesc =>
+      'Ordner mit einer .nomedia-Datei einbeziehen, die Galerie-Apps normalerweise überspringen';
+
+  @override
+  String get motionPhotoCopyNote =>
+      'Die bearbeitete Kopie ist ein Standbild. Die Originaldatei, ihre EXIF-Daten und eingebettete Videos bleiben unverändert.';
+
+  @override
+  String get pimInputHint => 'Leer lassen oder 0 für Standard';
+
+  @override
+  String get galleryMetadataIndexStorageLabel =>
+      'Gallery metadata index storage';
+
+  @override
+  String get galleryMetadataUseGlobalDefaultDesc =>
+      'Follow the app-wide gallery metadata index storage setting.';
+
+  @override
+  String get galleryMetadataAppStorageOption => 'App storage';
+
+  @override
+  String get galleryMetadataInVaultOption => 'Inside vault';
+
+  @override
+  String get galleryMetadataSectionHeader => 'Gallery Metadata Index';
+
+  @override
+  String get galleryMetadataUseGlobalDefaultTitle =>
+      'Use app-wide gallery index setting';
+
+  @override
+  String get musicIndexSectionHeader => 'Music Index';
+
+  @override
+  String get musicIndexStorageLabel => 'Music index storage';
+
+  @override
+  String get musicIndexUseGlobalDefaultTitle =>
+      'Use app-wide music index setting';
+
+  @override
+  String get musicIndexUseGlobalDefaultDesc =>
+      'Follow the app-wide music index storage setting.';
+
+  @override
+  String get musicIndexAppStorageOption => 'App storage';
+
+  @override
+  String get musicIndexInVaultOption => 'Inside vault';
+
+  @override
+  String get musicIndexHiddenFolderOption => 'Hidden folder';
+
+  @override
+  String get musicIndexHiddenFolderDesc =>
+      'Stored in an unencrypted hidden folder in Local Storage.';
+
+  @override
+  String get libraryStorageHiddenFolder =>
+      'Index saved in an unencrypted hidden folder';
+
+  @override
+  String get libraryStorageDisabled =>
+      'Saved music index is disabled; tracks are rescanned each time.';
+
+  @override
+  String get galleryMetadataClearAction => 'Clear saved gallery index';
+
+  @override
+  String get galleryMetadataClearConfirmTitle =>
+      'Clear gallery metadata index?';
+
+  @override
+  String get galleryMetadataClearConfirmMessage =>
+      'This deletes saved photo details. The index will be rebuilt as you browse the gallery.';
+
+  @override
+  String get galleryMetadataIndexClearedMessage =>
+      'Gallery metadata index cleared.';
+
+  @override
+  String get musicIndexClearAction => 'Clear saved music index';
+
+  @override
+  String get musicIndexClearConfirmTitle => 'Clear saved music index?';
+
+  @override
+  String get musicIndexClearConfirmMessage =>
+      'This deletes saved track details. Music Mode will rebuild the index the next time it opens.';
+
+  @override
+  String get musicIndexClearedMessage => 'Music index cleared.';
+
+  @override
+  String get clearSavedIndexButton => 'Clear index';
+
+  @override
+  String get appIndexClearedUnlockMessage =>
+      'App-storage copy cleared. Open the vault with write access to clear any index copy inside it.';
+
+  @override
+  String get savedIndexClearFailedMessage =>
+      'Could not clear all saved index data.';
+
+  @override
+  String get libraryStorageReadOnly =>
+      'Vault is read-only; the music index is not saved.';
+
+  @override
+  String get clearLocalStorageThumbnailCacheMessage =>
+      'This will delete cached thumbnails for Local Storage. They will be regenerated the next time you browse media.';
+
+  @override
+  String vcToolsDetectedFormat(String format) {
+    return 'Erkannt: $format';
+  }
+
+  @override
+  String get vcToolsUnencryptedDetected =>
+      'Sieht unverschlüsselt aus; dieses Tool benötigt einen verschlüsselten Container';
+
+  @override
+  String get vcToolsAssumingVeraCrypt =>
+      'Automatisch nicht erkannt; VeraCrypt wird angenommen';
+
+  @override
+  String get vcToolsManualFormat => 'Manuell festlegen';
+
+  @override
+  String get vcToolsExpandInsufficientSpaceForSize =>
+      'Nicht genügend freier Speicherplatz auf dem Gerät für diese Größe.';
+
+  @override
+  String vcToolsNewSizePreview(String size) {
+    return 'Neue Größe: $size';
+  }
+
+  @override
+  String vcToolsNewSizePreviewWithAdded(String size, String added) {
+    return 'Neue Größe: $size (+$added)';
+  }
+
+  @override
+  String get vcToolsFileSize => 'Dateigröße';
+
+  @override
+  String get vcToolsCurrentSize => 'Aktuelle Größe';
+
+  @override
+  String vcToolsFreeOnDevice(String size) {
+    return 'Auf dem Gerät verfügbar: $size';
+  }
+
+  @override
+  String get vcToolsSetExactTotalInstead =>
+      'Stattdessen exakte Gesamtgröße festlegen';
+
+  @override
+  String get vcToolsBitLockerDiskImageSizeHint =>
+      'Geben Sie bei einem Datenträgerabbild (VHD/VHDX) die neue virtuelle Gesamtdatenträgergröße ein, nicht die Dateigröße.';
+
+  @override
+  String get vcToolsNewTotalSize => 'Neue Gesamtgröße';
+
+  @override
+  String get vcToolsAddSize => 'Hinzufügen';
+
+  @override
+  String vcToolsQuickAddGiB(String amount) {
+    return '+$amount GiB';
+  }
+
+  @override
+  String get vcToolsDoubleSize => 'Verdoppeln';
+
+  @override
+  String get vcToolsSizeMustExceedCurrent =>
+      'Die neue Größe muss größer als die aktuelle Größe sein.';
+
+  @override
+  String get vcToolsInsufficientFreeSpace =>
+      'Nicht genügend freier Speicherplatz auf dem Gerät.';
+
+  @override
+  String get vcToolsContainerSectionHeader => 'Container';
+
+  @override
+  String get vcToolsCredentialsSectionHeader => 'Anmeldedaten';
+
+  @override
+  String get vcToolsVolumeOptionsSectionHeader => 'Volume-Optionen';
+
+  @override
+  String get vcToolsDetectingFormat => 'Wird erkannt…';
+
+  @override
+  String get indexesAndThumbnailsTitle => 'Indizes & Miniaturansichten';
+
+  @override
+  String get indexesAndThumbnailsSubtitle =>
+      'Verwalte Miniaturansichten, Galerie-Metadaten und den Musikindex.';
+
+  @override
+  String get resetFileManagerSettingsTitle =>
+      'Dateimanager-Einstellungen zurücksetzen?';
+
+  @override
+  String get resetFileManagerSettingsMessage =>
+      'Dadurch wird jede Option auf diesem Bildschirm auf den Standardwert zurückgesetzt, einschließlich der Einstellungen für Tabs, Layout, Symbolleiste, Raster, Vorschaubilder, Viewer und Design. Deine Dateien, Lesezeichen und ordnerspezifischen Einstellungen bleiben unverändert.';
 }

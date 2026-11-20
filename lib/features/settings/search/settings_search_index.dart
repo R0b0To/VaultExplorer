@@ -522,6 +522,14 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
     keywords: ['dotfiles', 'hidden', 'invisible'],
   ),
   _e(
+    'file_manager.nomedia_folders',
+    SettingsDestination.fileManager,
+    (l) => l.showNoMediaFoldersLabel,
+    section: (l) => l.browserLayoutSectionHeader,
+    details: [(l) => l.showNoMediaFoldersDesc],
+    keywords: ['nomedia', 'gallery', 'hidden folders', 'ignored'],
+  ),
+  _e(
     'file_manager.file_extensions',
     SettingsDestination.fileManager,
     (l) => l.showFileExtensionsLabel,
@@ -560,6 +568,22 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
     section: (l) => l.browserLayoutSectionHeader,
     details: [(l) => l.textEditorAutoHideTabBarDescription],
     keywords: ['tabs', 'tab strip', 'scroll', 'hide'],
+  ),
+  _e(
+    'file_manager.auto_hide_toolbar',
+    SettingsDestination.fileManager,
+    (l) => l.autoHideToolbarLabel,
+    section: (l) => l.browserLayoutSectionHeader,
+    details: [(l) => l.autoHideToolbarDesc],
+    keywords: ['bottom bar', 'toolbar', 'action bar', 'scroll', 'hide'],
+  ),
+  _e(
+    'file_manager.auto_hide_breadcrumb_bar',
+    SettingsDestination.fileManager,
+    (l) => l.autoHideBreadcrumbBarLabel,
+    section: (l) => l.browserLayoutSectionHeader,
+    details: [(l) => l.autoHideBreadcrumbBarDesc],
+    keywords: ['breadcrumb', 'path', 'navigation', 'scroll', 'hide'],
   ),
   _e(
     'file_manager.app_bar_at_bottom',
@@ -833,6 +857,24 @@ kSettingsSearchEntries = List.unmodifiable(<SettingsSearchEntry>[
     (l) => l.sortContainersByLabel,
     section: (l) => l.navBarVaultsLabel,
     keywords: ['order', 'sort', 'vault list', 'containers'],
+  ),
+  _e(
+    'appearance.predictive_back',
+    SettingsDestination.appearance,
+    (l) => l.predictiveBackAnimationsLabel,
+    section: (l) => l.sectionNavigation,
+    details: [(l) => l.predictiveBackAnimationsDesc],
+    keywords: [
+      'back gesture',
+      'swipe back',
+      'back animation',
+      'predictive back',
+      'preview',
+      'transition',
+      'navigation',
+    ],
+    // Back-gesture progress needs Android 14; the row is hidden below that.
+    minSdk: 34,
   ),
 
   // ─────────────────────────── Screens reached from Appearance ───────────────

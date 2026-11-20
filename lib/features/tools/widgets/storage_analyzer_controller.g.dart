@@ -41,7 +41,7 @@ final class StorageAnalyzerProvider
   }
 }
 
-String _$storageAnalyzerHash() => r'27c07f567cd13a1fbc1db630561005e0a32e1d7d';
+String _$storageAnalyzerHash() => r'b7e1cce19036006b5ec0a946b13925fe44c90e8d';
 
 abstract class _$StorageAnalyzer extends $Notifier<StorageAnalyzerState> {
   StorageAnalyzerState build();

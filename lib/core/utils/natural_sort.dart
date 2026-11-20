@@ -25,6 +25,7 @@ bool _isDigit(int codeUnit) =>
 /// run sorts first, purely to keep the ordering deterministic; real
 /// file/folder names essentially never hit this case.
 int naturalCompare(String a, String b) {
+  if (identical(a, b)) return 0;
   final aLen = a.length;
   final bLen = b.length;
   var i = 0;
@@ -34,7 +35,15 @@ int naturalCompare(String a, String b) {
     final ca = a.codeUnitAt(i);
     final cb = b.codeUnitAt(j);
 
-    if (_isDigit(ca) && _isDigit(cb)) {
+    if (!_isDigit(ca)) {
+      if (ca != cb) return ca - cb;
+      i++;
+      j++;
+      continue;
+    }
+    if (!_isDigit(cb)) return ca - cb;
+
+    {
       // Consume the full digit run on each side so a multi-digit number
       // is compared as one value, not digit-by-digit.
       var aEnd = i;
@@ -79,11 +88,7 @@ int naturalCompare(String a, String b) {
 
       i = aEnd;
       j = bEnd;
-    } else {
-      if (ca != cb) return ca - cb;
-      i++;
-      j++;
-    }
+    } 
   }
 
   return (aLen - i) - (bLen - j);

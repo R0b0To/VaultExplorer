@@ -51,7 +51,7 @@ class FileBrowserSelection extends _$FileBrowserSelection {
   /// selection.
   void setSelectedItems(Set<RawEntry> newSelection) {
     state = (
-      items: {...newSelection},
+      items: newSelection,
       resolvedFolderSizes: state.resolvedFolderSizes,
     );
   }
@@ -147,30 +147,58 @@ extension FileBrowserSelectionStateX on FileBrowserSelectionState {
   /// [items], for callers that need both (the workspace-wide aggregate runs on
   /// every selection change, and each of those getters walks the whole set).
   ({int totalBytes, bool hasPendingFolderSizes}) get totals {
-    var bytes = 0;
+    final stats = summaryStats;
+    return (
+      totalBytes: stats.totalBytes,
+      hasPendingFolderSizes: stats.hasPendingFolderSizes,
+    );
+  }
+
+  /// Single-pass statistics over [items] for selection summaries and totals.
+  ({
+    int fileCount,
+    int folderCount,
+    int fileBytes,
+    int totalBytes,
+    bool hasPendingFolderSizes,
+  }) get summaryStats {
+    var files = 0;
+    var folders = 0;
+    var fBytes = 0;
+    var tBytes = 0;
     var pending = false;
     for (final e in items) {
-      if (!e.isDir) {
-        bytes += e.sizeBytes;
-        continue;
-      }
-      final resolved = resolvedFolderSizes[e.name];
-      if (resolved == null) {
-        pending = true;
+      if (e.isDir) {
+        folders++;
+        final resolved = resolvedFolderSizes[e.name];
+        if (resolved == null) {
+          pending = true;
+        } else {
+          tBytes += resolved;
+        }
       } else {
-        bytes += resolved;
+        files++;
+        fBytes += e.sizeBytes;
+        tBytes += e.sizeBytes;
       }
     }
-    return (totalBytes: bytes, hasPendingFolderSizes: pending);
+    return (
+      fileCount: files,
+      folderCount: folders,
+      fileBytes: fBytes,
+      totalBytes: tBytes,
+      hasPendingFolderSizes: pending,
+    );
   }
 
   /// Ready-to-display summary for the selection action-bar, e.g.
   /// "3 files · 42.3 MB" or "2 folders (calculating…)".
   String selectionSummary(AppLocalizations l10n) {
-    final fc = selectedFolderCount;
-    final fileSize = selectedFileBytes;
-    final total = selectedTotalBytes;
-    final fileCount = selectedFileCount;
+    final stats = summaryStats;
+    final fc = stats.folderCount;
+    final fileSize = stats.fileBytes;
+    final total = stats.totalBytes;
+    final fileCount = stats.fileCount;
     final filePart = fileCount > 0
         ? '${l10n.statsFileCount(fileCount)}'
               '${fileSize > 0 ? ' · ${formatBytes(fileSize)}' : ''}'
@@ -178,7 +206,7 @@ extension FileBrowserSelectionStateX on FileBrowserSelectionState {
     if (fc == 0) return filePart;
     final folderLabel = l10n.statsFolderCount(fc);
     final String folderSizePart;
-    if (hasPendingFolderSizes) {
+    if (stats.hasPendingFolderSizes) {
       folderSizePart = '(${l10n.sizeCalculatingLabel})';
     } else {
       final resolvedBytes = total - fileSize;

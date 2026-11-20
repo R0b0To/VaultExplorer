@@ -16,6 +16,7 @@ import com.aeidolon.vaultexplorer.bridge.UsbBlockBridge
 import com.aeidolon.vaultexplorer.cryfs.CryfsVault
 import com.aeidolon.vaultexplorer.cryptomator.CryptomatorVault
 import com.aeidolon.vaultexplorer.engine.VaultOpenResult
+import com.aeidolon.vaultexplorer.foldervault.VaultOpenPreferences
 import com.aeidolon.vaultexplorer.gocryptfs.GocryptfsVault
 import com.aeidolon.vaultexplorer.handlers.DerivedKeyHandlers
 import com.aeidolon.vaultexplorer.saf.UriToPath
@@ -109,12 +110,33 @@ object ContainerLifecycleCore {
         return size ?: 0L
     }
 
-    fun lockContainer(context: Context, uriString: String): Boolean {
-        val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString) ?: return false
+    /** Why a lock did or did not happen; [lockContainer] collapses this to a Boolean. */
+    enum class LockOutcome {
+        LOCKED,
+
+        /** Not mounted at all, or a lock for this volume is already running. */
+        NOT_LOCKED,
+
+        /** USB device refused the final flush; the volume is still open and retryable. */
+        FLUSH_REFUSED,
+
+        /** Any other failure. */
+        FAILED,
+    }
+
+    fun lockContainer(context: Context, uriString: String, force: Boolean = false): Boolean =
+        lockContainerOutcome(context, uriString, force) == LockOutcome.LOCKED
+
+    fun lockContainerOutcome(
+        context: Context,
+        uriString: String,
+        force: Boolean = false,
+    ): LockOutcome {
+        val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString) ?: return LockOutcome.NOT_LOCKED
         val session = ContainerSessionRegistry.activeSessions[volId]
         val lockPermit = ContainerDocumentIoRegistry.beginLock(volId) ?: run {
             VeLog.w(TAG) { "lockContainer already pending for volId=$volId" }
-            return false
+            return LockOutcome.NOT_LOCKED
         }
         return try {
             if (lockPermit.handlesAtStart > 0) {
@@ -125,8 +147,10 @@ object ContainerLifecycleCore {
             lockPermit.awaitHandlesClosed()
             com.aeidolon.vaultexplorer.pdf.PdfRendererRegistry.closeAllForVolume(volId)
             com.aeidolon.vaultexplorer.pdf.VaultPdfSessionRegistry.revokeAllForVolume(volId)
+            // Throws when the USB device refuses the final flush (and force is false): the
+            // bridge and session below are then left in place so the lock can be retried.
             ContainerSessionRegistry.locks[volId].writeLock().withLock {
-                ContainerEngine.lock(volId)
+                ContainerEngine.lock(volId, force)
             }
             if (session?.isUsbSource == true) {
                 UsbBlockBridge.unregister(volId)
@@ -139,10 +163,13 @@ object ContainerLifecycleCore {
                 "lockContainer succeeded for volId=$volId, remaining active sessions=" +
                     "${ContainerSessionRegistry.activeSessions.keys.toList()}"
             }
-            true
+            LockOutcome.LOCKED
+        } catch (e: LockFlushRefusedException) {
+            VeLog.w(TAG) { "lockContainer refused by device for volId=$volId; vault left open" }
+            LockOutcome.FLUSH_REFUSED
         } catch (e: Exception) {
             VeLog.e(TAG, e) { "lockContainer failed for ${censorUri(uriString)} (volId=$volId)" }
-            false
+            LockOutcome.FAILED
         } finally {
             lockPermit.close()
         }
@@ -171,6 +198,7 @@ object ContainerLifecycleCore {
         cacheDerivedKey: Boolean = false,
         derivedKeyHandlers: DerivedKeyHandlers? = null,
         fuseHandler: Handler,
+        useBackupHeader: Boolean = false,
     ): UnlockCoreOutcome {
         var pfd: ParcelFileDescriptor? = null
         var proxyPfd: ParcelFileDescriptor? = null
@@ -238,6 +266,7 @@ object ContainerLifecycleCore {
                     fd, password, pim, targetVolId, cipherId, hashId, preservedKey, keyfileFds, readOnly,
                     if (protectHiddenVolume) hiddenPassword ?: "" else null,
                     hiddenPim, hiddenCipherId, hiddenHashId, hiddenKeyfileFds,
+                    useBackupHeader,
                 )
             }
 
@@ -333,7 +362,7 @@ object ContainerLifecycleCore {
     sealed class DirectoryVaultOutcome {
         data class Success(val result: DirectoryVaultResult) : DirectoryVaultOutcome()
         data class AuthFailure(val code: AuthFailureCode) : DirectoryVaultOutcome()
-        data class InvalidVault(val reason: String) : DirectoryVaultOutcome()
+        data class InvalidVault(val reason: String, val code: String? = null) : DirectoryVaultOutcome()
         data class Error(val exception: Exception) : DirectoryVaultOutcome()
     }
 
@@ -350,6 +379,7 @@ object ContainerLifecycleCore {
         preservedKey: ByteArray? = null,
         cacheDerivedKey: Boolean = false,
         derivedKeyHandlers: DerivedKeyHandlers? = null,
+        disableSingleClientMode: Boolean = false,
     ): DirectoryVaultOutcome {
         if (password.isNullOrEmpty() && preservedKey == null) {
             val err = IllegalArgumentException("password or preservedKey is required")
@@ -364,7 +394,10 @@ object ContainerLifecycleCore {
                 DirectoryVaultFormat.CRYPTOMATOR -> {
                     val chars = (password ?: "").toCharArray()
                     try {
-                        CryptomatorVault.open(context, uri, chars, readOnly)
+                        CryptomatorVault.open(
+                            context, uri, chars, readOnly,
+                            backupKeyFiles = VaultOpenPreferences.getBackupKeyFiles(context, uriString),
+                        )
                     } finally {
                         chars.fill('\u0000')
                     }
@@ -378,11 +411,11 @@ object ContainerLifecycleCore {
                     }
                 }
                 DirectoryVaultFormat.CRYFS -> if (preservedKey != null) {
-                    CryfsVault.openWithCombinedKey(context, uri, preservedKey, readOnly)
+                    CryfsVault.openWithCombinedKey(context, uri, preservedKey, readOnly, disableSingleClientMode)
                 } else {
                     val chars = (password ?: "").toCharArray()
                     try {
-                        CryfsVault.open(context, uri, chars, readOnly)
+                        CryfsVault.open(context, uri, chars, readOnly, disableSingleClientMode)
                     } finally {
                         chars.fill('\u0000')
                     }
@@ -425,7 +458,7 @@ object ContainerLifecycleCore {
                 }
                 is VaultOpenResult.InvalidVault -> {
                     VeLog.e(TAG) { "unlockDirectoryVault failed: Invalid $format vault (${openResult.reason}) for ${censorUri(uriString)}" }
-                    DirectoryVaultOutcome.InvalidVault(openResult.reason)
+                    DirectoryVaultOutcome.InvalidVault(openResult.reason, openResult.code)
                 }
             }
         } catch (e: Exception) {

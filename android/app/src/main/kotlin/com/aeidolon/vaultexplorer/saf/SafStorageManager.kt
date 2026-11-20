@@ -38,7 +38,9 @@ data class SafEntry(
     val lastModified: Long,
     val docId: String,
     val mimeType: String,
-)
+) {
+    fun toWire(): String = "${if (isDir) "D" else "F"}|$size|$lastModified|$name"
+}
 
 /**
  * High-performance SAF (Storage Access Framework) engine modeled after MaterialFiles'
@@ -121,7 +123,10 @@ class SafStorageManager(private val context: Context) {
                     DocumentsContract.getDocumentId(treeUri)
                 }
             } catch (e: Exception) {
-                VeLog.w(TAG) { "Failed to get tree document ID for $treeUri: ${e.message}" }
+                VeLog.w(TAG) {
+                    "Failed to get document ID: authority=${treeUri.authority}, " +
+                        "exception=${e.javaClass.simpleName}"
+                }
                 null
             }
         }
@@ -248,28 +253,93 @@ class SafStorageManager(private val context: Context) {
      * which silently return null/empty for an inaccessible tree).
      */
     fun isTreeAccessible(treeUri: Uri): Boolean {
+        var stage = "read_persisted_grants"
         return try {
             val decodedTarget = runCatching { Uri.decode(treeUri.toString()) }.getOrNull() ?: treeUri.toString()
-            val hasGrant = context.contentResolver.persistedUriPermissions.any { perm ->
-                if (!perm.isReadPermission) return@any false
-                if (perm.uri == treeUri || perm.uri.toString() == treeUri.toString()) return@any true
+            val persistedPermissions = context.contentResolver.persistedUriPermissions
+            val matchingReadGrants = persistedPermissions.filter { perm ->
+                if (!perm.isReadPermission) return@filter false
+                if (perm.uri == treeUri || perm.uri.toString() == treeUri.toString()) return@filter true
                 val decodedPerm = runCatching { Uri.decode(perm.uri.toString()) }.getOrNull() ?: perm.uri.toString()
                 decodedPerm == decodedTarget || (
                     perm.uri.authority == treeUri.authority &&
                     decodedTarget.startsWith(decodedPerm)
                 )
             }
-            if (!hasGrant) return false
+            val exactReadGrant = persistedPermissions.any { perm ->
+                perm.isReadPermission && (perm.uri == treeUri || perm.uri.toString() == treeUri.toString())
+            }
+            val authorityReadGrantCount = persistedPermissions.count {
+                it.isReadPermission && it.uri.authority == treeUri.authority
+            }
+            val hasGrant = matchingReadGrants.isNotEmpty()
+            VeLog.w(TAG) {
+                "Tree access probe: authority=${treeUri.authority}, hasReadGrant=$hasGrant, " +
+                    "exactReadGrant=$exactReadGrant, authorityReadGrantCount=$authorityReadGrantCount"
+            }
+            if (!hasGrant) {
+                VeLog.w(TAG) {
+                    "Tree access probe unavailable: authority=${treeUri.authority}, " +
+                        "reason=no_matching_persisted_read_grant"
+                }
+                return false
+            }
 
             if (DocumentsContract.isTreeUri(treeUri)) {
-                val rootDocId = resolveDocumentId(treeUri, "") ?: return false
+                stage = "resolve_tree_root_document_id"
+                val rootDocId = resolveDocumentId(treeUri, "")
+                if (rootDocId == null) {
+                    VeLog.w(TAG) {
+                        "Tree access probe unavailable: authority=${treeUri.authority}, " +
+                            "reason=root_document_id_unresolved"
+                    }
+                    return false
+                }
                 val docUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, rootDocId)
-                documentExists(docUri)
+                stage = "query_tree_root_document"
+                documentExistsForAccessProbe(docUri, treeUri.authority.orEmpty())
             } else {
-                documentExists(treeUri)
+                stage = "query_document"
+                documentExistsForAccessProbe(treeUri, treeUri.authority.orEmpty())
             }
         } catch (e: Exception) {
-            VeLog.w(TAG) { "isTreeAccessible check failed for $treeUri: ${e.message}" }
+            VeLog.w(TAG) {
+                "Tree access probe threw: authority=${treeUri.authority}, stage=$stage, " +
+                    "exception=${e.javaClass.simpleName}"
+            }
+            false
+        }
+    }
+
+    /** Same root-document probe as [documentExists], with diagnostic outcomes for saved locations. */
+    private fun documentExistsForAccessProbe(uri: Uri, authority: String): Boolean {
+        return try {
+            val cursor = context.contentResolver.query(
+                uri,
+                arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID),
+                null,
+                null,
+                null,
+            )
+            if (cursor == null) {
+                VeLog.w(TAG) {
+                    "Tree access probe root query returned null cursor: authority=$authority"
+                }
+                false
+            } else {
+                cursor.use {
+                    val hasRow = it.moveToFirst()
+                    VeLog.w(TAG) {
+                        "Tree access probe root query: authority=$authority, returnedRow=$hasRow"
+                    }
+                    hasRow
+                }
+            }
+        } catch (e: Exception) {
+            VeLog.w(TAG) {
+                "Tree access probe root query threw: authority=$authority, " +
+                    "exception=${e.javaClass.simpleName}"
+            }
             false
         }
     }
@@ -316,12 +386,21 @@ class SafStorageManager(private val context: Context) {
       val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentDocId)
         val entries = mutableListOf<SafEntry>()
 
-        // Use null projection first (MaterialFiles / DocumentsUI standard for cloud providers like Google Drive)
+        // Use PROJECTION_CHILDREN for ExternalStorageProvider (device storage) to avoid
+        // querying all table columns across Binder IPC cursor windows for large folders.
+        // For cloud providers (e.g. Google Drive), null projection is standard.
+        val preferredProjection = if (treeUri.authority == EXTERNAL_STORAGE_AUTHORITY) PROJECTION_CHILDREN else null
         var cursor = try {
-            context.contentResolver.query(childrenUri, null, null, null, null)
+            context.contentResolver.query(childrenUri, preferredProjection, null, null, null)
         } catch (_: Exception) {
             try {
-                context.contentResolver.query(childrenUri, PROJECTION_CHILDREN, null, null, null)
+                context.contentResolver.query(
+                    childrenUri,
+                    if (preferredProjection == null) PROJECTION_CHILDREN else null,
+                    null,
+                    null,
+                    null
+                )
             } catch (e: Exception) {
                 VeLog.w(TAG) { "queryChildren failed for $childrenUri: ${e.message}" }
                 null
@@ -346,7 +425,7 @@ class SafStorageManager(private val context: Context) {
             }
             cursor.close()
             cursor = try {
-                context.contentResolver.query(childrenUri, null, null, null, null)
+                context.contentResolver.query(childrenUri, preferredProjection, null, null, null)
             } catch (_: Exception) {
                 null
             } ?: return emptyList()
@@ -624,6 +703,46 @@ class SafStorageManager(private val context: Context) {
         }
     }
 
+    fun moveFile(treeUri: Uri, sourcePath: String, destPath: String): Boolean {
+        val source = normalizePath(sourcePath)
+        val dest = normalizePath(destPath)
+        if (source.isEmpty() || dest.isEmpty()) return false
+        if (source == dest) return true
+
+        val sourceName = source.substringAfterLast('/')
+        val destName = dest.substringAfterLast('/')
+        if (sourceName != destName) return false
+
+        val sourceParentPath = source.substringBeforeLast('/', "")
+        val destParentPath = dest.substringBeforeLast('/', "")
+        if (sourceParentPath == destParentPath) {
+            return renameFile(treeUri, source, destName)
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return false
+
+        val sourceUri = getDocumentUri(treeUri, source) ?: return false
+        val sourceParentUri = getDocumentUri(treeUri, sourceParentPath) ?: return false
+        val destParentUri = getDocumentUri(treeUri, destParentPath) ?: return false
+        return try {
+            val movedUri = DocumentsContract.moveDocument(
+                context.contentResolver,
+                sourceUri,
+                sourceParentUri,
+                destParentUri,
+            ) ?: return false
+            // Moving a directory changes paths for its cached descendants.
+            invalidateCache(treeUri)
+            runCatching {
+                pathDocumentIdCache[cacheKey(treeUri, dest)] =
+                    DocumentsContract.getDocumentId(movedUri)
+            }
+            true
+        } catch (e: Exception) {
+            VeLog.w(TAG) { "moveFile failed for " + sourcePath + ": " + e.message }
+            false
+        }
+    }
+
     fun deleteRecursively(treeUri: Uri, relativePath: String): Boolean {
         val clean = normalizePath(relativePath)
         val docId = resolveDocumentId(treeUri, clean) ?: return false
@@ -716,8 +835,8 @@ class SafStorageManager(private val context: Context) {
                                 alternate?.recycle()
                             }
                         }
-                        val scaled = scaledToFit(frame, targetSize)
-                        val stream = ByteArrayOutputStream()
+                         val scaled = scaledToFit(frame, targetSize)
+                        val stream = ByteArrayOutputStream(32768)
                         scaled.compress(Bitmap.CompressFormat.JPEG, quality.coerceIn(1, 100), stream)
                         val bytes = stream.toByteArray()
                         val w = frame.width
@@ -801,9 +920,29 @@ class SafStorageManager(private val context: Context) {
                     BitmapFactory.decodeStream(stream, null, decodeOptions)
                 } ?: return null
 
-                val oriented = applyExifOrientation(decoded, exifOrientationMatrix(exifOrientation))
-                val scaled = scaledToFit(oriented, targetSize)
-                val stream = ByteArrayOutputStream()
+                  val orientationMatrix = exifOrientationMatrix(exifOrientation)
+                val dW = decoded.width
+                val dH = decoded.height
+                val maxDim = maxOf(dW, dH)
+                val needsScale = maxDim > targetSize && maxDim > 0
+                val scale = if (needsScale) targetSize.toFloat() / maxDim else 1f
+                val scaled = if (needsScale && (dW * scale < 1f || dH * scale < 1f)) {
+                    val oriented = applyExifOrientation(decoded, orientationMatrix)
+                    scaledToFit(oriented, targetSize).also {
+                        if (it != oriented) oriented.recycle()
+                    }
+                } else {
+                    val combined = Matrix(orientationMatrix)
+                    if (needsScale) combined.preScale(scale, scale)
+                    if (combined.isIdentity) {
+                        decoded
+                    } else {
+                        Bitmap.createBitmap(decoded, 0, 0, dW, dH, combined, true).also {
+                            if (it != decoded) decoded.recycle()
+                        }
+                    }
+                }
+                val stream = ByteArrayOutputStream(32768)
                 val format = if (preserveAlpha) {
                     Bitmap.CompressFormat.WEBP
                 } else {
@@ -811,8 +950,7 @@ class SafStorageManager(private val context: Context) {
                 }
                 scaled.compress(format, quality.coerceIn(1, 100), stream)
                 val bytes = stream.toByteArray()
-                if (scaled != oriented) scaled.recycle()
-                oriented.recycle()
+                scaled.recycle()
 
                 mapOf("bytes" to bytes, "width" to srcW, "height" to srcH)
             } finally {
@@ -1105,6 +1243,56 @@ class SafStorageManager(private val context: Context) {
     }
 
     /**
+     * Writes a sequential stream to a SAF document. Some cloud providers
+     * (including Google Drive) do not support the seekable `rw` descriptors
+     * required by [writeFileChunk], so vault exports to SAF must use one
+     * output stream for the entire file.
+     */
+    fun writeStreamToFile(treeUri: Uri, relativePath: String, inputStream: InputStream): Boolean {
+        val clean = normalizePath(relativePath)
+        var shouldDeletePartial = false
+        var succeeded = false
+        try {
+            val documentUri = getDocumentUri(treeUri, clean) ?: run {
+                if (!createFile(treeUri, clean)) return false
+                shouldDeletePartial = true
+                getDocumentUri(treeUri, clean) ?: return false
+            }
+
+            val outputStream = context.contentResolver.openOutputStream(documentUri, "wt")
+                ?: throw java.io.IOException("Could not open SAF destination for writing")
+            shouldDeletePartial = true
+            inputStream.use { input ->
+                outputStream.use { output ->
+                    val buffer = ByteArray(256 * 1024)
+                    try {
+                        while (true) {
+                            val count = input.read(buffer)
+                            if (count < 0) break
+                            if (count > 0) output.write(buffer, 0, count)
+                        }
+                        output.flush()
+                    } finally {
+                        buffer.fill(0)
+                    }
+                }
+            }
+            succeeded = true
+            invalidateCache(treeUri, clean)
+            return true
+        } catch (e: Exception) {
+            VeLog.e(TAG, e) { "writeStreamToFile failed for $relativePath: ${e.message}" }
+            return false
+        } finally {
+            runCatching { inputStream.close() }
+            invalidateCache(treeUri, clean)
+            if (shouldDeletePartial && !succeeded) {
+                runCatching { deleteRecursively(treeUri, clean) }
+            }
+        }
+    }
+
+    /**
      * True when both ends of a copy are the very same file on disk, however
      * they are addressed (see [getRealPath]), or the same entry of the same
      * tree for providers that have no real path. Unknown means false.
@@ -1189,43 +1377,60 @@ class SafStorageManager(private val context: Context) {
      * Auto-discovers all mounted storage volumes (Primary, SD Cards, USB OTG).
      */
     fun getStorageVolumes(): List<Map<String, Any?>> {
-        val sm = context.getSystemService(Context.STORAGE_SERVICE) as StorageManager
+        val sm = context.getSystemService(Context.STORAGE_SERVICE) as? StorageManager
+            ?: return emptyList()
         val volumes = mutableListOf<Map<String, Any?>>()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            for (vol in sm.storageVolumes) {
-                val isPrimary = vol.isPrimary
-                val isRemovable = vol.isRemovable
-                val state = vol.state
-                val desc = vol.getDescription(context)
-                val uuid = vol.uuid
-                val dir = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) vol.directory else null
-                val path = dir?.absolutePath
-                    ?: (if (isPrimary) Environment.getExternalStorageDirectory().absolutePath else (if (uuid != null) "/storage/$uuid" else null))
-                val canRead = path != null && File(path).canRead()
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                for (vol in sm.storageVolumes) {
+                    try {
+                        val isPrimary = vol.isPrimary
+                        val isRemovable = vol.isRemovable
+                        val state = vol.state
+                        val desc = vol.getDescription(context)
+                        val uuid = vol.uuid
+                        val dir = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) vol.directory else null
+                        val path = dir?.absolutePath
+                            ?: (if (isPrimary) Environment.getExternalStorageDirectory().absolutePath else (if (uuid != null) "/storage/$uuid" else null))
+                        val canRead = path != null && File(path).canRead()
+                        // Must be stable across calls: the Dart side keys the volIds it
+                        // has already handed to open tabs on this id, so a value that
+                        // changes per call (e.g. a timestamp) would renumber the volume
+                        // on every refresh. A volume with no UUID is identified by its
+                        // mount path, falling back to its description.
+                        val fallback = path ?: desc ?: "unknown"
+                        val stableId = uuid ?: if (isPrimary) "primary" else
+                            "volume_" + fallback.replace(Regex("[^A-Za-z0-9._-]"), "_")
 
+                        volumes.add(mapOf(
+                            "id" to stableId,
+                            "description" to desc,
+                            "isPrimary" to isPrimary,
+                            "isRemovable" to isRemovable,
+                            "state" to state,
+                            "path" to (path ?: ""),
+                            "hasDirectAccess" to canRead,
+                        ))
+                    } catch (_: Throwable) {
+                        // Skip individual problematic volume on quirky OEM ROMs
+                    }
+                }
+            } else {
+                // Pre-Nougat fallback
+                val primaryDir = Environment.getExternalStorageDirectory()
                 volumes.add(mapOf(
-                    "id" to (uuid ?: if (isPrimary) "primary" else "volume_${System.currentTimeMillis()}"),
-                    "description" to desc,
-                    "isPrimary" to isPrimary,
-                    "isRemovable" to isRemovable,
-                    "state" to state,
-                    "path" to (path ?: ""),
-                    "hasDirectAccess" to canRead,
+                    "id" to "primary",
+                    "description" to "Internal Storage",
+                    "isPrimary" to true,
+                    "isRemovable" to false,
+                    "state" to Environment.getExternalStorageState(),
+                    "path" to primaryDir.absolutePath,
+                    "hasDirectAccess" to primaryDir.canRead(),
                 ))
             }
-        } else {
-            // Pre-Nougat fallback
-            val primaryDir = Environment.getExternalStorageDirectory()
-            volumes.add(mapOf(
-                "id" to "primary",
-                "description" to "Internal Storage",
-                "isPrimary" to true,
-                "isRemovable" to false,
-                "state" to Environment.getExternalStorageState(),
-                "path" to primaryDir.absolutePath,
-                "hasDirectAccess" to primaryDir.canRead(),
-            ))
+        } catch (_: Throwable) {
+            // Return any volumes collected before failure
         }
 
         return volumes

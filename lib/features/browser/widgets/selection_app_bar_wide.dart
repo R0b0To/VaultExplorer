@@ -26,6 +26,9 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
   final Map<FileManagerAction, WidgetBuilder> actionBuilders;
   final VoidCallback? onFileInfo;
 
+  /// Opens the edit tags / date & time / remove metadata menu. Null hides it.
+  final VoidCallback? onEditMetadata;
+
   /// Set only for a single selected item while a search is showing: offers
   /// "Go to location", which leaves the search and shows the item in the
   /// folder it lives in.
@@ -68,9 +71,10 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
   final VoidCallback onEncrypt;
   final VoidCallback onDecrypt;
 
-  /// The user's item-action configuration: hidden actions are removed from
-  /// the buttons and the overflow menu, and the menu follows this order.
+  /// The user's item-action configuration. Buttons prioritize quick actions,
+  /// and overflow puts quick actions before the rest of the configured order.
   final List<FileItemAction> itemActionOrder;
+  final Set<FileItemAction> quickItemActions;
   final Set<FileItemAction> hiddenItemActions;
 
   const SelectionAppBarWide({
@@ -84,6 +88,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
     this.hideVaultOnlyActions = false,
     this.isInsideArchive = false,
     this.onFileInfo,
+    this.onEditMetadata,
     this.onGoToLocation,
     this.onCopyPath,
     required this.readOnly,
@@ -128,6 +133,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
     required this.onEncrypt,
     required this.onDecrypt,
     this.itemActionOrder = FileItemAction.values,
+    this.quickItemActions = FileItemAction.defaultQuickActions,
     this.hiddenItemActions = const {},
   });
 
@@ -143,6 +149,68 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
         allowExtractAction &&
         (singleArchiveSelected || isInsideArchive) &&
         shown(FileItemAction.extract);
+    final visibleActionOrder = orderFileItemActions(
+      [
+        if (showExtractButton) FileItemAction.extract,
+        if (showShareOption && shown(FileItemAction.share))
+          FileItemAction.share,
+        if (!isInsideArchive && shown(FileItemAction.copy))
+          FileItemAction.copy,
+        if (!isInsideArchive && shown(FileItemAction.move))
+          FileItemAction.move,
+        if (!isInsideArchive &&
+            allowRenameAction &&
+            shown(FileItemAction.rename))
+          FileItemAction.rename,
+        if (!isInsideArchive && shown(FileItemAction.delete))
+          FileItemAction.delete,
+      ],
+      order: itemActionOrder,
+      quickActions: quickItemActions,
+    );
+
+    Widget buildActionButton(FileItemAction action) => switch (action) {
+      FileItemAction.extract => IconButton(
+        icon: const Icon(Icons.unarchive_outlined),
+        tooltip: context.l10n.extract,
+        onPressed: onExtractSelectedArchive,
+      ),
+      FileItemAction.share => IconButton(
+        icon: const Icon(Icons.share_rounded),
+        tooltip: context.l10n.shareAction,
+        onPressed: onShare,
+      ),
+      FileItemAction.copy => IconButton(
+        icon: const Icon(Icons.copy_rounded),
+        tooltip: context.l10n.copyTooltip,
+        onPressed: onCopy,
+      ),
+      FileItemAction.move => IconButton(
+        icon: Icon(
+          Icons.cut_rounded,
+          color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.5) : null,
+        ),
+        tooltip: readOnly ? context.l10n.readOnlyCantMoveTooltip : context.l10n.moveAction,
+        onPressed: onCut,
+      ),
+      FileItemAction.rename => IconButton(
+        icon: Icon(
+          Icons.drive_file_rename_outline_rounded,
+          color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.5) : null,
+        ),
+        tooltip: readOnly ? context.l10n.readOnlyCantRenameTooltip : context.l10n.renameTooltip,
+        onPressed: onRename,
+      ),
+      FileItemAction.delete => IconButton(
+        icon: Icon(
+          Icons.delete_outline_rounded,
+          color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.5) : cs.error,
+        ),
+        tooltip: readOnly ? context.l10n.readOnlyCantDeleteTooltip : context.l10n.delete,
+        onPressed: onDelete,
+      ),
+      _ => throw StateError('Unexpected selection-bar action: $action'),
+    };
 
     return AppBar(
       leading: IconButton(
@@ -179,51 +247,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
         ],
       ),
       actions: [
-        if (showExtractButton)
-          IconButton(
-            icon: const Icon(Icons.unarchive_outlined),
-            tooltip: context.l10n.extract,
-            onPressed: onExtractSelectedArchive,
-          ),
-        if (showShareOption && shown(FileItemAction.share))
-          IconButton(
-            icon: const Icon(Icons.share_rounded),
-            tooltip: context.l10n.shareAction,
-            onPressed: onShare,
-          ),
-        if (!isInsideArchive && shown(FileItemAction.copy))
-          IconButton(
-            icon: const Icon(Icons.copy_rounded),
-            tooltip: context.l10n.copyTooltip,
-            onPressed: onCopy,
-          ),
-        if (!isInsideArchive && shown(FileItemAction.move))
-          IconButton(
-            icon: Icon(
-              Icons.cut_rounded,
-              color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.5) : null,
-            ),
-            tooltip: readOnly ? context.l10n.readOnlyCantMoveTooltip : context.l10n.moveAction,
-            onPressed: onCut,
-          ),
-        if (!isInsideArchive && allowRenameAction && shown(FileItemAction.rename))
-          IconButton(
-            icon: Icon(
-              Icons.drive_file_rename_outline_rounded,
-              color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.5) : null,
-            ),
-            tooltip: readOnly ? context.l10n.readOnlyCantRenameTooltip : context.l10n.renameTooltip,
-            onPressed: onRename,
-          ),
-        if (!isInsideArchive && shown(FileItemAction.delete))
-          IconButton(
-            icon: Icon(
-              Icons.delete_outline_rounded,
-              color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.5) : cs.error,
-            ),
-            tooltip: readOnly ? context.l10n.readOnlyCantDeleteTooltip : context.l10n.delete,
-            onPressed: onDelete,
-          ),
+        ...visibleActionOrder.map(buildActionButton),
         PopupMenuButton<String>(
           icon: const Icon(Icons.more_vert_rounded),
           tooltip: context.l10n.moreOptionsTooltip,
@@ -248,6 +272,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
             if (value == 'go_to_location') onGoToLocation?.call();
             if (value == 'copy_path') onCopyPath?.call();
             if (value == 'file_info') onFileInfo?.call();
+                if (value == 'edit_metadata') onEditMetadata?.call();
           },
           itemBuilder: (context) => applyItemActionMenuConfig(
             [
@@ -487,7 +512,19 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
                   ],
                 ),
               ),
-            if (singleFileSelected || singleFolderSelected)
+            if (!isInsideArchive && onEditMetadata != null)
+              PopupMenuItem<String>(
+                value: 'edit_metadata',
+                enabled: !readOnly,
+                child: Row(
+                  children: [
+                    Icon(Icons.sell_outlined, color: cs.onSurfaceVariant, size: AppIconSize.small),
+                    const SizedBox(width: 12),
+                    Text(context.l10n.editMetadataAction),
+                  ],
+                ),
+              ),
+            if (!isInsideArchive && (singleFileSelected || singleFolderSelected))
               PopupMenuItem<String>(
                 value: 'file_info',
                 child: Row(
@@ -499,7 +536,10 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
                 ),
               ),
             ],
-            order: itemActionOrder,
+            order: quickActionsFirstOrder(
+              itemActionOrder,
+              quickItemActions,
+            ),
             hidden: hiddenItemActions,
           ),
         ),

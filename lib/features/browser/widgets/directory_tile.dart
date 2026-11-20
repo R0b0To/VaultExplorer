@@ -1,12 +1,14 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/theme/file_manager_skin_scope.dart';
+import 'package:vaultexplorer/core/utils/perf_trace.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/long_file_name_display_mode.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
+import 'package:vaultexplorer/features/browser/services/category_aggregate_scan.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_thumbnail_preview.dart';
 import 'package:vaultexplorer/features/browser/widgets/tile_selection_style.dart';
 
@@ -27,6 +29,7 @@ class DirectoryTile extends StatelessWidget {
 
   /// Two-row layout -- see `FileListView.isDetailed`.
   final bool isDetailed;
+  final bool largeThumbnail;
   final double zoomLevel;
   final List<FileDetailColumn> detailColumns;
   final LongFileNameDisplayMode longFileNameMode;
@@ -40,6 +43,10 @@ class DirectoryTile extends StatelessWidget {
   /// instead of the plain folder icon -- see [FolderThumbnailPreview].
   final MountedContainer? container;
   final String currentDirPath;
+
+  /// Files already known to lie inside this folder, best cover first. When
+  /// given, the cover comes from these instead of listing the folder.
+  final List<String>? previewPaths;
   final ThumbnailCacheMode cacheMode;
   final ThumbnailQuality quality;
 
@@ -62,6 +69,7 @@ class DirectoryTile extends StatelessWidget {
     this.showItemActionsMenu = true,
     this.isCompact = false,
     this.isDetailed = false,
+    this.largeThumbnail = false,
     this.zoomLevel = 1.0,
     this.detailColumns = const [FileDetailColumn.date, FileDetailColumn.size],
     this.longFileNameMode = LongFileNameDisplayMode.ellipsizeEnd,
@@ -71,13 +79,21 @@ class DirectoryTile extends StatelessWidget {
     this.isSynced = false,
     this.container,
     this.currentDirPath = '',
+    this.previewPaths,
     this.cacheMode = ThumbnailCacheMode.appCache,
     this.quality = ThumbnailQuality.defaultQuality,
     this.showThumbnailPreview = true,
   });
 
-  @override
+ @override
   Widget build(BuildContext context) {
+    final perfT0 = PerfTrace.begin();
+    final built = _buildTile(context);
+    PerfTrace.end('ui.dir_tile.build', perfT0, slowMs: 16);
+    return built;
+  }
+
+  Widget _buildTile(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final skin = FileManagerSkinScope.of(context);
     final folderIcon = skin.folderIcon;
@@ -87,7 +103,12 @@ class DirectoryTile extends StatelessWidget {
     final folderIconSize = (AppIconSize.action + 4) * zoomLevel;
 
     Widget? badge;
-    if ((isPinned || isBookmark || isDocumentProviderMounted || isSynced) && !isSelected) {
+    if ((entry.isSymlink ||
+            isPinned ||
+            isBookmark ||
+            isDocumentProviderMounted ||
+            isSynced) &&
+        !isSelected) {
       badge = Container(
         padding: EdgeInsets.symmetric(horizontal: 3 * zoomLevel, vertical: 1.5 * zoomLevel),
         decoration: BoxDecoration(
@@ -97,6 +118,14 @@ class DirectoryTile extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (entry.isSymlink)
+              Icon(
+                Icons.shortcut_rounded,
+                size: 11 * zoomLevel,
+                color: cs.primary,
+              ),
+            if (entry.isSymlink && isPinned)
+              SizedBox(width: 2 * zoomLevel),
             if (isPinned)
               Icon(
                 Icons.push_pin_rounded,
@@ -104,7 +133,7 @@ class DirectoryTile extends StatelessWidget {
                 color: cs.primary,
               ),
             if (isBookmark) ...[
-              if (isPinned) SizedBox(width: 2 * zoomLevel),
+              if (isPinned || entry.isSymlink) SizedBox(width: 2 * zoomLevel),
               Icon(
                 Icons.star_rounded,
                 size: 10 * zoomLevel,
@@ -112,7 +141,7 @@ class DirectoryTile extends StatelessWidget {
               ),
             ],
             if (isDocumentProviderMounted) ...[
-              if (isPinned || isBookmark) SizedBox(width: 2 * zoomLevel),
+              if (isPinned || isBookmark || entry.isSymlink) SizedBox(width: 2 * zoomLevel),
               Icon(
                 Icons.folder_shared_rounded,
                 size: 10 * zoomLevel,
@@ -120,7 +149,7 @@ class DirectoryTile extends StatelessWidget {
               ),
             ],
             if (isSynced) ...[
-              if (isPinned || isBookmark || isDocumentProviderMounted) SizedBox(width: 2 * zoomLevel),
+              if (isPinned || isBookmark || isDocumentProviderMounted || entry.isSymlink) SizedBox(width: 2 * zoomLevel),
               Icon(
                 Icons.sync_rounded,
                 size: 10 * zoomLevel,
@@ -138,12 +167,20 @@ class DirectoryTile extends StatelessWidget {
 
     Widget? customLeading;
     if (showPreview) {
-      final folderPath =
-          currentDirPath.isEmpty ? entry.name : '$currentDirPath/${entry.name}';
+      // A folder listed by a category or gallery scan carries its own full
+      // path; its name alone is relative and can sit anywhere in the tree.
+      // (`entry` is a field, which Dart does not promote, so use a local.)
+      final tileEntry = entry;
+      final folderPath = tileEntry is CategoryEntry
+          ? tileEntry.path
+          : (currentDirPath.isEmpty
+                ? tileEntry.name
+                : '$currentDirPath/${tileEntry.name}');
       customLeading = FolderThumbnailPreview(
         key: ValueKey('folder_preview:${container!.uri}:$folderPath'),
         container: container!,
         folderPath: folderPath,
+        previewPaths: previewPaths,
         cacheMode: cacheMode,
         quality: quality,
         iconSize: folderIconSize,
@@ -189,6 +226,7 @@ class DirectoryTile extends StatelessWidget {
       onIconTap: onIconTap,
       isCompact: isCompact,
       isDetailed: isDetailed,
+      largeThumbnail: largeThumbnail,
       zoomLevel: zoomLevel,
       iconBadge: badge,
     );

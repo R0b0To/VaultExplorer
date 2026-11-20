@@ -57,13 +57,13 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_nativeRestoreVeraCryptBackupHeaderF
         JNIEnv* env, jobject, jint fd, jstring password, jint pim, jint cipherId, jint hashId, jint opId) {
     JNI_TRY
 
-    const char* nativePass = env->GetStringUTFChars(password, nullptr);
+    const char* nativePass = vcGetPasswordUtf8(env, password);
     const size_t passLen = std::strlen(nativePass);
 
     VeraCryptRestoreResult result = restoreVeraCryptBackupHeaderUnmounted(
             fd, reinterpret_cast<const uint8_t*>(nativePass), passLen, pim, cipherId, hashId, opId);
 
-    env->ReleaseStringUTFChars(password, nativePass);
+    vcReleasePasswordUtf8(nativePass);
     return static_cast<jint>(result);
 
     JNI_CATCH_RETURN(static_cast<jint>(VeraCryptRestoreResult::kIoError))
@@ -158,10 +158,10 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_nativeRestoreContainerHeaderRegion(
     ScopeZeroize mixedPasswordGuard(mixedPassword, sizeof(mixedPassword));
     size_t mixedPasswordLen = 0;
     if (password != nullptr) {
-        const char* nativePass = env->GetStringUTFChars(password, nullptr);
+        const char* nativePass = vcGetPasswordUtf8(env, password);
         mixedPasswordLen = std::min(std::strlen(nativePass), sizeof(mixedPassword));
         std::memcpy(mixedPassword, nativePass, mixedPasswordLen);
-        env->ReleaseStringUTFChars(password, nativePass);
+        vcReleasePasswordUtf8(nativePass);
     }
 
     std::vector<int> kfFds = extractKeyfileFds(env, keyfileFds);

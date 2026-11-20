@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/external_storage_locations_provider.dart';
+import 'package:vaultexplorer/core/api/vault_engine_types.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
@@ -15,19 +17,47 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/vault_list_item.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
+import 'package:vaultexplorer/features/authenticator/authenticator_screen.dart';
+import 'package:vaultexplorer/features/browser/models/file_category.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_name_label.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_controller.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_config_sheet.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/drawer_bookmarks_section.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/drawer_categories_section.dart';
 import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/settings/app_settings_screen.dart';
+import 'package:vaultexplorer/features/dashboard/widgets/lock_flush_prompt.dart';
 import 'package:vaultexplorer/features/settings/long_file_name_display_provider.dart';
 import 'package:vaultexplorer/features/tools/tools_screen.dart';
+
+/// Prompts for All Files Access when a raw-path volume (SD card / USB) is
+/// selected without permission granted.
+Future<bool> _ensureAllFilesAccess(BuildContext context, WidgetRef ref) async {
+  final lifecycle = ref.read(vaultLifecycleApiProvider);
+  if (await lifecycle.hasAllFilesAccess()) return true;
+  if (!context.mounted) return false;
+  final shouldRequest = await showAppConfirmDialog(
+    context,
+    title: context.l10n.localStoragePermissionTitle,
+    message: context.l10n.filesPermissionMessage,
+    confirmLabel: context.l10n.localStorageGrantAccess,
+  );
+  if (shouldRequest) {
+    await lifecycle.requestAllFilesAccess(openSettings: true);
+  }
+  return false;
+}
 
 class AppNavigationDrawer extends ConsumerWidget {
   final int? currentVolId;
   final MountedContainer? primaryLocalContainer;
+  final ValueListenable<MountedContainer?>? localStorageNotifier;
   final VoidCallback? onOpenLocalStorage;
+  /// Opens an external raw-path storage (SD card / USB volume) through the
+  /// all-files-access permission flow, mirroring [onOpenLocalStorage] for
+  /// the primary internal storage. When null, external tiles fall back to
+  /// [onSelectContainer] (direct open, no permission prompt).
+  final ValueChanged<MountedContainer>? onOpenExternalStorage;
   final int selectedTabIndex;
   final ValueChanged<int>? onSelectTab;
   final ValueChanged<MountedContainer>? onSelectContainer;
@@ -39,13 +69,16 @@ class AppNavigationDrawer extends ConsumerWidget {
   /// Set only while the file manager is open with tabs: the long-press menus
   /// of vaults and storages then offer "Open in new tab".
   final ValueChanged<MountedContainer>? onOpenInNewTab;
+  final ValueChanged<FileCategory>? onOpenCategory;
   final bool keepBrowserTabsOnNavigate;
 
   const AppNavigationDrawer({
     super.key,
     this.currentVolId,
     this.primaryLocalContainer,
+    this.localStorageNotifier,
     this.onOpenLocalStorage,
+    this.onOpenExternalStorage,
     this.selectedTabIndex = 0,
     this.onSelectTab,
     this.onSelectContainer,
@@ -54,6 +87,7 @@ class AppNavigationDrawer extends ConsumerWidget {
     this.onDeleteVault,
     this.onAddVault,
     this.onOpenInNewTab,
+    this.onOpenCategory,
     this.keepBrowserTabsOnNavigate = false,
   });
 
@@ -186,28 +220,34 @@ class AppNavigationDrawer extends ConsumerWidget {
               ],
             ),
           ),
-        PopupMenuItem(
-          value: 'rename',
-          child: Row(
-            children: [
-              Icon(Icons.edit_outlined, size: 20, color: cs.onSurface),
-              const SizedBox(width: 12),
-              Text(context.l10n.rename),
-            ],
+        // System-discovered volumes (SD card, USB) are neither renameable
+        // nor removable: they're re-derived from StorageManager on every
+        // refresh, so rename/remove would either no-op or come back.
+        if (!loc.isSystemVolume)
+          PopupMenuItem(
+            value: 'rename',
+            child: Row(
+              children: [
+                Icon(Icons.edit_outlined, size: 20, color: cs.onSurface),
+                const SizedBox(width: 12),
+                Text(context.l10n.rename),
+              ],
+            ),
           ),
-        ),
-        PopupMenuItem(
-          value: 'remove',
-          child: Row(
-            children: [
-              Icon(Icons.delete_outline_rounded, size: 20, color: cs.error),
-              const SizedBox(width: 12),
-              Text(context.l10n.remove, style: TextStyle(color: cs.error)),
-            ],
+        if (!loc.isSystemVolume)
+          PopupMenuItem(
+            value: 'remove',
+            child: Row(
+              children: [
+                Icon(Icons.delete_outline_rounded, size: 20, color: cs.error),
+                const SizedBox(width: 12),
+                Text(context.l10n.remove, style: TextStyle(color: cs.error)),
+              ],
+            ),
           ),
-        ),
       ],
     ).then((action) {
+      if (!context.mounted) return;
       if (action == 'new_tab') {
         _openLocationInNewTab(context, ref, loc);
       } else if (action == 'rename') {
@@ -223,6 +263,13 @@ class AppNavigationDrawer extends ConsumerWidget {
     WidgetRef ref,
     ExternalStorageLocation loc,
   ) async {
+    // SAF locations carry their own persisted grant; only raw
+    // paths (auto-discovered SD card / USB) need file access.
+    if (!loc.resolvedUri.startsWith('content://') &&
+        !await _ensureAllFilesAccess(context, ref)) {
+      return;
+    }
+    if (!context.mounted) return;
     final accessible = await ref
         .read(externalStorageLocationsProvider.notifier)
         .isAccessible(loc);
@@ -300,10 +347,18 @@ class AppNavigationDrawer extends ConsumerWidget {
       return;
     }
     try {
-      final locked = await ref
-          .read(vaultLifecycleApiProvider)
-          .lockContainer(container.uri);
-      if (!locked) throw StateError('Container lock did not complete');
+      final result = await lockWithFlushPrompt(
+        context: context,
+        lifecycle: ref.read(vaultLifecycleApiProvider),
+        uri: container.uri,
+        displayName: container.displayName,
+      );
+      // The device refused the write-back and the person chose to keep the
+      // container open: nothing failed, so there is no error to report.
+      if (result == LockResult.flushRefused) return;
+      if (result != LockResult.locked) {
+        throw StateError('Container lock did not complete');
+      }
       VeLog.i(
         'AppNavigationDrawer',
         '_lockSingleVault: native lockContainer succeeded for volId=${container.volId}',
@@ -342,6 +397,9 @@ class AppNavigationDrawer extends ConsumerWidget {
     }
     var currentVaultGuardHeld = currentVaultGuardAcquired;
     var skippedBusyVault = false;
+    // Vaults whose USB device refused the final write-back. They stay open; the
+    // person is asked about each one only after every other vault has been locked.
+    final flushRefused = <MountedContainer>[];
     try {
       for (final c in mounted) {
         final guardAlreadyHeld =
@@ -351,11 +409,13 @@ class AppNavigationDrawer extends ConsumerWidget {
           continue;
         }
         try {
-          final locked = await ref
+          final result = await ref
               .read(vaultLifecycleApiProvider)
-              .lockContainer(c.uri);
-          if (locked) {
+              .lockContainerDetailed(c.uri);
+          if (result == LockResult.locked) {
             controller.onContainerLocked(c.volId);
+          } else if (result == LockResult.flushRefused) {
+            flushRefused.add(c);
           } else {
             skippedBusyVault = true;
           }
@@ -369,6 +429,27 @@ class AppNavigationDrawer extends ConsumerWidget {
     } finally {
       if (currentVaultGuardHeld) {
         controller.releaseLockGuard(currentVolId!);
+      }
+    }
+    for (final c in flushRefused) {
+      if (!controller.acquireLockGuard(c.volId)) continue;
+      try {
+        final result = await lockWithFlushPrompt(
+          context: context,
+          lifecycle: ref.read(vaultLifecycleApiProvider),
+          uri: c.uri,
+          displayName: c.displayName,
+          firstResult: LockResult.flushRefused,
+        );
+        if (result == LockResult.locked) {
+          controller.onContainerLocked(c.volId);
+        } else if (result == LockResult.failed) {
+          skippedBusyVault = true;
+        }
+      } catch (_) {
+        skippedBusyVault = true;
+      } finally {
+        controller.releaseLockGuard(c.volId);
       }
     }
     if (skippedBusyVault && context.mounted) {
@@ -453,6 +534,7 @@ class AppNavigationDrawer extends ConsumerWidget {
   }
 
   Widget _buildDrawerContent(BuildContext context, WidgetRef ref) {
+    final navigator = Navigator.of(context);
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final dashboardState = ref.watch(vaultDashboardControllerProvider);
@@ -463,6 +545,11 @@ class AppNavigationDrawer extends ConsumerWidget {
     final showStorageLocations = ref.watch(
       appSettingsControllerProvider.select(
         (s) => s.settings.showStorageLocationsInDrawer,
+      ),
+    );
+    final enableAuthenticator = ref.watch(
+      appSettingsControllerProvider.select(
+        (s) => s.settings.enableAuthenticator,
       ),
     );
     final primary = primaryLocalContainer;
@@ -796,6 +883,22 @@ class AppNavigationDrawer extends ConsumerWidget {
                                   Navigator.pop(context);
                                   return;
                                 }
+                                final container = buildExternalStorageContainer(
+                                  rootPath: loc.resolvedUri,
+                                  displayName: loc.displayName,
+                                  volId: loc.volId,
+                                );
+                                // Raw-path volumes (SD card / USB) go
+                                // through the all-files-access flow, like
+                                // the primary Local Storage tile does; a
+                                // missing grant would otherwise just be
+                                // reported as "unavailable" below.
+                                if (!loc.resolvedUri.startsWith('content://') &&
+                                    onOpenExternalStorage != null) {
+                                  Navigator.pop(context);
+                                  onOpenExternalStorage!(container);
+                                  return;
+                                }
                                 final isAccessible = await ref
                                     .read(
                                       externalStorageLocationsProvider.notifier,
@@ -815,13 +918,7 @@ class AppNavigationDrawer extends ConsumerWidget {
                                   return;
                                 }
                                 Navigator.pop(context);
-                                onSelectContainer?.call(
-                                  buildExternalStorageContainer(
-                                    rootPath: loc.resolvedUri,
-                                    displayName: loc.displayName,
-                                    volId: loc.volId,
-                                  ),
-                                );
+                                onSelectContainer?.call(container);
                               },
                             ),
                           );
@@ -882,6 +979,43 @@ class AppNavigationDrawer extends ConsumerWidget {
                     child: Divider(),
                   ),
 
+                  // 3b. Category shortcuts (Images, Videos, Audio, Documents)
+                  DrawerCategoriesSection(
+                    primaryLocalContainer: primary,
+                    currentVolId: currentVolId,
+                    onOpenLocalStorage: onOpenLocalStorage,
+                    onSelectContainer: onSelectContainer,
+                    onOpenCategory: onOpenCategory,
+                  ),
+
+                  // 3b. Authenticator Destination (same screen as the
+                  // dashboard app bar shortcut, reachable from every tab)
+                  if (enableAuthenticator)
+                    ListTile(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(28),
+                      ),
+                      leading: Icon(
+                        Icons.verified_user_rounded,
+                        color: cs.onSurfaceVariant,
+                      ),
+                      title: Text(
+                        context.l10n.authenticatorScreenTitle,
+                        style: textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const AuthenticatorScreen(),
+                          ),
+                        );
+                      },
+                    ),
+
                   // 4. Tools Destination
                   ListTile(
                     shape: RoundedRectangleBorder(
@@ -912,6 +1046,13 @@ class AppNavigationDrawer extends ConsumerWidget {
                               mountedContainers: ValueNotifier(
                                 dashboardState.mounted,
                               ),
+                              localStorageContainer: localStorageNotifier,
+                              onOpenInBrowser: onSelectContainer == null
+                                  ? null
+                                  : (container) {
+                                      if (navigator.canPop()) navigator.pop();
+                                      onSelectContainer!(container);
+                                    },
                             ),
                           ),
                         ),

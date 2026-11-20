@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/widgets/menus/back_dismissible_menu_anchor.dart';
 
 IconData sortIconFor(SortBy sortBy) => switch (sortBy) {
   SortBy.name => Icons.sort_by_alpha_rounded,
@@ -80,7 +81,7 @@ class _SortMenuButtonState extends State<SortMenuButton> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return MenuAnchor(
+    return BackDismissibleMenuAnchor(
       builder: (context, controller, child) => IconButton(
         icon: Icon(sortIconFor(widget.sortBy)),
         tooltip: context.l10n.sortOptionsTooltip,

@@ -1,0 +1,12 @@
+### Gallery
+- Local-storage gallery scans now save and reuse metadata indexes when thumbnail caching uses app storage.
+- Improved the gallery folder-scope choices for readability.
+- Added section markers to fast scrolling through grouped gallery results.
+
+### Media viewer
+- Added Motion Photo playback with a saved autoplay preference across viewer opens and playlist navigation.
+- Added interactive 360° panorama viewing for supported images; playlist swipes are disabled while viewing.
+- HEIC and HEIF images now show detailed metadata, and portrait HEIC images keep their correct fit when viewer controls open.
+
+### File browsing
+- Improved folder refresh handling when folders are exposed through document providers.

@@ -4,7 +4,6 @@ import android.net.Uri
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.ExecutorService
-import com.aeidolon.vaultexplorer.bridge.RepairLogBridge
 import com.aeidolon.vaultexplorer.container.ContainerFormat
 import com.aeidolon.vaultexplorer.MainActivity
 import com.aeidolon.vaultexplorer.NativeEngine
@@ -71,8 +70,8 @@ class RepairHandlers(
             val passwordChars = password?.toCharArray()
             try {
                 val outcome = com.aeidolon.vaultexplorer.foldercheck.FolderVaultChecker.repair(
-                    activity, Uri.parse(uri), format, passwordChars, volId,
-                ) { line -> RepairLogBridge.reportLog(opId, line) }
+                    activity, Uri.parse(uri), format, passwordChars, volId, opId,
+                )
 
                 activity.runOnUiThread {
                     when (outcome) {
@@ -220,12 +219,12 @@ class RepairHandlers(
      * [handleDiagnoseUnmountedContainerFile]/[handleDiagnoseMountedVolumeFilesystem]:
      * these vaults are a directory tree, not a single container file
      * wrapping a block-device filesystem, so there's no fd to hand to
-     * native code -- see foldercheck/FolderVaultChecker.kt for why the
-     * check itself lives entirely on the Kotlin side. [password] is
-     * optional: omitting it runs a structural-only scan (see that file's
-     * doc comment for what each depth covers) -- unless [volId] is given,
-     * in which case it's ignored in favor of that already-mounted volume's
-     * own session key (see [FolderVaultChecker.check]'s `mountedVolId` doc).
+     * native code. The check runs in the platform-neutral folder-vault core
+     * (cpp/foldervault/fv_check.h) through foldercheck/FolderVaultChecker.kt.
+     * [password] is optional: omitting it runs a structural-only scan --
+     * unless [volId] is given, in which case it's ignored in favor of that
+     * already-mounted volume's own session key (see
+     * [FolderVaultChecker.check]'s `mountedVolId` doc).
      */
     fun handleCheckFolderVault(call: MethodCall, result: MethodChannel.Result) {
         val uri = call.argument<String>("uri")
@@ -242,8 +241,8 @@ class RepairHandlers(
             val passwordChars = password?.toCharArray()
             try {
                 val outcome = com.aeidolon.vaultexplorer.foldercheck.FolderVaultChecker.check(
-                    activity, Uri.parse(uri), format, passwordChars, volId,
-                ) { line -> RepairLogBridge.reportLog(opId, line) }
+                    activity, Uri.parse(uri), format, passwordChars, volId, opId,
+                )
 
                 activity.runOnUiThread {
                     when (outcome) {

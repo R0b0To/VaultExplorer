@@ -109,7 +109,7 @@ class _HiddenVaultTriggerState extends ConsumerState<HiddenVaultTrigger> {
 
     // 6. When the user eventually exits the vault back to decoy root, restore
     // screenshot blocking policy for decoy mode.
-    unawaited(secureScreenPolicy.disableForDecoy());
+    unawaited(secureScreenPolicy.endRevealedVault());
   }
 
   @override

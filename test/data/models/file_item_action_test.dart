@@ -43,6 +43,7 @@ void main() {
         FileItemAction.editImage,
         FileItemAction.editVideo,
         FileItemAction.editAudio,
+        FileItemAction.editMetadata,
         FileItemAction.rename,
         FileItemAction.archive,
         FileItemAction.exportToDevice,
@@ -60,7 +61,7 @@ void main() {
       final groups = FileItemAction.values.map((a) => a.group).toList();
 
       expect(groups, [
-        0, 0, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 6, //
+        0, 0, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 6, //
       ]);
     });
 
@@ -70,7 +71,7 @@ void main() {
           .map((a) => a.group)
           .toList();
 
-      expect(groups, [0, 0, 1, 2, 2, 2, 2, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5]);
+      expect(groups, [0, 0, 1, 2, 2, 2, 2, 2, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5]);
     });
 
     test('every action has a label and survives a JSON round trip', () {

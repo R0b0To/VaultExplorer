@@ -14,11 +14,14 @@ import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/services/cross_container_clipboard.dart';
+import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
 import 'package:vaultexplorer/data/services/full_res_image_cache.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
+import 'package:vaultexplorer/data/services/media_index/media_index_service.dart';
 import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
+import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/sync/services/sync_providers.dart';
 
 part 'vault_dashboard_controller.g.dart';
@@ -150,6 +153,17 @@ class VaultDashboardController extends _$VaultDashboardController {
       if (previous != null) {
         VeLog.i(_kLogTag, 'containerRepository instance changed; reloading records');
         loadAll();
+      }
+    });
+
+    // The dashboard keeps its own snapshot of AppSettings (loaded in loadAll).
+    // Mirror later changes from the live settings controller so options like
+    // the vault sort order apply immediately instead of after an app restart.
+    // `this.state` is required: build() declares a local `state` that would
+    // otherwise shadow the notifier's state inside this closure.
+    ref.listen(appSettingsControllerProvider, (previous, next) {
+      if (!identical(previous?.settings, next.settings)) {
+        this.state = this.state._copy(appSettings: next.settings);
       }
     });
 
@@ -768,6 +782,12 @@ class VaultDashboardController extends _$VaultDashboardController {
       return;
     }
 
+    // Native volume ids are recycled. Clear any prior filesystem answer
+    // before this container is exposed to the browser, otherwise a newly
+    // mounted exFAT volume can briefly inherit the previous ext/NTFS type
+    // and incorrectly show the symbolic-link action.
+    VolumeFilesystemRegistry.forget(container.volId);
+
     final newMounted = List<MountedContainer>.from(state.mounted)
       ..add(container);
     final newRecords = Map<String, ContainerRecord>.from(state.records);
@@ -909,6 +929,7 @@ class VaultDashboardController extends _$VaultDashboardController {
             .catchError((_) {}),
       );
       MediaAspectRatioCache.clearForUri(container.uri);
+      MediaIndexService.forgetForUri(container.uri);
     }
     final clip = ref.read(crossContainerClipboardProvider);
     if (clip.hasItems &&
@@ -949,11 +970,18 @@ class VaultDashboardController extends _$VaultDashboardController {
           .read(vaultFileIoApiProvider)
           .getVaultInfo(container.uri);
       if (!ref.mounted) return;
-      if (!state.mounted.any((c) => c.volId == container.volId)) return;
+      if (!state.mounted.any(
+        (c) => c.volId == container.volId && c.uri == container.uri,
+      )) return;
       final label = info?['fileSystem'];
       final FilesystemType? type =
           filesystemTypeFromLabel(label is String ? label : null);
       VolumeFilesystemRegistry.record(container.volId, type);
+      // The registry is intentionally process-wide, but it is not itself a
+      // Riverpod provider. Publish a state revision so menus that depend on
+      // supportsVaultSymbolicLinks rebuild after the asynchronous filesystem
+      // probe completes (and so exFAT/FAT volumes stay hidden).
+      state = state._copy(mounted: List.unmodifiable(state.mounted));
     } catch (e) {
       VeLog.w(
         _kLogTag,
@@ -1008,6 +1036,7 @@ class VaultDashboardController extends _$VaultDashboardController {
 
     Future.delayed(const Duration(milliseconds: 300), () async {
       await ref.read(containerRepositoryProvider).remove(uri);
+      await ref.read(fileManagerToolbarServiceProvider).forgetMusicModeHint(uri);
       if (!ref.mounted) return;
 
       final newOut = Set<String>.from(state.animatingOutUris)..remove(uri);

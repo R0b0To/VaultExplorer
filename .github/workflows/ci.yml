@@ -99,12 +99,7 @@ jobs:
         run: cmake -S android/app/src/main/cpp -B build-host-tests -DCMAKE_BUILD_TYPE=Debug -DLIBGAV1_THREADPOOL_USE_STD_MUTEX=1
 
       - name: Build test binaries
-        run: >
-          cmake --build build-host-tests -j --target
-          sector_batching_test fs_scan_test kdf_table_test decrypted_block_cache_test fd_write_buffer_test
-          cryfs_block_cipher_test user_entropy_test utf16le_password_test composite_block_device_test
-          container_header_test container_utils_crc32_test chunked_block_device_test
-          archive_engine_test doc_scan_test archive_create_options_test archive_split_test
+        run: cmake --build build-host-tests -j --target host_tests
 
       - name: Run tests (ctest)
         working-directory: build-host-tests
@@ -118,7 +113,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install build tools and filesystem tools
-        run: sudo apt-get update && sudo apt-get install -y g++ libext2fs-dev e2fsprogs libssl-dev libmbedtls-dev
+        run: sudo apt-get update && sudo apt-get install -y g++ git python3 e2fsprogs libssl-dev libmbedtls-dev
 
       - name: Build and run ext_backend_test
         run: sh android/app/src/main/cpp/filesystems/test/run_ext_backend_test.sh

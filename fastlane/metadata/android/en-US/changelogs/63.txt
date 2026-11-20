@@ -1,0 +1,37 @@
+### Performance improvements
+- Improved file browsing performance, especially when navigating between previously visited folders.
+- Added directory listing caching with stale-while-revalidate behavior for faster folder navigation.
+- Optimized thumbnail loading, caching, and task prioritization to make scrolling smoother.
+- Improved gallery and masonry layouts with more efficient thumbnail sizing and image-dimension prefetching.
+- Reduced unnecessary widget rebuilds and rendering overhead in file grids and lists.
+- Added performance tracing and diagnostics to help identify bottlenecks.
+- Improved device-aware concurrency settings for background I/O and thumbnail processing.
+
+### Media improvements
+- Optimized video thumbnail decoding and frame extraction.
+- Added read-ahead buffering for media access inside encrypted containers.
+- Improved image-dimension probing without blocking visible thumbnail loading.
+- Improved media viewer layout updates when image or video dimensions become available.
+
+### Filesystem and vault improvements
+- Expanded native folder-vault functionality by moving format handling, configuration validation, and integrity operations into the native C++ engine.
+- Improved filesystem backend handling and write-flush behavior when locking containers.
+- Improved folder-vault storage and mirror synchronization paths.
+- Added safer cleanup of temporary files left behind by interrupted archive operations.
+
+### File management
+- Improved natural sorting and sorting consistency across file listings.
+- Fixed copied symbolic links receiving the appropriate target-file extension.
+- Improved directory listing cache invalidation when files and folders change.
+- Improved thumbnail previews for folder contents.
+
+### Music mode
+- Music mode now opens directly in the Tracks view instead of Albums.
+
+### Internal improvements
+- Added performance monitoring utilities and diagnostics.
+- Added directory listing cache, MD5 utility, and browser controller tests.
+- Expanded native folder-vault tests and documentation.
+- Removed duplicated Kotlin implementations of folder-vault cryptographic and format-handling components in favor of the native implementation.
+
+SHA256 Signature: `0bde9d3b0ee3f56617d02632c843b1629bf0b2faa4560dff5d26f651dc325f19`

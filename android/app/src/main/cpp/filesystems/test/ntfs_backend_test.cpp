@@ -6,7 +6,7 @@
 // physicalRead()/physicalWrite() are implemented over plain host files, and the
 // volume is configured as an unencrypted flat container, so the backend's
 // "no encryption layer at all -- pass bytes straight through" path is what runs.
-// BitLocker, VHD/VHDX and the cipher cascade are stubbed out; the NTFS logic
+// BitLocker, VHD/VHDX and both cipher engines are stubbed out; the NTFS logic
 // above them is the same code that runs on top of a decrypted BitLocker volume.
 //
 // Oracles are *independent* programs, not the backend reading back its own
@@ -23,9 +23,13 @@
 // NOT covered: BitLocker/VHD layers, FAT, and Windows' own chkdsk (nothing here
 // can run it). ntfsfix is a much weaker check than e2fsck is for ext.
 #include <fcntl.h>
+#include <cerrno>
 #include <unistd.h>
 
+#include <sys/resource.h>
+
 #include <algorithm>
+#include <csignal>
 #include <cstdint>
 #include <cstdio>
 #include <string>
@@ -46,6 +50,7 @@ extern "C" {
 #include "session/volume_state.h"
 
 #include "fs_test_support.h"
+#include "usb_test_support.h"
 
 // ---- The pieces of the app this test stands in for ----------------------------------
 VolumeState volumes[FF_VOLUMES];
@@ -59,6 +64,8 @@ bool bitlockerRead(int, uint64_t, unsigned char*, size_t) { return false; }
 bool bitlockerWrite(int, uint64_t, const unsigned char*, size_t) { return false; }
 void cascadeEncryptSector(const CascadeContext&, uint64_t, const unsigned char*, unsigned char*) {}
 void cascadeDecryptSector(const CascadeContext&, uint64_t, const unsigned char*, unsigned char*) {}
+bool luksCipherCrypt(const LuksCipherContext&, bool, uint64_t, uint32_t,
+                     const unsigned char*, unsigned char*, size_t) { return false; }
 void blockCipherEncryptBlock(const BlockCipherContext&, const unsigned char*, unsigned char*) {}
 void blockCipherDecryptBlock(const BlockCipherContext&, const unsigned char*, unsigned char*) {}
 bool usbFlushAndSync(int) { return true; }
@@ -78,6 +85,7 @@ extern "C" int vaultexplorer_mkntfs_main(int argc, char* argv[]);
 
 static const bool g_haveFix = commandExists("ntfsfix");
 static const bool g_haveLs = commandExists("ntfsls") && commandExists("ntfscat");
+static const bool g_haveInfo = commandExists("ntfsinfo");
 
 // ---- Volume fixture -----------------------------------------------------------------
 struct Vol {
@@ -166,6 +174,24 @@ struct Vol {
             }
             if (p) pclose(p);
             std::sort(out.begin(), out.end());
+        } else {
+            ++g_skips;
+        }
+        attach();
+        mount();
+        return out;
+    }
+    // Reparse tag and data of a file as the system ntfsinfo reports them ("" if unavailable).
+    std::string indepReparse(const std::string& file) {
+        closeFs();
+        std::string out;
+        if (g_haveInfo) {
+            const std::string cmd = "ntfsinfo -v -F '/" + file + "' '" + path +
+                                    "' 2>/dev/null | grep -A2 'Reparse tag'";
+            FILE* p = popen(cmd.c_str(), "r");
+            char line[4096];
+            while (p && fgets(line, sizeof(line), p)) out += line;
+            if (p) pclose(p);
         } else {
             ++g_skips;
         }
@@ -476,6 +502,51 @@ static void test_directory_cannot_move_into_itself() {
     v.fsckClean("directory into itself");
 }
 
+static void test_native_symlinks_follow_and_stay_inside_the_volume() {
+    Vol v;
+    CHECK(v.format(32));
+    const Bytes payload = pseudoRandom(3000, 91);
+    CHECK(putFile(0, "target.bin", payload));
+    CHECK(ntfsCreateSymlink(0, "file-link", "target.bin"));
+    std::string target;
+    CHECK(ntfsReadSymlink(0, "file-link", target));
+    CHECK_EQ(target, "target.bin");
+    CHECK(!ntfsCreateSymlink(0, "file-link", "other"));                              // the name is taken
+    CHECK(!ntfsCreateSymlink(0, "target.bin", "other"));                             // so is a file's
+    CHECK(!ntfsCreateSymlink(0, "empty", ""));
+    CHECK(!ntfsCreateSymlink(0, "abs", "/target.bin"));                              // absolute targets are refused
+    CHECK(!ntfsCreateSymlink(0, "abs2", "\\target.bin"));
+    std::vector<std::string> links;
+    ntfsListSymlinks(0, "", links);
+    CHECK_EQ(links.size(), 1u);
+
+    CHECK(ntfsCreateDirectory(0, "subdir"));
+    CHECK(ntfsCreateDirectory(0, "subdir/nested"));
+    CHECK(!ntfsCreateSymlink(0, "escape", "../../outside"));                         // relative targets stay inside the volume
+    CHECK(ntfsCreateSymlink(0, "subdir/nested/up", "../../target.bin"));
+    CHECK(getFile(0, "subdir/nested/up") == payload);                                // reads follow the link
+
+    // "Inside the volume" is judged from where the link PHYSICALLY lives, not from the path it was reached by.
+    // A folder link makes a path shallower or deeper than it reads; both directions must be handled.
+    CHECK(ntfsCreateDirectory(0, "b"));
+    CHECK(ntfsCreateDirectory(0, "b/c"));
+    CHECK(ntfsCreateSymlink(0, "up", "."));                                          // a folder link back to the root
+    CHECK(!ntfsCreateSymlink(0, "up/b/c/esc", "../../../x"));                        // reads 3 deep, is 2 deep: would leave the volume
+    CHECK(!ntfsCreateSymlink(0, "up/esc", "../x"));                                  // reads 1 deep, is 0 deep
+    CHECK(ntfsCreateSymlink(0, "up/b/c/stay", "../../x"));                           // lands exactly on the root: still fine
+    CHECK(ntfsCreateSymlink(0, "up/stay2", "x"));
+    CHECK(ntfsCreateSymlink(0, "deep-link", "subdir/nested"));                       // reads 1 deep, is 2 deep
+    CHECK(ntfsCreateSymlink(0, "deep-link/up2", "../../target.bin"));                // legitimate: lands on target.bin
+    CHECK(getFile(0, "deep-link/up2") == payload);
+    CHECK(!ntfsCreateSymlink(0, "deep-link/up3", "../../../target.bin"));            // one too many from the real depth
+
+    CHECK(ntfsDeleteFile(0, "up"));
+    CHECK(ntfsDeleteFile(0, "deep-link"));
+    CHECK(ntfsDeleteFile(0, "file-link"));
+    CHECK(getFile(0, "target.bin") == payload);                                      // deleting a link leaves its target alone
+    v.fsckClean("native symlinks");
+}
+
 static void test_delete_rules() {
     Vol v;
     CHECK(v.format(48));
@@ -601,6 +672,83 @@ static void test_streams_read_ranges() {
     v.fsckClean("streams");
 }
 
+static void test_native_symlinks_follow_and_manage_link_identity() {
+    Vol v;
+    CHECK(v.format(32));
+    const Bytes payload = pseudoRandom(4096, 177);
+    CHECK(putFile(0, "target.bin", payload));
+    CHECK(ntfsCreateSymlink(0, "file-link", "target.bin"));
+    std::string target;
+    CHECK(ntfsReadSymlink(0, "file-link", target));
+    CHECK_EQ(target, "target.bin");
+    std::vector<std::string> links;
+    ntfsListSymlinks(0, "", links);
+    CHECK_EQ(links.size(), 1u);
+    CHECK(!links.empty() && links[0].rfind("L|", 0) == 0);
+    CHECK(!links.empty() && links[0].find("|file-link") != std::string::npos);
+    // Independent oracle: stock ntfs-3g must see a WSL symlink (tag 0xa000001d, data = type 2 +
+    // the UTF-8 target), not just our own reader.
+    if (g_haveInfo) {
+        const std::string info = v.indepReparse("file-link");
+        CHECK(info.find("0xa000001d (Linux symlink)") != std::string::npos);
+        CHECK(info.find("0x020000007461726765742e62696e") != std::string::npos);  // 02000000 "target.bin"
+    } else {
+        ++g_skips;
+        std::printf("    SKIP reparse check (ntfsinfo not on PATH)\n");
+    }
+    CHECK(!has(0, "", "file-link"));              // symlinks stay out of normal file scans
+    CHECK(getFile(0, "file-link") == payload);    // ordinary reads follow the target
+    CHECK_EQ(ntfsGetFileSize(0, "file-link"), static_cast<int64_t>(payload.size()));
+
+    // Rename and delete operate on the link inode, never the target.
+    CHECK(ntfsRenameFile(0, "file-link", "renamed-link"));
+    CHECK(ntfsReadSymlink(0, "renamed-link", target));
+    CHECK_EQ(target, "target.bin");
+    CHECK(ntfsDeleteFile(0, "renamed-link"));
+    CHECK(getFile(0, "target.bin") == payload);
+
+    CHECK(ntfsCreateDirectory(0, "subdir"));
+    CHECK(putFile(0, "subdir/inside.txt", Bytes{'o', 'k'}));
+    CHECK(ntfsCreateSymlink(0, "dir-link", "subdir"));
+    links.clear();
+    ntfsListSymlinks(0, "", links);
+    CHECK(std::any_of(links.begin(), links.end(), [](const std::string& s) {
+        return s.rfind("LD|", 0) == 0 && s.find("|dir-link") != std::string::npos;
+    }));
+    std::vector<std::string> throughLink;
+    listNtfsDirectory(0, "dir-link", throughLink);
+    CHECK_EQ(throughLink.size(), 1u);
+    CHECK(!throughLink.empty() && throughLink[0].find("inside.txt") != std::string::npos);
+    CHECK(ntfsDeleteFile(0, "dir-link"));
+    CHECK(getFile(0, "subdir/inside.txt") == Bytes({'o', 'k'}));
+
+    // Long and broken links stay visible and are not mistaken for regular files.
+    const std::string longTarget = std::string(90, 'x') + "/missing-long-target";
+    CHECK(ntfsCreateSymlink(0, "long-link", longTarget));
+    CHECK(ntfsReadSymlink(0, "long-link", target));
+    CHECK_EQ(target, longTarget);
+
+    CHECK(ntfsCreateSymlink(0, "broken", "missing-target"));
+    links.clear();
+    ntfsListSymlinks(0, "", links);
+    CHECK(std::any_of(links.begin(), links.end(), [](const std::string& s) {
+        return s.find("|broken") != std::string::npos;
+    }));
+    CHECK_EQ(ntfsGetFileSize(0, "broken"), -1);
+
+    // Relative targets are confined to the volume root.
+    CHECK(!ntfsCreateSymlink(0, "escape", "../../outside"));
+    CHECK(ntfsCreateDirectory(0, "subdir/nested"));
+    CHECK(ntfsCreateSymlink(0, "subdir/nested/up", "../../target.bin"));
+    CHECK(getFile(0, "subdir/nested/up") == payload);
+
+    // A cycle is refused by the path resolver instead of hanging.
+    CHECK(ntfsCreateSymlink(0, "loop-a", "loop-b"));
+    CHECK(ntfsCreateSymlink(0, "loop-b", "loop-a"));
+    CHECK_EQ(ntfsGetFileSize(0, "loop-a"), -1);
+    v.fsckClean("native symlinks");
+}
+
 static void test_read_only_mount_changes_nothing() {
     Vol v;
     CHECK(v.format(32));
@@ -621,6 +769,210 @@ static void test_read_only_mount_changes_nothing() {
     CHECK(v.mount());
     CHECK(getFile(0, "d/f") == pseudoRandom(20000, 121));
     v.fsckClean("read-only session");
+}
+
+// ---- USB write-back -----------------------------------------------------------------
+// With a USB source, ntfs-3g's writes sit in volumes[].usbCache until flushed. ntfsSync
+// used to handle only the composite and fd paths -- USB sessions have fd == -1 -- so it
+// returned success while the bytes were still pending. These call the production sync
+// callback (the one ntfs-3g invokes through ntfs_device_operations) on a USB-source
+// volume and check what actually reached the device.
+static void test_usb_sync_reaches_the_device() {
+    Vol v;
+    CHECK(v.format(8));
+    VolumeState& vs = volumes[0];
+    g_usbDevice[0].reset(8u << 20);
+    vs.isUsbSource = true;
+
+    struct ntfs_device* dev = ntfs_device_alloc("vaultexplorer", 0, &vExplorer_ntfs_ops, &g_deviceId[0]);
+    CHECK(dev != nullptr);
+    if (dev) {
+        const uint64_t kFirst = 4096 * 5, kSecond = 4096 * 9, kThird = 4096 * 13;
+        const Bytes first(512, 0xA7), second(512, 0x5C), third(512, 0x3E);
+
+        // Healthy device: pending bytes are written and the device barrier is issued.
+        CHECK(vs.usbCache.write(0, kFirst, first.data(), first.size()));
+        CHECK_EQ(g_usbDevice[0].media[kFirst], 0);   // only pending in the cache so far
+        const int syncsBefore = g_usbDevice[0].syncCalls;
+        CHECK_EQ(dev->d_ops->sync(dev), 0);
+        CHECK_EQ(g_usbDevice[0].media[kFirst], 0xA7);
+        CHECK(g_usbDevice[0].syncCalls > syncsBefore);
+
+        // Device refuses the data: reported as EIO, bytes stay pending for a retry.
+        CHECK(vs.usbCache.write(0, kSecond, second.data(), second.size()));
+        g_usbDevice[0].refuseWrites = true;
+        errno = 0;
+        CHECK_EQ(dev->d_ops->sync(dev), -1);
+        CHECK_EQ(errno, EIO);
+        CHECK_EQ(g_usbDevice[0].media[kSecond], 0);
+        g_usbDevice[0].refuseWrites = false;
+        CHECK_EQ(dev->d_ops->sync(dev), 0);
+        CHECK_EQ(g_usbDevice[0].media[kSecond], 0x5C);
+
+        // Data written but the device-level barrier fails: still an error.
+        CHECK(vs.usbCache.write(0, kThird, third.data(), third.size()));
+        g_usbDevice[0].refuseSync = true;
+        errno = 0;
+        CHECK_EQ(dev->d_ops->sync(dev), -1);
+        CHECK_EQ(errno, EIO);
+        g_usbDevice[0].refuseSync = false;
+        CHECK_EQ(dev->d_ops->sync(dev), 0);
+        CHECK_EQ(g_usbDevice[0].media[kThird], 0x3E);
+
+        ntfs_device_free(dev);
+    }
+
+    vs.isUsbSource = false;
+    vs.usbCache.clear();
+}
+
+// Same contract for a plain fd volume: its acknowledged writes sit in the fd write-behind buffer, and
+// ntfsSync used to call flush() and fsync() and report success whatever they did. ntfs-3g trusts this
+// result (ntfs_inode_sync, ntfs_umount), so a failed flush must come back as -1/EIO with the bytes kept
+// for a retry -- VolumeState::reset() would drop them. The failure is an RLIMIT_FSIZE ceiling (EFBIG) on a
+// real fd, lifted again afterwards.
+static void test_fd_sync_reports_a_failed_writebehind_flush() {
+    Vol v;
+    CHECK(v.format(8));
+    VolumeState& vs = volumes[0];
+    char path[] = "/tmp/ve_ntfs_fd_syncXXXXXX";
+    const int fd = mkstemp(path);
+    CHECK(fd >= 0);
+    if (fd < 0) return;
+    unlink(path);
+    struct ntfs_device* dev = ntfs_device_alloc("vaultexplorer", 0, &vExplorer_ntfs_ops, &g_deviceId[0]);
+    CHECK(dev != nullptr);
+    if (dev) {
+        vs.fd = fd;
+        const Bytes px(512, 0x6D);
+        CHECK(vs.fdWriteBuffer.write(fd, 4096, px.data(), px.size()));
+        std::signal(SIGXFSZ, SIG_IGN);
+        struct rlimit saved;
+        getrlimit(RLIMIT_FSIZE, &saved);
+        struct rlimit tight = {1024, saved.rlim_max};
+        setrlimit(RLIMIT_FSIZE, &tight);
+        errno = 0;
+        CHECK_EQ(dev->d_ops->sync(dev), -1);
+        CHECK_EQ(errno, EIO);
+        setrlimit(RLIMIT_FSIZE, &saved);
+        CHECK_EQ(dev->d_ops->sync(dev), 0);          // the buffer kept the bytes: the retry persists them
+        unsigned char b = 0;
+        CHECK_EQ(pread(fd, &b, 1, 4096), 1);
+        CHECK_EQ(b, 0x6D);
+        vs.fdWriteBuffer.reset();
+        vs.fd = -1;
+        ntfs_device_free(dev);
+    }
+    close(fd);
+}
+
+// ---- Growing the file system after the container was expanded ------------------------
+static const bool g_haveResize = commandExists("ntfsresize");
+
+// ntfsresize --info is a full consistency check ($Bitmap against every MFT record's runs); a second
+// run with no target size must report that the volume already fills the device.
+static bool resizeOracleOk(Vol& v, const char* what) {
+    v.closeFs();
+    bool ok = true;
+    if (g_haveResize) {
+        const std::string info = g_tmp + "/resize_info.log", fill = g_tmp + "/resize_fill.log";
+        const int rc1 = std::system(("ntfsresize -i -f '" + v.path + "' >'" + info + "' 2>&1").c_str());
+        const int rc2 = std::system(("ntfsresize -n -f '" + v.path + "' >'" + fill + "' 2>&1").c_str());
+        const bool fills = std::system(("grep -q 'Nothing to do' '" + fill + "'").c_str()) == 0;
+        ok = rc1 == 0 && rc2 == 0 && fills;
+        if (!ok) {
+            std::printf("    ntfsresize oracle failed after '%s' (info rc=%d, no-action rc=%d, fills=%d):\n", what, rc1, rc2, fills);
+            std::system(("tail -8 '" + info + "' | sed 's/^/        /'; tail -5 '" + fill + "' | sed 's/^/        /'").c_str());
+        }
+    } else {
+        ++g_skips;
+        std::printf("    SKIP ntfsresize oracle '%s' (ntfsresize not on PATH)\n", what);
+    }
+    v.attach();
+    v.mount();
+    ++g_checks;
+    if (!ok) { ++g_failures; std::printf("    FAIL ntfsresize oracle: %s\n", what); }
+    return ok;
+}
+
+static bool extendNtfsImage(Vol& v, uint64_t addMiB, bool garbage) {
+    VolumeState& vs = volumes[v.id];
+    const uint64_t old = vs.dataAreaLengthBytes;
+    if (std::system(("truncate -s " + std::to_string(old + addMiB * 1048576) + " '" + v.path + "'").c_str()) != 0) return false;
+    if (garbage) {
+        const Bytes noise = pseudoRandom(1048576, 77);
+        for (uint64_t i = 0; i < addMiB; ++i) CHECK(pwrite(g_fd[v.id], noise.data(), noise.size(), static_cast<off_t>(old + i * 1048576)) == 1048576);
+    }
+    vs.dataAreaLengthBytes = static_cast<uint64_t>(lseek(g_fd[v.id], 0, SEEK_END));
+    return true;
+}
+
+static void ntfsGrowAndVerify(Vol& v, uint64_t addMiB, bool garbage, bool fillFirst, const char* what) {
+    std::vector<std::pair<std::string, Bytes>> files;
+    for (int i = 0; i < 6; ++i) {
+        files.push_back({"f" + std::to_string(i), pseudoRandom(150000 + i * 40000, 7 + i)});
+        CHECK(putFile(v.id, files.back().first, files.back().second));
+    }
+    CHECK(ntfsCreateDirectory(v.id, "dir"));
+    CHECK(putFile(v.id, "dir/inner", pseudoRandom(70000, 5)));
+    if (fillFirst) {
+        for (int i = 0; i < 4000; ++i) if (!putFile(v.id, "fill" + std::to_string(i), pseudoRandom(262144, 100 + i))) break;
+        CHECK(freeBytes(v.id) < 1048576);
+    }
+    CHECK(v.fsckClean(what));
+    uint64_t totalBefore = 0, freeBefore = 0;
+    ntfsGetSpaceInfo(v.id, totalBefore, freeBefore);
+    CHECK(extendNtfsImage(v, addMiB, garbage));
+    CHECK(ntfsGrowToFit(v.id) == FsGrowStatus::kGrown);
+    v.closeFs(); v.attach(); CHECK(v.mount());               // what fsGrowToFit does after a successful grow
+    uint64_t totalAfter = 0, freeAfter = 0;
+    ntfsGetSpaceInfo(v.id, totalAfter, freeAfter);
+    CHECK(totalAfter >= totalBefore + (addMiB - 2) * 1048576);
+    CHECK(freeAfter >= freeBefore + (addMiB - 2) * 1048576);
+    for (const auto& f : files) CHECK(getFile(v.id, f.first) == f.second);
+    CHECK(getFile(v.id, "dir/inner") == pseudoRandom(70000, 5));
+    CHECK(resizeOracleOk(v, (std::string(what) + " after grow").c_str()));
+    CHECK(v.fsckClean((std::string(what) + " after grow (ntfsfix)").c_str()));
+    // The new space is usable all the way, and what lives there reads back through the system tools too.
+    const size_t big = static_cast<size_t>((addMiB - 6) * 1048576);
+    CHECK(putFile(v.id, "big_after_grow", pseudoRandom(big, 3)));
+    CHECK(getFile(v.id, "big_after_grow") == pseudoRandom(big, 3));
+    CHECK(v.indepCat("big_after_grow") == pseudoRandom(big, 3));
+    CHECK(ntfsGrowToFit(v.id) == FsGrowStatus::kAlreadyFills);
+    CHECK(resizeOracleOk(v, (std::string(what) + " after use").c_str()));
+}
+
+static void test_grow_variants() {
+    struct Case { uint64_t mib; uint64_t add; bool garbage; bool full; };
+    // 400/900 MiB cross the point where $Bitmap needs an extra cluster; "full" fills the old file system first,
+    // so the extension has to come from the new space.
+    const Case cases[] = {{16, 20, false, false}, {16, 40, true, false}, {16, 400, false, false},
+                          {16, 400, true, true},  {16, 900, false, true}, {32, 70, true, true}};
+    for (const auto& c : cases) {
+        Vol v;
+        CHECK(v.format(c.mib));
+        const std::string what = "grow ntfs " + std::to_string(c.mib) + "+" + std::to_string(c.add) +
+                                 (c.full ? " full" : "") + (c.garbage ? " garbage" : "");
+        ntfsGrowAndVerify(v, c.add, c.garbage, c.full, what.c_str());
+    }
+}
+
+static void test_grow_refusals() {
+    Vol v;
+    CHECK(v.format(16));
+    CHECK(ntfsGrowToFit(v.id) == FsGrowStatus::kAlreadyFills);
+    CHECK(putFile(v.id, "a", pseudoRandom(5000, 1)));
+    CHECK(extendNtfsImage(v, 8, false));
+    void* stream = ntfsOpenStream(v.id, "a");
+    CHECK(stream != nullptr);
+    CHECK(ntfsGrowToFit(v.id) == FsGrowStatus::kBusy);
+    ntfsCloseStream(v.id, stream);
+    volumes[v.id].readOnly = true;
+    CHECK(ntfsGrowToFit(v.id) == FsGrowStatus::kFailed);
+    volumes[v.id].readOnly = false;
+    CHECK(ntfsGrowToFit(v.id) == FsGrowStatus::kGrown);
+    v.closeFs(); v.attach(); CHECK(v.mount());
+    CHECK(resizeOracleOk(v, "refusals then grow"));
 }
 
 // ---- Runner -------------------------------------------------------------------------
@@ -648,13 +1000,19 @@ int main() {
         T(test_rename_reports_success_and_changes_only_the_name),
         T(test_directory_move_keeps_contents),
         T(test_directory_cannot_move_into_itself),
+        T(test_native_symlinks_follow_and_stay_inside_the_volume),
         T(test_delete_rules),
         T(test_writes_refuse_directories),
         T(test_large_directory_grows),
         T(test_set_last_modified_time),
         T(test_copy_between_and_within_volumes),
         T(test_streams_read_ranges),
+        T(test_native_symlinks_follow_and_manage_link_identity),
         T(test_read_only_mount_changes_nothing),
+        T(test_usb_sync_reaches_the_device),
+        T(test_fd_sync_reports_a_failed_writebehind_flush),
+        T(test_grow_variants),
+        T(test_grow_refusals),
     };
     return runTests("ntfs_backend", tests, sizeof(tests) / sizeof(tests[0]), closeAllVolumes);
 }

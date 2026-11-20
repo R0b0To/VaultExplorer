@@ -17,7 +17,6 @@ import 'package:vaultexplorer/data/models/video_aspect_ratio_mode.dart';
 import 'package:vaultexplorer/data/models/media_decoder_mode.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
-import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/widgets/zoom_indicator_pill.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/playlist_swipe_claim.dart';

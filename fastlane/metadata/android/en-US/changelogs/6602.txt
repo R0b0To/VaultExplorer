@@ -1,0 +1,4 @@
+• Added per-vault and Local Storage controls for thumbnail, gallery metadata and music index storage, plus clear actions.
+• Added an Indexes & thumbnails hub and a format-aware VeraCrypt/LUKS/BitLocker expander with size previews.
+• Improved Vault Sync comparisons, transfer responsiveness and Android document-provider reliability.
+• Added native HMAC/AES-CBC support; removed redundant password hints and clarified the PIM default.

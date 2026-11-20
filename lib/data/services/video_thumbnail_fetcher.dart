@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
+import 'package:vaultexplorer/core/utils/image_preview_exception.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
@@ -58,6 +59,17 @@ import 'package:vaultexplorer/features/browser/widgets/archive_thumbnail_support
 /// frame to the durable cache first, every other layout just reads it
 /// back and the symptom disappears -- which is why visiting grid/list
 /// first "fixed" it.
+/// Thrown when native video thumbnail extraction fails outside active playback.
+/// Marked as [PermanentThumbnailFailure] so [AsyncThumbnailLoader] skips
+/// multi-second backoff retries on un-decodable video streams.
+class VideoThumbnailUnavailableException
+    implements PermanentThumbnailFailure {
+  const VideoThumbnailUnavailableException();
+
+  @override
+  String toString() => 'VideoThumbnailUnavailableException()';
+}
+
 class VideoThumbnailFetcher {
   VideoThumbnailFetcher._();
 
@@ -71,6 +83,7 @@ class VideoThumbnailFetcher {
     required int targetSize,
     ArchiveContext? archiveContext,
     String? archiveRootPath,
+    bool checkCache = true,
   }) async {
     if (archiveContext != null && archiveRootPath != null) {
       final bytes = await fetchArchiveVideoEntryForThumbnail(
@@ -85,7 +98,7 @@ class VideoThumbnailFetcher {
       return bytes;
     }
 
-    if (mode != ThumbnailCacheMode.disabled) {
+    if (checkCache && mode != ThumbnailCacheMode.disabled) {
       final cached = await thumbnailCache.fetch(
         container: container,
         filePath: filePath,
@@ -108,7 +121,10 @@ class VideoThumbnailFetcher {
     );
     final activeDuringFetch =
         activeBeforeFetch || PlaybackThrottleController.isPlaybackActive.value;
-    if (data == null || data.isEmpty) {
+   if (data == null || data.isEmpty) {
+      if (!activeDuringFetch) {
+        throw const VideoThumbnailUnavailableException();
+      }
       throw StateError('Video thumbnail unavailable');
     }
 
@@ -132,7 +148,7 @@ class VideoThumbnailFetcher {
   /// the real aspect ratio. [onUnknownSize] is called instead when a cache
   /// *hit* has no size on record (e.g. written before dimensions were
   /// tracked, or the `.meta` sidecar is missing/unreadable).
-  static Future<Uint8List> fetchWithSize(
+   static Future<Uint8List> fetchWithSize(
     ThumbnailCacheService thumbnailCache,
     VaultFileIoApi fileIoApi,
     MountedContainer container,
@@ -144,6 +160,7 @@ class VideoThumbnailFetcher {
     required Future<void> Function(Uint8List bytes) onUnknownSize,
     ArchiveContext? archiveContext,
     String? archiveRootPath,
+    bool checkCache = true,
   }) async {
     if (archiveContext != null && archiveRootPath != null) {
       final (bytes, width, height) =
@@ -171,7 +188,7 @@ class VideoThumbnailFetcher {
       return bytes;
     }
 
-    if (mode != ThumbnailCacheMode.disabled) {
+    if (checkCache && mode != ThumbnailCacheMode.disabled) {
       final cached = await thumbnailCache.fetchWithSize(
         container: container,
         filePath: filePath,
@@ -198,8 +215,11 @@ class VideoThumbnailFetcher {
     );
     final activeDuringFetch =
         activeBeforeFetch || PlaybackThrottleController.isPlaybackActive.value;
-    final data = thumb?.bytes;
+   final data = thumb?.bytes;
     if (data == null || data.isEmpty) {
+      if (!activeDuringFetch) {
+        throw const VideoThumbnailUnavailableException();
+      }
       throw StateError('Video thumbnail unavailable');
     }
     onSizeKnown(thumb!.width, thumb.height);

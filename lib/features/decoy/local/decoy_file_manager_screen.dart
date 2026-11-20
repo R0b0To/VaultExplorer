@@ -122,6 +122,9 @@ class _DecoyFileManagerScreenState extends ConsumerState<DecoyFileManagerScreen>
       _isForeground = true;
       _checkAccessAndResolveRoot();
       unawaited(_container.read(vaultDashboardControllerProvider.notifier).handleRefresh());
+      ref
+          .read(externalStorageLocationsProvider.notifier)
+          .refreshSystemVolumes();
       if (_sessionLockConfigured) {
         lockController.handleAppLifecycleState(state);
       }

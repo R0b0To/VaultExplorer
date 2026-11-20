@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/external_storage_locations_provider.dart';
@@ -13,6 +14,24 @@ import 'package:vaultexplorer/features/dashboard/widgets/drawer_categories_secti
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_screen.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
+
+/// Prompts for All Files Access when a raw-path volume (SD card / USB) is
+/// selected without permission granted.
+Future<bool> _ensureAllFilesAccess(BuildContext context, WidgetRef ref) async {
+  final lifecycle = ref.read(vaultLifecycleApiProvider);
+  if (await lifecycle.hasAllFilesAccess()) return true;
+  if (!context.mounted) return false;
+  final shouldRequest = await showAppConfirmDialog(
+    context,
+    title: context.l10n.localStoragePermissionTitle,
+    message: context.l10n.filesPermissionMessage,
+    confirmLabel: context.l10n.localStorageGrantAccess,
+  );
+  if (shouldRequest) {
+    await lifecycle.requestAllFilesAccess(openSettings: true);
+  }
+  return false;
+}
 
 class StorageLocationsDrawer extends ConsumerWidget {
   final int activeVolId;
@@ -139,6 +158,7 @@ class StorageLocationsDrawer extends ConsumerWidget {
           ),
       ],
     ).then((action) {
+      if (!context.mounted) return;
       if (action == 'rename') {
         _promptRename(context, ref, loc);
       } else if (action == 'remove') {
@@ -241,6 +261,13 @@ class StorageLocationsDrawer extends ConsumerWidget {
                                 Navigator.pop(context);
                                 return;
                               }
+                              // SAF locations carry their own persisted grant; only raw
+                              // paths (auto-discovered SD card / USB) need file access.
+                              if (!loc.resolvedUri.startsWith('content://') &&
+                                  !await _ensureAllFilesAccess(context, ref)) {
+                                return;
+                              }
+                              if (!context.mounted) return;
                               final isAccessible = await ref
                                   .read(externalStorageLocationsProvider.notifier)
                                   .isAccessible(loc);

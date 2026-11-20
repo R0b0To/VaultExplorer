@@ -30,6 +30,24 @@ import 'package:vaultexplorer/features/dashboard/widgets/lock_flush_prompt.dart'
 import 'package:vaultexplorer/features/settings/long_file_name_display_provider.dart';
 import 'package:vaultexplorer/features/tools/tools_screen.dart';
 
+/// Prompts for All Files Access when a raw-path volume (SD card / USB) is
+/// selected without permission granted.
+Future<bool> _ensureAllFilesAccess(BuildContext context, WidgetRef ref) async {
+  final lifecycle = ref.read(vaultLifecycleApiProvider);
+  if (await lifecycle.hasAllFilesAccess()) return true;
+  if (!context.mounted) return false;
+  final shouldRequest = await showAppConfirmDialog(
+    context,
+    title: context.l10n.localStoragePermissionTitle,
+    message: context.l10n.filesPermissionMessage,
+    confirmLabel: context.l10n.localStorageGrantAccess,
+  );
+  if (shouldRequest) {
+    await lifecycle.requestAllFilesAccess(openSettings: true);
+  }
+  return false;
+}
+
 class AppNavigationDrawer extends ConsumerWidget {
   final int? currentVolId;
   final MountedContainer? primaryLocalContainer;
@@ -229,6 +247,7 @@ class AppNavigationDrawer extends ConsumerWidget {
           ),
       ],
     ).then((action) {
+      if (!context.mounted) return;
       if (action == 'new_tab') {
         _openLocationInNewTab(context, ref, loc);
       } else if (action == 'rename') {
@@ -244,6 +263,13 @@ class AppNavigationDrawer extends ConsumerWidget {
     WidgetRef ref,
     ExternalStorageLocation loc,
   ) async {
+    // SAF locations carry their own persisted grant; only raw
+    // paths (auto-discovered SD card / USB) need file access.
+    if (!loc.resolvedUri.startsWith('content://') &&
+        !await _ensureAllFilesAccess(context, ref)) {
+      return;
+    }
+    if (!context.mounted) return;
     final accessible = await ref
         .read(externalStorageLocationsProvider.notifier)
         .isAccessible(loc);

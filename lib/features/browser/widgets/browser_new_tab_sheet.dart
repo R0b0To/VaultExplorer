@@ -14,6 +14,30 @@ import 'package:vaultexplorer/features/browser/widgets/browser_tab_strip.dart';
 /// it (null = the container root).
 typedef BrowserNewTabChoice = ({MountedContainer? container, String? path});
 
+/// Whether raw-path storage (an auto-discovered SD card / USB drive) can be
+/// listed right now. That needs "All files access"; without it the tab would
+/// open onto an empty listing with no explanation.
+///
+/// When access is missing this offers the system grant screen -- same wording
+/// as the dashboard's Local Storage flow -- and returns false. The grant
+/// happens outside the app and this sheet can't observe it, so the person
+/// taps the storage again afterwards (the sheet stays open meanwhile).
+Future<bool> _ensureAllFilesAccess(BuildContext context, WidgetRef ref) async {
+  final lifecycle = ref.read(vaultLifecycleApiProvider);
+  if (await lifecycle.hasAllFilesAccess()) return true;
+  if (!context.mounted) return false;
+  final shouldRequest = await showAppConfirmDialog(
+    context,
+    title: context.l10n.localStoragePermissionTitle,
+    message: context.l10n.filesPermissionMessage,
+    confirmLabel: context.l10n.localStorageGrantAccess,
+  );
+  if (shouldRequest) {
+    await lifecycle.requestAllFilesAccess(openSettings: true);
+  }
+  return false;
+}
+
 /// Bottom sheet listing places a new tab can open: each unlocked vault, this
 /// device's storage and any added external storage. Returns the picked
 /// [BrowserNewTabChoice] (or null when dismissed).
@@ -169,6 +193,13 @@ class BrowserNewTabSheet extends ConsumerWidget {
                   final notifier = ref.read(
                     externalStorageLocationsProvider.notifier,
                   );
+                  // SAF locations carry their own persisted grant; only raw
+                  // paths (auto-discovered SD card / USB) need file access.
+                  if (!loc.resolvedUri.startsWith('content://') &&
+                      !await _ensureAllFilesAccess(context, ref)) {
+                    return;
+                  }
+                  if (!context.mounted) return;
                   final accessible = await notifier.isAccessible(loc);
                   if (!context.mounted) return;
                   if (!accessible) {

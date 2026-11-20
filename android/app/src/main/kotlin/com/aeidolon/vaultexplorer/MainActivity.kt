@@ -1505,7 +1505,11 @@ open class MainActivity : FlutterFragmentActivity() {
                 }
                 ChannelMethods.GET_STORAGE_VOLUMES -> {
                     ioExecutor.execute {
-                        val volumes = safStorageManager.getStorageVolumes()
+                        val volumes = try {
+                            safStorageManager.getStorageVolumes()
+                        } catch (_: Throwable) {
+                            emptyList<Map<String, Any?>>()
+                        }
                         runOnUiThread { result.success(volumes) }
                     }
                 }

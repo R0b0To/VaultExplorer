@@ -1377,43 +1377,60 @@ class SafStorageManager(private val context: Context) {
      * Auto-discovers all mounted storage volumes (Primary, SD Cards, USB OTG).
      */
     fun getStorageVolumes(): List<Map<String, Any?>> {
-        val sm = context.getSystemService(Context.STORAGE_SERVICE) as StorageManager
+        val sm = context.getSystemService(Context.STORAGE_SERVICE) as? StorageManager
+            ?: return emptyList()
         val volumes = mutableListOf<Map<String, Any?>>()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            for (vol in sm.storageVolumes) {
-                val isPrimary = vol.isPrimary
-                val isRemovable = vol.isRemovable
-                val state = vol.state
-                val desc = vol.getDescription(context)
-                val uuid = vol.uuid
-                val dir = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) vol.directory else null
-                val path = dir?.absolutePath
-                    ?: (if (isPrimary) Environment.getExternalStorageDirectory().absolutePath else (if (uuid != null) "/storage/$uuid" else null))
-                val canRead = path != null && File(path).canRead()
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                for (vol in sm.storageVolumes) {
+                    try {
+                        val isPrimary = vol.isPrimary
+                        val isRemovable = vol.isRemovable
+                        val state = vol.state
+                        val desc = vol.getDescription(context)
+                        val uuid = vol.uuid
+                        val dir = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) vol.directory else null
+                        val path = dir?.absolutePath
+                            ?: (if (isPrimary) Environment.getExternalStorageDirectory().absolutePath else (if (uuid != null) "/storage/$uuid" else null))
+                        val canRead = path != null && File(path).canRead()
+                        // Must be stable across calls: the Dart side keys the volIds it
+                        // has already handed to open tabs on this id, so a value that
+                        // changes per call (e.g. a timestamp) would renumber the volume
+                        // on every refresh. A volume with no UUID is identified by its
+                        // mount path, falling back to its description.
+                        val fallback = path ?: desc ?: "unknown"
+                        val stableId = uuid ?: if (isPrimary) "primary" else
+                            "volume_" + fallback.replace(Regex("[^A-Za-z0-9._-]"), "_")
 
+                        volumes.add(mapOf(
+                            "id" to stableId,
+                            "description" to desc,
+                            "isPrimary" to isPrimary,
+                            "isRemovable" to isRemovable,
+                            "state" to state,
+                            "path" to (path ?: ""),
+                            "hasDirectAccess" to canRead,
+                        ))
+                    } catch (_: Throwable) {
+                        // Skip individual problematic volume on quirky OEM ROMs
+                    }
+                }
+            } else {
+                // Pre-Nougat fallback
+                val primaryDir = Environment.getExternalStorageDirectory()
                 volumes.add(mapOf(
-                    "id" to (uuid ?: if (isPrimary) "primary" else "volume_${System.currentTimeMillis()}"),
-                    "description" to desc,
-                    "isPrimary" to isPrimary,
-                    "isRemovable" to isRemovable,
-                    "state" to state,
-                    "path" to (path ?: ""),
-                    "hasDirectAccess" to canRead,
+                    "id" to "primary",
+                    "description" to "Internal Storage",
+                    "isPrimary" to true,
+                    "isRemovable" to false,
+                    "state" to Environment.getExternalStorageState(),
+                    "path" to primaryDir.absolutePath,
+                    "hasDirectAccess" to primaryDir.canRead(),
                 ))
             }
-        } else {
-            // Pre-Nougat fallback
-            val primaryDir = Environment.getExternalStorageDirectory()
-            volumes.add(mapOf(
-                "id" to "primary",
-                "description" to "Internal Storage",
-                "isPrimary" to true,
-                "isRemovable" to false,
-                "state" to Environment.getExternalStorageState(),
-                "path" to primaryDir.absolutePath,
-                "hasDirectAccess" to primaryDir.canRead(),
-            ))
+        } catch (_: Throwable) {
+            // Return any volumes collected before failure
         }
 
         return volumes

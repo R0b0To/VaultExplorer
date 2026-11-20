@@ -145,6 +145,11 @@ class _VaultSyncLocationPickerSheetState
 
     final externals = ref.read(externalStorageLocationsProvider.notifier);
     for (final location in ref.read(externalStorageLocationsProvider)) {
+      // Raw-path external volumes require All Files Access just like the
+      // primary local storage does.
+      if (!location.resolvedUri.startsWith('content://') && _localRoot == null) {
+        continue;
+      }
       final resolved = externals.resolveContainer(location.volId);
       if (resolved == null) continue;
       targets.add(

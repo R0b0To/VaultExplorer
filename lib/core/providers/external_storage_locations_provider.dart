@@ -17,8 +17,31 @@ class SelfReferentialStorageException implements Exception {
   const SelfReferentialStorageException();
 }
 
+/// Overridable so tests can run the notifier without touching disk.
+final externalStorageRepositoryProvider = Provider<ExternalStorageRepository>(
+  (ref) => const ExternalStorageRepository(),
+);
+
 class ExternalStorageLocationsNotifier extends Notifier<List<ExternalStorageLocation>> {
-  static const ExternalStorageRepository _repo = ExternalStorageRepository();
+  ExternalStorageRepository get _repo => ref.read(externalStorageRepositoryProvider);
+
+  /// Tail of the queue that [_serialized] chains onto.
+  Future<void> _tail = Future<void>.value();
+
+  /// Runs [action] only after every previously queued mutation or refresh
+  /// has finished, so each one sees the in-memory state *and* the file the
+  /// previous one left behind.
+  ///
+  /// Without this, [refreshSystemVolumes] (fired on app resume) can race
+  /// with [promptAndAddLocation]: the SAF folder picker backgrounds the app,
+  /// so a resume lands right as the new location is being saved, and the
+  /// refresh can read the not-yet-updated file and drop the new entry from
+  /// state. A failed action does not block the actions queued behind it.
+  Future<T> _serialized<T>(Future<T> Function() action) {
+    final run = _tail.then((_) => action());
+    _tail = run.then<void>((_) {}, onError: (_) {});
+    return run;
+  }
 
   /// SAF authority of this app's own `ContainerDocumentsProvider` (see the
   /// Kotlin class of that name, and `FolderDocumentProviderHandlers`, which
@@ -40,6 +63,34 @@ class ExternalStorageLocationsNotifier extends Notifier<List<ExternalStorageLoca
     if (treeUri == null || treeUri.isEmpty) return false;
     try {
       return Uri.parse(treeUri).authority == _kOwnDocumentsProviderAuthority;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// SAF authority of the system's external-storage provider, which backs
+  /// SD cards and USB drives.
+  static const _kExternalStorageDocumentsAuthority =
+      'com.android.externalstorage.documents';
+
+  /// True if [treeUri] is the SAF grant for the *root* of the removable
+  /// volume whose native id (its UUID) is [volumeId], e.g.
+  /// `content://com.android.externalstorage.documents/tree/1234-5678%3A`.
+  ///
+  /// A user who already added their SD card through the folder picker has
+  /// exactly this in `treeUri`, while `path` holds the same URI (not the raw
+  /// `/storage/<uuid>` path), so a plain path comparison would list the card
+  /// a second time. A grant on a *subfolder* (`1234-5678:DCIM`) is a
+  /// different location and does not match.
+  static bool _isVolumeRootTreeUri(String? treeUri, String volumeId) {
+    if (treeUri == null || volumeId.isEmpty) return false;
+    try {
+      final uri = Uri.parse(treeUri);
+      if (uri.authority != _kExternalStorageDocumentsAuthority) return false;
+      final segments = uri.pathSegments;
+      return segments.length >= 2 &&
+          segments[0] == 'tree' &&
+          segments[1].toLowerCase() == '$volumeId:'.toLowerCase();
     } catch (_) {
       return false;
     }
@@ -89,14 +140,23 @@ class ExternalStorageLocationsNotifier extends Notifier<List<ExternalStorageLoca
       for (final volId in previousSystemVolIds.values) {
         if (volId <= nextVolId) nextVolId = volId - 1;
       }
-      final usedVolIds = {
-        ...persisted.map((loc) => loc.volId),
-        ...previousSystemVolIds.values,
-      };
+      // IDs that can't be handed out again. Only persisted locations (and
+      // volumes assigned below) belong here -- NOT previousSystemVolIds:
+      // those are exactly the IDs a returning volume is meant to keep, and
+      // seeding them here would make every one look "taken" and get
+      // renumbered on each refresh, closing its open tabs.
+      final usedVolIds = {...persisted.map((loc) => loc.volId)};
 
       final result = <ExternalStorageLocation>[];
       final existingKeys = persisted
-          .expand((loc) => [loc.path, if (loc.treeUri != null) loc.treeUri!])
+          .expand((loc) => [
+                loc.path,
+                loc.path.toLowerCase(),
+                if (loc.treeUri != null) ...[
+                  loc.treeUri!,
+                  loc.treeUri!.toLowerCase(),
+                ],
+              ])
           .toSet();
       for (final vol in volumes) {
         final id = vol['id'] as String? ?? '';
@@ -114,10 +174,16 @@ class ExternalStorageLocationsNotifier extends Notifier<List<ExternalStorageLoca
         }
         // Skip if the user already added this exact root (or the volume's
         // path matches an existing entry's resolved location).
-        if (existingKeys.contains(path) || existingKeys.contains(id)) continue;
+        if (existingKeys.contains(path) ||
+            existingKeys.contains(path.toLowerCase()) ||
+            existingKeys.contains(id) ||
+            existingKeys.contains(id.toLowerCase()) ||
+            persisted.any((loc) => _isVolumeRootTreeUri(loc.treeUri, id))) {
+          continue;
+        }
 
         int? volId = previousSystemVolIds[id];
-        if (volId != null && !usedVolIds.add(volId)) {
+        if (volId != null && usedVolIds.contains(volId)) {
           volId = null;
         }
         volId ??= nextVolId--;
@@ -140,10 +206,12 @@ class ExternalStorageLocationsNotifier extends Notifier<List<ExternalStorageLoca
 
   /// Re-runs system-volume discovery (SD card / USB hot-plug, e.g. after
   /// the app resumes with a new volume attached) and rebuilds the state
-  /// from disk + volumes. User-added SAF locations are reloaded from disk,
-  /// so an in-flight rename/add that wasn't saved yet is lost -- call this
-  /// only at idle points (init, app resume).
-  Future<void> refreshSystemVolumes() async {
+  /// from disk + volumes. Queued behind any in-flight add/rename/remove (see
+  /// [_serialized]), so it always reloads a file those have finished writing
+  /// and is safe to call at any time.
+  Future<void> refreshSystemVolumes() => _serialized(_refreshSystemVolumes);
+
+  Future<void> _refreshSystemVolumes() async {
     final persisted = (await _repo.loadAll())
         .where((loc) => !loc.id.startsWith(_kSystemVolumeIdPrefix))
         .toList();
@@ -238,34 +306,41 @@ class ExternalStorageLocationsNotifier extends Notifier<List<ExternalStorageLoca
       displayName = 'Google Drive ($displayName)';
     }
 
-    var nextVolId = kExternalStorageBaseVolId;
-    for (final loc in state) {
-      if (loc.volId <= nextVolId) {
-        nextVolId = loc.volId - 1;
+    // The picker above can take arbitrarily long and backgrounds the app,
+    // so only the state read/modify/save below is queued: `state` and the
+    // volId are read *inside* the queue so they can't be stale by then.
+    return _serialized(() async {
+      var nextVolId = kExternalStorageBaseVolId;
+      for (final loc in state) {
+        if (loc.volId <= nextVolId) {
+          nextVolId = loc.volId - 1;
+        }
       }
-    }
 
-    final newLocation = ExternalStorageLocation(
-      id: 'ext_${DateTime.now().millisecondsSinceEpoch}',
-      path: effectivePath,
-      treeUri: treeUri,
-      displayName: displayName,
-      volId: nextVolId,
-    );
+      final newLocation = ExternalStorageLocation(
+        id: 'ext_${DateTime.now().millisecondsSinceEpoch}',
+        path: effectivePath,
+        treeUri: treeUri,
+        displayName: displayName,
+        volId: nextVolId,
+      );
 
-    state = [...state, newLocation];
-    await _savePersisted();
-    VeLog.d('ExternalStorage', 'Successfully saved storage location: ${newLocation.displayName} (volId=${newLocation.volId})');
-    return newLocation;
+      state = [...state, newLocation];
+      await _savePersisted();
+      VeLog.d('ExternalStorage', 'Successfully saved storage location: ${newLocation.displayName} (volId=${newLocation.volId})');
+      return newLocation;
+    });
   }
 
-  Future<void> removeLocation(String id) async {
+  Future<void> removeLocation(String id) {
     // System-discovered volumes (SD cards, USB) cannot be removed: they
     // are re-derived from StorageManager on every refresh anyway, and a
     // "removed" device would silently come back -- which must not happen.
-    if (id.startsWith(_kSystemVolumeIdPrefix)) return;
-    state = state.where((loc) => loc.id != id).toList();
-    await _savePersisted();
+    if (id.startsWith(_kSystemVolumeIdPrefix)) return Future<void>.value();
+    return _serialized(() async {
+      state = state.where((loc) => loc.id != id).toList();
+      await _savePersisted();
+    });
   }
 
   /// Writes only user-added locations to disk; ephemeral system-volume
@@ -323,16 +398,18 @@ class ExternalStorageLocationsNotifier extends Notifier<List<ExternalStorageLoca
     }
   }
 
-  Future<void> renameLocation(String id, String newName) async {
+  Future<void> renameLocation(String id, String newName) {
     // System-discovered volumes keep their StorageManager-provided name.
-    if (id.startsWith(_kSystemVolumeIdPrefix)) return;
-    state = state.map((loc) {
-      if (loc.id == id) {
-        return loc.copyWith(displayName: newName);
-      }
-      return loc;
-    }).toList();
-    await _savePersisted();
+    if (id.startsWith(_kSystemVolumeIdPrefix)) return Future<void>.value();
+    return _serialized(() async {
+      state = state.map((loc) {
+        if (loc.id == id) {
+          return loc.copyWith(displayName: newName);
+        }
+        return loc;
+      }).toList();
+      await _savePersisted();
+    });
   }
 
   MountedContainer? resolveContainer(int volId) {

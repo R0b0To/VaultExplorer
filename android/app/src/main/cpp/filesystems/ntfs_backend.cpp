@@ -41,6 +41,9 @@ extern "C" {
 #include "containers/vhd_image.h"
 #include "containers/vhdx_image.h"
 #include "filesystems/stream_handles.h"
+#include "io/host_file.h"
+
+static bool ntfsIsDirectoryInode(const ntfs_inode* ni);
 
 static bool ntfsIsDirectoryInode(const ntfs_inode* ni);
 
@@ -1185,6 +1188,82 @@ bool ntfsWriteFileChunk(int volumeId, const std::string& path, uint64_t offset, 
     return success;
 }
 
+// Desktop mount layer: same as ntfsWriteFileChunk minus the truncate at offset 0, and it never creates
+// the file (creation goes through ntfsWriteFileChunk(offset 0, length 0)).
+bool ntfsWriteFileAt(int volumeId, const std::string& path, uint64_t offset, const uint8_t* data, size_t length) {
+    auto& v = volumes[volumeId];
+    if (v.readOnly) return false;
+    bool success = false;
+    ntfs_inode* ni = ntfsResolvePath(v.ntfsVol, path, true);
+    if (ni && ntfsIsDirectoryInode(ni)) {
+        ntfs_inode_close(ni);
+        ni = nullptr;
+    }
+    if (ni) {
+        ntfs_attr* na = ntfs_attr_open(ni, AT_DATA, NULL, 0);
+        if (!na) {
+            ntfs_attr_add(ni, AT_DATA, AT_UNNAMED, 0, NULL, 0);
+            na = ntfs_attr_open(ni, AT_DATA, NULL, 0);
+        }
+        if (na) {
+            const s64 bw = length == 0 ? 0 : ntfs_attr_pwrite(na, offset, length, data);
+            if (bw == static_cast<s64>(length)) success = true;
+            ntfs_attr_close(na);
+        }
+        ntfs_inode_close(ni);
+    }
+    return success;
+}
+
+// Creates an empty file (or empties an existing one). ntfs_attr_pwrite rejects a zero-length write, so the
+// generic "write 0 bytes at offset 0" route cannot be used to create a file on NTFS.
+bool ntfsCreateEmptyFile(int volumeId, const std::string& path) {
+    auto& v = volumes[volumeId];
+    if (v.readOnly) return false;
+    ntfs_inode* ni = ntfsResolvePath(v.ntfsVol, path, true);
+    if (!ni) ni = createNtfsFile(v.ntfsVol, "/" + path);
+    if (!ni) return false;
+    bool ok = false;
+    if (!ntfsIsDirectoryInode(ni)) {
+        ntfs_attr* na = ntfs_attr_open(ni, AT_DATA, NULL, 0);
+        if (!na) {
+            ntfs_attr_add(ni, AT_DATA, AT_UNNAMED, 0, NULL, 0);
+            na = ntfs_attr_open(ni, AT_DATA, NULL, 0);
+        }
+        if (na) {
+            ok = ntfs_attr_truncate(na, 0) == 0;
+            ntfs_attr_close(na);
+        }
+    }
+    ntfs_inode_close(ni);
+    return ok;
+}
+
+// Sets the size of an existing file (grown space reads back as zeros).
+bool ntfsTruncateFile(int volumeId, const std::string& path, uint64_t newSize) {
+    auto& v = volumes[volumeId];
+    if (v.readOnly) return false;
+    bool ok = false;
+    ntfs_inode* ni = ntfsResolvePath(v.ntfsVol, path, true);
+    if (ni && ntfsIsDirectoryInode(ni)) {
+        ntfs_inode_close(ni);
+        ni = nullptr;
+    }
+    if (ni) {
+        ntfs_attr* na = ntfs_attr_open(ni, AT_DATA, NULL, 0);
+        if (!na) {
+            ntfs_attr_add(ni, AT_DATA, AT_UNNAMED, 0, NULL, 0);
+            na = ntfs_attr_open(ni, AT_DATA, NULL, 0);
+        }
+        if (na) {
+            ok = ntfs_attr_truncate(na, static_cast<s64>(newSize)) == 0;
+            ntfs_attr_close(na);
+        }
+        ntfs_inode_close(ni);
+    }
+    return ok;
+}
+
 bool ntfsCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const std::string& destPath,
                    const CopyProgressCallback& onProgress) {
     auto& srcV = volumes[srcVolId];
@@ -1248,7 +1327,7 @@ int openNtfsHostSource(const std::string& sourceHostPath) {
             return duplicated;
         }
     }
-    return open(sourceHostPath.c_str(), O_RDONLY | O_CLOEXEC);
+    return hostOpen(sourceHostPath.c_str(), O_RDONLY | O_CLOEXEC);
 }
 
 int openNtfsHostDest(const std::string& destHostPath) {
@@ -1260,7 +1339,7 @@ int openNtfsHostDest(const std::string& destHostPath) {
             return duplicated;
         }
     }
-    return open(destHostPath.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
+    return hostOpen(destHostPath.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
 }
 } // namespace
 

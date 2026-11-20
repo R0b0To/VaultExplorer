@@ -19,12 +19,9 @@ migrate_working_dir/
 *.ipr
 *.iws
 .idea/
-
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
-
+.idea/
+.vscode/
+Thumbs.db
 # Flutter/Dart/Pub related
 **/doc/api/
 **/ios/Flutter/.last_build_id
@@ -56,19 +53,20 @@ app.*.map.json
 # Local Android signing credentials
 /android/key.properties
 /android/app/key.jks
-
-# Widget Preview related
-.widget_preview/
 gitattributes
 
-# Local build and tool state
+# Ignore local i18n WIP folder
 /vaultexplorer-i18n-wip/
+/copy/
+android/.gradle/
 android/local.properties
 android/.vscode
 **/.cxx/
 .cxx/
 .externalNativeBuild/
 android/**/.cxx/
+# Widget Preview related
+.widget_preview/
 **/android/key.properties
 **/android/app/*.jks
 **/android/app/*.keystore

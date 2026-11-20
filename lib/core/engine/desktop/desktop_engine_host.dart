@@ -21,12 +21,14 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';
 
 import 'desktop_crypto.dart';
 import 'desktop_external.dart';
 import 'desktop_hash.dart';
 import 'desktop_images.dart';
+import 'desktop_mounts.dart';
 import 'desktop_secure_store.dart';
 import 'desktop_split_join.dart';
 import 'desktop_transfers.dart';
@@ -39,6 +41,9 @@ class _SessionMeta {
   String displayName;
   final String format;
   final bool readOnly;
+
+  /// gocryptfs / Cryptomator / CryFS (a directory vault, not a container file).
+  bool get isFolderVault => format == 'gocryptfs' || format == 'cryptomator' || format == 'cryfs';
 }
 
 class DesktopEngineHost {
@@ -77,6 +82,10 @@ class DesktopEngineHost {
   /// Handing files to other apps + a few host-file helpers (see desktop_external.dart).
   final DesktopExternal _external = DesktopExternal();
 
+  /// "Expose this folder" as a real directory in the OS (FUSE on Linux; see desktop_mounts.dart) -- the
+  /// desktop counterpart of Android's DocumentsProvider.
+  late final DesktopMounts _mounts = DesktopMounts(pool: pool);
+
   final Map<String, int> _volByUri = {};
   final Map<int, String> _uriByVol = {};
   final Map<int, _SessionMeta> _meta = {};
@@ -110,7 +119,6 @@ class DesktopEngineHost {
     'openBatterySettings': true,
     'requestNotificationPermission': true,
     'openAppSettings': true,
-    'getMountedContainerFolders': <Object?>[],
     'isShareTargetEnabled': false,
     'setShareTargetEnabled': null,
     'isUsbAttachPromptEnabled': false,
@@ -228,6 +236,24 @@ class DesktopEngineHost {
           final meta = vol == null ? null : _meta[vol];
           if (meta == null) return false;
           meta.displayName = (args['displayName'] as String?) ?? meta.displayName;
+          // The per-container "document provider" setting: on Android it registers the container as a
+          // DocumentsProvider root; here it is an OS mount of the whole vault, following the setting live.
+          final dp = args['documentProvider'];
+          if (dp is bool) {
+            final uri = args['filePath'] as String;
+            if (dp) {
+              final ok = await _mounts.mount(
+                vol: vol!,
+                path: '',
+                displayName: meta.displayName,
+                containerName: p.basenameWithoutExtension(uri),
+                readOnly: meta.readOnly,
+              );
+              if (ok) _reveal(vol, '');
+            } else {
+              await _mounts.unmount(vol: vol!, path: '');
+            }
+          }
           return true;
         }
       case ChannelMethods.getDeviceCapabilityProfile:
@@ -333,6 +359,29 @@ class DesktopEngineHost {
       case ChannelMethods.lockContainer:
         return _lock(args['filePath'] as String);
 
+      // ── OS mounts (Android: the folder DocumentsProvider) ──
+      case ChannelMethods.mountContainerFolder:
+        {
+          final uri = args['filePath'] as String;
+          final vol = _vol(uri);
+          final path = (args['path'] as String?) ?? '';
+          final ok = await _mounts.mount(
+            vol: vol,
+            path: path,
+            displayName: args['displayName'] as String?,
+            containerName: p.basenameWithoutExtension(uri),
+          );
+          if (ok) _reveal(vol, path);
+          return ok;
+        }
+      case ChannelMethods.unmountContainerFolder:
+        return _mounts.unmount(vol: _vol(args['filePath']), path: (args['path'] as String?) ?? '');
+      case ChannelMethods.getMountedContainerFolders:
+        {
+          final vol = _volByUri[args['filePath']];
+          return vol == null ? <Object?>[] : _mounts.paths(vol);
+        }
+
       case ChannelMethods.listDirectory:
         {
           final r = await pool.call('list', [_vol(args['filePath']), (args['dirPath'] as String?) ?? '']) as List<Object?>;
@@ -392,6 +441,65 @@ class DesktopEngineHost {
           if (r[0] != veOk) return null;
           return (r[1] as List<Object?>).cast<int>();
         }
+
+      // ── folder vaults (gocryptfs / Cryptomator / CryFS) ──
+      case ChannelMethods.pickCryptomatorVault:
+        return _pickFolderVault(veFvCryptomator);
+      case ChannelMethods.pickGocryptfsVault:
+        return _pickFolderVault(veFvGocryptfs);
+      case ChannelMethods.pickCryfsVault:
+        return _pickFolderVault(veFvCryfs);
+      case ChannelMethods.isGocryptfsVault:
+        return _isFolderVault(args['uri'], veFvGocryptfs);
+      case ChannelMethods.isCryfsVault:
+        return _isFolderVault(args['uri'], veFvCryfs);
+      case ChannelMethods.unlockCryptomatorVault:
+        return _unlockFolderVault(args, veFvCryptomator);
+      case ChannelMethods.unlockGocryptfsVault:
+        return _unlockFolderVault(args, veFvGocryptfs);
+      case ChannelMethods.unlockCryfsVault:
+        return _unlockFolderVault(args, veFvCryfs);
+      case ChannelMethods.createCryptomatorVault:
+        return _createFolderVault(args, veFvCryptomator);
+      case ChannelMethods.createGocryptfsVault:
+        return _createFolderVault(args, veFvGocryptfs);
+      case ChannelMethods.createCryfsVault:
+        return _createFolderVault(args, veFvCryfs);
+      case ChannelMethods.changeCryptomatorVaultPassword:
+        return _changeFolderVaultPassword(args, veFvCryptomator);
+      case ChannelMethods.changeGocryptfsVaultPassword:
+        return _changeFolderVaultPassword(args, veFvGocryptfs);
+      case ChannelMethods.changeCryfsVaultPassword:
+        return _changeFolderVaultPassword(args, veFvCryfs);
+      case ChannelMethods.migrateCryptomatorVault:
+        return _migrateCryptomatorVault(args);
+      case ChannelMethods.probeCryptomatorVault:
+        return _probeCryptomatorVault(args);
+      case ChannelMethods.getCryptomatorKeyFileBackup:
+        return _vaultOpenPrefs.getBackupKeyFiles(args['uri'] as String);
+      case ChannelMethods.setCryptomatorKeyFileBackup:
+        return _vaultOpenPrefs.setBackupKeyFiles(args['uri'] as String, args['enabled'] == true);
+      case ChannelMethods.clearVaultOpenPreferences:
+        return _vaultOpenPrefs.clear(args['uri'] as String);
+      case ChannelMethods.listVaultSymlinks:
+        return _listVaultSymlinks(args);
+      case ChannelMethods.readVaultSymlink:
+        return _readVaultSymlink(args);
+      case ChannelMethods.createVaultSymlink:
+        return _createVaultSymlink(args);
+      case ChannelMethods.getHiddenEntryCount:
+        return _hiddenEntryCount(args);
+      // Block-device volumes have nothing to flush or batch; a folder vault does.
+      case ChannelMethods.finishWrite:
+        return _folderVaultFinishWrite(args);
+      case ChannelMethods.beginBatchWrite:
+        return _folderVaultBatch(args, kind: 0, begin: true);
+      case ChannelMethods.endBatchWrite:
+        return _folderVaultBatch(args, kind: 0, begin: false);
+      case ChannelMethods.beginBatchDelete:
+        return _folderVaultBatch(args, kind: 1, begin: true);
+      case ChannelMethods.endBatchDelete:
+        return _folderVaultBatch(args, kind: 1, begin: false);
     }
 
     final (handledByCrypto, cryptoResult) = await _crypto.handle(call.method, args);
@@ -403,6 +511,274 @@ class DesktopEngineHost {
       debugPrint('[desktop-engine] not implemented yet: ${call.method} (replying null)');
     }
     return null;
+  }
+
+  // ── folder vaults (gocryptfs / Cryptomator / CryFS) ────────────────────
+  //
+  // A vault is an ordinary directory. Unlocking parks it in a volume slot (same allocator as
+  // containers), after which every file call (list, read, write, copy, import, export, ...) goes
+  // through the usual slot-addressed path -- the engine routes it to the vault. Only the
+  // format-specific entry points live here.
+
+  static const Map<int, String> _fvWireNames = {
+    veFvGocryptfs: 'gocryptfs',
+    veFvCryptomator: 'cryptomator',
+    veFvCryfs: 'cryfs',
+  };
+
+  String? _fvStateDir;
+  late final _VaultOpenPrefs _vaultOpenPrefs = _VaultOpenPrefs(_folderVaultPrefsFile);
+
+  Future<File> _folderVaultPrefsFile() async {
+    final support = await getApplicationSupportDirectory();
+    return File(p.join(support.path, 'vault_open_prefs.json'));
+  }
+
+  /// CryFS keeps per-vault integrity state outside the vault; it has to survive restarts.
+  Future<String> _folderVaultStateDir() async {
+    final cached = _fvStateDir;
+    if (cached != null) return cached;
+    final support = await getApplicationSupportDirectory();
+    final dir = Directory(p.join(support.path, 'cryfs-state'));
+    await dir.create(recursive: true);
+    return _fvStateDir = dir.path;
+  }
+
+  /// Folder picker. `looksLikeVault` says whether the chosen directory is a vault of the format the
+  /// caller asked for; `format` is whatever format it actually looks like (null = none).
+  Future<Object?> _pickFolderVault(int expected) async {
+    final dir = await getDirectoryPath();
+    if (dir == null) return null;
+    final detected = await pool.call('fvProbe', [dir]) as int;
+    return {
+      'uri': dir,
+      'displayName': p.basename(dir),
+      'looksLikeVault': detected == expected,
+      'format': _fvWireNames[detected],
+    };
+  }
+
+  Future<bool> _isFolderVault(Object? uri, int format) async {
+    if (uri is! String) return false;
+    return (await pool.call('fvProbe', [uri]) as int) == format;
+  }
+
+  /// Slot for [uri]: the one it already holds, else the first free one.
+  Future<int> _claimSlot(String uri) async {
+    final existing = _volByUri[uri];
+    if (existing != null) return existing;
+    final slots = await _slotCount();
+    for (var i = 0; i < slots; i++) {
+      if (!_uriByVol.containsKey(i)) return i;
+    }
+    throw PlatformException(code: 'MAX_CONTAINERS', message: 'Maximum $slots containers already mounted');
+  }
+
+  Never _fvFail(int rc, String? message, {String wrongPassword = 'Incorrect password'}) {
+    if (rc == veErrAuthFailed) {
+      throw PlatformException(code: 'AUTH_FAIL', message: wrongPassword, details: 'INCORRECT_PASSWORD');
+    }
+    if (rc == veErrInvalidArg) {
+      throw PlatformException(code: 'C++_ERROR', message: 'Invalid arguments');
+    }
+    throw PlatformException(code: 'INVALID_VAULT', message: message ?? 'Not a valid vault (code $rc)');
+  }
+
+  Future<Object?> _unlockFolderVault(Map<Object?, Object?> args, int format) async {
+    final root = args['filePath'] as String;
+
+    // Already unlocked: hand back the live session rather than failing on the occupied slot.
+    final live = _volByUri[root];
+    if (live != null && (_meta[live]?.isFolderVault ?? false)) {
+      final r = await pool.call('list', [live, '']) as List<Object?>;
+      if (r[0] == veOk) {
+        return {
+          'volId': live,
+          'files': (r[1] as List<Object?>).cast<String>(),
+          'matchedCipherId': 255,
+          'matchedHashId': 255,
+          'containerFormat': _meta[live]!.format,
+        };
+      }
+      _forget(live); // the engine no longer has it; unlock afresh
+    }
+
+    final vol = await _claimSlot(root);
+    emit('onUnlockStarted', {'volId': vol});
+
+    final password = Uint8List.fromList(utf8.encode((args['password'] as String?) ?? ''));
+    final preserved = args['preservedKey'] is String ? base64Decode(args['preservedKey'] as String) : null;
+    final Map<Object?, Object?> result;
+    try {
+      result = await _withActivity(() async => await pool.call('fvUnlock', [
+            {
+              'path': root,
+              'volId': vol,
+              'format': format,
+              'password': password,
+              'combinedKey': preserved,
+              'readOnly': args['readOnly'] == true,
+              'backupKeyFiles': await _vaultOpenPrefs.getBackupKeyFiles(root),
+              'localStateDir': await _folderVaultStateDir(),
+              'tempDir': Directory.systemTemp.path,
+            },
+          ])) as Map<Object?, Object?>;
+    } finally {
+      password.fillRange(0, password.length, 0);
+    }
+
+    final rc = result['rc'] as int;
+    if (rc != veOk) _fvFail(rc, result['message'] as String?);
+
+    final wire = result['format'] as String;
+    _volByUri[root] = vol;
+    _uriByVol[vol] = root;
+    _meta[vol] = _SessionMeta(
+      displayName: (args['displayName'] as String?) ?? p.basename(root),
+      format: wire,
+      readOnly: args['readOnly'] == true,
+    );
+    // CryFS hands back a derived key for the Android "remember" fast path; desktop has no keystore
+    // to hold it, so it is not surfaced.
+    final derived = result['derivedKey'];
+    if (derived is Uint8List) derived.fillRange(0, derived.length, 0);
+    _exposeAfterUnlock(vol, root, args);
+    return {
+      'volId': vol,
+      'files': (result['files'] as List<Object?>).cast<String>(),
+      'matchedCipherId': 255,
+      'matchedHashId': 255,
+      'containerFormat': wire,
+    };
+  }
+
+  Future<bool> _createFolderVault(Map<Object?, Object?> args, int format) async {
+    final root = args['filePath'] as String;
+    await Directory(root).create(recursive: true);
+    final password = Uint8List.fromList(utf8.encode((args['password'] as String?) ?? ''));
+    final cipherName = (args['cipher'] as String?) ?? '';
+    try {
+      final r = await _withActivity(() async => await pool.call('fvCreate', [
+            {
+              'path': root,
+              'format': format,
+              'password': password,
+              // gocryptfs: AES-256-GCM / XChaCha20-Poly1305 / AES-SIV; CryFS takes the name as is.
+              'cipher': switch (cipherName) { 'xchacha20-poly1305' => 1, 'aes-siv' => 2, _ => 0 },
+              'plaintextNames': false,
+              'deterministicNames': args['deterministicNames'] == true,
+              'longNameMax': (args['longNameMax'] as num?)?.toInt() ?? 0,
+              'blockSize': (args['blockSize'] as num?)?.toInt() ?? 0,
+              'cipherName': format == veFvCryfs ? cipherName : '',
+              'userEntropy': args['userEntropy'] as Uint8List?,
+              'localStateDir': await _folderVaultStateDir(),
+              'tempDir': Directory.systemTemp.path,
+            },
+          ])) as Map<Object?, Object?>;
+      if (r['rc'] != veOk && kDebugMode) debugPrint('[desktop-engine] folder vault create failed: ${r['message']}');
+      return r['rc'] == veOk;
+    } finally {
+      password.fillRange(0, password.length, 0);
+    }
+  }
+
+  Future<bool> _changeFolderVaultPassword(Map<Object?, Object?> args, int format) async {
+    final oldPw = Uint8List.fromList(utf8.encode((args['oldPassword'] as String?) ?? ''));
+    final newPw = Uint8List.fromList(utf8.encode((args['newPassword'] as String?) ?? ''));
+    try {
+      final r = await _withActivity(() async => await pool.call('fvChangePassword', [
+            {'path': args['filePath'], 'format': format, 'oldPassword': oldPw, 'newPassword': newPw},
+          ])) as Map<Object?, Object?>;
+      final rc = r['rc'] as int;
+      if (rc != veOk) _fvFail(rc, r['message'] as String?);
+      return true;
+    } finally {
+      oldPw.fillRange(0, oldPw.length, 0);
+      newPw.fillRange(0, newPw.length, 0);
+    }
+  }
+
+  Future<bool> _migrateCryptomatorVault(Map<Object?, Object?> args) async {
+    // The native side refuses whatever the UI showed: a vault open in this app must not be rewritten under it.
+    if (_volByUri.containsKey(args['filePath'])) {
+      throw PlatformException(code: 'VAULT_UNLOCKED', message: 'The vault is unlocked in this app. Lock it first.');
+    }
+    final pw = Uint8List.fromList(utf8.encode((args['password'] as String?) ?? ''));
+    try {
+      final r = await _withActivity(() async => await pool.call('fvMigrate', [
+            {'path': args['filePath'], 'password': pw},
+          ])) as Map<Object?, Object?>;
+      final rc = r['rc'] as int;
+      if (rc != veOk) _fvFail(rc, r['message'] as String?);
+      return true;
+    } finally {
+      pw.fillRange(0, pw.length, 0);
+    }
+  }
+
+  /// Password-free Cryptomator format check (0 unknown, 7 migratable, 8 current, -8 config not synced yet,
+  /// 6 too old); never throws.
+  Future<int> _probeCryptomatorVault(Map<Object?, Object?> args) async {
+    final path = args['filePath'];
+    if (path is! String) return 0;
+    try {
+      return await pool.call('fvProbeCryptomator', [path]) as int;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  /// Symlinks work on any unlocked slot (ext/NTFS containers and Cryptomator vaults), so these look the
+  /// slot up by path rather than requiring a folder vault.
+  Future<Object?> _listVaultSymlinks(Map<Object?, Object?> args) async {
+    final vol = _volByUri[args['filePath']];
+    if (vol == null) return <Object?>[];
+    final r = await pool.call('listSymlinks', [vol, (args['dirPath'] as String?) ?? '']) as List<Object?>;
+    return r[0] == veOk ? r[1] : <Object?>[];
+  }
+
+  Future<Object?> _readVaultSymlink(Map<Object?, Object?> args) async {
+    final vol = _volByUri[args['filePath']];
+    if (vol == null) return null;
+    final r = await pool.call('readSymlink', [vol, args['path'] as String]) as List<Object?>;
+    return r[0] == veOk ? r[1] : null;
+  }
+
+  /// False when the filesystem/vault refuses the link; session and read-only problems throw like the other writes.
+  Future<bool> _createVaultSymlink(Map<Object?, Object?> args) async {
+    final vol = _volByUri[args['filePath']];
+    if (vol == null) throw PlatformException(code: 'NOT_UNLOCKED', message: 'NOT_UNLOCKED');
+    final rc = await pool.call('createSymlink', [vol, args['path'] as String, args['target'] as String]) as int;
+    return _ok(rc);
+  }
+
+  Future<int> _hiddenEntryCount(Map<Object?, Object?> args) async {
+    final vol = _volByUri[args['filePath']];
+    if (vol == null || !(_meta[vol]?.isFolderVault ?? false)) return -1;
+    final n = await pool.call('fvHidden', [vol, (args['dirPath'] as String?) ?? '']) as int;
+    return n < 0 ? -1 : n;
+  }
+
+  /// The slot a call names, but only if it is a folder vault (finishWrite carries a volId, the batch
+  /// calls a vault path).
+  int? _folderVaultSlot(Map<Object?, Object?> args) {
+    final vol = args['volId'] is num ? (args['volId'] as num).toInt() : _volByUri[args['filePath']];
+    if (vol == null) return null;
+    return (_meta[vol]?.isFolderVault ?? false) ? vol : null;
+  }
+
+  Future<bool> _folderVaultFinishWrite(Map<Object?, Object?> args) async {
+    final vol = _folderVaultSlot(args);
+    if (vol == null) return true; // containers have nothing to finish
+    final path = (args['path'] ?? args['fileName']) as String?;
+    if (path == null) return true;
+    return await pool.call('fvFinishWrite', [vol, path]) == veOk;
+  }
+
+  Future<bool> _folderVaultBatch(Map<Object?, Object?> args, {required int kind, required bool begin}) async {
+    final vol = _folderVaultSlot(args);
+    if (vol == null) return true;
+    return await pool.call('fvBatch', [vol, kind, begin]) == veOk;
   }
 
   // ── picking ────────────────────────────────────────────────────────────
@@ -564,6 +940,7 @@ class DesktopEngineHost {
           format: result['format'] as String,
           readOnly: args['readOnly'] == true,
         );
+        _exposeAfterUnlock(vol, uri, args);
         return {
           'volId': vol,
           'files': (result['files'] as List<Object?>).cast<String>(),
@@ -587,6 +964,57 @@ class DesktopEngineHost {
     }
   }
 
+  /// Opens a mounted folder in the OS file manager. There is no sidebar entry for it yet and the mounts
+  /// live under a hidden ~/.local path, so without this an explicit "expose" would look like nothing happened.
+  void _reveal(int vol, String path) {
+    final mp = _mounts.mountPointOf(vol, path);
+    if (mp == null) return;
+    // A bare drive letter ("Z:") means "the current directory on Z:"; Explorer needs "Z:\\".
+    final target = (Platform.isWindows && mp.length == 2 && mp[1] == ':') ? '$mp\\' : mp;
+    unawaited(_external.launch(target));
+  }
+
+  /// Android registers a container as a DocumentsProvider root at unlock (the per-container "document
+  /// provider" setting) and re-exposes the folders the user had exposed before (`autoMountFolders`). The
+  /// desktop equivalent is an OS mount of the whole vault / of those folders. Fire-and-forget: unlocking
+  /// must not wait on (or fail because of) a mount; a failure is logged with its reason.
+  void _exposeAfterUnlock(int vol, String uri, Map<Object?, Object?> args) {
+    final whole = args['documentProvider'] == true;
+    final folders = <String>[
+      for (final f in (args['autoMountFolders'] as List?) ?? const <Object?>[])
+        if (f is String && f.isNotEmpty) f,
+    ];
+    if (!whole && folders.isEmpty) return;
+    final meta = _meta[vol];
+    final container = p.basenameWithoutExtension(uri);
+    unawaited(() async {
+      if (whole) {
+        final ok = await _mounts.mount(
+          vol: vol,
+          path: '',
+          displayName: meta?.displayName,
+          containerName: container,
+          readOnly: meta?.readOnly ?? false,
+        );
+        if (ok) {
+          _reveal(vol, '');
+        } else {
+          debugPrint('[desktop-mounts] could not expose "$container": ${_mounts.lastError}');
+        }
+      }
+      for (final f in folders) {
+        final ok = await _mounts.mount(
+          vol: vol,
+          path: f,
+          displayName: p.basename(f),
+          containerName: container,
+          readOnly: meta?.readOnly ?? false,
+        );
+        if (!ok) debugPrint('[desktop-mounts] could not expose "$f": ${_mounts.lastError}');
+      }
+    }());
+  }
+
   Future<bool> _lock(String uri) async {
     final vol = _volByUri[uri];
     if (vol == null) return true; // already locked
@@ -599,6 +1027,7 @@ class DesktopEngineHost {
   // ── sessions ───────────────────────────────────────────────────────────
 
   void _forget(int vol) {
+    _mounts.forgetVolume(vol); // the engine unmounts a slot's mounts when it locks it
     final uri = _uriByVol.remove(vol);
     if (uri != null) _volByUri.remove(uri);
     _meta.remove(vol);
@@ -848,10 +1277,13 @@ class DesktopEngineHost {
     return rc == veOk;
   }
 
+  /// Engine sizes are >= 0, -1 for a path that does not exist (what the Dart layer already treats as
+  /// "missing", as on Android), or -veErr* for a session problem.
   int _size(int v) {
     if (v >= 0) return v;
+    if (v == -veErrFailed) return -1;
     _throwFor(-v);
-    return 0;
+    return -1;
   }
 
   Future<T> _withActivity<T>(Future<T> Function() body) async {
@@ -897,8 +1329,64 @@ class DesktopEngineHost {
     _uriByVol.clear();
     _volByUri.clear();
     _meta.clear();
+    await _mounts.dispose();
     await _external.cleanupAll();
     await _hash.dispose();
     await pool.dispose();
+  }
+}
+
+/// Per-vault open options that must survive restarts (what Android keeps in a Kotlin preference file).
+/// Plain JSON in the app-support folder: nothing in it is secret.
+class _VaultOpenPrefs {
+  _VaultOpenPrefs(this._file);
+
+  final Future<File> Function() _file;
+  Map<String, Map<String, Object?>>? _cache;
+
+  Future<Map<String, Map<String, Object?>>> _load() async {
+    final cached = _cache;
+    if (cached != null) return cached;
+    final loaded = <String, Map<String, Object?>>{};
+    try {
+      final f = await _file();
+      if (await f.exists()) {
+        final decoded = jsonDecode(await f.readAsString());
+        if (decoded is Map) {
+          decoded.forEach((k, v) {
+            if (k is String && v is Map) loaded[k] = Map<String, Object?>.from(v);
+          });
+        }
+      }
+    } catch (_) {
+      // unreadable or corrupt: start from defaults
+    }
+    return _cache = loaded;
+  }
+
+  Future<void> _save() async {
+    try {
+      final f = await _file();
+      await f.parent.create(recursive: true);
+      await f.writeAsString(jsonEncode(_cache ?? const {}));
+    } catch (_) {
+      // best effort: the option just reverts to its default next launch
+    }
+  }
+
+  /// Keep `.bkup` copies of Cryptomator's key files on read-write unlocks. Defaults to true.
+  Future<bool> getBackupKeyFiles(String uri) async => (await _load())[uri]?['backupKeyFiles'] != false;
+
+  Future<bool> setBackupKeyFiles(String uri, bool enabled) async {
+    final all = await _load();
+    all.putIfAbsent(uri, () => <String, Object?>{})['backupKeyFiles'] = enabled;
+    await _save();
+    return true;
+  }
+
+  Future<bool> clear(String uri) async {
+    final all = await _load();
+    if (all.remove(uri) != null) await _save();
+    return true;
   }
 }

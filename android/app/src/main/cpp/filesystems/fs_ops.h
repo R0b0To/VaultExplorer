@@ -68,6 +68,16 @@ bool fsWriteFileChunk(int volId, const std::string& path, uint64_t offset,
 // and "import from device storage" flows) rather than chunk-by-chunk.
 // onProgress: see fsCopyFile's comment above -- same callback type, same
 // per-chunk cadence, same progress+cancellation semantics.
+// fsWriteFileAt: in-place write of `length` bytes at `offset` into an EXISTING file, with none of
+// fsWriteFileChunk's truncate-at-offset-0 behaviour. `offset` must be <= the current size (grow with
+// fsTruncateFile first). Used by the desktop mount layer, whose callers do real random-access I/O.
+bool fsWriteFileAt(int volId, const std::string& path, uint64_t offset,
+                   const uint8_t* data, size_t length);
+// fsTruncateFile: sets the size of an existing file; growing zero-fills.
+bool fsTruncateFile(int volId, const std::string& path, uint64_t newSize);
+// fsCreateEmptyFile: creates an empty file, or empties an existing one.
+bool fsCreateEmptyFile(int volId, const std::string& path);
+
 bool fsWriteBackFile(int volId, const std::string& targetPath, const std::string& sourceHostPath,
                       const CopyProgressCallback& onProgress = nullptr);
 bool fsExtractFile(int volId, const std::string& targetPath, const std::string& destHostPath,

@@ -19,12 +19,16 @@
 #include <windows.h>
 #include <bcrypt.h>
 #include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <fcntl.h>
 #include <io.h>
 #include <vector>
 #include <stdint.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+
+bool osRandomBytes(void* buf, size_t len);  // defined at the end of this file
 
 namespace {
 
@@ -61,6 +65,8 @@ ssize_t positionalIo(int fd, void* buf, size_t count, int64_t offset, bool write
 
 }  // namespace
 
+extern "C" {
+
 ssize_t pread(int fd, void* buf, size_t count, off_t offset) {
     return positionalIo(fd, buf, count, static_cast<int64_t>(offset), false);
 }
@@ -76,6 +82,63 @@ ssize_t pwrite64(int fd, const void* buf, size_t count, int64_t offset) {
 int fsync(int fd) { return _commit(fd); }
 int fdatasync(int fd) { return _commit(fd); }
 
+// ── POSIX calls the vendored C libraries reference but the engine never exercises on Windows ──
+// They exist so the DLL links; each reports "not supported" or a neutral answer.
+
+unsigned int getuid(void) { return 0; }
+unsigned int geteuid(void) { return 0; }
+unsigned int getgid(void) { return 0; }
+unsigned int getegid(void) { return 0; }
+
+// ntfs-3g / mkntfs use random() for volume serials and sid generation. The OS CSPRNG is a strictly better
+// source than a seeded PRNG, so srandom() ignores its seed.
+long random(void) {
+    uint32_t v = 0;
+    if (!osRandomBytes(&v, sizeof(v))) v = static_cast<uint32_t>(GetTickCount64());
+    return static_cast<long>(v & 0x7fffffffu);
+}
+void srandom(unsigned int) {}
+
+int ioctl(int, unsigned long, ...) {
+    errno = ENOTTY;
+    return -1;
+}
+int fork(void) {  // ntfs-3g's daemonize helper; never called by the engine
+    errno = ENOSYS;
+    return -1;
+}
+int setsid(void) {
+    errno = ENOSYS;
+    return -1;
+}
+
+// POSIX getline(): only dislocker's interactive prompt uses it.
+ssize_t getline(char** lineptr, size_t* n, FILE* stream) {
+    if (!lineptr || !n || !stream) { errno = EINVAL; return -1; }
+    if (!*lineptr || *n == 0) {
+        *n = 128;
+        *lineptr = static_cast<char*>(malloc(*n));
+        if (!*lineptr) { errno = ENOMEM; return -1; }
+    }
+    size_t len = 0;
+    for (int c; (c = fgetc(stream)) != EOF;) {
+        if (len + 2 > *n) {
+            const size_t grown = *n * 2;
+            char* bigger = static_cast<char*>(realloc(*lineptr, grown));
+            if (!bigger) { errno = ENOMEM; return -1; }
+            *lineptr = bigger;
+            *n = grown;
+        }
+        (*lineptr)[len++] = static_cast<char>(c);
+        if (c == '\n') break;
+    }
+    if (len == 0) return -1;
+    (*lineptr)[len] = '\0';
+    return static_cast<ssize_t>(len);
+}
+
+}  // extern "C"
+
 // crypto/os_random.h declares this (non-inline) on Windows so that header never needs windows.h.
 bool osRandomBytes(void* buf, size_t len) {
     if (len == 0) return true;
@@ -88,6 +151,18 @@ bool osRandomBytes(void* buf, size_t len) {
         len -= chunk;
     }
     return true;
+}
+
+// io/host_file.h: the engine's host-file opener. UTF-8 path, ALWAYS binary mode (the CRT default of text mode
+// would translate CR/LF and treat 0x1A as end-of-file), not inherited by child processes.
+extern "C" int ve_host_open(const char* path, int flags, int mode) {
+    if (!path) { errno = EINVAL; return -1; }
+    const int wlen = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, -1, nullptr, 0);
+    if (wlen <= 0) { errno = EINVAL; return -1; }
+    std::vector<wchar_t> wpath(static_cast<size_t>(wlen));
+    if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, -1, wpath.data(), wlen) <= 0) { errno = EINVAL; return -1; }
+    (void)mode;  // owner read/write is what Windows can express
+    return _wopen(wpath.data(), flags | _O_BINARY | _O_NOINHERIT, _S_IREAD | _S_IWRITE);
 }
 
 // Opens a host file from a UTF-8 path (declared in ffi/ve_engine.cpp). Returns a CRT descriptor or -1.

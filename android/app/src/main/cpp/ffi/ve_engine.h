@@ -38,7 +38,7 @@ extern "C" {
 #  define VE_API __attribute__((visibility("default")))
 #endif
 
-#define VE_ABI_VERSION 6 /* bump whenever a function/struct is added or changed; the Dart side checks it */
+#define VE_ABI_VERSION 9 /* bump whenever a function/struct is added or changed; the Dart side checks it */
 
 /* ---- result codes ------------------------------------------------------- */
 #define VE_OK 0
@@ -50,6 +50,8 @@ extern "C" {
 #define VE_ERR_EXCEPTION 6     /* a C++ exception was caught at the boundary */
 #define VE_ERR_MOUNT_FAILED 7  /* decrypted OK but the filesystem could not be mounted */
 #define VE_ERR_AUTH_FAILED 8   /* the supplied OLD password / keyfile did not verify (LUKS password change) */
+#define VE_ERR_UNSUPPORTED 9   /* the operation does not exist for this kind of slot / on this platform */
+#define VE_ERR_BUSY 10         /* refused because the resource is in use (e.g. unmount with open files) */
 
 /* ---- library info / logging -------------------------------------------- */
 VE_API int32_t ve_abi_version(void);
@@ -198,7 +200,8 @@ VE_API int32_t ve_change_password(const ve_change_password_params* params);
  * all little-endian. Each entry is the engine's directory-entry wire string. */
 VE_API int32_t ve_list_directory(int32_t vol_id, const char* path, ve_buffer* out);
 
-/* Sizes: >= 0 on success, < 0 on error (-VE_ERR_*). Missing path reads as 0. */
+/* Sizes: >= 0 on success; -1 when the path does not exist (or is the wrong kind) -- the same "-1 = missing"
+ * contract as fsGetFileSize; any other negative value is -VE_ERR_* (session errors such as NOT_UNLOCKED). */
 VE_API int64_t ve_get_file_size(int32_t vol_id, const char* path);
 VE_API int64_t ve_get_folder_size(int32_t vol_id, const char* path);
 
@@ -361,6 +364,139 @@ VE_API int32_t ve_poll_event(ve_event* out);
  * non-empty, so a host can wake a poller instead of using a timer. Must be cheap
  * and must not call back into the engine. Pass NULL to clear. */
 VE_API void ve_set_wake_callback(void (*cb)(void));
+
+
+/* ---- symbolic links (any unlocked slot: ext/NTFS containers and Cryptomator vaults) ----
+ * Links are kept out of ve_list_directory on purpose (they are neither files nor folders, so scanners,
+ * sync and export never see them). ve_list_symlinks returns ONLY the links of a folder, in the
+ * ve_list_directory wire format: "L|targetBytes|mtimeSeconds|name", or "LD|0|mtimeSeconds|name" when the
+ * target is a directory. ve_read_symlink returns the raw UTF-8 target (never followed); VE_ERR_FAILED if
+ * `path` is not a readable link. ve_create_symlink refuses what the filesystem/vault refuses (absolute or
+ * escaping targets, unsupported filesystems): VE_ERR_FAILED, or VE_ERR_READ_ONLY. */
+VE_API int32_t ve_list_symlinks(int32_t vol_id, const char* path, ve_buffer* out);
+VE_API int32_t ve_read_symlink(int32_t vol_id, const char* path, ve_buffer* out);
+VE_API int32_t ve_create_symlink(int32_t vol_id, const char* path, const char* target);
+
+/* ---- folder vaults (gocryptfs / Cryptomator / CryFS) ---------------------
+ * Directory-based vaults live in the platform-neutral foldervault/ core. An unlocked one takes a
+ * volume slot exactly like a container does: afterwards EVERY ve_* file call above (list, read,
+ * write, copy, import, export, streams, space info, lock ...) works on that slot unchanged, so the
+ * caller never needs to know which family backs it. Only unlock / create / password change and the
+ * few queries below are folder-vault specific.
+ *
+ * Not available on Windows yet (foldervault/fv_storage.cpp is POSIX-only): there every function
+ * below fails with VE_ERR_FAILED and ve_fv_probe reports "no vault". ve_fv_supported() says which.
+ *
+ * `message` out-buffers (optional, may be NULL) receive a short UTF-8 reason on failure; free them
+ * with ve_buffer_free. Passwords are raw UTF-8 bytes and are never retained. */
+#define VE_FV_GOCRYPTFS 0
+#define VE_FV_CRYPTOMATOR 1
+#define VE_FV_CRYFS 2
+/* ve_get_container_format() values for an unlocked folder-vault slot (VeraCrypt..plain are 0..4). */
+#define VE_FORMAT_GOCRYPTFS 10
+#define VE_FORMAT_CRYPTOMATOR 11
+#define VE_FORMAT_CRYFS 12
+
+VE_API int32_t ve_fv_supported(void); /* 1 if folder vaults are compiled in, else 0 */
+
+/* Which folder-vault format does the directory `root` look like? Writes VE_FV_* or -1 (none) to
+ * *format_out. Password-free and read-only. */
+VE_API int32_t ve_fv_probe(const char* root, int32_t* format_out);
+
+/* Opens the vault at `root` into slot `vol_id`. Returns VE_OK, VE_ERR_AUTH_FAILED (wrong password),
+ * VE_ERR_FAILED (not a vault / I/O error) or VE_ERR_INVALID_ARG. `combined_key` (CryFS only,
+ * may be NULL) is the derived key from an earlier unlock and replaces the password.
+ * `backup_key_files` (Cryptomator, read-write unlocks only) keeps .bkup copies of masterkey.cryptomator
+ * and vault.cryptomator next to the originals; the other formats ignore it.
+ * `derived_key` (optional) receives the CryFS derived key so the caller can offer "remember". */
+VE_API int32_t ve_fv_unlock(int32_t vol_id, int32_t format, const char* root,
+                            const uint8_t* password, int32_t password_len,
+                            const uint8_t* combined_key, int32_t combined_key_len,
+                            int32_t read_only, int32_t backup_key_files, const char* local_state_dir,
+                            const char* temp_dir, ve_buffer* message, ve_buffer* derived_key);
+
+/* Password-free look at a Cryptomator vault folder from its files alone (nothing is decrypted or
+ * written): *code_out = 0 not a (readable) vault, 7 format 7 (migratable), 8 current, -8 key file is
+ * version 8+ but vault.cryptomator has not synced yet (NEVER migrate), 6 too old to migrate here. */
+VE_API int32_t ve_fv_probe_cryptomator(const char* root, int32_t* code_out);
+
+/* Creates a new vault in the (empty) directory `root`. gocryptfs: cipher 0 AES-256-GCM,
+ * 1 XChaCha20-Poly1305, 2 AES-SIV; plaintext_names / deterministic_names flags; long_name_max
+ * 0 or 62..255. CryFS: cipher_name (e.g. "xchacha20-poly1305", NULL = default) and block_size
+ * (0 = default). Cryptomator ignores all of them. user_entropy (optional) is mixed into key
+ * generation like ve_create_container. Returns VE_OK / VE_ERR_FAILED / VE_ERR_INVALID_ARG. */
+VE_API int32_t ve_fv_create(int32_t format, const char* root, const uint8_t* password,
+                            int32_t password_len, int32_t cipher, int32_t plaintext_names,
+                            int32_t deterministic_names, int32_t long_name_max, int32_t block_size,
+                            const char* cipher_name, const uint8_t* user_entropy,
+                            int32_t user_entropy_len, const char* local_state_dir,
+                            const char* temp_dir, ve_buffer* message);
+
+/* Rewraps the key under a new password. VE_OK, VE_ERR_AUTH_FAILED (old password wrong) or VE_ERR_FAILED. */
+VE_API int32_t ve_fv_change_password(int32_t format, const char* root, const uint8_t* old_password,
+                                     int32_t old_len, const uint8_t* new_password, int32_t new_len,
+                                     ve_buffer* message);
+
+/* Cryptomator format 7 -> 8 (one way). Same return codes as ve_fv_change_password. */
+VE_API int32_t ve_fv_migrate_cryptomator(const char* root, const uint8_t* password,
+                                         int32_t password_len, ve_buffer* message);
+
+/* Queries on an unlocked folder-vault slot (VE_ERR_NOT_UNLOCKED when vol_id is not one). */
+/* Vault properties as triples: u32 count, then per item 3 x (u32 length + UTF-8 bytes):
+ * key, kind ("s" string / "i" integer / "b" boolean), value. Little-endian. */
+VE_API int32_t ve_fv_info(int32_t vol_id, ve_buffer* out);
+/* Number of entries hidden from listings in `path` (>= 0), or a negative -VE_ERR_* code. */
+VE_API int32_t ve_fv_hidden_entry_count(int32_t vol_id, const char* path);
+/* Flushes pending metadata for a file that was written chunk by chunk. */
+VE_API int32_t ve_fv_finish_write(int32_t vol_id, const char* path);
+/* Brackets a burst of writes (kind 0) or deletes (kind 1) so the vault can defer index work. */
+VE_API int32_t ve_fv_batch(int32_t vol_id, int32_t kind, int32_t begin);
+
+/* ---- random-access writes (block containers) ------------------------------------------------------
+ * ve_write_file_chunk keeps its historical meaning (a write at offset 0 REPLACES the file). The two calls
+ * below are for callers that need ordinary file semantics -- the OS mount layer.
+ *   ve_write_file_at     writes `len` bytes at `offset` into an EXISTING file without touching the rest.
+ *                        `offset` must be <= the current size (grow with ve_truncate first).
+ *   ve_truncate          sets the size of an existing file; growing zero-fills.
+ *   ve_create_empty_file creates an empty file (a folder vault commits it immediately).
+ * Folder-vault slots only accept chunks in order from offset 0 + ve_fv_finish_write, so the first two
+ * return VE_ERR_UNSUPPORTED there (the mount layer buffers instead). */
+VE_API int32_t ve_write_file_at(int32_t vol_id, const char* path, int64_t offset, const uint8_t* data, size_t len);
+VE_API int32_t ve_truncate(int32_t vol_id, const char* path, int64_t size);
+VE_API int32_t ve_create_empty_file(int32_t vol_id, const char* path);
+
+/* ---- OS mounts (Linux: FUSE 3; Windows: WinFsp, not built yet) -------------------------------------
+ * Exposes an unlocked slot as a real folder / drive so any application and the file manager can use it --
+ * the desktop equivalent of the Android DocumentsProvider. Works for every format behind a slot.
+ *   ve_mount_supported  1 if mounting can work on this machine; else 0 and a short human-readable reason
+ *                       in reason_buf (e.g. "libfuse3 / fusermount3 not found").
+ *   ve_mount            mount_point must be an existing, empty directory owned by the caller (or absent,
+ *                       in which case it is created). *out_mount_id receives the mount's id.
+ *   ve_unmount          unmounts and commits pending writes. force=0 returns VE_ERR_BUSY if files are open;
+ *                       force=1 detaches regardless. Also reaps a mount that already ended on its own.
+ *   ve_list_mounts      u32 count, then per mount u32 length + UTF-8 "<id>|<vol>|<state>|<mount point>"
+ *                       with state "active" or "ended" (someone unmounted it from outside).
+ *   ve_set_mount_callback  event 1 = mount `mount_id` ended without ve_unmount (external eject / crash of the
+ *                       FUSE side). Called from a native thread: forward it to Dart with NativeCallable.listener.
+ * ve_lock() unmounts every mount of the slot first, so key material is never wiped under a live mount. */
+typedef struct ve_mount_options {
+    int32_t struct_size;        /* sizeof(ve_mount_options) */
+    int32_t read_only;          /* mount read-only even if the slot is writable */
+    int32_t allow_other;        /* let other users reach it (Linux: needs user_allow_other in /etc/fuse.conf) */
+    int32_t max_buffer_mb;      /* per open file, folder vaults: in-memory cap for in-place edits; 0 = 256 */
+    const char* volume_name;    /* shown by the file manager; NULL = "VaultExplorer" */
+    const char* sub_path;       /* vault folder to expose, e.g. "/Documents"; NULL or "/" = whole vault */
+} ve_mount_options;
+
+VE_API int32_t ve_mount_supported(char* reason_buf, size_t reason_cap);
+VE_API int32_t ve_mount(int32_t vol_id, const char* mount_point_utf8, const ve_mount_options* opts,
+                        int64_t* out_mount_id);
+VE_API int32_t ve_unmount(int64_t mount_id, int32_t force);
+VE_API int32_t ve_list_mounts(ve_buffer* out);
+VE_API void ve_set_mount_callback(void (*cb)(int64_t mount_id, int32_t event));
+/* Human-readable reason for the most recent failed ve_mount / ve_unmount (e.g. "mount point is not empty").
+ * Returns the message length; copies at most cap-1 bytes + NUL into buf. */
+VE_API int32_t ve_mount_last_error(char* buf, size_t cap);
 
 #ifdef __cplusplus
 }

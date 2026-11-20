@@ -44,6 +44,47 @@ int fdatasync(int fd);
 #include <stdlib.h>
 #include <time.h>
 
+// The UCRT exposes the equivalent environment APIs as _putenv_s rather than
+// setenv/unsetenv. Keep the POSIX return convention used by the engine.
+static inline int setenv(const char* name, const char* value, int overwrite) {
+    if (!name || !name[0] || !value) {
+        errno = EINVAL;
+        return -1;
+    }
+    for (const char* p = name; *p; ++p) {
+        if (*p == '=') {
+            errno = EINVAL;
+            return -1;
+        }
+    }
+    if (!overwrite && getenv(name) != nullptr) return 0;
+    const int result = _putenv_s(name, value);
+    if (result != 0) {
+        errno = result;
+        return -1;
+    }
+    return 0;
+}
+
+static inline int unsetenv(const char* name) {
+    if (!name || !name[0]) {
+        errno = EINVAL;
+        return -1;
+    }
+    for (const char* p = name; *p; ++p) {
+        if (*p == '=') {
+            errno = EINVAL;
+            return -1;
+        }
+    }
+    const int result = _putenv_s(name, "");
+    if (result != 0) {
+        errno = result;
+        return -1;
+    }
+    return 0;
+}
+
 // localtime_r: MinGW has the secure localtime_s with swapped argument order.
 static inline struct tm* localtime_r(const time_t* t, struct tm* out) {
     return localtime_s(out, t) == 0 ? out : nullptr;

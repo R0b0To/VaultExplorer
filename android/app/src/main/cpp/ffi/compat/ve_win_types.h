@@ -51,6 +51,10 @@ ssize_t getline(char** lineptr, size_t* n, FILE* stream);
 #ifndef S_ISLNK
 #define S_ISLNK(m) (((m) & S_IFMT) == S_IFLNK)
 #endif
+#ifndef st_blocks
+/* MinGW's stat omits st_blocks; the engine's Windows path sizes regular files via st_size. */
+#define st_blocks st_size
+#endif
 #ifndef S_ISUID
 #define S_ISUID 0004000
 #define S_ISGID 0002000

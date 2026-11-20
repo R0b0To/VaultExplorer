@@ -183,6 +183,11 @@ class _MainShellState extends ConsumerState<MainShell>
       _configureSessionLock();
     }
     final policy = _secureScreenPolicy; // Eagerly evaluate while mounted
+    // Revealed from Mask Mode: the persisted mode is still `decoy`, so mark
+    // the vault as visible or later "decoy -> disable FLAG_SECURE" syncs
+    // (dashboard load, mount changes, app-lock enforcement) would strip the
+    // screenshot block the user asked for.
+    if (widget.returnToDecoyOnBackground) policy.beginRevealedVault();
     ref.read(appSettingsServiceProvider).loadSettings().then((settings) {
       policy.apply(preference: settings.blockScreenshots);
     });
@@ -468,12 +473,16 @@ class _MainShellState extends ConsumerState<MainShell>
     _vaultEngineEvents.removeQuickCaptureRequestedListener(
       _onQuickCaptureRequested,
     );
-    disguiseModeApi.getMode().then((mode) {
-      if (mode == DisguiseMode.decoy) {
-        // Safe: calling the cached service directly without using `ref`
-        _secureScreenPolicy.disableForDecoy();
-      }
-    });
+    if (widget.returnToDecoyOnBackground) {
+      // Safe: calling the cached service directly without using `ref`
+      unawaited(_secureScreenPolicy.endRevealedVault());
+    } else {
+      disguiseModeApi.getMode().then((mode) {
+        if (mode == DisguiseMode.decoy) {
+          _secureScreenPolicy.disableForDecoy();
+        }
+      });
+    }
     super.dispose();
   }
 

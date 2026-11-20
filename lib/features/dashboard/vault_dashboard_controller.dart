@@ -21,6 +21,7 @@ import 'package:vaultexplorer/data/services/media_index/media_index_service.dart
 import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
+import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 import 'package:vaultexplorer/features/sync/services/sync_providers.dart';
 
 part 'vault_dashboard_controller.g.dart';
@@ -152,6 +153,17 @@ class VaultDashboardController extends _$VaultDashboardController {
       if (previous != null) {
         VeLog.i(_kLogTag, 'containerRepository instance changed; reloading records');
         loadAll();
+      }
+    });
+
+    // The dashboard keeps its own snapshot of AppSettings (loaded in loadAll).
+    // Mirror later changes from the live settings controller so options like
+    // the vault sort order apply immediately instead of after an app restart.
+    // `this.state` is required: build() declares a local `state` that would
+    // otherwise shadow the notifier's state inside this closure.
+    ref.listen(appSettingsControllerProvider, (previous, next) {
+      if (!identical(previous?.settings, next.settings)) {
+        this.state = this.state._copy(appSettings: next.settings);
       }
     });
 

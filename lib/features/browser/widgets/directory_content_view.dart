@@ -25,6 +25,7 @@ import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/core/widgets/activity/clipboard_fab.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/data/models/archive_models.dart';
@@ -2728,9 +2729,10 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
   bool handleStartBackGesture(PredictiveBackEvent backEvent) {
     if (!_isOwnRouteCurrent) return false;
     if (backEvent.isButtonEvent) return false;
-    // A menu is open: leave the gesture unclaimed so it reaches the menu's
-    // PopScope and closes it instead of previewing a folder change.
+    // An overlay menu handles its own back through its PopScope.
     if (OpenMenuBackGuard.hasOpenMenu) return false;
+    // The drawer handles back by closing itself, not previewing a folder.
+    if (OpenDrawerBackGuard.hasOpenDrawer) return false;
     // "Predictive back animations" off: leave the gesture unclaimed so it takes
     // the same path as a back-button press -- on commit the PopScope in
     // build() calls _onSystemBack(), and a cancel does nothing. Only the start
@@ -6920,7 +6922,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
     final bool isActiveTab = _isActiveTab;
     final bool canPop =
         !isActiveTab ||
-        (_resolveBack() == BrowserBackAction.leave && _exitArmed);
+        (!OpenDrawerBackGuard.hasOpenDrawer &&
+            _resolveBack() == BrowserBackAction.leave &&
+            _exitArmed);
     final systemOverlayStyle = AppSystemUI.forTheme(Theme.of(context));
     final Widget? browserBottomBar = (!isLandscape && showActionBar)
         ? Column(
@@ -7592,8 +7596,9 @@ class _DirectoryContentViewState extends ConsumerState<DirectoryContentView>
         canPop: canPop,
         onPopInvokedWithResult: (bool didPop, Object? result) {
           if (didPop || !_isActiveTab) return;
-          // A menu is open: this press closes it (BackDismissibleMenuAnchor).
+          // Let popup menus close before the drawer itself.
           if (OpenMenuBackGuard.hasOpenMenu) return;
+          if (OpenDrawerBackGuard.hasOpenDrawer) return;
           _onSystemBack();
         },
         child: browserBody,

@@ -10,6 +10,7 @@ import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/providers/external_storage_locations_provider.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_feedback.dart';
 import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart';
+import 'package:vaultexplorer/core/widgets/full_screen_drag_drawer.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area.dart';
 import 'package:vaultexplorer/core/theme/skin/skin_area_scope.dart';
@@ -72,6 +73,8 @@ class _MainShellState extends ConsumerState<MainShell>
   );
   final GlobalKey<VaultDashboardState> _dashboardKey =
       GlobalKey<VaultDashboardState>();
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  bool _scaffoldDrawerOpen = false;
   MountedContainer? _cachedLocalStorageContainer;
 
   MountedContainer? get _primaryLocalStorageContainer {
@@ -86,6 +89,12 @@ class _MainShellState extends ConsumerState<MainShell>
     if (dashboard != null) {
       _cachedLocalStorageContainer = dashboard.localStorageContainer;
     }
+  }
+
+  void _onScaffoldDrawerChanged(bool isOpen) {
+    if (!mounted || _scaffoldDrawerOpen == isOpen) return;
+    OpenDrawerBackGuard.setDrawerOpen(this, isOpen);
+    setState(() => _scaffoldDrawerOpen = isOpen);
   }
 
   // Cached synchronously while the widget is mounted
@@ -440,6 +449,7 @@ class _MainShellState extends ConsumerState<MainShell>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    OpenDrawerBackGuard.setDrawerOpen(this, false);
     _exitArmTimer?.cancel();
     _mountedNotifier.dispose();
     _localStorageNotifier.dispose();
@@ -1019,6 +1029,8 @@ class _MainShellState extends ConsumerState<MainShell>
     );
 
     final Widget scaffold = Scaffold(
+      key: _scaffoldKey,
+      onDrawerChanged: _onScaffoldDrawerChanged,
       resizeToAvoidBottomInset: !browserContentVisible,
       // Tools and Settings have no horizontal pager, so let a drawer drag
       // start anywhere in their content, too.
@@ -1053,11 +1065,26 @@ class _MainShellState extends ConsumerState<MainShell>
       // exit hint. The decoy is the one that asks for the second back before
       // the app is left (see the app-root back handling in
       // DirectoryContentView).
-      canPop: atHome && (_exitArmed || widget.returnToDecoyOnBackground),
+      canPop:
+          atHome &&
+          !_scaffoldDrawerOpen &&
+          !OpenDrawerBackGuard.hasOpenDrawer &&
+          (_exitArmed || widget.returnToDecoyOnBackground),
       onPopInvokedWithResult: (bool didPop, Object? result) {
         if (didPop) return;
         // A menu is open: this press closes it (BackDismissibleMenuAnchor).
         if (OpenMenuBackGuard.hasOpenMenu) return;
+        if (_scaffoldDrawerOpen) {
+          scheduleMicrotask(() {
+            if (mounted && _scaffoldDrawerOpen) {
+              _scaffoldKey.currentState?.closeDrawer();
+            }
+          });
+          return;
+        }
+        // BrowserTabsHost closes its drawer after all route back handlers have
+        // observed this press.
+        if (OpenDrawerBackGuard.hasOpenDrawer) return;
         // The focused folder tab handles back itself.
         if (browserContentVisible && !dashboardLocationIsActive) return;
         if (atHome) {

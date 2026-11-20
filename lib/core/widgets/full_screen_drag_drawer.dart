@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/widgets/menus/back_dismissible_menu_anchor.dart';
 
 /// A modal drawer that can be pulled from its content area or screen edge.
 ///
@@ -60,6 +62,10 @@ class _FullScreenDragDrawerState extends State<FullScreenDragDrawer>
     _pointerDrag = null;
     _historyEntry?.remove();
     _historyEntry = null;
+    if (_reportedOpen) {
+      _reportedOpen = false;
+      OpenDrawerBackGuard.setDrawerOpen(this, false);
+    }
     _controller.dispose();
     super.dispose();
   }
@@ -115,6 +121,7 @@ class _FullScreenDragDrawerState extends State<FullScreenDragDrawer>
   void _setReportedOpen(bool open) {
     if (_reportedOpen == open) return;
     _reportedOpen = open;
+    OpenDrawerBackGuard.setDrawerOpen(this, open);
     widget.onDrawerChanged?.call(open);
   }
 
@@ -309,10 +316,21 @@ class _FullScreenDragDrawerState extends State<FullScreenDragDrawer>
       ),
     );
     if (widget.drawer == null) return listener;
-    return FullScreenDragDrawerScope(
-      openDrawer: openDrawer,
-      setDrawerDragBlocked: _setDrawerDragBlocked,
-      child: listener,
+    return PopScope(
+      canPop: !_reportedOpen,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop || !_reportedOpen || OpenMenuBackGuard.hasOpenMenu) return;
+        // Let every back handler on the route see the drawer as open before
+        // closing it, so they stand down instead of acting on the content.
+        scheduleMicrotask(() {
+          if (mounted && _reportedOpen) _closeDrawer();
+        });
+      },
+      child: FullScreenDragDrawerScope(
+        openDrawer: openDrawer,
+        setDrawerDragBlocked: _setDrawerDragBlocked,
+        child: listener,
+      ),
     );
   }
 }
@@ -330,6 +348,23 @@ class _DrawerPointerDrag {
   final double startValue;
   final VelocityTracker velocityTracker;
   bool isDragging = false;
+}
+
+/// Lets route back handlers stand down while an open drawer consumes back.
+class OpenDrawerBackGuard {
+  OpenDrawerBackGuard._();
+
+  static final Set<Object> _openDrawers = <Object>{};
+
+  static bool get hasOpenDrawer => _openDrawers.isNotEmpty;
+
+  static void setDrawerOpen(Object owner, bool open) {
+    if (open) {
+      _openDrawers.add(owner);
+    } else {
+      _openDrawers.remove(owner);
+    }
+  }
 }
 
 class FullScreenDragDrawerScope extends InheritedWidget {

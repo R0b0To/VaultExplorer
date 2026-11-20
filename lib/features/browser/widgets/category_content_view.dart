@@ -3400,6 +3400,7 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
         if (didPop || !_isActiveTab) return;
         // A menu is open: this press closes it (BackDismissibleMenuAnchor).
         if (OpenMenuBackGuard.hasOpenMenu) return;
+        if (OpenDrawerBackGuard.hasOpenDrawer) return;
         if (isSelecting) {
           _clearSelection();
         } else if (_searchActive) {

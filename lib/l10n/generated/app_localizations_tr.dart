@@ -8496,6 +8496,21 @@ class AppLocalizationsTr extends AppLocalizations {
       'Görüntüleme alanını en üst düzeye çıkarmak için aşağı kaydırırken üst çubuğu gizle';
 
   @override
+  String get autoHideToolbarLabel => 'Kaydırırken araç çubuğunu otomatik gizle';
+
+  @override
+  String get autoHideToolbarDesc =>
+      'Görüntüleme alanını genişletmek için aşağı kaydırırken alt araç çubuğunu gizle';
+
+  @override
+  String get autoHideBreadcrumbBarLabel =>
+      'Kaydırırken klasör yolu çubuğunu otomatik gizle';
+
+  @override
+  String get autoHideBreadcrumbBarDesc =>
+      'Görüntüleme alanını genişletmek için aşağı kaydırırken klasör yolu çubuğunu gizle';
+
+  @override
   String get useFabForToolbarLabel => 'Araç çubuğu için yüzen düğme kullan';
 
   @override
@@ -14239,6 +14254,25 @@ class AppLocalizationsTr extends AppLocalizations {
   String get galleryFilterClear => 'Temizle';
 
   @override
+  String get galleryFilterMatchAny => 'En az biri';
+
+  @override
+  String get galleryFilterMatchAll => 'Tümü';
+
+  @override
+  String get galleryFoldersMenu => 'Galeri klasörleri';
+
+  @override
+  String get galleryFoldersHint =>
+      'Galerinin tarayacağı klasörleri seçin. Alt klasörler de taranır. Hiç klasör seçmezseniz tüm depolama alanı taranır.';
+
+  @override
+  String get galleryFoldersUseAll => 'Her şeyi tara';
+
+  @override
+  String get galleryFoldersApply => 'Uygula';
+
+  @override
   String galleryFilterShownOfTotal(int shown, int total) {
     return '$shown / $total gösteriliyor';
   }
@@ -14602,4 +14636,213 @@ class AppLocalizationsTr extends AppLocalizations {
   @override
   String get showNoMediaFoldersDesc =>
       'Galeri uygulamalarının normalde atladığı, .nomedia dosyasıyla işaretli klasörleri de dahil et';
+
+  @override
+  String get motionPhotoCopyNote =>
+      'Düzenlenen kopya hareketsiz bir görüntü olur. Orijinal dosya, EXIF meta verileri ve varsa dosyaya gömülü video değişmeden kalır.';
+
+  @override
+  String get pimInputHint =>
+      'Varsayılan değerler için boş bırakın veya 0 girin';
+
+  @override
+  String get galleryMetadataIndexStorageLabel =>
+      'Galeri meta veri dizininin depolama konumu';
+
+  @override
+  String get galleryMetadataUseGlobalDefaultDesc =>
+      'Uygulama genelindeki galeri meta veri dizini depolama ayarını kullanın.';
+
+  @override
+  String get galleryMetadataAppStorageOption => 'Uygulama depolaması';
+
+  @override
+  String get galleryMetadataInVaultOption => 'Kasa içinde';
+
+  @override
+  String get galleryMetadataSectionHeader => 'Galeri meta veri dizini';
+
+  @override
+  String get galleryMetadataUseGlobalDefaultTitle =>
+      'Uygulama genelindeki galeri dizini ayarını kullan';
+
+  @override
+  String get musicIndexSectionHeader => 'Müzik dizini';
+
+  @override
+  String get musicIndexStorageLabel => 'Müzik dizininin depolama konumu';
+
+  @override
+  String get musicIndexUseGlobalDefaultTitle =>
+      'Uygulama genelindeki müzik dizini ayarını kullan';
+
+  @override
+  String get musicIndexUseGlobalDefaultDesc =>
+      'Uygulama genelindeki müzik dizini depolama ayarını kullanın.';
+
+  @override
+  String get musicIndexAppStorageOption => 'Uygulama depolaması';
+
+  @override
+  String get musicIndexInVaultOption => 'Kasa içinde';
+
+  @override
+  String get musicIndexHiddenFolderOption => 'Gizli klasör';
+
+  @override
+  String get musicIndexHiddenFolderDesc =>
+      'Yerel Depolama\'da şifrelenmemiş gizli bir klasörde saklanır.';
+
+  @override
+  String get libraryStorageHiddenFolder =>
+      'Dizin şifrelenmemiş gizli bir klasöre kaydedildi';
+
+  @override
+  String get libraryStorageDisabled =>
+      'Kaydedilmiş müzik dizini devre dışı; parçalar her seferinde yeniden taranır.';
+
+  @override
+  String get galleryMetadataClearAction =>
+      'Kaydedilmiş galeri dizinini temizle';
+
+  @override
+  String get galleryMetadataClearConfirmTitle =>
+      'Galeri meta veri dizini temizlensin mi?';
+
+  @override
+  String get galleryMetadataClearConfirmMessage =>
+      'Kaydedilmiş fotoğraf ayrıntıları silinir. Galeride gezinirken dizin yeniden oluşturulur.';
+
+  @override
+  String get galleryMetadataIndexClearedMessage =>
+      'Galeri meta veri dizini temizlendi.';
+
+  @override
+  String get musicIndexClearAction => 'Kaydedilmiş müzik dizinini temizle';
+
+  @override
+  String get musicIndexClearConfirmTitle =>
+      'Kaydedilmiş müzik dizini temizlensin mi?';
+
+  @override
+  String get musicIndexClearConfirmMessage =>
+      'Kaydedilmiş parça ayrıntıları silinir. Müzik Modu, bir sonraki açılışında dizini yeniden oluşturur.';
+
+  @override
+  String get musicIndexClearedMessage => 'Müzik dizini temizlendi.';
+
+  @override
+  String get clearSavedIndexButton => 'Dizini temizle';
+
+  @override
+  String get appIndexClearedUnlockMessage =>
+      'Uygulama depolamasındaki kopya temizlendi. Kasa içindeki dizin kopyasını temizlemek için kasayı yazma erişimiyle açın.';
+
+  @override
+  String get savedIndexClearFailedMessage =>
+      'Kaydedilmiş dizin verilerinin tamamı temizlenemedi.';
+
+  @override
+  String get libraryStorageReadOnly =>
+      'Kasa salt okunur; müzik dizini kaydedilmiyor.';
+
+  @override
+  String get clearLocalStorageThumbnailCacheMessage =>
+      'Bu işlem Yerel Depolama için önbelleğe alınmış küçük resimleri siler. Medyalara bir sonraki göz atışınızda yeniden oluşturulurlar.';
+
+  @override
+  String vcToolsDetectedFormat(String format) {
+    return 'Algılanan biçim: $format';
+  }
+
+  @override
+  String get vcToolsUnencryptedDetected =>
+      'Şifrelenmemiş görünüyor; bu araç şifreli bir kapsayıcı gerektirir';
+
+  @override
+  String get vcToolsAssumingVeraCrypt =>
+      'Otomatik olarak algılanamadı; VeraCrypt olduğu varsayılıyor';
+
+  @override
+  String get vcToolsManualFormat => 'Elle ayarla';
+
+  @override
+  String get vcToolsExpandInsufficientSpaceForSize =>
+      'Bu boyut için cihazda yeterli boş alan yok.';
+
+  @override
+  String vcToolsNewSizePreview(String size) {
+    return 'Yeni boyut: $size';
+  }
+
+  @override
+  String vcToolsNewSizePreviewWithAdded(String size, String added) {
+    return 'Yeni boyut: $size (+$added)';
+  }
+
+  @override
+  String get vcToolsFileSize => 'Dosya boyutu';
+
+  @override
+  String get vcToolsCurrentSize => 'Mevcut boyut';
+
+  @override
+  String vcToolsFreeOnDevice(String size) {
+    return 'Cihazda boş alan: $size';
+  }
+
+  @override
+  String get vcToolsSetExactTotalInstead => 'Toplam boyutu tam olarak ayarla';
+
+  @override
+  String get vcToolsBitLockerDiskImageSizeHint =>
+      'Disk görüntüsü (VHD/VHDX) için dosya boyutunu değil, yeni toplam sanal disk boyutunu girin.';
+
+  @override
+  String get vcToolsNewTotalSize => 'Yeni toplam boyut';
+
+  @override
+  String get vcToolsAddSize => 'Ekle';
+
+  @override
+  String vcToolsQuickAddGiB(String amount) {
+    return '+$amount GiB';
+  }
+
+  @override
+  String get vcToolsDoubleSize => 'İki katına çıkar';
+
+  @override
+  String get vcToolsSizeMustExceedCurrent =>
+      'Yeni boyut geçerli boyuttan büyük olmalıdır.';
+
+  @override
+  String get vcToolsInsufficientFreeSpace => 'Cihazda yeterli boş alan yok.';
+
+  @override
+  String get vcToolsContainerSectionHeader => 'Kapsayıcı';
+
+  @override
+  String get vcToolsCredentialsSectionHeader => 'Kimlik bilgileri';
+
+  @override
+  String get vcToolsVolumeOptionsSectionHeader => 'Birim seçenekleri';
+
+  @override
+  String get vcToolsDetectingFormat => 'Biçim algılanıyor…';
+
+  @override
+  String get indexesAndThumbnailsTitle => 'Dizinler ve küçük resimler';
+
+  @override
+  String get indexesAndThumbnailsSubtitle =>
+      'Küçük resim depolamasını, galeri meta verilerini ve müzik dizini ayarlarını yönetin.';
+
+  @override
+  String get resetFileManagerSettingsTitle =>
+      'Dosya yöneticisi ayarları sıfırlansın mı?';
+
+  @override
+  String get resetFileManagerSettingsMessage =>
+      'Bu ekrandaki tüm seçenekler varsayılan değerlerine döner; sekme, düzen, araç çubuğu, ızgara, küçük resim, görüntüleyici ve tema ayarları da buna dahildir. Dosyalarınız, yer imleriniz ve klasöre özel tercihleriniz değişmez.';
 }

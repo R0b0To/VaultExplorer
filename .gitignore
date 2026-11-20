@@ -43,6 +43,15 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+/android/.gradle/
+/android/build/
+/android/app/build/
+/android/app/.cxx/
+/android/app/.externalNativeBuild/
+
+# Local Android signing credentials
+/android/key.properties
+/android/app/key.jks
 
 # Widget Preview related
 .widget_preview/

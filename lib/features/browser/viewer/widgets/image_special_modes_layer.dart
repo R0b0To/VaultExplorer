@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:vaultexplorer/core/providers/vault_engine_providers.dart';
@@ -9,6 +10,8 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/browser/metadata/image_metadata_reader.dart';
 import 'package:vaultexplorer/features/browser/metadata/metadata_edit_service.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
+import 'package:vaultexplorer/features/browser/viewer/panorama/device_orientation_sensor.dart';
+import 'package:vaultexplorer/features/browser/viewer/panorama/panorama_camera.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dart';
 
 class ImageSpecialModesLayer extends ConsumerStatefulWidget {
@@ -50,10 +53,16 @@ class _ImageSpecialModesLayerState
 
   static Future<ui.FragmentProgram>? _programLoad;
 
+  /// Gyro mode is remembered for the rest of the session, so flicking through
+  /// several 360° photos does not need the toggle every time.
+  static bool _lastSensorChoice = false;
+
   _SpecialImageMetadata _metadata = const _SpecialImageMetadata();
   bool _panoramaActive = false;
   bool _autoPlayRequested = false;
   bool _panoramaLoading = false;
+  bool _sensorAvailable = false;
+  bool _sensorOn = false;
   String? _panoramaError;
   ui.Image? _panoramaImage;
   ui.FragmentShader? _panoramaShader;
@@ -64,6 +73,23 @@ class _ImageSpecialModesLayerState
   void initState() {
     super.initState();
     unawaited(_readMetadata());
+    unawaited(_probeSensor());
+  }
+
+  Future<void> _probeSensor() async {
+    final available = await DeviceOrientationSensor.isAvailable();
+    if (!mounted) return;
+    setState(() {
+      _sensorAvailable = available;
+      if (!available) _sensorOn = false;
+    });
+  }
+
+  void _toggleSensor() {
+    setState(() {
+      _sensorOn = !_sensorOn;
+      _lastSensorChoice = _sensorOn;
+    });
   }
 
   @override
@@ -142,6 +168,7 @@ class _ImageSpecialModesLayerState
       setState(() {
         _panoramaActive = true;
         _panoramaError = null;
+        _sensorOn = _sensorAvailable && _lastSensorChoice;
       });
       widget.onPanoramaModeChanged(true);
       return;
@@ -152,6 +179,7 @@ class _ImageSpecialModesLayerState
       _panoramaActive = true;
       _panoramaLoading = true;
       _panoramaError = null;
+      _sensorOn = _sensorAvailable && _lastSensorChoice;
     });
     widget.onPanoramaModeChanged(true);
     ui.Image? decodedImage;
@@ -217,6 +245,7 @@ class _ImageSpecialModesLayerState
       _panoramaActive = false;
       _panoramaLoading = false;
       _panoramaError = null;
+      _sensorOn = false;
     });
     widget.onPanoramaModeChanged(false);
   }
@@ -315,6 +344,7 @@ class _ImageSpecialModesLayerState
                   image: _panoramaImage!,
                   shader: _panoramaShader!,
                   spec: _metadata.panorama!,
+                  sensorEnabled: _sensorOn,
                   onTap: () => widget.onToggleUI(!widget.showUI),
                 )
               : const SizedBox.shrink(),
@@ -401,6 +431,15 @@ class _ImageSpecialModesLayerState
                       selected: _panoramaActive,
                       onTap: _togglePanorama,
                     ),
+                  if (showPanoramaPill && _panoramaActive && _sensorAvailable)
+                    const SizedBox(width: 8),
+                  if (showPanoramaPill && _panoramaActive && _sensorAvailable)
+                    _modePill(
+                      label: 'Gyro',
+                      icon: Icons.screen_rotation_alt_outlined,
+                      selected: _sensorOn,
+                      onTap: _toggleSensor,
+                    ),
                 ],
               ),
             ),
@@ -439,6 +478,25 @@ class _SpecialImageMetadata {
     final projection = tag('ProjectionType')?.toLowerCase();
     final useViewer = yes(tag('UsePanoramaViewer'));
     if (projection != 'equirectangular' && !useViewer) {
+      // Many 360° exports carry no GPano XMP at all. A 2:1 image that says
+      // nothing else about its projection is treated as a full equirectangular
+      // sphere; the spec's zeros mean "the whole image".
+      if (projection == null && _looksEquirectangular(directories)) {
+        return _SpecialImageMetadata(
+          motionPhoto: isMotionPhoto,
+          panorama: const _PanoramaSpec(
+            fullWidth: 0,
+            fullHeight: 0,
+            cropLeft: 0,
+            cropTop: 0,
+            cropWidth: 0,
+            cropHeight: 0,
+            initialHeading: 0,
+            initialPitch: 0,
+            initialFov: 90,
+          ),
+        );
+      }
       return _SpecialImageMetadata(motionPhoto: isMotionPhoto);
     }
 
@@ -457,6 +515,25 @@ class _SpecialImageMetadata {
       ),
     );
   }
+}
+
+bool _looksEquirectangular(List<MetadataDirectory> directories) {
+  double? dimension(String name) {
+    for (final directory in directories) {
+      for (final tag in directory.tags) {
+        if (tag.name.toLowerCase() == name) {
+          final value = double.tryParse(tag.value.trim());
+          if (value != null) return value;
+        }
+      }
+    }
+    return null;
+  }
+
+  final width = dimension('image width');
+  final height = dimension('image height');
+  if (width == null || height == null || height <= 0) return false;
+  return width >= 2048 && (width / height - 2).abs() < 0.02;
 }
 
 class _PanoramaSpec {
@@ -488,66 +565,149 @@ class _PanoramaScene extends StatefulWidget {
     required this.image,
     required this.shader,
     required this.spec,
+    required this.sensorEnabled,
     required this.onTap,
   });
 
   final ui.Image image;
   final ui.FragmentShader shader;
   final _PanoramaSpec spec;
+  final bool sensorEnabled;
   final VoidCallback onTap;
 
   @override
   State<_PanoramaScene> createState() => _PanoramaSceneState();
 }
 
-class _PanoramaSceneState extends State<_PanoramaScene> {
-  late double _yaw = widget.spec.initialHeading * math.pi / 180;
-  late double _pitch = widget.spec.initialPitch * math.pi / 180;
-  late double _fov =
-      (widget.spec.initialFov.clamp(35, 110)).toDouble() * math.pi / 180;
-  double _startYaw = 0;
-  double _startPitch = 0;
+class _PanoramaSceneState extends State<_PanoramaScene>
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+  late final PanoramaCamera _camera = PanoramaCamera(
+    yaw: widget.spec.initialHeading * math.pi / 180,
+    pitch: widget.spec.initialPitch * math.pi / 180,
+    fov: widget.spec.initialFov * math.pi / 180,
+  );
+  late final Ticker _flingTicker = createTicker(_onFlingTick);
+
+  StreamSubscription<List<double>>? _sensorSub;
+  bool _resumed = true;
+
   double _startFov = math.pi / 2;
-  Offset _startFocalPoint = Offset.zero;
+  bool _multiTouch = false;
+  double _viewportHeight = 1;
+  double _flingYaw = 0; // rad/s
+  double _flingPitch = 0; // rad/s
+  Duration _lastTick = Duration.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _syncSensor();
+  }
+
+  @override
+  void didUpdateWidget(covariant _PanoramaScene oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.sensorEnabled != widget.sensorEnabled) _syncSensor();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final resumed = state == AppLifecycleState.resumed;
+    if (resumed == _resumed) return;
+    _resumed = resumed;
+    _syncSensor();
+  }
+
+  void _syncSensor() {
+    final shouldRun = widget.sensorEnabled && _resumed;
+    if (shouldRun && _sensorSub == null) {
+      _stopFling();
+      if (_camera.sensorActive) {
+        // Resuming after a pause: keep looking where the user was looking.
+        _camera.beginSensor(_camera.forward().heading);
+      } else {
+        _camera.beginSensor(widget.spec.initialHeading * math.pi / 180);
+      }
+      _sensorSub = DeviceOrientationSensor.matrices().listen(
+        _camera.onDeviceMatrix,
+        onError: (_) {},
+      );
+    } else if (!shouldRun && _sensorSub != null) {
+      _sensorSub?.cancel();
+      _sensorSub = null;
+      if (widget.sensorEnabled) {
+        _camera.suspendSensor(); // paused in background; resume re-anchors
+      } else {
+        _camera.endSensor();
+      }
+    } else if (!widget.sensorEnabled && _camera.sensorActive) {
+      _camera.endSensor();
+    }
+  }
+
+  void _stopFling() {
+    if (_flingTicker.isActive) _flingTicker.stop();
+    _flingYaw = 0;
+    _flingPitch = 0;
+  }
+
+  void _onFlingTick(Duration elapsed) {
+    final dt = ((elapsed - _lastTick).inMicroseconds / 1e6).clamp(0.0, 0.05);
+    _lastTick = elapsed;
+    _camera.rotateBy(_flingYaw * dt, _flingPitch * dt);
+    final decay = math.exp(-3.5 * dt);
+    _flingYaw *= decay;
+    _flingPitch *= decay;
+    if (_flingYaw.abs() < 0.02 && _flingPitch.abs() < 0.02) _stopFling();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _sensorSub?.cancel();
+    _flingTicker.dispose();
+    _camera.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        final height = constraints.maxHeight;
+        _viewportHeight = constraints.maxHeight;
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: widget.onTap,
           onScaleStart: (details) {
-            _startYaw = _yaw;
-            _startPitch = _pitch;
-            _startFov = _fov;
-            _startFocalPoint = details.focalPoint;
+            _stopFling();
+            _startFov = _camera.fov;
+            _multiTouch = details.pointerCount > 1;
           },
           onScaleUpdate: (details) {
-            if (width <= 0 || height <= 0) return;
-            final delta = details.focalPoint - _startFocalPoint;
-            setState(() {
-              _yaw = _startYaw - delta.dx / width * 2 * math.pi;
-              _pitch = (_startPitch + delta.dy / height * math.pi).clamp(
-                -math.pi / 2,
-                math.pi / 2,
-              );
-              _fov = (_startFov / details.scale).clamp(
-                35 * math.pi / 180,
-                110 * math.pi / 180,
-              );
-            });
+            if (_viewportHeight <= 0) return;
+            if (details.pointerCount > 1) _multiTouch = true;
+            _camera.panBy(details.focalPointDelta, _viewportHeight);
+            if (details.scale != 1.0) {
+              _camera.setFov(_startFov / details.scale);
+            }
+          },
+          onScaleEnd: (details) {
+            if (_multiTouch || _viewportHeight <= 0) return;
+            final rpp = _camera.radiansPerPixel(_viewportHeight);
+            final v = details.velocity.pixelsPerSecond;
+            _flingYaw = -v.dx * rpp;
+            _flingPitch = v.dy * rpp;
+            if (_flingYaw.abs() < 0.2 && _flingPitch.abs() < 0.2) return;
+            _lastTick = Duration.zero;
+            _flingTicker.start();
           },
           child: CustomPaint(
             painter: _PanoramaPainter(
               image: widget.image,
               shader: widget.shader,
               spec: widget.spec,
-              yaw: _yaw,
-              pitch: _pitch,
-              fov: _fov,
+              camera: _camera,
             ),
             size: Size.infinite,
           ),
@@ -558,21 +718,17 @@ class _PanoramaSceneState extends State<_PanoramaScene> {
 }
 
 class _PanoramaPainter extends CustomPainter {
-  const _PanoramaPainter({
+  _PanoramaPainter({
     required this.image,
     required this.shader,
     required this.spec,
-    required this.yaw,
-    required this.pitch,
-    required this.fov,
-  });
+    required this.camera,
+  }) : super(repaint: camera);
 
   final ui.Image image;
   final ui.FragmentShader shader;
   final _PanoramaSpec spec;
-  final double yaw;
-  final double pitch;
-  final double fov;
+  final PanoramaCamera camera;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -588,19 +744,25 @@ class _PanoramaPainter extends CustomPainter {
     final cropHeight = spec.cropHeight > 0
         ? spec.cropHeight
         : image.height.toDouble();
+    final sensor = camera.sensorActive && camera.hasSensorSample;
+    final rows = camera.rows;
     shader
       ..setFloat(0, size.width)
       ..setFloat(1, size.height)
-      ..setFloat(2, yaw)
-      ..setFloat(3, pitch)
-      ..setFloat(4, fov)
+      ..setFloat(2, camera.yaw)
+      ..setFloat(3, camera.pitch)
+      ..setFloat(4, camera.fov)
       ..setFloat(5, fullWidth)
       ..setFloat(6, fullHeight)
       ..setFloat(7, spec.cropLeft)
       ..setFloat(8, spec.cropTop)
       ..setFloat(9, cropWidth)
       ..setFloat(10, cropHeight)
-      ..setImageSampler(0, image);
+      ..setFloat(11, sensor ? 1 : 0);
+    for (var i = 0; i < 9; i++) {
+      shader.setFloat(12 + i, rows[i]);
+    }
+    shader.setImageSampler(0, image);
     canvas.drawRect(Offset.zero & size, Paint()..shader = shader);
   }
 
@@ -608,8 +770,6 @@ class _PanoramaPainter extends CustomPainter {
   bool shouldRepaint(covariant _PanoramaPainter oldDelegate) =>
       oldDelegate.image != image ||
       oldDelegate.shader != shader ||
-      oldDelegate.yaw != yaw ||
-      oldDelegate.pitch != pitch ||
-      oldDelegate.fov != fov ||
+      oldDelegate.camera != camera ||
       oldDelegate.spec != spec;
 }

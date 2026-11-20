@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vaultexplorer/core/api/vault_crypto_api.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/api/vault_hash_api.dart';
+import 'package:vaultexplorer/core/services/thumbnail_stamp_registry.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
@@ -193,6 +194,7 @@ void main() {
   setUp(() {
     fileIoApi = _FakeFileIoApi();
     ThumbnailCacheService.resetInContainerStateForTesting();
+    ThumbnailStampRegistry.clearForTesting();
     ThumbnailCacheService.inContainerDebounceDuration = const Duration(milliseconds: 20);
     ThumbnailCacheService.configure(
       fileIoApi: fileIoApi,
@@ -570,6 +572,86 @@ void main() {
     final third = await remount(second);
     expect(await readThumb(third, '/pics/a.jpg'), isNull);
     expect(await readThumb(third, '/pics/b.jpg'), equals(_thumb(2)));
+  });
+
+  group('content stamp', () {
+    // A listing reports every file's size and modified time; the cache folds
+    // them into its keys, so a changed file can never get an older version's
+    // thumbnail back.
+    void listed(MountedContainer c, String path, int size, int secs) {
+      ThumbnailStampRegistry.record(c.uri, path, size, secs);
+    }
+
+    test('a thumbnail is served while the file is unchanged, across a re-mount', () async {
+      final first = _container('gocryptfs', 'content://stamp-same');
+      listed(first, '/pics/a.jpg', 100, 1000);
+      await putThumb(first, '/pics/a.jpg', _thumb(1));
+
+      final second = await remount(first);
+      listed(second, '/pics/a.jpg', 100, 1000);
+      expect(await readThumb(second, '/pics/a.jpg'), equals(_thumb(1)));
+    });
+
+    test('a file replaced under the same name misses, even after a re-mount', () async {
+      final first = _container('gocryptfs', 'content://stamp-changed');
+      listed(first, '/pics/a.jpg', 100, 1000);
+      await putThumb(first, '/pics/a.jpg', _thumb(1));
+
+      final second = await remount(first);
+      listed(second, '/pics/a.jpg', 100, 2000); // same size, newer mtime
+      expect(await readThumb(second, '/pics/a.jpg'), isNull);
+
+      listed(second, '/pics/a.jpg', 150, 2000); // different size
+      expect(await readThumb(second, '/pics/a.jpg'), isNull);
+    });
+
+    test('a changed file is served again once it has a thumbnail for its new content', () async {
+      final first = _container('gocryptfs', 'content://stamp-regenerated');
+      listed(first, '/pics/a.jpg', 100, 1000);
+      await putThumb(first, '/pics/a.jpg', _thumb(1));
+
+      listed(first, '/pics/a.jpg', 100, 2000);
+      await putThumb(first, '/pics/a.jpg', _thumb(2));
+
+      final second = await remount(first);
+      listed(second, '/pics/a.jpg', 100, 2000);
+      expect(await readThumb(second, '/pics/a.jpg'), equals(_thumb(2)));
+    });
+
+    test('the memory tier does not hand back the old version either', () async {
+      final c = _container('gocryptfs', 'content://stamp-memory');
+      listed(c, '/pics/a.jpg', 100, 1000);
+      await putThumb(c, '/pics/a.jpg', _thumb(1));
+      expect(
+        ThumbnailCacheService.getFromMemory(c, '/pics/a.jpg'),
+        equals(_thumb(1)),
+      );
+
+      listed(c, '/pics/a.jpg', 100, 2000);
+      expect(ThumbnailCacheService.getFromMemory(c, '/pics/a.jpg'), isNull);
+    });
+
+    test('a file no listing has reported keeps the old path-only behaviour', () async {
+      final first = _container('gocryptfs', 'content://stamp-unlisted');
+      await putThumb(first, '/pics/a.jpg', _thumb(1));
+
+      final second = await remount(first);
+      expect(await readThumb(second, '/pics/a.jpg'), equals(_thumb(1)));
+    });
+
+    test('invalidate() removes the entry stored under the current stamp', () async {
+      final first = _container('gocryptfs', 'content://stamp-invalidate');
+      listed(first, '/pics/a.jpg', 100, 1000);
+      await putThumb(first, '/pics/a.jpg', _thumb(1));
+
+      final second = await remount(first);
+      listed(second, '/pics/a.jpg', 100, 1000);
+      await ThumbnailCacheService.invalidateFile(second, '/pics/a.jpg');
+
+      final third = await remount(second);
+      listed(third, '/pics/a.jpg', 100, 1000);
+      expect(await readThumb(third, '/pics/a.jpg'), isNull);
+    });
   });
 
   test('invalidate() drops a thumbnail that is still queued for a pack', () async {

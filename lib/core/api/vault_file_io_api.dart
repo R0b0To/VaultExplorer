@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
+import 'package:vaultexplorer/core/services/thumbnail_refresh_signal.dart';
+import 'package:vaultexplorer/core/services/thumbnail_stamp_registry.dart';
 import 'package:vaultexplorer/core/utils/image_preview_exception.dart';
 import 'package:vaultexplorer/core/utils/listing_job.dart';
 import 'package:vaultexplorer/core/utils/perf_trace.dart';
@@ -798,7 +800,39 @@ class VaultFileIoApi {
     }
   }
 
+  /// Every listing passes through here, so this is where each file's size and
+  /// modified time are noted for the thumbnail cache (see
+  /// [ThumbnailStampRegistry]). Tiles, category and gallery views all get their
+  /// files from a listing, so a thumbnail is always looked up after its file's
+  /// stamp was recorded.
   Future<List<String>?> listDirectory(
+    MountedContainer container,
+    String dirPath, {
+    bool refresh = false,
+  }) async {
+    final raw = await _listDirectoryRaw(container, dirPath, refresh: refresh);
+    if (raw != null && raw.isNotEmpty) {
+      _noteChangedFiles(
+        container,
+        ThumbnailStampRegistry.recordWire(container.uri, dirPath, raw),
+      );
+    }
+    return raw;
+  }
+
+  /// A file whose size or modified time differs from what the last listing
+  /// reported has new content: tell live thumbnail tiles to fetch it again
+  /// (the cache itself already treats the new stamp as a miss). Bounded, so
+  /// a folder where everything changed at once cannot flood the listeners.
+  void _noteChangedFiles(MountedContainer container, List<String> changed) {
+    const maxSignals = 256;
+    final n = changed.length < maxSignals ? changed.length : maxSignals;
+    for (var i = 0; i < n; i++) {
+      ThumbnailRefreshSignal.invalidate(container, changed[i]);
+    }
+  }
+
+  Future<List<String>?> _listDirectoryRaw(
     MountedContainer container,
     String dirPath, {
     bool refresh = false,
@@ -918,6 +952,10 @@ class VaultFileIoApi {
         refresh: refresh,
       );
       PerfTrace.end('io.list.local', localT0, slowMs: 150);
+      _noteChangedFiles(
+        container,
+        ThumbnailStampRegistry.recordEntries(container.uri, dirPath, entries),
+      );
       // The repository returns an UnmodifiableListView replaced on refresh,
       // avoiding a 40k-element array copy on the UI thread.
       return ParsedDirectoryListing(entries, preSortedByNameAsc: true);
@@ -964,6 +1002,14 @@ class VaultFileIoApi {
           // list is unmodifiable and the browser only ever reads it.
           .map((entries) {
             PerfTrace.end('io.list.local', localT0, slowMs: 150);
+            _noteChangedFiles(
+              container,
+              ThumbnailStampRegistry.recordEntries(
+                container.uri,
+                dirPath,
+                entries,
+              ),
+            );
             return ParsedDirectoryListing(entries, preSortedByNameAsc: true);
           });
     }

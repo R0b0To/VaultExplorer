@@ -13,6 +13,7 @@ import 'package:vaultexplorer/core/api/vault_engine_channel.dart';
 import 'package:vaultexplorer/core/api/vault_file_io_api.dart';
 import 'package:vaultexplorer/core/api/vault_hash_api.dart';
 import 'package:vaultexplorer/core/services/thumbnail_refresh_signal.dart';
+import 'package:vaultexplorer/core/services/thumbnail_stamp_registry.dart';
 import 'package:vaultexplorer/core/utils/byte_budget_cache.dart';
 import 'package:vaultexplorer/core/utils/md5_hex.dart';
 import 'package:vaultexplorer/core/utils/perf_trace.dart';
@@ -266,11 +267,19 @@ class ThumbnailCacheService {
         : null;
   }
 
+  /// The stamp segment (`@size.mtime`) of [filePath]'s current content, or
+  /// null when no listing has reported the file yet. See
+  /// [ThumbnailStampRegistry].
+  static String? _stampFor(MountedContainer container, String filePath) =>
+      ThumbnailStampRegistry.segmentFor(container.uri, filePath);
+
   static String _filePrefix(MountedContainer container, String filePath) {
     final base =
         '${container.volId}:${container.mountedAt.millisecondsSinceEpoch}:$filePath|';
+    final stamp = _stampFor(container, filePath);
+    final withStamp = stamp == null ? base : '$base$stamp|';
     final variant = _variantForPath(filePath);
-    return variant == null ? base : '$base$variant|';
+    return variant == null ? withStamp : '$withStamp$variant|';
   }
 
   static String _fileIdentityPrefix(
@@ -355,17 +364,26 @@ class ThumbnailCacheService {
   /// them; the digest is identical, so every key already on disk still matches.
   static String _encodeKey(String value) => md5HexOfString(value);
 
+  /// The string every cache key is derived from:
+  /// `path[|@size.mtime][|variant]|size|quality`.
+  ///
+  /// [stamp] ties the entry to the file's content (see
+  /// [ThumbnailStampRegistry]); a file that changed asks for a different key
+  /// and so never gets another version's thumbnail. Null keeps the old,
+  /// path-only layout.
   static String _qualifiedPath(
     String filePath,
     ThumbnailQuality quality, {
     String? videoVariant,
+    String? stamp,
   }) {
     final variant = videoVariant == null
         ? _variantForPath(filePath)
         : 'video:$videoVariant';
+    final head = stamp == null ? filePath : '$filePath|$stamp';
     return variant == null
-        ? '$filePath|${quality.size}|${quality.quality}'
-        : '$filePath|$variant|${quality.size}|${quality.quality}';
+        ? '$head|${quality.size}|${quality.quality}'
+        : '$head|$variant|${quality.size}|${quality.quality}';
   }
 
   static String _memKey(
@@ -375,7 +393,7 @@ class ThumbnailCacheService {
   ) {
     _rememberQuality(container, filePath, quality);
     return '${container.volId}:${container.mountedAt.millisecondsSinceEpoch}:'
-        '${_qualifiedPath(filePath, quality)}';
+        '${_qualifiedPath(filePath, quality, stamp: _stampFor(container, filePath))}';
   }
 
   static void _rememberQuality(
@@ -562,10 +580,17 @@ class ThumbnailCacheService {
       return mem;
     }
 
+    // The file's content stamp at the moment of the lookup. Everything below
+    // is keyed by it, and a result is dropped if the stamp moved while it was
+    // being read -- see the checks before each putInMemory.
+    final stamp = _stampFor(container, filePath);
+
     try {
       if (mode == ThumbnailCacheMode.appCache) {
         final dir = await _thumbDir(container);
-        final cacheKey = _encodeKey(_qualifiedPath(filePath, quality));
+        final cacheKey = _encodeKey(
+          _qualifiedPath(filePath, quality, stamp: stamp),
+        );
 
         // Read the file directly instead of asking exists() first: that was a
         // whole extra round trip to the I/O thread for every lookup, to learn
@@ -580,7 +605,10 @@ class ThumbnailCacheService {
         } catch (_) {
           return null;
         }
-        if (raw == null && _variantForPath(filePath) == null) {
+        // Only a file no listing has reported yet may fall back to the old
+        // path-only name: nothing stamps those entries, so for a file whose
+        // content is known they could be a previous version's thumbnail.
+        if (raw == null && stamp == null && _variantForPath(filePath) == null) {
           try {
             raw = await File('$dir/${_encodeKey(filePath)}').readAsBytes();
           } catch (_) {
@@ -605,12 +633,15 @@ class ThumbnailCacheService {
         final width = dims?.$1;
         final height = dims?.$2;
 
+        if (_stampFor(container, filePath) != stamp) return null;
         putInMemory(container, filePath, bytes, quality, width, height);
         PerfTrace.count('thumb.cache.hit_disk');
         return (bytes, width, height);
       } else {
         // Mode: inContainer
-        final keyHex = _encodeKey(_qualifiedPath(filePath, quality));
+        final keyHex = _encodeKey(
+          _qualifiedPath(filePath, quality, stamp: stamp),
+        );
         final queue = _getPackQueue(container);
 
         // 1. Anything queued for, or being written to, a pack right now.
@@ -643,6 +674,7 @@ class ThumbnailCacheService {
           if (chunk != null &&
               chunk.length == entry.length &&
               _looksLikeValidImage(chunk)) {
+            if (_stampFor(container, filePath) != stamp) return null;
             putInMemory(
               container,
               filePath,
@@ -671,6 +703,7 @@ class ThumbnailCacheService {
             final dims = _extractImageDimensions(stored);
             final width = dims?.$1;
             final height = dims?.$2;
+            if (_stampFor(container, filePath) != stamp) return null;
             putInMemory(container, filePath, stored, quality, width, height);
             // Move it into a pack (which also deletes the loose file) the
             // first time it's used, so the loose files drain away over time.
@@ -786,10 +819,13 @@ class ThumbnailCacheService {
       return Future.value();
     }
 
+    // Resolved here, in the same synchronous step as the memory write above,
+    // so both tiers file the thumbnail under the same content stamp.
+    final stamp = _stampFor(container, filePath);
     final dedupKey =
         '${mode.name}:${container.volId}:'
         '${container.mountedAt.millisecondsSinceEpoch}:'
-        '${_qualifiedPath(filePath, quality)}';
+        '${_qualifiedPath(filePath, quality, stamp: stamp)}';
     final existing = _inFlightPuts[dedupKey];
     if (existing != null) return existing;
 
@@ -799,6 +835,7 @@ class ThumbnailCacheService {
       data: data,
       mode: mode,
       quality: quality,
+      stamp: stamp,
       width: width,
       height: height,
     );
@@ -816,6 +853,7 @@ class ThumbnailCacheService {
     required Uint8List data,
     required ThumbnailCacheMode mode,
     required ThumbnailQuality quality,
+    required String? stamp,
     int? width,
     int? height,
   }) async {
@@ -831,7 +869,9 @@ class ThumbnailCacheService {
         }
         await _ensuredThumbDirs[dirPath];
 
-        final cacheKey = _encodeKey(_qualifiedPath(filePath, quality));
+        final cacheKey = _encodeKey(
+          _qualifiedPath(filePath, quality, stamp: stamp),
+        );
         final file = File('$dirPath/$cacheKey');
         final key = await getOrFetchKey();
 
@@ -844,7 +884,9 @@ class ThumbnailCacheService {
         }
       } else {
         // Mode: inContainer
-        final keyHex = _encodeKey(_qualifiedPath(filePath, quality));
+        final keyHex = _encodeKey(
+          _qualifiedPath(filePath, quality, stamp: stamp),
+        );
         // Pack index keys are 16-byte digests; anything else can't be indexed.
         if (!_cacheKeyRe.hasMatch(keyHex)) return;
         final resolvedDims =
@@ -1311,20 +1353,30 @@ class ThumbnailCacheService {
     _sizeCache.removeWhere((key, _) => key.startsWith(prefix));
     _latestKeyByFile.removeWhere((key, _) => key.startsWith(prefix));
 
+    // Entries filed under the file's current stamp, plus the path-only ones
+    // (legacy entries and files that were never listed).
+    final stamps = <String?>{null, _stampFor(container, filePath)};
     final inContainerKeys = <String>[];
     final videoVariants = _variantForPath(filePath) == null
         ? <String?>[null]
         : _knownVideoThumbnailVariants.toList();
     for (final quality in qualitiesToInvalidate) {
       for (final variant in videoVariants) {
-        try {
-          inContainerKeys.add(
-            _encodeKey(
-              _qualifiedPath(filePath, quality, videoVariant: variant),
-            ),
-          );
-        } catch (e) {
-          logSwallowed('invalidateFile', e, expected: true);
+        for (final stamp in stamps) {
+          try {
+            inContainerKeys.add(
+              _encodeKey(
+                _qualifiedPath(
+                  filePath,
+                  quality,
+                  videoVariant: variant,
+                  stamp: stamp,
+                ),
+              ),
+            );
+          } catch (e) {
+            logSwallowed('invalidateFile', e, expected: true);
+          }
         }
       }
     }
@@ -1334,16 +1386,23 @@ class ThumbnailCacheService {
       final dir = await _thumbDir(container);
       for (final quality in qualitiesToInvalidate) {
         for (final variant in videoVariants) {
-          try {
-            final cacheKey = _encodeKey(
-              _qualifiedPath(filePath, quality, videoVariant: variant),
-            );
-            final file = File('$dir/$cacheKey');
-            if (await file.exists()) await file.delete();
-            final metaFile = File('${file.path}.meta');
-            if (await metaFile.exists()) await metaFile.delete();
-          } catch (e) {
-            logSwallowed('invalidateFile', e, expected: true);
+          for (final stamp in stamps) {
+            try {
+              final cacheKey = _encodeKey(
+                _qualifiedPath(
+                  filePath,
+                  quality,
+                  videoVariant: variant,
+                  stamp: stamp,
+                ),
+              );
+              final file = File('$dir/$cacheKey');
+              if (await file.exists()) await file.delete();
+              final metaFile = File('${file.path}.meta');
+              if (await metaFile.exists()) await metaFile.delete();
+            } catch (e) {
+              logSwallowed('invalidateFile', e, expected: true);
+            }
           }
         }
       }

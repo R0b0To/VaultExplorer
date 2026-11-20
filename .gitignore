@@ -26,10 +26,12 @@ Thumbs.db
 **/ios/Flutter/.last_build_id
 .dart_tool/
 .flutter-plugins-dependencies
+.flutter-plugins
 .pub-cache/
 .pub/
 /build/
 /coverage/
+**/flutter/ephemeral/
 
 # Symbolication related
 app.*.symbols

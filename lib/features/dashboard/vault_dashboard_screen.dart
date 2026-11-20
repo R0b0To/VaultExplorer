@@ -99,14 +99,22 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
   late final AnimationController _dashboardAppBarAnimController =
       AnimationController(vsync: this, duration: AppMotion.short2, value: 1.0);
   int? _pendingLocalStorageOriginVolId;
+  // When the pending permission check was started for an external storage
+  // (SD card / USB) rather than the primary local storage, this holds the
+  // container to open once the grant lands (see _openLocalStorage).
+  MountedContainer? _pendingLocalStorageOriginContainer;
   int _localStoragePermissionRequestId = 0;
   void showAddOptionsSheet() => _showAddOptionsSheet();
 
-  /// Opens Local storage, first walking the person through granting
+  /// Opens Local storage (or an external raw-path storage [external] --
+  /// SD card / USB volume), first walking the person through granting
   /// all-files access when it is missing. Exposed so the app shell's drawer
   /// can use the same flow as the dashboard's own.
-  Future<void> openLocalStorage({int? currentVolId}) =>
-      _openLocalStorage(currentVolId: currentVolId);
+  Future<void> openLocalStorage({
+    int? currentVolId,
+    MountedContainer? external,
+  }) =>
+      _openLocalStorage(currentVolId: currentVolId, external: external);
 
   void reloadDashboard() {
     ref.read(vaultDashboardControllerProvider.notifier).loadAll();
@@ -315,6 +323,12 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
       localStorageNotifier: widget.localStorageNotifier,
       onOpenLocalStorage: () =>
           unawaited(_openLocalStorage(currentVolId: currentVolId)),
+      onOpenExternalStorage: (externalContainer) => unawaited(
+        _openLocalStorage(
+          currentVolId: externalContainer.volId,
+          external: externalContainer,
+        ),
+      ),
       selectedTabIndex: 0,
       onSelectTab: widget.onNavigateTab,
       keepBrowserTabsOnNavigate:
@@ -379,53 +393,60 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
   Route<void> _buildLocalStorageRoute(MountedContainer container) =>
       _buildBrowserRoute(container);
 
-  Future<void> _openLocalStorage({int? currentVolId}) async {
+  Future<void> _openLocalStorage({
+    int? currentVolId,
+    MountedContainer? external,
+  }) async {
     if (currentVolId == kDecoyLocalVolId) return;
 
     final lifecycle = ref.read(vaultLifecycleApiProvider);
     final hasAccess = await lifecycle.hasAllFilesAccess();
     if (!mounted) return;
 
-    if (!hasAccess) {
-      final shouldRequestAccess = await showAppConfirmDialog(
-        context,
-        title: context.l10n.localStoragePermissionTitle,
-        message: context.l10n.filesPermissionMessage,
-        confirmLabel: context.l10n.localStorageGrantAccess,
-      );
-      if (!mounted) return;
-      if (!shouldRequestAccess) {
-        await _promptToHideStorageLocations();
-        return;
-      }
-
-      final sdkInt = await lifecycle.getAndroidSdkInt();
-      if (!mounted) return;
-      if (sdkInt >= 30) {
-        final requestId = ++_localStoragePermissionRequestId;
-        _pendingLocalStoragePermissionCheck = true;
-        _pendingLocalStorageOriginVolId = currentVolId;
-        final settingsOpened = await lifecycle.requestAllFilesAccess(
-          openSettings: true,
-        );
-        if (!mounted) return;
-
-        final accessGranted = await lifecycle.hasAllFilesAccess();
-        if (accessGranted || !settingsOpened) {
-          await _finishLocalStoragePermissionRequest(requestId);
-        }
-        return;
-      }
-
-      final granted = await lifecycle.requestAllFilesAccess();
-      if (!mounted) return;
-      if (!granted) {
-        await _promptToHideStorageLocations();
-        return;
-      }
+    if (hasAccess) {
+      await _navigateToLocalStorage(currentVolId, target: external);
+      return;
     }
 
-    await _navigateToLocalStorage(currentVolId);
+    final shouldRequestAccess = await showAppConfirmDialog(
+      context,
+      title: context.l10n.localStoragePermissionTitle,
+      message: context.l10n.filesPermissionMessage,
+      confirmLabel: context.l10n.localStorageGrantAccess,
+    );
+    if (!mounted) return;
+    if (!shouldRequestAccess) {
+      await _promptToHideStorageLocations();
+      return;
+    }
+
+    final sdkInt = await lifecycle.getAndroidSdkInt();
+    if (!mounted) return;
+    if (sdkInt >= 30) {
+      final requestId = ++_localStoragePermissionRequestId;
+      _pendingLocalStoragePermissionCheck = true;
+      _pendingLocalStorageOriginVolId = external?.volId ?? currentVolId;
+      _pendingLocalStorageOriginContainer = external;
+      final settingsOpened = await lifecycle.requestAllFilesAccess(
+        openSettings: true,
+      );
+      if (!mounted) return;
+
+      final accessGranted = await lifecycle.hasAllFilesAccess();
+      if (accessGranted || !settingsOpened) {
+        await _finishLocalStoragePermissionRequest(requestId);
+      }
+      return;
+    }
+
+    final granted = await lifecycle.requestAllFilesAccess();
+    if (!mounted) return;
+    if (!granted) {
+      await _promptToHideStorageLocations();
+      return;
+    }
+
+    await _navigateToLocalStorage(currentVolId, target: external);
   }
 
   Future<void> _finishLocalStoragePermissionRequest(int requestId) async {
@@ -445,11 +466,13 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
     }
 
     final originVolId = _pendingLocalStorageOriginVolId;
+    final originContainer = _pendingLocalStorageOriginContainer;
     _pendingLocalStoragePermissionCheck = false;
     _pendingLocalStorageOriginVolId = null;
+    _pendingLocalStorageOriginContainer = null;
 
     if (granted) {
-      await _navigateToLocalStorage(originVolId);
+      await _navigateToLocalStorage(originVolId, target: originContainer);
     } else {
       await _promptToHideStorageLocations();
     }
@@ -471,8 +494,11 @@ class VaultDashboardState extends ConsumerState<VaultDashboard>
         );
   }
 
-  Future<void> _navigateToLocalStorage(int? currentVolId) async {
-    var container = _localStorageContainer;
+  Future<void> _navigateToLocalStorage(
+    int? currentVolId, {
+    MountedContainer? target,
+  }) async {
+    var container = target ?? _localStorageContainer;
     if (container == null) {
       // Shouldn't normally happen -- _checkStorageAccess populates this
       // before the card is even shown -- but fall back to resolving it

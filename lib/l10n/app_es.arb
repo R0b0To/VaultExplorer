@@ -4137,5 +4137,7 @@
   "vcToolsVolumeOptionsSectionHeader": "Opciones del volumen",
   "vcToolsDetectingFormat": "Detectando…",
   "indexesAndThumbnailsTitle": "Índices y miniaturas",
-  "indexesAndThumbnailsSubtitle": "Gestiona el almacenamiento de miniaturas y los índices de metadatos de la galería y de música."
+  "indexesAndThumbnailsSubtitle": "Gestiona el almacenamiento de miniaturas y los índices de metadatos de la galería y de música.",
+  "resetFileManagerSettingsTitle": "¿Restablecer los ajustes del administrador de archivos?",
+  "resetFileManagerSettingsMessage": "Esto devuelve cada opción de esta pantalla a su valor predeterminado, incluidos los ajustes de pestañas, diseño, barra de herramientas, cuadrícula, miniaturas, visor y apariencia. Tus archivos, marcadores y opciones por carpeta no se modifican."
 }

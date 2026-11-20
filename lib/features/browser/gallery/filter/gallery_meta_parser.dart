@@ -2,16 +2,23 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
+import '../../metadata/heif_container.dart';
+import '../../metadata/metadata_source.dart';
 import 'gallery_meta.dart';
 
 /// Reads the gallery's per-photo facts (date taken, GPS, camera, keywords,
 /// rating) out of the start of an image file: EXIF in JPEG, PNG and WebP, and
-/// XMP in all three.
+/// XMP in all three; Exif and XMP of HEIC (see [parseSource]).
 ///
-/// Pure and synchronous: give it the first [headerBytes] of the file. Never
-/// throws; anything it cannot read is simply missing from the result. HEIC,
-/// AVIF, TIFF and RAW containers are not read (their metadata sits in boxes
-/// or IFD chains this reader does not walk), so they come back [GalleryMeta.empty].
+/// [parse] is pure and synchronous: give it the first [headerBytes] of the
+/// file. It never throws; anything it cannot read is simply missing from the
+/// result. AVIF, TIFF and RAW containers are not read (their metadata sits in
+/// boxes or IFD chains this reader does not walk), so they come back
+/// [GalleryMeta.empty].
+///
+/// A HEIC keeps its Exif block as an item among the picture data, usually
+/// well past the first [headerBytes]. [parse] reads it when it happens to be
+/// in the bytes it is given; [parseSource] goes and gets it.
 class GalleryMetaParser {
   const GalleryMetaParser._();
 
@@ -28,9 +35,72 @@ class GalleryMetaParser {
     'jfif',
     'png',
     'webp',
+    'heic',
+    'heif',
+    'hif',
   };
 
   static bool canParse(String extension) => parsedExtensions.contains(extension);
+
+  /// Whether [bytes] (the start of a file) is an ISO base media file such as
+  /// HEIC: a first box of type `ftyp`.
+  static bool isHeif(Uint8List bytes) =>
+      bytes.length >= 12 && _startsWith(bytes, 4, _ftyp);
+
+  /// The most a HEIC's Exif block or XMP packet may weigh for the gallery to
+  /// read it. They are a few kilobytes; a bigger one is not worth a read for
+  /// every photo of a library.
+  static const int maxHeifItemBytes = 1024 * 1024;
+
+  /// What the file behind [source] says, reading from it what a HEIC needs
+  /// beyond its first [headerBytes]. [header] is those first bytes when the
+  /// caller has them already.
+  ///
+  /// Anything wrong with the file's own structure just leaves facts out of the
+  /// result. A failing [source] is not that: its error is passed on, so that
+  /// a photo that could not be read now is asked again later rather than
+  /// remembered as having no metadata.
+  static Future<GalleryMeta> parseSource(
+    MetadataSource source, {
+    Uint8List? header,
+  }) async {
+    final head =
+        header ??
+        await source.read(0, math.min(source.length, headerBytes));
+    if (!isHeif(head)) return parse(head);
+    try {
+      final layout =
+          HeifLayout.fromHeader(head, source.length) ??
+          await HeifLayout.locate(BufferedMetadataSource(source));
+      if (layout == null) return GalleryMeta.empty;
+      final c = _Collector();
+      final exif = layout.exif;
+      if (exif != null) {
+        final data =
+            layout.itemFromHeader(head, exif, maxBytes: maxHeifItemBytes) ??
+            await layout.readItem(source, exif, maxBytes: maxHeifItemBytes);
+        _addHeifExif(c, data);
+      }
+      final xmp = layout.xmp;
+      if (xmp != null) {
+        final data =
+            layout.itemFromHeader(head, xmp, maxBytes: maxHeifItemBytes) ??
+            await layout.readItem(source, xmp, maxBytes: maxHeifItemBytes);
+        if (data != null) c.addXmp(data);
+      }
+      return c.build();
+    } on RangeError {
+      return GalleryMeta.empty;
+    } on FormatException {
+      return GalleryMeta.empty;
+    }
+  }
+
+  static void _addHeifExif(_Collector c, Uint8List? item) {
+    if (item == null) return;
+    final at = HeifLayout.exifTiffOffset(item);
+    if (at != null) c.addTiff(Uint8List.sublistView(item, at));
+  }
 
   static GalleryMeta parse(Uint8List bytes) {
     try {
@@ -45,6 +115,7 @@ class GalleryMetaParser {
           _startsWith(bytes, 8, _webp)) {
         return _parseWebp(bytes);
       }
+      if (isHeif(bytes)) return _parseHeif(bytes);
     } catch (_) {
       // A damaged header is just a photo without metadata.
     }
@@ -54,6 +125,7 @@ class GalleryMetaParser {
   // ── Containers ───────────────────────────────────────────────────────────
 
   static const _pngSignature = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+  static const _ftyp = [0x66, 0x74, 0x79, 0x70]; // ftyp
   static const _riff = [0x52, 0x49, 0x46, 0x46]; // RIFF
   static const _webp = [0x57, 0x45, 0x42, 0x50]; // WEBP
   static const _exifId = [0x45, 0x78, 0x69, 0x66, 0x00, 0x00]; // Exif\0\0
@@ -162,6 +234,27 @@ class GalleryMetaParser {
         c.addXmp(data);
       }
       o = start + len + (len & 1); // chunks are padded to an even size
+    }
+    return c.build();
+  }
+
+  /// The Exif and XMP of a HEIC, as far as they are inside [b]. [b] is
+  /// taken for the whole file, so an item beyond its end is left out.
+  static GalleryMeta _parseHeif(Uint8List b) {
+    final layout = HeifLayout.fromHeader(b, b.length);
+    if (layout == null) return GalleryMeta.empty;
+    final c = _Collector();
+    final exif = layout.exif;
+    if (exif != null) {
+      _addHeifExif(
+        c,
+        layout.itemFromHeader(b, exif, maxBytes: maxHeifItemBytes),
+      );
+    }
+    final xmp = layout.xmp;
+    if (xmp != null) {
+      final data = layout.itemFromHeader(b, xmp, maxBytes: maxHeifItemBytes);
+      if (data != null) c.addXmp(data);
     }
     return c.build();
   }

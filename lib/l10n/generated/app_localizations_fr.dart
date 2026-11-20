@@ -15095,4 +15095,12 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get indexesAndThumbnailsSubtitle =>
       'Gérez le stockage des miniatures, les métadonnées de la galerie et l’index musical.';
+
+  @override
+  String get resetFileManagerSettingsTitle =>
+      'Réinitialiser les paramètres du gestionnaire de fichiers ?';
+
+  @override
+  String get resetFileManagerSettingsMessage =>
+      'Toutes les options de cet écran reviendront à leur valeur par défaut, y compris les paramètres des onglets, de la disposition, de la barre d’outils, de la grille, des miniatures, de la visionneuse et du thème. Vos fichiers, favoris et choix par dossier ne sont pas modifiés.';
 }

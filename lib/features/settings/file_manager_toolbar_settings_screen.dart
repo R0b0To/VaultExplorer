@@ -95,7 +95,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
       if (!context.mounted) return;
       final cache = ref.read(thumbnailCacheServiceProvider);
       await cache.clearAppCacheForUri(localContainer.uri);
-      await cache.clearInContainerCacheForUri(localContainer.uri);
+      await cache.clearInContainerCache(localContainer);
       if (!context.mounted) return;
       showAppSnackBar(
         context,
@@ -207,6 +207,23 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
     }
   }
 
+  Future<void> _confirmResetToDefaults(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: context.l10n.resetFileManagerSettingsTitle,
+      message: context.l10n.resetFileManagerSettingsMessage,
+      confirmLabel: context.l10n.reset,
+      isDestructive: true,
+    );
+    if (!confirmed || !context.mounted) return;
+    await ref
+        .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
+        .resetToDefaults();
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(fileManagerToolbarSettingsProvider(containerUri));
@@ -245,9 +262,7 @@ class FileManagerToolbarSettingsScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.restart_alt_rounded),
             tooltip: context.l10n.resetToDefaultsTooltip,
-            onPressed: () => ref
-                .read(fileManagerToolbarSettingsProvider(containerUri).notifier)
-                .resetToDefaults(),
+            onPressed: () => _confirmResetToDefaults(context, ref),
           ),
           const SizedBox(width: 4),
         ],

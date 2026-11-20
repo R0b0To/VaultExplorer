@@ -1256,8 +1256,9 @@ static void testCryfsCompat() {
     lowercaseAllBlocks(root);
     CHECK(countLowercaseBlockPaths(root) > 0);
     {   // plant a leftover from an interrupted two-step rename
-        std::string victim;
-        walkFiles(root, [&](const std::string& p, off_t) { if (victim.empty() && p.find("cryfs.config") == std::string::npos) victim = p; });
+        // Use the root blob so open must recover its temporary spelling before the rest of normalization can run.
+        std::string victim = root + "/" + readCfg().rootBlob.pathLower();
+        CHECK(access(victim.c_str(), F_OK) == 0);
         CHECK(::rename(victim.c_str(), (victim + ".fvtmp").c_str()) == 0);
     }
     std::string stateDir = env.cryfsLocalStateDir + "/" + toHex(readCfg().filesystemId.data(), 16);

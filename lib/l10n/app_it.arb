@@ -4137,5 +4137,7 @@
   "vcToolsVolumeOptionsSectionHeader": "Opzioni volume",
   "vcToolsDetectingFormat": "Rilevamento in corso…",
   "indexesAndThumbnailsTitle": "Indici e miniature",
-  "indexesAndThumbnailsSubtitle": "Gestisci l’archiviazione delle miniature, i metadati della galleria e l’indice musicale."
+  "indexesAndThumbnailsSubtitle": "Gestisci l’archiviazione delle miniature, i metadati della galleria e l’indice musicale.",
+  "resetFileManagerSettingsTitle": "Ripristinare le impostazioni di gestione file?",
+  "resetFileManagerSettingsMessage": "Tutte le opzioni di questa schermata torneranno ai valori predefiniti, comprese le impostazioni di schede, layout, barra degli strumenti, griglia, miniature, visualizzatore e aspetto. File, segnalibri e scelte per cartella non vengono modificati."
 }

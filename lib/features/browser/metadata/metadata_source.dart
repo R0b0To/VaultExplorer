@@ -196,7 +196,8 @@ class MetadataEditException implements Exception {
 
 enum MetadataEditFailure {
   /// The file is not a JPEG, PNG or WebP (the formats whose metadata is
-  /// edited here).
+  /// edited here), or a HEIC with an Exif block to put a date in, or the edit
+  /// asks for more than a HEIC can take (only its date is edited).
   unsupportedFormat,
 
   /// The file's structure is damaged or not what its extension says.

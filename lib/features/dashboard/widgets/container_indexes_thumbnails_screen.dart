@@ -503,7 +503,6 @@ class _ContainerIndexesThumbnailsScreenState
   }) {
     if (!isModified) return null;
     final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
 
     return Container(
       decoration: BoxDecoration(
@@ -515,6 +514,10 @@ class _ContainerIndexesThumbnailsScreenState
       child: SafeArea(
         minimum: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Center(
+          // Scaffold gives bottomNavigationBar loose height constraints up to
+          // the full screen height. Without heightFactor, Center expands to
+          // fill all of it, so the save button covers the whole screen.
+          heightFactor: 1.0,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 600),
             child: Column(
@@ -549,8 +552,12 @@ class _ContainerIndexesThumbnailsScreenState
                         )
                       : Text(
                           context.l10n.saveConfigurationButton,
-                          style: textTheme.labelLarge?.copyWith(
+                          // No color here: textTheme styles carry an explicit
+                          // color that would override the button's themed
+                          // foreground (actionOnPrimary).
+                          style: const TextStyle(
                             fontWeight: FontWeight.bold,
+                            fontSize: 15,
                           ),
                         ),
                 ),

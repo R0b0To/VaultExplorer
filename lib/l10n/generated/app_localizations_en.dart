@@ -14440,7 +14440,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get metadataFormatsNote =>
-      'Tags, dates and removal are written into JPEG, PNG and WebP images. Other files only get a new modified date.';
+      'Tags, dates and removal are written into JPEG, PNG and WebP images, and dates into HEIC photos. Other files only get a new modified date.';
 
   @override
   String get metadataReadOnlyMessage => 'This vault is read-only';
@@ -14745,4 +14745,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get indexesAndThumbnailsSubtitle =>
       'Manage thumbnail storage, gallery metadata, and music index settings.';
+
+  @override
+  String get resetFileManagerSettingsTitle => 'Reset file manager settings?';
+
+  @override
+  String get resetFileManagerSettingsMessage =>
+      'This puts every option on this screen back to its default, including tabs, layout, toolbar, grid, thumbnail, viewer and skin settings. Your files, bookmarks and per-folder choices are not changed.';
 }

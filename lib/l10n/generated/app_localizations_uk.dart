@@ -15068,4 +15068,12 @@ class AppLocalizationsUk extends AppLocalizations {
   @override
   String get indexesAndThumbnailsSubtitle =>
       'Керуйте зберіганням мініатюр, метаданими галереї та музичним індексом.';
+
+  @override
+  String get resetFileManagerSettingsTitle =>
+      'Скинути налаштування файлового менеджера?';
+
+  @override
+  String get resetFileManagerSettingsMessage =>
+      'Усі параметри на цьому екрані повернуться до значень за замовчуванням, зокрема налаштування вкладок, розмітки, панелі інструментів, сітки, мініатюр, засобу перегляду та оформлення. Ваші файли, закладки та вибір для окремих папок не змінюються.';
 }

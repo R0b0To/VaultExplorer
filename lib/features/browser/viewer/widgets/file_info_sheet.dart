@@ -645,7 +645,7 @@ class _FileInfoSheetState extends ConsumerState<FileInfoSheet> {
                           ],
                           if (!widget.entry.isDir &&
                               !widget.container.readOnly &&
-                              ImageMetadataEditor.canEdit(
+                              ImageMetadataEditor.canEditDate(
                                 widget.entry.name,
                               )) ...[
                             const SizedBox(height: 16),

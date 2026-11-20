@@ -15011,4 +15011,12 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get indexesAndThumbnailsSubtitle =>
       'Gestiona el almacenamiento de miniaturas y los índices de metadatos de la galería y de música.';
+
+  @override
+  String get resetFileManagerSettingsTitle =>
+      '¿Restablecer los ajustes del administrador de archivos?';
+
+  @override
+  String get resetFileManagerSettingsMessage =>
+      'Esto devuelve cada opción de esta pantalla a su valor predeterminado, incluidos los ajustes de pestañas, diseño, barra de herramientas, cuadrícula, miniaturas, visor y apariencia. Tus archivos, marcadores y opciones por carpeta no se modifican.';
 }

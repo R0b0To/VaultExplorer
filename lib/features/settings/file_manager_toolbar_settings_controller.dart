@@ -22,6 +22,8 @@ import 'package:vaultexplorer/data/models/video_aspect_ratio_mode.dart';
 import 'package:vaultexplorer/core/theme/app_skin_settings_provider.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
+import 'package:vaultexplorer/data/services/app_settings_service.dart';
+import 'package:vaultexplorer/features/settings/app_settings_controller.dart';
 
 part 'file_manager_toolbar_settings_controller.g.dart';
 
@@ -469,9 +471,49 @@ class FileManagerToolbarSettings extends _$FileManagerToolbarSettings {
     ),
   );
 
+  /// Puts every option on the file manager settings screen back to its
+  /// default. Per-storage state that is not an option on that screen (gallery
+  /// and music mode choices, skipped prompts, per-folder overrides) and the
+  /// app-wide vault thumbnail defaults are kept as they are.
+  ///
+  /// The app-level options the screen also shows (tabs, dual pane, app bar
+  /// position, default layout, tab swipe gestures) live in app settings, so
+  /// they are reset there too.
   Future<void> resetToDefaults() async {
     final def = FileManagerToolbarConfig.defaults();
-    await _updateConfig(def);
+    final cur = state.config;
+    final next = def.copyWith(
+      folderLayoutModes: cur.folderLayoutModes,
+      folderGridAspectRatios: cur.folderGridAspectRatios,
+      folderSortModes: cur.folderSortModes,
+      galleryModeStorageUris: cur.galleryModeStorageUris,
+      galleryFoldersByStorage: cur.galleryFoldersByStorage,
+      skipGalleryPromptStorageUris: cur.skipGalleryPromptStorageUris,
+      skipMusicPromptStorageUris: cur.skipMusicPromptStorageUris,
+      musicModeStorageUris: cur.musicModeStorageUris,
+      defaultThumbnailCacheMode: cur.defaultThumbnailCacheMode,
+      defaultThumbnailQuality: cur.defaultThumbnailQuality,
+      defaultGalleryMetadataCacheMode: cur.defaultGalleryMetadataCacheMode,
+      defaultMusicIndexCacheMode: cur.defaultMusicIndexCacheMode,
+    );
+    ThumbnailCacheService.setVideoThumbnailSettings(
+      next.mediaViewerToolbarConfig.thumbnailGenerationStrategy,
+      next.mediaViewerToolbarConfig.thumbnailFramePosition,
+    );
+    await _updateConfig(next);
+    if (!ref.mounted) return;
+    final defaults = AppSettings();
+    await ref
+        .read(appSettingsControllerProvider.notifier)
+        .updateSettings(
+          (s) => s.copyWith(
+            defaultLayoutMode: defaults.defaultLayoutMode,
+            useBrowserTabs: defaults.useBrowserTabs,
+            useDualPaneBrowsing: defaults.useDualPaneBrowsing,
+            tabSwipeGestures: defaults.tabSwipeGestures,
+            appBarAtBottom: defaults.appBarAtBottom,
+          ),
+        );
   }
 
   void applyImportedConfig(FileManagerToolbarConfig newConfig) {

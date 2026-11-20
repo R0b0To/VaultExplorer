@@ -4137,5 +4137,7 @@
   "vcToolsVolumeOptionsSectionHeader": "Volume-Optionen",
   "vcToolsDetectingFormat": "Wird erkannt…",
   "indexesAndThumbnailsTitle": "Indizes & Miniaturansichten",
-  "indexesAndThumbnailsSubtitle": "Verwalte Miniaturansichten, Galerie-Metadaten und den Musikindex."
+  "indexesAndThumbnailsSubtitle": "Verwalte Miniaturansichten, Galerie-Metadaten und den Musikindex.",
+  "resetFileManagerSettingsTitle": "Dateimanager-Einstellungen zurücksetzen?",
+  "resetFileManagerSettingsMessage": "Dadurch wird jede Option auf diesem Bildschirm auf den Standardwert zurückgesetzt, einschließlich der Einstellungen für Tabs, Layout, Symbolleiste, Raster, Vorschaubilder, Viewer und Design. Deine Dateien, Lesezeichen und ordnerspezifischen Einstellungen bleiben unverändert."
 }

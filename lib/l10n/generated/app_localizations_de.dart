@@ -14968,4 +14968,12 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get indexesAndThumbnailsSubtitle =>
       'Verwalte Miniaturansichten, Galerie-Metadaten und den Musikindex.';
+
+  @override
+  String get resetFileManagerSettingsTitle =>
+      'Dateimanager-Einstellungen zurücksetzen?';
+
+  @override
+  String get resetFileManagerSettingsMessage =>
+      'Dadurch wird jede Option auf diesem Bildschirm auf den Standardwert zurückgesetzt, einschließlich der Einstellungen für Tabs, Layout, Symbolleiste, Raster, Vorschaubilder, Viewer und Design. Deine Dateien, Lesezeichen und ordnerspezifischen Einstellungen bleiben unverändert.';
 }

@@ -4137,5 +4137,7 @@
   "vcToolsVolumeOptionsSectionHeader": "خيارات وحدة التخزين",
   "vcToolsDetectingFormat": "جارٍ الكشف…",
   "indexesAndThumbnailsTitle": "الفهارس والصور المصغّرة",
-  "indexesAndThumbnailsSubtitle": "إدارة تخزين الصور المصغّرة وفهرس بيانات المعرض وفهرس الموسيقى."
+  "indexesAndThumbnailsSubtitle": "إدارة تخزين الصور المصغّرة وفهرس بيانات المعرض وفهرس الموسيقى.",
+  "resetFileManagerSettingsTitle": "إعادة تعيين إعدادات مدير الملفات؟",
+  "resetFileManagerSettingsMessage": "سيعيد هذا كل خيار في هذه الشاشة إلى قيمته الافتراضية، بما في ذلك إعدادات علامات التبويب والتخطيط وشريط الأدوات والشبكة والصور المصغرة والعارض والمظهر. لن يتم تغيير ملفاتك ولا الإشارات المرجعية ولا خياراتك الخاصة بكل مجلد."
 }

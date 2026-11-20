@@ -5,6 +5,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 
+import '../../metadata/metadata_source.dart';
 import 'gallery_meta.dart';
 import 'gallery_meta_parser.dart';
 import 'gallery_meta_worker.dart';
@@ -12,6 +13,10 @@ import 'gallery_meta_worker.dart';
 /// Reads the first [length] bytes of [path] in the source [volId].
 typedef GalleryHeaderReader =
     Future<Uint8List?> Function(int volId, String path, int length);
+
+/// Reads [length] bytes of [path] in the source [volId], starting at [offset].
+typedef GalleryRangeReader =
+    Future<Uint8List?> Function(int volId, String path, int offset, int length);
 
 /// Parses one photo header (see [GalleryMetaWorker.parse]).
 typedef GalleryHeaderParser = Future<GalleryMeta> Function(Uint8List bytes);
@@ -52,6 +57,30 @@ class GalleryIndexRequest {
   final String path;
   final int size;
   final int mtime;
+}
+
+/// A file as [MetadataSource]: its first bytes are already in hand, the rest
+/// is read on demand. A read that fails throws, which leaves the photo
+/// unknown (asked again later) instead of recorded as having no metadata.
+class _RangeSource implements MetadataSource {
+  _RangeSource(this.length, this._head, this._read);
+
+  @override
+  final int length;
+  final Uint8List _head;
+  final Future<Uint8List?> Function(int offset, int count) _read;
+
+  @override
+  Future<Uint8List> read(int offset, int count) async {
+    if (offset < 0 || offset >= length || count <= 0) return Uint8List(0);
+    final want = math.min(count, length - offset);
+    if (offset + want <= _head.length) {
+      return Uint8List.sublistView(_head, offset, offset + want);
+    }
+    final bytes = await _read(offset, want);
+    if (bytes == null) throw StateError('Could not read at $offset');
+    return bytes;
+  }
 }
 
 class _Stored {
@@ -197,6 +226,7 @@ String? _mergeSegments(_MergeJob job) {
 class GalleryMetaIndex extends ChangeNotifier {
   GalleryMetaIndex({
     required this.readHeader,
+    this.readRange,
     this.storage,
     this.memory,
     this.retain,
@@ -217,6 +247,12 @@ class GalleryMetaIndex extends ChangeNotifier {
   static const int storageVersion = 1;
 
   final GalleryHeaderReader readHeader;
+
+  /// Reads a part of a file other than its start. A HEIC keeps its Exif block
+  /// as an item among the picture data, far from the header; with this the
+  /// index fetches just that block. Without it only a HEIC whose Exif happens
+  /// to be inside the header is read.
+  final GalleryRangeReader? readRange;
   final GalleryMetaStorage? storage;
 
   /// Where the results of the sources [retain] selects are kept between
@@ -441,7 +477,23 @@ class GalleryMetaIndex extends ChangeNotifier {
     try {
       final length = math.min(r.size, GalleryMetaParser.headerBytes);
       final bytes = await readHeader(r.volId, r.path, length);
-      if (bytes != null) meta = await _parse(bytes);
+      if (bytes != null) {
+        final range = readRange;
+        if (range != null && GalleryMetaParser.isHeif(bytes)) {
+          // Small (an Exif block), so read here rather than on the worker,
+          // which cannot reach the source.
+          meta = await GalleryMetaParser.parseSource(
+            _RangeSource(
+              r.size,
+              bytes,
+              (offset, count) => range(r.volId, r.path, offset, count),
+            ),
+            header: bytes,
+          );
+        } else {
+          meta = await _parse(bytes);
+        }
+      }
     } catch (_) {
       // Unreadable now (locked, removed): left unknown, asked again later.
     }

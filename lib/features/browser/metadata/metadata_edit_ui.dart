@@ -33,6 +33,10 @@ class MetadataEditTarget {
 
   /// Whether tags, dates and removal can be written into the file itself.
   bool get canEditEmbedded => ImageMetadataEditor.canEdit(name);
+
+  /// Whether the date taken can be written into the file itself: the files of
+  /// [canEditEmbedded], and HEIC (only its date).
+  bool get canEditEmbeddedDate => ImageMetadataEditor.canEditDate(name);
 }
 
 /// Opens the "Edit metadata" menu for [targets]: edit tags, edit date and
@@ -376,12 +380,12 @@ Future<void> _editDate(
         wall = dateFromFileName(t.name);
       case _DateMode.shift:
         var base = wallClockOfEpochSecs(t.modifiedSecs);
-        if (t.canEditEmbedded && t.sizeBytes > 0) {
+        if (t.canEditEmbeddedDate && t.sizeBytes > 0) {
           final source = await service.openSource(t.container, t.path);
           if (source != null) {
-            final taken = GalleryMetaParser.parse(
-              await source.read(0, GalleryMetaParser.headerBytes),
-            ).takenWallClock;
+            final taken = (await GalleryMetaParser.parseSource(
+              source,
+            )).takenWallClock;
             if (taken != null) base = taken;
           }
         }
@@ -390,11 +394,15 @@ Future<void> _editDate(
     if (wall == null) return _Step.skipped;
 
     final modified = epochSecsOfWallClock(wall);
-    if (!t.canEditEmbedded) {
-      // Videos, HEIC and the like have no dates this app can write into the
-      // file, so the file's own modified date is what changes.
+    Future<_Step> onlyModified() async {
       final ok = await service.setModifiedTime(t.container, t.path, modified);
       return ok ? _Step.changed : _Step.failed;
+    }
+
+    if (!t.canEditEmbeddedDate) {
+      // Videos and the like have no dates this app can write into the file,
+      // so the file's own modified date is what changes.
+      return onlyModified();
     }
     final setModified =
         choice.alsoSetModified && choice.mode != _DateMode.fromModified;
@@ -405,6 +413,11 @@ Future<void> _editDate(
       keepModifiedSecs: t.modifiedSecs,
       newModifiedSecs: setModified ? modified : null,
     );
+    // A HEIC without an Exif block has nowhere to keep a date: it gets the
+    // modified date, like a file of a format that cannot be edited.
+    if (outcome.status == MetadataEditStatus.unsupported) {
+      return onlyModified();
+    }
     return _stepOf(outcome);
   });
 }

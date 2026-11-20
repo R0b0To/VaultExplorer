@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io' show zlib;
 import 'dart:typed_data';
 
+import 'heif_metadata_editor.dart';
 import 'metadata_source.dart';
 import 'tiff_exif_editor.dart';
 import 'xmp_editor.dart';
@@ -48,9 +49,14 @@ class MetadataEdit {
 
   bool get isEmpty =>
       keywords == null && takenWallClock == null && strip.isEmpty;
+
+  /// Whether the only change asked for is the date taken.
+  bool get isDateOnly =>
+      takenWallClock != null && keywords == null && strip.isEmpty;
 }
 
-/// Plans edits to the metadata of JPEG, PNG and WebP files.
+/// Plans edits to the metadata of JPEG, PNG and WebP files, and changes of the
+/// date taken in HEIC files.
 ///
 /// Everything is expressed as a [MetadataEditPlan] ("copy this, write that"),
 /// so the (large) pixel data is streamed through untouched and nothing is
@@ -69,12 +75,25 @@ class ImageMetadataEditor {
     'webp',
   };
 
-  static bool canEdit(String fileName) {
+  /// Whether everything ([MetadataEdit.keywords], dates, removal) can be
+  /// written into [fileName].
+  static bool canEdit(String fileName) =>
+      supportedExtensions.contains(_extension(fileName));
+
+  /// Whether the date taken can be written into [fileName]: the formats of
+  /// [canEdit], and HEIC, where only the date is edited.
+  static bool canEditDate(String fileName) =>
+      canEdit(fileName) ||
+      HeifMetadataEditor.extensions.contains(_extension(fileName));
+
+  /// Whether [edit] can be applied to [fileName]: everything for the formats
+  /// of [canEdit], only a new date for HEIC.
+  static bool canApply(String fileName, MetadataEdit edit) =>
+      canEdit(fileName) || (edit.isDateOnly && canEditDate(fileName));
+
+  static String _extension(String fileName) {
     final dot = fileName.lastIndexOf('.');
-    if (dot < 0) return false;
-    return supportedExtensions.contains(
-      fileName.substring(dot + 1).toLowerCase(),
-    );
+    return dot < 0 ? '' : fileName.substring(dot + 1).toLowerCase();
   }
 
   /// The plan for applying [edit] to [source], or null when the file would
@@ -96,6 +115,16 @@ class ImageMetadataEditor {
       return _planPng(s, edit);
     if (head.length >= 12 && _eq(head, 0, _riff) && _eq(head, 8, _webp)) {
       return _planWebp(s, edit);
+    }
+    if (head.length >= 12 && _eq(head, 4, _ftyp)) {
+      // HEIC: only the date taken is edited (see HeifMetadataEditor).
+      if (!edit.isDateOnly) {
+        throw const MetadataEditException(
+          MetadataEditFailure.unsupportedFormat,
+          'heif: only the date can be changed',
+        );
+      }
+      return HeifMetadataEditor.planDate(s, edit.takenWallClock!);
     }
     throw const MetadataEditException(MetadataEditFailure.unsupportedFormat);
   }
@@ -774,6 +803,7 @@ class ImageMetadataEditor {
 
   // ── WebP ─────────────────────────────────────────────────────────────────
 
+  static const _ftyp = [0x66, 0x74, 0x79, 0x70]; // ftyp
   static const _riff = [0x52, 0x49, 0x46, 0x46]; // RIFF
   static const _webp = [0x57, 0x45, 0x42, 0x50]; // WEBP
 

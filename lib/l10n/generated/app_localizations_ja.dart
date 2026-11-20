@@ -14152,4 +14152,11 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get indexesAndThumbnailsSubtitle =>
       'サムネイルの保存先、ギャラリーのメタデータ、音楽インデックスを管理します。';
+
+  @override
+  String get resetFileManagerSettingsTitle => 'ファイルマネージャーの設定をリセットしますか？';
+
+  @override
+  String get resetFileManagerSettingsMessage =>
+      'この画面のすべての項目が初期値に戻ります。タブ、レイアウト、ツールバー、グリッド、サムネイル、ビューア、スキンの設定も含まれます。ファイル、ブックマーク、フォルダごとの設定は変更されません。';
 }

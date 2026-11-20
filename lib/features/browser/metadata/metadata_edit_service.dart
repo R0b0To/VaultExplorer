@@ -14,7 +14,8 @@ enum MetadataEditStatus {
   /// Nothing would have changed, so the file was left alone.
   unchanged,
 
-  /// Not a JPEG, PNG or WebP: its embedded metadata cannot be edited here.
+  /// Not a JPEG, PNG or WebP (or a HEIC with an Exif block, for its date):
+  /// its embedded metadata cannot be edited here.
   unsupported,
 
   /// The requested edit could damage Motion Photo or extended XMP content.
@@ -94,7 +95,7 @@ class MetadataEditService {
   }) async {
     if (container.readOnly)
       return const MetadataEditOutcome(MetadataEditStatus.readOnly);
-    if (!ImageMetadataEditor.canEdit(path)) {
+    if (!ImageMetadataEditor.canApply(path, edit)) {
       return const MetadataEditOutcome(MetadataEditStatus.unsupported);
     }
     final source = await openSource(container, path);
@@ -128,7 +129,7 @@ class MetadataEditService {
   }
 
   /// Sets only the modified time, for files whose embedded dates cannot be
-  /// edited (videos, HEIC, GIF).
+  /// edited (videos, GIF, a HEIC without Exif).
   Future<bool> setModifiedTime(
     MountedContainer container,
     String path,

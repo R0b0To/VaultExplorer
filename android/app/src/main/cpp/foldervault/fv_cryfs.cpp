@@ -615,10 +615,26 @@ std::optional<Bytes> BlockStore::load(const BlockId& id) {
     Bytes cached;
     if (cacheGet(id, cached)) return cached;
     Bytes raw;
+    const std::string upPath = id.pathUpper();
+    const std::string lowPath = id.pathLower();
+    std::string sourcePath = upPath;
     bool fromLower = false;
-    if (!st_.readWhole(id.pathUpper(), raw)) {
-        if (!st_.readWhole(id.pathLower(), raw)) return std::nullopt;
-        fromLower = true;   // only reachable on case-sensitive storage, where it is a distinct legacy file
+    bool fromTemporary = false;
+    if (!st_.readWhole(upPath, raw)) {
+        sourcePath = lowPath;
+        if (st_.readWhole(lowPath, raw)) {
+            fromLower = true;   // only reachable on case-sensitive storage, where it is a distinct legacy file
+        } else {
+            // A block-name normalization can be interrupted between its two atomic renames, leaving
+            // <block-id>.fvtmp. The root block must be loadable before finishOpen can run the full
+            // normalizer, so accept and promote this authenticated temporary spelling here as well.
+            sourcePath = upPath + ".fvtmp";
+            if (!st_.readWhole(sourcePath, raw)) {
+                sourcePath = lowPath + ".fvtmp";
+                if (!st_.readWhole(sourcePath, raw)) return std::nullopt;
+            }
+            fromTemporary = true;
+        }
     }
     const size_t prefix = sizeof(kOnDiskHeader) + sizeof(kEncLayerHeader);
     if (raw.size() < prefix) return std::nullopt;
@@ -641,11 +657,11 @@ std::optional<Bytes> BlockStore::load(const BlockId& id) {
     }
     Bytes payload(plain.begin() + kIntegrityHeader, plain.end());
     secureZero(plain.data(), plain.size());
-    if (fromLower && !readOnly_.load()) {
-        // Older builds wrote lowercase names, which official CryFS cannot see: fix this block as it is touched
-        // (best effort; the full one-time pass runs on open). The block has just been verified.
-        const std::string upPath = id.pathUpper();
-        if (st_.mkdir(parentOf(upPath))) st_.rename(id.pathLower(), upPath);
+    if ((fromLower || fromTemporary) && !readOnly_.load()) {
+        // Older builds wrote lowercase names; a rename interrupted during normalization can also leave .fvtmp.
+        // Repair the verified block lazily, while the full one-time pass handles the rest of the vault.
+        DirEntry existing;
+        if (!st_.stat(upPath, existing) && st_.mkdir(parentOf(upPath))) st_.rename(sourcePath, upPath);
     }
     cachePut(id, payload);
     return payload;

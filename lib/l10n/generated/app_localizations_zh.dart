@@ -13933,4 +13933,11 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get indexesAndThumbnailsSubtitle => '管理缩略图存储、图库元数据和音乐索引。';
+
+  @override
+  String get resetFileManagerSettingsTitle => '要重置文件管理器设置吗？';
+
+  @override
+  String get resetFileManagerSettingsMessage =>
+      '此屏幕上的所有选项都将恢复为默认值，包括标签页、布局、工具栏、网格、缩略图、查看器和皮肤设置。您的文件、书签和各文件夹的单独设置不会更改。';
 }

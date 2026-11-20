@@ -16661,7 +16661,7 @@
   "@removeMetadataAction": {
     "description": "Action to remove metadata from files"
   },
-  "metadataFormatsNote": "Tags, dates and removal are written into JPEG, PNG and WebP images. Other files only get a new modified date.",
+  "metadataFormatsNote": "Tags, dates and removal are written into JPEG, PNG and WebP images, and dates into HEIC photos. Other files only get a new modified date.",
   "@metadataFormatsNote": {
     "description": "Note explaining which file formats support metadata changes"
   },
@@ -16976,5 +16976,13 @@
   "indexesAndThumbnailsSubtitle": "Manage thumbnail storage, gallery metadata, and music index settings.",
   "@indexesAndThumbnailsSubtitle": {
     "description": "Subtitle describing the thumbnail, gallery metadata index, and music index settings in the destination page."
+  },
+  "resetFileManagerSettingsTitle": "Reset file manager settings?",
+  "@resetFileManagerSettingsTitle": {
+    "description": "Title of the confirmation dialog for resetting file manager settings"
+  },
+  "resetFileManagerSettingsMessage": "This puts every option on this screen back to its default, including tabs, layout, toolbar, grid, thumbnail, viewer and skin settings. Your files, bookmarks and per-folder choices are not changed.",
+  "@resetFileManagerSettingsMessage": {
+    "description": "Body of the confirmation dialog for resetting file manager settings"
   }
 }

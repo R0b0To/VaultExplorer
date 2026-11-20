@@ -14153,4 +14153,11 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get indexesAndThumbnailsSubtitle =>
       '썸네일 저장소, 갤러리 메타데이터 및 음악 인덱스를 관리합니다.';
+
+  @override
+  String get resetFileManagerSettingsTitle => '파일 관리자 설정을 초기화할까요?';
+
+  @override
+  String get resetFileManagerSettingsMessage =>
+      '이 화면의 모든 옵션이 기본값으로 돌아갑니다. 탭, 레이아웃, 툴바, 그리드, 썸네일, 뷰어, 스킨 설정도 포함됩니다. 파일, 북마크, 폴더별 설정은 변경되지 않습니다.';
 }

@@ -14970,4 +14970,12 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get indexesAndThumbnailsSubtitle =>
       'Gira o armazenamento de miniaturas, os metadados da galeria e o índice de música.';
+
+  @override
+  String get resetFileManagerSettingsTitle =>
+      'Redefinir as configurações do gerenciador de arquivos?';
+
+  @override
+  String get resetFileManagerSettingsMessage =>
+      'Isso devolve todas as opções desta tela ao valor padrão, incluindo as configurações de abas, layout, barra de ferramentas, grade, miniaturas, visualizador e aparência. Seus arquivos, favoritos e escolhas por pasta não são alterados.';
 }

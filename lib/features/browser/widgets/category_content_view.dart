@@ -953,8 +953,16 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
       }
     }
 
+    // A gallery shows photos by when they were taken, so its date order is
+    // the capture date the files carry (Exif, XMP), the modified date only
+    // for what has none or is not read yet.
+    final byCaptureDate = gallery && _sortBy == SortBy.date;
     list.sort((a, b) {
       if (_folderMode && a.isDir != b.isDir) return a.isDir ? -1 : 1;
+      if (byCaptureDate) {
+        final c = _compareByCaptureDate(a, b);
+        if (c != 0) return _sortAscending ? c : -c;
+      }
       return compareEntriesBySort(
         a,
         b,
@@ -1016,6 +1024,11 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
         final container = _containers[volId];
         if (container == null) return null;
         return io.readFileChunk(container, path, 0, length);
+      },
+      readRange: (volId, path, offset, length) async {
+        final container = _containers[volId];
+        if (container == null) return null;
+        return io.readFileChunk(container, path, offset, length);
       },
       storage: storage,
       // Sources without writable persistent metadata keep their parsed index
@@ -1220,6 +1233,16 @@ class _CategoryContentViewState extends ConsumerState<CategoryContentView> {
     final subject = _subjectOf(e);
     if (query != null && !query.positive(subject)) return false;
     return filters.matches(subject);
+  }
+
+  /// Orders two entries by the date the gallery files them under: when the
+  /// photo was taken if its file says so, else its modified date (see
+  /// [GalleryFilterSubject.date]). 0 when both are the same moment.
+  int _compareByCaptureDate(RawEntry a, RawEntry b) {
+    if (a.isDir || b.isDir) return 0;
+    final da = _subjectOf(a).date?.millisecondsSinceEpoch ?? 0;
+    final db = _subjectOf(b).date?.millisecondsSinceEpoch ?? 0;
+    return da.compareTo(db);
   }
 
   GalleryGrouper _galleryGrouper(GalleryGroupBy by) => GalleryGrouper(

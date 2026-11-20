@@ -15013,4 +15013,12 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get indexesAndThumbnailsSubtitle =>
       'إدارة تخزين الصور المصغّرة وفهرس بيانات المعرض وفهرس الموسيقى.';
+
+  @override
+  String get resetFileManagerSettingsTitle =>
+      'إعادة تعيين إعدادات مدير الملفات؟';
+
+  @override
+  String get resetFileManagerSettingsMessage =>
+      'سيعيد هذا كل خيار في هذه الشاشة إلى قيمته الافتراضية، بما في ذلك إعدادات علامات التبويب والتخطيط وشريط الأدوات والشبكة والصور المصغرة والعارض والمظهر. لن يتم تغيير ملفاتك ولا الإشارات المرجعية ولا خياراتك الخاصة بكل مجلد.';
 }

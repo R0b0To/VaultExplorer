@@ -16,6 +16,7 @@ import 'package:vaultexplorer/core/services/thumbnail_refresh_signal.dart';
 import 'package:vaultexplorer/core/utils/byte_budget_cache.dart';
 import 'package:vaultexplorer/core/utils/md5_hex.dart';
 import 'package:vaultexplorer/core/utils/perf_trace.dart';
+import 'package:vaultexplorer/core/filesystem/local_storage_container.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/utils/ve_log.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -169,6 +170,13 @@ class ThumbnailCacheService {
 
   Future<void> clearInContainerCacheForUri(String uri) =>
       clearInContainerCacheByUri(uri);
+
+  /// Container-aware variant. Unlike [clearInContainerCacheForUri] (which
+  /// talks to the native vault channel directly and so only works for real
+  /// vault sessions), this goes through the file-IO layer, which routes
+  /// local storage and SAF trees to their own backends.
+  Future<void> clearInContainerCache(MountedContainer container) =>
+      clearInContainerCacheFor(container);
 
   static const _channel = kVaultEngineChannel;
 
@@ -1223,6 +1231,52 @@ class ThumbnailCacheService {
       });
     } catch (_) {
       rethrow;
+    }
+  }
+
+  /// Clears the hidden `.thumbcache` folder of [container] through the
+  /// file-IO layer, so it also works for Local Storage (no vault session,
+  /// `volId < 0`) and SAF storages, where the raw native channel call used
+  /// by [clearInContainerCacheByUri] has nothing to talk to and throws.
+  static Future<void> clearInContainerCacheFor(
+    MountedContainer container,
+  ) async {
+    final uri = container.uri.toString();
+    _ensuredThumbDirs.remove(uri);
+    _inContainerIndices.remove(uri);
+    final queue = _inContainerQueues.remove(uri);
+    queue?.dispose();
+    if (queue != null) await queue.settle();
+
+    // Local (non-SAF) storage: the folder is a plain directory and the
+    // local backend deletes directories recursively (a missing one counts as
+    // success), so a single delete is enough.
+    if (container.isLocalStorage && !container.isSafStorage) {
+      final ok = await _fileIo.deleteFile(container, inContainerDir);
+      if (!ok) {
+        throw StateError('Failed to delete $inContainerDir in ${container.uri}');
+      }
+      return;
+    }
+
+    final raw = await _fileIo.listDirectory(container, inContainerDir);
+    if (raw == null) return; // nothing there
+    var failed = false;
+    for (final line in raw) {
+      if (line.startsWith('System:')) continue;
+      final RawEntry entry;
+      try {
+        entry = RawEntry.parse(line);
+      } on FormatException {
+        continue;
+      }
+      if (!await _fileIo.deleteFile(container, '$inContainerDir/${entry.name}')) {
+        failed = true;
+      }
+    }
+    if (!await _fileIo.deleteFile(container, inContainerDir)) failed = true;
+    if (failed) {
+      throw StateError('Failed to fully clear $inContainerDir in ${container.uri}');
     }
   }
 

@@ -24446,7 +24446,7 @@ abstract class AppLocalizations {
   /// Note explaining which file formats support metadata changes
   ///
   /// In en, this message translates to:
-  /// **'Tags, dates and removal are written into JPEG, PNG and WebP images. Other files only get a new modified date.'**
+  /// **'Tags, dates and removal are written into JPEG, PNG and WebP images, and dates into HEIC photos. Other files only get a new modified date.'**
   String get metadataFormatsNote;
 
   /// Message shown when metadata cannot be changed because the vault is read-only
@@ -24952,6 +24952,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Manage thumbnail storage, gallery metadata, and music index settings.'**
   String get indexesAndThumbnailsSubtitle;
+
+  /// Title of the confirmation dialog for resetting file manager settings
+  ///
+  /// In en, this message translates to:
+  /// **'Reset file manager settings?'**
+  String get resetFileManagerSettingsTitle;
+
+  /// Body of the confirmation dialog for resetting file manager settings
+  ///
+  /// In en, this message translates to:
+  /// **'This puts every option on this screen back to its default, including tabs, layout, toolbar, grid, thumbnail, viewer and skin settings. Your files, bookmarks and per-folder choices are not changed.'**
+  String get resetFileManagerSettingsMessage;
 }
 
 class _AppLocalizationsDelegate

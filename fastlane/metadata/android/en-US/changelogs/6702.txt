@@ -1,0 +1,3 @@
+• HEIF metadata, capture-date editing and sorting, and gyro-assisted panorama viewing.
+• Auto-discover SD/USB volumes with access prompts; refresh thumbnails when files change.
+• File manager reset, live settings, Turkish translation, Mask Mode protection, and CryFS recovery.

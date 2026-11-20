@@ -1,0 +1,16 @@
+### Photos and viewer
+- Gallery indexes and filters now read HEIF/HEIC Exif and XMP metadata; date sorting uses capture dates when available.
+- Added embedded capture-date editing for HEIF images that contain Exif metadata.
+- The panorama viewer now recognizes untagged 2:1 panoramas and offers optional gyro navigation.
+
+### Storage and file manager
+- Automatically discovers mounted SD cards and USB drives, refreshes them when the app resumes, and requests All Files Access when needed.
+- Thumbnail previews refresh when a file's size or modification time changes; in-container cache clearing now works for Local Storage and SAF locations.
+- Added a confirmed reset for file manager and related browsing preferences; fixed the save panel layout on the indexes and thumbnails screen.
+
+### Security and reliability
+- Kept screenshot protection active while a vault is revealed from Mask Mode, and improved recovery after interrupted CryFS block-name normalization.
+- Dashboard settings now apply live, and Back closes an open drawer before navigating the current page.
+
+### Localization and polish
+- Added Turkish translations throughout the app and removed the redundant PIM input hint.

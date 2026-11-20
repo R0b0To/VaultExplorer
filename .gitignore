@@ -60,3 +60,5 @@ android/**/.cxx/
 **/android/key.properties
 **/android/app/*.jks
 **/android/app/*.keystore
+devtools_options.yaml
+.flutter

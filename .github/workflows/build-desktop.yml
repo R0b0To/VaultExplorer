@@ -1,0 +1,305 @@
+name: Build desktop (Linux + Windows)
+
+# Builds the desktop app for Linux and Windows and packages each one twice:
+#
+#   Linux    VaultExplorer-v<version>-linux-x64.tar.gz          portable: extract anywhere, run ./vaultexplorer
+#            VaultExplorer-v<version>-linux-x64.deb             installer (Debian / Ubuntu / Mint / KDE neon ...)
+#   Windows  VaultExplorer-v<version>-windows-x64-portable.zip  portable: extract anywhere, run vaultexplorer.exe
+#            VaultExplorer-v<version>-windows-x64-setup.exe     installer (per-user or all-users, Start menu entry)
+#
+# Desktop is experimental, so this is separate from the Android release (build-release.yml) and manual only:
+# Actions -> "Build desktop (Linux + Windows)" -> Run workflow.
+#   publish off (default)  the packages are only kept as downloadable workflow artifacts (30 days)
+#   publish on             they are also attached to a GitHub *pre-release* tagged desktop-alpha-<version>
+#                          (or the tag you give), which is never marked as the latest release
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish the packages as a desktop alpha pre-release'
+        type: boolean
+        default: false
+      tag:
+        description: 'Pre-release tag (empty = desktop-alpha-v<version>). Must not start with "v": that would look like an Android release tag.'
+        type: string
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    name: Linux (x64)
+    # Pinned, not ubuntu-latest: the glibc / libmpv this is built against decides which distributions the
+    # packages run on, and the .deb's library dependencies are computed from this image.
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository with submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          # Flutter's Linux toolchain; libsecret/jsoncpp for flutter_secure_storage; libmpv for media_kit;
+          # libfuse3 headers so the engine is built WITH OS mounts; dpkg-dev for dpkg-shlibdeps.
+          sudo apt-get install -y \
+            clang cmake ninja-build pkg-config git perl curl unzip xz-utils zip \
+            libgtk-3-dev liblzma-dev libstdc++-12-dev \
+            libsecret-1-dev libjsoncpp-dev \
+            libmpv-dev mpv libfuse3-dev zlib1g-dev \
+            dpkg-dev
+
+      - name: Read version from pubspec.yaml
+        run: |
+          full=$(grep '^version:' pubspec.yaml | sed 's/^version: *//')
+          echo "VERSION=${full%%+*}" >> "$GITHUB_ENV"
+          if [[ "$full" == *+* ]]; then echo "BUILD=${full##*+}" >> "$GITHUB_ENV"; else echo "BUILD=" >> "$GITHUB_ENV"; fi
+
+      - name: Set up Flutter (submodule)
+        run: |
+          git -C .flutter fetch --tags
+          echo "$GITHUB_WORKSPACE/.flutter/bin" >> "$GITHUB_PATH"
+
+      - name: Resolve dependencies
+        run: |
+          flutter config --no-analytics
+          flutter pub get --enforce-lockfile
+
+      # The native engine is a separate CMake build that linux/CMakeLists.txt bundles into the app.
+      - name: Build engine library
+        run: |
+          bash scripts/build_desktop_engine.sh
+          if ! grep -q '^VE_FUSE3_INCLUDE_DIR:PATH=/' build/desktop-engine/CMakeCache.txt; then
+            echo "::error::libfuse3 headers were not found, so the engine was built without OS mounts"
+            exit 1
+          fi
+          strip --strip-unneeded build/desktop-engine/libvaultexplorer_engine.so
+
+      - name: Build Linux app
+        run: flutter build linux --release
+
+      - name: Package (portable tar.gz + .deb)
+        run: bash packaging/linux/build_packages.sh build/linux/x64/release/bundle "$VERSION" dist "$BUILD"
+
+      # Installs the .deb with only its *required* dependencies and checks every shared library resolves,
+      # so a wrong Depends line fails here instead of on a user's machine.
+      - name: Verify the .deb installs and links
+        run: |
+          sudo apt-get install -y --no-install-recommends ./dist/*.deb
+          test -x /usr/bin/vaultexplorer
+          missing=$(ldd /opt/vaultexplorer/vaultexplorer /opt/vaultexplorer/lib/*.so | grep 'not found' || true)
+          if [ -n "$missing" ]; then echo "$missing"; echo "::error::unresolved shared libraries"; exit 1; fi
+
+      - name: Upload Linux packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: VaultExplorer-linux-desktop
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 30
+
+  windows:
+    name: Windows (x64)
+    # Pinned: windows-latest moved to Visual Studio 2026 in June 2026; Flutter's Windows tooling targets VS 2022.
+    runs-on: windows-2022
+    env:
+      # Only WinFsp's C headers are needed (to build the engine's OS-mount support); the user installs WinFsp
+      # itself to get mounts at run time. The headers are not vendored in this repository.
+      WINFSP_REF: v2.2
+    steps:
+      - name: Checkout repository with submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Read version from pubspec.yaml
+        shell: pwsh
+        run: |
+          $full = (Select-String -Path pubspec.yaml -Pattern '^version:\s*(\S+)').Matches[0].Groups[1].Value
+          $parts = $full.Split('+')
+          "VERSION=$($parts[0])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      # The engine's dependencies are fetched with git and some have deeply nested paths.
+      - name: Allow long paths in git
+        run: git config --system core.longpaths true
+
+      - name: Set up Flutter (submodule)
+        shell: pwsh
+        run: |
+          git -C .flutter fetch --tags
+          "$env:GITHUB_WORKSPACE\.flutter\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
+      - name: Resolve dependencies
+        shell: pwsh
+        run: |
+          flutter config --no-analytics
+          flutter pub get --enforce-lockfile
+          if ($LASTEXITCODE -ne 0) { throw 'flutter pub get failed' }
+
+      # Same toolchain scripts/build_windows.ps1 uses locally: MSYS2 UCRT64 GCC + CMake + Ninja.
+      - name: Set up MSYS2 UCRT64 toolchain
+        id: msys2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: false
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+
+      - name: Get WinFsp headers
+        shell: pwsh
+        run: |
+          $dest = Join-Path $env:RUNNER_TEMP 'winfsp'
+          git clone --quiet --depth 1 --branch $env:WINFSP_REF https://github.com/winfsp/winfsp.git $dest
+          if ($LASTEXITCODE -ne 0) { throw 'cloning WinFsp failed' }
+          $inc = Join-Path $dest 'inc'
+          if (-not (Test-Path (Join-Path $inc 'fuse3\fuse.h'))) { throw "fuse3/fuse.h not found in $inc" }
+          "WINFSP_INC=$($inc -replace '\\', '/')" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Build engine DLL
+        shell: pwsh
+        run: |
+          # Resolve Git for Windows before MSYS2 goes on PATH: MSYS2's own git can fail outside an MSYS2 shell,
+          # and the engine's CMake fetches its dependencies with git (same reason build_windows.ps1 passes it).
+          $git = (Get-Command git).Source
+          $env:PATH = (Join-Path '${{ steps.msys2.outputs.msys2-location }}' 'ucrt64\bin') + ";$env:PATH"
+          # A short build path keeps the fetched dependencies well under Windows' 260-character limit.
+          $out = Join-Path $env:RUNNER_TEMP 've-engine'
+
+          cmake -S android/app/src/main/cpp -B $out -G Ninja `
+            -DVAULTEXPLORER_DESKTOP=ON -DCMAKE_BUILD_TYPE=Release `
+            "-DGIT_EXECUTABLE:FILEPATH=$git" "-DVE_WINFSP_INCLUDE_DIR=$env:WINFSP_INC" 2>&1 | Tee-Object -FilePath (Join-Path $env:RUNNER_TEMP 'engine-configure.log')
+          if ($LASTEXITCODE -ne 0) { throw 'engine CMake configure failed' }
+          if (-not (Select-String -Path (Join-Path $env:RUNNER_TEMP 'engine-configure.log') -Pattern 'OS mounts enabled' -Quiet)) {
+            throw 'WinFsp headers were not picked up, so the engine would be built without OS mounts'
+          }
+
+          cmake --build $out --target vaultexplorer
+          if ($LASTEXITCODE -ne 0) { throw 'engine build failed' }
+          if (-not (Test-Path (Join-Path $out 'vaultexplorer_engine.dll'))) { throw 'vaultexplorer_engine.dll was not produced' }
+          "ENGINE_DLL=$(Join-Path $out 'vaultexplorer_engine.dll')" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Build Windows app
+        shell: pwsh
+        run: |
+          flutter build windows --release
+          if ($LASTEXITCODE -ne 0) { throw 'flutter build windows failed' }
+
+      # The engine DLL is not part of Flutter's own bundle (scripts/build_windows.ps1 copies it the same way).
+      # The Visual C++ runtime is bundled too so the portable zip also runs on a machine that never installed it
+      # (these three DLLs are the ones Flutter's documentation lists for app-local deployment).
+      - name: Assemble the app folder
+        shell: pwsh
+        run: |
+          $rel = 'build\windows\x64\runner\Release'
+          foreach ($f in 'vaultexplorer.exe', 'flutter_windows.dll') {
+            if (-not (Test-Path (Join-Path $rel $f))) { throw "$f missing from $rel" }
+          }
+          Copy-Item $env:ENGINE_DLL $rel
+          foreach ($dll in 'msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll') {
+            $src = Join-Path $env:SystemRoot "System32\$dll"
+            if (-not (Test-Path $src)) { throw "$dll not found in System32" }
+            Copy-Item $src $rel
+          }
+
+      - name: Package portable zip
+        shell: pwsh
+        run: |
+          $rel = (Resolve-Path 'build\windows\x64\runner\Release').Path
+          $name = "VaultExplorer-v$env:VERSION-windows-x64"
+          $dist = Join-Path $PWD 'dist'
+          New-Item -ItemType Directory -Force $dist | Out-Null
+          $stage = Join-Path $env:RUNNER_TEMP "stage\$name"
+          New-Item -ItemType Directory -Force $stage | Out-Null
+          Copy-Item (Join-Path $rel '*') $stage -Recurse
+          Copy-Item packaging\windows\README-portable.txt (Join-Path $stage 'README.txt')
+          Compress-Archive -Path $stage -DestinationPath (Join-Path $dist "$name-portable.zip") -CompressionLevel Optimal
+
+      # Inno Setup 6 and 7 both work with packaging/windows/installer.iss and install side by side
+      # ("Inno Setup 6" / "Inno Setup 7"), so find whichever ISCC.exe is present instead of assuming a path.
+      - name: Package installer
+        shell: pwsh
+        run: |
+          function Find-Iscc {
+            Get-ChildItem -Path ${env:ProgramFiles(x86)}, $env:ProgramFiles -Directory -Filter 'Inno Setup*' -ErrorAction SilentlyContinue |
+              ForEach-Object { Join-Path $_.FullName 'ISCC.exe' } |
+              Where-Object { Test-Path $_ } |
+              Sort-Object -Descending |
+              Select-Object -First 1
+          }
+          $iscc = Find-Iscc
+          if (-not $iscc) {
+            choco install innosetup -y --no-progress
+            if ($LASTEXITCODE -notin 0, 1641, 3010) { throw 'installing Inno Setup failed' }
+            $iscc = Find-Iscc
+          }
+          if (-not $iscc) { throw 'ISCC.exe (Inno Setup) not found' }
+          Write-Host "Using $iscc"
+
+          $rel = (Resolve-Path 'build\windows\x64\runner\Release').Path
+          $dist = (Resolve-Path 'dist').Path
+          & $iscc "/DAppVersion=$env:VERSION" "/DBuildDir=$rel" "/DOutputDir=$dist" "/DOutputName=VaultExplorer-v$env:VERSION-windows-x64-setup" packaging\windows\installer.iss
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup compile failed' }
+
+      - name: Upload Windows packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: VaultExplorer-windows-desktop
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    name: Publish alpha pre-release
+    needs: [linux, windows]
+    if: ${{ inputs.publish }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Work out version and tag
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          full=$(grep '^version:' pubspec.yaml | sed 's/^version: *//')
+          version="${full%%+*}"
+          tag="${INPUT_TAG:-desktop-alpha-v$version}"
+          if [[ "$tag" == v* ]]; then
+            echo "::error::Tag '$tag' starts with 'v'; use another name so it cannot be mistaken for an Android release tag."
+            exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "TAG=$tag" >> "$GITHUB_ENV"
+
+      - name: Download desktop packages
+        uses: actions/download-artifact@v4
+        with:
+          path: release-desktop
+          pattern: VaultExplorer-*-desktop
+          merge-multiple: true
+
+      - name: Create GitHub pre-release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          target_commitish: ${{ github.sha }}
+          name: VaultExplorer desktop alpha (v${{ env.VERSION }})
+          prerelease: true
+          make_latest: false
+          body: |
+            **Experimental desktop alpha for Linux and Windows.** Expect rough edges. The Android app is released separately.
+
+            Linux: `.tar.gz` (portable) or `.deb` (installer). Windows: `-portable.zip` or `-setup.exe` (not code-signed).
+            Branch: `${{ github.ref_name }}`, commit: `${{ github.sha }}`, run #${{ github.run_number }}.
+          files: release-desktop/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

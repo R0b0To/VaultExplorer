@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=VaultExplorer
+GenericName=Encrypted Container Explorer
+Comment=Open, browse and manage VeraCrypt, LUKS, BitLocker and other encrypted containers
+Exec=vaultexplorer
+Icon=com.aeidolon.vaultexplorer
+Terminal=false
+Categories=Utility;Security;
+Keywords=VeraCrypt;LUKS;BitLocker;Cryptomator;encryption;vault;container;
+StartupNotify=true
+StartupWMClass=com.aeidolon.vaultexplorer

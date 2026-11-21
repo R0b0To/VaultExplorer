@@ -93,6 +93,19 @@ See [PRIVACY_POLICY.md](PRIVACY_POLICY.md) for what the app accesses and what le
 Download the APK for your architecture (arm64, armeabi, or x64) from [Releases](https://github.com/R0b0To/VaultExplorer/releases). Requires Android 8.0 (API 26) or newer.
 The published APKs are signed using a certificate with the following SHA-256 fingerprint `0bde9d3b0ee3f56617d02632c843b1629bf0b2faa4560dff5d26f651dc325f19`
 
+### Desktop (Linux and Windows)
+
+**Experimental alpha.** Desktop builds are published separately from the Android releases, as pre-releases tagged `desktop-alpha-*`, each as a portable archive or an installer:
+
+| | Portable (extract and run) | Installer |
+|---|---|---|
+| **Linux x64** | `VaultExplorer-v<version>-linux-x64.tar.gz`: run `./vaultexplorer` | `VaultExplorer-v<version>-linux-x64.deb`: `sudo apt install ./VaultExplorer-v<version>-linux-x64.deb` |
+| **Windows x64** | `VaultExplorer-v<version>-windows-x64-portable.zip`: run `vaultexplorer.exe` | `VaultExplorer-v<version>-windows-x64-setup.exe` |
+
+"Portable" means nothing has to be installed; settings and saved credentials still live in your user profile. The Linux packages are built on Ubuntu 24.04, so they need Ubuntu 24.04 or a similarly recent distribution (older ones may lack the required glibc). Video playback needs libmpv, and mounting containers in the file manager needs `fuse3` on Linux or [WinFsp](https://winfsp.dev) on Windows. The Windows build is not code-signed, so SmartScreen may warn on first run.
+
+The packages are built by [`build-desktop.yml`](.github/workflows/build-desktop.yml), which is run by hand from the Actions tab (tick *publish* to create the alpha pre-release). If `assets/images/app_icon.png` changes, regenerate the desktop icons with `python3 scripts/generate_desktop_icons.py`.
+
 ### Build from source
 
 ```bash

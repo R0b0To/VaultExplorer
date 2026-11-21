@@ -426,6 +426,9 @@ class CameraTopControlsBar extends StatelessWidget {
   final int segmentMinutes;
   final ValueChanged<int>? onSegmentMinutesChanged;
 
+  /// Panorama mode uses its own overlay controls and suppresses flash/crop/burst.
+  final bool isPanoramaMode;
+
   const CameraTopControlsBar({
     super.key,
     required this.isVideoMode,
@@ -455,6 +458,7 @@ class CameraTopControlsBar extends StatelessWidget {
     this.onToggleContinuousCapture,
     this.segmentMinutes = 0,
     this.onSegmentMinutesChanged,
+    this.isPanoramaMode = false,
   });
 
   String _segmentLabel(BuildContext context, int minutes) => minutes <= 0
@@ -584,6 +588,8 @@ class CameraTopControlsBar extends StatelessWidget {
                   ],
                 ),
               )
+            else if (isPanoramaMode)
+              const SizedBox.shrink()
             else
               Flexible(
                 // Keeps the row inside the bar on narrow screens instead of

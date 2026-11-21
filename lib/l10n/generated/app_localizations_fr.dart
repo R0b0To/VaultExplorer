@@ -4301,6 +4301,69 @@ class AppLocalizationsFr extends AppLocalizations {
   String get unknownErrorFallback => 'erreur inconnue';
 
   @override
+  String get panoramaModeWide => 'Large';
+
+  @override
+  String get panoramaStitching => 'Assemblage en cours…';
+
+  @override
+  String panoramaShotCount(int count) {
+    return 'Photos : $count';
+  }
+
+  @override
+  String get panoramaWaitingForMotionSensor =>
+      'En attente du capteur de mouvement…';
+
+  @override
+  String get panoramaStartSphereHint =>
+      'Appuyez sur le déclencheur, puis visez chaque point';
+
+  @override
+  String get panoramaStartWideHint =>
+      'Appuyez sur le déclencheur, puis balayez régulièrement';
+
+  @override
+  String get panoramaHoldStillHint => 'Ne bougez pas…';
+
+  @override
+  String get panoramaKeepVerticallyAlignedHint =>
+      'Gardez l’alignement vertical';
+
+  @override
+  String get panoramaKeepLevelHint => 'Gardez le téléphone à niveau';
+
+  @override
+  String get panoramaAimAtDotOrHoldStillHint =>
+      'Visez un point (ou ne bougez pas pour déclencher)';
+
+  @override
+  String get panoramaSlowDownHint => 'Ralentissez';
+
+  @override
+  String get panoramaAimAtDotHint => 'Visez un point';
+
+  @override
+  String panoramaFollowLineHint(String done) {
+    return 'Suivez la ligne — appuyez sur $done pour terminer';
+  }
+
+  @override
+  String get panoramaNoMotionSensorError =>
+      'Cet appareil ne possède pas de capteur de mouvement pour les panoramas';
+
+  @override
+  String get panoramaRearCameraRequiredError =>
+      'Les panoramas nécessitent l’appareil photo arrière';
+
+  @override
+  String get panoramaNotEnoughPhotosError =>
+      'Pas assez de photos. Continuez à balayer un peu plus longtemps.';
+
+  @override
+  String get panoramaStitchFailedError => 'Impossible d’assembler le panorama';
+
+  @override
   String get cameraPermissionsRequiredMessage =>
       'Les autorisations d\'appareil photo et de microphone sont requises pour utiliser l\'appareil photo.';
 

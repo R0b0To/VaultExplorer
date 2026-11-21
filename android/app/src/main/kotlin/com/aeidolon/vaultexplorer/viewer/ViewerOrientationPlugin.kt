@@ -8,8 +8,11 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Build
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.Looper
+import android.os.SystemClock
 import android.view.Surface
+import com.aeidolon.vaultexplorer.panorama.PanoramaPoseTracker
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
@@ -19,18 +22,8 @@ private const val METHOD_CHANNEL = "com.aeidolon.vaultexplorer/viewer/orientatio
 private const val EVENT_CHANNEL = "com.aeidolon.vaultexplorer/viewer/orientation"
 
 /**
- * Streams the device attitude to the 360° image viewer ("look around by moving
- * the phone").
- *
- * Android's own sensor fusion does the heavy lifting: TYPE_GAME_ROTATION_VECTOR
- * (gyroscope + accelerometer, no magnetometer, so no drift and no compass
- * jitter) is preferred, with TYPE_ROTATION_VECTOR as a fallback. Each event is
- * turned into a 3x3 rotation matrix, row-major, mapping the *screen* axes
- * (x right, y up, z out of the screen) to the world axes (East, North, Up),
- * already corrected for the current display rotation so landscape works.
- *
- * The sensor is only registered while Dart is listening, i.e. while the viewer
- * is actually in gyro mode. No permission is needed at SENSOR_DELAY_GAME.
+ * Streams the device attitude to the 360° image viewer and panorama capture
+ * ("look around by moving the phone").
  */
 class ViewerOrientationPlugin(
     private val activity: Activity,
@@ -42,6 +35,7 @@ class ViewerOrientationPlugin(
     private val eventChannel = EventChannel(messenger, EVENT_CHANNEL)
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    private var sensorThread: HandlerThread? = null
     private var listener: SensorEventListener? = null
     private val deviceToWorld = FloatArray(9)
     private val screenToWorld = FloatArray(9)
@@ -77,6 +71,10 @@ class ViewerOrientationPlugin(
             sink.error("unavailable", "No rotation-vector sensor on this device", null)
             return
         }
+        val thread = HandlerThread("vx-orientation").apply { start() }
+        sensorThread = thread
+        val sensorHandler = Handler(thread.looper)
+
         val l = object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent) {
                 SensorManager.getRotationMatrixFromVector(deviceToWorld, event.values)
@@ -86,13 +84,19 @@ class ViewerOrientationPlugin(
                     Surface.ROTATION_270 -> remap(SensorManager.AXIS_MINUS_Y, SensorManager.AXIS_X)
                     else -> deviceToWorld
                 }
-                sink.success(out.copyOf())
+                val copy = out.copyOf()
+                PanoramaPoseTracker.recordAndroidMatrix(SystemClock.elapsedRealtimeNanos(), copy)
+                mainHandler.post {
+                    if (listener === this) {
+                        sink.success(copy)
+                    }
+                }
             }
 
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
         }
         listener = l
-        sensorManager.registerListener(l, sensor, SensorManager.SENSOR_DELAY_GAME, mainHandler)
+        sensorManager.registerListener(l, sensor, SensorManager.SENSOR_DELAY_GAME, sensorHandler)
     }
 
     private fun remap(axisX: Int, axisY: Int): FloatArray {
@@ -105,6 +109,9 @@ class ViewerOrientationPlugin(
     private fun stop() {
         listener?.let { sensorManager.unregisterListener(it) }
         listener = null
+        sensorThread?.quitSafely()
+        sensorThread = null
+        PanoramaPoseTracker.clear()
     }
 
     fun dispose() {

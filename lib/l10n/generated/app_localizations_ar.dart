@@ -4310,6 +4310,66 @@ class AppLocalizationsAr extends AppLocalizations {
   String get unknownErrorFallback => 'خطأ غير معروف';
 
   @override
+  String get panoramaModeWide => 'عريض';
+
+  @override
+  String get panoramaStitching => 'جارٍ دمج الصور…';
+
+  @override
+  String panoramaShotCount(int count) {
+    return 'اللقطات: $count';
+  }
+
+  @override
+  String get panoramaWaitingForMotionSensor => 'في انتظار مستشعر الحركة…';
+
+  @override
+  String get panoramaStartSphereHint =>
+      'اضغط زر الغالق، ثم وجّه الهاتف نحو كل نقطة';
+
+  @override
+  String get panoramaStartWideHint => 'اضغط زر الغالق، ثم حرّك الهاتف بسلاسة';
+
+  @override
+  String get panoramaHoldStillHint => 'اثبت…';
+
+  @override
+  String get panoramaKeepVerticallyAlignedHint => 'حافظ على المحاذاة الرأسية';
+
+  @override
+  String get panoramaKeepLevelHint => 'أبقِ الهاتف مستويًا';
+
+  @override
+  String get panoramaAimAtDotOrHoldStillHint =>
+      'وجّه نحو نقطة (أو اثبت لالتقاط الصورة)';
+
+  @override
+  String get panoramaSlowDownHint => 'أبطئ الحركة';
+
+  @override
+  String get panoramaAimAtDotHint => 'وجّه نحو نقطة';
+
+  @override
+  String panoramaFollowLineHint(String done) {
+    return 'اتبع الخط — اضغط $done عند الانتهاء';
+  }
+
+  @override
+  String get panoramaNoMotionSensorError =>
+      'لا يحتوي هذا الجهاز على مستشعر حركة لالتقاط الصور البانورامية';
+
+  @override
+  String get panoramaRearCameraRequiredError =>
+      'تتطلب الصور البانورامية استخدام الكاميرا الخلفية';
+
+  @override
+  String get panoramaNotEnoughPhotosError =>
+      'الصور غير كافية. واصل التحريك قليلًا.';
+
+  @override
+  String get panoramaStitchFailedError => 'تعذّر دمج الصورة البانورامية';
+
+  @override
   String get cameraPermissionsRequiredMessage =>
       'يلزم إذنا الكاميرا والميكروفون لاستخدام الكاميرا.';
 

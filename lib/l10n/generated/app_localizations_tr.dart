@@ -4228,6 +4228,67 @@ class AppLocalizationsTr extends AppLocalizations {
   String get unknownErrorFallback => 'bilinmeyen hata';
 
   @override
+  String get panoramaModeWide => 'Geniş';
+
+  @override
+  String get panoramaStitching => 'Panorama birleştiriliyor…';
+
+  @override
+  String panoramaShotCount(int count) {
+    return 'Çekim: $count';
+  }
+
+  @override
+  String get panoramaWaitingForMotionSensor => 'Hareket sensörü bekleniyor…';
+
+  @override
+  String get panoramaStartSphereHint =>
+      'Deklanşöre dokunun, ardından her noktaya yönelin';
+
+  @override
+  String get panoramaStartWideHint =>
+      'Deklanşöre dokunun, ardından yavaşça kaydırın';
+
+  @override
+  String get panoramaHoldStillHint => 'Sabit tutun…';
+
+  @override
+  String get panoramaKeepVerticallyAlignedHint => 'Dikey hizayı koruyun';
+
+  @override
+  String get panoramaKeepLevelHint => 'Telefonu düz tutun';
+
+  @override
+  String get panoramaAimAtDotOrHoldStillHint =>
+      'Bir noktaya yönelin (veya çekmek için sabit tutun)';
+
+  @override
+  String get panoramaSlowDownHint => 'Yavaşlayın';
+
+  @override
+  String get panoramaAimAtDotHint => 'Bir noktaya yönelin';
+
+  @override
+  String panoramaFollowLineHint(String done) {
+    return 'Çizgiyi izleyin — bitirmek için $done düğmesine dokunun';
+  }
+
+  @override
+  String get panoramaNoMotionSensorError =>
+      'Bu cihazda panoramalar için hareket sensörü yok';
+
+  @override
+  String get panoramaRearCameraRequiredError =>
+      'Panorama çekimi için arka kamera gerekir';
+
+  @override
+  String get panoramaNotEnoughPhotosError =>
+      'Yeterli fotoğraf yok. Biraz daha kaydırın.';
+
+  @override
+  String get panoramaStitchFailedError => 'Panorama birleştirilemedi';
+
+  @override
   String get cameraPermissionsRequiredMessage =>
       'Kamerayı kullanmak için kamera ve mikrofon izinleri gerekli.';
 

@@ -4201,6 +4201,65 @@ class AppLocalizationsEn extends AppLocalizations {
   String get unknownErrorFallback => 'unknown error';
 
   @override
+  String get panoramaModeWide => 'Wide';
+
+  @override
+  String get panoramaStitching => 'Stitching…';
+
+  @override
+  String panoramaShotCount(int count) {
+    return 'Shots: $count';
+  }
+
+  @override
+  String get panoramaWaitingForMotionSensor => 'Waiting for the motion sensor…';
+
+  @override
+  String get panoramaStartSphereHint => 'Tap the shutter, then aim at each dot';
+
+  @override
+  String get panoramaStartWideHint => 'Tap the shutter, then sweep smoothly';
+
+  @override
+  String get panoramaHoldStillHint => 'Hold still…';
+
+  @override
+  String get panoramaKeepVerticallyAlignedHint => 'Keep aligned vertically';
+
+  @override
+  String get panoramaKeepLevelHint => 'Keep the phone level';
+
+  @override
+  String get panoramaAimAtDotOrHoldStillHint =>
+      'Aim at a dot (or hold still to snap)';
+
+  @override
+  String get panoramaSlowDownHint => 'Slow down';
+
+  @override
+  String get panoramaAimAtDotHint => 'Aim at a dot';
+
+  @override
+  String panoramaFollowLineHint(String done) {
+    return 'Follow the line — tap $done when finished';
+  }
+
+  @override
+  String get panoramaNoMotionSensorError =>
+      'This device has no motion sensor for panoramas';
+
+  @override
+  String get panoramaRearCameraRequiredError =>
+      'Panoramas need the rear camera';
+
+  @override
+  String get panoramaNotEnoughPhotosError =>
+      'Not enough photos. Keep sweeping a little longer.';
+
+  @override
+  String get panoramaStitchFailedError => 'Could not stitch the panorama';
+
+  @override
   String get cameraPermissionsRequiredMessage =>
       'Camera and microphone permissions are required to use the camera.';
 

@@ -4291,6 +4291,68 @@ class AppLocalizationsUk extends AppLocalizations {
   String get unknownErrorFallback => 'невідома помилка';
 
   @override
+  String get panoramaModeWide => 'Широкий';
+
+  @override
+  String get panoramaStitching => 'Об’єднання панорами…';
+
+  @override
+  String panoramaShotCount(int count) {
+    return 'Знімки: $count';
+  }
+
+  @override
+  String get panoramaWaitingForMotionSensor => 'Очікування датчика руху…';
+
+  @override
+  String get panoramaStartSphereHint =>
+      'Натисніть кнопку затвора, потім наведіть її на кожну точку';
+
+  @override
+  String get panoramaStartWideHint =>
+      'Натисніть кнопку затвора, потім плавно повертайте телефон';
+
+  @override
+  String get panoramaHoldStillHint => 'Не рухайтеся…';
+
+  @override
+  String get panoramaKeepVerticallyAlignedHint =>
+      'Тримайте вертикальне вирівнювання';
+
+  @override
+  String get panoramaKeepLevelHint => 'Тримайте телефон рівно';
+
+  @override
+  String get panoramaAimAtDotOrHoldStillHint =>
+      'Наведіть на точку (або не рухайтеся для зйомки)';
+
+  @override
+  String get panoramaSlowDownHint => 'Рухайтеся повільніше';
+
+  @override
+  String get panoramaAimAtDotHint => 'Наведіть на точку';
+
+  @override
+  String panoramaFollowLineHint(String done) {
+    return 'Дотримуйтеся лінії — натисніть «$done», щоб завершити';
+  }
+
+  @override
+  String get panoramaNoMotionSensorError =>
+      'На цьому пристрої немає датчика руху для панорамної зйомки';
+
+  @override
+  String get panoramaRearCameraRequiredError =>
+      'Для панорам потрібна задня камера';
+
+  @override
+  String get panoramaNotEnoughPhotosError =>
+      'Недостатньо фото. Продовжуйте рух ще трохи.';
+
+  @override
+  String get panoramaStitchFailedError => 'Не вдалося об’єднати панораму';
+
+  @override
   String get cameraPermissionsRequiredMessage =>
       'Для використання камери потрібні дозволи на камеру та мікрофон.';
 

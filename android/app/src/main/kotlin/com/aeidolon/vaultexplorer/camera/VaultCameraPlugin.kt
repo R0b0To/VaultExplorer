@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
+import com.aeidolon.vaultexplorer.panorama.PanoramaStore
 import android.hardware.camera2.CameraManager
 import android.os.Build
 import android.os.Handler
@@ -227,21 +228,55 @@ class VaultCameraPlugin(
                     val orientationDegrees = (args["orientationDegrees"] as? Number)
                         ?.toInt()
                         ?.let { ((it % 360) + 360) % 360 }
-                    session.capturePhoto(aspectRatio, orientationDegrees) { ok, bytes, thumbBytes, error ->
-                        mainHandler.post {
-                            if (ok && bytes != null) {
-                                result.success(
-                                    mapOf<String, Any?>(
-                                        "success" to true,
-                                        "bytes" to bytes,
-                                        "thumbnail" to thumbBytes,
+                    val forPanorama = args["panorama"] as? Boolean ?: false
+                    if (forPanorama) {
+                        session.capturePanoramaPhoto(orientationDegrees) { ok, bytes, rotDeg, pose, motionRad, error ->
+                            mainHandler.post {
+                                if (ok && bytes != null) {
+                                    PanoramaStore.setPending(bytes, rotDeg)
+                                    result.success(
+                                        mapOf<String, Any?>(
+                                            "success" to true,
+                                            "pose" to pose?.map { it.toDouble() },
+                                            "motionRad" to motionRad?.toDouble(),
+                                        )
                                     )
-                                )
-                            } else {
-                                result.success(mapOf<String, Any?>("success" to false, "error" to error))
+                                } else {
+                                    result.success(mapOf<String, Any?>("success" to false, "error" to error))
+                                }
+                            }
+                        }
+                    } else {
+                        session.capturePhoto(aspectRatio, orientationDegrees) { ok, bytes, thumbBytes, error ->
+                            mainHandler.post {
+                                if (ok && bytes != null) {
+                                    result.success(
+                                        mapOf<String, Any?>(
+                                            "success" to true,
+                                            "bytes" to bytes,
+                                            "thumbnail" to thumbBytes,
+                                        )
+                                    )
+                                } else {
+                                    result.success(mapOf<String, Any?>("success" to false, "error" to error))
+                                }
                             }
                         }
                     }
+                }
+                "setPanoramaMode" -> withSession(call, result) { session, args ->
+                    val enabled = args["enabled"] as? Boolean ?: false
+                    session.setPanoramaMode(enabled) {
+                        mainHandler.post { result.success(null) }
+                    }
+                }
+                "setPanoramaCaptureActive" -> withSession(call, result) { session, args ->
+                    val active = args["active"] as? Boolean ?: false
+                    session.setPanoramaCaptureActive(active)
+                    result.success(null)
+                }
+                "getFieldOfView" -> withSession(call, result) { session, _ ->
+                    result.success(session.fieldOfViewHalfTangent())
                 }
                 "savePhotoToVault" -> {
                     val args = call.arguments as? Map<*, *> ?: emptyMap<String, Any?>()

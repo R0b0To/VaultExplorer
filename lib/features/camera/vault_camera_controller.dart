@@ -339,9 +339,13 @@ class VaultCameraController {
     });
   }
 
+  /// With [panorama] the photo stays on the native side, parked for the
+  /// panorama stitcher (see PanoramaChannel); `bytes` and `thumbnail` are then
+  /// null and `success` says whether the frame was taken.
   Future<({bool success, Uint8List? bytes, Uint8List? thumbnail, String? error})> capturePhoto({
     double? aspectRatio,
     int? orientationDegrees,
+    bool panorama = false,
   }) async {
     final sId = _sessionId;
     if (sId == null) return (success: false, bytes: null, thumbnail: null, error: 'Camera not open');
@@ -350,6 +354,7 @@ class VaultCameraController {
       'sessionId': sId,
       'aspectRatio': ?aspectRatio,
       'orientationDegrees': ?orientationDegrees,
+      if (panorama) 'panorama': true,
     });
 
     final ok = res?['success'] as bool? ?? false;
@@ -357,6 +362,71 @@ class VaultCameraController {
     final thumbnail = res?['thumbnail'] as Uint8List?;
     final error = res?['error'] as String?;
     return (success: ok, bytes: bytes, thumbnail: thumbnail, error: error);
+  }
+
+  /// Switches the native session between regular still capture and fast
+  /// streaming YUV panorama capture.
+  Future<void> setPanoramaMode(bool enabled) async {
+    final sId = _sessionId;
+    if (sId == null) return;
+    try {
+      await _channel.invokeMethod('setPanoramaMode', {
+        'sessionId': sId,
+        'enabled': enabled,
+      });
+    } catch (e) {
+      VeLog.w('VaultCameraController', 'setPanoramaMode failed', e);
+    }
+  }
+
+  /// Locks/unlocks white balance natively while a panorama capture is running.
+  Future<void> setPanoramaCaptureActive(bool active) async {
+    final sId = _sessionId;
+    if (sId == null) return;
+    try {
+      await _channel.invokeMethod('setPanoramaCaptureActive', {
+        'sessionId': sId,
+        'active': active,
+      });
+    } catch (e) {
+      VeLog.d('VaultCameraController', 'setPanoramaCaptureActive: ignored ($e)');
+    }
+  }
+
+  /// Captures a panorama frame parked natively and returns the exposure-time
+  /// pose & angular motion measured across the actual shutter window.
+  Future<({bool success, List<double>? pose, double? motionRad, String? error})>
+      capturePanoramaPhoto({int? orientationDegrees}) async {
+    final sId = _sessionId;
+    if (sId == null) {
+      return (success: false, pose: null, motionRad: null, error: 'Camera not open');
+    }
+    final res = await _channel.invokeMethod<Map<dynamic, dynamic>>('capturePhoto', {
+      'sessionId': sId,
+      'orientationDegrees': ?orientationDegrees,
+      'panorama': true,
+    });
+    final ok = res?['success'] as bool? ?? false;
+    final rawPose = res?['pose'] as List<dynamic>?;
+    final pose = rawPose != null && rawPose.length >= 9
+        ? List<double>.generate(9, (i) => (rawPose[i] as num).toDouble())
+        : null;
+    final motionRad = (res?['motionRad'] as num?)?.toDouble();
+    final error = res?['error'] as String?;
+    return (success: ok, pose: pose, motionRad: motionRad, error: error);
+  }
+
+  /// tan(half the field of view) along the photo's long edge at the current
+  /// zoom, or null when the lens data is unavailable.
+  Future<double?> getFieldOfView() async {
+    final sId = _sessionId;
+    if (sId == null) return null;
+    try {
+      final v = await _channel.invokeMethod<double>('getFieldOfView', {'sessionId': sId});
+      return (v != null && v.isFinite && v > 0) ? v : null;
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<bool> savePhotoToVault({

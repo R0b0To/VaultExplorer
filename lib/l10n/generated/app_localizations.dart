@@ -7184,6 +7184,108 @@ abstract class AppLocalizations {
   /// **'unknown error'**
   String get unknownErrorFallback;
 
+  /// Label for the wide panorama capture mode
+  ///
+  /// In en, this message translates to:
+  /// **'Wide'**
+  String get panoramaModeWide;
+
+  /// Progress label while panorama photos are being stitched
+  ///
+  /// In en, this message translates to:
+  /// **'Stitching…'**
+  String get panoramaStitching;
+
+  /// Count label for photos captured in a wide panorama
+  ///
+  /// In en, this message translates to:
+  /// **'Shots: {count}'**
+  String panoramaShotCount(int count);
+
+  /// Hint shown while waiting for motion sensor data
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the motion sensor…'**
+  String get panoramaWaitingForMotionSensor;
+
+  /// Starting instruction for photo-sphere capture
+  ///
+  /// In en, this message translates to:
+  /// **'Tap the shutter, then aim at each dot'**
+  String get panoramaStartSphereHint;
+
+  /// Starting instruction for wide panorama capture
+  ///
+  /// In en, this message translates to:
+  /// **'Tap the shutter, then sweep smoothly'**
+  String get panoramaStartWideHint;
+
+  /// Capture guidance asking the user to hold still
+  ///
+  /// In en, this message translates to:
+  /// **'Hold still…'**
+  String get panoramaHoldStillHint;
+
+  /// Capture guidance to keep the phone vertically aligned
+  ///
+  /// In en, this message translates to:
+  /// **'Keep aligned vertically'**
+  String get panoramaKeepVerticallyAlignedHint;
+
+  /// Capture guidance to keep the phone level
+  ///
+  /// In en, this message translates to:
+  /// **'Keep the phone level'**
+  String get panoramaKeepLevelHint;
+
+  /// Photo-sphere guidance to aim at a target dot or hold still
+  ///
+  /// In en, this message translates to:
+  /// **'Aim at a dot (or hold still to snap)'**
+  String get panoramaAimAtDotOrHoldStillHint;
+
+  /// Capture guidance to slow down the phone movement
+  ///
+  /// In en, this message translates to:
+  /// **'Slow down'**
+  String get panoramaSlowDownHint;
+
+  /// Photo-sphere guidance to aim at a target dot
+  ///
+  /// In en, this message translates to:
+  /// **'Aim at a dot'**
+  String get panoramaAimAtDotHint;
+
+  /// Wide panorama guidance to follow the line and finish
+  ///
+  /// In en, this message translates to:
+  /// **'Follow the line — tap {done} when finished'**
+  String panoramaFollowLineHint(String done);
+
+  /// Error shown when the device has no motion sensor for panorama capture
+  ///
+  /// In en, this message translates to:
+  /// **'This device has no motion sensor for panoramas'**
+  String get panoramaNoMotionSensorError;
+
+  /// Error shown when panorama capture requires the rear camera
+  ///
+  /// In en, this message translates to:
+  /// **'Panoramas need the rear camera'**
+  String get panoramaRearCameraRequiredError;
+
+  /// Error shown when too few photos were captured for a panorama
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough photos. Keep sweeping a little longer.'**
+  String get panoramaNotEnoughPhotosError;
+
+  /// Error shown when panorama stitching fails
+  ///
+  /// In en, this message translates to:
+  /// **'Could not stitch the panorama'**
+  String get panoramaStitchFailedError;
+
   /// Error message shown when camera/microphone permissions are denied
   ///
   /// In en, this message translates to:

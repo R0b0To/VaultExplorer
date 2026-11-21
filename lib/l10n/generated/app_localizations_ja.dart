@@ -4058,6 +4058,61 @@ class AppLocalizationsJa extends AppLocalizations {
   String get unknownErrorFallback => '不明なエラー';
 
   @override
+  String get panoramaModeWide => 'パノラマ';
+
+  @override
+  String get panoramaStitching => '画像を合成中…';
+
+  @override
+  String panoramaShotCount(int count) {
+    return '撮影枚数: $count';
+  }
+
+  @override
+  String get panoramaWaitingForMotionSensor => 'モーションセンサーを待っています…';
+
+  @override
+  String get panoramaStartSphereHint => 'シャッターを押してから、各点にカメラを向けてください';
+
+  @override
+  String get panoramaStartWideHint => 'シャッターを押してから、滑らかに動かしてください';
+
+  @override
+  String get panoramaHoldStillHint => '動かさないでください…';
+
+  @override
+  String get panoramaKeepVerticallyAlignedHint => '縦方向を合わせてください';
+
+  @override
+  String get panoramaKeepLevelHint => 'スマートフォンを水平に保ってください';
+
+  @override
+  String get panoramaAimAtDotOrHoldStillHint => '点に向けてください（撮影時は静止してください）';
+
+  @override
+  String get panoramaSlowDownHint => 'ゆっくり動かしてください';
+
+  @override
+  String get panoramaAimAtDotHint => '点に向けてください';
+
+  @override
+  String panoramaFollowLineHint(String done) {
+    return '線に沿って動かし、完了したら「$done」を押してください';
+  }
+
+  @override
+  String get panoramaNoMotionSensorError => 'この端末にはパノラマ撮影用のモーションセンサーがありません';
+
+  @override
+  String get panoramaRearCameraRequiredError => 'パノラマ撮影には背面カメラが必要です';
+
+  @override
+  String get panoramaNotEnoughPhotosError => '写真が足りません。もう少し動かしてください。';
+
+  @override
+  String get panoramaStitchFailedError => 'パノラマを合成できませんでした';
+
+  @override
   String get cameraPermissionsRequiredMessage => 'カメラを使用するには、カメラとマイクの権限が必要です。';
 
   @override

@@ -338,17 +338,33 @@ private fun auxStop(
 // ── Intrinsic zoom ratio (port of CameraX IntrinsicZoomCalculator) ─────────
 
 /** tan(horizontal field of view / 2) of [c] at its default focal length, or null. */
-private fun halfFovTangent(c: CameraCharacteristics): Double? {
+private fun halfFovTangent(c: CameraCharacteristics, photoAspect: Double? = null): Double? {
     val focal = c.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)?.firstOrNull() ?: return null
     val physical = c.get(CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE) ?: return null
     val active = c.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE) ?: return null
     val pixelArray = c.get(CameraCharacteristics.SENSOR_INFO_PIXEL_ARRAY_SIZE) ?: return null
-    if (focal <= 0f || physical.width <= 0f || pixelArray.width <= 0) return null
-    // Sensor width actually used for the image (the active area of the pixel array).
-    val widthMm = physical.width.toDouble() * active.width().toDouble() / pixelArray.width.toDouble()
-    if (widthMm <= 0.0) return null
-    return widthMm / (2.0 * focal)
+    if (focal <= 0f || physical.width <= 0f || physical.height <= 0f ||
+        pixelArray.width <= 0 || pixelArray.height <= 0
+    ) {
+        return null
+    }
+    val activeWidthMm = physical.width.toDouble() * active.width().toDouble() / pixelArray.width.toDouble()
+    val activeHeightMm = physical.height.toDouble() * active.height().toDouble() / pixelArray.height.toDouble()
+    val longMm = maxOf(activeWidthMm, activeHeightMm)
+    val shortMm = minOf(activeWidthMm, activeHeightMm)
+    if (longMm <= 0.0 || shortMm <= 0.0) return null
+    val usedLongMm = if (photoAspect != null && photoAspect > 0.0) {
+        val sensorAspect = longMm / shortMm
+        if (photoAspect >= sensorAspect) longMm else shortMm * photoAspect
+    } else {
+        longMm
+    }
+    return usedLongMm / (2.0 * focal)
 }
+
+/** [halfFovTangent] for code outside this file (the panorama stitcher needs the lens' field of view). */
+internal fun halfFovTangentOf(c: CameraCharacteristics, photoAspect: Double? = null): Double? =
+    halfFovTangent(c, photoAspect)
 
 private fun intrinsicRatio(c: CameraCharacteristics, reference: CameraCharacteristics): Float? {
     val own = halfFovTangent(c) ?: return null

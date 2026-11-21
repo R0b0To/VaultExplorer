@@ -451,7 +451,7 @@ class FileRowShell extends StatelessWidget {
                             ),
                           ),
                   ),
-                  if (!isCompact &&
+                  if ((tableColumns || !isCompact) &&
                       !effectiveDetailed &&
                       detailColumns.isNotEmpty) ...[
                     for (int i = 0; i < detailColumns.length; i++) ...[

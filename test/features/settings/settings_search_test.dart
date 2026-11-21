@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/features/settings/search/settings_search_index.dart';
 import 'package:vaultexplorer/features/settings/search/settings_search_matcher.dart';
 import 'package:vaultexplorer/features/settings/search/settings_search_models.dart';
@@ -99,7 +100,20 @@ void main() {
 
   group('settings search registry', () {
     final l10n = AppLocalizationsEn();
-    final resolved = resolveSettingsSearchIndex(l10n, androidSdkInt: 36);
+    bool? previousDesktopOverride;
+    late List<ResolvedSettingsEntry> resolved;
+
+    setUp(() {
+      previousDesktopOverride = PlatformFeatures.debugIsDesktopOverride;
+      // These registry assertions describe Android settings across API levels,
+      // regardless of the operating system running the test suite (e.g. CI).
+      PlatformFeatures.debugIsDesktopOverride = false;
+      resolved = resolveSettingsSearchIndex(l10n, androidSdkInt: 36);
+    });
+
+    tearDown(() {
+      PlatformFeatures.debugIsDesktopOverride = previousDesktopOverride;
+    });
 
     test('entry ids are unique', () {
       final ids = [for (final e in kSettingsSearchEntries) e.id];

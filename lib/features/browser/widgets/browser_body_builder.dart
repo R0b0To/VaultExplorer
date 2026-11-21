@@ -208,9 +208,13 @@ Widget buildBrowserBody(
       onFileTap: onFileTap,
       onItemLongPress: onItemLongPress,
       onFileLongMenu: onItemMoreTap,
-      // Off: the icon is part of the row, so a tap opens the item and
-      // selecting starts with a long press.
-      onIconTap: toolbarConfig.selectByIcon ? onIconTap : null,
+      // In double-click mode the icon follows the row behavior too: the
+      // first click selects and the second opens. Otherwise it can be a
+      // dedicated selection target when that option is enabled.
+      onIconTap:
+          toolbarConfig.selectByIcon && !toolbarConfig.doubleClickToOpen
+          ? onIconTap
+          : null,
       onSelectionChanged: onSelectionChanged,
       enableFileDrag: enableFileDrag,
       onFileDrop: onFileDrop,

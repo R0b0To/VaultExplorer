@@ -61,10 +61,10 @@ const double kBrowserTabStripHeight = 40;
 const double kBrowserTabItemWidth = 148;
 
 /// File-manager tab strip with a horizontally scrollable reorderable row of
-/// tabs and a fixed new-tab button. Tapping switches tabs; tapping the active
-/// tab opens its operation menu; long-press and drag reorder tabs. The tab
-/// controller retains its horizontal offset while the strip moves between
-/// screens.
+/// tabs and a new-tab button immediately after the last tab. Tapping switches
+/// tabs; tapping the active tab opens its operation menu; long-press and drag
+/// reorder tabs. The tab controller retains its horizontal offset while the
+/// strip moves between screens.
 ///
 /// With a [pane] the strip belongs to that pane in the dual-pane layout: it
 /// lists only the pane's own tabs, switching a tab changes only that pane, the
@@ -444,7 +444,6 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
                   '${widget.storageKey}-${pane?.name ?? 'all'}',
                 ),
                 scrollController: _scrollController,
-                itemExtent: kBrowserTabItemWidth,
                 scrollDirection: Axis.horizontal,
                 clipBehavior: Clip.hardEdge,
                 buildDefaultDragHandles: false,
@@ -452,7 +451,7 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
                   horizontal: _stripPadding,
                   vertical: 3,
                 ),
-                itemCount: tabs.length,
+                itemCount: tabs.length + 1,
                 onReorderStart: (index) {
                   HapticFeedback.mediumImpact();
                   _draggingTabId = index >= 0 && index < tabs.length
@@ -481,6 +480,24 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
                   );
                 },
                 itemBuilder: (context, index) {
+                  if (index == tabs.length) {
+                    return SizedBox(
+                      key: ValueKey<String>(
+                        'new-tab-${pane?.name ?? 'all'}',
+                      ),
+                      width: 48,
+                      child: IconButton(
+                        icon: const Icon(Icons.add_rounded, size: 20),
+                        visualDensity: VisualDensity.compact,
+                        tooltip: context.l10n.browserTabNew,
+                        onPressed: () {
+                          // The new tab joins the pane whose + was pressed.
+                          if (pane != null) actions.focusPane(pane);
+                          widget.onNewTab();
+                        },
+                      ),
+                    );
+                  }
                   final tab = tabs[index];
                   final itemKey = _tabItemKeys.putIfAbsent(
                     tab.tabId,
@@ -573,17 +590,6 @@ class _BrowserTabStripState extends ConsumerState<BrowserTabStrip> {
               ),
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.add_rounded, size: 20),
-            visualDensity: VisualDensity.compact,
-            tooltip: context.l10n.browserTabNew,
-            onPressed: () {
-              // The new tab joins the pane whose + was pressed.
-              if (pane != null) actions.focusPane(pane);
-              widget.onNewTab();
-            },
-          ),
-          const SizedBox(width: 4),
         ],
       ),
     );

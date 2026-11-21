@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/data/models/file_item_action.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/data/models/file_manager_skin.dart';
@@ -267,7 +268,7 @@ class FileManagerToolbarConfig {
     this.gridCornerStyle = GridCornerStyle.rounded,
     this.gridSpacing = defaultGridSpacing,
     this.showListThumbnails = true,
-    this.showItemActionsMenu = true,
+    this.showItemActionsMenu = false,
     this.selectByIcon = true,
     this.doubleClickToOpen = false,
     this.showFileExtensions = true,
@@ -290,7 +291,7 @@ class FileManagerToolbarConfig {
     this.skin = FileManagerSkin.classic,
   });
 
-  factory FileManagerToolbarConfig.defaults() => const FileManagerToolbarConfig(
+  factory FileManagerToolbarConfig.defaults() => FileManagerToolbarConfig(
     order: defaultActionOrder,
     hidden: {FileManagerAction.playMedia},
     showBreadcrumbBar: true,
@@ -330,9 +331,9 @@ class FileManagerToolbarConfig {
     gridCornerStyle: GridCornerStyle.rounded,
     gridSpacing: defaultGridSpacing,
     showListThumbnails: true,
-    showItemActionsMenu: true,
+    showItemActionsMenu: false,
     selectByIcon: true,
-    doubleClickToOpen: false,
+    doubleClickToOpen: PlatformFeatures.isDesktop,
     showFileExtensions: true,
     longFileNameDisplayMode: LongFileNameDisplayMode.ellipsizeEnd,
     listZoomLevel: 1.0,
@@ -1075,11 +1076,12 @@ class FileManagerToolbarConfig {
       gridSpacing: ((j['gridSpacing'] as num?)?.toInt() ?? defaultGridSpacing)
           .clamp(minGridSpacing, maxGridSpacing),
       showListThumbnails: j['showListThumbnails'] as bool? ?? true,
-      showItemActionsMenu: j['showItemActionsMenu'] as bool? ?? true,
+      showItemActionsMenu: j['showItemActionsMenu'] as bool? ?? false,
       // Absent in configs saved before these options existed -> the original
       // behavior (icon taps select; names shown in full).
       selectByIcon: j['selectByIcon'] as bool? ?? true,
-      doubleClickToOpen: j['doubleClickToOpen'] as bool? ?? false,
+      doubleClickToOpen:
+          j['doubleClickToOpen'] as bool? ?? PlatformFeatures.isDesktop,
       showFileExtensions: j['showFileExtensions'] as bool? ?? true,
       longFileNameDisplayMode: longFileNameDisplayMode,
       listZoomLevel: (j['listZoomLevel'] as num?)?.toDouble() ?? 1.0,

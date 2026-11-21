@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/data/models/file_item_action.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/data/models/file_manager_skin.dart';
@@ -54,7 +55,10 @@ void main() {
       await controller.setSelectByIcon(false);
       expect(container.read(provider).config.selectByIcon, isFalse);
 
-      expect(container.read(provider).config.doubleClickToOpen, isFalse);
+      expect(
+        container.read(provider).config.doubleClickToOpen,
+        PlatformFeatures.isDesktop,
+      );
       await controller.setDoubleClickToOpen(true);
       expect(container.read(provider).config.doubleClickToOpen, isTrue);
 

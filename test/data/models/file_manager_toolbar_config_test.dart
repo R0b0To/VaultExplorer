@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:ui' show Color;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vaultexplorer/core/utils/platform_features.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/data/models/file_item_action.dart';
 import 'package:vaultexplorer/data/models/file_manager_skin.dart';
@@ -742,8 +743,11 @@ void main() {
   });
 
   group('FileManagerToolbarConfig doubleClickToOpen', () {
-    test('is off by default, so one tap or click still opens an item', () {
-      expect(FileManagerToolbarConfig.defaults().doubleClickToOpen, isFalse);
+    test('defaults to the desktop file-manager interaction on desktop', () {
+      expect(
+        FileManagerToolbarConfig.defaults().doubleClickToOpen,
+        PlatformFeatures.isDesktop,
+      );
     });
 
     test('copyWith turns it on and back off', () {
@@ -765,12 +769,15 @@ void main() {
       expect(FileManagerToolbarConfig.fromJson(json).doubleClickToOpen, isTrue);
     });
 
-    test('a config saved before the option existed reads as off', () {
-      final config = FileManagerToolbarConfig.fromJson(<String, dynamic>{
-        'showBreadcrumbBar': true,
-      });
-      expect(config.doubleClickToOpen, isFalse);
-    });
+    test(
+      'a config saved before the option existed uses the platform default',
+      () {
+        final config = FileManagerToolbarConfig.fromJson(<String, dynamic>{
+          'showBreadcrumbBar': true,
+        });
+        expect(config.doubleClickToOpen, PlatformFeatures.isDesktop);
+      },
+    );
 
     test('travels with the behavior half of an export, not the look half', () {
       expect(FileManagerToolbarConfig.behaviorKeys, contains('doubleClickToOpen'));

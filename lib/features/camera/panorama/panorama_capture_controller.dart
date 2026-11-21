@@ -505,7 +505,9 @@ class PanoramaCaptureController extends ChangeNotifier {
     _rate = 0;
     try {
       await PanoramaChannel.cancel();
-    } catch (_) {}
+    } catch (_) {
+      // Best effort: the native session may already be gone when closing; reset() below clears local state anyway.
+    }
     reset();
   }
 

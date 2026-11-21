@@ -1,4 +1,5 @@
 #include "fv_engine.h"
+#include "fv_os.h"
 
 #include <algorithm>
 #include <cstring>
@@ -377,7 +378,7 @@ struct FileSource : ByteSource {
 }  // namespace
 
 bool ChunkedFileEngine::writeBackFile(const std::string& vpath, const std::string& sourceFile, Progress* p) {
-    int fd = ::open(sourceFile.c_str(), O_RDONLY | O_CLOEXEC);
+    int fd = osOpen(sourceFile.c_str(), O_RDONLY | O_CLOEXEC, 0);
     if (fd < 0) return false;
     FileSource src(fd);
     return writeFrom(vpath, src, p, false);
@@ -395,7 +396,7 @@ bool ChunkedFileEngine::extractFile(const std::string& vpath, const std::string&
         if (!host_.resolveForRead(path, physical)) return false;
         FdFile in = st_.openRead(physical, path);
         if (!in.valid()) return false;
-        FdFile dst(::open(destFile.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600));
+        FdFile dst(osOpen(destFile.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600));
         if (!dst.valid()) return false;
 
         const size_t hs = fmt_.headerSize();

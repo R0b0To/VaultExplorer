@@ -2,6 +2,21 @@ cmake_minimum_required(VERSION 3.18.0)
 
 project("vaultexplorer")
 
+# Desktop mode (Linux / Windows): build the engine as a plain shared library with a
+# C ABI (ffi/ve_engine.h) for dart:ffi, instead of the Android JNI library. The
+# engine core is shared; only the platform glue differs:
+#   Android: jni/*.cpp                    (JNI bridges + JVM callbacks)
+#   Desktop: ffi/ve_engine.cpp + ffi/ve_callbacks.cpp, with ffi/compat/ first on the
+#            include path (stand-ins for <jni.h> / <android/log.h>).
+# Off by default, so the Android build is exactly what it was.
+option(VAULTEXPLORER_DESKTOP "Build the desktop (dart:ffi) engine library instead of the Android JNI library" OFF)
+if(VAULTEXPLORER_DESKTOP)
+    # Every static dependency (mbedTLS, BoringSSL, libarchive, e2fsprogs bits, ...) is linked
+    # into one shared library, so it must all be PIC. The NDK toolchain does this implicitly;
+    # a desktop toolchain does not.
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+endif()
+
 # Strip CMAKE_BINARY_DIR (which contains .cxx/release/<hash>) from compiled C/C++ binaries
 add_compile_options("-ffile-prefix-map=${CMAKE_BINARY_DIR}=/build_tree")
 add_compile_options("-ffile-prefix-map=${CMAKE_SOURCE_DIR}=/source_tree")
@@ -32,7 +47,7 @@ endif()
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 
 # For x86/x86_64, disable ASM if NASM isn't present to avoid build failure
-if(ANDROID_ABI MATCHES "x86")
+if(ANDROID_ABI MATCHES "x86" OR (VAULTEXPLORER_DESKTOP AND WIN32))
     set(OPENSSL_NO_ASM ON CACHE BOOL "" FORCE)
 else()
     set(OPENSSL_NO_ASM OFF CACHE BOOL "" FORCE)
@@ -41,49 +56,53 @@ endif()
 FetchContent_MakeAvailable(boringssl)
 
 
-# ── AVIF Decoder (libgav1 + libavif) ──
-FetchContent_Declare(
-    libgav1
-    GIT_REPOSITORY https://chromium.googlesource.com/codecs/libgav1
-    GIT_TAG        c05bf9be660cf170d7c26bd06bb42b3322180e58
-)
-set(LIBGAV1_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
-set(LIBGAV1_ENABLE_EXAMPLES OFF CACHE BOOL "" FORCE)
-if(NOT ANDROID)
-    # Without this, libgav1's own CMakeLists.txt requires Abseil for the
-    # core library (not just its tests/examples, which are already off
-    # above) -- LIBGAV1_THREADPOOL_USE_STD_MUTEX defaults to 1 (std::mutex,
-    # no Abseil) only on Android & iOS, and to 0 otherwise, per libgav1's
-    # README. That default-0 case is exactly what breaks the "Native
-    # host-side tests (no NDK)" CI job: it configures this same
-    # CMakeLists.txt without the Android toolchain, so libgav1 falls back
-    # to absl::Mutex and fails configure with "Abseil not found" -- even
-    # though none of the host tests touch libgav1/AVIF decoding at all.
-    # Gated on NOT ANDROID so the real Android build never sets this and
-    # keeps getting libgav1's own default-1 behavior untouched -- setting
-    # it unconditionally previously broke the real Android/NDK build.
-    set(LIBGAV1_THREADPOOL_USE_STD_MUTEX "1" CACHE STRING "" FORCE)
-endif()
-FetchContent_MakeAvailable(libgav1)
-
-if(TARGET libgav1_static)
-    target_include_directories(libgav1_static PUBLIC ${libgav1_SOURCE_DIR}/src)
-    if(NOT TARGET libgav1::libgav1)
-        add_library(libgav1::libgav1 ALIAS libgav1_static)
+# AVIF decoding is only reachable through jni/avif_bridge.cpp today, so the desktop
+# build skips libgav1 + libavif entirely.
+if(NOT VAULTEXPLORER_DESKTOP)
+    # ── AVIF Decoder (libgav1 + libavif) ──
+    FetchContent_Declare(
+        libgav1
+        GIT_REPOSITORY https://chromium.googlesource.com/codecs/libgav1
+        GIT_TAG        c05bf9be660cf170d7c26bd06bb42b3322180e58
+    )
+    set(LIBGAV1_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
+    set(LIBGAV1_ENABLE_EXAMPLES OFF CACHE BOOL "" FORCE)
+    if(NOT ANDROID)
+        # Without this, libgav1's own CMakeLists.txt requires Abseil for the
+        # core library (not just its tests/examples, which are already off
+        # above) -- LIBGAV1_THREADPOOL_USE_STD_MUTEX defaults to 1 (std::mutex,
+        # no Abseil) only on Android & iOS, and to 0 otherwise, per libgav1's
+        # README. That default-0 case is exactly what breaks the "Native
+        # host-side tests (no NDK)" CI job: it configures this same
+        # CMakeLists.txt without the Android toolchain, so libgav1 falls back
+        # to absl::Mutex and fails configure with "Abseil not found" -- even
+        # though none of the host tests touch libgav1/AVIF decoding at all.
+        # Gated on NOT ANDROID so the real Android build never sets this and
+        # keeps getting libgav1's own default-1 behavior untouched -- setting
+        # it unconditionally previously broke the real Android/NDK build.
+        set(LIBGAV1_THREADPOOL_USE_STD_MUTEX "1" CACHE STRING "" FORCE)
     endif()
-    set(libgav1_FOUND TRUE CACHE BOOL "" FORCE)
-endif()
+    FetchContent_MakeAvailable(libgav1)
 
-FetchContent_Declare(
-    libavif
-    GIT_REPOSITORY https://github.com/AOMediaCodec/libavif.git
-    GIT_TAG        c5240fc79fe5c2407e10afd35f5505ef6333ea49
-)
-set(AVIF_CODEC_LIBGAV1 SYSTEM CACHE STRING "" FORCE)
-set(AVIF_LIBYUV LOCAL CACHE STRING "" FORCE)
-set(AVIF_BUILD_APPS OFF CACHE BOOL "" FORCE)
-set(AVIF_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(libavif)
+    if(TARGET libgav1_static)
+        target_include_directories(libgav1_static PUBLIC ${libgav1_SOURCE_DIR}/src)
+        if(NOT TARGET libgav1::libgav1)
+            add_library(libgav1::libgav1 ALIAS libgav1_static)
+        endif()
+        set(libgav1_FOUND TRUE CACHE BOOL "" FORCE)
+    endif()
+
+    FetchContent_Declare(
+        libavif
+        GIT_REPOSITORY https://github.com/AOMediaCodec/libavif.git
+        GIT_TAG        c5240fc79fe5c2407e10afd35f5505ef6333ea49
+    )
+    set(AVIF_CODEC_LIBGAV1 SYSTEM CACHE STRING "" FORCE)
+    set(AVIF_LIBYUV LOCAL CACHE STRING "" FORCE)
+    set(AVIF_BUILD_APPS OFF CACHE BOOL "" FORCE)
+    set(AVIF_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(libavif)
+endif()
 
 # Enable ARMv8 Cryptography Extensions ONLY for ARM targets
 if(ANDROID_ABI STREQUAL "arm64-v8a")
@@ -95,25 +114,53 @@ endif()
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# 1z. ZXing-C++ (Lightweight offline barcode/QR decoder)
-FetchContent_Declare(
-    zxing_cpp
-    GIT_REPOSITORY https://github.com/zxing-cpp/zxing-cpp.git
-    GIT_TAG        v3.1.1
-)
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-set(ZXING_READERS ON CACHE BOOL "" FORCE)
-set(ZXING_WRITERS OFF CACHE BOOL "" FORCE)
-set(ZXING_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(ZXING_C_API OFF CACHE BOOL "" FORCE)
-set(ZXING_UNIT_TESTS OFF CACHE BOOL "" FORCE)
-set(ZXING_BLACKBOX_TESTS OFF CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(zxing_cpp)
+if(NOT VAULTEXPLORER_DESKTOP)  # ZXing is only used by jni/qr_bridge.cpp
+    # 1z. ZXing-C++ (Lightweight offline barcode/QR decoder)
+    FetchContent_Declare(
+        zxing_cpp
+        GIT_REPOSITORY https://github.com/zxing-cpp/zxing-cpp.git
+        GIT_TAG        v3.1.1
+    )
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+    set(ZXING_READERS ON CACHE BOOL "" FORCE)
+    set(ZXING_WRITERS OFF CACHE BOOL "" FORCE)
+    set(ZXING_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(ZXING_C_API OFF CACHE BOOL "" FORCE)
+    set(ZXING_UNIT_TESTS OFF CACHE BOOL "" FORCE)
+    set(ZXING_BLACKBOX_TESTS OFF CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(zxing_cpp)
+endif()
 
 # 1a. Archive engine (libarchive + its compression filters) -- see
 # archive_deps.cmake's file-level comment for what's vendored vs. reused
 # from the NDK/BoringSSL, and for a caveat on what could/couldn't be
 # verified without an actual Android build.
+if(VAULTEXPLORER_DESKTOP AND WIN32)
+    # The NDK and a Linux host provide libz; a MinGW toolchain has none, so vendor it. libarchive's own
+    # find_package(ZLIB) is pre-seeded below so it uses this copy instead of searching.
+    FetchContent_Declare(
+            zlib_upstream
+            GIT_REPOSITORY https://github.com/madler/zlib.git
+            GIT_TAG        v1.3.1
+            GIT_SHALLOW    TRUE
+    )
+    set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(SKIP_INSTALL_ALL ON CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(zlib_upstream)
+    set(VE_ZLIB_LIB zlibstatic)
+    set(VE_ZLIB_INCLUDE_DIRS ${zlib_upstream_SOURCE_DIR} ${zlib_upstream_BINARY_DIR})
+    set(ZLIB_FOUND TRUE CACHE BOOL "" FORCE)
+    set(ZLIB_INCLUDE_DIR ${zlib_upstream_SOURCE_DIR} CACHE PATH "" FORCE)
+    set(ZLIB_INCLUDE_DIRS "${VE_ZLIB_INCLUDE_DIRS}" CACHE STRING "" FORCE)
+    set(ZLIB_LIBRARY zlibstatic CACHE STRING "" FORCE)
+    set(ZLIB_LIBRARIES zlibstatic CACHE STRING "" FORCE)
+    set(HAVE_LIBZ 1 CACHE BOOL "" FORCE)
+    set(HAVE_ZLIB_H 1 CACHE BOOL "" FORCE)
+else()
+    set(VE_ZLIB_LIB z)
+    set(VE_ZLIB_INCLUDE_DIRS "")
+endif()
+
 include(${CMAKE_CURRENT_SOURCE_DIR}/archive_deps.cmake)
 
 # 2. Download ChaN's FatFs (Filesystem Engine)
@@ -269,13 +316,22 @@ foreach(E2FS_TARGET e2fs_com_err e2fs_uuid e2fs_ext2fs)
             ${CMAKE_CURRENT_BINARY_DIR} ${E2FS_GENERATED_DIR}
             ${E2FS_SRC_DIR}/lib ${E2FS_SRC_DIR}/lib/et
             ${E2FS_SRC_DIR}/lib/uuid ${E2FS_EXT2FS_DIR})
-    target_compile_definitions(${E2FS_TARGET} PRIVATE
+    set(E2FS_DEFINITIONS
             HAVE_CONFIG_H HAVE_SYS_TYPES_H HAVE_SYS_STAT_H HAVE_UNISTD_H
             HAVE_STDLIB_H HAVE_STRING_H HAVE_ERRNO_H HAVE_INTTYPES_H
             HAVE_SNPRINTF HAVE_STRCASECMP HAVE_STRDUP HAVE_STRNLEN
             HAVE_PREAD HAVE_PWRITE HAVE_PREAD64 HAVE_PWRITE64
             HAVE_LINUX_TYPES_H HAVE_SYS_TIME_H HAVE_GETPAGESIZE
             CRC_LE_BITS=1 CRC_BE_BITS=1 DISABLE_BACKTRACE _GNU_SOURCE)
+    if(WIN32)
+        # No <linux/types.h> and no getpagesize() on a Windows C runtime (e2fsprogs falls back to constants).
+        list(REMOVE_ITEM E2FS_DEFINITIONS HAVE_LINUX_TYPES_H HAVE_GETPAGESIZE)
+        target_include_directories(${E2FS_TARGET} BEFORE PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ffi/compat_win)
+        # getuid() & co. (gen_uuid.c, getenv.c) -- declared, not implicitly guessed (an error from GCC 14 on)
+        target_compile_options(${E2FS_TARGET} PRIVATE
+                "$<$<COMPILE_LANGUAGE:C>:SHELL:-include ${CMAKE_CURRENT_SOURCE_DIR}/ffi/compat/ve_win_types.h>")
+    endif()
+    target_compile_definitions(${E2FS_TARGET} PRIVATE ${E2FS_DEFINITIONS})
 endforeach()
 target_include_directories(e2fs_ext2fs PRIVATE ${E2FS_SRC_DIR}/resize)
 target_link_libraries(e2fs_ext2fs PRIVATE e2fs_com_err e2fs_uuid)
@@ -314,6 +370,9 @@ set(CONFIG_H_CONTENT "
 #define HAVE_STRTOULL 1
 #define HAVE_GETTIMEOFDAY 1
 #define HAVE_SYS_TIME_H 1
+#define HAVE_STDINT_H 1
+#define HAVE_STDDEF_H 1
+#define HAVE_SYS_IOCTL_H 1
 #define HAVE_SYS_STAT_H 1
 #define HAVE_SYS_TYPES_H 1
 #define HAVE_UNISTD_H 1
@@ -361,6 +420,11 @@ struct hd_geometry {
 
 #endif
 ")
+if(WIN32)
+    # MinGW's C runtime has no <sys/sysmacros.h> (major/minor/makedev are defined just below) and no utimensat.
+    string(REPLACE "#define HAVE_SYS_SYSMACROS_H 1\n" "" CONFIG_H_CONTENT "${CONFIG_H_CONTENT}")
+    string(REPLACE "#define HAVE_UTIMENSAT 1\n" "" CONFIG_H_CONTENT "${CONFIG_H_CONTENT}")
+endif()
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/config.h "${CONFIG_H_CONTENT}")
 
 # 3c. VeraCrypt crypto primitives
@@ -422,9 +486,17 @@ set(NTFS_3G_SOURCES
     ${ntfs3g_SOURCE_DIR}/ntfsprogs/utils.c
 )
 
-# Argon2 SIMD sources for x86 / x86_64
+# Argon2 SIMD sources for x86 / x86_64. The reference dispatcher (ref.c) calls
+# fill_segment_sse2/avx2 whenever the *compiler* targets x86, so a desktop x86 build needs
+# them exactly like an Android x86 build does (ARM desktop builds fall back to ref.c).
 set(ARGON2_SIMD_SOURCES)
+set(VE_X86_TARGET OFF)
 if(ANDROID_ABI MATCHES "x86")
+    set(VE_X86_TARGET ON)
+elseif(VAULTEXPLORER_DESKTOP AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86|X86|AMD64|amd64|i[3-6]86)")
+    set(VE_X86_TARGET ON)
+endif()
+if(VE_X86_TARGET)
     set(ARGON2_SIMD_SOURCES
         ${VC_ARGON2_DIR}/src/opt_sse2.c
         ${VC_ARGON2_DIR}/src/opt_avx2.c
@@ -444,10 +516,20 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${CMAKE_CURRENT_S
 # foldervault/fv_vault.h). The shared primitives it builds on (scrypt, EME,
 # AES-SIV, XChaCha20, the CryFS block cipher) stay in crypto/ and are linked in
 # by the final target, so they are deliberately not listed here.
+# Windows: fv_storage.cpp is POSIX-only (opendir/fstatat/statvfs/utimensat), so Windows builds foldervault/fv_storage_win.cpp
+# instead -- the same Storage interface (PosixStorage) on the Win32 API, UTF-16 and \\?\ paths. The rest of the core
+# is platform-neutral.
+set(VE_FV_LIB "")
+set(VE_VOLMAN_LIB "")
+if(WIN32)
+    set(VE_FV_STORAGE_SOURCE foldervault/fv_storage_win.cpp)
+else()
+    set(VE_FV_STORAGE_SOURCE foldervault/fv_storage.cpp)
+endif()
 add_library(foldervault_core STATIC
         foldervault/fv_common.cpp
         foldervault/fv_crypto.cpp
-        foldervault/fv_storage.cpp
+        ${VE_FV_STORAGE_SOURCE}
         foldervault/fv_engine.cpp
         foldervault/fv_json.cpp
         foldervault/fv_gocryptfs.cpp
@@ -468,6 +550,12 @@ target_compile_options(foldervault_core PRIVATE -Wall -Wextra)
 # invisible in directory listings (fstatat -> EOVERFLOW) and cannot be read. The vaultexplorer target already
 # sets it, but this library is a separate target. No header exposes off_t, so PRIVATE is safe.
 target_compile_definitions(foldervault_core PRIVATE _FILE_OFFSET_BITS=64)
+if(WIN32)
+    # windows.h must not define min()/max() (the code uses std::min/std::max); fv_crypto.cpp draws its random
+    # bytes from BCryptGenRandom.
+    target_compile_definitions(foldervault_core PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+    target_link_libraries(foldervault_core PUBLIC bcrypt)
+endif()
 target_include_directories(foldervault_core PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${mbedtls_SOURCE_DIR}/include)
@@ -478,6 +566,11 @@ if(ANDROID)
     target_compile_definitions(foldervault_core PRIVATE FV_AEAD_EVP=1 FV_USE_USERENTROPY=1)
     target_link_libraries(foldervault_core PUBLIC crypto)
 endif()
+if(VAULTEXPLORER_DESKTOP)
+    # Same key-generation entropy mixing as Android (crypto/user_entropy.cpp is part of the engine).
+    target_compile_definitions(foldervault_core PRIVATE FV_USE_USERENTROPY=1)
+endif()
+set(VE_FV_LIB foldervault_core)
 
 # Transfer helpers: content hashing (MD5 / SHA-1 / SHA-256 / SHA-512, several in one pass)
 # and splitting / joining files into numbered parts, on abstract byte sources and sinks.
@@ -506,26 +599,26 @@ target_link_libraries(xfer_host PUBLIC xfer_core)
 # same calls (see volman/vm_manager.h). Folder vaults plug in through vm_foldervault;
 # block-device volumes through volman/vm_block_volume.cpp, which needs the engine
 # (volumes[], fs_ops.h) and is therefore compiled into the engine target below, not here.
-add_library(volman_core STATIC
-        volman/vm_manager.cpp
-        volman/vm_foldervault.cpp
-        volman/vm_xfer.cpp)
-set_target_properties(volman_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
-target_compile_features(volman_core PUBLIC cxx_std_20)
-target_compile_options(volman_core PRIVATE $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall> $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wextra>)
-target_include_directories(volman_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(volman_core PUBLIC foldervault_core xfer_core)
+if(TARGET foldervault_core)
+    add_library(volman_core STATIC
+            volman/vm_manager.cpp
+            volman/vm_foldervault.cpp
+            volman/vm_xfer.cpp)
+    set_target_properties(volman_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    target_compile_features(volman_core PUBLIC cxx_std_20)
+    target_compile_options(volman_core PRIVATE $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall> $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wextra>)
+    target_include_directories(volman_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(volman_core PUBLIC foldervault_core xfer_core)
+    set(VE_VOLMAN_LIB volman_core)
+endif()
 
 # 4. Build target
-add_library(
-        vaultexplorer
-        SHARED
+set(VE_ENGINE_SOURCES
         io/virtual_block_device.cpp
         jni/jni_bridge_common.cpp
         jni/crypto_bridge.cpp
         jni/foldervault_bridge.cpp
         jni/volman_bridge.cpp
-        volman/vm_block_volume.cpp
         jni/prims_bridge.cpp
         crypto/prims.cpp
         jni/session_bridge.cpp
@@ -603,15 +696,54 @@ add_library(
         jni/docscan_bridge.cpp
 )
 
+if(TARGET volman_core)
+    list(APPEND VE_ENGINE_SOURCES volman/vm_block_volume.cpp)
+endif()
+
+if(VAULTEXPLORER_DESKTOP)
+    # Drop every JNI bridge / JVM-callback file and add the C ABI + desktop callbacks.
+    list(FILTER VE_ENGINE_SOURCES EXCLUDE REGEX "^jni/")
+    list(APPEND VE_ENGINE_SOURCES
+            ffi/ve_engine.cpp
+            ffi/ve_crypto.cpp
+            ffi/ve_foldervault.cpp
+            ffi/ve_callbacks.cpp
+            ffi/ve_mount_fs.cpp
+            ffi/ve_mount_fuse.cpp)
+    if(WIN32)
+        # pread/pwrite over CRT descriptors + BCryptGenRandom (the only file that includes <windows.h>)
+        list(APPEND VE_ENGINE_SOURCES ffi/ve_win_platform.cpp)
+    endif()
+endif()
+
+add_library(vaultexplorer SHARED ${VE_ENGINE_SOURCES})
+
 if(ANDROID_ABI STREQUAL "arm64-v8a")
     target_compile_options(vaultexplorer PRIVATE -march=armv8-a+crypto+sha2)
 elseif(ANDROID_ABI STREQUAL "armeabi-v7a")
     target_compile_options(vaultexplorer PRIVATE -mfpu=neon)
 endif()
 
-target_link_options(vaultexplorer PRIVATE
-        "-Wl,-z,max-page-size=16384"
-        "-Wl,-z,common-page-size=16384")
+# GCC 14+ makes implicit function declarations a hard error, and some legacy C in the vendored
+# dependencies (ntfs-3g, e2fsprogs, dislocker) still relies on them. Desktop toolchains are GCC;
+# the Android NDK (clang) build keeps its flags exactly as before.
+if(VAULTEXPLORER_DESKTOP AND NOT MSVC)
+    set(VE_LEGACY_C_FLAGS -Wno-error=implicit-function-declaration -Wno-error=int-conversion
+                          -Wno-error=incompatible-pointer-types)
+    target_compile_options(vaultexplorer PRIVATE "$<$<COMPILE_LANGUAGE:C>:${VE_LEGACY_C_FLAGS}>")
+    # the other vendored legacy-C libraries built in this directory
+    foreach(VE_LEGACY_TARGET e2fs_com_err e2fs_ext2fs e2fs_uuid dislocker_lib)
+        if(TARGET ${VE_LEGACY_TARGET})
+            target_compile_options(${VE_LEGACY_TARGET} PRIVATE "$<$<COMPILE_LANGUAGE:C>:${VE_LEGACY_C_FLAGS}>")
+        endif()
+    endforeach()
+endif()
+
+if(NOT VAULTEXPLORER_DESKTOP)
+    target_link_options(vaultexplorer PRIVATE
+            "-Wl,-z,max-page-size=16384"
+            "-Wl,-z,common-page-size=16384")
+endif()
 
 set_source_files_properties(${VC_ARGON2_DIR}/src/core.c
         TARGET_DIRECTORY vaultexplorer
@@ -629,10 +761,18 @@ target_compile_definitions(vaultexplorer PRIVATE
 )
 
 # 5. Header search paths
+if(VAULTEXPLORER_DESKTOP)
+    # BEFORE: the stand-in <jni.h> / <android/log.h> must win over any JDK/NDK header.
+    target_include_directories(vaultexplorer BEFORE PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/ffi/compat)
+    target_include_directories(vaultexplorer PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ffi ${VE_ZLIB_INCLUDE_DIRS})
+else()
+    target_include_directories(vaultexplorer PRIVATE ${zxing_cpp_SOURCE_DIR}/core/src)
+endif()
+
 target_include_directories(
         vaultexplorer PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
-        ${zxing_cpp_SOURCE_DIR}/core/src
         ${CMAKE_CURRENT_SOURCE_DIR}/Common
         ${CMAKE_CURRENT_SOURCE_DIR}/crypto
         ${CMAKE_CURRENT_SOURCE_DIR}/jni
@@ -667,10 +807,20 @@ endif()
 
 target_compile_features(vaultexplorer PRIVATE cxx_std_20)
 
+# Same link order as before for Android (avif/libgav1 between dislocker and the
+# archive engine, ZXing last); the desktop build simply has none of the three.
+if(VAULTEXPLORER_DESKTOP)
+    set(VE_AVIF_LIBS "")
+    set(VE_ZXING_LIB "")
+else()
+    set(VE_AVIF_LIBS avif libgav1_static)
+    set(VE_ZXING_LIB ZXing::ZXing)
+endif()
+
 target_link_libraries(
         vaultexplorer
         ${log-lib}
-        z
+        ${VE_ZLIB_LIB}
         mbedcrypto
         crypto
         e2fs_ext2fs
@@ -678,12 +828,104 @@ target_link_libraries(
         e2fs_uuid
         cjson
         dislocker_lib
-        avif
-        libgav1_static
+        ${VE_AVIF_LIBS}
         ${ARCHIVE_ENGINE_LIBRARY}
-        ZXing::ZXing
-        foldervault_core
-        volman_core)
+        ${VE_ZXING_LIB}
+        ${VE_FV_LIB}
+        ${VE_VOLMAN_LIB})
+
+if(VAULTEXPLORER_DESKTOP)
+    find_package(Threads REQUIRED)
+    target_link_libraries(vaultexplorer Threads::Threads)
+    if(WIN32)
+        # OS mounts through WinFsp's FUSE 3 API (ffi/ve_mount_winfsp.cpp). winfsp-x64.dll is loaded at run time
+        # from WinFsp's install dir, so only WinFsp's *headers* (the "Developer" install component, or
+        # -DVE_WINFSP_INCLUDE_DIR=<winfsp>/inc) are needed to build. They are not vendored: WinFsp is
+        # GPLv3 with a FLOSS exception -- check that against this project's license.
+        find_path(VE_WINFSP_INCLUDE_DIR fuse3/fuse.h
+            PATHS "$ENV{ProgramFiles\(x86\)}/WinFsp/inc" "$ENV{ProgramFiles}/WinFsp/inc" "C:/Program Files (x86)/WinFsp/inc")
+        if(VE_WINFSP_INCLUDE_DIR)
+            target_sources(vaultexplorer PRIVATE ffi/ve_mount_winfsp.cpp)
+            target_compile_definitions(vaultexplorer PRIVATE VE_HAVE_WINFSP=1)
+            target_include_directories(vaultexplorer PRIVATE ${VE_WINFSP_INCLUDE_DIR})
+            message(STATUS "WinFsp headers found (${VE_WINFSP_INCLUDE_DIR}): OS mounts enabled")
+        else()
+            message(WARNING "WinFsp headers not found: building WITHOUT OS mounts (install WinFsp with the Developer component, or pass -DVE_WINFSP_INCLUDE_DIR=...)")
+        endif()
+    endif()
+    if(NOT WIN32)
+        # OS mounts (ffi/ve_mount_*.cpp). libfuse3 is dlopen()ed at runtime, so the library never links to it
+        # and still loads on machines without FUSE; only the *headers* are needed here, for the struct layouts.
+        find_path(VE_FUSE3_INCLUDE_DIR fuse3/fuse.h)
+        if(VE_FUSE3_INCLUDE_DIR)
+            target_compile_definitions(vaultexplorer PRIVATE VE_HAVE_FUSE3=1)
+            target_include_directories(vaultexplorer PRIVATE ${VE_FUSE3_INCLUDE_DIR})
+            set_source_files_properties(ffi/ve_mount_fuse.cpp PROPERTIES COMPILE_DEFINITIONS "_FILE_OFFSET_BITS=64")
+            message(STATUS "FUSE 3 headers found (${VE_FUSE3_INCLUDE_DIR}): OS mounts enabled")
+        else()
+            message(WARNING "\n  ***  libfuse3 development headers not found: building WITHOUT OS mounts  ***\n  Install them (Debian/Ubuntu/KDE neon: libfuse3-dev, Fedora/openSUSE: fuse3-devel, Arch: fuse3),\n  then rebuild the engine.\n")
+        endif()
+        target_link_libraries(vaultexplorer ${CMAKE_DL_LIBS})
+        target_sources(vaultexplorer PRIVATE ffi/ve_mount_places.cpp)  # sidebar entries (Dolphin / GTK bookmarks)
+    endif()
+    # (Windows used to define VE_NO_FOLDERVAULT here -- the "unsupported" stubs in ffi/ve_foldervault.cpp. The core now builds
+    # there; only a build without foldervault_core would still need the stubs.)
+    if(NOT VE_FV_LIB)
+        target_compile_definitions(vaultexplorer PRIVATE VE_NO_FOLDERVAULT=1)
+    endif()
+    if(WIN32)
+        # Self-contained DLL: link the MinGW runtime (libgcc / libstdc++ / winpthread) statically, so it depends
+        # only on system DLLs and a Flutter Windows bundle needs nothing from an MSYS2 install.
+        target_link_options(vaultexplorer PRIVATE -static)
+        target_link_libraries(vaultexplorer bcrypt ws2_32)  # BCryptGenRandom (ffi/ve_win_platform.cpp); htonl & co. (e2fsprogs)
+        # POSIX shims (pread/pwrite/...) for every engine C++ file; declarations only, no windows.h.
+        target_compile_options(vaultexplorer PRIVATE
+                "$<$<COMPILE_LANGUAGE:CXX>:SHELL:-include ${CMAKE_CURRENT_SOURCE_DIR}/ffi/compat/ve_win_compat.h>")
+        # ntfs-3g's ntfstime.h declares its own `struct timespec` unless glibc's marker is set;
+        # MinGW already has one (via <time.h>/pthread), so tell it so.
+        target_compile_definitions(vaultexplorer PRIVATE __timespec_defined=1)
+        # uid_t/gid_t, S_IFSOCK, flock/fcntl ... for the vendored C code (ntfs-3g); see ffi/compat/ve_win_types.h
+        target_compile_options(vaultexplorer PRIVATE
+                "$<$<COMPILE_LANGUAGE:C>:SHELL:-include ${CMAKE_CURRENT_SOURCE_DIR}/ffi/compat/ve_win_types.h>")
+    endif()
+    # Export only the ve_* C ABI (VE_API); keep every engine symbol private so the
+    # library cannot clash with anything the host process (Flutter) already loads.
+    if(UNIX AND NOT APPLE)
+        # The static dependencies (bzip2, zstd, mbedTLS, BoringSSL, ...) were not built with hidden
+        # visibility, so without this their symbols would be exported from the .so and could clash
+        # with copies already loaded into the host process. Only the ve_* ABI should be visible.
+        target_link_options(vaultexplorer PRIVATE "-Wl,--exclude-libs,ALL")
+    endif()
+    if(WIN32)
+        # POSIX header stand-ins (termios.h, pwd.h, grp.h, sys/ioctl.h, ...). Windows ONLY: on Linux they would
+        # shadow the real system headers.
+        target_include_directories(vaultexplorer BEFORE PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ffi/compat_win)
+        # MinGW would name it libvaultexplorer_engine.dll; the Dart loader expects vaultexplorer_engine.dll
+        set_target_properties(vaultexplorer PROPERTIES PREFIX "")
+    endif()
+    set_target_properties(vaultexplorer PROPERTIES
+            OUTPUT_NAME vaultexplorer_engine
+            C_VISIBILITY_PRESET hidden
+            CXX_VISIBILITY_PRESET hidden
+            VISIBILITY_INLINES_HIDDEN ON)
+
+    # Black-box smoke test: only touches the exported ve_* C ABI, like a dart:ffi host.
+    add_executable(ve_smoke_test ffi/test/ve_smoke_test.cpp)
+    target_include_directories(ve_smoke_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ffi)
+    target_link_libraries(ve_smoke_test vaultexplorer)
+    if(WIN32)
+        target_link_options(ve_smoke_test PRIVATE -static)
+    endif()
+
+    # Mount-layer test. It compiles ffi/ve_mount_fs.cpp into itself (the library keeps its internals
+    # hidden) and drives it through the exported ve_* ABI, on every container format and a folder vault.
+    # (POSIX-only: it drives real FUSE mounts with fusermount3, cp, sed, ...)
+    if(NOT WIN32)
+        add_executable(ve_mount_test ffi/test/ve_mount_test.cpp ffi/ve_mount_fs.cpp ffi/ve_mount_places.cpp)
+        target_include_directories(ve_mount_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ffi)
+        target_link_libraries(ve_mount_test vaultexplorer mbedcrypto)
+    endif()
+endif()
 
 
 set_source_files_properties(
@@ -860,6 +1102,11 @@ if(NOT ANDROID)
     add_executable(fvcli foldervault/test/fvcli.cpp ${FV_CRYPTO_SOURCES})
     target_link_libraries(fvcli foldervault_core mbedcrypto)
     list(APPEND VAULTEXPLORER_HOST_TESTS foldervault_test)
+    # The same scenarios on any platform's directory storage (Windows: fv_storage_win.cpp): empty-folder listing,
+    # create / find the config / unlock / work / unlock again for all three formats, Unicode and over-long paths.
+    add_executable(foldervault_storage_test foldervault/test/fv_storage_test.cpp ${FV_CRYPTO_SOURCES})
+    target_link_libraries(foldervault_storage_test foldervault_core mbedcrypto)
+    list(APPEND VAULTEXPLORER_HOST_TESTS foldervault_storage_test)
 
     # Volume manager: slots, streams, copy and close semantics on an in-memory
     # volume, plus real gocryptfs / Cryptomator / CryFS vaults behind the same

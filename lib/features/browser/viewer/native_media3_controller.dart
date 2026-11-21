@@ -7,6 +7,7 @@ import 'package:vaultexplorer/data/models/audio_equalizer_settings.dart';
 import 'package:vaultexplorer/data/models/media_decoder_mode.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_session_bridge.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
+import 'package:vaultexplorer/features/browser/viewer/video_playback_backend.dart';
 
 @immutable
 class AudioTrackInfo {
@@ -136,7 +137,8 @@ class MediaDiagnosticsInfo {
   }
 }
 
-class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
+class NativeMedia3Controller extends ValueNotifier<NativeVideoValue>
+    implements VideoPlaybackBackend {
   static const MethodChannel _cmdChannel = MethodChannel(
     'com.aeidolon.vaultexplorer/player',
   );

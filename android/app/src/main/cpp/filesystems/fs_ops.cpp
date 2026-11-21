@@ -79,6 +79,34 @@ bool fsWriteFileChunk(int volId, const std::string& path, uint64_t offset,
     }
 }
 
+bool fsWriteFileAt(int volId, const std::string& path, uint64_t offset,
+                   const uint8_t* data, size_t length) {
+    switch (volumes[volId].fsType) {
+        case VolumeState::FS_FATFS: return fatWriteFileAt(volId, path, offset, data, length);
+        case VolumeState::FS_NTFS:  return ntfsWriteFileAt(volId, path, offset, data, length);
+        case VolumeState::FS_EXT:   return extWriteFileAt(volId, path, offset, data, length);
+        default: return false;
+    }
+}
+
+bool fsTruncateFile(int volId, const std::string& path, uint64_t newSize) {
+    switch (volumes[volId].fsType) {
+        case VolumeState::FS_FATFS: return fatTruncateFile(volId, path, newSize);
+        case VolumeState::FS_NTFS:  return ntfsTruncateFile(volId, path, newSize);
+        case VolumeState::FS_EXT:   return extTruncateFile(volId, path, newSize);
+        default: return false;
+    }
+}
+
+bool fsCreateEmptyFile(int volId, const std::string& path) {
+    switch (volumes[volId].fsType) {
+        case VolumeState::FS_NTFS:  return ntfsCreateEmptyFile(volId, path);
+        case VolumeState::FS_FATFS: return fatWriteFileChunk(volId, path, 0, nullptr, 0);
+        case VolumeState::FS_EXT:   return extWriteFileChunk(volId, path, 0, nullptr, 0);
+        default: return false;
+    }
+}
+
 bool fsWriteBackFile(int volId, const std::string& targetPath, const std::string& sourceHostPath,
                       const CopyProgressCallback& onProgress) {
     switch (volumes[volId].fsType) {

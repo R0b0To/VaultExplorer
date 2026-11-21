@@ -24,6 +24,7 @@
 #include "crypto/cascade.h"
 #include "crypto/keyfile_mixing.h"
 #include "crypto/luks_header.h"
+#include "crypto/os_random.h"
 #include "crypto/user_entropy.h"
 #include "crypto/vc_header_layout.h"
 #include "crypto/xts_tweak.h"

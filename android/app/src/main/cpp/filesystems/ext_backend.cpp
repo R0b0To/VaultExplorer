@@ -1,5 +1,6 @@
 #include "ext_backend.h"
 #include "dir_entry_wire.h"
+#include "crypto/os_random.h"
 #include <algorithm>
 #include "platform/engine_log.h"
 #include <cstdio>
@@ -14,6 +15,7 @@
 #include "diskio.h"
 #include "volume_state.h"
 #include "filesystems/stream_handles.h"
+#include "io/host_file.h"
 // resize2fs engine (e2fsprogs resize/resize2fs.c, built into libext2fs -- see CMakeLists.txt). The progress
 // callback type is spelled with void* because ext2_resize_t is an opaque pointer here; we always pass null.
 extern "C" errcode_t resize_fs(ext2_filsys fs, blk64_t* new_size, int flags,
@@ -198,7 +200,7 @@ int openExtHostSource(const char* sourceHostPath) {
             return duplicated;
         }
     }
-    return open(sourceHostPath, O_RDONLY | O_CLOEXEC);
+    return hostOpen(sourceHostPath, O_RDONLY | O_CLOEXEC);
 }
 
 int openExtHostDest(const char* destHostPath) {
@@ -210,7 +212,7 @@ int openExtHostDest(const char* destHostPath) {
             return duplicated;
         }
     }
-    return open(destHostPath, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
+    return hostOpen(destHostPath, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
 }
 } // namespace
 
@@ -495,12 +497,10 @@ bool formatExtVolume(int volumeId, const char* variant) {
     fs->super->s_mtime = now;
     fs->super->s_wtime = now;
     unsigned char uuid[16];
-    if (FILE* random = fopen("/dev/urandom", "rb")) {
-        fread(uuid, 1, sizeof(uuid), random);
+    if (osRandomBytes(uuid, sizeof(uuid))) {
         uuid[6] = (uuid[6] & 0x0F) | 0x40;
         uuid[8] = (uuid[8] & 0x3F) | 0x80;
         std::memcpy(fs->super->s_uuid, uuid, sizeof(uuid));
-        fclose(random);
     }
     std::strncpy(reinterpret_cast<char*>(fs->super->s_last_mounted), "/", sizeof(fs->super->s_last_mounted));
     fs->super->s_r_blocks_count = 0;
@@ -1173,6 +1173,42 @@ bool extWriteFileChunk(int volumeId, const std::string& path, uint64_t offset, c
         ext2fs_file_close(file);
     }
     return success;
+}
+
+// Desktop mount layer: in-place write without the truncate at offset 0 (the file must already exist).
+bool extWriteFileAt(int volumeId, const std::string& path, uint64_t offset, const uint8_t* data, size_t length) {
+    auto& v = volumes[volumeId];
+    bool success = false;
+    ensureExtBitmapsLoaded(volumeId);
+    ext2_file_t file = nullptr;
+    if (extOpenFile(v.extFs, path, true, false, &file)) {
+        __u64 position = 0;
+        unsigned int written = 0;
+        if (ext2fs_file_llseek(file, static_cast<__u64>(offset), EXT2_SEEK_SET, &position) == 0 &&
+            (length == 0 ||
+             (ext2fs_file_write(file, data, static_cast<unsigned int>(length), &written) == 0 &&
+              written == static_cast<unsigned int>(length))) &&
+            ext2fs_file_flush(file) == 0) {
+            ext2fs_flush(v.extFs);
+            success = true;
+        }
+        ext2fs_file_close(file);
+    }
+    return success;
+}
+
+// Sets the size of an existing file (grown space is a hole and reads back as zeros).
+bool extTruncateFile(int volumeId, const std::string& path, uint64_t newSize) {
+    auto& v = volumes[volumeId];
+    bool ok = false;
+    ensureExtBitmapsLoaded(volumeId);
+    ext2_file_t file = nullptr;
+    if (extOpenFile(v.extFs, path, true, false, &file)) {
+        ok = ext2fs_file_set_size2(file, static_cast<ext2_off64_t>(newSize)) == 0 && ext2fs_file_flush(file) == 0;
+        ext2fs_file_close(file);
+        if (ok) ext2fs_flush(v.extFs);
+    }
+    return ok;
 }
 bool extCopyFile(int srcVolId, const std::string& srcPath, int destVolId, const std::string& destPath,
                   const CopyProgressCallback& onProgress) {

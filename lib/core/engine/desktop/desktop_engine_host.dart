@@ -179,7 +179,9 @@ class DesktopEngineHost {
       case ChannelMethods.documentExists:
         {
           final path = args['filePath'] as String?;
-          return path != null && await File(path).exists();
+          // Any entry, not just a file: a folder vault is a directory, and File.exists() is false for it -- every
+          // saved folder vault then looked "missing" and the unlock sheet asked for the folder again.
+          return path != null && await FileSystemEntity.type(path) != FileSystemEntityType.notFound;
         }
       case ChannelMethods.getVaultInfo:
         {
